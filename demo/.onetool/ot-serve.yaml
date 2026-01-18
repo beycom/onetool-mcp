@@ -1,22 +1,19 @@
 # OneTool Configuration
 version: 1
 
-# Load default snippets library (path relative to this config file)
-snippets_dir:
-  - ../../resources/config/snippets.yaml
+# Include external config files (merged left-to-right, inline overrides all)
+include:
+  - ../../resources/config/prompts.yaml   # prompts: section
+  - ../../resources/config/snippets.yaml  # snippets: section (brv_, c7_, rg_, db_, etc.)
+  - ../../resources/config/servers.yaml   # servers: section (github)
+  - ../../resources/config/diagram.yaml   # tools: {diagram: ...} section
 
 tools_dir:
   - src/ot_tools/*.py
   - demo/src/demo_tools.py
 
 # Configuration files (paths relative to this ot-serve.yaml)
-prompts_file: ../../resources/config/prompts.yaml
 # secrets_file: secrets.yaml   # default - sibling of this config (gitignored)
-
-# Inline prompts (overrides prompts_file if set)
-# prompts:
-#   instructions: |
-#     OneTool executes Python code...
 
 log_level: INFO
 # log_dir: ../logs  # Default - logs go to demo/logs
@@ -27,66 +24,25 @@ transform:
   model: google/gemini-3-flash-preview
   base_url: https://openrouter.ai/api/v1
 
-# Tool-specific configuration (all optional - defaults shown)
-tools:
-  # Diagram tool - include default config with templates
-  diagram: !include ../../resources/config/diagram.yaml
-  msg:
-    topics:
-      - pattern: "status:*"
-        file: ../msg/status.yaml
-      - pattern: "doc:*"
-        file: ../msg/docs.yaml
-      - pattern: "*"
-        file: ../msg/default.yaml
-#   brave:
-#     timeout: 60.0              # 1.0 - 300.0 seconds
-#   ground:
-#     model: gemini-2.5-flash    # Gemini model for grounding
-#   context7:
-#     timeout: 30.0              # 1.0 - 120.0 seconds
-#     docs_limit: 10             # 1 - 20 results
-#   web_fetch:
-#     timeout: 30.0              # 1.0 - 120.0 seconds
-#     max_length: 50000          # 1000 - 500000 chars
-#   ripgrep:
-#     timeout: 60.0              # 1.0 - 300.0 seconds
-#   code_search:
-#     limit: 10                  # 1 - 100 results
-#   db:
-#     max_chars: 4000            # 100 - 100000 chars
-#   page_view:
-#     sessions_dir: .browse      # Relative or absolute path
-#   package:
-#     timeout: 30.0              # 1.0 - 120.0 seconds
+# Tool-specific configuration (all optional - from diagram.yaml include)
+# tools:
+#   diagram: ...  # loaded from ../../resources/config/diagram.yaml
 
-# External MCP servers to proxy through OneTool
-# Tools become available as: namespace.ToolName()
 servers:
+  # Package Version MCP Server (stdio)
+  # No auth required
+  # Tools: proxy_package_version.check_npm_versions(), etc.
   proxy_package_version:
     type: stdio
     command: npx
     args: ["-y", "mcp-package-version@0.1.17"]
     timeout: 30
 
-  # Remote GitHub MCP Server (HTTP) - proxied through OneTool
-  # Tools available as: github.create_issue(), github.search_code(), etc.
-  github:
-    type: http
-    url: https://api.githubcopilot.com/mcp/
-    headers:
-      Authorization: Bearer ${GITHUB_TOKEN}
-      Accept: "application/json, text/event-stream"
-      "MCP-Protocol-Version": "2025-06-18"
-    timeout: 60
-
-
 # Aliases: Short names for common tool functions
 alias:
   alias_f: demo.foo
   alias_b: demo.bar
 
-# Snippets: Reusable templates with Jinja2 variable substitution
 snippets:
   # foo for multiple items
   foon:

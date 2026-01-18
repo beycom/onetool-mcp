@@ -23,42 +23,29 @@ def test_load_config_defaults() -> None:
     assert config.log_level == "INFO"
     assert config.validate_code is True
     assert config.tools_dir == ["src/ot_tools/*.py"]
-    assert config.prompts_file == "prompts.yaml"
     assert config.secrets_file == "secrets.yaml"
 
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_load_config_from_yaml() -> None:
+def test_load_config_from_yaml(write_config) -> None:
     """Config loads from YAML file."""
     from ot.config.loader import load_config
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config_path = Path(tmpdir) / "test-config.yaml"
-        config_path.write_text(
-            yaml.dump(
-                {
-                    "version": 1,
-                    "log_level": "DEBUG",
-                    "validate_code": False,
-                }
-            )
-        )
+    config_path = write_config(
+        {"version": 1, "log_level": "DEBUG", "validate_code": False}
+    )
 
-        config = load_config(config_path)
-        assert config.log_level == "DEBUG"
-        assert config.validate_code is False
+    config = load_config(config_path)
+    assert config.log_level == "DEBUG"
+    assert config.validate_code is False
 
 
 @pytest.mark.unit
 @pytest.mark.core
 def test_secrets_expansion() -> None:
     """${VAR} expands from secrets.yaml, not os.environ."""
-    # Clear early secrets cache to ensure fresh load
-    import ot.config.mcp
     from ot.config.loader import load_config
-
-    ot.config.mcp._early_secrets = None
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create secrets.yaml with test variable
@@ -73,7 +60,7 @@ def test_secrets_expansion() -> None:
             yaml.dump(
                 {
                     "version": 1,
-                    "prompts_file": "${TEST_CONFIG_VAR}/prompts.yaml",
+                    "secrets_file": "${TEST_CONFIG_VAR}/secrets.yaml",
                 }
             )
         )
@@ -84,25 +71,19 @@ def test_secrets_expansion() -> None:
 
         try:
             config = load_config(config_path)
-            assert config.prompts_file == "/test/path/prompts.yaml"
+            assert config.secrets_file == "/test/path/secrets.yaml"
         finally:
-            # Clean up
             if old_cwd is not None:
                 os.environ["OT_CWD"] = old_cwd
             else:
                 os.environ.pop("OT_CWD", None)
-            ot.config.mcp._early_secrets = None
 
 
 @pytest.mark.unit
 @pytest.mark.core
 def test_secrets_expansion_default_value() -> None:
     """${VAR:-default} uses default when variable not in secrets."""
-    # Clear early secrets cache
-    import ot.config.mcp
     from ot.config.loader import load_config
-
-    ot.config.mcp._early_secrets = None
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "test-config.yaml"
@@ -110,27 +91,20 @@ def test_secrets_expansion_default_value() -> None:
             yaml.dump(
                 {
                     "version": 1,
-                    "prompts_file": "${NONEXISTENT_VAR:-/default/path}/prompts.yaml",
+                    "secrets_file": "${NONEXISTENT_VAR:-/default/path}/secrets.yaml",
                 }
             )
         )
 
         config = load_config(config_path)
-        assert config.prompts_file == "/default/path/prompts.yaml"
-
-    # Clean up
-    ot.config.mcp._early_secrets = None
+        assert config.secrets_file == "/default/path/secrets.yaml"
 
 
 @pytest.mark.unit
 @pytest.mark.core
 def test_secrets_expansion_error_on_missing() -> None:
     """${VAR} without default raises error when not in secrets."""
-    # Clear early secrets cache
-    import ot.config.mcp
     from ot.config.loader import load_config
-
-    ot.config.mcp._early_secrets = None
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "test-config.yaml"
@@ -138,16 +112,13 @@ def test_secrets_expansion_error_on_missing() -> None:
             yaml.dump(
                 {
                     "version": 1,
-                    "prompts_file": "${MISSING_VAR}/prompts.yaml",
+                    "secrets_file": "${MISSING_VAR}/secrets.yaml",
                 }
             )
         )
 
         with pytest.raises(ValueError, match=r"Missing variables in secrets\.yaml"):
             load_config(config_path)
-
-    # Clean up
-    ot.config.mcp._early_secrets = None
 
 
 @pytest.mark.unit
@@ -359,27 +330,6 @@ def test_config_dir_tracking() -> None:
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_prompts_file_relative_resolution() -> None:
-    """prompts_file resolves relative to config directory."""
-    from ot.config.loader import load_config
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config_dir = Path(tmpdir) / ".onetool"
-        config_dir.mkdir()
-        config_path = config_dir / "ot-serve.yaml"
-        config_path.write_text(
-            yaml.dump({"version": 1, "prompts_file": "prompts.yaml"})
-        )
-
-        config = load_config(config_path)
-
-        # prompts_file should resolve relative to config dir
-        expected = (config_dir / "prompts.yaml").resolve()
-        assert config.get_prompts_file_path() == expected
-
-
-@pytest.mark.unit
-@pytest.mark.core
 def test_secrets_file_relative_resolution() -> None:
     """secrets_file resolves relative to config directory."""
     from ot.config.loader import load_config
@@ -399,103 +349,352 @@ def test_secrets_file_relative_resolution() -> None:
         assert config.get_secrets_file_path() == expected
 
 
-@pytest.mark.unit
-@pytest.mark.core
-def test_prompts_file_absolute_passthrough() -> None:
-    """Absolute prompts_file paths pass through unchanged."""
-    from ot.config.loader import load_config
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config_dir = Path(tmpdir) / ".onetool"
-        config_dir.mkdir()
-        config_path = config_dir / "ot-serve.yaml"
-        config_path.write_text(
-            yaml.dump({"version": 1, "prompts_file": "/absolute/path/prompts.yaml"})
-        )
-
-        config = load_config(config_path)
-
-        # Absolute path should pass through
-        assert config.get_prompts_file_path() == Path("/absolute/path/prompts.yaml")
+# ==================== include: Tests ====================
 
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_prompts_file_tilde_expansion() -> None:
-    """prompts_file with ~ expands to home directory."""
-    from ot.config.loader import load_config
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config_dir = Path(tmpdir) / ".onetool"
-        config_dir.mkdir()
-        config_path = config_dir / "ot-serve.yaml"
-        config_path.write_text(
-            yaml.dump({"version": 1, "prompts_file": "~/prompts.yaml"})
-        )
-
-        config = load_config(config_path)
-
-        # ~ should expand to home directory
-        expected = Path.home() / "prompts.yaml"
-        assert config.get_prompts_file_path() == expected
-
-
-@pytest.mark.unit
-@pytest.mark.core
-def test_prompts_file_parent_relative() -> None:
-    """prompts_file with ../ resolves relative to config directory."""
-    from ot.config.loader import load_config
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config_dir = Path(tmpdir) / ".onetool"
-        config_dir.mkdir()
-        config_path = config_dir / "ot-serve.yaml"
-        config_path.write_text(
-            yaml.dump({"version": 1, "prompts_file": "../shared/prompts.yaml"})
-        )
-
-        config = load_config(config_path)
-
-        # ../ should resolve relative to config dir
-        expected = (config_dir / ".." / "shared" / "prompts.yaml").resolve()
-        assert config.get_prompts_file_path() == expected
-
-
-# ==================== snippets_dir Tests ====================
-
-
-@pytest.mark.unit
-@pytest.mark.core
-def test_snippets_dir_single_file() -> None:
-    """snippets_dir loads snippets from single file."""
+def test_include_single_file() -> None:
+    """include: loads and merges single file."""
     from ot.config.loader import load_config
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config_dir = Path(tmpdir) / ".onetool"
         config_dir.mkdir()
 
-        # Create external snippets file
-        snippets_path = config_dir / "my-snippets.yaml"
-        snippets_path.write_text(
+        # Create include file with servers section
+        servers_file = config_dir / "servers.yaml"
+        servers_file.write_text(
             yaml.dump(
                 {
-                    "snippets": {
-                        "test_snip": {
-                            "description": "Test snippet",
-                            "body": "demo.foo()",
+                    "servers": {
+                        "test_server": {
+                            "type": "stdio",
+                            "command": "test",
                         }
                     }
                 }
             )
         )
 
-        # Create config referencing the snippets file
+        # Create main config with include
         config_path = config_dir / "ot-serve.yaml"
         config_path.write_text(
             yaml.dump(
                 {
                     "version": 1,
-                    "snippets_dir": ["my-snippets.yaml"],
+                    "include": ["servers.yaml"],
+                }
+            )
+        )
+
+        config = load_config(config_path)
+
+        assert "test_server" in config.servers
+        assert config.servers["test_server"].type == "stdio"
+        assert config.servers["test_server"].command == "test"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_include_multiple_files_merge_order() -> None:
+    """include: merges multiple files left-to-right (later wins)."""
+    from ot.config.loader import load_config
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir) / ".onetool"
+        config_dir.mkdir()
+
+        # Create first include file
+        first_file = config_dir / "first.yaml"
+        first_file.write_text(
+            yaml.dump(
+                {
+                    "alias": {
+                        "a": "first.a",
+                        "b": "first.b",
+                    }
+                }
+            )
+        )
+
+        # Create second include file (should override 'a')
+        second_file = config_dir / "second.yaml"
+        second_file.write_text(
+            yaml.dump(
+                {
+                    "alias": {
+                        "a": "second.a",
+                        "c": "second.c",
+                    }
+                }
+            )
+        )
+
+        # Create main config
+        config_path = config_dir / "ot-serve.yaml"
+        config_path.write_text(
+            yaml.dump(
+                {
+                    "version": 1,
+                    "include": ["first.yaml", "second.yaml"],
+                }
+            )
+        )
+
+        config = load_config(config_path)
+
+        # 'a' should be from second (later wins)
+        assert config.alias["a"] == "second.a"
+        # 'b' should be from first
+        assert config.alias["b"] == "first.b"
+        # 'c' should be from second
+        assert config.alias["c"] == "second.c"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_include_inline_overrides_included() -> None:
+    """Inline content in main file overrides included content."""
+    from ot.config.loader import load_config
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir) / ".onetool"
+        config_dir.mkdir()
+
+        # Create include file
+        include_file = config_dir / "base.yaml"
+        include_file.write_text(
+            yaml.dump(
+                {
+                    "alias": {
+                        "a": "included.a",
+                    },
+                    "log_level": "DEBUG",
+                }
+            )
+        )
+
+        # Create main config with inline override
+        config_path = config_dir / "ot-serve.yaml"
+        config_path.write_text(
+            yaml.dump(
+                {
+                    "version": 1,
+                    "include": ["base.yaml"],
+                    "alias": {
+                        "a": "inline.a",
+                    },
+                }
+            )
+        )
+
+        config = load_config(config_path)
+
+        # Inline should override included
+        assert config.alias["a"] == "inline.a"
+        # Non-overridden values from include should be preserved
+        assert config.log_level == "DEBUG"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_include_nested_dicts_deep_merged() -> None:
+    """Nested dicts are deep-merged, not replaced."""
+    from ot.config.loader import load_config
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir) / ".onetool"
+        config_dir.mkdir()
+
+        # Create include file with partial tools config
+        include_file = config_dir / "tools.yaml"
+        include_file.write_text(
+            yaml.dump(
+                {
+                    "tools": {
+                        "brave": {
+                            "timeout": 120.0,
+                        }
+                    }
+                }
+            )
+        )
+
+        # Create main config with different tool setting
+        config_path = config_dir / "ot-serve.yaml"
+        config_path.write_text(
+            yaml.dump(
+                {
+                    "version": 1,
+                    "include": ["tools.yaml"],
+                    "tools": {
+                        "context7": {
+                            "timeout": 60.0,
+                        }
+                    },
+                }
+            )
+        )
+
+        config = load_config(config_path)
+
+        # Both tool configs should be present (deep merged)
+        assert config.tools.brave.timeout == 120.0
+        assert config.tools.context7.timeout == 60.0
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_include_missing_file_logs_warning() -> None:
+    """Missing include file logs warning and continues."""
+    from ot.config.loader import load_config
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir) / ".onetool"
+        config_dir.mkdir()
+
+        # Create config with non-existent include
+        config_path = config_dir / "ot-serve.yaml"
+        config_path.write_text(
+            yaml.dump(
+                {
+                    "version": 1,
+                    "include": ["nonexistent.yaml"],
+                    "log_level": "DEBUG",
+                }
+            )
+        )
+
+        # Should not raise
+        config = load_config(config_path)
+
+        # Main config should still work
+        assert config.log_level == "DEBUG"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_include_circular_detection() -> None:
+    """Circular includes are detected and skipped."""
+    from ot.config.loader import load_config
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir) / ".onetool"
+        config_dir.mkdir()
+
+        # Create file A that includes file B
+        file_a = config_dir / "a.yaml"
+        file_a.write_text(
+            yaml.dump(
+                {
+                    "include": ["b.yaml"],
+                    "alias": {"from_a": "a.value"},
+                }
+            )
+        )
+
+        # Create file B that includes file A (circular)
+        file_b = config_dir / "b.yaml"
+        file_b.write_text(
+            yaml.dump(
+                {
+                    "include": ["a.yaml"],
+                    "alias": {"from_b": "b.value"},
+                }
+            )
+        )
+
+        # Create main config
+        config_path = config_dir / "ot-serve.yaml"
+        config_path.write_text(
+            yaml.dump(
+                {
+                    "version": 1,
+                    "include": ["a.yaml"],
+                }
+            )
+        )
+
+        # Should not raise or loop forever
+        config = load_config(config_path)
+
+        # Both files should be processed (once each)
+        assert "from_a" in config.alias
+        assert "from_b" in config.alias
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_include_with_prompts_section() -> None:
+    """include: with prompts: section works (migration from prompts_file)."""
+    from ot.config.loader import load_config
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir) / ".onetool"
+        config_dir.mkdir()
+
+        # Create prompts file with prompts: key
+        prompts_file = config_dir / "prompts.yaml"
+        prompts_file.write_text(
+            yaml.dump(
+                {
+                    "prompts": {
+                        "instructions": "Test instructions",
+                    }
+                }
+            )
+        )
+
+        # Create main config using include instead of prompts_file
+        config_path = config_dir / "ot-serve.yaml"
+        config_path.write_text(
+            yaml.dump(
+                {
+                    "version": 1,
+                    "include": ["prompts.yaml"],
+                }
+            )
+        )
+
+        config = load_config(config_path)
+
+        assert config.prompts is not None
+        assert config.prompts["instructions"] == "Test instructions"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_include_with_snippets_section() -> None:
+    """include: with snippets: section works (migration from snippets_dir)."""
+    from ot.config.loader import load_config
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir) / ".onetool"
+        config_dir.mkdir()
+
+        # Create snippets file with snippets: key
+        snippets_file = config_dir / "my-snippets.yaml"
+        snippets_file.write_text(
+            yaml.dump(
+                {
+                    "snippets": {
+                        "test_snip": {
+                            "description": "Test snippet",
+                            "body": "test.call()",
+                        }
+                    }
+                }
+            )
+        )
+
+        # Create main config using include instead of snippets_dir
+        config_path = config_dir / "ot-serve.yaml"
+        config_path.write_text(
+            yaml.dump(
+                {
+                    "version": 1,
+                    "include": ["my-snippets.yaml"],
                 }
             )
         )
@@ -503,257 +702,55 @@ def test_snippets_dir_single_file() -> None:
         config = load_config(config_path)
 
         assert "test_snip" in config.snippets
-        assert config.snippets["test_snip"].description == "Test snippet"
-        assert config.snippets["test_snip"].body == "demo.foo()"
+        assert config.snippets["test_snip"].body == "test.call()"
+
+
+# ==================== Deep Merge Tests ====================
 
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_snippets_dir_glob_pattern() -> None:
-    """snippets_dir loads snippets from glob pattern."""
-    from ot.config.loader import load_config
+def test_deep_merge_basic() -> None:
+    """_deep_merge merges dicts correctly."""
+    from ot.config.loader import _deep_merge
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config_dir = Path(tmpdir) / ".onetool"
-        config_dir.mkdir()
+    base = {"a": 1, "b": {"x": 10, "y": 20}}
+    override = {"b": {"y": 30, "z": 40}, "c": 3}
 
-        # Create snippets subdirectory
-        snippets_subdir = config_dir / "snippets"
-        snippets_subdir.mkdir()
+    result = _deep_merge(base, override)
 
-        # Create multiple snippet files
-        (snippets_subdir / "a-snippets.yaml").write_text(
-            yaml.dump(
-                {
-                    "snippets": {
-                        "snip_a": {"body": "a.call()"},
-                    }
-                }
-            )
-        )
-        (snippets_subdir / "b-snippets.yaml").write_text(
-            yaml.dump(
-                {
-                    "snippets": {
-                        "snip_b": {"body": "b.call()"},
-                    }
-                }
-            )
-        )
-
-        # Create config with glob pattern
-        config_path = config_dir / "ot-serve.yaml"
-        config_path.write_text(
-            yaml.dump(
-                {
-                    "version": 1,
-                    "snippets_dir": ["snippets/*.yaml"],
-                }
-            )
-        )
-
-        config = load_config(config_path)
-
-        # Both snippets should be loaded
-        assert "snip_a" in config.snippets
-        assert "snip_b" in config.snippets
-        assert config.snippets["snip_a"].body == "a.call()"
-        assert config.snippets["snip_b"].body == "b.call()"
+    assert result["a"] == 1
+    assert result["b"]["x"] == 10  # From base
+    assert result["b"]["y"] == 30  # From override
+    assert result["b"]["z"] == 40  # From override
+    assert result["c"] == 3  # From override
 
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_snippets_dir_merge_with_inline() -> None:
-    """snippets_dir merges external snippets with inline snippets."""
-    from ot.config.loader import load_config
+def test_deep_merge_list_replacement() -> None:
+    """_deep_merge replaces lists entirely (no merge)."""
+    from ot.config.loader import _deep_merge
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config_dir = Path(tmpdir) / ".onetool"
-        config_dir.mkdir()
+    base = {"items": [1, 2, 3]}
+    override = {"items": [4, 5]}
 
-        # Create external snippets file
-        snippets_path = config_dir / "external.yaml"
-        snippets_path.write_text(
-            yaml.dump(
-                {
-                    "snippets": {
-                        "external_snip": {"body": "external.call()"},
-                    }
-                }
-            )
-        )
+    result = _deep_merge(base, override)
 
-        # Create config with both inline and external snippets
-        config_path = config_dir / "ot-serve.yaml"
-        config_path.write_text(
-            yaml.dump(
-                {
-                    "version": 1,
-                    "snippets_dir": ["external.yaml"],
-                    "snippets": {
-                        "inline_snip": {"body": "inline.call()"},
-                    },
-                }
-            )
-        )
-
-        config = load_config(config_path)
-
-        # Both external and inline snippets should be present
-        assert "external_snip" in config.snippets
-        assert "inline_snip" in config.snippets
-        assert config.snippets["external_snip"].body == "external.call()"
-        assert config.snippets["inline_snip"].body == "inline.call()"
+    # Lists are replaced, not merged
+    assert result["items"] == [4, 5]
 
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_snippets_dir_inline_wins_on_conflict() -> None:
-    """Inline snippets override external snippets on name conflict."""
-    from ot.config.loader import load_config
+def test_deep_merge_type_mismatch() -> None:
+    """_deep_merge replaces when types don't match."""
+    from ot.config.loader import _deep_merge
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config_dir = Path(tmpdir) / ".onetool"
-        config_dir.mkdir()
+    base = {"value": {"nested": "dict"}}
+    override = {"value": "scalar"}
 
-        # Create external snippets file with same name as inline
-        snippets_path = config_dir / "external.yaml"
-        snippets_path.write_text(
-            yaml.dump(
-                {
-                    "snippets": {
-                        "conflicting": {
-                            "description": "External version",
-                            "body": "external.call()",
-                        },
-                    }
-                }
-            )
-        )
+    result = _deep_merge(base, override)
 
-        # Create config where inline has same snippet name
-        config_path = config_dir / "ot-serve.yaml"
-        config_path.write_text(
-            yaml.dump(
-                {
-                    "version": 1,
-                    "snippets_dir": ["external.yaml"],
-                    "snippets": {
-                        "conflicting": {
-                            "description": "Inline version",
-                            "body": "inline.call()",
-                        },
-                    },
-                }
-            )
-        )
-
-        config = load_config(config_path)
-
-        # Inline should win
-        assert config.snippets["conflicting"].description == "Inline version"
-        assert config.snippets["conflicting"].body == "inline.call()"
-
-
-@pytest.mark.unit
-@pytest.mark.core
-def test_snippets_dir_invalid_file_skipped() -> None:
-    """Invalid snippet files are skipped with error logged."""
-    from ot.config.loader import load_config
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config_dir = Path(tmpdir) / ".onetool"
-        config_dir.mkdir()
-
-        snippets_subdir = config_dir / "snippets"
-        snippets_subdir.mkdir()
-
-        # Create one valid and one invalid file
-        (snippets_subdir / "valid.yaml").write_text(
-            yaml.dump(
-                {
-                    "snippets": {
-                        "valid_snip": {"body": "valid.call()"},
-                    }
-                }
-            )
-        )
-        (snippets_subdir / "invalid.yaml").write_text("invalid: yaml: content: ::::")
-
-        # Create config with glob pattern
-        config_path = config_dir / "ot-serve.yaml"
-        config_path.write_text(
-            yaml.dump(
-                {
-                    "version": 1,
-                    "snippets_dir": ["snippets/*.yaml"],
-                }
-            )
-        )
-
-        # Should not raise - invalid file is skipped
-        config = load_config(config_path)
-
-        # Valid snippet should still be loaded
-        assert "valid_snip" in config.snippets
-        assert config.snippets["valid_snip"].body == "valid.call()"
-
-
-@pytest.mark.unit
-@pytest.mark.core
-def test_snippets_dir_missing_pattern_warns() -> None:
-    """snippets_dir with no matching files logs warning but continues."""
-    from ot.config.loader import load_config
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config_dir = Path(tmpdir) / ".onetool"
-        config_dir.mkdir()
-
-        # Create config with non-existent pattern
-        config_path = config_dir / "ot-serve.yaml"
-        config_path.write_text(
-            yaml.dump(
-                {
-                    "version": 1,
-                    "snippets_dir": ["nonexistent/*.yaml"],
-                }
-            )
-        )
-
-        # Should not raise
-        config = load_config(config_path)
-
-        # Snippets should be empty (or just defaults)
-        assert len(config.snippets) == 0
-
-
-@pytest.mark.unit
-@pytest.mark.core
-def test_snippets_dir_file_without_snippets_key() -> None:
-    """YAML files without 'snippets' key are skipped gracefully."""
-    from ot.config.loader import load_config
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config_dir = Path(tmpdir) / ".onetool"
-        config_dir.mkdir()
-
-        # Create YAML file without snippets key
-        snippets_path = config_dir / "not-snippets.yaml"
-        snippets_path.write_text(yaml.dump({"other_key": "value"}))
-
-        # Create config referencing the file
-        config_path = config_dir / "ot-serve.yaml"
-        config_path.write_text(
-            yaml.dump(
-                {
-                    "version": 1,
-                    "snippets_dir": ["not-snippets.yaml"],
-                }
-            )
-        )
-
-        # Should not raise
-        config = load_config(config_path)
-
-        # Snippets should be empty
-        assert len(config.snippets) == 0
+    # Override wins even with type mismatch
+    assert result["value"] == "scalar"

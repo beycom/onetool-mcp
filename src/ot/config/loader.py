@@ -4,18 +4,19 @@ Loads ot-serve.yaml with tool discovery patterns and settings.
 
 Example ot-serve.yaml:
 
+    version: 1
+
+    include:
+      - prompts.yaml    # prompts: section
+      - snippets.yaml   # snippets: section
+
     tools_dir:
       - src/ot_tools/*.py
 
     transform:
       model: anthropic/claude-3-5-haiku
 
-    # prompts_file and secrets_file resolve relative to this config file
-    prompts_file: prompts.yaml   # default: sibling of ot-serve.yaml
     secrets_file: secrets.yaml   # default: sibling of ot-serve.yaml
-
-    # Use !include for modular configs
-    diagram: !include diagram.yaml
 """
 
 from __future__ import annotations
@@ -31,62 +32,6 @@ from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from ot.config.mcp import McpServerConfig, expand_secrets
 from ot.paths import get_effective_cwd, get_global_dir
-
-
-# Custom YAML Loader with !include support
-class IncludeLoader(yaml.SafeLoader):
-    """YAML loader that supports !include tag for modular configs.
-
-    The !include tag loads another YAML file and inlines its contents.
-    Paths are resolved relative to the including file.
-
-    Example:
-        # In ot-serve.yaml
-        diagram: !include diagram.yaml
-
-        # In diagram.yaml
-        backend:
-          type: kroki
-          prefer: remote
-    """
-
-    _base_path: Path | None = None
-
-    @classmethod
-    def with_base_path(cls, base_path: Path) -> type[IncludeLoader]:
-        """Create a loader class with a specific base path for includes."""
-
-        class BoundLoader(cls):  # type: ignore[valid-type,misc]
-            _base_path = base_path
-
-        return BoundLoader
-
-
-def _include_constructor(loader: IncludeLoader, node: yaml.Node) -> Any:
-    """Handle !include YAML tag by loading the referenced file."""
-    include_path = loader.construct_scalar(node)  # type: ignore[arg-type]
-
-    if loader._base_path is None:
-        raise yaml.YAMLError(f"Cannot resolve !include path: {include_path}")
-
-    # Resolve path relative to the including file
-    resolved = (loader._base_path / include_path).resolve()
-
-    if not resolved.exists():
-        logger.warning(f"!include file not found: {resolved}")
-        return None
-
-    try:
-        with resolved.open() as f:
-            # Create a new loader with the included file's directory as base
-            bound_loader = IncludeLoader.with_base_path(resolved.parent)
-            return yaml.load(f, Loader=bound_loader)
-    except yaml.YAMLError as e:
-        raise yaml.YAMLError(f"Error loading !include {include_path}: {e}") from e
-
-
-# Register the !include constructor
-IncludeLoader.add_constructor("!include", _include_constructor)
 
 # Current config schema version
 CURRENT_CONFIG_VERSION = 1
@@ -480,6 +425,11 @@ class OneToolConfig(BaseModel):
         description="Config schema version for migration support",
     )
 
+    include: list[str] = Field(
+        default_factory=list,
+        description="Files to deep-merge into config (processed before validation)",
+    )
+
     transform: TransformConfig = Field(
         default_factory=TransformConfig, description="transform() tool configuration"
     )
@@ -492,11 +442,6 @@ class OneToolConfig(BaseModel):
     snippets: dict[str, SnippetDef] = Field(
         default_factory=dict,
         description="Reusable snippet templates with Jinja2 variable substitution",
-    )
-
-    snippets_dir: list[str] = Field(
-        default_factory=list,
-        description="Glob patterns for external snippet files to load",
     )
 
     servers: dict[str, McpServerConfig] = Field(
@@ -513,17 +458,13 @@ class OneToolConfig(BaseModel):
         default_factory=lambda: ["src/ot_tools/*.py"],
         description="Glob patterns for tool discovery",
     )
-    prompts_file: str = Field(
-        default="prompts.yaml",
-        description="Path to prompts file (relative to config dir, or absolute)",
-    )
     secrets_file: str = Field(
         default="secrets.yaml",
         description="Path to secrets file (relative to config dir, or absolute)",
     )
     prompts: dict[str, Any] | None = Field(
         default=None,
-        description="Inline prompts config (overrides prompts_file if set)",
+        description="Inline prompts config (can also be loaded via include:)",
     )
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
@@ -587,16 +528,6 @@ class OneToolConfig(BaseModel):
         # Fallback: resolve relative to cwd/.onetool
         return (get_effective_cwd() / ".onetool" / path).resolve()
 
-    def get_prompts_file_path(self) -> Path:
-        """Get the resolved path to the prompts configuration file.
-
-        Path is resolved relative to the config file directory.
-
-        Returns:
-            Absolute Path to prompts file
-        """
-        return self._resolve_config_relative_path(self.prompts_file)
-
     def get_secrets_file_path(self) -> Path:
         """Get the resolved path to the secrets configuration file.
 
@@ -616,83 +547,6 @@ class OneToolConfig(BaseModel):
             Absolute Path to log directory
         """
         return self._resolve_config_relative_path(self.log_dir)
-
-    def load_external_snippets(self) -> None:
-        """Load snippets from external files and merge with inline snippets.
-
-        External snippets are loaded first, then inline snippets override them.
-        This method modifies self.snippets in place.
-
-        Files are matched using glob patterns from snippets_dir.
-        Invalid files are logged and skipped.
-        """
-        if not self.snippets_dir:
-            return
-
-        # Store inline snippets (these take precedence)
-        inline_snippets = dict(self.snippets)
-
-        # Load external snippets
-        external_snippets: dict[str, SnippetDef] = {}
-
-        for pattern in self.snippets_dir:
-            # Resolve path relative to config directory
-            resolved_path = self._resolve_config_relative_path(pattern)
-
-            # Find matching files
-            if "*" in pattern:
-                # Glob pattern - use parent directory and glob the filename
-                files = sorted(resolved_path.parent.glob(resolved_path.name))
-            else:
-                # Single file
-                files = [resolved_path] if resolved_path.exists() else []
-
-            if not files:
-                logger.warning(f"No snippet files found matching: {pattern}")
-                continue
-
-            for file_path in files:
-                try:
-                    with file_path.open() as f:
-                        data = yaml.safe_load(f)
-
-                    if not data or "snippets" not in data:
-                        logger.debug(f"No snippets key in {file_path}")
-                        continue
-
-                    for name, snippet_data in data["snippets"].items():
-                        if name in external_snippets:
-                            logger.warning(
-                                f"Snippet '{name}' overridden by {file_path}"
-                            )
-                        external_snippets[name] = SnippetDef.model_validate(
-                            snippet_data
-                        )
-
-                    logger.debug(
-                        f"Loaded {len(data['snippets'])} snippets from {file_path}"
-                    )
-
-                except yaml.YAMLError as e:
-                    logger.error(f"Invalid YAML in {file_path}: {e}")
-                except Exception as e:
-                    logger.error(f"Failed to load snippets from {file_path}: {e}")
-
-        # Merge: external first, then inline overrides
-        merged_snippets = external_snippets.copy()
-
-        for name, snippet_def in inline_snippets.items():
-            if name in external_snippets:
-                logger.debug(f"Inline snippet '{name}' overrides external")
-            merged_snippets[name] = snippet_def
-
-        self.snippets = merged_snippets
-
-        if external_snippets:
-            logger.info(
-                f"Loaded {len(external_snippets)} external snippets, "
-                f"{len(inline_snippets)} inline"
-            )
 
 
 def _resolve_config_path(config_path: Path | str | None) -> Path | None:
@@ -733,8 +587,6 @@ def _resolve_config_path(config_path: Path | str | None) -> Path | None:
 def _load_yaml_file(config_path: Path) -> dict[str, Any]:
     """Load and parse YAML file with error handling.
 
-    Supports !include tags for modular configuration files.
-
     Args:
         config_path: Path to YAML file.
 
@@ -750,9 +602,7 @@ def _load_yaml_file(config_path: Path) -> dict[str, Any]:
 
     try:
         with config_path.open() as f:
-            # Use IncludeLoader to support !include tags
-            bound_loader = IncludeLoader.with_base_path(config_path.parent)
-            raw_data = yaml.load(f, Loader=bound_loader)
+            raw_data = yaml.safe_load(f)
     except yaml.YAMLError as e:
         raise ValueError(f"Invalid YAML in {config_path}: {e}") from e
     except OSError as e:
@@ -816,6 +666,115 @@ def _remove_legacy_fields(data: dict[str, Any]) -> None:
             del data[key]
 
 
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """Deep merge two dictionaries, with override values taking precedence.
+
+    - Nested dicts are recursively merged
+    - Non-dict values (lists, scalars) are replaced entirely
+    - Keys in override not in base are added
+
+    Args:
+        base: Base dictionary (inputs not mutated)
+        override: Override dictionary (inputs not mutated, values take precedence)
+
+    Returns:
+        New merged dictionary
+    """
+    result = base.copy()
+
+    for key, override_value in override.items():
+        if key in result:
+            base_value = result[key]
+            # Only deep merge if both are dicts
+            if isinstance(base_value, dict) and isinstance(override_value, dict):
+                result[key] = _deep_merge(base_value, override_value)
+            else:
+                # Replace entirely (lists, scalars, or type mismatch)
+                result[key] = override_value
+        else:
+            # New key from override
+            result[key] = override_value
+
+    return result
+
+
+def _load_includes(
+    data: dict[str, Any], config_dir: Path, seen_paths: set[Path] | None = None
+) -> dict[str, Any]:
+    """Load and merge files from 'include:' list into config data.
+
+    Files are merged left-to-right (later files override earlier).
+    Inline content in the main file overrides everything.
+
+    Args:
+        data: Config data dict containing optional 'include' key
+        config_dir: Directory for resolving relative paths
+        seen_paths: Set of already-processed paths (for circular detection)
+
+    Returns:
+        Merged config data with includes processed
+    """
+    if seen_paths is None:
+        seen_paths = set()
+
+    include_list = data.get("include", [])
+    if not include_list:
+        return data
+
+    # Start with empty base for merging included files
+    merged: dict[str, Any] = {}
+
+    for include_path_str in include_list:
+        # Resolve path relative to config directory
+        include_path = Path(include_path_str).expanduser()
+        if not include_path.is_absolute():
+            include_path = (config_dir / include_path).resolve()
+        else:
+            include_path = include_path.resolve()
+
+        # Circular include detection
+        if include_path in seen_paths:
+            logger.warning(f"Circular include detected, skipping: {include_path}")
+            continue
+
+        if not include_path.exists():
+            logger.warning(f"Include file not found: {include_path}")
+            continue
+
+        try:
+            with include_path.open() as f:
+                include_data = yaml.safe_load(f)
+
+            if not include_data or not isinstance(include_data, dict):
+                logger.debug(f"Empty or non-dict include file: {include_path}")
+                continue
+
+            # Recursively process nested includes
+            new_seen = seen_paths | {include_path}
+            include_data = _load_includes(
+                include_data, include_path.parent, new_seen
+            )
+
+            # Merge this include file (later overrides earlier)
+            merged = _deep_merge(merged, include_data)
+
+            logger.debug(f"Merged include file: {include_path}")
+
+        except yaml.YAMLError as e:
+            logger.error(f"Invalid YAML in include file {include_path}: {e}")
+        except OSError as e:
+            logger.error(f"Error reading include file {include_path}: {e}")
+
+    # Main file content (minus 'include' key) overrides everything
+    main_content = {k: v for k, v in data.items() if k != "include"}
+    result = _deep_merge(merged, main_content)
+
+    # Preserve the include list for reference (but it's already processed)
+    result["include"] = include_list
+
+    return result
+
+
 def load_config(config_path: Path | str | None = None) -> OneToolConfig:
     """Load OneTool configuration from YAML file.
 
@@ -841,7 +800,6 @@ def load_config(config_path: Path | str | None = None) -> OneToolConfig:
         logger.debug("No config file found, using defaults")
         config = OneToolConfig()
         config._config_dir = get_effective_cwd() / ".onetool"
-        config.load_external_snippets()
         return config
 
     logger.debug(f"Loading config from {resolved_path}")
@@ -849,16 +807,19 @@ def load_config(config_path: Path | str | None = None) -> OneToolConfig:
     raw_data = _load_yaml_file(resolved_path)
     expanded_data = _expand_secrets_recursive(raw_data)
 
-    _validate_version(expanded_data, resolved_path)
-    _remove_legacy_fields(expanded_data)
+    # Process includes before validation (merges external files)
+    config_dir = resolved_path.parent.resolve()
+    merged_data = _load_includes(expanded_data, config_dir)
+
+    _validate_version(merged_data, resolved_path)
+    _remove_legacy_fields(merged_data)
 
     try:
-        config = OneToolConfig.model_validate(expanded_data)
+        config = OneToolConfig.model_validate(merged_data)
     except Exception as e:
         raise ValueError(f"Invalid configuration in {resolved_path}: {e}") from e
 
     config._config_dir = resolved_path.parent.resolve()
-    config.load_external_snippets()
 
     logger.info(f"Config loaded: version {config.version}")
 

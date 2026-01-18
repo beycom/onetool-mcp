@@ -1,4 +1,12 @@
 # OneTool Configuration
+version: 1
+
+# Include external config files (merged left-to-right, inline overrides all)
+include:
+  - prompts.yaml   # prompts: section
+  - snippets.yaml  # snippets: section
+  - servers.yaml   # servers: section
+  - diagram.yaml   # tools: {diagram: ...} section
 
 # Custom tool directories (glob patterns)
 # Add your own Python tools - functions become available as namespace.function()
@@ -6,8 +14,7 @@
 #   - tools/*.py           # All .py files in tools/
 #   - lib/my_tools.py      # Specific file
 
-# Configuration files (paths relative to this ot-serve.yaml file)
-# prompts_file: prompts.yaml   # default - sibling of this config
+# Security-sensitive config (kept separate, not in include:)
 # secrets_file: secrets.yaml   # default - sibling of this config (gitignored)
 
 log_level: INFO
@@ -29,6 +36,9 @@ transform:
 #     timeout: 60.0              # 1.0 - 300.0 seconds
 #   db:
 #     max_chars: 4000            # 100 - 100000 chars
+#   diagram:
+#     backend:
+#       prefer: remote           # remote | self_hosted | auto
 #   msg:
 #     topics:                    # Topic-to-file routing (first match wins)
 #       - pattern: "status:*"

@@ -1,165 +1,167 @@
 # Diagram tool configuration
-# Use !include diagram.yaml in ot-serve.yaml to load this config
+# Load via: include: [resources/config/diagram.yaml]
 
-backend:
-  type: kroki
-  remote_url: https://kroki.io
-  self_hosted_url: http://localhost:8000
-  prefer: self_hosted  # remote | self_hosted | auto
-  timeout: 30.0
+tools:
+  diagram:
+    backend:
+      type: kroki
+      remote_url: https://kroki.io
+      self_hosted_url: http://localhost:8000
+      prefer: self_hosted  # remote | self_hosted | auto
+      timeout: 30.0
 
-policy:
-  rules: |
-    NEVER use ASCII art or text-based diagrams in markdown.
-    Use the diagram tools for all visual representations.
-    Save output as SVG and reference in markdown.
-    Always generate source first, then render.
-    Choose the provider based on diagram type - see instructions.
-  preferred_format: svg
-  preferred_providers:
-    - mermaid
-    - d2
-    - plantuml
+    policy:
+      rules: |
+        NEVER use ASCII art or text-based diagrams in markdown.
+        Use the diagram tools for all visual representations.
+        Save output as SVG and reference in markdown.
+        Always generate source first, then render.
+        Choose the provider based on diagram type - see instructions.
+      preferred_format: svg
+      preferred_providers:
+        - mermaid
+        - d2
+        - plantuml
 
-output:
-  dir: ../diagrams  # Relative to config dir (.onetool/../diagrams)
-  naming: "{provider}_{name}_{timestamp}"
-  default_format: svg
-  save_source: true
+    output:
+      dir: ../diagrams  # Relative to config dir (.onetool/../diagrams)
+      naming: "{provider}_{name}_{timestamp}"
+      default_format: svg
+      save_source: true
 
-instructions:
-  mermaid:
-    when_to_use: |
-      - Flowcharts and decision trees
-      - Sequence diagrams for API flows
-      - Class diagrams for data models
-      - State diagrams for workflows
-      - Gantt charts for project timelines
-      - Mindmaps for brainstorming
-    style_tips: |
-      Use subgraphs to group related nodes.
-      Keep flowcharts top-to-bottom (TD) for readability.
-      Limit sequence diagrams to 5-7 participants.
+    instructions:
+      mermaid:
+        when_to_use: |
+          - Flowcharts and decision trees
+          - Sequence diagrams for API flows
+          - Class diagrams for data models
+          - State diagrams for workflows
+          - Gantt charts for project timelines
+          - Mindmaps for brainstorming
+        style_tips: |
+          Use subgraphs to group related nodes.
+          Keep flowcharts top-to-bottom (TD) for readability.
+          Limit sequence diagrams to 5-7 participants.
 
-      QUOTING RULES (critical):
-      - Sequence diagrams: NO quotes after 'as' (they appear literally)
-        Use: participant WS as Web Server
-        NOT: participant WS as "Web Server"
-      - Flowcharts/class: USE quotes for labels with spaces
-        Use: A["Start Process"], B{"Decision?"}
-      - Never put spaces in node/participant IDs
-    syntax_guide: https://mermaid.js.org/syntax/
-    example: |
-      sequenceDiagram
-          participant C as Client
-          participant S as Server
-          C->>S: Request
-          S-->>C: Response
+          QUOTING RULES (critical):
+          - Sequence diagrams: NO quotes after 'as' (they appear literally)
+            Use: participant WS as Web Server
+            NOT: participant WS as "Web Server"
+          - Flowcharts/class: USE quotes for labels with spaces
+            Use: A["Start Process"], B{"Decision?"}
+          - Never put spaces in node/participant IDs
+        syntax_guide: https://mermaid.js.org/syntax/
+        example: |
+          sequenceDiagram
+              participant C as Client
+              participant S as Server
+              C->>S: Request
+              S-->>C: Response
 
-  plantuml:
-    when_to_use: |
-      - Complex UML diagrams (class, component, deployment)
-      - C4 architecture diagrams (use stdlib)
-      - Detailed sequence diagrams with notes
-      - Diagrams requiring themes and skinparams
-    style_tips: |
-      Use skinparam for consistent theming.
-      Leverage !include for reusable components.
-      Use packages to organise large diagrams.
-      Add notes for context on complex relationships.
+      plantuml:
+        when_to_use: |
+          - Complex UML diagrams (class, component, deployment)
+          - C4 architecture diagrams (use stdlib)
+          - Detailed sequence diagrams with notes
+          - Diagrams requiring themes and skinparams
+        style_tips: |
+          Use skinparam for consistent theming.
+          Leverage !include for reusable components.
+          Use packages to organise large diagrams.
+          Add notes for context on complex relationships.
 
-      QUOTING RULES (critical):
-      - Always quote display names BEFORE 'as':
-        participant "Web Server" as WS
-      - Never put spaces in aliases (the ID after 'as')
-      - Use stereotypes for interfaces: <<interface>>
-    syntax_guide: https://plantuml.com/
-    example: |
-      @startuml
-      actor User
-      participant "API Gateway" as GW
-      database DB
+          QUOTING RULES (critical):
+          - Always quote display names BEFORE 'as':
+            participant "Web Server" as WS
+          - Never put spaces in aliases (the ID after 'as')
+          - Use stereotypes for interfaces: <<interface>>
+        syntax_guide: https://plantuml.com/
+        example: |
+          @startuml
+          actor User
+          participant "API Gateway" as GW
+          database DB
 
-      User -> GW: Login request
-      GW -> DB: Check credentials
-      DB --> GW: User record
-      GW --> User: 200 OK
-      @enduml
+          User -> GW: Login request
+          GW -> DB: Check credentials
+          DB --> GW: User record
+          GW --> User: 200 OK
+          @enduml
 
-  d2:
-    when_to_use: |
-      - Clean architecture diagrams
-      - System context diagrams
-      - Hand-drawn style (sketch mode)
-      - Layouts with automatic positioning
-      - C4-style container diagrams
-    style_tips: |
-      Use containers for logical grouping.
-      D2 auto-layouts well - avoid manual positioning.
-      Use markdown in labels for rich formatting.
-      Leverage layers for complex diagrams.
-      Use shape: person for actors.
-      Direction hint: direction: right or direction: down.
+      d2:
+        when_to_use: |
+          - Clean architecture diagrams
+          - System context diagrams
+          - Hand-drawn style (sketch mode)
+          - Layouts with automatic positioning
+          - C4-style container diagrams
+        style_tips: |
+          Use containers for logical grouping.
+          D2 auto-layouts well - avoid manual positioning.
+          Use markdown in labels for rich formatting.
+          Leverage layers for complex diagrams.
+          Use shape: person for actors.
+          Direction hint: direction: right or direction: down.
 
-      QUOTING RULES (critical):
-      - Always quote labels after colon: node: "Display Name"
-      - IDs (before colon) should not have spaces
-      - Use style.sketch: true for hand-drawn look
-    syntax_guide: https://d2lang.com/tour/intro
-    example: |
-      direction: right
+          QUOTING RULES (critical):
+          - Always quote labels after colon: node: "Display Name"
+          - IDs (before colon) should not have spaces
+          - Use style.sketch: true for hand-drawn look
+        syntax_guide: https://d2lang.com/tour/intro
+        example: |
+          direction: right
 
-      user: "User" {
-        shape: person
-      }
+          user: "User" {
+            shape: person
+          }
 
-      system: "My System" {
-        api: "API Server"
-        db: "Database"
-      }
+          system: "My System" {
+            api: "API Server"
+            db: "Database"
+          }
 
-      user -> system.api: "Uses"
-      system.api -> system.db
+          user -> system.api: "Uses"
+          system.api -> system.db
 
-templates:
-  api-flow:
-    provider: mermaid
-    diagram_type: sequence
-    description: REST API request/response flow
-    file: diagram-templates/api-flow.mmd
+    templates:
+      api-flow:
+        provider: mermaid
+        diagram_type: sequence
+        description: REST API request/response flow
+        file: diagram-templates/api-flow.mmd
 
-  microservices:
-    provider: d2
-    diagram_type: architecture
-    description: Microservices architecture layout
-    file: diagram-templates/microservices.d2
+      microservices:
+        provider: d2
+        diagram_type: architecture
+        description: Microservices architecture layout
+        file: diagram-templates/microservices.d2
 
-  c4-context:
-    provider: plantuml
-    diagram_type: c4
-    description: C4 system context diagram
-    file: diagram-templates/c4-context.puml
+      c4-context:
+        provider: plantuml
+        diagram_type: c4
+        description: C4 system context diagram
+        file: diagram-templates/c4-context.puml
 
-  state-machine:
-    provider: mermaid
-    diagram_type: state
-    description: State machine diagram
-    file: diagram-templates/state-machine.mmd
+      state-machine:
+        provider: mermaid
+        diagram_type: state
+        description: State machine diagram
+        file: diagram-templates/state-machine.mmd
 
-  class-diagram:
-    provider: mermaid
-    diagram_type: class
-    description: Class/data model diagram
-    file: diagram-templates/class-diagram.mmd
+      class-diagram:
+        provider: mermaid
+        diagram_type: class
+        description: Class/data model diagram
+        file: diagram-templates/class-diagram.mmd
 
-  project-gantt:
-    provider: mermaid
-    diagram_type: gantt
-    description: Project timeline Gantt chart
-    file: diagram-templates/project-gantt.mmd
+      project-gantt:
+        provider: mermaid
+        diagram_type: gantt
+        description: Project timeline Gantt chart
+        file: diagram-templates/project-gantt.mmd
 
-  feature-mindmap:
-    provider: mermaid
-    diagram_type: mindmap
-    description: Feature brainstorming mindmap
-    file: diagram-templates/feature-mindmap.mmd
+      feature-mindmap:
+        provider: mermaid
+        diagram_type: mindmap
+        description: Feature brainstorming mindmap
+        file: diagram-templates/feature-mindmap.mmd

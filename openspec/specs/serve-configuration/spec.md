@@ -83,24 +83,6 @@ The system SHALL support advanced configuration options with config-relative pat
 - **THEN** it SHALL discover tools from all matching glob patterns
 - **DEFAULT** ["src/ot_tools/*.py"]
 
-#### Scenario: Custom prompts file
-- **GIVEN** `prompts_file: custom-prompts.yaml`
-- **WHEN** the server starts
-- **THEN** it SHALL resolve the path relative to the config file directory
-- **AND** load prompts from that resolved path
-- **DEFAULT** `prompts.yaml` (sibling of ot-serve.yaml)
-
-#### Scenario: Absolute prompts file path
-- **GIVEN** `prompts_file: /absolute/path/prompts.yaml`
-- **WHEN** the server starts
-- **THEN** it SHALL use the absolute path directly
-- **AND** NOT resolve relative to config directory
-
-#### Scenario: Prompts file with tilde expansion
-- **GIVEN** `prompts_file: ~/shared/prompts.yaml`
-- **WHEN** the server starts
-- **THEN** it SHALL expand `~` to home directory
-
 #### Scenario: Log level configuration
 - **GIVEN** `log_level: DEBUG`
 - **WHEN** the server starts
@@ -711,89 +693,6 @@ The system SHALL support logging settings in YAML config instead of environment 
 - **THEN** values SHALL be truncated at 200 characters
 - **DEFAULT** 120
 
-### Requirement: Snippets Directory
-
-The system SHALL support loading snippets from external YAML files.
-
-#### Scenario: Single file path
-- **GIVEN** configuration with:
-  ```yaml
-  snippets_dir:
-    - resources/config/snippets.yaml
-  ```
-- **WHEN** the server starts
-- **THEN** it SHALL load snippets from the specified file
-- **AND** merge them with inline `snippets:` definitions
-
-#### Scenario: Glob pattern
-- **GIVEN** configuration with:
-  ```yaml
-  snippets_dir:
-    - snippets/*.yaml
-  ```
-- **WHEN** the server starts
-- **THEN** it SHALL load snippets from all matching files
-- **AND** files SHALL be processed in alphabetical order
-
-#### Scenario: Multiple sources
-- **GIVEN** configuration with:
-  ```yaml
-  snippets_dir:
-    - resources/config/snippets.yaml
-    - project/snippets/*.yaml
-  snippets:
-    custom:
-      body: "demo.foo()"
-  ```
-- **WHEN** the server starts
-- **THEN** it SHALL merge snippets from all sources
-- **AND** inline `snippets:` SHALL take precedence on name conflicts
-
-#### Scenario: Name conflict resolution
-- **GIVEN** a snippet "brv_research" defined in both file and inline
-- **WHEN** snippets are merged
-- **THEN** the inline definition SHALL be used
-- **AND** a warning SHALL be logged
-
-#### Scenario: Invalid file handling
-- **GIVEN** a snippets_dir pattern matching an invalid YAML file
-- **WHEN** the server starts
-- **THEN** it SHALL log an error for the invalid file
-- **AND** continue loading valid files
-- **AND** the server SHALL start successfully
-
-#### Scenario: Missing file handling
-- **GIVEN** a snippets_dir pattern matching no files
-- **WHEN** the server starts
-- **THEN** it SHALL log a warning
-- **AND** continue with empty snippets from that pattern
-
-#### Scenario: Path resolution
-- **GIVEN** a relative path in snippets_dir
-- **WHEN** files are loaded
-- **THEN** paths SHALL be resolved relative to the config file directory
-- **AND** `~` SHALL expand to user home directory
-
-#### Scenario: Snippet file format
-- **GIVEN** an external snippet file
-- **WHEN** parsed
-- **THEN** it SHALL use the same format as inline snippets:
-  ```yaml
-  snippets:
-    snippet_name:
-      description: "What it does"
-      params:
-        param1: {default: "value", description: "Param description"}
-      body: |
-        code_template()
-  ```
-
-#### Scenario: Default snippets library
-- **GIVEN** no snippets_dir configured
-- **WHEN** the server starts
-- **THEN** it SHALL NOT automatically load any external snippets
-- **NOTE** Users must explicitly add `resources/config/snippets.yaml` to snippets_dir
-
 ### Requirement: Remote GitHub MCP Server Configuration
 
 The system SHALL support configuration for the Remote GitHub MCP Server as a documented example.
@@ -831,4 +730,99 @@ The system SHALL support configuration for the Remote GitHub MCP Server as a doc
 - **AND** server config references `${GITHUB_TOKEN}`
 - **WHEN** the server starts
 - **THEN** the token SHALL be expanded from secrets
+
+### Requirement: Config Include
+
+The system SHALL support a top-level `include:` key for merging external config files.
+
+#### Scenario: Single include file
+- **GIVEN** configuration with:
+  ```yaml
+  include:
+    - base.yaml
+  ```
+- **WHEN** the config is loaded
+- **THEN** the content of `base.yaml` SHALL be merged into the config
+
+#### Scenario: Multiple include files
+- **GIVEN** configuration with:
+  ```yaml
+  include:
+    - shared.yaml
+    - project.yaml
+    - local.yaml
+  ```
+- **WHEN** the config is loaded
+- **THEN** files SHALL be merged left-to-right
+- **AND** later files SHALL override earlier files on key conflicts
+
+#### Scenario: Inline content overrides includes
+- **GIVEN** configuration with:
+  ```yaml
+  include:
+    - base.yaml  # contains servers: {github: {...}}
+  servers:
+    github:
+      timeout: 120  # override
+    local:
+      type: stdio   # addition
+  ```
+- **WHEN** the config is loaded
+- **THEN** inline `servers.github` SHALL override included `servers.github`
+- **AND** inline `servers.local` SHALL be added
+
+#### Scenario: Deep merge nested dicts
+- **GIVEN** `base.yaml` contains `tools: {brave: {timeout: 60}}`
+- **AND** main config contains `tools: {brave: {retries: 3}}`
+- **WHEN** merged
+- **THEN** result SHALL be `tools: {brave: {timeout: 60, retries: 3}}`
+
+#### Scenario: Non-dict values replaced
+- **GIVEN** `base.yaml` contains `log_level: DEBUG`
+- **AND** main config contains `log_level: INFO`
+- **WHEN** merged
+- **THEN** result SHALL be `log_level: INFO`
+
+#### Scenario: Missing include file
+- **GIVEN** `include:` references a non-existent file
+- **WHEN** the config is loaded
+- **THEN** a warning SHALL be logged
+- **AND** loading SHALL continue with remaining files
+
+#### Scenario: Path resolution
+- **GIVEN** a relative path in `include:`
+- **WHEN** the file is loaded
+- **THEN** the path SHALL be resolved relative to the config file directory
+- **AND** `~` SHALL expand to user home directory
+
+#### Scenario: Nested includes
+- **GIVEN** `base.yaml` contains its own `include:` key
+- **WHEN** the config is loaded
+- **THEN** nested includes SHALL be processed recursively
+- **AND** merge order SHALL be depth-first
+
+#### Scenario: Circular include detection
+- **GIVEN** `a.yaml` includes `b.yaml` which includes `a.yaml`
+- **WHEN** the config is loaded
+- **THEN** circular includes SHALL be detected and skipped
+- **AND** loading SHALL continue without error
+
+#### Scenario: No include key
+- **GIVEN** configuration without `include:` key
+- **WHEN** the config is loaded
+- **THEN** loading SHALL proceed normally with no external files
+
+#### Scenario: Snippet file format with include
+- **GIVEN** an external snippet file loaded via `include:`
+- **WHEN** parsed
+- **THEN** it SHALL contain the `snippets:` key:
+  ```yaml
+  snippets:
+    snippet_name:
+      description: "What it does"
+      params:
+        param1: {default: "value", description: "Param description"}
+      body: |
+        code_template()
+  ```
 

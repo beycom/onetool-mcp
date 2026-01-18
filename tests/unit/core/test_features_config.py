@@ -118,36 +118,23 @@ class TestConfigVariableExpansion:
         """${VAR:-default} uses default when variable not set."""
         from ot.config.loader import load_config
 
-        # Clear any cached secrets
-        import ot.config.mcp
-
-        ot.config.mcp._early_secrets = None
-
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = Path(tmpdir) / "test-config.yaml"
             config_path.write_text(
                 yaml.dump(
                     {
                         "version": 1,
-                        "prompts_file": "${NONEXISTENT_VAR:-/default}/prompts.yaml",
+                        "secrets_file": "${NONEXISTENT_VAR:-/default}/secrets.yaml",
                     }
                 )
             )
 
             config = load_config(config_path)
-            assert config.prompts_file == "/default/prompts.yaml"
-
-        # Clean up
-        ot.config.mcp._early_secrets = None
+            assert config.secrets_file == "/default/secrets.yaml"
 
     def test_missing_variable_error(self) -> None:
         """${VAR} without default raises error when not defined."""
         from ot.config.loader import load_config
-
-        # Clear any cached secrets
-        import ot.config.mcp
-
-        ot.config.mcp._early_secrets = None
 
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = Path(tmpdir) / "test-config.yaml"
@@ -155,13 +142,10 @@ class TestConfigVariableExpansion:
                 yaml.dump(
                     {
                         "version": 1,
-                        "prompts_file": "${MISSING_VAR}/prompts.yaml",
+                        "secrets_file": "${MISSING_VAR}/secrets.yaml",
                     }
                 )
             )
 
             with pytest.raises(ValueError, match=r"Missing variables"):
                 load_config(config_path)
-
-        # Clean up
-        ot.config.mcp._early_secrets = None

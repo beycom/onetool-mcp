@@ -151,8 +151,8 @@ def test_expand_snippet_with_defaults() -> None:
 
 @pytest.mark.integration
 @pytest.mark.core
-def test_snippets_dir_loads_default_library() -> None:
-    """Verify snippets_dir loads snippets from resources/config/snippets.yaml."""
+def test_include_loads_snippets_library() -> None:
+    """Verify include: loads snippets from resources/config/snippets.yaml."""
     import tempfile
     from pathlib import Path
 
@@ -168,7 +168,7 @@ def test_snippets_dir_loads_default_library() -> None:
     if not snippets_yaml.exists():
         pytest.skip("Default snippets library not found")
 
-    # Create minimal test config that references the snippets library
+    # Create minimal test config that includes the snippets library
     with tempfile.TemporaryDirectory() as tmpdir:
         config_dir = Path(tmpdir) / ".onetool"
         config_dir.mkdir()
@@ -178,7 +178,7 @@ def test_snippets_dir_loads_default_library() -> None:
             yaml.dump(
                 {
                     "version": 1,
-                    "snippets_dir": [str(snippets_yaml)],
+                    "include": [str(snippets_yaml)],
                 }
             )
         )
@@ -201,8 +201,8 @@ def test_snippets_dir_loads_default_library() -> None:
 
 @pytest.mark.integration
 @pytest.mark.core
-def test_snippets_dir_inline_overrides_external() -> None:
-    """Verify inline snippets override external snippets from snippets_dir."""
+def test_include_inline_overrides_included() -> None:
+    """Verify inline snippets override snippets from include: files."""
     import tempfile
     from pathlib import Path
 
@@ -217,18 +217,18 @@ def test_snippets_dir_inline_overrides_external() -> None:
     if not snippets_yaml.exists():
         pytest.skip("Default snippets library not found")
 
-    # Create config with both snippets_dir and inline snippets
+    # Create config with both include and inline snippets
     with tempfile.TemporaryDirectory() as tmpdir:
         config_dir = Path(tmpdir) / ".onetool"
         config_dir.mkdir()
 
-        # Create config with inline snippet that has same name as one in default lib
+        # Create config with inline snippet that has same name as one in included lib
         config_path = config_dir / "ot-serve.yaml"
         config_path.write_text(
             yaml.dump(
                 {
                     "version": 1,
-                    "snippets_dir": [str(snippets_yaml)],
+                    "include": [str(snippets_yaml)],
                     "snippets": {
                         "ot_find": {"body": "custom.override()"},
                         "my_inline": {"body": "inline.snippet()"},

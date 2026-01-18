@@ -55,11 +55,8 @@ def _get_instructions() -> str:
     Note: Tool descriptions are NOT included here - they come through
     the MCP tool definitions which the client converts to function calling format.
     """
-    # Load prompts from config: inline prompts take priority over prompts_file
-    prompts = get_prompts(
-        prompts_path=_config.get_prompts_file_path(),
-        inline_prompts=_config.prompts,
-    )
+    # Load prompts from config (loaded via include: or inline prompts:)
+    prompts = get_prompts(inline_prompts=_config.prompts)
 
     # Start with base instructions from prompts.yaml
     instructions = prompts.instructions.strip()
@@ -111,10 +108,7 @@ mcp = FastMCP(
 def list_tools_resource() -> list[dict[str, str]]:
     """List all available tools with signatures and descriptions."""
     registry = get_registry()
-    prompts = get_prompts(
-        prompts_path=_config.get_prompts_file_path(),
-        inline_prompts=_config.prompts,
-    )
+    prompts = get_prompts(inline_prompts=_config.prompts)
 
     tools_list = []
 
@@ -147,10 +141,7 @@ def list_tools_resource() -> list[dict[str, str]]:
 def get_tool_resource(name: str) -> dict[str, Any]:
     """Get detailed information about a specific tool."""
     registry = get_registry()
-    prompts = get_prompts(
-        prompts_path=_config.get_prompts_file_path(),
-        inline_prompts=_config.prompts,
-    )
+    prompts = get_prompts(inline_prompts=_config.prompts)
 
     tool = registry.tools.get(name)
     if not tool:

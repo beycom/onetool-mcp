@@ -65,11 +65,11 @@ tools:
       default_format: svg
 ```
 
-Or use `!include`:
+Or use `include:` to load from a shared config file:
 
 ```yaml
-tools:
-  diagram: !include diagram.yaml
+include:
+  - resources/config/diagram.yaml  # contains tools: {diagram: ...}
 ```
 
 ## Self-Hosted Setup

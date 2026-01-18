@@ -90,10 +90,13 @@ api_key = get_secret("BRAVE_API_KEY")
 ```yaml
 version: 1                    # Config schema version (required)
 
+include:                      # External config files to merge
+  - prompts.yaml              # prompts: section
+  - snippets.yaml             # snippets: section
+  - servers.yaml              # servers: section
+
 tools_dir:                    # Tool discovery patterns
   - src/ot_tools/*.py
-
-prompts_file: prompts.yaml    # LLM instructions (see resources/config/prompts.yaml)
 
 log_level: INFO               # DEBUG, INFO, WARNING, ERROR
 validate_code: true           # Validate generated code before execution
@@ -103,6 +106,55 @@ servers: {}                   # External MCP servers
 tools: {}                     # Tool-specific configuration
 alias: {}                     # Function aliases
 snippets: {}                  # Reusable code templates
+prompts: {}                   # Inline prompts (overrides included)
+```
+
+### Config Includes
+
+The `include:` key allows composing configuration from multiple files:
+
+```yaml
+version: 1
+
+include:
+  - ../../resources/config/prompts.yaml   # Shared prompts
+  - ../../resources/config/snippets.yaml  # Shared snippets
+  - ../../resources/config/servers.yaml   # Shared MCP servers
+  - local-snippets.yaml                   # Project additions
+
+# Inline content overrides included content
+servers:
+  local_dev:
+    type: stdio
+    command: python
+```
+
+**Merge behaviour:**
+- Files are merged left-to-right (later files override earlier)
+- Inline content in the main file overrides everything
+- Nested dicts are deep-merged
+- Non-dict values (lists, scalars) are replaced entirely
+
+**Included file format:**
+
+Each included file contains complete config sections with their own keys:
+
+```yaml
+# prompts.yaml
+prompts:
+  instructions: |
+    OneTool executes Python code...
+
+# snippets.yaml
+snippets:
+  brv_research:
+    body: brave.search(query="{{ topic }}")
+
+# servers.yaml
+servers:
+  github:
+    type: http
+    url: https://api.githubcopilot.com/mcp/
 ```
 
 ### Projects Configuration
@@ -218,20 +270,20 @@ snippets:
 
 ### External Snippet Files
 
-Load snippets from external YAML files using `snippets_dir`:
+Load snippets from external YAML files using `include:`:
 
 ```yaml
-snippets_dir:
-  - resources/config/snippets.yaml       # Single file
-  - project/snippets/*.yaml              # Glob pattern
+include:
+  - resources/config/snippets.yaml       # Shared library
+  - project/snippets/local.yaml          # Project additions
 
 snippets:
-  # Inline snippets override external ones with same name
+  # Inline snippets override included ones with same name
   custom:
     body: "demo.foo()"
 ```
 
-External snippet files use the same format:
+External snippet files must have a `snippets:` key:
 
 ```yaml
 # my-snippets.yaml
