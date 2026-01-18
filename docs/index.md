@@ -1,4 +1,6 @@
-# OneTool Documentation
+<p align="center">
+  <img src="assets/onetool-logo.png" alt="OneTool" width="400">
+</p>
 
 **Don't enumerate tools. Execute code.**
 

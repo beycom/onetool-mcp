@@ -1,6 +1,10 @@
-# OneTool
+<p align="center">
+  <img src="docs/assets/onetool-logo.png" alt="OneTool" width="400">
+</p>
 
-> *One Tool to rule them all, One Tool to find them, One Tool to bring them all, and in the development bind them.*
+<p align="center">
+  <em>One tool to rule them all, one tool to find them, one tool to bring them all, and in the development bind them.</em>
+</p>
 
 **Don't enumerate tools. Execute code.**
 
@@ -95,6 +99,7 @@ def search(*, query: str) -> str:
 ## Licensing & Roadmap
 
 **OneTool** is currently licensed under **GPLv3**. I have chosen this license for the early development phase to:
+
 - **Prevent Fragmentation:** Ensure the community remains focused on a single, high-quality version.
 - **Guarantee Reciprocity:** Ensure all early improvements are shared back with the project.
 
