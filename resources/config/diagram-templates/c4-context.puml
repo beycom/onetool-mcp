@@ -1,0 +1,30 @@
+@startuml C4 Context Diagram
+!include <C4/C4_Context>
+
+title System Context Diagram - [System Name]
+
+' Actors
+Person(user, "User", "A user of the system who needs to accomplish tasks")
+Person(admin, "Administrator", "Manages system configuration and users")
+
+' Core system
+System(system, "My System", "Provides the main functionality that users need")
+
+' External systems
+System_Ext(email, "Email System", "Sends notifications and alerts")
+System_Ext(payment, "Payment Provider", "Handles payment processing")
+System_Ext(identity, "Identity Provider", "Manages authentication via SSO")
+
+' Relationships
+Rel(user, system, "Uses", "HTTPS")
+Rel(admin, system, "Administers", "HTTPS")
+
+Rel(system, email, "Sends emails using", "SMTP")
+Rel(system, payment, "Processes payments via", "HTTPS/REST")
+Rel(system, identity, "Authenticates users with", "OIDC")
+
+' Layout hints
+Lay_D(user, system)
+Lay_R(system, email)
+
+@enduml

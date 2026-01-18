@@ -1,0 +1,22 @@
+# Benchmark Harness configuration
+# Run benchmarks to test OneTool performance and tool behavior
+
+log_level: INFO
+
+# Favorite benchmarks for quick access via --tui
+# favorites:
+#   - name: Tool latency test
+#     path: benchmarks/latency.yaml
+#     description: Measure response times for all tools
+#
+#   - name: MCP proxy comparison
+#     path: benchmarks/proxy_vs_direct.yaml
+#     description: Compare proxied MCP vs direct invocation
+#
+#   - name: Multi-tool workflow
+#     path: benchmarks/workflows/*.yaml
+#     description: Test chained tool operations
+#
+#   - name: All benchmarks
+#     path: benchmarks/
+#     description: Select from all available benchmarks

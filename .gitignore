@@ -1,0 +1,107 @@
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*~
+.project
+.classpath
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# Dependencies
+node_modules/
+bower_components/
+vendor/
+jspm_packages/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+out/
+target/
+*.pyc
+__pycache__/
+*.class
+*.o
+*.so
+*.dll
+*.exe
+
+# Environment variables and secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+**/secrets.yaml
+**/bench-secrets.yaml
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+
+# Coverage reports
+coverage/
+.nyc_output/
+.coverage
+*.lcov
+htmlcov/
+
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+composer.lock
+
+# IDE specific
+.vs/
+.vscode/settings.json
+.fleet/
+
+# Secrets and credentials
+*.pem
+*.key
+*.cert
+secrets/
+credentials/
+
+# Project
+.browse/
+.chunkhound/
+scratch/
+diagrams/
+msg/
+plan/
+
+# Demo: downloadable assets (see demo/README.md)
+demo/db/northwind.db
+demo/opentelemetry-demo-main.zip
+demo/opentelemetry-demo-main/
+
+# ChunkHound db files can be very large and are easily recreated
+**/.chunkhound/db

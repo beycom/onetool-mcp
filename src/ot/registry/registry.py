@@ -1,0 +1,311 @@
+"""Tool registry class for auto-discovering Python tools."""
+
+from __future__ import annotations
+
+import ast
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+import yaml
+from loguru import logger
+
+from ot.logging import LogEntry
+
+from .parser import parse_function
+
+if TYPE_CHECKING:
+    from .models import ToolInfo
+
+
+class ToolRegistry:
+    """Registry for auto-discovered Python tools.
+
+    Scans a directory for Python files and extracts function information
+    using AST parsing (no execution required).
+    """
+
+    def __init__(self, tools_path: Path | None = None) -> None:
+        """Initialize the registry.
+
+        Args:
+            tools_path: Path to tools directory. Defaults to 'src/ot_tools/'.
+        """
+        self._tools_path = tools_path or Path("src/ot_tools")
+        self._tools: dict[str, ToolInfo] = {}
+
+    @property
+    def tools_path(self) -> Path:
+        """Return the tools directory path."""
+        return self._tools_path
+
+    @property
+    def tools(self) -> dict[str, ToolInfo]:
+        """Return dictionary of registered tools by name."""
+        return self._tools.copy()
+
+    def scan_files(self, files: list[Path]) -> list[ToolInfo]:
+        """Scan specific Python files and register public functions.
+
+        Args:
+            files: List of Python files to scan.
+
+        Returns:
+            List of registered ToolInfo objects.
+        """
+        # Track previous state to detect changes
+        previous_tools = dict(self._tools)
+        self._tools.clear()
+
+        for py_file in files:
+            if not py_file.exists():
+                logger.debug(
+                    LogEntry(span="registry.scan", path=str(py_file), exists=False)
+                )
+                continue
+            try:
+                tools = self.parse_file(py_file)
+                for tool in tools:
+                    if tool.name in self._tools:
+                        logger.warning(
+                            LogEntry(
+                                span="registry.duplicate",
+                                tool=tool.name,
+                                file=str(py_file),
+                            )
+                        )
+                    self._tools[tool.name] = tool
+            except SyntaxError as e:
+                logger.warning(
+                    LogEntry(
+                        span="registry.error",
+                        file=str(py_file),
+                        error=str(e),
+                        errorType="SyntaxError",
+                    )
+                )
+            except Exception as e:
+                logger.warning(
+                    LogEntry(
+                        span="registry.error",
+                        file=str(py_file),
+                        error=str(e),
+                        errorType=type(e).__name__,
+                    )
+                )
+
+        # Detect added/changed/removed tools
+        added: list[str] = []
+        changed: list[str] = []
+        removed: list[str] = []
+
+        for name, tool in self._tools.items():
+            if name not in previous_tools:
+                added.append(name)
+            elif tool.signature != previous_tools[name].signature:
+                changed.append(name)
+
+        for name in previous_tools:
+            if name not in self._tools:
+                removed.append(name)
+
+        # Only log if this is first scan or there are changes
+        if not previous_tools:
+            # First scan - log all tools
+            logger.info(
+                LogEntry(
+                    span="registry.ready",
+                    path="tools",
+                    toolCount=len(self._tools),
+                    tools=[tool.name for tool in self._tools.values()],
+                )
+            )
+        elif added or changed or removed:
+            # Subsequent scan with changes
+            logger.info(
+                LogEntry(
+                    span="registry.changed",
+                    path="tools",
+                    toolCount=len(self._tools),
+                    added=added if added else None,
+                    changed=changed if changed else None,
+                    removed=removed if removed else None,
+                )
+            )
+
+        return list(self._tools.values())
+
+    def scan_directory(self, path: Path | None = None) -> list[ToolInfo]:
+        """Scan directory for Python files and register public functions.
+
+        Args:
+            path: Directory to scan. Defaults to self.tools_path.
+
+        Returns:
+            List of registered ToolInfo objects.
+        """
+        scan_path = path or self._tools_path
+
+        if not scan_path.exists():
+            logger.debug(
+                LogEntry(span="registry.scan", path=str(scan_path), exists=False)
+            )
+            return []
+
+        if not scan_path.is_dir():
+            logger.warning(
+                LogEntry(span="registry.scan", path=str(scan_path), isDir=False)
+            )
+            return []
+
+        py_files = list(scan_path.glob("*.py"))
+        return self.scan_files(py_files)
+
+    def parse_file(self, path: Path) -> list[ToolInfo]:
+        """Parse a Python file and extract public function information.
+
+        Args:
+            path: Path to Python file.
+
+        Returns:
+            List of ToolInfo for public functions (not starting with '_').
+        """
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(path))
+
+        # Module name: tools/gold_prices.py -> tools.gold_prices
+        module_name = f"tools.{path.stem}"
+
+        tools: list[ToolInfo] = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                # Skip private functions
+                if node.name.startswith("_"):
+                    continue
+
+                tool = parse_function(node, module_name)
+                tools.append(tool)
+
+        return tools
+
+    def format_yaml(self) -> str:
+        """Format registry as YAML for LLM context.
+
+        Returns:
+            YAML string with tool definitions.
+        """
+        if not self._tools:
+            return "tools: []"
+
+        tools_list: list[dict[str, Any]] = []
+        for tool in self._tools.values():
+            tool_dict: dict[str, Any] = {
+                "name": tool.name,
+                "module": tool.module,
+                "signature": tool.signature,
+            }
+            if tool.description:
+                tool_dict["description"] = tool.description
+            if tool.args:
+                tool_dict["args"] = [
+                    {
+                        k: v
+                        for k, v in {
+                            "name": arg.name,
+                            "type": arg.type,
+                            "default": arg.default,
+                            "description": arg.description if arg.description else None,
+                        }.items()
+                        if v is not None
+                    }
+                    for arg in tool.args
+                ]
+            if tool.returns:
+                tool_dict["returns"] = tool.returns
+
+            tools_list.append(tool_dict)
+
+        result: str = yaml.dump(
+            {"tools": tools_list}, default_flow_style=False, sort_keys=False
+        )
+        return result
+
+    def format_summary(self) -> str:
+        """Format registry summary for CLI display.
+
+        Returns:
+            Human-readable summary of registered tools.
+        """
+        if not self._tools:
+            return "No tools registered."
+
+        lines = [f"Registered tools ({len(self._tools)}):"]
+        for tool in self._tools.values():
+            lines.append(f"  - {tool.signature}")
+            if tool.description:
+                lines.append(f"      {tool.description}")
+
+        return "\n".join(lines)
+
+    def get_tool(self, name: str) -> ToolInfo | None:
+        """Get tool by name.
+
+        Args:
+            name: Tool function name.
+
+        Returns:
+            ToolInfo if found, None otherwise.
+        """
+        return self._tools.get(name)
+
+    def describe_tool(self, name: str) -> str:
+        """Get detailed description of a tool.
+
+        Args:
+            name: Tool function name.
+
+        Returns:
+            Detailed tool description string.
+        """
+        tool = self._tools.get(name)
+        if not tool:
+            return f"Tool '{name}' not found."
+
+        lines = [
+            f"Tool: {tool.name}",
+            f"Module: {tool.module}",
+            f"Signature: {tool.signature}",
+        ]
+
+        # Show deprecation warning first
+        if tool.deprecated:
+            msg = tool.deprecated_message or "This tool is deprecated"
+            lines.append(f"DEPRECATED: {msg}")
+
+        if not tool.enabled:
+            lines.append("Status: DISABLED")
+
+        if tool.description:
+            lines.append(f"Description: {tool.description}")
+
+        if tool.tags:
+            lines.append(f"Tags: {', '.join(tool.tags)}")
+
+        if tool.args:
+            lines.append("Arguments:")
+            for arg in tool.args:
+                arg_line = f"  - {arg.name}: {arg.type}"
+                if arg.default is not None:
+                    arg_line += f" = {arg.default}"
+                lines.append(arg_line)
+                if arg.description:
+                    lines.append(f"      {arg.description}")
+
+        if tool.returns:
+            lines.append(f"Returns: {tool.returns}")
+
+        if tool.examples:
+            lines.append("Examples:")
+            for example in tool.examples:
+                lines.append(f"  {example}")
+
+        return "\n".join(lines)

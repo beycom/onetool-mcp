@@ -1,0 +1,42 @@
+%% State Machine Template
+%% Replace states and transitions with your workflow
+
+stateDiagram-v2
+    [*] --> Draft: create
+
+    Draft --> Submitted: submit
+    Draft --> Cancelled: cancel
+
+    Submitted --> UnderReview: assign_reviewer
+    Submitted --> Draft: request_changes
+
+    UnderReview --> Approved: approve
+    UnderReview --> Rejected: reject
+    UnderReview --> Draft: request_changes
+
+    Approved --> Published: publish
+    Approved --> Draft: unpublish
+
+    Rejected --> Draft: revise
+    Rejected --> Cancelled: abandon
+
+    Published --> Archived: archive
+    Published --> Draft: unpublish
+
+    Cancelled --> [*]
+    Archived --> [*]
+
+    note right of Draft
+        Initial state for new items.
+        Can be edited freely.
+    end note
+
+    note right of UnderReview
+        Assigned to a reviewer.
+        Cannot be edited by author.
+    end note
+
+    note right of Published
+        Visible to all users.
+        Audit trail maintained.
+    end note

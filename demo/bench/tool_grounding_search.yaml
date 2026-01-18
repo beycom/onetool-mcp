@@ -1,0 +1,127 @@
+# Per-Tool Benchmark: Grounding Search
+#
+# Configurations:
+# - Base: No server, LLM knowledge only
+# - OneTool: Grounding with Google Search via Gemini
+#
+# Use with: ot-bench run demo/bench/tool_grounding_search.yaml
+
+defaults:
+  timeout: 120
+  model: google/gemini-3-flash-preview
+
+evaluators:
+  reddit_insights:
+    model: google/gemini-3-flash-preview
+    prompt: |
+      Evaluate this response about Reddit community discussions.
+
+      Response: {response}
+
+      Score based on:
+      - Does it include specific Reddit discussions or opinions? (40 points)
+      - Does it cite sources or threads? (30 points)
+      - Is the information relevant and useful? (30 points)
+
+      Return JSON: {"score": <0-100>, "reason": "<brief explanation>"}
+
+  dev_resources:
+    model: google/gemini-3-flash-preview
+    prompt: |
+      Evaluate this response about developer resources.
+
+      Response: {response}
+
+      Score based on:
+      - Does it include technical details? (30 points)
+      - Does it reference documentation or code examples? (30 points)
+      - Are sources cited? (20 points)
+      - Is it useful for a developer? (20 points)
+
+      Return JSON: {"score": <0-100>, "reason": "<brief explanation>"}
+
+scenarios:
+  - name: Reddit Search Comparison
+    description: Compare Reddit search capabilities
+    tasks:
+      - name: "tool:ground:base"
+        tags: [tool, ground, base]
+        server:
+        evaluate: reddit_insights
+        prompt: |
+          What do Reddit users say about FastAPI vs Flask for building REST APIs?
+
+      - name: "tool:ground:onetool:reddit"
+        tags: [tool, ground, onetool]
+        server: onetool
+        evaluate: reddit_insights
+        prompt: |
+          __ot `ground.reddit(query="FastAPI vs Flask REST API 2024 2025", subreddit="python")`
+          Summarize the key opinions from Reddit discussions, including specific user perspectives and any consensus.
+
+  - name: Developer Resources Search
+    description: Compare developer documentation search
+    tasks:
+      - name: "tool:ground:base:dev"
+        tags: [tool, ground, base]
+        server:
+        evaluate: dev_resources
+        prompt: |
+          How do I implement WebSocket connections in FastAPI?
+
+      - name: "tool:ground:onetool:dev"
+        tags: [tool, ground, onetool]
+        server: onetool
+        evaluate: dev_resources
+        prompt: |
+          __ot `ground.dev(query="WebSocket connections implementation", framework="FastAPI")`
+          Provide a technical guide with code examples for implementing WebSocket connections in FastAPI.
+
+      - name: "tool:ground:onetool:docs"
+        tags: [tool, ground, onetool]
+        server: onetool
+        evaluate: dev_resources
+        prompt: |
+          __ot `ground.docs(query="WebSocket endpoint", technology="FastAPI")`
+          Summarize the official documentation for WebSocket support in FastAPI.
+
+  - name: Grounded Search with Focus
+    description: Test focus modes for search
+    tasks:
+      - name: "tool:ground:base:code"
+        tags: [tool, ground, base, focus]
+        server:
+        evaluate: dev_resources
+        prompt: |
+          Show me Python async context manager code examples and implementation patterns.
+
+      - name: "tool:ground:onetool:code"
+        tags: [tool, ground, onetool, focus]
+        server: onetool
+        evaluate: dev_resources
+        prompt: |
+          __ot `ground.search(query="Python async context manager implementation example", focus="code")`
+          Show practical code examples with explanations for implementing async context managers in Python.
+
+      - name: "tool:ground:base:troubleshoot"
+        tags: [tool, ground, base, focus]
+        server:
+        evaluate: dev_resources
+        prompt: |
+          How do I fix "RuntimeError: This event loop is already running" in Python asyncio?
+
+      - name: "tool:ground:onetool:troubleshoot"
+        tags: [tool, ground, onetool, focus]
+        server: onetool
+        evaluate: dev_resources
+        prompt: |
+          __ot `ground.search(query="Python asyncio event loop already running fix solution", focus="troubleshooting")`
+          Provide step-by-step troubleshooting guidance with specific solutions for each common cause.
+
+servers:
+  onetool:
+    type: stdio
+    command: uv
+    args: ["run", "ot-serve"]
+    env:
+      OT_CWD: demo

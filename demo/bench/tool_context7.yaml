@@ -1,0 +1,53 @@
+# Tool Demo: Context7 Documentation
+#
+# Demonstrates OneTool Context7 documentation lookup:
+# - Library search
+# - Topic-based documentation retrieval
+# - Code example lookup
+#
+# Use with: ot-bench run demo/bench/tool_context7.yaml
+
+defaults:
+  timeout: 120
+  model: google/gemini-3-flash-preview
+
+evaluators:
+  has_docs:
+    regex: "(documentation|example|code|API|function|method)"
+    expect_match: true
+
+servers:
+  onetool:
+    type: stdio
+    command: uv
+    args: ["run", "ot-serve"]
+    env:
+      OT_CWD: demo
+
+scenarios:
+  - name: "Context7 Documentation Demo"
+    description: Demonstrate Context7 documentation lookup
+    tasks:
+      - name: "tool:context7:nextjs"
+        server: onetool
+        tags: [demo, tool, context7]
+        evaluate: has_docs
+        prompt: |
+          __ot `context7.doc(library_key="/vercel/next.js", topic="Partial Pre-Rendering")`
+          Summarise the key points about PPR.
+
+      - name: "tool:context7:react"
+        server: onetool
+        tags: [demo, tool, context7]
+        evaluate: has_docs
+        prompt: |
+          __ot `context7.doc(library_key="/facebook/react", topic="hooks")`
+          Summarise the key React hooks.
+
+      - name: "tool:context7:typescript"
+        server: onetool
+        tags: [demo, tool, context7]
+        evaluate: has_docs
+        prompt: |
+          __ot `context7.doc(library_key="/microsoft/typescript", topic="generics")`
+          Explain TypeScript generics with examples.

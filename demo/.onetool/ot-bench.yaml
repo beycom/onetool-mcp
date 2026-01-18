@@ -1,0 +1,21 @@
+# Benchmark Harness configuration
+
+log_level: INFO
+
+# Favorite benchmarks for quick access via --tui
+favorites:
+  - name: Run Compare benchmark
+    path: demo/bench/compare.yaml
+    description: Main comparison - base vs 1 MCP vs all MCPs vs OneTool
+
+  - name: Run Features benchmark
+    path: demo/bench/features.yaml
+    description: OneTool features - invocation, proxy, snippets
+
+  - name: Select a benchmark from demo/bench
+    path: demo/bench/
+    description: All benchmark files
+
+  - name: Run all tool benchmarks
+    path: demo/bench/tool_*.yaml
+    description: Run all tool tests

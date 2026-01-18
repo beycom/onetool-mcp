@@ -1,0 +1,72 @@
+# Tool Demo: Database Tool
+#
+# Demonstrates OneTool database capabilities:
+# - Table listing
+# - Schema inspection
+# - Query execution
+# - Parameterised queries
+#
+# Uses the Northwind sample database at demo/db/northwind.db.
+#
+# Use with: ot-bench run demo/bench/tool_db.yaml
+
+defaults:
+  timeout: 60
+  model: google/gemini-3-flash-preview
+
+evaluators:
+  has_tables:
+    regex: "(Customers|Products|Orders|Employees)"
+    expect_match: true
+
+  has_schema:
+    regex: "(TEXT|INTEGER|VARCHAR|PRIMARY)"
+    expect_match: true
+
+  has_data:
+    regex: "(row|Result|CustomerID|ProductID)"
+    expect_match: true
+
+servers:
+  onetool:
+    type: stdio
+    command: uv
+    args: ["run", "ot-serve"]
+    env:
+      OT_CWD: demo
+
+scenarios:
+  - name: "Database Demo"
+    description: Demonstrate OneTool database capabilities
+    tasks:
+      - name: "tool:db:tables"
+        server: onetool
+        tags: [demo, tool, db]
+        evaluate: has_tables
+        prompt: |
+          __ot `db.tables(db_url="sqlite:///demo/db/northwind.db")`
+          Return the list of tables.
+
+      - name: "tool:db:schema"
+        server: onetool
+        tags: [demo, tool, db]
+        evaluate: has_schema
+        prompt: |
+          __ot `db.schema(table_names=["Customers", "Products"], db_url="sqlite:///demo/db/northwind.db")`
+          Describe the schema structure.
+
+      - name: "tool:db:query"
+        server: onetool
+        tags: [demo, tool, db]
+        evaluate: has_data
+        prompt: |
+          __ot `db.query(sql="SELECT * FROM Customers LIMIT 5", db_url="sqlite:///demo/db/northwind.db")`
+          Summarise the query results.
+
+      - name: "tool:db:query_params"
+        server: onetool
+        tags: [demo, tool, db]
+        evaluate: has_data
+        prompt: |
+          __ot `db.query(sql="SELECT * FROM Customers WHERE Country = :country", db_url="sqlite:///demo/db/northwind.db", params={"country": "Germany"})`
+          Summarise the query results.

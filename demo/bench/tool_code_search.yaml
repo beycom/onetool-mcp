@@ -1,0 +1,96 @@
+# Per-Tool Benchmark: Code Search
+#
+# Configurations:
+# - Base: No server, LLM knowledge only
+# - MCP: chunkhound MCP server (if available)
+# - OneTool: code.search() with various options
+#
+# Use with: ot-bench run demo/bench/tools/code-search.yaml
+
+defaults:
+  timeout: 60
+  model: google/gemini-3-flash-preview
+
+evaluators:
+  code_search:
+    model: google/gemini-3-flash-preview
+    prompt: |
+      Evaluate if the response correctly found code matches.
+
+      Response: {response}
+
+      Score based on:
+      - Found relevant file(s) (40 points)
+      - Shows line numbers (20 points)
+      - Shows code context (20 points)
+      - Results are well-formatted (20 points)
+
+      Return JSON: {"score": <0-100>, "reason": "<brief explanation>"}
+
+# =============================================================================
+# IN PROGRESS
+# =============================================================================
+
+scenarios:
+  - name: Code Search in OneTool Codebase
+    description: Search for code patterns in the project
+    tasks:
+      - name: "tool:code-search:base"
+        server:
+        tags: [tool, code-search, base]
+        evaluate: code_search
+        prompt: |
+          Based on your knowledge, what function in this codebase handles MCP tool execution?
+          The codebase is a Python project called OneTool.
+
+      - name: "tool:code-search:onetool:simple"
+        server: onetool
+        tags: [tool, code-search, onetool]
+        evaluate: code_search
+        prompt: |
+          __ot
+          ```python
+          code.search(query="mcp tool execution", max_results=5)
+          ```
+          What files handle MCP tool execution?
+
+      - name: "tool:code-search:onetool:pattern"
+        server: onetool
+        tags: [tool, code-search, onetool, pattern]
+        evaluate: code_search
+        prompt: |
+          __ot
+          ```python
+          code.search(query="def.*mcp", mode="regex", max_results=10)
+          ```
+          Find all MCP-related function definitions.
+
+      - name: "tool:code-search:onetool:file-type"
+        server: onetool
+        tags: [tool, code-search, onetool, filter]
+        evaluate: code_search
+        prompt: |
+          __ot
+          ```python
+          code.search(query="async def", file_pattern="*.py", max_results=10)
+          ```
+          Find async function definitions in Python files.
+
+      - name: "tool:code-search:onetool:context"
+        server: onetool
+        tags: [tool, code-search, onetool, context]
+        evaluate: code_search
+        prompt: |
+          __ot
+          ```python
+          code.search(query="class.*Tool", context_lines=3, max_results=5)
+          ```
+          Find Tool class definitions with surrounding context.
+
+servers:
+  onetool:
+    type: stdio
+    command: uv
+    args: ["run", "ot-serve"]
+    env:
+      OT_CWD: demo

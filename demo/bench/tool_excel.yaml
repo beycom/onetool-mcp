@@ -1,0 +1,99 @@
+# Tool Demo: Excel
+#
+# Demonstrates OneTool Excel capabilities:
+# - Create and write workbooks
+# - Read and inspect data
+# - Formula evaluation
+# - Sheet management
+# - Search operations
+# - Range manipulation
+#
+# Uses demo/data/sample_sales.xlsx for read operations.
+#
+# Use with: ot-bench run demo/bench/tool_excel.yaml
+
+defaults:
+  timeout: 60
+  model: google/gemini-3-flash-preview
+
+evaluators:
+  has_data:
+    regex: "(Widget|Gadget|Product|Revenue|Sales)"
+    expect_match: true
+
+  has_sheets:
+    regex: "(Sales|Inventory|Summary|Sheet)"
+    expect_match: true
+
+  has_success:
+    regex: "(Created|Wrote|Success|OK|row)"
+    expect_match: true
+
+servers:
+  onetool:
+    type: stdio
+    command: uv
+    args: ["run", "ot-serve"]
+    env:
+      OT_CWD: demo
+
+scenarios:
+  - name: "Excel Demo"
+    description: Demonstrate OneTool Excel capabilities
+    tasks:
+      - name: "tool:excel:create_write_read"
+        server: onetool
+        tags: [demo, tool, excel]
+        evaluate: has_data
+        prompt: |
+          __ot
+          ```python
+          excel.create(filepath="tmp/test_data.xlsx", sheet_name="Sales")
+          excel.write(filepath="tmp/test_data.xlsx", sheet_name="Sales", data=[["Product", "Revenue"], ["Widget", 1000], ["Gadget", 2500]])
+          excel.read(filepath="tmp/test_data.xlsx", sheet_name="Sales")
+          ```
+
+      - name: "tool:excel:read_demo"
+        server: onetool
+        tags: [demo, tool, excel]
+        evaluate: has_data
+        prompt: |
+          __ot `excel.read(filepath="data/sample_sales.xlsx", sheet_name="Sales")`
+          Summarise the sales data.
+
+      - name: "tool:excel:info"
+        server: onetool
+        tags: [demo, tool, excel]
+        evaluate: has_sheets
+        prompt: |
+          __ot `excel.info(filepath="data/sample_sales.xlsx", include_ranges=True)`
+          Describe the workbook structure.
+
+      - name: "tool:excel:formula"
+        server: onetool
+        tags: [demo, tool, excel]
+        evaluate: has_success
+        prompt: |
+          __ot
+          ```python
+          excel.create(filepath="tmp/calc.xlsx")
+          excel.write(filepath="tmp/calc.xlsx", data=[["Values"], [10], [20], [30]])
+          excel.formula(filepath="tmp/calc.xlsx", cell="A5", formula="=SUM(A2:A4)")
+          excel.read(filepath="tmp/calc.xlsx")
+          ```
+
+      - name: "tool:excel:search"
+        server: onetool
+        tags: [demo, tool, excel]
+        evaluate: has_data
+        prompt: |
+          __ot `excel.search(filepath="data/sample_sales.xlsx", pattern="Widget*", sheet_name="Sales")`
+          Show the search results.
+
+      - name: "tool:excel:tables"
+        server: onetool
+        tags: [demo, tool, excel]
+        evaluate: has_data
+        prompt: |
+          __ot `excel.table_data(filepath="data/sample_sales.xlsx", table_name="SalesData", sheet_name="Sales")`
+          Display the table data.

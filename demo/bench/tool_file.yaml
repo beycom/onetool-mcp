@@ -1,0 +1,131 @@
+# Tool Demo: File Operations
+#
+# Demonstrates OneTool file operation capabilities:
+# - Read files with line numbers
+# - File metadata and info
+# - Directory listing and tree
+# - File search
+# - Write and edit operations
+#
+# Use with: ot-bench run demo/bench/tool_file.yaml
+
+defaults:
+  timeout: 60
+  model: google/gemini-3-flash-preview
+
+evaluators:
+  file_read:
+    regex: "(?i)(def |import |class |#|\"\"\")"  # Python code content
+    expect_match: true
+
+  file_info:
+    regex: "(?i)(path|type|size|file|bytes|permissions|created|modified)"
+    expect_match: true
+
+  file_list:
+    regex: "(?i)(\\.yaml|\\.py|\\.md|directory|file|folder)"
+    expect_match: true
+
+  file_tree:
+    regex: "(?i)([├└│─]|tree|directory|folder|\\|--)"  # Box-drawing chars or ASCII tree
+    expect_match: true
+
+  file_search:
+    regex: "(?i)(\\d+(\\.\\d+)?\\s*(B|KB|MB|GB)|found|match|file)"
+    expect_match: true
+
+  file_write:
+    regex: "(?i)(wrote|written|created|saved|bytes|success)"
+    expect_match: true
+
+servers:
+  onetool:
+    type: stdio
+    command: uv
+    args: ["run", "ot-serve"]
+    env:
+      OT_CWD: demo
+
+scenarios:
+  - name: "File Operations Demo"
+    description: Demonstrate OneTool file capabilities
+    tasks:
+      - name: "tool:file:read"
+        server: onetool
+        tags: [demo, tool, file]
+        evaluate: file_read
+        prompt: |
+          __ot `file.read(path="src/demo_tools.py")`
+          Show the file content.
+
+      - name: "tool:file:read_paginated"
+        server: onetool
+        tags: [demo, tool, file]
+        evaluate: file_read
+        prompt: |
+          __ot `file.read(path="src/demo_tools.py", offset=0, limit=10)`
+          Show the first 10 lines.
+
+      - name: "tool:file:info"
+        server: onetool
+        tags: [demo, tool, file]
+        evaluate: file_info
+        prompt: |
+          __ot `file.info(path="src/demo_tools.py")`
+          Describe the file metadata.
+
+      - name: "tool:file:list"
+        server: onetool
+        tags: [demo, tool, file]
+        evaluate: file_list
+        prompt: |
+          __ot `file.list(path=".", pattern="*.yaml")`
+          List all YAML files.
+
+      - name: "tool:file:tree"
+        server: onetool
+        tags: [demo, tool, file]
+        evaluate: file_tree
+        prompt: |
+          __ot `file.tree(path=".", max_depth=2)`
+          Show the directory tree.
+
+      - name: "tool:file:search"
+        server: onetool
+        tags: [demo, tool, file]
+        evaluate: file_search
+        prompt: |
+          __ot `file.search(pattern="*tool*")`
+          Find files matching the pattern.
+
+      - name: "tool:file:write"
+        server: onetool
+        tags: [demo, tool, file]
+        evaluate: file_write
+        prompt: |
+          __ot `file.write(path="tmp/test.txt", content="Hello from benchmark!", create_dirs=True)`
+          Write a test file.
+
+      - name: "tool:file:append"
+        server: onetool
+        tags: [demo, tool, file]
+        evaluate: file_write
+        prompt: |
+          __ot `file.write(path="tmp/test.txt", content="\nAppended line.", append=True)`
+          Append to the test file.
+
+      - name: "tool:file:list_sorted"
+        server: onetool
+        tags: [demo, tool, file]
+        evaluate: file_list
+        prompt: |
+          __ot `file.list(path="bench", sort_by="size", reverse=True)`
+          List benchmark files sorted by size.
+
+      - name: "tool:file:tree_bench"
+        server: onetool
+        tags: [demo, tool, file]
+        evaluate: file_tree
+        prompt: |
+          __ot `file.tree(path="bench", max_depth=1)`
+          Show the bench directory structure.

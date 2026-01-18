@@ -1,0 +1,73 @@
+# GitHub MCP Benchmark: Comparing Access Methods
+#
+# Two options for GitHub integration:
+# - Option A: Direct MCP (HTTP) - api.githubcopilot.com with PAT
+# - Option B: OneTool proxy - proxied via OneTool
+#
+# Use with: ot-bench run demo/bench/tool_github.yaml
+
+defaults:
+  timeout: 120
+  model: google/gemini-3-flash-preview
+
+evaluators:
+  github_response:
+    model: google/gemini-3-flash-preview
+    prompt: |
+      Evaluate if the response contains valid GitHub data.
+
+      Expected: Response should contain actual repository/issue/code data from GitHub.
+      The response should NOT be an error message or empty.
+
+      Response: {response}
+
+      Score criteria:
+      - 100: Contains specific GitHub data (repo names, issue titles, code snippets)
+      - 50: Contains partial data or generic response
+      - 0: Error, empty, or no GitHub data
+
+      Return JSON: {"score": <0-100>, "reason": "<brief explanation>"}
+
+scenarios:
+  - name: "GitHub MCP Comparison"
+    description: Compare direct MCP (HTTP) vs OneTool proxy for GitHub operations.
+    tasks:
+      # Option A: Direct GitHub MCP (HTTP endpoint)
+      - name: "github:mcp-http"
+        server: github-http
+        tags: [github, mcp, http]
+        evaluate: github_response
+        prompt: |
+          Use the GitHub tools to search for repositories in the facebook organization.
+          List the top 5 repositories by stars with their descriptions.
+
+      # Option B: OneTool proxying GitHub MCP
+      - name: "github:onetool-proxy"
+        server: onetool
+        tags: [github, onetool, proxy]
+        evaluate: github_response
+        prompt: |
+          __ot
+          ```python
+          github.search_repositories(query="org:facebook", sort="stars", per_page=5)
+          ```
+          List the top 5 Facebook repositories by stars with their descriptions.
+
+servers:
+  # OneTool with GitHub proxy configured
+  onetool:
+    type: stdio
+    command: uv
+    args: ["run", "ot-serve"]
+    env:
+      OT_CWD: demo
+
+  # Direct GitHub MCP (HTTP - official remote endpoint)
+  github-http:
+    type: http
+    url: https://api.githubcopilot.com/mcp/
+    headers:
+      Authorization: Bearer ${GITHUB_TOKEN}
+      Accept: application/json, text/event-stream
+      "MCP-Protocol-Version": "2025-06-18"
+    timeout: 60

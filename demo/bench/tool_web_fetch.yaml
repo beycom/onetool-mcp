@@ -1,0 +1,87 @@
+# Tool Demo: Web Fetch
+#
+# Demonstrates OneTool Web Fetch capabilities:
+# - Single URL fetch
+# - Batch fetch for multiple URLs
+# - Transform fetched content with LLM
+# - API endpoint fetch (OpenRouter)
+# - API transform pipeline
+#
+# Base/MCP comparison removed - focuses on OneTool capabilities.
+#
+# Use with: ot-bench run demo/bench/tool_web_fetch.yaml
+
+defaults:
+  timeout: 90
+  model: google/gemini-3-flash-preview
+
+evaluators:
+  has_content:
+    regex: "(?i)(content|data|result|http|model|version)"
+    expect_match: true
+
+servers:
+  onetool:
+    type: stdio
+    command: uv
+    args: ["run", "ot-serve"]
+    env:
+      OT_CWD: demo
+
+scenarios:
+  - name: "Web Fetch Demo"
+    description: Demonstrate OneTool Web Fetch capabilities
+    tasks:
+      - name: "tool:web-fetch:single"
+        server: onetool
+        tags: [demo, tool, web-fetch]
+        evaluate: has_content
+        prompt: |
+          __ot
+          ```python
+          openai = web.fetch(url="https://en.wikipedia.org/wiki/ChatGPT")
+          anthropic = web.fetch(url="https://en.wikipedia.org/wiki/Claude_(language_model)")
+          {"OpenAI": openai, "Anthropic": anthropic}
+          ```
+          Summarise the key information from both pages.
+
+      - name: "tool:web-fetch:batch"
+        server: onetool
+        tags: [demo, tool, web-fetch, batch]
+        evaluate: has_content
+        prompt: |
+          __ot
+          ```python
+          web.fetch_batch(urls=[["https://en.wikipedia.org/wiki/ChatGPT", "OpenAI"], ["https://en.wikipedia.org/wiki/Claude_(language_model)", "Anthropic"]])
+          ```
+          Summarise the key information from both pages.
+
+      - name: "tool:web-fetch:transform"
+        server: onetool
+        tags: [demo, tool, web-fetch, transform]
+        evaluate: has_content
+        prompt: |
+          __ot
+          ```python
+          data = web.fetch_batch(urls=[["https://en.wikipedia.org/wiki/ChatGPT", "OpenAI"], ["https://en.wikipedia.org/wiki/Claude_(language_model)", "Anthropic"]])
+          llm.transform(input=data, prompt="Extract the latest model version and release date for each")
+          ```
+
+      - name: "tool:web-fetch:openrouter"
+        server: onetool
+        tags: [demo, tool, web-fetch, api]
+        evaluate: has_content
+        prompt: |
+          __ot `web.fetch(url="https://openrouter.ai/api/v1/models")`
+          List the first 5 models from the API response.
+
+      - name: "tool:web-fetch:api-transform"
+        server: onetool
+        tags: [demo, tool, web-fetch, api, transform]
+        evaluate: has_content
+        prompt: |
+          __ot
+          ```python
+          data = web.fetch_batch(urls=[["https://openrouter.ai/api/v1/models", "Models"]])
+          llm.transform(input=data, prompt="List the 5 most recent models with their release dates")
+          ```

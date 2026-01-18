@@ -1,0 +1,81 @@
+# Microservices Architecture Template
+# Replace placeholders with actual service names
+
+direction: right
+
+# External actors
+user: "User" {
+  shape: person
+}
+
+# Frontend layer
+frontend: "Frontend" {
+  style.fill: "#e3f2fd"
+
+  web: "Web App"
+  mobile: "Mobile App"
+}
+
+# API layer
+gateway: "API Gateway" {
+  style.fill: "#fff3e0"
+
+  auth: "Auth"
+  routing: "Router"
+  rate_limit: "Rate Limiter"
+}
+
+# Services layer
+services: "Services" {
+  style.fill: "#e8f5e9"
+
+  user_svc: "User Service"
+  order_svc: "Order Service"
+  notification_svc: "Notification Service"
+}
+
+# Data layer
+data: "Data Stores" {
+  style.fill: "#fce4ec"
+
+  postgres: "PostgreSQL" {
+    shape: cylinder
+  }
+  redis: "Redis" {
+    shape: cylinder
+  }
+  queue: "Message Queue" {
+    shape: queue
+  }
+}
+
+# External services
+external: "External" {
+  style.stroke-dash: 3
+
+  email: "Email Provider"
+  payment: "Payment Gateway"
+}
+
+# Connections
+user -> frontend.web
+user -> frontend.mobile
+
+frontend.web -> gateway.routing
+frontend.mobile -> gateway.routing
+
+gateway.routing -> gateway.auth
+gateway.auth -> services.user_svc
+gateway.routing -> services.order_svc
+gateway.routing -> services.notification_svc
+
+services.user_svc -> data.postgres
+services.order_svc -> data.postgres
+services.order_svc -> data.queue
+
+services.notification_svc -> data.queue
+services.notification_svc -> external.email
+
+services.order_svc -> external.payment
+
+data.redis <- gateway.rate_limit: "Rate limits"

@@ -1,0 +1,172 @@
+# Main Comparison Benchmark: OneTool vs MCP Ecosystem
+#
+# Demonstrates OneTool's value proposition by comparing 5 configurations:
+# - base: No MCP, LLM knowledge only
+# - mcp: Single MCP server (package-version)
+# - multiple-mcp: 9 MCP servers (demonstrates context bloat)
+# - onetool: OneTool with direct execution
+# - onetool-proxy: OneTool proxying to MCP server
+#
+# Simplified to 2 libraries (express, httpx) for fast, reliable testing.
+# Evaluator checks for recent versions (express 5.x, httpx 0.28+) that LLMs
+# won't know from training data alone.
+#
+# Use with: ot-bench run demo/bench/compare.yaml
+
+defaults:
+  timeout: 60
+  model: google/gemini-3-flash-preview
+
+evaluators:
+  # Check for current versions of express and httpx (both must be present)
+  version_found:
+    expected: ["5.2.", "0.28."]
+
+scenarios:
+  - name: "Compare: Package Versions (npm + pypi)"
+    description: Get latest versions of express (npm) and httpx (pypi) across configurations
+    tasks:
+      - name: "compare:packages:base"
+        server:
+        tags: [compare, base, npm, pypi]
+        evaluate: version_found
+        prompt: |
+          Based on your training data, what are the latest versions of:
+          1. express (npm package)
+          2. httpx (Python/PyPI package)
+
+      - name: "compare:packages:mcp"
+        server: package-version
+        tags: [compare, mcp, npm, pypi]
+        evaluate: version_found
+        prompt: |
+          Get the latest versions of express (npm) and httpx (pypi).
+          Use check_npm_versions with: {"dependencies": {"express": "4.0.0"}}
+          Use check_python_versions with: {"requirements": ["httpx==0.20.0"]}
+
+      - name: "compare:packages:multiple-mcp"
+        server: [package-version, brave-search, context7, github, fetch, sequential-thinking, filesystem, memory, plantuml, excel, ripgrep, gemini-grounding, chunkhound, mcp-alchemy]
+        tags: [compare, multiple-mcp, npm, pypi]
+        evaluate: version_found
+        prompt: |
+          What are the latest versions of:
+          1. express (npm package)
+          2. httpx (Python/PyPI package)
+          Use check_npm_versions with: {"dependencies": {"express": "4.0.0"}}
+          Use check_python_versions with: {"requirements": ["httpx==0.20.0"]}
+
+      - name: "compare:packages:onetool"
+        server: onetool
+        tags: [compare, onetool, npm, pypi]
+        evaluate: version_found
+        prompt: |
+          __ot
+          ```python
+          npm = package.version(registry="npm", packages={"express": "4.0.0"})
+          pypi = package.version(registry="pypi", packages={"httpx": "0.20.0"})
+          {"express": npm, "httpx": pypi}
+          ```
+          Return only latest versions.
+
+      - name: "compare:packages:proxy"
+        server: onetool
+        tags: [compare, onetool, proxy, npm, pypi]
+        evaluate: version_found
+        prompt: |
+          __ot
+          ```python
+          npm = proxy_package_version.check_npm_versions(dependencies={"express": "4.0.0"})
+          pypi = proxy_package_version.check_python_versions(requirements=["httpx==0.20.0"])
+          {"express": npm, "httpx": pypi}
+          ```
+          Return only latest versions.
+
+servers:
+  onetool:
+    type: stdio
+    command: uv
+    args: ["run", "ot-serve"]
+    env:
+      OT_CWD: demo
+
+  package-version:
+    type: stdio
+    command: npx
+    args: ["-y", "mcp-package-version@0.1.17"]
+
+  brave-search:
+    type: stdio
+    command: npx
+    args: ["-y", "@brave/brave-search-mcp-server", "--brave-api-key", "${B_BRAVE_API_KEY}"]
+
+  context7:
+    type: http
+    url: https://mcp.context7.com/mcp
+    headers:
+      CONTEXT7_API_KEY: ${B_CONTEXT7_API_KEY}
+
+  github:
+    type: http
+    url: https://api.githubcopilot.com/mcp/
+    headers:
+      Authorization: Bearer ${B_GITHUB_TOKEN}
+      Accept: application/json, text/event-stream
+      "MCP-Protocol-Version": "2025-06-18"
+    timeout: 60
+
+  sequential-thinking:
+    type: stdio
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+
+  filesystem:
+    type: stdio
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "."]
+
+  memory:
+    type: stdio
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-memory"]
+
+  fetch:
+    type: http
+    url: https://remote.mcpservers.org/fetch/mcp
+
+  plantuml:
+    type: stdio
+    command: npx
+    args: ["-y", "@brainstack/plantuml-mcp"]
+
+  excel:
+    type: stdio
+    command: npx
+    args: ["--yes", "@negokaz/excel-mcp-server"]
+    env:
+      EXCEL_MCP_PAGING_CELLS_LIMIT: "4000"
+
+  ripgrep:
+    type: stdio
+    command: npx
+    args: ["-y", "mcp-ripgrep@latest"]
+
+  gemini-grounding:
+    type: stdio
+    command: npx
+    args: ["-y", "gemini-grounding"]
+    env:
+      GEMINI_API_KEY: ${B_GEMINI_API_KEY}
+
+  chunkhound:
+    type: stdio
+    command: uvx
+    args: ["chunkhound", "mcp"]
+    env:
+      OPENAI_API_KEY: ${B_OPENAI_API_KEY}
+
+  mcp-alchemy:
+    type: stdio
+    command: uvx
+    args: ["mcp-alchemy"]
+    env:
+      DB_URL: "sqlite:///demo/db/northwind.db"

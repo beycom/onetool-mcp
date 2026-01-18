@@ -1,0 +1,80 @@
+# Tool Demo: Brave Search
+#
+# Demonstrates OneTool Brave Search capabilities:
+# - Single search with count parameter
+# - Batch search for multiple queries
+# - Transform results with LLM
+# - High count search (20 results)
+#
+# Base/MCP comparison removed - focuses on OneTool capabilities.
+#
+# Use with: ot-bench run demo/bench/tool_brave_search.yaml
+
+defaults:
+  timeout: 60
+  model: google/gemini-3-flash-preview
+
+evaluators:
+  has_results:
+    regex: "(http|https|www\\.|result|search)"
+    expect_match: true
+
+servers:
+  onetool:
+    type: stdio
+    command: uv
+    args: ["run", "ot-serve"]
+    env:
+      OT_CWD: demo
+
+scenarios:
+  - name: "Brave Search Demo"
+    description: Demonstrate OneTool Brave Search capabilities
+    tasks:
+      - name: "tool:brave:single"
+        server: onetool
+        tags: [demo, tool, brave]
+        evaluate: has_results
+        prompt: |
+          __ot
+          ```python
+          openai = brave.search(query="OpenAI latest GPT model version release date 2025", count=5)
+          anthropic = brave.search(query="Anthropic latest Claude Opus version release date 2025", count=5)
+          {"OpenAI": openai, "Anthropic": anthropic}
+          ```
+          Summarise the search results.
+
+      - name: "tool:brave:batch"
+        server: onetool
+        tags: [demo, tool, brave, batch]
+        evaluate: has_results
+        prompt: |
+          __ot
+          ```python
+          brave.search_batch(queries=[("OpenAI latest GPT model 2025", "OpenAI"), ("Anthropic latest Claude Opus 2025", "Anthropic")], count=5)
+          ```
+          Summarise the search results.
+
+      - name: "tool:brave:transform"
+        server: onetool
+        tags: [demo, tool, brave, transform]
+        evaluate: has_results
+        prompt: |
+          __ot
+          ```python
+          data = brave.search_batch(queries=[("OpenAI latest GPT model 2025", "OpenAI"), ("Anthropic latest Claude Opus 2025", "Anthropic")], count=5)
+          llm.transform(input=data, prompt="Extract the latest GPT model and Claude Opus model with version and release date.", model="google/gemini-3-flash-preview")
+          ```
+
+      - name: "tool:brave:count20"
+        server: onetool
+        tags: [demo, tool, brave, count]
+        evaluate: has_results
+        prompt: |
+          __ot
+          ```python
+          openai = brave.search(query="OpenAI latest GPT model version release date 2025", count=20)
+          anthropic = brave.search(query="Anthropic latest Claude Opus version release date 2025", count=20)
+          {"OpenAI": openai, "Anthropic": anthropic}
+          ```
+          Summarise the search results.

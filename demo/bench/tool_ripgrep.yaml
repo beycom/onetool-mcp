@@ -1,0 +1,126 @@
+# Tool Demo: Ripgrep Search
+#
+# Demonstrates OneTool ripgrep capabilities:
+# - Basic text search
+# - Regex patterns
+# - Case sensitivity options
+# - File type filtering
+# - Match counting
+# - File listing
+#
+# Requires: `rg` binary installed and in PATH
+#
+# Use with: ot-bench run demo/bench/tool_ripgrep.yaml
+
+defaults:
+  timeout: 60
+  model: google/gemini-3-flash-preview
+
+evaluators:
+  has_search_results:
+    regex: "(?i)(def |class |import |function|method|\\.py|found|match)"
+    expect_match: true
+
+  has_count_results:
+    regex: "(?i)(\\d+|count|match|found|result|\\.py)"
+    expect_match: true
+
+  has_file_list:
+    regex: "(?i)(\\.py|python|file|found)"
+    expect_match: true
+
+  has_type_list:
+    regex: "(?i)(\\*\\.|type|extension|format|support)"
+    expect_match: true
+
+servers:
+  onetool:
+    type: stdio
+    command: uv
+    args: ["run", "ot-serve"]
+    env:
+      OT_CWD: demo
+
+scenarios:
+  - name: "Ripgrep Demo"
+    description: Demonstrate OneTool ripgrep capabilities
+    tasks:
+      - name: "tool:ripgrep:search"
+        server: onetool
+        tags: [demo, tool, ripgrep]
+        evaluate: has_search_results
+        prompt: |
+          __ot `ripgrep.search(pattern="def ", path="../src", file_type="py", max_results=5)`
+          Find function definitions.
+
+      - name: "tool:ripgrep:search_case"
+        server: onetool
+        tags: [demo, tool, ripgrep]
+        evaluate: has_search_results
+        prompt: |
+          __ot `ripgrep.search(pattern="error", path="../src", case_sensitive=False, max_results=5)`
+          Search for error handling (case insensitive).
+
+      - name: "tool:ripgrep:search_class"
+        server: onetool
+        tags: [demo, tool, ripgrep]
+        evaluate: has_search_results
+        prompt: |
+          __ot `ripgrep.search(pattern="class ", path="../src", file_type="py", max_results=5)`
+          Find class definitions.
+
+      - name: "tool:ripgrep:search_import"
+        server: onetool
+        tags: [demo, tool, ripgrep]
+        evaluate: has_search_results
+        prompt: |
+          __ot `ripgrep.search(pattern="^import|^from", path="../src", file_type="py", max_results=5)`
+          Find import statements.
+
+      - name: "tool:ripgrep:search_async"
+        server: onetool
+        tags: [demo, tool, ripgrep]
+        evaluate: has_search_results
+        prompt: |
+          __ot `ripgrep.search(pattern="async def", path="../src", file_type="py", max_results=5)`
+          Find async function definitions.
+
+      - name: "tool:ripgrep:count"
+        server: onetool
+        tags: [demo, tool, ripgrep]
+        evaluate: has_count_results
+        prompt: |
+          __ot `ripgrep.count(pattern="import", path="../src", file_type="py")`
+          Count import statements per file.
+
+      - name: "tool:ripgrep:count_def"
+        server: onetool
+        tags: [demo, tool, ripgrep]
+        evaluate: has_count_results
+        prompt: |
+          __ot `ripgrep.count(pattern="def ", path="../src", file_type="py")`
+          Count function definitions per file.
+
+      - name: "tool:ripgrep:files"
+        server: onetool
+        tags: [demo, tool, ripgrep]
+        evaluate: has_file_list
+        prompt: |
+          __ot `ripgrep.files(path="../src", file_type="py")`
+          List all Python files.
+
+      - name: "tool:ripgrep:files_yaml"
+        server: onetool
+        tags: [demo, tool, ripgrep]
+        evaluate: has_file_list
+        prompt: |
+          __ot `ripgrep.files(path="bench", file_type="yaml")`
+          List all YAML files in bench directory.
+
+      - name: "tool:ripgrep:types"
+        server: onetool
+        tags: [demo, tool, ripgrep]
+        evaluate: has_type_list
+        prompt: |
+          __ot `ripgrep.types()`
+          List supported file types.

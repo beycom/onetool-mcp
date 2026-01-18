@@ -1,0 +1,37 @@
+%% Project Gantt Chart Template
+%% Replace with your actual project timeline
+
+gantt
+    title Project Timeline
+    dateFormat YYYY-MM-DD
+    excludes weekends
+
+    section Planning
+    Requirements gathering     :a1, 2024-01-08, 5d
+    Technical design          :a2, after a1, 5d
+    Architecture review       :milestone, m1, after a2, 0d
+
+    section Development
+    Core infrastructure       :b1, after m1, 10d
+    Feature A implementation  :b2, after b1, 8d
+    Feature B implementation  :b3, after b1, 12d
+    Integration               :b4, after b2, 5d
+    Development complete      :milestone, m2, after b4, 0d
+
+    section Testing
+    Unit testing             :c1, after b2, 5d
+    Integration testing      :c2, after m2, 5d
+    Performance testing      :c3, after c2, 3d
+    UAT                      :c4, after c3, 5d
+    Testing complete         :milestone, m3, after c4, 0d
+
+    section Deployment
+    Staging deployment       :d1, after m3, 2d
+    Production preparation   :d2, after d1, 2d
+    Go-live                  :milestone, m4, after d2, 0d
+    Post-launch support      :d3, after m4, 5d
+
+    section Documentation
+    API documentation        :e1, after b1, 15d
+    User guide               :e2, after c2, 10d
+    Release notes            :e3, after m3, 3d

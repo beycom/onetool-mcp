@@ -1,0 +1,301 @@
+"""Tool loading and discovery for command execution.
+
+Handles:
+- Loading tool functions from config-defined tool files
+- Caching based on file modification times
+- Namespace extraction from tool modules
+- PEP 723 detection for routing to worker processes
+
+Used by the runner to make tools available during code execution.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+from loguru import logger
+
+from ot.executor.pep723 import ToolFileInfo, categorize_tools
+from ot.executor.worker_proxy import create_worker_proxy
+from ot.paths import get_effective_cwd
+
+if TYPE_CHECKING:
+    from ot.config.loader import OneToolConfig
+
+
+@dataclass
+class LoadedTools:
+    """Registry of loaded tool functions with namespace support.
+
+    The functions dict uses full namespaced names as keys (e.g., "brave.search")
+    to avoid collisions when multiple namespaces have functions with the same name.
+    The namespaces dict provides grouped access by namespace.
+    """
+
+    functions: dict[str, Any]  # Full name -> callable (e.g., "brave.search" -> func)
+    namespaces: dict[str, dict[str, Any]]  # Nested: namespace -> {name -> callable}
+    worker_tools: list[ToolFileInfo] = field(
+        default_factory=list
+    )  # Tools using workers
+
+
+# Module cache: stores (LoadedTools, mtime_dict) for each tools_dir
+_module_cache: dict[Path, tuple[LoadedTools, dict[str, float]]] = {}
+
+
+def _get_tool_files(
+    tools_dir: Path | None, config: OneToolConfig | None
+) -> tuple[set[Path], Path]:
+    """Resolve tool files from config or directory.
+
+    Args:
+        tools_dir: Explicit tools directory path.
+        config: Loaded configuration (may be None).
+
+    Returns:
+        Tuple of (set of resolved file paths, cache key).
+    """
+    config_tool_files = config.get_tool_files() if config else []
+
+    if config_tool_files:
+        tool_files = config_tool_files
+        cache_key = Path("__config__")
+    else:
+        tools_dir = tools_dir or Path("src/ot_tools")
+        if not tools_dir.exists():
+            return set(), tools_dir
+        tools_dir = tools_dir.resolve()
+        tool_files = list(tools_dir.glob("*.py"))
+        cache_key = tools_dir
+
+    current_files = {f.resolve() for f in tool_files if f.exists()}
+    return current_files, cache_key
+
+
+def _check_cache(cache_key: Path, current_files: set[Path]) -> LoadedTools | None:
+    """Return cached registry if valid, None if stale or missing.
+
+    Args:
+        cache_key: Key for cache lookup.
+        current_files: Set of current tool file paths.
+
+    Returns:
+        Cached LoadedTools if valid, None otherwise.
+    """
+    if cache_key not in _module_cache:
+        return None
+
+    cached_registry, cached_mtimes = _module_cache[cache_key]
+    cached_files = {Path(f) for f in cached_mtimes}
+
+    if current_files != cached_files:
+        return None
+
+    for py_file in current_files:
+        try:
+            if py_file.stat().st_mtime != cached_mtimes.get(str(py_file), 0):
+                return None
+        except OSError:
+            return None
+
+    return cached_registry
+
+
+def _load_worker_tools(
+    worker_tools: list[ToolFileInfo],
+    config_dict: dict[str, Any],
+    secrets: dict[str, Any],
+    namespaces: dict[str, dict[str, Any]],
+    mtimes: dict[str, float],
+) -> tuple[dict[str, Any], list[ToolFileInfo]]:
+    """Load PEP 723 tools via worker proxies.
+
+    Args:
+        worker_tools: List of tool file info for worker tools.
+        config_dict: Configuration as dict.
+        secrets: Secrets dict.
+        namespaces: Namespaces dict to populate.
+        mtimes: Modification times dict to populate.
+
+    Returns:
+        Tuple of (functions dict, loaded worker tools list).
+    """
+    functions: dict[str, Any] = {}
+    loaded_workers: list[ToolFileInfo] = []
+
+    for tool_info in worker_tools:
+        py_file = tool_info.path
+        try:
+            mtimes[str(py_file)] = py_file.stat().st_mtime
+
+            namespace = tool_info.namespace
+            if namespace and namespace in namespaces:
+                logger.warning(
+                    f"Namespace collision: '{namespace}' already defined, "
+                    f"merging functions from {py_file.stem}"
+                )
+
+            proxy = create_worker_proxy(
+                tool_path=py_file,
+                functions=tool_info.functions,
+                config=config_dict,
+                secrets=secrets,
+            )
+
+            if namespace:
+                if namespace not in namespaces:
+                    namespaces[namespace] = {}
+                namespaces[namespace] = proxy  # type: ignore[assignment]
+                for func_name in tool_info.functions:
+                    full_name = f"{namespace}.{func_name}"
+                    functions[full_name] = getattr(proxy, func_name)
+            else:
+                for func_name in tool_info.functions:
+                    functions[func_name] = getattr(proxy, func_name)
+
+            loaded_workers.append(tool_info)
+            logger.debug(
+                f"Loaded worker tool {py_file.stem} with {len(tool_info.functions)} functions"
+            )
+
+        except Exception as e:
+            logger.warning(f"Failed to load worker tool {py_file.stem}: {e}")
+
+    return functions, loaded_workers
+
+
+def _load_inprocess_tools(
+    inprocess_tools: list[ToolFileInfo],
+    namespaces: dict[str, dict[str, Any]],
+    mtimes: dict[str, float],
+) -> dict[str, Any]:
+    """Load regular Python tools via importlib.
+
+    Args:
+        inprocess_tools: List of tool file info for in-process tools.
+        namespaces: Namespaces dict to populate.
+        mtimes: Modification times dict to populate.
+
+    Returns:
+        Functions dict with loaded tools.
+    """
+    functions: dict[str, Any] = {}
+
+    for tool_info in inprocess_tools:
+        py_file = tool_info.path
+        module_name = f"tools.{py_file.stem}"
+
+        try:
+            mtimes[str(py_file)] = py_file.stat().st_mtime
+
+            spec = importlib.util.spec_from_file_location(module_name, py_file)
+            if spec is None or spec.loader is None:
+                continue
+
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[module_name] = module
+            spec.loader.exec_module(module)
+
+            namespace = getattr(module, "namespace", None)
+            if namespace and namespace in namespaces:
+                logger.warning(
+                    f"Namespace collision: '{namespace}' already defined, "
+                    f"merging functions from {py_file.stem}"
+                )
+
+            export_names = getattr(module, "__all__", None)
+            if export_names is None:
+                export_names = [n for n in dir(module) if not n.startswith("_")]
+
+            for name in export_names:
+                obj = getattr(module, name, None)
+                if obj is not None and callable(obj) and not isinstance(obj, type):
+                    if namespace:
+                        if namespace not in namespaces:
+                            namespaces[namespace] = {}
+                        namespaces[namespace][name] = obj
+                        full_name = f"{namespace}.{name}"
+                        functions[full_name] = obj
+                    else:
+                        functions[name] = obj
+
+        except Exception as e:
+            logger.warning(f"Failed to load tool module {py_file.stem}: {e}")
+
+    return functions
+
+
+def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
+    """Load all tool functions from config tool files with namespace support.
+
+    Uses caching based on file modification times to avoid redundant loading.
+    Reads `namespace` module variable from each tool file to group functions.
+    Detects PEP 723 headers to route tools to worker processes.
+
+    Args:
+        tools_dir: Path to tools directory (fallback if no config).
+                   Defaults to 'src/ot_tools/' if no config available.
+
+    Returns:
+        LoadedTools with functions dict (namespaced keys) and namespaces dict.
+    """
+    from ot.config.loader import get_config
+    from ot.config.secrets import get_secrets
+
+    config = get_config()
+    current_files, cache_key = _get_tool_files(tools_dir, config)
+
+    if not current_files:
+        return LoadedTools(functions={}, namespaces={})
+
+    cached = _check_cache(cache_key, current_files)
+    if cached is not None:
+        return cached
+
+    logger.debug(f"Loading tools from {cache_key} ({len(current_files)} files)")
+
+    namespaces: dict[str, dict[str, Any]] = {}
+    mtimes: dict[str, float] = {}
+
+    worker_tools, inprocess_tools = categorize_tools(list(current_files))
+
+    secrets_path = config.get_secrets_file_path() if config else None
+    secrets = get_secrets(secrets_path)
+    config_dict = config.model_dump() if config else {}
+
+    # Inject path context for worker tools (used by ot_sdk path functions)
+    config_dict["_project_path"] = str(get_effective_cwd())
+    if config and config._config_dir:
+        config_dict["_config_dir"] = str(config._config_dir)
+
+    worker_funcs, worker_tools_list = _load_worker_tools(
+        worker_tools, config_dict, secrets, namespaces, mtimes
+    )
+    inprocess_funcs = _load_inprocess_tools(inprocess_tools, namespaces, mtimes)
+
+    functions = {**worker_funcs, **inprocess_funcs}
+
+    registry = LoadedTools(
+        functions=functions, namespaces=namespaces, worker_tools=worker_tools_list
+    )
+    _module_cache[cache_key] = (registry, mtimes)
+
+    return registry
+
+
+def load_tool_functions(tools_dir: Path | None = None) -> dict[str, Any]:
+    """Load all tool functions from the tools directory.
+
+    Uses caching based on file modification times to avoid redundant loading.
+
+    Args:
+        tools_dir: Path to tools directory. Defaults to 'src/ot_tools/'.
+
+    Returns:
+        Dictionary mapping function names to callable functions.
+    """
+    return load_tool_registry(tools_dir).functions

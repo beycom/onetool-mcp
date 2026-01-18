@@ -1,0 +1,60 @@
+# Kroki diagram rendering service
+# Start: just kroki-start
+# Stop:  just kroki-stop
+# Health: curl http://localhost:8000/health
+#
+# Built-in diagram libraries (no companion needed):
+#   PlantUML, GraphViz, D2, Structurizr, BlockDiag, SeqDiag, ActDiag,
+#   NwDiag, PacketDiag, RackDiag, C4 (via PlantUML), Ditaa, Erd, Nomnoml,
+#   Pikchr, Svgbob, UMlet, Vega, Vega-Lite, WaveDrom, Wireviz, Bytefield
+#
+# Companion containers (extend functionality):
+#   - mermaid: Flowcharts, sequences, Gantt, class diagrams, state diagrams
+#   - bpmn: Business process model and notation diagrams
+#   - excalidraw: Hand-drawn style diagrams
+#   - diagramsnet: diagrams.net/draw.io format (experimental)
+
+services:
+  kroki:
+    image: yuzutech/kroki
+    ports:
+      - "8000:8000"
+    environment:
+      - KROKI_MERMAID_HOST=mermaid
+      # Uncomment if enabling optional companions:
+      # - KROKI_BPMN_HOST=bpmn
+      # - KROKI_EXCALIDRAW_HOST=excalidraw
+      # - KROKI_DIAGRAMSNET_HOST=diagramsnet
+    depends_on:
+      - mermaid
+    # Required for diagram processing (official best practice)
+    tmpfs:
+      - /tmp:exec
+    restart: unless-stopped
+
+  # Required for Mermaid diagrams (focus provider)
+  mermaid:
+    image: yuzutech/kroki-mermaid
+    expose:
+      - "8002"
+    restart: unless-stopped
+
+  # Optional companions - uncomment to enable:
+
+  # bpmn:
+  #   image: yuzutech/kroki-bpmn
+  #   expose:
+  #     - "8003"
+  #   restart: unless-stopped
+
+  # excalidraw:
+  #   image: yuzutech/kroki-excalidraw
+  #   expose:
+  #     - "8004"
+  #   restart: unless-stopped
+
+  # diagramsnet:
+  #   image: yuzutech/kroki-diagramsnet
+  #   expose:
+  #     - "8005"
+  #   restart: unless-stopped

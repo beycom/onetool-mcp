@@ -1,0 +1,273 @@
+# OneTool Features Benchmark
+#
+# Tests OneTool-specific capabilities that require LLM interpretation:
+# - Aliases (LLM must resolve alias → function)
+# - Snippets (LLM must expand $snippet param=val)
+# - Proxy functionality (needs live MCP server)
+# - OT internal tools (ot.tools, ot.config, ot.health, ot.push)
+# - Direct harness execution (sanity check)
+#
+# Prefix and style tests moved to unit tests (tests/unit/test_features_triggers.py)
+# Python construct tests moved to unit tests (tests/unit/test_features_python.py)
+#
+# Use with: ot-bench run demo/bench/features.yaml
+
+defaults:
+  timeout: 60
+  model: google/gemini-3-flash-preview
+  system_prompt:
+
+evaluators:
+  # Check for YAML list output with name field
+  has_tools_list:
+    regex: "name:\\s*[a-z]+\\.[a-z_]+"
+    expect_match: true
+
+  # Check for config with aliases/snippets/servers (YAML format)
+  has_config:
+    regex: "(aliases|snippets|servers):"
+    expect_match: true
+
+  # Check for health status (YAML format - status: ok appears on its own line)
+  has_health:
+    regex: "status:\\s*ok"
+    expect_match: true
+
+  # Check for ot.push OK response with topic routing
+  has_push_ok:
+    regex: "OK:.*->"
+    expect_match: true
+
+servers:
+  onetool:
+    type: stdio
+    command: uv
+    args: ["run", "ot-serve"]
+    env:
+      OT_CWD: demo
+
+scenarios:
+  # =============================================================================
+  # ALIASES - Short names for functions (LLM must resolve)
+  # =============================================================================
+
+  - name: "Alias"
+    description: "Aliases for demo.foo and demo.bar"
+    tasks:
+      - name: "alias:alias_f:simple"
+        server: onetool
+        tags: [demo, alias]
+        evaluate:
+          expected:
+            - regex: "\\bgold\\b"
+        prompt: |
+          __ot alias_f(text="world")
+
+      - name: "alias:alias_b:simple"
+        server: onetool
+        tags: [demo, alias]
+        evaluate:
+          expected:
+            - regex: "\\bbear\\b"
+        prompt: |
+          __ot alias_b(text="item0")
+
+      - name: "alias:alias_f:backticks"
+        server: onetool
+        tags: [demo, alias]
+        evaluate:
+          expected:
+            - regex: "\\bmagenta\\b"
+        prompt: |
+          __ot `alias_f(text="hello")`
+
+      - name: "alias:alias_b:backticks"
+        server: onetool
+        tags: [demo, alias]
+        evaluate:
+          expected:
+            - regex: "\\bfox\\b"
+        prompt: |
+          __ot `alias_b(text="item1")`
+
+  # =============================================================================
+  # SNIPPETS - Reusable templates with parameters (LLM must expand)
+  # =============================================================================
+
+  - name: "Snippet: foon"
+    description: "Get foo() for n items"
+    tasks:
+      - name: "snippet:foon:default"
+        server: onetool
+        tags: [demo, snippet, foon]
+        evaluate:
+          expected:
+            - regex: "cyan.*teal.*purple.*silver.*olive"
+        prompt: |
+          __ot `$foon`
+
+      - name: "snippet:foon:n10"
+        server: onetool
+        tags: [demo, snippet, foon]
+        evaluate:
+          expected:
+            - regex: "cyan.*teal.*purple.*silver.*olive.*purple.*navy.*red.*purple.*brown"
+        prompt: |
+          __ot `$foon n=10`
+
+  - name: "Snippet: barn"
+    description: "Get bar() for n items"
+    tasks:
+      - name: "snippet:barn:default"
+        server: onetool
+        tags: [demo, snippet, barn]
+        evaluate:
+          expected:
+            - regex: "bear.*fox.*eagle.*lion.*raven"
+        prompt: |
+          __ot `$barn`
+
+      - name: "snippet:barn:n10"
+        server: onetool
+        tags: [demo, snippet, barn]
+        evaluate:
+          expected:
+            - regex: "bear.*fox.*eagle.*lion.*raven.*raven.*bear.*raven.*raven.*bear"
+        prompt: |
+          __ot `$barn n=10`
+
+  - name: "Snippet: foobar"
+    description: "Get foo and bar combined for n items"
+    tasks:
+      - name: "snippet:foobar:default"
+        server: onetool
+        tags: [demo, snippet, foobar]
+        evaluate:
+          expected:
+            - regex: "cyan-bear.*teal-fox.*purple-eagle"
+        prompt: |
+          __ot `$foobar`
+
+      - name: "snippet:foobar:n5"
+        server: onetool
+        tags: [demo, snippet, foobar]
+        evaluate:
+          expected:
+            - regex: "cyan-bear.*teal-fox.*purple-eagle.*silver-lion.*olive-raven"
+        prompt: |
+          __ot `$foobar n=5`
+
+  # =============================================================================
+  # PROXY FUNCTIONALITY - Using OneTool to access MCP servers
+  # =============================================================================
+
+  - name: "Proxy: Package Version"
+    description: "Access package version tools via proxy"
+    tasks:
+      - name: "proxy:npm"
+        server: onetool
+        tags: [demo, proxy, package]
+        evaluate:
+          expected:
+            - regex: "react.*\\d+\\.\\d+"
+        prompt: |
+          __ot `package.npm(packages=["react"])`
+          Return the latest version found.
+
+      - name: "proxy:pypi"
+        server: onetool
+        tags: [demo, proxy, package]
+        evaluate:
+          expected:
+            - regex: "\\d+\\.\\d+"
+        prompt: |
+          __ot `package.pypi(packages=["requests"])`
+          Return the latest version found.
+
+  # =============================================================================
+  # DIRECT HARNESS EXECUTION - Bypasses LLM (sanity check)
+  # =============================================================================
+
+  - name: "Harness: Direct Execution"
+    description: "Direct MCP calls without LLM interpretation"
+    tasks:
+      - name: "harness:direct:hello"
+        type: harness
+        server: onetool
+        tags: [demo, harness, direct]
+        evaluate:
+          expected:
+            - regex: "\\bmagenta\\b"
+        prompt: |
+          __ot demo.foo(text="hello")
+
+      - name: "harness:direct:test"
+        type: harness
+        server: onetool
+        tags: [demo, harness, direct]
+        evaluate:
+          expected:
+            - regex: "\\borange\\b"
+        prompt: |
+          __ot demo.foo(text="test")
+
+  # =============================================================================
+  # OT INTERNAL TOOLS - Consolidated ot namespace (needs live server)
+  # =============================================================================
+
+  - name: "OT: Tool Discovery"
+    description: "List available tools"
+    tasks:
+      - name: "ot:tools:all"
+        server: onetool
+        tags: [demo, ot, tools]
+        evaluate: has_tools_list
+        prompt: |
+          __ot `ot.tools(compact=True)`
+          Return EXACTLY the tool output. No wrapping, no JSON conversion, no modifications.
+
+      - name: "ot:tools:pattern"
+        server: onetool
+        tags: [demo, ot, tools, filter]
+        evaluate: has_tools_list
+        prompt: |
+          __ot `ot.tools(pattern="search")`
+          Return EXACTLY the tool output. No wrapping, no JSON conversion, no modifications.
+
+  - name: "OT: Configuration"
+    description: "Inspect configuration and health"
+    tasks:
+      - name: "ot:config"
+        server: onetool
+        tags: [demo, ot, config]
+        evaluate: has_config
+        prompt: |
+          __ot `ot.config()`
+          Return EXACTLY the tool output. No wrapping, no JSON conversion, no modifications.
+
+      - name: "ot:health"
+        server: onetool
+        tags: [demo, ot, health]
+        evaluate: has_health
+        prompt: |
+          __ot `ot.health()`
+          Return EXACTLY the tool output. No wrapping, no JSON conversion, no modifications.
+
+  - name: "OT: Push"
+    description: "Message publishing with topic routing"
+    tasks:
+      - name: "ot:push:status"
+        server: onetool
+        tags: [demo, ot, push]
+        evaluate: has_push_ok
+        prompt: |
+          __ot `ot.push(topic="status", message="Scanning src/ directory")`
+          Return EXACTLY the tool output. No wrapping, no JSON conversion, no modifications.
+
+      - name: "ot:push:doc"
+        server: onetool
+        tags: [demo, ot, push]
+        evaluate: has_push_ok
+        prompt: |
+          __ot `ot.push(topic="doc:api", message="API documentation")`
+          Return EXACTLY the tool output. No wrapping, no JSON conversion, no modifications.

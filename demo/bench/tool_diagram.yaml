@@ -1,0 +1,280 @@
+# Per-Tool Benchmark: Diagram Generation
+#
+# Tests the diagram tool's ability to:
+# - Provide provider guidance (Mermaid, PlantUML, D2)
+# - Generate valid diagram source code
+# - List available providers and templates
+#
+# Note: Rendering tests require Kroki (just kroki-start)
+#
+# Use with: ot-bench run demo/bench/tool_diagram.yaml
+
+defaults:
+  timeout: 120
+  model: google/gemini-3-flash-preview
+
+evaluators:
+  guidance_check:
+    model: google/gemini-3-flash-preview
+    prompt: |
+      Check if the response contains useful diagram guidance. It should include:
+      - When to use the provider
+      - Style tips or syntax guidance
+      - Common patterns or examples
+
+      Response: {response}
+
+      Score based on completeness:
+      - 100: Comprehensive guidance with examples
+      - 75: Good guidance, missing some details
+      - 50: Basic guidance only
+      - 25: Minimal or incomplete
+      - 0: No useful guidance
+
+      Return JSON: {"score": <0-100>, "reason": "<brief explanation>"}
+
+  source_valid:
+    model: google/gemini-3-flash-preview
+    prompt: |
+      Check if the response contains valid diagram source code.
+
+      For Mermaid: Should start with a diagram type (flowchart, sequenceDiagram, classDiagram, etc.)
+      For PlantUML: Should have @startuml/@enduml markers
+      For D2: Should have valid D2 syntax with connections (->)
+
+      Response: {response}
+
+      Score:
+      - 100: Valid, well-structured diagram source
+      - 75: Valid but simple diagram
+      - 50: Mostly valid with minor issues
+      - 25: Has diagram elements but invalid syntax
+      - 0: No valid diagram source
+
+      Return JSON: {"score": <0-100>, "reason": "<brief explanation>"}
+
+  render_check:
+    model: google/gemini-3-flash-preview
+    prompt: |
+      Check if the response indicates successful diagram rendering.
+
+      A successful render should include:
+      - "Rendered:" with a file path (e.g., .svg, .png, .pdf)
+      - "Size:" with bytes information
+      - "Format:" indicating the output format
+      - Optionally a "Share URL" or "Source saved" line
+
+      Response: {response}
+
+      Score:
+      - 100: Successful render with file path and size info
+      - 75: Render success but missing some metadata
+      - 50: Partial success or warnings present
+      - 25: Error message but recoverable
+      - 0: Failed to render or "Error" in response
+
+      Return JSON: {"score": <0-100>, "reason": "<brief explanation>"}
+
+  providers_check:
+    model: google/gemini-3-flash-preview
+    prompt: |
+      Check if the response lists Kroki-supported diagram providers.
+      Should include at least: mermaid, plantuml, d2, graphviz, blockdiag
+
+      Response: {response}
+
+      Score = (providers_found / 5) * 100
+      Return JSON: {"score": <0-100>, "reason": "<count> core providers listed"}
+
+scenarios:
+  - name: Diagram Provider Guidance
+    description: Get provider-specific guidance for creating diagrams
+    tasks:
+      - name: "guidance:mermaid"
+        server: onetool
+        tags: [tool, diagram, guidance, mermaid]
+        evaluate: guidance_check
+        prompt: |
+          __ot
+          ```python
+          diagram.get_diagram_instructions(provider="mermaid")
+          ```
+          Summarise the key points for creating Mermaid diagrams.
+
+      - name: "guidance:plantuml"
+        server: onetool
+        tags: [tool, diagram, guidance, plantuml]
+        evaluate: guidance_check
+        prompt: |
+          __ot
+          ```python
+          diagram.get_diagram_instructions(provider="plantuml")
+          ```
+          Summarise the key points for creating PlantUML diagrams.
+
+      - name: "guidance:d2"
+        server: onetool
+        tags: [tool, diagram, guidance, d2]
+        evaluate: guidance_check
+        prompt: |
+          __ot
+          ```python
+          diagram.get_diagram_instructions(provider="d2")
+          ```
+          Summarise the key points for creating D2 diagrams.
+
+  - name: Diagram Source Generation
+    description: Generate valid diagram source code
+    tasks:
+      - name: "source:mermaid:flowchart"
+        server: onetool
+        tags: [tool, diagram, source, mermaid]
+        evaluate: source_valid
+        prompt: |
+          __ot
+          ```python
+          diagram.get_template(name="api-flow")
+          ```
+          Show me the template content.
+
+      - name: "source:plantuml:c4"
+        server: onetool
+        tags: [tool, diagram, source, plantuml]
+        evaluate: source_valid
+        prompt: |
+          __ot
+          ```python
+          diagram.get_template(name="c4-context")
+          ```
+          Show me the template content.
+
+      - name: "source:d2:architecture"
+        server: onetool
+        tags: [tool, diagram, source, d2]
+        evaluate: source_valid
+        prompt: |
+          __ot
+          ```python
+          diagram.get_template(name="microservices")
+          ```
+          Show me the template content.
+
+  - name: Diagram Rendering
+    description: Generate and render diagrams via Kroki
+    tasks:
+      - name: "render:mermaid:sequence"
+        server: onetool
+        tags: [tool, diagram, render, mermaid]
+        evaluate: render_check
+        prompt: |
+          __ot
+          ```python
+          source = """sequenceDiagram
+              participant C as Client
+              participant A as API
+              participant D as Database
+              C->>A: POST /users
+              A->>D: INSERT user
+              D-->>A: OK
+              A-->>C: 201 Created
+          """
+          diagram.render_diagram(source=source, provider="mermaid", name="api-sequence")
+          ```
+          Render a sequence diagram showing API flow.
+
+      - name: "render:d2:architecture"
+        server: onetool
+        tags: [tool, diagram, render, d2]
+        evaluate: render_check
+        prompt: |
+          __ot
+          ```python
+          source = """direction: right
+
+          user: "User" {
+            shape: person
+          }
+
+          frontend: "Web App" {
+            style.fill: "#e1f5fe"
+          }
+
+          backend: "API Server" {
+            style.fill: "#fff3e0"
+          }
+
+          db: "PostgreSQL" {
+            shape: cylinder
+          }
+
+          user -> frontend: "Uses"
+          frontend -> backend: "REST API"
+          backend -> db: "Queries"
+          """
+          diagram.render_diagram(source=source, provider="d2", name="system-arch")
+          ```
+          Render a D2 architecture diagram.
+
+      - name: "render:plantuml:class"
+        server: onetool
+        tags: [tool, diagram, render, plantuml]
+        evaluate: render_check
+        prompt: |
+          __ot
+          ```python
+          source = """@startuml
+          class User {
+            +id: int
+            +name: string
+            +email: string
+            +save()
+            +delete()
+          }
+
+          class Order {
+            +id: int
+            +total: decimal
+            +status: string
+            +confirm()
+            +cancel()
+          }
+
+          User "1" -- "*" Order : places
+          @enduml
+          """
+          diagram.render_diagram(source=source, provider="plantuml", name="data-model")
+          ```
+          Render a PlantUML class diagram.
+
+  - name: Provider Discovery
+    description: List available diagram providers
+    tasks:
+      - name: "providers:list"
+        server: onetool
+        tags: [tool, diagram, providers]
+        evaluate: providers_check
+        prompt: |
+          __ot
+          ```python
+          diagram.list_providers()
+          ```
+          List all the providers, grouped by category.
+
+      - name: "policy:get"
+        server: onetool
+        tags: [tool, diagram, policy]
+        evaluate: guidance_check
+        prompt: |
+          __ot
+          ```python
+          diagram.get_diagram_policy()
+          ```
+          Summarise the diagram generation policy.
+
+servers:
+  onetool:
+    type: stdio
+    command: uv
+    args: ["run", "ot-serve"]
+    env:
+      OT_CWD: demo

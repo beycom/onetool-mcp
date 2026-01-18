@@ -1,0 +1,33 @@
+%% API Flow Template - Sequence Diagram
+%% Replace placeholders with actual service names and operations
+
+sequenceDiagram
+    participant C as Client
+    participant GW as API Gateway
+    participant S as Service
+    participant DB as Database
+
+    Note over C,DB: Request Flow
+
+    C->>GW: POST /api/resource
+    activate GW
+
+    GW->>GW: Validate token
+    alt Invalid token
+        GW-->>C: 401 Unauthorized
+    else Valid token
+        GW->>S: Forward request
+        activate S
+
+        S->>DB: Query data
+        activate DB
+        DB-->>S: Result set
+        deactivate DB
+
+        S-->>GW: Response payload
+        deactivate S
+
+        GW-->>C: 200 OK + data
+    end
+
+    deactivate GW

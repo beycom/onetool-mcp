@@ -1,0 +1,54 @@
+OneTool
+Copyright 2024-present, OneTool Authors
+
+This product includes software developed by third parties.
+
+================================================================================
+trafilatura
+================================================================================
+Copyright 2019-present, Adrien Barbaresi and contributors
+Licensed under the Apache License, Version 2.0
+https://github.com/adbar/trafilatura
+
+Used in: tools/web_fetch.py
+
+================================================================================
+brave-search-mcp-server
+================================================================================
+Copyright (c) 2024 Anthropic, PBC
+Copyright (c) 2025 Brave Software, Inc
+Licensed under the MIT License
+https://github.com/brave/brave-search-mcp-server
+
+Used in: tools/brave_search.py (API integration patterns)
+
+================================================================================
+context7
+================================================================================
+Copyright (c) 2021 Upstash, Inc.
+Licensed under the MIT License
+https://github.com/upstash/context7
+
+Used in: tools/context7.py (API integration patterns)
+
+================================================================================
+ChunkHound
+================================================================================
+Copyright (c) 2025 Ofri Wolfus
+Licensed under the MIT License
+https://github.com/chunkhound/chunkhound
+
+Used in: tools/code_search.py (LanceDB schema and indexing patterns)
+
+================================================================================
+mcp-alchemy
+================================================================================
+Copyright (c) 2024 Rune Kaagaard
+Licensed under the Mozilla Public License, v. 2.0
+https://github.com/runekaagaard/mcp-alchemy
+
+Used in: ot_tools/db.py (database introspection and query patterns)
+
+================================================================================
+
+Full license texts are available in the licenses/ directory.

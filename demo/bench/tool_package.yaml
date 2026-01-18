@@ -1,0 +1,56 @@
+# Tool Demo: Package Version
+#
+# Demonstrates OneTool Package Version capabilities:
+# - v1: Version check with current version comparison
+# - v2: Simple latest version lookup
+#
+# Base/MCP comparison removed - focuses on OneTool capabilities.
+#
+# Use with: ot-bench run demo/bench/tool_package.yaml
+
+defaults:
+  timeout: 120
+  model: google/gemini-3-flash-preview
+
+evaluators:
+  has_versions:
+    regex: "\\d+\\.\\d+\\.\\d+"
+    expect_match: true
+
+servers:
+  onetool:
+    type: stdio
+    command: uv
+    args: ["run", "ot-serve"]
+    env:
+      OT_CWD: demo
+
+scenarios:
+  - name: "Package Version Demo"
+    description: Demonstrate OneTool Package Version capabilities
+    tasks:
+      - name: "tool:package:v1"
+        server: onetool
+        tags: [demo, tool, package, batch]
+        evaluate: has_versions
+        prompt: |
+          __ot
+          ```python
+          npm = package.version(registry="npm", packages={"react": "18.0.0", "express": "4.0.0", "typescript": "5.0.0"})
+          pypi = package.version(registry="pypi", packages={"requests": "2.31.0", "flask": "3.0.0", "fastapi": "0.100.0"})
+          [npm, pypi]
+          ```
+          List the latest version for each package and highlight if the current version is up-to-date.
+
+      - name: "tool:package:v2"
+        server: onetool
+        tags: [demo, tool, package, latest]
+        evaluate: has_versions
+        prompt: |
+          __ot
+          ```python
+          npm = package.version(registry="npm", packages=["react", "express", "typescript"])
+          pypi = package.version(registry="pypi", packages=["requests", "flask", "fastapi"])
+          [npm, pypi]
+          ```
+          List the latest version for each package.

@@ -1,0 +1,309 @@
+# OneTool Default Snippets Library
+# Load via: snippets_dir: [resources/config/snippets.yaml]
+
+snippets:
+  # ============================================================================
+  # BRAVE SEARCH (brv_)
+  # ============================================================================
+
+  brv_research:
+    description: Search web and extract structured findings
+    params:
+      topic: { description: "Topic to research" }
+      count: { default: 5, description: "Number of sources" }
+    body: |
+      results = brave.search(query="{{ topic }}", count={{ count }})
+      llm.transform(input=results, prompt="Extract key findings as bullet points with sources")
+
+  brv_compare:
+    description: Compare technologies from multiple sources
+    params:
+      items: { description: "Comma-separated items (e.g., 'FastAPI, Flask')" }
+    body: |
+      brave.search_batch(queries=[{% for item in items.split(',') %}"{{ item.strip() }} pros cons"{% if not loop.last %}, {% endif %}{% endfor %}])
+
+  brv_news:
+    description: Get summarized news on a topic
+    params:
+      topic: { description: "News topic" }
+      freshness: { default: "pd", description: "pd=day, pw=week, pm=month" }
+    body: |
+      results = brave.news(query="{{ topic }}", freshness="{{ freshness }}", count=10)
+      llm.transform(input=results, prompt="Summarize the top 5 news stories in 2-3 sentences each")
+
+  # ============================================================================
+  # CONTEXT7 DOCS (c7_)
+  # ============================================================================
+
+  c7_docs:
+    description: Fetch library documentation for a topic
+    params:
+      library: { description: "Library name (e.g., 'fastapi', 'react')" }
+      topic: { default: "", description: "Specific topic to focus on" }
+    body: |
+      context7.doc(library_key="{{ library }}", topic="{{ topic }}", mode="info")
+
+  c7_examples:
+    description: Fetch code examples from library docs
+    params:
+      library: { description: "Library name" }
+      topic: { description: "Feature/API to get examples for" }
+    body: |
+      context7.doc(library_key="{{ library }}", topic="{{ topic }}", mode="code")
+
+  # ============================================================================
+  # GROUND SEARCH (g_)
+  # ============================================================================
+
+  g_docs:
+    description: Search official documentation with Google grounding
+    params:
+      query: { description: "What to search for" }
+      tech: { default: "", description: "Technology name (e.g., Python, React)" }
+    body: |
+      ground.docs(query="{{ query }}", technology="{{ tech }}")
+
+  g_debug:
+    description: Search for solutions to an error
+    params:
+      error: { description: "Error message or description" }
+      tech: { default: "", description: "Technology stack" }
+    body: |
+      ground.search(query="{{ error }}", context="{{ tech }}", focus="troubleshooting")
+
+  g_reddit:
+    description: Find community discussions on a topic
+    params:
+      topic: { description: "Topic to discuss" }
+      subreddit: { default: "", description: "Specific subreddit" }
+    body: |
+      ground.reddit(query="{{ topic }}"{% if subreddit %}, subreddit="{{ subreddit }}"{% endif %})
+
+  # ============================================================================
+  # RIPGREP (rg_)
+  # ============================================================================
+
+  rg_todos:
+    description: Find all TODOs and FIXMEs in project
+    params:
+      path: { default: ".", description: "Search path" }
+    body: |
+      ripgrep.search(pattern="TODO|FIXME|HACK|XXX", path="{{ path }}")
+
+  rg_count:
+    description: Count pattern occurrences by file
+    params:
+      pattern: { description: "Pattern to count" }
+      file_type: { default: "", description: "File type filter (py, ts, etc.)" }
+    body: |
+      {% if file_type %}ripgrep.count(pattern="{{ pattern }}", file_type="{{ file_type }}"){% else %}ripgrep.count(pattern="{{ pattern }}"){% endif %}
+
+  rg_def:
+    description: Find function or class definitions
+    params:
+      name: { description: "Function or class name" }
+      lang: { default: "py", description: "Language (py, ts, go)" }
+    body: |
+      {% if lang == 'py' %}ripgrep.search(pattern="(def|class)\\s+{{ name }}", file_type="py"){% elif lang == 'ts' %}ripgrep.search(pattern="(function|class|const|interface)\\s+{{ name }}", file_type="ts"){% else %}ripgrep.search(pattern="{{ name }}", file_type="{{ lang }}"){% endif %}
+
+  # ============================================================================
+  # CODE SEARCH (c_)
+  # ============================================================================
+
+  c_search:
+    description: Search code by meaning (requires ChunkHound index)
+    params:
+      query: { description: "Natural language description" }
+      limit: { default: 5, description: "Max results" }
+    body: |
+      code.search(query="{{ query }}", limit={{ limit }})
+
+  # ============================================================================
+  # DATABASE (db_)
+  # ============================================================================
+
+  db_explore:
+    description: List all tables in database
+    params:
+      url: { description: "Database connection URL" }
+      filter: { default: "", description: "Filter table names" }
+    body: |
+      db.tables(db_url="{{ url }}"{% if filter %}, filter="{{ filter }}"{% endif %})
+
+  db_preview:
+    description: Preview data from a table
+    params:
+      url: { description: "Database connection URL" }
+      table: { description: "Table name" }
+      limit: { default: 10, description: "Row limit" }
+    body: |
+      db.query(sql="SELECT * FROM {{ table }} LIMIT {{ limit }}", db_url="{{ url }}")
+
+  db_count:
+    description: Count rows with optional filter
+    params:
+      url: { description: "Database connection URL" }
+      table: { description: "Table name" }
+      where: { default: "", description: "Optional WHERE clause" }
+    body: |
+      db.query(sql="SELECT COUNT(*) FROM {{ table }}{% if where %} WHERE {{ where }}{% endif %}", db_url="{{ url }}")
+
+  # ============================================================================
+  # PACKAGE (pkg_)
+  # ============================================================================
+
+  pkg_npm:
+    description: Check latest npm package versions
+    params:
+      packages: { description: "Comma-separated package names" }
+    body: |
+      package.npm(packages=[{% for pkg in packages.split(',') %}"{{ pkg.strip() }}"{% if not loop.last %}, {% endif %}{% endfor %}])
+
+  pkg_pip:
+    description: Check latest PyPI package versions
+    params:
+      packages: { description: "Comma-separated package names" }
+    body: |
+      package.pypi(packages=[{% for pkg in packages.split(',') %}"{{ pkg.strip() }}"{% if not loop.last %}, {% endif %}{% endfor %}])
+
+  pkg_model:
+    description: Search OpenRouter for AI models
+    params:
+      query: { default: "", description: "Search term (claude, gpt-4)" }
+      provider: { default: "", description: "Filter by provider" }
+    body: |
+      package.models(query="{{ query }}", provider="{{ provider }}", limit=10)
+
+  # ============================================================================
+  # WEB FETCH (web_)
+  # ============================================================================
+
+  web_summary:
+    description: Fetch and summarize a web page
+    params:
+      url: { description: "URL to fetch" }
+      focus: { default: "", description: "What to focus on in summary" }
+    body: |
+      content = web.fetch(url="{{ url }}", output_format="markdown")
+      llm.transform(input=content, prompt="Summarize this page{% if focus %}, focusing on {{ focus }}{% endif %}")
+
+  web_extract:
+    description: Extract structured data from a web page
+    params:
+      url: { description: "URL to fetch" }
+      schema: { description: "What to extract (e.g., 'prices as {item, price}')" }
+    body: |
+      content = web.fetch(url="{{ url }}")
+      llm.transform(input=content, prompt="Extract {{ schema }} as YAML")
+
+  # ============================================================================
+  # EXCEL (xl_)
+  # ============================================================================
+
+  xl_new:
+    description: Create new Excel report with headers
+    params:
+      filepath: { description: "Output file path" }
+      headers: { description: "Comma-separated column headers" }
+    body: |
+      excel.create(filepath="{{ filepath }}")
+      excel.write(filepath="{{ filepath }}", data=[[{% for h in headers.split(',') %}"{{ h.strip() }}"{% if not loop.last %}, {% endif %}{% endfor %}]])
+
+  xl_read:
+    description: Read a cell range from Excel
+    params:
+      filepath: { description: "Excel file path" }
+      range: { description: "Cell range: 'A1:D10' or 'Sheet1!A1:D10'" }
+    body: |
+      {% if '!' in range %}{% set sheet, cells = range.split('!') %}{% else %}{% set sheet = '' %}{% set cells = range %}{% endif %}{% set parts = cells.split(':') %}{% set start = parts[0] %}{% set end = parts[1] if parts|length > 1 else '' %}excel.read(filepath="{{ filepath }}", start_cell="{{ start }}"{% if end %}, end_cell="{{ end }}"{% endif %}{% if sheet %}, sheet_name="{{ sheet }}"{% endif %})
+
+  xl_write:
+    description: Write data to Excel cells
+    params:
+      filepath: { description: "Excel file path" }
+      cell: { description: "Start cell (e.g., 'A1', 'B5')" }
+      data: { description: "Data to write (2D array as string)" }
+      sheet: { default: "", description: "Sheet name (default: active)" }
+    body: |
+      excel.write(filepath="{{ filepath }}", start_cell="{{ cell }}", data={{ data }}{% if sheet %}, sheet_name="{{ sheet }}"{% endif %})
+
+  xl_sum:
+    description: Add SUM formula row to Excel
+    params:
+      filepath: { description: "Excel file path" }
+      column: { description: "Column letter (e.g., B)" }
+      start_row: { default: 2, description: "First data row" }
+      end_row: { description: "Last data row" }
+    body: |
+      excel.formula(filepath="{{ filepath }}", cell="{{ column }}{{ end_row|int + 1 }}", formula="=SUM({{ column }}{{ start_row }}:{{ column }}{{ end_row }})")
+
+  # ============================================================================
+  # GITHUB (gh_) - requires github MCP server configured
+  # ============================================================================
+
+  gh_repos:
+    description: Search GitHub repositories
+    params:
+      query: { description: "Search query (e.g., 'org:facebook language:python')" }
+      sort: { default: "stars", description: "Sort by: stars, forks, updated" }
+    body: |
+      github.search_repositories(query="{{ query }}", sort="{{ sort }}", per_page=10)
+
+  gh_issues:
+    description: Search GitHub issues
+    params:
+      query: { description: "Search query (e.g., 'repo:owner/name is:open')" }
+    body: |
+      github.search_issues(query="{{ query }}", per_page=10)
+
+  # ============================================================================
+  # INTERNAL TOOLS (ot_)
+  # ============================================================================
+
+  ot_find:
+    description: Find tools by name pattern
+    params:
+      pattern: { description: "Pattern to match (e.g., 'search', 'query')" }
+    body: |
+      ot.tools(pattern="{{ pattern }}", compact=True)
+
+  ot_ns:
+    description: List all tools in a namespace
+    params:
+      ns: { description: "Namespace (e.g., 'brave', 'db', 'ripgrep')" }
+    body: |
+      ot.tools(ns="{{ ns }}")
+
+  ot_status:
+    description: Show system health and configuration
+    params: {}
+    body: |
+      {"health": ot.health(), "config": ot.config()}
+
+  # ============================================================================
+  # LLM TRANSFORM (llm_)
+  # ============================================================================
+
+  llm_summary:
+    description: Summarize text content
+    params:
+      input: { description: "Text to summarize" }
+      max_words: { default: 100, description: "Target word count" }
+    body: |
+      llm.transform(input="{{ input }}", prompt="Summarize in {{ max_words }} words or less")
+
+  llm_extract:
+    description: Extract structured data from text
+    params:
+      input: { description: "Text to extract from" }
+      schema: { description: "Fields to extract (e.g., 'name, email, phone')" }
+    body: |
+      llm.transform(input="{{ input }}", prompt="Extract {{ schema }} as YAML. Return only the YAML, no explanation.")
+
+  llm_rewrite:
+    description: Rewrite text with style instructions
+    params:
+      input: { description: "Text to rewrite" }
+      style: { default: "concise", description: "Style (concise, formal, casual, technical)" }
+    body: |
+      llm.transform(input="{{ input }}", prompt="Rewrite this text in a {{ style }} style")

@@ -1,0 +1,87 @@
+%% Class Diagram Template
+%% Replace with your actual data model
+
+classDiagram
+    class User {
+        +String id
+        +String email
+        +String name
+        +DateTime createdAt
+        +DateTime updatedAt
+        +login() bool
+        +logout() void
+        +updateProfile(data) User
+    }
+
+    class Organisation {
+        +String id
+        +String name
+        +String slug
+        +Plan plan
+        +getMembers() List~User~
+        +addMember(user) void
+        +removeMember(user) void
+    }
+
+    class Project {
+        +String id
+        +String name
+        +String description
+        +Status status
+        +DateTime deadline
+        +getTasks() List~Task~
+        +addTask(task) void
+        +archive() void
+    }
+
+    class Task {
+        +String id
+        +String title
+        +String description
+        +Priority priority
+        +Status status
+        +User assignee
+        +assign(user) void
+        +complete() void
+    }
+
+    class Comment {
+        +String id
+        +String content
+        +User author
+        +DateTime createdAt
+        +edit(content) void
+        +delete() void
+    }
+
+    %% Relationships
+    User "1" --> "*" Organisation : belongs to
+    Organisation "1" --> "*" Project : owns
+    Project "1" --> "*" Task : contains
+    User "1" --> "*" Task : assigned to
+    Task "1" --> "*" Comment : has
+    User "1" --> "*" Comment : writes
+
+    %% Enums
+    class Status {
+        <<enumeration>>
+        DRAFT
+        ACTIVE
+        COMPLETED
+        ARCHIVED
+    }
+
+    class Priority {
+        <<enumeration>>
+        LOW
+        MEDIUM
+        HIGH
+        CRITICAL
+    }
+
+    class Plan {
+        <<enumeration>>
+        FREE
+        PRO
+        ENTERPRISE
+    }

@@ -1,0 +1,34 @@
+# OneTool Prompts Configuration
+# See: docs/guides/explicit-calls.md, docs/guides/prompting-best-practices.md
+
+instructions: |
+  OneTool executes Python code via the `run` tool
+
+  ## Triggers
+  - `__ot` (recommended)
+  - Alternatives: `__onetool__run`, `__onetool`, `__ot__run`, `mcp__onetool__run`
+
+  ## Code Styles (in order of preference)
+  1. Simple: `__ot foo.bar(x=1)` - single function calls
+  2. Backticks: `__ot `foo.bar(x=1)`` - inline code
+  3. Fence: `__ot` then ```python ... ``` - multi-line code
+
+  ## Tool Discovery
+  `ot.tools()` lists all tools; `ot.tools(pattern="x")` filters by name
+
+  ## Aliases & Snippets
+  - Aliases: Short names for functions. `__ot ws(query="test")` calls `brave.web_search`
+  - Snippets: Templates with `$` prefix. `__ot $snippet_name param=value` expands and runs the template
+
+  ## Call Rules
+  1. **Keyword args only**: `foo.bar(x=1)` not `foo.bar(1)`
+  2. **Batch when possible**: `foo(items=["a","b"])` not multiple calls
+  3. **Return last expression**: For multi-step code, end with the value to return: `x = a(); y = b(); {"a": x, "b": y}`
+
+  ## Tool Output
+  Return the tool output directly. Do not add commentary, formatting, or summaries unless explicitly requested
+
+  ## Do Not
+  - Do not retry successful tool calls to get "better" results unless explicitly requested
+  - Do not compute results yourself if a tool call fails - report the error
+  - Do not explain what you are about to do before calling the tool

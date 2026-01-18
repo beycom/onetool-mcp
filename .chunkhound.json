@@ -1,0 +1,37 @@
+{
+  "database": {
+    "provider": "duckdb"
+  },
+  "embedding": {
+    "provider": "openai",
+    "model": "text-embedding-3-small",
+    "base_url": "https://openrouter.ai/api/v1"
+  },
+  "indexing": {
+    "include": [
+      "**/*.py",
+      "**/*.md",
+      "**/*.yaml",
+      "**/*.toml",
+      "**/*.json"
+    ],
+    "exclude": [
+      "**/node_modules/**",
+      "**/__pycache__/**",
+      "**/.venv/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/*.egg-info/**",
+      "**/.git/**",
+      "**/.local/**",
+      "**/htmlcov/**",
+      "**/.mypy_cache/**",
+      "**/.pytest_cache/**",
+      "**/.ruff_cache/**"
+    ]
+  },
+  "mcp": {
+    "transport": "stdio"
+  },
+  "debug": false
+}
