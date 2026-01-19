@@ -148,6 +148,15 @@ tool-diagram-logs:
     docker compose -f resources/docker/kroki/docker-compose.yaml logs -f
 
 # ============================================================================
+# TOOL: MCP INSPECTOR (MCPJam)
+# ============================================================================
+
+# Launch MCP Inspector for testing MCP servers
+# https://github.com/MCPJam/inspector
+tool-inspector:
+    npx @mcpjam/inspector@latest
+
+# ============================================================================
 # GLOBAL TOOL MANAGEMENT
 # ============================================================================
 

@@ -89,10 +89,30 @@ def parse_snippet(code: str) -> ParsedSnippet:
         return _parse_singleline_snippet(name, first_line[len(name) :], stripped)
 
 
+def _strip_quotes(value: str) -> str:
+    """Strip matching outer quotes from a value.
+
+    Handles both single and double quotes. Only strips if quotes are balanced.
+
+    Args:
+        value: String that may have outer quotes
+
+    Returns:
+        String with outer quotes removed if present and balanced
+    """
+    if len(value) >= 2 and (
+        (value.startswith('"') and value.endswith('"'))
+        or (value.startswith("'") and value.endswith("'"))
+    ):
+        return value[1:-1]
+    return value
+
+
 def _parse_singleline_snippet(name: str, params_str: str, raw: str) -> ParsedSnippet:
-    """Parse single-line snippet parameters: key=value key2=value2.
+    """Parse single-line snippet parameters: key=value key2="value with spaces".
 
     Values extend until the next key= or end of string.
+    Outer quotes are stripped from values (key="value" becomes key=value).
     Escaped equals (\\=) are preserved in values.
     """
     params: dict[str, str] = {}
@@ -113,6 +133,8 @@ def _parse_singleline_snippet(name: str, params_str: str, raw: str) -> ParsedSni
     for key, value in matches:
         # Restore escaped equals and strip whitespace
         value = value.replace(placeholder, "=").strip()
+        # Strip outer quotes from value (e.g., packages="react" -> packages=react)
+        value = _strip_quotes(value)
         params[key] = value
 
     return ParsedSnippet(name=name, params=params, raw=raw)
@@ -123,6 +145,7 @@ def _parse_multiline_snippet(name: str, lines: list[str], raw: str) -> ParsedSni
 
     Blank line terminates the snippet parameters.
     Only the first colon is the separator (colons in values are preserved).
+    Outer quotes are stripped from values for consistency with single-line format.
     """
     params: dict[str, str] = {}
 
@@ -146,6 +169,8 @@ def _parse_multiline_snippet(name: str, lines: list[str], raw: str) -> ParsedSni
             logger.warning(f"Empty key in snippet line: {stripped}")
             continue
 
+        # Strip outer quotes from value for consistency
+        value = _strip_quotes(value)
         params[key] = value
 
     return ParsedSnippet(name=name, params=params, raw=raw)

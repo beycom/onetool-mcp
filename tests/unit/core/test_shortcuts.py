@@ -67,6 +67,42 @@ def test_parse_snippet_basic() -> None:
 
 @pytest.mark.unit
 @pytest.mark.core
+def test_parse_snippet_strips_quotes() -> None:
+    """Verify parse_snippet strips outer quotes from values."""
+    from ot.shortcuts import parse_snippet
+
+    # Double quotes
+    result = parse_snippet('$pkg packages="react, express"')
+    assert result.name == "pkg"
+    assert result.params == {"packages": "react, express"}
+
+    # Single quotes
+    result = parse_snippet("$pkg packages='react, express'")
+    assert result.name == "pkg"
+    assert result.params == {"packages": "react, express"}
+
+    # Mixed quoted and unquoted
+    result = parse_snippet('$test name="Alice" count=5')
+    assert result.params == {"name": "Alice", "count": "5"}
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_parse_snippet_multiline_strips_quotes() -> None:
+    """Verify parse_snippet strips outer quotes in multiline format."""
+    from ot.shortcuts import parse_snippet
+
+    code = '''$pkg
+packages: "react, express"
+limit: 10'''
+
+    result = parse_snippet(code)
+    assert result.name == "pkg"
+    assert result.params == {"packages": "react, express", "limit": "10"}
+
+
+@pytest.mark.unit
+@pytest.mark.core
 def test_parse_snippet_no_params() -> None:
     """Verify parse_snippet works with no parameters."""
     from ot.shortcuts import parse_snippet

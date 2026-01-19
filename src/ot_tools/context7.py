@@ -307,6 +307,14 @@ def doc(
         resolved_key = _resolve_library_key(library_key)
         s.add(resolvedKey=resolved_key)
 
+        # Validate resolved key has org/repo format
+        if "/" not in resolved_key:
+            return (
+                f"Could not resolve library '{library_key}' to org/repo format. "
+                f"Please use full format like 'facebook/react' or 'vercel/next.js'. "
+                f"Use context7.search(query=\"{library_key}\") to find the correct library key."
+            )
+
         # Normalize topic
         normalized_topic = _normalize_topic(topic)
 

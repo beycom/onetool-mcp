@@ -35,10 +35,17 @@ snippets:
   # CONTEXT7 DOCS (c7_)
   # ============================================================================
 
+  c7_search:
+    description: Search for a library to get its key
+    params:
+      query: { description: "Library name to search for (e.g., 'react', 'fastapi')" }
+    body: |
+      context7.search(query="{{ query }}")
+
   c7_docs:
     description: Fetch library documentation for a topic
     params:
-      library: { description: "Library name (e.g., 'fastapi', 'react')" }
+      library: { description: "Library key in org/repo format (e.g., 'facebook/react', 'tiangolo/fastapi')" }
       topic: { default: "", description: "Specific topic to focus on" }
     body: |
       context7.doc(library_key="{{ library }}", topic="{{ topic }}", mode="info")
@@ -46,7 +53,7 @@ snippets:
   c7_examples:
     description: Fetch code examples from library docs
     params:
-      library: { description: "Library name" }
+      library: { description: "Library key in org/repo format (e.g., 'facebook/react')" }
       topic: { description: "Feature/API to get examples for" }
     body: |
       context7.doc(library_key="{{ library }}", topic="{{ topic }}", mode="code")
