@@ -17,6 +17,7 @@ from ot.logging import configure_logging
 from ot.paths import get_effective_cwd, get_global_dir
 from ot_bench.cli import app
 from ot_bench.harness.config import load_config
+from ot_bench.harness.csv_writer import write_results_csv
 from ot_bench.harness.runner import AgenticRunner
 from ot_bench.reporter import ConsoleReporter
 from ot_bench.utils import run_async
@@ -346,6 +347,11 @@ def run(
         "--tui",
         help="Interactive TUI mode for selecting from favorites.",
     ),
+    csv: bool = typer.Option(
+        False,
+        "--csv",
+        help="Write results to CSV file with per-call metrics breakdown.",
+    ),
 ) -> None:
     """Run tasks (direct MCP calls or LLM benchmarks).
 
@@ -442,6 +448,15 @@ def run(
             console.print(f"\nResults written to: {output}")
         except OSError as e:
             console.print(f"[red]Error writing results:[/red] {e}")
+            raise typer.Exit(EXIT_RUNTIME_ERROR) from e
+
+    # Write CSV with per-call metrics if requested
+    if csv:
+        try:
+            csv_path = write_results_csv(all_results)
+            console.print(f"CSV results written to: {csv_path}")
+        except OSError as e:
+            console.print(f"[red]Error writing CSV:[/red] {e}")
             raise typer.Exit(EXIT_RUNTIME_ERROR) from e
 
     # Exit 1 only for runtime errors (exceptions, config errors, interrupts)

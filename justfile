@@ -118,7 +118,7 @@ demo-serve *args:
 
 # Run benchmark scenarios (TUI picker or specific file)
 demo-bench *args:
-    OT_CWD=demo uv run ot-bench run --tui {{ args }}
+    OT_CWD=demo uv run ot-bench run --tui --csv {{ args }}
 
 # Truncate demo log files
 demo-logs-clean:

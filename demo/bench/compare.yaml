@@ -81,6 +81,38 @@ scenarios:
           ```
           Return only latest versions.
 
+      - name: "compare:packages:multi-prompt:mcp"
+        server: [package-version, brave-search, context7, github, fetch, sequential-thinking, filesystem, memory, plantuml, excel, ripgrep, gemini-grounding, chunkhound, mcp-alchemy]
+        tags: [compare, mcp, multi-prompt, npm, pypi]
+        evaluate: version_found
+        prompt: |
+          Get the latest version of express (npm).
+          Use check_npm_versions with: {"dependencies": {"express": "4.0.0"}}
+          Return only the version number.
+          ---PROMPT---
+          Get the latest version of httpx (pypi).
+          Use check_python_versions with: {"requirements": ["httpx==0.20.0"]}
+          Return only the version number.
+          ---PROMPT---
+          Based on the previous results, state the LATEST versions NOT the current version: "express: [version], httpx: [version]".
+
+      - name: "compare:packages:multi-prompt:onetool"
+        server: onetool
+        tags: [compare, onetool, multi-prompt, npm, pypi]
+        evaluate: version_found
+        prompt: |
+          __ot
+          ```python
+          package.version(registry="npm", packages={"express": "4.0.0"})
+          ```
+          ---PROMPT---
+          __ot
+          ```python
+          package.version(registry="pypi", packages={"httpx": "0.20.0"})
+          ```
+          ---PROMPT---
+          Based on the previous results, state the LATEST versions NOT the current version: "express: [version], httpx: [version]".
+
 servers:
   onetool:
     type: stdio

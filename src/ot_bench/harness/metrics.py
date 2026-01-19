@@ -85,6 +85,22 @@ def calculate_cost(
 
 
 @dataclass
+class LLMCallMetrics:
+    """Metrics captured for a single LLM API call within a task.
+
+    Tracks token usage, latency, and tool call count for each individual
+    LLM call in an agentic loop.
+    """
+
+    call_number: int
+    input_tokens: int
+    output_tokens: int
+    tool_calls_made: int
+    cumulative_input: int
+    latency_ms: int
+
+
+@dataclass
 class EvaluationResult:
     """Result from evaluation (pass/fail or scored).
 
@@ -133,6 +149,33 @@ class TaskResult:
     tool_results: list[str] = field(default_factory=list)
     # Tags from task config
     tags: list[str] = field(default_factory=list)
+    # Per-LLM-call metrics for context growth analysis
+    llm_call_metrics: list[LLMCallMetrics] = field(default_factory=list)
+
+    @property
+    def base_context(self) -> int:
+        """Return first call's input tokens (base context size)."""
+        if self.llm_call_metrics:
+            return self.llm_call_metrics[0].input_tokens
+        return 0
+
+    @property
+    def context_growth_avg(self) -> float:
+        """Calculate average context growth per turn.
+
+        Returns average increase in input tokens between consecutive LLM calls.
+        Returns 0 if fewer than 2 calls.
+        """
+        if len(self.llm_call_metrics) < 2:
+            return 0.0
+        total_growth = 0
+        for i in range(1, len(self.llm_call_metrics)):
+            growth = (
+                self.llm_call_metrics[i].input_tokens
+                - self.llm_call_metrics[i - 1].input_tokens
+            )
+            total_growth += growth
+        return total_growth / (len(self.llm_call_metrics) - 1)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for YAML output."""
@@ -168,6 +211,18 @@ class TaskResult:
             result["evaluation"] = eval_dict
         if self.error:
             result["error"] = self.error
+        if self.llm_call_metrics:
+            result["llm_call_metrics"] = [
+                {
+                    "call_number": m.call_number,
+                    "input_tokens": m.input_tokens,
+                    "output_tokens": m.output_tokens,
+                    "tool_calls_made": m.tool_calls_made,
+                    "cumulative_input": m.cumulative_input,
+                    "latency_ms": m.latency_ms,
+                }
+                for m in self.llm_call_metrics
+            ]
         return result
 
 

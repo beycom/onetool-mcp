@@ -431,6 +431,136 @@ The execution engine SHALL be tested via unit tests, not benchmarks.
 
 ---
 
+### Requirement: Per-LLM-Call Metrics
+
+The harness SHALL track metrics for each individual LLM API call within a task execution.
+
+#### Scenario: Track per-call input tokens
+- **GIVEN** a task that makes multiple LLM calls (agentic loop)
+- **WHEN** the task completes
+- **THEN** `TaskResult.llm_call_metrics` SHALL contain one entry per LLM call
+- **AND** each entry SHALL include `input_tokens` from that call's `response.usage.prompt_tokens`
+
+#### Scenario: Track per-call output tokens
+- **GIVEN** a task with multiple LLM calls
+- **WHEN** the task completes
+- **THEN** each `LLMCallMetrics` entry SHALL include `output_tokens` from `response.usage.completion_tokens`
+
+#### Scenario: Track per-call latency
+- **GIVEN** a task with multiple LLM calls
+- **WHEN** each LLM API call is made
+- **THEN** the harness SHALL measure wall-clock time for that call
+- **AND** store it as `latency_ms` in the metrics entry
+
+#### Scenario: Track cumulative input
+- **GIVEN** a task with N LLM calls
+- **WHEN** the task completes
+- **THEN** each `LLMCallMetrics` entry SHALL include `cumulative_input`
+- **AND** `cumulative_input` for call N equals sum of `input_tokens` for calls 1 through N
+- **NOTE** This is a running total computed during execution, not stored redundantly
+
+#### Scenario: Track tool calls per LLM response
+- **GIVEN** an LLM response with tool calls
+- **WHEN** metrics are recorded
+- **THEN** `tool_calls_made` SHALL equal the number of tool calls in that response
+
+### Requirement: Multi-Prompt Tasks
+
+The harness SHALL support tasks with one or more sequential prompts to enable controlled multi-turn benchmarking.
+
+#### Scenario: Split prompt on delimiter
+- **GIVEN** a task YAML with `prompt` field containing `---PROMPT---` delimiter(s)
+- **WHEN** the runner processes the task
+- **THEN** it SHALL split the prompt into multiple prompts on `---PROMPT---`
+- **AND** strip whitespace from each resulting prompt
+
+#### Scenario: Single prompt without delimiter
+- **GIVEN** a task YAML with `prompt` field containing no `---PROMPT---` delimiter
+- **WHEN** the runner processes the task
+- **THEN** it SHALL treat the entire prompt as a single prompt (existing behaviour)
+
+#### Scenario: Execute prompts sequentially
+- **GIVEN** a task with N prompts (split from `prompt` field)
+- **WHEN** the task executes
+- **THEN** the runner SHALL send prompt 1 and wait for its agentic loop to complete
+- **AND** then send prompt 2 with accumulated conversation history
+- **AND** continue until all N prompts are processed
+
+#### Scenario: Accumulate conversation history across prompts
+- **GIVEN** a multi-prompt task where prompt 1 triggers tool calls
+- **WHEN** prompt 2 is sent
+- **THEN** the message history SHALL include prompt 1, its tool calls, tool results, and LLM response
+- **AND** prompt 2 is appended to this history
+
+#### Scenario: Track metrics across all prompts
+- **GIVEN** a multi-prompt task
+- **WHEN** the task completes
+- **THEN** `TaskResult.llm_call_metrics` SHALL include entries for all LLM calls across all prompts
+- **AND** total token counts SHALL reflect the full task execution
+
+### Requirement: Context Growth Analysis
+
+The harness SHALL provide analysis of context growth patterns.
+
+#### Scenario: Estimate base context
+- **GIVEN** a completed task with per-call metrics
+- **WHEN** `TaskResult.base_context` is accessed
+- **THEN** it SHALL return the `input_tokens` from the first LLM call
+- **REASON** First call represents system prompt + tool definitions before conversation history
+
+#### Scenario: Calculate average context growth
+- **GIVEN** a completed task with N > 1 LLM calls
+- **WHEN** `TaskResult.context_growth_avg` is accessed
+- **THEN** it SHALL return the average increase in `input_tokens` between consecutive calls
+- **FORMULA** `sum(call[i+1].input_tokens - call[i].input_tokens) / (N - 1)`
+
+#### Scenario: Handle single LLM call growth
+- **GIVEN** a completed task with exactly 1 LLM call
+- **WHEN** `TaskResult.context_growth_avg` is accessed
+- **THEN** it SHALL return 0
+
+### Requirement: CSV Results Export
+
+The harness SHALL support exporting detailed results to CSV format.
+
+#### Scenario: Enable CSV export
+- **GIVEN** user runs `ot-bench run <file> --csv`
+- **WHEN** the benchmark completes
+- **THEN** results SHALL be written to `tmp/result-{timestamp}.csv`
+- **AND** timestamp format SHALL be `YYYYMMDD-HHMM`
+
+#### Scenario: Include task summary in CSV
+- **GIVEN** CSV export is enabled
+- **WHEN** results are written
+- **THEN** each row SHALL include: `scenario`, `task`, `model`, `server`, `result`, `total_input`, `total_output`, `llm_calls`, `tool_calls`, `duration_s`, `cost_usd`
+
+#### Scenario: Include context analysis in CSV
+- **GIVEN** CSV export is enabled
+- **WHEN** results are written
+- **THEN** columns SHALL include `base_context` and `context_growth_avg`
+
+#### Scenario: Create CSV directory automatically
+- **GIVEN** CSV export is enabled
+- **AND** `tmp/` directory does not exist
+- **WHEN** results are written
+- **THEN** the directory SHALL be created automatically
+
+### Requirement: Enhanced Reporter Output
+
+The harness reporter SHALL display context growth information when relevant.
+
+#### Scenario: Show context columns in verbose mode
+- **GIVEN** user runs with `--verbose` flag
+- **WHEN** results table is displayed
+- **THEN** additional columns SHALL show per-call input tokens
+- **AND** context growth average
+
+#### Scenario: Display context efficiency summary
+- **GIVEN** a scenario with multiple server configurations (e.g., multiple-mcp vs onetool)
+- **WHEN** results are displayed
+- **THEN** the reporter MAY show a summary comparing context efficiency
+- **EXAMPLE** "onetool uses 4% of multiple-mcp context"
+
 ## Schema Reference
 
 ### HarnessConfig (Root)

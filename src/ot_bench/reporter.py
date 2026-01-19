@@ -513,6 +513,11 @@ class ConsoleReporter:
 
         self.console.print(f"[yellow]Scenario[/yellow]: {scenario_result.name}")
 
+        # Check if any task has per-call metrics (for context columns)
+        has_call_metrics = any(
+            task.llm_call_metrics for task in scenario_result.tasks
+        )
+
         # Create comparison table with ROUNDED box style
         table = Table(show_header=True, header_style="bold", box=box.ROUNDED)
         table.add_column("Task", min_width=16, no_wrap=True)
@@ -520,6 +525,12 @@ class ConsoleReporter:
         table.add_column("in", justify="right", no_wrap=True)
         table.add_column("out", justify="right", no_wrap=True)
         table.add_column("tools", justify="right", no_wrap=True)
+
+        # Add context columns if per-call metrics exist
+        if has_call_metrics:
+            table.add_column("base", justify="right", no_wrap=True)
+            table.add_column("growth", justify="right", no_wrap=True)
+
         table.add_column("time", justify="right", no_wrap=True)
         table.add_column("cost", justify="right", no_wrap=True)
         table.add_column("result", justify="right", no_wrap=True)
@@ -534,18 +545,62 @@ class ConsoleReporter:
             if eval_style:
                 eval_display = f"[{eval_style}]{eval_display}[/{eval_style}]"
 
-            table.add_row(
+            row = [
                 task_result.name,
                 tags_str,
                 str(task_result.input_tokens),
                 str(task_result.output_tokens),
                 str(task_result.tool_calls),
+            ]
+
+            # Add context metrics if available
+            if has_call_metrics:
+                base = task_result.base_context
+                growth = task_result.context_growth_avg
+                row.append(str(base) if base else "-")
+                row.append(f"{growth:.0f}" if growth else "-")
+
+            row.extend([
                 f"{task_result.duration_seconds:.0f}s",
                 f"{cost_cents:.2f}¢",
                 eval_display,
-            )
+            ])
+
+            table.add_row(*row)
 
         self.console.print(table)
+
+        # Show per-call breakdown in verbose mode
+        if self.verbose and has_call_metrics:
+            self.console.print("\n  [dim]Per-call breakdown:[/dim]")
+            for task_result in scenario_result.tasks:
+                if task_result.llm_call_metrics:
+                    self.console.print(f"    [cyan]{task_result.name}[/cyan]:")
+                    for m in task_result.llm_call_metrics:
+                        self.console.print(
+                            f"      call{m.call_number}: "
+                            f"in={m.input_tokens}, out={m.output_tokens}, "
+                            f"tools={m.tool_calls_made}, "
+                            f"cumulative={m.cumulative_input}, "
+                            f"latency={m.latency_ms}ms"
+                        )
+
+        # Calculate context efficiency comparison if multiple tasks with metrics
+        tasks_with_metrics = [
+            t for t in scenario_result.tasks if t.llm_call_metrics and t.input_tokens > 0
+        ]
+        if len(tasks_with_metrics) >= 2:
+            # Sort by input tokens to find min and max
+            sorted_tasks = sorted(tasks_with_metrics, key=lambda t: t.input_tokens)
+            min_task = sorted_tasks[0]
+            max_task = sorted_tasks[-1]
+
+            if max_task.input_tokens > 0 and min_task.input_tokens < max_task.input_tokens:
+                ratio = (min_task.input_tokens / max_task.input_tokens) * 100
+                self.console.print(
+                    f"\n  [dim]Context efficiency: "
+                    f"{min_task.name} uses {ratio:.0f}% of {max_task.name} context[/dim]"
+                )
 
         # Show totals with camelCase labels
         totals = scenario_result.calculate_totals()

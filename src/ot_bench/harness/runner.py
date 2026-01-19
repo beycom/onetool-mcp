@@ -21,6 +21,7 @@ from ot_bench.harness.client import (
 from ot_bench.harness.evaluate import evaluate_task, resolve_evaluator
 from ot_bench.harness.metrics import (
     EvaluationResult,
+    LLMCallMetrics,
     ScenarioResult,
     TaskResult,
     calculate_cost,
@@ -29,6 +30,27 @@ from ot_bench.secrets import get_bench_secret
 
 # Delay between tasks to avoid rate limits on external APIs (OpenRouter, etc.)
 TASK_DELAY_SECONDS = 3.0
+
+# Delimiter for multi-prompt tasks
+PROMPT_DELIMITER = "---PROMPT---"
+
+
+def split_prompts(prompt: str) -> list[str]:
+    """Split a prompt into multiple sequential prompts.
+
+    Uses the `---PROMPT---` delimiter to split a single prompt field
+    into multiple prompts for controlled benchmarking.
+
+    Args:
+        prompt: The prompt string (may contain delimiters).
+
+    Returns:
+        List of prompt strings. Single element if no delimiter found.
+    """
+    if not prompt:
+        return [""]
+    parts = prompt.split(PROMPT_DELIMITER)
+    return [p.strip() for p in parts if p.strip()]
 
 if TYPE_CHECKING:
     from ot_bench.harness.config import HarnessConfig, TaskConfig
@@ -345,6 +367,9 @@ class AgenticRunner:
         tool_results: list[str] = []
         response_text = ""
         error_msg: str | None = None
+        # Per-call metrics tracking
+        llm_call_metrics: list[LLMCallMetrics] = []
+        cumulative_input = 0
 
         # Get list of servers to connect to
         server_names = self._get_server_names(task.server)
@@ -459,7 +484,6 @@ class AgenticRunner:
                         messages.append(
                             {"role": "system", "content": "\n".join(system_parts)}
                         )
-                    messages.append({"role": "user", "content": task.prompt or ""})
 
                     # Get combined tools from all servers (with prefixed names if multiple)
                     tools = None
@@ -467,151 +491,191 @@ class AgenticRunner:
                     if multi.all_tools:
                         tools, tool_mapping = multi_server_tools_to_openai(multi)
 
-                    while True:
-                        # Emit LLM request event before calling
-                        self._emit(
-                            "llm_request",
-                            task=task.name,
-                            llm_request=messages,
-                        )
+                    # Split prompts for multi-prompt tasks
+                    prompts = split_prompts(task.prompt or "")
 
-                        # Run sync LLM call in thread so asyncio.timeout can cancel it
-                        response = await asyncio.to_thread(
-                            self.client.chat.completions.create,  # type: ignore[arg-type]
-                            model=model,
-                            messages=messages,
-                            tools=tools,
-                            timeout=timeout,
-                        )
-                        llm_call_count += 1
+                    # Process each prompt sequentially (conversation accumulates)
+                    for prompt_text in prompts:
+                        messages.append({"role": "user", "content": prompt_text})
 
-                        # Track token usage
-                        if response.usage:
-                            input_tokens += response.usage.prompt_tokens
-                            output_tokens += response.usage.completion_tokens
-
-                        assistant_msg = response.choices[0].message
-
-                        if assistant_msg.tool_calls and multi.all_tools:
-                            # Add assistant message with tool calls
-                            messages.append(
-                                {
-                                    "role": "assistant",
-                                    "content": assistant_msg.content,
-                                    "tool_calls": [
-                                        {
-                                            "id": tc.id,
-                                            "type": "function",
-                                            "function": {
-                                                "name": tc.function.name,  # type: ignore[union-attr]
-                                                "arguments": tc.function.arguments,  # type: ignore[union-attr]
-                                            },
-                                        }
-                                        for tc in assistant_msg.tool_calls
-                                    ],
-                                }
+                        while True:
+                            # Emit LLM request event before calling
+                            self._emit(
+                                "llm_request",
+                                task=task.name,
+                                llm_request=messages,
                             )
 
-                            # Execute each tool call
-                            for tc in assistant_msg.tool_calls:
-                                tool_call_count += 1
-                                prefixed_name = tc.function.name  # type: ignore[union-attr]
-                                tool_args = json.loads(tc.function.arguments)  # type: ignore[union-attr]
+                            # Track per-call timing
+                            call_start = time.time()
 
-                                # Look up server and original tool name from mapping
-                                if prefixed_name in tool_mapping:
-                                    server_name, original_tool_name = tool_mapping[
-                                        prefixed_name
-                                    ]
-                                else:
-                                    # Fallback: tool name not prefixed (single server)
-                                    server_name = ""
-                                    original_tool_name = prefixed_name
+                            # Run sync LLM call in thread so asyncio.timeout can cancel it
+                            response = await asyncio.to_thread(
+                                self.client.chat.completions.create,  # type: ignore[arg-type]
+                                model=model,
+                                messages=messages,
+                                tools=tools,
+                                timeout=timeout,
+                            )
 
-                                # Track unique tools used (use prefixed name for display)
-                                if prefixed_name not in tools_used:
-                                    tools_used.append(prefixed_name)
+                            call_latency_ms = int((time.time() - call_start) * 1000)
+                            llm_call_count += 1
 
-                                # Emit tool_call event for progress callback
-                                self._emit(
-                                    "tool_call",
-                                    task=task.name,
-                                    tool_name=prefixed_name,
-                                    tool_args=tool_args,
+                            # Track token usage
+                            call_input_tokens = 0
+                            call_output_tokens = 0
+                            if response.usage:
+                                call_input_tokens = response.usage.prompt_tokens
+                                call_output_tokens = response.usage.completion_tokens
+                                input_tokens += call_input_tokens
+                                output_tokens += call_output_tokens
+                                cumulative_input += call_input_tokens
+
+                            assistant_msg = response.choices[0].message
+
+                            # Count tool calls in this response
+                            call_tool_count = (
+                                len(assistant_msg.tool_calls)
+                                if assistant_msg.tool_calls
+                                else 0
+                            )
+
+                            # Create per-call metrics
+                            llm_call_metrics.append(
+                                LLMCallMetrics(
+                                    call_number=llm_call_count,
+                                    input_tokens=call_input_tokens,
+                                    output_tokens=call_output_tokens,
+                                    tool_calls_made=call_tool_count,
+                                    cumulative_input=cumulative_input,
+                                    latency_ms=call_latency_ms,
                                 )
+                            )
 
-                                # Find the session for this tool
-                                if server_name and server_name in multi.connections:
-                                    session = multi.connections[server_name].session
-                                else:
-                                    # Fallback: search by original name
-                                    session = multi.get_session_for_tool(
-                                        original_tool_name
-                                    )
-
-                                if not session:
-                                    result = f"Error: Tool '{prefixed_name}' not found in any server"
-                                    logger.error(f"[{task.name}] {result}")
-                                else:
-                                    try:
-                                        # Call with original (unprefixed) tool name
-                                        result = await call_tool(
-                                            session,
-                                            original_tool_name,
-                                            tool_args,
-                                            timeout=timeout,
-                                        )
-                                    except TimeoutError:
-                                        result = f"Error: Tool '{prefixed_name}' timed out after {timeout}s"
-                                        logger.error(
-                                            f"[{task.name}] Tool timeout | "
-                                            f"tool={prefixed_name} | timeout={timeout}s"
-                                        )
-                                    except RuntimeError as e:
-                                        # Tool returned an error - pass to LLM
-                                        result = str(e)
-                                        logger.warning(
-                                            f"[{task.name}] Tool error | "
-                                            f"tool={prefixed_name} | error={str(e)[:200]}"
-                                        )
-                                    except Exception as e:
-                                        # Unexpected error - log and pass to LLM
-                                        result = (
-                                            f"Error: Tool '{prefixed_name}' failed: {e}"
-                                        )
-                                        logger.error(
-                                            f"[{task.name}] Tool exception | "
-                                            f"tool={prefixed_name} | type={type(e).__name__} | error={e}"
-                                        )
-
-                                # Emit tool_response event for progress callback
-                                self._emit(
-                                    "tool_response",
-                                    task=task.name,
-                                    tool_name=prefixed_name,
-                                    tool_result=result,
-                                )
-
-                                # Capture tool result for evaluation
-                                tool_results.append(result)
-
+                            if assistant_msg.tool_calls and multi.all_tools:
+                                # Add assistant message with tool calls
                                 messages.append(
                                     {
-                                        "role": "tool",
-                                        "tool_call_id": tc.id,
-                                        "content": result,
+                                        "role": "assistant",
+                                        "content": assistant_msg.content,
+                                        "tool_calls": [
+                                            {
+                                                "id": tc.id,
+                                                "type": "function",
+                                                "function": {
+                                                    "name": tc.function.name,  # type: ignore[union-attr]
+                                                    "arguments": tc.function.arguments,  # type: ignore[union-attr]
+                                                },
+                                            }
+                                            for tc in assistant_msg.tool_calls
+                                        ],
                                     }
                                 )
 
-                        else:
-                            # No tool calls, done
-                            response_text = assistant_msg.content or ""
-                            self._emit(
-                                "llm_response",
-                                task=task.name,
-                                llm_response=response_text,
-                            )
-                            break
+                                # Execute each tool call
+                                for tc in assistant_msg.tool_calls:
+                                    tool_call_count += 1
+                                    prefixed_name = tc.function.name  # type: ignore[union-attr]
+                                    tool_args = json.loads(tc.function.arguments)  # type: ignore[union-attr]
+
+                                    # Look up server and original tool name from mapping
+                                    if prefixed_name in tool_mapping:
+                                        server_name, original_tool_name = tool_mapping[
+                                            prefixed_name
+                                        ]
+                                    else:
+                                        # Fallback: tool name not prefixed (single server)
+                                        server_name = ""
+                                        original_tool_name = prefixed_name
+
+                                    # Track unique tools used (use prefixed name for display)
+                                    if prefixed_name not in tools_used:
+                                        tools_used.append(prefixed_name)
+
+                                    # Emit tool_call event for progress callback
+                                    self._emit(
+                                        "tool_call",
+                                        task=task.name,
+                                        tool_name=prefixed_name,
+                                        tool_args=tool_args,
+                                    )
+
+                                    # Find the session for this tool
+                                    if server_name and server_name in multi.connections:
+                                        session = multi.connections[server_name].session
+                                    else:
+                                        # Fallback: search by original name
+                                        session = multi.get_session_for_tool(
+                                            original_tool_name
+                                        )
+
+                                    if not session:
+                                        result = f"Error: Tool '{prefixed_name}' not found in any server"
+                                        logger.error(f"[{task.name}] {result}")
+                                    else:
+                                        try:
+                                            # Call with original (unprefixed) tool name
+                                            result = await call_tool(
+                                                session,
+                                                original_tool_name,
+                                                tool_args,
+                                                timeout=timeout,
+                                            )
+                                        except TimeoutError:
+                                            result = f"Error: Tool '{prefixed_name}' timed out after {timeout}s"
+                                            logger.error(
+                                                f"[{task.name}] Tool timeout | "
+                                                f"tool={prefixed_name} | timeout={timeout}s"
+                                            )
+                                        except RuntimeError as e:
+                                            # Tool returned an error - pass to LLM
+                                            result = str(e)
+                                            logger.warning(
+                                                f"[{task.name}] Tool error | "
+                                                f"tool={prefixed_name} | error={str(e)[:200]}"
+                                            )
+                                        except Exception as e:
+                                            # Unexpected error - log and pass to LLM
+                                            result = (
+                                                f"Error: Tool '{prefixed_name}' failed: {e}"
+                                            )
+                                            logger.error(
+                                                f"[{task.name}] Tool exception | "
+                                                f"tool={prefixed_name} | type={type(e).__name__} | error={e}"
+                                            )
+
+                                    # Emit tool_response event for progress callback
+                                    self._emit(
+                                        "tool_response",
+                                        task=task.name,
+                                        tool_name=prefixed_name,
+                                        tool_result=result,
+                                    )
+
+                                    # Capture tool result for evaluation
+                                    tool_results.append(result)
+
+                                    messages.append(
+                                        {
+                                            "role": "tool",
+                                            "tool_call_id": tc.id,
+                                            "content": result,
+                                        }
+                                    )
+
+                            else:
+                                # No tool calls, done with this prompt
+                                response_text = assistant_msg.content or ""
+                                self._emit(
+                                    "llm_response",
+                                    task=task.name,
+                                    llm_response=response_text,
+                                )
+                                # Add assistant response to messages for next prompt
+                                messages.append(
+                                    {"role": "assistant", "content": response_text}
+                                )
+                                break
 
         except TimeoutError:
             error_msg = f"Task timed out after {timeout}s"
@@ -644,6 +708,7 @@ class AgenticRunner:
             cost_usd=cost,
             error=error_msg,
             tags=task.tags,
+            llm_call_metrics=llm_call_metrics,
         )
 
     async def run_scenario(
