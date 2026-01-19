@@ -175,7 +175,7 @@ A sample spreadsheet is available at `demo/data/sample_sales.xlsx` with:
 - Extended from 6 to 25 functions
 - Added table operations, search, structure manipulation
 - Pure cell range functions (no file I/O required)
-- Returns YAML-formatted data for LLM consumption
+- Returns JSON-formatted data for LLM consumption
 - Auto-creates parent directories on workbook creation
 - Auto-prepends `=` to formulas if missing
 

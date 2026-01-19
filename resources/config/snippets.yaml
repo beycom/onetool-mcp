@@ -159,7 +159,7 @@ snippets:
     body: |
       package.npm(packages=[{% for pkg in packages.split(',') %}"{{ pkg.strip() }}"{% if not loop.last %}, {% endif %}{% endfor %}])
 
-  pkg_pip:
+  pkg_pypi:
     description: Check latest PyPI package versions
     params:
       packages: { description: "Comma-separated package names" }

@@ -15,11 +15,10 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC
 from typing import Any
 
-import yaml
-
 from ot.config import get_config
 from ot.http_client import http_get
 from ot.logging import LogSpan
+from ot.utils import format_result
 
 NPM_REGISTRY = "https://registry.npmjs.org"
 PYPI_API = "https://pypi.org/pypi"
@@ -31,11 +30,6 @@ def _clean_version(version: str) -> str:
     import re
 
     return re.sub(r"^[\^~>=<]+", "", version)
-
-
-def _to_yaml(data: dict[str, Any] | list[dict[str, Any]]) -> str:
-    """Convert data to YAML flow style."""
-    return yaml.dump(data, default_flow_style=True, allow_unicode=True).strip()
 
 
 def _fetch(url: str, timeout: float | None = None) -> tuple[bool, dict[str, Any] | str]:
@@ -61,7 +55,7 @@ def npm(*, packages: list[str]) -> str:
         packages: List of npm package names
 
     Returns:
-        YAML flow style list of {name, latest} entries
+        JSON list of {name, latest} entries
 
     Example:
         package.npm(packages=["react", "lodash", "express"])
@@ -76,7 +70,7 @@ def pypi(*, packages: list[str]) -> str:
         packages: List of Python package names
 
     Returns:
-        YAML flow style list of {name, latest} entries
+        JSON list of {name, latest} entries
 
     Example:
         package.pypi(packages=["requests", "flask", "fastapi"])
@@ -114,7 +108,7 @@ def models(
         limit: Maximum results to return (default: 20)
 
     Returns:
-        YAML flow style list of models with id, name, context_length, pricing, modality
+        JSON list of models with id, name, context_length, pricing, modality
 
     Example:
         # Search by name
@@ -169,7 +163,7 @@ def models(
             if len(results) >= limit:
                 break
 
-        return _to_yaml(results)
+        return format_result(results)
 
 
 def _fetch_package(
@@ -264,7 +258,7 @@ def version(
         packages: List of package names, or dict mapping names to current versions
 
     Returns:
-        YAML flow style list of version results. If current versions provided,
+        JSON list of version results. If current versions provided,
         includes both 'current' and 'latest' fields.
 
     Examples:
@@ -307,4 +301,4 @@ def version(
         else:
             return f"Unknown registry: {registry}. Use npm, pypi, or openrouter."
 
-        return _to_yaml(results)
+        return format_result(results)

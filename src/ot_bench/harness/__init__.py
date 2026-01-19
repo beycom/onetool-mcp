@@ -21,13 +21,13 @@ from ot_bench.harness.config import (
     load_config,
     load_harness_config,
 )
+from ot_bench.harness.csv_writer import write_results_csv
 from ot_bench.harness.evaluate import (
     evaluate_deterministic,
     evaluate_regex,
     evaluate_task,
     resolve_evaluator,
 )
-from ot_bench.harness.csv_writer import write_results_csv
 from ot_bench.harness.metrics import (
     EvaluationResult,
     LLMCallMetrics,

@@ -47,7 +47,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-import yaml
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.utils.cell import column_index_from_string, coordinate_from_string
@@ -55,6 +54,7 @@ from openpyxl.worksheet.cell_range import CellRange
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from ot.paths import get_effective_cwd
+from ot.utils import format_result
 from ot_sdk import log, worker_main
 
 
@@ -188,7 +188,7 @@ def read(
         end_cell: Ending cell reference (default: auto-detect)
 
     Returns:
-        Data as YAML-formatted list of lists, or error message
+        Data as JSON list of lists, or error message
 
     Example:
         excel.read(filepath="data.xlsx")
@@ -232,7 +232,7 @@ def read(
                 rows.append(row_data)
 
             s.add(rows=len(rows))
-            return yaml.dump(rows, default_flow_style=True, allow_unicode=True).strip()
+            return format_result(rows)
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -344,9 +344,7 @@ def info(*, filepath: str, include_ranges: bool = False) -> str:
 
             wb.close()
             s.add(sheets=len(info_dict["sheets"]))
-            return yaml.dump(
-                info_dict, default_flow_style=False, allow_unicode=True
-            ).strip()
+            return format_result(info_dict, compact=False)
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -500,7 +498,7 @@ def search(
         first_only: Return only first match (default: False)
 
     Returns:
-        YAML list of matches: [{cell: "A1", value: "found text"}, ...]
+        JSON list of matches: [{cell: "A1", value: "found text"}, ...]
 
     Example:
         excel.search(filepath="data.xlsx", pattern="Error*")
@@ -541,15 +539,11 @@ def search(
                         matches.append({"cell": cell.coordinate, "value": text})
                         if first_only:
                             s.add(resultCount=1)
-                            return yaml.dump(
-                                matches[0], default_flow_style=True, allow_unicode=True
-                            ).strip()
+                            return format_result(matches[0])
 
             wb.close()
             s.add(resultCount=len(matches))
-            return yaml.dump(
-                matches, default_flow_style=True, allow_unicode=True
-            ).strip()
+            return format_result(matches)
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -572,7 +566,7 @@ def tables(
         sheet_name: Sheet to inspect (default: active sheet)
 
     Returns:
-        YAML list of table info: [{name, ref}, ...]
+        JSON list of table info: [{name, ref}, ...]
 
     Example:
         excel.tables(filepath="sales.xlsx")
@@ -596,9 +590,7 @@ def tables(
 
             wb.close()
             s.add(resultCount=len(table_list))
-            return yaml.dump(
-                table_list, default_flow_style=True, allow_unicode=True
-            ).strip()
+            return format_result(table_list)
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -618,7 +610,7 @@ def table_info(
         sheet_name: Sheet containing table (default: active sheet)
 
     Returns:
-        YAML dict: name, ref, headers, row_count, has_totals
+        JSON dict: name, ref, headers, row_count, has_totals
 
     Example:
         excel.table_info(filepath="sales.xlsx", table_name="SalesData")
@@ -658,9 +650,7 @@ def table_info(
 
             wb.close()
             s.add(found=True)
-            return yaml.dump(
-                info_dict, default_flow_style=False, allow_unicode=True
-            ).strip()
+            return format_result(info_dict, compact=False)
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -682,8 +672,8 @@ def table_data(
         sheet_name: Sheet containing table
 
     Returns:
-        Single row: YAML dict {header: value, ...}
-        All rows: YAML list of dicts
+        Single row: JSON dict {header: value, ...}
+        All rows: JSON list of dicts
 
     Example:
         excel.table_data(filepath="sales.xlsx", table_name="SalesData")
@@ -732,19 +722,13 @@ def table_data(
             if row_index is not None:
                 if 0 <= row_index < len(rows_data):
                     s.add(resultCount=1)
-                    return yaml.dump(
-                        rows_data[row_index],
-                        default_flow_style=True,
-                        allow_unicode=True,
-                    ).strip()
+                    return format_result(rows_data[row_index])
                 else:
                     s.add(error="row_index_out_of_range")
                     return f"Error: Row index {row_index} out of range (0-{len(rows_data) - 1})"
 
             s.add(resultCount=len(rows_data))
-            return yaml.dump(
-                rows_data, default_flow_style=True, allow_unicode=True
-            ).strip()
+            return format_result(rows_data)
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -1099,7 +1083,7 @@ def sheets(*, filepath: str) -> str:
         filepath: Path to Excel file
 
     Returns:
-        YAML list: [{name, state}, ...]
+        JSON list: [{name, state}, ...]
         state: 'visible', 'hidden', 'veryHidden'
 
     Example:
@@ -1120,9 +1104,7 @@ def sheets(*, filepath: str) -> str:
 
             wb.close()
             s.add(resultCount=len(sheet_list))
-            return yaml.dump(
-                sheet_list, default_flow_style=True, allow_unicode=True
-            ).strip()
+            return format_result(sheet_list)
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -1184,7 +1166,7 @@ def formulas(
         sheet_name: Sheet to inspect (default: active sheet)
 
     Returns:
-        YAML list: [{cell, formula}, ...]
+        JSON list: [{cell, formula}, ...]
 
     Example:
         excel.formulas(filepath="calc.xlsx")
@@ -1218,9 +1200,7 @@ def formulas(
 
             wb.close()
             s.add(resultCount=len(formula_list))
-            return yaml.dump(
-                formula_list, default_flow_style=True, allow_unicode=True
-            ).strip()
+            return format_result(formula_list)
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -1238,7 +1218,7 @@ def hyperlinks(
         sheet_name: Sheet to inspect (default: active sheet)
 
     Returns:
-        YAML list: [{cell, target, display}, ...]
+        JSON list: [{cell, target, display}, ...]
 
     Example:
         excel.hyperlinks(filepath="links.xlsx")
@@ -1270,9 +1250,7 @@ def hyperlinks(
 
             wb.close()
             s.add(resultCount=len(link_list))
-            return yaml.dump(
-                link_list, default_flow_style=True, allow_unicode=True
-            ).strip()
+            return format_result(link_list)
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -1290,7 +1268,7 @@ def merged_cells(
         sheet_name: Sheet to inspect (default: active sheet)
 
     Returns:
-        YAML list of range strings: ["B2:F4", "A10:C10", ...]
+        JSON list of range strings: ["B2:F4", "A10:C10", ...]
 
     Example:
         excel.merged_cells(filepath="report.xlsx")
@@ -1312,9 +1290,7 @@ def merged_cells(
 
             wb.close()
             s.add(resultCount=len(merged_list))
-            return yaml.dump(
-                merged_list, default_flow_style=True, allow_unicode=True
-            ).strip()
+            return format_result(merged_list)
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -1327,7 +1303,7 @@ def named_ranges(*, filepath: str) -> str:
         filepath: Path to Excel file
 
     Returns:
-        YAML list: [{name, value, destinations}, ...]
+        JSON list: [{name, value, destinations}, ...]
 
     Example:
         excel.named_ranges(filepath="report.xlsx")
@@ -1359,9 +1335,7 @@ def named_ranges(*, filepath: str) -> str:
 
             wb.close()
             s.add(resultCount=len(range_list))
-            return yaml.dump(
-                range_list, default_flow_style=True, allow_unicode=True
-            ).strip()
+            return format_result(range_list)
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"

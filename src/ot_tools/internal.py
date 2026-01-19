@@ -47,79 +47,7 @@ from ot.executor.tool_loader import load_tool_registry
 from ot.logging import LogSpan
 from ot.paths import get_effective_cwd
 from ot.proxy import get_proxy_manager
-
-# ============================================================================
-# YAML Formatting Helpers
-# ============================================================================
-
-
-def _needs_quoting(value: str) -> bool:
-    """Check if a string value needs quoting in YAML flow style."""
-    special_chars = (
-        ":",
-        "{",
-        "}",
-        "[",
-        "]",
-        ",",
-        "&",
-        "*",
-        "#",
-        "?",
-        "|",
-        "-",
-        "<",
-        ">",
-        "=",
-        "!",
-        "%",
-        "@",
-        "`",
-        "'",
-        '"',
-    )
-    return (
-        any(c in value for c in special_chars)
-        or value.startswith(" ")
-        or value.endswith(" ")
-    )
-
-
-def _quote_string(dumper: yaml.Dumper, data: str) -> yaml.Node:
-    """Quote strings that contain special characters."""
-    if _needs_quoting(data):
-        return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="'")
-    return dumper.represent_scalar("tag:yaml.org,2002:str", data)
-
-
-def _flow_style_representer(dumper: yaml.Dumper, data: dict[str, Any]) -> yaml.Node:
-    """Custom representer for flow style dicts."""
-    return dumper.represent_mapping(
-        "tag:yaml.org,2002:map", data.items(), flow_style=True
-    )
-
-
-def _to_yaml_flow(data: Any, *, inline_dicts: bool = True) -> str:
-    """Format data as YAML with flow style for compact output."""
-    if data is None:
-        return "null"
-
-    class FlowDumper(yaml.SafeDumper):
-        pass
-
-    FlowDumper.add_representer(str, _quote_string)
-    if inline_dicts:
-        FlowDumper.add_representer(dict, _flow_style_representer)
-
-    result: str = yaml.dump(
-        data,
-        Dumper=FlowDumper,
-        default_flow_style=False,
-        sort_keys=False,
-        allow_unicode=True,
-    )
-    return result.rstrip()
-
+from ot.utils import format_result
 
 # ============================================================================
 # Tool Discovery Functions
@@ -179,7 +107,7 @@ def tools(
         compact: If True, return only name and short description (default: False)
 
     Returns:
-        YAML list of tools with name, signature, description, source
+        JSON list of tools with name, signature, description, source
 
     Example:
         ot.tools()
@@ -272,7 +200,7 @@ def tools(
 
         tools_list.sort(key=lambda t: t["name"])
         s.add("count", len(tools_list))
-        return _to_yaml_flow(tools_list)
+        return format_result(tools_list)
 
 
 # ============================================================================
@@ -399,7 +327,7 @@ def config() -> str:
     Returns aliases, snippets, and server names.
 
     Returns:
-        YAML with configuration summary
+        JSON with configuration summary
 
     Example:
         ot.config()
@@ -422,14 +350,14 @@ def config() -> str:
         s.add("snippetCount", len(result["snippets"]))
         s.add("serverCount", len(result["servers"]))
 
-        return _to_yaml_flow(result, inline_dicts=False)
+        return format_result(result, compact=False)
 
 
 def health() -> str:
     """Check health of OneTool components.
 
     Returns:
-        YAML with component status for registry and proxy
+        JSON with component status for registry and proxy
 
     Example:
         ot.health()
@@ -479,7 +407,7 @@ def health() -> str:
         s.add("registryOk", registry_status["status"] == "ok")
         s.add("proxyOk", proxy_status["status"] == "ok")
 
-        return _to_yaml_flow(result, inline_dicts=False)
+        return format_result(result, compact=False)
 
 
 # ============================================================================

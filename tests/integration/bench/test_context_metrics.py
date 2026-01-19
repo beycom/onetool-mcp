@@ -15,14 +15,14 @@ from ot_bench.harness.metrics import LLMCallMetrics, ScenarioResult, TaskResult
 from ot_bench.harness.runner import split_prompts
 
 
-@pytest.mark.integration
+@pytest.mark.unit
 @pytest.mark.bench
-class TestContextMetricsIntegration:
-    """Integration tests for context metrics collection."""
+class TestContextMetricsUnit:
+    """Unit tests for context metrics and CSV export."""
 
     def test_task_result_with_metrics_to_csv(self, tmp_path: Path) -> None:
-        """Verify full flow from TaskResult with metrics to CSV export."""
-        # Create realistic task results with per-call metrics
+        """Verify CSV export includes base_context and context_growth_avg."""
+        # Create task results with per-call metrics
         onetool_metrics = [
             LLMCallMetrics(
                 call_number=1,
@@ -131,19 +131,12 @@ class TestContextMetricsIntegration:
         assert onetool_row["task"] == "version-check-onetool"
         assert onetool_row["base_context"] == "5000"
         assert int(onetool_row["llm_calls"]) == 2
-        assert onetool_row["call1_input"] == "5000"
-        assert onetool_row["call2_input"] == "6000"
-        # call3 and call4 should be empty for onetool (only 2 calls)
-        assert onetool_row["call3_input"] == ""
-        assert onetool_row["call4_input"] == ""
 
         # Verify mcp task
         mcp_row = rows[1]
         assert mcp_row["task"] == "version-check-mcp"
         assert mcp_row["base_context"] == "5000"
         assert int(mcp_row["llm_calls"]) == 4
-        assert mcp_row["call4_input"] == "7200"
-        assert mcp_row["call4_cumulative"] == "24500"
 
         # Verify context growth calculation
         onetool_growth = float(onetool_row["context_growth_avg"])

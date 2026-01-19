@@ -141,7 +141,7 @@ files = ["src/ot"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src/ot_tools"]
+pythonpath = ["src"]
 addopts = "-v"
 asyncio_mode = "auto"
 cache_dir = "tmp/.pytest_cache"

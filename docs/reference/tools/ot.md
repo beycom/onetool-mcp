@@ -8,23 +8,34 @@ Internal tools for OneTool introspection and management.
 
 | Function | Description |
 |----------|-------------|
-| `ot.tools()` | List all available tools and their signatures |
+| `ot.tools(pattern, ns, compact)` | List all available tools and their signatures |
 | `ot.push(topic, message)` | Publish message to configured topic |
-| `ot.config(path)` | Get configuration value by dotted path |
+| `ot.config()` | Show aliases, snippets, and server names |
 | `ot.health()` | Check tool dependencies and API connectivity |
 | `ot.help(tool)` | Get detailed help for a specific tool |
-| `ot.alias()` | List configured aliases |
-| `ot.snippet(name)` | Get snippet by name |
+| `ot.instructions(ns)` | Get usage instructions for a namespace |
+| `ot.alias(name)` | Show alias definition (use `*` to list all) |
+| `ot.snippet(name)` | Show snippet definition (use `*` to list all) |
 
 ## ot.tools()
 
 List all available tools with signatures.
 
 ```python
+# List all tools
 ot.tools()
+
+# Filter by name pattern
+ot.tools(pattern="search")
+
+# Filter by namespace
+ot.tools(ns="brave")
+
+# Compact output (name and description only)
+ot.tools(compact=True)
 ```
 
-Returns YAML-formatted list of all registered tools.
+Returns JSON-formatted list of all registered tools.
 
 ## ot.push()
 
@@ -40,23 +51,24 @@ Configure topics in `ot-serve.yaml`:
 tools:
   msg:
     topics:
-      - topic: notes
+      - pattern: "notes"
         file: .notes/inbox.md
-      - topic: ideas
+      - pattern: "ideas"
         file: .notes/ideas.md
 ```
 
 ## ot.config()
 
-Get configuration values by dotted path.
+Show key configuration values including aliases, snippets, and servers.
 
 ```python
-# Get timeout setting
-ot.config(path="tools.brave.timeout")
-
-# Get all tool configs
-ot.config(path="tools")
+ot.config()
 ```
+
+Returns JSON with:
+- `aliases` - configured command aliases
+- `snippets` - available snippet templates
+- `servers` - configured MCP server names
 
 ## ot.health()
 
@@ -67,9 +79,9 @@ ot.health()
 ```
 
 Returns status of:
-- Required API keys
-- External dependencies (ripgrep, playwright)
-- Database connections
+- OneTool version and Python version
+- Registry status and tool count
+- Proxy status and server connections
 
 ## ot.help()
 
@@ -77,14 +89,32 @@ Get detailed documentation for a tool.
 
 ```python
 ot.help(tool="brave.search")
+ot.help(tool="ot.tools")
 ```
+
+Returns formatted help with signature, args, returns, and examples.
+
+## ot.instructions()
+
+Get usage instructions for a namespace.
+
+```python
+ot.instructions(ns="brave")
+ot.instructions(ns="github")
+```
+
+Returns instructions from `prompts.yaml` if configured, otherwise generates from tool docstrings.
 
 ## ot.alias()
 
-List configured aliases.
+Show alias definition or list all aliases.
 
 ```python
-ot.alias()
+# Show specific alias
+ot.alias(name="ws")
+
+# List all aliases
+ot.alias(name="*")
 ```
 
 Aliases are defined in config:
@@ -98,10 +128,14 @@ alias:
 
 ## ot.snippet()
 
-Get or execute a snippet template.
+Show snippet definition or list all snippets.
 
 ```python
+# Show specific snippet
 ot.snippet(name="multi_search")
+
+# List all snippets
+ot.snippet(name="*")
 ```
 
 Snippets are defined in config:

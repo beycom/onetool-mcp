@@ -16,7 +16,6 @@ from ot_tools.package import (
     _fetch_package,
     _format_created,
     _format_price,
-    _to_yaml,
     models,
     npm,
     pypi,
@@ -30,7 +29,7 @@ from ot_tools.package import (
 
 
 @pytest.mark.unit
-@pytest.mark.tools
+@pytest.mark.serve
 class TestCleanVersion:
     """Test _clean_version semver prefix stripping."""
 
@@ -63,7 +62,7 @@ class TestCleanVersion:
 
 
 @pytest.mark.unit
-@pytest.mark.tools
+@pytest.mark.serve
 class TestFormatPrice:
     """Test _format_price conversion to $/MTok."""
 
@@ -99,25 +98,7 @@ class TestFormatPrice:
 
 
 @pytest.mark.unit
-@pytest.mark.tools
-class TestToYaml:
-    """Test _to_yaml conversion."""
-
-    def test_dict_to_yaml(self):
-        data = {"name": "react", "version": "18.0.0"}
-        result = _to_yaml(data)
-        assert "name" in result
-        assert "react" in result
-
-    def test_list_to_yaml(self):
-        data = [{"name": "react"}, {"name": "lodash"}]
-        result = _to_yaml(data)
-        assert "react" in result
-        assert "lodash" in result
-
-
-@pytest.mark.unit
-@pytest.mark.tools
+@pytest.mark.serve
 class TestFormatCreated:
     """Test _format_created timestamp formatting."""
 
@@ -140,7 +121,7 @@ class TestFormatCreated:
 
 
 @pytest.mark.unit
-@pytest.mark.tools
+@pytest.mark.serve
 class TestNpm:
     """Test npm function with mocked HTTP."""
 
@@ -175,7 +156,7 @@ class TestNpm:
 
 
 @pytest.mark.unit
-@pytest.mark.tools
+@pytest.mark.serve
 class TestPypi:
     """Test pypi function with mocked HTTP."""
 
@@ -198,7 +179,7 @@ class TestPypi:
 
 
 @pytest.mark.unit
-@pytest.mark.tools
+@pytest.mark.serve
 class TestModels:
     """Test models function with mocked HTTP."""
 
@@ -280,12 +261,12 @@ class TestModels:
 
         result = models(limit=5)
 
-        # Count how many model entries (each starts with "- {")
-        assert result.count("id:") <= 5
+        # Count how many model entries (each has "id":)
+        assert result.count('"id":') <= 5
 
 
 @pytest.mark.unit
-@pytest.mark.tools
+@pytest.mark.serve
 class TestVersion:
     """Test version function with mocked HTTP."""
 
@@ -337,7 +318,7 @@ class TestVersion:
 
 
 @pytest.mark.unit
-@pytest.mark.tools
+@pytest.mark.serve
 class TestFetchPackage:
     """Test _fetch_package helper."""
 
@@ -371,7 +352,7 @@ class TestFetchPackage:
 
 
 @pytest.mark.unit
-@pytest.mark.tools
+@pytest.mark.serve
 class TestFetchModel:
     """Test _fetch_model helper."""
 

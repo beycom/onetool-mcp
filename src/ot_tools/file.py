@@ -45,11 +45,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from ot.config import get_config
 from ot.logging import LogSpan
 from ot.paths import get_effective_cwd
+from ot.utils import format_result
 
 # Optional send2trash for safe deletion
 try:
@@ -223,13 +222,6 @@ def _is_binary(data: bytes, sample_size: int = 8192) -> bool:
     # Check ratio of non-printable characters using pre-computed set
     non_text = sum(1 for byte in sample if byte not in _TEXT_CHARS)
     return non_text / len(sample) > 0.3 if sample else False
-
-
-def _format_yaml(data: Any) -> str:
-    """Format data as YAML."""
-    return yaml.safe_dump(
-        data, default_flow_style=False, allow_unicode=True, sort_keys=False
-    ).rstrip()
 
 
 def _format_size(size_bytes: int) -> str:
@@ -414,7 +406,7 @@ def info(*, path: str) -> str:
         path: Path to file or directory
 
     Returns:
-        YAML formatted metadata
+        JSON formatted metadata
 
     Example:
         file.info(path="src/main.py")
@@ -464,7 +456,7 @@ def info(*, path: str) -> str:
                 info_data["target"] = str(resolved.readlink())
 
             s.add(found=True, type=file_type)
-            return _format_yaml(info_data)
+            return format_result(info_data, compact=False)
 
         except OSError as e:
             s.add(error=str(e))

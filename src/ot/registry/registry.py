@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import ast
+import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import yaml
 from loguru import logger
 
 from ot.logging import LogEntry
@@ -187,14 +187,14 @@ class ToolRegistry:
 
         return tools
 
-    def format_yaml(self) -> str:
-        """Format registry as YAML for LLM context.
+    def format_json(self) -> str:
+        """Format registry as JSON for LLM context.
 
         Returns:
-            YAML string with tool definitions.
+            JSON string with tool definitions.
         """
         if not self._tools:
-            return "tools: []"
+            return '{"tools":[]}'
 
         tools_list: list[dict[str, Any]] = []
         for tool in self._tools.values():
@@ -224,10 +224,7 @@ class ToolRegistry:
 
             tools_list.append(tool_dict)
 
-        result: str = yaml.dump(
-            {"tools": tools_list}, default_flow_style=False, sort_keys=False
-        )
-        return result
+        return json.dumps({"tools": tools_list}, ensure_ascii=False, indent=2)
 
     def format_summary(self) -> str:
         """Format registry summary for CLI display.

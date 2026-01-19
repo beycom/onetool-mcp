@@ -105,13 +105,13 @@ def test_tools_compact_mode_reduces_output_size() -> None:
     # Compact should be significantly smaller
     assert len(compact_output) < len(full_output) * 0.5
 
-    # Compact should not have signature or source fields
-    assert "signature:" not in compact_output
-    assert "source:" not in compact_output
+    # Compact should not have signature or source fields (JSON format)
+    assert '"signature"' not in compact_output
+    assert '"source"' not in compact_output
 
-    # But should still have name and description
-    assert "name:" in compact_output
-    assert "description:" in compact_output
+    # But should still have name and description (JSON format)
+    assert '"name"' in compact_output
+    assert '"description"' in compact_output
 
 
 @pytest.mark.unit
@@ -135,23 +135,22 @@ def test_tools_namespace_filter() -> None:
 @pytest.mark.serve
 def test_health_counts_all_tools() -> None:
     """Verify ot.health() counts all tools including duplicates."""
+    import json
+
     from ot_tools.internal import health
 
     result = health()
 
-    # Should have registry status
-    assert "registry:" in result
-    assert "tool_count:" in result
+    # Should be valid JSON with registry status
+    data = json.loads(result)
+    assert "registry" in data
+    assert "tool_count" in data["registry"]
 
     # The count should include all tools across namespaces
     # (not deduplicated by bare name)
     # We have at least 5 "search" functions in different namespaces
     # so total should be > 30 (rough estimate)
-    import re
-
-    match = re.search(r"tool_count:\s*(\d+)", result)
-    assert match is not None
-    count = int(match.group(1))
+    count = data["registry"]["tool_count"]
     assert count >= 30, f"Expected at least 30 tools, got {count}"
 
 
@@ -159,14 +158,17 @@ def test_health_counts_all_tools() -> None:
 @pytest.mark.serve
 def test_config_returns_configuration() -> None:
     """Verify ot.config() returns configuration information."""
+    import json
+
     from ot_tools.internal import config
 
     result = config()
 
-    # Should have expected sections
-    assert "aliases:" in result
-    assert "snippets:" in result
-    assert "servers:" in result
+    # Should be valid JSON with expected sections
+    data = json.loads(result)
+    assert "aliases" in data
+    assert "snippets" in data
+    assert "servers" in data
 
 
 # ============================================================================

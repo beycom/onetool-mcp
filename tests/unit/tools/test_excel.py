@@ -438,7 +438,7 @@ def test_search_first_only(excel_file: Path) -> None:
 
     assert "Test1" in result
     # Should not contain array markers since it's a single result
-    assert "cell:" in result
+    assert '"cell":' in result
 
 
 @pytest.mark.unit
