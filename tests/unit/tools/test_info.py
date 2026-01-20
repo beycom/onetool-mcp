@@ -118,17 +118,21 @@ def test_tools_compact_mode_reduces_output_size() -> None:
 @pytest.mark.serve
 def test_tools_namespace_filter() -> None:
     """Verify namespace filter works correctly."""
+    import json
+
     from ot_tools.internal import tools
 
     result = tools(ns="ot")
+    tools_list = json.loads(result)
+    tool_names = [t["name"] for t in tools_list]
 
     # Should only have ot namespace tools
-    assert "ot.tools" in result
-    assert "ot.health" in result
+    assert any(name == "ot.tools" for name in tool_names)
+    assert any(name == "ot.health" for name in tool_names)
 
-    # Should NOT have other namespace tools
-    assert "brave." not in result
-    assert "page." not in result
+    # Should NOT have other namespace tools (check actual tool names, not examples)
+    assert not any(name.startswith("brave.") for name in tool_names)
+    assert not any(name.startswith("page.") for name in tool_names)
 
 
 @pytest.mark.unit

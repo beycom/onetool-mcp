@@ -153,10 +153,17 @@ def _create_proxy_introspection_namespace() -> Any:
     return ProxyIntrospectionNamespace()
 
 
+# Cache for execution namespace: key=(registry_id, frozenset of proxy servers)
+_namespace_cache: dict[tuple[int, frozenset[str]], dict[str, Any]] = {}
+
+
 def build_execution_namespace(
     registry: LoadedTools,
 ) -> dict[str, Any]:
     """Build execution namespace with namespace proxies for dot notation access.
+
+    Results are cached based on registry identity and proxy server configuration.
+    Cache is invalidated when registry changes or proxy servers are added/removed.
 
     Provides dot notation access to tools:
     - brave.web_search(query="test")  # namespace access
@@ -171,6 +178,13 @@ def build_execution_namespace(
     from ot.executor.worker_proxy import WorkerNamespaceProxy
     from ot.proxy import get_proxy_manager
 
+    # Check cache - key is registry identity + current proxy servers
+    proxy_mgr = get_proxy_manager()
+    cache_key = (id(registry), frozenset(proxy_mgr.servers))
+
+    if cache_key in _namespace_cache:
+        return _namespace_cache[cache_key]
+
     namespace: dict[str, Any] = {}
 
     # Add namespace proxies for dot notation
@@ -182,7 +196,6 @@ def build_execution_namespace(
             namespace[ns_name] = _create_namespace_proxy(ns_name, ns_funcs)
 
     # Add MCP proxy namespaces (only if not already defined locally)
-    proxy_mgr = get_proxy_manager()
     for server_name in proxy_mgr.servers:
         if server_name not in namespace:
             namespace[server_name] = _create_mcp_proxy_namespace(server_name)
@@ -191,4 +204,11 @@ def build_execution_namespace(
     if "proxy" not in namespace:
         namespace["proxy"] = _create_proxy_introspection_namespace()
 
+    # Cache result (simple LRU: keep last 10)
+    if len(_namespace_cache) >= 10:
+        # Remove oldest entry
+        oldest_key = next(iter(_namespace_cache))
+        del _namespace_cache[oldest_key]
+
+    _namespace_cache[cache_key] = namespace
     return namespace

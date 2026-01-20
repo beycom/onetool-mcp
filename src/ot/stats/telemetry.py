@@ -16,13 +16,21 @@ Data NOT collected:
 - File contents or paths
 - API keys or credentials
 - Personal information
+
+Performance notes:
+- All capture calls are non-blocking (run in background thread)
+- Shutdown has a configurable timeout to prevent hanging
+- Events are batched by PostHog client automatically
 """
 
 from __future__ import annotations
 
+import atexit
 import hashlib
 import os
 import platform
+import queue
+import threading
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
@@ -44,6 +52,59 @@ try:
 except ImportError:
     posthog = None
     POSTHOG_AVAILABLE = False
+
+# Shutdown timeout in seconds
+SHUTDOWN_TIMEOUT = 2.0
+
+# Background event queue and worker
+_event_queue: queue.Queue[tuple[str, dict[str, Any]] | None] = queue.Queue()
+_worker_thread: threading.Thread | None = None
+_worker_running = False
+_worker_lock = threading.Lock()
+
+
+def _worker_loop() -> None:
+    """Background worker that processes telemetry events."""
+    global _worker_running
+    while _worker_running:
+        try:
+            # Wait for event with timeout to allow clean shutdown
+            item = _event_queue.get(timeout=0.5)
+            if item is None:
+                # Shutdown signal
+                break
+            event, properties = item
+            _send_event_sync(event, properties)
+        except queue.Empty:
+            continue
+        except Exception as e:
+            logger.debug(f"Telemetry worker error: {e}")
+
+
+def _send_event_sync(event: str, properties: dict[str, Any]) -> None:
+    """Send event synchronously (called from worker thread)."""
+    if posthog is None:
+        return
+    try:
+        posthog.capture(
+            distinct_id=_get_anonymous_id(),
+            event=event,
+            properties=properties,
+        )
+    except Exception as e:
+        logger.debug(f"Telemetry capture error: {e}")
+
+
+def _start_worker() -> None:
+    """Start the background worker thread."""
+    global _worker_thread, _worker_running
+    with _worker_lock:
+        if _worker_thread is not None and _worker_thread.is_alive():
+            return
+        _worker_running = True
+        _worker_thread = threading.Thread(target=_worker_loop, daemon=True)
+        _worker_thread.start()
+        atexit.register(_atexit_shutdown)
 
 
 def _get_anonymous_id() -> str:
@@ -110,27 +171,68 @@ def initialize_telemetry(config: StatsConfig) -> None:
     # Disable debug mode in production
     posthog.debug = False
 
+    # Start background worker for non-blocking event capture
+    _start_worker()
+
     logger.debug("Telemetry initialized")
 
 
-def shutdown_telemetry() -> None:
-    """Shutdown PostHog and flush pending events."""
-    if not POSTHOG_AVAILABLE or posthog is None:
-        return
+def _atexit_shutdown() -> None:
+    """Cleanup handler for atexit - non-blocking."""
+    shutdown_telemetry(timeout=SHUTDOWN_TIMEOUT)
 
+
+def shutdown_telemetry(timeout: float = SHUTDOWN_TIMEOUT) -> None:
+    """Shutdown telemetry worker and flush pending events.
+
+    Args:
+        timeout: Maximum time to wait for shutdown in seconds.
+    """
+    global _worker_running, _worker_thread
+
+    # Stop the worker
+    with _worker_lock:
+        if not _worker_running:
+            return
+        _worker_running = False
+
+    # Send shutdown signal
     try:
-        posthog.shutdown()
-        logger.debug("Telemetry shutdown")
-    except Exception as e:
-        logger.debug(f"Telemetry shutdown error: {e}")
+        _event_queue.put_nowait(None)
+    except queue.Full:
+        pass
+
+    # Wait for worker to finish (with timeout)
+    if _worker_thread is not None:
+        _worker_thread.join(timeout=timeout)
+        if _worker_thread.is_alive():
+            logger.debug("Telemetry worker did not stop in time")
+
+    # Flush PostHog with timeout (run in separate thread to enforce timeout)
+    if POSTHOG_AVAILABLE and posthog is not None:
+
+        def _flush() -> None:
+            try:
+                posthog.shutdown()
+            except Exception as e:
+                logger.debug(f"Telemetry flush error: {e}")
+
+        flush_thread = threading.Thread(target=_flush, daemon=True)
+        flush_thread.start()
+        flush_thread.join(timeout=timeout)
+        if flush_thread.is_alive():
+            logger.debug("Telemetry flush timed out")
+        else:
+            logger.debug("Telemetry shutdown")
 
 
 def capture_event(
     event: str,
     properties: dict[str, Any] | None = None,
 ) -> None:
-    """Capture a telemetry event.
+    """Capture a telemetry event (non-blocking).
 
+    Events are queued and sent in a background thread.
     No-op if telemetry is disabled or posthog not available.
 
     Args:
@@ -146,15 +248,16 @@ def capture_event(
     if os.getenv("ONETOOL_TELEMETRY_DISABLED") == "1":
         return
 
+    # Check if worker is running
+    if not _worker_running:
+        return
+
+    # Queue the event (non-blocking)
     try:
-        posthog.capture(
-            distinct_id=_get_anonymous_id(),
-            event=event,
-            properties=properties or {},
-        )
-    except Exception as e:
-        # Never let telemetry errors affect the main application
-        logger.debug(f"Telemetry capture error: {e}")
+        _event_queue.put_nowait((event, properties or {}))
+    except queue.Full:
+        # Drop event if queue is full - never block main thread
+        logger.debug("Telemetry queue full, dropping event")
 
 
 def capture_server_started(version: str, tool_count: int) -> None:

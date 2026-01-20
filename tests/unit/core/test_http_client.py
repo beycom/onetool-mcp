@@ -27,9 +27,10 @@ def test_http_get_json_response() -> None:
     mock_response.json.return_value = {"key": "value"}
     mock_response.status_code = 200
 
-    with patch("ot.http_client.httpx.Client") as mock_client:
-        mock_client.return_value.__enter__.return_value.get.return_value = mock_response
+    mock_client = MagicMock()
+    mock_client.get.return_value = mock_response
 
+    with patch("ot.http_client._get_shared_client", return_value=mock_client):
         success, result = http_get("https://api.example.com/data")
 
         assert success is True
@@ -47,9 +48,10 @@ def test_http_get_text_response() -> None:
     mock_response.text = "Hello, World!"
     mock_response.status_code = 200
 
-    with patch("ot.http_client.httpx.Client") as mock_client:
-        mock_client.return_value.__enter__.return_value.get.return_value = mock_response
+    mock_client = MagicMock()
+    mock_client.get.return_value = mock_response
 
+    with patch("ot.http_client._get_shared_client", return_value=mock_client):
         success, result = http_get("https://api.example.com/text")
 
         assert success is True
@@ -67,20 +69,21 @@ def test_http_get_with_params_and_headers() -> None:
     mock_response.json.return_value = {}
     mock_response.status_code = 200
 
-    with patch("ot.http_client.httpx.Client") as mock_client:
-        mock_get = mock_client.return_value.__enter__.return_value.get
-        mock_get.return_value = mock_response
+    mock_client = MagicMock()
+    mock_client.get.return_value = mock_response
 
+    with patch("ot.http_client._get_shared_client", return_value=mock_client):
         http_get(
             "https://api.example.com/search",
             params={"q": "test"},
             headers={"Authorization": "Bearer token"},
         )
 
-        mock_get.assert_called_once_with(
+        mock_client.get.assert_called_once_with(
             "https://api.example.com/search",
             params={"q": "test"},
             headers={"Authorization": "Bearer token"},
+            timeout=30.0,
         )
 
 
@@ -94,14 +97,14 @@ def test_http_get_http_status_error() -> None:
     mock_response.status_code = 404
     mock_response.text = "Not Found"
 
-    with patch("ot.http_client.httpx.Client") as mock_client:
-        mock_get = mock_client.return_value.__enter__.return_value.get
-        mock_get.return_value.raise_for_status.side_effect = httpx.HTTPStatusError(
-            message="Not Found",
-            request=MagicMock(),
-            response=mock_response,
-        )
+    mock_client = MagicMock()
+    mock_client.get.return_value.raise_for_status.side_effect = httpx.HTTPStatusError(
+        message="Not Found",
+        request=MagicMock(),
+        response=mock_response,
+    )
 
+    with patch("ot.http_client._get_shared_client", return_value=mock_client):
         success, result = http_get("https://api.example.com/missing")
 
         assert success is False
@@ -115,10 +118,10 @@ def test_http_get_request_error() -> None:
     """http_get returns error message for request errors."""
     from ot.http_client import http_get
 
-    with patch("ot.http_client.httpx.Client") as mock_client:
-        mock_get = mock_client.return_value.__enter__.return_value.get
-        mock_get.side_effect = httpx.RequestError("Connection refused")
+    mock_client = MagicMock()
+    mock_client.get.side_effect = httpx.RequestError("Connection refused")
 
+    with patch("ot.http_client._get_shared_client", return_value=mock_client):
         success, result = http_get("https://api.example.com/data")
 
         assert success is False
@@ -128,7 +131,7 @@ def test_http_get_request_error() -> None:
 @pytest.mark.unit
 @pytest.mark.core
 def test_http_get_with_timeout() -> None:
-    """http_get uses provided timeout."""
+    """http_get uses provided timeout in the request."""
     from ot.http_client import http_get
 
     mock_response = MagicMock()
@@ -136,12 +139,15 @@ def test_http_get_with_timeout() -> None:
     mock_response.json.return_value = {}
     mock_response.status_code = 200
 
-    with patch("ot.http_client.httpx.Client") as mock_client:
-        mock_client.return_value.__enter__.return_value.get.return_value = mock_response
+    mock_client = MagicMock()
+    mock_client.get.return_value = mock_response
 
+    with patch("ot.http_client._get_shared_client", return_value=mock_client):
         http_get("https://api.example.com/data", timeout=60.0)
 
-        mock_client.assert_called_once_with(timeout=60.0)
+        mock_client.get.assert_called_once()
+        call_kwargs = mock_client.get.call_args.kwargs
+        assert call_kwargs["timeout"] == 60.0
 
 
 @pytest.mark.unit
@@ -155,12 +161,15 @@ def test_http_get_default_timeout() -> None:
     mock_response.json.return_value = {}
     mock_response.status_code = 200
 
-    with patch("ot.http_client.httpx.Client") as mock_client:
-        mock_client.return_value.__enter__.return_value.get.return_value = mock_response
+    mock_client = MagicMock()
+    mock_client.get.return_value = mock_response
 
+    with patch("ot.http_client._get_shared_client", return_value=mock_client):
         http_get("https://api.example.com/data")
 
-        mock_client.assert_called_once_with(timeout=30.0)
+        mock_client.get.assert_called_once()
+        call_kwargs = mock_client.get.call_args.kwargs
+        assert call_kwargs["timeout"] == 30.0
 
 
 @pytest.mark.unit
@@ -174,9 +183,10 @@ def test_http_get_with_log_span() -> None:
     mock_response.json.return_value = {"result": "ok"}
     mock_response.status_code = 200
 
-    with patch("ot.http_client.httpx.Client") as mock_client:
-        mock_client.return_value.__enter__.return_value.get.return_value = mock_response
+    mock_client = MagicMock()
+    mock_client.get.return_value = mock_response
 
+    with patch("ot.http_client._get_shared_client", return_value=mock_client):
         with patch("ot.logging.LogSpan") as mock_span_class:
             mock_span = MagicMock()
             mock_span_class.return_value = mock_span

@@ -7,24 +7,12 @@ Requires PyMuPDF, python-docx, python-pptx, and openpyxl.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
-from unittest.mock import patch
 
 import pytest
-
-if TYPE_CHECKING:
-    from collections.abc import Generator
 
 
 # Sample files directory
 SAMPLE_DIR = Path(__file__).parent.parent.parent.parent / "scratch" / "tools" / "convert" / "input"
-
-
-@pytest.fixture(autouse=True)
-def mock_convert_config(tmp_path: Path) -> Generator[None, None, None]:
-    """Mock convert tool config - patches effective cwd."""
-    with patch("ot_tools.convert.get_effective_cwd", return_value=SAMPLE_DIR):
-        yield
 
 
 @pytest.fixture

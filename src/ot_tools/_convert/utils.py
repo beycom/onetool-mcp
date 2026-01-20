@@ -19,9 +19,17 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+# Cache for file checksums: key=(path, mtime, size), value=checksum
+# Avoids re-reading file for checksum when conversion will read it anyway
+_checksum_cache: dict[tuple[str, float, int], str] = {}
+_CHECKSUM_CACHE_MAX_SIZE = 100
+
 
 def compute_file_checksum(path: Path) -> str:
-    """Compute SHA256 checksum of a file.
+    """Compute SHA256 checksum of a file (with caching).
+
+    Results are cached based on path+mtime+size to avoid redundant reads
+    when the same file is processed multiple times.
 
     Args:
         path: Path to file
@@ -29,11 +37,30 @@ def compute_file_checksum(path: Path) -> str:
     Returns:
         Checksum in format 'sha256:abc123...'
     """
+    # Get file stats for cache key
+    stat = path.stat()
+    cache_key = (str(path.resolve()), stat.st_mtime, stat.st_size)
+
+    # Check cache first
+    if cache_key in _checksum_cache:
+        return _checksum_cache[cache_key]
+
+    # Compute checksum
     sha256 = hashlib.sha256()
     with path.open("rb") as f:
         for chunk in iter(lambda: f.read(8192), b""):
             sha256.update(chunk)
-    return f"sha256:{sha256.hexdigest()}"
+    checksum = f"sha256:{sha256.hexdigest()}"
+
+    # Cache result (with simple size limit)
+    if len(_checksum_cache) >= _CHECKSUM_CACHE_MAX_SIZE:
+        # Remove oldest entries (simple approach: clear half)
+        keys = list(_checksum_cache.keys())
+        for key in keys[: len(keys) // 2]:
+            del _checksum_cache[key]
+
+    _checksum_cache[cache_key] = checksum
+    return checksum
 
 
 def compute_image_hash(data: bytes) -> str:

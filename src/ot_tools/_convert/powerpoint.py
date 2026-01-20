@@ -54,23 +54,28 @@ def convert_powerpoint(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     prs: PresentationType = Presentation(str(input_path))
+    try:
+        # Get metadata for frontmatter
+        checksum = compute_file_checksum(input_path)
+        mtime = get_mtime_iso(input_path)
+        total_slides = len(prs.slides)
 
-    # Get metadata for frontmatter
-    checksum = compute_file_checksum(input_path)
-    mtime = get_mtime_iso(input_path)
-    total_slides = len(prs.slides)
+        # Set up images directory
+        images_dir = output_dir / f"{input_path.stem}_images"
+        writer = IncrementalWriter()
+        images_extracted = 0
 
-    # Set up images directory
-    images_dir = output_dir / f"{input_path.stem}_images"
-    writer = IncrementalWriter()
-    images_extracted = 0
-
-    # Process slides
-    for slide_idx, slide in enumerate(prs.slides, 1):
-        imgs = _process_slide(
-            slide, slide_idx, writer, images_dir, include_notes
-        )
-        images_extracted += imgs
+        # Process slides
+        for slide_idx, slide in enumerate(prs.slides, 1):
+            imgs = _process_slide(
+                slide, slide_idx, writer, images_dir, include_notes
+            )
+            images_extracted += imgs
+    finally:
+        # Ensure presentation resources are released
+        # python-pptx Presentation doesn't have explicit close, but we can
+        # help garbage collection by clearing references
+        del prs
 
     # Generate TOC
     headings = writer.get_headings()

@@ -24,6 +24,7 @@ namespace = "convert"
 __all__ = ["auto", "excel", "pdf", "powerpoint", "word"]
 
 import asyncio
+import os
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -40,6 +41,22 @@ from ot_tools._convert import (
 
 # Type alias for converter functions
 ConverterFunc = Callable[[Path, Path, str], dict[str, Any]]
+
+# Shared thread pool for file conversions (created lazily, sized for parallelism)
+_conversion_executor: ThreadPoolExecutor | None = None
+
+
+def _get_conversion_executor() -> ThreadPoolExecutor:
+    """Get or create the shared conversion thread pool."""
+    global _conversion_executor
+    if _conversion_executor is None:
+        # Use CPU count but cap at reasonable max for I/O-bound work
+        max_workers = min(os.cpu_count() or 4, 8)
+        _conversion_executor = ThreadPoolExecutor(
+            max_workers=max_workers,
+            thread_name_prefix="convert",
+        )
+    return _conversion_executor
 
 
 def _resolve_glob(pattern: str) -> list[Path]:
@@ -123,13 +140,13 @@ async def _convert_file_async(
     source_rel: str,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Run conversion in thread pool for async execution."""
+    """Run conversion in shared thread pool for async execution."""
     loop = asyncio.get_event_loop()
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        return await loop.run_in_executor(
-            executor,
-            lambda: converter(input_path, output_dir, source_rel, **kwargs),
-        )
+    executor = _get_conversion_executor()
+    return await loop.run_in_executor(
+        executor,
+        lambda: converter(input_path, output_dir, source_rel, **kwargs),
+    )
 
 
 async def _convert_batch_async(

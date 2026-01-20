@@ -50,50 +50,55 @@ def convert_word(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     doc: DocumentType = Document(str(input_path))
+    try:
+        # Get metadata for frontmatter
+        checksum = compute_file_checksum(input_path)
+        mtime = get_mtime_iso(input_path)
 
-    # Get metadata for frontmatter
-    checksum = compute_file_checksum(input_path)
-    mtime = get_mtime_iso(input_path)
+        # Count pages (approximate - Word doesn't store exact page count)
+        # Use paragraph count / 40 as rough estimate
+        page_count = max(1, len(doc.paragraphs) // 40)
 
-    # Count pages (approximate - Word doesn't store exact page count)
-    # Use paragraph count / 40 as rough estimate
-    page_count = max(1, len(doc.paragraphs) // 40)
+        # Set up images directory
+        images_dir = output_dir / f"{input_path.stem}_images"
+        writer = IncrementalWriter()
+        images_extracted = 0
+        paragraphs_processed = 0
+        tables_processed = 0
+        processed_image_rels: set[str] = set()
 
-    # Set up images directory
-    images_dir = output_dir / f"{input_path.stem}_images"
-    writer = IncrementalWriter()
-    images_extracted = 0
-    paragraphs_processed = 0
-    tables_processed = 0
-    processed_image_rels: set[str] = set()
+        # Process document elements in order
+        for element in doc.element.body:
+            if isinstance(element, CT_P):
+                paragraph = Paragraph(element, doc)
+                _process_paragraph(
+                    paragraph, writer, doc, images_dir, processed_image_rels
+                )
+                if paragraph.text.strip():
+                    paragraphs_processed += 1
+                    # Count images extracted during paragraph processing
+                    images_extracted = len(processed_image_rels)
 
-    # Process document elements in order
-    for element in doc.element.body:
-        if isinstance(element, CT_P):
-            paragraph = Paragraph(element, doc)
-            _process_paragraph(
-                paragraph, writer, doc, images_dir, processed_image_rels
-            )
-            if paragraph.text.strip():
-                paragraphs_processed += 1
-                # Count images extracted during paragraph processing
-                images_extracted = len(processed_image_rels)
+            elif isinstance(element, CT_Tbl):
+                table = Table(element, doc)
+                _process_table(table, writer)
+                tables_processed += 1
 
-        elif isinstance(element, CT_Tbl):
-            table = Table(element, doc)
-            _process_table(table, writer)
-            tables_processed += 1
-
-    # Extract remaining images not caught inline
-    for rel_id, rel in doc.part.rels.items():
-        if "image" in rel.target_ref and rel_id not in processed_image_rels:
-            try:
-                image_data = rel.target_part.blob
-                save_image(image_data, images_dir, rel.target_part.content_type)
-                images_extracted += 1
-                processed_image_rels.add(rel_id)
-            except Exception:
-                continue
+        # Extract remaining images not caught inline
+        for rel_id, rel in doc.part.rels.items():
+            if "image" in rel.target_ref and rel_id not in processed_image_rels:
+                try:
+                    image_data = rel.target_part.blob
+                    save_image(image_data, images_dir, rel.target_part.content_type)
+                    images_extracted += 1
+                    processed_image_rels.add(rel_id)
+                except Exception:
+                    continue
+    finally:
+        # Ensure document resources are released
+        # python-docx Document doesn't have explicit close, but we can
+        # help garbage collection by clearing references
+        del doc
 
     # Generate TOC
     headings = writer.get_headings()
@@ -233,19 +238,20 @@ def _process_drawing(
             )
 
             if r_embed and r_embed not in processed_rels:
-                for rel_id, rel in doc.part.rels.items():
-                    if rel_id == r_embed and "image" in rel.target_ref:
-                        try:
-                            image_data = rel.target_part.blob
-                            processed_rels.add(r_embed)
+                # Direct dictionary lookup instead of iteration - O(1) vs O(n)
+                rel = doc.part.rels.get(r_embed)
+                if rel is not None and "image" in rel.target_ref:
+                    try:
+                        image_data = rel.target_part.blob
+                        processed_rels.add(r_embed)
 
-                            img_path = save_image(
-                                image_data, images_dir, rel.target_part.content_type
-                            )
-                            rel_path = f"{images_dir.name}/{img_path.name}"
-                            return f"![{img_path.name}]({rel_path})"
-                        except Exception:
-                            return ""
+                        img_path = save_image(
+                            image_data, images_dir, rel.target_part.content_type
+                        )
+                        rel_path = f"{images_dir.name}/{img_path.name}"
+                        return f"![{img_path.name}]({rel_path})"
+                    except Exception:
+                        return ""
     except Exception:
         pass
     return ""

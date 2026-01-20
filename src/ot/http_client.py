@@ -6,6 +6,7 @@ Provides a unified http_get() function for making HTTP GET requests with:
 - Optional timeout (defaults from config)
 - Optional LogSpan integration for observability
 - Content-type aware response parsing (JSON or text)
+- Connection pooling via shared client singleton
 
 Usage:
     from ot.http_client import http_get
@@ -30,9 +31,44 @@ Usage:
 
 from __future__ import annotations
 
+import atexit
+import threading
 from typing import Any
 
 import httpx
+
+# Global shared HTTP client with connection pooling
+_client: httpx.Client | None = None
+_client_lock = threading.Lock()
+
+
+def _get_shared_client() -> httpx.Client:
+    """Get or create the shared HTTP client with connection pooling."""
+    global _client
+    if _client is None:
+        with _client_lock:
+            if _client is None:
+                _client = httpx.Client(
+                    timeout=30.0,
+                    limits=httpx.Limits(
+                        max_keepalive_connections=20,
+                        max_connections=100,
+                        keepalive_expiry=30.0,
+                    ),
+                )
+                atexit.register(_shutdown_client)
+    return _client
+
+
+def _shutdown_client() -> None:
+    """Close the shared client on exit."""
+    global _client
+    if _client is not None:
+        try:
+            _client.close()
+        except Exception:
+            pass
+        _client = None
 
 
 def http_get(
@@ -71,21 +107,21 @@ def http_get(
         span.__enter__()
 
     try:
-        with httpx.Client(timeout=timeout) as client:
-            response = client.get(url, params=params, headers=headers)
-            response.raise_for_status()
+        client = _get_shared_client()
+        response = client.get(url, params=params, headers=headers, timeout=timeout)
+        response.raise_for_status()
 
-            # Parse based on content type
-            content_type = response.headers.get("content-type", "")
-            if "application/json" in content_type:
-                result = response.json()
-            else:
-                result = response.text
+        # Parse based on content type
+        content_type = response.headers.get("content-type", "")
+        if "application/json" in content_type:
+            result = response.json()
+        else:
+            result = response.text
 
-            if span:
-                span.add("status", response.status_code)
+        if span:
+            span.add("status", response.status_code)
 
-            return True, result
+        return True, result
 
     except httpx.HTTPStatusError as e:
         error_msg = f"HTTP error ({e.response.status_code}): {e.response.text[:200]}"

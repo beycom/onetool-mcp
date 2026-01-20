@@ -94,6 +94,64 @@ def _get_outline_headings(doc: fitz.Document) -> list[tuple[int, str, int]]:
         return []
 
 
+def _extract_and_save_image(
+    doc: fitz.Document,
+    xref: int,
+    images_dir: Path,
+    writer: IncrementalWriter,
+) -> bool:
+    """Extract a single image and save to disk.
+
+    This function encapsulates image processing so that memory (image_bytes)
+    is freed when the function returns, preventing accumulation.
+
+    Args:
+        doc: PyMuPDF document
+        xref: Image xref in the document
+        images_dir: Directory for saving images
+        writer: Incremental writer for markdown output
+
+    Returns:
+        True if image was successfully extracted, False otherwise
+    """
+    base_image = doc.extract_image(xref)
+    image_bytes = base_image.get("image")
+    smask = base_image.get("smask")
+
+    if not image_bytes:
+        return False
+
+    # Handle soft-mask (transparency)
+    if smask:
+        try:
+            sm_base = doc.extract_image(smask)
+            sm_bytes = sm_base.get("image")
+            if sm_bytes:
+                image_bytes = _merge_smask(image_bytes, sm_bytes)
+                extension = "png"
+            else:
+                extension = _detect_image_format(image_bytes)
+        except Exception:
+            extension = _detect_image_format(image_bytes)
+    else:
+        extension = _detect_image_format(image_bytes)
+
+    # Hash-based naming for diff stability
+    img_hash = compute_image_hash(image_bytes)
+    img_name = f"img_{img_hash}.{extension}"
+    img_path = images_dir / img_name
+
+    # Only write if not already extracted (dedup by hash)
+    if not img_path.exists():
+        images_dir.mkdir(parents=True, exist_ok=True)
+        img_path.write_bytes(image_bytes)
+
+    rel_path = f"{images_dir.name}/{img_name}"
+    writer.write(f"![{img_name}]({rel_path})\n\n")
+
+    return True
+
+
 def convert_pdf(
     input_path: Path,
     output_dir: Path,
@@ -112,89 +170,59 @@ def convert_pdf(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     doc = fitz.open(input_path)
-    total_pages = len(doc)
+    try:
+        total_pages = len(doc)
 
-    # Get metadata for frontmatter
-    checksum = compute_file_checksum(input_path)
-    mtime = get_mtime_iso(input_path)
+        # Get metadata for frontmatter
+        checksum = compute_file_checksum(input_path)
+        mtime = get_mtime_iso(input_path)
 
-    # Get outline for heading insertion
-    outline = _get_outline_headings(doc)
-    outline_by_page: dict[int, list[tuple[int, str]]] = {}
-    for level, title, page in outline:
-        if page not in outline_by_page:
-            outline_by_page[page] = []
-        outline_by_page[page].append((level, title))
+        # Get outline for heading insertion
+        outline = _get_outline_headings(doc)
+        outline_by_page: dict[int, list[tuple[int, str]]] = {}
+        for level, title, page in outline:
+            if page not in outline_by_page:
+                outline_by_page[page] = []
+            outline_by_page[page].append((level, title))
 
-    # Set up images directory
-    images_dir = output_dir / f"{input_path.stem}_images"
-    writer = IncrementalWriter()
-    images_extracted = 0
+        # Set up images directory
+        images_dir = output_dir / f"{input_path.stem}_images"
+        writer = IncrementalWriter()
+        images_extracted = 0
 
-    # Process pages with lazy loading
-    for pageno in range(total_pages):
-        page = doc[pageno]
-        page_num = pageno + 1
+        # Process pages with lazy loading
+        for pageno in range(total_pages):
+            page = doc[pageno]
+            page_num = pageno + 1
 
-        # Insert outline headings for this page
-        if page_num in outline_by_page:
-            for level, title in outline_by_page[page_num]:
-                writer.write_heading(min(level, 6), title)
-        elif not outline:
-            # No outline - use page numbers as structure
-            writer.write_heading(1, f"Page {page_num}")
+            # Insert outline headings for this page
+            if page_num in outline_by_page:
+                for level, title in outline_by_page[page_num]:
+                    writer.write_heading(min(level, 6), title)
+            elif not outline:
+                # No outline - use page numbers as structure
+                writer.write_heading(1, f"Page {page_num}")
 
-        # Extract text
-        text = page.get_text("text")
-        if text.strip():
-            writer.write(text.rstrip() + "\n\n")
+            # Extract text
+            text = page.get_text("text")
+            if text.strip():
+                writer.write(text.rstrip() + "\n\n")
 
-        # Extract images
-        image_list = page.get_images(full=True)
-        for img in image_list:
-            xref = img[0]
-            try:
-                base_image = doc.extract_image(xref)
-                image_bytes = base_image.get("image")
-                smask = base_image.get("smask")
-
-                if not image_bytes:
+            # Extract images - process one at a time to minimize memory
+            image_list = page.get_images(full=True)
+            for img in image_list:
+                xref = img[0]
+                try:
+                    result = _extract_and_save_image(
+                        doc, xref, images_dir, writer
+                    )
+                    if result:
+                        images_extracted += 1
+                except Exception:
+                    # Skip failed image extraction
                     continue
-
-                # Handle soft-mask
-                if smask:
-                    try:
-                        sm_base = doc.extract_image(smask)
-                        sm_bytes = sm_base.get("image")
-                        if sm_bytes:
-                            image_bytes = _merge_smask(image_bytes, sm_bytes)
-                            extension = "png"
-                        else:
-                            extension = _detect_image_format(image_bytes)
-                    except Exception:
-                        extension = _detect_image_format(image_bytes)
-                else:
-                    extension = _detect_image_format(image_bytes)
-
-                # Hash-based naming for diff stability
-                img_hash = compute_image_hash(image_bytes)
-                img_name = f"img_{img_hash}.{extension}"
-                img_path = images_dir / img_name
-
-                # Only write if not already extracted (dedup by hash)
-                if not img_path.exists():
-                    images_dir.mkdir(parents=True, exist_ok=True)
-                    img_path.write_bytes(image_bytes)
-
-                images_extracted += 1
-                rel_path = f"{images_dir.name}/{img_name}"
-                writer.write(f"![{img_name}]({rel_path})\n\n")
-
-            except Exception:
-                # Skip failed image extraction
-                continue
-
-    doc.close()
+    finally:
+        doc.close()
 
     # Generate TOC
     headings = writer.get_headings()

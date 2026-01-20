@@ -10,15 +10,30 @@ from __future__ import annotations
 
 import json
 import os
-import select
+import queue
 import subprocess
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
+
+# Shared thread pool for non-blocking I/O operations
+_io_executor: ThreadPoolExecutor | None = None
+_io_executor_lock = threading.Lock()
+
+
+def _get_io_executor() -> ThreadPoolExecutor:
+    """Get or create the shared I/O thread pool."""
+    global _io_executor
+    if _io_executor is None:
+        with _io_executor_lock:
+            if _io_executor is None:
+                _io_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="worker-io")
+    return _io_executor
 
 
 @dataclass
@@ -246,19 +261,21 @@ class WorkerPool:
                 self._workers.pop(tool_path, None)
             raise RuntimeError(f"Worker for {tool_path.name} died: {e}") from e
 
-        # Read response with timeout
+        # Read response with timeout using thread pool (non-blocking, cross-platform)
         try:
             if worker.process.stdout is None:
                 raise RuntimeError("Worker stdout is None")
 
-            # Use a simple readline with overall timeout
-            # NOTE: select.select() on file objects only works on Unix.
-            # For Windows support, consider using threading or asyncio.
-            ready, _, _ = select.select([worker.process.stdout], [], [], timeout)
-            if not ready:
-                raise TimeoutError(f"Worker call timed out after {timeout}s")
+            # Use thread pool for readline to avoid blocking main thread
+            # This is more portable than select.select() and works on Windows
+            executor = _get_io_executor()
+            future = executor.submit(worker.process.stdout.readline)
+            try:
+                response_line = future.result(timeout=timeout)
+            except TimeoutError:
+                future.cancel()
+                raise TimeoutError(f"Worker call timed out after {timeout}s") from None
 
-            response_line = worker.process.stdout.readline()
             if not response_line:
                 # Worker closed stdout (crashed)
                 with self._lock:
@@ -336,8 +353,11 @@ def get_worker_pool() -> WorkerPool:
 
 
 def shutdown_worker_pool() -> None:
-    """Shut down the global worker pool."""
-    global _pool
+    """Shut down the global worker pool and I/O executor."""
+    global _pool, _io_executor
     if _pool is not None:
         _pool.shutdown()
         _pool = None
+    if _io_executor is not None:
+        _io_executor.shutdown(wait=False)
+        _io_executor = None
