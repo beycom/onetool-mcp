@@ -52,44 +52,28 @@ def _extract_sources(response: Any) -> list[dict[str, str]]:
     """
     sources: list[dict[str, str]] = []
 
+    # Navigate to grounding metadata
     if not hasattr(response, "candidates") or not response.candidates:
         return sources
 
     candidate = response.candidates[0]
-    if not hasattr(candidate, "grounding_metadata"):
-        return sources
-
-    metadata = candidate.grounding_metadata
+    metadata = getattr(candidate, "grounding_metadata", None)
     if not metadata:
         return sources
 
     # Extract from grounding_chunks
-    if hasattr(metadata, "grounding_chunks") and metadata.grounding_chunks:
-        for chunk in metadata.grounding_chunks:
-            if hasattr(chunk, "web") and chunk.web:
-                web = chunk.web
-                title = getattr(web, "title", "") or ""
-                uri = getattr(web, "uri", "") or ""
-                if uri:
-                    sources.append({"title": title, "url": uri})
+    chunks = getattr(metadata, "grounding_chunks", None)
+    if not chunks:
+        return sources
 
-    # Extract from grounding_supports as fallback
-    if not sources and hasattr(metadata, "grounding_supports"):
-        for support in metadata.grounding_supports or []:
-            if hasattr(support, "grounding_chunk_indices"):
-                for idx in support.grounding_chunk_indices or []:
-                    if (
-                        hasattr(metadata, "grounding_chunks")
-                        and metadata.grounding_chunks
-                        and idx < len(metadata.grounding_chunks)
-                    ):
-                        chunk = metadata.grounding_chunks[idx]
-                        if hasattr(chunk, "web") and chunk.web:
-                            web = chunk.web
-                            title = getattr(web, "title", "") or ""
-                            uri = getattr(web, "uri", "") or ""
-                            if uri and {"title": title, "url": uri} not in sources:
-                                sources.append({"title": title, "url": uri})
+    for chunk in chunks:
+        web = getattr(chunk, "web", None)
+        if not web:
+            continue
+        uri = getattr(web, "uri", "") or ""
+        if uri:
+            title = getattr(web, "title", "") or ""
+            sources.append({"title": title, "url": uri})
 
     return sources
 

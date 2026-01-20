@@ -224,6 +224,34 @@ def _is_binary(data: bytes, sample_size: int = 8192) -> bool:
     return non_text / len(sample) > 0.3 if sample else False
 
 
+def _decode_content(data: bytes, encoding: str) -> str | None:
+    """Decode bytes to string with encoding fallback.
+
+    Args:
+        data: Raw bytes to decode
+        encoding: Primary encoding to try
+
+    Returns:
+        Decoded string, or None if decoding failed
+    """
+    try:
+        return data.decode(encoding)
+    except UnicodeDecodeError:
+        pass
+
+    # Fallback: try charset detection
+    try:
+        import charset_normalizer
+
+        detected = charset_normalizer.from_bytes(data).best()
+        if detected:
+            return str(detected)
+    except ImportError:
+        pass
+
+    return None
+
+
 def _format_size(size_bytes: int) -> str:
     """Format bytes as human-readable size.
 
@@ -317,66 +345,36 @@ def read(
             return f"Error: {size_error}"
 
         try:
-            # Read first chunk to check for binary content
-            with resolved.open("rb") as f:
-                sample = f.read(8192)
-                if _is_binary(sample):
-                    # Get full size for error message
-                    f.seek(0, 2)  # Seek to end
-                    size = f.tell()
-                    s.add(error="binary_file")
-                    return f"Error: Binary file detected ({size} bytes). Use appropriate tools for binary files."
+            # Read file once in binary mode for both detection and content
+            raw_data = resolved.read_bytes()
 
-            # Stream file line by line for efficient paginated reads (P1 fix)
-            output_lines = []
-            total_lines = 0
-            lines_collected = 0
-            end_line = offset + limit if limit else None
+            # Check for binary content
+            if _is_binary(raw_data):
+                s.add(error="binary_file")
+                return f"Error: Binary file detected ({len(raw_data)} bytes). Use appropriate tools for binary files."
 
-            try:
-                with resolved.open("r", encoding=encoding) as f:
-                    for line_num, line in enumerate(f):
-                        total_lines = line_num + 1
+            # Decode content
+            content = _decode_content(raw_data, encoding)
+            if content is None:
+                s.add(error="encoding_error")
+                return f"Error: Could not decode file as {encoding}. Try specifying correct encoding."
 
-                        # Skip lines before offset
-                        if line_num < offset:
-                            continue
-
-                        # Stop if we've collected enough lines
-                        if end_line and line_num >= end_line:
-                            # Continue counting total lines
-                            continue
-
-                        # Collect this line
-                        line_text = line.rstrip("\n\r")
-                        output_lines.append(f"{line_num + 1:6d}\t{line_text}")
-                        lines_collected += 1
-
-            except UnicodeDecodeError:
-                # Fallback: try charset detection
-                try:
-                    import charset_normalizer
-
-                    raw_data = resolved.read_bytes()
-                    detected = charset_normalizer.from_bytes(raw_data).best()
-                    if detected:
-                        content = str(detected)
-                        lines = content.splitlines()
-                        total_lines = len(lines)
-                        end = offset + limit if limit else total_lines
-                        for i, line in enumerate(lines[offset:end], start=offset + 1):
-                            output_lines.append(f"{i:6d}\t{line}")
-                            lines_collected += 1
-                    else:
-                        s.add(error="encoding_error")
-                        return f"Error: Could not decode file with {encoding} or auto-detected encoding"
-                except ImportError:
-                    s.add(error="encoding_error")
-                    return f"Error: Could not decode file as {encoding}. Try specifying correct encoding."
+            # Process lines with pagination
+            lines = content.splitlines()
+            total_lines = len(lines)
 
             if offset >= total_lines:
                 s.add(resultLen=0, totalLines=total_lines)
                 return f"(empty - offset {offset} >= total lines {total_lines})"
+
+            # Apply pagination
+            end_line = offset + limit if limit else total_lines
+            output_lines = [
+                f"{i + 1:6d}\t{line}"
+                for i, line in enumerate(lines)
+                if offset <= i < end_line
+            ]
+            lines_collected = len(output_lines)
 
             result = "\n".join(output_lines)
 

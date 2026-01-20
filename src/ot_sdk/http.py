@@ -18,7 +18,7 @@ _client: httpx.Client | None = None
 
 
 def _get_client() -> httpx.Client:
-    """Get or create the shared HTTP client."""
+    """Get or create the shared HTTP client with connection pooling."""
     global _client
     if _client is None:
         _client = httpx.Client(
@@ -27,6 +27,11 @@ def _get_client() -> httpx.Client:
             headers={
                 "User-Agent": "OneTool-Worker/1.0",
             },
+            limits=httpx.Limits(
+                max_keepalive_connections=20,
+                max_connections=100,
+                keepalive_expiry=30.0,
+            ),
         )
     return _client
 

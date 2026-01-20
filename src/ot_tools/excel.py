@@ -315,24 +315,24 @@ def info(*, filepath: str, include_ranges: bool = False) -> str:
     """
     with log("excel.info", filepath=filepath) as s:
         try:
-            if not _expand_path(filepath).exists():
+            resolved = _expand_path(filepath)
+            if not resolved.exists():
                 s.add(error="file_not_found")
                 return f"Error: File not found: {filepath}"
 
-            wb = load_workbook(_expand_path(filepath), read_only=True)
-            file_size = _expand_path(filepath).stat().st_size
+            # Use read_only=True only when we don't need ranges
+            # (read_only mode doesn't populate max_row/max_column accurately)
+            wb = load_workbook(resolved, read_only=not include_ranges)
+            file_size = resolved.stat().st_size
 
             info_dict: dict[str, Any] = {
-                "file": _expand_path(filepath).name,
+                "file": resolved.name,
                 "sheets": wb.sheetnames,
                 "size": f"{file_size:,} bytes",
             }
 
             if include_ranges:
                 ranges = {}
-                # Need to reload without read_only to get dimensions
-                wb.close()
-                wb = load_workbook(_expand_path(filepath))
                 for sheet_name in wb.sheetnames:
                     ws = wb[sheet_name]
                     if ws.max_row and ws.max_column:

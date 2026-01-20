@@ -42,10 +42,14 @@ def _get_api_key() -> str:
     return get_secret("BRAVE_API_KEY") or ""
 
 
-def _get_headers() -> dict[str, str]:
-    """Get headers for Brave API requests."""
+def _get_headers(api_key: str) -> dict[str, str]:
+    """Get headers for Brave API requests.
+
+    Args:
+        api_key: Pre-fetched Brave API key
+    """
     return {
-        "X-Subscription-Token": _get_api_key(),
+        "X-Subscription-Token": api_key,
     }
 
 
@@ -77,7 +81,7 @@ def _make_request(
             response = _client.get(
                 endpoint,
                 params=params,
-                headers=_get_headers(),
+                headers=_get_headers(api_key),
                 timeout=timeout,
             )
             response.raise_for_status()
