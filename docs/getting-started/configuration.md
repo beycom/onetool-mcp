@@ -235,7 +235,6 @@ All tools section fields are optional. Omitted fields use defaults shown above.
 | stats | cost_per_million_input_tokens | float | 15.0 | ≥0 | Input token cost (USD per million) |
 | stats | cost_per_million_output_tokens | float | 75.0 | ≥0 | Output token cost (USD per million) |
 | stats | chars_per_token | float | 4.0 | ≥1.0 | Characters per token estimate |
-| stats.telemetry | enabled | bool | true | - | Enable anonymous telemetry (opt-out available) |
 
 ### Statistics Configuration
 
@@ -253,8 +252,6 @@ tools:
     cost_per_million_input_tokens: 15.0   # Input cost (USD)
     cost_per_million_output_tokens: 75.0  # Output cost (USD)
     chars_per_token: 4.0             # Characters per token estimate
-    telemetry:
-      enabled: true                  # Enable anonymous telemetry (opt-out available)
 ```
 
 **What's tracked:**
@@ -294,21 +291,6 @@ cost = (input_tokens / 1M × input_cost) + (output_tokens / 1M × output_cost)
 ```
 
 The HTML report shows the estimated cost with the model name for reference.
-
-**Telemetry:**
-
-OneTool includes anonymous telemetry to help improve the project. Telemetry is **enabled by default**.
-
-When enabled, it collects:
-- Server start events (version, tool count)
-- Aggregated run stats (success/failure, duration, character counts)
-
-It **never** collects: code content, file paths, API responses, or personal information.
-
-Opt-out methods (any of these disables telemetry):
-- Set `telemetry.enabled: false` in configuration
-- Set `DO_NOT_TRACK=1` environment variable
-- Set `ONETOOL_TELEMETRY_DISABLED=1` environment variable
 
 ### External MCP Servers
 

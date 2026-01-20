@@ -332,7 +332,6 @@ def test_stats_config_defaults() -> None:
     assert config.cost_per_million_input_tokens == 15.0
     assert config.cost_per_million_output_tokens == 75.0
     assert config.chars_per_token == 4.0
-    assert config.telemetry.enabled is True
 
 
 @pytest.mark.unit
@@ -406,33 +405,3 @@ def test_timed_tool_call_records_error() -> None:
         assert call_kwargs["error_type"] == "ValueError"
 
 
-@pytest.mark.unit
-@pytest.mark.core
-def test_telemetry_enabled_by_default() -> None:
-    """Telemetry is enabled by default (but requires posthog package)."""
-    from ot.config.loader import StatsConfig
-
-    config = StatsConfig()
-    assert config.telemetry.enabled is True
-
-
-@pytest.mark.unit
-@pytest.mark.core
-def test_telemetry_respects_env_vars() -> None:
-    """Telemetry respects DO_NOT_TRACK env var."""
-    import os
-    from unittest.mock import patch
-
-    from ot.config.loader import StatsConfig, TelemetryConfig
-    from ot.stats import is_telemetry_enabled
-
-    # Enable telemetry in config
-    config = StatsConfig(telemetry=TelemetryConfig(enabled=True))
-
-    # But DO_NOT_TRACK should disable it
-    with patch.dict(os.environ, {"DO_NOT_TRACK": "1"}):
-        assert is_telemetry_enabled(config) is False
-
-    # ONETOOL_TELEMETRY_DISABLED should also disable it
-    with patch.dict(os.environ, {"ONETOOL_TELEMETRY_DISABLED": "1"}):
-        assert is_telemetry_enabled(config) is False

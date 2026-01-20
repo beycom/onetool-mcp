@@ -44,14 +44,10 @@ from ot.proxy import get_proxy_manager
 from ot.registry import get_registry
 from ot.stats import (
     JsonlStatsWriter,
-    capture_run_completed,
-    capture_server_started,
     get_client_name,
-    initialize_telemetry,
     set_stats_writer,
-    shutdown_telemetry,
 )
-from ot.support import get_startup_message, get_version
+from ot.support import get_startup_message
 
 _config = get_config()
 
@@ -107,24 +103,16 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
             start_span.add("statsEnabled", True)
             start_span.add("statsPath", str(stats_path))
 
-            # Initialize optional telemetry (disabled by default)
-            initialize_telemetry(_config.tools.stats)
-            capture_server_started(
-                version=get_version(),
-                tool_count=len(registry.tools),
-            )
-
         # Log support message
         logger.info(get_startup_message())
 
     yield
 
     with LogSpan(span="mcp.server.stop") as stop_span:
-        # Shutdown: stop stats writer and telemetry
+        # Shutdown: stop stats writer
         if _stats_writer is not None:
             await _stats_writer.stop()
             set_stats_writer(None)
-            shutdown_telemetry()
             stop_span.add("statsStopped", True)
 
         # Shutdown: disconnect from proxy MCP servers
@@ -304,13 +292,6 @@ async def run(command: str) -> str:
             duration_ms=duration_ms,
             success=result.success,
             error_type=result.error_type,
-        )
-        # Capture telemetry event (no-op if disabled)
-        capture_run_completed(
-            chars_in=len(command),
-            chars_out=len(result.result),
-            duration_ms=duration_ms,
-            success=result.success,
         )
 
     return result.result

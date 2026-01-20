@@ -395,15 +395,6 @@ class DiagramConfig(BaseModel):
     )
 
 
-class TelemetryConfig(BaseModel):
-    """Telemetry configuration for anonymous usage analytics."""
-
-    enabled: bool = Field(
-        default=True,
-        description="Enable anonymous telemetry (enabled by default, opt-out available)",
-    )
-
-
 class StatsConfig(BaseModel):
     """Runtime statistics collection configuration."""
 
@@ -449,10 +440,6 @@ class StatsConfig(BaseModel):
         default=4.0,
         ge=1.0,
         description="Average characters per token for estimation",
-    )
-    telemetry: TelemetryConfig = Field(
-        default_factory=TelemetryConfig,
-        description="Optional anonymous telemetry settings",
     )
 
 
