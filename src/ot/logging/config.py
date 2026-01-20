@@ -13,6 +13,7 @@ import json
 import logging
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -50,6 +51,8 @@ class JSONEncoder(json.JSONEncoder):
             return o.isoformat().replace("+00:00", "Z")
         elif isinstance(o, Decimal):
             return float(o)
+        elif isinstance(o, Path):
+            return str(o)
         elif hasattr(o, "__dict__"):
             return o.__dict__
         return super().default(o)
@@ -189,11 +192,12 @@ def patching(record: Any) -> None:
     record["extra"]["dev"] = dev_formatter(record)
 
 
-def configure_logging(log_name: str = "onetool") -> None:
+def configure_logging(log_name: str = "onetool", level: str | None = None) -> None:
     """Configure Loguru for file-only output with dev-friendly format.
 
     Args:
         log_name: Name for the log file (e.g., "serve" -> logs/serve.log)
+        level: Optional log level override. If None, uses config value.
 
     Settings from ot-serve.yaml:
     - log_level: Log level (default: INFO)
@@ -202,7 +206,7 @@ def configure_logging(log_name: str = "onetool") -> None:
     logger.remove()
 
     config = get_config()
-    level = config.log_level.upper()
+    level = (level or config.log_level).upper()
     log_dir = config.get_log_dir_path()
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / f"{log_name}.log"
@@ -233,7 +237,7 @@ def configure_logging(log_name: str = "onetool") -> None:
     for logger_name in ["httpcore", "httpx", "hpack"]:
         logging.getLogger(logger_name).setLevel(logging.WARNING)
 
-    logger.debug("Logging configured", level=level, file=log_file)
+    logger.debug("Logging configured", level=level, file=str(log_file))
 
 
 def configure_test_logging(

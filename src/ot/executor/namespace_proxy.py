@@ -10,17 +10,36 @@ Used by the runner to build the execution namespace.
 
 from __future__ import annotations
 
+from functools import wraps
 from typing import TYPE_CHECKING, Any
 
+from ot.stats import timed_tool_call
+
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from ot.executor.tool_loader import LoadedTools
+
+
+def _wrap_with_stats(
+    ns_name: str, func_name: str, func: Callable[..., Any]
+) -> Callable[..., Any]:
+    """Wrap a function to record execution-level stats."""
+    tool_name = f"{ns_name}.{func_name}"
+
+    @wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        with timed_tool_call(tool_name):
+            return func(*args, **kwargs)
+
+    return wrapper
 
 
 def _create_namespace_proxy(ns_name: str, ns_funcs: dict[str, Any]) -> Any:
     """Create a namespace proxy instance for dot notation access.
 
     Returns an object that allows ns.func() syntax where func is looked up
-    from ns_funcs dict.
+    from ns_funcs dict. Each function call is tracked for execution-level stats.
     """
 
     class NamespaceProxy:
@@ -28,7 +47,8 @@ def _create_namespace_proxy(ns_name: str, ns_funcs: dict[str, Any]) -> Any:
 
         def __getattr__(self, name: str) -> Any:
             if name in ns_funcs:
-                return ns_funcs[name]
+                # Wrap function with stats tracking
+                return _wrap_with_stats(ns_name, name, ns_funcs[name])
             available = ", ".join(sorted(ns_funcs.keys()))
             raise AttributeError(
                 f"Function '{name}' not found in namespace '{ns_name}'. "
@@ -44,6 +64,8 @@ def _create_mcp_proxy_namespace(server_name: str) -> Any:
     Allows calling proxied MCP tools using dot notation:
     - context7.resolve_library_id(library_name="next.js")
 
+    Each call is tracked for execution-level stats.
+
     Args:
         server_name: Name of the MCP server.
 
@@ -57,8 +79,10 @@ def _create_mcp_proxy_namespace(server_name: str) -> Any:
 
         def __getattr__(self, tool_name: str) -> Any:
             def call_proxy_tool(**kwargs: Any) -> str:
-                proxy = get_proxy_manager()
-                return proxy.call_tool_sync(server_name, tool_name, kwargs)
+                tool_full_name = f"{server_name}.{tool_name}"
+                with timed_tool_call(tool_full_name):
+                    proxy = get_proxy_manager()
+                    return proxy.call_tool_sync(server_name, tool_name, kwargs)
 
             return call_proxy_tool
 

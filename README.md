@@ -107,6 +107,21 @@ def search(*, query: str) -> str:
 
 I kindly ask that you contribute via Pull Requests to the main repository rather than maintaining separate public forks to help reach that milestone faster.
 
+## Telemetry
+
+OneTool includes anonymous telemetry to help improve the project. **Telemetry is enabled by default.**
+
+When enabled, OneTool collects:
+- Server start events (version, tool count)
+- Aggregated run stats (success/failure, duration, character counts)
+
+OneTool **never** collects: code content, file paths, API responses, personal information, or IP addresses.
+
+**Opt-out methods** (any of these disables telemetry):
+- Set `telemetry.enabled: false` in configuration
+- Set `DO_NOT_TRACK=1` environment variable
+- Set `ONETOOL_TELEMETRY_DISABLED=1` environment variable
+
 ## Support
 
 If you use or like this project, please consider buying me a coffee:

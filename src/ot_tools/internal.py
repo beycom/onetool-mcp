@@ -12,6 +12,7 @@ Functions:
     ot.instructions(ns) - Get usage instructions for a namespace
     ot.alias(name) - Show alias definition
     ot.snippet(name) - Show snippet definition
+    ot.stats() - Get runtime statistics for OneTool usage
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ __all__ = [
     "instructions",
     "push",
     "snippet",
+    "stats",
     "tools",
 ]
 
@@ -406,6 +408,90 @@ def health() -> str:
 
         s.add("registryOk", registry_status["status"] == "ok")
         s.add("proxyOk", proxy_status["status"] == "ok")
+
+        return format_result(result, compact=False)
+
+
+def stats(
+    *,
+    period: str = "all",
+    tool: str = "",
+    output: str = "",
+) -> str:
+    """Get runtime statistics for OneTool usage.
+
+    Returns aggregated statistics including call counts, success rates,
+    durations, and estimated context/time savings from tool consolidation.
+
+    Args:
+        period: Time period to filter - "day", "week", "month", or "all" (default: "all")
+        tool: Filter by tool name (e.g., "brave.search"). Empty for all tools.
+        output: Path to write HTML report. Empty for JSON output only.
+
+    Returns:
+        JSON with aggregated statistics including:
+        - total_calls: Total number of tool calls
+        - success_rate: Percentage of successful calls
+        - context_saved: Estimated context tokens saved
+        - time_saved_ms: Estimated time saved in milliseconds
+        - tools: Per-tool breakdown
+
+    Example:
+        ot.stats()
+        ot.stats(period="day")
+        ot.stats(period="week", tool="brave.search")
+        ot.stats(output="stats_report.html")
+    """
+    from ot.stats import Period, StatsReader
+    from ot.support import get_support_dict
+
+    with LogSpan(span="ot.stats", period=period, tool=tool or None) as s:
+        cfg = get_config()
+
+        # Validate period
+        valid_periods: list[Period] = ["day", "week", "month", "all"]
+        if period not in valid_periods:
+            s.add("error", "invalid_period")
+            return f"Error: Invalid period '{period}'. Use: {', '.join(valid_periods)}"
+
+        # Check if stats are enabled
+        if not cfg.tools.stats.enabled:
+            s.add("error", "stats_disabled")
+            return "Error: Statistics collection is disabled in configuration"
+
+        # Read stats
+        stats_path = cfg.get_stats_file_path()
+        reader = StatsReader(
+            path=stats_path,
+            context_per_call=cfg.tools.stats.context_per_call,
+            time_overhead_per_call_ms=cfg.tools.stats.time_overhead_per_call_ms,
+            model=cfg.tools.stats.model,
+            cost_per_million_input_tokens=cfg.tools.stats.cost_per_million_input_tokens,
+            cost_per_million_output_tokens=cfg.tools.stats.cost_per_million_output_tokens,
+            chars_per_token=cfg.tools.stats.chars_per_token,
+        )
+
+        aggregated = reader.read(
+            period=period,  # type: ignore[arg-type]
+            tool=tool if tool else None,
+        )
+
+        result = aggregated.to_dict()
+        result["support"] = get_support_dict()
+        s.add("totalCalls", result["total_calls"])
+        s.add("toolCount", len(result["tools"]))
+
+        # Generate HTML report if output path specified
+        if output:
+            from ot.stats.html import generate_html_report
+
+            # Resolve output path relative to log directory (alongside stats.jsonl)
+            output_path = cfg.get_log_dir_path() / output
+            html_content = generate_html_report(aggregated)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(html_content)
+            result["html_report"] = str(output_path)
+            s.add("htmlReport", str(output_path))
 
         return format_result(result, compact=False)
 

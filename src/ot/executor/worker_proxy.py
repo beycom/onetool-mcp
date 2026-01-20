@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from ot.executor.worker_pool import get_worker_pool
+from ot.stats import timed_tool_call
 
 
 class WorkerFunctionProxy:
@@ -45,14 +46,16 @@ class WorkerFunctionProxy:
         Returns:
             Result from the function
         """
-        pool = get_worker_pool()
-        return pool.call(
-            tool_path=self.tool_path,
-            function=self.function_name,
-            kwargs=kwargs,
-            config=self.config,
-            secrets=self.secrets,
-        )
+        tool_name = f"{self.tool_path.stem}.{self.function_name}"
+        with timed_tool_call(tool_name):
+            pool = get_worker_pool()
+            return pool.call(
+                tool_path=self.tool_path,
+                function=self.function_name,
+                kwargs=kwargs,
+                config=self.config,
+                secrets=self.secrets,
+            )
 
     def __repr__(self) -> str:
         return f"<WorkerFunctionProxy {self.tool_path.stem}.{self.function_name}>"

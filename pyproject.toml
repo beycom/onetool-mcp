@@ -51,6 +51,8 @@ Issues = "https://github.com/beycom/onetool/issues"
 [project.optional-dependencies]
 # File tool safe deletion (moves to trash instead of permanent delete)
 file = ["send2trash>=2.1.0"]
+# Optional anonymous telemetry
+telemetry = ["posthog>=3.5.0"]
 
 [project.scripts]
 ot-serve = "ot_serve.cli:cli"

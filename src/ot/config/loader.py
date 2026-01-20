@@ -395,6 +395,67 @@ class DiagramConfig(BaseModel):
     )
 
 
+class TelemetryConfig(BaseModel):
+    """Telemetry configuration for anonymous usage analytics."""
+
+    enabled: bool = Field(
+        default=True,
+        description="Enable anonymous telemetry (enabled by default, opt-out available)",
+    )
+
+
+class StatsConfig(BaseModel):
+    """Runtime statistics collection configuration."""
+
+    enabled: bool = Field(
+        default=True,
+        description="Enable statistics collection",
+    )
+    persist_path: str = Field(
+        default="stats.jsonl",
+        description="Path to JSONL file for stats persistence (relative to log dir)",
+    )
+    flush_interval_seconds: int = Field(
+        default=30,
+        ge=1,
+        le=300,
+        description="Interval in seconds between flushing stats to disk",
+    )
+    context_per_call: int = Field(
+        default=30000,
+        ge=0,
+        description="Estimated context tokens saved per consolidated tool call",
+    )
+    time_overhead_per_call_ms: int = Field(
+        default=4000,
+        ge=0,
+        description="Estimated time overhead in ms saved per consolidated tool call",
+    )
+    model: str = Field(
+        default="anthropic/claude-opus-4.5",
+        description="Model for cost estimation (e.g., anthropic/claude-opus-4.5)",
+    )
+    cost_per_million_input_tokens: float = Field(
+        default=15.0,
+        ge=0,
+        description="Cost in USD per million input tokens",
+    )
+    cost_per_million_output_tokens: float = Field(
+        default=75.0,
+        ge=0,
+        description="Cost in USD per million output tokens",
+    )
+    chars_per_token: float = Field(
+        default=4.0,
+        ge=1.0,
+        description="Average characters per token for estimation",
+    )
+    telemetry: TelemetryConfig = Field(
+        default_factory=TelemetryConfig,
+        description="Optional anonymous telemetry settings",
+    )
+
+
 class ToolsConfig(BaseModel):
     """Aggregated tool configurations."""
 
@@ -410,6 +471,7 @@ class ToolsConfig(BaseModel):
     msg: MsgConfig = Field(default_factory=MsgConfig)
     file: FileConfig = Field(default_factory=FileConfig)
     diagram: DiagramConfig = Field(default_factory=DiagramConfig)
+    stats: StatsConfig = Field(default_factory=StatsConfig)
 
 
 class OneToolConfig(BaseModel):
@@ -547,6 +609,16 @@ class OneToolConfig(BaseModel):
             Absolute Path to log directory
         """
         return self._resolve_config_relative_path(self.log_dir)
+
+    def get_stats_file_path(self) -> Path:
+        """Get the resolved path to the stats CSV file.
+
+        Stats file is stored in the log directory alongside other logs.
+
+        Returns:
+            Absolute Path to stats file
+        """
+        return self.get_log_dir_path() / self.tools.stats.persist_path
 
 
 def _resolve_config_path(config_path: Path | str | None) -> Path | None:

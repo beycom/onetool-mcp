@@ -3,18 +3,19 @@
 # Tests all snippets defined in resources/config/snippets.yaml
 # Validates that snippet expansion and execution work correctly.
 #
-# Snippet groups:
-# - pkg_*  : Package version checks (no API key required)
-# - ot_*   : Internal OneTool tools (no API key required)
-# - rg_*   : Ripgrep code search (local, no API key)
-# - xl_*   : Excel operations (local files)
-# - brv_*  : Brave Search (requires BRAVE_API_KEY)
-# - c7_*   : Context7 docs (requires CONTEXT7_API_KEY)
-# - g_*    : Google grounding (requires GOOGLE_API_KEY)
-# - gh_*   : GitHub (requires GITHUB_TOKEN)
-# - web_*  : Web fetch (may require API keys)
-# - db_*   : Database (requires DB connection)
-# - llm_*  : LLM transform (uses configured model)
+# Tool groups (each group is a single scenario with multiple tasks):
+# - Package (pkg_*): Version checks for npm, pypi, models
+# - OneTool (ot_*): Internal tools for find, namespace, status
+# - Ripgrep (rg_*): Local code search (todos, definitions, counts)
+# - Brave (brv_*): Brave Search (requires BRAVE_API_KEY)
+# - Context7 (c7_*): Documentation lookup (requires CONTEXT7_API_KEY)
+# - Google (g_*): Google grounding (requires GOOGLE_API_KEY)
+# - GitHub (gh_*): GitHub search (requires GITHUB_TOKEN)
+# - Web (web_*): Web fetch operations
+# - Excel (xl_*): Excel file operations
+# - LLM (llm_*): LLM transform operations
+# - Code (c_*): Semantic code search (requires index)
+# - Database (db_*): Database operations
 #
 # Use with: ot-bench run demo/bench/snippets.yaml
 # Run specific tags: ot-bench run demo/bench/snippets.yaml --tags pkg
@@ -74,558 +75,642 @@ servers:
 
 scenarios:
   # =============================================================================
-  # PACKAGE SNIPPETS (pkg_) - No API key required
+  # PACKAGE SNIPPETS (pkg_*) - No API key required
   # =============================================================================
 
-  - name: "Snippet: pkg_npm"
-    description: "Check npm package versions"
+  - name: "Snippet: Package"
+    description: "Package version checks (npm, pypi, model search)"
     tasks:
-      - name: "snippet:pkg_npm:single"
+      - name: "snippet:pkg:npm_single"
         server: onetool
         tags: [snippet, pkg, npm]
         evaluate: has_version
         prompt: |
-          __ot `$pkg_npm packages=react`
+          __ot
+          ```
+          $pkg_npm packages=react
+          ```
           Return the version found.
 
-      - name: "snippet:pkg_npm:multi"
+      - name: "snippet:pkg:npm_multi"
         server: onetool
         tags: [snippet, pkg, npm]
         evaluate: has_version
         prompt: |
-          __ot `$pkg_npm packages="react, express, typescript"`
+          __ot
+          ```
+          $pkg_npm packages="react, express, typescript"
+          ```
           List all versions found.
 
-  - name: "Snippet: pkg_pypi"
-    description: "Check PyPI package versions"
-    tasks:
-      - name: "snippet:pkg_pypi:single"
+      - name: "snippet:pkg:pypi_single"
         server: onetool
         tags: [snippet, pkg, pypi]
         evaluate: has_version
         prompt: |
-          __ot `$pkg_pypi packages=requests`
+          __ot
+          ```
+          $pkg_pypi packages=requests
+          ```
           Return the version found.
 
-      - name: "snippet:pkg_pypi:multi"
+      - name: "snippet:pkg:pypi_multi"
         server: onetool
         tags: [snippet, pkg, pypi]
         evaluate: has_version
         prompt: |
-          __ot `$pkg_pypi packages="requests, flask, fastapi"`
+          __ot
+          ```
+          $pkg_pypi packages="requests, flask, fastapi"
+          ```
           List all versions found.
 
-  - name: "Snippet: pkg_model"
-    description: "Search OpenRouter AI models"
-    tasks:
-      - name: "snippet:pkg_model:query"
+      - name: "snippet:pkg:model_query"
         server: onetool
         tags: [snippet, pkg, model]
         evaluate: has_model
         prompt: |
-          __ot `$pkg_model query=claude`
+          __ot
+          ```
+          $pkg_model query=claude
+          ```
           List the models found.
 
-      - name: "snippet:pkg_model:provider"
+      - name: "snippet:pkg:model_provider"
         server: onetool
         tags: [snippet, pkg, model]
         evaluate: has_model
         prompt: |
-          __ot `$pkg_model provider=anthropic`
+          __ot
+          ```
+          $pkg_model provider=anthropic
+          ```
           List the models found.
 
   # =============================================================================
-  # ONETOOL INTERNAL SNIPPETS (ot_) - No API key required
+  # ONETOOL INTERNAL SNIPPETS (ot_*) - No API key required
   # =============================================================================
 
-  - name: "Snippet: ot_find"
-    description: "Find tools by pattern"
+  - name: "Snippet: OneTool"
+    description: "Internal OneTool operations (find, namespace, status)"
     tasks:
-      - name: "snippet:ot_find:search"
+      - name: "snippet:ot:find_search"
         server: onetool
         tags: [snippet, ot, find]
         evaluate: has_tools
         prompt: |
-          __ot `$ot_find pattern=search`
+          __ot
+          ```
+          $ot_find pattern=search
+          ```
           Return the tool output exactly.
 
-      - name: "snippet:ot_find:version"
+      - name: "snippet:ot:find_version"
         server: onetool
         tags: [snippet, ot, find]
         evaluate: has_tools
         prompt: |
-          __ot `$ot_find pattern=version`
+          __ot
+          ```
+          $ot_find pattern=version
+          ```
           Return the tool output exactly.
 
-  - name: "Snippet: ot_ns"
-    description: "List tools in namespace"
-    tasks:
-      - name: "snippet:ot_ns:package"
+      - name: "snippet:ot:ns_package"
         server: onetool
         tags: [snippet, ot, ns]
         evaluate: has_tools
         prompt: |
-          __ot `$ot_ns ns=package`
+          __ot
+          ```
+          $ot_ns ns=package
+          ```
           Return the tool output exactly.
 
-      - name: "snippet:ot_ns:ot"
+      - name: "snippet:ot:ns_ot"
         server: onetool
         tags: [snippet, ot, ns]
         evaluate: has_tools
         prompt: |
-          __ot `$ot_ns ns=ot`
+          __ot
+          ```
+          $ot_ns ns=ot
+          ```
           Return the tool output exactly.
 
-  - name: "Snippet: ot_status"
-    description: "Show system health and config"
-    tasks:
-      - name: "snippet:ot_status"
+      - name: "snippet:ot:status"
         server: onetool
         tags: [snippet, ot, status]
         evaluate: has_health
         prompt: |
-          __ot `$ot_status`
+          __ot
+          ```
+          $ot_status
+          ```
           Return the output exactly.
 
   # =============================================================================
-  # RIPGREP SNIPPETS (rg_) - Local search, no API key
+  # RIPGREP SNIPPETS (rg_*) - Local search, no API key
   # =============================================================================
 
-  - name: "Snippet: rg_todos"
-    description: "Find TODOs in codebase"
+  - name: "Snippet: Ripgrep"
+    description: "Local code search (todos, definitions, counts)"
     tasks:
-      - name: "snippet:rg_todos:default"
+      - name: "snippet:rg:todos_default"
         server: onetool
         tags: [snippet, rg, todos]
         evaluate:
           regex: "(TODO|FIXME|no matches)"
           expect_match: true
         prompt: |
-          __ot `$rg_todos`
+          __ot
+          ```
+          $rg_todos
+          ```
           Return any TODOs found or indicate none found.
 
-      - name: "snippet:rg_todos:path"
+      - name: "snippet:rg:todos_path"
         server: onetool
         tags: [snippet, rg, todos]
         evaluate:
           regex: "(TODO|FIXME|no matches)"
           expect_match: true
         prompt: |
-          __ot `$rg_todos path=src`
+          __ot
+          ```
+          $rg_todos path=src
+          ```
           Return any TODOs found or indicate none found.
 
-  - name: "Snippet: rg_def"
-    description: "Find function/class definitions"
-    tasks:
-      - name: "snippet:rg_def:python"
+      - name: "snippet:rg:def_python"
         server: onetool
         tags: [snippet, rg, def]
         evaluate: has_file_match
         prompt: |
-          __ot `$rg_def name=foo lang=py`
+          __ot
+          ```
+          $rg_def name=foo lang=py
+          ```
           Return matches found.
 
-      - name: "snippet:rg_def:default"
+      - name: "snippet:rg:def_default"
         server: onetool
         tags: [snippet, rg, def]
         evaluate: has_file_match
         prompt: |
-          __ot `$rg_def name=bar`
+          __ot
+          ```
+          $rg_def name=bar
+          ```
           Return matches found.
 
-  - name: "Snippet: rg_count"
-    description: "Count pattern occurrences"
-    tasks:
-      - name: "snippet:rg_count:simple"
+      - name: "snippet:rg:count_simple"
         server: onetool
         tags: [snippet, rg, count]
         evaluate:
           regex: "\\d+"
           expect_match: true
         prompt: |
-          __ot `$rg_count pattern="def "`
+          __ot
+          ```
+          $rg_count pattern="def "
+          ```
           Return the count.
 
-      - name: "snippet:rg_count:typed"
+      - name: "snippet:rg:count_typed"
         server: onetool
         tags: [snippet, rg, count]
         evaluate:
           regex: "\\d+"
           expect_match: true
         prompt: |
-          __ot `$rg_count pattern=import file_type=py`
+          __ot
+          ```
+          $rg_count pattern=import file_type=py
+          ```
           Return the count.
 
   # =============================================================================
-  # BRAVE SEARCH SNIPPETS (brv_) - Requires BRAVE_API_KEY
+  # BRAVE SEARCH SNIPPETS (brv_*) - Requires BRAVE_API_KEY
   # =============================================================================
 
-  - name: "Snippet: brv_research"
-    description: "Search and extract findings"
+  - name: "Snippet: Brave"
+    description: "Brave Search (research, compare, news)"
     tasks:
-      - name: "snippet:brv_research:default"
+      - name: "snippet:brv:research_default"
         server: onetool
         tags: [snippet, brv, research, external]
         evaluate: has_content
         prompt: |
-          __ot `$brv_research topic="Python async best practices"`
+          __ot
+          ```
+          $brv_research topic="Python async best practices"
+          ```
           Summarize the findings.
 
-      - name: "snippet:brv_research:count"
+      - name: "snippet:brv:research_count"
         server: onetool
         tags: [snippet, brv, research, external]
         evaluate: has_content
         prompt: |
-          __ot `$brv_research topic="FastAPI tutorials" count=3`
+          __ot
+          ```
+          $brv_research topic="FastAPI tutorials" count=3
+          ```
           Summarize the findings.
 
-  - name: "Snippet: brv_compare"
-    description: "Compare technologies"
-    tasks:
-      - name: "snippet:brv_compare"
+      - name: "snippet:brv:compare"
         server: onetool
         tags: [snippet, brv, compare, external]
         evaluate: has_content
         prompt: |
-          __ot `$brv_compare items="FastAPI, Flask"`
+          __ot
+          ```
+          $brv_compare items="FastAPI, Flask"
+          ```
           Compare the technologies.
 
-  - name: "Snippet: brv_news"
-    description: "Get news on topic"
-    tasks:
-      - name: "snippet:brv_news:default"
+      - name: "snippet:brv:news_default"
         server: onetool
         tags: [snippet, brv, news, external]
         evaluate: has_content
         prompt: |
-          __ot `$brv_news topic=AI`
+          __ot
+          ```
+          $brv_news topic=AI
+          ```
           Summarize the news.
 
   # =============================================================================
-  # CONTEXT7 SNIPPETS (c7_) - Requires CONTEXT7_API_KEY
+  # CONTEXT7 SNIPPETS (c7_*) - Requires CONTEXT7_API_KEY
   # =============================================================================
 
-  - name: "Snippet: c7_search"
-    description: "Search for library keys"
+  - name: "Snippet: Context7"
+    description: "Library documentation lookup (search, docs, examples)"
     tasks:
-      - name: "snippet:c7_search"
+      - name: "snippet:c7:search"
         server: onetool
         tags: [snippet, c7, search, external]
         evaluate: has_content
         prompt: |
-          __ot `$c7_search query=fastapi`
+          __ot
+          ```
+          $c7_search query=fastapi
+          ```
           Return the library keys found.
 
-  - name: "Snippet: c7_docs"
-    description: "Fetch library documentation"
-    tasks:
-      - name: "snippet:c7_docs:simple"
+      - name: "snippet:c7:docs_simple"
         server: onetool
         tags: [snippet, c7, docs, external]
         evaluate: has_content
         prompt: |
-          __ot `$c7_docs library="tiangolo/fastapi"`
+          __ot
+          ```
+          $c7_docs library="tiangolo/fastapi"
+          ```
           Return the documentation summary.
 
-      - name: "snippet:c7_docs:topic"
+      - name: "snippet:c7:docs_topic"
         server: onetool
         tags: [snippet, c7, docs, external]
         evaluate: has_content
         prompt: |
-          __ot `$c7_docs library=facebook/react topic=hooks`
+          __ot
+          ```
+          $c7_docs library=facebook/react topic=hooks
+          ```
           Return the documentation.
 
-  - name: "Snippet: c7_examples"
-    description: "Fetch code examples"
-    tasks:
-      - name: "snippet:c7_examples"
+      - name: "snippet:c7:examples"
         server: onetool
         tags: [snippet, c7, examples, external]
         evaluate: has_content
         prompt: |
-          __ot `$c7_examples library="tiangolo/fastapi" topic="dependency injection"`
+          __ot
+          ```
+          $c7_examples library="tiangolo/fastapi" topic="dependency injection"
+          ```
           Return the examples.
 
   # =============================================================================
-  # GOOGLE GROUNDING SNIPPETS (g_) - Requires GOOGLE_API_KEY
+  # GOOGLE GROUNDING SNIPPETS (g_*) - Requires GOOGLE_API_KEY
   # =============================================================================
 
-  - name: "Snippet: g_docs"
-    description: "Search official docs"
+  - name: "Snippet: Google"
+    description: "Google grounding search (docs, debug, reddit)"
     tasks:
-      - name: "snippet:g_docs:simple"
+      - name: "snippet:g:docs_simple"
         server: onetool
         tags: [snippet, g, docs, external]
         evaluate: has_content
         prompt: |
-          __ot `$g_docs query="async generators"`
+          __ot
+          ```
+          $g_docs query="async generators"
+          ```
           Return the documentation.
 
-      - name: "snippet:g_docs:tech"
+      - name: "snippet:g:docs_tech"
         server: onetool
         tags: [snippet, g, docs, external]
         evaluate: has_content
         prompt: |
-          __ot `$g_docs query=middleware tech=FastAPI`
+          __ot
+          ```
+          $g_docs query=middleware tech=FastAPI
+          ```
           Return the documentation.
 
-  - name: "Snippet: g_debug"
-    description: "Search for error solutions"
-    tasks:
-      - name: "snippet:g_debug"
+      - name: "snippet:g:debug"
         server: onetool
         tags: [snippet, g, debug, external]
         evaluate: has_content
         prompt: |
-          __ot `$g_debug error=ModuleNotFoundError tech=Python`
+          __ot
+          ```
+          $g_debug error=ModuleNotFoundError tech=Python
+          ```
           Return the solutions.
 
-  - name: "Snippet: g_reddit"
-    description: "Find community discussions"
-    tasks:
-      - name: "snippet:g_reddit:simple"
+      - name: "snippet:g:reddit_simple"
         server: onetool
         tags: [snippet, g, reddit, external]
         evaluate: has_content
         prompt: |
-          __ot `$g_reddit topic="best Python IDE"`
+          __ot
+          ```
+          $g_reddit topic="best Python IDE"
+          ```
           Return the discussions.
 
-      - name: "snippet:g_reddit:subreddit"
+      - name: "snippet:g:reddit_subreddit"
         server: onetool
         tags: [snippet, g, reddit, external]
         evaluate: has_content
         prompt: |
-          __ot `$g_reddit topic="FastAPI deployment" subreddit=Python`
+          __ot
+          ```
+          $g_reddit topic="FastAPI deployment" subreddit=Python
+          ```
           Return the discussions.
 
   # =============================================================================
-  # GITHUB SNIPPETS (gh_) - Requires GITHUB_TOKEN
+  # GITHUB SNIPPETS (gh_*) - Requires GITHUB_TOKEN
   # =============================================================================
 
-  - name: "Snippet: gh_repos"
-    description: "Search GitHub repositories"
+  - name: "Snippet: GitHub"
+    description: "GitHub search (repos, issues)"
     tasks:
-      - name: "snippet:gh_repos:default"
+      - name: "snippet:gh:repos_default"
         server: onetool
         tags: [snippet, gh, repos, external]
         evaluate: has_content
         prompt: |
-          __ot `$gh_repos query="mcp server language:python"`
+          __ot
+          ```
+          $gh_repos query="mcp server language:python"
+          ```
           List the repositories found.
 
-      - name: "snippet:gh_repos:sort"
+      - name: "snippet:gh:repos_sort"
         server: onetool
         tags: [snippet, gh, repos, external]
         evaluate: has_content
         prompt: |
-          __ot `$gh_repos query="fastapi template" sort=updated`
+          __ot
+          ```
+          $gh_repos query="fastapi template" sort=updated
+          ```
           List the repositories found.
 
-  - name: "Snippet: gh_issues"
-    description: "Search GitHub issues"
-    tasks:
-      - name: "snippet:gh_issues"
+      - name: "snippet:gh:issues"
         server: onetool
         tags: [snippet, gh, issues, external]
         evaluate: has_content
         prompt: |
-          __ot `$gh_issues query="repo:anthropics/anthropic-sdk-python is:open"`
+          __ot
+          ```
+          $gh_issues query="repo:anthropics/anthropic-sdk-python is:open"
+          ```
           List the issues found.
 
   # =============================================================================
-  # WEB FETCH SNIPPETS (web_)
+  # WEB FETCH SNIPPETS (web_*) - May require external access
   # =============================================================================
 
-  - name: "Snippet: web_summary"
-    description: "Fetch and summarize web page"
+  - name: "Snippet: Web"
+    description: "Web fetch operations (summary, extract)"
     tasks:
-      - name: "snippet:web_summary:simple"
+      - name: "snippet:web:summary_simple"
         server: onetool
         tags: [snippet, web, summary, external]
         evaluate: has_content
         prompt: |
-          __ot `$web_summary url="https://docs.python.org/3/library/asyncio.html"`
+          __ot
+          ```
+          $web_summary url="https://docs.python.org/3/library/asyncio.html"
+          ```
           Return the summary.
 
-      - name: "snippet:web_summary:focus"
+      - name: "snippet:web:summary_focus"
         server: onetool
         tags: [snippet, web, summary, external]
         evaluate: has_content
         prompt: |
-          __ot `$web_summary url="https://fastapi.tiangolo.com/" focus=features`
+          __ot
+          ```
+          $web_summary url="https://fastapi.tiangolo.com/" focus=features
+          ```
           Return the summary.
 
-  - name: "Snippet: web_extract"
-    description: "Extract structured data from page"
-    tasks:
-      - name: "snippet:web_extract"
+      - name: "snippet:web:extract"
         server: onetool
         tags: [snippet, web, extract, external]
         evaluate: has_content
         prompt: |
-          __ot `$web_extract url="https://pypi.org/project/requests/" schema="name, version, description"`
+          __ot
+          ```
+          $web_extract url="https://pypi.org/project/requests/" schema="name, version, description"
+          ```
           Return the extracted data.
 
   # =============================================================================
-  # EXCEL SNIPPETS (xl_) - Local file operations
+  # EXCEL SNIPPETS (xl_*) - Local file operations
   # =============================================================================
 
-  - name: "Snippet: xl_new"
-    description: "Create new Excel file"
+  - name: "Snippet: Excel"
+    description: "Excel file operations (new, read, write, sum)"
     tasks:
-      - name: "snippet:xl_new"
+      - name: "snippet:xl:new"
         server: onetool
         tags: [snippet, xl, new]
         evaluate: has_excel_success
         prompt: |
-          __ot `$xl_new filepath="/tmp/test_snippet.xlsx" headers="Name, Value, Date"`
+          __ot
+          ```
+          $xl_new filepath="/tmp/test_snippet.xlsx" headers="Name, Value, Date"
+          ```
           Confirm the file was created.
 
-  - name: "Snippet: xl_read"
-    description: "Read Excel range"
-    tasks:
-      - name: "snippet:xl_read"
+      - name: "snippet:xl:read"
         server: onetool
         tags: [snippet, xl, read]
         evaluate:
           regex: "(Name|Value|Date|empty|no data)"
           expect_match: true
         prompt: |
-          __ot `$xl_read filepath="/tmp/test_snippet.xlsx" range="A1:C1"`
+          __ot
+          ```
+          $xl_read filepath="/tmp/test_snippet.xlsx" range="A1:C1"
+          ```
           Return the data read.
 
-  - name: "Snippet: xl_write"
-    description: "Write data to Excel"
-    tasks:
-      - name: "snippet:xl_write"
+      - name: "snippet:xl:write"
         server: onetool
         tags: [snippet, xl, write]
         evaluate: has_excel_success
         prompt: |
-          __ot `$xl_write filepath="/tmp/test_snippet.xlsx" cell=A2 data="[[\"Test\", 100, \"2024-01-01\"]]"`
+          __ot
+          ```
+          $xl_write filepath="/tmp/test_snippet.xlsx" cell=A2 data="[[\"Test\", 100, \"2024-01-01\"]]"
+          ```
           Confirm the write succeeded.
 
-  - name: "Snippet: xl_sum"
-    description: "Add SUM formula"
-    tasks:
-      - name: "snippet:xl_sum"
+      - name: "snippet:xl:sum"
         server: onetool
         tags: [snippet, xl, sum]
         evaluate: has_excel_success
         prompt: |
-          __ot `$xl_sum filepath="/tmp/test_snippet.xlsx" column=B start_row=2 end_row=5`
+          __ot
+          ```
+          $xl_sum filepath="/tmp/test_snippet.xlsx" column=B start_row=2 end_row=5
+          ```
           Confirm the formula was added.
 
   # =============================================================================
-  # LLM TRANSFORM SNIPPETS (llm_) - Uses configured model
+  # LLM TRANSFORM SNIPPETS (llm_*) - Uses configured model
   # =============================================================================
 
-  - name: "Snippet: llm_summary"
-    description: "Summarize text"
+  - name: "Snippet: LLM"
+    description: "LLM transform operations (summary, extract, rewrite)"
     tasks:
-      - name: "snippet:llm_summary:default"
+      - name: "snippet:llm:summary_default"
         server: onetool
         tags: [snippet, llm, summary]
         evaluate: has_content
         prompt: |
-          __ot `$llm_summary input="Python is a high-level, interpreted programming language known for its clear syntax and readability. It supports multiple programming paradigms including procedural, object-oriented, and functional programming. Python has a large standard library and an active community."`
+          __ot
+          ```
+          $llm_summary input="Python is a high-level, interpreted programming language known for its clear syntax and readability. It supports multiple programming paradigms including procedural, object-oriented, and functional programming. Python has a large standard library and an active community."
+          ```
           Return the summary.
 
-      - name: "snippet:llm_summary:short"
+      - name: "snippet:llm:summary_short"
         server: onetool
         tags: [snippet, llm, summary]
         evaluate: has_content
         prompt: |
-          __ot `$llm_summary input="FastAPI is a modern, fast web framework for building APIs with Python based on standard Python type hints. It offers automatic validation, serialization, and documentation." max_words=20`
+          __ot
+          ```
+          $llm_summary input="FastAPI is a modern, fast web framework for building APIs with Python based on standard Python type hints. It offers automatic validation, serialization, and documentation." max_words=20
+          ```
           Return the summary.
 
-  - name: "Snippet: llm_extract"
-    description: "Extract structured data"
-    tasks:
-      - name: "snippet:llm_extract"
+      - name: "snippet:llm:extract"
         server: onetool
         tags: [snippet, llm, extract]
         evaluate: has_content
         prompt: |
-          __ot `$llm_extract input="Contact John Smith at john@example.com or call 555-1234" schema="name, email, phone"`
+          __ot
+          ```
+          $llm_extract input="Contact John Smith at john@example.com or call 555-1234" schema="name, email, phone"
+          ```
           Return the extracted data.
 
-  - name: "Snippet: llm_rewrite"
-    description: "Rewrite text with style"
-    tasks:
-      - name: "snippet:llm_rewrite:formal"
+      - name: "snippet:llm:rewrite_formal"
         server: onetool
         tags: [snippet, llm, rewrite]
         evaluate: has_content
         prompt: |
-          __ot `$llm_rewrite input="Hey, this API is super cool and really fast!" style=formal`
+          __ot
+          ```
+          $llm_rewrite input="Hey, this API is super cool and really fast!" style=formal
+          ```
           Return the rewritten text.
 
-      - name: "snippet:llm_rewrite:concise"
+      - name: "snippet:llm:rewrite_concise"
         server: onetool
         tags: [snippet, llm, rewrite]
         evaluate: has_content
         prompt: |
-          __ot `$llm_rewrite input="The implementation of the feature was completed successfully and all the tests passed without any failures or errors."`
+          __ot
+          ```
+          $llm_rewrite input="The implementation of the feature was completed successfully and all the tests passed without any failures or errors."
+          ```
           Return the rewritten text.
 
   # =============================================================================
-  # CODE SEARCH SNIPPETS (c_) - Requires ChunkHound index
+  # CODE SEARCH SNIPPETS (c_*) - Requires ChunkHound index
   # =============================================================================
 
-  - name: "Snippet: c_search"
+  - name: "Snippet: Code"
     description: "Semantic code search"
     tasks:
-      - name: "snippet:c_search"
+      - name: "snippet:c:search"
         server: onetool
         tags: [snippet, c, search, external]
         evaluate:
           regex: "(result|match|found|error|not configured)"
           expect_match: true
         prompt: |
-          __ot `$c_search query="error handling" limit=3`
+          __ot
+          ```
+          $c_search query="error handling" limit=3
+          ```
           Return the results or indicate if not configured.
 
   # =============================================================================
-  # DATABASE SNIPPETS (db_) - Requires DB connection
+  # DATABASE SNIPPETS (db_*) - Requires DB connection
   # =============================================================================
 
-  - name: "Snippet: db_explore"
-    description: "List database tables"
+  - name: "Snippet: Database"
+    description: "Database operations (explore, preview, count)"
     tasks:
-      - name: "snippet:db_explore"
+      - name: "snippet:db:explore"
         server: onetool
         tags: [snippet, db, explore, external]
         evaluate:
           regex: "(table|error|connection|not configured)"
           expect_match: true
         prompt: |
-          __ot `$db_explore url="sqlite:///demo/db/northwind.db"`
+          __ot
+          ```
+          $db_explore url="sqlite:///demo/db/northwind.db"
+          ```
           List tables or indicate error.
 
-  - name: "Snippet: db_preview"
-    description: "Preview table data"
-    tasks:
-      - name: "snippet:db_preview"
+      - name: "snippet:db:preview"
         server: onetool
         tags: [snippet, db, preview, external]
         evaluate:
           regex: "(row|data|error|connection|not found)"
           expect_match: true
         prompt: |
-          __ot `$db_preview url="sqlite:///demo/db/northwind.db" table=Orders limit=5`
+          __ot
+          ```
+          $db_preview url="sqlite:///demo/db/northwind.db" table=Orders limit=5
+          ```
           Return preview or indicate error.
 
-  - name: "Snippet: db_count"
-    description: "Count table rows"
-    tasks:
-      - name: "snippet:db_count"
+      - name: "snippet:db:count"
         server: onetool
         tags: [snippet, db, count, external]
         evaluate:
           regex: "(\\d+|error|connection|not found)"
           expect_match: true
         prompt: |
-          __ot `$db_count url="sqlite:///demo/db/northwind.db" table=Orders`
+          __ot
+          ```
+          $db_count url="sqlite:///demo/db/northwind.db" table=Orders
+          ```
           Return count or indicate error.

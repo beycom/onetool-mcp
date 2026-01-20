@@ -20,12 +20,11 @@ Or direct MCP calls:
 
 Supported prefixes: __ot, __ot__run, __onetool, __onetool__run, mcp__onetool__run
 Note: mcp__ot__run is NOT valid.
-
-V3: Host execution with namespaces, aliases, and snippets.
 """
 
 from __future__ import annotations
 
+import time
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
@@ -33,6 +32,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
 from fastmcp import FastMCP
+from loguru import logger
 
 from ot.config.loader import get_config
 from ot.executor import SimpleExecutor, execute_command
@@ -42,11 +42,24 @@ from ot.logging import LogSpan, configure_logging
 from ot.prompts import get_prompts, get_tool_description, get_tool_examples
 from ot.proxy import get_proxy_manager
 from ot.registry import get_registry
+from ot.stats import (
+    JsonlStatsWriter,
+    capture_run_completed,
+    capture_server_started,
+    get_client_name,
+    initialize_telemetry,
+    set_stats_writer,
+    shutdown_telemetry,
+)
+from ot.support import get_startup_message, get_version
 
 _config = get_config()
 
 # Initialize logging to serve.log
 configure_logging(log_name="serve")
+
+# Global stats writer (unified JSONL for both run and tool stats)
+_stats_writer: JsonlStatsWriter | None = None
 
 
 def _get_instructions() -> str:
@@ -58,18 +71,15 @@ def _get_instructions() -> str:
     # Load prompts from config (loaded via include: or inline prompts:)
     prompts = get_prompts(inline_prompts=_config.prompts)
 
-    # Start with base instructions from prompts.yaml
-    instructions = prompts.instructions.strip()
-
-    # Add header
-    instructions = f"OneTool MCP server (V3, host execution).\n\n{instructions}"
-
-    return instructions
+    # Return instructions from prompts.yaml
+    return prompts.instructions.strip()
 
 
 @asynccontextmanager
 async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
     """Manage server lifecycle - startup and shutdown."""
+    global _stats_writer
+
     with LogSpan(span="mcp.server.start") as start_span:
         # Startup: connect to proxy MCP servers
         proxy = get_proxy_manager()
@@ -82,9 +92,41 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
         registry = get_registry()
         start_span.add("toolCount", len(registry.tools))
 
+        # Startup: initialize unified JSONL stats writer if enabled
+        if _config.tools.stats.enabled:
+            stats_path = _config.get_stats_file_path()
+            flush_interval = _config.tools.stats.flush_interval_seconds
+
+            _stats_writer = JsonlStatsWriter(
+                path=stats_path,
+                flush_interval=flush_interval,
+            )
+            await _stats_writer.start()
+            set_stats_writer(_stats_writer)
+
+            start_span.add("statsEnabled", True)
+            start_span.add("statsPath", str(stats_path))
+
+            # Initialize optional telemetry (disabled by default)
+            initialize_telemetry(_config.tools.stats)
+            capture_server_started(
+                version=get_version(),
+                tool_count=len(registry.tools),
+            )
+
+        # Log support message
+        logger.info(get_startup_message())
+
     yield
 
     with LogSpan(span="mcp.server.stop") as stop_span:
+        # Shutdown: stop stats writer and telemetry
+        if _stats_writer is not None:
+            await _stats_writer.stop()
+            set_stats_writer(None)
+            shutdown_telemetry()
+            stop_span.add("statsStopped", True)
+
         # Shutdown: disconnect from proxy MCP servers
         if proxy.servers:
             with LogSpan(span="server.shutdown.proxy", serverCount=len(proxy.servers)):
@@ -97,6 +139,37 @@ mcp = FastMCP(
     instructions=_get_instructions(),
     lifespan=_lifespan,
 )
+
+
+# =============================================================================
+# MCP Logging - Dynamic log level control
+# =============================================================================
+
+
+@mcp._mcp_server.set_logging_level()
+async def handle_set_logging_level(level: str) -> None:
+    """Handle logging/setLevel requests from MCP clients.
+
+    Allows clients to dynamically change the server's log level.
+    """
+    # Map MCP LoggingLevel to Python logging levels
+    level_map = {
+        "debug": "DEBUG",
+        "info": "INFO",
+        "notice": "INFO",  # MCP notice -> INFO
+        "warning": "WARNING",
+        "error": "ERROR",
+        "critical": "CRITICAL",
+        "alert": "CRITICAL",  # MCP alert -> CRITICAL
+        "emergency": "CRITICAL",  # MCP emergency -> CRITICAL
+    }
+
+    log_level = level_map.get(str(level).lower(), "INFO")
+    logger.info(f"Log level change requested: {level} -> {log_level}")
+
+    # Reconfigure logging with new level
+    configure_logging(log_name="serve", level=log_level)
+    logger.info(f"Logging reconfigured at level {log_level}")
 
 
 # =============================================================================
@@ -187,31 +260,58 @@ def _get_executor() -> SimpleExecutor:
     return _executor
 
 
+def _get_run_description() -> str:
+    """Get run tool description from prompts config.
+
+    Raises:
+        ValueError: If run tool description not found in prompts.yaml
+    """
+    prompts = get_prompts(inline_prompts=_config.prompts)
+    desc = get_tool_description(prompts, "run", "")
+    if not desc:
+        raise ValueError("Missing 'run' tool description in prompts.yaml")
+    return desc
+
+
 @mcp.tool(
+    description=_get_run_description(),
     annotations={
         "title": "Execute OneTool Command",
         "readOnlyHint": False,
         "destructiveHint": False,
         "idempotentHint": False,
         "openWorldHint": True,
-    }
+    },
 )
 async def run(command: str) -> str:
-    """Execute Python code or function calls.
-
-    Args:
-        command: Python code or function call to execute
-
-    Returns:
-        The result from executing the command
-    """
-
     # Get registry (cached, no rescan per request) and executor
     registry = get_registry()
     executor = _get_executor()
 
+    # Record start time for stats
+    start_time = time.monotonic()
+
     # Execute through unified runner
     result = await execute_command(command, registry, executor)
+
+    # Record run-level stats if enabled
+    if _stats_writer is not None:
+        duration_ms = int((time.monotonic() - start_time) * 1000)
+        _stats_writer.record_run(
+            client=get_client_name(),
+            chars_in=len(command),
+            chars_out=len(result.result),
+            duration_ms=duration_ms,
+            success=result.success,
+            error_type=result.error_type,
+        )
+        # Capture telemetry event (no-op if disabled)
+        capture_run_completed(
+            chars_in=len(command),
+            chars_out=len(result.result),
+            duration_ms=duration_ms,
+            success=result.success,
+        )
 
     return result.result
 

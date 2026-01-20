@@ -226,6 +226,89 @@ All tools section fields are optional. Omitted fields use defaults shown above.
 | code_search | limit | int | 10 | 1-100 | Max search results |
 | db | max_chars | int | 4000 | 100-100K | Query output truncation |
 | package | timeout | float | 30.0 | 1-120 | Registry request timeout |
+| stats | enabled | bool | true | - | Enable statistics collection |
+| stats | persist_path | string | stats.jsonl | - | JSONL file for stats (relative to config) |
+| stats | flush_interval_seconds | int | 30 | 1-300 | Interval between disk flushes |
+| stats | context_per_call | int | 30000 | ≥0 | Context tokens saved per call estimate |
+| stats | time_overhead_per_call_ms | int | 4000 | ≥0 | Time overhead saved per call (ms) |
+| stats | model | string | anthropic/claude-opus-4.5 | - | Model name for cost estimation |
+| stats | cost_per_million_input_tokens | float | 15.0 | ≥0 | Input token cost (USD per million) |
+| stats | cost_per_million_output_tokens | float | 75.0 | ≥0 | Output token cost (USD per million) |
+| stats | chars_per_token | float | 4.0 | ≥1.0 | Characters per token estimate |
+| stats.telemetry | enabled | bool | true | - | Enable anonymous telemetry (opt-out available) |
+
+### Statistics Configuration
+
+Track runtime statistics to measure OneTool's efficiency:
+
+```yaml
+tools:
+  stats:
+    enabled: true                    # Enable/disable statistics collection
+    persist_path: stats.jsonl        # JSONL file path (relative to config dir)
+    flush_interval_seconds: 30       # How often to write to disk
+    context_per_call: 30000          # Estimated context tokens saved per call
+    time_overhead_per_call_ms: 4000  # Estimated time overhead saved per call
+    model: anthropic/claude-opus-4.5 # Model name for cost display
+    cost_per_million_input_tokens: 15.0   # Input cost (USD)
+    cost_per_million_output_tokens: 75.0  # Output cost (USD)
+    chars_per_token: 4.0             # Characters per token estimate
+    telemetry:
+      enabled: true                  # Enable anonymous telemetry (opt-out available)
+```
+
+**What's tracked:**
+- Tool name, characters in/out, duration
+- Success/error status with error type
+- Timestamp for period filtering
+
+**Viewing statistics:**
+
+Use `ot.stats()` to view aggregated statistics:
+
+```python
+# View all-time statistics
+ot.stats()
+
+# View last 24 hours
+ot.stats(period="day")
+
+# Filter by tool
+ot.stats(period="week", tool="brave.search")
+
+# Generate HTML report
+ot.stats(output="stats_report.html")
+```
+
+**Savings estimates:**
+
+The `context_per_call` and `time_overhead_per_call_ms` settings control how savings are calculated. These represent the overhead that would be incurred by traditional MCP tool calls (tool description in context, round-trip latency) that OneTool eliminates through consolidation.
+
+**Cost estimation:**
+
+Statistics include an estimated cost based on the configured model pricing. Cost is calculated from characters in/out converted to tokens:
+
+```text
+tokens = chars / chars_per_token
+cost = (input_tokens / 1M × input_cost) + (output_tokens / 1M × output_cost)
+```
+
+The HTML report shows the estimated cost with the model name for reference.
+
+**Telemetry:**
+
+OneTool includes anonymous telemetry to help improve the project. Telemetry is **enabled by default**.
+
+When enabled, it collects:
+- Server start events (version, tool count)
+- Aggregated run stats (success/failure, duration, character counts)
+
+It **never** collects: code content, file paths, API responses, or personal information.
+
+Opt-out methods (any of these disables telemetry):
+- Set `telemetry.enabled: false` in configuration
+- Set `DO_NOT_TRACK=1` environment variable
+- Set `ONETOOL_TELEMETRY_DISABLED=1` environment variable
 
 ### External MCP Servers
 
