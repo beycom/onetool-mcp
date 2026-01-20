@@ -157,6 +157,14 @@ if __name__ == "__main__":
     worker_main()
 ```
 
+> **⚠️ Critical:** The `if __name__ == "__main__": worker_main()` block is **required** for any file with a PEP 723 header. Without it, the tool will fail with "Worker for X.py closed unexpectedly" because:
+> 1. PEP 723 headers mark a tool as a worker (runs in subprocess)
+> 2. Workers communicate via stdin/stdout JSON-RPC
+> 3. `worker_main()` provides the stdin loop that handles requests
+> 4. Without it, the subprocess starts, executes module-level code, and exits immediately
+>
+> If you have a PEP 723 header but don't need isolated dependencies, remove the header instead of adding `worker_main()`. This lets the tool run in-process.
+
 ### SDK Exports
 
 The `ot_sdk` package provides these utilities for worker tools:

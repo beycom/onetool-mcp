@@ -1,7 +1,3 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["duckdb>=1.2.0", "openai>=1.0.0", "httpx>=0.27.0", "pyyaml>=6.0.0"]
-# ///
 """Semantic code search using ChunkHound indexes.
 
 Queries existing ChunkHound DuckDB databases for semantic code search.

@@ -149,28 +149,69 @@ checksum: {checksum}
 """
 
 
-def generate_toc(headings: Sequence[tuple[int, str, int, int]]) -> str:
-    """Generate table of contents with line ranges.
+def generate_toc(
+    headings: Sequence[tuple[int, str, int, int]],
+    main_file: str,
+    source: str,
+    converted: str,
+    pages: int,
+    checksum: str,
+) -> str:
+    """Generate table of contents as a separate file with line ranges.
+
+    Creates a TOC document with frontmatter and instructions for LLMs
+    on how to use the line numbers to navigate the main document.
 
     Args:
         headings: List of (level, title, start_line, end_line) tuples
             Level 1 = H1, Level 2 = H2, etc.
+        main_file: Filename of the main markdown file (for linking)
+        source: Original source file path (for reference)
+        converted: ISO 8601 timestamp (source file mtime)
+        pages: Page/slide/sheet count
+        checksum: SHA256 hash of source file
 
     Returns:
-        Markdown formatted TOC
+        Complete markdown TOC document with frontmatter
     """
-    if not headings:
-        return ""
+    lines = [
+        "---",
+        f"source: {source}",
+        f"converted: {converted}",
+        f"pages: {pages}",
+        f"checksum: {checksum}",
+        "---",
+        "",
+        "# Table of Contents",
+        "",
+        f"**Document:** [{main_file}]({main_file})",
+        "",
+        "## How to Use This TOC",
+        "",
+        "Each entry shows `(lines <start>-<end>)` for the main document.",
+        "To read a section efficiently:",
+        "",
+        "1. Find the section you need below",
+        f"2. Use the line range to read only that portion of [{main_file}]({main_file})",
+        "3. Line numbers are exact - no offset needed",
+        "",
+        "---",
+        "",
+        "## Contents",
+        "",
+    ]
 
-    lines = ["## Table of Contents", ""]
-    for level, title, start_line, end_line in headings:
-        indent = "  " * (level - 1)
-        # Create anchor from title
-        anchor = _slugify(title)
-        line_count = end_line - start_line + 1
-        lines.append(
-            f"{indent}- [{title}](#{anchor}) `L{start_line}-L{end_line}` ({line_count} lines)"
-        )
+    if not headings:
+        lines.append("*No headings found in document.*")
+    else:
+        for level, title, start_line, end_line in headings:
+            indent = "  " * (level - 1)
+            # Create anchor linking to section in main file
+            anchor = _slugify(title)
+            lines.append(
+                f"{indent}- [{title}]({main_file}#{anchor}) (lines {start_line}-{end_line})"
+            )
+
     lines.append("")
     return "\n".join(lines)
 
@@ -187,6 +228,36 @@ def _slugify(text: str) -> str:
     # Remove non-alphanumeric chars, replace spaces with hyphens
     slug = re.sub(r"[^\w\s-]", "", text.lower())
     return re.sub(r"[\s_]+", "-", slug).strip("-")
+
+
+def write_toc_file(
+    headings: list[tuple[int, str, int, int]],
+    output_dir: Path,
+    stem: str,
+    source: str,
+    converted: str,
+    pages: int,
+    checksum: str,
+) -> Path:
+    """Write TOC to a separate file with frontmatter.
+
+    Args:
+        headings: List of (level, title, start_line, end_line) tuples
+        output_dir: Directory for output files
+        stem: Base filename (without extension)
+        source: Original source file path
+        converted: ISO 8601 timestamp (source file mtime)
+        pages: Page/slide/sheet count
+        checksum: SHA256 hash of source file
+
+    Returns:
+        Path to the written TOC file
+    """
+    main_file = f"{stem}.md"
+    toc_content = generate_toc(headings, main_file, source, converted, pages, checksum)
+    toc_path = output_dir / f"{stem}.toc.md"
+    toc_path.write_text(toc_content, encoding="utf-8")
+    return toc_path
 
 
 def normalise_whitespace(content: str) -> str:

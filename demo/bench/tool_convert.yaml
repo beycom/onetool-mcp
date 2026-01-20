@@ -27,7 +27,7 @@ evaluators:
     regex: "^---\\n.*source:"
     expect_match: true
   conversion_success:
-    regex: "(?i)(converted|output|pages|slides|sheets)"
+    regex: "(?i)(convert|output|pages?|slides?|sheets?|paragraphs?|tables?|rows?|images?)"
     expect_match: true
 
 servers:

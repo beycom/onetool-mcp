@@ -173,51 +173,68 @@ The `convert.auto()` function SHALL detect file format and use the appropriate c
 
 ---
 
-### Requirement: Frontmatter Metadata
+### Requirement: Separate TOC File with Frontmatter
 
-All converted documents SHALL include YAML frontmatter.
+Each conversion SHALL produce two files: a main content file and a separate TOC file.
 
-#### Scenario: Frontmatter content
+#### Scenario: Main content file
 - **GIVEN** a document is converted
 - **WHEN** the markdown file is written
-- **THEN** it SHALL begin with YAML frontmatter containing:
+- **THEN** it SHALL contain pure content starting at line 1
+- **AND** no frontmatter or TOC (for exact line number references)
+
+#### Scenario: TOC file with frontmatter
+- **GIVEN** a document is converted
+- **WHEN** the TOC file is written
+- **THEN** it SHALL be named `{stem}.toc.md`
+- **AND** it SHALL begin with YAML frontmatter containing:
   - `source`: relative path to original file
   - `converted`: ISO 8601 timestamp (source file mtime for diff-stability)
   - `pages`: page/slide/sheet count
   - `checksum`: SHA256 hash of source file
 
-#### Scenario: Frontmatter format
+#### Scenario: TOC file format
 - **GIVEN** a converted PDF `docs/report.pdf`
-- **WHEN** written to `output/report.md`
-- **THEN** the frontmatter SHALL be:
+- **WHEN** written to `output/`
+- **THEN** the TOC file `output/report.toc.md` SHALL be:
 
-  ```yaml
+  ```markdown
   ---
   source: docs/report.pdf
   converted: 2026-01-19T10:30:00Z
   pages: 42
   checksum: sha256:abc123...
   ---
+
+  # Table of Contents
+
+  **Document:** [report.md](report.md)
+
+  ## How to Use This TOC
+
+  Each entry shows `(lines <start>-<end>)` for the main document.
+  To read a section efficiently:
+
+  1. Find the section you need below
+  2. Use the line range to read only that portion of [report.md](report.md)
+  3. Line numbers are exact - no offset needed
+
+  ---
+
+  ## Contents
+
+  - [Introduction](report.md#introduction) (lines 1-50)
+    - [Background](report.md#background) (lines 15-30)
+  - [Results](report.md#results) (lines 51-100)
   ```
-
----
-
-### Requirement: Table of Contents with Line Numbers
-
-All converted documents SHALL include a table of contents with line references.
-
-#### Scenario: TOC generation
-- **GIVEN** a document with headings
-- **WHEN** converted to markdown
-- **THEN** a Table of Contents SHALL be generated after the frontmatter
 
 #### Scenario: Line number references
 - **GIVEN** a TOC entry for a section
 - **WHEN** the TOC is rendered
-- **THEN** each entry SHALL include line range in backticks:
+- **THEN** each entry SHALL link to the section in the main file with line range:
 
   ```markdown
-  - [Requirements](#requirements) `L52-L141` (90 lines)
+  - [Requirements](report.md#requirements) (lines 52-141)
   ```
 
 #### Scenario: Nested headings

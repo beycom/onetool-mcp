@@ -21,11 +21,10 @@ from docx.text.paragraph import Paragraph
 from ot_tools._convert.utils import (
     IncrementalWriter,
     compute_file_checksum,
-    generate_frontmatter,
-    generate_toc,
     get_mtime_iso,
     normalise_whitespace,
     save_image,
+    write_toc_file,
 )
 
 if TYPE_CHECKING:
@@ -100,28 +99,26 @@ def convert_word(
         # help garbage collection by clearing references
         del doc
 
-    # Generate TOC
-    headings = writer.get_headings()
-    toc = generate_toc(headings)
+    # Write main output (pure content, no frontmatter - line numbers start at 1)
+    content = normalise_whitespace(writer.get_content())
+    output_path = output_dir / f"{input_path.stem}.md"
+    output_path.write_text(content, encoding="utf-8")
 
-    # Generate frontmatter
-    frontmatter = generate_frontmatter(
+    # Write separate TOC file (includes frontmatter)
+    headings = writer.get_headings()
+    toc_path = write_toc_file(
+        headings=headings,
+        output_dir=output_dir,
+        stem=input_path.stem,
         source=source_rel,
         converted=mtime,
         pages=page_count,
         checksum=checksum,
     )
 
-    # Combine all content
-    content = frontmatter + "\n" + toc + writer.get_content()
-    content = normalise_whitespace(content)
-
-    # Write output
-    output_path = output_dir / f"{input_path.stem}.md"
-    output_path.write_text(content, encoding="utf-8")
-
     return {
         "output": str(output_path),
+        "toc": str(toc_path),
         "paragraphs": paragraphs_processed,
         "tables": tables_processed,
         "images": images_extracted,

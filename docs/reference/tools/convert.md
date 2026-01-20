@@ -2,7 +2,7 @@
 
 **Transform documents to LLM-friendly Markdown.**
 
-Convert PDF, Word, PowerPoint, and Excel documents to Markdown with LLM-optimised output including YAML frontmatter, table of contents, and diff-stable image naming.
+Convert PDF, Word, PowerPoint, and Excel documents to Markdown with LLM-optimised output. Each conversion produces two files: a pure content file with exact line numbers, and a separate TOC file with frontmatter and navigation.
 
 ## Functions
 
@@ -23,29 +23,44 @@ Convert PDF, Word, PowerPoint, and Excel documents to Markdown with LLM-optimise
 
 ## Output Format
 
-All converters produce Markdown with:
+Each conversion produces two files:
 
-### YAML Frontmatter
+### Main Content File (`{name}.md`)
 
-```yaml
+Pure content starting at line 1 - no frontmatter or TOC. This ensures line numbers in the TOC are exact.
+
+### TOC File (`{name}.toc.md`)
+
+A separate file with frontmatter and table of contents:
+
+```markdown
 ---
 source: path/to/document.pdf
 converted: 2026-01-20T10:30:00Z
 pages: 15
 checksum: sha256:abc123...
 ---
-```
 
-### Table of Contents
+# Table of Contents
 
-Generated with line ranges for easy navigation:
+**Document:** [document.md](document.md)
 
-```markdown
-## Table of Contents
+## How to Use This TOC
 
-- [Introduction](#introduction) `L10-L50` (40 lines)
-  - [Background](#background) `L15-L30` (15 lines)
-- [Results](#results) `L51-L100` (50 lines)
+Each entry shows `(lines <start>-<end>)` for the main document.
+To read a section efficiently:
+
+1. Find the section you need below
+2. Use the line range to read only that portion of [document.md](document.md)
+3. Line numbers are exact - no offset needed
+
+---
+
+## Contents
+
+- [Introduction](document.md#introduction) (lines 1-50)
+  - [Background](document.md#background) (lines 15-30)
+- [Results](document.md#results) (lines 51-100)
 ```
 
 ### Diff-Stable Images
@@ -157,7 +172,7 @@ All converters support glob patterns and process multiple files in parallel:
 convert.pdf(pattern="archive/**/*.pdf", output_dir="output")
 # Converted 25 files, 0 failed
 # Outputs:
-#   output/report1.md
-#   output/report2.md
+#   output/report1.md + output/report1.toc.md
+#   output/report2.md + output/report2.toc.md
 #   ...
 ```

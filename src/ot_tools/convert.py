@@ -1,13 +1,3 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = [
-#     "pymupdf>=1.21.0",
-#     "python-docx>=1.1.0",
-#     "python-pptx>=0.6.0",
-#     "openpyxl>=3.1.0",
-#     "pillow>=10.0.0",
-# ]
-# ///
 """Document conversion tools for OneTool.
 
 Converts PDF, Word, PowerPoint, and Excel documents to Markdown
@@ -68,39 +58,52 @@ def _resolve_glob(pattern: str) -> list[Path]:
     Returns:
         List of matching file paths
     """
-    # Expand ~ in pattern
-    expanded = Path(pattern).expanduser()
+    # Expand ~ and resolve relative to project dir
+    path = Path(pattern).expanduser()
+    if not path.is_absolute():
+        path = get_effective_cwd() / pattern
 
-    # Check if pattern is a direct file path (no glob characters)
-    if not any(c in pattern for c in "*?["):
-        path = expanded if expanded.is_absolute() else get_effective_cwd() / pattern
-        return [path] if path.exists() and path.is_file() else []
+    # If pattern has no glob chars and exists, return it directly
+    if path.exists() and path.is_file():
+        return [path]
 
-    # For glob patterns, find base directory and glob portion
-    cwd = get_effective_cwd()
+    # Otherwise glob from parent
+    parent = path.parent
+    glob_pattern = path.name
 
-    # Split pattern into base (non-glob) and glob portions
-    parts = expanded.parts
-    base_parts: list[str] = []
-    for i, part in enumerate(parts):
-        if any(c in part for c in "*?["):
-            glob_pattern = str(Path(*parts[i:]))
-            break
-        base_parts.append(part)
-    else:
-        # No glob chars found (shouldn't happen given check above)
-        return []
+    # Handle recursive globs in parent
+    if "**" in str(path):
+        # Find the base directory before **
+        parts = Path(pattern).expanduser().parts
+        base_parts: list[str] = []
+        glob_parts: list[str] = []
+        found_glob = False
+        for part in parts:
+            if "**" in part or "*" in part or "?" in part:
+                found_glob = True
+            if found_glob:
+                glob_parts.append(part)
+            else:
+                base_parts.append(part)
 
-    # Construct base directory
-    if base_parts:
-        base = Path(*base_parts)
-        if not base.is_absolute():
-            base = cwd / base
-    else:
-        base = cwd
+        if base_parts:
+            base = Path(*base_parts)
+            if not base.is_absolute():
+                base = get_effective_cwd() / base
+        else:
+            base = get_effective_cwd()
 
-    # Use Path.glob which handles ** patterns natively
-    return list(base.glob(glob_pattern)) if base.exists() else []
+        glob_pattern = str(Path(*glob_parts)) if glob_parts else "*"
+        return list(base.glob(glob_pattern))
+
+    # Simple glob in directory
+    if not parent.is_absolute():
+        parent = get_effective_cwd() / parent.relative_to(".") if str(parent) != "." else get_effective_cwd()
+
+    if parent.exists():
+        return list(parent.glob(glob_pattern))
+
+    return []
 
 
 def _get_source_rel(path: Path) -> str:
