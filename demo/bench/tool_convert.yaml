@@ -1,0 +1,140 @@
+# Tool Demo: Document Conversion
+#
+# Demonstrates OneTool Convert capabilities:
+# - PDF conversion with outline-based heading extraction
+# - Word document conversion (.docx)
+# - PowerPoint conversion (.pptx) with optional speaker notes
+# - Excel conversion (.xlsx) with streaming
+# - Auto-detection of document format
+# - Batch conversion with glob patterns
+#
+# Test files (in demo/data/):
+# - gpt3-paper.pdf (6.8MB, 75 pages) - "Language Models are Few-Shot Learners"
+# - attention-paper.pdf (2.2MB, 15 pages) - "Attention Is All You Need"
+# - file_example_1MB.docx, file_example_PPT_1MB.pptx, file_example_XLS_1000.xlsx
+#
+# Use with: ot-bench run demo/bench/tool_convert.yaml
+
+defaults:
+  timeout: 120
+  model: google/gemini-3-flash-preview
+
+evaluators:
+  has_markdown:
+    regex: "(?i)(#|\\*\\*|\\|.*\\|)"
+    expect_match: true
+  has_frontmatter:
+    regex: "^---\\n.*source:"
+    expect_match: true
+  conversion_success:
+    regex: "(?i)(converted|output|pages|slides|sheets)"
+    expect_match: true
+
+servers:
+  onetool:
+    type: stdio
+    command: uv
+    args: ["run", "ot-serve"]
+    env:
+      OT_CWD: demo
+
+scenarios:
+  - name: "Convert Demo - PDF"
+    description: PDF conversion with large academic papers
+    tasks:
+      - name: "tool:convert:pdf-large"
+        server: onetool
+        tags: [demo, tool, convert, pdf, large]
+        timeout: 180
+        evaluate: conversion_success
+        prompt: |
+          __ot
+          ```python
+          convert.pdf(pattern="data/gpt3-paper.pdf", output_dir="tmp")
+          ```
+          What was the conversion result? How many pages were converted?
+
+      - name: "tool:convert:pdf-small"
+        server: onetool
+        tags: [demo, tool, convert, pdf]
+        evaluate: conversion_success
+        prompt: |
+          __ot
+          ```python
+          convert.pdf(pattern="data/attention-paper.pdf", output_dir="tmp")
+          ```
+          What was the conversion result?
+
+      - name: "tool:convert:pdf-batch"
+        server: onetool
+        tags: [demo, tool, convert, pdf, batch]
+        timeout: 180
+        evaluate: conversion_success
+        prompt: |
+          __ot
+          ```python
+          convert.pdf(pattern="data/*.pdf", output_dir="tmp")
+          ```
+          How many files were converted in total?
+
+  - name: "Convert Demo - Office Formats"
+    description: Word, PowerPoint, and Excel conversion
+    tasks:
+      - name: "tool:convert:word"
+        server: onetool
+        tags: [demo, tool, convert, word]
+        evaluate: conversion_success
+        prompt: |
+          __ot
+          ```python
+          convert.word(pattern="data/file_example_1MB.docx", output_dir="tmp")
+          ```
+          What was the conversion result? How many paragraphs and tables?
+
+      - name: "tool:convert:powerpoint"
+        server: onetool
+        tags: [demo, tool, convert, powerpoint]
+        evaluate: conversion_success
+        prompt: |
+          __ot
+          ```python
+          convert.powerpoint(pattern="data/file_example_PPT_1MB.pptx", output_dir="tmp")
+          ```
+          What was the conversion result? How many slides?
+
+      - name: "tool:convert:excel"
+        server: onetool
+        tags: [demo, tool, convert, excel]
+        evaluate: conversion_success
+        prompt: |
+          __ot
+          ```python
+          convert.excel(pattern="data/file_example_XLS_1000.xlsx", output_dir="tmp")
+          ```
+          What was the conversion result? How many sheets and rows?
+
+  - name: "Convert Demo - Auto Detection"
+    description: Auto-detection and batch conversion
+    tasks:
+      - name: "tool:convert:auto-single"
+        server: onetool
+        tags: [demo, tool, convert, auto]
+        evaluate: conversion_success
+        prompt: |
+          __ot
+          ```python
+          convert.auto(pattern="data/gpt3-paper.pdf", output_dir="tmp")
+          ```
+          Did auto-detection correctly identify the PDF format?
+
+      - name: "tool:convert:auto-mixed"
+        server: onetool
+        tags: [demo, tool, convert, auto, batch]
+        timeout: 180
+        evaluate: conversion_success
+        prompt: |
+          __ot
+          ```python
+          convert.auto(pattern="data/*", output_dir="tmp")
+          ```
+          How many files were converted? Were any skipped due to unsupported format?

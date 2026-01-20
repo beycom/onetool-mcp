@@ -100,14 +100,18 @@ demo-setup:
     cd demo && unzip -q -o opentelemetry-demo-main.zip
     @echo "=== Indexing OpenTelemetry demo ==="
     cd demo/opentelemetry-demo-main && OPENAI_API_KEY=$({{ _get_openai_key }}) uvx chunkhound index --model text-embedding-3-small --base-url https://openrouter.ai/api/v1
+    @echo "=== Downloading benchmark PDFs ==="
+    curl -L -o demo/data/gpt3-paper.pdf https://arxiv.org/pdf/2005.14165
+    curl -L -o demo/data/attention-paper.pdf https://arxiv.org/pdf/1706.03762
     @echo "=== Demo setup complete ==="
     @echo "Run 'just demo-bench' to run the benchmark scenarios."
 
-# Remove all demo assets (database, zip, extracted project, logs)
+# Remove all demo assets (database, zip, extracted project, PDFs, logs)
 demo-clean:
     rm -rf demo/db/northwind.db
     rm -rf demo/opentelemetry-demo-main.zip
     rm -rf demo/opentelemetry-demo-main
+    rm -rf demo/data/*.pdf
     rm -rf demo/tmp/*
     @for f in demo/logs/*.log; do [ -f "$f" ] && : > "$f"; done 2>/dev/null || true
     @echo "Demo assets cleaned"

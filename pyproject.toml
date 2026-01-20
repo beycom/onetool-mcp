@@ -77,10 +77,13 @@ dev = [
     "types-pyyaml>=6.0.12.20250915",
     # Tool dependencies for testing (these use inline script metadata in production)
     "duckdb>=1.0.0",      # for ot_tools.code_search
-    "openpyxl>=3.1.5",    # for ot_tools.excel
+    "openpyxl>=3.1.5",    # for ot_tools.excel, ot_tools.convert
     "send2trash>=2.1.0",  # for ot_tools.file safe deletion
     "sqlalchemy>=2.0.45", # for ot_tools.db
     "trafilatura>=2.0.0", # for ot_tools.web_fetch
+    "pymupdf>=1.21.0",    # for ot_tools.convert (PDF)
+    "python-docx>=1.1.0", # for ot_tools.convert (Word)
+    "python-pptx>=0.6.0", # for ot_tools.convert (PowerPoint)
 ]
 
 [tool.ruff]
@@ -179,6 +182,9 @@ pyyaml = "yaml"
 pillow = "PIL"
 pydantic-settings = "pydantic_settings"
 google-genai = "google"
+pymupdf = "fitz"
+python-docx = "docx"
+python-pptx = "pptx"
 
 [tool.coverage.html]
 directory = "tmp/htmlcov"

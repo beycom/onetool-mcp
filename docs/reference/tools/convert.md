@@ -1,0 +1,163 @@
+# Convert
+
+**Transform documents to LLM-friendly Markdown.**
+
+Convert PDF, Word, PowerPoint, and Excel documents to Markdown with LLM-optimised output including YAML frontmatter, table of contents, and diff-stable image naming.
+
+## Functions
+
+| Function | Description |
+|----------|-------------|
+| `convert.pdf(pattern, output_dir)` | Convert PDF documents to Markdown |
+| `convert.word(pattern, output_dir)` | Convert Word documents (.docx) to Markdown |
+| `convert.powerpoint(pattern, output_dir, include_notes)` | Convert PowerPoint presentations (.pptx) to Markdown |
+| `convert.excel(pattern, output_dir, include_formulas)` | Convert Excel spreadsheets (.xlsx) to Markdown |
+| `convert.auto(pattern, output_dir)` | Auto-detect format and convert |
+
+## Key Parameters
+
+- `pattern`: Glob pattern for input files (e.g., `docs/*.pdf`, `**/*.docx`)
+- `output_dir`: Directory for output Markdown files and images
+- `include_notes`: Include speaker notes in PowerPoint conversion
+- `include_formulas`: Include cell formulas in Excel conversion
+
+## Output Format
+
+All converters produce Markdown with:
+
+### YAML Frontmatter
+
+```yaml
+---
+source: path/to/document.pdf
+converted: 2026-01-20T10:30:00Z
+pages: 15
+checksum: sha256:abc123...
+---
+```
+
+### Table of Contents
+
+Generated with line ranges for easy navigation:
+
+```markdown
+## Table of Contents
+
+- [Introduction](#introduction) `L10-L50` (40 lines)
+  - [Background](#background) `L15-L30` (15 lines)
+- [Results](#results) `L51-L100` (50 lines)
+```
+
+### Diff-Stable Images
+
+Images are named using content hashes (`img_abc123.png`) for stable diffs across regenerations.
+
+## Examples
+
+### Converting PDFs
+
+```python
+# Single file
+convert.pdf(pattern="report.pdf", output_dir="output")
+
+# Batch conversion with glob
+convert.pdf(pattern="docs/**/*.pdf", output_dir="converted")
+```
+
+### Converting Word Documents
+
+```python
+# Single document
+convert.word(pattern="spec.docx", output_dir="output")
+
+# All Word docs in folder
+convert.word(pattern="documents/*.docx", output_dir="md")
+```
+
+### Converting PowerPoint
+
+```python
+# Basic conversion
+convert.powerpoint(pattern="deck.pptx", output_dir="output")
+
+# Include speaker notes
+convert.powerpoint(
+    pattern="presentations/*.pptx",
+    output_dir="output",
+    include_notes=True
+)
+```
+
+### Converting Excel
+
+```python
+# Basic conversion (values only)
+convert.excel(pattern="data.xlsx", output_dir="output")
+
+# Include formulas
+convert.excel(
+    pattern="spreadsheets/*.xlsx",
+    output_dir="output",
+    include_formulas=True
+)
+```
+
+### Auto-Detection
+
+```python
+# Convert all supported formats
+convert.auto(pattern="documents/*", output_dir="converted")
+
+# Recursive with mixed formats
+convert.auto(pattern="input/**/*", output_dir="output")
+```
+
+## Supported Formats
+
+| Format | Extension | Converter |
+|--------|-----------|-----------|
+| PDF | `.pdf` | PyMuPDF (fitz) |
+| Word | `.docx` | python-docx |
+| PowerPoint | `.pptx` | python-pptx |
+| Excel | `.xlsx` | openpyxl |
+
+## Features by Format
+
+### PDF
+- Lazy page loading for memory efficiency
+- Outline-based heading extraction (uses PDF bookmarks)
+- Falls back to "Page N" headers if no outline
+- Image extraction with soft-mask transparency support
+
+### Word
+- Heading style detection (Heading 1-6)
+- Table conversion to Markdown
+- Inline image extraction
+- Bold, italic, underline formatting
+
+### PowerPoint
+- Slide titles as H2 headers
+- Bullet point detection
+- Table conversion
+- Image extraction
+- Optional speaker notes
+
+### Excel
+- Sheet-based sections
+- Streaming for large files
+- Markdown table formatting
+- Optional formula extraction
+
+## Batch Processing
+
+All converters support glob patterns and process multiple files in parallel:
+
+```python
+# Process all PDFs in parallel
+convert.pdf(pattern="archive/**/*.pdf", output_dir="output")
+# Converted 25 files, 0 failed
+# Outputs:
+#   output/report1.md
+#   output/report2.md
+#   ...
+```

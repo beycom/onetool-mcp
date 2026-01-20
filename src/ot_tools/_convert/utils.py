@@ -1,0 +1,259 @@
+"""Shared utilities for document converters.
+
+Provides diff-stable output formatting including:
+- YAML frontmatter generation
+- TOC generation with line ranges
+- Hash-based image naming
+- Whitespace normalisation
+"""
+
+from __future__ import annotations
+
+import hashlib
+import io
+import re
+from datetime import UTC, datetime
+from pathlib import Path  # noqa: TC003 (used at runtime)
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+
+def compute_file_checksum(path: Path) -> str:
+    """Compute SHA256 checksum of a file.
+
+    Args:
+        path: Path to file
+
+    Returns:
+        Checksum in format 'sha256:abc123...'
+    """
+    sha256 = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            sha256.update(chunk)
+    return f"sha256:{sha256.hexdigest()}"
+
+
+def compute_image_hash(data: bytes) -> str:
+    """Compute hash for image naming (first 8 chars of SHA256).
+
+    Args:
+        data: Image bytes
+
+    Returns:
+        8-character hex hash
+    """
+    return hashlib.sha256(data).hexdigest()[:8]
+
+
+def save_image(data: bytes, images_dir: Path, content_type: str) -> Path:
+    """Save image with hash-based naming for diff stability.
+
+    Args:
+        data: Image bytes
+        images_dir: Directory to save image
+        content_type: MIME content type (e.g., "image/png", "image/jpeg")
+
+    Returns:
+        Path to saved image file
+    """
+    # Determine extension from content type
+    if "jpeg" in content_type or "jpg" in content_type:
+        extension = "jpg"
+    elif "png" in content_type:
+        extension = "png"
+    elif "gif" in content_type:
+        extension = "gif"
+    else:
+        extension = "png"
+
+    # Hash-based naming for diff stability
+    img_hash = compute_image_hash(data)
+    img_name = f"img_{img_hash}.{extension}"
+    img_path = images_dir / img_name
+
+    # Only write if not already extracted (dedup by hash)
+    if not img_path.exists():
+        images_dir.mkdir(parents=True, exist_ok=True)
+        img_path.write_bytes(data)
+
+    return img_path
+
+
+def get_mtime_iso(path: Path) -> str:
+    """Get file modification time as ISO 8601 string.
+
+    Args:
+        path: Path to file
+
+    Returns:
+        ISO 8601 timestamp with Z suffix
+    """
+    mtime = path.stat().st_mtime
+    return datetime.fromtimestamp(mtime, tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def generate_frontmatter(
+    *,
+    source: str,
+    converted: str,
+    pages: int,
+    checksum: str,
+) -> str:
+    """Generate YAML frontmatter for converted document.
+
+    Args:
+        source: Relative path to source file
+        converted: ISO 8601 timestamp (source file mtime)
+        pages: Page/slide/sheet count
+        checksum: SHA256 hash of source file
+
+    Returns:
+        YAML frontmatter block including delimiters
+    """
+    return f"""---
+source: {source}
+converted: {converted}
+pages: {pages}
+checksum: {checksum}
+---
+"""
+
+
+def generate_toc(headings: Sequence[tuple[int, str, int, int]]) -> str:
+    """Generate table of contents with line ranges.
+
+    Args:
+        headings: List of (level, title, start_line, end_line) tuples
+            Level 1 = H1, Level 2 = H2, etc.
+
+    Returns:
+        Markdown formatted TOC
+    """
+    if not headings:
+        return ""
+
+    lines = ["## Table of Contents", ""]
+    for level, title, start_line, end_line in headings:
+        indent = "  " * (level - 1)
+        # Create anchor from title
+        anchor = _slugify(title)
+        line_count = end_line - start_line + 1
+        lines.append(
+            f"{indent}- [{title}](#{anchor}) `L{start_line}-L{end_line}` ({line_count} lines)"
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _slugify(text: str) -> str:
+    """Convert text to URL-safe anchor.
+
+    Args:
+        text: Text to slugify
+
+    Returns:
+        Lowercase slug with hyphens
+    """
+    # Remove non-alphanumeric chars, replace spaces with hyphens
+    slug = re.sub(r"[^\w\s-]", "", text.lower())
+    return re.sub(r"[\s_]+", "-", slug).strip("-")
+
+
+def normalise_whitespace(content: str) -> str:
+    """Normalise whitespace for diff-stable output.
+
+    - Converts CRLF to LF
+    - Removes trailing whitespace
+    - Ensures consistent blank line spacing (max 2 consecutive)
+    - Ensures single trailing newline
+
+    Args:
+        content: Raw content
+
+    Returns:
+        Normalised content
+    """
+    # Normalise line endings
+    content = content.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Remove trailing whitespace from each line
+    lines = [line.rstrip() for line in content.split("\n")]
+
+    # Collapse multiple blank lines to max 2
+    result_lines: list[str] = []
+    blank_count = 0
+    for line in lines:
+        if line == "":
+            blank_count += 1
+            if blank_count <= 2:
+                result_lines.append(line)
+        else:
+            blank_count = 0
+            result_lines.append(line)
+
+    # Join and ensure single trailing newline
+    result = "\n".join(result_lines).rstrip("\n") + "\n"
+    return result
+
+
+class IncrementalWriter:
+    """Write content incrementally to track line numbers.
+
+    Buffers content and tracks line numbers for TOC generation.
+    """
+
+    def __init__(self) -> None:
+        self._buffer = io.StringIO()
+        self._line_count = 0
+        self._headings: list[tuple[int, str, int, int]] = []
+        self._current_heading: tuple[int, str, int] | None = None
+
+    def write(self, text: str) -> None:
+        """Write text to buffer."""
+        self._buffer.write(text)
+        self._line_count += text.count("\n")
+
+    def write_heading(self, level: int, title: str) -> None:
+        """Write a heading and track it for TOC.
+
+        Args:
+            level: Heading level (1-6)
+            title: Heading text
+        """
+        # Close previous heading
+        if self._current_heading:
+            prev_level, prev_title, prev_start = self._current_heading
+            self._headings.append((prev_level, prev_title, prev_start, self._line_count))
+
+        # Start new heading
+        heading_line = self._line_count + 1
+        self._current_heading = (level, title, heading_line)
+
+        # Write the heading
+        prefix = "#" * level
+        self.write(f"{prefix} {title}\n\n")
+
+    def close_heading(self) -> None:
+        """Close the current heading section."""
+        if self._current_heading:
+            prev_level, prev_title, prev_start = self._current_heading
+            self._headings.append((prev_level, prev_title, prev_start, self._line_count))
+            self._current_heading = None
+
+    def get_content(self) -> str:
+        """Get buffered content."""
+        return self._buffer.getvalue()
+
+    def get_headings(self) -> list[tuple[int, str, int, int]]:
+        """Get collected headings for TOC generation."""
+        # Close any open heading
+        self.close_heading()
+        return self._headings
+
+    @property
+    def line_count(self) -> int:
+        """Current line count."""
+        return self._line_count

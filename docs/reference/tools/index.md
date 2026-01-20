@@ -1,6 +1,6 @@
 # Tools Reference
 
-**11 namespaces. 50+ functions. Zero tool-selection overhead.**
+**12 namespaces. 55+ functions. Zero tool-selection overhead.**
 
 Every function below is callable with a single `__ot` prefix. No JSON schemas, no tool discovery loops.
 
@@ -17,6 +17,7 @@ Every function below is callable with a single `__ot` prefix. No JSON schemas, n
 | **llm** | Data transformation | [transform.md](transform.md) |
 | **db** | Database queries | [database.md](database.md) |
 | **excel** | Excel manipulation | [excel.md](excel.md) |
+| **convert** | Document to Markdown | [convert.md](convert.md) |
 | **package** | Package versions | [package.md](package.md) |
 | **file** | File operations | [file.md](file.md) |
 | **diagram** | Diagram generation | [diagram.md](diagram.md) |
@@ -68,6 +69,19 @@ excel.read(path="data.xlsx", sheet="Sheet1")
 excel.write(path="output.xlsx", data=rows)
 ```
 
+### Document Conversion
+
+```python
+# Convert documents to Markdown
+convert.pdf(pattern="report.pdf", output_dir="output")
+convert.word(pattern="doc.docx", output_dir="output")
+convert.powerpoint(pattern="deck.pptx", output_dir="output")
+convert.excel(pattern="data.xlsx", output_dir="output")
+
+# Auto-detect format
+convert.auto(pattern="documents/*", output_dir="converted")
+```
+
 ### Package Management
 
 ```python
@@ -106,6 +120,7 @@ diagram.render_directory(directory="./diagrams")
 | Transform | MIT |
 | Database | MPL 2.0 |
 | Excel | MIT |
+| Convert | MIT |
 | Package | MIT |
 | Diagram | MIT |
 

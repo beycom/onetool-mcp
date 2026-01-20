@@ -102,6 +102,8 @@ plan/
 demo/db/northwind.db
 demo/opentelemetry-demo-main.zip
 demo/opentelemetry-demo-main/
+demo/data/*.pdf
+demo/tmp/
 
 # ChunkHound db files can be very large and are easily recreated
 **/.chunkhound/db
