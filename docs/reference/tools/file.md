@@ -147,4 +147,4 @@ All paths are validated against:
 
 **Inspired by:** [fast-filesystem-mcp](https://github.com/efforthye/fast-filesystem-mcp) by efforthye
 
-**License:** Apache 2.0 ([LICENSE](../licenses/fast-filesystem-mcp-LICENSE))
+**License:** Apache 2.0

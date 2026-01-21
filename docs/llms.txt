@@ -53,7 +53,7 @@ def my_function(*, arg: str) -> str:
 
 ## Repository
 
-https://github.com/beycom/onetool
+https://github.com/beycom/onetool-mcp
 
 ## License
 

@@ -51,4 +51,4 @@ db.query(
 
 **Comparison:** Based on mcp-alchemy with simplified API. Requires explicit db_url parameter (no environment fallback), vertical result formatting optimized for LLM consumption.
 
-**License:** MPL 2.0 ([LICENSE](../licenses/mcp-alchemy-LICENSE))
+**License:** MPL 2.0 ([LICENSE](../../../licenses/mcp-alchemy-LICENSE))

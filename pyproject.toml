@@ -65,6 +65,9 @@ build-backend = "hatchling.build"
 packages = ["src/ot", "src/ot_tools", "src/ot_sdk", "src/ot_serve", "src/ot_bench", "src/ot_browse"]
 
 [dependency-groups]
+docs = [
+    "mkdocs-material>=9.5.0",
+]
 dev = [
     "mypy>=1.19.1",
     "pytest>=9.0.2",

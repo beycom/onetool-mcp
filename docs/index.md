@@ -1,4 +1,4 @@
-<p align="center">
+<p align="center" markdown>
   <img src="assets/onetool-logo.png" alt="OneTool" width="400">
 </p>
 

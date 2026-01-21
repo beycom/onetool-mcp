@@ -98,6 +98,9 @@ diagrams/
 msg/
 plan/
 
+# Docs: generated results
+docs/results/
+
 # Demo: downloadable assets (see demo/README.md)
 demo/db/northwind.db
 demo/opentelemetry-demo-main.zip

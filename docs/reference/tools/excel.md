@@ -179,4 +179,4 @@ A sample spreadsheet is available at `demo/data/sample_sales.xlsx` with:
 - Auto-creates parent directories on workbook creation
 - Auto-prepends `=` to formulas if missing
 
-**License:** MIT ([LICENSE](../licenses/excel-mcp-server-LICENSE))
+**License:** MIT ([LICENSE](../../../licenses/excel-mcp-server-LICENSE))

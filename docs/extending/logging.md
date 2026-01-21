@@ -90,7 +90,7 @@ Span names use dot-notation: `{component}.{operation}[.{detail}]`
 
 ### Tool Operations
 
-See [Creating Tools](creating-tools.md#existing-tool-spans) for tool span naming conventions.
+See [Creating Tools](creating-tools.md#logging-with-logspan) for tool span naming conventions.
 
 ## Examples
 

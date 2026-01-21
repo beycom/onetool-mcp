@@ -29,4 +29,4 @@ Semantic code search using ChunkHound indexes and DuckDB.
 
 **Comparison:** Custom implementation; no upstream MCP exists. Uses ChunkHound indexes + DuckDB queries with provider/model filtering.
 
-**License:** MIT ([LICENSE](../licenses/chunkhound-LICENSE))
+**License:** MIT ([LICENSE](../../../licenses/chunkhound-LICENSE))

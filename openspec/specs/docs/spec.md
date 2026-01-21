@@ -170,3 +170,91 @@ Every documentation directory SHALL have an index.md file.
 - **WHEN** read
 - **THEN** it describes the section and links to its contents
 
+### Requirement: Documentation Site Generation
+
+The project SHALL use MkDocs Material to generate a static documentation site from `docs/`.
+
+#### Scenario: Local development server
+- **GIVEN** a developer with docs dependencies installed
+- **WHEN** they run `just docs-serve`
+- **THEN** a local server starts at `http://127.0.0.1:8000`
+- **AND** changes to markdown files trigger hot reload
+
+#### Scenario: Production build
+- **GIVEN** the docs source in `docs/`
+- **WHEN** `just docs-build` is run
+- **THEN** a static site is generated in `dist/site/`
+- **AND** the build fails on warnings when using `--strict`
+
+#### Scenario: Manual deployment
+- **GIVEN** a built documentation site
+- **WHEN** `just docs-deploy` is run
+- **THEN** the site is deployed to the `gh-pages` branch
+
+### Requirement: Documentation Site Features
+
+The generated documentation site SHALL provide navigation, search, and theming.
+
+#### Scenario: Site navigation
+- **GIVEN** a user visiting the documentation site
+- **WHEN** they view any page
+- **THEN** they see a sidebar with section navigation
+- **AND** they see breadcrumbs showing current location
+- **AND** they can navigate to any section without page reload
+
+#### Scenario: Search functionality
+- **GIVEN** a user on the documentation site
+- **WHEN** they use the search bar
+- **THEN** results appear instantly (client-side search)
+- **AND** matching terms are highlighted in results
+
+#### Scenario: Theme toggle
+- **GIVEN** a user on the documentation site
+- **WHEN** they click the theme toggle
+- **THEN** the site switches between light and dark modes
+- **AND** their preference is remembered
+
+#### Scenario: Code blocks
+- **GIVEN** a documentation page with code examples
+- **WHEN** a user views the page
+- **THEN** code blocks have syntax highlighting
+- **AND** code blocks have a copy button
+
+### Requirement: GitHub Pages Deployment
+
+The documentation site SHALL deploy automatically to GitHub Pages.
+
+#### Scenario: Automatic deployment on push
+- **GIVEN** changes pushed to the main branch
+- **WHEN** the changes include files in `docs/` or `mkdocs.yml`
+- **THEN** the GitHub Actions workflow builds the site
+- **AND** deploys it to the `gh-pages` branch
+- **AND** GitHub Pages serves the updated content
+
+#### Scenario: PR validation
+- **GIVEN** a pull request with documentation changes
+- **WHEN** the PR is created or updated
+- **THEN** the workflow runs lint checks
+- **AND** deployment is skipped (only on main branch)
+
+### Requirement: Documentation Build Configuration
+
+The project SHALL maintain MkDocs configuration in `mkdocs.yml`.
+
+#### Scenario: Configuration location
+- **GIVEN** the repository root
+- **WHEN** checked for MkDocs config
+- **THEN** `mkdocs.yml` exists with site configuration
+
+#### Scenario: Navigation structure
+- **GIVEN** the `mkdocs.yml` configuration
+- **WHEN** the `nav` section is read
+- **THEN** it defines navigation matching the `docs/` directory structure
+- **AND** all existing documentation pages are included
+
+#### Scenario: Markdown extensions
+- **GIVEN** the `mkdocs.yml` configuration
+- **WHEN** the `markdown_extensions` section is read
+- **THEN** it enables: toc, admonition, attr_list, tables
+- **AND** it enables pymdownx extensions for code highlighting and tabs
+

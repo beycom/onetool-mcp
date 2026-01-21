@@ -71,6 +71,22 @@ deps-check:
     uvx deptry . 2>&1 | grep -v "^Assuming"
 
 # ============================================================================
+# DOCUMENTATION
+# ============================================================================
+
+# Serve documentation locally with hot reload
+docs-serve:
+    uv run mkdocs serve --dev-addr 127.0.0.1:8000
+
+# Build documentation site (strict mode)
+docs-build:
+    uv run mkdocs build --strict
+
+# Deploy documentation to GitHub Pages
+docs-deploy:
+    uv run mkdocs gh-deploy --force
+
+# ============================================================================
 # BUILD & RELEASE
 # ============================================================================
 

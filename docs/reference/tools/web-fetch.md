@@ -24,4 +24,4 @@ Extracts main content from web pages, filtering navigation, ads, and boilerplate
 
 **Comparison:** No standard MCP exists for web fetch; this is a trafilatura-based implementation with batch support and format options.
 
-**License:** Apache 2.0 ([LICENSE](../licenses/trafilatura-LICENSE))
+**License:** Apache 2.0 ([LICENSE](../../../licenses/trafilatura-LICENSE))

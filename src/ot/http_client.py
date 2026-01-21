@@ -32,6 +32,7 @@ Usage:
 from __future__ import annotations
 
 import atexit
+import contextlib
 import threading
 from typing import Any
 
@@ -64,10 +65,8 @@ def _shutdown_client() -> None:
     """Close the shared client on exit."""
     global _client
     if _client is not None:
-        try:
+        with contextlib.suppress(Exception):
             _client.close()
-        except Exception:
-            pass
         _client = None
 
 

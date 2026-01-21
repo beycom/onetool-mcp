@@ -30,4 +30,4 @@ Web, news, local, image, and video search via Brave Search API.
 
 **Comparison:** Original MCP has no validation and single queries only. OneTool adds query validation (400 char/50 word), batch search, and all search types unified.
 
-**License:** MIT ([LICENSE](../licenses/brave-search-mcp-server-LICENSE))
+**License:** MIT ([LICENSE](../../../licenses/brave-search-mcp-server-LICENSE))

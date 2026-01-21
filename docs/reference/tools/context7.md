@@ -27,4 +27,4 @@ Library documentation search and retrieval.
 
 **Comparison:** Original MCP requires strict key format. OneTool adds library key normalization (URLs, versions), topic normalization, and mode suggestions.
 
-**License:** MIT ([LICENSE](../licenses/context7-LICENSE))
+**License:** MIT ([LICENSE](../../../licenses/context7-LICENSE))

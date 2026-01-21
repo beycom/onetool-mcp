@@ -1,0 +1,121 @@
+site_name: OneTool MCP
+site_description: "Don't enumerate tools. Execute code. MCP server exposing a single 'run' tool for LLM code execution."
+site_url: https://beycom.github.io/onetool-mcp
+site_dir: dist/site
+repo_name: beycom/onetool-mcp
+repo_url: https://github.com/beycom/onetool-mcp
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - content.code.copy
+    - content.code.annotate
+    - navigation.instant
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+  favicon: assets/onetool-favicon-64.png
+  logo: assets/logo-white.png
+
+plugins:
+  - search
+  - tags
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+  - def_list
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Quickstart: getting-started/quickstart.md
+      - Installation: getting-started/installation.md
+      - Configuration: getting-started/configuration.md
+  - Introduction:
+      - Why OneTool: intro/index.md
+      - LinkedIn Article: intro/linkedin-article.md
+      - Source Analysis: intro/why-onetool-source.md
+  - Guides:
+      - Explicit Calls: guides/explicit-calls.md
+      - Database Queries: guides/database-queries.md
+      - Prompting Best Practices: guides/prompting-best-practices.md
+  - Examples:
+      - Overview: examples/index.md
+  - Reference:
+      - Tools:
+          - Overview: reference/tools/index.md
+          - Brave Search: reference/tools/brave-search.md
+          - Code Search: reference/tools/code-search.md
+          - Context7: reference/tools/context7.md
+          - Convert: reference/tools/convert.md
+          - Database: reference/tools/database.md
+          - Diagram: reference/tools/diagram.md
+          - Excel: reference/tools/excel.md
+          - File: reference/tools/file.md
+          - Grounding Search: reference/tools/grounding-search.md
+          - OT (Meta): reference/tools/ot.md
+          - Package: reference/tools/package.md
+          - Ripgrep: reference/tools/ripgrep.md
+          - Transform: reference/tools/transform.md
+          - Web Fetch: reference/tools/web-fetch.md
+      - CLI:
+          - Overview: reference/cli/index.md
+          - ot-serve: reference/cli/ot-serve.md
+          - ot-bench: reference/cli/ot-bench.md
+  - Extending:
+      - Overview: extending/index.md
+      - Creating Tools: extending/creating-tools.md
+      - Creating CLIs: extending/creating-clis.md
+      - Logging: extending/logging.md
+      - Testing: extending/testing.md
+  - Beta:
+      - Overview: beta/index.md
+      - Browser Inspector: beta/browser-inspector.md
+      - ot-browse: beta/ot-browse.md
+      - Page View: beta/page-view.md
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/beycom/onetool-mcp

@@ -26,4 +26,4 @@ Check latest versions for npm, PyPI packages and search OpenRouter AI models.
 - Support for current version comparison (pass dict instead of list)
 - OpenRouter model search with glob patterns (e.g., `anthropic/claude-sonnet-4.*`)
 
-**License:** MIT ([LICENSE](../licenses/mcp-package-version-LICENSE))
+**License:** MIT ([LICENSE](../../../licenses/mcp-package-version-LICENSE))
