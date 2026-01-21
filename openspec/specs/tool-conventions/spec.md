@@ -404,3 +404,81 @@ A centralised format helper SHALL provide consistent JSON output formatting.
 - **WHEN** formatted
 - **THEN** it SHALL preserve Unicode (not escape to `\uXXXX`)
 
+### Requirement: Source Attribution Model
+
+Tool implementations SHALL follow a three-tier attribution model for upstream acknowledgment.
+
+#### Scenario: Attribution levels
+- **GIVEN** a tool implementation
+- **WHEN** determining attribution level
+- **THEN** it SHALL be classified as one of:
+  - **Based on**: Code derived or ported from upstream project
+  - **Inspired by**: Similar functionality with independent implementation
+  - **Original**: Clean room implementation or API wrapper
+
+#### Scenario: Based on requirements
+- **GIVEN** a tool classified as "Based on"
+- **WHEN** implementing the tool
+- **THEN** it SHALL include in the module docstring:
+  ```
+  Based on {project-name} by {Author Name} ({License}).
+  {URL}
+  ```
+- **AND** a license file SHALL exist at `licenses/{project-name}-LICENSE`
+
+#### Scenario: Inspired by requirements
+- **GIVEN** a tool classified as "Inspired by"
+- **WHEN** implementing the tool
+- **THEN** it SHALL include in the module docstring:
+  ```
+  Inspired by {project-name} by {Author Name} ({License}).
+  {URL}
+  ```
+- **AND** no license file is required (independent code)
+
+#### Scenario: Original requirements
+- **GIVEN** a tool classified as "Original"
+- **WHEN** implementing the tool
+- **THEN** it MAY optionally include a reference comment:
+  ```
+  API docs: {URL}
+  ```
+- **AND** no attribution section is required
+
+### Requirement: License File Management
+
+Tools derived from upstream projects SHALL include license files.
+
+#### Scenario: License file location
+- **GIVEN** a "Based on" tool
+- **WHEN** including the license
+- **THEN** the license file SHALL be at `licenses/{project-name}-LICENSE`
+- **AND** the file SHALL be a copy of the upstream LICENSE file
+
+#### Scenario: License file naming
+- **GIVEN** an upstream project named "my-project"
+- **WHEN** creating the license file
+- **THEN** it SHALL be named `my-project-LICENSE`
+
+#### Scenario: No license for inspired tools
+- **GIVEN** an "Inspired by" tool
+- **WHEN** checking license requirements
+- **THEN** no license file SHALL be required
+- **AND** the independent implementation does not create license obligations
+
+### Requirement: Attribution Consistency
+
+Source code attribution SHALL match documentation attribution.
+
+#### Scenario: Source header matches doc
+- **GIVEN** a tool with source header attribution
+- **WHEN** the tool documentation is written
+- **THEN** the attribution level in the doc SHALL match the source header
+- **AND** "Based on" in source requires "Based on" section in doc
+- **AND** "Inspired by" in source requires "Inspired by" section in doc
+
+#### Scenario: No source attribution
+- **GIVEN** a tool without source header attribution
+- **WHEN** the tool documentation is written
+- **THEN** the doc SHALL NOT include an attribution section
+

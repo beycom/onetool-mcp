@@ -4,29 +4,47 @@
 
 Semantic code search using ChunkHound indexes and DuckDB.
 
+## Highlights
+
+- Natural language queries for code search
+- Vector search via DuckDB vss extension
+- Filter by language or project
+- Provider/model filtering for embedding compatibility
+
+## Functions
+
 | Function | Description |
 |----------|-------------|
 | `code.search(query, ...)` | Search code by meaning |
-| `code.status(project)`    | Check index status |
+| `code.status(project)` | Check index status |
 
-**Key Parameters:**
-- `query`: Natural language query (e.g., "authentication logic")
-- `project`: Project name from config or path
-- `language`: Filter by language (e.g., "python")
-- `limit`: Max results (default: 10)
+## Key Parameters
 
-**Requires:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `query` | str | Natural language query (e.g., "authentication logic") |
+| `project` | str | Project name from config or path |
+| `language` | str | Filter by language (e.g., "python") |
+| `limit` | int | Max results (default: 10) |
+
+## Requires
+
 - `OT_OPENAI_API_KEY` for embeddings
 - Project indexed with `chunkhound index <project>`
 
-**Based on:** [ChunkHound](https://github.com/chunkhound/chunkhound) DuckDB schema
+## Examples
 
-**Implementation notes:**
-- Queries existing ChunkHound DuckDB databases
-- Uses `array_cosine_similarity()` for vector search via vss extension
-- Filters by provider/model for embedding compatibility
-- Resolves file paths via files table join
+```python
+# Search by meaning
+code.search(query="authentication logic", project="myapp")
 
-**Comparison:** Custom implementation; no upstream MCP exists. Uses ChunkHound indexes + DuckDB queries with provider/model filtering.
+# Filter by language
+code.search(query="database connection", project="myapp", language="python")
 
-**License:** MIT ([LICENSE](../../../licenses/chunkhound-LICENSE))
+# Check index status
+code.status(project="myapp")
+```
+
+## Source
+
+[ChunkHound](https://github.com/chunkhound/chunkhound) | [DuckDB](https://duckdb.org/)

@@ -4,6 +4,14 @@
 
 Generates and renders diagrams using Kroki as the unified backend, supporting Mermaid, PlantUML, D2, and 25+ other diagram types.
 
+## Highlights
+
+- Two-stage pipeline (generate source, then render)
+- Config-driven instructions and templates
+- Policy rules for LLM guidance
+- Batch operations for self-hosted backends
+- Playground URL generation for debugging
+
 ## Two-Stage Pipeline
 
 | Function | Description |
@@ -45,11 +53,37 @@ All 28+ Kroki providers are available for advanced use.
 
 ## Key Parameters
 
-**generate_source / render_diagram:**
-- `provider`: mermaid, plantuml, d2, graphviz, etc.
-- `output_format`: svg (default), png, pdf
-- `output_dir`: Override default output directory
-- `async_mode`: Return task ID for status polling
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `source` | str | Diagram source code |
+| `provider` | str | mermaid, plantuml, d2, graphviz, etc. |
+| `output_format` | str | svg (default), png, pdf |
+| `output_dir` | str | Override default output directory |
+| `async_mode` | bool | Return task ID for status polling |
+
+## Examples
+
+```python
+# Generate source for review
+diagram.generate_source(
+    source="graph TD\n  A --> B",
+    provider="mermaid",
+    name="flow"
+)
+
+# Render diagram
+diagram.render_diagram(
+    source="graph TD\n  A --> B",
+    provider="mermaid",
+    name="flow"
+)
+
+# Get playground URL for debugging
+diagram.get_playground_url(source="graph TD\n  A --> B", provider="mermaid")
+
+# List available providers
+diagram.list_providers(focus_only=True)
+```
 
 ## Configuration
 
@@ -94,15 +128,6 @@ tools:
       self_hosted_url: http://localhost:8000
 ```
 
-**Based on:** [Kroki](https://kroki.io/)
+## Source
 
-**Differences from upstream:**
-- Two-stage pipeline (generate source, then render)
-- Config-driven instructions and templates
-- Policy rules for LLM guidance
-- Batch operations for self-hosted backends
-- Playground URL generation for debugging
-
-**Comparison:** Similar to kroki-mcp, but adds config-driven instructions, two-stage pipeline, and onetool integration patterns.
-
-**License:** MIT (Kroki is MIT licensed)
+[Kroki](https://kroki.io/) | [Mermaid](https://mermaid.js.org/) | [PlantUML](https://plantuml.com/) | [D2](https://d2lang.com/)

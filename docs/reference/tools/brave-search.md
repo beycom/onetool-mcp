@@ -4,6 +4,15 @@
 
 Web, news, local, image, and video search via Brave Search API.
 
+## Highlights
+
+- Five search types: web, news, local, image, video
+- Batch search with concurrent execution
+- Query validation (400 char / 50 word limits)
+- AI-generated summaries (Pro plan)
+
+## Functions
+
 | Function | Description |
 |----------|-------------|
 | `brave.search(query, ...)` | General web search |
@@ -14,20 +23,38 @@ Web, news, local, image, and video search via Brave Search API.
 | `brave.search_batch(queries, ...)` | Multiple searches concurrently |
 | `brave.summarize(query, ...)` | AI-generated summary (Pro plan) |
 
-**Key Parameters:**
-- `count`: Results per query (1-20)
-- `freshness`: "pd" (day), "pw" (week), "pm" (month), "py" (year)
-- `safesearch`: "off", "moderate", "strict"
+## Key Parameters
 
-**Requires:** `OT_BRAVE_API_KEY` environment variable
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `query` | str | Search query (max 400 chars, 50 words) |
+| `count` | int | Results per query (1-20) |
+| `freshness` | str | "pd" (day), "pw" (week), "pm" (month), "py" (year) |
+| `safesearch` | str | "off", "moderate", "strict" |
 
-**Based on:** [brave-search-mcp-server](https://github.com/brave/brave-search-mcp-server)
+## Requires
 
-**Differences from upstream:**
-- Query validation (400 char / 50 word limits)
-- Batch search with concurrent execution
-- Simplified local search (uses web endpoint with locations filter)
+- `OT_BRAVE_API_KEY` environment variable
 
-**Comparison:** Original MCP has no validation and single queries only. OneTool adds query validation (400 char/50 word), batch search, and all search types unified.
+## Examples
 
-**License:** MIT ([LICENSE](../../../licenses/brave-search-mcp-server-LICENSE))
+```python
+# Web search
+brave.search(query="python async tutorial", count=10)
+
+# News with freshness filter
+brave.news(query="AI announcements", freshness="pw")
+
+# Local search
+brave.local(query="coffee shops near Times Square")
+
+# Batch search
+brave.search_batch(queries=["react hooks", "vue composition api"])
+
+# AI summary (Pro plan)
+brave.summarize(query="latest developments in quantum computing")
+```
+
+## Source
+
+[Brave Search API](https://api.search.brave.com/app/documentation)

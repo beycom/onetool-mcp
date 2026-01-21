@@ -4,6 +4,15 @@
 
 Check latest versions for npm, PyPI packages and search OpenRouter AI models.
 
+## Highlights
+
+- Unified version checking across npm and PyPI
+- Parallel fetching via ThreadPoolExecutor
+- Version comparison support (pass dict with current versions)
+- OpenRouter model search with glob patterns
+
+## Functions
+
 | Function | Description |
 |----------|-------------|
 | `package.npm(packages)` | Check latest npm package versions |
@@ -11,19 +20,42 @@ Check latest versions for npm, PyPI packages and search OpenRouter AI models.
 | `package.models(query, provider, limit)` | Search OpenRouter AI models |
 | `package.version(registry, packages)` | Unified version check with parallel fetching |
 
-**Key Parameters:**
-- `packages`: List of package names, or dict mapping names to current versions
-- `registry`: "npm", "pypi", or "openrouter"
-- `query`: Search query for model name/id (case-insensitive)
-- `provider`: Filter models by provider (e.g., "anthropic", "openai")
+## Key Parameters
 
-**No API key required.**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `packages` | list or dict | Package names, or dict mapping names to current versions |
+| `registry` | str | "npm", "pypi", or "openrouter" |
+| `query` | str | Search query for model name/id (case-insensitive) |
+| `provider` | str | Filter models by provider (e.g., "anthropic", "openai") |
 
-**Based on:** [mcp-package-version](https://github.com/sammcj/mcp-package-version) by Sam McLeod
+## Requires
 
-**Differences from upstream:**
-- Unified `version()` function with parallel fetching via ThreadPoolExecutor
-- Support for current version comparison (pass dict instead of list)
-- OpenRouter model search with glob patterns (e.g., `anthropic/claude-sonnet-4.*`)
+No API key required.
 
-**License:** MIT ([LICENSE](../../../licenses/mcp-package-version-LICENSE))
+## Examples
+
+```python
+# Check npm package versions
+package.npm(packages=["react", "typescript"])
+
+# Check PyPI package versions
+package.pypi(packages=["requests", "httpx"])
+
+# Compare against current versions
+package.npm(packages={"react": "18.2.0", "typescript": "5.0.0"})
+
+# Search OpenRouter models
+package.models(query="claude-sonnet-4.*", provider="anthropic")
+
+# Unified version check
+package.version(registry="npm", packages=["express", "fastify"])
+```
+
+## Source
+
+[npm Registry API](https://github.com/npm/registry) | [PyPI JSON API](https://warehouse.pypa.io/api-reference/json.html) | [OpenRouter API](https://openrouter.ai/docs)
+
+## Based on
+
+[mcp-package-version](https://github.com/sammcj/mcp-package-version) by Sam McLeod (MIT)

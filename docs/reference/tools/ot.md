@@ -4,6 +4,13 @@
 
 Internal tools for OneTool introspection and management.
 
+## Highlights
+
+- List and filter available tools with signatures
+- Check system health and API connectivity
+- Access configuration, aliases, and snippets
+- Publish messages to configured topics
+
 ## Functions
 
 | Function | Description |
@@ -152,6 +159,10 @@ snippets:
           results.append(brave.search(query=q))
       "\n---\n".join(results)
 ```
+
+## Source
+
+OneTool internal implementation
 
 ## Related
 

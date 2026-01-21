@@ -83,7 +83,7 @@ The project SHALL document all tools at `docs/reference/tools/`.
 #### Scenario: Individual tool docs
 - **GIVEN** each tool namespace
 - **WHEN** the user reads its doc
-- **THEN** they find: purpose, functions, parameters, and examples
+- **THEN** they find: purpose tagline, highlights, functions table, key parameters table, requires, examples, source
 
 #### Scenario: ot namespace documented
 - **GIVEN** the `ot.*` namespace
@@ -149,7 +149,7 @@ The project SHALL provide developer docs at `docs/extending/`.
 #### Scenario: Tool creation guide
 - **GIVEN** a developer creating a new tool
 - **WHEN** they read `extending/creating-tools.md`
-- **THEN** they find the full guide from ot-tools.md
+- **THEN** they find the full guide including attribution requirements
 
 #### Scenario: Testing and logging
 - **GIVEN** a developer debugging
@@ -257,4 +257,113 @@ The project SHALL maintain MkDocs configuration in `mkdocs.yml`.
 - **WHEN** the `markdown_extensions` section is read
 - **THEN** it enables: toc, admonition, attr_list, tables
 - **AND** it enables pymdownx extensions for code highlighting and tabs
+
+### Requirement: Tool Documentation Format
+
+Individual tool documentation files SHALL follow a standardised format.
+
+#### Scenario: Required sections
+- **GIVEN** a tool documentation file at `docs/reference/tools/{tool}.md`
+- **WHEN** the file is structured
+- **THEN** it SHALL include in order:
+  1. Title (H1): Tool name
+  2. Purpose tagline (bold): What it does, not how it differs
+  3. Description: 1-2 sentences of functionality
+  4. Highlights section: Feature list without comparisons
+  5. Functions section: Table of functions with descriptions
+  6. Key Parameters section: Table with Parameter, Type, Description columns
+  7. Requires section: Dependencies and API key requirements
+  8. Examples section: Python code examples
+  9. Source section: Link to API or service documentation
+
+#### Scenario: Optional sections
+- **GIVEN** a tool documentation file
+- **WHEN** tool-specific content is needed
+- **THEN** it MAY include after Examples:
+  - Configuration section: YAML config examples (if tool has config)
+  - Based on / Inspired by section: Attribution (if applicable)
+
+#### Scenario: Prohibited sections
+- **GIVEN** a tool documentation file
+- **WHEN** describing the tool
+- **THEN** it SHALL NOT include:
+  - "Differences from upstream" sections
+  - "Comparison" sections
+  - Feature comparisons to other implementations
+
+### Requirement: Tool Documentation Highlights
+
+The Highlights section SHALL describe features positively without upstream comparisons.
+
+#### Scenario: Highlight format
+- **GIVEN** a Highlights section
+- **WHEN** listing features
+- **THEN** each highlight SHALL:
+  - Describe what the tool does (not what it differs from)
+  - Use action-oriented language
+  - Focus on user-facing capability
+
+#### Scenario: Prohibited language
+- **GIVEN** a Highlights section
+- **WHEN** describing features
+- **THEN** it SHALL NOT use:
+  - "Unlike upstream..."
+  - "Compared to..."
+  - "Original MCP..."
+  - "Differences include..."
+
+### Requirement: Tool Documentation Tables
+
+Functions and Key Parameters sections SHALL use table format.
+
+#### Scenario: Functions table
+- **GIVEN** a Functions section
+- **WHEN** documenting functions
+- **THEN** it SHALL use a table with columns: Function, Description
+- **AND** Function column SHALL show `namespace.function(params)` format
+
+#### Scenario: Key Parameters table
+- **GIVEN** a Key Parameters section
+- **WHEN** documenting parameters
+- **THEN** it SHALL use a table with columns: Parameter, Type, Description
+- **AND** Type column SHALL show the Python type (str, int, bool, etc.)
+
+### Requirement: Tool Documentation Attribution
+
+Tool documentation SHALL include attribution sections based on the tool's derivation level.
+
+#### Scenario: Based on attribution
+- **GIVEN** a tool derived from upstream code
+- **WHEN** the source header says "Based on"
+- **THEN** the doc SHALL include a "Based on" section at the end
+- **AND** it SHALL link to the upstream repository
+- **AND** it SHALL name the author and license type
+
+#### Scenario: Inspired by attribution
+- **GIVEN** a tool with independent code inspired by another project
+- **WHEN** the source header says "Inspired by"
+- **THEN** the doc SHALL include an "Inspired by" section at the end
+- **AND** it SHALL link to the inspiring project
+- **AND** it SHALL name the author and license type
+
+#### Scenario: Original tool
+- **GIVEN** a clean room implementation or API wrapper
+- **WHEN** no attribution is in the source header
+- **THEN** the doc SHALL NOT include an attribution section
+- **AND** the "Source" section SHALL link to the API documentation
+
+### Requirement: Tool Documentation Source Section
+
+All tool documentation SHALL include a Source section.
+
+#### Scenario: API-based tools
+- **GIVEN** a tool that wraps an external API
+- **WHEN** documenting the source
+- **THEN** the Source section SHALL link to the API documentation
+- **NOT** to any upstream implementation repository
+
+#### Scenario: Library-based tools
+- **GIVEN** a tool that uses a library (e.g., SQLAlchemy)
+- **WHEN** documenting the source
+- **THEN** the Source section SHALL link to the library documentation
 

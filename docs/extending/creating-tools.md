@@ -326,6 +326,58 @@ def list_files(*, directory: str = ".") -> str:
 | `get_effective_cwd()` | `onetool.paths` | Returns project directory |
 | `expand_path()` | `ot_sdk` | Only expands `~` |
 
+## Attribution & Licensing
+
+When creating tools based on or inspired by external projects, follow this three-tier attribution model:
+
+| Level | When to Use | Source Header | License File | Tool Doc |
+|-------|-------------|---------------|--------------|----------|
+| **Based on** | Code derived or ported from upstream | Required | Required in `licenses/` | Include "Based on" section |
+| **Inspired by** | Similar functionality, independent code | Required | Not required | Include "Inspired by" section |
+| **Original** | Clean room implementation, API wrappers | Optional `API docs:` | Not required | No attribution section |
+
+### Source Header Format
+
+Add attribution to the module docstring:
+
+```python
+# Based on (code derived from upstream)
+"""Database operations via SQLAlchemy.
+
+Based on mcp-alchemy by Rui Machado (MPL-2.0).
+https://github.com/runekaagaard/mcp-alchemy
+"""
+
+# Inspired by (independent implementation)
+"""Secure file operations with configurable boundaries.
+
+Inspired by fast-filesystem-mcp by efforthye (Apache 2.0).
+https://github.com/efforthye/fast-filesystem-mcp
+"""
+
+# Original (API wrapper or clean room)
+"""Web search via Brave Search API.
+
+API docs: https://api.search.brave.com/app/documentation
+"""
+```
+
+### License File Requirements
+
+For "Based on" tools, include the upstream license:
+
+1. Copy the upstream LICENSE file to `licenses/{project-name}-LICENSE`
+2. Use the exact project name from the source header
+3. Example: `licenses/mcp-alchemy-LICENSE` for database tool
+
+### Documentation Requirements
+
+| Level | Tool Doc Attribution |
+|-------|---------------------|
+| Based on | Add "## Based on" section at end with project link, author, license |
+| Inspired by | Add "## Inspired by" section at end with project link, author, license |
+| Original | No attribution section; include "## Source" linking to API docs |
+
 ## Checklist
 
 - [ ] Module docstring with description
@@ -337,6 +389,10 @@ def list_files(*, directory: str = ".") -> str:
 - [ ] Error handling returning strings
 - [ ] Secrets in `secrets.yaml`
 - [ ] Dependencies in `pyproject.toml` or PEP 723
+- [ ] Attribution level determined (Based on / Inspired by / Original)
+- [ ] Source header matches attribution level
+- [ ] License file in `licenses/` (if "Based on")
+- [ ] Tool doc attribution section matches source header
 
 ## Related
 

@@ -4,6 +4,14 @@
 
 Secure file operations with configurable security boundaries. Read, write, edit, and manage files with path validation against allowed directories.
 
+## Highlights
+
+- Configurable security boundaries with allowed directories
+- Automatic backup creation before writes
+- Recursive directory operations with pattern filtering
+- Line-numbered file reading with pagination
+- Text replacement with occurrence control
+
 ## Read Operations
 
 | Function | Description |
@@ -36,11 +44,13 @@ Secure file operations with configurable security boundaries. Read, write, edit,
 
 ## Key Parameters
 
-- `path`: File or directory path (relative to cwd or absolute)
-- `pattern`: Glob pattern for filtering (e.g., `*.py`, `**/*.md`)
-- `offset`: Line number to start from (0-indexed)
-- `limit`: Maximum lines to return
-- `occurrence`: Which match to replace (1=first, 0=all)
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `path` | str | File or directory path (relative to cwd or absolute) |
+| `pattern` | str | Glob pattern for filtering (e.g., `*.py`, `**/*.md`) |
+| `offset` | int | Line number to start from (0-indexed) |
+| `limit` | int | Maximum lines to return |
+| `occurrence` | int | Which match to replace (1=first, 0=all) |
 
 ## Configuration
 
@@ -143,8 +153,10 @@ All paths are validated against:
 - **Exclude patterns**: Paths matching patterns like `.git` are blocked
 - **File size limits**: Large files are rejected to prevent memory issues
 
-## Attribution
+## Source
 
-**Inspired by:** [fast-filesystem-mcp](https://github.com/efforthye/fast-filesystem-mcp) by efforthye
+[Python pathlib](https://docs.python.org/3/library/pathlib.html) | [shutil](https://docs.python.org/3/library/shutil.html)
 
-**License:** Apache 2.0
+## Inspired by
+
+[fast-filesystem-mcp](https://github.com/efforthye/fast-filesystem-mcp) by efforthye (Apache 2.0)

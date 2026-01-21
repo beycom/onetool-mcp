@@ -4,6 +4,15 @@
 
 Excel file manipulation using openpyxl. Create, read, write workbooks, apply formulas, manage tables, and inspect spreadsheet structure.
 
+## Highlights
+
+- 25 functions covering all spreadsheet operations
+- Table operations with dictionary-based data access
+- Pure cell range functions (no file I/O required)
+- JSON-formatted output for LLM consumption
+- Auto-creates parent directories on workbook creation
+- Auto-prepends `=` to formulas if missing
+
 ## Core Operations
 
 | Function | Description |
@@ -60,12 +69,14 @@ Excel file manipulation using openpyxl. Create, read, write workbooks, apply for
 
 ## Key Parameters
 
-- `filepath`: Path to Excel file (required)
-- `sheet_name`: Target sheet (default: active sheet)
-- `data`: List of rows for writing (list of lists)
-- `start_cell`: Starting cell reference (default: "A1")
-- `pattern`: Search pattern (wildcards or regex)
-- `table_name`: Name for table operations
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `filepath` | str | Path to Excel file (required) |
+| `sheet_name` | str | Target sheet (default: active sheet) |
+| `data` | list[list] | Rows for writing (list of lists) |
+| `start_cell` | str | Starting cell reference (default: "A1") |
+| `pattern` | str | Search pattern (wildcards or regex) |
+| `table_name` | str | Name for table operations |
 
 ## Examples
 
@@ -167,16 +178,10 @@ A sample spreadsheet is available at `demo/data/sample_sales.xlsx` with:
 - **Inventory** sheet: Stock levels with conditional formulas
 - **Summary** sheet: Cross-sheet formulas and merged cells
 
-## Attribution
+## Source
 
-**Based on:** [excel-mcp-server](https://github.com/haris-musa/excel-mcp-server) by Haris Musa
+[openpyxl Documentation](https://openpyxl.readthedocs.io/)
 
-**Differences from upstream:**
-- Extended from 6 to 25 functions
-- Added table operations, search, structure manipulation
-- Pure cell range functions (no file I/O required)
-- Returns JSON-formatted data for LLM consumption
-- Auto-creates parent directories on workbook creation
-- Auto-prepends `=` to formulas if missing
+## Based on
 
-**License:** MIT ([LICENSE](../../../licenses/excel-mcp-server-LICENSE))
+[excel-mcp-server](https://github.com/haris-musa/excel-mcp-server) by Haris Musa (MIT)

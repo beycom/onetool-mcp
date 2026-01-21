@@ -4,19 +4,32 @@
 
 Database introspection and query execution via SQLAlchemy. Supports any SQLAlchemy-compatible database (PostgreSQL, MySQL, SQLite, Oracle, MS SQL Server, etc.).
 
+## Highlights
+
+- Connection pooling with automatic health checks
+- Vertical result formatting optimized for LLM consumption
+- Parameterized queries for safe SQL execution
+- Large results truncated at 4000 characters
+- Per-URL connection pools with 1-hour recycling
+
+## Functions
+
 | Function | Description |
 |----------|-------------|
 | `db.tables(db_url, ...)` | List table names in the database |
 | `db.schema(table_names, db_url)` | Get schema definitions for tables |
 | `db.query(sql, db_url, ...)` | Execute SQL and return formatted results |
 
-**Key Parameters:**
-- `db_url`: Database URL (required) - SQLAlchemy connection string
-- `filter`: Substring to filter table names (tables only)
-- `table_names`: List of tables to inspect (schema only)
-- `params`: Query parameters for safe substitution (query only)
+## Key Parameters
 
-**Example:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `db_url` | str | SQLAlchemy connection string (required) |
+| `filter` | str | Substring to filter table names (tables only) |
+| `table_names` | list[str] | Tables to inspect (schema only) |
+| `params` | dict | Query parameters for safe substitution (query only) |
+
+## Examples
 
 ```python
 # Get database URL from project config
@@ -40,15 +53,10 @@ db.query(
 )
 ```
 
-**Based on:** [mcp-alchemy](https://github.com/runekaagaard/mcp-alchemy) by Rui Machado
+## Source
 
-**Implementation notes:**
-- Connection pooling with automatic health checks (`pool_pre_ping`)
-- Connections recycled after 1 hour
-- Results formatted in vertical format with row numbers
-- Large results truncated at 4000 characters
-- Each unique `db_url` maintains its own connection pool
+[SQLAlchemy Documentation](https://docs.sqlalchemy.org/)
 
-**Comparison:** Based on mcp-alchemy with simplified API. Requires explicit db_url parameter (no environment fallback), vertical result formatting optimized for LLM consumption.
+## Based on
 
-**License:** MPL 2.0 ([LICENSE](../../../licenses/mcp-alchemy-LICENSE))
+[mcp-alchemy](https://github.com/runekaagaard/mcp-alchemy) by Rui Machado (MPL-2.0)

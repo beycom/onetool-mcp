@@ -2,7 +2,16 @@
 
 **Blazing fast file search. Regex or literal. Any codebase.**
 
-Fast text and regex search in files using ripgrep. Requires the `rg` binary (install with: `brew install ripgrep`).
+Fast text and regex search in files using ripgrep.
+
+## Highlights
+
+- Search, count, and list files with regex or literal patterns
+- Filter by file type or glob pattern
+- Context lines around matches
+- Path resolution relative to effective cwd
+
+## Functions
 
 | Function | Description |
 |----------|-------------|
@@ -11,17 +20,24 @@ Fast text and regex search in files using ripgrep. Requires the `rg` binary (ins
 | `ripgrep.files(path, ...)` | List files that would be searched |
 | `ripgrep.types()` | List supported file types |
 
-**Key Parameters:**
-- `pattern`: Regex or literal pattern to search for
-- `path`: Directory or file to search (default: current directory)
-- `case_sensitive`: Match case-sensitively (default: True)
-- `fixed_strings`: Treat pattern as literal, not regex
-- `file_type`: Filter by type (e.g., "py", "js", "ts")
-- `glob`: Filter by glob pattern (e.g., "*.md")
-- `context`: Lines of context around matches
-- `max_results`: Limit number of matching lines
+## Key Parameters
 
-**Example:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `pattern` | str | Regex or literal pattern to search for |
+| `path` | str | Directory or file to search (default: current directory) |
+| `case_sensitive` | bool | Match case-sensitively (default: True) |
+| `fixed_strings` | bool | Treat pattern as literal, not regex |
+| `file_type` | str | Filter by type (e.g., "py", "js", "ts") |
+| `glob` | str | Filter by glob pattern (e.g., "*.md") |
+| `context` | int | Lines of context around matches |
+| `max_results` | int | Limit number of matching lines |
+
+## Requires
+
+- `rg` binary (install with: `brew install ripgrep`)
+
+## Examples
 
 ```python
 # Basic search
@@ -35,10 +51,15 @@ ripgrep.count(pattern="import", path=".", file_type="py")
 
 # List files
 ripgrep.files(path="src/", file_type="py")
+
+# List supported file types
+ripgrep.types()
 ```
 
-**Inspired by:** [mcp-ripgrep](https://github.com/mcollina/mcp-ripgrep) by Matteo Collina
+## Source
 
-**Comparison:** Original implementation inspired by mcp-ripgrep. Provides search, count, files, and types functions with path resolution relative to effective cwd.
+[ripgrep](https://github.com/BurntSushi/ripgrep)
 
-**License:** MIT
+## Inspired by
+
+[mcp-ripgrep](https://github.com/mcollina/mcp-ripgrep) by Matteo Collina (MIT)

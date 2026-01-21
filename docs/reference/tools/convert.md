@@ -4,6 +4,13 @@
 
 Convert PDF, Word, PowerPoint, and Excel documents to Markdown with LLM-optimised output. Each conversion produces two files: a pure content file with exact line numbers, and a separate TOC file with frontmatter and navigation.
 
+## Highlights
+
+- Two-file output: pure content + separate TOC with line numbers
+- Parallel batch processing with glob patterns
+- Diff-stable image naming using content hashes
+- Format-specific features (PDF bookmarks, speaker notes, formulas)
+
 ## Functions
 
 | Function | Description |
@@ -16,10 +23,12 @@ Convert PDF, Word, PowerPoint, and Excel documents to Markdown with LLM-optimise
 
 ## Key Parameters
 
-- `pattern`: Glob pattern for input files (e.g., `docs/*.pdf`, `**/*.docx`)
-- `output_dir`: Directory for output Markdown files and images
-- `include_notes`: Include speaker notes in PowerPoint conversion
-- `include_formulas`: Include cell formulas in Excel conversion
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `pattern` | str | Glob pattern for input files (e.g., `docs/*.pdf`, `**/*.docx`) |
+| `output_dir` | str | Directory for output Markdown files and images |
+| `include_notes` | bool | Include speaker notes in PowerPoint conversion |
+| `include_formulas` | bool | Include cell formulas in Excel conversion |
 
 ## Output Format
 
@@ -176,3 +185,7 @@ convert.pdf(pattern="archive/**/*.pdf", output_dir="output")
 #   output/report2.md + output/report2.toc.md
 #   ...
 ```
+
+## Source
+
+[PyMuPDF](https://pymupdf.readthedocs.io/) | [python-docx](https://python-docx.readthedocs.io/) | [python-pptx](https://python-pptx.readthedocs.io/) | [openpyxl](https://openpyxl.readthedocs.io/)
