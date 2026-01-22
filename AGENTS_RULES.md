@@ -7,6 +7,16 @@
 - `/openspec/changes` - pending proposals
 - `/openspec/archive` - completed proposals
 
+## Spec Naming
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| `{cli}` | `bench`, `browse` | Main spec for a CLI (`ot-{cli}`) |
+| `{cli}-{feature}` | `bench-config` | CLI feature spec |
+| `serve-{feature}` | `serve-configuration` | MCP server feature spec |
+| `tool-{name}` | `tool-brave-search` | Built-in tool spec |
+| `_nf-{name}` | `_nf-observability` | Non-functional / cross-cutting spec |
+
 ## Models
 
 - Bench default: `openai/gpt-5-mini`

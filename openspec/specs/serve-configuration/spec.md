@@ -816,6 +816,7 @@ The system SHALL support a top-level `include:` key for merging external config 
 - **GIVEN** an external snippet file loaded via `include:`
 - **WHEN** parsed
 - **THEN** it SHALL contain the `snippets:` key:
+
   ```yaml
   snippets:
     snippet_name:
@@ -825,4 +826,89 @@ The system SHALL support a top-level `include:` key for merging external config 
       body: |
         code_template()
   ```
+
+### Requirement: Security Configuration
+
+The system SHALL support configurable security patterns for code validation at the root level.
+
+#### Scenario: Security section at root level
+- **GIVEN** configuration with:
+
+  ```yaml
+  security:
+    validate_code: true
+    enabled: true
+    blocked:
+      - my_dangerous.*
+    warned:
+      - custom_risky.*
+    allow:
+      - open
+  ```
+
+- **WHEN** code is validated
+- **THEN** configured patterns SHALL be merged with defaults
+
+#### Scenario: Default security configuration
+- **GIVEN** no `security` section in configuration
+- **WHEN** code is validated
+- **THEN** built-in default patterns SHALL be used
+
+#### Scenario: Security disabled
+- **GIVEN** configuration with `security.enabled: false`
+- **WHEN** code is validated
+- **THEN** security pattern checks SHALL be skipped
+
+#### Scenario: Additive pattern behavior
+- **GIVEN** configuration with custom patterns:
+
+  ```yaml
+  security:
+    blocked:
+      - my_dangerous.*
+  ```
+
+- **WHEN** patterns are loaded
+- **THEN** `my_dangerous.*` SHALL be added to defaults
+- **AND** default blocked patterns (exec, eval, subprocess.*, etc.) SHALL still apply
+- **RATIONALE** Prevents accidental removal of critical security patterns
+
+#### Scenario: Allow list exemption
+- **GIVEN** configuration with:
+
+  ```yaml
+  security:
+    allow:
+      - open
+  ```
+
+- **WHEN** code calls `open()`
+- **THEN** validation SHALL pass without warning
+- **AND** `open` SHALL be removed from warned defaults
+
+#### Scenario: Promoting warning to block
+- **GIVEN** configuration adding `open` to blocked:
+
+  ```yaml
+  security:
+    blocked:
+      - open
+  ```
+
+- **WHEN** code calls `open()`
+- **THEN** validation SHALL fail with error
+- **AND** blocked takes precedence over warned
+
+#### Scenario: Wildcard patterns in security config
+- **GIVEN** security patterns containing wildcards (*, ?, [seq])
+- **WHEN** patterns are loaded
+- **THEN** they SHALL be matched using fnmatch semantics
+- **EXAMPLE** `subprocess.*` matches `subprocess.run`, `subprocess.Popen`, etc.
+
+#### Scenario: Pattern type auto-detection
+- **GIVEN** patterns in blocked/warned lists
+- **WHEN** matching occurs
+- **THEN** patterns without dots SHALL match builtins and imports
+- **AND** patterns with dots SHALL match qualified function calls
+- **EXAMPLE** `subprocess` matches `import subprocess`; `subprocess.*` matches `subprocess.run()`
 

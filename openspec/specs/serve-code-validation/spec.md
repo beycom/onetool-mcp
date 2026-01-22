@@ -30,22 +30,22 @@ The system SHALL detect and block dangerous code patterns.
 #### Scenario: Exec call blocked
 - **GIVEN** code containing `exec("code")`
 - **WHEN** validate_python_code() is called with check_security=True
-- **THEN** it SHALL return valid=False with error "Dangerous call: exec() not allowed"
+- **THEN** it SHALL return valid=False with error "Dangerous builtin 'exec' is not allowed (matches 'exec')"
 
 #### Scenario: Eval call blocked
 - **GIVEN** code containing `eval("expression")`
 - **WHEN** validate_python_code() is called with check_security=True
-- **THEN** it SHALL return valid=False with error "Dangerous call: eval() not allowed"
+- **THEN** it SHALL return valid=False with error "Dangerous builtin 'eval' is not allowed (matches 'eval')"
 
 #### Scenario: Dynamic import blocked
 - **GIVEN** code containing `__import__("module")`
 - **WHEN** validate_python_code() is called with check_security=True
-- **THEN** it SHALL return valid=False with error "Dangerous call: __import__() not allowed"
+- **THEN** it SHALL return valid=False with error "Dangerous builtin '__import__' is not allowed (matches '__import__')"
 
 #### Scenario: Compile blocked
 - **GIVEN** code containing `compile("code", "", "exec")`
 - **WHEN** validate_python_code() is called with check_security=True
-- **THEN** it SHALL return valid=False with error "Dangerous call: compile() not allowed"
+- **THEN** it SHALL return valid=False with error "Dangerous builtin 'compile' is not allowed (matches 'compile')"
 
 #### Scenario: Open generates warning
 - **GIVEN** code containing `open("file.txt")`
@@ -134,3 +134,97 @@ The system SHALL generate warnings for potentially unsafe but commonly-needed fu
 - **WHEN** validate_python_code() is called with check_security=True
 - **THEN** it SHALL return valid=True with warning "Potentially unsafe function 'open'"
 - **RATIONALE** File access is often required by legitimate tools. Warning is appropriate.
+
+### Requirement: Configurable Security Patterns
+
+The system SHALL support configurable security patterns via ot-serve.yaml.
+
+#### Scenario: Custom blocked patterns
+- **GIVEN** configuration with:
+
+  ```yaml
+  security:
+    blocked:
+      - my_dangerous.*
+  ```
+
+- **WHEN** code containing `my_dangerous.func()` is validated
+- **THEN** it SHALL return valid=False with error
+- **AND** built-in default blocked patterns SHALL still apply
+
+#### Scenario: Security disabled
+- **GIVEN** configuration with `security.enabled: false`
+- **WHEN** code containing dangerous patterns is validated
+- **THEN** security checks SHALL be skipped
+- **AND** only syntax validation SHALL occur
+
+#### Scenario: Default patterns used
+- **GIVEN** no security configuration in ot-serve.yaml
+- **WHEN** code is validated
+- **THEN** built-in default patterns SHALL be used
+
+#### Scenario: Additive configuration
+- **GIVEN** configuration with only custom patterns
+- **WHEN** patterns are loaded
+- **THEN** custom patterns SHALL be merged with defaults
+- **AND** defaults SHALL NOT be replaced
+- **RATIONALE** Prevents accidental removal of critical security patterns
+
+#### Scenario: Allow list exemption
+- **GIVEN** configuration with:
+
+  ```yaml
+  security:
+    allow:
+      - open
+  ```
+
+- **WHEN** code containing `open()` is validated
+- **THEN** it SHALL pass without warning (exempted from defaults)
+
+### Requirement: Wildcard Pattern Matching
+
+The system SHALL support fnmatch wildcards in security patterns.
+
+#### Scenario: Asterisk wildcard
+- **GIVEN** blocked pattern `subprocess.*`
+- **WHEN** code containing `subprocess.run()` or `subprocess.Popen()` is validated
+- **THEN** both SHALL be blocked
+
+#### Scenario: Question mark wildcard
+- **GIVEN** blocked pattern `os.exec?`
+- **WHEN** code containing `os.execl()` is validated
+- **THEN** it SHALL be blocked
+- **AND** `os.execve()` SHALL NOT be blocked (more than one char)
+
+#### Scenario: Exact match fallback
+- **GIVEN** blocked pattern `os.system` (no wildcards)
+- **WHEN** code containing `os.system()` is validated
+- **THEN** exact match SHALL be used (fast path)
+
+#### Scenario: Error message includes pattern
+- **GIVEN** code blocked by wildcard pattern `subprocess.*`
+- **WHEN** error is reported
+- **THEN** message SHALL include both the function name and the matched pattern
+- **EXAMPLE** "subprocess.check_output is not allowed (matches 'subprocess.*')"
+
+### Requirement: Simplified Security Pattern Categories
+
+The system SHALL support two categories of security patterns with automatic type detection.
+
+#### Scenario: Blocked patterns
+- **GIVEN** `blocked: [exec, eval, subprocess.*, os.system]`
+- **WHEN** code uses these patterns
+- **THEN** validation SHALL fail with error
+
+#### Scenario: Warned patterns
+- **GIVEN** `warned: [subprocess, os, open, pickle.*]`
+- **WHEN** code uses these patterns
+- **THEN** validation SHALL pass with warning
+
+#### Scenario: Pattern type detection
+- **GIVEN** patterns without dots (e.g., `exec`, `subprocess`)
+- **WHEN** pattern matching occurs
+- **THEN** they SHALL match builtin calls AND import statements
+- **AND** patterns with dots (e.g., `subprocess.*`) SHALL match qualified calls only
+- **RATIONALE** Simplifies configuration from 4 categories to 2 while preserving functionality
