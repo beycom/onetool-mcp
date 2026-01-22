@@ -69,6 +69,7 @@ nav:
       - Quickstart: getting-started/quickstart.md
       - Installation: getting-started/installation.md
       - Configuration: getting-started/configuration.md
+      - Security: getting-started/security.md
   - Introduction:
       - Why OneTool: intro/index.md
       - LinkedIn Article: intro/linkedin-article.md

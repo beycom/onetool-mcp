@@ -15,6 +15,7 @@ MCP doesn't scale. Connect 5 servers: 55K tokens burned. Connect 10+: 100K+ toke
 - **[Quickstart](getting-started/quickstart.md)** - Running in 2 minutes
 - **[Installation](getting-started/installation.md)** - All platforms
 - **[Configuration](getting-started/configuration.md)** - YAML schema
+- **[Security](getting-started/security.md)** - Security model and policies
 
 ## Learn
 
