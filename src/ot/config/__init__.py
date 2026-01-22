@@ -16,6 +16,7 @@ from ot.config.loader import (
     SnippetDef,
     SnippetParam,
     get_config,
+    is_log_verbose,
     load_config,
 )
 from ot.config.mcp import McpServerConfig
@@ -29,6 +30,7 @@ __all__ = [
     "get_config",
     "get_secret",
     "get_secrets",
+    "is_log_verbose",
     "load_config",
     "load_secrets",
 ]

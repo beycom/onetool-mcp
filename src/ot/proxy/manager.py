@@ -39,7 +39,7 @@ class ProxyManager:
 
     def __init__(self) -> None:
         """Initialize the proxy manager."""
-        self._clients: dict[str, Client] = {}
+        self._clients: dict[str, Client] = {}  # type: ignore[type-arg]
         self._tools_by_server: dict[str, list[types.Tool]] = {}
         self._initialized = False
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -54,7 +54,7 @@ class ProxyManager:
         """Total number of proxied tools across all servers."""
         return sum(len(tools) for tools in self._tools_by_server.values())
 
-    def get_connection(self, server: str) -> Client | None:
+    def get_connection(self, server: str) -> Client | None:  # type: ignore[type-arg]
         """Get a client by server name."""
         return self._clients.get(server)
 
@@ -226,7 +226,7 @@ class ProxyManager:
             client = self._create_client(name, config)
 
             # Enter the client context manager for persistent connection
-            await client.__aenter__()
+            await client.__aenter__()  # type: ignore[no-untyped-call]
 
             try:
                 # List tools to verify connection and cache tool info
@@ -242,10 +242,10 @@ class ProxyManager:
 
             except Exception:
                 # Clean up on failure
-                await client.__aexit__(None, None, None)
+                await client.__aexit__(None, None, None)  # type: ignore[no-untyped-call]
                 raise
 
-    def _create_client(self, name: str, config: McpServerConfig) -> Client:
+    def _create_client(self, name: str, config: McpServerConfig) -> Client:  # type: ignore[type-arg]
         """Create a FastMCP Client for the given configuration."""
         if config.type == "http":
             return self._create_http_client(name, config)
@@ -254,7 +254,7 @@ class ProxyManager:
         else:
             raise ValueError(f"Unknown server type: {config.type}")
 
-    def _create_http_client(self, name: str, config: McpServerConfig) -> Client:
+    def _create_http_client(self, name: str, config: McpServerConfig) -> Client:  # type: ignore[type-arg]
         """Create an HTTP/SSE client."""
         if not config.url:
             raise RuntimeError(f"Server {name}: HTTP server requires url")
@@ -275,7 +275,7 @@ class ProxyManager:
 
         return Client(url, headers=headers, timeout=float(config.timeout))
 
-    def _create_stdio_client(self, name: str, config: McpServerConfig) -> Client:
+    def _create_stdio_client(self, name: str, config: McpServerConfig) -> Client:  # type: ignore[type-arg]
         """Create a stdio client."""
         if not config.command:
             raise RuntimeError(f"Server {name}: stdio server requires command")
@@ -301,7 +301,7 @@ class ProxyManager:
         with LogSpan(span="proxy.shutdown", serverCount=len(self._clients)):
             for name, client in list(self._clients.items()):
                 try:
-                    await client.__aexit__(None, None, None)
+                    await client.__aexit__(None, None, None)  # type: ignore[no-untyped-call]
                     logger.debug(f"Disconnected from MCP server '{name}'")
                 except (Exception, asyncio.CancelledError) as e:
                     logger.debug(f"Error disconnecting from '{name}': {e}")

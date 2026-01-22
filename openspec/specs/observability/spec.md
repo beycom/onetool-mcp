@@ -11,7 +11,6 @@ This consolidated spec includes requirements previously in:
 - `browse-observability` (browser session logging)
 
 ---
-
 ## Requirements
 
 <!-- Section: Core Infrastructure -->
@@ -150,10 +149,10 @@ The system SHALL support configurable logging.
 - **WHEN** the server runs
 - **THEN** only WARNING and above SHALL be logged
 
-#### Scenario: Truncation configuration
-- **GIVEN** `OT_LOG_TRUNCATE=100`
+#### Scenario: Verbose logging configuration
+- **GIVEN** `OT_LOG_VERBOSE=true` or `log_verbose: true` in config
 - **WHEN** a long value is logged
-- **THEN** it SHALL be truncated at 100 characters with `... (N chars)` suffix
+- **THEN** truncation SHALL be disabled (full values shown)
 
 #### Scenario: Log rotation
 - **GIVEN** `OT_LOG_FILE` is configured
@@ -298,6 +297,11 @@ All public tool functions SHALL use LogSpan for structured operation logging.
 - **GIVEN** a tool in namespace `ns` with function `fn`
 - **WHEN** LogSpan is created
 - **THEN** the span name SHALL be `{ns}.{fn}` (e.g., `brave.search`, `db.query`)
+
+#### Scenario: Use log() helper
+- **GIVEN** a tool function needs to create a LogSpan
+- **WHEN** the span is created
+- **THEN** it SHALL use the `log()` context manager helper, not `LogSpan` directly
 
 ### Requirement: Span Field Guidelines
 
@@ -614,3 +618,114 @@ The system SHALL log browser state save/load operations.
   - `span: "browse.state.load"`
   - `path`: State file path
   - `success`: Boolean indicating success
+
+### Requirement: Log Output Formatting
+
+The system SHALL format log output with truncation and sanitisation at write time.
+
+#### Scenario: Field-based truncation
+- **GIVEN** a log entry with a `path` field containing 300 characters
+- **WHEN** the entry is written to file or console
+- **THEN** the value SHALL be truncated to 200 characters with `...` suffix
+
+#### Scenario: URL truncation
+- **GIVEN** a log entry with a `url` field exceeding 120 characters
+- **WHEN** the entry is written
+- **THEN** the value SHALL be truncated to 120 characters with `...` suffix
+
+#### Scenario: Query truncation
+- **GIVEN** a log entry with a `query` field exceeding 100 characters
+- **WHEN** the entry is written
+- **THEN** the value SHALL be truncated to 100 characters with `...` suffix
+
+#### Scenario: Credential sanitisation
+- **GIVEN** a log entry with a URL containing credentials (`://user:pass@`)
+- **WHEN** the entry is written
+- **THEN** credentials SHALL be masked as `://***:***@`
+
+#### Scenario: Full values preserved
+- **GIVEN** a LogEntry with a long path value
+- **WHEN** `entry.to_dict()` is called directly
+- **THEN** the full untruncated value SHALL be returned
+
+### Requirement: Verbose Logging Mode
+
+The system SHALL support a verbose mode that disables output truncation.
+
+#### Scenario: Verbose config option
+- **GIVEN** `log_verbose: true` in serve config
+- **WHEN** log entries are written
+- **THEN** truncation SHALL be skipped and full values SHALL appear
+
+#### Scenario: Verbose environment variable
+- **GIVEN** `OT_LOG_VERBOSE=true` environment variable
+- **WHEN** the server runs
+- **THEN** truncation SHALL be skipped
+
+#### Scenario: Default behaviour
+- **GIVEN** no verbose option set
+- **WHEN** log entries are written
+- **THEN** truncation SHALL be applied based on field type
+
+### Requirement: Helper Function Logging
+
+Internal helper functions making external calls SHALL use LogSpan for observability.
+
+#### Scenario: HTTP request helpers
+- **GIVEN** a helper function making HTTP requests (e.g., `_fetch()`, `_make_request()`)
+- **WHEN** the request completes
+- **THEN** it SHALL log with a span including `url`, `status`, and `duration`
+
+#### Scenario: Subprocess execution
+- **GIVEN** a helper function executing subprocesses (e.g., `_run_rg()`)
+- **WHEN** execution completes
+- **THEN** it SHALL log with a span including `returnCode` and `outputLen`
+
+#### Scenario: Database connection
+- **GIVEN** a helper function creating database connections
+- **WHEN** the connection is established
+- **THEN** it SHALL log with a span including `dbUrl` (sanitised at output)
+
+#### Scenario: Embedding API calls
+- **GIVEN** a helper function calling embedding APIs
+- **WHEN** the API call completes
+- **THEN** it SHALL log with a span including `model` and `dimensions`
+
+### Requirement: Benchmark Span Naming
+
+Benchmark CLI spans SHALL follow the `bench.{component}.{action}` naming convention.
+
+#### Scenario: Tool call spans
+- **GIVEN** the benchmark harness invokes an MCP tool
+- **WHEN** the call is logged
+- **THEN** the span SHALL be named `bench.tool_call`
+
+#### Scenario: LLM call spans
+- **GIVEN** the benchmark harness calls an LLM
+- **WHEN** the call is logged
+- **THEN** the span SHALL be named `bench.llm_call`
+
+#### Scenario: Server connection spans
+- **GIVEN** the benchmark connects to MCP servers
+- **WHEN** the connection is logged
+- **THEN** the span SHALL be named `bench.servers.connect`
+
+### Requirement: Span Attribute Naming
+
+LogSpan attributes SHALL use camelCase naming consistently.
+
+#### Scenario: Count attributes
+- **GIVEN** a span logs a count metric
+- **WHEN** the attribute is named
+- **THEN** it SHALL use camelCase (e.g., `resultCount`, `fileCount`, `outputLen`)
+
+#### Scenario: Boolean attributes
+- **GIVEN** a span logs a boolean outcome
+- **WHEN** the attribute is named
+- **THEN** it SHALL use camelCase (e.g., `success`, `found`, `cached`)
+
+#### Scenario: Invalid naming detected
+- **GIVEN** an attribute uses snake_case (e.g., `output_len`)
+- **WHEN** the code is reviewed
+- **THEN** it SHALL be corrected to camelCase (`outputLen`)
+

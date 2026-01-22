@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from ot.logging import LogSpan
 from ot.paths import get_effective_cwd
 
 if TYPE_CHECKING:
@@ -38,6 +39,16 @@ def write_results_csv(
     timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M")
     output_path = output_dir / f"result-{timestamp}.csv"
 
+    task_count = sum(len(s.tasks) for s in results)
+
+    with LogSpan(span="bench.results.write", path=str(output_path), tasks=task_count):
+        _write_csv_file(results, output_path)
+
+    return output_path
+
+
+def _write_csv_file(results: list[ScenarioResult], output_path: Path) -> None:
+    """Write benchmark results to CSV file."""
     headers = [
         "scenario",
         "task",
@@ -96,5 +107,3 @@ def write_results_csv(
                 ]
 
                 writer.writerow(row)
-
-    return output_path

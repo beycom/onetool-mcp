@@ -831,7 +831,7 @@ def search(
         page.search(session_id="001", capture_id="001", pattern="button")
         page.search(session_id="001", capture_id="001", pattern="class=", search_in="html")
     """
-    with LogSpan(span="page.search", pattern=pattern[:50], search_in=search_in) as span:
+    with LogSpan(span="page.search", pattern=pattern, search_in=search_in) as span:
         if not session_id or not capture_id:
             span.add("error", "missing_params")
             return "Error: session_id and capture_id parameters are required"

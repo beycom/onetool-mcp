@@ -16,7 +16,7 @@ from typing import Any, Literal
 
 from ot.config import get_config
 from ot.config.secrets import get_secret
-from ot.logging import LogSpan
+from ot_sdk import log
 
 try:
     from google import genai
@@ -136,7 +136,7 @@ def _grounded_search(
     Returns:
         Formatted search results with sources
     """
-    with LogSpan(span=span_name, **log_extras) as s:
+    with log(span_name, **log_extras) as s:
         try:
             if model is None:
                 model = get_config().tools.ground.model

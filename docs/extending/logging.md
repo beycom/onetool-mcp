@@ -33,6 +33,7 @@ configure_logging(log_name="serve")  # Creates logs/serve.log
 **Environment variables:**
 - `OT_LOG_LEVEL`: Log level (default: INFO)
 - `OT_LOG_DIR`: Directory for log files (default: ../logs, relative to config dir)
+- `OT_LOG_VERBOSE`: Disable truncation, show full values (default: false)
 
 ### LogSpan
 
@@ -214,12 +215,59 @@ The logging system intercepts standard Python logging and redirects to Loguru:
 - `openai`, `openai._base_client` - API client noise
 - `anyio`, `mcp` - Async framework noise
 
+## Output Formatting
+
+Log output is automatically formatted with truncation and credential sanitization at output time. Full values are preserved in `LogEntry` for programmatic access.
+
+### Truncation Limits
+
+Field-based truncation limits (applied unless `OT_LOG_VERBOSE=true`):
+
+| Field Pattern                           | Limit |
+| --------------------------------------- | ----- |
+| path, filepath, source, dest, directory | 200   |
+| url                                     | 120   |
+| query, topic, pattern                   | 100   |
+| error                                   | 300   |
+| default                                 | 120   |
+
+### Credential Sanitization
+
+URLs with embedded credentials are automatically masked:
+
+```text
+postgres://user:password@host/db → postgres://***:***@host/db
+```
+
+Applied to:
+- Fields containing "url" in the name
+- String values starting with `http://` or `https://`
+
+### Verbose Mode
+
+Disable truncation with `OT_LOG_VERBOSE=true` or `log_verbose: true` in config:
+
+```bash
+OT_LOG_VERBOSE=true ot-serve
+```
+
+Credentials are **always** sanitized, even in verbose mode.
+
+### Formatting Functions
+
+```python
+from ot.logging import format_log_entry, sanitize_url, format_value
+
+# Format entire log entry
+formatted = format_log_entry(entry.to_dict(), verbose=False)
+
+# Sanitize a single URL
+safe_url = sanitize_url("postgres://user:pass@host/db")
+
+# Truncate a value with field-based limit
+truncated = format_value(long_string, field_name="query")
+```
+
 ## Related Documentation
 
 - [Creating Tools](creating-tools.md) - Tool-specific logging patterns and span naming
-
-## Future Work
-
-The following spec features are not yet implemented:
-- `OT_LOG_TRUNCATE` - Configurable truncation for long values
-- Console output with `--verbose` flag or `OT_LOG_LEVEL=DEBUG`

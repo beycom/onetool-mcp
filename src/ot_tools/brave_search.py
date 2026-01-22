@@ -582,7 +582,7 @@ def search_batch(
         # Format output preserving original order
         sections = [f"=== {label} ===\n{results[label]}" for _, label in normalized]
         output = "\n\n".join(sections)
-        s.add(output_len=len(output))
+        s.add(outputLen=len(output))
         return output
 
 

@@ -8,8 +8,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from loguru import logger
 
+from ot.logging import LogSpan
 from ot.paths import get_effective_cwd, get_global_dir
 
 # Cached bench secrets
@@ -51,29 +51,33 @@ def load_bench_secrets() -> dict[str, str]:
         return _bench_secrets
 
     secrets_path = _find_bench_secrets_file()
-    if secrets_path is None:
-        logger.warning("bench-secrets.yaml not found")
-        _bench_secrets = {}
+
+    with LogSpan(
+        span="bench.secrets.load",
+        path=str(secrets_path) if secrets_path else "not_found",
+    ) as span:
+        if secrets_path is None:
+            span.add(error="bench-secrets.yaml not found")
+            _bench_secrets = {}
+            return _bench_secrets
+
+        try:
+            with secrets_path.open() as f:
+                raw_data = yaml.safe_load(f)
+        except (yaml.YAMLError, OSError) as e:
+            span.add(error=str(e))
+            _bench_secrets = {}
+            return _bench_secrets
+
+        if raw_data is None:
+            span.add(count=0)
+            _bench_secrets = {}
+            return _bench_secrets
+
+        # Convert all values to strings
+        _bench_secrets = {k: str(v) for k, v in raw_data.items() if v is not None}
+        span.add(count=len(_bench_secrets))
         return _bench_secrets
-
-    logger.debug(f"Loading bench secrets from {secrets_path}")
-
-    try:
-        with secrets_path.open() as f:
-            raw_data = yaml.safe_load(f)
-    except (yaml.YAMLError, OSError) as e:
-        logger.error(f"Error loading bench secrets: {e}")
-        _bench_secrets = {}
-        return _bench_secrets
-
-    if raw_data is None:
-        _bench_secrets = {}
-        return _bench_secrets
-
-    # Convert all values to strings
-    _bench_secrets = {k: str(v) for k, v in raw_data.items() if v is not None}
-    logger.info(f"Loaded {len(_bench_secrets)} bench secrets")
-    return _bench_secrets
 
 
 def get_bench_secret(name: str) -> str:

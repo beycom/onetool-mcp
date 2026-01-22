@@ -67,26 +67,29 @@ def _make_request(
     if timeout is None:
         timeout = get_config("tools.context7.timeout") or 30.0
 
-    try:
-        response = _client.get(
-            url,
-            params=params,
-            headers=_get_headers(),
-            timeout=timeout,
-        )
-        response.raise_for_status()
+    with log("context7.request", url=url) as span:
+        try:
+            response = _client.get(
+                url,
+                params=params,
+                headers=_get_headers(),
+                timeout=timeout,
+            )
+            response.raise_for_status()
 
-        content_type = response.headers.get("content-type", "")
-        if "application/json" in content_type:
-            return True, response.json()
-        return True, response.text
+            content_type = response.headers.get("content-type", "")
+            span.add(status=response.status_code)
+            if "application/json" in content_type:
+                return True, response.json()
+            return True, response.text
 
-    except Exception as e:
-        error_type = type(e).__name__
-        if hasattr(e, "response"):
-            status = getattr(e.response, "status_code", "unknown")
-            return False, f"HTTP error ({status}): {error_type}"
-        return False, f"Request failed: {e}"
+        except Exception as e:
+            error_type = type(e).__name__
+            span.add(error=f"{error_type}: {e}")
+            if hasattr(e, "response"):
+                status = getattr(e.response, "status_code", "unknown")
+                return False, f"HTTP error ({status}): {error_type}"
+            return False, f"Request failed: {e}"
 
 
 @cache(ttl=3600)  # Cache library key resolutions for 1 hour

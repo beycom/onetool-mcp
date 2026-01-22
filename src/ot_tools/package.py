@@ -45,7 +45,10 @@ def _fetch(url: str, timeout: float | None = None) -> tuple[bool, dict[str, Any]
     if timeout is None:
         timeout = get_config().tools.package.timeout
 
-    return http_get(url, timeout=timeout)
+    with LogSpan(span="package.fetch", url=url) as span:
+        success, data = http_get(url, timeout=timeout)
+        span.add(success=success)
+        return success, data
 
 
 def npm(*, packages: list[str]) -> str:

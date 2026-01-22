@@ -46,9 +46,9 @@ from pathlib import Path
 from typing import Any
 
 from ot.config import get_config
-from ot.logging import LogSpan
 from ot.paths import get_effective_cwd
 from ot.utils import format_result
+from ot_sdk import log
 
 # Optional send2trash for safe deletion
 try:
@@ -327,7 +327,7 @@ def read(
         file.read(path="src/main.py", offset=100, limit=50)
         file.read(path="config.json", encoding="utf-8")
     """
-    with LogSpan(span="file.read", path=path, offset=offset, limit=limit) as s:
+    with log("file.read", path=path, offset=offset, limit=limit) as s:
         resolved, error = _validate_path(path, must_exist=True)
         if error:
             s.add(error=error)
@@ -410,7 +410,7 @@ def info(*, path: str) -> str:
         file.info(path="src/main.py")
         file.info(path="./docs")
     """
-    with LogSpan(span="file.info", path=path) as s:
+    with log("file.info", path=path) as s:
         resolved, error = _validate_path(path, must_exist=True)
         if error:
             s.add(error=error)
@@ -491,8 +491,7 @@ def list(
         file.list(path=".", recursive=True, pattern="*.md")
         file.list(path=".", sort_by="size", reverse=True)
     """
-    with LogSpan(
-        span="file.list", path=path, pattern=pattern, recursive=recursive
+    with log("file.list", path=path, pattern=pattern, recursive=recursive
     ) as s:
         resolved, error = _validate_path(path, must_exist=True)
         if error:
@@ -614,7 +613,7 @@ def tree(
         file.tree(path="src", max_depth=2)
         file.tree(path=".", include_hidden=True)
     """
-    with LogSpan(span="file.tree", path=path, maxDepth=max_depth) as s:
+    with log("file.tree", path=path, maxDepth=max_depth) as s:
         resolved, error = _validate_path(path, must_exist=True)
         if error:
             s.add(error=error)
@@ -701,8 +700,7 @@ def search(
         file.search(pattern="config", file_pattern="*.yaml")
         file.search(path="src", pattern="*handler*", file_pattern="*.py")
     """
-    with LogSpan(
-        span="file.search", path=path, pattern=pattern, filePattern=file_pattern
+    with log("file.search", path=path, pattern=pattern, filePattern=file_pattern
     ) as s:
         resolved, error = _validate_path(path, must_exist=True)
         if error:
@@ -814,8 +812,7 @@ def write(
         file.write(path="log.txt", content="New entry\\n", append=True)
         file.write(path="new/dir/file.txt", content="data", create_dirs=True)
     """
-    with LogSpan(
-        span="file.write", path=path, append=append, contentLen=len(content)
+    with log("file.write", path=path, append=append, contentLen=len(content)
     ) as s:
         # For new files, validate parent directory
         resolved, error = _validate_path(path, must_exist=False)
@@ -909,8 +906,7 @@ def edit(
         file.edit(path="config.py", old_text="DEBUG = False", new_text="DEBUG = True")
         file.edit(path="main.py", old_text="TODO", new_text="DONE", occurrence=0)
     """
-    with LogSpan(
-        span="file.edit", path=path, oldLen=len(old_text), newLen=len(new_text)
+    with log("file.edit", path=path, oldLen=len(old_text), newLen=len(new_text)
     ) as s:
         resolved, error = _validate_path(path, must_exist=True)
         if error:
@@ -1028,7 +1024,7 @@ def delete(*, path: str, backup: bool = True) -> str:
         file.delete(path="temp.txt")
         file.delete(path="old_file.py", backup=False)
     """
-    with LogSpan(span="file.delete", path=path) as s:
+    with log("file.delete", path=path) as s:
         resolved, error = _validate_path(path, must_exist=True)
         if error:
             s.add(error=error)
@@ -1089,7 +1085,7 @@ def copy(*, source: str, dest: str) -> str:
         file.copy(source="config.yaml", dest="config.backup.yaml")
         file.copy(source="src/", dest="src_backup/")
     """
-    with LogSpan(span="file.copy", source=source, dest=dest) as s:
+    with log("file.copy", source=source, dest=dest) as s:
         src_resolved, error = _validate_path(source, must_exist=True)
         if error:
             s.add(error=f"source: {error}")
@@ -1144,7 +1140,7 @@ def move(*, source: str, dest: str) -> str:
         file.move(source="old_name.py", dest="new_name.py")
         file.move(source="file.txt", dest="archive/file.txt")
     """
-    with LogSpan(span="file.move", source=source, dest=dest) as s:
+    with log("file.move", source=source, dest=dest) as s:
         src_resolved, error = _validate_path(source, must_exist=True)
         if error:
             s.add(error=f"source: {error}")

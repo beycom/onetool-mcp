@@ -526,6 +526,10 @@ class OneToolConfig(BaseModel):
     compact_max_length: int = Field(
         default=120, description="Max value length in compact console output"
     )
+    log_verbose: bool = Field(
+        default=False,
+        description="Disable log truncation for debugging (full values in output)",
+    )
     validate_code: bool = Field(
         default=True, description="Whether to validate code before execution"
     )
@@ -887,6 +891,32 @@ def load_config(config_path: Path | str | None = None) -> OneToolConfig:
 
 # Global config instance
 _config: OneToolConfig | None = None
+
+
+def is_log_verbose() -> bool:
+    """Check if verbose logging is enabled.
+
+    Verbose mode disables log truncation, showing full values.
+    Enabled by:
+    - OT_LOG_VERBOSE=true environment variable (highest priority)
+    - log_verbose: true in config file
+
+    Returns:
+        True if verbose logging is enabled
+    """
+    # Environment variable takes priority
+    env_verbose = os.getenv("OT_LOG_VERBOSE", "").lower()
+    if env_verbose in ("true", "1", "yes"):
+        return True
+    if env_verbose in ("false", "0", "no"):
+        return False
+
+    # Fall back to config
+    global _config
+    if _config is not None:
+        return _config.log_verbose
+
+    return False
 
 
 def get_config(

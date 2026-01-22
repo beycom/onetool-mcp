@@ -609,7 +609,7 @@ class MultiServerContextManager:
                 return (name, e)
 
         # Connect to all servers in parallel
-        with LogSpan(span="servers.connect", count=len(valid_servers)):
+        with LogSpan(span="bench.servers.connect", count=len(valid_servers)):
             results = await asyncio.gather(
                 *[connect_one(name, config) for name, config in valid_servers]
             )

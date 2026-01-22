@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 from loguru import logger
 from openai import OpenAI
 
+from ot.logging import LogSpan
 from ot.utils import flatten_exception_group
 from ot_bench.harness.client import (
     ServerConnectionCallback,
@@ -510,13 +511,23 @@ class AgenticRunner:
                             call_start = time.time()
 
                             # Run sync LLM call in thread so asyncio.timeout can cancel it
-                            response = await asyncio.to_thread(
-                                self.client.chat.completions.create,  # type: ignore[arg-type]
+                            with LogSpan(
+                                span="bench.llm.request",
                                 model=model,
-                                messages=messages,
-                                tools=tools,
-                                timeout=timeout,
-                            )
+                                call=llm_call_count + 1,
+                            ) as llm_span:
+                                response = await asyncio.to_thread(
+                                    self.client.chat.completions.create,  # type: ignore[arg-type]
+                                    model=model,
+                                    messages=messages,
+                                    tools=tools,
+                                    timeout=timeout,
+                                )
+                                if response.usage:
+                                    llm_span.add(
+                                        inputTokens=response.usage.prompt_tokens,
+                                        outputTokens=response.usage.completion_tokens,
+                                    )
 
                             call_latency_ms = int((time.time() - call_start) * 1000)
                             llm_call_count += 1
@@ -836,27 +847,37 @@ class AgenticRunner:
 
                 # Evaluate task after task_complete (so span duration excludes evaluation)
                 if not self.dry_run:
-                    if result.error:
-                        # Check if this test expects an error (e.g., timeout tests)
-                        # Must resolve evaluator first since task.evaluate can be a string
-                        eval_config = resolve_evaluator(task, self.config)
-                        if eval_config and eval_config.expect_error:
-                            # Use error message as response for evaluation
-                            result.response = result.error
+                    with LogSpan(span="bench.evaluate", task=task.name) as eval_span:
+                        if result.error:
+                            # Check if this test expects an error (e.g., timeout tests)
+                            # Must resolve evaluator first since task.evaluate can be a string
+                            eval_config = resolve_evaluator(task, self.config)
+                            if eval_config and eval_config.expect_error:
+                                # Use error message as response for evaluation
+                                result.response = result.error
+                                evaluation = evaluate_task(result, task, self.config)
+                                if evaluation:
+                                    result.evaluation = evaluation
+                                    eval_span.add(
+                                        passed=evaluation.passed,
+                                        evalType=evaluation.eval_type,
+                                    )
+                            else:
+                                result.evaluation = EvaluationResult(
+                                    score=0,
+                                    reason=f"Skipped due to error: {result.error}",
+                                    eval_type="pass_fail",
+                                    passed=False,
+                                )
+                                eval_span.add(skipped=True, error=result.error)
+                        else:
                             evaluation = evaluate_task(result, task, self.config)
                             if evaluation:
                                 result.evaluation = evaluation
-                        else:
-                            result.evaluation = EvaluationResult(
-                                score=0,
-                                reason=f"Skipped due to error: {result.error}",
-                                eval_type="pass_fail",
-                                passed=False,
-                            )
-                    else:
-                        evaluation = evaluate_task(result, task, self.config)
-                        if evaluation:
-                            result.evaluation = evaluation
+                                eval_span.add(
+                                    passed=evaluation.passed,
+                                    evalType=evaluation.eval_type,
+                                )
                     # Emit separate event for evaluation display
                     self._emit(
                         "task_evaluated",

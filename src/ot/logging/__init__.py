@@ -17,6 +17,12 @@ from ot.logging.config import (  # noqa: E402
     configure_test_logging,
 )
 from ot.logging.entry import LogEntry  # noqa: E402
+from ot.logging.format import (  # noqa: E402
+    format_log_entry,
+    format_value,
+    sanitize_for_output,
+    sanitize_url,
+)
 from ot.logging.span import LogSpan  # noqa: E402
 
 __all__ = [
@@ -24,4 +30,8 @@ __all__ = [
     "LogSpan",
     "configure_logging",
     "configure_test_logging",
+    "format_log_entry",
+    "format_value",
+    "sanitize_for_output",
+    "sanitize_url",
 ]

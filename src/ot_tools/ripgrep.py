@@ -74,30 +74,36 @@ def _run_rg(
     if timeout is None:
         timeout = get_config().tools.ripgrep.timeout
 
-    try:
-        result = subprocess.run(
-            ["rg", *args],
-            capture_output=True,
-            text=True,
-            cwd=cwd,
-            timeout=timeout,
-        )
+    with LogSpan(span="ripgrep.exec", args=args[:3] if len(args) > 3 else args) as span:
+        try:
+            result = subprocess.run(
+                ["rg", *args],
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=timeout,
+            )
 
-        # rg returns 1 for no matches (not an error), 2 for actual errors
-        if result.returncode == 2:
-            return False, result.stderr.strip() or "ripgrep error"
+            # rg returns 1 for no matches (not an error), 2 for actual errors
+            if result.returncode == 2:
+                span.add(returncode=2, error=result.stderr.strip())
+                return False, result.stderr.strip() or "ripgrep error"
 
-        return True, result.stdout
+            span.add(returncode=result.returncode, outputLen=len(result.stdout))
+            return True, result.stdout
 
-    except subprocess.TimeoutExpired:
-        return False, f"Error: Search timed out after {timeout} seconds"
-    except FileNotFoundError:
-        return (
-            False,
-            f"Error: ripgrep (rg) is not installed. {get_install_hint('rg')}",
-        )
-    except Exception as e:
-        return False, f"Error: {e}"
+        except subprocess.TimeoutExpired:
+            span.add(error="timeout")
+            return False, f"Error: Search timed out after {timeout} seconds"
+        except FileNotFoundError:
+            span.add(error="not_installed")
+            return (
+                False,
+                f"Error: ripgrep (rg) is not installed. {get_install_hint('rg')}",
+            )
+        except Exception as e:
+            span.add(error=str(e))
+            return False, f"Error: {e}"
 
 
 def search(

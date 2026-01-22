@@ -18,12 +18,14 @@ Example (async with FastMCP Context):
 
 from __future__ import annotations
 
+import json
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
 from ot.logging.entry import LogEntry
+from ot.logging.format import format_log_entry
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -31,6 +33,22 @@ if TYPE_CHECKING:
 
 # FastMCP Context is Any since it's an optional dependency with dynamic methods
 Context = Any  # FastMCP context with log_info, log_error, etc.
+
+
+def _format_for_output(entry: LogEntry) -> str:
+    """Format a LogEntry for log output with truncation and sanitisation.
+
+    Args:
+        entry: LogEntry to format
+
+    Returns:
+        JSON string with formatted values
+    """
+    # Import here to avoid circular dependency
+    from ot.config import is_log_verbose
+
+    formatted = format_log_entry(entry.to_dict(), verbose=is_log_verbose())
+    return json.dumps(formatted, separators=(",", ":"), default=str)
 
 
 class LogSpan:
@@ -167,12 +185,12 @@ class LogSpan:
                     error_type=type(exc_val).__name__, error_message=str(exc_val)
                 )
             # depth=1 makes loguru report the caller's location, not span.py
-            logger.opt(depth=1).error(str(self._entry))
+            logger.opt(depth=1).error(_format_for_output(self._entry))
         else:
             # Success - log at configured level
             self._entry.success()
             # depth=1 makes loguru report the caller's location, not span.py
-            logger.opt(depth=1).log(self._level, str(self._entry))
+            logger.opt(depth=1).log(self._level, _format_for_output(self._entry))
 
     # -------------------------------------------------------------------------
     # Async logging methods
@@ -304,26 +322,28 @@ class LogSpan:
                     )
 
                 # Log via Context or loguru
+                formatted = _format_for_output(span._entry)
                 if ctx is not None:
                     try:
-                        await ctx.log_error(str(span._entry))
+                        await ctx.log_error(formatted)
                     except Exception:
-                        logger.error(str(span._entry))
+                        logger.error(formatted)
                 else:
-                    logger.error(str(span._entry))
+                    logger.error(formatted)
             else:
                 # Success
                 span._entry.success()
 
                 # Log via Context or loguru
+                formatted = _format_for_output(span._entry)
                 if ctx is not None:
                     try:
                         log_method = getattr(ctx, f"log_{span._level.lower()}", None)
                         if log_method is not None and callable(log_method):
-                            await log_method(str(span._entry))
+                            await log_method(formatted)
                         else:
-                            await ctx.log_info(str(span._entry))
+                            await ctx.log_info(formatted)
                     except Exception:
-                        logger.log(span._level, str(span._entry))
+                        logger.log(span._level, formatted)
                 else:
-                    logger.log(span._level, str(span._entry))
+                    logger.log(span._level, formatted)

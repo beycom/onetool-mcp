@@ -28,13 +28,23 @@ class LogSpan:
         self.start_time = time.time()
         self.error: str | None = None
 
-    def add(self, **attrs: Any) -> None:
+    def add(self, key: str | None = None, value: Any = None, **attrs: Any) -> LogSpan:
         """Add attributes to the span.
 
+        Supports both positional and keyword argument styles.
+
         Args:
-            **attrs: Attributes to add (e.g., count=10, cached=True)
+            key: Attribute name (optional if using kwargs)
+            value: Attribute value (required if key is provided)
+            **attrs: Bulk attribute additions (e.g., count=10, cached=True)
+
+        Returns:
+            Self for method chaining
         """
+        if key is not None:
+            self.attrs[key] = value
         self.attrs.update(attrs)
+        return self
 
     def _emit(self) -> None:
         """Emit the log entry to stderr."""

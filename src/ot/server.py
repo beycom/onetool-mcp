@@ -134,7 +134,7 @@ mcp = FastMCP(
 # =============================================================================
 
 
-@mcp._mcp_server.set_logging_level()
+@mcp._mcp_server.set_logging_level()  # type: ignore[no-untyped-call,untyped-decorator]
 async def handle_set_logging_level(level: str) -> None:
     """Handle logging/setLevel requests from MCP clients.
 

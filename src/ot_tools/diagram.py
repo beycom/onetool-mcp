@@ -300,18 +300,23 @@ def _render_via_kroki(
     kroki_url = _get_kroki_url()
     url = f"{kroki_url}/{provider}/{output_format}"
 
-    resp = http.post(
-        url,
-        content=source.encode("utf-8"),
-        headers={"Content-Type": "text/plain"},
-        timeout=timeout,
-    )
+    with log("diagram.kroki", provider=provider, format=output_format, url=url) as span:
+        resp = http.post(
+            url,
+            content=source.encode("utf-8"),
+            headers={"Content-Type": "text/plain"},
+            timeout=timeout,
+        )
 
-    if resp.status_code != 200:
-        error_msg = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
-        raise Exception(f"Kroki render failed: {error_msg}")
+        span.add(status=resp.status_code)
 
-    return resp.content
+        if resp.status_code != 200:
+            error_msg = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
+            span.add(error=error_msg)
+            raise Exception(f"Kroki render failed: {error_msg}")
+
+        span.add(responseLen=len(resp.content))
+        return resp.content
 
 
 def _get_kroki_get_url(source: str, provider: str, output_format: str = "svg") -> str:

@@ -17,8 +17,8 @@ from typing import Any
 
 from ot.config import get_config
 from ot.config.secrets import get_secret
-from ot.logging import LogSpan
 from ot.paths import get_effective_cwd
+from ot_sdk import log
 
 try:
     import duckdb
@@ -80,12 +80,14 @@ def _get_openai_client() -> OpenAI:
 
 def _generate_embedding(query: str) -> list[float]:
     """Generate embedding vector for a search query."""
-    client = _get_openai_client()
-    response = client.embeddings.create(
-        model=EMBEDDING_MODEL,
-        input=query,
-    )
-    return response.data[0].embedding
+    with log("code.embedding", model=EMBEDDING_MODEL, queryLen=len(query)) as span:
+        client = _get_openai_client()
+        response = client.embeddings.create(
+            model=EMBEDDING_MODEL,
+            input=query,
+        )
+        span.add(dimensions=len(response.data[0].embedding))
+        return response.data[0].embedding
 
 
 def _format_result(result: dict[str, Any]) -> dict[str, Any]:
@@ -140,10 +142,10 @@ def search(
         limit = get_config().tools.code_search.limit
     db_path, project_root = _get_db_path(path)
 
-    with LogSpan(
-        span="code.search",
+    with log(
+        "code.search",
         project=str(project_root),
-        query=query[:50],
+        query=query,
         limit=limit,
         language=language,
     ) as s:
@@ -266,7 +268,7 @@ def status(*, path: str | None = None) -> str:
     """
     db_path, project_root = _get_db_path(path)
 
-    with LogSpan(span="code.status", project=str(project_root)) as s:
+    with log("code.status", project=str(project_root)) as s:
         if not db_path.exists():
             s.add("indexed", False)
             return (

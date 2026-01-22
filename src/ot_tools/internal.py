@@ -46,10 +46,10 @@ import yaml
 from ot import __version__
 from ot.config import get_config
 from ot.executor.tool_loader import load_tool_registry
-from ot.logging import LogSpan
 from ot.paths import get_effective_cwd
 from ot.proxy import get_proxy_manager
 from ot.utils import format_result
+from ot_sdk import log
 
 # ============================================================================
 # Tool Discovery Functions
@@ -117,8 +117,7 @@ def tools(
         ot.tools(ns="brave")
         ot.tools(compact=True)
     """
-    with LogSpan(
-        span="ot.tools", pattern=pattern or None, ns=ns or None, compact=compact
+    with log("ot.tools", pattern=pattern or None, ns=ns or None, compact=compact
     ) as s:
         runner_registry = load_tool_registry()
         proxy = get_proxy_manager()
@@ -263,7 +262,7 @@ def _match_topic_to_file(topic: str) -> Path | None:
 
 async def _write_to_file(file_path: Path, doc: dict) -> None:
     """Write message document to file asynchronously."""
-    with LogSpan(span="ot.write", file=str(file_path), topic=doc.get("topic")) as s:
+    with log("ot.write", file=str(file_path), topic=doc.get("topic")) as s:
         try:
             file_path.parent.mkdir(parents=True, exist_ok=True)
             async with aiofiles.open(file_path, "a") as f:
@@ -292,7 +291,7 @@ def push(*, topic: str, message: str) -> str:
     Example:
         ot.push(topic="status:scan", message="Scanning src/ directory")
     """
-    with LogSpan(span="ot.push", topic=topic) as s:
+    with log("ot.push", topic=topic) as s:
         file_path = _match_topic_to_file(topic)
 
         if file_path is None:
@@ -334,7 +333,7 @@ def config() -> str:
     Example:
         ot.config()
     """
-    with LogSpan(span="ot.config") as s:
+    with log("ot.config") as s:
         cfg = get_config()
 
         result: dict[str, Any] = {
@@ -364,7 +363,7 @@ def health() -> str:
     Example:
         ot.health()
     """
-    with LogSpan(span="ot.health") as s:
+    with log("ot.health") as s:
         from ot.executor.worker_proxy import WorkerNamespaceProxy
 
         runner_registry = load_tool_registry()
@@ -445,7 +444,7 @@ def stats(
     from ot.stats import Period, StatsReader
     from ot.support import get_support_dict
 
-    with LogSpan(span="ot.stats", period=period, tool=tool or None) as s:
+    with log("ot.stats", period=period, tool=tool or None) as s:
         cfg = get_config()
 
         # Validate period
@@ -517,7 +516,7 @@ def help(*, tool: str) -> str:
         ot.help(tool="ot.tools")
         ot.help(tool="github.create_issue")
     """
-    with LogSpan(span="ot.help", tool=tool) as s:
+    with log("ot.help", tool=tool) as s:
         # Validate format
         if "." not in tool:
             s.add("error", "invalid_format")
@@ -712,7 +711,7 @@ def instructions(*, ns: str) -> str:
     """
     from ot.prompts import PromptsError, get_namespace_instructions, get_prompts
 
-    with LogSpan(span="ot.instructions", ns=ns) as s:
+    with log("ot.instructions", ns=ns) as s:
         runner_registry = load_tool_registry()
         proxy = get_proxy_manager()
 
@@ -799,7 +798,7 @@ def alias(*, name: str) -> str:
         ot.alias(name="ws")
         ot.alias(name="*")
     """
-    with LogSpan(span="ot.alias", name=name) as s:
+    with log("ot.alias", aliasName=name) as s:
         cfg = get_config()
 
         if name == "*":
@@ -836,7 +835,7 @@ def snippet(*, name: str) -> str:
         ot.snippet(name="brv_research")
         ot.snippet(name="*")
     """
-    with LogSpan(span="ot.snippet", name=name) as s:
+    with log("ot.snippet", snippetName=name) as s:
         cfg = get_config()
 
         if name == "*":

@@ -64,20 +64,23 @@ def _get_engine(db_url: str) -> Engine:
     if db_url in _engines:
         return _engines[db_url]
 
-    try:
-        _engines[db_url] = _create_engine(db_url)
-        return _engines[db_url]
+    with log("db.connect", db_url=db_url) as span:
+        try:
+            _engines[db_url] = _create_engine(db_url)
+            span.add(cached=False)
+            return _engines[db_url]
 
-    except Exception:
-        # Database might have restarted - try fresh
-        if db_url in _engines:
-            with contextlib.suppress(Exception):
-                _engines[db_url].dispose()
-            del _engines[db_url]
+        except Exception:
+            # Database might have restarted - try fresh
+            if db_url in _engines:
+                with contextlib.suppress(Exception):
+                    _engines[db_url].dispose()
+                del _engines[db_url]
 
-        # One retry with fresh engine
-        _engines[db_url] = _create_engine(db_url)
-        return _engines[db_url]
+            # One retry with fresh engine
+            span.add(retry=True)
+            _engines[db_url] = _create_engine(db_url)
+            return _engines[db_url]
 
 
 def _format_value(val: Any) -> str:
@@ -106,7 +109,7 @@ def tables(*, db_url: str, filter: str | None = None) -> str:
         # Filter tables containing "user"
         db.tables(db_url="sqlite:///data.db", filter="user")
     """
-    with log("db.tables", db_url=db_url[:50], filter=filter) as s:
+    with log("db.tables", db_url=db_url, filter=filter) as s:
         try:
             engine = _get_engine(db_url)
             with engine.connect() as conn:
@@ -143,7 +146,7 @@ def schema(*, table_names: list[str], db_url: str) -> str:
         # Multiple tables
         db.schema(table_names=["users", "orders"], db_url="sqlite:///data.db")
     """
-    with log("db.schema", tables=table_names, db_url=db_url[:50]) as s:
+    with log("db.schema", tables=table_names, db_url=db_url) as s:
         if not table_names:
             s.add(error="no_tables")
             return "Error: table_names parameter is required"
@@ -240,9 +243,7 @@ def query(*, sql: str, db_url: str, params: dict[str, Any] | None = None) -> str
             params={"status": "inactive", "id": 123}
         )
     """
-    with log(
-        "db.query", sql=sql[:100] if len(sql) > 100 else sql, db_url=db_url[:50]
-    ) as s:
+    with log("db.query", sql=sql, db_url=db_url) as s:
         if not sql or not sql.strip():
             s.add(error="empty_query")
             return "Error: sql parameter is required"

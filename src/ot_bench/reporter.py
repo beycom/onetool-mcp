@@ -278,7 +278,7 @@ class ConsoleReporter:
 
         # Create LogSpan - it captures timing automatically
         self.current_tool_span = LogSpan(
-            span="LLM called MCP",
+            span="bench.tool_call",
             task=task or "",
             call=call_num,
             server=server,
@@ -359,7 +359,7 @@ class ConsoleReporter:
 
             # Create LogSpan - it captures timing automatically
             self.current_harness_span = LogSpan(
-                span="Harness called LLM",
+                span="bench.llm_call",
                 task=task or "",
                 systemPrompt=system_prompt,
                 taskRequest=user_request,

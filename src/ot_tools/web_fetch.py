@@ -36,8 +36,13 @@ def _create_config(timeout: float) -> Any:
 @cache(ttl=300)  # Cache fetched pages for 5 minutes
 def _fetch_url_cached(url: str, timeout: float) -> str | None:
     """Fetch URL with caching to avoid redundant requests."""
-    config = _create_config(timeout)
-    return trafilatura.fetch_url(url, config=config)
+    with log("web.download", url=url, timeout=timeout) as span:
+        config = _create_config(timeout)
+        result = trafilatura.fetch_url(url, config=config)
+        span.add(success=result is not None)
+        if result:
+            span.add(responseLen=len(result))
+        return result
 
 
 def fetch(

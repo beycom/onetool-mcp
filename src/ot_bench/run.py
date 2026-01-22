@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from rich.console import Console
 
 from ot._tui import ask_select
-from ot.logging import configure_logging
+from ot.logging import LogSpan, configure_logging
 from ot.paths import get_effective_cwd, get_global_dir
 from ot_bench.cli import app
 from ot_bench.harness.config import load_config
@@ -238,14 +238,18 @@ def run_single_benchmark(
         - success: True if completed without runtime errors or interrupts.
                    Test evaluation failures (PASS/FAIL) don't affect this.
     """
-    try:
-        config = load_config(config_file)
-    except FileNotFoundError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        return [], False
-    except Exception as e:
-        console.print(f"[red]Configuration error:[/red] {e}")
-        return [], False
+    with LogSpan(span="bench.config.load", path=str(config_file)) as span:
+        try:
+            config = load_config(config_file)
+            span.add(scenarios=len(config.scenarios), servers=len(config.servers))
+        except FileNotFoundError as e:
+            span.add(error="file_not_found")
+            console.print(f"[red]Error:[/red] {e}")
+            return [], False
+        except Exception as e:
+            span.add(error=str(e))
+            console.print(f"[red]Configuration error:[/red] {e}")
+            return [], False
 
     console.print(f"Loaded config: {config_file}")
     console.print(f"  Scenarios: {len(config.scenarios)}")

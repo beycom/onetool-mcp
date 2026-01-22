@@ -1,0 +1,114 @@
+file,log-span,function,attributes
+src/ot_tools/code_search.py,code.embedding,_generate_embedding,"model, queryLen"
+src/ot_tools/code_search.py,code.search,search,"project, queryLen, limit"
+src/ot_tools/code_search.py,code.status,status,project
+src/ot_tools/context7.py,context7.request,_make_request,url
+src/ot_tools/context7.py,context7.search,search,query
+src/ot_tools/context7.py,context7.doc,doc,"library_key, topic, mode"
+src/ot_tools/transform.py,llm.transform,transform,promptLen
+src/ot_tools/grounding_search.py,grounding.search,_grounded_search,"query, model (dynamic span_name)"
+src/ot_tools/file.py,file.read,read,"path, offset, limit"
+src/ot_tools/file.py,file.info,info,path
+src/ot_tools/file.py,file.list,list,"path, pattern, recursive"
+src/ot_tools/file.py,file.tree,tree,"path, maxDepth"
+src/ot_tools/file.py,file.search,search,"path, pattern, filePattern"
+src/ot_tools/file.py,file.write,write,"path, append, contentLen"
+src/ot_tools/file.py,file.edit,edit,"path, oldLen, newLen"
+src/ot_tools/file.py,file.delete,delete,path
+src/ot_tools/file.py,file.copy,copy,"source, dest"
+src/ot_tools/file.py,file.move,move,"source, dest"
+src/ot_tools/excel.py,excel.create,create,"filepath, sheet"
+src/ot_tools/excel.py,excel.add_sheet,add_sheet,"filepath, sheet"
+src/ot_tools/excel.py,excel.read,read,"filepath, sheet"
+src/ot_tools/excel.py,excel.write,write,"filepath, sheet, rows"
+src/ot_tools/excel.py,excel.info,info,filepath
+src/ot_tools/excel.py,excel.formula,formula,"filepath, cell"
+src/ot_tools/excel.py,excel.cell_range,cell_range,"cell, right, down"
+src/ot_tools/excel.py,excel.cell_shift,cell_shift,"cell, rows, cols"
+src/ot_tools/excel.py,excel.search,search,"filepath, pattern"
+src/ot_tools/excel.py,excel.tables,tables,filepath
+src/ot_tools/excel.py,excel.table_info,table_info,"filepath, table"
+src/ot_tools/excel.py,excel.table_data,table_data,"filepath, table"
+src/ot_tools/excel.py,excel.insert_rows,insert_rows,"filepath, row, count"
+src/ot_tools/excel.py,excel.delete_rows,delete_rows,"filepath, row, count"
+src/ot_tools/excel.py,excel.insert_cols,insert_cols,"filepath, col, count"
+src/ot_tools/excel.py,excel.delete_cols,delete_cols,"filepath, col, count"
+src/ot_tools/excel.py,excel.copy_range,copy_range,"filepath, source, target"
+src/ot_tools/excel.py,excel.create_table,create_table,"filepath, range"
+src/ot_tools/excel.py,excel.sheets,sheets,filepath
+src/ot_tools/excel.py,excel.used_range,used_range,filepath
+src/ot_tools/excel.py,excel.formulas,formulas,filepath
+src/ot_tools/excel.py,excel.hyperlinks,hyperlinks,filepath
+src/ot_tools/excel.py,excel.merged_cells,merged_cells,filepath
+src/ot_tools/excel.py,excel.named_ranges,named_ranges,filepath
+src/ot_tools/web_fetch.py,web.download,_fetch_url_cached,"url, timeout"
+src/ot_tools/web_fetch.py,web.fetch,fetch,"url, output_format"
+src/ot_tools/web_fetch.py,web.batch,fetch_batch,"urlCount, output_format"
+src/ot_tools/db.py,db.connect,_get_engine,db_url
+src/ot_tools/db.py,db.tables,tables,"db_url, filter"
+src/ot_tools/db.py,db.schema,schema,"tables, db_url"
+src/ot_tools/db.py,db.query,query,"sql, db_url"
+src/ot_tools/diagram.py,diagram.kroki,_render_via_kroki,"provider, format, url"
+src/ot_tools/diagram.py,diagram.generate_source,generate_source,"provider, diagram_name"
+src/ot_tools/diagram.py,diagram.render_diagram,render_diagram,"provider, format, output_dir, name"
+src/ot_tools/diagram.py,diagram.get_render_status,get_render_status,task_id
+src/ot_tools/diagram.py,diagram.batch_render,batch_render,"count, format"
+src/ot_tools/diagram.py,diagram.render_directory,render_directory,"directory, pattern"
+src/ot_tools/diagram.py,diagram.get_diagram_policy,get_diagram_policy,
+src/ot_tools/diagram.py,diagram.get_diagram_instructions,get_diagram_instructions,provider
+src/ot_tools/diagram.py,diagram.get_output_config,get_output_config,
+src/ot_tools/diagram.py,diagram.get_template,get_template,template_name
+src/ot_tools/diagram.py,diagram.list_providers,list_providers,focus_only
+src/ot_tools/diagram.py,diagram.get_playground_url,get_playground_url,provider
+src/ot_tools/brave_search.py,brave.request,_make_request,"endpoint, query"
+src/ot_tools/brave_search.py,brave.batch,search_batch,"query_count, count"
+src/ot_tools/ripgrep.py,ripgrep.exec,_run_rg,args
+src/ot_tools/ripgrep.py,ripgrep.search,search,"pattern, path"
+src/ot_tools/ripgrep.py,ripgrep.count,count,"pattern, path"
+src/ot_tools/ripgrep.py,ripgrep.files,files,path
+src/ot_tools/ripgrep.py,ripgrep.types,types,
+src/ot_tools/package.py,package.fetch,_fetch,url
+src/ot_tools/package.py,package.models,models,"query, provider"
+src/ot_tools/package.py,package.version,version,"registry, count"
+src/ot_tools/internal.py,ot.tools,tools,"pattern, ns, compact"
+src/ot_tools/internal.py,ot.write,_write_to_file,"file, topic"
+src/ot_tools/internal.py,ot.push,push,topic
+src/ot_tools/internal.py,ot.config,config,
+src/ot_tools/internal.py,ot.health,health,
+src/ot_tools/internal.py,ot.stats,stats,"period, tool"
+src/ot_tools/internal.py,ot.help,help,tool
+src/ot_tools/internal.py,ot.instructions,instructions,ns
+src/ot_tools/internal.py,ot.alias,alias,aliasName
+src/ot_tools/internal.py,ot.snippet,snippet,snippetName
+src/ot_tools/page_view.py,page.list,list,
+src/ot_tools/page_view.py,page.captures,captures,session_id
+src/ot_tools/page_view.py,page.annotations,annotations,"session_id, capture_id"
+src/ot_tools/page_view.py,page.context,context,"annotation_id, context_lines"
+src/ot_tools/page_view.py,page.search,search,"pattern, search_in"
+src/ot_tools/page_view.py,page.accessibility,accessibility,"filter_type, max_lines"
+src/ot_tools/page_view.py,page.diff,diff,"capture_id_1, capture_id_2"
+src/ot_tools/page_view.py,page.summary,summary,"session_id, capture_id"
+src/ot_tools/convert.py,convert.pdf,pdf,"pattern, output_dir"
+src/ot_tools/convert.py,convert.word,word,"pattern, output_dir"
+src/ot_tools/convert.py,convert.powerpoint,powerpoint,"pattern, output_dir"
+src/ot_tools/convert.py,convert.excel,excel,"pattern, output_dir"
+src/ot_tools/convert.py,convert.auto,auto,"pattern, output_dir"
+src/ot_browse/app.py,browse.session.start,_start_session,"url, connect_existing"
+src/ot/server.py,mcp.server.start,_lifespan,
+src/ot/server.py,server.startup.proxy,_lifespan,serverCount
+src/ot/server.py,mcp.server.stop,_lifespan,
+src/ot/server.py,server.shutdown.proxy,_lifespan,serverCount
+src/ot/proxy/manager.py,proxy.tool.call,call_tool,"server, tool"
+src/ot/proxy/manager.py,proxy.init,connect,serverCount
+src/ot/proxy/manager.py,proxy.connect,_connect_single,"server, type"
+src/ot/proxy/manager.py,proxy.shutdown,shutdown,serverCount
+src/ot/executor/runner.py,runner.execute,execute_python_code,"mode, command"
+src/ot/executor/simple.py,executor.simple,_execute_sync,tool
+src/ot_bench/run.py,bench.config.load,run_single_benchmark,path
+src/ot_bench/secrets.py,bench.secrets.load,load_bench_secrets,path
+src/ot_bench/harness/csv_writer.py,bench.results.write,write_results_csv,"path, tasks"
+src/ot_bench/harness/client.py,bench.servers.connect,connect_to_servers,count
+src/ot_bench/harness/runner.py,bench.llm.request,_run_single_task,"model, call"
+src/ot_bench/harness/runner.py,bench.evaluate,_run_single_task,task
+src/ot_bench/reporter.py,bench.tool_call,_on_tool_request,"task, call, server, tool, requestLLM"
+src/ot_bench/reporter.py,bench.llm_call,_on_llm_request,"task, systemPrompt, taskRequest"
