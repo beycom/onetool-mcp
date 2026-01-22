@@ -99,7 +99,10 @@ tools_dir:                    # Tool discovery patterns
   - src/ot_tools/*.py
 
 log_level: INFO               # DEBUG, INFO, WARNING, ERROR
-validate_code: true           # Validate generated code before execution
+
+security:                     # Code validation settings
+  validate_code: true         # Validate generated code before execution
+  enabled: true               # Enable security pattern checks
 
 projects: {}                  # Named project paths
 servers: {}                   # External MCP servers
@@ -292,6 +295,45 @@ cost = (input_tokens / 1M × input_cost) + (output_tokens / 1M × output_cost)
 
 The HTML report shows the estimated cost with the model name for reference.
 
+### Security Configuration
+
+Control code validation and security pattern detection:
+
+```yaml
+security:
+  validate_code: true          # Enable AST validation before execution
+  enabled: true                # Enable security pattern checks
+  blocked:                     # Additional patterns to block (extends defaults)
+    - my_dangerous.*
+  warned:                      # Additional patterns to warn on
+    - custom_risky.*
+  allow:                       # Patterns to exempt from defaults
+    - open                     # Allow open() without warning
+```
+
+**Pattern matching:**
+
+- Patterns without dots (e.g., `exec`, `subprocess`) match builtin calls AND import statements
+- Patterns with dots (e.g., `subprocess.*`, `os.system`) match qualified function calls only
+- Supports fnmatch wildcards: `*` (any chars), `?` (single char), `[seq]` (char set)
+
+**Default blocked patterns:**
+
+- `exec`, `eval`, `compile`, `__import__` (arbitrary code execution)
+- `subprocess.*`, `os.system`, `os.popen`, `os.spawn*`, `os.exec*` (command injection)
+
+**Default warned patterns:**
+
+- `subprocess`, `os` (imports that enable dangerous operations)
+- `open` (file access)
+- `pickle.*`, `yaml.load`, `marshal.*` (deserialisation attacks)
+
+**Configuration behaviour:**
+
+- `blocked` and `warned` lists **extend** defaults (additive, not replacement)
+- Adding a pattern to `warned` downgrades it from blocked if in defaults
+- Use `allow` to exempt specific patterns entirely (no warning)
+
 ### External MCP Servers
 
 Proxy external MCP servers through OneTool:
@@ -403,7 +445,9 @@ tools_dir:
   - src/ot_tools/*.py
 
 log_level: WARNING
-validate_code: true
+
+security:
+  validate_code: true
 
 tools:
   brave:

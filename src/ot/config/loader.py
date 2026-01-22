@@ -395,6 +395,66 @@ class DiagramConfig(BaseModel):
     )
 
 
+class SecurityConfig(BaseModel):
+    """Code validation security configuration.
+
+    Controls code validation and which patterns are blocked or warned.
+    Blocked patterns prevent code execution; warned patterns log but allow.
+
+    Patterns support fnmatch wildcards:
+    - '*' matches any characters (e.g., 'subprocess.*' matches 'subprocess.run')
+    - '?' matches a single character
+    - '[seq]' matches any character in seq
+
+    Pattern matching logic (handled automatically by validator):
+    - Patterns WITHOUT dots (e.g., 'exec', 'subprocess') match:
+      * Builtin function calls: exec(), eval()
+      * Import statements: import subprocess, from os import system
+    - Patterns WITH dots (e.g., 'subprocess.*', 'os.system') match:
+      * Qualified function calls: subprocess.run(), os.system()
+
+    Configuration behavior:
+    - blocked/warned lists EXTEND the built-in defaults (additive)
+    - Adding a pattern to 'warned' downgrades it from blocked (if in defaults)
+    - Use 'allow' list to exempt specific patterns entirely (no warning)
+    - This prevents accidentally removing critical security patterns
+
+    This simplified two-category design replaces the previous four categories
+    (blocked_builtins, blocked_functions, warned_functions, warned_imports).
+    The validator determines the match type based on the pattern structure.
+    """
+
+    validate_code: bool = Field(
+        default=True,
+        description="Enable AST-based code validation before execution",
+    )
+
+    enabled: bool = Field(
+        default=True,
+        description="Enable security pattern checking (requires validate_code)",
+    )
+
+    # Blocked patterns - EXTENDS built-in defaults (prevents accidental removal)
+    # Use 'allow' to exempt specific patterns if needed
+    blocked: list[str] = Field(
+        default_factory=list,
+        description="Additional patterns to block (extends defaults, not replaces)",
+    )
+
+    # Warned patterns - EXTENDS built-in defaults
+    warned: list[str] = Field(
+        default_factory=list,
+        description="Additional patterns to warn on (extends defaults, not replaces)",
+    )
+
+    # Allow list - explicitly exempt patterns from defaults
+    # Use this to remove a default pattern you need (e.g., allow 'open' for file tools)
+    allow: list[str] = Field(
+        default_factory=list,
+        description="Patterns to exempt from blocking/warning (removes from defaults)",
+    )
+
+
 class StatsConfig(BaseModel):
     """Runtime statistics collection configuration."""
 
@@ -503,6 +563,11 @@ class OneToolConfig(BaseModel):
         description="Tool-specific configuration (timeouts, limits, etc.)",
     )
 
+    security: SecurityConfig = Field(
+        default_factory=SecurityConfig,
+        description="Code validation and security pattern configuration",
+    )
+
     tools_dir: list[str] = Field(
         default_factory=lambda: ["src/ot_tools/*.py"],
         description="Glob patterns for tool discovery",
@@ -529,9 +594,6 @@ class OneToolConfig(BaseModel):
     log_verbose: bool = Field(
         default=False,
         description="Disable log truncation for debugging (full values in output)",
-    )
-    validate_code: bool = Field(
-        default=True, description="Whether to validate code before execution"
     )
 
     def get_tool_files(self) -> list[Path]:

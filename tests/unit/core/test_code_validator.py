@@ -8,9 +8,8 @@ from __future__ import annotations
 import pytest
 
 from ot.executor.validator import (
-    DANGEROUS_BUILTINS,
-    DANGEROUS_FUNCTIONS,
-    WARN_PATTERNS,
+    DEFAULT_BLOCKED,
+    DEFAULT_WARNED,
     validate_for_exec,
     validate_python_code,
 )
@@ -353,26 +352,94 @@ def test_validate_for_exec_blocks_dangerous() -> None:
 @pytest.mark.unit
 @pytest.mark.core
 def test_dangerous_builtins_set() -> None:
-    """DANGEROUS_BUILTINS contains expected patterns."""
-    assert "exec" in DANGEROUS_BUILTINS
-    assert "eval" in DANGEROUS_BUILTINS
-    assert "compile" in DANGEROUS_BUILTINS
-    assert "__import__" in DANGEROUS_BUILTINS
+    """DEFAULT_BLOCKED contains expected builtin patterns (no dots)."""
+    assert "exec" in DEFAULT_BLOCKED
+    assert "eval" in DEFAULT_BLOCKED
+    assert "compile" in DEFAULT_BLOCKED
+    assert "__import__" in DEFAULT_BLOCKED
 
 
 @pytest.mark.unit
 @pytest.mark.core
 def test_dangerous_functions_set() -> None:
-    """DANGEROUS_FUNCTIONS contains expected patterns."""
-    assert "subprocess.run" in DANGEROUS_FUNCTIONS
-    assert "subprocess.Popen" in DANGEROUS_FUNCTIONS
-    assert "os.system" in DANGEROUS_FUNCTIONS
+    """DEFAULT_BLOCKED contains expected qualified function patterns (with dots)."""
+    assert "subprocess.*" in DEFAULT_BLOCKED
+    assert "os.system" in DEFAULT_BLOCKED
+    assert "os.spawn*" in DEFAULT_BLOCKED
+    assert "os.exec*" in DEFAULT_BLOCKED
 
 
 @pytest.mark.unit
 @pytest.mark.core
 def test_warn_patterns_set() -> None:
-    """WARN_PATTERNS contains expected patterns."""
-    assert "open" in WARN_PATTERNS
-    assert "pickle.load" in WARN_PATTERNS
-    assert "yaml.load" in WARN_PATTERNS
+    """DEFAULT_WARNED contains expected warning patterns."""
+    assert "open" in DEFAULT_WARNED
+    assert "pickle.*" in DEFAULT_WARNED
+    assert "yaml.load" in DEFAULT_WARNED
+    assert "marshal.*" in DEFAULT_WARNED
+
+
+# =============================================================================
+# Wildcard Pattern Tests
+# =============================================================================
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_wildcard_subprocess_all() -> None:
+    """subprocess.* wildcard matches any subprocess function."""
+    # subprocess.call should be blocked by subprocess.* pattern
+    result = validate_python_code("subprocess.call(['ls'])")
+    assert result.valid is False
+    assert any("subprocess.call" in e for e in result.errors)
+    assert any("subprocess.*" in e for e in result.errors)
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_wildcard_os_spawn_variants() -> None:
+    """os.spawn* wildcard matches all spawn variants."""
+    for variant in ["os.spawnl", "os.spawnle", "os.spawnv", "os.spawnve"]:
+        result = validate_python_code(f"{variant}('/bin/ls', 'ls')")
+        assert result.valid is False, f"{variant} should be blocked"
+        assert any(variant in e for e in result.errors)
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_wildcard_os_exec_variants() -> None:
+    """os.exec* wildcard matches all exec variants."""
+    for variant in ["os.execl", "os.execle", "os.execv", "os.execve"]:
+        result = validate_python_code(f"{variant}('/bin/ls', 'ls')")
+        assert result.valid is False, f"{variant} should be blocked"
+        assert any(variant in e for e in result.errors)
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_wildcard_pickle_all() -> None:
+    """pickle.* wildcard matches pickle.load and pickle.loads."""
+    for func in ["pickle.load", "pickle.loads", "pickle.dump"]:
+        result = validate_python_code(f"x = {func}(f)")
+        assert result.valid is True  # Warnings, not errors
+        assert any(func in w for w in result.warnings), f"{func} should warn"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_wildcard_marshal_all() -> None:
+    """marshal.* wildcard matches marshal.load and marshal.loads."""
+    for func in ["marshal.load", "marshal.loads"]:
+        result = validate_python_code(f"x = {func}(f)")
+        assert result.valid is True
+        assert any(func in w for w in result.warnings), f"{func} should warn"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_error_message_shows_matched_pattern() -> None:
+    """Error messages include the matched pattern."""
+    result = validate_python_code("subprocess.check_output(['ls'])")
+    assert result.valid is False
+    # Should show both the function name and the pattern it matched
+    assert any("subprocess.check_output" in e and "subprocess.*" in e for e in result.errors)

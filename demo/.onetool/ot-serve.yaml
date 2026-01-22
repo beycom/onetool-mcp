@@ -17,7 +17,10 @@ tools_dir:
 
 log_level: INFO
 # log_dir: ../logs  # Default - logs go to demo/logs
-validate_code: true
+
+# Security settings
+security:
+  validate_code: true
 
 # Transform tool configuration (LLM for code generation)
 transform:

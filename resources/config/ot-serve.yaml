@@ -18,7 +18,32 @@ include:
 # secrets_file: secrets.yaml   # default - sibling of this config (gitignored)
 
 log_level: INFO
-validate_code: true
+
+# Code validation and security (AST-based)
+# Patterns support fnmatch wildcards: * (any chars), ? (single char), [seq]
+#
+# Pattern matching is automatic based on structure:
+# - No dot (e.g., 'exec', 'subprocess') → matches builtins AND imports
+# - With dot (e.g., 'subprocess.*') → matches qualified function calls
+#
+# IMPORTANT: blocked/warned lists EXTEND built-in defaults (they don't replace).
+# - Add to 'warned' to downgrade a blocked default to warning
+# - Add to 'allow' to exempt entirely (no warning)
+#
+# Built-in defaults:
+#   blocked: exec, eval, compile, __import__, subprocess.*, os.system,
+#            os.popen, os.spawn*, os.exec*
+#   warned: subprocess, os, open, pickle.*, yaml.load, marshal.*
+#
+# security:
+#   validate_code: true          # Enable AST validation before execution
+#   enabled: true                # Enable security pattern checking
+#   blocked:                     # Additional patterns to block (extends defaults)
+#     - my_dangerous.*           # Custom blocked pattern
+#   warned:                      # Additional patterns to warn on (extends defaults)
+#     - requests.*               # Custom warning pattern
+#   allow:                       # Exempt from defaults (e.g., for file-based tools)
+#     - open                     # Allow open() without warning
 
 # Transform tool configuration (LLM for code generation) - REQUIRED
 transform:
