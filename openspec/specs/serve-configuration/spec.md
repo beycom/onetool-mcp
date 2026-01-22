@@ -840,6 +840,8 @@ The system SHALL support configurable security patterns for code validation at t
     enabled: true
     blocked:
       - my_dangerous.*
+    ask:
+      - requests.*
     warned:
       - custom_risky.*
     allow:
@@ -848,6 +850,15 @@ The system SHALL support configurable security patterns for code validation at t
 
 - **WHEN** code is validated
 - **THEN** configured patterns SHALL be merged with defaults
+
+#### Scenario: Four security levels
+- **GIVEN** the security configuration
+- **WHEN** patterns are evaluated
+- **THEN** the system SHALL support four levels:
+  - `blocked`: Deny execution with error
+  - `ask`: Prompt user for confirmation before execution
+  - `warned`: Allow with logged warning
+  - `allow`: Permit without warning (exempt from defaults)
 
 #### Scenario: Default security configuration
 - **GIVEN** no `security` section in configuration
@@ -904,6 +915,27 @@ The system SHALL support configurable security patterns for code validation at t
 - **WHEN** patterns are loaded
 - **THEN** they SHALL be matched using fnmatch semantics
 - **EXAMPLE** `subprocess.*` matches `subprocess.run`, `subprocess.Popen`, etc.
+
+#### Scenario: Ask level for network operations
+- **GIVEN** configuration with:
+
+  ```yaml
+  security:
+    ask:
+      - requests.*
+      - urllib.*
+      - httpx.*
+  ```
+
+- **WHEN** code makes network requests
+- **THEN** user SHALL be prompted for confirmation
+- **RATIONALE** Network operations may exfiltrate data; user approval adds a security checkpoint
+
+#### Scenario: Ask level default patterns
+- **GIVEN** no `ask` section in configuration
+- **WHEN** code is validated
+- **THEN** no patterns SHALL require confirmation by default
+- **RATIONALE** Ask mode is opt-in to avoid disrupting existing workflows
 
 #### Scenario: Pattern type auto-detection
 - **GIVEN** patterns in blocked/warned lists

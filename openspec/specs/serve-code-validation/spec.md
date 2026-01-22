@@ -208,23 +208,73 @@ The system SHALL support fnmatch wildcards in security patterns.
 - **THEN** message SHALL include both the function name and the matched pattern
 - **EXAMPLE** "subprocess.check_output is not allowed (matches 'subprocess.*')"
 
-### Requirement: Simplified Security Pattern Categories
+### Requirement: Four-Level Security Pattern Categories
 
-The system SHALL support two categories of security patterns with automatic type detection.
+The system SHALL support four categories of security patterns with automatic type detection.
 
 #### Scenario: Blocked patterns
 - **GIVEN** `blocked: [exec, eval, subprocess.*, os.system]`
 - **WHEN** code uses these patterns
 - **THEN** validation SHALL fail with error
+- **AND** execution SHALL be denied
+
+#### Scenario: Ask patterns
+- **GIVEN** `ask: [requests.*, urllib.*]`
+- **WHEN** code uses these patterns
+- **THEN** validation SHALL return `requires_confirmation=True`
+- **AND** the caller SHALL prompt the user for confirmation before execution
+- **AND** if denied, execution SHALL be blocked
 
 #### Scenario: Warned patterns
 - **GIVEN** `warned: [subprocess, os, open, pickle.*]`
 - **WHEN** code uses these patterns
 - **THEN** validation SHALL pass with warning
+- **AND** warning SHALL be logged
+
+#### Scenario: Allow patterns
+- **GIVEN** `allow: [open]`
+- **WHEN** code uses these patterns
+- **THEN** validation SHALL pass without warning
+- **AND** pattern SHALL be exempt from warned/ask defaults
+
+#### Scenario: Pattern precedence
+- **GIVEN** a pattern appears in multiple categories
+- **WHEN** validation occurs
+- **THEN** precedence SHALL be: `blocked` > `ask` > `warned` > `allow`
+- **EXAMPLE** If `open` is in both `blocked` and `allow`, it SHALL be blocked
 
 #### Scenario: Pattern type detection
 - **GIVEN** patterns without dots (e.g., `exec`, `subprocess`)
 - **WHEN** pattern matching occurs
 - **THEN** they SHALL match builtin calls AND import statements
 - **AND** patterns with dots (e.g., `subprocess.*`) SHALL match qualified calls only
-- **RATIONALE** Simplifies configuration from 4 categories to 2 while preserving functionality
+
+### Requirement: Ask Mode Confirmation Flow
+
+The system SHALL support interactive confirmation for ask-level patterns.
+
+#### Scenario: ValidationResult with confirmation required
+- **GIVEN** code matches an `ask` pattern
+- **WHEN** validate_python_code() is called
+- **THEN** it SHALL return ValidationResult with:
+  - `valid=True`
+  - `requires_confirmation=True`
+  - `confirmation_patterns=[list of matched ask patterns]`
+
+#### Scenario: MCP client handles confirmation
+- **GIVEN** ValidationResult with `requires_confirmation=True`
+- **WHEN** the MCP server receives the result
+- **THEN** it SHALL signal the client to prompt the user
+- **AND** await confirmation before proceeding
+
+#### Scenario: Confirmation denied
+- **GIVEN** user denies confirmation for an ask pattern
+- **WHEN** the response is received
+- **THEN** execution SHALL be blocked
+- **AND** error message SHALL indicate user denied execution
+
+#### Scenario: Confirmation granted
+- **GIVEN** user grants confirmation for an ask pattern
+- **WHEN** the response is received
+- **THEN** execution SHALL proceed normally
+- **AND** a log entry SHALL record the user approval
