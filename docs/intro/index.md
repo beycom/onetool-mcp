@@ -77,13 +77,6 @@ __ot brave.search(query="AI trends 2026")
 
 OneTool is built for that future.
 
-## Deep Dives
-
-| Article | Description |
-|---------|-------------|
-| [Technical Analysis](why-onetool-source.md) | Full research citations, benchmarks, and architecture |
-| [LinkedIn Article](linkedin-article.md) | Short-form summary for sharing |
-
 ## Key Benefits
 
 - **Token efficiency**: 24x fewer tokens, same accuracy

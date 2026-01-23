@@ -72,8 +72,6 @@ nav:
       - Security: getting-started/security.md
   - Introduction:
       - Why OneTool: intro/index.md
-      - LinkedIn Article: intro/linkedin-article.md
-      - Source Analysis: intro/why-onetool-source.md
   - Guides:
       - Explicit Calls: guides/explicit-calls.md
       - Database Queries: guides/database-queries.md
@@ -107,11 +105,6 @@ nav:
       - Creating CLIs: extending/creating-clis.md
       - Logging: extending/logging.md
       - Testing: extending/testing.md
-  - Beta:
-      - Overview: beta/index.md
-      - Browser Inspector: beta/browser-inspector.md
-      - ot-browse: beta/ot-browse.md
-      - Page View: beta/page-view.md
 
 extra_css:
   - stylesheets/extra.css

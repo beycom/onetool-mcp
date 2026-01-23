@@ -21,7 +21,7 @@ def test_load_config_defaults() -> None:
     # Check defaults
     assert config.version == 1
     assert config.log_level == "INFO"
-    assert config.validate_code is True
+    assert config.security.validate_code is True
     assert config.tools_dir == ["src/ot_tools/*.py"]
     assert config.secrets_file == "secrets.yaml"
 
@@ -33,12 +33,12 @@ def test_load_config_from_yaml(write_config) -> None:
     from ot.config.loader import load_config
 
     config_path = write_config(
-        {"version": 1, "log_level": "DEBUG", "validate_code": False}
+        {"version": 1, "log_level": "DEBUG", "security": {"validate_code": False}}
     )
 
     config = load_config(config_path)
     assert config.log_level == "DEBUG"
-    assert config.validate_code is False
+    assert config.security.validate_code is False
 
 
 @pytest.mark.unit
@@ -754,3 +754,245 @@ def test_deep_merge_type_mismatch() -> None:
 
     # Override wins even with type mismatch
     assert result["value"] == "scalar"
+
+
+# ==================== Three-Tier Include Resolution Tests ====================
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_resolve_include_path_config_dir_first() -> None:
+    """_resolve_include_path finds file in config_dir first."""
+    from ot.config.loader import _resolve_include_path
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir).resolve()
+        include_file = config_dir / "test.yaml"
+        include_file.write_text("test: value")
+
+        result = _resolve_include_path("test.yaml", config_dir)
+
+        # Both paths should resolve to the same location
+        assert result is not None
+        assert result.resolve() == include_file.resolve()
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_resolve_include_path_global_fallback(tmp_path: Path) -> None:
+    """_resolve_include_path falls back to global when not in config_dir."""
+    from ot.config.loader import _resolve_include_path
+    from ot.paths import get_global_dir
+
+    # Create file in global dir but not in config_dir
+    global_dir = get_global_dir()
+    global_dir.mkdir(parents=True, exist_ok=True)
+    global_file = global_dir / "global-only.yaml"
+
+    try:
+        global_file.write_text("global: test")
+
+        # config_dir doesn't have the file
+        result = _resolve_include_path("global-only.yaml", tmp_path)
+
+        assert result == global_file
+    finally:
+        if global_file.exists():
+            global_file.unlink()
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_resolve_include_path_bundled_fallback(tmp_path: Path) -> None:
+    """_resolve_include_path falls back to bundled when not in config_dir or global."""
+    from ot.config.loader import _resolve_include_path
+    from ot.paths import get_bundled_config_dir
+
+    # prompts.yaml exists in bundled defaults
+    bundled_dir = get_bundled_config_dir()
+    expected = bundled_dir / "prompts.yaml"
+
+    # tmp_path doesn't have the file, and we assume global doesn't either
+    result = _resolve_include_path("prompts.yaml", tmp_path)
+
+    # Should find it in bundled
+    assert result is not None
+    assert result.name == "prompts.yaml"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_resolve_include_path_absolute_used_as_is(tmp_path: Path) -> None:
+    """_resolve_include_path uses absolute paths directly."""
+    from ot.config.loader import _resolve_include_path
+
+    # Create a file with absolute path
+    abs_file = tmp_path / "absolute.yaml"
+    abs_file.write_text("absolute: test")
+
+    result = _resolve_include_path(str(abs_file), Path("/some/other/dir"))
+
+    assert result == abs_file
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_resolve_include_path_not_found() -> None:
+    """_resolve_include_path returns None when file not found anywhere."""
+    from ot.config.loader import _resolve_include_path
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        result = _resolve_include_path("nonexistent-file.yaml", Path(tmpdir))
+
+        assert result is None
+
+
+# ==================== Inheritance Tests ====================
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_inherit_none_no_merging() -> None:
+    """inherit: none prevents any inheritance."""
+    from ot.config.loader import load_config
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir) / ".onetool"
+        config_dir.mkdir()
+
+        # Create project config with inherit: none
+        config_path = config_dir / "ot-serve.yaml"
+        config_path.write_text(
+            yaml.dump(
+                {
+                    "version": 1,
+                    "inherit": "none",
+                    "log_level": "ERROR",
+                }
+            )
+        )
+
+        config = load_config(config_path)
+
+        # Should use values from config only (defaults from model, not from global/bundled)
+        assert config.inherit == "none"
+        assert config.log_level == "ERROR"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_inherit_bundled_merges_bundled_only() -> None:
+    """inherit: bundled merges from bundled defaults only."""
+    from ot.config.loader import load_config
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir) / ".onetool"
+        config_dir.mkdir()
+
+        # Create project config with inherit: bundled and override
+        config_path = config_dir / "ot-serve.yaml"
+        config_path.write_text(
+            yaml.dump(
+                {
+                    "version": 1,
+                    "inherit": "bundled",
+                    "log_level": "ERROR",
+                }
+            )
+        )
+
+        config = load_config(config_path)
+
+        # Should have bundled inheritance
+        assert config.inherit == "bundled"
+        # Our override should apply
+        assert config.log_level == "ERROR"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_inherit_global_is_default() -> None:
+    """inherit defaults to 'global' when not specified."""
+    from ot.config.loader import load_config
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir) / ".onetool"
+        config_dir.mkdir()
+
+        # Create project config without inherit field
+        config_path = config_dir / "ot-serve.yaml"
+        config_path.write_text(
+            yaml.dump(
+                {
+                    "version": 1,
+                    "log_level": "DEBUG",
+                }
+            )
+        )
+
+        config = load_config(config_path)
+
+        # Default should be 'global'
+        assert config.inherit == "global"
+        # Our override should apply
+        assert config.log_level == "DEBUG"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_inherit_deep_merges_tools() -> None:
+    """Inheritance deep-merges nested tool configurations."""
+    from ot.config.loader import load_config
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir) / ".onetool"
+        config_dir.mkdir()
+
+        # Create project config with partial tool override
+        config_path = config_dir / "ot-serve.yaml"
+        config_path.write_text(
+            yaml.dump(
+                {
+                    "version": 1,
+                    "inherit": "bundled",
+                    "tools": {
+                        "brave": {"timeout": 120.0},
+                    },
+                }
+            )
+        )
+
+        config = load_config(config_path)
+
+        # Override should apply
+        assert config.tools.brave.timeout == 120.0
+        # Other tool defaults should still work
+        assert config.tools.context7.timeout == 30.0
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_include_three_tier_fallback() -> None:
+    """include: uses three-tier fallback resolution."""
+    from ot.config.loader import load_config
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir) / ".onetool"
+        config_dir.mkdir()
+
+        # Create project config that includes bundled prompts.yaml
+        config_path = config_dir / "ot-serve.yaml"
+        config_path.write_text(
+            yaml.dump(
+                {
+                    "version": 1,
+                    "inherit": "none",
+                    "include": ["prompts.yaml"],  # Should fall back to bundled
+                }
+            )
+        )
+
+        config = load_config(config_path)
+
+        # Should have loaded prompts from bundled defaults
+        assert config.prompts is not None

@@ -103,7 +103,7 @@ Or use `include:` to load from a shared config file:
 
 ```yaml
 include:
-  - resources/config/diagram.yaml  # contains tools: {diagram: ...}
+  - diagram.yaml  # Falls back to global or bundled defaults
 ```
 
 ## Self-Hosted Setup

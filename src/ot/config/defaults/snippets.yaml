@@ -1,5 +1,5 @@
 # OneTool Default Snippets Library
-# Load via: include: [resources/config/snippets.yaml]
+# Load via: include: [snippets.yaml] (falls back to bundled)
 
 snippets:
   # ============================================================================

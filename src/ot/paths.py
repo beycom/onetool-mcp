@@ -1,6 +1,7 @@
 """Path resolution for OneTool global and project directories.
 
-OneTool uses a two-tier directory structure:
+OneTool uses a three-tier directory structure:
+- Bundled: package data in ot.config.defaults — read-only defaults
 - Global: ~/.onetool/ — user-wide settings, secrets
 - Project: .onetool/ — project-specific config
 
@@ -11,11 +12,75 @@ from __future__ import annotations
 
 import os
 import sys
+from importlib import resources
 from pathlib import Path
 
 # Directory names
 GLOBAL_DIR_NAME = ".onetool"
 PROJECT_DIR_NAME = ".onetool"
+
+# Package containing bundled config defaults
+BUNDLED_CONFIG_PACKAGE = "ot.config.defaults"
+
+
+def get_bundled_config_dir() -> Path:
+    """Get the bundled config defaults directory path.
+
+    Uses importlib.resources to access package data. Works correctly across:
+    - Regular pip/uv install (wheel)
+    - Editable install (uv tool install -e .)
+    - Development mode
+
+    Returns:
+        Path to bundled defaults directory (read-only package data)
+
+    Raises:
+        FileNotFoundError: If bundled defaults package is not found or not on filesystem
+    """
+    try:
+        files = resources.files(BUNDLED_CONFIG_PACKAGE)
+    except (ModuleNotFoundError, TypeError) as e:
+        raise FileNotFoundError(
+            f"Bundled config package not found: {BUNDLED_CONFIG_PACKAGE}. "
+            "Ensure onetool is properly installed."
+        ) from e
+
+    # Try multiple approaches to get a filesystem path from the Traversable.
+    # importlib.resources returns different types depending on install mode:
+    # - Regular install: pathlib.Path-like object
+    # - Editable install: MultiplexedPath (internal type)
+    # - Zipped package: ZipPath (would need extraction)
+
+    # Approach 1: Direct _path attribute (MultiplexedPath in editable installs)
+    if hasattr(files, "_path"):
+        path = Path(files._path)
+        if path.is_dir():
+            return path
+
+    # Approach 2: String conversion (works for regular Path-like objects)
+    path_str = str(files)
+
+    # Skip if it looks like a repr() output rather than a path
+    if not path_str.startswith(("MultiplexedPath(", "<", "{")):
+        path = Path(path_str)
+        if path.is_dir():
+            return path
+
+    # Approach 3: Extract path from MultiplexedPath repr as last resort
+    if path_str.startswith("MultiplexedPath("):
+        import re
+        match = re.search(r"'([^']+)'", path_str)
+        if match:
+            path = Path(match.group(1))
+            if path.is_dir():
+                return path
+
+    # If we get here, the package exists but isn't on a real filesystem
+    # (e.g., inside a zipfile). This is not supported.
+    raise FileNotFoundError(
+        f"Bundled config directory exists but is not on filesystem: {path_str}. "
+        "OneTool requires installation from an unpacked wheel, not a zipfile."
+    )
 
 
 def get_effective_cwd() -> Path:
@@ -64,7 +129,7 @@ def get_project_dir(start: Path | None = None) -> Path | None:
 def ensure_global_dir(quiet: bool = False) -> Path:
     """Ensure the global OneTool directory exists.
 
-    Creates ~/.onetool/ and copies default config files from resources/config/.
+    Creates ~/.onetool/ and copies default config files from bundled package data.
     Prints creation message to stderr (since MCP uses stdout).
 
     Args:
@@ -83,15 +148,18 @@ def ensure_global_dir(quiet: bool = False) -> Path:
     # Create directory structure
     global_dir.mkdir(parents=True, exist_ok=True)
 
-    # Copy default config files from resources/config/
-    resources_config_dir = Path(__file__).parent.parent.parent / "resources" / "config"
+    # Copy default config files from bundled package data
     copied_configs: list[str] = []
-    if resources_config_dir.exists():
-        for config_file in resources_config_dir.glob("*.yaml"):
+    try:
+        bundled_dir = get_bundled_config_dir()
+        for config_file in bundled_dir.glob("*.yaml"):
             dest = global_dir / config_file.name
             if not dest.exists():
                 shutil.copy(config_file, dest)
                 copied_configs.append(config_file.name)
+    except FileNotFoundError:
+        # Bundled defaults not available (dev environment without package install)
+        pass
 
     if not quiet:
         # Use stderr to avoid interfering with MCP stdout

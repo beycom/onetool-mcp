@@ -188,23 +188,27 @@ def test_expand_snippet_with_defaults() -> None:
 @pytest.mark.integration
 @pytest.mark.core
 def test_include_loads_snippets_library() -> None:
-    """Verify include: loads snippets from resources/config/snippets.yaml."""
+    """Verify include: loads snippets from bundled defaults via three-tier fallback."""
     import tempfile
     from pathlib import Path
 
     import yaml
 
     from ot.config.loader import load_config
+    from ot.paths import get_bundled_config_dir
     from ot.shortcuts import expand_snippet, parse_snippet
 
-    # Find the default snippets library
-    project_root = Path(__file__).parent.parent.parent.parent
-    snippets_yaml = project_root / "resources" / "config" / "snippets.yaml"
+    # Verify bundled snippets library exists
+    try:
+        bundled_dir = get_bundled_config_dir()
+        snippets_yaml = bundled_dir / "snippets.yaml"
+    except FileNotFoundError:
+        pytest.skip("Bundled snippets library not found")
 
     if not snippets_yaml.exists():
-        pytest.skip("Default snippets library not found")
+        pytest.skip("Bundled snippets library not found")
 
-    # Create minimal test config that includes the snippets library
+    # Create minimal test config that includes snippets via three-tier fallback
     with tempfile.TemporaryDirectory() as tmpdir:
         config_dir = Path(tmpdir) / ".onetool"
         config_dir.mkdir()
@@ -214,7 +218,8 @@ def test_include_loads_snippets_library() -> None:
             yaml.dump(
                 {
                     "version": 1,
-                    "include": [str(snippets_yaml)],
+                    "inherit": "none",  # Disable inheritance to test include fallback
+                    "include": ["snippets.yaml"],  # Falls back to bundled
                 }
             )
         )
@@ -245,13 +250,17 @@ def test_include_inline_overrides_included() -> None:
     import yaml
 
     from ot.config.loader import load_config
+    from ot.paths import get_bundled_config_dir
 
-    # Find the default snippets library
-    project_root = Path(__file__).parent.parent.parent.parent
-    snippets_yaml = project_root / "resources" / "config" / "snippets.yaml"
+    # Find the default snippets library from bundled defaults
+    try:
+        bundled_dir = get_bundled_config_dir()
+        snippets_yaml = bundled_dir / "snippets.yaml"
+    except FileNotFoundError:
+        pytest.skip("Bundled snippets library not found")
 
     if not snippets_yaml.exists():
-        pytest.skip("Default snippets library not found")
+        pytest.skip("Bundled snippets library not found")
 
     # Create config with both include and inline snippets
     with tempfile.TemporaryDirectory() as tmpdir:

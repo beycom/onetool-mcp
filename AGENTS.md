@@ -17,4 +17,5 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 <!-- OPENSPEC:END -->
 
-Follow AGENTS_RULES.md for this project.
+Read AGENTS_RULES.md for this project.
+Read AGENTS_PRIME.md for a project overview.

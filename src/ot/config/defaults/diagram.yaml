@@ -1,5 +1,5 @@
 # Diagram tool configuration
-# Load via: include: [resources/config/diagram.yaml]
+# Load via: include: [diagram.yaml] (falls back to bundled)
 
 tools:
   diagram:

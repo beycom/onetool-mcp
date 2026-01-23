@@ -4,15 +4,95 @@ Complete reference for OneTool configuration.
 
 ## Configuration Files
 
-OneTool uses a layered configuration system:
+OneTool uses a three-tier configuration system:
 
-| Location | Purpose | Scope |
-|----------|---------|-------|
-| `config/ot-serve.yaml` | Development config | Repository |
-| `.onetool/ot-serve.yaml` | Project config | Project |
-| `~/.onetool/ot-serve.yaml` | Global config | User |
+```text
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│    Bundled       │ --> │     Global       │ --> │    Project       │
+│ (package data)   │     │  (~/.onetool/)   │     │ (cwd/.onetool/)  │
+└──────────────────┘     └──────────────────┘     └──────────────────┘
+   Read-only              User preferences        Project overrides
+   Ships with pkg         API keys, prefs         tools_dir, etc.
+```
+
+| Location                     | Purpose                      | Scope        |
+| ---------------------------- | ---------------------------- | ------------ |
+| Bundled defaults             | Read-only package defaults   | All installs |
+| `~/.onetool/ot-serve.yaml`   | Global config                | User         |
+| `.onetool/ot-serve.yaml`     | Project config               | Project      |
 
 **Windows paths:** Replace `~/.onetool/` with `%USERPROFILE%\.onetool\`
+
+### First Run Bootstrap
+
+On first `ot-serve` invocation, OneTool creates `~/.onetool/` with bundled default configs:
+
+```bash
+$ ot-serve --help
+Creating ~/.onetool/
+  ✓ ot-serve.yaml
+  ✓ prompts.yaml
+  ✓ snippets.yaml
+  ✓ servers.yaml
+  ✓ diagram.yaml
+  ✓ secrets.yaml
+```
+
+**Note:** Only `ot-serve` bootstraps the global config directory. Other tools (`ot-bench`, `ot-browse`) require `~/.onetool/` to exist and will prompt you to run `ot-serve --help` first if it's missing.
+
+### Configuration Inheritance
+
+Project configs can inherit from global or bundled defaults using the `inherit` directive:
+
+```yaml
+version: 1
+inherit: global  # global (default), bundled, or none
+
+tools_dir:
+  - ./tools/*.py
+```
+
+| Value              | Behaviour                                      |
+| ------------------ | ---------------------------------------------- |
+| `global` (default) | Merge global config first, project overrides   |
+| `bundled`          | Merge bundled defaults only (skip global)      |
+| `none`             | No inheritance, use project config as-is       |
+
+#### Merge Semantics
+
+- Nested dicts are deep-merged (partial overrides work)
+- Lists and scalars are replaced entirely
+
+#### Minimal Project Config with Global Inheritance
+
+```yaml
+# my-project/.onetool/ot-serve.yaml
+version: 1
+# inherit: global  (implicit default)
+
+tools_dir:
+  - ./tools/*.py
+```
+
+This loads project `tools_dir` while inheriting prompts, snippets, and servers from global.
+
+#### Standalone Config (No Inheritance)
+
+```yaml
+# isolated/.onetool/ot-serve.yaml
+version: 1
+inherit: none  # Explicit: don't merge anything
+
+transform:
+  model: local/llama3
+
+prompts:
+  instructions: |
+    Custom standalone instructions.
+
+tools_dir:
+  - ./tools/*.py
+```
 
 ## Environment Variables
 
@@ -120,10 +200,9 @@ The `include:` key allows composing configuration from multiple files:
 version: 1
 
 include:
-  - ../../resources/config/prompts.yaml   # Shared prompts
-  - ../../resources/config/snippets.yaml  # Shared snippets
-  - ../../resources/config/servers.yaml   # Shared MCP servers
-  - local-snippets.yaml                   # Project additions
+  - prompts.yaml       # Falls back to global or bundled if not in project
+  - snippets.yaml      # Same three-tier resolution
+  - local-snippets.yaml  # Project-only additions
 
 # Inline content overrides included content
 servers:
@@ -132,7 +211,16 @@ servers:
     command: python
 ```
 
+**Include resolution (three-tier fallback):**
+
+1. Project config directory (where the including file is)
+2. Global (`~/.onetool/`)
+3. Bundled (package defaults)
+
+This allows minimal project configs that reference shared files without specifying paths.
+
 **Merge behaviour:**
+
 - Files are merged left-to-right (later files override earlier)
 - Inline content in the main file overrides everything
 - Nested dicts are deep-merged
@@ -381,8 +469,8 @@ Load snippets from external YAML files using `include:`:
 
 ```yaml
 include:
-  - resources/config/snippets.yaml       # Shared library
-  - project/snippets/local.yaml          # Project additions
+  - snippets.yaml              # Falls back to global or bundled
+  - local-snippets.yaml        # Project-specific additions
 
 snippets:
   # Inline snippets override included ones with same name

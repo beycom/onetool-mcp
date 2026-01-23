@@ -1,12 +1,7 @@
-# OneTool Configuration
+# OneTool Configuration - Demo Project
+# This is part of the onetool-mcp repo; always use bundled defaults from src/ot/config/defaults/
 version: 1
-
-# Include external config files (merged left-to-right, inline overrides all)
-include:
-  - ../../resources/config/prompts.yaml   # prompts: section
-  - ../../resources/config/snippets.yaml  # snippets: section (brv_, c7_, rg_, db_, etc.)
-  - ../../resources/config/servers.yaml   # servers: section (github)
-  - ../../resources/config/diagram.yaml   # tools: {diagram: ...} section
+inherit: bundled  # IMPORTANT: never use global (~/.onetool/) for dev/test consistency
 
 tools_dir:
   - src/ot_tools/*.py
@@ -27,9 +22,9 @@ transform:
   model: google/gemini-3-flash-preview
   base_url: https://openrouter.ai/api/v1
 
-# Tool-specific configuration (all optional - from diagram.yaml include)
+# Tool-specific configuration (inherited from bundled, override here if needed)
 # tools:
-#   diagram: ...  # loaded from ../../resources/config/diagram.yaml
+#   diagram: ...  # inherited from src/ot/config/defaults/
 
 servers:
   # Package Version MCP Server (stdio)

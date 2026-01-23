@@ -186,3 +186,75 @@ def test_expand_path_does_not_expand_env_vars() -> None:
     # ${VAR} is not expanded - only ~ is expanded
     # The result contains the literal ${MY_DIR} resolved to absolute path
     assert "${MY_DIR}" in str(result)
+
+
+# ==================== Bundled Config Tests ====================
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_get_bundled_config_dir_returns_path() -> None:
+    """Verify get_bundled_config_dir() returns a valid Path."""
+    from ot.paths import get_bundled_config_dir
+
+    result = get_bundled_config_dir()
+
+    assert isinstance(result, Path)
+    # Should point to the defaults directory
+    assert result.name == "defaults"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_get_bundled_config_dir_contains_yaml_files() -> None:
+    """Verify bundled config directory contains expected YAML files."""
+    from ot.paths import get_bundled_config_dir
+
+    bundled_dir = get_bundled_config_dir()
+
+    # Should contain key config files
+    assert (bundled_dir / "ot-serve.yaml").exists()
+    assert (bundled_dir / "prompts.yaml").exists()
+    assert (bundled_dir / "snippets.yaml").exists()
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_ensure_global_dir_creates_directory(tmp_path: Path) -> None:
+    """Verify ensure_global_dir() creates ~/.onetool/ with configs."""
+    from ot.paths import ensure_global_dir
+
+    # Use a fake home directory
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+
+    with patch.dict(os.environ, {"HOME": str(fake_home)}):
+        # Import fresh to pick up new HOME
+        import importlib
+
+        import ot.paths
+
+        importlib.reload(ot.paths)
+
+        result = ot.paths.ensure_global_dir(quiet=True)
+
+        # Should create the directory
+        assert result.exists()
+        assert result.name == ".onetool"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_ensure_global_dir_idempotent(tmp_path: Path) -> None:
+    """Verify ensure_global_dir() is idempotent (no error on second call)."""
+    from ot.paths import ensure_global_dir, get_global_dir
+
+    # Create the directory manually first
+    global_dir = get_global_dir()
+    global_dir.mkdir(parents=True, exist_ok=True)
+
+    # Should not raise, should return existing directory
+    result = ensure_global_dir(quiet=True)
+
+    assert result == global_dir
+    assert result.exists()

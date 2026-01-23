@@ -31,7 +31,7 @@ Python 3.11+, FastMCP, OpenAI SDK (OpenRouter), Typer, Pydantic, YAML config
 **Locations**:
 - Project configs: `<project>/.onetool/*.yaml`
 - Global configs: `~/.onetool/*.yaml`
-- Default templates: `resources/config/`
+- Bundled defaults: `src/ot/config/defaults/` (packaged with wheel)
 - Secrets: `secrets.yaml` (ot-serve) and `bench-secrets.yaml` (ot-bench) in `.onetool/`
 
 **Variable expansion**: `${VAR}` in config files reads from `secrets.yaml` only (not environment variables). Use `${VAR:-default}` for defaults. Paths support `~` expansion only.

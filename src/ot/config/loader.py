@@ -28,10 +28,10 @@ from typing import Any, Literal
 
 import yaml
 from loguru import logger
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr
 
 from ot.config.mcp import McpServerConfig, expand_secrets
-from ot.paths import get_effective_cwd, get_global_dir
+from ot.paths import get_bundled_config_dir, get_effective_cwd, get_global_dir
 
 # Current config schema version
 CURRENT_CONFIG_VERSION = 1
@@ -524,14 +524,26 @@ class ToolsConfig(BaseModel):
 class OneToolConfig(BaseModel):
     """Root configuration for OneTool V1."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     # Private attribute to track config file location (not serialized)
+    # Note: Path is natively supported by Pydantic, no arbitrary_types_allowed needed
     _config_dir: Path | None = PrivateAttr(default=None)
 
     version: int = Field(
         default=1,
         description="Config schema version for migration support",
+    )
+
+    inherit: Literal["global", "bundled", "none"] = Field(
+        default="global",
+        description=(
+            "Config inheritance mode:\n"
+            "  - 'global' (default): Merge ~/.onetool/ot-serve.yaml first, then "
+            "bundled defaults as fallback. Use for project configs that extend user prefs.\n"
+            "  - 'bundled': Merge package defaults only, skip global config. "
+            "Use for reproducible configs that shouldn't depend on user settings.\n"
+            "  - 'none': Standalone config with no inheritance. "
+            "Use for fully self-contained configs."
+        ),
     )
 
     include: list[str] = Field(
@@ -604,8 +616,8 @@ class OneToolConfig(BaseModel):
         """
         tool_files: list[Path] = []
         for pattern in self.tools_dir:
-            # NOTE: Use glob.glob() not Path().glob() - pathlib doesn't support
-            # absolute patterns like "/path/to/tools/**/*.py" (raises NotImplementedError)
+            # Use glob.glob() for cross-platform compatibility and to support
+            # both relative and absolute patterns in tools_dir configuration
             for match in glob.glob(pattern, recursive=True):  # noqa: PTH207
                 path = Path(match)
                 if path.is_file() and path.suffix == ".py":
@@ -791,6 +803,65 @@ def _remove_legacy_fields(data: dict[str, Any]) -> None:
             del data[key]
 
 
+def _resolve_include_path(
+    include_path_str: str, config_dir: Path
+) -> Path | None:
+    """Resolve an include path using three-tier fallback.
+
+    Search order:
+    1. config_dir (project or wherever the main config is)
+    2. global (~/.onetool/)
+    3. bundled (package defaults)
+
+    Supports:
+    - Absolute paths (used as-is)
+    - ~ expansion (expands to home directory)
+    - Relative paths (searched in three-tier order)
+
+    Args:
+        include_path_str: Path string from include directive
+        config_dir: Directory of the config file containing the include
+
+    Returns:
+        Resolved Path if found, None otherwise
+    """
+    # Expand ~ first
+    include_path = Path(include_path_str).expanduser()
+
+    # Absolute paths are used as-is
+    if include_path.is_absolute():
+        if include_path.exists():
+            logger.debug(f"Include resolved (absolute): {include_path}")
+            return include_path
+        return None
+
+    # Tier 1: config_dir (project or current config location)
+    tier1 = (config_dir / include_path).resolve()
+    if tier1.exists():
+        logger.debug(f"Include resolved (config_dir): {tier1}")
+        return tier1
+
+    # Tier 2: global (~/.onetool/)
+    tier2 = (get_global_dir() / include_path).resolve()
+    if tier2.exists():
+        logger.debug(f"Include resolved (global): {tier2}")
+        return tier2
+
+    # Tier 3: bundled (package defaults)
+    try:
+        bundled_dir = get_bundled_config_dir()
+        tier3 = (bundled_dir / include_path).resolve()
+        if tier3.exists():
+            logger.debug(f"Include resolved (bundled): {tier3}")
+            return tier3
+    except FileNotFoundError:
+        # Bundled defaults not available
+        pass
+
+    logger.debug(f"Include not found in any tier: {include_path_str}")
+    return None
+
+
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     """Deep merge two dictionaries, with override values taking precedence.
 
@@ -831,6 +902,11 @@ def _load_includes(
     Files are merged left-to-right (later files override earlier).
     Inline content in the main file overrides everything.
 
+    Include resolution uses three-tier fallback:
+    1. config_dir (project or current config location)
+    2. global (~/.onetool/)
+    3. bundled (package defaults)
+
     Args:
         data: Config data dict containing optional 'include' key
         config_dir: Directory for resolving relative paths
@@ -850,20 +926,16 @@ def _load_includes(
     merged: dict[str, Any] = {}
 
     for include_path_str in include_list:
-        # Resolve path relative to config directory
-        include_path = Path(include_path_str).expanduser()
-        if not include_path.is_absolute():
-            include_path = (config_dir / include_path).resolve()
-        else:
-            include_path = include_path.resolve()
+        # Use three-tier resolution
+        include_path = _resolve_include_path(include_path_str, config_dir)
+
+        if include_path is None:
+            logger.warning(f"Include file not found: {include_path_str}")
+            continue
 
         # Circular include detection
         if include_path in seen_paths:
             logger.warning(f"Circular include detected, skipping: {include_path}")
-            continue
-
-        if not include_path.exists():
-            logger.warning(f"Include file not found: {include_path}")
             continue
 
         try:
@@ -900,14 +972,86 @@ def _load_includes(
     return result
 
 
+def _load_base_config(
+    inherit: str, current_config_path: Path | None
+) -> dict[str, Any]:
+    """Load base configuration for inheritance.
+
+    Args:
+        inherit: Inheritance mode (global, bundled, none)
+        current_config_path: Path to the current config file (to avoid self-include)
+
+    Returns:
+        Base config data dict to merge with current config
+    """
+    if inherit == "none":
+        return {}
+
+    # Try global first for 'global' mode
+    if inherit == "global":
+        global_config_path = get_global_dir() / "ot-serve.yaml"
+        if global_config_path.exists():
+            # Skip if this is the same file we're already loading
+            if current_config_path and global_config_path.resolve() == current_config_path.resolve():
+                logger.debug("Skipping global inheritance (loading global config itself)")
+            else:
+                try:
+                    raw_data = _load_yaml_file(global_config_path)
+                    # Process includes in global config (with bundled fallback)
+                    data = _load_includes(raw_data, global_config_path.parent)
+                    logger.debug(f"Inherited base config from global: {global_config_path}")
+                    return data
+                except (FileNotFoundError, ValueError) as e:
+                    logger.warning(f"Failed to load global config for inheritance: {e}")
+
+    # Fall back to bundled for both 'global' (when global missing) and 'bundled' modes
+    try:
+        bundled_dir = get_bundled_config_dir()
+        bundled_config_path = bundled_dir / "ot-serve.yaml"
+        if bundled_config_path.exists():
+            raw_data = _load_yaml_file(bundled_config_path)
+            # Process includes in bundled config (within bundled dir)
+            data = _load_includes(raw_data, bundled_config_path.parent)
+            logger.debug(f"Inherited base config from bundled: {bundled_config_path}")
+            return data
+    except FileNotFoundError:
+        logger.debug("Bundled config not available for inheritance")
+
+    return {}
+
+
 def load_config(config_path: Path | str | None = None) -> OneToolConfig:
     """Load OneTool configuration from YAML file.
 
     Resolution order (when config_path is None):
-    1. OT_SERVE_CONFIG env var
-    2. cwd/.onetool/ot-serve.yaml
-    3. ~/.onetool/ot-serve.yaml
-    4. Built-in defaults
+        1. OT_SERVE_CONFIG env var
+        2. cwd/.onetool/ot-serve.yaml (project config)
+        3. ~/.onetool/ot-serve.yaml (global config)
+        4. Built-in defaults (bundled with package)
+
+    Inheritance (controlled by 'inherit' field in your config):
+
+        'global' (default):
+            Base: ~/.onetool/ot-serve.yaml → bundled defaults (if global missing)
+            Your config overrides the base. Use for project configs that
+            extend user preferences (API keys, timeouts, etc.).
+
+        'bundled':
+            Base: bundled defaults only (ignores ~/.onetool/)
+            Your config overrides bundled. Use for reproducible configs
+            that shouldn't depend on user-specific settings.
+
+        'none':
+            No base config. Your config is standalone.
+            Use for fully self-contained configurations.
+
+    Example minimal project config using global inheritance::
+
+        # .onetool/ot-serve.yaml
+        version: 1
+        # inherit: global  (implicit default - gets API keys from ~/.onetool/)
+        tools_dir:
+          - ./tools/*.py
 
     Args:
         config_path: Path to config file (overrides resolution)
@@ -936,6 +1080,19 @@ def load_config(config_path: Path | str | None = None) -> OneToolConfig:
     config_dir = resolved_path.parent.resolve()
     merged_data = _load_includes(expanded_data, config_dir)
 
+    # Determine inheritance mode (default: global)
+    inherit = merged_data.get("inherit", "global")
+    if inherit not in ("global", "bundled", "none"):
+        logger.warning(f"Invalid inherit value '{inherit}', using 'global'")
+        inherit = "global"
+
+    # Load and merge base config for inheritance
+    base_config = _load_base_config(inherit, resolved_path)
+    if base_config:
+        # Base first, then current config overrides
+        merged_data = _deep_merge(base_config, merged_data)
+        logger.debug(f"Applied inheritance mode: {inherit}")
+
     _validate_version(merged_data, resolved_path)
     _remove_legacy_fields(merged_data)
 
@@ -951,7 +1108,10 @@ def load_config(config_path: Path | str | None = None) -> OneToolConfig:
     return config
 
 
-# Global config instance
+# Global config instance (singleton pattern)
+# Thread-safety: This cache is NOT thread-safe. In multi-threaded applications,
+# ensure load_config() is called once during initialization before spawning threads.
+# The `reload` parameter is intended for testing only.
 _config: OneToolConfig | None = None
 
 
@@ -984,14 +1144,23 @@ def is_log_verbose() -> bool:
 def get_config(
     config_path: Path | str | None = None, reload: bool = False
 ) -> OneToolConfig:
-    """Get or load the global configuration.
+    """Get or load the global configuration (singleton pattern).
+
+    Returns a cached config instance. On first call, loads config from disk.
+    Subsequent calls return the cached instance unless reload=True.
+
+    Thread-safety note: This function is NOT thread-safe. In multi-threaded
+    applications, call this once during initialization before spawning threads.
+    The cache uses a simple global variable without locking.
 
     Args:
-        config_path: Path to config file (only used on first load)
-        reload: Force reload configuration
+        config_path: Path to config file (only used on first load or reload).
+            Ignored after config is cached unless reload=True.
+        reload: Force reload configuration from disk. Use sparingly - primarily
+            intended for testing. In production, restart the process to reload.
 
     Returns:
-        OneToolConfig instance
+        OneToolConfig instance (same instance on subsequent calls)
     """
     global _config
 

@@ -1,6 +1,6 @@
 # OneTool Prompts Configuration
 # See: docs/guides/explicit-calls.md, docs/guides/prompting-best-practices.md
-# Load via: include: [resources/config/prompts.yaml]
+# Load via: include: [prompts.yaml] (falls back to bundled)
 
 prompts:
   # Per-tool descriptions (override docstrings)

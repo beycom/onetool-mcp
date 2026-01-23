@@ -44,6 +44,11 @@ def serve(
         ot-serve
         ot-serve --config config/ot-serve.yaml
     """
+    # Bootstrap global config directory on first run
+    from ot.paths import ensure_global_dir
+
+    ensure_global_dir(quiet=True)
+
     # Only run if no subcommand was invoked (handles --help automatically)
     if ctx.invoked_subcommand is not None:
         return

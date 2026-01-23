@@ -46,16 +46,22 @@ def test_pdf_real_conversion(output_dir: Path) -> None:
     pdf_path = SAMPLE_DIR / "file_example_PDF_1MB.pdf"
     result = convert_pdf(pdf_path, output_dir, "file_example_PDF_1MB.pdf")
 
-    # Verify output
+    # Verify main output (pure content, no frontmatter)
     assert "output" in result
     output_path = Path(result["output"])
     assert output_path.exists()
-
-    # Verify content structure
     content = output_path.read_text()
-    assert "---" in content  # Frontmatter
-    assert "source:" in content
-    assert "checksum:" in content
+    assert len(content) > 0  # Has content
+
+    # Verify TOC file has frontmatter
+    assert "toc" in result
+    toc_path = Path(result["toc"])
+    assert toc_path.exists()
+    toc_content = toc_path.read_text()
+    assert "---" in toc_content  # Frontmatter
+    assert "source:" in toc_content
+    assert "checksum:" in toc_content
+
     assert "pages" in result
     assert result["pages"] > 0
 
@@ -67,14 +73,15 @@ def test_pdf_real_conversion(output_dir: Path) -> None:
     reason="Sample PDF not available"
 )
 def test_pdf_frontmatter(output_dir: Path) -> None:
-    """Test PDF frontmatter generation."""
+    """Test PDF frontmatter generation in TOC file."""
     from ot_tools._convert.pdf import convert_pdf
 
     pdf_path = SAMPLE_DIR / "file_example_PDF_1MB.pdf"
     result = convert_pdf(pdf_path, output_dir, "test.pdf")
 
-    output_path = Path(result["output"])
-    content = output_path.read_text()
+    # Frontmatter is now in the separate TOC file
+    toc_path = Path(result["toc"])
+    content = toc_path.read_text()
 
     # Check frontmatter
     assert content.startswith("---\n")
@@ -315,7 +322,7 @@ def test_generate_frontmatter() -> None:
 @pytest.mark.integration
 @pytest.mark.tools
 def test_generate_toc() -> None:
-    """Test TOC generation."""
+    """Test TOC generation with frontmatter."""
     from ot_tools._convert.utils import generate_toc
 
     headings = [
@@ -325,11 +332,21 @@ def test_generate_toc() -> None:
         (1, "Results", 51, 100),
     ]
 
-    toc = generate_toc(headings)
+    toc = generate_toc(
+        headings=headings,
+        main_file="test.md",
+        source="test.pdf",
+        converted="2026-01-20T10:00:00Z",
+        pages=5,
+        checksum="sha256:abc123",
+    )
 
-    assert "## Table of Contents" in toc
+    # TOC now includes frontmatter
+    assert toc.startswith("---\n")
+    assert "source: test.pdf" in toc
+    assert "# Table of Contents" in toc
     assert "[Introduction]" in toc
-    assert "L10-L50" in toc
+    assert "(lines 10-50)" in toc
     assert "  -" in toc  # Nested items should be indented
 
 

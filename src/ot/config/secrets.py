@@ -12,6 +12,11 @@ Example secrets.yaml:
     BRAVE_API_KEY: "your-brave-api-key"
     OPENAI_API_KEY: "sk-..."
     DATABASE_URL: "postgresql://..."
+
+Loading Order:
+    load_secrets_from_default_locations() is used during early config loading.
+    The search order is: project (.onetool/secrets.yaml) → global (~/.onetool/secrets.yaml).
+    This function is also used by mcp.py for ${VAR} expansion during config loading.
 """
 
 from __future__ import annotations
@@ -25,6 +30,9 @@ from loguru import logger
 
 # Global secrets cache
 _secrets: dict[str, str] | None = None
+
+# Cache for early secrets loading (before full config is available)
+_early_secrets: dict[str, str] | None = None
 
 
 def load_secrets(secrets_path: Path | str | None = None) -> dict[str, str]:
@@ -83,6 +91,70 @@ def load_secrets(secrets_path: Path | str | None = None) -> dict[str, str]:
 
     logger.info(f"Loaded {len(secrets)} secrets")
     return secrets
+
+
+def load_secrets_from_default_locations(silent: bool = False) -> dict[str, str]:
+    """Load secrets from default project and global locations.
+
+    Searches in order (first found wins):
+    1. Project: {effective_cwd}/.onetool/secrets.yaml
+    2. Global: ~/.onetool/secrets.yaml
+
+    This is used during early config loading before the full config (with custom
+    secrets_file path) is available. Also used by mcp.py for ${VAR} expansion.
+
+    Args:
+        silent: If True, suppress error logging (for early loading during config parse)
+
+    Returns:
+        Dictionary of secret name -> value (empty if no secrets found)
+    """
+    # Import here to avoid circular imports at module level
+    from ot.paths import get_effective_cwd, get_global_dir
+
+    # Try project secrets first, then global
+    paths_to_try = [
+        get_effective_cwd() / ".onetool" / "secrets.yaml",
+        get_global_dir() / "secrets.yaml",
+    ]
+
+    for secrets_path in paths_to_try:
+        if secrets_path.exists():
+            try:
+                return load_secrets(secrets_path)
+            except ValueError as e:
+                if not silent:
+                    logger.warning(f"Error loading secrets from {secrets_path}: {e}")
+                # Continue to next path on error
+                continue
+
+    return {}
+
+
+def get_early_secret(name: str) -> str | None:
+    """Get a secret value during early config loading.
+
+    Uses cached secrets loaded from default locations (.onetool/secrets.yaml).
+    This is the canonical way to get secrets during config expansion before
+    the full config (with custom secrets_file) is available.
+
+    Thread-safety note: This uses a global cache populated on first access.
+    In multi-threaded scenarios, ensure config loading completes in the main
+    thread before spawning workers.
+
+    Args:
+        name: Secret name to look up
+
+    Returns:
+        Secret value or None if not found
+    """
+    global _early_secrets
+
+    if _early_secrets is None:
+        # Load from default locations with silent=True to not spam logs during parsing
+        _early_secrets = load_secrets_from_default_locations(silent=True)
+
+    return _early_secrets.get(name)
 
 
 def get_secrets(

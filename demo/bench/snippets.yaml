@@ -1,6 +1,6 @@
 # Snippets Benchmark
 #
-# Tests all snippets defined in resources/config/snippets.yaml
+# Tests all snippets defined in bundled defaults (src/ot/config/defaults/snippets.yaml)
 # Validates that snippet expansion and execution work correctly.
 #
 # Tool groups (each group is a single scenario with multiple tasks):

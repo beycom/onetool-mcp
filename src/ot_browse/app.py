@@ -550,6 +550,22 @@ def clear_sessions() -> int:
 
 def main() -> None:
     """CLI entry point."""
+    import sys
+
+    # Allow --help without requiring global config
+    if not any(arg in sys.argv for arg in ("--help", "-h")):
+        # Require global config directory (created by ot-serve)
+        from ot.paths import get_global_dir
+
+        global_dir = get_global_dir()
+        if not global_dir.exists():
+            print(
+                f"Error: {global_dir} not found.\n"
+                "Run 'ot-serve --help' first to initialize OneTool configuration.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
     # Initialize logging first
     configure_logging(log_name="browse")
 
