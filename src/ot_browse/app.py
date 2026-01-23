@@ -7,11 +7,14 @@ import asyncio
 from pathlib import Path
 
 import questionary
+from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
 from ot._cli import console
 from ot._tui import APP_STYLE, ask_select, ask_text, safe_ask
 from ot.logging import LogSpan, configure_logging
+from ot.support import KOFI_URL, get_version
 
 from .browser import BrowserService
 from .config import BrowseConfig, get_config
@@ -19,6 +22,25 @@ from .state import Annotation, AppState, ConnectionState
 from .storage import create_session, save_comprehensive_capture
 
 APP_NAME = "Browser Inspector"
+
+
+def _print_startup_banner() -> None:
+    """Print a startup banner."""
+    version = get_version()
+
+    lines = Text()
+    lines.append("OneTool Browser Inspector", style="bold cyan")
+    lines.append(f" v{version}\n\n", style="dim")
+    lines.append("Buy me a coffee: ", style="dim")
+    lines.append(KOFI_URL, style="link " + KOFI_URL)
+
+    panel = Panel(
+        lines,
+        border_style="blue",
+        padding=(0, 1),
+    )
+    console.print(panel)
+    console.print()
 
 
 # ─── UI Primitives ────────────────────────────────────────────────────────────
@@ -584,6 +606,9 @@ def main() -> None:
 
     if args.clear_sessions:
         clear_sessions()
+
+    # Print startup banner
+    _print_startup_banner()
 
     try:
         cli = BrowserInspectorCLI(config)

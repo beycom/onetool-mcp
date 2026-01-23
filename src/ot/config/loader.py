@@ -607,6 +607,10 @@ class OneToolConfig(BaseModel):
         default=False,
         description="Disable log truncation for debugging (full values in output)",
     )
+    debug_tracebacks: bool = Field(
+        default=False,
+        description="Show verbose tracebacks with local variables on errors",
+    )
 
     @field_validator("snippets", "servers", "alias", mode="before")
     @classmethod

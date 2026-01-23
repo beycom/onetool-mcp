@@ -2,18 +2,64 @@
 
 from __future__ import annotations
 
+import os
+import signal
 from pathlib import Path
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
 import ot
 from ot._cli import create_cli, version_callback
+from ot.support import KOFI_URL, get_version
 
 app = create_cli(
     "ot-serve",
     "OneTool MCP server - exposes a single 'run' tool for LLM code generation.",
 )
+
+# Console for stderr output (stdout is reserved for MCP JSON-RPC)
+_stderr_console = Console(stderr=True)
+
+
+def _print_startup_banner() -> None:
+    """Print a nice startup banner to stderr."""
+    version = get_version()
+
+    # Build the banner content
+    lines = Text()
+    lines.append("OneTool MCP Server", style="bold cyan")
+    lines.append(f" v{version}\n", style="dim")
+    lines.append("\nRunning on stdio transport. Press ")
+    lines.append("Ctrl+C", style="bold yellow")
+    lines.append(" to stop.\n\n")
+    lines.append("Buy me a coffee: ", style="dim")
+    lines.append(KOFI_URL, style="link " + KOFI_URL)
+
+    panel = Panel(
+        lines,
+        border_style="blue",
+        padding=(0, 1),
+    )
+    _stderr_console.print(panel)
+
+
+def _setup_signal_handlers() -> None:
+    """Set up signal handlers for clean exit."""
+
+    def handle_signal(signum: int, _frame: object) -> None:
+        """Handle termination signals gracefully."""
+        sig_name = signal.Signals(signum).name
+        _stderr_console.print(f"\n[dim]Received {sig_name}, shutting down...[/dim]")
+        # Use os._exit() for immediate termination - sys.exit() doesn't work
+        # well with asyncio event loops and can require multiple Ctrl+C presses
+        os._exit(0)
+
+    # Handle SIGINT (Ctrl+C) and SIGTERM
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
 
 # Init subcommand group - manage global configuration
 init_app = typer.Typer(
@@ -49,8 +95,8 @@ def init_create() -> None:
     global_dir = get_global_dir()
     if global_dir.exists():
         console = Console(stderr=True)
-        console.print(f"[dim]Global config already exists at {global_dir}/[/dim]")
-        console.print("[dim]Use 'ot-serve init reset' to reinstall templates.[/dim]")
+        console.print(f"Global config already exists at {global_dir}/")
+        console.print("Use 'ot-serve init reset' to reinstall templates.")
         return
 
     ensure_global_dir(quiet=False, force=False)
@@ -185,8 +231,11 @@ def serve(
 
         get_config(config)
 
-    # Note: MCP uses stdio for JSON-RPC, so we must not print to stdout
-    # Use stderr for any startup messages if needed
+    # Set up signal handlers for clean exit (before starting server)
+    _setup_signal_handlers()
+
+    # Print startup banner to stderr (stdout is for MCP JSON-RPC)
+    _print_startup_banner()
 
     # Import here to avoid circular imports and only load when needed
     from ot.server import main as server_main

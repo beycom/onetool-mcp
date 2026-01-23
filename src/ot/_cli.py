@@ -5,6 +5,7 @@ Provides common patterns used across ot-serve, ot-bench, and ot-browse CLIs.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import typer
@@ -14,6 +15,25 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 __all__ = ["console", "create_cli", "version_callback"]
+
+
+def _is_debug_tracebacks() -> bool:
+    """Check if verbose tracebacks are enabled.
+
+    Reads debug_tracebacks from ~/.onetool/ot-serve.yaml.
+    Returns False on any error (fail-safe for broken configs).
+    """
+    try:
+        import yaml
+
+        config_path = Path.home() / ".onetool" / "ot-serve.yaml"
+        if not config_path.exists():
+            return False
+        with config_path.open() as f:
+            data = yaml.safe_load(f)
+        return bool(data.get("debug_tracebacks", False)) if data else False
+    except Exception:
+        return False
 
 # Shared console instance for consistent output
 console = Console(highlight=False)
@@ -67,6 +87,10 @@ def create_cli(
     Returns:
         Configured Typer app
 
+    Note:
+        Set debug_tracebacks: true in ~/.onetool/ot-serve.yaml for Rich
+        formatted tracebacks with local variables and syntax highlighting.
+
     Example:
         app = create_cli(
             "ot-bench",
@@ -74,8 +98,10 @@ def create_cli(
             no_args_is_help=True,
         )
     """
+    debug = _is_debug_tracebacks()
     return typer.Typer(
         name=name,
         help=help_text,
         no_args_is_help=no_args_is_help,
+        pretty_exceptions_enable=debug,
     )

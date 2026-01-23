@@ -13,6 +13,7 @@ version: 1
 #   - diagram.yaml    # Diagram tool settings
 
 # log_level: INFO
+# debug_tracebacks: false  # Set to true for verbose error tracebacks
 
 # Transform tool (LLM for code generation)
 # transform:

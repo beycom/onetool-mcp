@@ -46,24 +46,32 @@ class PromptsError(Exception):
     """Error loading prompts configuration."""
 
 
+def _get_bundled_prompts_path() -> Path:
+    """Get path to bundled default prompts.yaml."""
+    return Path(__file__).parent / "config" / "defaults" / "prompts.yaml"
+
+
 def load_prompts(prompts_path: Path | str | None = None) -> PromptsConfig:
     """Load prompts configuration from YAML file.
 
     Args:
-        prompts_path: Path to prompts file. Defaults to config/prompts.yaml in cwd.
+        prompts_path: Path to prompts file. Falls back to bundled default.
 
     Returns:
         PromptsConfig with loaded prompts.
 
     Raises:
-        PromptsError: If file is missing, invalid, or has no instructions.
+        PromptsError: If file is invalid or has no instructions.
     """
-    prompts_path = (
-        Path("config/prompts.yaml") if prompts_path is None else Path(prompts_path)
-    )
-
-    if not prompts_path.exists():
-        raise PromptsError(f"Prompts file not found: {prompts_path}")
+    if prompts_path is not None:
+        prompts_path = Path(prompts_path)
+        if not prompts_path.exists():
+            raise PromptsError(f"Prompts file not found: {prompts_path}")
+    else:
+        # Try config/prompts.yaml, fall back to bundled default
+        prompts_path = Path("config/prompts.yaml")
+        if not prompts_path.exists():
+            prompts_path = _get_bundled_prompts_path()
 
     logger.debug(f"Loading prompts from {prompts_path}")
 
@@ -77,6 +85,10 @@ def load_prompts(prompts_path: Path | str | None = None) -> PromptsConfig:
 
     if raw_data is None or not isinstance(raw_data, dict):
         raise PromptsError(f"Empty or invalid prompts file: {prompts_path}")
+
+    # Handle nested 'prompts:' key (used in bundled default)
+    if "prompts" in raw_data and isinstance(raw_data["prompts"], dict):
+        raw_data = raw_data["prompts"]
 
     if "instructions" not in raw_data or not raw_data["instructions"]:
         raise PromptsError(f"Missing 'instructions' in {prompts_path}")

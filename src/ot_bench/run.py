@@ -11,10 +11,13 @@ import typer
 import yaml
 from pydantic import BaseModel, Field
 from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
 from ot._tui import ask_select
 from ot.logging import LogSpan, configure_logging
 from ot.paths import get_effective_cwd, get_global_dir
+from ot.support import KOFI_URL, get_version
 from ot_bench.cli import app
 from ot_bench.harness.config import load_config
 from ot_bench.harness.csv_writer import write_results_csv
@@ -27,6 +30,25 @@ EXIT_SUCCESS = 0
 EXIT_RUNTIME_ERROR = 1
 EXIT_CONFIG_ERROR = 2
 EXIT_FILE_NOT_FOUND = 3
+
+
+def _print_startup_banner(console: Console) -> None:
+    """Print a startup banner."""
+    version = get_version()
+
+    lines = Text()
+    lines.append("OneTool Benchmark", style="bold cyan")
+    lines.append(f" v{version}\n\n", style="dim")
+    lines.append("Buy me a coffee: ", style="dim")
+    lines.append(KOFI_URL, style="link " + KOFI_URL)
+
+    panel = Panel(
+        lines,
+        border_style="blue",
+        padding=(0, 1),
+    )
+    console.print(panel)
+    console.print()
 
 
 class BenchFavorite(BaseModel):
@@ -380,6 +402,9 @@ def run(
 
     # Initialize logging inside command to avoid module-level side effects
     configure_logging(log_name="bench")
+
+    # Print startup banner
+    _print_startup_banner(console)
 
     # Handle TUI mode
     if tui:
