@@ -8,8 +8,6 @@ from pathlib import Path
 
 import typer
 from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
 
 import ot
 from ot._cli import create_cli, version_callback
@@ -25,25 +23,11 @@ _stderr_console = Console(stderr=True)
 
 
 def _print_startup_banner() -> None:
-    """Print a nice startup banner to stderr."""
+    """Print startup message to stderr."""
     version = get_version()
-
-    # Build the banner content
-    lines = Text()
-    lines.append("OneTool MCP Server", style="bold cyan")
-    lines.append(f" v{version}\n", style="dim")
-    lines.append("\nRunning on stdio transport. Press ")
-    lines.append("Ctrl+C", style="bold yellow")
-    lines.append(" to stop.\n\n")
-    lines.append("Buy me a coffee: ", style="dim")
-    lines.append(KOFI_URL, style="link " + KOFI_URL)
-
-    panel = Panel(
-        lines,
-        border_style="blue",
-        padding=(0, 1),
-    )
-    _stderr_console.print(panel)
+    _stderr_console.print(f"[bold cyan]OneTool MCP Server[/bold cyan] [dim]v{version}[/dim]")
+    _stderr_console.print("Running on stdio transport. Press [bold yellow]Ctrl+C[/bold yellow] to stop.")
+    _stderr_console.print(f"[dim]Support development:[/dim] {KOFI_URL}")
 
 
 def _setup_signal_handlers() -> None:

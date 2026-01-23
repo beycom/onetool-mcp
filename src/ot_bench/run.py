@@ -11,8 +11,6 @@ import typer
 import yaml
 from pydantic import BaseModel, Field
 from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
 
 from ot._tui import ask_select
 from ot.logging import LogSpan, configure_logging
@@ -33,21 +31,10 @@ EXIT_FILE_NOT_FOUND = 3
 
 
 def _print_startup_banner(console: Console) -> None:
-    """Print a startup banner."""
+    """Print startup message."""
     version = get_version()
-
-    lines = Text()
-    lines.append("OneTool Benchmark", style="bold cyan")
-    lines.append(f" v{version}\n\n", style="dim")
-    lines.append("Buy me a coffee: ", style="dim")
-    lines.append(KOFI_URL, style="link " + KOFI_URL)
-
-    panel = Panel(
-        lines,
-        border_style="blue",
-        padding=(0, 1),
-    )
-    console.print(panel)
+    console.print(f"[bold cyan]OneTool Benchmark[/bold cyan] [dim]v{version}[/dim]")
+    console.print(f"[dim]Support development:[/dim] {KOFI_URL}")
     console.print()
 
 

@@ -7,9 +7,7 @@ import asyncio
 from pathlib import Path
 
 import questionary
-from rich.panel import Panel
 from rich.table import Table
-from rich.text import Text
 
 from ot._cli import console
 from ot._tui import APP_STYLE, ask_select, ask_text, safe_ask
@@ -25,21 +23,10 @@ APP_NAME = "Browser Inspector"
 
 
 def _print_startup_banner() -> None:
-    """Print a startup banner."""
+    """Print startup message."""
     version = get_version()
-
-    lines = Text()
-    lines.append("OneTool Browser Inspector", style="bold cyan")
-    lines.append(f" v{version}\n\n", style="dim")
-    lines.append("Buy me a coffee: ", style="dim")
-    lines.append(KOFI_URL, style="link " + KOFI_URL)
-
-    panel = Panel(
-        lines,
-        border_style="blue",
-        padding=(0, 1),
-    )
-    console.print(panel)
+    console.print(f"[bold cyan]OneTool Browser Inspector[/bold cyan] [dim]v{version}[/dim]")
+    console.print(f"[dim]Support development:[/dim] {KOFI_URL}")
     console.print()
 
 
