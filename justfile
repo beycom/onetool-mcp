@@ -173,7 +173,7 @@ tool-diagram-logs:
 
 # Launch MCP Inspector for testing MCP servers
 # https://github.com/MCPJam/inspector
-tool-inspector:
+ot-inspector:
     npx @mcpjam/inspector@latest
 
 # ============================================================================
@@ -181,15 +181,20 @@ tool-inspector:
 # ============================================================================
 
 # Install onetool globally via uv
-tool-install:
+ot-install:
     uv tool install . -v
 
+# Install onetool globally via uv
+ot-install-dev:
+    uv tool install . -e -v
+
+
 # Uninstall global onetool
-tool-uninstall:
-    uv tool uninstall onetool || true
+ot-uninstall:
+    uv tool uninstall onetool-mcp || true
 
 # List installed uv tools
-tool-list:
+ot-list:
     uv tool list
 
 # ============================================================================

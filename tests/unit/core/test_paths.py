@@ -258,3 +258,119 @@ def test_ensure_global_dir_idempotent(tmp_path: Path) -> None:
 
     assert result == global_dir
     assert result.exists()
+
+
+# ==================== Global Templates Tests ====================
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_get_global_templates_dir_returns_path() -> None:
+    """Verify get_global_templates_dir() returns a valid Path."""
+    from ot.paths import get_global_templates_dir
+
+    result = get_global_templates_dir()
+
+    assert isinstance(result, Path)
+    # Should point to the global_templates directory
+    assert result.name == "global_templates"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_get_global_templates_dir_contains_yaml_files() -> None:
+    """Verify global templates directory contains expected template files."""
+    from ot.paths import get_global_templates_dir
+
+    templates_dir = get_global_templates_dir()
+
+    # Should contain key template files
+    assert (templates_dir / "ot-serve.yaml").exists()
+    assert (templates_dir / "snippets.yaml").exists()
+    assert (templates_dir / "servers.yaml").exists()
+    # secrets-template.yaml (named to avoid gitignore)
+    assert (templates_dir / "secrets-template.yaml").exists()
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_ensure_global_dir_copies_from_templates(tmp_path: Path) -> None:
+    """Verify ensure_global_dir() copies from global_templates, not defaults."""
+    import importlib
+
+    import ot.paths
+
+    # Use a fake home directory
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+
+    with patch.dict(os.environ, {"HOME": str(fake_home)}):
+        importlib.reload(ot.paths)
+
+        result = ot.paths.ensure_global_dir(quiet=True)
+
+        # Should copy template files
+        assert (result / "ot-serve.yaml").exists()
+        # secrets-template.yaml should be copied as secrets.yaml
+        assert (result / "secrets.yaml").exists()
+        # Subdirectories (like diagram-templates) should NOT be copied
+        assert not (result / "diagram-templates").exists()
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_ensure_global_dir_force_overwrites(tmp_path: Path) -> None:
+    """Verify ensure_global_dir(force=True) overwrites existing files."""
+    import importlib
+
+    import ot.paths
+
+    # Use a fake home directory
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+
+    with patch.dict(os.environ, {"HOME": str(fake_home)}):
+        importlib.reload(ot.paths)
+
+        # Create directory with a custom file
+        global_dir = ot.paths.get_global_dir()
+        global_dir.mkdir(parents=True)
+        custom_config = global_dir / "ot-serve.yaml"
+        custom_config.write_text("# custom config")
+
+        # Force should overwrite
+        ot.paths.ensure_global_dir(quiet=True, force=True)
+
+        # File should now contain template content, not custom content
+        content = custom_config.read_text()
+        assert "# custom config" not in content
+        assert "OneTool Global Configuration" in content or "version:" in content
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_ensure_global_dir_no_force_preserves(tmp_path: Path) -> None:
+    """Verify ensure_global_dir(force=False) preserves existing files."""
+    import importlib
+
+    import ot.paths
+
+    # Use a fake home directory
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+
+    with patch.dict(os.environ, {"HOME": str(fake_home)}):
+        importlib.reload(ot.paths)
+
+        # Create directory with a custom file
+        global_dir = ot.paths.get_global_dir()
+        global_dir.mkdir(parents=True)
+        custom_config = global_dir / "ot-serve.yaml"
+        custom_config.write_text("# custom config")
+
+        # Without force, should not overwrite
+        ot.paths.ensure_global_dir(quiet=True, force=False)
+
+        # File should still contain custom content
+        content = custom_config.read_text()
+        assert "# custom config" in content

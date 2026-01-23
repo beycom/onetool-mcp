@@ -50,7 +50,7 @@ def main(
     if not global_dir.exists():
         print(
             f"Error: {global_dir} not found.\n"
-            "Run 'ot-serve --help' first to initialize OneTool configuration.",
+            "Run 'ot-serve init' to initialize OneTool configuration.",
             file=sys.stderr,
         )
         raise typer.Exit(1)

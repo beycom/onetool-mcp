@@ -28,7 +28,7 @@ from typing import Any, Literal
 
 import yaml
 from loguru import logger
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, field_validator
 
 from ot.config.mcp import McpServerConfig, expand_secrets
 from ot.paths import get_bundled_config_dir, get_effective_cwd, get_global_dir
@@ -607,6 +607,16 @@ class OneToolConfig(BaseModel):
         default=False,
         description="Disable log truncation for debugging (full values in output)",
     )
+
+    @field_validator("snippets", "servers", "alias", mode="before")
+    @classmethod
+    def empty_dict_if_none(cls, v: Any) -> Any:
+        """Convert None to empty dict for dict-type fields.
+
+        This handles YAML files where the key exists but all values are commented out,
+        which YAML parses as None instead of an empty dict.
+        """
+        return {} if v is None else v
 
     def get_tool_files(self) -> list[Path]:
         """Get list of tool files matching configured glob patterns.

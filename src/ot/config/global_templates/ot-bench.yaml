@@ -2,3 +2,8 @@
 # Run benchmarks to test OneTool performance and tool behavior
 
 log_level: INFO
+
+# Favorite benchmarks for quick access via --tui
+# favorites:
+#   - name: All benchmarks
+#     path: *.yaml

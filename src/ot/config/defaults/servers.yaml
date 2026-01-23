@@ -5,14 +5,3 @@
 # in project-specific ot-serve.yaml files.
 
 servers:
-  # GitHub MCP Server (HTTP) - proxied through OneTool
-  # Optional: Set GITHUB_TOKEN in secrets.yaml for authenticated access
-  # Tools: github.create_issue(), github.search_code(), etc.
-  github:
-    type: http
-    url: https://api.githubcopilot.com/mcp/
-    headers:
-      Authorization: Bearer ${GITHUB_TOKEN}
-      Accept: "application/json, text/event-stream"
-      "MCP-Protocol-Version": "2025-06-18"
-    timeout: 60

@@ -38,7 +38,15 @@ Creating ~/.onetool/
   ✓ secrets.yaml
 ```
 
-**Note:** Only `ot-serve` bootstraps the global config directory. Other tools (`ot-bench`, `ot-browse`) require `~/.onetool/` to exist and will prompt you to run `ot-serve --help` first if it's missing.
+You can also manage the global config directory manually:
+
+```bash
+ot-serve init           # Create ~/.onetool/ (if missing)
+ot-serve init reset     # Reset to defaults (overwrites existing)
+ot-serve init validate  # Check for errors
+```
+
+**Note:** Only `ot-serve` bootstraps the global config directory. Other tools (`ot-bench`, `ot-browse`) require `~/.onetool/` to exist and will prompt you to run `ot-serve init` first if it's missing.
 
 ### Configuration Inheritance
 

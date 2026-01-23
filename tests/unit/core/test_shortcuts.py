@@ -188,53 +188,63 @@ def test_expand_snippet_with_defaults() -> None:
 @pytest.mark.integration
 @pytest.mark.core
 def test_include_loads_snippets_library() -> None:
-    """Verify include: loads snippets from bundled defaults via three-tier fallback."""
+    """Verify include: loads snippets from external file and expands them correctly."""
     import tempfile
     from pathlib import Path
 
     import yaml
 
     from ot.config.loader import load_config
-    from ot.paths import get_bundled_config_dir
     from ot.shortcuts import expand_snippet, parse_snippet
 
-    # Verify bundled snippets library exists
-    try:
-        bundled_dir = get_bundled_config_dir()
-        snippets_yaml = bundled_dir / "snippets.yaml"
-    except FileNotFoundError:
-        pytest.skip("Bundled snippets library not found")
-
-    if not snippets_yaml.exists():
-        pytest.skip("Bundled snippets library not found")
-
-    # Create minimal test config that includes snippets via three-tier fallback
+    # Create self-contained test with known snippets (not dependent on external files)
     with tempfile.TemporaryDirectory() as tmpdir:
         config_dir = Path(tmpdir) / ".onetool"
         config_dir.mkdir()
+
+        # Create a test snippets file with known content
+        test_snippets_path = config_dir / "test-snippets.yaml"
+        test_snippets_path.write_text(
+            yaml.dump(
+                {
+                    "snippets": {
+                        "test_find": {
+                            "description": "Test find snippet",
+                            "body": 'ot.tools(pattern="{{ pattern }}")',
+                        },
+                        "test_search": {
+                            "description": "Test search snippet",
+                            "body": 'brave.search(query="{{ q }}")',
+                        },
+                        "test_todos": {
+                            "description": "Test todos snippet",
+                            "body": "rg.search(pattern='TODO')",
+                        },
+                    }
+                }
+            )
+        )
 
         config_path = config_dir / "ot-serve.yaml"
         config_path.write_text(
             yaml.dump(
                 {
                     "version": 1,
-                    "inherit": "none",  # Disable inheritance to test include fallback
-                    "include": ["snippets.yaml"],  # Falls back to bundled
+                    "inherit": "none",  # Disable inheritance for isolated test
+                    "include": ["test-snippets.yaml"],
                 }
             )
         )
 
         config = load_config(config_path)
 
-    # Verify snippets from default library are loaded
-    assert "ot_find" in config.snippets, "Default snippet 'ot_find' not loaded"
-    assert "brv_research" in config.snippets, (
-        "Default snippet 'brv_research' not loaded"
-    )
-    assert "rg_todos" in config.snippets, "Default snippet 'rg_todos' not loaded"
+    # Verify snippets from include file are loaded
+    assert "test_find" in config.snippets, "Snippet 'test_find' not loaded"
+    assert "test_search" in config.snippets, "Snippet 'test_search' not loaded"
+    assert "test_todos" in config.snippets, "Snippet 'test_todos' not loaded"
 
     # Verify we can expand a snippet from the library
-    parsed = parse_snippet("$ot_find pattern=search")
+    parsed = parse_snippet("$test_find pattern=search")
     result = expand_snippet(parsed, config)
 
     assert 'ot.tools(pattern="search"' in result
@@ -250,22 +260,24 @@ def test_include_inline_overrides_included() -> None:
     import yaml
 
     from ot.config.loader import load_config
-    from ot.paths import get_bundled_config_dir
 
-    # Find the default snippets library from bundled defaults
-    try:
-        bundled_dir = get_bundled_config_dir()
-        snippets_yaml = bundled_dir / "snippets.yaml"
-    except FileNotFoundError:
-        pytest.skip("Bundled snippets library not found")
-
-    if not snippets_yaml.exists():
-        pytest.skip("Bundled snippets library not found")
-
-    # Create config with both include and inline snippets
+    # Create self-contained test with known snippets (not dependent on external files)
     with tempfile.TemporaryDirectory() as tmpdir:
         config_dir = Path(tmpdir) / ".onetool"
         config_dir.mkdir()
+
+        # Create a test snippets file with known content
+        test_snippets_path = config_dir / "test-snippets.yaml"
+        test_snippets_path.write_text(
+            yaml.dump(
+                {
+                    "snippets": {
+                        "shared_snippet": {"body": "original.call()"},
+                        "external_only": {"body": "external.snippet()"},
+                    }
+                }
+            )
+        )
 
         # Create config with inline snippet that has same name as one in included lib
         config_path = config_dir / "ot-serve.yaml"
@@ -273,9 +285,10 @@ def test_include_inline_overrides_included() -> None:
             yaml.dump(
                 {
                     "version": 1,
-                    "include": [str(snippets_yaml)],
+                    "inherit": "none",  # Disable inheritance for isolated test
+                    "include": [str(test_snippets_path)],
                     "snippets": {
-                        "ot_find": {"body": "custom.override()"},
+                        "shared_snippet": {"body": "custom.override()"},
                         "my_inline": {"body": "inline.snippet()"},
                     },
                 }
@@ -284,12 +297,13 @@ def test_include_inline_overrides_included() -> None:
 
         config = load_config(config_path)
 
-    # Verify inline snippet exists and takes precedence
-    assert "ot_find" in config.snippets
-    assert config.snippets["ot_find"].body == "custom.override()"
+    # Verify inline snippet exists and takes precedence over included
+    assert "shared_snippet" in config.snippets
+    assert config.snippets["shared_snippet"].body == "custom.override()"
 
     # Verify other inline snippets are present
     assert "my_inline" in config.snippets
 
     # Verify external snippets that weren't overridden are still present
-    assert "brv_research" in config.snippets
+    assert "external_only" in config.snippets
+    assert config.snippets["external_only"].body == "external.snippet()"

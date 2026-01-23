@@ -1,128 +1,19 @@
-# OneTool Configuration
+# OneTool Bundled Defaults
+# Minimal working config - inherited by global and project configs.
+# User customization goes in ~/.onetool/ot-serve.yaml
+
 version: 1
 
-# Include external config files (merged left-to-right, inline overrides all)
+# Include external config files (merged left-to-right)
 include:
-  - prompts.yaml   # prompts: section
-  - snippets.yaml  # snippets: section
-  - servers.yaml   # servers: section
-  - diagram.yaml   # tools: {diagram: ...} section
-
-# Custom tool directories (glob patterns)
-# Add your own Python tools - functions become available as namespace.function()
-# tools_dir:
-#   - tools/*.py           # All .py files in tools/
-#   - lib/my_tools.py      # Specific file
-
-# Security-sensitive config (kept separate, not in include:)
-# secrets_file: secrets.yaml   # default - sibling of this config (gitignored)
+  - prompts.yaml   # Tool instructions for LLM
+  - snippets.yaml  # Snippet workflows
+  - servers.yaml   # External MCP servers
+  - diagram.yaml   # Diagram tool settings
 
 log_level: INFO
 
-# Code validation and security (AST-based)
-# Patterns support fnmatch wildcards: * (any chars), ? (single char), [seq]
-#
-# Pattern matching is automatic based on structure:
-# - No dot (e.g., 'exec', 'subprocess') → matches builtins AND imports
-# - With dot (e.g., 'subprocess.*') → matches qualified function calls
-#
-# IMPORTANT: blocked/warned lists EXTEND built-in defaults (they don't replace).
-# - Add to 'warned' to downgrade a blocked default to warning
-# - Add to 'allow' to exempt entirely (no warning)
-#
-# Built-in defaults:
-#   blocked: exec, eval, compile, __import__, subprocess.*, os.system,
-#            os.popen, os.spawn*, os.exec*
-#   warned: subprocess, os, open, pickle.*, yaml.load, marshal.*
-#
-# security:
-#   validate_code: true          # Enable AST validation before execution
-#   enabled: true                # Enable security pattern checking
-#   blocked:                     # Additional patterns to block (extends defaults)
-#     - my_dangerous.*           # Custom blocked pattern
-#   warned:                      # Additional patterns to warn on (extends defaults)
-#     - requests.*               # Custom warning pattern
-#   allow:                       # Exempt from defaults (e.g., for file-based tools)
-#     - open                     # Allow open() without warning
-
-# Transform tool configuration (LLM for code generation) - REQUIRED
+# Transform tool (LLM for code generation)
 transform:
-  model: google/gemini-3-flash-preview  # Model identifier (e.g., openai/gpt-4o, anthropic/claude-3-5-sonnet)
-  base_url: https://openrouter.ai/api/v1  # OpenAI-compatible API endpoint
-
-# Tool-specific configuration (all optional - defaults shown)
-# tools:
-#   brave:
-#     timeout: 60.0              # 1.0 - 300.0 seconds
-#   context7:
-#     timeout: 30.0              # 1.0 - 120.0 seconds
-#     docs_limit: 10             # 1 - 20 results
-#   ripgrep:
-#     timeout: 60.0              # 1.0 - 300.0 seconds
-#   db:
-#     max_chars: 4000            # 100 - 100000 chars
-#   diagram:
-#     backend:
-#       prefer: remote           # remote | self_hosted | auto
-#   msg:
-#     topics:                    # Topic-to-file routing (first match wins)
-#       - pattern: "status:*"
-#         file: .msg/status.yaml
-#       - pattern: "doc:*"
-#         file: .msg/docs.yaml
-
-# External MCP servers - tools become available as: namespace.tool_name()
-# servers:
-#   # Option 1: Local stdio (requires Node.js)
-#   github-local:
-#     type: stdio
-#     command: npx
-#     args: ["-y", "@modelcontextprotocol/server-github"]
-#     env:
-#       GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_TOKEN}
-#     timeout: 30
-#
-#   # Option 2: Remote HTTP (hosted by GitHub, no local deps)
-#   github:
-#     type: http
-#     url: https://api.githubcopilot.com/mcp/
-#     headers:
-#       Authorization: Bearer ${GITHUB_TOKEN}
-#       X-GitHub-Api-Version: "2022-11-28"
-#     timeout: 60
-
-# Aliases: Short names for common operations
-# alias:
-#   search: brave.web_search
-#   grep: ripgrep.search
-#   sql: db.query
-
-# Snippets: Multi-step workflows with Jinja2 templating
-# snippets:
-#   # Search and summarize: brave.web_search + AI analysis
-#   research:
-#     description: Search web and compile findings
-#     params:
-#       topic: { description: "Research topic" }
-#       count: { default: 5, description: "Number of sources" }
-#     body: |
-#       results = brave.web_search(query="{{ topic }}", count={{ count }})
-#       f"Research on: {{ topic }}\n\nSources:\n{results}"
-#
-#   # Find FIX across a codebase
-#   fixes:
-#     description: Find all FIXes in project
-#     params:
-#       path: { default: ".", description: "Search path" }
-#     body: |
-#       ripgrep.search(pattern="FIX|FIXME|HACK", path="{{ path }}")
-#
-#   # Query database with automatic table discovery
-#   explore_db:
-#     description: Show database structure
-#     params:
-#       url: { description: "Database connection URL" }
-#     body: |
-#       tables = db.tables(db_url="{{ url }}")
-#       schema = db.schema(db_url="{{ url }}")
-#       f"Tables:\n{tables}\n\nSchema:\n{schema}"
+  model: google/gemini-3-flash-preview
+  base_url: https://openrouter.ai/api/v1

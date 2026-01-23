@@ -1,0 +1,20 @@
+# OneTool Global Configuration
+# User customization for ~/.onetool/ot-serve.yaml
+# Uncomment and modify settings as needed.
+
+version: 1
+
+# Include external config files (merged left-to-right)
+# These fall back to bundled defaults if not found in ~/.onetool/
+# include:
+#   - prompts.yaml    # Tool instructions for LLM
+#   - snippets.yaml   # Snippet workflows
+#   - servers.yaml    # External MCP servers
+#   - diagram.yaml    # Diagram tool settings
+
+# log_level: INFO
+
+# Transform tool (LLM for code generation)
+# transform:
+#   model: google/gemini-3-flash-preview
+#   base_url: https://openrouter.ai/api/v1

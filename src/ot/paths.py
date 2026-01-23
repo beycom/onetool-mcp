@@ -22,26 +22,33 @@ PROJECT_DIR_NAME = ".onetool"
 # Package containing bundled config defaults
 BUNDLED_CONFIG_PACKAGE = "ot.config.defaults"
 
+# Package containing global templates (copied to ~/.onetool/ on first run)
+GLOBAL_TEMPLATES_PACKAGE = "ot.config.global_templates"
 
-def get_bundled_config_dir() -> Path:
-    """Get the bundled config defaults directory path.
+
+def _resolve_package_dir(package_name: str, description: str) -> Path:
+    """Resolve a package to a filesystem directory path.
 
     Uses importlib.resources to access package data. Works correctly across:
     - Regular pip/uv install (wheel)
     - Editable install (uv tool install -e .)
     - Development mode
 
+    Args:
+        package_name: Dotted package name (e.g., "ot.config.defaults")
+        description: Human-readable description for error messages
+
     Returns:
-        Path to bundled defaults directory (read-only package data)
+        Path to package directory (read-only package data)
 
     Raises:
-        FileNotFoundError: If bundled defaults package is not found or not on filesystem
+        FileNotFoundError: If package is not found or not on filesystem
     """
     try:
-        files = resources.files(BUNDLED_CONFIG_PACKAGE)
+        files = resources.files(package_name)
     except (ModuleNotFoundError, TypeError) as e:
         raise FileNotFoundError(
-            f"Bundled config package not found: {BUNDLED_CONFIG_PACKAGE}. "
+            f"{description} package not found: {package_name}. "
             "Ensure onetool is properly installed."
         ) from e
 
@@ -69,6 +76,7 @@ def get_bundled_config_dir() -> Path:
     # Approach 3: Extract path from MultiplexedPath repr as last resort
     if path_str.startswith("MultiplexedPath("):
         import re
+
         match = re.search(r"'([^']+)'", path_str)
         if match:
             path = Path(match.group(1))
@@ -78,9 +86,42 @@ def get_bundled_config_dir() -> Path:
     # If we get here, the package exists but isn't on a real filesystem
     # (e.g., inside a zipfile). This is not supported.
     raise FileNotFoundError(
-        f"Bundled config directory exists but is not on filesystem: {path_str}. "
+        f"{description} directory exists but is not on filesystem: {path_str}. "
         "OneTool requires installation from an unpacked wheel, not a zipfile."
     )
+
+
+def get_bundled_config_dir() -> Path:
+    """Get the bundled config defaults directory path.
+
+    Uses importlib.resources to access package data. Works correctly across:
+    - Regular pip/uv install (wheel)
+    - Editable install (uv tool install -e .)
+    - Development mode
+
+    Returns:
+        Path to bundled defaults directory (read-only package data)
+
+    Raises:
+        FileNotFoundError: If bundled defaults package is not found or not on filesystem
+    """
+    return _resolve_package_dir(BUNDLED_CONFIG_PACKAGE, "Bundled config")
+
+
+def get_global_templates_dir() -> Path:
+    """Get the global templates directory path.
+
+    Global templates are user-facing config files with commented examples,
+    copied to ~/.onetool/ on first run. Unlike bundled defaults (which are
+    minimal working configs), these provide rich documentation and examples.
+
+    Returns:
+        Path to global templates directory (read-only package data)
+
+    Raises:
+        FileNotFoundError: If global templates package is not found or not on filesystem
+    """
+    return _resolve_package_dir(GLOBAL_TEMPLATES_PACKAGE, "Global templates")
 
 
 def get_effective_cwd() -> Path:
@@ -126,14 +167,17 @@ def get_project_dir(start: Path | None = None) -> Path | None:
     return None
 
 
-def ensure_global_dir(quiet: bool = False) -> Path:
+def ensure_global_dir(quiet: bool = False, force: bool = False) -> Path:
     """Ensure the global OneTool directory exists.
 
-    Creates ~/.onetool/ and copies default config files from bundled package data.
-    Prints creation message to stderr (since MCP uses stdout).
+    Creates ~/.onetool/ and copies template config files from global_templates.
+    Templates are user-facing files with commented examples for customization.
+    Subdirectories (like diagram-templates/) are NOT copied - they remain in
+    bundled defaults and are accessed via config inheritance.
 
     Args:
         quiet: Suppress creation messages
+        force: Overwrite existing files (for reset functionality)
 
     Returns:
         Path to ~/.onetool/
@@ -142,30 +186,38 @@ def ensure_global_dir(quiet: bool = False) -> Path:
 
     global_dir = get_global_dir()
 
-    if global_dir.exists():
+    # If directory exists and not forcing, return early
+    if global_dir.exists() and not force:
         return global_dir
 
     # Create directory structure
     global_dir.mkdir(parents=True, exist_ok=True)
 
-    # Copy default config files from bundled package data
-    copied_configs: list[str] = []
+    # Copy template config files from global_templates package
+    # Only YAML files are copied; subdirectories stay in bundled defaults
+    # Files named *-template.yaml are copied without the -template suffix
+    # (to avoid gitignore patterns on secrets.yaml)
+    copied_items: list[str] = []
     try:
-        bundled_dir = get_bundled_config_dir()
-        for config_file in bundled_dir.glob("*.yaml"):
-            dest = global_dir / config_file.name
-            if not dest.exists():
+        templates_dir = get_global_templates_dir()
+        for config_file in templates_dir.glob("*.yaml"):
+            # Strip -template suffix if present (e.g., secrets-template.yaml -> secrets.yaml)
+            dest_name = config_file.name.replace("-template.yaml", ".yaml")
+            dest = global_dir / dest_name
+            # Copy if doesn't exist, or if forcing
+            if not dest.exists() or force:
                 shutil.copy(config_file, dest)
-                copied_configs.append(config_file.name)
+                copied_items.append(dest_name)
     except FileNotFoundError:
-        # Bundled defaults not available (dev environment without package install)
+        # Global templates not available (dev environment without package install)
         pass
 
-    if not quiet:
+    if not quiet and copied_items:
         # Use stderr to avoid interfering with MCP stdout
-        print(f"Creating {global_dir}/", file=sys.stderr)
-        for config_name in copied_configs:
-            print(f"  ✓ {config_name}", file=sys.stderr)
+        action = "Resetting" if force else "Creating"
+        print(f"{action} {global_dir}/", file=sys.stderr)
+        for item_name in copied_items:
+            print(f"  ✓ {item_name}", file=sys.stderr)
 
     return global_dir
 

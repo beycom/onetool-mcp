@@ -27,12 +27,12 @@ The paths module SHALL provide a function to get the effective working directory
 - **GIVEN** `~/.onetool/` does not exist
 - **WHEN** `ot-serve` starts
 - **THEN** it SHALL call `ensure_global_dir()` to bootstrap the global directory
-- **AND** the global directory SHALL be seeded from bundled defaults
+- **AND** the global directory SHALL be seeded from global templates (not bundled defaults)
 
 #### Scenario: Secondary CLIs require global config
 - **GIVEN** `~/.onetool/` does not exist
 - **WHEN** `ot-bench` or `ot-browse` starts
-- **THEN** it SHALL print an error message directing the user to run `ot-serve --help`
+- **THEN** it SHALL print an error message directing the user to run `ot-serve init`
 - **AND** exit with non-zero status
 
 ### Requirement: Standard Config Resolution
@@ -159,10 +159,10 @@ The paths module SHALL provide access to bundled default configuration files.
 - **GIVEN** the bundled config directory exists
 - **WHEN** its contents are listed
 - **THEN** it SHALL contain:
-  - `ot-serve.yaml`, `ot-bench.yaml`, `ot-browse.yaml`
+  - `ot-serve.yaml`, `ot-bench.yaml`, `ot-browse.yaml` (minimal working configs)
   - `prompts.yaml`, `snippets.yaml`, `servers.yaml`, `diagram.yaml`
-  - `secrets.yaml` (template)
   - `diagram-templates/` subdirectory
+- **NOTE** `secrets.yaml` is NOT in bundled defaults; it is in global templates only
 
 #### Scenario: Bundled configs in development mode
 - **GIVEN** OneTool is installed in editable mode (`uv tool install -e .`)
@@ -170,16 +170,44 @@ The paths module SHALL provide access to bundled default configuration files.
 - **THEN** it SHALL return the path to `src/ot/config/defaults/`
 - **AND** the configs SHALL be usable without rebuilding
 
+### Requirement: Global Templates Directory
+
+The paths module SHALL provide access to global template configuration files for user customization.
+
+#### Scenario: Get global templates directory
+- **GIVEN** OneTool is installed as a package
+- **WHEN** `get_global_templates_dir()` is called
+- **THEN** it SHALL return the path to `ot/config/global_templates/` within the installed package
+- **AND** the path SHALL be accessible via `importlib.resources`
+
+#### Scenario: Global templates directory contents
+- **GIVEN** the global templates directory exists
+- **WHEN** its contents are listed
+- **THEN** it SHALL contain:
+  - `ot-serve.yaml` (commented template with all options)
+  - `snippets.yaml` (example snippets as comments)
+  - `servers.yaml` (example MCP server configs as comments)
+  - `secrets-template.yaml` (API key placeholders, copied as `secrets.yaml`)
+  - `ot-bench.yaml` (bench config template)
+  - `bench-secrets-template.yaml` (bench secrets, copied as `bench-secrets.yaml`)
+
+#### Scenario: Template files avoid gitignore
+- **GIVEN** secrets files are gitignored (`**/secrets.yaml`)
+- **WHEN** templates are packaged
+- **THEN** secrets templates SHALL be named `*-template.yaml`
+- **AND** they SHALL be copied without the `-template` suffix to `~/.onetool/`
+
 ### Requirement: Global Directory Bootstrap
 
-The `ensure_global_dir` function SHALL seed from bundled package resources.
+The `ensure_global_dir` function SHALL seed from global templates (not bundled defaults).
 
 #### Scenario: First run bootstrap
 - **GIVEN** `~/.onetool/` does not exist
 - **WHEN** `ensure_global_dir()` is called
 - **THEN** it SHALL create `~/.onetool/`
-- **AND** copy YAML configs from bundled defaults
-- **AND** copy `diagram-templates/` subdirectory
+- **AND** copy YAML configs from global templates
+- **AND** rename `*-template.yaml` files to remove the suffix (e.g., `secrets-template.yaml` → `secrets.yaml`)
+- **AND** NOT copy subdirectories (diagram-templates stays in bundled defaults)
 - **AND** print creation messages to stderr
 
 #### Scenario: Subsequent runs no-op
@@ -191,4 +219,16 @@ The `ensure_global_dir` function SHALL seed from bundled package resources.
 - **GIVEN** `~/.onetool/` does not exist
 - **WHEN** `ensure_global_dir(quiet=True)` is called
 - **THEN** it SHALL create the directory without printing messages
+
+#### Scenario: Force reset
+- **GIVEN** `~/.onetool/` already exists with customized files
+- **WHEN** `ensure_global_dir(force=True)` is called
+- **THEN** it SHALL overwrite all template files with fresh copies
+- **AND** print reset messages to stderr
+
+#### Scenario: CLI init reset command
+- **GIVEN** a user wants to reset their global config
+- **WHEN** `ot-serve init reset` is called
+- **THEN** it SHALL prompt for confirmation
+- **AND** call `ensure_global_dir(force=True)` if confirmed
 

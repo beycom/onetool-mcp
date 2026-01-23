@@ -17,6 +17,48 @@ ot-serve [OPTIONS]
 | `-c, --config PATH` | Path to ot-serve.yaml configuration file |
 | `-v, --version` | Show version and exit |
 
+## Commands
+
+### init
+
+Initialize and manage global configuration in `~/.onetool/`.
+
+```bash
+ot-serve init [subcommand]
+```
+
+Running `ot-serve init` without a subcommand creates the global config directory.
+
+| Subcommand | Description |
+|------------|-------------|
+| `reset` | Reset global config to default templates (overwrites existing files) |
+| `validate` | Validate all configuration files |
+
+#### init (default)
+
+Creates the global config directory and copies template files if they don't already exist.
+
+```bash
+ot-serve init
+```
+
+#### init reset
+
+Overwrites existing config files in `~/.onetool/` with fresh templates. Use with caution.
+
+```bash
+ot-serve init reset        # Prompts for confirmation
+ot-serve init reset --force  # No confirmation
+```
+
+#### init validate
+
+Checks global and project config files for syntax and schema errors.
+
+```bash
+ot-serve init validate
+```
+
 ## Examples
 
 ```bash
