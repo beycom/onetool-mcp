@@ -92,8 +92,3 @@ results = db.query(
     sql="SELECT customer_id, COUNT(*) as order_count FROM orders GROUP BY customer_id"
 )
 ```
-
-## Related
-
-- [Database Tool Reference](../reference/tools/database.md)
-- [Configuration](../getting-started/configuration.md)

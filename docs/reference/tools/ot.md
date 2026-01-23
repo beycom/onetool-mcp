@@ -163,8 +163,3 @@ snippets:
 ## Source
 
 OneTool internal implementation
-
-## Related
-
-- [Configuration](../../getting-started/configuration.md) - Full config schema
-- [Creating Tools](../../extending/creating-tools.md) - Add custom tools

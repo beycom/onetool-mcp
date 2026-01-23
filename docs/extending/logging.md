@@ -267,7 +267,3 @@ safe_url = sanitize_url("postgres://user:pass@host/db")
 # Truncate a value with field-based limit
 truncated = format_value(long_string, field_name="query")
 ```
-
-## Related Documentation
-
-- [Creating Tools](creating-tools.md) - Tool-specific logging patterns and span naming

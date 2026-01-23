@@ -122,8 +122,3 @@ Benchmarks produce:
 - Cost estimates (USD)
 - Timing information
 - Evaluation scores
-
-## Related
-
-- [Testing Strategy](../../extending/testing.md) - Test markers and organization
-- [Examples](../../examples/index.md) - Demo benchmarks

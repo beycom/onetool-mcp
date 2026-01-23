@@ -393,9 +393,3 @@ For "Based on" tools, include the upstream license:
 - [ ] Source header matches attribution level
 - [ ] License file in `licenses/` (if "Based on")
 - [ ] Tool doc attribution section matches source header
-
-## Related
-
-- [Logging](logging.md) - LogSpan usage
-- [Testing](testing.md) - Test your tools
-- [Tools Reference](../reference/tools/index.md) - Existing tools

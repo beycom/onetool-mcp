@@ -60,9 +60,3 @@ Benefits:
 - No code execution during discovery
 - Instant startup
 - Hot reload support
-
-## Related
-
-- [Configuration](../../getting-started/configuration.md) - YAML schema
-- [Creating Tools](../../extending/creating-tools.md) - Add custom tools
-- [Tools Reference](../tools/index.md) - Built-in tools

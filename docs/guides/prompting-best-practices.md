@@ -82,8 +82,3 @@ When tools return errors:
 - Use short prefixes (`__ot`) for simple calls
 - Use code fences for multi-step operations
 - Prefer batch operations over multiple calls
-
-## Related
-
-- [Explicit Tool Calls](explicit-calls.md) - Invocation syntax
-- [Configuration](../getting-started/configuration.md) - Tool settings

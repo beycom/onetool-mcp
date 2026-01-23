@@ -54,8 +54,3 @@ Default config: `config/ot-browse.yaml` or `.onetool/ot-browse.yaml`
 # Install Playwright browser (one-time)
 playwright install chromium
 ```
-
-## Related
-
-- [Browser Inspector](browser-inspector.md) - Detailed inspector usage
-- [Page View Tools](page-view.md) - Analyse captures programmatically

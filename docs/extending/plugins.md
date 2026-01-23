@@ -274,9 +274,3 @@ def word(*, pattern: str, output_dir: str = "output") -> str:
 if __name__ == "__main__":
     worker_main()
 ```
-
-## Related
-
-- [Creating Tools](creating-tools.md) - Tool patterns, signatures, and conventions
-- [Testing](testing.md) - Test markers and organization
-- [Logging](logging.md) - Structured logging with LogSpan
