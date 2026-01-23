@@ -21,9 +21,10 @@ Usage:
     ot-bench call tools.yaml
 """
 
+from importlib.metadata import version
 from typing import Any
 
-__version__ = "3.2.0"
+__version__ = version("onetool-mcp")
 
 __all__ = ["__version__", "main"]
 

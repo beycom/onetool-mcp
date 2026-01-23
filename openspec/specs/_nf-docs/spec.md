@@ -367,3 +367,38 @@ All tool documentation SHALL include a Source section.
 - **WHEN** documenting the source
 - **THEN** the Source section SHALL link to the library documentation
 
+### Requirement: Plugin Development Documentation
+
+The documentation SHALL include a plugin development guide for building standalone tools in separate repositories.
+
+#### Scenario: Minimal plugin structure documented
+
+- **WHEN** a developer reads the plugin guide
+- **THEN** they SHALL find the minimal structure: a single Python file with `namespace` declaration
+- **AND** a local `.onetool/` directory for development configuration
+
+#### Scenario: Local development configuration documented
+
+- **WHEN** a developer sets up their plugin project
+- **THEN** the guide SHALL explain creating `.onetool/ot-serve.yaml` with `tools_dir` pointing to the plugin source
+- **AND** `.onetool/secrets.yaml` for any required API keys
+- **AND** optionally `.onetool/ot-bench.yaml` for benchmark testing
+
+#### Scenario: Configuration for consumers documented
+
+- **WHEN** a user wants to use a third-party plugin
+- **THEN** the guide SHALL explain adding the plugin path to their project or global `tools_dir`
+- **AND** glob patterns SHALL be documented (e.g., `~/plugins/myproject/src/*.py`)
+
+#### Scenario: Worker tool pattern documented
+
+- **WHEN** a plugin requires isolated dependencies
+- **THEN** the guide SHALL explain the PEP 723 header pattern
+- **AND** include the required `worker_main()` call
+- **AND** reference the `ot_sdk` exports
+
+#### Scenario: Plugin testing approach documented
+
+- **WHEN** a developer needs to test their plugin
+- **THEN** the guide SHALL explain testing without a full OneTool installation
+- **AND** describe the direct function call approach

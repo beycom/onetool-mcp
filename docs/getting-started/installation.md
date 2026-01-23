@@ -58,6 +58,14 @@ cd onetool
 uv sync --group dev
 ```
 
+### Local Development Install
+
+```bash
+uv tool install -e .
+```
+
+Code changes are picked up immediately. Reinstall only for new entry points, dependencies, or top-level packages.
+
 ## API Keys
 
 API keys are stored in `secrets.yaml` (gitignored):

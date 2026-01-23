@@ -9,6 +9,7 @@ Adding tools to OneTool is trivial - create a Python file, declare a namespace, 
 | Guide | Description |
 |-------|-------------|
 | [Creating Tools](creating-tools.md) | Add custom tool functions |
+| [Creating Plugins](plugins.md) | Build tools in separate repositories |
 | [Creating CLIs](creating-clis.md) | Build command-line interfaces |
 | [Testing](testing.md) | Test markers and organization |
 | [Logging](logging.md) | Structured logging with LogSpan |

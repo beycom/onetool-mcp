@@ -215,4 +215,3 @@ OneTool is a developer tool, not a sandbox. It does not:
 ## See Also
 
 - [Configuration Reference](configuration.md) - Full YAML schema
-- [Security Patterns Spec](../../openspec/specs/serve-code-validation/spec.md) - Implementation details
