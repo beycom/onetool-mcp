@@ -15,7 +15,7 @@ from rich.console import Console
 from ot._tui import ask_select
 from ot.logging import LogSpan, configure_logging
 from ot.paths import get_effective_cwd, get_global_dir
-from ot.support import KOFI_URL, get_version
+from ot.support import get_support_banner, get_version
 from ot_bench.cli import app
 from ot_bench.harness.config import load_config
 from ot_bench.harness.csv_writer import write_results_csv
@@ -34,7 +34,7 @@ def _print_startup_banner(console: Console) -> None:
     """Print startup message."""
     version = get_version()
     console.print(f"[bold cyan]OneTool Benchmark[/bold cyan] [dim]v{version}[/dim]")
-    console.print(f"[dim]Support development:[/dim] {KOFI_URL}")
+    console.print(get_support_banner())
     console.print()
 
 

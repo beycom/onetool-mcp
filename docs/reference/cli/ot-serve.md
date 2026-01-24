@@ -31,8 +31,8 @@ Running `ot-serve init` without a subcommand creates the global config directory
 
 | Subcommand | Description |
 |------------|-------------|
+| `validate` | Validate config and show status |
 | `reset` | Reset global config to default templates |
-| `validate` | Validate all configuration files |
 
 #### init (default)
 
@@ -42,20 +42,20 @@ Creates the global config directory and copies template files if they don't alre
 ot-serve init
 ```
 
+#### init validate
+
+Validates configuration files and displays status including packs, secrets (names only), snippets, aliases, and MCP servers.
+
+```bash
+ot-serve init validate
+```
+
 #### init reset
 
 Resets config files in `~/.onetool/` to fresh templates. Prompts for each existing file before overwriting, with option to create backups. Backups are named `file.bak`, `file.bak.1`, `file.bak.2`, etc.
 
 ```bash
 ot-serve init reset
-```
-
-#### init validate
-
-Checks global and project config files for syntax and schema errors.
-
-```bash
-ot-serve init validate
 ```
 
 ## Examples

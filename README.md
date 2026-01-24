@@ -105,4 +105,4 @@ LLMs write Python instead of parsing JSON schemas. You see what's being called. 
 
 If you use or like this project, please consider buying me a coffee:
 
-[![Ko-fi](https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-ff5e5b?logo=ko-fi)](https://ko-fi.com/gavinlas)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-ff5e5b?logo=ko-fi)](https://ko-fi.com/beycom)

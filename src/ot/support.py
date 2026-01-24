@@ -8,8 +8,8 @@ from __future__ import annotations
 from importlib.metadata import PackageNotFoundError, version
 
 # Support URLs
-KOFI_URL = "https://ko-fi.com/gavinlas"
-KOFI_HANDLE = "gavinlas"
+KOFI_URL = "https://ko-fi.com/beycom"
+KOFI_HANDLE = "beycom"
 
 # Support messages
 SUPPORT_MESSAGE = "If you find OneTool useful, please consider supporting development!"
@@ -40,6 +40,15 @@ def get_startup_message() -> str:
         Formatted startup message with support link
     """
     return f"{SUPPORT_MESSAGE_SHORT}: {KOFI_URL}"
+
+
+def get_support_banner() -> str:
+    """Get Rich-formatted support message for CLI banners.
+
+    Returns:
+        Rich markup string for console.print()
+    """
+    return f"[yellow]☕ Please buy me a coffee:[/yellow] [link={KOFI_URL}]{KOFI_URL}[/link]"
 
 
 def get_version() -> str:

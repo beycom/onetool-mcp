@@ -261,3 +261,15 @@ The `ensure_global_dir` function SHALL seed from global templates (not bundled d
 - **THEN** it SHALL prompt for each existing file before overwriting (default: Y)
 - **AND** offer to create a backup before overwriting (default: Y)
 - **AND** backups SHALL be numbered (`file.bak`, `file.bak.1`, `file.bak.2`, etc.)
+
+#### Scenario: CLI init validate command
+- **GIVEN** a user wants to validate config and view status
+- **WHEN** `ot-serve init validate` is called
+- **THEN** it SHALL validate configuration files for syntax errors
+- **AND** display (all sorted alphabetically with counts):
+  - Global and project directory paths with existence status
+  - Packs with total tool counts
+  - Secret names (NOT values) with "set" indicator
+  - Snippet names
+  - Alias mappings
+  - MCP server names

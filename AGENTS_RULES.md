@@ -32,6 +32,10 @@
 - No em-dashes, use hyphens
 - No backward compat - delete unused code completely
 
+## CLI
+
+- Use Rich with `highlight=False` for all CLIs (disables auto syntax highlighting)
+
 ## Python
 
 - `__init__.py` required in `src/` packages

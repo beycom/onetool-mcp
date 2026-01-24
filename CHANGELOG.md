@@ -38,4 +38,4 @@ uv tool install onetool-mcp
 
 - [Documentation](https://onetool.beycom.online)
 - [Issues](https://github.com/beycom/onetool/issues)
-- [Support](https://ko-fi.com/gavinlas)
+- [Support](https://ko-fi.com/beycom)
