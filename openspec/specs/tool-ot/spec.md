@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the `ot` namespace providing internal tool functions for accessing ot-serve state, tool discovery, configuration inspection, and system health. All output uses YAML flow style for compact, readable context that LLMs can easily parse.
+Defines the `ot` pack providing internal tool functions for accessing ot-serve state, tool discovery, configuration inspection, and system health. All output uses YAML flow style for compact, readable context that LLMs can easily parse.
 
 This spec consolidates `tool-internal` and `tool-info`.
 ## Requirements
@@ -22,10 +22,10 @@ The `ot.tools()` function SHALL list all available tools with optional filtering
 - **WHEN** `ot.tools(pattern="search")` is called
 - **THEN** it SHALL return only tools with names matching the pattern (case-insensitive)
 
-#### Scenario: Filter by namespace
-- **GIVEN** a namespace parameter
-- **WHEN** `ot.tools(ns="brave")` is called
-- **THEN** it SHALL return only tools in the "brave" namespace
+#### Scenario: Filter by pack
+- **GIVEN** a pack parameter
+- **WHEN** `ot.tools(pack="brave")` is called
+- **THEN** it SHALL return only tools in the "brave" pack
 
 #### Scenario: Compact output
 - **GIVEN** compact=True parameter
@@ -148,9 +148,9 @@ The `ot.help()` function SHALL display full documentation for a tool, including 
 - **AND** include source as "proxy:github"
 
 #### Scenario: Tool not found
-- **GIVEN** an invalid tool name not in local or proxy namespaces
+- **GIVEN** an invalid tool name not in local or proxy packs
 - **WHEN** `ot.help(tool="nonexistent.tool")` is called
-- **THEN** it SHALL return an error message listing available namespaces
+- **THEN** it SHALL return an error message listing available packs
 
 #### Scenario: Local tool output format
 - **GIVEN** a valid local tool
@@ -158,32 +158,32 @@ The `ot.help()` function SHALL display full documentation for a tool, including 
 - **THEN** output SHALL be formatted as:
 ```
 
-### Requirement: Namespace Instructions
+### Requirement: Pack Instructions
 
-The `ot.instructions()` function SHALL return usage instructions for a namespace.
+The `ot.instructions()` function SHALL return usage instructions for a pack.
 
-#### Scenario: Get namespace instructions from config
+#### Scenario: Get pack instructions from config
 - **GIVEN** prompts.yaml contains key "excel" with instructions text
-- **WHEN** `ot.instructions(ns="excel")` is called
+- **WHEN** `ot.instructions(pack="excel")` is called
 - **THEN** it SHALL return the configured instructions text
 
-#### Scenario: Get local namespace instructions fallback
-- **GIVEN** no config override for namespace "brave"
-- **AND** "brave" is a local namespace
-- **WHEN** `ot.instructions(ns="brave")` is called
+#### Scenario: Get local pack instructions fallback
+- **GIVEN** no config override for pack "brave"
+- **AND** "brave" is a local pack
+- **WHEN** `ot.instructions(pack="brave")` is called
 - **THEN** it SHALL return aggregated docstrings from brave tools
 
-#### Scenario: Get proxy namespace instructions fallback
-- **GIVEN** no config override for namespace "github"
+#### Scenario: Get proxy pack instructions fallback
+- **GIVEN** no config override for pack "github"
 - **AND** "github" is a proxy server
-- **WHEN** `ot.instructions(ns="github")` is called
+- **WHEN** `ot.instructions(pack="github")` is called
 - **THEN** it SHALL return the MCP server_info if available
 - **OR** return a default message listing available tools
 
-#### Scenario: Unknown namespace
-- **GIVEN** namespace "nonexistent" is not local or proxy
-- **WHEN** `ot.instructions(ns="nonexistent")` is called
-- **THEN** it SHALL return an error with available namespaces
+#### Scenario: Unknown pack
+- **GIVEN** pack "nonexistent" is not local or proxy
+- **WHEN** `ot.instructions(pack="nonexistent")` is called
+- **THEN** it SHALL return an error with available packs
 
 #### Scenario: Logging
 - **GIVEN** `ot.instructions()` is called

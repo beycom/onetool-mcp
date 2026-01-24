@@ -1,7 +1,7 @@
 """Unit tests for internal tool functions.
 
-Tests that ot.tools() correctly handles namespaced functions,
-especially when multiple namespaces have functions with the same name.
+Tests that ot.tools() correctly handles pack.function names,
+especially when multiple packs have functions with the same name.
 """
 
 from __future__ import annotations
@@ -81,7 +81,7 @@ def test_tools_returns_correct_signatures_for_same_named_functions() -> None:
 
     result = tools(pattern="search")
 
-    # Each namespace's search function should have its own signature
+    # Each pack's search function should have its own signature
     assert "brave.search" in result
     assert "ground.search" in result
     assert "page.search" in result
@@ -116,21 +116,21 @@ def test_tools_compact_mode_reduces_output_size() -> None:
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_tools_namespace_filter() -> None:
-    """Verify namespace filter works correctly."""
+def test_tools_pack_filter() -> None:
+    """Verify pack filter works correctly."""
     import json
 
     from ot_tools.internal import tools
 
-    result = tools(ns="ot")
+    result = tools(pack="ot")
     tools_list = json.loads(result)
     tool_names = [t["name"] for t in tools_list]
 
-    # Should only have ot namespace tools
+    # Should only have ot pack tools
     assert any(name == "ot.tools" for name in tool_names)
     assert any(name == "ot.health" for name in tool_names)
 
-    # Should NOT have other namespace tools (check actual tool names, not examples)
+    # Should NOT have other pack tools (check actual tool names, not examples)
     assert not any(name.startswith("brave.") for name in tool_names)
     assert not any(name.startswith("page.") for name in tool_names)
 
@@ -150,9 +150,9 @@ def test_health_counts_all_tools() -> None:
     assert "registry" in data
     assert "tool_count" in data["registry"]
 
-    # The count should include all tools across namespaces
+    # The count should include all tools across packs
     # (not deduplicated by bare name)
-    # We have at least 5 "search" functions in different namespaces
+    # We have at least 5 "search" functions in different packs
     # so total should be > 30 (rough estimate)
     count = data["registry"]["tool_count"]
     assert count >= 30, f"Expected at least 30 tools, got {count}"
@@ -200,22 +200,22 @@ def test_help_with_invalid_format() -> None:
     """Verify ot.help() returns error for invalid tool format."""
     from ot_tools.internal import help
 
-    result = help(tool="nonamespace")
+    result = help(tool="nopack")
 
     assert "Error:" in result
-    assert "namespace.function" in result
+    assert "pack.function" in result
 
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_help_with_unknown_namespace() -> None:
-    """Verify ot.help() returns error for unknown namespace."""
+def test_help_with_unknown_pack() -> None:
+    """Verify ot.help() returns error for unknown pack."""
     from ot_tools.internal import help
 
     result = help(tool="nonexistent.function")
 
     assert "Error:" in result
-    assert "Namespace" in result
+    assert "Pack" in result
     assert "not found" in result
 
 
@@ -411,12 +411,12 @@ def test_instructions_with_config_override(override_prompts: Any) -> None:
     with override_prompts(
         PromptsConfig(
             instructions="Main instructions",
-            namespaces={
+            packs={
                 "brave": "Custom brave instructions from config.\nUse brave.search() for web search."
             },
         )
     ):
-        result = instructions(ns="brave")
+        result = instructions(pack="brave")
         assert "Custom brave instructions" in result
         assert "brave.search()" in result
 
@@ -424,18 +424,18 @@ def test_instructions_with_config_override(override_prompts: Any) -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 def test_instructions_fallback_local(override_prompts: Any) -> None:
-    """Verify ot.instructions() falls back to docstrings for local namespace."""
+    """Verify ot.instructions() falls back to docstrings for local pack."""
     from ot_tools.internal import instructions
 
     with override_prompts(
         PromptsConfig(
             instructions="Main instructions",
-            namespaces={},  # No override for ot namespace
+            packs={},  # No override for ot pack
         )
     ):
-        result = instructions(ns="ot")
+        result = instructions(pack="ot")
         # Should generate from docstrings
-        assert "# ot namespace" in result
+        assert "# ot pack" in result
         assert "ot.tools" in result
         assert "ot.help" in result
 
@@ -445,7 +445,7 @@ def test_instructions_fallback_local(override_prompts: Any) -> None:
 def test_instructions_fallback_proxy(
     override_prompts: Any, mock_proxy_manager: MagicMock
 ) -> None:
-    """Verify ot.instructions() falls back to tool list for proxy namespace."""
+    """Verify ot.instructions() falls back to tool list for proxy pack."""
     from unittest.mock import patch
 
     from ot_tools.internal import instructions
@@ -472,24 +472,24 @@ def test_instructions_fallback_proxy(
     with override_prompts(
         PromptsConfig(
             instructions="Main instructions",
-            namespaces={},  # No override
+            packs={},  # No override
         )
     ):
         with patch(
             "ot_tools.internal.get_proxy_manager", return_value=mock_proxy_manager
         ):
-            result = instructions(ns="github")
+            result = instructions(pack="github")
 
         # Should generate from proxy tool list
-        assert "# github namespace (proxy)" in result
+        assert "# github pack (proxy)" in result
         assert "github.create_issue" in result
         assert "github.list_repos" in result
 
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_instructions_unknown_namespace(mock_proxy_manager: MagicMock) -> None:
-    """Verify ot.instructions() returns error for unknown namespace."""
+def test_instructions_unknown_pack(mock_proxy_manager: MagicMock) -> None:
+    """Verify ot.instructions() returns error for unknown pack."""
     from unittest.mock import patch
 
     from ot_tools.internal import instructions
@@ -497,8 +497,8 @@ def test_instructions_unknown_namespace(mock_proxy_manager: MagicMock) -> None:
     mock_proxy_manager.servers = []
 
     with patch("ot_tools.internal.get_proxy_manager", return_value=mock_proxy_manager):
-        result = instructions(ns="nonexistent")
+        result = instructions(pack="nonexistent")
 
     assert "Error:" in result
-    assert "Namespace" in result
+    assert "Pack" in result
     assert "not found" in result

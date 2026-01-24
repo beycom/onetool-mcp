@@ -44,7 +44,7 @@ __ot brave.search(query="AI news")
 Create `src/ot_tools/mytool.py`:
 
 ```python
-namespace = "mytool"
+pack = "mytool"
 
 def my_function(*, arg: str) -> str:
     """Description shown to LLM."""

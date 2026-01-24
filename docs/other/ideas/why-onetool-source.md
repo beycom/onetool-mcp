@@ -120,7 +120,7 @@ Input → Strip Fences → Expand Snippets → Resolve Aliases → AST Parse →
 
 **Fence stripping**: Handles `code`, backticks, and raw Python.
 
-**Namespaces**: Tools declare `namespace = "brave"` for `brave.search()` access.
+**Packs**: Tools declare `pack = "brave"` for `brave.search()` access.
 
 **Aliases**: `ws(query="AI")` → `brave.search(query="AI")`
 
@@ -284,7 +284,7 @@ Tools handle messy LLM outputs:
 
 ```python
 # tools/mytool.py
-namespace = "mytool"
+pack = "mytool"
 
 def myfunction(*, arg: str) -> str:
     """Description shown to LLM."""

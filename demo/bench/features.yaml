@@ -212,7 +212,7 @@ scenarios:
           __ot demo.foo(text="test")
 
   # =============================================================================
-  # OT INTERNAL TOOLS - Consolidated ot namespace (needs live server)
+  # OT INTERNAL TOOLS - Consolidated ot pack (needs live server)
   # =============================================================================
 
   - name: "OT: Tool Discovery"

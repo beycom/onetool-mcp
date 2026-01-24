@@ -1,7 +1,7 @@
-"""Namespace proxy creation for dot notation access.
+"""Pack proxy creation for dot notation access.
 
 Creates proxy objects that allow:
-- brave.web_search(query="test") - namespace access to tool functions
+- brave.web_search(query="test") - pack access to tool functions
 - context7.resolve_library_id() - MCP proxy access
 - proxy.list_servers() - introspection of MCP servers
 
@@ -22,10 +22,10 @@ if TYPE_CHECKING:
 
 
 def _wrap_with_stats(
-    ns_name: str, func_name: str, func: Callable[..., Any]
+    pack_name: str, func_name: str, func: Callable[..., Any]
 ) -> Callable[..., Any]:
     """Wrap a function to record execution-level stats."""
-    tool_name = f"{ns_name}.{func_name}"
+    tool_name = f"{pack_name}.{func_name}"
 
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -35,31 +35,31 @@ def _wrap_with_stats(
     return wrapper
 
 
-def _create_namespace_proxy(ns_name: str, ns_funcs: dict[str, Any]) -> Any:
-    """Create a namespace proxy instance for dot notation access.
+def _create_pack_proxy(pack_name: str, pack_funcs: dict[str, Any]) -> Any:
+    """Create a pack proxy instance for dot notation access.
 
-    Returns an object that allows ns.func() syntax where func is looked up
-    from ns_funcs dict. Each function call is tracked for execution-level stats.
+    Returns an object that allows pack.func() syntax where func is looked up
+    from pack_funcs dict. Each function call is tracked for execution-level stats.
     """
 
-    class NamespaceProxy:
-        """Proxy object that provides dot notation access to namespaced functions."""
+    class PackProxy:
+        """Proxy object that provides dot notation access to pack functions."""
 
         def __getattr__(self, name: str) -> Any:
-            if name in ns_funcs:
+            if name in pack_funcs:
                 # Wrap function with stats tracking
-                return _wrap_with_stats(ns_name, name, ns_funcs[name])
-            available = ", ".join(sorted(ns_funcs.keys()))
+                return _wrap_with_stats(pack_name, name, pack_funcs[name])
+            available = ", ".join(sorted(pack_funcs.keys()))
             raise AttributeError(
-                f"Function '{name}' not found in namespace '{ns_name}'. "
+                f"Function '{name}' not found in pack '{pack_name}'. "
                 f"Available: {available}"
             )
 
-    return NamespaceProxy()
+    return PackProxy()
 
 
-def _create_mcp_proxy_namespace(server_name: str) -> Any:
-    """Create a namespace proxy for an MCP server.
+def _create_mcp_proxy_pack(server_name: str) -> Any:
+    """Create a pack proxy for an MCP server.
 
     Allows calling proxied MCP tools using dot notation:
     - context7.resolve_library_id(library_name="next.js")
@@ -74,7 +74,7 @@ def _create_mcp_proxy_namespace(server_name: str) -> Any:
     """
     from ot.proxy import get_proxy_manager
 
-    class McpProxyNamespace:
+    class McpProxyPack:
         """Proxy object that routes tool calls to an MCP server."""
 
         def __getattr__(self, tool_name: str) -> Any:
@@ -86,11 +86,11 @@ def _create_mcp_proxy_namespace(server_name: str) -> Any:
 
             return call_proxy_tool
 
-    return McpProxyNamespace()
+    return McpProxyPack()
 
 
-def _create_proxy_introspection_namespace() -> Any:
-    """Create the 'proxy' namespace for introspection.
+def _create_proxy_introspection_pack() -> Any:
+    """Create the 'proxy' pack for introspection.
 
     Provides:
     - proxy.list_servers() - List all configured MCP servers with status
@@ -101,7 +101,7 @@ def _create_proxy_introspection_namespace() -> Any:
     """
     from ot.proxy import get_proxy_manager
 
-    class ProxyIntrospectionNamespace:
+    class ProxyIntrospectionPack:
         """Provides introspection methods for proxied MCP servers."""
 
         def list_servers(self) -> list[dict[str, Any]]:
@@ -150,7 +150,7 @@ def _create_proxy_introspection_namespace() -> Any:
             tools = proxy.list_tools(server)
             return [{"name": t.name, "description": t.description} for t in tools]
 
-    return ProxyIntrospectionNamespace()
+    return ProxyIntrospectionPack()
 
 
 # Cache for execution namespace: key=(registry_id, frozenset of proxy servers)
@@ -160,22 +160,22 @@ _namespace_cache: dict[tuple[int, frozenset[str]], dict[str, Any]] = {}
 def build_execution_namespace(
     registry: LoadedTools,
 ) -> dict[str, Any]:
-    """Build execution namespace with namespace proxies for dot notation access.
+    """Build execution namespace with pack proxies for dot notation access.
 
     Results are cached based on registry identity and proxy server configuration.
     Cache is invalidated when registry changes or proxy servers are added/removed.
 
     Provides dot notation access to tools:
-    - brave.web_search(query="test")  # namespace access
+    - brave.web_search(query="test")  # pack access
     - context7.resolve_library_id()   # MCP proxy access
 
     Args:
-        registry: LoadedTools registry with functions and namespaces
+        registry: LoadedTools registry with functions and packs
 
     Returns:
         Dict suitable for use as exec() globals
     """
-    from ot.executor.worker_proxy import WorkerNamespaceProxy
+    from ot.executor.worker_proxy import WorkerPackProxy
     from ot.proxy import get_proxy_manager
 
     # Check cache - key is registry identity + current proxy servers
@@ -187,22 +187,22 @@ def build_execution_namespace(
 
     namespace: dict[str, Any] = {}
 
-    # Add namespace proxies for dot notation
-    for ns_name, ns_funcs in registry.namespaces.items():
-        if isinstance(ns_funcs, WorkerNamespaceProxy):
+    # Add pack proxies for dot notation
+    for pack_name, pack_funcs in registry.packs.items():
+        if isinstance(pack_funcs, WorkerPackProxy):
             # Worker tools already have a proxy - use directly
-            namespace[ns_name] = ns_funcs
+            namespace[pack_name] = pack_funcs
         else:
-            namespace[ns_name] = _create_namespace_proxy(ns_name, ns_funcs)
+            namespace[pack_name] = _create_pack_proxy(pack_name, pack_funcs)
 
-    # Add MCP proxy namespaces (only if not already defined locally)
+    # Add MCP proxy packs (only if not already defined locally)
     for server_name in proxy_mgr.servers:
         if server_name not in namespace:
-            namespace[server_name] = _create_mcp_proxy_namespace(server_name)
+            namespace[server_name] = _create_mcp_proxy_pack(server_name)
 
-    # Add proxy introspection namespace (always available)
+    # Add proxy introspection pack (always available)
     if "proxy" not in namespace:
-        namespace["proxy"] = _create_proxy_introspection_namespace()
+        namespace["proxy"] = _create_proxy_introspection_pack()
 
     # Cache result (simple LRU: keep last 10)
     if len(_namespace_cache) >= 10:

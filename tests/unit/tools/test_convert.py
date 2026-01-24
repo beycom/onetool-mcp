@@ -57,11 +57,11 @@ def test_xlsx(tmp_path: Path) -> Path:
 
 @pytest.mark.unit
 @pytest.mark.tools
-def test_namespace_is_convert() -> None:
-    """Verify namespace is correctly set."""
-    from ot_tools.convert import namespace
+def test_pack_is_convert() -> None:
+    """Verify pack is correctly set."""
+    from ot_tools.convert import pack
 
-    assert namespace == "convert"
+    assert pack == "convert"
 
 
 @pytest.mark.unit

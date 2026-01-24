@@ -1,49 +1,51 @@
 # Why OneTool Exists
 
-**MCP doesn't scale. OneTool fixes this.**
+**MCP doesn't scale.**
 
-The AI coding landscape faces three converging crises that are fundamentally changing how we build with LLMs.
+Here's the problem: every MCP server you add makes your AI dumber. Not in theory - in practice.
 
-## The Three Crises
+## What's actually happening
 
-### 1. Context Rot
+### Context rot is real
 
-LLM performance degrades as input tokens increase. [Chroma's research](https://research.trychroma.com/context-rot) found that the 10,000th token is handled less reliably than the 100th.
+LLM performance degrades as input tokens pile up. [Chroma's research](https://research.trychroma.com/context-rot) measured this: the 10,000th token is handled less reliably than the 100th.
 
 > "Context must be treated as a finite resource with diminishing marginal returns."
 > - [Anthropic Engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
 
-### 2. MCP Token Bloat
+### MCP eats your context for breakfast
 
-Every MCP server you connect adds thousands of tokens to your context - before you even start talking.
+Every MCP server you connect adds thousands of tokens before you've said anything.
 
-| Setup | Token Cost | Impact |
-|-------|------------|--------|
-| 5 servers | ~55K | Before any conversation |
-| 10+ servers | 100K+ | Context nearly exhausted |
-| Tool calls | N loops | Expensive LLM deliberation |
+| Setup | Token Cost | What that means |
+| ----- | ---------- | --------------- |
+| 5 servers | ~55K | Gone before you type |
+| 10+ servers | 100K+ | Context nearly full |
+| Tool calls | N loops | LLM deliberation tax |
 
-This isn't additive - it's *degradative*. Each server compounds the context rot problem.
+Each server makes context rot worse, not just bigger.
 
-### 3. Vibe Coding Collapse
+### Vibe coding catches up with you
 
-[Collins Dictionary's 2025 Word of the Year](https://en.wikipedia.org/wiki/Vibe_coding) - Andrej Karpathy's term for accepting code "that looks roughly right."
+[Collins Dictionary's 2025 Word of the Year](https://en.wikipedia.org/wiki/Vibe_coding): Andrej Karpathy's term for accepting code "that looks roughly right."
 
-The reality? A [UK study of 120 firms](https://www.secondtalent.com/resources/vibe-coding-statistics/) found **41% more debugging time** at scale. The "Day 2" problem - maintaining AI-generated systems - remains unsolved.
+A [UK study of 120 firms](https://www.secondtalent.com/resources/vibe-coding-statistics/) found 41% more debugging time at scale. Day 2 maintenance of AI-generated code is still an unsolved problem.
 
-## The Solution
+## What OneTool does differently
 
-OneTool addresses all three crises with one tool, code execution, and spec-driven development.
+One tool. Code execution. That's basically it.
 
-### The Numbers
+### The numbers
 
-| Metric | Traditional MCP | OneTool | Improvement |
-|--------|-----------------|---------|-------------|
-| Token usage | 150,000 | 2,000 | **98.7% reduction** |
-| Cost per query | $0.025 | $0.002 | **10x cheaper** |
-| Tool calls | 5+ | 1 | **Single call** |
+| Metric | Traditional MCP | OneTool |
+| ------ | --------------- | ------- |
+| Token usage | 150,000 | 2,000 |
+| Cost per query | $0.025 | $0.002 |
+| Tool calls | 5+ | 1 |
 
-### How It Works
+98.7% fewer tokens. 10x cheaper. One call instead of five.
+
+### How it works
 
 ```
 Traditional MCP:
@@ -55,32 +57,24 @@ OneTool:
   Total: ~2K tokens, 1 call
 ```
 
-Instead of loading 50 separate tool schemas, LLMs write Python:
+Instead of loading 50 tool schemas, LLMs write Python:
 
 ```python
 __ot brave.search(query="AI trends 2026")
 ```
 
-## Core Principles
+## The approach
 
-| Principle | Description |
-|-----------|-------------|
-| **Fight Context Rot** | MCP tool enumeration consumes 55K-150K tokens. OneTool reduces to ~2K (98.7% reduction). |
-| **Code is King** | LLMs write Python to call functions directly. No JSON schema parsing, no tool selection loops. |
-| **Explicit Invocation** | You write the code to call APIs - no hoping the LLM guesses the right tool or usage. The `__ot` prefix makes tool calls deterministic and visible. |
-| **Batteries Included + Extensible** | 10 namespaces built-in. Add snippets, functions, or new tools by dropping in Python files. |
+LLMs write Python to call functions. No JSON schema parsing. No tool selection loops. You see exactly what's being called because you wrote it.
 
-## The Industry Shift
+15 packs built-in. Adding your own is dropping a Python file in a folder.
 
-> "The industry is shifting from vibe coding to agentic engineering."
-> - [MIT Technology Review](https://www.technologyreview.com/2025/11/05/1127477/from-vibe-coding-to-context-engineering-2025-in-software-development/)
+[MIT Technology Review](https://www.technologyreview.com/2025/11/05/1127477/from-vibe-coding-to-context-engineering-2025-in-software-development/) calls this shift "from vibe coding to agentic engineering." Whatever you call it, the token math works out.
 
-OneTool is built for that future.
+## What you get
 
-## Key Benefits
-
-- **Token efficiency**: 24x fewer tokens, same accuracy
-- **Drop-in tools**: Add Python files, no registration needed
-- **AST security**: Code validated before execution - no sandbox escapes
-- **Benchmark harness**: Test LLM + MCP combinations rigorously with `ot-bench`
-- **Proxy support**: Wrap existing MCP servers through the efficient execution model
+- 24x fewer tokens, same accuracy
+- Drop a Python file, get a new pack
+- AST validation before execution
+- `ot-bench` for testing LLM + MCP combinations
+- Proxy mode wraps existing MCP servers

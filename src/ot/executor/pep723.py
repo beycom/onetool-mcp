@@ -52,7 +52,7 @@ class ToolFileInfo:
     """Information about a tool file."""
 
     path: Path
-    namespace: str | None = None
+    pack: str | None = None
     functions: list[str] = field(default_factory=list)
     is_worker: bool = False
     metadata: ScriptMetadata | None = None
@@ -155,16 +155,16 @@ def extract_tool_functions(path: Path) -> list[str]:
     return functions
 
 
-def extract_namespace(path: Path) -> str | None:
-    """Extract the namespace declaration from a tool file.
+def extract_pack(path: Path) -> str | None:
+    """Extract the pack declaration from a tool file.
 
-    Looks for: namespace = "name" at the top of the file.
+    Looks for: pack = "name" at the top of the file.
 
     Args:
         path: Path to Python file
 
     Returns:
-        Namespace string, or None if not declared
+        Pack string, or None if not declared
     """
     try:
         content = path.read_text()
@@ -172,13 +172,13 @@ def extract_namespace(path: Path) -> str | None:
     except (OSError, SyntaxError):
         return None
 
-    # Look for namespace assignment in module body
+    # Look for pack assignment in module body
     for node in tree.body:
         if isinstance(node, ast.Assign):
             for target in node.targets:
                 if (
                     isinstance(target, ast.Name)
-                    and target.id == "namespace"
+                    and target.id == "pack"
                     and isinstance(node.value, ast.Constant)
                     and isinstance(node.value.value, str)
                 ):
@@ -187,7 +187,7 @@ def extract_namespace(path: Path) -> str | None:
 
 
 def analyze_tool_file(path: Path) -> ToolFileInfo:
-    """Analyze a tool file for metadata, namespace, and functions.
+    """Analyze a tool file for metadata, pack, and functions.
 
     Args:
         path: Path to Python file
@@ -206,8 +206,8 @@ def analyze_tool_file(path: Path) -> ToolFileInfo:
     info.metadata = parse_pep723_metadata(content)
     info.is_worker = info.metadata is not None and info.metadata.has_dependencies
 
-    # Extract namespace and functions
-    info.namespace = extract_namespace(path)
+    # Extract pack and functions
+    info.pack = extract_pack(path)
     info.functions = extract_tool_functions(path)
 
     return info

@@ -8,8 +8,8 @@ Supports glob patterns for batch conversion with async parallel processing.
 
 from __future__ import annotations
 
-# Namespace for dot notation: convert.pdf(), convert.word(), etc.
-namespace = "convert"
+# Pack for dot notation: convert.pdf(), convert.word(), etc.
+pack = "convert"
 
 __all__ = ["auto", "excel", "pdf", "powerpoint", "word"]
 

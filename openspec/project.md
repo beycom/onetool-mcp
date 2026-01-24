@@ -42,7 +42,7 @@ Config includes `version` field for migrations.
 
 ## Tool Development
 
-1. Create `src/ot_tools/<name>.py` with `namespace = "<name>"` and `__all__`
+1. Create `src/ot_tools/<name>.py` with `pack = "<name>"` and `__all__`
 2. Use `LogSpan` for logging
 3. Declare dependencies via `__onetool_requires__ = {"secrets": [...], "system": [...]}`
 4. Add spec to `openspec/specs/tool-<name>/spec.md`

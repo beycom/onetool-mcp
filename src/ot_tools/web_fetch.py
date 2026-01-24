@@ -12,8 +12,8 @@ Reference: https://github.com/adbar/trafilatura
 
 from __future__ import annotations
 
-# Namespace for dot notation: web.fetch(), web.fetch_batch()
-namespace = "web"
+# Pack for dot notation: web.fetch(), web.fetch_batch()
+pack = "web"
 
 __all__ = ["fetch", "fetch_batch"]
 

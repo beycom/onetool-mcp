@@ -7,8 +7,6 @@
 | [`ot-serve`](ot-serve.md) | MCP server |
 | [`ot-bench`](ot-bench.md) | Benchmark harness |
 
-See [Beta Features](../../beta/index.md) for experimental CLIs like `ot-browse`.
-
 ## Configuration
 
 All CLIs follow a consistent configuration pattern:

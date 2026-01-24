@@ -26,8 +26,8 @@ Examples:
 
 from __future__ import annotations
 
-# Namespace for dot notation: db.tables(), db.schema(), db.query()
-namespace = "db"
+# Pack for dot notation: db.tables(), db.schema(), db.query()
+pack = "db"
 
 __all__ = ["query", "schema", "tables"]
 

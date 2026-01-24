@@ -24,8 +24,8 @@ Tool is not available until all three are configured.
 
 from __future__ import annotations
 
-# Namespace for dot notation: llm.transform()
-namespace = "llm"
+# Pack for dot notation: llm.transform()
+pack = "llm"
 
 __all__ = ["transform"]
 

@@ -1,10 +1,10 @@
-"""Unit tests for tool registry and namespace handling.
+"""Unit tests for tool registry and pack handling.
 
 Tests that the registry correctly handles:
-- Loading tools with namespace support
-- No name collisions between namespaces
-- Namespace proxy access (dot notation)
-- Function lookup by full namespaced name
+- Loading tools with pack support
+- No name collisions between packs
+- Pack proxy access (dot notation)
+- Function lookup by full pack.function name
 """
 
 from __future__ import annotations
@@ -14,48 +14,48 @@ import pytest
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_registry_has_namespaces() -> None:
-    """Verify registry loads tools organized by namespace."""
+def test_registry_has_packs() -> None:
+    """Verify registry loads tools organized by pack."""
     from ot.executor.tool_loader import load_tool_registry
 
     registry = load_tool_registry()
 
-    # Should have multiple namespaces
-    assert len(registry.namespaces) >= 5
+    # Should have multiple packs
+    assert len(registry.packs) >= 5
 
-    # Check expected namespaces exist
-    assert "brave" in registry.namespaces
-    assert "ot" in registry.namespaces
-    assert "page" in registry.namespaces
-    assert "ground" in registry.namespaces
+    # Check expected packs exist
+    assert "brave" in registry.packs
+    assert "ot" in registry.packs
+    assert "page" in registry.packs
+    assert "ground" in registry.packs
 
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_registry_namespaces_have_correct_functions() -> None:
-    """Verify each namespace has its own functions."""
+def test_registry_packs_have_correct_functions() -> None:
+    """Verify each pack has its own functions."""
     from ot.executor.tool_loader import load_tool_registry
-    from ot.executor.worker_proxy import WorkerNamespaceProxy
+    from ot.executor.worker_proxy import WorkerPackProxy
 
     registry = load_tool_registry()
 
-    # brave namespace should have brave-specific functions
-    brave_ns = registry.namespaces["brave"]
-    if isinstance(brave_ns, WorkerNamespaceProxy):
-        assert "search" in brave_ns.functions
-        brave_search = brave_ns.search
+    # brave pack should have brave-specific functions
+    brave_pack = registry.packs["brave"]
+    if isinstance(brave_pack, WorkerPackProxy):
+        assert "search" in brave_pack.functions
+        brave_search = brave_pack.search
     else:
-        assert "search" in brave_ns
-        brave_search = brave_ns["search"]
+        assert "search" in brave_pack
+        brave_search = brave_pack["search"]
 
-    # ground namespace should have ground-specific functions
-    ground_ns = registry.namespaces["ground"]
-    if isinstance(ground_ns, WorkerNamespaceProxy):
-        assert "search" in ground_ns.functions
-        ground_search = ground_ns.search
+    # ground pack should have ground-specific functions
+    ground_pack = registry.packs["ground"]
+    if isinstance(ground_pack, WorkerPackProxy):
+        assert "search" in ground_pack.functions
+        ground_search = ground_pack.search
     else:
-        assert "search" in ground_ns
-        ground_search = ground_ns["search"]
+        assert "search" in ground_pack
+        ground_search = ground_pack["search"]
         # Check docstrings for non-proxy functions
         assert "Gemini" in (ground_search.__doc__ or "") or "grounding" in (
             ground_search.__doc__ or ""
@@ -68,35 +68,35 @@ def test_registry_namespaces_have_correct_functions() -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 def test_registry_counts_all_functions() -> None:
-    """Verify we can count all functions across namespaces without collision."""
+    """Verify we can count all functions across packs without collision."""
     from ot.executor.tool_loader import load_tool_registry
-    from ot.executor.worker_proxy import WorkerNamespaceProxy
+    from ot.executor.worker_proxy import WorkerPackProxy
 
     registry = load_tool_registry()
 
-    # Count functions per namespace - handle both dict and WorkerNamespaceProxy
+    # Count functions per pack - handle both dict and WorkerPackProxy
     total = 0
-    for ns in registry.namespaces.values():
-        if isinstance(ns, WorkerNamespaceProxy):
-            total += len(ns.functions)
+    for pack in registry.packs.values():
+        if isinstance(pack, WorkerPackProxy):
+            total += len(pack.functions)
         else:
-            total += len(ns)
+            total += len(pack)
 
-    # Should have many tools (including duplicates like 'search' in multiple namespaces)
+    # Should have many tools (including duplicates like 'search' in multiple packs)
     assert total >= 30
 
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_build_execution_namespace_has_namespace_proxies() -> None:
-    """Verify execution namespace has namespace proxy objects."""
-    from ot.executor.namespace_proxy import build_execution_namespace
+def test_build_execution_namespace_has_pack_proxies() -> None:
+    """Verify execution namespace has pack proxy objects."""
+    from ot.executor.pack_proxy import build_execution_namespace
     from ot.executor.tool_loader import load_tool_registry
 
     registry = load_tool_registry()
     namespace = build_execution_namespace(registry)
 
-    # Should have namespace proxies
+    # Should have pack proxies
     assert "brave" in namespace
     assert "ground" in namespace
     assert "ot" in namespace
@@ -109,32 +109,32 @@ def test_build_execution_namespace_has_namespace_proxies() -> None:
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_namespace_proxy_returns_correct_function() -> None:
-    """Verify namespace proxy returns the correct function for each namespace."""
-    from ot.executor.namespace_proxy import build_execution_namespace
+def test_pack_proxy_returns_correct_function() -> None:
+    """Verify pack proxy returns the correct function for each pack."""
+    from ot.executor.pack_proxy import build_execution_namespace
     from ot.executor.tool_loader import load_tool_registry
 
     registry = load_tool_registry()
     namespace = build_execution_namespace(registry)
 
-    # Get search from different namespaces
+    # Get search from different packs
     brave_search = namespace["brave"].search
     ground_search = namespace["ground"].search
 
     # They should be different functions/proxies
     assert brave_search is not ground_search
 
-    # For non-worker-proxy namespaces, check docstrings
-    # For worker-proxy namespaces, just verify they're callable
+    # For non-worker-proxy packs, check docstrings
+    # For worker-proxy packs, just verify they're callable
     assert callable(brave_search)
     assert callable(ground_search)
 
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_namespace_proxy_raises_on_unknown_function() -> None:
-    """Verify namespace proxy raises AttributeError for unknown functions."""
-    from ot.executor.namespace_proxy import build_execution_namespace
+def test_pack_proxy_raises_on_unknown_function() -> None:
+    """Verify pack proxy raises AttributeError for unknown functions."""
+    from ot.executor.pack_proxy import build_execution_namespace
     from ot.executor.tool_loader import load_tool_registry
 
     registry = load_tool_registry()
@@ -150,25 +150,25 @@ def test_namespace_proxy_raises_on_unknown_function() -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 def test_registry_functions_by_full_name() -> None:
-    """Verify we can look up functions by full namespaced name from namespaces dict."""
+    """Verify we can look up functions by full pack.function name from packs dict."""
     from ot.executor.tool_loader import load_tool_registry
-    from ot.executor.worker_proxy import WorkerNamespaceProxy
+    from ot.executor.worker_proxy import WorkerPackProxy
 
     registry = load_tool_registry()
 
-    # Look up by full name using namespaces
+    # Look up by full name using packs
     def get_function(full_name: str):
         if "." not in full_name:
             return None
-        ns_name, func_name = full_name.split(".", 1)
-        if ns_name not in registry.namespaces:
+        pack_name, func_name = full_name.split(".", 1)
+        if pack_name not in registry.packs:
             return None
-        ns = registry.namespaces[ns_name]
-        if isinstance(ns, WorkerNamespaceProxy):
-            if func_name in ns.functions:
-                return getattr(ns, func_name)
+        pack = registry.packs[pack_name]
+        if isinstance(pack, WorkerPackProxy):
+            if func_name in pack.functions:
+                return getattr(pack, func_name)
             return None
-        return ns.get(func_name)
+        return pack.get(func_name)
 
     # Should find each search function
     brave_search = get_function("brave.search")
@@ -212,8 +212,8 @@ def test_registry_caching() -> None:
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_registry_functions_use_namespaced_keys() -> None:
-    """Verify registry.functions uses full namespaced names as keys."""
+def test_registry_functions_use_qualified_keys() -> None:
+    """Verify registry.functions uses full pack.function names as keys."""
     from ot.executor.tool_loader import load_tool_registry
 
     registry = load_tool_registry()
@@ -224,7 +224,7 @@ def test_registry_functions_use_namespaced_keys() -> None:
     assert "page.search" in registry.functions
     assert "ot.tools" in registry.functions
 
-    # Each namespaced key should point to the correct function
+    # Each qualified key should point to the correct function
     brave_search = registry.functions["brave.search"]
     ground_search = registry.functions["ground.search"]
 
@@ -240,6 +240,6 @@ def test_registry_no_bare_name_collisions() -> None:
 
     registry = load_tool_registry()
 
-    # Should NOT have bare names for namespaced functions
-    # (only tools without a namespace would have bare names)
+    # Should NOT have bare names for functions in packs
+    # (only tools without a pack would have bare names)
     assert "search" not in registry.functions

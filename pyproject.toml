@@ -1,19 +1,20 @@
 [project]
 name = "onetool-mcp"
-version = "1.0.0"
-description = "MCP server exposing a single 'run' tool for LLM code execution"
+version = "1.0.0b1"
+description = "One MCP, unlimited tools."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "GPL-3.0" }
 authors = [{ name = "Gavin Las", email = "beycom99@gmail.com" }]
-keywords = ["mcp", "llm", "code-execution", "tools", "model-context-protocol"]
+keywords = ["mcp", "mcp-server", "llm", "code-execution", "tools", "model-context-protocol", "token-efficiency", "context-rot", "agents"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Typing :: Typed",
 ]
 dependencies = [
@@ -45,7 +46,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/beycom/onetool"
 Repository = "https://github.com/beycom/onetool"
-Documentation = "https://github.com/beycom/onetool/tree/main/docs"
+Documentation = "https://onetool.beycom.online"
 Issues = "https://github.com/beycom/onetool/issues"
 
 [project.optional-dependencies]

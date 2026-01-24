@@ -1,6 +1,6 @@
 """Consolidated OneTool internal tools.
 
-Provides tool discovery and messaging under the unified `ot` namespace.
+Provides tool discovery and messaging under the unified `ot` pack.
 These are in-process tools with no external dependencies.
 
 Functions:
@@ -9,7 +9,7 @@ Functions:
     ot.config() - Show configuration
     ot.health() - Check system health
     ot.help(tool) - Get full documentation for a tool
-    ot.instructions(ns) - Get usage instructions for a namespace
+    ot.instructions(pack) - Get usage instructions for a pack
     ot.alias(name) - Show alias definition
     ot.snippet(name) - Show snippet definition
     ot.stats() - Get runtime statistics for OneTool usage
@@ -17,8 +17,8 @@ Functions:
 
 from __future__ import annotations
 
-# Namespace for dot notation: ot.tools(), ot.push(), etc.
-namespace = "ot"
+# Pack for dot notation: ot.tools(), ot.push(), etc.
+pack = "ot"
 
 __all__ = [
     "alias",
@@ -95,17 +95,17 @@ def _parse_docstring(doc: str | None) -> dict[str, Any]:
 def tools(
     *,
     pattern: str = "",
-    ns: str = "",
+    pack: str = "",
     compact: bool = False,
 ) -> str:
     """List all available tools with optional filtering.
 
     Lists registered local tools and proxied MCP server tools.
-    Use pattern for name matching or ns to filter by namespace.
+    Use pattern for name matching or pack to filter by pack.
 
     Args:
         pattern: Filter tools by name pattern (case-insensitive substring match)
-        ns: Filter tools by namespace (e.g., "brave", "ot")
+        pack: Filter tools by pack (e.g., "brave", "ot")
         compact: If True, return only name and short description (default: False)
 
     Returns:
@@ -114,10 +114,10 @@ def tools(
     Example:
         ot.tools()
         ot.tools(pattern="search")
-        ot.tools(ns="brave")
+        ot.tools(pack="brave")
         ot.tools(compact=True)
     """
-    with log("ot.tools", pattern=pattern or None, ns=ns or None, compact=compact
+    with log("ot.tools", pattern=pattern or None, pack=pack or None, compact=compact
     ) as s:
         runner_registry = load_tool_registry()
         proxy = get_proxy_manager()
@@ -125,21 +125,21 @@ def tools(
         tools_list: list[dict[str, Any]] = []
 
         # Local tools from registry
-        from ot.executor.worker_proxy import WorkerNamespaceProxy
+        from ot.executor.worker_proxy import WorkerPackProxy
 
-        for ns_name, ns_funcs in runner_registry.namespaces.items():
-            if ns and ns_name != ns:
+        for pack_name, pack_funcs in runner_registry.packs.items():
+            if pack and pack_name != pack:
                 continue
 
-            # Handle both dict and WorkerNamespaceProxy
-            if isinstance(ns_funcs, WorkerNamespaceProxy):
-                func_names = list(ns_funcs.functions)
-                func_items = [(name, getattr(ns_funcs, name)) for name in func_names]
+            # Handle both dict and WorkerPackProxy
+            if isinstance(pack_funcs, WorkerPackProxy):
+                func_names = list(pack_funcs.functions)
+                func_items = [(name, getattr(pack_funcs, name)) for name in func_names]
             else:
-                func_items = list(ns_funcs.items())
+                func_items = list(pack_funcs.items())
 
             for func_name, func in func_items:
-                full_name = f"{ns_name}.{func_name}"
+                full_name = f"{pack_name}.{func_name}"
 
                 if pattern and pattern.lower() not in full_name.lower():
                     continue
@@ -175,9 +175,9 @@ def tools(
         # Proxied tools
         for proxy_tool in proxy.list_tools():
             tool_name = f"{proxy_tool.server}.{proxy_tool.name}"
-            tool_ns = proxy_tool.server
+            tool_pack = proxy_tool.server
 
-            if ns and tool_ns != ns:
+            if pack and tool_pack != pack:
                 continue
             if pattern and pattern.lower() not in tool_name.lower():
                 continue
@@ -364,16 +364,16 @@ def health() -> str:
         ot.health()
     """
     with log("ot.health") as s:
-        from ot.executor.worker_proxy import WorkerNamespaceProxy
+        from ot.executor.worker_proxy import WorkerPackProxy
 
         runner_registry = load_tool_registry()
         proxy = get_proxy_manager()
         cfg = get_config()
 
-        # Count functions, handling both dict and WorkerNamespaceProxy
+        # Count functions, handling both dict and WorkerPackProxy
         tool_count = 0
-        for funcs in runner_registry.namespaces.values():
-            if isinstance(funcs, WorkerNamespaceProxy):
+        for funcs in runner_registry.packs.values():
+            if isinstance(funcs, WorkerPackProxy):
                 tool_count += len(funcs.functions)
             else:
                 tool_count += len(funcs)
@@ -507,7 +507,7 @@ def help(*, tool: str) -> str:
     returns, and examples. Works for both local tools and proxy tools.
 
     Args:
-        tool: Tool name in namespace.function format (e.g., "brave.search")
+        tool: Tool name in pack.function format (e.g., "brave.search")
 
     Returns:
         Formatted documentation with signature, args, returns, and examples
@@ -520,60 +520,60 @@ def help(*, tool: str) -> str:
         # Validate format
         if "." not in tool:
             s.add("error", "invalid_format")
-            return f"Error: Use namespace.function format (e.g., brave.search). Got: {tool}"
+            return f"Error: Use pack.function format (e.g., brave.search). Got: {tool}"
 
-        ns_name, func_name = tool.rsplit(".", 1)
+        pack_name, func_name = tool.rsplit(".", 1)
         runner_registry = load_tool_registry()
         proxy = get_proxy_manager()
 
         # Check local registry first
-        if ns_name in runner_registry.namespaces:
-            ns_funcs = runner_registry.namespaces[ns_name]
+        if pack_name in runner_registry.packs:
+            pack_funcs = runner_registry.packs[pack_name]
 
-            # Handle both dict and WorkerNamespaceProxy
-            from ot.executor.worker_proxy import WorkerNamespaceProxy
+            # Handle both dict and WorkerPackProxy
+            from ot.executor.worker_proxy import WorkerPackProxy
 
-            if isinstance(ns_funcs, WorkerNamespaceProxy):
-                if func_name not in ns_funcs.functions:
-                    available = ", ".join(sorted(ns_funcs.functions))
+            if isinstance(pack_funcs, WorkerPackProxy):
+                if func_name not in pack_funcs.functions:
+                    available = ", ".join(sorted(pack_funcs.functions))
                     s.add("error", "function_not_found")
                     return (
-                        f"Error: '{func_name}' not in {ns_name}. Available: {available}"
+                        f"Error: '{func_name}' not in {pack_name}. Available: {available}"
                     )
-                func = getattr(ns_funcs, func_name)
+                func = getattr(pack_funcs, func_name)
             else:
-                if func_name not in ns_funcs:
-                    available = ", ".join(sorted(ns_funcs.keys()))
+                if func_name not in pack_funcs:
+                    available = ", ".join(sorted(pack_funcs.keys()))
                     s.add("error", "function_not_found")
                     return (
-                        f"Error: '{func_name}' not in {ns_name}. Available: {available}"
+                        f"Error: '{func_name}' not in {pack_name}. Available: {available}"
                     )
-                func = ns_funcs[func_name]
+                func = pack_funcs[func_name]
 
             s.add("found", True)
             s.add("source", "local")
             return _format_local_help(tool, func)
 
         # Check proxy tools
-        proxy_tools = proxy.list_tools(server=ns_name)
+        proxy_tools = proxy.list_tools(server=pack_name)
         if proxy_tools:
             for proxy_tool in proxy_tools:
                 if proxy_tool.name == func_name:
                     s.add("found", True)
-                    s.add("source", f"proxy:{ns_name}")
+                    s.add("source", f"proxy:{pack_name}")
                     return _format_proxy_help(tool, proxy_tool)
 
             # Tool not found in this proxy server
             available = ", ".join(sorted(t.name for t in proxy_tools))
             s.add("error", "function_not_found")
-            return f"Error: '{func_name}' not in {ns_name}. Available: {available}"
+            return f"Error: '{func_name}' not in {pack_name}. Available: {available}"
 
-        # Namespace not found in local or proxy
-        local_ns = set(runner_registry.namespaces.keys())
-        proxy_ns = set(proxy.servers)
-        all_ns = sorted(local_ns | proxy_ns)
-        s.add("error", "namespace_not_found")
-        return f"Error: Namespace '{ns_name}' not found. Available: {', '.join(all_ns)}"
+        # Pack not found in local or proxy
+        local_packs = set(runner_registry.packs.keys())
+        proxy_packs = set(proxy.servers)
+        all_packs = sorted(local_packs | proxy_packs)
+        s.add("error", "pack_not_found")
+        return f"Error: Pack '{pack_name}' not found. Available: {', '.join(all_packs)}"
 
 
 def _format_local_help(tool: str, func: Any) -> str:
@@ -693,42 +693,42 @@ def _format_proxy_help(tool: str, proxy_tool: Any) -> str:
     return "\n".join(lines)
 
 
-def instructions(*, ns: str) -> str:
-    """Get usage instructions for a namespace.
+def instructions(*, pack: str) -> str:
+    """Get usage instructions for a pack.
 
     Returns instructions from prompts.yaml if configured, otherwise
     generates instructions from tool docstrings (local) or tool list (proxy).
 
     Args:
-        ns: Namespace name (e.g., "brave", "github", "excel")
+        pack: Pack name (e.g., "brave", "github", "excel")
 
     Returns:
-        Instructions text for the namespace
+        Instructions text for the pack
 
     Example:
-        ot.instructions(ns="brave")
-        ot.instructions(ns="github")
+        ot.instructions(pack="brave")
+        ot.instructions(pack="github")
     """
-    from ot.prompts import PromptsError, get_namespace_instructions, get_prompts
+    from ot.prompts import PromptsError, get_pack_instructions, get_prompts
 
-    with log("ot.instructions", ns=ns) as s:
+    with log("ot.instructions", pack=pack) as s:
         runner_registry = load_tool_registry()
         proxy = get_proxy_manager()
 
-        # Collect available namespaces
-        local_ns = set(runner_registry.namespaces.keys())
-        proxy_ns = set(proxy.servers)
-        all_ns = local_ns | proxy_ns
+        # Collect available packs
+        local_packs = set(runner_registry.packs.keys())
+        proxy_packs = set(proxy.servers)
+        all_packs = local_packs | proxy_packs
 
-        # Check if namespace exists
-        if ns not in all_ns:
-            s.add("error", "namespace_not_found")
-            return f"Error: Namespace '{ns}' not found. Available: {', '.join(sorted(all_ns))}"
+        # Check if pack exists
+        if pack not in all_packs:
+            s.add("error", "pack_not_found")
+            return f"Error: Pack '{pack}' not found. Available: {', '.join(sorted(all_packs))}"
 
         # Try to get configured instructions from prompts.yaml
         try:
             prompts_config = get_prompts()
-            configured = get_namespace_instructions(prompts_config, ns)
+            configured = get_pack_instructions(prompts_config, pack)
             if configured:
                 s.add("source", "config")
                 return configured
@@ -737,48 +737,48 @@ def instructions(*, ns: str) -> str:
             pass
 
         # Fallback: generate instructions
-        if ns in local_ns:
+        if pack in local_packs:
             s.add("source", "local_docstrings")
-            return _generate_local_instructions(ns, runner_registry)
+            return _generate_local_instructions(pack, runner_registry)
         else:
             s.add("source", "proxy_tools")
-            return _generate_proxy_instructions(ns, proxy)
+            return _generate_proxy_instructions(pack, proxy)
 
 
-def _generate_local_instructions(ns: str, registry: Any) -> str:
+def _generate_local_instructions(pack: str, registry: Any) -> str:
     """Generate instructions from local tool docstrings."""
-    from ot.executor.worker_proxy import WorkerNamespaceProxy
+    from ot.executor.worker_proxy import WorkerPackProxy
 
-    ns_funcs = registry.namespaces[ns]
+    pack_funcs = registry.packs[pack]
 
-    lines = [f"# {ns} namespace", ""]
+    lines = [f"# {pack} pack", ""]
 
-    # Handle both dict and WorkerNamespaceProxy
-    if isinstance(ns_funcs, WorkerNamespaceProxy):
-        func_items = [(name, getattr(ns_funcs, name)) for name in ns_funcs.functions]
+    # Handle both dict and WorkerPackProxy
+    if isinstance(pack_funcs, WorkerPackProxy):
+        func_items = [(name, getattr(pack_funcs, name)) for name in pack_funcs.functions]
     else:
-        func_items = list(ns_funcs.items())
+        func_items = list(pack_funcs.items())
 
     for func_name, func in sorted(func_items):
         doc = func.__doc__ or "(no description)"
         first_line = doc.split("\n")[0].strip()
-        lines.append(f"- **{ns}.{func_name}**: {first_line}")
+        lines.append(f"- **{pack}.{func_name}**: {first_line}")
 
     return "\n".join(lines)
 
 
-def _generate_proxy_instructions(ns: str, proxy: Any) -> str:
+def _generate_proxy_instructions(pack: str, proxy: Any) -> str:
     """Generate instructions from proxy tool list."""
-    tools = proxy.list_tools(server=ns)
+    tools = proxy.list_tools(server=pack)
 
-    lines = [f"# {ns} namespace (proxy)", ""]
-    lines.append(f"Tools available from the {ns} MCP server:")
+    lines = [f"# {pack} pack (proxy)", ""]
+    lines.append(f"Tools available from the {pack} MCP server:")
     lines.append("")
 
     for tool in sorted(tools, key=lambda t: t.name):
         desc = tool.description or "(no description)"
         first_line = desc.split("\n")[0].strip()
-        lines.append(f"- **{ns}.{tool.name}**: {first_line}")
+        lines.append(f"- **{pack}.{tool.name}**: {first_line}")
 
     return "\n".join(lines)
 

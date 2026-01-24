@@ -21,7 +21,7 @@ from __future__ import annotations
 # Use typing.List for type annotations to avoid mypy confusion.
 from typing import List  # noqa: UP035
 
-namespace = "file"
+pack = "file"
 
 __all__ = [
     "copy",

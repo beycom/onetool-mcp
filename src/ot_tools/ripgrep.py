@@ -9,8 +9,8 @@ by Matteo Collina, licensed under MIT.
 
 from __future__ import annotations
 
-# Namespace for dot notation: ripgrep.search(), ripgrep.count(), etc.
-namespace = "ripgrep"
+# Pack for dot notation: ripgrep.search(), ripgrep.count(), etc.
+pack = "ripgrep"
 
 __all__ = ["count", "files", "search", "types"]
 

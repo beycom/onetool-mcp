@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the `run()` MCP tool for executing Python code with access to the tool registry. Handles code fence stripping, namespace resolution, alias expansion, snippet processing, result capture, and error context.
+Defines the `run()` MCP tool for executing Python code with access to the tool registry. Handles code fence stripping, pack resolution, alias expansion, snippet processing, result capture, and error context.
 ## Requirements
 ### Requirement: Robust Fence Stripping
 
@@ -124,26 +124,26 @@ The system SHALL provide clear error context for failures.
 - **WHEN** execution fails
 - **THEN** error SHALL include expected signature
 
-### Requirement: Namespace Resolution
+### Requirement: Pack Resolution
 
-The system SHALL resolve dot-notation namespaces to actual tool functions.
+The system SHALL resolve dot-notation packs to actual tool functions.
 
-#### Scenario: Simple namespaced call
-- **GIVEN** command `brave.web_search(query="test")` where `brave` namespace contains `web_search`
+#### Scenario: Simple pack call
+- **GIVEN** command `brave.web_search(query="test")` where `brave` pack contains `web_search`
 - **WHEN** run() processes the command
-- **THEN** it SHALL call the `web_search` function from `brave` namespace
+- **THEN** it SHALL call the `web_search` function from `brave` pack
 
-#### Scenario: Unknown namespace
-- **GIVEN** command `unknown.func()` where `unknown` namespace does not exist
+#### Scenario: Unknown pack
+- **GIVEN** command `unknown.func()` where `unknown` pack does not exist
 - **WHEN** run() processes the command
-- **THEN** it SHALL return error listing available namespaces
+- **THEN** it SHALL return error listing available packs
 
-#### Scenario: Function not in namespace
-- **GIVEN** command `brave.nonexistent()` where function does not exist in `brave` namespace
+#### Scenario: Function not in pack
+- **GIVEN** command `brave.nonexistent()` where function does not exist in `brave` pack
 - **WHEN** run() processes the command
-- **THEN** it SHALL return error listing available functions in that namespace
+- **THEN** it SHALL return error listing available functions in that pack
 
-#### Scenario: Same function name in different namespaces
+#### Scenario: Same function name in different packs
 - **GIVEN** `brave.search()` and `context7.search()` exist as distinct functions
 - **WHEN** run() processes `brave.search(query="test")`
 - **THEN** it SHALL call the brave-specific search function
@@ -171,9 +171,9 @@ The system SHALL expand snippet templates using Jinja2.
 - **WHEN** run() processes the command
 - **THEN** it SHALL expand the snippet template and execute the result
 
-### Requirement: Project Namespace Proxy
+### Requirement: Project Pack Proxy
 
-The `proj` namespace SHALL use a special proxy supporting dynamic project attributes.
+The `proj` pack SHALL use a special proxy supporting dynamic project attributes.
 
 #### Scenario: Dynamic attribute resolution
 - **GIVEN** `projects: { onetool: ~/projects/onetool }` in config
@@ -181,7 +181,7 @@ The `proj` namespace SHALL use a special proxy supporting dynamic project attrib
 - **THEN** it SHALL resolve to the configured project path as `ProjectPath`
 
 #### Scenario: Function priority
-- **GIVEN** the `proj` namespace has `path` and `list` functions
+- **GIVEN** the `proj` pack has `path` and `list` functions
 - **WHEN** `proj.path` or `proj.list` is accessed
 - **THEN** the function SHALL be returned, not a project lookup
 
@@ -211,10 +211,10 @@ The runner implementation SHALL be organized into focused modules.
 - **WHEN** tools are discovered and cached
 - **THEN** it SHALL use the dedicated `tool_loader` module
 
-#### Scenario: Namespace proxy isolation
+#### Scenario: Pack proxy isolation
 - **GIVEN** the runner builds execution namespace
 - **WHEN** proxy objects are created for dot notation
-- **THEN** it SHALL use the dedicated `namespace_proxy` module
+- **THEN** it SHALL use the dedicated `pack_proxy` module
 
 #### Scenario: Runner focused on orchestration
 - **GIVEN** the runner module

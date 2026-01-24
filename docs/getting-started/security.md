@@ -133,7 +133,7 @@ DATABASE_URL: "${PROD_DB_URL}"
 Tools run in isolated worker processes:
 
 - Separate memory space from main server
-- Controlled namespace (no arbitrary imports)
+- Controlled execution environment (no arbitrary imports)
 - Timeout enforcement per tool
 - Clean process state between calls
 

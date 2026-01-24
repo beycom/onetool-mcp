@@ -12,8 +12,8 @@ https://github.com/haris-musa/excel-mcp-server
 
 from __future__ import annotations
 
-# Namespace for dot notation: excel.create(), excel.read(), etc.
-namespace = "excel"
+# Pack for dot notation: excel.create(), excel.read(), etc.
+pack = "excel"
 
 __all__ = [
     "add_sheet",

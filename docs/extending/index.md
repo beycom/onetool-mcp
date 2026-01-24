@@ -1,8 +1,8 @@
 # Extending OneTool
 
-**Drop a file. Get a namespace. No registration.**
+**Drop a file. Get a pack. No registration.**
 
-Adding tools to OneTool is trivial - create a Python file, declare a namespace, and you're done.
+Adding tools to OneTool is trivial - create a Python file, declare a pack, and you're done.
 
 ## Developer Guides
 
@@ -20,7 +20,7 @@ Adding tools to OneTool is trivial - create a Python file, declare a namespace, 
 
 ```python
 # src/ot_tools/mytool.py
-namespace = "mytool"
+pack = "mytool"
 
 __all__ = ["search"]
 

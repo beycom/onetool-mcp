@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 import pytest
 
 from ot.executor.pep723 import (
-    extract_namespace,
+    extract_pack,
     extract_tool_functions,
     parse_pep723_metadata,
 )
@@ -86,26 +86,26 @@ class TestParsePep723Metadata:
 
 @pytest.mark.unit
 @pytest.mark.core
-class TestExtractNamespace:
-    """Tests for extract_namespace function."""
+class TestExtractPack:
+    """Tests for extract_pack function."""
 
-    def test_extracts_namespace_declaration(self, tmp_path: Path) -> None:
-        """Should extract namespace from module-level assignment."""
+    def test_extracts_pack_declaration(self, tmp_path: Path) -> None:
+        """Should extract pack from module-level assignment."""
         tool_file = tmp_path / "my_tool.py"
         tool_file.write_text(
             dedent("""
-            namespace = "brave"
+            pack = "brave"
 
             def search(query: str) -> str:
                 return query
         """)
         )
 
-        result = extract_namespace(tool_file)
+        result = extract_pack(tool_file)
         assert result == "brave"
 
-    def test_returns_none_when_no_namespace(self, tmp_path: Path) -> None:
-        """Should return None when no namespace is declared."""
+    def test_returns_none_when_no_pack(self, tmp_path: Path) -> None:
+        """Should return None when no pack is declared."""
         tool_file = tmp_path / "my_tool.py"
         tool_file.write_text(
             dedent("""
@@ -114,22 +114,22 @@ class TestExtractNamespace:
         """)
         )
 
-        result = extract_namespace(tool_file)
+        result = extract_pack(tool_file)
         assert result is None
 
-    def test_ignores_non_string_namespace(self, tmp_path: Path) -> None:
-        """Should return None when namespace is not a string literal."""
+    def test_ignores_non_string_pack(self, tmp_path: Path) -> None:
+        """Should return None when pack is not a string literal."""
         tool_file = tmp_path / "my_tool.py"
         tool_file.write_text(
             dedent("""
-            namespace = get_namespace()
+            pack = get_pack()
 
             def search(query: str) -> str:
                 return query
         """)
         )
 
-        result = extract_namespace(tool_file)
+        result = extract_pack(tool_file)
         assert result is None
 
 

@@ -9,8 +9,8 @@ Reference: https://github.com/chunkhound/chunkhound
 
 from __future__ import annotations
 
-# Namespace for dot notation: code.search(), code.status()
-namespace = "code"
+# Pack for dot notation: code.search(), code.status()
+pack = "code"
 
 from pathlib import Path
 from typing import Any

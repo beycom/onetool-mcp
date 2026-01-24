@@ -9,7 +9,7 @@ import pytest
 
 from ot.executor.worker_proxy import (
     WorkerFunctionProxy,
-    WorkerNamespaceProxy,
+    WorkerPackProxy,
     create_worker_function,
     create_worker_proxy,
 )
@@ -59,12 +59,12 @@ class TestWorkerFunctionProxy:
 
 @pytest.mark.unit
 @pytest.mark.core
-class TestWorkerNamespaceProxy:
-    """Tests for WorkerNamespaceProxy class."""
+class TestWorkerPackProxy:
+    """Tests for WorkerPackProxy class."""
 
     def test_getattr_returns_function_proxy(self) -> None:
         """Should return function proxy for valid function name."""
-        proxy = WorkerNamespaceProxy(
+        proxy = WorkerPackProxy(
             tool_path=Path("/path/to/tool.py"),
             functions=["search", "fetch"],
             config={},
@@ -77,7 +77,7 @@ class TestWorkerNamespaceProxy:
 
     def test_getattr_caches_function_proxy(self) -> None:
         """Should cache function proxies."""
-        proxy = WorkerNamespaceProxy(
+        proxy = WorkerPackProxy(
             tool_path=Path("/path/to/tool.py"),
             functions=["search"],
             config={},
@@ -91,7 +91,7 @@ class TestWorkerNamespaceProxy:
 
     def test_getattr_raises_for_unknown_function(self) -> None:
         """Should raise AttributeError for unknown function."""
-        proxy = WorkerNamespaceProxy(
+        proxy = WorkerPackProxy(
             tool_path=Path("/path/to/tool.py"),
             functions=["search"],
             config={},
@@ -103,7 +103,7 @@ class TestWorkerNamespaceProxy:
 
     def test_getattr_raises_for_private_attr(self) -> None:
         """Should raise AttributeError for private attribute access."""
-        proxy = WorkerNamespaceProxy(
+        proxy = WorkerPackProxy(
             tool_path=Path("/path/to/tool.py"),
             functions=["search"],
             config={},
@@ -115,7 +115,7 @@ class TestWorkerNamespaceProxy:
 
     def test_dir_returns_function_names(self) -> None:
         """Should return function names for introspection."""
-        proxy = WorkerNamespaceProxy(
+        proxy = WorkerPackProxy(
             tool_path=Path("/path/to/tool.py"),
             functions=["search", "fetch"],
             config={},
@@ -126,7 +126,7 @@ class TestWorkerNamespaceProxy:
 
     def test_repr(self) -> None:
         """Should have informative repr."""
-        proxy = WorkerNamespaceProxy(
+        proxy = WorkerPackProxy(
             tool_path=Path("/path/to/brave.py"),
             functions=["search", "web"],
             config={},
@@ -145,7 +145,7 @@ class TestCreateWorkerProxy:
     """Tests for create_worker_proxy factory function."""
 
     def test_creates_namespace_proxy(self) -> None:
-        """Should create WorkerNamespaceProxy."""
+        """Should create WorkerPackProxy."""
         proxy = create_worker_proxy(
             tool_path=Path("/path/to/tool.py"),
             functions=["search", "fetch"],
@@ -153,7 +153,7 @@ class TestCreateWorkerProxy:
             secrets={"API_KEY": "secret"},
         )
 
-        assert isinstance(proxy, WorkerNamespaceProxy)
+        assert isinstance(proxy, WorkerPackProxy)
         assert "search" in dir(proxy)
         assert "fetch" in dir(proxy)
 

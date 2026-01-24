@@ -10,18 +10,18 @@ The system SHALL provide `ot tool add <source>` to install tools from various so
 
 #### Scenario: Add from local path
 - **WHEN** a user runs `ot tool add ./my_tool/tool.py`
-- **THEN** the tool is copied to `~/.onetool/tools/<namespace>/`
+- **THEN** the tool is copied to `~/.onetool/tools/<pack>/`
 - **AND** the tool becomes available for use
 
 #### Scenario: Add from git repository
 - **WHEN** a user runs `ot tool add https://github.com/user/ot-excel-tool`
-- **THEN** the repository is cloned to `~/.onetool/tools/<namespace>/`
+- **THEN** the repository is cloned to `~/.onetool/tools/<pack>/`
 - **AND** the tool becomes available for use
 
 #### Scenario: Add from registry
 - **WHEN** a user runs `ot tool add excel`
 - **THEN** the tool is fetched from the onetool registry (future)
-- **AND** installed to `~/.onetool/tools/<namespace>/`
+- **AND** installed to `~/.onetool/tools/<pack>/`
 
 ### Requirement: Tool Removal
 

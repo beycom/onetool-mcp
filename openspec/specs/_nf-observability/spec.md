@@ -288,14 +288,14 @@ All public tool functions SHALL use LogSpan for structured operation logging.
 - **GIVEN** a public tool function (non-underscore prefixed)
 - **WHEN** the function is executed
 - **THEN** it SHALL wrap execution in a `LogSpan` context manager with:
-  - `span`: Named using dot-notation `{namespace}.{function}`
+  - `span`: Named using dot-notation `{pack}.{function}`
   - Key parameters logged as span fields
   - Result metrics added before exit
 
 #### Scenario: Consistent span naming
-- **GIVEN** a tool in namespace `ns` with function `fn`
+- **GIVEN** a tool in pack `pack` with function `fn`
 - **WHEN** LogSpan is created
-- **THEN** the span name SHALL be `{ns}.{fn}` (e.g., `brave.search`, `db.query`)
+- **THEN** the span name SHALL be `{pack}.{fn}` (e.g., `brave.search`, `db.query`)
 
 #### Scenario: Use log() helper
 - **GIVEN** a tool function needs to create a LogSpan

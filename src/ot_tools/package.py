@@ -8,8 +8,8 @@ Attribution: Based on mcp-package-version by Sam McLeod - MIT License
 
 from __future__ import annotations
 
-# Namespace for dot notation: package.version(), package.npm(), etc.
-namespace = "package"
+# Pack for dot notation: package.version(), package.npm(), etc.
+pack = "package"
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC

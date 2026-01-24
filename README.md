@@ -6,15 +6,21 @@
   <em>One tool to rule them all, one tool to find them, one tool to bring them all, and in the development bind them.</em>
 </p>
 
+<p align="center">
+  <a href="https://pypi.org/project/onetool-mcp/"><img alt="PyPI" src="https://img.shields.io/pypi/v/onetool-mcp"></a>
+  <a href="https://github.com/beycom/onetool-mcp/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPLv3-blue"></a>
+  <a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-blue"></a>
+</p>
+
+> **v1.0.0 Pre-Release** - API stable, actively tested.
+
 **Don't enumerate tools. Execute code.**
 
 OneTool is a local-first MCP server that exposes a single `run` tool for code execution, giving your AI assistant access to unlimited capabilities through one interface.
 
 ## The Problem
 
-Token bloat • Context rot • Tool sprawl • Guessing games • Schema overhead • Scaling limits
-
-Connect 5 MCP servers: **55K tokens** consumed before conversation begins. Connect 10+: **100K+ tokens** burned. Your AI gets worse as you add more tools.
+Connect 5 MCP servers and you've burned 55K tokens before the conversation starts. Connect 10+ and you're at 100K tokens. Your AI gets worse as you add more tools - that's not a bug, it's how context windows work.
 
 ## The Solution
 
@@ -32,9 +38,9 @@ Based on [Anthropic's research](https://www.anthropic.com/engineering/code-execu
 
 ## Core Capabilities
 
-- **10 built-in namespaces** - brave, web, context7, code, llm, db, package, ripgrep, excel, ot
+- **15 built-in packs** - brave, web, ground, context7, code, ripgrep, llm, db, excel, convert, package, file, diagram, page, ot
 - **30-second setup** - Install with uv or pip
-- **Drop-in extensibility** - Add a Python file, get a new namespace
+- **Drop-in extensibility** - Add a Python file, get a new pack
 - **AST security** - All code validated before execution
 - **Benchmark harness** - Test LLM + MCP combinations with `ot-bench`
 
@@ -60,29 +66,26 @@ Add to Claude Code (`~/.claude/settings.json`):
 
 ## What's Inside
 
-**Namespaces** - brave (web search), web (fetch), context7 (library docs), code (semantic search), llm (transform), db (SQL), package (npm/PyPI), ripgrep (file search), excel (spreadsheets), ot (meta tools)
+**Packs** - brave (web search), web (fetch), ground (Google grounded), context7 (library docs), code (semantic search), ripgrep (file search), llm (transform), db (SQL), excel (spreadsheets), convert (PDF/Word to Markdown), package (npm/PyPI), file (safe operations), diagram (PlantUML), page (browser captures), ot (meta tools)
 
 **CLIs** - `ot-serve` (MCP server), `ot-bench` (benchmark harness)
 
 ## Extending
 
-Drop a Python file, get a namespace. No registration, no config:
+Drop a Python file, get a pack. No registration, no config:
 
 ```python
 # tools/mytool.py
-namespace = "mytool"
+pack = "mytool"
 
 def search(*, query: str) -> str:
     """Search for something."""
     return f"Results for: {query}"
 ```
 
-## Philosophy
+## Why this approach
 
-- **Fight Context Rot** - 2K tokens instead of 150K
-- **Code is King** - LLMs write Python, not JSON
-- **Explicit Invocation** - You control what gets called
-- **Batteries Included** - 10 namespaces ready, extensible by design
+LLMs write Python instead of parsing JSON schemas. You see what's being called. 2K tokens instead of 150K. 15 packs ready to use, and adding your own is just dropping in a file.
 
 ## Documentation
 
@@ -96,16 +99,9 @@ def search(*, query: str) -> str:
 - [Code Execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) - Anthropic Engineering
 - [Context Rot](https://research.trychroma.com/context-rot) - Chroma Research
 
-## Licensing & Roadmap
+## Licensing
 
-**OneTool** is currently licensed under **GPLv3**. I have chosen this license for the early development phase to:
-
-- **Prevent Fragmentation:** Ensure the community remains focused on a single, high-quality version.
-- **Guarantee Reciprocity:** Ensure all early improvements are shared back with the project.
-
-**The Future:** Once OneTool reaches a stable milestone (Target: Version 2.0), I intend to re-license the project under the **MIT License**. This will allow for maximum flexibility once the core architecture is established.
-
-I kindly ask that you contribute via Pull Requests to the main repository rather than maintaining separate public forks to help reach that milestone faster.
+**GPLv3** - Will transition to **MIT** at v2.0. Contribute via PRs to help us get there.
 
 ## Support
 

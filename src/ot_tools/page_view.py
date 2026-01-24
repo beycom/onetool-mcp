@@ -20,8 +20,8 @@ Session/Capture Hierarchy:
 
 from __future__ import annotations
 
-# Namespace for dot notation: page.list(), page.captures(), page.summary(), etc.
-namespace = "page"
+# Pack for dot notation: page.list(), page.captures(), page.summary(), etc.
+pack = "page"
 
 __all__ = [
     "accessibility",

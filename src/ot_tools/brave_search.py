@@ -14,8 +14,8 @@ Reference: https://github.com/brave/brave-search-mcp-server
 
 from __future__ import annotations
 
-# Namespace for dot notation: brave.search(), brave.news(), etc.
-namespace = "brave"
+# Pack for dot notation: brave.search(), brave.news(), etc.
+pack = "brave"
 
 __all__ = ["image", "local", "news", "search", "search_batch", "summarize", "video"]
 

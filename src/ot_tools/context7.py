@@ -13,8 +13,8 @@ https://github.com/upstash/context7
 
 from __future__ import annotations
 
-# Namespace for dot notation: context7.search(), context7.doc()
-namespace = "context7"
+# Pack for dot notation: context7.search(), context7.doc()
+pack = "context7"
 
 __all__ = ["doc", "search"]
 

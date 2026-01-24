@@ -61,10 +61,10 @@ class WorkerFunctionProxy:
         return f"<WorkerFunctionProxy {self.tool_path.stem}.{self.function_name}>"
 
 
-class WorkerNamespaceProxy:
-    """Proxy for a tool namespace that routes attribute access to functions.
+class WorkerPackProxy:
+    """Proxy for a tool pack that routes attribute access to functions.
 
-    Provides dot notation access: namespace.function(**kwargs)
+    Provides dot notation access: pack.function(**kwargs)
     """
 
     def __init__(
@@ -74,7 +74,7 @@ class WorkerNamespaceProxy:
         config: dict[str, Any],
         secrets: dict[str, str],
     ) -> None:
-        """Initialize namespace proxy.
+        """Initialize pack proxy.
 
         Args:
             tool_path: Path to the tool Python file
@@ -122,7 +122,7 @@ class WorkerNamespaceProxy:
 
     def __repr__(self) -> str:
         funcs = ", ".join(sorted(self.functions))
-        return f"<WorkerNamespaceProxy {self.tool_path.stem}: {funcs}>"
+        return f"<WorkerPackProxy {self.tool_path.stem}: {funcs}>"
 
     def __dir__(self) -> list[str]:
         """Return available function names for introspection."""
@@ -134,7 +134,7 @@ def create_worker_proxy(
     functions: list[str],
     config: dict[str, Any] | None = None,
     secrets: dict[str, str] | None = None,
-) -> WorkerNamespaceProxy:
+) -> WorkerPackProxy:
     """Create a worker proxy for a tool.
 
     Args:
@@ -144,9 +144,9 @@ def create_worker_proxy(
         secrets: Secrets dict to pass to worker
 
     Returns:
-        WorkerNamespaceProxy for the tool
+        WorkerPackProxy for the tool
     """
-    return WorkerNamespaceProxy(
+    return WorkerPackProxy(
         tool_path=tool_path,
         functions=functions,
         config=config or {},
@@ -162,7 +162,7 @@ def create_worker_function(
 ) -> Callable[..., Any]:
     """Create a single worker function proxy.
 
-    Use this when you need a standalone function rather than a namespace.
+    Use this when you need a standalone function rather than a pack.
 
     Args:
         tool_path: Path to the tool Python file

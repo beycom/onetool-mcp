@@ -36,9 +36,9 @@ class PromptsConfig(BaseModel):
         default_factory=dict,
         description="Reusable prompt templates with {variable} placeholders",
     )
-    namespaces: dict[str, str] = Field(
+    packs: dict[str, str] = Field(
         default_factory=dict,
-        description="Per-namespace instructions (e.g., excel, github)",
+        description="Per-pack instructions (e.g., excel, github)",
     )
 
 
@@ -158,17 +158,17 @@ def get_tool_examples(config: PromptsConfig, tool_name: str) -> list[str]:
     return []
 
 
-def get_namespace_instructions(config: PromptsConfig, namespace: str) -> str | None:
-    """Get instructions for a namespace from prompts config.
+def get_pack_instructions(config: PromptsConfig, pack: str) -> str | None:
+    """Get instructions for a pack from prompts config.
 
     Args:
-        config: PromptsConfig with namespace instructions
-        namespace: Name of the namespace (e.g., "excel", "github")
+        config: PromptsConfig with pack instructions
+        pack: Name of the pack (e.g., "excel", "github")
 
     Returns:
-        Namespace instructions string, or None if not configured.
+        Pack instructions string, or None if not configured.
     """
-    return config.namespaces.get(namespace)
+    return config.packs.get(pack)
 
 
 # Global prompts instance

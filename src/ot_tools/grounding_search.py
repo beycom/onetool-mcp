@@ -7,8 +7,8 @@ Requires GEMINI_API_KEY in secrets.yaml.
 
 from __future__ import annotations
 
-# Namespace for dot notation: ground.search(), ground.dev(), etc.
-namespace = "ground"
+# Pack for dot notation: ground.search(), ground.dev(), etc.
+pack = "ground"
 
 __all__ = ["dev", "docs", "reddit", "search"]
 

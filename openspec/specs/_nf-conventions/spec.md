@@ -14,15 +14,15 @@ All tool files SHALL follow a standard structure.
 - **THEN** it SHALL include in order:
   1. Module docstring (description, requirements, references)
   2. `from __future__ import annotations`
-  3. `namespace = "<name>"` declaration
+  3. `pack = "<name>"` declaration
   4. `__all__ = [...]` export list
   5. Standard library imports
   6. Project imports
   7. Third-party imports (with graceful error handling)
 
-#### Scenario: Namespace declaration position
+#### Scenario: Pack declaration position
 - **GIVEN** a tool file
-- **WHEN** `namespace` is declared
+- **WHEN** `pack` is declared
 - **THEN** it SHALL appear before all imports except `from __future__`
 
 #### Scenario: Export control
@@ -74,7 +74,7 @@ All public tool functions SHALL include complete docstrings.
 #### Scenario: Example format
 - **GIVEN** an Example section
 - **WHEN** examples are provided
-- **THEN** they SHALL show namespace.function() calls with realistic parameters
+- **THEN** they SHALL show pack.function() calls with realistic parameters
 
 ---
 
@@ -88,9 +88,9 @@ All public tool functions SHALL use LogSpan for structured operation logging.
 - **THEN** it SHALL wrap execution in `LogSpan` context manager
 
 #### Scenario: Span naming
-- **GIVEN** a tool in namespace `ns` with function `fn`
+- **GIVEN** a tool in pack `pack` with function `fn`
 - **WHEN** LogSpan is created
-- **THEN** span name SHALL be `{ns}.{fn}` (e.g., `brave.search`, `db.query`)
+- **THEN** span name SHALL be `{pack}.{fn}` (e.g., `brave.search`, `db.query`)
 
 #### Scenario: Input logging
 - **GIVEN** a function with input parameters
@@ -179,7 +179,7 @@ Tools SHALL access configuration via get_config().
 #### Scenario: Tool-specific config
 - **GIVEN** a tool with configurable options
 - **WHEN** accessing configuration
-- **THEN** it SHALL use `get_config().tools.<namespace>.<field>`
+- **THEN** it SHALL use `get_config().tools.<pack>.<field>`
 
 #### Scenario: Default values
 - **GIVEN** a config field is not set

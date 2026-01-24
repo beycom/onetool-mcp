@@ -15,12 +15,12 @@ Internal tools for OneTool introspection and management.
 
 | Function | Description |
 |----------|-------------|
-| `ot.tools(pattern, ns, compact)` | List all available tools and their signatures |
+| `ot.tools(pattern, pack, compact)` | List all available tools and their signatures |
 | `ot.push(topic, message)` | Publish message to configured topic |
 | `ot.config()` | Show aliases, snippets, and server names |
 | `ot.health()` | Check tool dependencies and API connectivity |
 | `ot.help(tool)` | Get detailed help for a specific tool |
-| `ot.instructions(ns)` | Get usage instructions for a namespace |
+| `ot.instructions(pack)` | Get usage instructions for a pack |
 | `ot.alias(name)` | Show alias definition (use `*` to list all) |
 | `ot.snippet(name)` | Show snippet definition (use `*` to list all) |
 
@@ -35,8 +35,8 @@ ot.tools()
 # Filter by name pattern
 ot.tools(pattern="search")
 
-# Filter by namespace
-ot.tools(ns="brave")
+# Filter by pack
+ot.tools(pack="brave")
 
 # Compact output (name and description only)
 ot.tools(compact=True)
@@ -103,11 +103,11 @@ Returns formatted help with signature, args, returns, and examples.
 
 ## ot.instructions()
 
-Get usage instructions for a namespace.
+Get usage instructions for a pack.
 
 ```python
-ot.instructions(ns="brave")
-ot.instructions(ns="github")
+ot.instructions(pack="brave")
+ot.instructions(pack="github")
 ```
 
 Returns instructions from `prompts.yaml` if configured, otherwise generates from tool docstrings.

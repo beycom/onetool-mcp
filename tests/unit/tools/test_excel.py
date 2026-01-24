@@ -22,11 +22,11 @@ def excel_file(tmp_path: Path) -> Path:
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_namespace_is_excel() -> None:
-    """Verify namespace is correctly set."""
-    from ot_tools.excel import namespace
+def test_pack_is_excel() -> None:
+    """Verify pack is correctly set."""
+    from ot_tools.excel import pack
 
-    assert namespace == "excel"
+    assert pack == "excel"
 
 
 @pytest.mark.unit

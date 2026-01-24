@@ -1,6 +1,6 @@
 # Creating Tools
 
-**One file. One namespace. Instant availability.**
+**One file. One pack. Instant availability.**
 
 No registration. No configuration. Drop a Python file, restart the server, call your functions.
 
@@ -17,8 +17,8 @@ Requirements (e.g., "Requires MY_API_KEY in secrets.yaml").
 
 from __future__ import annotations
 
-# Namespace declaration MUST be before other imports
-namespace = "mytools"
+# Pack declaration MUST be before other imports
+pack = "mytools"
 
 # Export only these functions as tools
 __all__ = ["search", "fetch", "batch"]
@@ -29,16 +29,16 @@ from ot.config.secrets import get_secret
 from ot.logging import LogSpan
 ```
 
-## Namespace Declaration
+## Pack Declaration
 
-The `namespace` variable enables dot notation:
+The `pack` variable enables dot notation:
 
 ```python
-namespace = "brave"  # Exposes brave.search(), brave.news()
-namespace = "web"    # Exposes web.fetch(), web.fetch_batch()
+pack = "brave"  # Exposes brave.search(), brave.news()
+pack = "web"    # Exposes web.fetch(), web.fetch_batch()
 ```
 
-**Important**: The namespace declaration must appear before other imports (except `from __future__`).
+**Important**: The pack declaration must appear before other imports (except `from __future__`).
 
 ## Export Control
 
@@ -141,7 +141,7 @@ Tools with external dependencies run as isolated subprocesses using PEP 723:
 
 from ot_sdk import get_config, get_secret, http, log, cache, worker_main
 
-namespace = "mytool"
+pack = "mytool"
 __all__ = ["search"]
 
 @cache(ttl=300)  # Cache results for 5 minutes
@@ -381,7 +381,7 @@ For "Based on" tools, include the upstream license:
 ## Checklist
 
 - [ ] Module docstring with description
-- [ ] `namespace = "..."` before imports
+- [ ] `pack = "..."` before imports
 - [ ] `__all__ = [...]` listing exports
 - [ ] All functions use keyword-only arguments (`*,`)
 - [ ] Complete docstrings with Args, Returns, Example

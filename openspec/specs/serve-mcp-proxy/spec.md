@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Enable OneTool to proxy external MCP servers, exposing their tools through OneTool's single `run` tool using namespace dot-notation (e.g., `wix.ListWixSites()`).
+Enable OneTool to proxy external MCP servers, exposing their tools through OneTool's single `run` tool using pack dot-notation (e.g., `wix.ListWixSites()`).
 
 ## Requirements
 ### Requirement: Proxy Server Lifecycle
@@ -31,9 +31,9 @@ The system SHALL manage proxy MCP server connections through the server lifecycl
 - **WHEN** the OneTool server starts
 - **THEN** connections MAY be established in parallel for faster startup
 
-### Requirement: Namespace Tool Access
+### Requirement: Pack Tool Access
 
-The system SHALL expose proxied MCP tools via namespace dot-notation.
+The system SHALL expose proxied MCP tools via pack dot-notation.
 
 #### Scenario: Simple proxied tool call
 - **GIVEN** MCP server `context7` with tool `resolve_library_id`
@@ -45,33 +45,33 @@ The system SHALL expose proxied MCP tools via namespace dot-notation.
 - **WHEN** run() receives `wix.get_product(product_id="abc", include_variants=True)`
 - **THEN** it SHALL pass all arguments to the proxied tool
 
-#### Scenario: Unknown proxy namespace
+#### Scenario: Unknown proxy pack
 - **GIVEN** no MCP server named `unknown` is configured
 - **WHEN** run() receives `unknown.some_tool()`
-- **THEN** it SHALL return an error listing available namespaces
+- **THEN** it SHALL return an error listing available packs
 
-#### Scenario: Unknown tool in namespace
+#### Scenario: Unknown tool in pack
 - **GIVEN** MCP server `wix` exists but has no tool `nonexistent`
 - **WHEN** run() receives `wix.nonexistent()`
-- **THEN** it SHALL return an error listing available tools in that namespace
+- **THEN** it SHALL return an error listing available tools in that pack
 
 #### Scenario: Multiple proxy calls in one request
 - **GIVEN** multiple MCP servers configured
-- **WHEN** run() receives code with multiple namespace calls (e.g., `sites = wix.list_sites(); pages = notion.search(query=sites[0].name)`)
+- **WHEN** run() receives code with multiple pack calls (e.g., `sites = wix.list_sites(); pages = notion.search(query=sites[0].name)`)
 - **THEN** it SHALL execute both calls and return combined results
 
 ### Requirement: Local Tool Precedence
 
 The system SHALL prioritize local tools over proxied tools when names conflict.
 
-#### Scenario: Namespace collision
-- **GIVEN** local namespace `brave` with `web_search`
+#### Scenario: Pack collision
+- **GIVEN** local pack `brave` with `web_search`
 - **AND** proxied MCP named `brave` with `web_search`
 - **WHEN** run() receives `brave.web_search(query="test")`
 - **THEN** it SHALL use the local tool (local wins)
 
 #### Scenario: No collision
-- **GIVEN** local namespace `brave` with `web_search`
+- **GIVEN** local pack `brave` with `web_search`
 - **AND** proxied MCP named `wix` with `list_sites`
 - **WHEN** run() receives `wix.list_sites()`
 - **THEN** it SHALL use the proxied tool

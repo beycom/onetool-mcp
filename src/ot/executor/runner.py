@@ -8,7 +8,7 @@ Routes all command execution through Python code mode:
 Delegates to specialized modules:
 - fence_processor: Strips markdown fences and execution prefixes
 - tool_loader: Discovers and caches tool functions
-- namespace_proxy: Creates proxy objects for dot notation access
+- pack_proxy: Creates proxy objects for dot notation access
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 
 from ot.executor.fence_processor import strip_fences
-from ot.executor.namespace_proxy import build_execution_namespace
+from ot.executor.pack_proxy import build_execution_namespace
 from ot.executor.tool_loader import load_tool_functions, load_tool_registry
 from ot.logging import LogSpan
 
@@ -359,7 +359,7 @@ async def execute_command(
     # Step 5: Resolve aliases (ws -> brave.web_search)
     stripped = resolve_alias(stripped, config)
 
-    # Step 6: Load tools with namespace support
+    # Step 6: Load tools with pack support
     tool_registry = load_tool_registry(tools_dir)
     tool_namespace = build_execution_namespace(tool_registry)
 

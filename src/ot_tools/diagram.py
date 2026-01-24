@@ -18,8 +18,8 @@ Reference: https://kroki.io/
 
 from __future__ import annotations
 
-# Namespace for dot notation: diagram.generate_source(), diagram.render(), etc.
-namespace = "diagram"
+# Pack for dot notation: diagram.generate_source(), diagram.render(), etc.
+pack = "diagram"
 
 __all__ = [
     "batch_render",

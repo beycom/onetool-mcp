@@ -78,15 +78,15 @@ The project SHALL document all tools at `docs/reference/tools/`.
 #### Scenario: Tool index
 - **GIVEN** a user at `reference/tools/index.md`
 - **WHEN** they scan the page
-- **THEN** they find a table of all namespaces with links to individual docs
+- **THEN** they find a table of all packs with links to individual docs
 
 #### Scenario: Individual tool docs
-- **GIVEN** each tool namespace
+- **GIVEN** each tool pack
 - **WHEN** the user reads its doc
 - **THEN** they find: purpose tagline, highlights, functions table, key parameters table, requires, examples, source
 
-#### Scenario: ot namespace documented
-- **GIVEN** the `ot.*` namespace
+#### Scenario: ot pack documented
+- **GIVEN** the `ot.*` pack
 - **WHEN** a user reads `reference/tools/ot.md`
 - **THEN** they find docs for ot.tools, ot.push, ot.config
 
@@ -320,7 +320,7 @@ Functions and Key Parameters sections SHALL use table format.
 - **GIVEN** a Functions section
 - **WHEN** documenting functions
 - **THEN** it SHALL use a table with columns: Function, Description
-- **AND** Function column SHALL show `namespace.function(params)` format
+- **AND** Function column SHALL show `pack.function(params)` format
 
 #### Scenario: Key Parameters table
 - **GIVEN** a Key Parameters section
@@ -374,7 +374,7 @@ The documentation SHALL include a plugin development guide for building standalo
 #### Scenario: Minimal plugin structure documented
 
 - **WHEN** a developer reads the plugin guide
-- **THEN** they SHALL find the minimal structure: a single Python file with `namespace` declaration
+- **THEN** they SHALL find the minimal structure: a single Python file with `pack` declaration
 - **AND** a local `.onetool/` directory for development configuration
 
 #### Scenario: Local development configuration documented

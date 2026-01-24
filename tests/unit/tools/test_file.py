@@ -61,11 +61,11 @@ def test_dir(tmp_path: Path) -> Path:
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_namespace_is_file() -> None:
-    """Verify namespace is correctly set."""
-    from ot_tools.file import namespace
+def test_pack_is_file() -> None:
+    """Verify pack is correctly set."""
+    from ot_tools.file import pack
 
-    assert namespace == "file"
+    assert pack == "file"
 
 
 @pytest.mark.unit

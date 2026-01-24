@@ -1,12 +1,12 @@
 # Tools Reference
 
-**12 namespaces. 55+ functions. Zero tool-selection overhead.**
+**12 packs. 55+ functions. Zero tool-selection overhead.**
 
 Every function below is callable with a single `__ot` prefix. No JSON schemas, no tool discovery loops.
 
 ## Tool Index
 
-| Namespace | Description | Documentation |
+| Pack | Description | Documentation |
 |-----------|-------------|---------------|
 | **web** | Content extraction | [web-fetch.md](web-fetch.md) |
 | **brave** | Web, news, local search | [brave-search.md](brave-search.md) |
@@ -124,4 +124,4 @@ diagram.render_directory(directory="./diagrams")
 | Package | MIT |
 | Diagram | MIT |
 
-Full license texts: [licenses/](../../../licenses/)
+Full license texts: [licenses/](https://github.com/beycom/onetool/tree/main/licenses)

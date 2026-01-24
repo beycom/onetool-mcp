@@ -18,7 +18,7 @@ ot-mytool/
 
 ```python
 # src/mytool.py
-namespace = "mytool"
+pack = "mytool"
 __all__ = ["search"]
 
 def search(*, query: str) -> str:
@@ -33,7 +33,7 @@ def search(*, query: str) -> str:
     return f"Found: {query}"
 ```
 
-That's the minimum. One file with a `namespace` declaration and exported functions.
+That's the minimum. One file with a `pack` declaration and exported functions.
 
 ## Local Development Setup
 
@@ -130,7 +130,7 @@ If your tool needs external packages, use PEP 723 headers and run as an isolated
 
 from __future__ import annotations
 
-namespace = "mytool"
+pack = "mytool"
 __all__ = ["fetch"]
 
 from ot_sdk import http, log, worker_main
@@ -254,7 +254,7 @@ The main tool file imports from the implementation package:
 
 from __future__ import annotations
 
-namespace = "convert"
+pack = "convert"
 __all__ = ["pdf", "word"]
 
 from ot_sdk import get_project_path, log, worker_main

@@ -2,7 +2,7 @@
 
 **SQL from your AI. Three functions. Any database.**
 
-The `db.*` namespace gives LLMs direct database access - explore tables, inspect schemas, run queries.
+The `db.*` pack gives LLMs direct database access - explore tables, inspect schemas, run queries.
 
 ## Available Functions
 

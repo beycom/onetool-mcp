@@ -710,7 +710,7 @@ The system SHALL support configuration for the Remote GitHub MCP Server as a doc
   ```
 - **WHEN** the server starts
 - **THEN** it SHALL connect to GitHub's hosted MCP server
-- **AND** expose GitHub tools via the `github` namespace
+- **AND** expose GitHub tools via the `github` pack
 
 #### Scenario: GitHub Enterprise Cloud with data residency
 - **GIVEN** configuration with:

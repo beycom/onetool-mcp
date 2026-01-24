@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Excel file manipulation tools using openpyxl. Worker tool with namespace `excel`.
+Excel file manipulation tools using openpyxl. Worker tool with pack `excel`.
 
 Provides functions to create, read, write Excel workbooks and apply formulas.
 

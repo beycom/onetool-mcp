@@ -25,18 +25,17 @@ MCP doesn't scale. Connect 5 servers: 55K tokens burned. Connect 10+: 100K+ toke
 
 ## Reference
 
-- **[Tools](reference/tools/index.md)** - 10 built-in namespaces
+- **[Tools](reference/tools/index.md)** - 10 built-in packs
 - **[CLIs](reference/cli/index.md)** - ot-serve, ot-bench
-- **[Beta](beta/index.md)** - Experimental features
 
 ## Extend
 
-- **[Creating Tools](extending/creating-tools.md)** - Drop a file, get a namespace
+- **[Creating Tools](extending/creating-tools.md)** - Drop a file, get a pack
 - **[Creating CLIs](extending/creating-clis.md)** - Build command-line tools
 
 ---
 
-## Built-in Namespaces
+## Built-in Packs
 
 **Search & Web**: `brave` (web, news, local, image, video), `ground` (Google grounded), `web` (fetch, extract)
 

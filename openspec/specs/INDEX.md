@@ -69,7 +69,7 @@ The MCP server that exposes tools for LLM code execution.
 
 | Spec | Purpose |
 |------|---------|
-| [tool-ot](tool-ot/spec.md) | Internal `ot.*` namespace (tools, config, health, push) |
+| [tool-ot](tool-ot/spec.md) | Internal `ot.*` pack (tools, config, health, push) |
 | [tool-brave-search](tool-brave-search/spec.md) | Brave Search API (web, news, local, image, video) |
 | [tool-context7](tool-context7/spec.md) | Context7 library documentation API |
 | [tool-grounding-search](tool-grounding-search/spec.md) | Google grounding via Gemini API |

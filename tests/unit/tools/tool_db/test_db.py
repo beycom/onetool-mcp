@@ -220,11 +220,11 @@ def test_format_value_handles_datetime() -> None:
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_namespace_is_db() -> None:
-    """Verify namespace is correctly set."""
-    from ot_tools.db import namespace
+def test_pack_is_db() -> None:
+    """Verify pack is correctly set."""
+    from ot_tools.db import pack
 
-    assert namespace == "db"
+    assert pack == "db"
 
 
 @pytest.mark.unit

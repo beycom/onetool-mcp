@@ -3,7 +3,7 @@
 Handles:
 - Loading tool functions from config-defined tool files
 - Caching based on file modification times
-- Namespace extraction from tool modules
+- Pack extraction from tool modules
 - PEP 723 detection for routing to worker processes
 
 Used by the runner to make tools available during code execution.
@@ -29,15 +29,15 @@ if TYPE_CHECKING:
 
 @dataclass
 class LoadedTools:
-    """Registry of loaded tool functions with namespace support.
+    """Registry of loaded tool functions with pack support.
 
-    The functions dict uses full namespaced names as keys (e.g., "brave.search")
-    to avoid collisions when multiple namespaces have functions with the same name.
-    The namespaces dict provides grouped access by namespace.
+    The functions dict uses full pack-qualified names as keys (e.g., "brave.search")
+    to avoid collisions when multiple packs have functions with the same name.
+    The packs dict provides grouped access by pack.
     """
 
     functions: dict[str, Any]  # Full name -> callable (e.g., "brave.search" -> func)
-    namespaces: dict[str, dict[str, Any]]  # Nested: namespace -> {name -> callable}
+    packs: dict[str, dict[str, Any]]  # Nested: pack -> {name -> callable}
     worker_tools: list[ToolFileInfo] = field(
         default_factory=list
     )  # Tools using workers
@@ -109,7 +109,7 @@ def _load_worker_tools(
     worker_tools: list[ToolFileInfo],
     config_dict: dict[str, Any],
     secrets: dict[str, Any],
-    namespaces: dict[str, dict[str, Any]],
+    packs: dict[str, dict[str, Any]],
     mtimes: dict[str, float],
 ) -> tuple[dict[str, Any], list[ToolFileInfo]]:
     """Load PEP 723 tools via worker proxies.
@@ -118,7 +118,7 @@ def _load_worker_tools(
         worker_tools: List of tool file info for worker tools.
         config_dict: Configuration as dict.
         secrets: Secrets dict.
-        namespaces: Namespaces dict to populate.
+        packs: Packs dict to populate.
         mtimes: Modification times dict to populate.
 
     Returns:
@@ -132,10 +132,10 @@ def _load_worker_tools(
         try:
             mtimes[str(py_file)] = py_file.stat().st_mtime
 
-            namespace = tool_info.namespace
-            if namespace and namespace in namespaces:
+            pack = tool_info.pack
+            if pack and pack in packs:
                 logger.warning(
-                    f"Namespace collision: '{namespace}' already defined, "
+                    f"Pack collision: '{pack}' already defined, "
                     f"merging functions from {py_file.stem}"
                 )
 
@@ -146,12 +146,12 @@ def _load_worker_tools(
                 secrets=secrets,
             )
 
-            if namespace:
-                if namespace not in namespaces:
-                    namespaces[namespace] = {}
-                namespaces[namespace] = proxy  # type: ignore[assignment]
+            if pack:
+                if pack not in packs:
+                    packs[pack] = {}
+                packs[pack] = proxy  # type: ignore[assignment]
                 for func_name in tool_info.functions:
-                    full_name = f"{namespace}.{func_name}"
+                    full_name = f"{pack}.{func_name}"
                     functions[full_name] = getattr(proxy, func_name)
             else:
                 for func_name in tool_info.functions:
@@ -170,14 +170,14 @@ def _load_worker_tools(
 
 def _load_inprocess_tools(
     inprocess_tools: list[ToolFileInfo],
-    namespaces: dict[str, dict[str, Any]],
+    packs: dict[str, dict[str, Any]],
     mtimes: dict[str, float],
 ) -> dict[str, Any]:
     """Load regular Python tools via importlib.
 
     Args:
         inprocess_tools: List of tool file info for in-process tools.
-        namespaces: Namespaces dict to populate.
+        packs: Packs dict to populate.
         mtimes: Modification times dict to populate.
 
     Returns:
@@ -200,10 +200,10 @@ def _load_inprocess_tools(
             sys.modules[module_name] = module
             spec.loader.exec_module(module)
 
-            namespace = getattr(module, "namespace", None)
-            if namespace and namespace in namespaces:
+            pack = getattr(module, "pack", None)
+            if pack and pack in packs:
                 logger.warning(
-                    f"Namespace collision: '{namespace}' already defined, "
+                    f"Pack collision: '{pack}' already defined, "
                     f"merging functions from {py_file.stem}"
                 )
 
@@ -214,11 +214,11 @@ def _load_inprocess_tools(
             for name in export_names:
                 obj = getattr(module, name, None)
                 if obj is not None and callable(obj) and not isinstance(obj, type):
-                    if namespace:
-                        if namespace not in namespaces:
-                            namespaces[namespace] = {}
-                        namespaces[namespace][name] = obj
-                        full_name = f"{namespace}.{name}"
+                    if pack:
+                        if pack not in packs:
+                            packs[pack] = {}
+                        packs[pack][name] = obj
+                        full_name = f"{pack}.{name}"
                         functions[full_name] = obj
                     else:
                         functions[name] = obj
@@ -230,10 +230,10 @@ def _load_inprocess_tools(
 
 
 def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
-    """Load all tool functions from config tool files with namespace support.
+    """Load all tool functions from config tool files with pack support.
 
     Uses caching based on file modification times to avoid redundant loading.
-    Reads `namespace` module variable from each tool file to group functions.
+    Reads `pack` module variable from each tool file to group functions.
     Detects PEP 723 headers to route tools to worker processes.
 
     Args:
@@ -241,7 +241,7 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
                    Defaults to 'src/ot_tools/' if no config available.
 
     Returns:
-        LoadedTools with functions dict (namespaced keys) and namespaces dict.
+        LoadedTools with functions dict (pack-qualified keys) and packs dict.
     """
     from ot.config.loader import get_config
     from ot.config.secrets import get_secrets
@@ -250,7 +250,7 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
     current_files, cache_key = _get_tool_files(tools_dir, config)
 
     if not current_files:
-        return LoadedTools(functions={}, namespaces={})
+        return LoadedTools(functions={}, packs={})
 
     cached = _check_cache(cache_key, current_files)
     if cached is not None:
@@ -258,7 +258,7 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
 
     logger.debug(f"Loading tools from {cache_key} ({len(current_files)} files)")
 
-    namespaces: dict[str, dict[str, Any]] = {}
+    packs: dict[str, dict[str, Any]] = {}
     mtimes: dict[str, float] = {}
 
     worker_tools, inprocess_tools = categorize_tools(list(current_files))
@@ -273,14 +273,14 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
         config_dict["_config_dir"] = str(config._config_dir)
 
     worker_funcs, worker_tools_list = _load_worker_tools(
-        worker_tools, config_dict, secrets, namespaces, mtimes
+        worker_tools, config_dict, secrets, packs, mtimes
     )
-    inprocess_funcs = _load_inprocess_tools(inprocess_tools, namespaces, mtimes)
+    inprocess_funcs = _load_inprocess_tools(inprocess_tools, packs, mtimes)
 
     functions = {**worker_funcs, **inprocess_funcs}
 
     registry = LoadedTools(
-        functions=functions, namespaces=namespaces, worker_tools=worker_tools_list
+        functions=functions, packs=packs, worker_tools=worker_tools_list
     )
     _module_cache[cache_key] = (registry, mtimes)
 

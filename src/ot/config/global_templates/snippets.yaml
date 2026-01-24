@@ -274,12 +274,12 @@ snippets:
     body: |
       ot.tools(pattern="{{ pattern }}", compact=True)
 
-  ot_ns:
-    description: List all tools in a namespace
+  ot_pack:
+    description: List all tools in a pack
     params:
-      ns: { description: "Namespace (e.g., 'brave', 'db', 'ripgrep')" }
+      pack: { description: "Pack (e.g., 'brave', 'db', 'ripgrep')" }
     body: |
-      ot.tools(ns="{{ ns }}")
+      ot.tools(pack="{{ pack }}")
 
   ot_status:
     description: Show system health and configuration
