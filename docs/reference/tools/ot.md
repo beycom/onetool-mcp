@@ -23,6 +23,7 @@ Internal tools for OneTool introspection and management.
 | `ot.instructions(pack)` | Get usage instructions for a pack |
 | `ot.alias(name)` | Show alias definition (use `*` to list all) |
 | `ot.snippet(name)` | Show snippet definition (use `*` to list all) |
+| `ot.stats(period, tool, output)` | Get runtime usage statistics |
 
 ## ot.tools()
 
@@ -159,6 +160,32 @@ snippets:
           results.append(brave.search(query=q))
       "\n---\n".join(results)
 ```
+
+## ot.stats()
+
+Get runtime statistics for OneTool usage.
+
+```python
+# All-time stats
+ot.stats()
+
+# Filter by time period
+ot.stats(period="day")
+ot.stats(period="week")
+
+# Filter by tool
+ot.stats(tool="brave.search")
+
+# Generate HTML report
+ot.stats(output="stats.html")
+```
+
+Returns JSON with:
+- `total_calls` - Total number of tool calls
+- `success_rate` - Percentage of successful calls
+- `context_saved` - Estimated context tokens saved
+- `time_saved_ms` - Estimated time saved in milliseconds
+- `tools` - Per-tool breakdown
 
 ## Source
 

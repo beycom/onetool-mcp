@@ -1,6 +1,6 @@
 # Tools Reference
 
-**12 packs. 55+ functions. Zero tool-selection overhead.**
+**14 packs. 65+ functions. Zero tool-selection overhead.**
 
 Every function below is callable with a single `__ot` prefix. No JSON schemas, no tool discovery loops.
 
@@ -61,8 +61,8 @@ ripgrep.search(pattern="def.*async", path="src/")
 llm.transform(input=data, prompt="extract emails")
 
 # Database
-db.tables(project="myapp")
-db.query(project="myapp", sql="SELECT * FROM users")
+db.tables(db_url="sqlite:///data.db")
+db.query(sql="SELECT * FROM users", db_url="sqlite:///data.db")
 
 # Excel
 excel.read(path="data.xlsx", sheet="Sheet1")

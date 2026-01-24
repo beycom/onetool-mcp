@@ -14,8 +14,6 @@
 
 > **v1.0.0 Pre-Release** - API stable, actively tested.
 
-**Don't enumerate tools. Execute code.**
-
 OneTool is a local-first MCP server that exposes a single `run` tool for code execution, giving your AI assistant access to unlimited capabilities through one interface.
 
 ## The Problem
@@ -26,7 +24,7 @@ Connect 5 MCP servers and you've burned 55K tokens before the conversation start
 
 **98.7% fewer tokens. Same accuracy. 10x lower cost.**
 
-Instead of loading 50 separate tool schemas, your LLM writes Python directly:
+Instead of loading 50 separate tool schemas, you write Python directly:
 
 ```python
 __ot brave.search(query="AI trends 2026")
@@ -38,7 +36,7 @@ Based on [Anthropic's research](https://www.anthropic.com/engineering/code-execu
 
 ## Core Capabilities
 
-- **15 built-in packs** - brave, web, ground, context7, code, ripgrep, llm, db, excel, convert, package, file, diagram, page, ot
+- **14 built-in packs** - brave, web, ground, context7, code, ripgrep, llm, db, excel, convert, package, file, diagram, ot
 - **30-second setup** - Install with uv or pip
 - **Drop-in extensibility** - Add a Python file, get a new pack
 - **AST security** - All code validated before execution
@@ -66,7 +64,7 @@ Add to Claude Code (`~/.claude/settings.json`):
 
 ## What's Inside
 
-**Packs** - brave (web search), web (fetch), ground (Google grounded), context7 (library docs), code (semantic search), ripgrep (file search), llm (transform), db (SQL), excel (spreadsheets), convert (PDF/Word to Markdown), package (npm/PyPI), file (safe operations), diagram (PlantUML), page (browser captures), ot (meta tools)
+**Packs** - brave (web search), web (fetch), ground (Google grounded), context7 (library docs), code (semantic search), ripgrep (file search), llm (transform), db (SQL), excel (spreadsheets), convert (PDF/Word to Markdown), package (npm/PyPI), file (safe operations), diagram (PlantUML), ot (meta tools)
 
 **CLIs** - `ot-serve` (MCP server), `ot-bench` (benchmark harness)
 

@@ -90,6 +90,10 @@ docs-serve:
 docs-build:
     uv run mkdocs build --strict
 
+# Clean and rebuild docs (strict mode)
+docs-clean:
+    rm -rf dist/site && uv run mkdocs build --strict
+
 # Deploy documentation to GitHub Pages
 docs-deploy:
     uv run mkdocs gh-deploy --force

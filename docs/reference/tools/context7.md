@@ -29,7 +29,7 @@ Library documentation search and retrieval with extensive key normalization.
 
 ## Requires
 
-- `OT_CONTEXT7_API_KEY` environment variable
+- `CONTEXT7_API_KEY` in secrets.yaml
 
 ## Examples
 

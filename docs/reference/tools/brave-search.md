@@ -34,7 +34,7 @@ Web, news, local, image, and video search via Brave Search API.
 
 ## Requires
 
-- `OT_BRAVE_API_KEY` environment variable
+- `BRAVE_API_KEY` in secrets.yaml
 
 ## Examples
 

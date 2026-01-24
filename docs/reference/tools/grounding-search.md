@@ -34,7 +34,7 @@ Web search with Google's grounding capabilities via Gemini API. Provides current
 
 ## Requires
 
-- `OT_GEMINI_API_KEY` environment variable
+- `GEMINI_API_KEY` in secrets.yaml
 
 ## Examples
 

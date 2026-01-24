@@ -29,7 +29,7 @@ Semantic code search using ChunkHound indexes and DuckDB.
 
 ## Requires
 
-- `OT_OPENAI_API_KEY` for embeddings
+- `OPENAI_API_KEY` in secrets.yaml (for embeddings)
 - Project indexed with `chunkhound index <project>`
 
 ## Examples

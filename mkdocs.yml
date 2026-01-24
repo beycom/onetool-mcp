@@ -1,6 +1,6 @@
 site_name: OneTool MCP
 site_description: "Don't enumerate tools. Execute code. MCP server exposing a single 'run' tool for LLM code execution."
-site_url: https://beycom.github.io/onetool-mcp
+site_url: https://onetool.beycom.online
 site_dir: dist/site
 repo_name: beycom/onetool-mcp
 repo_url: https://github.com/beycom/onetool-mcp
