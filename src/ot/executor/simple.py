@@ -16,6 +16,7 @@ from loguru import logger
 
 from ot.executor.base import ExecutionResult
 from ot.logging import LogEntry, LogSpan
+from ot.utils import serialize_result
 
 if TYPE_CHECKING:
     from ot.registry import ToolInfo
@@ -102,7 +103,7 @@ class SimpleExecutor:
             with LogSpan(span="executor.simple", tool=func_name) as span:
                 span.add("kwargs", {k: str(v) for k, v in kwargs.items()})
                 result = func(**kwargs)
-                result_str = str(result)
+                result_str = serialize_result(result)
                 span.add("resultLength", len(result_str))
 
             duration = time.perf_counter() - start_time

@@ -70,7 +70,7 @@ class TestParseNested:
     def test_slice_after_sort(self, executor: Callable[[str], str]) -> None:
         """Slice after sorted call."""
         result = executor("sorted([5, 2, 8, 1, 9, 3])[:3]")
-        assert result == "[1, 2, 3]"
+        assert result == "[1,2,3]"
 
 
 @pytest.mark.unit
@@ -104,14 +104,14 @@ class TestParseLiterals:
     def test_sorted_list(self, executor: Callable[[str], str]) -> None:
         """Sorted list literal."""
         result = executor("sorted([3, 1, 4, 1, 5, 9, 2, 6])")
-        assert result == "[1, 1, 2, 3, 4, 5, 6, 9]"
+        assert result == "[1,1,2,3,4,5,6,9]"
 
     def test_nested_comprehension(self, executor: Callable[[str], str]) -> None:
         """Flatten nested list via comprehension."""
         result = executor(
             "[x for sublist in [[1, 2], [3, 4], [5, 6]] for x in sublist]"
         )
-        assert result == "[1, 2, 3, 4, 5, 6]"
+        assert result == "[1,2,3,4,5,6]"
 
     def test_float_multiplication(self, executor: Callable[[str], str]) -> None:
         """Float multiplication."""
@@ -227,12 +227,12 @@ class TestExecComprehensions:
     def test_list_comprehension(self, executor: Callable[[str], str]) -> None:
         """List comprehension with squares."""
         result = executor("[foo ** 2 for foo in [1, 2, 3, 4, 5]]")
-        assert result == "[1, 4, 9, 16, 25]"
+        assert result == "[1,4,9,16,25]"
 
     def test_filtered_comprehension(self, executor: Callable[[str], str]) -> None:
         """List comprehension with filter."""
         result = executor("[foo ** 2 for foo in [1, 2, 3, 4, 5] if foo % 2 == 0]")
-        assert result == "[4, 16]"
+        assert result == "[4,16]"
 
     def test_dict_comprehension(self, executor: Callable[[str], str]) -> None:
         """Dict comprehension."""

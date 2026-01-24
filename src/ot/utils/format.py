@@ -1,24 +1,31 @@
-"""JSON formatting utilities for tool output."""
+"""Result serialization utilities for MCP responses."""
 
 from __future__ import annotations
 
 import json
 from typing import Any
 
-__all__ = ["format_result"]
+__all__ = ["serialize_result"]
 
 
-def format_result(data: Any, *, compact: bool = True) -> str:
-    """Format data as JSON for tool output.
+def serialize_result(result: Any) -> str:
+    """Serialize tool result to string for MCP response.
+
+    Tools return native Python types (dict, list, str). This function
+    serializes them to a string suitable for MCP text content.
+
+    - Strings pass through unchanged
+    - Dicts and lists are serialized to compact JSON
+    - Other types use str()
 
     Args:
-        data: Data to format (dict, list, or primitive)
-        compact: If True, output single-line JSON (default).
-                 If False, output pretty-printed JSON with indentation.
+        result: Tool result (dict, list, str, or other)
 
     Returns:
-        JSON string representation of data
+        String representation suitable for MCP response
     """
-    if compact:
-        return json.dumps(data, ensure_ascii=False, separators=(",", ":"))
-    return json.dumps(data, ensure_ascii=False, indent=2)
+    if isinstance(result, str):
+        return result
+    if isinstance(result, (dict, list)):
+        return json.dumps(result, ensure_ascii=False, separators=(",", ":"))
+    return str(result)

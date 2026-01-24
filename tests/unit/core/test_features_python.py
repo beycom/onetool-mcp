@@ -82,7 +82,7 @@ for n in numbers:
         evens.append(n)
 evens"""
         result = executor(code)
-        assert result == "[0, 2, 4, 6, 8]"
+        assert result == "[0,2,4,6,8]"
 
     def test_nested_conditional(self, executor: Callable[[str], str]) -> None:
         """Nested if/elif/else logic."""
@@ -120,7 +120,7 @@ class TestPythonComprehensions:
         """List comprehension with filter."""
         code = """[x for x in range(10) if x % 3 == 0]"""
         result = executor(code)
-        assert result == "[0, 3, 6, 9]"
+        assert result == "[0,3,6,9]"
 
     def test_dict_comprehension(self, executor: Callable[[str], str]) -> None:
         """Dict comprehension creating key-value pairs."""
@@ -152,7 +152,7 @@ class TestPythonChains:
         """Chain list operations with sorted."""
         code = """sorted([3, 1, 4, 1, 5])[:3]"""
         result = executor(code)
-        assert result == "[1, 1, 3]"
+        assert result == "[1,1,3]"
 
     def test_complex_chain(self, executor: Callable[[str], str]) -> None:
         """Complex chain with multiple operations."""

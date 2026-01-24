@@ -6,12 +6,24 @@ Uses tmp_path fixture for isolated test files.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import json
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+def _to_str(result: Any) -> str:
+    """Convert result to string for assertion comparisons.
+
+    Since tools now return native types, we convert to JSON string
+    for tests that check string presence.
+    """
+    if isinstance(result, str):
+        return result
+    return json.dumps(result)
 
 
 @pytest.fixture
@@ -91,7 +103,7 @@ def test_create_workbook_with_sheet_name(excel_file: Path) -> None:
     create(filepath=str(excel_file), sheet_name="Sales")
     result = info(filepath=str(excel_file))
 
-    assert "Sales" in result
+    assert "Sales" in _to_str(result)
 
 
 @pytest.mark.unit
@@ -118,7 +130,7 @@ def test_add_sheet(excel_file: Path) -> None:
 
     assert "Created sheet" in result
     info_result = info(filepath=str(excel_file))
-    assert "Summary" in info_result
+    assert "Summary" in _to_str(info_result)
 
 
 @pytest.mark.unit
@@ -156,9 +168,10 @@ def test_write_and_read(excel_file: Path) -> None:
     write(filepath=str(excel_file), data=[["Name", "Value"], ["A", 1], ["B", 2]])
     result = read(filepath=str(excel_file))
 
-    assert "Name" in result
-    assert "Value" in result
-    assert "A" in result
+    result_str = _to_str(result)
+    assert "Name" in result_str
+    assert "Value" in result_str
+    assert "A" in result_str
 
 
 @pytest.mark.unit
@@ -192,8 +205,9 @@ def test_write_to_specific_sheet(excel_file: Path) -> None:
     )
     result = read(filepath=str(excel_file), sheet_name="Data")
 
-    assert "Test" in result
-    assert "123" in result
+    result_str = _to_str(result)
+    assert "Test" in result_str
+    assert "123" in result_str
 
 
 @pytest.mark.unit
@@ -219,8 +233,9 @@ def test_read_specific_range(excel_file: Path) -> None:
     write(filepath=str(excel_file), data=[["A", "B", "C"], [1, 2, 3], [4, 5, 6]])
     result = read(filepath=str(excel_file), start_cell="B1", end_cell="C2")
 
-    assert "B" in result
-    assert "C" in result
+    result_str = _to_str(result)
+    assert "B" in result_str
+    assert "C" in result_str
 
 
 @pytest.mark.unit
@@ -245,8 +260,9 @@ def test_info_returns_metadata(excel_file: Path) -> None:
     create(filepath=str(excel_file), sheet_name="Data")
     result = info(filepath=str(excel_file))
 
-    assert "test.xlsx" in result
-    assert "Data" in result
+    result_str = _to_str(result)
+    assert "test.xlsx" in result_str
+    assert "Data" in result_str
 
 
 @pytest.mark.unit
@@ -260,7 +276,8 @@ def test_info_with_ranges(excel_file: Path) -> None:
     result = info(filepath=str(excel_file), include_ranges=True)
 
     # Should show range like A1:B3
-    assert "A1" in result or "range" in result.lower()
+    result_str = _to_str(result)
+    assert "A1" in result_str or "range" in result_str.lower()
 
 
 @pytest.mark.unit
@@ -422,8 +439,9 @@ def test_search_wildcard(excel_file: Path) -> None:
     )
     result = search(filepath=str(excel_file), pattern="Widget*")
 
-    assert "Widget A" in result
-    assert "Widget C" in result
+    result_str = _to_str(result)
+    assert "Widget A" in result_str
+    assert "Widget C" in result_str
 
 
 @pytest.mark.unit
@@ -436,9 +454,10 @@ def test_search_first_only(excel_file: Path) -> None:
     write(filepath=str(excel_file), data=[["Name"], ["Test1"], ["Test2"], ["Test3"]])
     result = search(filepath=str(excel_file), pattern="Test*", first_only=True)
 
-    assert "Test1" in result
-    # Should not contain array markers since it's a single result
-    assert '"cell":' in result
+    result_str = _to_str(result)
+    assert "Test1" in result_str
+    # Should have cell info since it's a dict result
+    assert "cell" in result_str
 
 
 @pytest.mark.unit
@@ -453,8 +472,9 @@ def test_search_regex(excel_file: Path) -> None:
     )
     result = search(filepath=str(excel_file), pattern="^ABC", regex=True)
 
-    assert "ABC-123" in result
-    assert "ABC-789" in result
+    result_str = _to_str(result)
+    assert "ABC-123" in result_str
+    assert "ABC-789" in result_str
 
 
 @pytest.mark.unit
@@ -467,7 +487,8 @@ def test_search_no_matches(excel_file: Path) -> None:
     write(filepath=str(excel_file), data=[["Name"], ["Alpha"], ["Beta"]])
     result = search(filepath=str(excel_file), pattern="Gamma*")
 
-    assert result == "[]"
+    # Result is now an empty list
+    assert result == []
 
 
 # =============================================================================
@@ -516,8 +537,9 @@ def test_tables_list(excel_file: Path) -> None:
     create_table(filepath=str(excel_file), data_range="A1:B3", table_name="MyTable")
     result = tables(filepath=str(excel_file))
 
-    assert "MyTable" in result
-    assert "A1:B3" in result
+    result_str = _to_str(result)
+    assert "MyTable" in result_str
+    assert "A1:B3" in result_str
 
 
 @pytest.mark.unit
@@ -531,10 +553,11 @@ def test_table_info(excel_file: Path) -> None:
     create_table(filepath=str(excel_file), data_range="A1:B3", table_name="InfoTable")
     result = table_info(filepath=str(excel_file), table_name="InfoTable")
 
-    assert "InfoTable" in result
-    assert "Col1" in result
-    assert "Col2" in result
-    assert "row_count" in result
+    result_str = _to_str(result)
+    assert "InfoTable" in result_str
+    assert "Col1" in result_str
+    assert "Col2" in result_str
+    assert "row_count" in result_str
 
 
 @pytest.mark.unit
@@ -550,9 +573,10 @@ def test_table_data(excel_file: Path) -> None:
     create_table(filepath=str(excel_file), data_range="A1:B3", table_name="DataTable")
     result = table_data(filepath=str(excel_file), table_name="DataTable")
 
-    assert "Alice" in result
-    assert "Bob" in result
-    assert "95" in result
+    result_str = _to_str(result)
+    assert "Alice" in result_str
+    assert "Bob" in result_str
+    assert "95" in result_str
 
 
 @pytest.mark.unit
@@ -568,8 +592,9 @@ def test_table_data_single_row(excel_file: Path) -> None:
     create_table(filepath=str(excel_file), data_range="A1:B3", table_name="RowTable")
     result = table_data(filepath=str(excel_file), table_name="RowTable", row_index=0)
 
-    assert "Alice" in result
-    assert "Bob" not in result
+    result_str = _to_str(result)
+    assert "Alice" in result_str
+    assert "Bob" not in result_str
 
 
 # =============================================================================
@@ -655,7 +680,8 @@ def test_copy_range(excel_file: Path) -> None:
     assert "Copied" in result
     # Verify the data was copied
     data = read(filepath=str(excel_file))
-    assert "X" in data  # Original
+    data_str = _to_str(data)
+    assert "X" in data_str  # Original
     assert "D1:E3" in result or "Copied A1:B3" in result
 
 
@@ -674,8 +700,9 @@ def test_copy_range_to_different_sheet(excel_file: Path) -> None:
 
     assert "Copied" in result
     backup_data = read(filepath=str(excel_file), sheet_name="Backup")
-    assert "Data" in backup_data
-    assert "100" in backup_data
+    backup_str = _to_str(backup_data)
+    assert "Data" in backup_str
+    assert "100" in backup_str
 
 
 # =============================================================================
@@ -694,10 +721,11 @@ def test_sheets(excel_file: Path) -> None:
     add_sheet(filepath=str(excel_file), sheet_name="Summary")
     result = sheets(filepath=str(excel_file))
 
-    assert "Main" in result
-    assert "Data" in result
-    assert "Summary" in result
-    assert "visible" in result
+    result_str = _to_str(result)
+    assert "Main" in result_str
+    assert "Data" in result_str
+    assert "Summary" in result_str
+    assert "visible" in result_str
 
 
 @pytest.mark.unit
@@ -741,10 +769,11 @@ def test_formulas_list(excel_file: Path) -> None:
     formula(filepath=str(excel_file), cell="A6", formula="=AVERAGE(A2:A4)")
     result = formulas(filepath=str(excel_file))
 
-    assert "SUM" in result
-    assert "AVERAGE" in result
-    assert "A5" in result
-    assert "A6" in result
+    result_str = _to_str(result)
+    assert "SUM" in result_str
+    assert "AVERAGE" in result_str
+    assert "A5" in result_str
+    assert "A6" in result_str
 
 
 @pytest.mark.unit
@@ -765,8 +794,9 @@ def test_merged_cells(excel_file: Path) -> None:
 
     result = merged_cells(filepath=str(excel_file))
 
-    assert "A1:C1" in result
-    assert "B3:D5" in result
+    result_str = _to_str(result)
+    assert "A1:C1" in result_str
+    assert "B3:D5" in result_str
 
 
 @pytest.mark.unit
@@ -789,7 +819,8 @@ def test_named_ranges(excel_file: Path) -> None:
 
     result = named_ranges(filepath=str(excel_file))
 
-    assert "SalesData" in result
+    result_str = _to_str(result)
+    assert "SalesData" in result_str
 
 
 @pytest.mark.unit
@@ -802,4 +833,5 @@ def test_hyperlinks_empty(excel_file: Path) -> None:
     write(filepath=str(excel_file), data=[["Text"], ["Hello"], ["World"]])
     result = hyperlinks(filepath=str(excel_file))
 
-    assert result == "[]"
+    # Result is now an empty list
+    assert result == []

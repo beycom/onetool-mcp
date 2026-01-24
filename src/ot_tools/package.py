@@ -18,7 +18,6 @@ from typing import Any
 from ot.config import get_config
 from ot.http_client import http_get
 from ot.logging import LogSpan
-from ot.utils import format_result
 
 NPM_REGISTRY = "https://registry.npmjs.org"
 PYPI_API = "https://pypi.org/pypi"
@@ -51,14 +50,14 @@ def _fetch(url: str, timeout: float | None = None) -> tuple[bool, dict[str, Any]
         return success, data
 
 
-def npm(*, packages: list[str]) -> str:
+def npm(*, packages: list[str]) -> list[dict[str, Any]]:
     """Check latest npm package versions.
 
     Args:
         packages: List of npm package names
 
     Returns:
-        JSON list of {name, latest} entries
+        List of dicts with name, registry, latest fields
 
     Example:
         package.npm(packages=["react", "lodash", "express"])
@@ -66,14 +65,14 @@ def npm(*, packages: list[str]) -> str:
     return version(registry="npm", packages=packages)
 
 
-def pypi(*, packages: list[str]) -> str:
+def pypi(*, packages: list[str]) -> list[dict[str, Any]]:
     """Check latest PyPI package versions.
 
     Args:
         packages: List of Python package names
 
     Returns:
-        JSON list of {name, latest} entries
+        List of dicts with name, registry, latest fields
 
     Example:
         package.pypi(packages=["requests", "flask", "fastapi"])
@@ -102,7 +101,7 @@ def models(
     query: str = "",
     provider: str = "",
     limit: int = 20,
-) -> str:
+) -> list[dict[str, Any]]:
     """Search OpenRouter AI models.
 
     Args:
@@ -111,7 +110,7 @@ def models(
         limit: Maximum results to return (default: 20)
 
     Returns:
-        JSON list of models with id, name, context_length, pricing, modality
+        List of model dicts with id, name, context_length, pricing, modality
 
     Example:
         # Search by name
@@ -123,7 +122,7 @@ def models(
     with LogSpan(span="package.models", query=query, provider=provider):
         ok, data = _fetch(OPENROUTER_API)
         if not ok or not isinstance(data, dict):
-            return "[]"
+            return []
 
         models_data = data.get("data", [])
         results = []
@@ -166,7 +165,7 @@ def models(
             if len(results) >= limit:
                 break
 
-        return format_result(results)
+        return results
 
 
 def _fetch_package(
@@ -253,7 +252,7 @@ def version(
     *,
     registry: str,
     packages: list[str] | dict[str, str],
-) -> str:
+) -> list[dict[str, Any]] | str:
     """Check latest versions for packages from a registry.
 
     Args:
@@ -261,7 +260,7 @@ def version(
         packages: List of package names, or dict mapping names to current versions
 
     Returns:
-        JSON list of version results. If current versions provided,
+        List of version result dicts. If current versions provided,
         includes both 'current' and 'latest' fields.
 
     Examples:
@@ -304,4 +303,4 @@ def version(
         else:
             return f"Unknown registry: {registry}. Use npm, pypi, or openrouter."
 
-        return format_result(results)
+        return results

@@ -48,7 +48,6 @@ from ot.config import get_config
 from ot.executor.tool_loader import load_tool_registry
 from ot.paths import get_effective_cwd
 from ot.proxy import get_proxy_manager
-from ot.utils import format_result
 from ot_sdk import log
 
 # ============================================================================
@@ -97,7 +96,7 @@ def tools(
     pattern: str = "",
     pack: str = "",
     compact: bool = False,
-) -> str:
+) -> list[dict[str, Any]]:
     """List all available tools with optional filtering.
 
     Lists registered local tools and proxied MCP server tools.
@@ -109,7 +108,7 @@ def tools(
         compact: If True, return only name and short description (default: False)
 
     Returns:
-        JSON list of tools with name, signature, description, source
+        List of tool dicts with name, signature, description, source
 
     Example:
         ot.tools()
@@ -117,7 +116,8 @@ def tools(
         ot.tools(pack="brave")
         ot.tools(compact=True)
     """
-    with log("ot.tools", pattern=pattern or None, pack=pack or None, compact=compact
+    with log(
+        "ot.tools", pattern=pattern or None, pack=pack or None, compact=compact
     ) as s:
         runner_registry = load_tool_registry()
         proxy = get_proxy_manager()
@@ -201,7 +201,7 @@ def tools(
 
         tools_list.sort(key=lambda t: t["name"])
         s.add("count", len(tools_list))
-        return format_result(tools_list)
+        return tools_list
 
 
 # ============================================================================
@@ -322,13 +322,13 @@ def push(*, topic: str, message: str) -> str:
 # ============================================================================
 
 
-def config() -> str:
+def config() -> dict[str, Any]:
     """Show key configuration values.
 
     Returns aliases, snippets, and server names.
 
     Returns:
-        JSON with configuration summary
+        Dict with configuration summary
 
     Example:
         ot.config()
@@ -351,14 +351,14 @@ def config() -> str:
         s.add("snippetCount", len(result["snippets"]))
         s.add("serverCount", len(result["servers"]))
 
-        return format_result(result, compact=False)
+        return result
 
 
-def health() -> str:
+def health() -> dict[str, Any]:
     """Check health of OneTool components.
 
     Returns:
-        JSON with component status for registry and proxy
+        Dict with component status for registry and proxy
 
     Example:
         ot.health()
@@ -408,7 +408,7 @@ def health() -> str:
         s.add("registryOk", registry_status["status"] == "ok")
         s.add("proxyOk", proxy_status["status"] == "ok")
 
-        return format_result(result, compact=False)
+        return result
 
 
 def stats(
@@ -416,7 +416,7 @@ def stats(
     period: str = "all",
     tool: str = "",
     output: str = "",
-) -> str:
+) -> dict[str, Any] | str:
     """Get runtime statistics for OneTool usage.
 
     Returns aggregated statistics including call counts, success rates,
@@ -428,7 +428,7 @@ def stats(
         output: Path to write HTML report. Empty for JSON output only.
 
     Returns:
-        JSON with aggregated statistics including:
+        Dict with aggregated statistics including:
         - total_calls: Total number of tool calls
         - success_rate: Percentage of successful calls
         - context_saved: Estimated context tokens saved
@@ -492,7 +492,7 @@ def stats(
             result["html_report"] = str(output_path)
             s.add("htmlReport", str(output_path))
 
-        return format_result(result, compact=False)
+        return result
 
 
 # ============================================================================
@@ -537,17 +537,13 @@ def help(*, tool: str) -> str:
                 if func_name not in pack_funcs.functions:
                     available = ", ".join(sorted(pack_funcs.functions))
                     s.add("error", "function_not_found")
-                    return (
-                        f"Error: '{func_name}' not in {pack_name}. Available: {available}"
-                    )
+                    return f"Error: '{func_name}' not in {pack_name}. Available: {available}"
                 func = getattr(pack_funcs, func_name)
             else:
                 if func_name not in pack_funcs:
                     available = ", ".join(sorted(pack_funcs.keys()))
                     s.add("error", "function_not_found")
-                    return (
-                        f"Error: '{func_name}' not in {pack_name}. Available: {available}"
-                    )
+                    return f"Error: '{func_name}' not in {pack_name}. Available: {available}"
                 func = pack_funcs[func_name]
 
             s.add("found", True)
@@ -755,7 +751,9 @@ def _generate_local_instructions(pack: str, registry: Any) -> str:
 
     # Handle both dict and WorkerPackProxy
     if isinstance(pack_funcs, WorkerPackProxy):
-        func_items = [(name, getattr(pack_funcs, name)) for name in pack_funcs.functions]
+        func_items = [
+            (name, getattr(pack_funcs, name)) for name in pack_funcs.functions
+        ]
     else:
         func_items = list(pack_funcs.items())
 

@@ -43,6 +43,7 @@
 
 ## Testing
 
+Run tests with `just test` (uses `uv run pytest` for proper dependency resolution).
 Markers required: speed (`smoke`|`unit`|`integration`|`slow`) + component (`core`|`bench`|`serve`)
 Principles: lean tests, DRY fixtures in `conftest.py`, test behaviour not implementation
 

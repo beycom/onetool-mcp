@@ -47,7 +47,6 @@ from typing import Any
 
 from ot.config import get_config
 from ot.paths import get_effective_cwd
-from ot.utils import format_result
 from ot_sdk import log
 
 # Optional send2trash for safe deletion
@@ -395,7 +394,7 @@ def read(
             return f"Error: {e}"
 
 
-def info(*, path: str) -> str:
+def info(*, path: str) -> dict[str, Any] | str:
     """Get file or directory metadata.
 
     Returns size, timestamps, permissions, and type information.
@@ -404,7 +403,7 @@ def info(*, path: str) -> str:
         path: Path to file or directory
 
     Returns:
-        JSON formatted metadata
+        Dict with path, type, size, permissions, timestamps (or error string)
 
     Example:
         file.info(path="src/main.py")
@@ -454,7 +453,7 @@ def info(*, path: str) -> str:
                 info_data["target"] = str(resolved.readlink())
 
             s.add(found=True, type=file_type)
-            return format_result(info_data, compact=False)
+            return info_data
 
         except OSError as e:
             s.add(error=str(e))
@@ -491,8 +490,7 @@ def list(
         file.list(path=".", recursive=True, pattern="*.md")
         file.list(path=".", sort_by="size", reverse=True)
     """
-    with log("file.list", path=path, pattern=pattern, recursive=recursive
-    ) as s:
+    with log("file.list", path=path, pattern=pattern, recursive=recursive) as s:
         resolved, error = _validate_path(path, must_exist=True)
         if error:
             s.add(error=error)
@@ -700,8 +698,7 @@ def search(
         file.search(pattern="config", file_pattern="*.yaml")
         file.search(path="src", pattern="*handler*", file_pattern="*.py")
     """
-    with log("file.search", path=path, pattern=pattern, filePattern=file_pattern
-    ) as s:
+    with log("file.search", path=path, pattern=pattern, filePattern=file_pattern) as s:
         resolved, error = _validate_path(path, must_exist=True)
         if error:
             s.add(error=error)
@@ -812,8 +809,7 @@ def write(
         file.write(path="log.txt", content="New entry\\n", append=True)
         file.write(path="new/dir/file.txt", content="data", create_dirs=True)
     """
-    with log("file.write", path=path, append=append, contentLen=len(content)
-    ) as s:
+    with log("file.write", path=path, append=append, contentLen=len(content)) as s:
         # For new files, validate parent directory
         resolved, error = _validate_path(path, must_exist=False)
         if error:
@@ -906,8 +902,7 @@ def edit(
         file.edit(path="config.py", old_text="DEBUG = False", new_text="DEBUG = True")
         file.edit(path="main.py", old_text="TODO", new_text="DONE", occurrence=0)
     """
-    with log("file.edit", path=path, oldLen=len(old_text), newLen=len(new_text)
-    ) as s:
+    with log("file.edit", path=path, oldLen=len(old_text), newLen=len(new_text)) as s:
         resolved, error = _validate_path(path, must_exist=True)
         if error:
             s.add(error=error)

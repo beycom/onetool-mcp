@@ -100,12 +100,12 @@ All public tool functions must use LogSpan:
 ```python
 from ot.logging import LogSpan
 
-def search(*, query: str) -> str:
+def search(*, query: str) -> list[dict]:
     """Search for items."""
     with LogSpan(span="mytools.search", query=query) as s:
         results = do_search(query)
         s.add("resultCount", len(results))
-        return format_results(results)
+        return results  # Return native type directly
 ```
 
 ## Error Handling
@@ -122,7 +122,7 @@ def search(*, query: str) -> str:
 
         try:
             result = call_api(query)
-            return format_result(result)
+            return result  # Return native type directly
         except APIError as e:
             s.add("error", str(e))
             return f"API error: {e}"
@@ -145,13 +145,14 @@ pack = "mytool"
 __all__ = ["search"]
 
 @cache(ttl=300)  # Cache results for 5 minutes
-def search(*, query: str) -> str:
+def search(*, query: str) -> list[dict]:
     """Search for items."""
     with log("mytool.search", query=query) as s:
         api_key = get_secret("MY_API_KEY")
         response = http.get(f"https://api.example.com/search?q={query}")
-        s.add("resultCount", len(response.json()))
-        return format_results(response.json())
+        results = response.json()
+        s.add("resultCount", len(results))
+        return results  # Return native type directly
 
 if __name__ == "__main__":
     worker_main()

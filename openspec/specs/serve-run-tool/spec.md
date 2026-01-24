@@ -54,7 +54,7 @@ The system SHALL use a single code path for all command execution.
 
 ### Requirement: Robust Result Capture
 
-The system SHALL capture results from any valid Python expression or statement.
+The system SHALL capture results from any valid Python expression or statement and serialize them consistently.
 
 #### Scenario: Expression result
 - **GIVEN** code that is a single expression like `search(query="test")`
@@ -80,6 +80,29 @@ The system SHALL capture results from any valid Python expression or statement.
 - **GIVEN** code that explicitly returns None or function returns None
 - **WHEN** execution completes
 - **THEN** it SHALL indicate None was returned (not "no return value")
+
+#### Scenario: Native dict serialization
+- **GIVEN** a tool function that returns a Python dict
+- **WHEN** the result is captured by the runner
+- **THEN** the dict SHALL be serialized to compact JSON using `serialize_result()`
+- **AND** the result SHALL NOT contain double-escaped JSON
+
+#### Scenario: Native list serialization
+- **GIVEN** a tool function that returns a Python list
+- **WHEN** the result is captured by the runner
+- **THEN** the list SHALL be serialized to compact JSON using `serialize_result()`
+- **AND** the result SHALL NOT contain double-escaped JSON
+
+#### Scenario: String passthrough
+- **GIVEN** a tool function that returns a plain string
+- **WHEN** the result is captured by the runner
+- **THEN** the string SHALL be returned as-is without additional serialization
+
+#### Scenario: Composed tool results
+- **GIVEN** code like `{"health": ot.health(), "config": ot.config()}`
+- **WHEN** each tool returns a native dict
+- **THEN** the composed result SHALL be a single clean JSON object
+- **AND** nested values SHALL NOT be double-escaped strings
 
 ### Requirement: Indentation-Safe Code Wrapping
 
@@ -221,3 +244,4 @@ The runner implementation SHALL be organized into focused modules.
 - **WHEN** examining its responsibilities
 - **THEN** it SHALL focus on code execution and command routing
 - **AND** it SHALL import fence, loader, and proxy functionality from dedicated modules
+

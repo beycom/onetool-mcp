@@ -26,6 +26,7 @@ from ot.executor.fence_processor import strip_fences
 from ot.executor.pack_proxy import build_execution_namespace
 from ot.executor.tool_loader import load_tool_functions, load_tool_registry
 from ot.logging import LogSpan
+from ot.utils import serialize_result
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -278,8 +279,8 @@ def execute_python_code(
 
         # If we have both a result and stdout, include both
         if stdout_output:
-            return f"{stdout_output}\n{result}"
-        return str(result)
+            return f"{stdout_output}\n{serialize_result(result)}"
+        return serialize_result(result)
 
     except Exception as e:
         error_msg, line_num = _map_error_line(e, line_offset)

@@ -6,7 +6,7 @@ Tests pure functions directly and main functions with HTTP mocks.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -21,7 +21,6 @@ from ot_tools.package import (
     pypi,
     version,
 )
-
 
 # -----------------------------------------------------------------------------
 # Pure Function Tests (No Mocking Required)
@@ -131,8 +130,11 @@ class TestNpm:
 
         result = npm(packages=["react"])
 
-        assert "react" in result
-        assert "18.2.0" in result
+        # Result is now a list of dicts
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["name"] == "react"
+        assert result[0]["latest"] == "18.2.0"
 
     @patch("ot_tools.package._fetch")
     def test_handles_unknown_package(self, mock_fetch):
@@ -140,7 +142,9 @@ class TestNpm:
 
         result = npm(packages=["nonexistent-package-xyz"])
 
-        assert "unknown" in result
+        # Result is now a list of dicts
+        assert isinstance(result, list)
+        assert result[0]["latest"] == "unknown"
 
     @patch("ot_tools.package._fetch")
     def test_fetches_multiple_packages(self, mock_fetch):
@@ -151,8 +155,11 @@ class TestNpm:
 
         result = npm(packages=["react", "lodash"])
 
-        assert "react" in result
-        assert "lodash" in result
+        # Result is now a list of dicts
+        assert isinstance(result, list)
+        names = [r["name"] for r in result]
+        assert "react" in names
+        assert "lodash" in names
 
 
 @pytest.mark.unit
@@ -166,8 +173,11 @@ class TestPypi:
 
         result = pypi(packages=["requests"])
 
-        assert "requests" in result
-        assert "2.31.0" in result
+        # Result is now a list of dicts
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["name"] == "requests"
+        assert result[0]["latest"] == "2.31.0"
 
     @patch("ot_tools.package._fetch")
     def test_handles_unknown_package(self, mock_fetch):
@@ -175,7 +185,9 @@ class TestPypi:
 
         result = pypi(packages=["nonexistent-package-xyz"])
 
-        assert "unknown" in result
+        # Result is now a list of dicts
+        assert isinstance(result, list)
+        assert result[0]["latest"] == "unknown"
 
 
 @pytest.mark.unit
@@ -202,8 +214,11 @@ class TestModels:
 
         result = models(query="claude")
 
-        assert "claude" in result.lower()
-        assert "anthropic" in result.lower()
+        # Result is now a list of dicts
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert "claude" in result[0]["id"].lower()
+        assert "anthropic" in result[0]["id"].lower()
 
     @patch("ot_tools.package._fetch")
     def test_filters_by_provider(self, mock_fetch):
@@ -232,7 +247,9 @@ class TestModels:
         result = models(provider="anthropic")
 
         # Should only include anthropic models
-        assert "anthropic" in result.lower()
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert "anthropic" in result[0]["id"].lower()
 
     @patch("ot_tools.package._fetch")
     def test_returns_empty_on_failure(self, mock_fetch):
@@ -240,7 +257,8 @@ class TestModels:
 
         result = models(query="test")
 
-        assert result == "[]"
+        # Result is now an empty list
+        assert result == []
 
     @patch("ot_tools.package._fetch")
     def test_limits_results(self, mock_fetch):
@@ -261,8 +279,9 @@ class TestModels:
 
         result = models(limit=5)
 
-        # Count how many model entries (each has "id":)
-        assert result.count('"id":') <= 5
+        # Result is now a list, check length
+        assert isinstance(result, list)
+        assert len(result) <= 5
 
 
 @pytest.mark.unit
@@ -276,9 +295,12 @@ class TestVersion:
 
         result = version(registry="npm", packages={"react": "^18.0.0"})
 
-        assert "react" in result
-        assert "18.0.0" in result  # current (stripped of ^)
-        assert "18.2.0" in result  # latest
+        # Result is now a list of dicts
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["name"] == "react"
+        assert result[0]["current"] == "18.0.0"  # current (stripped of ^)
+        assert result[0]["latest"] == "18.2.0"  # latest
 
     @patch("ot_tools.package._fetch")
     def test_pypi_with_list(self, mock_fetch):
@@ -286,8 +308,11 @@ class TestVersion:
 
         result = version(registry="pypi", packages=["requests"])
 
-        assert "requests" in result
-        assert "2.31.0" in result
+        # Result is now a list of dicts
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["name"] == "requests"
+        assert result[0]["latest"] == "2.31.0"
 
     @patch("ot_tools.package._fetch")
     def test_openrouter_with_wildcard(self, mock_fetch):
@@ -308,12 +333,16 @@ class TestVersion:
 
         result = version(registry="openrouter", packages=["openai/gpt-4*"])
 
-        assert "openai" in result.lower()
-        assert "gpt-4" in result.lower()
+        # Result is now a list of dicts
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert "openai" in result[0]["id"].lower()
+        assert "gpt-4" in result[0]["id"].lower()
 
     def test_unknown_registry(self):
         result = version(registry="invalid", packages=["test"])
 
+        # This returns a string error message
         assert "Unknown registry" in result
 
 

@@ -54,7 +54,6 @@ from openpyxl.worksheet.cell_range import CellRange
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from ot.paths import get_effective_cwd
-from ot.utils import format_result
 from ot_sdk import log, worker_main
 
 
@@ -232,7 +231,7 @@ def read(
                 rows.append(row_data)
 
             s.add(rows=len(rows))
-            return format_result(rows)
+            return rows
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -344,7 +343,7 @@ def info(*, filepath: str, include_ranges: bool = False) -> str:
 
             wb.close()
             s.add(sheets=len(info_dict["sheets"]))
-            return format_result(info_dict, compact=False)
+            return info_dict
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -539,11 +538,11 @@ def search(
                         matches.append({"cell": cell.coordinate, "value": text})
                         if first_only:
                             s.add(resultCount=1)
-                            return format_result(matches[0])
+                            return matches[0]
 
             wb.close()
             s.add(resultCount=len(matches))
-            return format_result(matches)
+            return matches
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -590,7 +589,7 @@ def tables(
 
             wb.close()
             s.add(resultCount=len(table_list))
-            return format_result(table_list)
+            return table_list
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -650,7 +649,7 @@ def table_info(
 
             wb.close()
             s.add(found=True)
-            return format_result(info_dict, compact=False)
+            return info_dict
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -722,13 +721,13 @@ def table_data(
             if row_index is not None:
                 if 0 <= row_index < len(rows_data):
                     s.add(resultCount=1)
-                    return format_result(rows_data[row_index])
+                    return rows_data[row_index]
                 else:
                     s.add(error="row_index_out_of_range")
                     return f"Error: Row index {row_index} out of range (0-{len(rows_data) - 1})"
 
             s.add(resultCount=len(rows_data))
-            return format_result(rows_data)
+            return rows_data
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -1104,7 +1103,7 @@ def sheets(*, filepath: str) -> str:
 
             wb.close()
             s.add(resultCount=len(sheet_list))
-            return format_result(sheet_list)
+            return sheet_list
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -1200,7 +1199,7 @@ def formulas(
 
             wb.close()
             s.add(resultCount=len(formula_list))
-            return format_result(formula_list)
+            return formula_list
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -1250,7 +1249,7 @@ def hyperlinks(
 
             wb.close()
             s.add(resultCount=len(link_list))
-            return format_result(link_list)
+            return link_list
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -1290,7 +1289,7 @@ def merged_cells(
 
             wb.close()
             s.add(resultCount=len(merged_list))
-            return format_result(merged_list)
+            return merged_list
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -1335,7 +1334,7 @@ def named_ranges(*, filepath: str) -> str:
 
             wb.close()
             s.add(resultCount=len(range_list))
-            return format_result(range_list)
+            return range_list
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"

@@ -81,16 +81,20 @@ def test_tools_returns_correct_signatures_for_same_named_functions() -> None:
 
     result = tools(pattern="search")
 
+    # Result is now a list of dicts
+    tool_names = [t["name"] for t in result]
+    tool_descs = " ".join(t.get("description", "") for t in result)
+
     # Each pack's search function should have its own signature
-    assert "brave.search" in result
-    assert "ground.search" in result
-    assert "page.search" in result
+    assert "brave.search" in tool_names
+    assert "ground.search" in tool_names
+    assert "page.search" in tool_names
 
     # ground.search should mention Gemini/grounding (non-proxied function)
-    assert "Gemini" in result or "grounding" in result
+    assert "Gemini" in tool_descs or "grounding" in tool_descs
 
     # page.search should mention HTML/accessibility (non-proxied function)
-    assert "accessibility" in result or "HTML" in result
+    assert "accessibility" in tool_descs or "HTML" in tool_descs
 
 
 @pytest.mark.unit
@@ -102,29 +106,30 @@ def test_tools_compact_mode_reduces_output_size() -> None:
     full_output = tools()
     compact_output = tools(compact=True)
 
-    # Compact should be significantly smaller
-    assert len(compact_output) < len(full_output) * 0.5
+    # Both are lists of dicts
+    assert isinstance(full_output, list)
+    assert isinstance(compact_output, list)
 
-    # Compact should not have signature or source fields (JSON format)
-    assert '"signature"' not in compact_output
-    assert '"source"' not in compact_output
+    # Compact should not have signature or source fields
+    for tool in compact_output:
+        assert "signature" not in tool
+        assert "source" not in tool
 
-    # But should still have name and description (JSON format)
-    assert '"name"' in compact_output
-    assert '"description"' in compact_output
+    # But should still have name and description
+    for tool in compact_output:
+        assert "name" in tool
+        assert "description" in tool
 
 
 @pytest.mark.unit
 @pytest.mark.serve
 def test_tools_pack_filter() -> None:
     """Verify pack filter works correctly."""
-    import json
-
     from ot_tools.internal import tools
 
     result = tools(pack="ot")
-    tools_list = json.loads(result)
-    tool_names = [t["name"] for t in tools_list]
+    # Result is now a list of dicts directly
+    tool_names = [t["name"] for t in result]
 
     # Should only have ot pack tools
     assert any(name == "ot.tools" for name in tool_names)
@@ -139,22 +144,19 @@ def test_tools_pack_filter() -> None:
 @pytest.mark.serve
 def test_health_counts_all_tools() -> None:
     """Verify ot.health() counts all tools including duplicates."""
-    import json
-
     from ot_tools.internal import health
 
     result = health()
 
-    # Should be valid JSON with registry status
-    data = json.loads(result)
-    assert "registry" in data
-    assert "tool_count" in data["registry"]
+    # Result is now a dict directly
+    assert "registry" in result
+    assert "tool_count" in result["registry"]
 
     # The count should include all tools across packs
     # (not deduplicated by bare name)
     # We have at least 5 "search" functions in different packs
     # so total should be > 30 (rough estimate)
-    count = data["registry"]["tool_count"]
+    count = result["registry"]["tool_count"]
     assert count >= 30, f"Expected at least 30 tools, got {count}"
 
 
@@ -162,17 +164,14 @@ def test_health_counts_all_tools() -> None:
 @pytest.mark.serve
 def test_config_returns_configuration() -> None:
     """Verify ot.config() returns configuration information."""
-    import json
-
     from ot_tools.internal import config
 
     result = config()
 
-    # Should be valid JSON with expected sections
-    data = json.loads(result)
-    assert "aliases" in data
-    assert "snippets" in data
-    assert "servers" in data
+    # Result is now a dict directly
+    assert "aliases" in result
+    assert "snippets" in result
+    assert "servers" in result
 
 
 # ============================================================================

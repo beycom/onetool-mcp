@@ -1,4 +1,4 @@
-"""Unit tests for format_result() helper."""
+"""Unit tests for serialize_result() helper."""
 
 from __future__ import annotations
 
@@ -6,77 +6,67 @@ import json
 
 import pytest
 
-from ot.utils import format_result
+from ot.utils import serialize_result
 
 
 @pytest.mark.unit
 @pytest.mark.core
-class TestFormatResult:
-    """Test format_result JSON serialisation."""
+class TestSerializeResult:
+    """Test serialize_result serialization for MCP responses."""
 
-    def test_dict_compact(self):
-        """Compact mode outputs single-line JSON without whitespace."""
+    def test_string_passthrough(self):
+        """String values pass through unchanged."""
+        assert serialize_result("hello world") == "hello world"
+        assert serialize_result("") == ""
+        assert serialize_result("Error: something failed") == "Error: something failed"
+
+    def test_dict_to_compact_json(self):
+        """Dict is serialized to compact JSON."""
         data = {"name": "test", "value": 123}
-        result = format_result(data)
+        result = serialize_result(data)
 
         assert result == '{"name":"test","value":123}'
         assert json.loads(result) == data
 
-    def test_dict_pretty(self):
-        """Pretty mode outputs indented multi-line JSON."""
-        data = {"name": "test", "value": 123}
-        result = format_result(data, compact=False)
-
-        assert "\n" in result
-        assert "  " in result  # Indentation
-        assert json.loads(result) == data
-
-    def test_list_compact(self):
-        """List data is serialised correctly in compact mode."""
+    def test_list_to_compact_json(self):
+        """List is serialized to compact JSON."""
         data = [{"a": 1}, {"b": 2}]
-        result = format_result(data)
+        result = serialize_result(data)
 
         assert result == '[{"a":1},{"b":2}]'
         assert json.loads(result) == data
 
-    def test_list_pretty(self):
-        """List data is serialised correctly in pretty mode."""
-        data = [{"a": 1}, {"b": 2}]
-        result = format_result(data, compact=False)
-
-        assert "\n" in result
-        assert json.loads(result) == data
-
-    def test_unicode_preserved(self):
-        """Unicode characters are not escaped."""
-        data = {"name": "日本語", "emoji": "🎉"}
-        result = format_result(data)
-
-        assert "日本語" in result
-        assert "🎉" in result
-        assert json.loads(result) == data
-
     def test_nested_structures(self):
-        """Nested dicts and lists are handled."""
+        """Nested dicts and lists are serialized correctly."""
         data = {
             "outer": {
                 "inner": [1, 2, 3],
                 "deep": {"key": "value"},
             }
         }
-        result = format_result(data)
+        result = serialize_result(data)
 
         assert json.loads(result) == data
+        # Verify compact (no extra whitespace)
+        assert "\n" not in result
+        assert ": " not in result
 
-    def test_primitives(self):
-        """Primitive values are serialised correctly."""
-        assert format_result(42) == "42"
-        assert format_result("hello") == '"hello"'
-        assert format_result(True) == "true"
-        assert format_result(False) == "false"
-        assert format_result(None) == "null"
+    def test_unicode_preserved(self):
+        """Unicode characters are not escaped."""
+        data = {"name": "日本語", "emoji": "🎉"}
+        result = serialize_result(data)
+
+        assert "日本語" in result
+        assert "🎉" in result
+        assert json.loads(result) == data
 
     def test_empty_structures(self):
         """Empty dicts and lists are handled."""
-        assert format_result({}) == "{}"
-        assert format_result([]) == "[]"
+        assert serialize_result({}) == "{}"
+        assert serialize_result([]) == "[]"
+
+    def test_non_json_types_use_str(self):
+        """Non-JSON types use str() fallback."""
+        assert serialize_result(42) == "42"
+        assert serialize_result(True) == "True"
+        assert serialize_result(None) == "None"

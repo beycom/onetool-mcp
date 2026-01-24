@@ -254,27 +254,28 @@ Tools SHALL format output consistently.
 - **WHEN** formatting output
 - **THEN** it SHALL return `"No results found."` or similar
 
-#### Scenario: JSON format for structured data
-- **GIVEN** structured data output (lists, dicts, nested structures)
-- **WHEN** formatting for LLM consumption
-- **THEN** it SHALL use `format_result(data)` from `ot.utils`
-- **AND** the helper internally uses `json.dumps(data, ensure_ascii=False, separators=(',', ':'))`
+#### Scenario: Native type returns
+- **GIVEN** structured data output (lists, dicts)
+- **WHEN** returning from a tool function
+- **THEN** it SHALL return the native Python type directly
+- **AND** serialization to JSON occurs at the runner level via `serialize_result()`
 
-#### Scenario: Pretty JSON for metadata
-- **GIVEN** complex metadata output (file info, table info)
-- **WHEN** readability is prioritised over compactness
-- **THEN** it MAY use `json.dumps(data, ensure_ascii=False, indent=2)`
+#### Scenario: String returns
+- **GIVEN** a tool returning text output or error messages
+- **WHEN** returning from a tool function
+- **THEN** it SHALL return a plain string
+- **AND** strings pass through the runner unchanged
 
 #### Scenario: Result truncation
 - **GIVEN** output exceeds max length
 - **WHEN** truncating
 - **THEN** it SHALL append truncation indicator (e.g., "... (truncated)")
 
-#### Scenario: Centralised formatter
-- **GIVEN** a tool returning structured data
-- **WHEN** formatting the result
-- **THEN** it SHOULD use `format_result()` from `ot.utils.format`
-- **AND** the helper SHALL handle both compact and pretty modes
+#### Scenario: Runner serialization
+- **GIVEN** a tool returns a dict or list
+- **WHEN** the runner captures the result
+- **THEN** it SHALL serialize using `serialize_result()` from `ot.utils`
+- **AND** the output SHALL be compact JSON with no whitespace
 
 ---
 
@@ -382,26 +383,26 @@ Each tool SHALL have an OpenSpec specification.
 
 ### Requirement: Format Helper Module
 
-A centralised format helper SHALL provide consistent JSON output formatting.
+A centralised serialization helper SHALL provide consistent output formatting at the runner level.
 
 #### Scenario: Module location
-- **GIVEN** the format helper module
+- **GIVEN** the serialization helper module
 - **WHEN** locating it
 - **THEN** it SHALL be at `src/ot/utils/format.py`
 
-#### Scenario: Compact mode
-- **GIVEN** `format_result(data)` is called without arguments
-- **WHEN** data is a list or dict
-- **THEN** it SHALL return JSON with no whitespace: `{"key":"value"}`
+#### Scenario: Dict and list serialization
+- **GIVEN** `serialize_result(data)` is called with a dict or list
+- **WHEN** serializing for MCP response
+- **THEN** it SHALL return compact JSON with no whitespace: `{"key":"value"}`
 
-#### Scenario: Pretty mode
-- **GIVEN** `format_result(data, compact=False)` is called
-- **WHEN** data is a list or dict
-- **THEN** it SHALL return JSON with 2-space indentation
+#### Scenario: String passthrough
+- **GIVEN** `serialize_result(data)` is called with a string
+- **WHEN** serializing for MCP response
+- **THEN** it SHALL return the string unchanged
 
 #### Scenario: Unicode handling
 - **GIVEN** data contains non-ASCII characters
-- **WHEN** formatted
+- **WHEN** serialized
 - **THEN** it SHALL preserve Unicode (not escape to `\uXXXX`)
 
 ### Requirement: Source Attribution Model

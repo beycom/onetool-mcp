@@ -154,9 +154,11 @@ def test_info_file(test_file: Path) -> None:
 
     result = info(path=str(test_file))
 
-    assert "test.txt" in result or str(test_file) in result
-    assert "file" in result.lower()
-    assert "size" in result.lower()
+    # Result is now a dict with path, type, size, etc.
+    assert isinstance(result, dict)
+    assert "test.txt" in result["path"]
+    assert result["type"] == "file"
+    assert "size" in result
 
 
 @pytest.mark.unit
@@ -167,7 +169,9 @@ def test_info_directory(test_dir: Path) -> None:
 
     result = info(path=str(test_dir))
 
-    assert "directory" in result.lower()
+    # Result is now a dict with type field
+    assert isinstance(result, dict)
+    assert result["type"] == "directory"
 
 
 # =============================================================================

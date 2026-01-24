@@ -20,8 +20,11 @@ class TestPackageLive:
 
         result = npm(packages=["lodash"])
 
-        assert "lodash" in result
-        assert "unknown" not in result.lower()  # Got a real version
+        # Result is now a list of dicts
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["name"] == "lodash"
+        assert result[0]["latest"] != "unknown"  # Got a real version
 
     def test_pypi_live(self):
         """Verify PyPI integration works."""
@@ -29,8 +32,11 @@ class TestPackageLive:
 
         result = pypi(packages=["requests"])
 
-        assert "requests" in result
-        assert "unknown" not in result.lower()  # Got a real version
+        # Result is now a list of dicts
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["name"] == "requests"
+        assert result[0]["latest"] != "unknown"  # Got a real version
 
     def test_openrouter_models_live(self):
         """Verify OpenRouter models API works."""
@@ -38,4 +44,8 @@ class TestPackageLive:
 
         result = models(query="claude", limit=3)
 
-        assert "claude" in result.lower() or "[]" in result  # Either results or empty
+        # Result is now a list of dicts (or empty list if API unavailable)
+        assert isinstance(result, list)
+        if len(result) > 0:
+            # Check that we got claude models
+            assert any("claude" in m.get("id", "").lower() for m in result)
