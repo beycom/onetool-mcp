@@ -1987,7 +1987,7 @@
 
 
 <h1 id="tools-reference">Tools Reference<a class="headerlink" href="#tools-reference" title="Permanent link">&para;</a></h1>
-<p><strong>12 packs. 55+ functions. Zero tool-selection overhead.</strong></p>
+<p><strong>14 packs. 65+ functions. Zero tool-selection overhead.</strong></p>
 <p>Every function below is callable with a single <code>__ot</code> prefix. No JSON schemas, no tool discovery loops.</p>
 <h2 id="tool-index">Tool Index<a class="headerlink" href="#tool-index" title="Permanent link">&para;</a></h2>
 <table>
@@ -2100,8 +2100,8 @@
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">llm</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="nb">input</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">prompt</span><span class="o">=</span><span class="s2">&quot;extract emails&quot;</span><span class="p">)</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Database</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">db</span><span class="o">.</span><span class="n">tables</span><span class="p">(</span><span class="n">project</span><span class="o">=</span><span class="s2">&quot;myapp&quot;</span><span class="p">)</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">db</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">project</span><span class="o">=</span><span class="s2">&quot;myapp&quot;</span><span class="p">,</span> <span class="n">sql</span><span class="o">=</span><span class="s2">&quot;SELECT * FROM users&quot;</span><span class="p">)</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">db</span><span class="o">.</span><span class="n">tables</span><span class="p">(</span><span class="n">db_url</span><span class="o">=</span><span class="s2">&quot;sqlite:///data.db&quot;</span><span class="p">)</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">db</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">sql</span><span class="o">=</span><span class="s2">&quot;SELECT * FROM users&quot;</span><span class="p">,</span> <span class="n">db_url</span><span class="o">=</span><span class="s2">&quot;sqlite:///data.db&quot;</span><span class="p">)</span>
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
 </span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># Excel</span>
 </span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="n">excel</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">&quot;data.xlsx&quot;</span><span class="p">,</span> <span class="n">sheet</span><span class="o">=</span><span class="s2">&quot;Sheet1&quot;</span><span class="p">)</span>
