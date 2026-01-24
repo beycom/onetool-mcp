@@ -68,6 +68,8 @@ packages = ["src/ot", "src/ot_tools", "src/ot_sdk", "src/ot_serve", "src/ot_benc
 [dependency-groups]
 docs = [
     "mkdocs-material>=9.5.0",
+    "mkdocs-section-index>=0.3.10",
+    "mkdocs-redirects>=1.2.2",
 ]
 dev = [
     "mypy>=1.19.1",

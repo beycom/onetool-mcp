@@ -585,23 +585,6 @@ class ConsoleReporter:
                             f"latency={m.latency_ms}ms"
                         )
 
-        # Calculate context efficiency comparison if multiple tasks with metrics
-        tasks_with_metrics = [
-            t for t in scenario_result.tasks if t.llm_call_metrics and t.input_tokens > 0
-        ]
-        if len(tasks_with_metrics) >= 2:
-            # Sort by input tokens to find min and max
-            sorted_tasks = sorted(tasks_with_metrics, key=lambda t: t.input_tokens)
-            min_task = sorted_tasks[0]
-            max_task = sorted_tasks[-1]
-
-            if max_task.input_tokens > 0 and min_task.input_tokens < max_task.input_tokens:
-                ratio = (min_task.input_tokens / max_task.input_tokens) * 100
-                self.console.print(
-                    f"\n  [dim]Context efficiency: "
-                    f"{min_task.name} uses {ratio:.0f}% of {max_task.name} context[/dim]"
-                )
-
         # Show totals with camelCase labels
         totals = scenario_result.calculate_totals()
         cost_cents = totals["total_cost_usd"] * 100

@@ -12,6 +12,10 @@ favorites:
     path: demo/bench/features.yaml
     description: OneTool features - invocation, proxy, snippets
 
+  - name: Run everything-claude-code benchmark
+    path: demo/bench/ecc.yaml
+    description: All Everything Claude Code recommended MCP servers. See https://github.com/affaan-m/everything-claude-code/blob/main/mcp-configs/mcp-servers.json
+
   - name: Select a benchmark from demo/bench
     path: demo/bench/
     description: All benchmark files

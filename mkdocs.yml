@@ -42,6 +42,9 @@ theme:
 plugins:
   - search
   - tags
+  - section-index
+  - redirects:
+      redirect_maps: {}
 
 markdown_extensions:
   - toc:

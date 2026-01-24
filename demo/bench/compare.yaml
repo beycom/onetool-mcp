@@ -14,7 +14,7 @@
 # Use with: ot-bench run demo/bench/compare.yaml
 
 defaults:
-  timeout: 60
+  timeout: 120
   model: google/gemini-3-flash-preview
 
 evaluators:
