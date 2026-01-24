@@ -74,6 +74,10 @@ typecheck:
 deps-check:
     uvx deptry . 2>&1 | grep -v "^Assuming"
 
+# Scan for secrets with gitleaks
+secrets-check:
+    gitleaks detect --source . --verbose
+
 # ============================================================================
 # DOCUMENTATION
 # ============================================================================

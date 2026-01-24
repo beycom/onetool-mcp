@@ -1,0 +1,19 @@
+# Gitleaks configuration
+# https://github.com/gitleaks/gitleaks
+
+[extend]
+useDefault = true
+
+# Global allowlist
+[allowlist]
+description = "Allowed patterns and paths"
+
+# PostHog project API keys are public client-side tokens (write-only)
+regexes = ['''phc_[a-zA-Z0-9]+''']
+
+# Paths containing example/captured content
+paths = [
+    '''\.browse/''',
+    '''examples/data/\.browse/''',
+    '''openspec/.*/spec\.md''',
+]
