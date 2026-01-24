@@ -1,0 +1,8 @@
+scenario,task,model,server,result,total_input,total_output,llm_calls,tool_calls,duration_s,cost_usd,base_context,context_growth_avg
+Compare: Package Versions (npm + pypi),compare:packages:base,google/gemini-3-flash-preview,-,FAIL,34,291,1,0,3.54,0.00089,34,0.0
+Compare: Package Versions (npm + pypi),compare:packages:mcp,google/gemini-3-flash-preview,package-version,PASS,3263,110,2,2,4.0,0.001961,1541,181.0
+Compare: Package Versions (npm + pypi),compare:packages:multiple-mcp,google/gemini-3-flash-preview,"package-version,brave-search,context7,github,fetch,sequential-thinking,filesystem,memory,plantuml,excel,ripgrep,gemini-grounding,chunkhound,mcp-alchemy",PASS,49214,105,2,2,11.87,0.024922,24509,196.0
+Compare: Package Versions (npm + pypi),compare:packages:onetool,google/gemini-3-flash-preview,onetool,PASS,1285,86,2,1,5.82,0.0009,571,143.0
+Compare: Package Versions (npm + pypi),compare:packages:proxy,google/gemini-3-flash-preview,onetool,PASS,1372,98,2,1,5.18,0.00098,577,218.0
+Compare: Package Versions (npm + pypi),compare:packages:multi-prompt:mcp,google/gemini-3-flash-preview,"package-version,brave-search,context7,github,fetch,sequential-thinking,filesystem,memory,plantuml,excel,ripgrep,gemini-grounding,chunkhound,mcp-alchemy",PASS,123149,88,5,2,18.19,0.061838,24475,71.2
+Compare: Package Versions (npm + pypi),compare:packages:multi-prompt:onetool,google/gemini-3-flash-preview,onetool,PASS,3401,135,5,2,12.71,0.002105,524,74.8

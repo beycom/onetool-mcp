@@ -1,0 +1,60 @@
+# OneTool
+
+> *One Tool to rule them all, One Tool to find them, One Tool to bring them all and in the development bind them.*
+
+> MCP server exposing a single `run` tool for LLM code execution.
+
+OneTool reduces MCP token usage from ~150K to ~2K by presenting tools as code APIs instead of individual tool definitions.
+
+## Quick Start
+
+```bash
+uv sync && uv run ot-serve
+```
+
+## Invocation
+
+```python
+__ot brave.search(query="AI news")
+```
+
+## Tools
+
+- brave: search, news, local, image, video
+- web: fetch, fetch_batch
+- context7: search, doc
+- code: search, status
+- llm: transform
+- db: tables, schema, query
+- package: npm, pypi, models, version
+- ripgrep: search, count, files
+- excel: create, read, write
+- ot: tools, push, config, health
+
+## Documentation
+
+- Getting Started: docs/getting-started/
+- Tools Reference: docs/reference/tools/
+- CLI Reference: docs/reference/cli/
+- Examples: docs/examples/
+- Extending: docs/extending/
+
+## Adding Tools
+
+Create `src/ot_tools/mytool.py`:
+
+```python
+pack = "mytool"
+
+def my_function(*, arg: str) -> str:
+    """Description shown to LLM."""
+    return f"Result: {arg}"
+```
+
+## Repository
+
+https://github.com/beycom/onetool-mcp
+
+## License
+
+MIT
