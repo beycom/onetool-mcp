@@ -84,27 +84,11 @@ Span names use dot-notation: `{component}.{operation}[.{detail}]`
 - `mcp.server.stop` - Server shutdown
 - `tool.lookup` - Tool resolution
 
-### CLI Operations
-- `browse.session.start` - Browser session start
-- `browse.navigate` - Navigation
-- `browse.screenshot` - Screenshot capture
-
 ### Tool Operations
 
 See [Creating Tools](creating-tools.md#logging-with-logspan) for tool span naming conventions.
 
 ## Examples
-
-### CLI Initialisation
-
-```python
-# In src/ot_browse/app.py
-from ot.logging import configure_logging
-
-def main() -> None:
-    configure_logging(log_name="browse")
-    # ... rest of CLI
-```
 
 ### Tool Functions
 
@@ -130,16 +114,16 @@ async def execute_tool(ctx, tool_name: str, args: dict) -> str:
 ### Nested Spans
 
 ```python
-with LogSpan(span="browse.session", source=source) as outer:
-    # Navigate
-    with LogSpan(span="browse.navigate", url=url) as nav:
-        page = navigate_to(url)
-        nav.add("status", page.status)
+with LogSpan(span="web.fetch", url=url) as outer:
+    # Download
+    with LogSpan(span="web.download", url=url) as dl:
+        response = download(url)
+        dl.add("status", response.status)
 
-    # Capture
-    with LogSpan(span="browse.capture", page=page.url) as cap:
-        files = capture_page(page)
-        cap.add("fileCount", len(files))
+    # Extract
+    with LogSpan(span="web.extract", url=url) as ext:
+        content = extract_content(response)
+        ext.add("length", len(content))
 
     outer.add("success", True)
 ```

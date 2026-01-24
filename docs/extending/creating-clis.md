@@ -258,7 +258,7 @@ def run(
 
 ## Interactive TUI CLIs
 
-For interactive menu-driven CLIs (like `ot-browse`), use argparse with a controller class:
+For interactive menu-driven CLIs, use argparse with a controller class:
 
 ```python
 # src/ot_example/app.py

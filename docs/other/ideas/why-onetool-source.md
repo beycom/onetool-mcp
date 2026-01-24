@@ -172,18 +172,6 @@ Real LLM + MCP testing. Define tasks in YAML, get objective metrics: token count
 ot-bench run examples/bench/package_version.yaml
 ```
 
-### `ot-browse` - Browser Inspector
-
-Captures pages as structured data for LLM consumption: HTML, screenshots, accessibility trees, annotations.
-
-- **Task-based INDEX.md**: tells LLMs which file to read
-- **Large file warnings**: suggests filtering for 100KB+ files
-- **Line numbers**: precise references into page.html
-
-```bash
-ot-browse https://example.com
-```
-
 ---
 
 ## Built-in Tools
@@ -236,16 +224,6 @@ package.version(registry, pkgs) # Unified, parallel
 ```
 
 No API key required. Based on [mcp-package-version](https://github.com/sammcj/mcp-package-version).
-
-### `page` - Browser Captures
-
-```python
-page.annotations(session, capture)   # Get selectors
-page.accessibility(session, capture) # Filter tree
-page.diff(session, cap1, cap2)       # Compare captures
-```
-
-Streams large files, filters 258KB accessibility trees to <10KB.
 
 ### `llm` - Data Transformation
 

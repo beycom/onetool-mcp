@@ -7,6 +7,10 @@
 - `/openspec/changes` - pending proposals
 - `/openspec/archive` - completed proposals
 
+## Beta (Exclude)
+
+- `ot-browse` CLI and `page` pack are beta - do not reference in docs or stats
+
 ## Spec Naming
 
 | Pattern | Example | Description |

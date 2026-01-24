@@ -46,7 +46,7 @@ ot-serve init reset     # Reset to defaults (overwrites existing)
 ot-serve init validate  # Check for errors
 ```
 
-**Note:** Only `ot-serve` bootstraps the global config directory. Other tools (`ot-bench`, `ot-browse`) require `~/.onetool/` to exist and will prompt you to run `ot-serve init` first if it's missing.
+**Note:** Only `ot-serve` bootstraps the global config directory. Other tools (`ot-bench`) require `~/.onetool/` to exist and will prompt you to run `ot-serve init` first if it's missing.
 
 ### Configuration Inheritance
 

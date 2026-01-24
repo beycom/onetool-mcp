@@ -17,12 +17,11 @@
 
 **Code-Centric**
 - **Easy to extend**: Drop a Python file, get a tool pack. No registration.
-- **Batteries included**: 15 packs, 97 tools ready to use
+- **Batteries included**: 14 packs, 89 tools ready to use
 - **Worker isolation**: External dependencies run in isolated subprocesses (PEP 723)
 - **AST security**: All code validated before execution
 
 **Built-in CLIs**
 - `ot-serve` — The MCP server
 - `ot-bench` — Benchmark harness (tokens, cost, accuracy)
-- `ot-browse` — Browser TUI with capture tools
 ```

@@ -33,7 +33,6 @@ Every test requires two markers: a **speed tier** and a **component tag**.
 | `core` | Core library (`ot`) |
 | `serve` | MCP server (`ot_serve`) |
 | `bench` | Benchmark harness (`ot_bench`) |
-| `browse` | Browser inspector (`ot_browse`) |
 | `pkg` | Package management |
 | `spec` | OpenSpec tooling |
 
@@ -226,7 +225,7 @@ class TestPackageLive:
 ### Checklist
 
 - [ ] Add speed marker (`smoke`, `unit`, `integration`, or `slow`)
-- [ ] Add component marker (`tools`, `core`, `serve`, `bench`, `browse`, `pkg`, `spec`)
+- [ ] Add component marker (`tools`, `core`, `serve`, `bench`, `pkg`, `spec`)
 - [ ] Add dependency markers if needed (`network`, `api`, `playwright`, `docker`)
 - [ ] Write descriptive docstring explaining what is tested
 - [ ] Use class grouping for related tests

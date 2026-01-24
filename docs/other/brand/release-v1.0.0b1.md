@@ -26,7 +26,7 @@
 - Proxy external MCP servers
 
 🔋 **Batteries Included**
-- 15 packs, 97 tools ready to use
+- 14 packs, 89 tools ready to use
 - Drop a file to add a pack
 - Worker isolation for external dependencies
 

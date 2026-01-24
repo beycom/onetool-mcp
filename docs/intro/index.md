@@ -67,7 +67,7 @@ __ot brave.search(query="AI trends 2026")
 
 LLMs write Python to call functions. No JSON schema parsing. No tool selection loops. You see exactly what's being called because you wrote it.
 
-15 packs built-in. Adding your own is dropping a Python file in a folder.
+14 packs built-in. Adding your own is dropping a Python file in a folder.
 
 [MIT Technology Review](https://www.technologyreview.com/2025/11/05/1127477/from-vibe-coding-to-context-engineering-2025-in-software-development/) calls this shift "from vibe coding to agentic engineering." Whatever you call it, the token math works out.
 
