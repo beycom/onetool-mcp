@@ -87,32 +87,70 @@ def init_create() -> None:
 
 
 @init_app.command("reset")
-def init_reset(
-    force: bool = typer.Option(
-        False,
-        "--force",
-        "-f",
-        help="Reset without confirmation prompt.",
-    ),
-) -> None:
+def init_reset() -> None:
     """Reset global config to default templates.
 
-    Overwrites existing config files in ~/.onetool/ with fresh templates.
-    Use with caution - any customizations will be lost.
+    Prompts for each file before overwriting. For existing files, offers to
+    create a backup first. Backups are named file.bak, file.bak.1, etc.
     """
-    from ot.paths import ensure_global_dir, get_global_dir
+    import shutil
+
+    from ot.paths import create_backup, get_global_dir, get_template_files
 
     global_dir = get_global_dir()
     console = Console(stderr=True)
 
-    if not force:
-        console.print(f"[yellow]This will overwrite files in {global_dir}/[/yellow]")
-        confirm = typer.confirm("Continue?", default=False)
-        if not confirm:
-            raise typer.Abort()
+    # Ensure global dir exists
+    global_dir.mkdir(parents=True, exist_ok=True)
 
-    ensure_global_dir(quiet=False, force=True)
-    console.print("[green]Global config reset to defaults.[/green]")
+    template_files = get_template_files()
+    if not template_files:
+        console.print("[yellow]No template files found.[/yellow]")
+        return
+
+    copied_files: list[str] = []
+    backed_up_files: list[tuple[str, Path]] = []
+    skipped_files: list[str] = []
+
+    for source_path, dest_name in template_files:
+        dest_path = global_dir / dest_name
+        exists = dest_path.exists()
+
+        if exists:
+            # Prompt for overwrite
+            console.print(f"\n[yellow]{dest_name}[/yellow] already exists.")
+            do_overwrite = typer.confirm("Overwrite?", default=True)
+
+            if not do_overwrite:
+                skipped_files.append(dest_name)
+                continue
+
+            # Prompt for backup
+            do_backup = typer.confirm(f"Create backup of {dest_name}?", default=True)
+
+            if do_backup:
+                backup_path = create_backup(dest_path)
+                backed_up_files.append((dest_name, backup_path))
+
+        shutil.copy(source_path, dest_path)
+        copied_files.append(dest_name)
+
+    # Summary
+    console.print()
+    if copied_files:
+        console.print(f"[green]Reset files in {global_dir}/:[/green]")
+        for name in copied_files:
+            console.print(f"  ✓ {name}")
+
+    if backed_up_files:
+        console.print("\n[cyan]Backups created:[/cyan]")
+        for name, backup_path in backed_up_files:
+            console.print(f"  → {name} → {backup_path.name}")
+
+    if skipped_files:
+        console.print("\n[dim]Skipped:[/dim]")
+        for name in skipped_files:
+            console.print(f"  - {name}")
 
 
 @init_app.command("validate")

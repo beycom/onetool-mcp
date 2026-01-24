@@ -42,7 +42,7 @@ You can also manage the global config directory manually:
 
 ```bash
 ot-serve init           # Create ~/.onetool/ (if missing)
-ot-serve init reset     # Reset to defaults (overwrites existing)
+ot-serve init reset     # Reset to defaults (prompts per file, offers backups)
 ot-serve init validate  # Check for errors
 ```
 

@@ -167,6 +167,54 @@ def get_project_dir(start: Path | None = None) -> Path | None:
     return None
 
 
+def get_template_files() -> list[tuple[Path, str]]:
+    """Get list of template files that would be copied to global dir.
+
+    Returns:
+        List of (source_path, dest_name) tuples for each template file.
+        dest_name has -template suffix stripped (e.g., secrets-template.yaml -> secrets.yaml)
+    """
+    try:
+        templates_dir = get_global_templates_dir()
+        result = []
+        for config_file in templates_dir.glob("*.yaml"):
+            dest_name = config_file.name.replace("-template.yaml", ".yaml")
+            result.append((config_file, dest_name))
+        return result
+    except FileNotFoundError:
+        return []
+
+
+def create_backup(file_path: Path) -> Path:
+    """Create a numbered backup of a file.
+
+    Creates backups as file.bak, file.bak.1, file.bak.2, etc.
+
+    Args:
+        file_path: Path to the file to backup
+
+    Returns:
+        Path to the created backup file
+    """
+    backup_base = file_path.with_suffix(file_path.suffix + ".bak")
+
+    # Find the next available backup number
+    if not backup_base.exists():
+        backup_path = backup_base
+    else:
+        n = 1
+        while True:
+            backup_path = backup_base.with_suffix(f".bak.{n}")
+            if not backup_path.exists():
+                break
+            n += 1
+
+    import shutil
+
+    shutil.copy2(file_path, backup_path)
+    return backup_path
+
+
 def ensure_global_dir(quiet: bool = False, force: bool = False) -> Path:
     """Ensure the global OneTool directory exists.
 

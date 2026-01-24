@@ -31,7 +31,7 @@ Running `ot-serve init` without a subcommand creates the global config directory
 
 | Subcommand | Description |
 |------------|-------------|
-| `reset` | Reset global config to default templates (overwrites existing files) |
+| `reset` | Reset global config to default templates |
 | `validate` | Validate all configuration files |
 
 #### init (default)
@@ -44,11 +44,10 @@ ot-serve init
 
 #### init reset
 
-Overwrites existing config files in `~/.onetool/` with fresh templates. Use with caution.
+Resets config files in `~/.onetool/` to fresh templates. Prompts for each existing file before overwriting, with option to create backups. Backups are named `file.bak`, `file.bak.1`, `file.bak.2`, etc.
 
 ```bash
-ot-serve init reset        # Prompts for confirmation
-ot-serve init reset --force  # No confirmation
+ot-serve init reset
 ```
 
 #### init validate

@@ -197,6 +197,35 @@ The paths module SHALL provide access to global template configuration files for
 - **THEN** secrets templates SHALL be named `*-template.yaml`
 - **AND** they SHALL be copied without the `-template` suffix to `~/.onetool/`
 
+### Requirement: Template File Discovery
+
+The paths module SHALL provide a function to list template files.
+
+#### Scenario: Get template files
+- **GIVEN** global templates directory exists
+- **WHEN** `get_template_files()` is called
+- **THEN** it SHALL return a list of (source_path, dest_name) tuples
+- **AND** dest_name SHALL have `-template` suffix stripped
+
+### Requirement: File Backup
+
+The paths module SHALL provide a function to create numbered backups.
+
+#### Scenario: First backup
+- **GIVEN** file `secrets.yaml` exists
+- **WHEN** `create_backup(Path("secrets.yaml"))` is called
+- **THEN** it SHALL create `secrets.yaml.bak`
+
+#### Scenario: Subsequent backups
+- **GIVEN** `secrets.yaml` and `secrets.yaml.bak` exist
+- **WHEN** `create_backup(Path("secrets.yaml"))` is called
+- **THEN** it SHALL create `secrets.yaml.bak.1`
+
+#### Scenario: Numbered backup sequence
+- **GIVEN** `secrets.yaml.bak` through `secrets.yaml.bak.5` exist
+- **WHEN** `create_backup(Path("secrets.yaml"))` is called
+- **THEN** it SHALL create `secrets.yaml.bak.6`
+
 ### Requirement: Global Directory Bootstrap
 
 The `ensure_global_dir` function SHALL seed from global templates (not bundled defaults).
@@ -229,6 +258,6 @@ The `ensure_global_dir` function SHALL seed from global templates (not bundled d
 #### Scenario: CLI init reset command
 - **GIVEN** a user wants to reset their global config
 - **WHEN** `ot-serve init reset` is called
-- **THEN** it SHALL prompt for confirmation
-- **AND** call `ensure_global_dir(force=True)` if confirmed
-
+- **THEN** it SHALL prompt for each existing file before overwriting (default: Y)
+- **AND** offer to create a backup before overwriting (default: Y)
+- **AND** backups SHALL be numbered (`file.bak`, `file.bak.1`, `file.bak.2`, etc.)
