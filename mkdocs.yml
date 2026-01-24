@@ -8,6 +8,7 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
+  custom_dir: docs/overrides
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -110,6 +111,9 @@ extra_css:
   - stylesheets/extra.css
 
 extra:
+  analytics:
+    provider: posthog
+    property: phc_Abm7GbXLKOv1ti9x5Su7mdQRUdUthSuJeYqV5DNAlFl
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/beycom/onetool-mcp

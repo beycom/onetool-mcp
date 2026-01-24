@@ -5,6 +5,9 @@ Every test must have:
 2. A component marker (serve, bench, browse, pkg, core)
 
 Tests missing required markers are automatically skipped.
+
+Use `--allow-skips` to gracefully skip tests with missing requirements.
+By default, tests with missing requirements will error (fail fast).
 """
 
 from __future__ import annotations
@@ -16,6 +19,45 @@ from typing import TYPE_CHECKING, Any, Callable
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """Add custom CLI options."""
+    parser.addoption(
+        "--allow-skips",
+        action="store_true",
+        default=False,
+        help="Skip tests with missing requirements instead of erroring",
+    )
+
+
+def require(condition: bool, reason: str, request: pytest.FixtureRequest) -> None:
+    """Require a condition or error/skip based on --allow-skips.
+
+    Use in fixtures to enforce requirements:
+        @pytest.fixture
+        def api_key(request):
+            key = get_secret("API_KEY")
+            require(key is not None, "API_KEY not configured", request)
+            return key
+
+    Args:
+        condition: If False, the test will error or skip
+        reason: Description of missing requirement
+        request: pytest request fixture (pass from your fixture)
+
+    Raises:
+        pytest.fail: If condition is False and --allow-skips is not set
+        pytest.skip: If condition is False and --allow-skips is set
+    """
+    if condition:
+        return
+
+    allow_skips = request.config.getoption("--allow-skips", default=False)
+    if allow_skips:
+        pytest.skip(reason)
+    else:
+        pytest.fail(f"Missing requirement: {reason} (use --allow-skips to skip)")
 
 
 # -----------------------------------------------------------------------------

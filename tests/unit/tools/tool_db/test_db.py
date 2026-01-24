@@ -6,24 +6,91 @@ All db functions require explicit db_url parameter.
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import Generator
 
 import pytest
 
 
 @pytest.fixture
-def northwind_db_url() -> str:
-    """Return URL to Northwind sample database."""
-    # Go up from tests/unit/tools/tool_db/ to project root
-    db_path = (
-        Path(__file__).parent.parent.parent.parent.parent
-        / "demo"
-        / "db"
-        / "northwind.db"
-    )
-    if not db_path.exists():
-        pytest.skip("Northwind sample database not found")
-    return f"sqlite:///{db_path}"
+def test_db_url(tmp_path) -> Generator[str, None, None]:
+    """Create a test SQLite database with Northwind-like schema."""
+    import sqlite3
+
+    db_path = tmp_path / "test.db"
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Create tables matching Northwind schema
+    cursor.executescript("""
+        CREATE TABLE Customers (
+            CustomerID TEXT PRIMARY KEY,
+            CompanyName TEXT,
+            ContactName TEXT,
+            Country TEXT
+        );
+
+        CREATE TABLE Products (
+            ProductID INTEGER PRIMARY KEY,
+            ProductName TEXT,
+            UnitPrice REAL,
+            UnitsInStock INTEGER
+        );
+
+        CREATE TABLE Employees (
+            EmployeeID INTEGER PRIMARY KEY,
+            LastName TEXT,
+            FirstName TEXT,
+            Title TEXT
+        );
+
+        CREATE TABLE Orders (
+            OrderID INTEGER PRIMARY KEY,
+            CustomerID TEXT,
+            EmployeeID INTEGER,
+            OrderDate TEXT,
+            FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID),
+            FOREIGN KEY (EmployeeID) REFERENCES Employees(EmployeeID)
+        );
+
+        CREATE TABLE "Order Details" (
+            OrderID INTEGER,
+            ProductID INTEGER,
+            UnitPrice REAL,
+            Quantity INTEGER,
+            PRIMARY KEY (OrderID, ProductID),
+            FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
+            FOREIGN KEY (ProductID) REFERENCES Products(ProductID)
+        );
+
+        -- Insert test data
+        INSERT INTO Customers VALUES
+            ('ALFKI', 'Alfreds Futterkiste', 'Maria Anders', 'Germany'),
+            ('ANATR', 'Ana Trujillo', 'Ana Trujillo', 'Mexico'),
+            ('ANTON', 'Antonio Moreno', 'Antonio Moreno', 'Mexico');
+
+        INSERT INTO Products VALUES
+            (1, 'Chai', 18.00, 39),
+            (2, 'Chang', 19.00, 17),
+            (3, 'Aniseed Syrup', 10.00, 13);
+
+        INSERT INTO Employees VALUES
+            (1, 'Davolio', 'Nancy', 'Sales Representative'),
+            (2, 'Fuller', 'Andrew', 'Vice President');
+
+        INSERT INTO Orders VALUES
+            (10248, 'ALFKI', 1, '1996-07-04'),
+            (10249, 'ANATR', 1, '1996-07-05');
+
+        INSERT INTO "Order Details" VALUES
+            (10248, 1, 14.00, 12),
+            (10248, 2, 9.80, 10),
+            (10249, 3, 10.00, 5);
+    """)
+
+    conn.commit()
+    conn.close()
+
+    yield f"sqlite:///{db_path}"
 
 
 @pytest.fixture
@@ -37,11 +104,11 @@ def reset_engines() -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 @pytest.mark.usefixtures("reset_engines")
-def test_tables_lists_all_tables(northwind_db_url: str) -> None:
+def test_tables_lists_all_tables(test_db_url: str) -> None:
     """Verify db.tables() returns all table names."""
     from ot_tools.db import tables
 
-    result = tables(db_url=northwind_db_url)
+    result = tables(db_url=test_db_url)
 
     # Northwind has these tables
     assert "Customers" in result
@@ -53,11 +120,11 @@ def test_tables_lists_all_tables(northwind_db_url: str) -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 @pytest.mark.usefixtures("reset_engines")
-def test_tables_filter_by_substring(northwind_db_url: str) -> None:
+def test_tables_filter_by_substring(test_db_url: str) -> None:
     """Verify db.tables(filter=...) filters table names."""
     from ot_tools.db import tables
 
-    result = tables(db_url=northwind_db_url, filter="Order")
+    result = tables(db_url=test_db_url, filter="Order")
 
     assert "Orders" in result or "OrderDetails" in result
     # Should not have unrelated tables
@@ -67,11 +134,11 @@ def test_tables_filter_by_substring(northwind_db_url: str) -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 @pytest.mark.usefixtures("reset_engines")
-def test_schema_returns_column_info(northwind_db_url: str) -> None:
+def test_schema_returns_column_info(test_db_url: str) -> None:
     """Verify db.schema() returns column definitions."""
     from ot_tools.db import schema
 
-    result = schema(table_names=["Customers"], db_url=northwind_db_url)
+    result = schema(table_names=["Customers"], db_url=test_db_url)
 
     assert "Customers:" in result
     assert "CustomerID" in result or "Id" in result
@@ -86,11 +153,11 @@ def test_schema_returns_column_info(northwind_db_url: str) -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 @pytest.mark.usefixtures("reset_engines")
-def test_schema_multiple_tables(northwind_db_url: str) -> None:
+def test_schema_multiple_tables(test_db_url: str) -> None:
     """Verify db.schema() handles multiple tables."""
     from ot_tools.db import schema
 
-    result = schema(table_names=["Customers", "Products"], db_url=northwind_db_url)
+    result = schema(table_names=["Customers", "Products"], db_url=test_db_url)
 
     assert "Customers:" in result
     assert "Products:" in result
@@ -99,12 +166,12 @@ def test_schema_multiple_tables(northwind_db_url: str) -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 @pytest.mark.usefixtures("reset_engines")
-def test_schema_shows_relationships(northwind_db_url: str) -> None:
+def test_schema_shows_relationships(test_db_url: str) -> None:
     """Verify db.schema() shows foreign key relationships."""
     from ot_tools.db import schema
 
     # "Order Details" has foreign keys (note: table name has space)
-    result = schema(table_names=["Order Details"], db_url=northwind_db_url)
+    result = schema(table_names=["Order Details"], db_url=test_db_url)
 
     # Should show relationships section if foreign keys exist
     # (Northwind has FK relationships)
@@ -114,11 +181,11 @@ def test_schema_shows_relationships(northwind_db_url: str) -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 @pytest.mark.usefixtures("reset_engines")
-def test_schema_empty_table_list_returns_error(northwind_db_url: str) -> None:
+def test_schema_empty_table_list_returns_error(test_db_url: str) -> None:
     """Verify db.schema() returns error for empty table list."""
     from ot_tools.db import schema
 
-    result = schema(table_names=[], db_url=northwind_db_url)
+    result = schema(table_names=[], db_url=test_db_url)
 
     assert "Error" in result
 
@@ -126,11 +193,11 @@ def test_schema_empty_table_list_returns_error(northwind_db_url: str) -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 @pytest.mark.usefixtures("reset_engines")
-def test_query_select(northwind_db_url: str) -> None:
+def test_query_select(test_db_url: str) -> None:
     """Verify db.query() executes SELECT and returns results."""
     from ot_tools.db import query
 
-    result = query(sql="SELECT * FROM Customers LIMIT 3", db_url=northwind_db_url)
+    result = query(sql="SELECT * FROM Customers LIMIT 3", db_url=test_db_url)
 
     # Should have row numbers
     assert "1. row" in result
@@ -141,13 +208,13 @@ def test_query_select(northwind_db_url: str) -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 @pytest.mark.usefixtures("reset_engines")
-def test_query_parameterized(northwind_db_url: str) -> None:
+def test_query_parameterized(test_db_url: str) -> None:
     """Verify db.query() handles parameterized queries."""
     from ot_tools.db import query
 
     result = query(
         sql="SELECT * FROM Customers WHERE Country = :country LIMIT 5",
-        db_url=northwind_db_url,
+        db_url=test_db_url,
         params={"country": "Germany"},
     )
 
@@ -158,13 +225,13 @@ def test_query_parameterized(northwind_db_url: str) -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 @pytest.mark.usefixtures("reset_engines")
-def test_query_no_results(northwind_db_url: str) -> None:
+def test_query_no_results(test_db_url: str) -> None:
     """Verify db.query() handles empty result sets."""
     from ot_tools.db import query
 
     result = query(
         sql="SELECT * FROM Customers WHERE CustomerID = 'NONEXISTENT'",
-        db_url=northwind_db_url,
+        db_url=test_db_url,
     )
 
     assert "No rows returned" in result
@@ -173,11 +240,11 @@ def test_query_no_results(northwind_db_url: str) -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 @pytest.mark.usefixtures("reset_engines")
-def test_query_invalid_sql_returns_error(northwind_db_url: str) -> None:
+def test_query_invalid_sql_returns_error(test_db_url: str) -> None:
     """Verify db.query() returns error for invalid SQL."""
     from ot_tools.db import query
 
-    result = query(sql="SELECT * FROM NonExistentTable", db_url=northwind_db_url)
+    result = query(sql="SELECT * FROM NonExistentTable", db_url=test_db_url)
 
     assert "Error" in result
 
@@ -185,11 +252,11 @@ def test_query_invalid_sql_returns_error(northwind_db_url: str) -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 @pytest.mark.usefixtures("reset_engines")
-def test_query_empty_sql_returns_error(northwind_db_url: str) -> None:
+def test_query_empty_sql_returns_error(test_db_url: str) -> None:
     """Verify db.query() returns error for empty SQL."""
     from ot_tools.db import query
 
-    result = query(sql="", db_url=northwind_db_url)
+    result = query(sql="", db_url=test_db_url)
 
     assert "Error" in result
 
@@ -239,20 +306,20 @@ def test_all_exports_only_public_functions() -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 @pytest.mark.usefixtures("reset_engines")
-def test_multi_db_connection_pooling(northwind_db_url: str) -> None:
+def test_multi_db_connection_pooling(test_db_url: str) -> None:
     """Verify connection pooling works with multiple databases."""
     import ot_tools.db as db_module
     from ot_tools.db import tables
 
     # Query northwind database
-    result1 = tables(db_url=northwind_db_url)
+    result1 = tables(db_url=test_db_url)
     assert "Customers" in result1
 
     # Engine should be cached
-    assert northwind_db_url in db_module._engines
+    assert test_db_url in db_module._engines
 
     # Query again - should reuse cached engine
-    result2 = tables(db_url=northwind_db_url)
+    result2 = tables(db_url=test_db_url)
     assert result1 == result2
 
     # Still only one engine

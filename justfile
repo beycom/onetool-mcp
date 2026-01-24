@@ -26,9 +26,13 @@ dev *args:
 # TESTING
 # ============================================================================
 
-# Run all tests
+# Run all tests (strict - errors on missing requirements)
 test *args:
     uv run pytest {{ args }}
+
+# Run tests with --allow-skips (lenient - skips on missing requirements)
+test-lenient *args:
+    uv run pytest --allow-skips {{ args }}
 
 # Run unit tests only
 test-unit:
