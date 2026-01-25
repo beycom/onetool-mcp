@@ -20,7 +20,6 @@ from ot_tools.code_search import (
     status,
 )
 
-
 # -----------------------------------------------------------------------------
 # Pure Function Tests
 # -----------------------------------------------------------------------------
@@ -47,7 +46,7 @@ class TestGetDbPath:
         assert db_path == Path("/explicit/path/.chunkhound/db/chunks.db")
 
     def test_expands_tilde(self):
-        db_path, project_root = _get_db_path("~/myproject")
+        _db_path, project_root = _get_db_path("~/myproject")
 
         # Should expand ~ to home directory
         assert "~" not in str(project_root)
@@ -133,11 +132,13 @@ class TestSearch:
     @patch("ot_tools.code_search._generate_embedding")
     @patch("ot_tools.code_search.duckdb")
     @patch("ot_tools.code_search._get_db_path")
-    @patch("ot_tools.code_search.get_config")
+    @patch("ot_tools.code_search.get_tool_config")
     def test_successful_search(
         self, mock_config, mock_db_path, mock_duckdb, mock_embed
     ):
-        mock_config.return_value.tools.code_search.limit = 10
+        from ot_tools.code_search import Config
+
+        mock_config.return_value = Config(limit=10)
 
         mock_path = MagicMock()
         mock_path.exists.return_value = True
@@ -173,11 +174,13 @@ class TestSearch:
 
     @patch("ot_tools.code_search.duckdb")
     @patch("ot_tools.code_search._get_db_path")
-    @patch("ot_tools.code_search.get_config")
+    @patch("ot_tools.code_search.get_tool_config")
     def test_returns_error_missing_chunks_table(
         self, mock_config, mock_db_path, mock_duckdb
     ):
-        mock_config.return_value.tools.code_search.limit = 10
+        from ot_tools.code_search import Config
+
+        mock_config.return_value = Config(limit=10)
 
         mock_path = MagicMock()
         mock_path.exists.return_value = True
@@ -196,11 +199,13 @@ class TestSearch:
 
     @patch("ot_tools.code_search.duckdb")
     @patch("ot_tools.code_search._get_db_path")
-    @patch("ot_tools.code_search.get_config")
+    @patch("ot_tools.code_search.get_tool_config")
     def test_returns_error_missing_embeddings_table(
         self, mock_config, mock_db_path, mock_duckdb
     ):
-        mock_config.return_value.tools.code_search.limit = 10
+        from ot_tools.code_search import Config
+
+        mock_config.return_value = Config(limit=10)
 
         mock_path = MagicMock()
         mock_path.exists.return_value = True
@@ -220,11 +225,13 @@ class TestSearch:
     @patch("ot_tools.code_search._generate_embedding")
     @patch("ot_tools.code_search.duckdb")
     @patch("ot_tools.code_search._get_db_path")
-    @patch("ot_tools.code_search.get_config")
+    @patch("ot_tools.code_search.get_tool_config")
     def test_no_results_message(
         self, mock_config, mock_db_path, mock_duckdb, mock_embed
     ):
-        mock_config.return_value.tools.code_search.limit = 10
+        from ot_tools.code_search import Config
+
+        mock_config.return_value = Config(limit=10)
 
         mock_path = MagicMock()
         mock_path.exists.return_value = True
@@ -247,9 +254,11 @@ class TestSearch:
     @patch("ot_tools.code_search._generate_embedding")
     @patch("ot_tools.code_search.duckdb")
     @patch("ot_tools.code_search._get_db_path")
-    @patch("ot_tools.code_search.get_config")
+    @patch("ot_tools.code_search.get_tool_config")
     def test_language_filter(self, mock_config, mock_db_path, mock_duckdb, mock_embed):
-        mock_config.return_value.tools.code_search.limit = 10
+        from ot_tools.code_search import Config
+
+        mock_config.return_value = Config(limit=10)
 
         mock_path = MagicMock()
         mock_path.exists.return_value = True

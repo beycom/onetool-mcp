@@ -152,29 +152,22 @@ def test_invalid_yaml_error() -> None:
 @pytest.mark.unit
 @pytest.mark.core
 def test_tools_config_defaults() -> None:
-    """Tools config has correct defaults."""
+    """Tools config has core infrastructure defaults."""
     from ot.config.loader import OneToolConfig
 
     config = OneToolConfig()
 
-    # Check tool defaults
-    assert config.tools.brave.timeout == 60.0
-    assert config.tools.ground.model == "gemini-2.5-flash"
-    assert config.tools.context7.timeout == 30.0
-    assert config.tools.context7.docs_limit == 10
-    assert config.tools.web_fetch.timeout == 30.0
-    assert config.tools.web_fetch.max_length == 50000
-    assert config.tools.ripgrep.timeout == 60.0
-    assert config.tools.code_search.limit == 10
-    assert config.tools.db.max_chars == 4000
-    assert config.tools.page_view.sessions_dir == ".browse"
-    assert config.tools.package.timeout == 30.0
+    # Core infrastructure config (msg, stats) is still typed
+    assert config.tools.msg is not None
+    assert config.tools.stats is not None
+    # Tool configs are now stored as extra dicts (validated at runtime by tools)
+    # The ToolsConfig uses ConfigDict(extra="allow")
 
 
 @pytest.mark.unit
 @pytest.mark.core
 def test_tools_config_partial() -> None:
-    """Partial tools config merges with defaults."""
+    """Partial tools config is preserved in extra fields."""
     from ot.config.loader import load_config
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -193,21 +186,16 @@ def test_tools_config_partial() -> None:
 
         config = load_config(config_path)
 
-        # Custom values
-        assert config.tools.brave.timeout == 120.0
-        assert config.tools.ground.model == "gemini-2.0-flash"
-
-        # Defaults for unconfigured tools
-        assert config.tools.context7.timeout == 30.0
-        assert config.tools.ripgrep.timeout == 60.0
+        # Tool configs are stored as dicts in model_extra (validated at runtime)
+        # Access via model_extra since tools now use ConfigDict(extra="allow")
+        assert config.tools.model_extra.get("brave", {}).get("timeout") == 120.0
+        assert config.tools.model_extra.get("ground", {}).get("model") == "gemini-2.0-flash"
 
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_tools_config_validation_timeout_too_low() -> None:
-    """Invalid tool config values rejected - timeout too low."""
-    from pydantic import ValidationError
-
+def test_tools_config_accepts_any_tool() -> None:
+    """Tool configs accept any fields (validated at runtime by tools)."""
     from ot.config.loader import load_config
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -217,64 +205,19 @@ def test_tools_config_validation_timeout_too_low() -> None:
                 {
                     "version": 1,
                     "tools": {
-                        "brave": {"timeout": 0.5},  # Below minimum of 1.0
+                        "brave": {"timeout": 0.5},  # Would fail old validation
+                        "custom_tool": {"my_setting": "value"},  # Unknown tool
                     },
                 }
             )
         )
 
-        with pytest.raises((ValueError, ValidationError)):
-            load_config(config_path)
+        # Now loads without error - validation happens at get_tool_config() time
+        config = load_config(config_path)
 
-
-@pytest.mark.unit
-@pytest.mark.core
-def test_tools_config_validation_timeout_too_high() -> None:
-    """Invalid tool config values rejected - timeout too high."""
-    from pydantic import ValidationError
-
-    from ot.config.loader import load_config
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config_path = Path(tmpdir) / "test-config.yaml"
-        config_path.write_text(
-            yaml.dump(
-                {
-                    "version": 1,
-                    "tools": {
-                        "brave": {"timeout": 500.0},  # Above maximum of 300.0
-                    },
-                }
-            )
-        )
-
-        with pytest.raises((ValueError, ValidationError)):
-            load_config(config_path)
-
-
-@pytest.mark.unit
-@pytest.mark.core
-def test_tools_config_validation_limit_too_low() -> None:
-    """Invalid tool config values rejected - limit too low."""
-    from pydantic import ValidationError
-
-    from ot.config.loader import load_config
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config_path = Path(tmpdir) / "test-config.yaml"
-        config_path.write_text(
-            yaml.dump(
-                {
-                    "version": 1,
-                    "tools": {
-                        "code_search": {"limit": 0},  # Below minimum of 1
-                    },
-                }
-            )
-        )
-
-        with pytest.raises((ValueError, ValidationError)):
-            load_config(config_path)
+        # Tool configs are accessible as dicts
+        assert config.tools.model_extra.get("brave", {}).get("timeout") == 0.5
+        assert config.tools.model_extra.get("custom_tool", {}).get("my_setting") == "value"
 
 
 @pytest.mark.unit
@@ -539,9 +482,9 @@ def test_include_nested_dicts_deep_merged() -> None:
 
         config = load_config(config_path)
 
-        # Both tool configs should be present (deep merged)
-        assert config.tools.brave.timeout == 120.0
-        assert config.tools.context7.timeout == 60.0
+        # Both tool configs should be present (deep merged, stored as extra dicts)
+        assert config.tools.model_extra.get("brave", {}).get("timeout") == 120.0
+        assert config.tools.model_extra.get("context7", {}).get("timeout") == 60.0
 
 
 @pytest.mark.unit
@@ -810,7 +753,7 @@ def test_resolve_include_path_bundled_fallback(tmp_path: Path) -> None:
 
     # prompts.yaml exists in bundled defaults
     bundled_dir = get_bundled_config_dir()
-    expected = bundled_dir / "prompts.yaml"
+    bundled_dir / "prompts.yaml"
 
     # tmp_path doesn't have the file, and we assume global doesn't either
     result = _resolve_include_path("prompts.yaml", tmp_path)
@@ -964,10 +907,9 @@ def test_inherit_deep_merges_tools() -> None:
 
         config = load_config(config_path)
 
-        # Override should apply
-        assert config.tools.brave.timeout == 120.0
-        # Other tool defaults should still work
-        assert config.tools.context7.timeout == 30.0
+        # Override should apply (tool configs stored as extra dicts)
+        assert config.tools.model_extra.get("brave", {}).get("timeout") == 120.0
+        # Other tool configs may come from bundled defaults if present
 
 
 @pytest.mark.unit

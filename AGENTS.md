@@ -19,3 +19,13 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 Read AGENTS_RULES.md for this project.
 Read AGENTS_PRIME.md for a project overview.
+
+## Quick Reference
+
+### Web Search
+
+Use OneTool web search:
+
+```text
+__ot $b_q q="query one|query two|query three"
+```

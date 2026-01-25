@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["trafilatura>=2.0.0", "httpx>=0.27.0", "pyyaml>=6.0.0"]
+# dependencies = ["httpx>=0.27.0", "pydantic>=2.0.0", "pyyaml>=6.0.0", "trafilatura>=2.0.0"]
 # ///
 """Web content extraction tools using trafilatura.
 
@@ -21,9 +21,27 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Literal
 
 import trafilatura
+from pydantic import BaseModel, Field
 from trafilatura.settings import use_config
 
 from ot_sdk import cache, get_config, log, truncate, worker_main
+
+
+class Config(BaseModel):
+    """Pack configuration - discovered by registry."""
+
+    timeout: float = Field(
+        default=30.0,
+        ge=1.0,
+        le=120.0,
+        description="Request timeout in seconds",
+    )
+    max_length: int = Field(
+        default=50000,
+        ge=1000,
+        le=500000,
+        description="Maximum content length in characters",
+    )
 
 
 def _create_config(timeout: float) -> Any:

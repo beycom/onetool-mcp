@@ -9,7 +9,6 @@ from __future__ import annotations
 import importlib.util
 import sys
 import time
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
@@ -46,19 +45,32 @@ class SimpleExecutor:
         Raises:
             ImportError: If module cannot be loaded
         """
-        # Get the tools directory path
-        tools_dir = Path("src/ot_tools")
-        if not tools_dir.exists():
-            raise ImportError(f"Tools directory not found: {tools_dir}")
+        from ot.config.loader import get_config
 
-        # Convert module path to file path (tools.example -> src/ot_tools/example.py)
+        # Get tool files from config
+        config = get_config()
+        tool_files = config.get_tool_files() if config else []
+        if not tool_files:
+            raise ImportError(
+                f"No tool files configured. Cannot load module: {module_name}"
+            )
+
+        # Convert module path to file name (tools.example -> example.py)
         parts = module_name.split(".")
         if len(parts) < 2 or parts[-2] != "tools":
             raise ImportError(f"Invalid tool module: {module_name}")
 
-        file_path = tools_dir / f"{parts[1]}.py"
-        if not file_path.exists():
-            raise ImportError(f"Tool file not found: {file_path}")
+        target_name = f"{parts[-1]}.py"
+
+        # Find matching tool file from config
+        file_path = None
+        for tf in tool_files:
+            if tf.name == target_name:
+                file_path = tf
+                break
+
+        if file_path is None or not file_path.exists():
+            raise ImportError(f"Tool file not found: {target_name}")
 
         # Load the module dynamically
         spec = importlib.util.spec_from_file_location(module_name, file_path)

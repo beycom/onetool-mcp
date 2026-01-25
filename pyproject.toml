@@ -18,15 +18,15 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "fastmcp>=2.14.3",
+    "fastmcp>=2.14.4",
     "httpx>=0.28.1",
     "loguru>=0.7.3",
-    "mcp>=1.25.0",
+    "mcp>=1.26.0",
     "openai>=2.15.0",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.12.0",
     "pyyaml>=6.0.3",
-    "rich>=14.2.0",
+    "rich>=14.3.1",
     "typer>=0.21.1",
     # Browser inspector (requires: playwright install chromium)
     "playwright>=1.57.0",
@@ -36,7 +36,7 @@ dependencies = [
     # Snippets template engine
     "jinja2>=3.1.6",
     # Gemini grounding search
-    "google-genai>=1.59.0",
+    "google-genai>=1.60.0",
     # Message tool async file I/O
     "aiofiles>=25.1.0",
     # Docstring parsing for ot.help() and ot.tools()
@@ -67,7 +67,7 @@ packages = ["src/ot", "src/ot_tools", "src/ot_sdk", "src/ot_serve", "src/ot_benc
 
 [dependency-groups]
 docs = [
-    "mkdocs-material>=9.5.0",
+    "mkdocs-material>=9.7.1",
     "mkdocs-section-index>=0.3.10",
     "mkdocs-redirects>=1.2.2",
 ]
@@ -77,17 +77,17 @@ dev = [
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=7.0.0",
     "pytest-sugar>=1.1.1",
-    "ruff>=0.14.13",
+    "ruff>=0.14.14",
     "types-pyyaml>=6.0.12.20250915",
     # Tool dependencies for testing (these use inline script metadata in production)
-    "duckdb>=1.0.0",      # for ot_tools.code_search
+    "duckdb>=1.4.3",      # for ot_tools.code_search
     "openpyxl>=3.1.5",    # for ot_tools.excel, ot_tools.convert
     "send2trash>=2.1.0",  # for ot_tools.file safe deletion
-    "sqlalchemy>=2.0.45", # for ot_tools.db
+    "sqlalchemy>=2.0.46", # for ot_tools.db
     "trafilatura>=2.0.0", # for ot_tools.web_fetch
-    "pymupdf>=1.21.0",    # for ot_tools.convert (PDF)
-    "python-docx>=1.1.0", # for ot_tools.convert (Word)
-    "python-pptx>=0.6.0", # for ot_tools.convert (PowerPoint)
+    "pymupdf>=1.26.7",    # for ot_tools.convert (PDF)
+    "python-docx>=1.2.0", # for ot_tools.convert (Word)
+    "python-pptx>=1.0.2", # for ot_tools.convert (PowerPoint)
 ]
 
 [tool.ruff]

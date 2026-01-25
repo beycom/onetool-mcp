@@ -89,9 +89,9 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
         start_span.add("toolCount", len(registry.tools))
 
         # Startup: initialize unified JSONL stats writer if enabled
-        if _config.tools.stats.enabled:
+        if _config.stats.enabled:
             stats_path = _config.get_stats_file_path()
-            flush_interval = _config.tools.stats.flush_interval_seconds
+            flush_interval = _config.stats.flush_interval_seconds
 
             _stats_writer = JsonlStatsWriter(
                 path=stats_path,

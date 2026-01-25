@@ -399,26 +399,29 @@ Tools SHALL declare their dependencies for verification by `onetool check`.
 
 ### Requirement: Configuration Validation (modified)
 
-The system SHALL validate configuration on load with field-level constraints.
+The system SHALL validate configuration on load using discovered tool schemas.
 
 #### Scenario: Tool timeout out of range
 - **GIVEN** config with `tools.brave.timeout: 500`
 - **WHEN** configuration loads
-- **THEN** it SHALL fail with validation error indicating max is 300.0
+- **THEN** it SHALL fail with validation error from BraveConfig schema
+- **AND** indicate max is 300.0
 
 #### Scenario: Tool limit out of range
 - **GIVEN** config with `tools.code_search.limit: 0`
 - **WHEN** configuration loads
-- **THEN** it SHALL fail with validation error indicating min is 1
+- **THEN** it SHALL fail with validation error from CodeSearchConfig schema
+- **AND** indicate min is 1
 
 ### Requirement: Tools Configuration Section
 
-The system SHALL support tool-specific configuration via the `tools:` section.
+The system SHALL support tool-specific configuration via the `tools:` section, with schemas discovered from tool files.
 
 #### Scenario: Default tool configuration
 - **GIVEN** no `tools:` section in configuration
 - **WHEN** tools are loaded
-- **THEN** they SHALL use built-in default values
+- **THEN** they SHALL use defaults from their `Config` class
+- **OR** built-in defaults if no Config class exists
 
 #### Scenario: Partial tools configuration
 - **GIVEN** configuration with only some tools configured:
@@ -428,7 +431,8 @@ The system SHALL support tool-specific configuration via the `tools:` section.
       model: gemini-2.0-flash
   ```
 - **WHEN** other tools are used
-- **THEN** they SHALL use their built-in defaults
+- **THEN** they SHALL use their Config class defaults
+- **OR** built-in defaults if no Config class
 
 #### Scenario: Brave timeout configuration
 - **GIVEN** configuration with:
@@ -439,7 +443,7 @@ The system SHALL support tool-specific configuration via the `tools:` section.
   ```
 - **WHEN** brave.* functions are called
 - **THEN** they SHALL use 120 second timeout
-- **DEFAULT** 60.0 seconds
+- **DEFAULT** 60.0 seconds (from brave_search.py Config class)
 - **RANGE** 1.0 - 300.0 seconds
 
 #### Scenario: Grounding search model configuration
@@ -451,7 +455,7 @@ The system SHALL support tool-specific configuration via the `tools:` section.
   ```
 - **WHEN** ground.search() is called
 - **THEN** it SHALL use the configured model
-- **DEFAULT** gemini-2.5-flash
+- **DEFAULT** gemini-2.5-flash (from grounding_search.py Config class)
 
 #### Scenario: Context7 configuration
 - **GIVEN** configuration with:
@@ -463,7 +467,7 @@ The system SHALL support tool-specific configuration via the `tools:` section.
   ```
 - **WHEN** context7.* functions are called
 - **THEN** they SHALL use 45 second timeout and 20 docs limit
-- **DEFAULT** timeout: 30.0, docs_limit: 10
+- **DEFAULT** timeout: 30.0, docs_limit: 10 (from context7.py Config class)
 - **RANGE** timeout: 1.0-120.0, docs_limit: 1-20
 
 #### Scenario: Web fetch configuration
@@ -476,7 +480,7 @@ The system SHALL support tool-specific configuration via the `tools:` section.
   ```
 - **WHEN** web_fetch.* functions are called
 - **THEN** they SHALL use 60 second timeout and 100000 max length
-- **DEFAULT** timeout: 30.0, max_length: 50000
+- **DEFAULT** timeout: 30.0, max_length: 50000 (from web_fetch.py Config class)
 - **RANGE** timeout: 1.0-120.0, max_length: 1000-500000
 
 #### Scenario: Ripgrep configuration
@@ -488,7 +492,7 @@ The system SHALL support tool-specific configuration via the `tools:` section.
   ```
 - **WHEN** ripgrep.* functions are called
 - **THEN** they SHALL use 120 second timeout
-- **DEFAULT** 60.0 seconds
+- **DEFAULT** 60.0 seconds (from ripgrep.py Config class)
 - **RANGE** 1.0 - 300.0 seconds
 
 #### Scenario: Code search configuration
@@ -500,7 +504,7 @@ The system SHALL support tool-specific configuration via the `tools:` section.
   ```
 - **WHEN** code_search.* functions are called
 - **THEN** they SHALL return up to 25 results
-- **DEFAULT** 10
+- **DEFAULT** 10 (from code_search.py Config class)
 - **RANGE** 1 - 100
 
 #### Scenario: Database configuration
@@ -512,7 +516,7 @@ The system SHALL support tool-specific configuration via the `tools:` section.
   ```
 - **WHEN** db.* functions return results
 - **THEN** they SHALL truncate at 8000 characters
-- **DEFAULT** 4000
+- **DEFAULT** 4000 (from db.py Config class)
 - **RANGE** 100 - 100000
 
 #### Scenario: Page view configuration
@@ -524,7 +528,7 @@ The system SHALL support tool-specific configuration via the `tools:` section.
   ```
 - **WHEN** page_view.* functions are called
 - **THEN** they SHALL use the configured sessions directory
-- **DEFAULT** .browse
+- **DEFAULT** .browse (from page_view.py Config class)
 
 #### Scenario: Package tool configuration
 - **GIVEN** configuration with:
@@ -535,7 +539,7 @@ The system SHALL support tool-specific configuration via the `tools:` section.
   ```
 - **WHEN** package.* functions are called
 - **THEN** they SHALL use 45 second timeout
-- **DEFAULT** 30.0 seconds
+- **DEFAULT** 30.0 seconds (from package.py Config class)
 - **RANGE** 1.0 - 120.0 seconds
 
 #### Scenario: Invalid tool configuration value
@@ -546,7 +550,8 @@ The system SHALL support tool-specific configuration via the `tools:` section.
       timeout: -5
   ```
 - **WHEN** configuration is loaded
-- **THEN** it SHALL fail with validation error indicating the field and constraint
+- **THEN** it SHALL fail with validation error from the tool's Config class
+- **AND** error message SHALL indicate the field and constraint
 
 ### Requirement: Cross-Platform Install Hints
 
@@ -1062,4 +1067,112 @@ The system SHALL deep merge inherited configs with specific semantics.
 - **AND** project config with `servers: {local: {...}}`
 - **WHEN** configs are merged
 - **THEN** result SHALL contain both `github` and `local`
+
+### Requirement: Tool-Local Configuration Schema
+
+Tools SHALL declare their configuration schema in the tool file itself using a Pydantic `Config` class.
+
+#### Scenario: Tool with Config class
+- **GIVEN** a tool file containing:
+  ```python
+  from pydantic import BaseModel, Field
+
+  pack = "brave"
+
+  class Config(BaseModel):
+      timeout: float = Field(default=60.0, ge=1.0, le=300.0)
+  ```
+- **WHEN** the tool is discovered by the registry
+- **THEN** the Config class SHALL be extracted via AST
+- **AND** stored in `ToolInfo.config_schema`
+
+#### Scenario: Tool without Config class
+- **GIVEN** a tool file without a `class Config(BaseModel)`
+- **WHEN** the tool is discovered
+- **THEN** `ToolInfo.config_schema` SHALL be None
+- **AND** the tool SHALL function normally without configuration
+
+#### Scenario: Config class naming convention
+- **GIVEN** a tool file with a config class
+- **WHEN** the class is defined
+- **THEN** it SHALL be named `Config` (not `BraveConfig`, `ToolConfig`, etc.)
+- **AND** it SHALL inherit from `pydantic.BaseModel`
+
+### Requirement: Dynamic Tool Configuration Building
+
+The system SHALL dynamically build `ToolsConfig` from discovered tool schemas.
+
+#### Scenario: Build ToolsConfig from registry
+- **GIVEN** multiple tools with Config classes are discovered
+- **WHEN** configuration is loaded
+- **THEN** `ToolsConfig` SHALL be dynamically generated
+- **AND** each pack with a Config SHALL have a corresponding field
+
+#### Scenario: Unknown tool config in YAML
+- **GIVEN** a `tools.unknown_pack:` section in ot-serve.yaml
+- **AND** no tool with pack "unknown_pack" is discovered
+- **WHEN** configuration is loaded
+- **THEN** the unknown section SHALL be ignored
+- **AND** a debug log message SHALL be emitted
+
+#### Scenario: Partial tool configuration
+- **GIVEN** a tool has Config class with defaults
+- **AND** ot-serve.yaml only specifies some fields
+- **WHEN** configuration is loaded
+- **THEN** specified fields SHALL override defaults
+- **AND** unspecified fields SHALL use Config class defaults
+
+### Requirement: Runtime Tool Config Access
+
+Tools SHALL access their configuration via `get_tool_config()` at runtime.
+
+#### Scenario: Get tool config with schema
+- **GIVEN** a tool needs its configuration
+- **WHEN** `get_tool_config("brave", Config)` is called
+- **THEN** it SHALL return a Config instance with merged values
+- **AND** values from ot-serve.yaml SHALL override defaults
+
+#### Scenario: Get tool config without schema
+- **GIVEN** a tool calls `get_tool_config("brave")`
+- **WHEN** no schema is provided
+- **THEN** it SHALL return a dict with raw config values
+- **OR** empty dict if no config exists
+
+#### Scenario: Config access before server init
+- **GIVEN** `get_tool_config()` is called before server initialisation
+- **WHEN** config is not yet loaded
+- **THEN** it SHALL return default values from the schema
+- **OR** raise an error if no schema provided
+
+### Requirement: Stats Configuration Location
+
+Statistics configuration SHALL be at the root level, not under `tools`.
+
+#### Scenario: Stats config at root level
+- **GIVEN** configuration with:
+  ```yaml
+  stats:
+    enabled: true
+    flush_interval_seconds: 60
+  ```
+- **WHEN** the server starts
+- **THEN** it SHALL use the root-level `stats` configuration
+
+#### Scenario: Legacy tools.stats path (deprecated)
+- **GIVEN** configuration with:
+  ```yaml
+  tools:
+    stats:
+      enabled: true
+  ```
+- **WHEN** the server starts
+- **THEN** it SHALL use the legacy path
+- **AND** log a deprecation warning
+- **AND** the root-level `stats` SHALL take precedence if both exist
+
+#### Scenario: Default stats location
+- **GIVEN** no stats configuration specified
+- **WHEN** the server starts
+- **THEN** stats SHALL use defaults from root-level schema
+- **DEFAULT** enabled: true, flush_interval_seconds: 30
 

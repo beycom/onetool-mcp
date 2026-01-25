@@ -28,7 +28,14 @@ from typing import Any, Literal
 
 import yaml
 from loguru import logger
-from pydantic import BaseModel, Field, PrivateAttr, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
 
 from ot.config.mcp import McpServerConfig, expand_secrets
 from ot.paths import get_bundled_config_dir, get_effective_cwd, get_global_dir
@@ -69,114 +76,10 @@ class SnippetDef(BaseModel):
     )
 
 
-# ==================== Tool Configuration Models ====================
-
-
-class BraveConfig(BaseModel):
-    """Brave search configuration."""
-
-    timeout: float = Field(
-        default=60.0,
-        ge=1.0,
-        le=300.0,
-        description="Request timeout in seconds",
-    )
-
-
-class GroundConfig(BaseModel):
-    """Grounding search configuration."""
-
-    model: str = Field(
-        default="gemini-2.5-flash",
-        description="Gemini model for grounding",
-    )
-
-
-class Context7Config(BaseModel):
-    """Context7 documentation API configuration."""
-
-    timeout: float = Field(
-        default=30.0,
-        ge=1.0,
-        le=120.0,
-        description="Request timeout in seconds",
-    )
-    docs_limit: int = Field(
-        default=10,
-        ge=1,
-        le=20,
-        description="Default docs result limit",
-    )
-
-
-class WebFetchConfig(BaseModel):
-    """Web fetch configuration."""
-
-    timeout: float = Field(
-        default=30.0,
-        ge=1.0,
-        le=120.0,
-        description="Request timeout in seconds",
-    )
-    max_length: int = Field(
-        default=50000,
-        ge=1000,
-        le=500000,
-        description="Max content length to return",
-    )
-
-
-class RipgrepConfig(BaseModel):
-    """Ripgrep search configuration."""
-
-    timeout: float = Field(
-        default=60.0,
-        ge=1.0,
-        le=300.0,
-        description="Search timeout in seconds",
-    )
-
-
-class CodeSearchConfig(BaseModel):
-    """Code search configuration."""
-
-    limit: int = Field(
-        default=10,
-        ge=1,
-        le=100,
-        description="Default result limit",
-    )
-
-
-class DbConfig(BaseModel):
-    """Database tools configuration."""
-
-    max_chars: int = Field(
-        default=4000,
-        ge=100,
-        le=100000,
-        description="Truncation limit for results",
-    )
-
-
-class PageViewConfig(BaseModel):
-    """Page view configuration."""
-
-    sessions_dir: str = Field(
-        default=".browse",
-        description="Directory for browser sessions",
-    )
-
-
-class PackageConfig(BaseModel):
-    """Package tools configuration."""
-
-    timeout: float = Field(
-        default=30.0,
-        ge=1.0,
-        le=120.0,
-        description="Request timeout in seconds",
-    )
+# ==================== Core Configuration Models ====================
+# Note: Tool-specific configs (BraveConfig, GroundConfig, etc.) have been
+# moved to their respective tool files. Tools access config via
+# get_tool_config(pack, Config) at runtime.
 
 
 class MsgTopicConfig(BaseModel):
@@ -198,200 +101,6 @@ class MsgConfig(BaseModel):
     topics: list[MsgTopicConfig] = Field(
         default_factory=list,
         description="Topic patterns mapped to output files (first match wins)",
-    )
-
-
-class FileConfig(BaseModel):
-    """File tool configuration."""
-
-    allowed_dirs: list[str] = Field(
-        default_factory=list,
-        description="Allowed directories (relative to OT_CWD). Empty = cwd only.",
-    )
-    exclude_patterns: list[str] = Field(
-        default_factory=lambda: [
-            # Version control
-            ".git",
-            ".svn",
-            ".hg",
-            # Dependencies
-            "node_modules",
-            ".venv",
-            "venv",
-            # Python cache
-            "__pycache__",
-            ".pytest_cache",
-            ".mypy_cache",
-            "*.pyc",
-            # Build artifacts
-            "dist",
-            "build",
-            # Environment files
-            ".env*",
-            # OS files
-            ".DS_Store",
-            "Thumbs.db",
-        ],
-        description="Glob patterns to exclude from operations",
-    )
-    max_file_size: int = Field(
-        default=10_000_000,
-        ge=1000,
-        le=100_000_000,
-        description="Maximum file size in bytes (1KB-100MB)",
-    )
-    max_list_entries: int = Field(
-        default=1000,
-        ge=10,
-        le=10000,
-        description="Maximum entries in directory listing (10-10000)",
-    )
-    backup_on_write: bool = Field(
-        default=True,
-        description="Create .bak backup before writes",
-    )
-    use_trash: bool = Field(
-        default=False,
-        description="Use send2trash for deletion (if available)",
-    )
-
-
-# ==================== Diagram Configuration Models ====================
-
-
-class DiagramBackendConfig(BaseModel):
-    """Kroki backend configuration for diagram rendering."""
-
-    type: Literal["kroki"] = Field(
-        default="kroki",
-        description="Backend type (only kroki supported)",
-    )
-    remote_url: str = Field(
-        default="https://kroki.io",
-        description="Remote Kroki service URL",
-    )
-    self_hosted_url: str = Field(
-        default="http://localhost:8000",
-        description="Self-hosted Kroki URL",
-    )
-    prefer: Literal["remote", "self_hosted", "auto"] = Field(
-        default="remote",
-        description="Preferred backend: remote, self_hosted, or auto",
-    )
-    timeout: float = Field(
-        default=30.0,
-        ge=1.0,
-        le=120.0,
-        description="Request timeout in seconds",
-    )
-
-
-class DiagramPolicyConfig(BaseModel):
-    """Policy rules for diagram generation."""
-
-    rules: str = Field(
-        default="""\
-NEVER use ASCII art or text-based diagrams in markdown.
-Use the diagram tools for all visual representations.
-Save output as SVG and reference in markdown.
-Always generate source first, then render.""",
-        description="Policy rules for LLM guidance",
-    )
-    preferred_format: Literal["svg", "png", "pdf"] = Field(
-        default="svg",
-        description="Default output format",
-    )
-    preferred_providers: list[str] = Field(
-        default_factory=lambda: ["mermaid", "d2", "plantuml"],
-        description="Preferred diagram providers in order",
-    )
-
-
-class DiagramOutputConfig(BaseModel):
-    """Output settings for generated diagrams."""
-
-    dir: str = Field(
-        default="diagrams",
-        description="Output directory for rendered diagrams (relative to project dir)",
-    )
-    naming: str = Field(
-        default="{provider}_{name}_{timestamp}",
-        description="Filename pattern (supports {provider}, {name}, {timestamp})",
-    )
-    default_format: Literal["svg", "png", "pdf"] = Field(
-        default="svg",
-        description="Default output format",
-    )
-    save_source: bool = Field(
-        default=True,
-        description="Save diagram source alongside rendered output",
-    )
-
-
-class DiagramProviderInstructions(BaseModel):
-    """Instructions for a specific diagram provider."""
-
-    when_to_use: str = Field(
-        default="",
-        description="Guidance on when to use this provider",
-    )
-    style_tips: str = Field(
-        default="",
-        description="Style and syntax tips",
-    )
-    syntax_guide: str = Field(
-        default="",
-        description="Link to syntax documentation",
-    )
-    example: str = Field(
-        default="",
-        description="Example diagram source",
-    )
-
-
-class DiagramTemplateRef(BaseModel):
-    """Reference to a diagram template file."""
-
-    provider: str = Field(
-        ...,
-        description="Diagram provider (mermaid, plantuml, d2)",
-    )
-    diagram_type: str = Field(
-        ...,
-        description="Type of diagram (sequence, flowchart, etc.)",
-    )
-    description: str = Field(
-        default="",
-        description="Template description",
-    )
-    file: str = Field(
-        ...,
-        description="Path to template file (relative to config)",
-    )
-
-
-class DiagramConfig(BaseModel):
-    """Complete diagram tool configuration."""
-
-    backend: DiagramBackendConfig = Field(
-        default_factory=DiagramBackendConfig,
-        description="Kroki backend settings",
-    )
-    policy: DiagramPolicyConfig = Field(
-        default_factory=DiagramPolicyConfig,
-        description="Policy rules for diagram generation",
-    )
-    output: DiagramOutputConfig = Field(
-        default_factory=DiagramOutputConfig,
-        description="Output settings",
-    )
-    instructions: dict[str, DiagramProviderInstructions] = Field(
-        default_factory=dict,
-        description="Provider-specific instructions",
-    )
-    templates: dict[str, DiagramTemplateRef] = Field(
-        default_factory=dict,
-        description="Named template references",
     )
 
 
@@ -504,20 +213,17 @@ class StatsConfig(BaseModel):
 
 
 class ToolsConfig(BaseModel):
-    """Aggregated tool configurations."""
+    """Aggregated tool configurations.
 
-    brave: BraveConfig = Field(default_factory=BraveConfig)
-    ground: GroundConfig = Field(default_factory=GroundConfig)
-    context7: Context7Config = Field(default_factory=Context7Config)
-    web_fetch: WebFetchConfig = Field(default_factory=WebFetchConfig)
-    ripgrep: RipgrepConfig = Field(default_factory=RipgrepConfig)
-    code_search: CodeSearchConfig = Field(default_factory=CodeSearchConfig)
-    db: DbConfig = Field(default_factory=DbConfig)
-    page_view: PageViewConfig = Field(default_factory=PageViewConfig)
-    package: PackageConfig = Field(default_factory=PackageConfig)
+    Core configs (msg, stats) are typed fields. Tool-specific configs
+    (brave, ground, etc.) are allowed as extra fields and accessed via
+    get_tool_config() with schemas defined in tool files.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    # Core configs - always available
     msg: MsgConfig = Field(default_factory=MsgConfig)
-    file: FileConfig = Field(default_factory=FileConfig)
-    diagram: DiagramConfig = Field(default_factory=DiagramConfig)
     stats: StatsConfig = Field(default_factory=StatsConfig)
 
 
@@ -580,6 +286,11 @@ class OneToolConfig(BaseModel):
         description="Code validation and security pattern configuration",
     )
 
+    stats: StatsConfig = Field(
+        default_factory=StatsConfig,
+        description="Runtime statistics collection configuration (replaces tools.stats)",
+    )
+
     tools_dir: list[str] = Field(
         default_factory=lambda: ["src/ot_tools/*.py"],
         description="Glob patterns for tool discovery",
@@ -621,6 +332,44 @@ class OneToolConfig(BaseModel):
         which YAML parses as None instead of an empty dict.
         """
         return {} if v is None else v
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_tools_stats(cls, data: Any) -> Any:
+        """Migrate tools.stats to root-level stats with deprecation warning.
+
+        During the deprecation period, supports both paths:
+        - Root-level `stats:` (preferred)
+        - Legacy `tools.stats:` (deprecated)
+
+        If both exist, root-level takes precedence.
+        """
+        if not isinstance(data, dict):
+            return data
+
+        tools = data.get("tools")
+        if not isinstance(tools, dict):
+            return data
+
+        legacy_stats = tools.get("stats")
+        root_stats = data.get("stats")
+
+        if legacy_stats and not root_stats:
+            # Only tools.stats exists - migrate with warning
+            logger.warning(
+                "Deprecation: 'tools.stats' config path is deprecated. "
+                "Move to root-level 'stats:' section. "
+                "This will be removed in a future version."
+            )
+            data["stats"] = legacy_stats
+        elif legacy_stats and root_stats:
+            # Both exist - root takes precedence, log info
+            logger.debug(
+                "Both 'stats' and 'tools.stats' defined. "
+                "Using root-level 'stats' (ignoring deprecated 'tools.stats')."
+            )
+
+        return data
 
     def get_tool_files(self) -> list[Path]:
         """Get list of tool files matching configured glob patterns.
@@ -690,14 +439,14 @@ class OneToolConfig(BaseModel):
         return self._resolve_config_relative_path(self.log_dir)
 
     def get_stats_file_path(self) -> Path:
-        """Get the resolved path to the stats CSV file.
+        """Get the resolved path to the stats JSONL file.
 
         Stats file is stored in the log directory alongside other logs.
 
         Returns:
             Absolute Path to stats file
         """
-        return self.get_log_dir_path() / self.tools.stats.persist_path
+        return self.get_log_dir_path() / self.stats.persist_path
 
 
 def _resolve_config_path(config_path: Path | str | None) -> Path | None:

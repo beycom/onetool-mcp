@@ -18,7 +18,6 @@ from ot_tools.grounding_search import (
     search,
 )
 
-
 # -----------------------------------------------------------------------------
 # Pure Function Tests
 # -----------------------------------------------------------------------------
@@ -317,11 +316,11 @@ class TestGroundedSearch:
     """Test _grounded_search core function."""
 
     @patch("ot_tools.grounding_search._create_client")
-    @patch("ot_tools.grounding_search.get_config")
+    @patch("ot_tools.grounding_search.get_tool_config")
     def test_successful_grounded_search(self, mock_config, mock_create_client):
-        from ot_tools.grounding_search import _grounded_search
+        from ot_tools.grounding_search import Config, _grounded_search
 
-        mock_config.return_value.tools.ground.model = "gemini-2.0-flash"
+        mock_config.return_value = Config(model="gemini-2.0-flash")
 
         mock_client = MagicMock()
         mock_create_client.return_value = mock_client
@@ -336,11 +335,11 @@ class TestGroundedSearch:
         assert "Search result text" in result
 
     @patch("ot_tools.grounding_search._create_client")
-    @patch("ot_tools.grounding_search.get_config")
+    @patch("ot_tools.grounding_search.get_tool_config")
     def test_handles_api_error(self, mock_config, mock_create_client):
-        from ot_tools.grounding_search import _grounded_search
+        from ot_tools.grounding_search import Config, _grounded_search
 
-        mock_config.return_value.tools.ground.model = "gemini-2.0-flash"
+        mock_config.return_value = Config(model="gemini-2.0-flash")
 
         mock_client = MagicMock()
         mock_create_client.return_value = mock_client

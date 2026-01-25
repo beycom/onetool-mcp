@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["httpx>=0.27.0", "pyyaml>=6.0.0"]
+# dependencies = ["httpx>=0.27.0", "pydantic>=2.0.0", "pyyaml>=6.0.0"]
 # ///
 """Context7 API tools for library search and documentation.
 
@@ -20,7 +20,26 @@ __all__ = ["doc", "search"]
 
 import re
 
+from pydantic import BaseModel, Field
+
 from ot_sdk import cache, get_config, get_secret, http, log, worker_main
+
+
+class Config(BaseModel):
+    """Pack configuration - discovered by registry."""
+
+    timeout: float = Field(
+        default=30.0,
+        ge=1.0,
+        le=120.0,
+        description="Request timeout in seconds",
+    )
+    docs_limit: int = Field(
+        default=10,
+        ge=1,
+        le=20,
+        description="Maximum number of documentation items to return",
+    )
 
 # Context7 REST API configuration
 CONTEXT7_SEARCH_URL = "https://context7.com/api/v2/search"

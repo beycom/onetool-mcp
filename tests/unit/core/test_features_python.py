@@ -13,12 +13,12 @@ Migrated from demo/bench/features.yaml Python construct tests.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import pytest
 
 if TYPE_CHECKING:
-    pass
+    from collections.abc import Callable
 
 
 @pytest.mark.unit

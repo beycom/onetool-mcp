@@ -6,8 +6,8 @@ Uses tmp_path fixture for isolated test files.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar
-from unittest.mock import MagicMock, patch
+from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 
@@ -16,26 +16,24 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-class MockFileConfig:
-    """Mock file config that allows any directory."""
-
-    allowed_dirs: ClassVar[list[str]] = []  # Empty = allows cwd, but we patch cwd
-    exclude_patterns: ClassVar[list[str]] = [".git", "__pycache__"]
-    max_file_size: int = 10_000_000
-    max_list_entries: int = 1000
-    backup_on_write: bool = False  # Disable for cleaner tests
-    use_trash: bool = False
-
-
 @pytest.fixture(autouse=True)
 def mock_file_config(tmp_path: Path) -> Generator[None, None, None]:
     """Mock file tool config to allow temp directories."""
-    mock_config = MagicMock()
-    mock_config.tools.file = MockFileConfig()
+    from ot_tools.file import Config
+
+    # Create a Config instance with test-friendly defaults
+    test_config = Config(
+        allowed_dirs=[],  # Empty = allows cwd, but we patch cwd
+        exclude_patterns=[".git", "__pycache__"],
+        max_file_size=10_000_000,
+        max_list_entries=1000,
+        backup_on_write=False,  # Disable for cleaner tests
+        use_trash=False,  # Disable for cleaner tests
+    )
 
     # Patch both the config getter and effective cwd
     with (
-        patch("ot_tools.file.get_config", return_value=mock_config),
+        patch("ot_tools.file.get_tool_config", return_value=test_config),
         patch("ot_tools.file.get_effective_cwd", return_value=tmp_path),
     ):
         yield

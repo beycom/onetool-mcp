@@ -40,10 +40,20 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
+from pydantic import BaseModel, Field
 
-from ot.config import get_config
+from ot.config import get_tool_config
 from ot.logging import LogSpan
 from ot.paths import get_effective_cwd
+
+
+class Config(BaseModel):
+    """Pack configuration - discovered by registry."""
+
+    sessions_dir: str = Field(
+        default=".browse",
+        description="Directory for browser session captures (relative to project)",
+    )
 
 
 def _get_default_sessions_dir() -> str:
@@ -57,7 +67,7 @@ def _get_default_sessions_dir() -> str:
     Returns:
         Directory name (typically ".browse").
     """
-    return get_config().tools.page_view.sessions_dir
+    return get_tool_config("page", Config).sessions_dir
 
 
 def _get_sessions_dir(sessions_dir: str | None = None) -> Path:

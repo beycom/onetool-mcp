@@ -45,9 +45,44 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from ot.config import get_config
+from pydantic import BaseModel, Field
+
+from ot.config import get_tool_config
 from ot.paths import get_effective_cwd
 from ot_sdk import log
+
+
+class Config(BaseModel):
+    """Pack configuration - discovered by registry."""
+
+    allowed_dirs: list[str] = Field(
+        default_factory=list,
+        description="Allowed directories for file operations (empty = cwd only)",
+    )
+    exclude_patterns: list[str] = Field(
+        default_factory=lambda: [".git", "node_modules", "__pycache__", ".venv", "venv"],
+        description="Path patterns to exclude from operations",
+    )
+    max_file_size: int = Field(
+        default=10000000,
+        ge=1000,
+        le=100000000,
+        description="Maximum file size in bytes (default 10MB)",
+    )
+    max_list_entries: int = Field(
+        default=1000,
+        ge=10,
+        le=10000,
+        description="Maximum entries to return in list/tree operations",
+    )
+    backup_on_write: bool = Field(
+        default=True,
+        description="Create .bak backup before overwriting files",
+    )
+    use_trash: bool = Field(
+        default=True,
+        description="Move files to trash instead of permanent deletion",
+    )
 
 # Optional send2trash for safe deletion
 try:
@@ -68,9 +103,9 @@ _TEXT_CHARS = frozenset({7, 8, 9, 10, 12, 13, 27} | set(range(0x20, 0x100)))
 # ============================================================================
 
 
-def _get_file_config() -> Any:
+def _get_file_config() -> Config:
     """Get file tool configuration."""
-    return get_config().tools.file
+    return get_tool_config("file", Config)
 
 
 def _expand_path(path: str) -> Path:

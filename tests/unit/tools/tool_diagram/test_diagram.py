@@ -24,7 +24,6 @@ from ot_tools.diagram import (
     encode_source,
 )
 
-
 # ==================== Encoding Tests ====================
 
 
@@ -215,10 +214,10 @@ def test_basic_source_validation_d2_with_at_marker() -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 def test_diagram_config_defaults() -> None:
-    """DiagramConfig has correct defaults."""
-    from ot.config.loader import DiagramConfig
+    """DiagramConfig has correct defaults (now in diagram.py)."""
+    from ot_tools.diagram import Config
 
-    config = DiagramConfig()
+    config = Config()
 
     # Backend defaults
     assert config.backend.type == "kroki"
@@ -241,7 +240,7 @@ def test_diagram_config_defaults() -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 def test_diagram_config_partial_override() -> None:
-    """DiagramConfig partial override merges with defaults."""
+    """DiagramConfig partial override - config stored as dict at load time."""
     from ot.config.loader import load_config
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -262,20 +261,16 @@ def test_diagram_config_partial_override() -> None:
 
         config = load_config(config_path)
 
-        # Overridden values
-        assert config.tools.diagram.backend.prefer == "self_hosted"
-        assert config.tools.diagram.output.dir == "./custom"
-
-        # Defaults preserved
-        assert config.tools.diagram.backend.type == "kroki"
-        assert config.tools.diagram.backend.timeout == 30.0
-        assert config.tools.diagram.output.default_format == "svg"
+        # Tool configs are now stored as dicts in model_extra
+        diagram_raw = config.tools.model_extra.get("diagram", {})
+        assert diagram_raw.get("backend", {}).get("prefer") == "self_hosted"
+        assert diagram_raw.get("output", {}).get("dir") == "./custom"
 
 
 @pytest.mark.unit
 @pytest.mark.serve
 def test_diagram_config_instructions() -> None:
-    """DiagramConfig can have provider instructions."""
+    """DiagramConfig can have provider instructions (stored as dict)."""
     from ot.config.loader import load_config
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -301,16 +296,18 @@ def test_diagram_config_instructions() -> None:
 
         config = load_config(config_path)
 
-        assert "mermaid" in config.tools.diagram.instructions
-        mermaid = config.tools.diagram.instructions["mermaid"]
-        assert mermaid.when_to_use == "For flowcharts"
-        assert mermaid.style_tips == "Use subgraphs"
+        # Tool configs are now dicts - validation happens at runtime via get_tool_config
+        diagram_raw = config.tools.model_extra.get("diagram", {})
+        assert "mermaid" in diagram_raw.get("instructions", {})
+        mermaid = diagram_raw["instructions"]["mermaid"]
+        assert mermaid["when_to_use"] == "For flowcharts"
+        assert mermaid["style_tips"] == "Use subgraphs"
 
 
 @pytest.mark.unit
 @pytest.mark.serve
 def test_diagram_config_templates() -> None:
-    """DiagramConfig can have template references."""
+    """DiagramConfig can have template references (stored as dict)."""
     from ot.config.loader import load_config
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -337,11 +334,13 @@ def test_diagram_config_templates() -> None:
 
         config = load_config(config_path)
 
-        assert "api-flow" in config.tools.diagram.templates
-        tmpl = config.tools.diagram.templates["api-flow"]
-        assert tmpl.provider == "mermaid"
-        assert tmpl.diagram_type == "sequence"
-        assert tmpl.file == "templates/api-flow.mmd"
+        # Tool configs are now dicts - validation happens at runtime via get_tool_config
+        diagram_raw = config.tools.model_extra.get("diagram", {})
+        assert "api-flow" in diagram_raw.get("templates", {})
+        tmpl = diagram_raw["templates"]["api-flow"]
+        assert tmpl["provider"] == "mermaid"
+        assert tmpl["diagram_type"] == "sequence"
+        assert tmpl["file"] == "templates/api-flow.mmd"
 
 
 # ==================== File Extension Tests ====================

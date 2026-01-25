@@ -56,6 +56,7 @@ class ToolFileInfo:
     functions: list[str] = field(default_factory=list)
     is_worker: bool = False
     metadata: ScriptMetadata | None = None
+    config_class_source: str | None = None
 
 
 def parse_pep723_metadata(content: str) -> ScriptMetadata | None:
@@ -108,21 +109,15 @@ def has_pep723_header(path: Path) -> bool:
         return False
 
 
-def extract_tool_functions(path: Path) -> list[str]:
-    """Extract public function names from a tool file using AST.
+def _extract_functions_from_ast(tree: ast.Module) -> list[str]:
+    """Extract public function names from a parsed AST.
 
     Args:
-        path: Path to Python file
+        tree: Parsed AST module
 
     Returns:
         List of public function names
     """
-    try:
-        content = path.read_text()
-        tree = ast.parse(content)
-    except (OSError, SyntaxError):
-        return []
-
     functions: list[str] = []
 
     # Check for __all__ definition
@@ -155,24 +150,17 @@ def extract_tool_functions(path: Path) -> list[str]:
     return functions
 
 
-def extract_pack(path: Path) -> str | None:
-    """Extract the pack declaration from a tool file.
+def _extract_pack_from_ast(tree: ast.Module) -> str | None:
+    """Extract the pack declaration from a parsed AST.
 
     Looks for: pack = "name" at the top of the file.
 
     Args:
-        path: Path to Python file
+        tree: Parsed AST module
 
     Returns:
         Pack string, or None if not declared
     """
-    try:
-        content = path.read_text()
-        tree = ast.parse(content)
-    except (OSError, SyntaxError):
-        return None
-
-    # Look for pack assignment in module body
     for node in tree.body:
         if isinstance(node, ast.Assign):
             for target in node.targets:
@@ -186,8 +174,44 @@ def extract_pack(path: Path) -> str | None:
     return None
 
 
+def _extract_config_from_ast(tree: ast.Module, content: str) -> str | None:
+    """Extract the Config class source from a parsed AST.
+
+    Looks for: class Config(BaseModel): in the module body.
+    The class must inherit from BaseModel (pydantic).
+
+    Args:
+        tree: Parsed AST module
+        content: Original file content (needed for source extraction)
+
+    Returns:
+        Config class source code as string, or None if not found
+    """
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef) and node.name == "Config":
+            # Verify it inherits from BaseModel
+            for base in node.bases:
+                base_name = None
+                if isinstance(base, ast.Name):
+                    base_name = base.id
+                elif isinstance(base, ast.Attribute):
+                    base_name = base.attr
+
+                if base_name == "BaseModel":
+                    # Extract source code using line numbers
+                    lines = content.split("\n")
+                    start_line = node.lineno - 1  # 0-indexed
+                    end_line = node.end_lineno or node.lineno
+                    config_source = "\n".join(lines[start_line:end_line])
+                    return config_source
+
+    return None
+
+
 def analyze_tool_file(path: Path) -> ToolFileInfo:
-    """Analyze a tool file for metadata, pack, and functions.
+    """Analyze a tool file for metadata, pack, functions, and config.
+
+    Reads the file once and extracts all information in a single pass.
 
     Args:
         path: Path to Python file
@@ -206,9 +230,16 @@ def analyze_tool_file(path: Path) -> ToolFileInfo:
     info.metadata = parse_pep723_metadata(content)
     info.is_worker = info.metadata is not None and info.metadata.has_dependencies
 
-    # Extract pack and functions
-    info.pack = extract_pack(path)
-    info.functions = extract_tool_functions(path)
+    # Parse AST once for all extractions
+    try:
+        tree = ast.parse(content)
+    except SyntaxError:
+        return info
+
+    # Extract pack, functions, and config class from pre-parsed AST
+    info.pack = _extract_pack_from_ast(tree)
+    info.functions = _extract_functions_from_ast(tree)
+    info.config_class_source = _extract_config_from_ast(tree, content)
 
     return info
 

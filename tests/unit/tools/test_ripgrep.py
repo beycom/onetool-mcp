@@ -11,7 +11,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # -----------------------------------------------------------------------------
 # Pure Function Tests (No Mocking Required)
 # -----------------------------------------------------------------------------
@@ -87,76 +86,76 @@ class TestCheckRgInstalled:
 # -----------------------------------------------------------------------------
 
 
+@pytest.fixture
+def mock_ripgrep_config():
+    """Mock get_tool_config to return a Config with default timeout."""
+    from ot_tools.ripgrep import Config
+
+    with patch("ot_tools.ripgrep.get_tool_config") as mock:
+        mock.return_value = Config(timeout=30)
+        yield mock
+
+
 @pytest.mark.unit
 @pytest.mark.tools
 class TestRunRg:
     """Test _run_rg subprocess wrapper."""
 
-    @patch("subprocess.run")
-    @patch("ot_tools.ripgrep.get_config")
-    def test_successful_run(self, mock_config, mock_run):
+    def test_successful_run(self, mock_ripgrep_config):
         from ot_tools.ripgrep import _run_rg
 
-        mock_config.return_value.tools.ripgrep.timeout = 30
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout="file.py:10:match", stderr=""
-        )
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0, stdout="file.py:10:match", stderr=""
+            )
 
-        success, output = _run_rg(["pattern", "."])
+            success, output = _run_rg(["pattern", "."])
 
         assert success is True
         assert "file.py:10:match" in output
 
-    @patch("subprocess.run")
-    @patch("ot_tools.ripgrep.get_config")
-    def test_no_matches_is_success(self, mock_config, mock_run):
+    def test_no_matches_is_success(self, mock_ripgrep_config):
         from ot_tools.ripgrep import _run_rg
 
-        mock_config.return_value.tools.ripgrep.timeout = 30
-        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="")
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="")
 
-        success, output = _run_rg(["pattern", "."])
+            success, _output = _run_rg(["pattern", "."])
 
         # returncode 1 = no matches, which is not an error
         assert success is True
 
-    @patch("subprocess.run")
-    @patch("ot_tools.ripgrep.get_config")
-    def test_actual_error(self, mock_config, mock_run):
+    def test_actual_error(self, mock_ripgrep_config):
         from ot_tools.ripgrep import _run_rg
 
-        mock_config.return_value.tools.ripgrep.timeout = 30
-        mock_run.return_value = MagicMock(
-            returncode=2, stdout="", stderr="Invalid regex"
-        )
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=2, stdout="", stderr="Invalid regex"
+            )
 
-        success, output = _run_rg(["[invalid", "."])
+            success, output = _run_rg(["[invalid", "."])
 
         assert success is False
         assert "Invalid regex" in output
 
-    @patch("subprocess.run")
-    @patch("ot_tools.ripgrep.get_config")
-    def test_timeout(self, mock_config, mock_run):
+    def test_timeout(self, mock_ripgrep_config):
         from ot_tools.ripgrep import _run_rg
 
-        mock_config.return_value.tools.ripgrep.timeout = 30
-        mock_run.side_effect = subprocess.TimeoutExpired(cmd="rg", timeout=30)
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.TimeoutExpired(cmd="rg", timeout=30)
 
-        success, output = _run_rg(["pattern", "."])
+            success, output = _run_rg(["pattern", "."])
 
         assert success is False
         assert "timed out" in output
 
-    @patch("subprocess.run")
-    @patch("ot_tools.ripgrep.get_config")
-    def test_rg_not_found(self, mock_config, mock_run):
+    def test_rg_not_found(self, mock_ripgrep_config):
         from ot_tools.ripgrep import _run_rg
 
-        mock_config.return_value.tools.ripgrep.timeout = 30
-        mock_run.side_effect = FileNotFoundError()
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = FileNotFoundError()
 
-        success, output = _run_rg(["pattern", "."])
+            success, output = _run_rg(["pattern", "."])
 
         assert success is False
         assert "not installed" in output

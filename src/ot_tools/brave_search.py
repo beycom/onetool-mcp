@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["httpx>=0.27.0", "pyyaml>=6.0.0"]
+# dependencies = ["httpx>=0.27.0", "pydantic>=2.0.0", "pyyaml>=6.0.0"]
 # ///
 """Brave Search API tools.
 
@@ -22,7 +22,20 @@ __all__ = ["image", "local", "news", "search", "search_batch", "summarize", "vid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Literal
 
+from pydantic import BaseModel, Field
+
 from ot_sdk import get_config, get_secret, http, log, worker_main
+
+
+class Config(BaseModel):
+    """Pack configuration - discovered by registry."""
+
+    timeout: float = Field(
+        default=60.0,
+        ge=1.0,
+        le=300.0,
+        description="Request timeout in seconds",
+    )
 
 BRAVE_API_BASE = "https://api.search.brave.com/res/v1"
 

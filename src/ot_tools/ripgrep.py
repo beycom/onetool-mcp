@@ -19,10 +19,23 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from ot.config import get_config
+from pydantic import BaseModel, Field
+
+from ot.config import get_tool_config
 from ot.logging import LogSpan
 from ot.paths import get_effective_cwd
 from ot.utils.platform import get_install_hint
+
+
+class Config(BaseModel):
+    """Pack configuration - discovered by registry."""
+
+    timeout: float = Field(
+        default=60.0,
+        ge=1.0,
+        le=300.0,
+        description="Command timeout in seconds",
+    )
 
 
 def _resolve_path(path: str) -> Path:
@@ -72,7 +85,7 @@ def _run_rg(
         Tuple of (success, output). If success is False, output contains error message.
     """
     if timeout is None:
-        timeout = get_config().tools.ripgrep.timeout
+        timeout = get_tool_config("ripgrep", Config).timeout
 
     with LogSpan(span="ripgrep.exec", args=args[:3] if len(args) > 3 else args) as span:
         try:

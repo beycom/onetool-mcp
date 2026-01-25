@@ -5,7 +5,7 @@ Tests trafilatura mocks for fetch functionality.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -16,7 +16,6 @@ from ot_tools.web_fetch import (
     fetch,
     fetch_batch,
 )
-
 
 # -----------------------------------------------------------------------------
 # Configuration Tests
@@ -121,7 +120,7 @@ class TestFetch:
         mock_trafilatura.fetch_url.return_value = "<html>content</html>"
         mock_trafilatura.extract.return_value = "# Heading\n\nParagraph"
 
-        result = fetch(
+        fetch(
             url="https://example.com", output_format="markdown", use_cache=False
         )
 
@@ -173,7 +172,7 @@ class TestFetch:
         mock_trafilatura.extract.return_value = "x" * 200
         mock_truncate.return_value = "x" * 100 + "...[Content truncated...]"
 
-        result = fetch(url="https://example.com", max_length=100, use_cache=False)
+        fetch(url="https://example.com", max_length=100, use_cache=False)
 
         mock_truncate.assert_called_once()
 

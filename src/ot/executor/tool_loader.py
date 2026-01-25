@@ -64,13 +64,17 @@ def _get_tool_files(
     if config_tool_files:
         tool_files = config_tool_files
         cache_key = Path("__config__")
-    else:
-        tools_dir = tools_dir or Path("src/ot_tools")
+    elif tools_dir is not None:
+        # Explicit tools_dir provided - use it
         if not tools_dir.exists():
             return set(), tools_dir
         tools_dir = tools_dir.resolve()
         tool_files = list(tools_dir.glob("*.py"))
         cache_key = tools_dir
+    else:
+        # No config and no explicit tools_dir - no extension tools to load
+        # The core 'ot' pack is registered separately from meta.py
+        return set(), Path("__no_tools__")
 
     current_files = {f.resolve() for f in tool_files if f.exists()}
     return current_files, cache_key
@@ -236,9 +240,12 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
     Reads `pack` module variable from each tool file to group functions.
     Detects PEP 723 headers to route tools to worker processes.
 
+    The core 'ot' pack (from meta.py) is always registered regardless of config.
+
     Args:
-        tools_dir: Path to tools directory (fallback if no config).
-                   Defaults to 'src/ot_tools/' if no config available.
+        tools_dir: Explicit path to tools directory. If not provided,
+                   tool files are loaded from config. If neither is available,
+                   only the core 'ot' pack will be available.
 
     Returns:
         LoadedTools with functions dict (pack-qualified keys) and packs dict.
@@ -279,6 +286,10 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
 
     functions = {**worker_funcs, **inprocess_funcs}
 
+    # Register the core 'ot' pack from meta.py (not loaded from tools_dir)
+    ot_funcs = _register_ot_pack(packs)
+    functions.update(ot_funcs)
+
     registry = LoadedTools(
         functions=functions, packs=packs, worker_tools=worker_tools_list
     )
@@ -287,13 +298,35 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
     return registry
 
 
+def _register_ot_pack(packs: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """Register the core 'ot' pack from ot.meta module.
+
+    The 'ot' pack provides introspection functions (tools, packs, config, etc.)
+    and is always available regardless of tools_dir configuration.
+
+    Args:
+        packs: Packs dict to add 'ot' pack to.
+
+    Returns:
+        Functions dict with ot.* entries.
+    """
+    from ot.meta import PACK_NAME, get_ot_pack_functions
+
+    ot_functions = get_ot_pack_functions()
+    packs[PACK_NAME] = ot_functions
+
+    # Build full function names
+    return {f"{PACK_NAME}.{name}": func for name, func in ot_functions.items()}
+
+
 def load_tool_functions(tools_dir: Path | None = None) -> dict[str, Any]:
     """Load all tool functions from the tools directory.
 
     Uses caching based on file modification times to avoid redundant loading.
 
     Args:
-        tools_dir: Path to tools directory. Defaults to 'src/ot_tools/'.
+        tools_dir: Explicit path to tools directory. If not provided,
+                   tool files are loaded from config.
 
     Returns:
         Dictionary mapping function names to callable functions.

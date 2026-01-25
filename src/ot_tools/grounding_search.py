@@ -15,9 +15,20 @@ __all__ = ["dev", "docs", "reddit", "search", "search_batch"]
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Literal
 
-from ot.config import get_config
+from pydantic import BaseModel, Field
+
+from ot.config import get_tool_config
 from ot.config.secrets import get_secret
 from ot_sdk import log
+
+
+class Config(BaseModel):
+    """Pack configuration - discovered by registry."""
+
+    model: str = Field(
+        default="gemini-2.5-flash",
+        description="Gemini model for grounding search (e.g., gemini-2.5-flash)",
+    )
 
 try:
     from google import genai
@@ -140,7 +151,7 @@ def _grounded_search(
     with log(span_name, **log_extras) as s:
         try:
             if model is None:
-                model = get_config().tools.ground.model
+                model = get_tool_config("ground", Config).model
             client = _create_client()
 
             # Configure grounding with Google Search

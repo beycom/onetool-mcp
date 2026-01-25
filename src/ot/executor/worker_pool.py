@@ -53,6 +53,38 @@ class Worker:
         self.last_used = time.time()
         self.call_count += 1
 
+    def drain_stderr(self, timeout: float = 0.5) -> str:
+        """Read any available stderr output from the worker.
+
+        Args:
+            timeout: Maximum time to wait for stderr data
+
+        Returns:
+            Stderr content, truncated if very long
+        """
+        if self.process.stderr is None:
+            return ""
+
+        try:
+            # Use thread pool for non-blocking read
+            executor = _get_io_executor()
+            future = executor.submit(self.process.stderr.read)
+            try:
+                stderr = future.result(timeout=timeout)
+            except TimeoutError:
+                future.cancel()
+                return ""
+
+            if stderr:
+                # Truncate very long output, keep last lines (most relevant)
+                lines = stderr.strip().split("\n")
+                if len(lines) > 20:
+                    stderr = "\n".join(["...(truncated)", *lines[-20:]])
+                return stderr.strip()
+        except Exception:
+            pass
+        return ""
+
 
 class WorkerPool:
     """Manages a pool of persistent worker processes.
@@ -255,10 +287,14 @@ class WorkerPool:
             worker.process.stdin.write(request_line)
             worker.process.stdin.flush()
         except (BrokenPipeError, OSError) as e:
-            # Worker died during write
+            # Worker died during write - capture stderr for debugging
+            stderr = worker.drain_stderr()
             with self._lock:
                 self._workers.pop(tool_path, None)
-            raise RuntimeError(f"Worker for {tool_path.name} died: {e}") from e
+            error_msg = f"Worker for {tool_path.name} died: {e}"
+            if stderr:
+                error_msg += f"\nStderr:\n{stderr}"
+            raise RuntimeError(error_msg) from e
 
         # Read response with timeout using thread pool (non-blocking, cross-platform)
         try:
@@ -276,10 +312,14 @@ class WorkerPool:
                 raise TimeoutError(f"Worker call timed out after {timeout}s") from None
 
             if not response_line:
-                # Worker closed stdout (crashed)
+                # Worker closed stdout (crashed) - capture stderr for debugging
+                stderr = worker.drain_stderr()
                 with self._lock:
                     self._workers.pop(tool_path, None)
-                raise RuntimeError(f"Worker for {tool_path.name} closed unexpectedly")
+                error_msg = f"Worker for {tool_path.name} closed unexpectedly"
+                if stderr:
+                    error_msg += f"\nStderr:\n{stderr}"
+                raise RuntimeError(error_msg)
 
             response = json.loads(response_line)
 

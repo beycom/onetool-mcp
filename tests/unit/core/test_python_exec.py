@@ -18,13 +18,12 @@ Migrated from demo/bench/python_exec.yaml to provide:
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import pytest
 
 if TYPE_CHECKING:
-    pass
-
+    from collections.abc import Callable
 
 # =============================================================================
 # PARSING - How function signatures are parsed

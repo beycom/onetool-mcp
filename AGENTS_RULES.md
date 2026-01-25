@@ -1,5 +1,7 @@
 # Rules
 
+**IMPORTANT:** All code changes must update: code, tests, readme, docs and specs.
+
 ## Paths
 
 - `/docs` - user docs

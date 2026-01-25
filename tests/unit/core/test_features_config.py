@@ -86,10 +86,8 @@ class TestConfigValidation:
             with pytest.raises(ValueError, match="Invalid YAML"):
                 load_config(config_path)
 
-    def test_invalid_tool_timeout_rejected(self) -> None:
-        """Invalid tool config values rejected."""
-        from pydantic import ValidationError
-
+    def test_invalid_tool_config_loads_but_validates_at_runtime(self) -> None:
+        """Tool config loads (validation happens at runtime via get_tool_config)."""
         from ot.config.loader import load_config
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -105,8 +103,10 @@ class TestConfigValidation:
                 )
             )
 
-            with pytest.raises((ValueError, ValidationError)):
-                load_config(config_path)
+            # Now loads without error - validation happens at get_tool_config() time
+            config = load_config(config_path)
+            # Config is stored as dict, accessible via model_extra
+            assert config.tools.model_extra.get("brave", {}).get("timeout") == 0.5
 
 
 @pytest.mark.unit

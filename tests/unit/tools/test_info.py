@@ -77,7 +77,7 @@ def mock_proxy_manager() -> MagicMock:
 @pytest.mark.serve
 def test_tools_returns_correct_signatures_for_same_named_functions() -> None:
     """Verify ot.tools() returns correct signatures for functions with same name."""
-    from ot_tools.internal import tools
+    from ot.meta import tools
 
     result = tools(pattern="search")
 
@@ -101,7 +101,7 @@ def test_tools_returns_correct_signatures_for_same_named_functions() -> None:
 @pytest.mark.serve
 def test_tools_compact_mode_reduces_output_size() -> None:
     """Verify compact mode produces smaller output."""
-    from ot_tools.internal import tools
+    from ot.meta import tools
 
     full_output = tools()
     compact_output = tools(compact=True)
@@ -125,7 +125,7 @@ def test_tools_compact_mode_reduces_output_size() -> None:
 @pytest.mark.serve
 def test_tools_pack_filter() -> None:
     """Verify pack filter works correctly."""
-    from ot_tools.internal import tools
+    from ot.meta import tools
 
     result = tools(pack="ot")
     # Result is now a list of dicts directly
@@ -145,7 +145,7 @@ def test_tools_pack_filter() -> None:
 @pytest.mark.serve
 def test_tools_name_exact_match() -> None:
     """Verify tools(name=...) returns a single tool by exact name."""
-    from ot_tools.internal import tools
+    from ot.meta import tools
 
     result = tools(name="ot.tools")
 
@@ -160,7 +160,7 @@ def test_tools_name_exact_match() -> None:
 @pytest.mark.serve
 def test_tools_name_not_found() -> None:
     """Verify tools(name=...) returns error for unknown tool."""
-    from ot_tools.internal import tools
+    from ot.meta import tools
 
     result = tools(name="nonexistent.tool")
 
@@ -173,7 +173,7 @@ def test_tools_name_not_found() -> None:
 @pytest.mark.serve
 def test_tools_name_invalid_format() -> None:
     """Verify tools(name=...) returns error for invalid format."""
-    from ot_tools.internal import tools
+    from ot.meta import tools
 
     result = tools(name="nopack")
 
@@ -186,7 +186,7 @@ def test_tools_name_invalid_format() -> None:
 @pytest.mark.serve
 def test_health_counts_all_tools() -> None:
     """Verify ot.health() counts all tools including duplicates."""
-    from ot_tools.internal import health
+    from ot.meta import health
 
     result = health()
 
@@ -206,7 +206,7 @@ def test_health_counts_all_tools() -> None:
 @pytest.mark.serve
 def test_config_returns_configuration() -> None:
     """Verify ot.config() returns configuration information."""
-    from ot_tools.internal import config
+    from ot.meta import config
 
     result = config()
 
@@ -225,7 +225,7 @@ def test_config_returns_configuration() -> None:
 @pytest.mark.serve
 def test_packs_list_all() -> None:
     """Verify ot.packs() lists all packs."""
-    from ot_tools.internal import packs
+    from ot.meta import packs
 
     result = packs()
 
@@ -249,7 +249,7 @@ def test_packs_list_all() -> None:
 @pytest.mark.serve
 def test_packs_get_by_name() -> None:
     """Verify ot.packs(name=...) returns detailed pack info."""
-    from ot_tools.internal import packs
+    from ot.meta import packs
 
     result = packs(name="ot")
 
@@ -265,7 +265,7 @@ def test_packs_get_by_name() -> None:
 @pytest.mark.serve
 def test_packs_pattern_filter() -> None:
     """Verify ot.packs() filters by pattern."""
-    from ot_tools.internal import packs
+    from ot.meta import packs
 
     result = packs(pattern="brav")
 
@@ -280,7 +280,7 @@ def test_packs_pattern_filter() -> None:
 @pytest.mark.serve
 def test_packs_not_found() -> None:
     """Verify ot.packs() returns error for unknown pack."""
-    from ot_tools.internal import packs
+    from ot.meta import packs
 
     result = packs(name="nonexistent")
 
@@ -298,7 +298,7 @@ def test_packs_not_found() -> None:
 @pytest.mark.serve
 def test_reload_clears_config() -> None:
     """Verify ot.reload() clears and reloads configuration."""
-    from ot_tools.internal import reload
+    from ot.meta import reload
 
     result = reload()
 
@@ -315,7 +315,7 @@ def test_reload_clears_config() -> None:
 @pytest.mark.serve
 def test_aliases_with_valid_alias(override_config: Any) -> None:
     """Verify ot.aliases() returns mapping for valid alias."""
-    from ot_tools.internal import aliases
+    from ot.meta import aliases
 
     with override_config(
         OneToolConfig(alias={"ws": "brave.web_search", "gs": "ground.search"})
@@ -328,7 +328,7 @@ def test_aliases_with_valid_alias(override_config: Any) -> None:
 @pytest.mark.serve
 def test_aliases_list_all(override_config: Any) -> None:
     """Verify ot.aliases() lists all aliases when called with no args."""
-    from ot_tools.internal import aliases
+    from ot.meta import aliases
 
     with override_config(
         OneToolConfig(alias={"ws": "brave.web_search", "gs": "ground.search"})
@@ -342,7 +342,7 @@ def test_aliases_list_all(override_config: Any) -> None:
 @pytest.mark.serve
 def test_aliases_pattern_filter(override_config: Any) -> None:
     """Verify ot.aliases() filters by pattern."""
-    from ot_tools.internal import aliases
+    from ot.meta import aliases
 
     with override_config(
         OneToolConfig(alias={"ws": "brave.web_search", "gs": "ground.search"})
@@ -356,7 +356,7 @@ def test_aliases_pattern_filter(override_config: Any) -> None:
 @pytest.mark.serve
 def test_aliases_not_found(override_config: Any) -> None:
     """Verify ot.aliases() returns error for unknown alias."""
-    from ot_tools.internal import aliases
+    from ot.meta import aliases
 
     with override_config(OneToolConfig(alias={"ws": "brave.web_search"})):
         result = aliases(name="unknown")
@@ -369,7 +369,7 @@ def test_aliases_not_found(override_config: Any) -> None:
 def test_snippets_with_valid_snippet(override_config: Any) -> None:
     """Verify ot.snippets() returns definition for valid snippet."""
     from ot.config import SnippetDef
-    from ot_tools.internal import snippets
+    from ot.meta import snippets
 
     with override_config(
         OneToolConfig(
@@ -393,7 +393,7 @@ def test_snippets_with_valid_snippet(override_config: Any) -> None:
 def test_snippets_list_all(override_config: Any) -> None:
     """Verify ot.snippets() lists all snippets when called with no args."""
     from ot.config import SnippetDef
-    from ot_tools.internal import snippets
+    from ot.meta import snippets
 
     with override_config(
         OneToolConfig(
@@ -413,7 +413,7 @@ def test_snippets_list_all(override_config: Any) -> None:
 def test_snippets_pattern_filter(override_config: Any) -> None:
     """Verify ot.snippets() filters by pattern."""
     from ot.config import SnippetDef
-    from ot_tools.internal import snippets
+    from ot.meta import snippets
 
     with override_config(
         OneToolConfig(
@@ -435,7 +435,7 @@ def test_snippets_pattern_filter(override_config: Any) -> None:
 def test_snippets_not_found(override_config: Any) -> None:
     """Verify ot.snippets() returns error for unknown snippet."""
     from ot.config import SnippetDef
-    from ot_tools.internal import snippets
+    from ot.meta import snippets
 
     with override_config(OneToolConfig(snippets={"known": SnippetDef(body="demo()")})):
         result = snippets(name="unknown")
@@ -454,7 +454,7 @@ def test_packs_with_proxy(mock_proxy_manager: MagicMock) -> None:
     """Verify ot.packs() includes proxy packs."""
     from unittest.mock import patch
 
-    from ot_tools.internal import packs
+    from ot.meta import packs
 
     # Create mock proxy tools
     mock_tools = [
@@ -475,7 +475,7 @@ def test_packs_with_proxy(mock_proxy_manager: MagicMock) -> None:
     mock_proxy_manager.list_tools.return_value = mock_tools
     mock_proxy_manager.servers = ["github"]
 
-    with patch("ot_tools.internal.get_proxy_manager", return_value=mock_proxy_manager):
+    with patch("ot.meta.get_proxy_manager", return_value=mock_proxy_manager):
         result = packs(name="github")
 
     # Should generate from proxy tool list
@@ -493,7 +493,7 @@ def test_packs_with_config_instructions(
     """Verify ot.packs() includes configured instructions."""
     from unittest.mock import patch
 
-    from ot_tools.internal import packs
+    from ot.meta import packs
 
     mock_proxy_manager.list_tools.return_value = []
     mock_proxy_manager.servers = []
@@ -507,7 +507,7 @@ def test_packs_with_config_instructions(
         )
     ):
         with patch(
-            "ot_tools.internal.get_proxy_manager", return_value=mock_proxy_manager
+            "ot.meta.get_proxy_manager", return_value=mock_proxy_manager
         ):
             result = packs(name="brave")
 

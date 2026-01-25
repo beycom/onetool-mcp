@@ -166,6 +166,15 @@ if __name__ == "__main__":
 >
 > If you have a PEP 723 header but don't need isolated dependencies, remove the header instead of adding `worker_main()`. This lets the tool run in-process.
 
+**⚠️ Critical:** All imports must be declared in the PEP 723 `dependencies` list. Worker tools run in isolated environments where only declared dependencies are available. If you import a module (e.g., `from pydantic import BaseModel`) without declaring it in dependencies, the worker will crash with "Worker for X.py closed unexpectedly" due to `ModuleNotFoundError`.
+
+**Common dependencies to include:**
+- `pydantic>=2.0.0` - if using `BaseModel`, `Field`, validators
+- `httpx>=0.27.0` - if using the SDK's `http` module
+- `pyyaml>=6.0.0` - if using YAML serialization
+
+Run `uv run src/ot_tools/your_tool.py` locally to verify all imports resolve before deployment.
+
 ### SDK Exports
 
 The `ot_sdk` package provides these utilities for worker tools:
@@ -226,23 +235,25 @@ Response: {"result": ..., "error": null} or {"result": null, "error": "message"}
 
 ## Configuration Access
 
-Tools can access centralized configuration:
+Tools can define a `Config` class that is automatically discovered and validated:
 
 ```python
-from ot.config import get_config
+from pydantic import BaseModel, Field
+
+from ot.config import get_tool_config
+
+# Define config schema - discovered automatically by the registry
+class Config(BaseModel):
+    timeout: float = Field(default=30.0, ge=1.0, le=120.0)
 
 def search(*, query: str, timeout: float | None = None) -> str:
     if timeout is None:
-        timeout = get_config().tools.mytool.timeout
+        config = get_tool_config("mytool", Config)
+        timeout = config.timeout
     # ...
 ```
 
-Add config to `src/ot/config/loader.py`:
-
-```python
-class MyToolConfig(BaseModel):
-    timeout: float = Field(default=30.0, ge=1.0, le=120.0)
-```
+The `Config` class is discovered from your tool file automatically - no need to modify `loader.py`.
 
 ## Path Resolution
 
@@ -305,10 +316,10 @@ def get_template(*, name: str) -> str:
 
 ### Main Process Tools
 
-For tools running in the main process (not workers), use `onetool.paths`:
+For tools running in the main process (not workers), use `ot.paths`:
 
 ```python
-from onetool.paths import get_effective_cwd, expand_path
+from ot.paths import get_effective_cwd, expand_path
 
 def list_files(*, directory: str = ".") -> str:
     """List files in a directory."""
@@ -324,7 +335,7 @@ def list_files(*, directory: str = ".") -> str:
 |----------|-------------|---------------------|
 | `get_project_path()` | `ot_sdk` | Project directory (`OT_CWD`) |
 | `get_config_path()` | `ot_sdk` | Config directory (`.onetool/`) |
-| `get_effective_cwd()` | `onetool.paths` | Returns project directory |
+| `get_effective_cwd()` | `ot.paths` | Returns project directory |
 | `expand_path()` | `ot_sdk` | Only expands `~` |
 
 ## Attribution & Licensing
@@ -389,7 +400,8 @@ For "Based on" tools, include the upstream license:
 - [ ] LogSpan logging for all operations
 - [ ] Error handling returning strings
 - [ ] Secrets in `secrets.yaml`
-- [ ] Dependencies in `pyproject.toml` or PEP 723
+- [ ] Dependencies in `pyproject.toml` or PEP 723 (all imports declared)
+- [ ] Worker tools tested with `uv run src/ot_tools/your_tool.py`
 - [ ] Attribution level determined (Based on / Inspired by / Original)
 - [ ] Source header matches attribution level
 - [ ] License file in `licenses/` (if "Based on")

@@ -5,7 +5,7 @@ Tests pure functions (validators, formatters) and main functions with HTTP mocks
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -25,7 +25,6 @@ from ot_tools.brave_search import (
     summarize,
     video,
 )
-
 
 # -----------------------------------------------------------------------------
 # Pure Function Tests (No Mocking Required)

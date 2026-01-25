@@ -6,7 +6,6 @@ Tests pure functions directly and main functions with HTTP mocks.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -455,11 +454,11 @@ class TestParseDependencyString:
         assert ver == ">=2.28.0"
 
     def test_normalizes_underscores(self):
-        name, ver = _parse_dependency_string("some_package>=1.0.0")
+        name, _ver = _parse_dependency_string("some_package>=1.0.0")
         assert name == "some-package"
 
     def test_uppercase_normalized(self):
-        name, ver = _parse_dependency_string("Requests>=1.0.0")
+        name, _ver = _parse_dependency_string("Requests>=1.0.0")
         assert name == "requests"
 
 

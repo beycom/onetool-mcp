@@ -50,11 +50,11 @@ def empty_msg_config() -> OneToolConfig:
 @pytest.mark.serve
 def test_notify_returns_ok_with_matching_topic(msg_config: OneToolConfig) -> None:
     """Verify notify() returns OK with file path for matching topic."""
-    from ot_tools.internal import notify
+    from ot.meta import notify
 
     with (
-        patch("ot_tools.internal.get_config", return_value=msg_config),
-        patch("ot_tools.internal._write_to_file"),
+        patch("ot.meta.get_config", return_value=msg_config),
+        patch("ot.meta._write_to_file"),
     ):
         result = notify(topic="status:scan", message="Scanning src/")
 
@@ -68,9 +68,9 @@ def test_notify_returns_ok_no_match_when_no_pattern_matches(
     empty_msg_config: OneToolConfig,
 ) -> None:
     """Verify notify() returns 'OK: no matching topic' when no pattern matches."""
-    from ot_tools.internal import notify
+    from ot.meta import notify
 
-    with patch("ot_tools.internal.get_config", return_value=empty_msg_config):
+    with patch("ot.meta.get_config", return_value=empty_msg_config):
         result = notify(topic="unknown:topic", message="test")
 
     assert result == "OK: no matching topic"
@@ -80,11 +80,11 @@ def test_notify_returns_ok_no_match_when_no_pattern_matches(
 @pytest.mark.serve
 def test_notify_uses_first_matching_pattern(msg_config: OneToolConfig) -> None:
     """Verify notify() uses first matching pattern (status:* before *)."""
-    from ot_tools.internal import notify
+    from ot.meta import notify
 
     with (
-        patch("ot_tools.internal.get_config", return_value=msg_config),
-        patch("ot_tools.internal._write_to_file"),
+        patch("ot.meta.get_config", return_value=msg_config),
+        patch("ot.meta._write_to_file"),
     ):
         # status:scan should match status:* not *
         result = notify(topic="status:scan", message="test")
@@ -97,11 +97,11 @@ def test_notify_uses_first_matching_pattern(msg_config: OneToolConfig) -> None:
 @pytest.mark.serve
 def test_notify_falls_through_to_catchall(msg_config: OneToolConfig) -> None:
     """Verify notify() falls through to catchall pattern."""
-    from ot_tools.internal import notify
+    from ot.meta import notify
 
     with (
-        patch("ot_tools.internal.get_config", return_value=msg_config),
-        patch("ot_tools.internal._write_to_file"),
+        patch("ot.meta.get_config", return_value=msg_config),
+        patch("ot.meta._write_to_file"),
     ):
         # other:topic should match * catchall
         result = notify(topic="other:topic", message="test")
@@ -115,9 +115,9 @@ def test_match_topic_to_file_returns_none_for_no_match(
     empty_msg_config: OneToolConfig,
 ) -> None:
     """Verify _match_topic_to_file returns None when no pattern matches."""
-    from ot_tools.internal import _match_topic_to_file
+    from ot.meta import _match_topic_to_file
 
-    with patch("ot_tools.internal.get_config", return_value=empty_msg_config):
+    with patch("ot.meta.get_config", return_value=empty_msg_config):
         result = _match_topic_to_file("any:topic")
 
     assert result is None
@@ -129,9 +129,9 @@ def test_match_topic_to_file_returns_path_for_match(
     msg_config: OneToolConfig,
 ) -> None:
     """Verify _match_topic_to_file returns Path for matching pattern."""
-    from ot_tools.internal import _match_topic_to_file
+    from ot.meta import _match_topic_to_file
 
-    with patch("ot_tools.internal.get_config", return_value=msg_config):
+    with patch("ot.meta.get_config", return_value=msg_config):
         result = _match_topic_to_file("doc:api")
 
     assert result is not None
@@ -143,7 +143,7 @@ def test_match_topic_to_file_returns_path_for_match(
 @pytest.mark.serve
 def test_resolve_path_expands_home() -> None:
     """Verify _resolve_path expands ~ to home directory."""
-    from ot_tools.internal import _resolve_path
+    from ot.meta import _resolve_path
 
     result = _resolve_path("~/test/file.yaml")
 
@@ -156,7 +156,7 @@ def test_resolve_path_expands_home() -> None:
 @pytest.mark.serve
 def test_resolve_path_preserves_absolute() -> None:
     """Verify _resolve_path preserves absolute paths."""
-    from ot_tools.internal import _resolve_path
+    from ot.meta import _resolve_path
 
     result = _resolve_path("/absolute/path/file.yaml")
 

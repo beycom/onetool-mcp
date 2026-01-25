@@ -12,13 +12,28 @@ from __future__ import annotations
 # Pack for dot notation: code.search(), code.status()
 pack = "code"
 
+__all__ = ["search", "status"]
+
 from pathlib import Path
 from typing import Any
 
-from ot.config import get_config
+from pydantic import BaseModel, Field
+
+from ot.config import get_tool_config
 from ot.config.secrets import get_secret
 from ot.paths import get_effective_cwd
 from ot_sdk import log
+
+
+class Config(BaseModel):
+    """Pack configuration - discovered by registry."""
+
+    limit: int = Field(
+        default=10,
+        ge=1,
+        le=100,
+        description="Maximum number of search results to return",
+    )
 
 try:
     import duckdb
@@ -139,7 +154,7 @@ def search(
         code.search("error handling", path="/path/to/other-project")
     """
     if limit is None:
-        limit = get_config().tools.code_search.limit
+        limit = get_tool_config("code", Config).limit
     db_path, project_root = _get_db_path(path)
 
     with log(

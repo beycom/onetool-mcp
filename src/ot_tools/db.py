@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["sqlalchemy>=2.0.0", "httpx>=0.27.0", "pyyaml>=6.0.0"]
+# dependencies = ["httpx>=0.27.0", "pydantic>=2.0.0", "pyyaml>=6.0.0", "sqlalchemy>=2.0.0"]
 # ///
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -35,9 +35,21 @@ import contextlib
 from datetime import date, datetime
 from typing import Any
 
+from pydantic import BaseModel, Field
 from sqlalchemy import Engine, create_engine, inspect, text
 
 from ot_sdk import get_config, log, worker_main
+
+
+class Config(BaseModel):
+    """Pack configuration - discovered by registry."""
+
+    max_chars: int = Field(
+        default=4000,
+        ge=100,
+        le=100000,
+        description="Maximum characters in query result output",
+    )
 
 # Connection pool keyed by URL - persists across calls in worker
 _engines: dict[str, Engine] = {}

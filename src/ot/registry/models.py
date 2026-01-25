@@ -42,3 +42,7 @@ class ToolInfo(BaseModel):
     deprecated_message: str | None = Field(
         default=None, description="Deprecation message"
     )
+    config_schema: str | None = Field(
+        default=None,
+        description="Config class source code extracted via AST (class Config(BaseModel))",
+    )

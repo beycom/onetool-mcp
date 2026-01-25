@@ -11,15 +11,30 @@ from __future__ import annotations
 # Pack for dot notation: package.version(), package.npm(), etc.
 pack = "package"
 
+__all__ = ["audit", "npm", "pypi", "version"]
+
 import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC
 from pathlib import Path
 from typing import Any
 
-from ot.config import get_config
+from pydantic import BaseModel, Field
+
+from ot.config import get_tool_config
 from ot.http_client import http_get
 from ot.logging import LogSpan
+
+
+class Config(BaseModel):
+    """Pack configuration - discovered by registry."""
+
+    timeout: float = Field(
+        default=30.0,
+        ge=1.0,
+        le=120.0,
+        description="Request timeout in seconds",
+    )
 
 NPM_REGISTRY = "https://registry.npmjs.org"
 PYPI_API = "https://pypi.org/pypi"
@@ -321,7 +336,7 @@ def _fetch(url: str, timeout: float | None = None) -> tuple[bool, dict[str, Any]
         Tuple of (success, data_or_error)
     """
     if timeout is None:
-        timeout = get_config().tools.package.timeout
+        timeout = get_tool_config("package", Config).timeout
 
     with LogSpan(span="package.fetch", url=url) as span:
         success, data = http_get(url, timeout=timeout)

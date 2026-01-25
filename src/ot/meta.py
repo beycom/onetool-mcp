@@ -1,7 +1,8 @@
-"""Consolidated OneTool internal tools.
+"""OneTool core introspection tools (ot pack).
 
 Provides tool discovery and messaging under the unified `ot` pack.
-These are in-process tools with no external dependencies.
+These are core introspection functions, not external tools, so they
+live in the core package rather than tools_dir.
 
 Functions:
     ot.tools() - List or get tools with full documentation
@@ -17,21 +18,6 @@ Functions:
 
 from __future__ import annotations
 
-# Pack for dot notation: ot.tools(), ot.packs(), etc.
-pack = "ot"
-
-__all__ = [
-    "aliases",
-    "config",
-    "health",
-    "notify",
-    "packs",
-    "reload",
-    "snippets",
-    "stats",
-    "tools",
-]
-
 import asyncio
 import fnmatch
 import inspect
@@ -45,10 +31,46 @@ import yaml
 
 from ot import __version__
 from ot.config import get_config
-from ot.executor.tool_loader import load_tool_registry
 from ot.paths import get_effective_cwd
 from ot.proxy import get_proxy_manager
 from ot_sdk import log
+
+# Pack name for dot notation: ot.tools(), ot.packs(), etc.
+PACK_NAME = "ot"
+
+__all__ = [
+    "PACK_NAME",
+    "aliases",
+    "config",
+    "get_ot_pack_functions",
+    "health",
+    "notify",
+    "packs",
+    "reload",
+    "snippets",
+    "stats",
+    "tools",
+]
+
+
+def get_ot_pack_functions() -> dict[str, Any]:
+    """Get all ot pack functions for registration.
+
+    Returns:
+        Dict mapping function names to callables
+    """
+    return {
+        "tools": tools,
+        "packs": packs,
+        "aliases": aliases,
+        "snippets": snippets,
+        "config": config,
+        "health": health,
+        "stats": stats,
+        "notify": notify,
+        "reload": reload,
+    }
+
 
 # ============================================================================
 # Tool Discovery Functions
@@ -158,6 +180,8 @@ def tools(
         ot.tools(pack="brave")
         ot.tools(compact=True)
     """
+    from ot.executor.tool_loader import load_tool_registry
+
     with log(
         "ot.tools", toolName=name or None, pattern=pattern or None, pack=pack or None, compact=compact
     ) as s:
@@ -287,6 +311,7 @@ def packs(
         ot.packs(name="brave")
         ot.packs(pattern="search")
     """
+    from ot.executor.tool_loader import load_tool_registry
     from ot.prompts import PromptsError, get_pack_instructions, get_prompts
 
     with log("ot.packs", packName=name or None, pattern=pattern or None) as s:
@@ -339,8 +364,8 @@ def packs(
                     first_line = doc.split("\n")[0].strip()
                     lines.append(f"- **{name}.{func_name}**: {first_line}")
             else:
-                tools = proxy.list_tools(server=name)
-                for tool in sorted(tools, key=lambda t: t.name):
+                proxy_tools = proxy.list_tools(server=name)
+                for tool in sorted(proxy_tools, key=lambda t: t.name):
                     desc = tool.description or "(no description)"
                     first_line = desc.split("\n")[0].strip()
                     lines.append(f"- **{name}.{tool.name}**: {first_line}")
@@ -426,10 +451,10 @@ def _match_topic_to_file(topic: str) -> Path | None:
     msg_config = cfg.tools.msg
 
     for topic_config in msg_config.topics:
-        pattern = topic_config.pattern
+        topic_pattern = topic_config.pattern
         file_path = topic_config.file
 
-        if fnmatch.fnmatch(topic, pattern):
+        if fnmatch.fnmatch(topic, topic_pattern):
             return _resolve_path(file_path)
 
     return None
@@ -538,6 +563,8 @@ def health() -> dict[str, Any]:
     Example:
         ot.health()
     """
+    from ot.executor.tool_loader import load_tool_registry
+
     with log("ot.health") as s:
         from ot.executor.worker_proxy import WorkerPackProxy
 
@@ -558,13 +585,13 @@ def health() -> dict[str, Any]:
         }
 
         server_statuses: dict[str, str] = {}
-        for name in cfg.servers:
-            conn = proxy.get_connection(name)
-            server_statuses[name] = "connected" if conn else "disconnected"
+        for server_name in cfg.servers:
+            conn = proxy.get_connection(server_name)
+            server_statuses[server_name] = "connected" if conn else "disconnected"
 
         proxy_status: dict[str, Any] = {
             "status": "ok"
-            if all(s == "connected" for s in server_statuses.values())
+            if all(status == "connected" for status in server_statuses.values())
             or not server_statuses
             else "degraded",
             "server_count": len(cfg.servers),
@@ -660,7 +687,7 @@ def stats(
             return f"Error: Invalid period '{period}'. Use: {', '.join(valid_periods)}"
 
         # Check if stats are enabled
-        if not cfg.tools.stats.enabled:
+        if not cfg.stats.enabled:
             s.add("error", "stats_disabled")
             return "Error: Statistics collection is disabled in configuration"
 
@@ -668,12 +695,12 @@ def stats(
         stats_path = cfg.get_stats_file_path()
         reader = StatsReader(
             path=stats_path,
-            context_per_call=cfg.tools.stats.context_per_call,
-            time_overhead_per_call_ms=cfg.tools.stats.time_overhead_per_call_ms,
-            model=cfg.tools.stats.model,
-            cost_per_million_input_tokens=cfg.tools.stats.cost_per_million_input_tokens,
-            cost_per_million_output_tokens=cfg.tools.stats.cost_per_million_output_tokens,
-            chars_per_token=cfg.tools.stats.chars_per_token,
+            context_per_call=cfg.stats.context_per_call,
+            time_overhead_per_call_ms=cfg.stats.time_overhead_per_call_ms,
+            model=cfg.stats.model,
+            cost_per_million_input_tokens=cfg.stats.cost_per_million_input_tokens,
+            cost_per_million_output_tokens=cfg.stats.cost_per_million_output_tokens,
+            chars_per_token=cfg.stats.chars_per_token,
         )
 
         aggregated = reader.read(

@@ -6,9 +6,12 @@ All db functions require explicit db_url parameter.
 
 from __future__ import annotations
 
-from typing import Generator
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @pytest.fixture

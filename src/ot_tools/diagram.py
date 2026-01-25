@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["httpx>=0.27.0", "pyyaml>=6.0.0", "aiofiles>=24.1.0"]
+# dependencies = ["aiofiles>=24.1.0", "httpx>=0.27.0", "pydantic>=2.0.0", "pyyaml>=6.0.0"]
 # ///
 """Diagram generation tools using Kroki as the rendering backend.
 
@@ -44,6 +44,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
+from pydantic import BaseModel, Field
+
 from ot_sdk import (
     get_config,
     get_config_path,
@@ -53,6 +55,144 @@ from ot_sdk import (
     truncate,
     worker_main,
 )
+
+# ==================== Configuration Classes ====================
+
+
+class BackendConfig(BaseModel):
+    """Kroki backend settings."""
+
+    type: Literal["kroki"] = Field(
+        default="kroki",
+        description="Backend type (only kroki supported)",
+    )
+    remote_url: str = Field(
+        default="https://kroki.io",
+        description="Remote Kroki service URL",
+    )
+    self_hosted_url: str = Field(
+        default="http://localhost:8000",
+        description="Self-hosted Kroki URL",
+    )
+    prefer: Literal["remote", "self_hosted", "auto"] = Field(
+        default="remote",
+        description="Preferred backend: remote, self_hosted, or auto",
+    )
+    timeout: float = Field(
+        default=30.0,
+        ge=1.0,
+        le=120.0,
+        description="Request timeout in seconds",
+    )
+
+
+class PolicyConfig(BaseModel):
+    """Policy rules for diagram generation."""
+
+    rules: str = Field(
+        default="""\
+NEVER use ASCII art or text-based diagrams in markdown.
+Use the diagram tools for all visual representations.
+Save output as SVG and reference in markdown.
+Always generate source first, then render.""",
+        description="Policy rules for LLM guidance",
+    )
+    preferred_format: Literal["svg", "png", "pdf"] = Field(
+        default="svg",
+        description="Default output format",
+    )
+    preferred_providers: list[str] = Field(
+        default_factory=lambda: ["mermaid", "d2", "plantuml"],
+        description="Preferred diagram providers in order",
+    )
+
+
+class OutputConfig(BaseModel):
+    """Output settings for generated diagrams."""
+
+    dir: str = Field(
+        default="diagrams",
+        description="Output directory for rendered diagrams (relative to project dir)",
+    )
+    naming: str = Field(
+        default="{provider}_{name}_{timestamp}",
+        description="Filename pattern (supports {provider}, {name}, {timestamp})",
+    )
+    default_format: Literal["svg", "png", "pdf"] = Field(
+        default="svg",
+        description="Default output format",
+    )
+    save_source: bool = Field(
+        default=True,
+        description="Save diagram source alongside rendered output",
+    )
+
+
+class ProviderInstructions(BaseModel):
+    """Instructions for a specific diagram provider."""
+
+    when_to_use: str = Field(
+        default="",
+        description="Guidance on when to use this provider",
+    )
+    style_tips: str = Field(
+        default="",
+        description="Style and syntax tips",
+    )
+    syntax_guide: str = Field(
+        default="",
+        description="Link to syntax documentation",
+    )
+    example: str = Field(
+        default="",
+        description="Example diagram source",
+    )
+
+
+class TemplateRef(BaseModel):
+    """Reference to a diagram template file."""
+
+    provider: str = Field(
+        ...,
+        description="Diagram provider (mermaid, plantuml, d2)",
+    )
+    diagram_type: str = Field(
+        ...,
+        description="Type of diagram (sequence, flowchart, etc.)",
+    )
+    description: str = Field(
+        default="",
+        description="Template description",
+    )
+    file: str = Field(
+        ...,
+        description="Path to template file (relative to config)",
+    )
+
+
+class Config(BaseModel):
+    """Pack configuration - discovered by registry."""
+
+    backend: BackendConfig = Field(
+        default_factory=BackendConfig,
+        description="Kroki backend settings",
+    )
+    policy: PolicyConfig = Field(
+        default_factory=PolicyConfig,
+        description="Policy rules for diagram generation",
+    )
+    output: OutputConfig = Field(
+        default_factory=OutputConfig,
+        description="Output settings",
+    )
+    instructions: dict[str, ProviderInstructions] = Field(
+        default_factory=dict,
+        description="Provider-specific instructions",
+    )
+    templates: dict[str, TemplateRef] = Field(
+        default_factory=dict,
+        description="Named template references",
+    )
 
 # ==================== Constants ====================
 

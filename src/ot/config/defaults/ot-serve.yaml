@@ -9,7 +9,7 @@ include:
   - prompts.yaml   # Tool instructions for LLM
   - snippets.yaml  # Snippet workflows
   - servers.yaml   # External MCP servers
-  - diagram.yaml   # Diagram tool settings
+  # Note: diagram.yaml moved to sidecar pattern (next to diagram.py)
 
 log_level: INFO
 

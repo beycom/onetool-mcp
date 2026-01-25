@@ -11,8 +11,7 @@ if TYPE_CHECKING:
 import pytest
 
 from ot.executor.pep723 import (
-    extract_pack,
-    extract_tool_functions,
+    analyze_tool_file,
     parse_pep723_metadata,
 )
 
@@ -87,7 +86,7 @@ class TestParsePep723Metadata:
 @pytest.mark.unit
 @pytest.mark.core
 class TestExtractPack:
-    """Tests for extract_pack function."""
+    """Tests for pack extraction via analyze_tool_file."""
 
     def test_extracts_pack_declaration(self, tmp_path: Path) -> None:
         """Should extract pack from module-level assignment."""
@@ -101,8 +100,8 @@ class TestExtractPack:
         """)
         )
 
-        result = extract_pack(tool_file)
-        assert result == "brave"
+        result = analyze_tool_file(tool_file)
+        assert result.pack == "brave"
 
     def test_returns_none_when_no_pack(self, tmp_path: Path) -> None:
         """Should return None when no pack is declared."""
@@ -114,8 +113,8 @@ class TestExtractPack:
         """)
         )
 
-        result = extract_pack(tool_file)
-        assert result is None
+        result = analyze_tool_file(tool_file)
+        assert result.pack is None
 
     def test_ignores_non_string_pack(self, tmp_path: Path) -> None:
         """Should return None when pack is not a string literal."""
@@ -129,14 +128,14 @@ class TestExtractPack:
         """)
         )
 
-        result = extract_pack(tool_file)
-        assert result is None
+        result = analyze_tool_file(tool_file)
+        assert result.pack is None
 
 
 @pytest.mark.unit
 @pytest.mark.core
 class TestExtractToolFunctions:
-    """Tests for extract_tool_functions function."""
+    """Tests for function extraction via analyze_tool_file."""
 
     def test_extracts_public_functions(self, tmp_path: Path) -> None:
         """Should extract all public function names."""
@@ -154,8 +153,8 @@ class TestExtractToolFunctions:
         """)
         )
 
-        result = extract_tool_functions(tool_file)
-        assert set(result) == {"search", "fetch"}
+        result = analyze_tool_file(tool_file)
+        assert set(result.functions) == {"search", "fetch"}
 
     def test_respects_all_declaration(self, tmp_path: Path) -> None:
         """Should only include functions listed in __all__."""
@@ -172,18 +171,122 @@ class TestExtractToolFunctions:
         """)
         )
 
-        result = extract_tool_functions(tool_file)
-        assert result == ["search"]
+        result = analyze_tool_file(tool_file)
+        assert result.functions == ["search"]
 
     def test_handles_syntax_error(self, tmp_path: Path) -> None:
         """Should return empty list for files with syntax errors."""
         tool_file = tmp_path / "broken.py"
         tool_file.write_text("def broken( = )")
 
-        result = extract_tool_functions(tool_file)
-        assert result == []
+        result = analyze_tool_file(tool_file)
+        assert result.functions == []
 
     def test_handles_missing_file(self, tmp_path: Path) -> None:
         """Should return empty list for non-existent files."""
-        result = extract_tool_functions(tmp_path / "nonexistent.py")
-        assert result == []
+        result = analyze_tool_file(tmp_path / "nonexistent.py")
+        assert result.functions == []
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestWorkerToolDependencies:
+    """Tests to ensure worker tools declare all their dependencies.
+
+    Worker tools with PEP 723 headers run in isolated environments where only
+    declared dependencies are available. If an import is missing from the
+    dependencies list, the worker will crash with "Worker closed unexpectedly".
+    """
+
+    # Modules that are always available (stdlib or provided by ot_sdk)
+    ALLOWED_MODULES = {
+        # Standard library modules commonly used
+        "abc", "asyncio", "base64", "collections", "concurrent", "contextlib",
+        "copy", "dataclasses", "datetime", "decimal", "enum", "fnmatch",
+        "functools", "hashlib", "html", "http", "importlib", "inspect", "io",
+        "itertools", "json", "logging", "math", "mimetypes", "operator", "os",
+        "pathlib", "pickle", "platform", "queue", "random", "re", "shutil",
+        "socket", "string", "subprocess", "sys", "tempfile", "textwrap",
+        "threading", "time", "traceback", "typing", "unittest", "urllib",
+        "uuid", "warnings", "weakref", "xml", "zipfile", "zlib",
+        # typing_extensions is often bundled
+        "typing_extensions",
+        # SDK-provided modules (available in worker environment via PYTHONPATH)
+        "ot_sdk",
+        "ot",  # Main onetool package, available via PYTHONPATH
+        # __future__ is special
+        "__future__",
+    }
+
+    # Map package names to their import names (when different)
+    PACKAGE_TO_IMPORT = {
+        "pyyaml": "yaml",
+        "pillow": "PIL",
+        "beautifulsoup4": "bs4",
+        "scikit-learn": "sklearn",
+    }
+
+    def _extract_imports(self, content: str) -> set[str]:
+        """Extract top-level module names from imports."""
+        import ast
+
+        imports: set[str] = set()
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            return imports
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    # Get top-level module (e.g., "os.path" -> "os")
+                    imports.add(alias.name.split(".")[0])
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imports.add(node.module.split(".")[0])
+
+        return imports
+
+    def _normalize_package_name(self, dep: str) -> str:
+        """Extract package name from dependency spec (e.g., 'pydantic>=2.0' -> 'pydantic')."""
+        import re
+
+        # Remove version specifiers
+        name = re.split(r"[<>=!~\[]", dep)[0].strip().lower()
+        # Map to import name if different
+        return self.PACKAGE_TO_IMPORT.get(name, name)
+
+    def test_all_worker_tools_declare_dependencies(self) -> None:
+        """All PEP 723 worker tools must declare their third-party imports."""
+        from pathlib import Path
+
+        tools_dir = Path(__file__).parent.parent.parent.parent / "src" / "ot_tools"
+        if not tools_dir.exists():
+            pytest.skip("ot_tools directory not found")
+
+        errors: list[str] = []
+
+        for tool_file in sorted(tools_dir.glob("*.py")):
+            content = tool_file.read_text()
+
+            # Check if it has a PEP 723 header
+            metadata = parse_pep723_metadata(content)
+            if metadata is None or not metadata.has_dependencies:
+                continue  # Not a worker tool
+
+            # Extract imports and declared dependencies
+            imports = self._extract_imports(content)
+            declared = {self._normalize_package_name(d) for d in metadata.dependencies}
+
+            # Find missing dependencies
+            for imp in imports:
+                if imp in self.ALLOWED_MODULES:
+                    continue
+                # Check if import is covered by any declared dependency
+                if imp.lower() not in declared:
+                    errors.append(f"{tool_file.name}: imports '{imp}' but not in dependencies")
+
+        if errors:
+            error_msg = "Worker tools with missing dependencies:\n" + "\n".join(
+                f"  - {e}" for e in errors
+            )
+            pytest.fail(error_msg)
