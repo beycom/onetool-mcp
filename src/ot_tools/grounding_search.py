@@ -10,8 +10,9 @@ from __future__ import annotations
 # Pack for dot notation: ground.search(), ground.dev(), etc.
 pack = "ground"
 
-__all__ = ["dev", "docs", "reddit", "search"]
+__all__ = ["dev", "docs", "reddit", "search", "search_batch"]
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Literal
 
 from ot.config import get_config
@@ -168,6 +169,7 @@ def search(
     query: str,
     context: str = "",
     focus: Literal["general", "code", "documentation", "troubleshooting"] = "general",
+    model: str | None = None,
 ) -> str:
     """Search the web using Google Gemini with grounding.
 
@@ -182,6 +184,7 @@ def search(
             - "code": Focus on code examples and implementations
             - "documentation": Focus on official documentation
             - "troubleshooting": Focus on solving problems and debugging
+        model: Gemini model to use (defaults to config, e.g., "gemini-2.5-flash")
 
     Returns:
         Search results with content and source citations
@@ -198,6 +201,9 @@ def search(
 
         # Focus on code examples
         ground.search(query="fastapi middleware", focus="code")
+
+        # Use a specific model
+        ground.search(query="latest AI news", model="gemini-3.0-flash")
     """
     # Build the search prompt
     focus_instructions = {
@@ -219,9 +225,89 @@ def search(
     return _grounded_search(
         prompt,
         span_name="ground.search",
+        model=model,
         query=query,
         focus=focus,
     )
+
+
+def search_batch(
+    *,
+    queries: list[tuple[str, str] | str],
+    context: str = "",
+    focus: Literal["general", "code", "documentation", "troubleshooting"] = "general",
+) -> str:
+    """Execute multiple grounded searches concurrently and return combined results.
+
+    Queries are executed in parallel using threads for better performance.
+
+    Args:
+        queries: List of queries. Each item can be:
+                 - A string (query text, used as both query and label)
+                 - A tuple of (query, label) for custom labeling
+        context: Additional context to refine all searches (e.g., "Python async")
+        focus: Search focus mode for all queries:
+            - "general": General purpose search (default)
+            - "code": Focus on code examples and implementations
+            - "documentation": Focus on official documentation
+            - "troubleshooting": Focus on solving problems and debugging
+
+    Returns:
+        Combined formatted results with labels
+
+    Example:
+        # Simple list of queries
+        ground.search_batch(queries=["fastapi", "django", "flask"])
+
+        # With custom labels
+        ground.search_batch(queries=[
+            ("Python async best practices", "Async"),
+            ("Python type hints guide", "Types"),
+            ("Python testing frameworks", "Testing"),
+        ])
+
+        # With context and focus
+        ground.search_batch(
+            queries=["error handling", "logging", "debugging"],
+            context="Python web development",
+            focus="code"
+        )
+    """
+    # Normalize queries to (query, label) tuples
+    normalized: list[tuple[str, str]] = []
+    for item in queries:
+        if isinstance(item, str):
+            normalized.append((item, item))
+        else:
+            normalized.append(item)
+
+    with log("ground.batch", query_count=len(normalized), focus=focus) as s:
+
+        def _search_one(query: str, label: str) -> tuple[str, str]:
+            """Execute a single search and return (label, result)."""
+            result = search(
+                query=query,
+                context=context,
+                focus=focus,
+            )
+            return label, result
+
+        # Run queries concurrently using threads
+        results: dict[str, str] = {}
+        with ThreadPoolExecutor(max_workers=len(normalized)) as executor:
+            futures = {
+                executor.submit(_search_one, query, label): label
+                for query, label in normalized
+            }
+            for future in as_completed(futures):
+                label, result = future.result()
+                results[label] = result
+
+        # Format output preserving original order
+        sections = [f"=== {label} ===\n{results[label]}" for _, label in normalized]
+        output = "\n\n".join(sections)
+        s.add(outputLen=len(output))
+        return output
 
 
 def dev(

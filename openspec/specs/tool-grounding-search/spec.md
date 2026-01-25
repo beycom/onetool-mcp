@@ -26,6 +26,12 @@ The `ground.search()` function SHALL perform grounded web searches using Google 
 - **THEN** it SHALL tailor results based on focus
 - **AND** valid focus values are "general" (default), "code", "documentation", "troubleshooting"
 
+#### Scenario: Custom model
+- **GIVEN** a search query and model parameter
+- **WHEN** `ground.search(query=query, model="gemini-3.0-flash")` is called
+- **THEN** it SHALL use the specified Gemini model for grounding
+- **AND** if model is None, it SHALL use the configured default model
+
 ### Requirement: Developer Resources Search
 
 The `ground.dev()` function SHALL search for developer resources and documentation.

@@ -27,6 +27,7 @@ Web search with Google's grounding capabilities via Gemini API. Provides current
 | `query` | str | Search query |
 | `context` | str | Additional context to refine search (search only) |
 | `focus` | str | "general", "code", "documentation", "troubleshooting" (search only) |
+| `model` | str | Gemini model to use, e.g., "gemini-2.5-pro" (search only) |
 | `language` | str | Filter for dev search |
 | `framework` | str | Filter for dev search |
 | `technology` | str | Filter for docs search |
@@ -41,6 +42,9 @@ Web search with Google's grounding capabilities via Gemini API. Provides current
 ```python
 # General search with context
 ground.search(query="kubernetes pod restart policy", focus="code")
+
+# Use a specific model
+ground.search(query="latest AI news", model="gemini-3.0-flash")
 
 # Developer resources search
 ground.dev(query="async/await best practices", language="python")

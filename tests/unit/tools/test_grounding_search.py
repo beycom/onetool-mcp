@@ -205,6 +205,24 @@ class TestSearch:
 
         assert mock_grounded.call_count == 4
 
+    @patch("ot_tools.grounding_search._grounded_search")
+    def test_custom_model(self, mock_grounded):
+        mock_grounded.return_value = "results"
+
+        search(query="test query", model="gemini-3.0-flash")
+
+        call_kwargs = mock_grounded.call_args[1]
+        assert call_kwargs["model"] == "gemini-3.0-flash"
+
+    @patch("ot_tools.grounding_search._grounded_search")
+    def test_model_defaults_to_none(self, mock_grounded):
+        mock_grounded.return_value = "results"
+
+        search(query="test query")
+
+        call_kwargs = mock_grounded.call_args[1]
+        assert call_kwargs["model"] is None
+
 
 @pytest.mark.unit
 @pytest.mark.tools
