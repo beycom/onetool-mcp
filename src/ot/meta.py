@@ -152,6 +152,110 @@ def _build_tool_info(
     return tool_info
 
 
+def _schema_to_signature(full_name: str, schema: dict[str, Any]) -> str:
+    """Convert JSON Schema to Python-like signature string.
+
+    Args:
+        full_name: Full tool name (e.g., "github.search")
+        schema: JSON Schema dict with 'properties' and 'required' keys
+
+    Returns:
+        Signature string like "github.search(query: str, repo: str = '...')"
+    """
+    props = schema.get("properties", {})
+    required = set(schema.get("required", []))
+
+    if not props:
+        return f"{full_name}()"
+
+    params: list[str] = []
+    # Process required params first, then optional
+    for prop_name in sorted(props.keys(), key=lambda k: (k not in required, k)):
+        prop_def = props[prop_name]
+        prop_type = prop_def.get("type", "Any")
+
+        # Map JSON Schema types to Python-like types
+        type_map = {
+            "string": "str",
+            "integer": "int",
+            "number": "float",
+            "boolean": "bool",
+            "array": "list",
+            "object": "dict",
+        }
+        py_type = type_map.get(prop_type, prop_type)
+
+        if prop_name in required:
+            params.append(f"{prop_name}: {py_type}")
+        else:
+            default = prop_def.get("default")
+            if default is not None:
+                params.append(f"{prop_name}: {py_type} = {default!r}")
+            else:
+                params.append(f"{prop_name}: {py_type} = ...")
+
+    return f"{full_name}({', '.join(params)})"
+
+
+def _parse_input_schema(schema: dict[str, Any]) -> list[str]:
+    """Extract argument descriptions from JSON Schema properties.
+
+    Args:
+        schema: JSON Schema dict with 'properties' key
+
+    Returns:
+        List of "param_name: description" strings matching local tool format
+    """
+    props = schema.get("properties", {})
+    required = set(schema.get("required", []))
+
+    args: list[str] = []
+    # Process required params first, then optional
+    for prop_name in sorted(props.keys(), key=lambda k: (k not in required, k)):
+        prop_def = props[prop_name]
+        description = prop_def.get("description", "(no description)")
+        args.append(f"{prop_name}: {description}")
+
+    return args
+
+
+def _build_proxy_tool_info(
+    full_name: str,
+    description: str,
+    input_schema: dict[str, Any],
+    source: str,
+    compact: bool,
+) -> dict[str, Any]:
+    """Build tool info dict for a proxy tool using its input schema.
+
+    Args:
+        full_name: Full tool name (e.g., "github.search")
+        description: Tool description from MCP server
+        input_schema: JSON Schema for tool input
+        source: Source identifier (e.g., "proxy:github")
+        compact: If True, return only name and description
+
+    Returns:
+        Tool info dict matching local tool format
+    """
+    if compact:
+        return {"name": full_name, "description": description}
+
+    tool_info: dict[str, Any] = {
+        "name": full_name,
+        "signature": _schema_to_signature(full_name, input_schema),
+        "description": description,
+    }
+
+    # Include args if schema has properties with descriptions
+    args = _parse_input_schema(input_schema)
+    if args:
+        tool_info["args"] = args
+
+    tool_info["source"] = source
+    return tool_info
+
+
 def tools(
     *,
     name: str = "",
@@ -218,12 +322,13 @@ def tools(
                 if proxy_tool.name == func_name:
                     s.add("found", True)
                     s.add("source", f"proxy:{pack_name}")
-                    return {
-                        "name": name,
-                        "signature": f"{name}(...)",
-                        "description": proxy_tool.description or "",
-                        "source": f"proxy:{pack_name}",
-                    }
+                    return _build_proxy_tool_info(
+                        name,
+                        proxy_tool.description or "",
+                        proxy_tool.input_schema,
+                        f"proxy:{pack_name}",
+                        compact,
+                    )
 
             # Not found
             local_packs = set(runner_registry.packs.keys())
@@ -266,22 +371,15 @@ def tools(
             if pattern and pattern.lower() not in tool_name.lower():
                 continue
 
-            if compact:
-                tools_list.append(
-                    {
-                        "name": tool_name,
-                        "description": proxy_tool.description or "",
-                    }
+            tools_list.append(
+                _build_proxy_tool_info(
+                    tool_name,
+                    proxy_tool.description or "",
+                    proxy_tool.input_schema,
+                    f"proxy:{proxy_tool.server}",
+                    compact,
                 )
-            else:
-                tools_list.append(
-                    {
-                        "name": tool_name,
-                        "signature": f"{tool_name}(...)",
-                        "description": proxy_tool.description or "",
-                        "source": f"proxy:{proxy_tool.server}",
-                    }
-                )
+            )
 
         tools_list.sort(key=lambda t: t["name"])
         s.add("count", len(tools_list))

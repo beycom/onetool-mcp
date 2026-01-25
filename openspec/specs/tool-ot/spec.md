@@ -48,7 +48,19 @@ The `ot.tools()` function SHALL list all available tools with optional filtering
 - {name: demo.foo, signature: "demo.foo(text)", description: "Demo function", source: local}
 ```
 
----
+#### Scenario: Proxy tool signature from schema
+- **GIVEN** a proxy MCP server with tools exposing `inputSchema`
+- **WHEN** `ot.tools()` lists proxy tools
+- **THEN** signature SHALL be derived from schema properties (e.g., `github.search(query: str, repo: str = '...')`)
+- **AND** required parameters SHALL appear without defaults
+- **AND** optional parameters SHALL show default values or `'...'` placeholder
+
+#### Scenario: Proxy tool arguments from schema
+- **GIVEN** a proxy tool with `inputSchema` containing property descriptions
+- **WHEN** `ot.tools(name="github.search")` is called (non-compact)
+- **THEN** the response SHALL include an `args` field
+- **AND** args SHALL be a list of `"param_name: description"` strings extracted from schema
+- **AND** format SHALL match local tool args output
 
 ### Requirement: Configuration Summary
 
@@ -265,3 +277,4 @@ body: |
 results = brave.search(query="Python", count=5)
 llm.transform(input=results, prompt="Extract key findings")
 ```
+

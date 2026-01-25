@@ -514,3 +514,227 @@ def test_packs_with_config_instructions(
     # Should include configured instructions
     assert "Custom brave instructions" in result
     assert "brave.search()" in result
+
+
+# ============================================================================
+# Schema Helper Tests
+# ============================================================================
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_schema_to_signature_empty_schema() -> None:
+    """Verify _schema_to_signature handles empty schema."""
+    from ot.meta import _schema_to_signature
+
+    result = _schema_to_signature("github.search", {})
+    assert result == "github.search()"
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_schema_to_signature_required_params() -> None:
+    """Verify _schema_to_signature handles required parameters."""
+    from ot.meta import _schema_to_signature
+
+    schema = {
+        "properties": {
+            "query": {"type": "string"},
+            "count": {"type": "integer"},
+        },
+        "required": ["query", "count"],
+    }
+    result = _schema_to_signature("github.search", schema)
+    assert result == "github.search(count: int, query: str)"
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_schema_to_signature_optional_params_with_defaults() -> None:
+    """Verify _schema_to_signature handles optional params with defaults."""
+    from ot.meta import _schema_to_signature
+
+    schema = {
+        "properties": {
+            "query": {"type": "string"},
+            "limit": {"type": "integer", "default": 10},
+        },
+        "required": ["query"],
+    }
+    result = _schema_to_signature("github.search", schema)
+    assert result == "github.search(query: str, limit: int = 10)"
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_schema_to_signature_optional_params_no_defaults() -> None:
+    """Verify _schema_to_signature uses ellipsis for optional params without defaults."""
+    from ot.meta import _schema_to_signature
+
+    schema = {
+        "properties": {
+            "query": {"type": "string"},
+            "repo": {"type": "string"},
+        },
+        "required": ["query"],
+    }
+    result = _schema_to_signature("github.search", schema)
+    assert result == "github.search(query: str, repo: str = ...)"
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_schema_to_signature_type_mapping() -> None:
+    """Verify _schema_to_signature maps JSON Schema types to Python types."""
+    from ot.meta import _schema_to_signature
+
+    schema = {
+        "properties": {
+            "text": {"type": "string"},
+            "count": {"type": "integer"},
+            "score": {"type": "number"},
+            "enabled": {"type": "boolean"},
+            "items": {"type": "array"},
+            "data": {"type": "object"},
+        },
+        "required": ["text", "count", "score", "enabled", "items", "data"],
+    }
+    result = _schema_to_signature("test.func", schema)
+    assert "text: str" in result
+    assert "count: int" in result
+    assert "score: float" in result
+    assert "enabled: bool" in result
+    assert "items: list" in result
+    assert "data: dict" in result
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_parse_input_schema_extracts_descriptions() -> None:
+    """Verify _parse_input_schema extracts argument descriptions."""
+    from ot.meta import _parse_input_schema
+
+    schema = {
+        "properties": {
+            "query": {"type": "string", "description": "Search query string"},
+            "limit": {"type": "integer", "description": "Maximum results to return"},
+        },
+        "required": ["query"],
+    }
+    result = _parse_input_schema(schema)
+    assert "query: Search query string" in result
+    assert "limit: Maximum results to return" in result
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_parse_input_schema_missing_description() -> None:
+    """Verify _parse_input_schema handles missing descriptions."""
+    from ot.meta import _parse_input_schema
+
+    schema = {
+        "properties": {
+            "query": {"type": "string"},
+        },
+        "required": ["query"],
+    }
+    result = _parse_input_schema(schema)
+    assert "query: (no description)" in result
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_parse_input_schema_empty() -> None:
+    """Verify _parse_input_schema handles empty schema."""
+    from ot.meta import _parse_input_schema
+
+    result = _parse_input_schema({})
+    assert result == []
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_build_proxy_tool_info_compact() -> None:
+    """Verify _build_proxy_tool_info returns compact format."""
+    from ot.meta import _build_proxy_tool_info
+
+    result = _build_proxy_tool_info(
+        "github.search",
+        "Search GitHub",
+        {"properties": {"query": {"type": "string"}}},
+        "proxy:github",
+        compact=True,
+    )
+    assert result == {"name": "github.search", "description": "Search GitHub"}
+    assert "signature" not in result
+    assert "args" not in result
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_build_proxy_tool_info_full() -> None:
+    """Verify _build_proxy_tool_info returns full format with schema-derived info."""
+    from ot.meta import _build_proxy_tool_info
+
+    schema = {
+        "properties": {
+            "query": {"type": "string", "description": "Search query"},
+            "limit": {"type": "integer", "default": 10, "description": "Max results"},
+        },
+        "required": ["query"],
+    }
+    result = _build_proxy_tool_info(
+        "github.search",
+        "Search GitHub repositories",
+        schema,
+        "proxy:github",
+        compact=False,
+    )
+    assert result["name"] == "github.search"
+    assert result["description"] == "Search GitHub repositories"
+    assert result["source"] == "proxy:github"
+    assert "query: str" in result["signature"]
+    assert "limit: int = 10" in result["signature"]
+    assert "query: Search query" in result["args"]
+    assert "limit: Max results" in result["args"]
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_tools_proxy_returns_enriched_info(mock_proxy_manager: MagicMock) -> None:
+    """Verify ot.tools() returns enriched info for proxy tools."""
+    from unittest.mock import patch
+
+    from ot.meta import tools
+
+    # Create mock proxy tool with input schema
+    mock_tools = [
+        ProxyToolInfo(
+            server="github",
+            name="search",
+            description="Search GitHub code",
+            input_schema={
+                "properties": {
+                    "query": {"type": "string", "description": "Search query"},
+                    "repo": {"type": "string", "description": "Repository name"},
+                },
+                "required": ["query"],
+            },
+        ),
+    ]
+
+    mock_proxy_manager.list_tools.return_value = mock_tools
+    mock_proxy_manager.servers = ["github"]
+
+    with patch("ot.meta.get_proxy_manager", return_value=mock_proxy_manager):
+        result = tools(name="github.search")
+
+    assert isinstance(result, dict)
+    assert result["name"] == "github.search"
+    assert result["source"] == "proxy:github"
+    # Signature should be derived from schema, not just (...)
+    assert "query: str" in result["signature"]
+    assert "repo: str = ..." in result["signature"]
+    # Args should be extracted from schema descriptions
+    assert "query: Search query" in result["args"]
+    assert "repo: Repository name" in result["args"]
