@@ -17,10 +17,16 @@ The `ot.tools()` function SHALL list all available tools with optional filtering
 - **AND** each entry SHALL include: `{name, signature, description, source}`
 - **AND** source SHALL be "local" or "proxy:{server}"
 
+#### Scenario: Get specific tool by name
+- **GIVEN** a name parameter
+- **WHEN** `ot.tools(name="brave.search")` is called
+- **THEN** it SHALL return a single tool dict for that exact tool
+- **AND** return an error if the tool is not found
+
 #### Scenario: Filter by pattern
 - **GIVEN** a pattern parameter
 - **WHEN** `ot.tools(pattern="search")` is called
-- **THEN** it SHALL return only tools with names matching the pattern (case-insensitive)
+- **THEN** it SHALL return only tools with names matching the pattern (case-insensitive substring)
 
 #### Scenario: Filter by pack
 - **GIVEN** a pack parameter
@@ -89,14 +95,27 @@ proxy: {status: ok, server_count: 1, servers: {proxy_package_version: connected}
 
 ---
 
-### Requirement: Push Message
+### Requirement: Notify Message
 
-The `ot.push()` function SHALL publish messages to configured topics.
+The `ot.notify()` function SHALL publish messages to configured topics.
 
-#### Scenario: Push message
-- **WHEN** `ot.push(topic="status:scan", message="Scanning...")`
+#### Scenario: Send notification
+- **WHEN** `ot.notify(topic="notes", message="Remember to review PR #123")`
 - **THEN** the message is routed to the matching topic file
 - **AND** appended as a YAML document
+
+---
+
+### Requirement: Reload Configuration
+
+The `ot.reload()` function SHALL force reload of all configuration.
+
+#### Scenario: Reload config
+- **GIVEN** configuration files have been modified
+- **WHEN** `ot.reload()` is called
+- **THEN** it SHALL clear all cached configuration
+- **AND** reload from disk
+- **AND** return "OK: Configuration reloaded"
 
 ---
 
@@ -129,134 +148,104 @@ The tool SHALL follow [tool-conventions](../tool-conventions/spec.md) for loggin
 
 ---
 
-### Requirement: Help Tool
+### Requirement: Pack Discovery
 
-The `ot.help()` function SHALL display full documentation for a tool, including proxy tools.
+The `ot.packs()` function SHALL list packs or get detailed pack info with instructions.
 
-#### Scenario: Get local tool help
-- **GIVEN** a valid local tool name
-- **WHEN** `ot.help(tool="brave.search")` is called
-- **THEN** it SHALL return the tool's full docstring
-- **AND** include the function signature
-- **AND** include Args, Returns, and Example sections if present
+#### Scenario: List all packs
+- **GIVEN** packs are registered (local and proxy)
+- **WHEN** `ot.packs()` is called
+- **THEN** it SHALL return a list of pack summaries
+- **AND** each entry SHALL include: `{name, source, tool_count}`
+- **AND** source SHALL be "local" or "proxy"
 
-#### Scenario: Get proxy tool help
-- **GIVEN** a proxy server "github" with tool "create_issue"
-- **WHEN** `ot.help(tool="github.create_issue")` is called
-- **THEN** it SHALL return the tool's description from MCP schema
-- **AND** include parameters with types and required markers
-- **AND** include source as "proxy:github"
+#### Scenario: Get specific pack by name
+- **GIVEN** a name parameter
+- **WHEN** `ot.packs(name="brave")` is called
+- **THEN** it SHALL return detailed pack info including:
+  - Pack header with name
+  - Configured instructions (if present in prompts.yaml)
+  - List of tools in the pack with descriptions
+- **AND** return an error if the pack is not found
 
-#### Scenario: Tool not found
-- **GIVEN** an invalid tool name not in local or proxy packs
-- **WHEN** `ot.help(tool="nonexistent.tool")` is called
-- **THEN** it SHALL return an error message listing available packs
+#### Scenario: Filter by pattern
+- **GIVEN** a pattern parameter
+- **WHEN** `ot.packs(pattern="brav")` is called
+- **THEN** it SHALL return only packs with names matching the pattern (case-insensitive substring)
 
-#### Scenario: Local tool output format
-- **GIVEN** a valid local tool
-- **WHEN** help is displayed
-- **THEN** output SHALL be formatted as:
-```
-
-### Requirement: Pack Instructions
-
-The `ot.instructions()` function SHALL return usage instructions for a pack.
-
-#### Scenario: Get pack instructions from config
-- **GIVEN** prompts.yaml contains key "excel" with instructions text
-- **WHEN** `ot.instructions(pack="excel")` is called
-- **THEN** it SHALL return the configured instructions text
-
-#### Scenario: Get local pack instructions fallback
-- **GIVEN** no config override for pack "brave"
-- **AND** "brave" is a local pack
-- **WHEN** `ot.instructions(pack="brave")` is called
-- **THEN** it SHALL return aggregated docstrings from brave tools
-
-#### Scenario: Get proxy pack instructions fallback
-- **GIVEN** no config override for pack "github"
-- **AND** "github" is a proxy server
-- **WHEN** `ot.instructions(pack="github")` is called
-- **THEN** it SHALL return the MCP server_info if available
-- **OR** return a default message listing available tools
-
-#### Scenario: Unknown pack
-- **GIVEN** pack "nonexistent" is not local or proxy
-- **WHEN** `ot.instructions(pack="nonexistent")` is called
+#### Scenario: Pack not found
+- **GIVEN** an unknown pack name
+- **WHEN** `ot.packs(name="nonexistent")` is called
 - **THEN** it SHALL return an error with available packs
 
-#### Scenario: Logging
-- **GIVEN** `ot.instructions()` is called
-- **WHEN** LogSpan is created
-- **THEN** span name SHALL be `ot.instructions`
+#### Scenario: Pack with configured instructions
+- **GIVEN** prompts.yaml contains instructions for pack "excel"
+- **WHEN** `ot.packs(name="excel")` is called
+- **THEN** it SHALL include the configured instructions text
 
-## brave.search
-
-Search the web using Brave Search API.
-
-**Signature**: brave.search(*, query: str, count: int = 10)
-
-**Args**:
-- query: Search query (max 400 chars)
-- count: Number of results (1-20, default: 10)
-
-**Returns**: YAML flow style search results
-
-**Example**:
-brave.search(query="Python async patterns", count=5)
-```
+#### Scenario: Proxy pack
+- **GIVEN** a proxy server "github" is configured
+- **WHEN** `ot.packs(name="github")` is called
+- **THEN** it SHALL list tools from the proxy server
+- **AND** show source as "proxy"
 
 ---
 
 ### Requirement: Alias Introspection
 
-The `ot.alias()` function SHALL show alias definitions.
-
-#### Scenario: Show alias
-- **GIVEN** an alias "ws" configured to "brave.web_search"
-- **WHEN** `ot.alias(name="ws")` is called
-- **THEN** it SHALL return: `ws -> brave.web_search`
-
-#### Scenario: Alias not found
-- **GIVEN** an unknown alias name
-- **WHEN** `ot.alias(name="xyz")` is called
-- **THEN** it SHALL return an error with available aliases
+The `ot.aliases()` function SHALL list aliases, filter by pattern, or get a specific alias.
 
 #### Scenario: List all aliases
 - **GIVEN** aliases are configured
-- **WHEN** `ot.alias(name="*")` is called
+- **WHEN** `ot.aliases()` is called with no arguments
 - **THEN** it SHALL return all alias mappings
+
+#### Scenario: Get specific alias by name
+- **GIVEN** an alias "ws" configured to "brave.web_search"
+- **WHEN** `ot.aliases(name="ws")` is called
+- **THEN** it SHALL return: `ws -> brave.web_search`
+
+#### Scenario: Filter by pattern
+- **GIVEN** aliases are configured
+- **WHEN** `ot.aliases(pattern="search")` is called
+- **THEN** it SHALL return only aliases where name or target matches the pattern (case-insensitive substring)
+
+#### Scenario: Alias not found
+- **GIVEN** an unknown alias name
+- **WHEN** `ot.aliases(name="xyz")` is called
+- **THEN** it SHALL return an error with available aliases
 
 ---
 
 ### Requirement: Snippet Introspection
 
-The `ot.snippet()` function SHALL show snippet definitions and previews.
+The `ot.snippets()` function SHALL list snippets, filter by pattern, or get a specific snippet definition.
 
-#### Scenario: Show snippet definition
+#### Scenario: List all snippets
+- **GIVEN** snippets are configured
+- **WHEN** `ot.snippets()` is called with no arguments
+- **THEN** it SHALL return all snippet names with descriptions
+
+#### Scenario: Get specific snippet by name
 - **GIVEN** a snippet "brv_research" is configured
-- **WHEN** `ot.snippet(name="brv_research")` is called
+- **WHEN** `ot.snippets(name="brv_research")` is called
 - **THEN** it SHALL return the snippet definition including:
   - description
   - params with types and defaults
   - body template
+- **AND** it SHALL include an example expansion with defaults
 
-#### Scenario: Show snippet preview
-- **GIVEN** a snippet with default params
-- **WHEN** `ot.snippet(name="brv_research")` is called
-- **THEN** it SHALL include an example expansion with defaults
+#### Scenario: Filter snippets by pattern
+- **GIVEN** snippets are configured
+- **WHEN** `ot.snippets(pattern="pkg")` is called
+- **THEN** it SHALL return only snippets where name or description matches the pattern (case-insensitive substring)
 
 #### Scenario: Snippet not found
 - **GIVEN** an unknown snippet name
-- **WHEN** `ot.snippet(name="xyz")` is called
+- **WHEN** `ot.snippets(name="xyz")` is called
 - **THEN** it SHALL return an error with available snippets
 
-#### Scenario: List all snippets
-- **GIVEN** snippets are configured
-- **WHEN** `ot.snippet(name="*")` is called
-- **THEN** it SHALL return all snippet names with descriptions
-
-#### Scenario: Output format
+#### Scenario: Snippet output format
 - **GIVEN** a valid snippet
 - **WHEN** definition is displayed
 - **THEN** output SHALL be formatted as:

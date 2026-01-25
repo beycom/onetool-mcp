@@ -49,3 +49,64 @@ class TestPackageLive:
         if len(result) > 0:
             # Check that we got claude models
             assert any("claude" in m.get("id", "").lower() for m in result)
+
+    def test_audit_pypi_live(self, tmp_path):
+        """Verify audit function works with real PyPI registry."""
+        from ot_tools.package import audit
+
+        # Create a minimal pyproject.toml with known packages
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text("""
+[project]
+dependencies = [
+    "requests>=2.28.0",
+    "click>=8.0.0",
+]
+""")
+
+        result = audit(path=str(tmp_path))
+
+        # Verify structure
+        assert "error" not in result, f"Got error: {result.get('error')}"
+        assert result["registry"] == "pypi"
+        assert len(result["packages"]) == 2
+        assert "summary" in result
+
+        # Verify packages have expected fields
+        for pkg in result["packages"]:
+            assert "name" in pkg
+            assert "required" in pkg
+            assert "latest" in pkg
+            assert "status" in pkg
+            assert pkg["latest"] != "unknown"  # Got real versions
+
+    def test_audit_npm_live(self, tmp_path):
+        """Verify audit function works with real npm registry."""
+        from ot_tools.package import audit
+
+        # Create a minimal package.json with known packages
+        pkg_json = tmp_path / "package.json"
+        pkg_json.write_text("""
+{
+    "dependencies": {
+        "lodash": "^4.17.0",
+        "chalk": "^5.0.0"
+    }
+}
+""")
+
+        result = audit(path=str(tmp_path))
+
+        # Verify structure
+        assert "error" not in result, f"Got error: {result.get('error')}"
+        assert result["registry"] == "npm"
+        assert len(result["packages"]) == 2
+        assert "summary" in result
+
+        # Verify packages have expected fields
+        for pkg in result["packages"]:
+            assert "name" in pkg
+            assert "required" in pkg
+            assert "latest" in pkg
+            assert "status" in pkg
+            assert pkg["latest"] != "unknown"  # Got real versions

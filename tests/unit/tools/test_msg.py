@@ -1,6 +1,6 @@
 """Unit tests for msg tool.
 
-Tests ot.push() topic routing and message formatting.
+Tests ot.notify() topic routing and message formatting.
 """
 
 from __future__ import annotations
@@ -48,15 +48,15 @@ def empty_msg_config() -> OneToolConfig:
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_push_returns_ok_with_matching_topic(msg_config: OneToolConfig) -> None:
-    """Verify push() returns OK with file path for matching topic."""
-    from ot_tools.internal import push
+def test_notify_returns_ok_with_matching_topic(msg_config: OneToolConfig) -> None:
+    """Verify notify() returns OK with file path for matching topic."""
+    from ot_tools.internal import notify
 
     with (
         patch("ot_tools.internal.get_config", return_value=msg_config),
         patch("ot_tools.internal._write_to_file"),
     ):
-        result = push(topic="status:scan", message="Scanning src/")
+        result = notify(topic="status:scan", message="Scanning src/")
 
     assert result.startswith("OK: status:scan ->")
     assert "/tmp/msg/status.yaml" in result
@@ -64,30 +64,30 @@ def test_push_returns_ok_with_matching_topic(msg_config: OneToolConfig) -> None:
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_push_returns_ok_no_match_when_no_pattern_matches(
+def test_notify_returns_ok_no_match_when_no_pattern_matches(
     empty_msg_config: OneToolConfig,
 ) -> None:
-    """Verify push() returns 'OK: no matching topic' when no pattern matches."""
-    from ot_tools.internal import push
+    """Verify notify() returns 'OK: no matching topic' when no pattern matches."""
+    from ot_tools.internal import notify
 
     with patch("ot_tools.internal.get_config", return_value=empty_msg_config):
-        result = push(topic="unknown:topic", message="test")
+        result = notify(topic="unknown:topic", message="test")
 
     assert result == "OK: no matching topic"
 
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_push_uses_first_matching_pattern(msg_config: OneToolConfig) -> None:
-    """Verify push() uses first matching pattern (status:* before *)."""
-    from ot_tools.internal import push
+def test_notify_uses_first_matching_pattern(msg_config: OneToolConfig) -> None:
+    """Verify notify() uses first matching pattern (status:* before *)."""
+    from ot_tools.internal import notify
 
     with (
         patch("ot_tools.internal.get_config", return_value=msg_config),
         patch("ot_tools.internal._write_to_file"),
     ):
         # status:scan should match status:* not *
-        result = push(topic="status:scan", message="test")
+        result = notify(topic="status:scan", message="test")
 
     assert "status.yaml" in result
     assert "default.yaml" not in result
@@ -95,16 +95,16 @@ def test_push_uses_first_matching_pattern(msg_config: OneToolConfig) -> None:
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_push_falls_through_to_catchall(msg_config: OneToolConfig) -> None:
-    """Verify push() falls through to catchall pattern."""
-    from ot_tools.internal import push
+def test_notify_falls_through_to_catchall(msg_config: OneToolConfig) -> None:
+    """Verify notify() falls through to catchall pattern."""
+    from ot_tools.internal import notify
 
     with (
         patch("ot_tools.internal.get_config", return_value=msg_config),
         patch("ot_tools.internal._write_to_file"),
     ):
         # other:topic should match * catchall
-        result = push(topic="other:topic", message="test")
+        result = notify(topic="other:topic", message="test")
 
     assert "default.yaml" in result
 

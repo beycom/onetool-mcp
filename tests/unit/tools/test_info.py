@@ -133,11 +133,53 @@ def test_tools_pack_filter() -> None:
 
     # Should only have ot pack tools
     assert any(name == "ot.tools" for name in tool_names)
+    assert any(name == "ot.packs" for name in tool_names)
     assert any(name == "ot.health" for name in tool_names)
 
     # Should NOT have other pack tools (check actual tool names, not examples)
     assert not any(name.startswith("brave.") for name in tool_names)
     assert not any(name.startswith("page.") for name in tool_names)
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_tools_name_exact_match() -> None:
+    """Verify tools(name=...) returns a single tool by exact name."""
+    from ot_tools.internal import tools
+
+    result = tools(name="ot.tools")
+
+    # Should return a single dict, not a list
+    assert isinstance(result, dict)
+    assert result["name"] == "ot.tools"
+    assert "signature" in result
+    assert "source" in result
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_tools_name_not_found() -> None:
+    """Verify tools(name=...) returns error for unknown tool."""
+    from ot_tools.internal import tools
+
+    result = tools(name="nonexistent.tool")
+
+    assert isinstance(result, str)
+    assert "Error:" in result
+    assert "not found" in result
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_tools_name_invalid_format() -> None:
+    """Verify tools(name=...) returns error for invalid format."""
+    from ot_tools.internal import tools
+
+    result = tools(name="nopack")
+
+    assert isinstance(result, str)
+    assert "Error:" in result
+    assert "pack.function" in result
 
 
 @pytest.mark.unit
@@ -175,106 +217,159 @@ def test_config_returns_configuration() -> None:
 
 
 # ============================================================================
-# Introspection Tool Tests
+# Packs Tests
 # ============================================================================
 
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_help_with_valid_tool() -> None:
-    """Verify ot.help() returns documentation for valid tool."""
-    from ot_tools.internal import help
+def test_packs_list_all() -> None:
+    """Verify ot.packs() lists all packs."""
+    from ot_tools.internal import packs
 
-    result = help(tool="ot.tools")
+    result = packs()
 
-    # Should have formatted sections
-    assert "## ot.tools" in result
-    assert "**Signature**:" in result
-    assert "**Args**:" in result or "**Returns**:" in result
+    # Should return a list of pack dicts
+    assert isinstance(result, list)
+    assert len(result) > 0
 
+    # Should have ot pack
+    pack_names = [p["name"] for p in result]
+    assert "ot" in pack_names
+    assert "brave" in pack_names
 
-@pytest.mark.unit
-@pytest.mark.serve
-def test_help_with_invalid_format() -> None:
-    """Verify ot.help() returns error for invalid tool format."""
-    from ot_tools.internal import help
-
-    result = help(tool="nopack")
-
-    assert "Error:" in result
-    assert "pack.function" in result
+    # Each pack should have name, source, tool_count
+    for pack in result:
+        assert "name" in pack
+        assert "source" in pack
+        assert "tool_count" in pack
 
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_help_with_unknown_pack() -> None:
-    """Verify ot.help() returns error for unknown pack."""
-    from ot_tools.internal import help
+def test_packs_get_by_name() -> None:
+    """Verify ot.packs(name=...) returns detailed pack info."""
+    from ot_tools.internal import packs
 
-    result = help(tool="nonexistent.function")
+    result = packs(name="ot")
 
+    # Should return formatted string with pack info
+    assert isinstance(result, str)
+    assert "# ot pack" in result
+    assert "## Tools" in result
+    assert "ot.tools" in result
+    assert "ot.packs" in result
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_packs_pattern_filter() -> None:
+    """Verify ot.packs() filters by pattern."""
+    from ot_tools.internal import packs
+
+    result = packs(pattern="brav")
+
+    # Should return filtered list
+    assert isinstance(result, list)
+    pack_names = [p["name"] for p in result]
+    assert "brave" in pack_names
+    assert "ot" not in pack_names
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_packs_not_found() -> None:
+    """Verify ot.packs() returns error for unknown pack."""
+    from ot_tools.internal import packs
+
+    result = packs(name="nonexistent")
+
+    assert isinstance(result, str)
     assert "Error:" in result
-    assert "Pack" in result
     assert "not found" in result
 
 
-@pytest.mark.unit
-@pytest.mark.serve
-def test_help_with_unknown_function() -> None:
-    """Verify ot.help() returns error for unknown function."""
-    from ot_tools.internal import help
-
-    result = help(tool="ot.nonexistent")
-
-    assert "Error:" in result
-    assert "not in ot" in result
+# ============================================================================
+# Reload Tests
+# ============================================================================
 
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_alias_with_valid_alias(override_config: Any) -> None:
-    """Verify ot.alias() returns mapping for valid alias."""
-    from ot_tools.internal import alias
+def test_reload_clears_config() -> None:
+    """Verify ot.reload() clears and reloads configuration."""
+    from ot_tools.internal import reload
+
+    result = reload()
+
+    assert "OK" in result
+    assert "reloaded" in result.lower()
+
+
+# ============================================================================
+# Aliases and Snippets Tests
+# ============================================================================
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_aliases_with_valid_alias(override_config: Any) -> None:
+    """Verify ot.aliases() returns mapping for valid alias."""
+    from ot_tools.internal import aliases
 
     with override_config(
         OneToolConfig(alias={"ws": "brave.web_search", "gs": "ground.search"})
     ):
-        result = alias(name="ws")
+        result = aliases(name="ws")
         assert "ws -> brave.web_search" in result
 
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_alias_with_star(override_config: Any) -> None:
-    """Verify ot.alias(name='*') lists all aliases."""
-    from ot_tools.internal import alias
+def test_aliases_list_all(override_config: Any) -> None:
+    """Verify ot.aliases() lists all aliases when called with no args."""
+    from ot_tools.internal import aliases
 
     with override_config(
         OneToolConfig(alias={"ws": "brave.web_search", "gs": "ground.search"})
     ):
-        result = alias(name="*")
+        result = aliases()
         assert "ws -> brave.web_search" in result
         assert "gs -> ground.search" in result
 
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_alias_not_found(override_config: Any) -> None:
-    """Verify ot.alias() returns error for unknown alias."""
-    from ot_tools.internal import alias
+def test_aliases_pattern_filter(override_config: Any) -> None:
+    """Verify ot.aliases() filters by pattern."""
+    from ot_tools.internal import aliases
+
+    with override_config(
+        OneToolConfig(alias={"ws": "brave.web_search", "gs": "ground.search"})
+    ):
+        result = aliases(pattern="brave")
+        assert "ws -> brave.web_search" in result
+        assert "gs -> ground.search" not in result
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_aliases_not_found(override_config: Any) -> None:
+    """Verify ot.aliases() returns error for unknown alias."""
+    from ot_tools.internal import aliases
 
     with override_config(OneToolConfig(alias={"ws": "brave.web_search"})):
-        result = alias(name="unknown")
+        result = aliases(name="unknown")
         assert "Error:" in result
         assert "not found" in result
 
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_snippet_with_valid_snippet(override_config: Any) -> None:
-    """Verify ot.snippet() returns definition for valid snippet."""
+def test_snippets_with_valid_snippet(override_config: Any) -> None:
+    """Verify ot.snippets() returns definition for valid snippet."""
     from ot.config import SnippetDef
-    from ot_tools.internal import snippet
+    from ot_tools.internal import snippets
 
     with override_config(
         OneToolConfig(
@@ -286,7 +381,7 @@ def test_snippet_with_valid_snippet(override_config: Any) -> None:
             }
         )
     ):
-        result = snippet(name="test_snip")
+        result = snippets(name="test_snip")
         assert "name: test_snip" in result
         assert "description: Test snippet" in result
         assert "body:" in result
@@ -295,10 +390,10 @@ def test_snippet_with_valid_snippet(override_config: Any) -> None:
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_snippet_with_star(override_config: Any) -> None:
-    """Verify ot.snippet(name='*') lists all snippets."""
+def test_snippets_list_all(override_config: Any) -> None:
+    """Verify ot.snippets() lists all snippets when called with no args."""
     from ot.config import SnippetDef
-    from ot_tools.internal import snippet
+    from ot_tools.internal import snippets
 
     with override_config(
         OneToolConfig(
@@ -308,146 +403,58 @@ def test_snippet_with_star(override_config: Any) -> None:
             }
         )
     ):
-        result = snippet(name="*")
+        result = snippets()
         assert "snip1: First snippet" in result
         assert "snip2: Second snippet" in result
 
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_snippet_not_found(override_config: Any) -> None:
-    """Verify ot.snippet() returns error for unknown snippet."""
+def test_snippets_pattern_filter(override_config: Any) -> None:
+    """Verify ot.snippets() filters by pattern."""
     from ot.config import SnippetDef
-    from ot_tools.internal import snippet
+    from ot_tools.internal import snippets
+
+    with override_config(
+        OneToolConfig(
+            snippets={
+                "pkg_pypi": SnippetDef(description="Check PyPI packages", body="one()"),
+                "pkg_npm": SnippetDef(description="Check NPM packages", body="two()"),
+                "search_web": SnippetDef(description="Search web", body="three()"),
+            }
+        )
+    ):
+        result = snippets(pattern="pkg")
+        assert "pkg_pypi" in result
+        assert "pkg_npm" in result
+        assert "search_web" not in result
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_snippets_not_found(override_config: Any) -> None:
+    """Verify ot.snippets() returns error for unknown snippet."""
+    from ot.config import SnippetDef
+    from ot_tools.internal import snippets
 
     with override_config(OneToolConfig(snippets={"known": SnippetDef(body="demo()")})):
-        result = snippet(name="unknown")
+        result = snippets(name="unknown")
         assert "Error:" in result
         assert "not found" in result
 
 
 # ============================================================================
-# Proxy Tool Help Tests
+# Proxy Pack Tests
 # ============================================================================
 
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_help_with_proxy_tool(mock_proxy_manager: MagicMock) -> None:
-    """Verify ot.help() returns documentation for proxy tools."""
+def test_packs_with_proxy(mock_proxy_manager: MagicMock) -> None:
+    """Verify ot.packs() includes proxy packs."""
     from unittest.mock import patch
 
-    from ot_tools.internal import help
-
-    # Create mock proxy tool
-    mock_tool = ProxyToolInfo(
-        server="github",
-        name="create_issue",
-        description="Create a new issue in a repository.",
-        input_schema={
-            "type": "object",
-            "properties": {
-                "repo": {"type": "string", "description": "Repository name"},
-                "title": {"type": "string", "description": "Issue title"},
-                "body": {"type": "string", "description": "Issue body"},
-            },
-            "required": ["repo", "title"],
-        },
-    )
-
-    mock_proxy_manager.list_tools.return_value = [mock_tool]
-    mock_proxy_manager.servers = ["github"]
-
-    with patch("ot_tools.internal.get_proxy_manager", return_value=mock_proxy_manager):
-        result = help(tool="github.create_issue")
-
-    # Should have proxy tool help format
-    assert "## github.create_issue" in result
-    assert "Create a new issue" in result
-    assert "**Parameters**:" in result
-    assert "repo:" in result
-    assert "(required)" in result
-    assert "**Source**: proxy:github" in result
-
-
-@pytest.mark.unit
-@pytest.mark.serve
-def test_help_proxy_tool_not_found(mock_proxy_manager: MagicMock) -> None:
-    """Verify ot.help() returns error when proxy tool not found."""
-    from unittest.mock import patch
-
-    from ot_tools.internal import help
-
-    mock_tool = ProxyToolInfo(
-        server="github",
-        name="list_repos",
-        description="List repositories",
-        input_schema={},
-    )
-
-    mock_proxy_manager.list_tools.return_value = [mock_tool]
-    mock_proxy_manager.servers = ["github"]
-
-    with patch("ot_tools.internal.get_proxy_manager", return_value=mock_proxy_manager):
-        result = help(tool="github.nonexistent")
-
-    assert "Error:" in result
-    assert "nonexistent" in result
-    assert "list_repos" in result  # Should list available tools
-
-
-# ============================================================================
-# Instructions Tests
-# ============================================================================
-
-
-@pytest.mark.unit
-@pytest.mark.serve
-def test_instructions_with_config_override(override_prompts: Any) -> None:
-    """Verify ot.instructions() returns config override when present."""
-    from ot_tools.internal import instructions
-
-    with override_prompts(
-        PromptsConfig(
-            instructions="Main instructions",
-            packs={
-                "brave": "Custom brave instructions from config.\nUse brave.search() for web search."
-            },
-        )
-    ):
-        result = instructions(pack="brave")
-        assert "Custom brave instructions" in result
-        assert "brave.search()" in result
-
-
-@pytest.mark.unit
-@pytest.mark.serve
-def test_instructions_fallback_local(override_prompts: Any) -> None:
-    """Verify ot.instructions() falls back to docstrings for local pack."""
-    from ot_tools.internal import instructions
-
-    with override_prompts(
-        PromptsConfig(
-            instructions="Main instructions",
-            packs={},  # No override for ot pack
-        )
-    ):
-        result = instructions(pack="ot")
-        # Should generate from docstrings
-        assert "# ot pack" in result
-        assert "ot.tools" in result
-        assert "ot.help" in result
-
-
-@pytest.mark.unit
-@pytest.mark.serve
-def test_instructions_fallback_proxy(
-    override_prompts: Any, mock_proxy_manager: MagicMock
-) -> None:
-    """Verify ot.instructions() falls back to tool list for proxy pack."""
-    from unittest.mock import patch
-
-    from ot_tools.internal import instructions
+    from ot_tools.internal import packs
 
     # Create mock proxy tools
     mock_tools = [
@@ -468,36 +475,42 @@ def test_instructions_fallback_proxy(
     mock_proxy_manager.list_tools.return_value = mock_tools
     mock_proxy_manager.servers = ["github"]
 
+    with patch("ot_tools.internal.get_proxy_manager", return_value=mock_proxy_manager):
+        result = packs(name="github")
+
+    # Should generate from proxy tool list
+    assert isinstance(result, str)
+    assert "# github pack" in result
+    assert "github.create_issue" in result
+    assert "github.list_repos" in result
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_packs_with_config_instructions(
+    override_prompts: Any, mock_proxy_manager: MagicMock
+) -> None:
+    """Verify ot.packs() includes configured instructions."""
+    from unittest.mock import patch
+
+    from ot_tools.internal import packs
+
+    mock_proxy_manager.list_tools.return_value = []
+    mock_proxy_manager.servers = []
+
     with override_prompts(
         PromptsConfig(
             instructions="Main instructions",
-            packs={},  # No override
+            packs={
+                "brave": "Custom brave instructions from config.\nUse brave.search() for web search."
+            },
         )
     ):
         with patch(
             "ot_tools.internal.get_proxy_manager", return_value=mock_proxy_manager
         ):
-            result = instructions(pack="github")
+            result = packs(name="brave")
 
-        # Should generate from proxy tool list
-        assert "# github pack (proxy)" in result
-        assert "github.create_issue" in result
-        assert "github.list_repos" in result
-
-
-@pytest.mark.unit
-@pytest.mark.serve
-def test_instructions_unknown_pack(mock_proxy_manager: MagicMock) -> None:
-    """Verify ot.instructions() returns error for unknown pack."""
-    from unittest.mock import patch
-
-    from ot_tools.internal import instructions
-
-    mock_proxy_manager.servers = []
-
-    with patch("ot_tools.internal.get_proxy_manager", return_value=mock_proxy_manager):
-        result = instructions(pack="nonexistent")
-
-    assert "Error:" in result
-    assert "Pack" in result
-    assert "not found" in result
+    # Should include configured instructions
+    assert "Custom brave instructions" in result
+    assert "brave.search()" in result

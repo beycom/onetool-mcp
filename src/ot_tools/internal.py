@@ -4,30 +4,30 @@ Provides tool discovery and messaging under the unified `ot` pack.
 These are in-process tools with no external dependencies.
 
 Functions:
-    ot.tools() - List available tools
-    ot.push(topic, msg) - Push message to topic file
-    ot.config() - Show configuration
+    ot.tools() - List or get tools with full documentation
+    ot.packs() - List or get packs with instructions
+    ot.aliases() - List or get alias definitions
+    ot.snippets() - List or get snippet definitions
+    ot.config() - Show configuration summary
     ot.health() - Check system health
-    ot.help(tool) - Get full documentation for a tool
-    ot.instructions(pack) - Get usage instructions for a pack
-    ot.alias(name) - Show alias definition
-    ot.snippet(name) - Show snippet definition
-    ot.stats() - Get runtime statistics for OneTool usage
+    ot.stats() - Get runtime statistics
+    ot.notify() - Publish message to topic
+    ot.reload() - Force configuration reload
 """
 
 from __future__ import annotations
 
-# Pack for dot notation: ot.tools(), ot.push(), etc.
+# Pack for dot notation: ot.tools(), ot.packs(), etc.
 pack = "ot"
 
 __all__ = [
-    "alias",
+    "aliases",
     "config",
     "health",
-    "help",
-    "instructions",
-    "push",
-    "snippet",
+    "notify",
+    "packs",
+    "reload",
+    "snippets",
     "stats",
     "tools",
 ]
@@ -91,36 +91,122 @@ def _parse_docstring(doc: str | None) -> dict[str, Any]:
     }
 
 
+def _build_tool_info(
+    full_name: str, func: Any, source: str, compact: bool
+) -> dict[str, Any]:
+    """Build tool info dict for a single tool.
+
+    When compact=False, includes full documentation (args, returns, example).
+    """
+    if func:
+        try:
+            sig = inspect.signature(func)
+            signature = f"{full_name}{sig}"
+        except (ValueError, TypeError):
+            signature = f"{full_name}(...)"
+        parsed = _parse_docstring(func.__doc__)
+        description = parsed["short"]
+    else:
+        signature = f"{full_name}(...)"
+        description = ""
+        parsed = _parse_docstring(None)
+
+    if compact:
+        return {"name": full_name, "description": description}
+
+    tool_info: dict[str, Any] = {
+        "name": full_name,
+        "signature": signature,
+        "description": description,
+    }
+    # Include full documentation for LLM context
+    if parsed["args"]:
+        tool_info["args"] = parsed["args"]
+    if parsed["returns"]:
+        tool_info["returns"] = parsed["returns"]
+    if parsed["example"]:
+        tool_info["example"] = parsed["example"]
+    tool_info["source"] = source
+    return tool_info
+
+
 def tools(
     *,
+    name: str = "",
     pattern: str = "",
     pack: str = "",
     compact: bool = False,
-) -> list[dict[str, Any]]:
-    """List all available tools with optional filtering.
+) -> list[dict[str, Any]] | dict[str, Any] | str:
+    """List all available tools with optional filtering, or get a specific tool.
 
     Lists registered local tools and proxied MCP server tools.
-    Use pattern for name matching or pack to filter by pack.
+    Use name for exact match, pattern for substring filtering, or pack to filter by pack.
 
     Args:
+        name: Get specific tool by exact name (e.g., "brave.search")
         pattern: Filter tools by name pattern (case-insensitive substring match)
         pack: Filter tools by pack (e.g., "brave", "ot")
         compact: If True, return only name and short description (default: False)
 
     Returns:
-        List of tool dicts with name, signature, description, source
+        Single tool dict if name specified, otherwise list of tool dicts
 
     Example:
         ot.tools()
+        ot.tools(name="brave.search")
         ot.tools(pattern="search")
         ot.tools(pack="brave")
         ot.tools(compact=True)
     """
     with log(
-        "ot.tools", pattern=pattern or None, pack=pack or None, compact=compact
+        "ot.tools", toolName=name or None, pattern=pattern or None, pack=pack or None, compact=compact
     ) as s:
         runner_registry = load_tool_registry()
         proxy = get_proxy_manager()
+
+        # If specific name requested, find and return just that tool
+        if name:
+            from ot.executor.worker_proxy import WorkerPackProxy
+
+            if "." not in name:
+                s.add("error", "invalid_format")
+                return f"Error: Use pack.function format (e.g., brave.search). Got: {name}"
+
+            pack_name, func_name = name.rsplit(".", 1)
+
+            # Check local registry
+            if pack_name in runner_registry.packs:
+                pack_funcs = runner_registry.packs[pack_name]
+                if isinstance(pack_funcs, WorkerPackProxy):
+                    if func_name in pack_funcs.functions:
+                        func = getattr(pack_funcs, func_name)
+                        s.add("found", True)
+                        s.add("source", "local")
+                        return _build_tool_info(f"{pack_name}.{func_name}", func, "local", compact)
+                elif func_name in pack_funcs:
+                    func = pack_funcs[func_name]
+                    s.add("found", True)
+                    s.add("source", "local")
+                    return _build_tool_info(f"{pack_name}.{func_name}", func, "local", compact)
+
+            # Check proxy tools
+            for proxy_tool in proxy.list_tools(server=pack_name):
+                if proxy_tool.name == func_name:
+                    s.add("found", True)
+                    s.add("source", f"proxy:{pack_name}")
+                    return {
+                        "name": name,
+                        "signature": f"{name}(...)",
+                        "description": proxy_tool.description or "",
+                        "source": f"proxy:{pack_name}",
+                    }
+
+            # Not found
+            local_packs = set(runner_registry.packs.keys())
+            proxy_packs = set(proxy.servers)
+            all_packs = sorted(local_packs | proxy_packs)
+            s.add("error", "not_found")
+            return f"Error: Tool '{name}' not found. Available packs: {', '.join(all_packs)}"
 
         tools_list: list[dict[str, Any]] = []
 
@@ -134,7 +220,7 @@ def tools(
             # Handle both dict and WorkerPackProxy
             if isinstance(pack_funcs, WorkerPackProxy):
                 func_names = list(pack_funcs.functions)
-                func_items = [(name, getattr(pack_funcs, name)) for name in func_names]
+                func_items = [(n, getattr(pack_funcs, n)) for n in func_names]
             else:
                 func_items = list(pack_funcs.items())
 
@@ -144,33 +230,7 @@ def tools(
                 if pattern and pattern.lower() not in full_name.lower():
                     continue
 
-                if func:
-                    try:
-                        sig = inspect.signature(func)
-                        signature = f"{full_name}{sig}"
-                    except (ValueError, TypeError):
-                        signature = f"{full_name}(...)"
-                    parsed = _parse_docstring(func.__doc__)
-                    description = parsed["short"]
-                else:
-                    signature = f"{full_name}(...)"
-                    description = ""
-                    parsed = _parse_docstring(None)
-
-                if compact:
-                    tools_list.append({"name": full_name, "description": description})
-                else:
-                    tool_info: dict[str, Any] = {
-                        "name": full_name,
-                        "signature": signature,
-                        "description": description,
-                    }
-                    if parsed["example"]:
-                        tool_info["example"] = parsed["example"]
-                    if parsed["returns"]:
-                        tool_info["returns"] = parsed["returns"]
-                    tool_info["source"] = "local"
-                    tools_list.append(tool_info)
+                tools_list.append(_build_tool_info(full_name, func, "local", compact))
 
         # Proxied tools
         for proxy_tool in proxy.list_tools():
@@ -202,6 +262,121 @@ def tools(
         tools_list.sort(key=lambda t: t["name"])
         s.add("count", len(tools_list))
         return tools_list
+
+
+def packs(
+    *,
+    name: str = "",
+    pattern: str = "",
+) -> list[dict[str, Any]] | str:
+    """List all packs or get detailed pack info with instructions.
+
+    With no arguments, lists all available packs (local and proxy).
+    Use name to get detailed pack info including instructions.
+    Use pattern for substring filtering.
+
+    Args:
+        name: Get specific pack by exact name (e.g., "brave")
+        pattern: Filter packs by name pattern (case-insensitive substring)
+
+    Returns:
+        List of pack summaries, or detailed pack info with instructions
+
+    Example:
+        ot.packs()
+        ot.packs(name="brave")
+        ot.packs(pattern="search")
+    """
+    from ot.prompts import PromptsError, get_pack_instructions, get_prompts
+
+    with log("ot.packs", packName=name or None, pattern=pattern or None) as s:
+        runner_registry = load_tool_registry()
+        proxy = get_proxy_manager()
+
+        # Collect all packs
+        local_packs = set(runner_registry.packs.keys())
+        proxy_packs = set(proxy.servers)
+        all_pack_names = sorted(local_packs | proxy_packs)
+
+        # Get specific pack by name
+        if name:
+            if name not in (local_packs | proxy_packs):
+                s.add("error", "not_found")
+                return f"Error: Pack '{name}' not found. Available: {', '.join(all_pack_names)}"
+
+            s.add("found", True)
+            is_local = name in local_packs
+            s.add("source", "local" if is_local else "proxy")
+
+            # Build detailed pack info
+            lines = [f"# {name} pack", ""]
+
+            # Get instructions
+            try:
+                prompts_config = get_prompts()
+                configured = get_pack_instructions(prompts_config, name)
+                if configured:
+                    lines.append(configured)
+                    lines.append("")
+            except PromptsError:
+                pass
+
+            # List tools in this pack
+            lines.append("## Tools")
+            lines.append("")
+
+            if is_local:
+                from ot.executor.worker_proxy import WorkerPackProxy
+
+                pack_funcs = runner_registry.packs[name]
+                if isinstance(pack_funcs, WorkerPackProxy):
+                    func_items = [(n, getattr(pack_funcs, n)) for n in pack_funcs.functions]
+                else:
+                    func_items = list(pack_funcs.items())
+
+                for func_name, func in sorted(func_items):
+                    doc = func.__doc__ or "(no description)"
+                    first_line = doc.split("\n")[0].strip()
+                    lines.append(f"- **{name}.{func_name}**: {first_line}")
+            else:
+                tools = proxy.list_tools(server=name)
+                for tool in sorted(tools, key=lambda t: t.name):
+                    desc = tool.description or "(no description)"
+                    first_line = desc.split("\n")[0].strip()
+                    lines.append(f"- **{name}.{tool.name}**: {first_line}")
+
+            return "\n".join(lines)
+
+        # List all packs (with optional pattern filter)
+        packs_list: list[dict[str, Any]] = []
+
+        for pack_name in all_pack_names:
+            if pattern and pattern.lower() not in pack_name.lower():
+                continue
+
+            is_local = pack_name in local_packs
+            source = "local" if is_local else "proxy"
+
+            # Count tools in pack
+            if is_local:
+                from ot.executor.worker_proxy import WorkerPackProxy
+
+                pack_funcs = runner_registry.packs[pack_name]
+                if isinstance(pack_funcs, WorkerPackProxy):
+                    tool_count = len(pack_funcs.functions)
+                else:
+                    tool_count = len(pack_funcs)
+            else:
+                tool_count = len(proxy.list_tools(server=pack_name))
+
+            packs_list.append({
+                "name": pack_name,
+                "source": source,
+                "tool_count": tool_count,
+            })
+
+        s.add("count", len(packs_list))
+        return packs_list
 
 
 # ============================================================================
@@ -275,23 +450,23 @@ async def _write_to_file(file_path: Path, doc: dict) -> None:
             s.add("error", str(e))
 
 
-def push(*, topic: str, message: str) -> str:
+def notify(*, topic: str, message: str) -> str:
     """Publish a message to the matching topic file.
 
     Routes the message to a YAML file based on topic pattern matching
     configured in ot-serve.yaml. The write happens asynchronously.
 
     Args:
-        topic: Topic string for routing (e.g., "status:scan", "doc:api")
+        topic: Topic string for routing (e.g., "status:scan", "notes")
         message: Message content (text, can be multiline)
 
     Returns:
         "OK: <topic> -> <file>" if routed, "OK: no matching topic" if no match
 
     Example:
-        ot.push(topic="status:scan", message="Scanning src/ directory")
+        ot.notify(topic="notes", message="Remember to review PR #123")
     """
-    with log("ot.push", topic=topic) as s:
+    with log("ot.notify", topic=topic) as s:
         file_path = _match_topic_to_file(topic)
 
         if file_path is None:
@@ -411,6 +586,37 @@ def health() -> dict[str, Any]:
         return result
 
 
+def reload() -> str:
+    """Force reload of all configuration.
+
+    Clears cached configuration and reloads from disk.
+    Use after modifying config files during a session.
+
+    Returns:
+        Status message confirming reload
+
+    Example:
+        ot.reload()
+    """
+    with log("ot.reload") as s:
+        import ot.config.loader
+        import ot.prompts
+
+        # Clear config cache
+        ot.config.loader._config = None
+
+        # Clear prompts cache
+        ot.prompts._prompts = None
+
+        # Reload to validate
+        cfg = get_config()
+        s.add("aliasCount", len(cfg.alias) if cfg.alias else 0)
+        s.add("snippetCount", len(cfg.snippets) if cfg.snippets else 0)
+        s.add("serverCount", len(cfg.servers) if cfg.servers else 0)
+
+        return "OK: Configuration reloaded"
+
+
 def stats(
     *,
     period: str = "all",
@@ -500,396 +706,149 @@ def stats(
 # ============================================================================
 
 
-def help(*, tool: str) -> str:
-    """Get full documentation for a tool.
+def aliases(
+    *,
+    name: str = "",
+    pattern: str = "",
+) -> str:
+    """List aliases or get a specific alias definition.
 
-    Returns the complete docstring with signature, arguments,
-    returns, and examples. Works for both local tools and proxy tools.
+    With no arguments, lists all aliases.
+    Use name for exact match, or pattern for substring filtering.
 
     Args:
-        tool: Tool name in pack.function format (e.g., "brave.search")
+        name: Get specific alias by exact name (e.g., "ws")
+        pattern: Filter aliases by name pattern (case-insensitive substring)
 
     Returns:
-        Formatted documentation with signature, args, returns, and examples
+        Single alias mapping, filtered list, or all aliases
 
     Example:
-        ot.help(tool="ot.tools")
-        ot.help(tool="github.create_issue")
+        ot.aliases()
+        ot.aliases(name="ws")
+        ot.aliases(pattern="search")
     """
-    with log("ot.help", tool=tool) as s:
-        # Validate format
-        if "." not in tool:
-            s.add("error", "invalid_format")
-            return f"Error: Use pack.function format (e.g., brave.search). Got: {tool}"
+    with log("ot.aliases", aliasName=name or None, pattern=pattern or None) as s:
+        cfg = get_config()
 
-        pack_name, func_name = tool.rsplit(".", 1)
-        runner_registry = load_tool_registry()
-        proxy = get_proxy_manager()
+        if not cfg.alias:
+            s.add("count", 0)
+            return "No aliases configured"
 
-        # Check local registry first
-        if pack_name in runner_registry.packs:
-            pack_funcs = runner_registry.packs[pack_name]
+        # Get specific alias by name
+        if name:
+            if name not in cfg.alias:
+                available = ", ".join(sorted(cfg.alias.keys()))
+                s.add("error", "not_found")
+                return f"Error: Alias '{name}' not found. Available: {available}"
+            s.add("found", True)
+            return f"{name} -> {cfg.alias[name]}"
 
-            # Handle both dict and WorkerPackProxy
-            from ot.executor.worker_proxy import WorkerPackProxy
+        # Filter by pattern or list all
+        items = sorted(cfg.alias.items())
+        if pattern:
+            pattern_lower = pattern.lower()
+            items = [(k, v) for k, v in items if pattern_lower in k.lower() or pattern_lower in v.lower()]
 
-            if isinstance(pack_funcs, WorkerPackProxy):
-                if func_name not in pack_funcs.functions:
-                    available = ", ".join(sorted(pack_funcs.functions))
-                    s.add("error", "function_not_found")
-                    return f"Error: '{func_name}' not in {pack_name}. Available: {available}"
-                func = getattr(pack_funcs, func_name)
+        if not items:
+            s.add("count", 0)
+            return f"No aliases matching pattern '{pattern}'"
+
+        lines = [f"{k} -> {v}" for k, v in items]
+        s.add("count", len(lines))
+        return "\n".join(lines)
+
+
+def snippets(
+    *,
+    name: str = "",
+    pattern: str = "",
+) -> str:
+    """List snippets or get a specific snippet definition.
+
+    With no arguments, lists all snippets with descriptions.
+    Use name for exact match (returns full definition), or pattern for filtering.
+
+    Args:
+        name: Get specific snippet by exact name (e.g., "pkg_pypi")
+        pattern: Filter snippets by name/description pattern (case-insensitive substring)
+
+    Returns:
+        Single snippet definition, filtered list, or all snippets
+
+    Example:
+        ot.snippets()
+        ot.snippets(name="pkg_pypi")
+        ot.snippets(pattern="search")
+    """
+    with log("ot.snippets", snippetName=name or None, pattern=pattern or None) as s:
+        cfg = get_config()
+
+        if not cfg.snippets:
+            s.add("count", 0)
+            return "No snippets configured"
+
+        # Get specific snippet by name
+        if name:
+            if name not in cfg.snippets:
+                available = ", ".join(sorted(cfg.snippets.keys()))
+                s.add("error", "not_found")
+                return f"Error: Snippet '{name}' not found. Available: {available}"
+
+            snippet_def = cfg.snippets[name]
+
+            # Format output as YAML-like
+            lines = [f"name: {name}"]
+
+            if snippet_def.description:
+                lines.append(f"description: {snippet_def.description}")
+
+            if snippet_def.params:
+                lines.append("params:")
+                for param_name, param_def in snippet_def.params.items():
+                    param_parts = []
+                    if param_def.default is not None:
+                        param_parts.append(f"default: {param_def.default}")
+                    if param_def.description:
+                        param_parts.append(f'description: "{param_def.description}"')
+                    lines.append(f"  {param_name}: {{{', '.join(param_parts)}}}")
+
+            lines.append("body: |")
+            for body_line in snippet_def.body.rstrip().split("\n"):
+                lines.append(f"  {body_line}")
+
+            # Add example invocation
+            lines.append("")
+            lines.append("# Example:")
+
+            # Build example with defaults
+            example_args = []
+            for param_name, param_def in snippet_def.params.items():
+                if param_def.default is not None:
+                    continue  # Skip params with defaults in example
+                example_args.append(f'{param_name}="..."')
+
+            if example_args:
+                lines.append(f"# ${name} {' '.join(example_args)}")
             else:
-                if func_name not in pack_funcs:
-                    available = ", ".join(sorted(pack_funcs.keys()))
-                    s.add("error", "function_not_found")
-                    return f"Error: '{func_name}' not in {pack_name}. Available: {available}"
-                func = pack_funcs[func_name]
+                lines.append(f"# ${name}")
 
             s.add("found", True)
-            s.add("source", "local")
-            return _format_local_help(tool, func)
-
-        # Check proxy tools
-        proxy_tools = proxy.list_tools(server=pack_name)
-        if proxy_tools:
-            for proxy_tool in proxy_tools:
-                if proxy_tool.name == func_name:
-                    s.add("found", True)
-                    s.add("source", f"proxy:{pack_name}")
-                    return _format_proxy_help(tool, proxy_tool)
-
-            # Tool not found in this proxy server
-            available = ", ".join(sorted(t.name for t in proxy_tools))
-            s.add("error", "function_not_found")
-            return f"Error: '{func_name}' not in {pack_name}. Available: {available}"
-
-        # Pack not found in local or proxy
-        local_packs = set(runner_registry.packs.keys())
-        proxy_packs = set(proxy.servers)
-        all_packs = sorted(local_packs | proxy_packs)
-        s.add("error", "pack_not_found")
-        return f"Error: Pack '{pack_name}' not found. Available: {', '.join(all_packs)}"
-
-
-def _format_local_help(tool: str, func: Any) -> str:
-    """Format help output for a local tool."""
-    from ot.prompts import (
-        PromptsError,
-        get_prompts,
-        get_tool_description,
-        get_tool_examples,
-    )
-
-    lines = [f"## {tool}", ""]
-
-    # Parse docstring
-    parsed = _parse_docstring(func.__doc__)
-    first_line = parsed["short"] or "(no description)"
-
-    # Check prompts.yaml for description override
-    try:
-        prompts_config = get_prompts()
-        description = get_tool_description(prompts_config, tool, first_line)
-        config_examples = get_tool_examples(prompts_config, tool)
-    except PromptsError:
-        description = first_line
-        config_examples = []
-
-    lines.append(description)
-    lines.append("")
-
-    # Signature
-    try:
-        sig = inspect.signature(func)
-        lines.append(f"**Signature**: {tool}{sig}")
-    except (ValueError, TypeError):
-        lines.append(f"**Signature**: {tool}(...)")
-    lines.append("")
-
-    if parsed["args"]:
-        lines.append("**Args**:")
-        for arg_line in parsed["args"]:
-            lines.append(f"- {arg_line}")
-        lines.append("")
-
-    if parsed["returns"]:
-        lines.append(f"**Returns**: {parsed['returns']}")
-        lines.append("")
-
-    # Use config examples if available, otherwise docstring examples
-    if config_examples:
-        lines.append("**Examples**:")
-        lines.append("```python")
-        for example in config_examples:
-            lines.append(example)
-        lines.append("```")
-    elif parsed["example"]:
-        lines.append("**Example**:")
-        lines.append("```python")
-        lines.append(parsed["example"])
-        lines.append("```")
-
-    return "\n".join(lines)
-
-
-def _format_proxy_help(tool: str, proxy_tool: Any) -> str:
-    """Format help output for a proxy tool from MCP schema."""
-    from ot.prompts import (
-        PromptsError,
-        get_prompts,
-        get_tool_description,
-        get_tool_examples,
-    )
-
-    lines = [f"## {tool}", ""]
-
-    # Get default description from proxy tool
-    default_desc = proxy_tool.description or "(no description)"
-
-    # Check prompts.yaml for description override
-    try:
-        prompts_config = get_prompts()
-        description = get_tool_description(prompts_config, tool, default_desc)
-        config_examples = get_tool_examples(prompts_config, tool)
-    except PromptsError:
-        description = default_desc
-        config_examples = []
-
-    lines.append(description)
-    lines.append("")
-
-    # Parameters from input schema
-    schema = proxy_tool.input_schema
-    if schema and "properties" in schema:
-        required = set(schema.get("required", []))
-        lines.append("**Parameters**:")
-        for param_name, param_info in schema["properties"].items():
-            param_type = param_info.get("type", "any")
-            param_desc = param_info.get("description", "")
-            required_marker = " (required)" if param_name in required else ""
-            if param_desc:
-                lines.append(f"- {param_name}: {param_desc}{required_marker}")
-            else:
-                lines.append(f"- {param_name}: ({param_type}){required_marker}")
-        lines.append("")
-
-    # Show examples if configured
-    if config_examples:
-        lines.append("**Examples**:")
-        lines.append("```python")
-        for example in config_examples:
-            lines.append(example)
-        lines.append("```")
-        lines.append("")
-
-    # Source
-    lines.append(f"**Source**: proxy:{proxy_tool.server}")
-
-    return "\n".join(lines)
-
-
-def instructions(*, pack: str) -> str:
-    """Get usage instructions for a pack.
-
-    Returns instructions from prompts.yaml if configured, otherwise
-    generates instructions from tool docstrings (local) or tool list (proxy).
-
-    Args:
-        pack: Pack name (e.g., "brave", "github", "excel")
-
-    Returns:
-        Instructions text for the pack
-
-    Example:
-        ot.instructions(pack="brave")
-        ot.instructions(pack="github")
-    """
-    from ot.prompts import PromptsError, get_pack_instructions, get_prompts
-
-    with log("ot.instructions", pack=pack) as s:
-        runner_registry = load_tool_registry()
-        proxy = get_proxy_manager()
-
-        # Collect available packs
-        local_packs = set(runner_registry.packs.keys())
-        proxy_packs = set(proxy.servers)
-        all_packs = local_packs | proxy_packs
-
-        # Check if pack exists
-        if pack not in all_packs:
-            s.add("error", "pack_not_found")
-            return f"Error: Pack '{pack}' not found. Available: {', '.join(sorted(all_packs))}"
-
-        # Try to get configured instructions from prompts.yaml
-        try:
-            prompts_config = get_prompts()
-            configured = get_pack_instructions(prompts_config, pack)
-            if configured:
-                s.add("source", "config")
-                return configured
-        except PromptsError:
-            # No prompts.yaml or loading failed - continue to fallback
-            pass
-
-        # Fallback: generate instructions
-        if pack in local_packs:
-            s.add("source", "local_docstrings")
-            return _generate_local_instructions(pack, runner_registry)
-        else:
-            s.add("source", "proxy_tools")
-            return _generate_proxy_instructions(pack, proxy)
-
-
-def _generate_local_instructions(pack: str, registry: Any) -> str:
-    """Generate instructions from local tool docstrings."""
-    from ot.executor.worker_proxy import WorkerPackProxy
-
-    pack_funcs = registry.packs[pack]
-
-    lines = [f"# {pack} pack", ""]
-
-    # Handle both dict and WorkerPackProxy
-    if isinstance(pack_funcs, WorkerPackProxy):
-        func_items = [
-            (name, getattr(pack_funcs, name)) for name in pack_funcs.functions
-        ]
-    else:
-        func_items = list(pack_funcs.items())
-
-    for func_name, func in sorted(func_items):
-        doc = func.__doc__ or "(no description)"
-        first_line = doc.split("\n")[0].strip()
-        lines.append(f"- **{pack}.{func_name}**: {first_line}")
-
-    return "\n".join(lines)
-
-
-def _generate_proxy_instructions(pack: str, proxy: Any) -> str:
-    """Generate instructions from proxy tool list."""
-    tools = proxy.list_tools(server=pack)
-
-    lines = [f"# {pack} pack (proxy)", ""]
-    lines.append(f"Tools available from the {pack} MCP server:")
-    lines.append("")
-
-    for tool in sorted(tools, key=lambda t: t.name):
-        desc = tool.description or "(no description)"
-        first_line = desc.split("\n")[0].strip()
-        lines.append(f"- **{pack}.{tool.name}**: {first_line}")
-
-    return "\n".join(lines)
-
-
-def alias(*, name: str) -> str:
-    """Show alias definition.
-
-    Returns what an alias expands to, or lists all aliases if name is "*".
-
-    Args:
-        name: Alias name, or "*" to list all aliases
-
-    Returns:
-        Alias mapping (alias -> target) or list of all aliases
-
-    Example:
-        ot.alias(name="ws")
-        ot.alias(name="*")
-    """
-    with log("ot.alias", aliasName=name) as s:
-        cfg = get_config()
-
-        if name == "*":
-            if not cfg.alias:
-                s.add("count", 0)
-                return "No aliases configured"
-
-            lines = [f"{k} -> {v}" for k, v in sorted(cfg.alias.items())]
-            s.add("count", len(lines))
             return "\n".join(lines)
 
-        if name not in cfg.alias:
-            available = ", ".join(sorted(cfg.alias.keys())) or "(none)"
-            s.add("error", "not_found")
-            return f"Error: Alias '{name}' not found. Available: {available}"
-
-        s.add("found", True)
-        return f"{name} -> {cfg.alias[name]}"
-
-
-def snippet(*, name: str) -> str:
-    """Show snippet definition and preview.
-
-    Returns the snippet's description, parameters, and body template.
-    If name is "*", lists all snippets with descriptions.
-
-    Args:
-        name: Snippet name, or "*" to list all snippets
-
-    Returns:
-        Snippet definition with example expansion, or list of snippets
-
-    Example:
-        ot.snippet(name="brv_research")
-        ot.snippet(name="*")
-    """
-    with log("ot.snippet", snippetName=name) as s:
-        cfg = get_config()
-
-        if name == "*":
-            if not cfg.snippets:
-                s.add("count", 0)
-                return "No snippets configured"
-
-            lines = [
-                f"{k}: {v.description or '(no description)'}"
-                for k, v in sorted(cfg.snippets.items())
+        # Filter by pattern or list all
+        items = sorted(cfg.snippets.items())
+        if pattern:
+            pattern_lower = pattern.lower()
+            items = [
+                (k, v) for k, v in items
+                if pattern_lower in k.lower() or pattern_lower in (v.description or "").lower()
             ]
-            s.add("count", len(lines))
-            return "\n".join(lines)
 
-        if name not in cfg.snippets:
-            available = ", ".join(sorted(cfg.snippets.keys())) or "(none)"
-            s.add("error", "not_found")
-            return f"Error: Snippet '{name}' not found. Available: {available}"
+        if not items:
+            s.add("count", 0)
+            return f"No snippets matching pattern '{pattern}'"
 
-        snippet_def = cfg.snippets[name]
-
-        # Format output as YAML-like
-        lines = [f"name: {name}"]
-
-        if snippet_def.description:
-            lines.append(f"description: {snippet_def.description}")
-
-        if snippet_def.params:
-            lines.append("params:")
-            for param_name, param_def in snippet_def.params.items():
-                param_parts = []
-                if param_def.default is not None:
-                    param_parts.append(f"default: {param_def.default}")
-                if param_def.description:
-                    param_parts.append(f'description: "{param_def.description}"')
-                lines.append(f"  {param_name}: {{{', '.join(param_parts)}}}")
-
-        lines.append("body: |")
-        for body_line in snippet_def.body.rstrip().split("\n"):
-            lines.append(f"  {body_line}")
-
-        # Add example invocation
-        lines.append("")
-        lines.append("# Example:")
-
-        # Build example with defaults
-        example_args = []
-        for param_name, param_def in snippet_def.params.items():
-            if param_def.default is not None:
-                continue  # Skip params with defaults in example
-            example_args.append(f'{param_name}="..."')
-
-        if example_args:
-            lines.append(f"# ${name} {' '.join(example_args)}")
-        else:
-            lines.append(f"# ${name}")
-
-        s.add("found", True)
+        lines = [f"{k}: {v.description or '(no description)'}" for k, v in items]
+        s.add("count", len(lines))
         return "\n".join(lines)

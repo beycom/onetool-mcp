@@ -6,16 +6,24 @@ Tests pure functions directly and main functions with HTTP mocks.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from ot_tools.package import (
     _clean_version,
+    _compare_versions,
     _fetch_model,
     _fetch_package,
     _format_created,
     _format_price,
+    _parse_dependency_string,
+    _parse_package_json,
+    _parse_pyproject_toml,
+    _parse_requirements_txt,
+    _parse_version_constraint,
+    audit,
     models,
     npm,
     pypi,
@@ -414,3 +422,401 @@ class TestFetchModel:
         result = _fetch_model("nonexistent", models_data)
 
         assert result["id"] == "unknown"
+
+
+# -----------------------------------------------------------------------------
+# Manifest Parsing Tests
+# -----------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+class TestParseDependencyString:
+    """Test _parse_dependency_string PEP 508 parsing."""
+
+    def test_simple_name(self):
+        name, ver = _parse_dependency_string("requests")
+        assert name == "requests"
+        assert ver == ""
+
+    def test_name_with_version(self):
+        name, ver = _parse_dependency_string("requests>=2.28.0")
+        assert name == "requests"
+        assert ver == ">=2.28.0"
+
+    def test_name_with_extras(self):
+        name, ver = _parse_dependency_string("requests[security]>=2.28.0")
+        assert name == "requests"
+        assert ver == ">=2.28.0"
+
+    def test_name_with_environment_marker(self):
+        name, ver = _parse_dependency_string("requests>=2.28.0; python_version >= '3.8'")
+        assert name == "requests"
+        assert ver == ">=2.28.0"
+
+    def test_normalizes_underscores(self):
+        name, ver = _parse_dependency_string("some_package>=1.0.0")
+        assert name == "some-package"
+
+    def test_uppercase_normalized(self):
+        name, ver = _parse_dependency_string("Requests>=1.0.0")
+        assert name == "requests"
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+class TestParseVersionConstraint:
+    """Test _parse_version_constraint extraction."""
+
+    def test_gte_constraint(self):
+        ver = _parse_version_constraint(">=2.28.0")
+        assert ver == "2.28.0"
+
+    def test_eq_constraint(self):
+        ver = _parse_version_constraint("==1.0.0")
+        assert ver == "1.0.0"
+
+    def test_caret_constraint(self):
+        ver = _parse_version_constraint("^18.0.0")
+        assert ver == "18.0.0"
+
+    def test_tilde_constraint(self):
+        ver = _parse_version_constraint("~=3.0")
+        assert ver == "3.0"
+
+    def test_bare_version(self):
+        ver = _parse_version_constraint("2.28.0")
+        assert ver == "2.28.0"
+
+    def test_full_dependency_string(self):
+        ver = _parse_version_constraint("requests>=2.28.0")
+        assert ver == "2.28.0"
+
+    def test_no_version(self):
+        ver = _parse_version_constraint("*")
+        assert ver is None
+
+    def test_empty_string(self):
+        ver = _parse_version_constraint("")
+        assert ver is None
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+class TestCompareVersions:
+    """Test _compare_versions status classification."""
+
+    def test_current_exact_match(self):
+        status = _compare_versions("1.0.0", "1.0.0")
+        assert status == "current"
+
+    def test_current_with_prefix(self):
+        status = _compare_versions("^1.0.0", "1.0.0")
+        assert status == "current"
+
+    def test_update_available_minor(self):
+        status = _compare_versions("1.0.0", "1.1.0")
+        assert status == "update_available"
+
+    def test_update_available_patch(self):
+        status = _compare_versions("1.0.0", "1.0.1")
+        assert status == "update_available"
+
+    def test_major_update(self):
+        status = _compare_versions("1.0.0", "2.0.0")
+        assert status == "major_update"
+
+    def test_unknown_no_current(self):
+        status = _compare_versions(None, "1.0.0")
+        assert status == "unknown"
+
+    def test_unknown_latest_unknown(self):
+        status = _compare_versions("1.0.0", "unknown")
+        assert status == "unknown"
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+class TestParsePyprojectToml:
+    """Test _parse_pyproject_toml manifest parsing."""
+
+    def test_parses_project_dependencies(self, tmp_path):
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text("""
+[project]
+dependencies = [
+    "requests>=2.28.0",
+    "click>=8.0.0",
+]
+""")
+        deps = _parse_pyproject_toml(pyproject)
+        assert "requests" in deps
+        assert "click" in deps
+        assert deps["requests"] == ">=2.28.0"
+
+    def test_parses_optional_dependencies(self, tmp_path):
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text("""
+[project]
+dependencies = ["requests>=2.28.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0.0", "ruff>=0.1.0"]
+""")
+        deps = _parse_pyproject_toml(pyproject)
+        assert "requests" in deps
+        assert "pytest" in deps
+        assert "ruff" in deps
+
+    def test_parses_dependency_groups(self, tmp_path):
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text("""
+[project]
+dependencies = ["requests>=2.28.0"]
+
+[dependency-groups]
+test = ["pytest>=7.0.0"]
+""")
+        deps = _parse_pyproject_toml(pyproject)
+        assert "requests" in deps
+        assert "pytest" in deps
+
+    def test_skips_include_group(self, tmp_path):
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text("""
+[project]
+dependencies = ["requests>=2.28.0"]
+
+[dependency-groups]
+all = [
+    {include-group = "test"},
+    "mypy>=1.0.0",
+]
+test = ["pytest>=7.0.0"]
+""")
+        deps = _parse_pyproject_toml(pyproject)
+        assert "requests" in deps
+        assert "mypy" in deps
+        # include-group dicts are skipped
+        assert "include-group" not in str(deps)
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+class TestParseRequirementsTxt:
+    """Test _parse_requirements_txt manifest parsing."""
+
+    def test_parses_simple(self, tmp_path):
+        req = tmp_path / "requirements.txt"
+        req.write_text("""
+requests>=2.28.0
+click>=8.0.0
+""")
+        deps = _parse_requirements_txt(req)
+        assert "requests" in deps
+        assert "click" in deps
+
+    def test_skips_comments(self, tmp_path):
+        req = tmp_path / "requirements.txt"
+        req.write_text("""
+# This is a comment
+requests>=2.28.0
+""")
+        deps = _parse_requirements_txt(req)
+        assert "requests" in deps
+        assert len(deps) == 1
+
+    def test_skips_options(self, tmp_path):
+        req = tmp_path / "requirements.txt"
+        req.write_text("""
+-r base.txt
+--index-url https://pypi.org/simple
+requests>=2.28.0
+""")
+        deps = _parse_requirements_txt(req)
+        assert "requests" in deps
+        assert len(deps) == 1
+
+    def test_skips_git_urls(self, tmp_path):
+        req = tmp_path / "requirements.txt"
+        req.write_text("""
+requests>=2.28.0
+git+https://github.com/user/repo.git
+""")
+        deps = _parse_requirements_txt(req)
+        assert "requests" in deps
+        assert len(deps) == 1
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+class TestParsePackageJson:
+    """Test _parse_package_json manifest parsing."""
+
+    def test_parses_dependencies(self, tmp_path):
+        pkg = tmp_path / "package.json"
+        pkg.write_text("""
+{
+    "dependencies": {
+        "react": "^18.0.0",
+        "lodash": "^4.17.0"
+    }
+}
+""")
+        deps = _parse_package_json(pkg)
+        assert "react" in deps
+        assert "lodash" in deps
+        assert deps["react"] == "^18.0.0"
+
+    def test_parses_dev_dependencies(self, tmp_path):
+        pkg = tmp_path / "package.json"
+        pkg.write_text("""
+{
+    "dependencies": {
+        "react": "^18.0.0"
+    },
+    "devDependencies": {
+        "typescript": "^5.0.0"
+    }
+}
+""")
+        deps = _parse_package_json(pkg)
+        assert "react" in deps
+        assert "typescript" in deps
+
+    def test_empty_sections(self, tmp_path):
+        pkg = tmp_path / "package.json"
+        pkg.write_text('{"name": "test"}')
+        deps = _parse_package_json(pkg)
+        assert deps == {}
+
+
+# -----------------------------------------------------------------------------
+# Audit Function Tests
+# -----------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+class TestAudit:
+    """Test audit function with mocked HTTP."""
+
+    @patch("ot_tools.package._fetch")
+    def test_auto_detect_pyproject(self, mock_fetch, tmp_path):
+        mock_fetch.return_value = (True, {"info": {"version": "2.31.0"}})
+
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text("""
+[project]
+dependencies = ["requests>=2.28.0"]
+""")
+
+        result = audit(path=str(tmp_path))
+
+        assert "error" not in result
+        assert result["registry"] == "pypi"
+        assert "pyproject.toml" in result["manifest"]
+        assert len(result["packages"]) == 1
+        assert result["packages"][0]["name"] == "requests"
+        assert result["packages"][0]["latest"] == "2.31.0"
+
+    @patch("ot_tools.package._fetch")
+    def test_auto_detect_package_json(self, mock_fetch, tmp_path):
+        mock_fetch.return_value = (True, {"dist-tags": {"latest": "18.2.0"}})
+
+        pkg = tmp_path / "package.json"
+        pkg.write_text('{"dependencies": {"react": "^18.0.0"}}')
+
+        result = audit(path=str(tmp_path))
+
+        assert "error" not in result
+        assert result["registry"] == "npm"
+        assert "package.json" in result["manifest"]
+        assert len(result["packages"]) == 1
+        assert result["packages"][0]["name"] == "react"
+
+    @patch("ot_tools.package._fetch")
+    def test_explicit_registry(self, mock_fetch, tmp_path):
+        mock_fetch.return_value = (True, {"dist-tags": {"latest": "18.2.0"}})
+
+        # Create both manifests
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text('[project]\ndependencies = ["requests>=2.28.0"]')
+
+        pkg = tmp_path / "package.json"
+        pkg.write_text('{"dependencies": {"react": "^18.0.0"}}')
+
+        # Explicit npm should use package.json
+        result = audit(path=str(tmp_path), registry="npm")
+
+        assert result["registry"] == "npm"
+        assert "package.json" in result["manifest"]
+
+    def test_no_manifest_error(self, tmp_path):
+        result = audit(path=str(tmp_path))
+
+        assert "error" in result
+        assert "No manifest found" in result["error"]
+
+    def test_invalid_registry_error(self, tmp_path):
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text('[project]\ndependencies = ["requests>=2.28.0"]')
+
+        result = audit(path=str(tmp_path), registry="invalid")
+
+        assert "error" in result
+        assert "Invalid registry" in result["error"]
+
+    @patch("ot_tools.package._fetch")
+    def test_status_classification(self, mock_fetch, tmp_path):
+        # Simulate different version scenarios
+        def mock_version(url, **kwargs):
+            if "requests" in url:
+                return (True, {"info": {"version": "2.28.0"}})  # current
+            elif "flask" in url:
+                return (True, {"info": {"version": "2.1.0"}})  # minor update
+            elif "django" in url:
+                return (True, {"info": {"version": "5.0.0"}})  # major update
+            return (False, "Not found")
+
+        mock_fetch.side_effect = mock_version
+
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text("""
+[project]
+dependencies = [
+    "requests>=2.28.0",
+    "flask>=2.0.0",
+    "django>=4.0.0",
+]
+""")
+
+        result = audit(path=str(tmp_path))
+
+        assert "error" not in result
+
+        # Find each package and check status
+        packages_by_name = {p["name"]: p for p in result["packages"]}
+
+        assert packages_by_name["requests"]["status"] == "current"
+        assert packages_by_name["flask"]["status"] == "update_available"
+        assert packages_by_name["django"]["status"] == "major_update"
+
+        # Check summary
+        assert result["summary"]["current"] == 1
+        assert result["summary"]["update_available"] == 1
+        assert result["summary"]["major_update"] == 1
+
+    @patch("ot_tools.package._fetch")
+    def test_requirements_txt_support(self, mock_fetch, tmp_path):
+        mock_fetch.return_value = (True, {"info": {"version": "2.31.0"}})
+
+        req = tmp_path / "requirements.txt"
+        req.write_text("requests>=2.28.0\nclick>=8.0.0")
+
+        result = audit(path=str(tmp_path))
+
+        assert "error" not in result
+        assert result["registry"] == "pypi"
+        assert "requirements.txt" in result["manifest"]
+        assert len(result["packages"]) == 2

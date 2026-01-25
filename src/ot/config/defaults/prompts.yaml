@@ -9,20 +9,18 @@ prompts:
       description: |
         Execute Python code, function calls, or snippets.
 
-        Triggers: __ot foo.bar(x=1) or __ot then ```python code```
         Snippets: $snippet_name param=value (expanded server-side)
 
         CRITICAL: Pass code EXACTLY as-is to this tool.
         - DO NOT rewrite the code or implement it yourself
-        - DO NOT use subprocess, eval, exec, or custom imports
         - JUST pass the exact command string provided
 
         Args:
             command: Python code, function call, or $snippet to execute
       examples:
-        - "__ot brave.search(query=\"AI news\")"
-        - "__ot $pkg_npm packages=\"react\""
-        - "__ot ot.tools(pattern=\"search\")"
+        - "brave.search(query=\"AI news\")"
+        - "$pkg_npm packages=\"react\""
+        - "ot.tools(pattern=\"search\")"
 
   instructions: |
     OneTool executes Python code via the `run` tool
@@ -36,8 +34,11 @@ prompts:
     2. Backticks: `__ot `foo.bar(x=1)`` - inline code
     3. Fence: `__ot` then ```python ... ``` - multi-line code
 
-    ## Tool Discovery
-    `ot.tools()` lists all tools; `ot.tools(pattern="x")` filters by name
+    ## Discovery
+    - Tools: `ot.tools()` lists all; `ot.tools(pattern="search")` filters; `ot.tools(name="brave.search")` gets one with full docs
+    - Packs: `ot.packs()` lists all; `ot.packs(pattern="brav")` filters; `ot.packs(name="brave")` gets one with instructions
+    - Snippets: `ot.snippets()` lists all; `ot.snippets(pattern="pkg")` filters; `ot.snippets(name="pkg_pypi")` gets one
+    - Aliases: `ot.aliases()` lists all; `ot.aliases(pattern="search")` filters; `ot.aliases(name="ws")` gets one
 
     ## Aliases & Snippets
     - Aliases: Short names for functions. `__ot ws(query="test")` calls `brave.web_search`

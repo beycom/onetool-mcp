@@ -11,8 +11,10 @@ from __future__ import annotations
 # Pack for dot notation: package.version(), package.npm(), etc.
 pack = "package"
 
+import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC
+from pathlib import Path
 from typing import Any
 
 from ot.config import get_config
@@ -26,9 +28,286 @@ OPENROUTER_API = "https://openrouter.ai/api/v1/models"
 
 def _clean_version(version: str) -> str:
     """Strip semver range prefixes (^, ~, >=, etc.) from version string."""
-    import re
-
     return re.sub(r"^[\^~>=<]+", "", version)
+
+
+def _parse_version_constraint(constraint: str) -> str | None:
+    """Extract version from a constraint string like 'requests>=2.28.0' or '>=2.28.0'.
+
+    Returns the version part or None if no version found.
+    """
+    # Match patterns like: >=2.28.0, ==1.0.0, ~=3.0, ^18.0.0, etc.
+    match = re.search(r"[\^~>=<!=]+\s*(\d+[.\d]*[a-zA-Z0-9.-]*)", constraint)
+    if match:
+        return match.group(1)
+    # Match bare version like "2.28.0"
+    match = re.match(r"^(\d+[.\d]*[a-zA-Z0-9.-]*)$", constraint.strip())
+    if match:
+        return match.group(1)
+    return None
+
+
+def _parse_pyproject_toml(path: Path) -> dict[str, str]:
+    """Parse dependencies from pyproject.toml.
+
+    Extracts from:
+    - project.dependencies
+    - project.optional-dependencies.*
+    - dependency-groups.*
+    """
+    try:
+        import tomllib
+    except ImportError:
+        import tomli as tomllib  # type: ignore[import-not-found]
+
+    content = path.read_text()
+    data = tomllib.loads(content)
+
+    deps: dict[str, str] = {}
+
+    # project.dependencies
+    project = data.get("project", {})
+    for dep in project.get("dependencies", []):
+        name, ver = _parse_dependency_string(dep)
+        if name:
+            deps[name] = ver
+
+    # project.optional-dependencies
+    for group_deps in project.get("optional-dependencies", {}).values():
+        for dep in group_deps:
+            name, ver = _parse_dependency_string(dep)
+            if name:
+                deps[name] = ver
+
+    # dependency-groups (PEP 735)
+    for group_deps in data.get("dependency-groups", {}).values():
+        for dep in group_deps:
+            # Skip include-group references like {"include-group": "dev"}
+            if isinstance(dep, str):
+                name, ver = _parse_dependency_string(dep)
+                if name:
+                    deps[name] = ver
+
+    return deps
+
+
+def _parse_dependency_string(dep: str) -> tuple[str | None, str]:
+    """Parse a PEP 508 dependency string like 'requests>=2.28.0' or 'requests[security]>=2.28.0'.
+
+    Returns (name, version_constraint) or (None, "") if invalid.
+    """
+    # Remove extras like [security] and environment markers
+    dep = dep.split(";")[0].strip()  # Remove environment markers
+
+    # Match: name[extras]version_spec or name version_spec
+    match = re.match(r"^([a-zA-Z0-9_-]+)(?:\[[^\]]+\])?\s*(.*)$", dep)
+    if match:
+        name = match.group(1).lower().replace("_", "-")
+        version_spec = match.group(2).strip()
+        return name, version_spec
+    return None, ""
+
+
+def _parse_requirements_txt(path: Path) -> dict[str, str]:
+    """Parse dependencies from requirements.txt."""
+    deps: dict[str, str] = {}
+
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        # Skip empty lines, comments, and options
+        if not line or line.startswith("#") or line.startswith("-"):
+            continue
+        # Skip editable installs
+        if line.startswith("git+") or line.startswith("http"):
+            continue
+
+        name, ver = _parse_dependency_string(line)
+        if name:
+            deps[name] = ver
+
+    return deps
+
+
+def _parse_package_json(path: Path) -> dict[str, str]:
+    """Parse dependencies from package.json.
+
+    Extracts from:
+    - dependencies
+    - devDependencies
+    """
+    import json
+
+    data = json.loads(path.read_text())
+    deps: dict[str, str] = {}
+
+    for section in ("dependencies", "devDependencies"):
+        for name, ver in data.get(section, {}).items():
+            deps[name] = ver
+
+    return deps
+
+
+def _compare_versions(current: str | None, latest: str) -> str:
+    """Compare current version against latest and return status.
+
+    Returns: "current", "update_available", "major_update", or "unknown"
+    """
+    if not current or latest == "unknown":
+        return "unknown"
+
+    # Clean version strings
+    current_clean = _clean_version(current)
+    latest_clean = latest
+
+    if current_clean == latest_clean:
+        return "current"
+
+    # Try to parse semver for major version comparison
+    current_parts = current_clean.split(".")
+    latest_parts = latest_clean.split(".")
+
+    try:
+        current_major = int(re.match(r"(\d+)", current_parts[0]).group(1))  # type: ignore
+        latest_major = int(re.match(r"(\d+)", latest_parts[0]).group(1))  # type: ignore
+
+        if latest_major > current_major:
+            return "major_update"
+    except (AttributeError, ValueError, IndexError):
+        pass
+
+    return "update_available"
+
+
+def _detect_manifest(path: Path) -> tuple[str, Path] | None:
+    """Auto-detect manifest file in directory.
+
+    Returns (registry, manifest_path) or None if not found.
+    """
+    # Check in order of preference
+    pyproject = path / "pyproject.toml"
+    if pyproject.exists():
+        return "pypi", pyproject
+
+    requirements = path / "requirements.txt"
+    if requirements.exists():
+        return "pypi", requirements
+
+    package_json = path / "package.json"
+    if package_json.exists():
+        return "npm", package_json
+
+    return None
+
+
+def audit(
+    *,
+    path: str = ".",
+    registry: str | None = None,
+) -> dict[str, Any]:
+    """Audit project dependencies against latest registry versions.
+
+    Auto-detects manifest files (pyproject.toml, requirements.txt, package.json)
+    and compares current versions against the latest available.
+
+    Args:
+        path: Project directory path (default: current directory)
+        registry: Force specific registry ("npm" or "pypi"). Auto-detects if not specified.
+
+    Returns:
+        Dict with manifest, registry, packages list, and summary counts.
+        Each package has: name, required, latest, status.
+
+    Example:
+        package.audit()
+        package.audit(path="./frontend", registry="npm")
+    """
+    with LogSpan(span="package.audit", path=path, registry=registry) as span:
+        base_path = Path(path).resolve()
+
+        # Determine registry and manifest
+        if registry:
+            # Explicit registry - find matching manifest
+            if registry == "npm":
+                manifest_path = base_path / "package.json"
+                if not manifest_path.exists():
+                    span.add(error="manifest_not_found")
+                    return {"error": f"No package.json found in {path}"}
+            elif registry == "pypi":
+                manifest_path = base_path / "pyproject.toml"
+                if not manifest_path.exists():
+                    manifest_path = base_path / "requirements.txt"
+                if not manifest_path.exists():
+                    span.add(error="manifest_not_found")
+                    return {"error": f"No pyproject.toml or requirements.txt found in {path}"}
+            else:
+                span.add(error="invalid_registry")
+                return {"error": f"Invalid registry: {registry}. Use 'npm' or 'pypi'."}
+        else:
+            # Auto-detect
+            detected = _detect_manifest(base_path)
+            if not detected:
+                span.add(error="no_manifest")
+                return {
+                    "error": f"No manifest found in {path}. Looking for: pyproject.toml, requirements.txt, package.json"
+                }
+            registry, manifest_path = detected
+
+        # Parse manifest
+        deps: dict[str, str] = {}
+        manifest_name = manifest_path.name
+
+        if manifest_name == "pyproject.toml":
+            deps = _parse_pyproject_toml(manifest_path)
+        elif manifest_name == "requirements.txt":
+            deps = _parse_requirements_txt(manifest_path)
+        elif manifest_name == "package.json":
+            deps = _parse_package_json(manifest_path)
+
+        if not deps:
+            span.add(error="no_dependencies")
+            return {"error": f"No dependencies found in {manifest_path}"}
+
+        span.add(count=len(deps))
+
+        # Fetch latest versions in parallel
+        with ThreadPoolExecutor(max_workers=min(len(deps), 20)) as executor:
+            futures = {
+                name: executor.submit(_fetch_package, registry, name, ver)
+                for name, ver in deps.items()
+            }
+            results = {name: f.result() for name, f in futures.items()}
+
+        # Build package list with status
+        packages: list[dict[str, Any]] = []
+        summary = {"current": 0, "update_available": 0, "major_update": 0, "unknown": 0}
+
+        for name in sorted(deps.keys()):
+            result = results[name]
+            required = deps[name] or "*"
+            latest = result.get("latest", "unknown")
+
+            # Get version from required constraint
+            current_ver = _parse_version_constraint(required) if required != "*" else None
+            status = _compare_versions(current_ver, latest)
+
+            packages.append(
+                {
+                    "name": name,
+                    "required": required,
+                    "latest": latest,
+                    "status": status,
+                }
+            )
+            summary[status] += 1
+
+        span.add(summary=summary)
+
+        return {
+            "manifest": str(manifest_path),
+            "registry": registry,
+            "packages": packages,
+            "summary": summary,
+        }
 
 
 def _fetch(url: str, timeout: float | None = None) -> tuple[bool, dict[str, Any] | str]:

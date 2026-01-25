@@ -6,7 +6,7 @@ Internal tools for OneTool introspection and management.
 
 ## Highlights
 
-- List and filter available tools with signatures
+- List and filter available tools and packs
 - Check system health and API connectivity
 - Access configuration, aliases, and snippets
 - Publish messages to configured topics
@@ -15,25 +15,28 @@ Internal tools for OneTool introspection and management.
 
 | Function | Description |
 |----------|-------------|
-| `ot.tools(pattern, pack, compact)` | List all available tools and their signatures |
-| `ot.push(topic, message)` | Publish message to configured topic |
+| `ot.tools(name, pattern, pack, compact)` | List tools, filter by pattern, or get one by name |
+| `ot.packs(name, pattern)` | List packs, filter by pattern, or get one with instructions |
+| `ot.aliases(name, pattern)` | List aliases, filter by pattern, or get one by name |
+| `ot.snippets(name, pattern)` | List snippets, filter by pattern, or get one by name |
 | `ot.config()` | Show aliases, snippets, and server names |
 | `ot.health()` | Check tool dependencies and API connectivity |
-| `ot.help(tool)` | Get detailed help for a specific tool |
-| `ot.instructions(pack)` | Get usage instructions for a pack |
-| `ot.alias(name)` | Show alias definition (use `*` to list all) |
-| `ot.snippet(name)` | Show snippet definition (use `*` to list all) |
 | `ot.stats(period, tool, output)` | Get runtime usage statistics |
+| `ot.notify(topic, message)` | Publish message to configured topic |
+| `ot.reload()` | Force configuration reload |
 
 ## ot.tools()
 
-List all available tools with signatures.
+List all available tools with signatures, filter by pattern, or get a specific tool.
 
 ```python
 # List all tools
 ot.tools()
 
-# Filter by name pattern
+# Get specific tool by name (includes full documentation)
+ot.tools(name="brave.search")
+
+# Filter by name pattern (substring match)
 ot.tools(pattern="search")
 
 # Filter by pack
@@ -43,26 +46,77 @@ ot.tools(pack="brave")
 ot.tools(compact=True)
 ```
 
-Returns JSON-formatted list of all registered tools.
+Returns a list of tool dicts, or a single tool dict when using `name=`.
 
-## ot.push()
+## ot.packs()
 
-Publish a message to a configured topic.
+List all packs or get detailed pack info with instructions.
 
 ```python
-ot.push(topic="notes", message="Remember to review PR #123")
+# List all packs
+ot.packs()
+
+# Get specific pack by name (includes instructions and tool list)
+ot.packs(name="brave")
+
+# Filter by pattern
+ot.packs(pattern="brav")
 ```
 
-Configure topics in `ot-serve.yaml`:
+Returns a list of pack summaries, or detailed pack info when using `name=`.
+
+## ot.aliases()
+
+List aliases, filter by pattern, or get a specific alias.
+
+```python
+# List all aliases
+ot.aliases()
+
+# Get specific alias by name
+ot.aliases(name="ws")
+
+# Filter by pattern (matches alias name or target)
+ot.aliases(pattern="search")
+```
+
+Aliases are defined in config:
 
 ```yaml
-tools:
-  msg:
-    topics:
-      - pattern: "notes"
-        file: .notes/inbox.md
-      - pattern: "ideas"
-        file: .notes/ideas.md
+alias:
+  ws: brave.search
+  ns: brave.news
+  wf: web.fetch
+```
+
+## ot.snippets()
+
+List snippets, filter by pattern, or get a specific snippet definition.
+
+```python
+# List all snippets
+ot.snippets()
+
+# Get specific snippet by name (shows full definition)
+ot.snippets(name="multi_search")
+
+# Filter by pattern (matches name or description)
+ot.snippets(pattern="search")
+```
+
+Snippets are defined in config:
+
+```yaml
+snippets:
+  multi_search:
+    description: Search multiple queries
+    params:
+      queries: { required: true }
+    body: |
+      results = []
+      for q in {{ queries }}:
+          results.append(brave.search(query=q))
+      "\n---\n".join(results)
 ```
 
 ## ot.config()
@@ -91,76 +145,6 @@ Returns status of:
 - Registry status and tool count
 - Proxy status and server connections
 
-## ot.help()
-
-Get detailed documentation for a tool.
-
-```python
-ot.help(tool="brave.search")
-ot.help(tool="ot.tools")
-```
-
-Returns formatted help with signature, args, returns, and examples.
-
-## ot.instructions()
-
-Get usage instructions for a pack.
-
-```python
-ot.instructions(pack="brave")
-ot.instructions(pack="github")
-```
-
-Returns instructions from `prompts.yaml` if configured, otherwise generates from tool docstrings.
-
-## ot.alias()
-
-Show alias definition or list all aliases.
-
-```python
-# Show specific alias
-ot.alias(name="ws")
-
-# List all aliases
-ot.alias(name="*")
-```
-
-Aliases are defined in config:
-
-```yaml
-alias:
-  ws: brave.search
-  ns: brave.news
-  wf: web.fetch
-```
-
-## ot.snippet()
-
-Show snippet definition or list all snippets.
-
-```python
-# Show specific snippet
-ot.snippet(name="multi_search")
-
-# List all snippets
-ot.snippet(name="*")
-```
-
-Snippets are defined in config:
-
-```yaml
-snippets:
-  multi_search:
-    description: Search multiple queries
-    params:
-      queries: { required: true }
-    body: |
-      results = []
-      for q in {{ queries }}:
-          results.append(brave.search(query=q))
-      "\n---\n".join(results)
-```
-
 ## ot.stats()
 
 Get runtime statistics for OneTool usage.
@@ -186,6 +170,36 @@ Returns JSON with:
 - `context_saved` - Estimated context tokens saved
 - `time_saved_ms` - Estimated time saved in milliseconds
 - `tools` - Per-tool breakdown
+
+## ot.notify()
+
+Publish a message to a configured topic.
+
+```python
+ot.notify(topic="notes", message="Remember to review PR #123")
+```
+
+Configure topics in `ot-serve.yaml`:
+
+```yaml
+tools:
+  msg:
+    topics:
+      - pattern: "notes"
+        file: .notes/inbox.md
+      - pattern: "ideas"
+        file: .notes/ideas.md
+```
+
+## ot.reload()
+
+Force reload of all configuration.
+
+```python
+ot.reload()
+```
+
+Clears cached configuration and reloads from disk. Use after modifying config files during a session.
 
 ## Source
 

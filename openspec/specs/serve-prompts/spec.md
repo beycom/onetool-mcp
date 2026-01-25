@@ -30,7 +30,7 @@ The system SHALL load MCP prompts from a YAML configuration file.
 
 ### Requirement: Server Instructions
 
-The system SHALL support externalized server instructions with explicit trigger documentation.
+The system SHALL support externalised server instructions with explicit trigger documentation and comprehensive discovery guidance.
 
 #### Scenario: Instructions loaded
 - **GIVEN** prompts.yaml with `instructions: "Custom instructions..."`
@@ -52,9 +52,14 @@ The system SHALL support externalized server instructions with explicit trigger 
 - **WHEN** default instructions are used
 - **THEN** they SHALL include the `__onetool__run` trigger pattern and canonical formats
 
+#### Scenario: Discovery functions documented
+- **GIVEN** prompts.yaml instructions
+- **WHEN** loaded
+- **THEN** they SHALL document `ot.tools()`, `ot.packs()`, `ot.snippets()`, and `ot.aliases()` for capability discovery
+
 ### Requirement: Tool-Specific Prompts
 
-The system SHALL support tool-specific descriptions and examples.
+The system SHALL support tool-specific descriptions and examples with minimal redundancy.
 
 #### Scenario: Tool description override
 - **GIVEN** prompts.yaml with `tools.run.description: "Custom run description"`
@@ -70,6 +75,16 @@ The system SHALL support tool-specific descriptions and examples.
 - **GIVEN** prompts.yaml with description for non-existent tool
 - **WHEN** prompts are loaded
 - **THEN** the extra config SHALL be ignored without error
+
+#### Scenario: Trigger documentation placement
+- **GIVEN** default prompts configuration
+- **WHEN** the run tool description is generated
+- **THEN** trigger patterns SHALL be documented in instructions only (not duplicated in tool description)
+
+#### Scenario: Critical rules in both
+- **GIVEN** default prompts configuration
+- **WHEN** tool description and instructions are generated
+- **THEN** critical pass-through rules ("DO NOT rewrite", "JUST pass the exact command") SHALL appear in both for redundancy
 
 ### Requirement: Prompt Templates
 
