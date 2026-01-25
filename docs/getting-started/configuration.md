@@ -137,6 +137,7 @@ BRAVE_API_KEY: "your-brave-api-key"
 OPENAI_API_KEY: "sk-..."
 CONTEXT7_API_KEY: "your-context7-key"
 GEMINI_API_KEY: "your-gemini-key"
+FIRECRAWL_API_KEY: "your-firecrawl-key"
 
 # Environment variable references
 DATABASE_URL: "${PROD_DATABASE_URL}"
@@ -307,6 +308,9 @@ tools:
 
   package:
     timeout: 30.0              # 1.0 - 120.0 seconds
+
+  firecrawl:
+    api_url: null              # Custom API URL for self-hosted instances
 ```
 
 All tools section fields are optional. Omitted fields use defaults shown above.
@@ -334,6 +338,7 @@ All tools section fields are optional. Omitted fields use defaults shown above.
 | stats | cost_per_million_input_tokens | float | 15.0 | ≥0 | Input token cost (USD per million) |
 | stats | cost_per_million_output_tokens | float | 75.0 | ≥0 | Output token cost (USD per million) |
 | stats | chars_per_token | float | 4.0 | ≥1.0 | Characters per token estimate |
+| firecrawl | api_url | string | null | - | Custom API URL for self-hosted instances |
 
 ### Statistics Configuration
 

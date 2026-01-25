@@ -17,4 +17,5 @@
 | **file**     | Secure file ops         | Full file system operations within configurable security boundaries. Read, write, edit, copy, move, delete files with backup support. |
 | **package**  | Package versions        | Check latest versions for npm and PyPI packages. Search OpenRouter AI models. No API keys required.  |
 | **diagram**  | Diagram generation      | Generate diagrams from text using Mermaid, PlantUML, D2, and 25+ other providers. Two-stage workflow: generate source, then render to SVG/PNG/PDF. |
+| **firecrawl**| Web scraping & crawling | Scrape, crawl, and extract structured data from websites. Supports batch scraping, sitemap crawling, and LLM-powered extraction with schemas. |
 | **ot**       | Meta tools              | Discover available tools, view configurations, check system health, and access runtime statistics.   |

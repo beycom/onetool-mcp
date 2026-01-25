@@ -13,7 +13,13 @@ import io
 from pathlib import Path  # noqa: TC003 (used at runtime)
 from typing import TYPE_CHECKING, Any
 
-import fitz  # type: ignore[import-untyped]  # PyMuPDF
+try:
+    import fitz  # type: ignore[import-untyped]  # PyMuPDF
+except ImportError as e:
+    raise ImportError(
+        "pymupdf is required for convert. Install with: pip install pymupdf"
+    ) from e
+
 from PIL import Image
 
 if TYPE_CHECKING:

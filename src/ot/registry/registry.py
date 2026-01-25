@@ -167,13 +167,19 @@ class ToolRegistry:
             path: Path to Python file.
 
         Returns:
-            List of ToolInfo for public functions (not starting with '_').
+            List of ToolInfo for exported functions (respects __all__ and pack).
         """
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(path))
 
         # Module name: tools/gold_prices.py -> tools.gold_prices
         module_name = f"tools.{path.stem}"
+
+        # Extract pack variable (e.g., pack = "code")
+        pack = self._extract_pack(tree)
+
+        # Extract __all__ list if present
+        export_names = self._extract_all(tree)
 
         tools: list[ToolInfo] = []
         for node in ast.walk(tree):
@@ -182,10 +188,65 @@ class ToolRegistry:
                 if node.name.startswith("_"):
                     continue
 
-                tool = parse_function(node, module_name)
+                # If __all__ is defined, only include exported functions
+                if export_names is not None and node.name not in export_names:
+                    continue
+
+                tool = parse_function(node, module_name, pack=pack)
                 tools.append(tool)
 
         return tools
+
+    def _extract_pack(self, tree: ast.Module) -> str | None:
+        """Extract pack variable from module AST.
+
+        Looks for module-level assignment: pack = "pack_name"
+
+        Args:
+            tree: Parsed AST module.
+
+        Returns:
+            Pack name string if found, None otherwise.
+        """
+        for node in tree.body:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if (
+                        isinstance(target, ast.Name)
+                        and target.id == "pack"
+                        and isinstance(node.value, ast.Constant)
+                        and isinstance(node.value.value, str)
+                    ):
+                        return node.value.value
+        return None
+
+    def _extract_all(self, tree: ast.Module) -> set[str] | None:
+        """Extract __all__ list from module AST.
+
+        Looks for module-level assignment: __all__ = ["func1", "func2"]
+
+        Args:
+            tree: Parsed AST module.
+
+        Returns:
+            Set of exported names if __all__ is defined, None otherwise.
+        """
+        for node in tree.body:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if (
+                        isinstance(target, ast.Name)
+                        and target.id == "__all__"
+                        and isinstance(node.value, ast.List)
+                    ):
+                        names: set[str] = set()
+                        for elt in node.value.elts:
+                            if isinstance(elt, ast.Constant) and isinstance(
+                                elt.value, str
+                            ):
+                                names.add(elt.value)
+                        return names
+        return None
 
     def format_json(self) -> str:
         """Format registry as JSON for LLM context.

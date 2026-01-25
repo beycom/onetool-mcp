@@ -12,11 +12,16 @@ from __future__ import annotations
 from pathlib import Path  # noqa: TC003 (used at runtime)
 from typing import TYPE_CHECKING, Any
 
-from docx import Document
-from docx.oxml.table import CT_Tbl
-from docx.oxml.text.paragraph import CT_P
-from docx.table import Table
-from docx.text.paragraph import Paragraph
+try:
+    from docx import Document
+    from docx.oxml.table import CT_Tbl
+    from docx.oxml.text.paragraph import CT_P
+    from docx.table import Table
+    from docx.text.paragraph import Paragraph
+except ImportError as e:
+    raise ImportError(
+        "python-docx is required for convert. Install with: pip install python-docx"
+    ) from e
 
 from ot_tools._convert.utils import (
     IncrementalWriter,

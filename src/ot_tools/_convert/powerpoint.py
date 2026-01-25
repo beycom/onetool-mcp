@@ -13,9 +13,14 @@ from __future__ import annotations
 from pathlib import Path  # noqa: TC003 (used at runtime)
 from typing import TYPE_CHECKING, Any
 
-from pptx import Presentation
-from pptx.enum.shapes import MSO_SHAPE_TYPE
-from pptx.shapes.picture import Picture
+try:
+    from pptx import Presentation
+    from pptx.enum.shapes import MSO_SHAPE_TYPE
+    from pptx.shapes.picture import Picture
+except ImportError as e:
+    raise ImportError(
+        "python-pptx is required for convert. Install with: pip install python-pptx"
+    ) from e
 
 from ot_tools._convert.utils import (
     IncrementalWriter,

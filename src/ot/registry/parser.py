@@ -10,18 +10,21 @@ from docstring_parser import parse as parse_docstring_lib
 from .models import ArgInfo, ToolInfo
 
 
-def parse_function(node: ast.FunctionDef, module: str) -> ToolInfo:
+def parse_function(
+    node: ast.FunctionDef, module: str, pack: str | None = None
+) -> ToolInfo:
     """Extract information from a function AST node.
 
     Args:
         node: AST FunctionDef node.
         module: Module path for the function.
+        pack: Optional pack name for namespace-qualified tool names.
 
     Returns:
         ToolInfo with extracted signature and docstring info.
     """
-    # Extract signature
-    signature = extract_signature(node)
+    # Extract signature (with pack-qualified name if pack is provided)
+    signature = extract_signature(node, pack=pack)
 
     # Parse docstring
     docstring = ast.get_docstring(node) or ""
@@ -36,8 +39,12 @@ def parse_function(node: ast.FunctionDef, module: str) -> ToolInfo:
     # Decorator description overrides docstring if provided
     description = decorator_info.get("description") or doc_info.get("description", "")
 
+    # Use pack-qualified name if pack is provided
+    qualified_name = f"{pack}.{node.name}" if pack else node.name
+
     return ToolInfo(
-        name=node.name,
+        name=qualified_name,
+        pack=pack,
         module=module,
         signature=signature,
         description=description,
@@ -102,14 +109,15 @@ def extract_tool_decorator(node: ast.FunctionDef) -> dict[str, Any]:
     return result
 
 
-def extract_signature(node: ast.FunctionDef) -> str:
+def extract_signature(node: ast.FunctionDef, pack: str | None = None) -> str:
     """Extract function signature string.
 
     Args:
         node: AST FunctionDef node.
+        pack: Optional pack name for namespace-qualified tool names.
 
     Returns:
-        Signature string like 'func_name(arg: type = default) -> return_type'
+        Signature string like 'pack.func_name(arg: type = default) -> return_type'
     """
     parts: list[str] = []
 
@@ -143,8 +151,9 @@ def extract_signature(node: ast.FunctionDef) -> str:
             arg_str += f" = {value_to_str(kw_defaults[i])}"
         parts.append(arg_str)
 
-    # Build signature
-    sig = f"{node.name}({', '.join(parts)})"
+    # Build signature with pack-qualified name if pack is provided
+    func_name = f"{pack}.{node.name}" if pack else node.name
+    sig = f"{func_name}({', '.join(parts)})"
 
     # Add return type
     if node.returns:

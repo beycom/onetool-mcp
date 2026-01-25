@@ -1,6 +1,6 @@
 # Tools Reference
 
-**14 packs. 65+ functions. Zero tool-selection overhead.**
+**15 packs. 70+ functions. Zero tool-selection overhead.**
 
 Every function below is callable with a single `__ot` prefix. No JSON schemas, no tool discovery loops.
 
@@ -21,6 +21,7 @@ Every function below is callable with a single `__ot` prefix. No JSON schemas, n
 | **package** | Package versions | [package.md](package.md) |
 | **file** | File operations | [file.md](file.md) |
 | **diagram** | Diagram generation | [diagram.md](diagram.md) |
+| **firecrawl** | Web scraping & crawling | [firecrawl.md](firecrawl.md) |
 | **ot** | Internal tools | [ot.md](ot.md) |
 
 ## Quick Reference
@@ -123,5 +124,6 @@ diagram.render_directory(directory="./diagrams")
 | Convert | MIT |
 | Package | MIT |
 | Diagram | MIT |
+| Firecrawl | AGPL-3.0 |
 
 Full license texts: [licenses/](https://github.com/beycom/onetool/tree/main/licenses)

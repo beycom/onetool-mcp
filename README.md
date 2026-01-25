@@ -36,7 +36,7 @@ Based on [Anthropic's research](https://www.anthropic.com/engineering/code-execu
 
 ## Core Capabilities
 
-- **14 built-in packs** - brave, web, ground, context7, code, ripgrep, llm, db, excel, convert, package, file, diagram, ot
+- **15 built-in packs** - brave, web, ground, context7, code, ripgrep, llm, db, excel, convert, package, file, diagram, firecrawl, ot
 - **30-second setup** - Install with uv or pip
 - **Drop-in extensibility** - Add a Python file, get a new pack
 - **AST security** - All code validated before execution
@@ -64,7 +64,7 @@ Add to Claude Code (`~/.claude/settings.json`):
 
 ## What's Inside
 
-**Packs** - brave (web search), web (fetch), ground (Google grounded), context7 (library docs), code (semantic search), ripgrep (file search), llm (transform), db (SQL), excel (spreadsheets), convert (PDF/Word to Markdown), package (npm/PyPI), file (safe operations), diagram (PlantUML), ot (meta tools)
+**Packs** - brave (web search), web (fetch), ground (Google grounded), context7 (library docs), code (semantic search), ripgrep (file search), llm (transform), db (SQL), excel (spreadsheets), convert (PDF/Word to Markdown), package (npm/PyPI), file (safe operations), diagram (PlantUML), firecrawl (web scraping), ot (meta tools)
 
 **CLIs** - `ot-serve` (MCP server), `ot-bench` (benchmark harness)
 
@@ -83,7 +83,7 @@ def search(*, query: str) -> str:
 
 ## Why this approach
 
-LLMs write Python instead of parsing JSON schemas. You see what's being called. 2K tokens instead of 150K. 15 packs ready to use, and adding your own is just dropping in a file.
+LLMs write Python instead of parsing JSON schemas. You see what's being called. 2K tokens instead of 150K. Adding your own packs is just dropping in a file.
 
 ## Documentation
 

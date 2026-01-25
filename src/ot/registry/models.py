@@ -19,7 +19,12 @@ class ArgInfo(BaseModel):
 class ToolInfo(BaseModel):
     """Information about a registered tool function."""
 
-    name: str = Field(description="Function name")
+    name: str = Field(
+        description="Qualified tool name (e.g., 'code.search' or 'search')"
+    )
+    pack: str | None = Field(
+        default=None, description="Pack name if tool belongs to a pack"
+    )
     module: str = Field(description="Module path (e.g., 'tools.gold_prices')")
     signature: str = Field(description="Full function signature")
     description: str = Field(

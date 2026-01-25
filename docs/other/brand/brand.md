@@ -85,8 +85,8 @@ python, mcp, model-context-protocol, mcp-server, llm, code-execution, mcp-tools,
 ### onetool.stats
 
 ```text
-- 14 packs
-- 89 tools
+- 15 packs
+- 90+ tools
 - 2 CLIs (ot-serve, ot-bench)
 - 98.7% token reduction
 - 10x cost reduction

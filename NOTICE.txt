@@ -50,5 +50,15 @@ https://github.com/runekaagaard/mcp-alchemy
 Used in: ot_tools/db.py (database introspection and query patterns)
 
 ================================================================================
+firecrawl-py
+================================================================================
+Copyright (c) 2024 Mendable.ai
+Licensed under the AGPL-3.0 License (SDK and server)
+https://github.com/firecrawl/firecrawl-py
+
+Used in: ot_tools/firecrawl_tool.py (API client SDK)
+Note: We use the SDK to call Firecrawl's cloud API. No server code is distributed.
+
+================================================================================
 
 Full license texts are available in the licenses/ directory.

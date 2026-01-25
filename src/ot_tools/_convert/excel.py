@@ -12,7 +12,12 @@ from __future__ import annotations
 from pathlib import Path  # noqa: TC003 (used at runtime)
 from typing import Any
 
-from openpyxl import load_workbook  # type: ignore[import-untyped]
+try:
+    from openpyxl import load_workbook  # type: ignore[import-untyped]
+except ImportError as e:
+    raise ImportError(
+        "openpyxl is required for convert. Install with: pip install openpyxl"
+    ) from e
 
 from ot_tools._convert.utils import (
     IncrementalWriter,
