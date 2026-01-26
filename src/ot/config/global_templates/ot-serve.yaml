@@ -5,17 +5,22 @@
 version: 1
 
 # Include external config files (merged left-to-right)
-# These fall back to bundled defaults if not found in ~/.onetool/
+# Paths are relative to OT_DIR (~/.onetool/), with fallback to bundled defaults
 # include:
-#   - prompts.yaml    # Tool instructions for LLM
-#   - snippets.yaml   # Snippet workflows
-#   - servers.yaml    # External MCP servers
-#   - diagram.yaml    # Diagram tool settings
+#   - config/prompts.yaml    # Tool instructions for LLM
+#   - config/snippets.yaml   # Snippet workflows
+#   - config/servers.yaml    # External MCP servers
 
 # log_level: INFO
 # debug_tracebacks: false  # Set to true for verbose error tracebacks
 
-# Transform tool (LLM for code generation)
-# transform:
-#   model: google/gemini-3-flash-preview
-#   base_url: https://openrouter.ai/api/v1
+# Tool-specific configuration
+# tools:
+#   # Transform tool (LLM for code generation)
+#   transform:
+#     model: google/gemini-3-flash-preview
+#     base_url: https://openrouter.ai/api/v1
+#   # Code search (semantic search via ChunkHound)
+#   code:
+#     base_url: https://openrouter.ai/api/v1
+#     model: text-embedding-3-small

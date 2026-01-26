@@ -4,27 +4,28 @@ version: 1
 inherit: bundled  # IMPORTANT: never use global (~/.onetool/) for dev/test consistency
 
 tools_dir:
-  - src/ot_tools/*.py
-  - demo/src/demo_tools.py
+  - .onetool/tools/demo/demo_tools.py
 
-# Configuration files (paths relative to this ot-serve.yaml)
+# Configuration files (paths relative to config/)
 # secrets_file: secrets.yaml   # default - sibling of this config (gitignored)
 
 log_level: INFO
-# log_dir: ../logs  # Default - logs go to demo/logs
+# log_dir: logs  # Default - logs go to .onetool/logs/
 
 # Security settings
 security:
   validate_code: true
 
-# Transform tool configuration (LLM for code generation)
-transform:
-  model: google/gemini-3-flash-preview
-  base_url: https://openrouter.ai/api/v1
-
-# Tool-specific configuration (inherited from bundled, override here if needed)
-# tools:
-#   diagram: ...  # inherited from src/ot/config/defaults/
+# Tool-specific configuration
+tools:
+  # Transform tool (LLM for code generation)
+  transform:
+    model: google/gemini-3-flash-preview
+    base_url: https://openrouter.ai/api/v1
+  # Code search (semantic search via ChunkHound)
+  code:
+    base_url: https://openrouter.ai/api/v1
+    model: text-embedding-3-small
 
 servers:
   # Package Version MCP Server (stdio)

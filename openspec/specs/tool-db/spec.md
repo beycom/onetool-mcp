@@ -3,9 +3,7 @@
 ## Purpose
 
 Provides database introspection and query execution for SQL databases via SQLAlchemy.
-
 ## Requirements
-
 ### Requirement: Table Listing
 
 The `db.tables()` function SHALL list table names from the connected database.
@@ -133,3 +131,34 @@ The tool SHALL log all operations using LogSpan.
 - **GIVEN** any database operation fails
 - **WHEN** error occurs
 - **THEN** it SHALL log the error with appropriate context
+
+### Requirement: SQLite Path Resolution
+
+The tool SHALL expand path prefixes in SQLite database URLs.
+
+#### Scenario: Tilde expansion in SQLite URL
+- **GIVEN** a SQLite URL with tilde: `sqlite:///~/data.db`
+- **WHEN** `db.query("SELECT 1", db_url="sqlite:///~/data.db")` is called
+- **THEN** `~` SHALL expand to the user's home directory
+- **AND** the connection SHALL be made to the expanded path
+
+#### Scenario: CWD prefix in SQLite URL
+- **GIVEN** a SQLite URL with CWD prefix: `sqlite:///CWD/data.db`
+- **WHEN** `db.query("SELECT 1", db_url="sqlite:///CWD/data.db")` is called
+- **THEN** `CWD` SHALL expand to the effective working directory (OT_CWD)
+
+#### Scenario: Relative SQLite path
+- **GIVEN** a relative SQLite URL: `sqlite:///data.db`
+- **WHEN** `db.query("SELECT 1", db_url="sqlite:///data.db")` is called
+- **THEN** the path SHALL be resolved relative to CWD
+
+#### Scenario: Absolute SQLite path unchanged
+- **GIVEN** an absolute SQLite URL: `sqlite:////tmp/data.db`
+- **WHEN** `db.query("SELECT 1", db_url="sqlite:////tmp/data.db")` is called
+- **THEN** the path SHALL be used unchanged
+
+#### Scenario: Non-SQLite URLs unchanged
+- **GIVEN** a non-SQLite URL: `postgresql://localhost/db`
+- **WHEN** `db.query("SELECT 1", db_url="postgresql://localhost/db")` is called
+- **THEN** the URL SHALL be passed to SQLAlchemy unchanged
+

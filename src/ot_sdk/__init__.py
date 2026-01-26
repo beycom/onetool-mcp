@@ -27,7 +27,15 @@ from ot_sdk.cache import cache
 from ot_sdk.config import get_config, get_secret
 from ot_sdk.http import http
 from ot_sdk.logging import log
-from ot_sdk.paths import expand_path, get_config_path, get_project_path
+from ot_sdk.paths import (
+    expand_path,
+    get_config_path,
+    get_ot_dir,
+    get_project_path,
+    resolve_cwd_path,
+    resolve_ot_path,
+    resolve_path,
+)
 from ot_sdk.utils import format_error, run_command, truncate
 from ot_sdk.worker import worker_main
 
@@ -37,10 +45,14 @@ __all__ = [
     "format_error",
     "get_config",
     "get_config_path",
+    "get_ot_dir",
     "get_project_path",
     "get_secret",
     "http",
     "log",
+    "resolve_cwd_path",
+    "resolve_ot_path",
+    "resolve_path",
     "run_command",
     "truncate",
     "worker_main",

@@ -19,11 +19,13 @@ if TYPE_CHECKING:
 @pytest.fixture(autouse=True)
 def mock_file_config(tmp_path: Path) -> Generator[None, None, None]:
     """Mock file tool config to allow temp directories."""
+    import ot_sdk.config as config_module
+
     from ot_tools.file import Config
 
     # Create a Config instance with test-friendly defaults
     test_config = Config(
-        allowed_dirs=[],  # Empty = allows cwd, but we patch cwd
+        allowed_dirs=[],  # Empty = allows cwd, but we set project path
         exclude_patterns=[".git", "__pycache__"],
         max_file_size=10_000_000,
         max_list_entries=1000,
@@ -31,12 +33,15 @@ def mock_file_config(tmp_path: Path) -> Generator[None, None, None]:
         use_trash=False,  # Disable for cleaner tests
     )
 
-    # Patch both the config getter and effective cwd
-    with (
-        patch("ot_tools.file.get_tool_config", return_value=test_config),
-        patch("ot_tools.file.get_effective_cwd", return_value=tmp_path),
-    ):
+    # Set SDK project path for path resolution
+    config_module._current_config.clear()
+    config_module._current_config.update({"_project_path": str(tmp_path)})
+
+    # Patch the config getter
+    with patch("ot_tools.file.get_tool_config", return_value=test_config):
         yield
+
+    config_module._current_config.clear()
 
 
 @pytest.fixture

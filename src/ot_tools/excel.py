@@ -44,8 +44,7 @@ __all__ = [
 
 import fnmatch
 import re
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
@@ -53,30 +52,32 @@ from openpyxl.utils.cell import column_index_from_string, coordinate_from_string
 from openpyxl.worksheet.cell_range import CellRange
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
-from ot.paths import get_effective_cwd
-from ot_sdk import log, worker_main
+from ot_sdk import log, resolve_cwd_path, worker_main
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _expand_path(filepath: str) -> Path:
     """Resolve a file path relative to project directory.
 
+    Uses SDK resolve_cwd_path() for consistent path resolution.
+
     Path resolution follows project conventions:
         - Relative paths: resolved relative to project directory (OT_CWD)
         - Absolute paths: used as-is
         - ~ paths: expanded to home directory
+        - Prefixed paths (CWD/, GLOBAL/, OT_DIR/): resolved to respective dirs
 
     Note: ${VAR} patterns are NOT expanded. Use ~/path instead of ${HOME}/path.
 
     Args:
-        filepath: Path string (can contain ~)
+        filepath: Path string (can contain ~ or prefixes)
 
     Returns:
         Resolved absolute Path
     """
-    p = Path(filepath).expanduser()
-    if p.is_absolute():
-        return p
-    return (get_effective_cwd() / p).resolve()
+    return resolve_cwd_path(filepath)
 
 
 def _ensure_parent_dir(filepath: str) -> None:

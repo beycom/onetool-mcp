@@ -38,7 +38,13 @@ from pydantic import (
 )
 
 from ot.config.mcp import McpServerConfig, expand_secrets
-from ot.paths import get_bundled_config_dir, get_effective_cwd, get_global_dir
+from ot.paths import (
+    CONFIG_SUBDIR,
+    get_bundled_config_dir,
+    get_config_dir,
+    get_effective_cwd,
+    get_global_dir,
+)
 
 # Current config schema version
 CURRENT_CONFIG_VERSION = 1
@@ -171,9 +177,13 @@ class StatsConfig(BaseModel):
         default=True,
         description="Enable statistics collection",
     )
+    persist_dir: str = Field(
+        default="stats",
+        description="Directory for stats files (relative to .onetool/)",
+    )
     persist_path: str = Field(
         default="stats.jsonl",
-        description="Path to JSONL file for stats persistence (relative to log dir)",
+        description="Filename for stats persistence (within persist_dir)",
     )
     flush_interval_seconds: int = Field(
         default=30,
@@ -292,12 +302,12 @@ class OneToolConfig(BaseModel):
     )
 
     tools_dir: list[str] = Field(
-        default_factory=lambda: ["src/ot_tools/*.py"],
-        description="Glob patterns for tool discovery",
+        default_factory=lambda: ["tools/*.py"],
+        description="Glob patterns for tool discovery (relative to OT_DIR .onetool/, or absolute)",
     )
     secrets_file: str = Field(
-        default="secrets.yaml",
-        description="Path to secrets file (relative to config dir, or absolute)",
+        default="config/secrets.yaml",
+        description="Path to secrets file (relative to OT_DIR .onetool/, or absolute)",
     )
     prompts: dict[str, Any] | None = Field(
         default=None,
@@ -308,8 +318,8 @@ class OneToolConfig(BaseModel):
         default="INFO", description="Logging level"
     )
     log_dir: str = Field(
-        default="../logs",
-        description="Directory for log files (relative to config dir)",
+        default="logs",
+        description="Directory for log files (relative to .onetool/)",
     )
     compact_max_length: int = Field(
         default=120, description="Max value length in compact console output"
@@ -374,19 +384,76 @@ class OneToolConfig(BaseModel):
     def get_tool_files(self) -> list[Path]:
         """Get list of tool files matching configured glob patterns.
 
+        Pattern resolution (all relative to OT_DIR .onetool/):
+        - Absolute paths: used as-is
+        - ~ paths: expanded to home directory
+        - Relative patterns: resolved relative to OT_DIR (.onetool/)
+
         Returns:
             List of Path objects for tool files
         """
         tool_files: list[Path] = []
+        cwd = get_effective_cwd()
+
+        # Determine OT_DIR for resolving patterns
+        if self._config_dir is not None:
+            # _config_dir is the config/ subdirectory, go up to .onetool/
+            ot_dir = self._config_dir.parent
+        else:
+            # Fallback: cwd/.onetool
+            ot_dir = cwd / ".onetool"
+
         for pattern in self.tools_dir:
-            # Use glob.glob() for cross-platform compatibility and to support
-            # both relative and absolute patterns in tools_dir configuration
-            for match in glob.glob(pattern, recursive=True):  # noqa: PTH207
+            # Expand ~ first
+            expanded = Path(pattern).expanduser()
+
+            # Determine resolved pattern for globbing
+            if expanded.is_absolute():
+                # Absolute pattern - use as-is
+                resolved_pattern = str(expanded)
+            else:
+                # All relative patterns resolve against OT_DIR
+                resolved_pattern = str(ot_dir / pattern)
+
+            # Use glob.glob() for cross-platform compatibility
+            for match in glob.glob(resolved_pattern, recursive=True):  # noqa: PTH207
                 path = Path(match)
                 if path.is_file() and path.suffix == ".py":
                     tool_files.append(path)
 
         return sorted(set(tool_files))
+
+    def _resolve_onetool_relative_path(self, path_str: str) -> Path:
+        """Resolve a path relative to the .onetool directory.
+
+        Handles:
+        - Absolute paths: returned as-is
+        - ~ expansion: expanded to home directory
+        - Relative paths: resolved relative to .onetool/ directory (parent of config/)
+
+        Note: Does NOT expand ${VAR} - use ~/path instead of ${HOME}/path.
+
+        Args:
+            path_str: Path string to resolve
+
+        Returns:
+            Resolved absolute Path
+        """
+        # Only expand ~ (no ${VAR} expansion)
+        path = Path(path_str).expanduser()
+
+        # If absolute after expansion, use as-is
+        if path.is_absolute():
+            return path
+
+        # Resolve relative to .onetool/ directory (parent of config/)
+        if self._config_dir is not None:
+            # _config_dir is the config/ subdirectory, go up to .onetool/
+            onetool_dir = self._config_dir.parent
+            return (onetool_dir / path).resolve()
+
+        # Fallback: resolve relative to cwd/.onetool
+        return (get_effective_cwd() / ".onetool" / path).resolve()
 
     def _resolve_config_relative_path(self, path_str: str) -> Path:
         """Resolve a path relative to the config directory.
@@ -394,7 +461,7 @@ class OneToolConfig(BaseModel):
         Handles:
         - Absolute paths: returned as-is
         - ~ expansion: expanded to home directory
-        - Relative paths: resolved relative to config directory
+        - Relative paths: resolved relative to config/ directory
 
         Note: Does NOT expand ${VAR} - use ~/path instead of ${HOME}/path.
 
@@ -415,38 +482,48 @@ class OneToolConfig(BaseModel):
         if self._config_dir is not None:
             return (self._config_dir / path).resolve()
 
-        # Fallback: resolve relative to cwd/.onetool
-        return (get_effective_cwd() / ".onetool" / path).resolve()
+        # Fallback: resolve relative to cwd/.onetool/config
+        return (get_effective_cwd() / ".onetool" / CONFIG_SUBDIR / path).resolve()
 
     def get_secrets_file_path(self) -> Path:
         """Get the resolved path to the secrets configuration file.
 
-        Path is resolved relative to the config file directory.
+        Path is resolved relative to OT_DIR (.onetool/).
 
         Returns:
             Absolute Path to secrets file
         """
-        return self._resolve_config_relative_path(self.secrets_file)
+        return self._resolve_onetool_relative_path(self.secrets_file)
 
     def get_log_dir_path(self) -> Path:
         """Get the resolved path to the log directory.
 
-        Path is resolved relative to the config file directory.
+        Path is resolved relative to the .onetool/ directory.
 
         Returns:
             Absolute Path to log directory
         """
-        return self._resolve_config_relative_path(self.log_dir)
+        return self._resolve_onetool_relative_path(self.log_dir)
+
+    def get_stats_dir_path(self) -> Path:
+        """Get the resolved path to the stats directory.
+
+        Path is resolved relative to the .onetool/ directory.
+
+        Returns:
+            Absolute Path to stats directory
+        """
+        return self._resolve_onetool_relative_path(self.stats.persist_dir)
 
     def get_stats_file_path(self) -> Path:
         """Get the resolved path to the stats JSONL file.
 
-        Stats file is stored in the log directory alongside other logs.
+        Stats file is stored in the stats directory.
 
         Returns:
             Absolute Path to stats file
         """
-        return self.get_log_dir_path() / self.stats.persist_path
+        return self.get_stats_dir_path() / self.stats.persist_path
 
 
 def _resolve_config_path(config_path: Path | str | None) -> Path | None:
@@ -455,8 +532,8 @@ def _resolve_config_path(config_path: Path | str | None) -> Path | None:
     Resolution order:
     1. Explicit config_path if provided
     2. OT_SERVE_CONFIG env var
-    3. cwd/.onetool/ot-serve.yaml
-    4. ~/.onetool/ot-serve.yaml
+    3. cwd/.onetool/config/ot-serve.yaml
+    4. ~/.onetool/config/ot-serve.yaml
     5. None (use defaults)
 
     Args:
@@ -473,11 +550,11 @@ def _resolve_config_path(config_path: Path | str | None) -> Path | None:
         return Path(env_config)
 
     cwd = get_effective_cwd()
-    project_config = cwd / ".onetool" / "ot-serve.yaml"
+    project_config = cwd / ".onetool" / CONFIG_SUBDIR / "ot-serve.yaml"
     if project_config.exists():
         return project_config
 
-    global_config = get_global_dir() / "ot-serve.yaml"
+    global_config = get_config_dir(get_global_dir()) / "ot-serve.yaml"
     if global_config.exists():
         return global_config
 
@@ -567,12 +644,12 @@ def _remove_legacy_fields(data: dict[str, Any]) -> None:
 
 
 def _resolve_include_path(
-    include_path_str: str, config_dir: Path
+    include_path_str: str, ot_dir: Path
 ) -> Path | None:
     """Resolve an include path using three-tier fallback.
 
     Search order:
-    1. config_dir (project or wherever the main config is)
+    1. ot_dir (project .onetool/ or wherever the config's OT_DIR is)
     2. global (~/.onetool/)
     3. bundled (package defaults)
 
@@ -583,7 +660,7 @@ def _resolve_include_path(
 
     Args:
         include_path_str: Path string from include directive
-        config_dir: Directory of the config file containing the include
+        ot_dir: The .onetool/ directory (OT_DIR) for the config
 
     Returns:
         Resolved Path if found, None otherwise
@@ -598,10 +675,10 @@ def _resolve_include_path(
             return include_path
         return None
 
-    # Tier 1: config_dir (project or current config location)
-    tier1 = (config_dir / include_path).resolve()
+    # Tier 1: ot_dir (project .onetool/ or current OT_DIR)
+    tier1 = (ot_dir / include_path).resolve()
     if tier1.exists():
-        logger.debug(f"Include resolved (config_dir): {tier1}")
+        logger.debug(f"Include resolved (ot_dir): {tier1}")
         return tier1
 
     # Tier 2: global (~/.onetool/)
@@ -658,7 +735,7 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
 
 
 def _load_includes(
-    data: dict[str, Any], config_dir: Path, seen_paths: set[Path] | None = None
+    data: dict[str, Any], ot_dir: Path, seen_paths: set[Path] | None = None
 ) -> dict[str, Any]:
     """Load and merge files from 'include:' list into config data.
 
@@ -666,13 +743,13 @@ def _load_includes(
     Inline content in the main file overrides everything.
 
     Include resolution uses three-tier fallback:
-    1. config_dir (project or current config location)
+    1. ot_dir (project .onetool/ or current OT_DIR)
     2. global (~/.onetool/)
     3. bundled (package defaults)
 
     Args:
         data: Config data dict containing optional 'include' key
-        config_dir: Directory for resolving relative paths
+        ot_dir: The .onetool/ directory (OT_DIR) for resolving relative paths
         seen_paths: Set of already-processed paths (for circular detection)
 
     Returns:
@@ -690,7 +767,7 @@ def _load_includes(
 
     for include_path_str in include_list:
         # Use three-tier resolution
-        include_path = _resolve_include_path(include_path_str, config_dir)
+        include_path = _resolve_include_path(include_path_str, ot_dir)
 
         if include_path is None:
             logger.warning(f"Include file not found: {include_path_str}")
@@ -709,10 +786,10 @@ def _load_includes(
                 logger.debug(f"Empty or non-dict include file: {include_path}")
                 continue
 
-            # Recursively process nested includes
+            # Recursively process nested includes (same OT_DIR for all nested includes)
             new_seen = seen_paths | {include_path}
             include_data = _load_includes(
-                include_data, include_path.parent, new_seen
+                include_data, ot_dir, new_seen
             )
 
             # Merge this include file (later overrides earlier)
@@ -752,7 +829,7 @@ def _load_base_config(
 
     # Try global first for 'global' mode
     if inherit == "global":
-        global_config_path = get_global_dir() / "ot-serve.yaml"
+        global_config_path = get_config_dir(get_global_dir()) / "ot-serve.yaml"
         if global_config_path.exists():
             # Skip if this is the same file we're already loading
             if current_config_path and global_config_path.resolve() == current_config_path.resolve():
@@ -760,8 +837,9 @@ def _load_base_config(
             else:
                 try:
                     raw_data = _load_yaml_file(global_config_path)
-                    # Process includes in global config (with bundled fallback)
-                    data = _load_includes(raw_data, global_config_path.parent)
+                    # Process includes in global config - OT_DIR is ~/.onetool/
+                    global_ot_dir = get_global_dir()
+                    data = _load_includes(raw_data, global_ot_dir)
                     logger.debug(f"Inherited base config from global: {global_config_path}")
                     return data
                 except (FileNotFoundError, ValueError) as e:
@@ -773,8 +851,8 @@ def _load_base_config(
         bundled_config_path = bundled_dir / "ot-serve.yaml"
         if bundled_config_path.exists():
             raw_data = _load_yaml_file(bundled_config_path)
-            # Process includes in bundled config (within bundled dir)
-            data = _load_includes(raw_data, bundled_config_path.parent)
+            # Process includes in bundled config - bundled dir is flat (no config/ subdir)
+            data = _load_includes(raw_data, bundled_dir)
             logger.debug(f"Inherited base config from bundled: {bundled_config_path}")
             return data
     except FileNotFoundError:
@@ -831,7 +909,7 @@ def load_config(config_path: Path | str | None = None) -> OneToolConfig:
     if resolved_path is None:
         logger.debug("No config file found, using defaults")
         config = OneToolConfig()
-        config._config_dir = get_effective_cwd() / ".onetool"
+        config._config_dir = get_effective_cwd() / ".onetool" / CONFIG_SUBDIR
         return config
 
     logger.debug(f"Loading config from {resolved_path}")
@@ -840,8 +918,10 @@ def load_config(config_path: Path | str | None = None) -> OneToolConfig:
     expanded_data = _expand_secrets_recursive(raw_data)
 
     # Process includes before validation (merges external files)
+    # Resolve includes from OT_DIR (.onetool/), not config_dir (.onetool/config/)
     config_dir = resolved_path.parent.resolve()
-    merged_data = _load_includes(expanded_data, config_dir)
+    ot_dir = config_dir.parent  # Go up from config/ to .onetool/
+    merged_data = _load_includes(expanded_data, ot_dir)
 
     # Determine inheritance mode (default: global)
     inherit = merged_data.get("inherit", "global")

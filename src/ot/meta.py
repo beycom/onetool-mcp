@@ -23,17 +23,18 @@ import fnmatch
 import inspect
 import sys
 from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 import aiofiles
 import yaml
 
 from ot import __version__
 from ot.config import get_config
-from ot.paths import get_effective_cwd
 from ot.proxy import get_proxy_manager
-from ot_sdk import log
+from ot_sdk import log, resolve_cwd_path, resolve_ot_path
 
 # Pack name for dot notation: ot.tools(), ot.packs(), etc.
 PACK_NAME = "ot"
@@ -510,12 +511,15 @@ _background_tasks: set[asyncio.Task[None]] = set()
 
 
 def _resolve_path(path: str) -> Path:
-    """Resolve a topic file path relative to project directory.
+    """Resolve a topic file path relative to OT_DIR (.onetool/).
 
-    Path resolution for topic files follows project conventions:
-        - Relative paths: resolved relative to project directory (OT_CWD)
+    Uses SDK resolve_ot_path() for consistent path resolution.
+
+    Path resolution for topic files follows OT_DIR conventions:
+        - Relative paths: resolved relative to OT_DIR (.onetool/)
         - Absolute paths: used as-is
         - ~ paths: expanded to home directory
+        - Prefixed paths (CWD/, GLOBAL/, OT_DIR/): resolved to respective dirs
 
     Note: ${VAR} patterns are NOT expanded here. Use ~/path instead of
     ${HOME}/path. Secrets (e.g., ${API_KEY}) are expanded during config
@@ -527,16 +531,13 @@ def _resolve_path(path: str) -> Path:
     Returns:
         Resolved absolute Path.
     """
-    p = Path(path).expanduser()
-    if p.is_absolute():
-        return p
-    return (get_effective_cwd() / p).resolve()
+    return resolve_ot_path(path)
 
 
 def _match_topic_to_file(topic: str) -> Path | None:
     """Match topic to file path using first matching pattern.
 
-    Paths in topic config are resolved relative to project directory (OT_CWD).
+    Paths in topic config are resolved relative to OT_DIR (.onetool/).
     See _resolve_path() for full path resolution behaviour.
 
     Args:
@@ -700,7 +701,7 @@ def health() -> dict[str, Any]:
         result = {
             "version": __version__,
             "python": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
-            "cwd": str(get_effective_cwd()),
+            "cwd": str(resolve_cwd_path(".")),
             "registry": registry_status,
             "proxy": proxy_status,
         }

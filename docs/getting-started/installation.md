@@ -147,11 +147,28 @@ Create a `.onetool/` directory in your project:
 | macOS/Linux | `~/.onetool/` | `.onetool/` |
 | Windows | `%USERPROFILE%\.onetool\` | `.onetool\` |
 
+## Optional Dependencies
+
+Some tools require additional Python packages. These are installed automatically when needed, or you can install them manually for faster first use:
+
+| Tool             | Package        | Install                      |
+|------------------|----------------|------------------------------|
+| `convert.excel`  | openpyxl       | `pip install openpyxl`       |
+| `code.search`    | duckdb, openai | `pip install duckdb openai`  |
+
+When you call a tool that requires an optional dependency, you'll see a clear error message with the install command if it's missing.
+
 ## Feature-Specific Requirements
 
 ### Semantic Code Search (`code_search`)
 
-Requires pre-indexed codebase:
+**Python dependencies:**
+
+```bash
+pip install duckdb openai
+```
+
+**Requires pre-indexed codebase:**
 
 ```bash
 chunkhound index /path/to/project

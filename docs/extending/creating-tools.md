@@ -128,6 +128,56 @@ def search(*, query: str) -> str:
             return f"API error: {e}"
 ```
 
+## Lazy Imports for Optional Dependencies
+
+Tools with optional dependencies must use **lazy imports** inside functions, not at module level. This ensures the tool module loads successfully even when the dependency is not installed - the error only occurs when the user calls a function that needs it.
+
+**Wrong** - fails at module load:
+
+```python
+# Module level import - BREAKS tool loading if duckdb not installed
+import duckdb
+
+def search(*, query: str) -> str:
+    conn = duckdb.connect(":memory:")
+    ...
+```
+
+**Correct** - lazy import inside function:
+
+```python
+def search(*, query: str) -> str:
+    """Search using DuckDB."""
+    try:
+        import duckdb
+    except ImportError as e:
+        raise ImportError(
+            "duckdb is required for search. Install with: pip install duckdb"
+        ) from e
+
+    conn = duckdb.connect(":memory:")
+    ...
+```
+
+For type hints, use `TYPE_CHECKING`:
+
+```python
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from openai import OpenAI
+
+def _get_client() -> "OpenAI":
+    """Get OpenAI client with lazy import."""
+    try:
+        from openai import OpenAI
+    except ImportError as e:
+        raise ImportError(
+            "openai is required. Install with: pip install openai"
+        ) from e
+    return OpenAI(api_key=get_secret("OPENAI_API_KEY"))
+```
+
 ## Worker Tools
 
 Tools with external dependencies run as isolated subprocesses using PEP 723:

@@ -47,7 +47,7 @@ def _setup_signal_handlers() -> None:
 # Init subcommand group - manage global configuration
 init_app = typer.Typer(
     name="init",
-    help="Initialize and manage global configuration in ~/.onetool/",
+    help="Initialize and manage global configuration in ~/.onetool/config/",
     invoke_without_command=True,
 )
 app.add_typer(init_app)
@@ -55,7 +55,7 @@ app.add_typer(init_app)
 
 @init_app.callback()
 def init_callback(ctx: typer.Context) -> None:
-    """Initialize and manage global configuration in ~/.onetool/.
+    """Initialize and manage global configuration in ~/.onetool/config/.
 
     Run without subcommand to initialize global config directory.
     """
@@ -93,12 +93,19 @@ def init_reset() -> None:
     """
     import shutil
 
-    from ot.paths import create_backup, get_global_dir, get_template_files
+    from ot.paths import (
+        CONFIG_SUBDIR,
+        create_backup,
+        get_global_dir,
+        get_template_files,
+    )
 
     global_dir = get_global_dir()
+    config_dir = global_dir / CONFIG_SUBDIR
 
-    # Ensure global dir exists
+    # Ensure directories exist
     global_dir.mkdir(parents=True, exist_ok=True)
+    config_dir.mkdir(exist_ok=True)
 
     template_files = get_template_files()
     if not template_files:
@@ -110,12 +117,12 @@ def init_reset() -> None:
     skipped_files: list[str] = []
 
     for source_path, dest_name in template_files:
-        dest_path = global_dir / dest_name
+        dest_path = config_dir / dest_name
         exists = dest_path.exists()
 
         if exists:
             # Prompt for overwrite
-            console.print(f"\n{dest_name} already exists.")
+            console.print(f"\nconfig/{dest_name} already exists.")
             do_overwrite = typer.confirm("Overwrite?", default=True)
 
             if not do_overwrite:
@@ -123,7 +130,7 @@ def init_reset() -> None:
                 continue
 
             # Prompt for backup
-            do_backup = typer.confirm(f"Create backup of {dest_name}?", default=True)
+            do_backup = typer.confirm(f"Create backup of config/{dest_name}?", default=True)
 
             if do_backup:
                 backup_path = create_backup(dest_path)
@@ -135,19 +142,19 @@ def init_reset() -> None:
     # Summary
     console.print()
     if copied_files:
-        console.print(f"Reset files in {global_dir}/:")
+        console.print(f"Reset files in {config_dir}/:")
         for name in copied_files:
             console.print(f"  + {name}")
 
     if backed_up_files:
         console.print("\nBackups created:")
         for name, backup_path in backed_up_files:
-            console.print(f"  {name} -> {backup_path.name}")
+            console.print(f"  config/{name} -> {backup_path.name}")
 
     if skipped_files:
         console.print("\nSkipped:")
         for name in skipped_files:
-            console.print(f"  - {name}")
+            console.print(f"  - config/{name}")
 
 
 @init_app.command("validate")
@@ -162,7 +169,7 @@ def init_validate() -> None:
     from ot.config.loader import get_config, load_config
     from ot.config.secrets import load_secrets_from_default_locations
     from ot.executor.tool_loader import load_tool_registry
-    from ot.paths import get_global_dir, get_project_dir
+    from ot.paths import CONFIG_SUBDIR, get_global_dir, get_project_dir
 
     # Suppress DEBUG logs from config loader
     logger.remove()
@@ -172,7 +179,7 @@ def init_validate() -> None:
 
     # Check global config
     global_dir = get_global_dir()
-    global_config = global_dir / "ot-serve.yaml"
+    global_config = global_dir / CONFIG_SUBDIR / "ot-serve.yaml"
     if global_config.exists():
         try:
             load_config(global_config)
@@ -183,7 +190,7 @@ def init_validate() -> None:
     # Check project config
     project_dir = get_project_dir()
     if project_dir:
-        project_config = project_dir / "ot-serve.yaml"
+        project_config = project_dir / CONFIG_SUBDIR / "ot-serve.yaml"
         if project_config.exists():
             try:
                 load_config(project_config)
@@ -218,7 +225,7 @@ def init_validate() -> None:
 
     if not validated and not errors:
         console.print("\nNo configuration files found.")
-        console.print(f"Checked: {global_config}, .onetool/ot-serve.yaml")
+        console.print(f"Checked: {global_config}, .onetool/config/ot-serve.yaml")
         return
 
     # Load merged config for status display

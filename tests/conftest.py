@@ -89,6 +89,44 @@ COMPONENT_MARKERS = {"serve", "bench", "browse", "pkg", "core", "spec", "tools"}
 
 
 # -----------------------------------------------------------------------------
+# Config Isolation for Unit Tests
+# -----------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def reset_config_cache():
+    """Reset config cache before each test to ensure test isolation.
+
+    This prevents user's global config (~/.onetool/config/ot-serve.yaml) from
+    affecting unit tests. Tests use tests/.onetool/config/ot-serve.yaml
+    which has inherit: none to prevent global config inheritance.
+    """
+    import ot.config.loader as loader
+    from ot.executor import tool_loader
+
+    # Reset config cache
+    loader._config = None
+
+    # Reset tool loader cache
+    tool_loader._module_cache.clear()
+
+    # Set OT_SERVE_CONFIG to test config that uses inherit: none
+    test_config = _project_root / "tests" / ".onetool" / "config" / "ot-serve.yaml"
+    old_config_env = os.environ.get("OT_SERVE_CONFIG")
+    os.environ["OT_SERVE_CONFIG"] = str(test_config)
+
+    yield
+
+    # Restore original env and clean up
+    if old_config_env is not None:
+        os.environ["OT_SERVE_CONFIG"] = old_config_env
+    else:
+        os.environ.pop("OT_SERVE_CONFIG", None)
+    loader._config = None
+    tool_loader._module_cache.clear()
+
+
+# -----------------------------------------------------------------------------
 # Executor Fixture for Unit Tests
 # -----------------------------------------------------------------------------
 

@@ -17,14 +17,17 @@ __all__ = ["count", "files", "search", "types"]
 import contextlib
 import shutil
 import subprocess
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 from ot.config import get_tool_config
 from ot.logging import LogSpan
-from ot.paths import get_effective_cwd
 from ot.utils.platform import get_install_hint
+from ot_sdk import resolve_cwd_path
 
 
 class Config(BaseModel):
@@ -41,23 +44,21 @@ class Config(BaseModel):
 def _resolve_path(path: str) -> Path:
     """Resolve a search path relative to project directory.
 
+    Uses SDK resolve_cwd_path() for consistent path resolution.
+
     Path resolution follows project conventions:
         - Relative paths: resolved relative to project directory (OT_CWD)
         - Absolute paths: used as-is
-
-    Note: Does not expand ~ or ${VAR} patterns. Use absolute paths or paths
-    relative to project directory.
+        - ~ paths: expanded to home directory
+        - Prefixed paths (CWD/, GLOBAL/, OT_DIR/): resolved to respective dirs
 
     Args:
-        path: Path string (absolute or relative)
+        path: Path string (can contain ~ or prefixes)
 
     Returns:
         Resolved absolute Path
     """
-    p = Path(path)
-    if p.is_absolute():
-        return p
-    return get_effective_cwd() / p
+    return resolve_cwd_path(path)
 
 
 def _check_rg_installed() -> str | None:

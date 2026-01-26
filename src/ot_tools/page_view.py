@@ -51,7 +51,7 @@ class Config(BaseModel):
     """Pack configuration - discovered by registry."""
 
     sessions_dir: str = Field(
-        default=".browse",
+        default=".onetool/sessions",
         description="Directory for browser session captures (relative to project)",
     )
 
@@ -62,10 +62,10 @@ def _get_default_sessions_dir() -> str:
     Reads from ot-serve.yaml:
         tools:
           page_view:
-            sessions_dir: ".browse"  # default
+            sessions_dir: ".onetool/sessions"  # default
 
     Returns:
-        Directory name (typically ".browse").
+        Directory name (typically ".onetool/sessions").
     """
     return get_tool_config("page", Config).sessions_dir
 

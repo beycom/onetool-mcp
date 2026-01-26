@@ -15,7 +15,7 @@ def test_config_has_required_logging_fields() -> None:
 
     # Check fields have expected defaults (migrated from Settings)
     assert config.log_level == "INFO"
-    assert config.log_dir == "../logs"
+    assert config.log_dir == "logs"  # relative to .onetool/
     assert config.compact_max_length == 120
 
 

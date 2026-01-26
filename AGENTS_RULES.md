@@ -45,7 +45,8 @@
 
 ## Testing
 
-Run tests with `just test` (uses `uv run pytest` for proper dependency resolution).
+Always use `uv run pytest` for proper dependency resolution (never bare `pytest` or `python -m pytest`).
+Shortcut: `just test` runs the full suite.
 Markers required: speed (`smoke`|`unit`|`integration`|`slow`) + component (`core`|`bench`|`serve`)
 Principles: lean tests, DRY fixtures in `conftest.py`, test behaviour not implementation
 

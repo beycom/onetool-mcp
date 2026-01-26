@@ -21,36 +21,44 @@ import pytest
 class TestResolvePath:
     """Test _resolve_path function."""
 
-    @patch("ot_tools.ripgrep.get_effective_cwd")
-    def test_absolute_path_unchanged(self, mock_cwd):
+    def test_absolute_path_unchanged(self):
+        import ot_sdk.config as config_module
+
         from ot_tools.ripgrep import _resolve_path
 
-        mock_cwd.return_value = Path("/project")
+        config_module._current_config.clear()
+        config_module._current_config.update({"_project_path": "/project"})
 
         result = _resolve_path("/absolute/path")
 
         assert result == Path("/absolute/path")
-        mock_cwd.assert_not_called()
+        config_module._current_config.clear()
 
-    @patch("ot_tools.ripgrep.get_effective_cwd")
-    def test_relative_path_resolved(self, mock_cwd):
+    def test_relative_path_resolved(self):
+        import ot_sdk.config as config_module
+
         from ot_tools.ripgrep import _resolve_path
 
-        mock_cwd.return_value = Path("/project")
+        config_module._current_config.clear()
+        config_module._current_config.update({"_project_path": "/project"})
 
         result = _resolve_path("src/main.py")
 
         assert result == Path("/project/src/main.py")
+        config_module._current_config.clear()
 
-    @patch("ot_tools.ripgrep.get_effective_cwd")
-    def test_dot_path_resolved(self, mock_cwd):
+    def test_dot_path_resolved(self):
+        import ot_sdk.config as config_module
+
         from ot_tools.ripgrep import _resolve_path
 
-        mock_cwd.return_value = Path("/project")
+        config_module._current_config.clear()
+        config_module._current_config.update({"_project_path": "/project"})
 
         result = _resolve_path(".")
 
         assert result == Path("/project")
+        config_module._current_config.clear()
 
 
 @pytest.mark.unit

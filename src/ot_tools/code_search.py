@@ -12,17 +12,20 @@ from __future__ import annotations
 # Pack for dot notation: code.search(), code.status()
 pack = "code"
 
-__all__ = ["search", "status"]
+__all__ = ["autodoc", "research", "search", "search_batch", "status"]
 
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
 from ot.config import get_tool_config
 from ot.config.secrets import get_secret
-from ot.paths import get_effective_cwd
-from ot_sdk import log
+from ot_sdk import log, resolve_cwd_path
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from openai import OpenAI
 
 
 class Config(BaseModel):
@@ -34,39 +37,42 @@ class Config(BaseModel):
         le=100,
         description="Maximum number of search results to return",
     )
+    base_url: str = Field(
+        default="https://openrouter.ai/api/v1",
+        description="OpenAI-compatible API base URL for embeddings",
+    )
+    model: str = Field(
+        default="text-embedding-3-small",
+        description="Embedding model (must match ChunkHound index)",
+    )
+    db_path: str = Field(
+        default=".chunkhound/db/chunks.db",
+        description="Path to ChunkHound DuckDB database relative to project root",
+    )
+    provider: str = Field(
+        default="openai",
+        description="Embedding provider stored in ChunkHound index",
+    )
+    dimensions: int = Field(
+        default=1536,
+        description="Embedding dimensions (must match model)",
+    )
 
-try:
-    import duckdb
-except ImportError as e:
-    raise ImportError(
-        "duckdb is required for code_search. Install with: pip install duckdb"
-    ) from e
 
-try:
-    from openai import OpenAI
-except ImportError as e:
-    raise ImportError(
-        "openai is required for code_search. Install with: pip install openai"
-    ) from e
-
-# ChunkHound database paths (DuckDB default)
-CHUNKHOUND_DB_PATH = ".chunkhound/db/chunks.db"
-
-# Embedding configuration (must match ChunkHound's configuration)
-EMBEDDING_PROVIDER = "openai"
-EMBEDDING_MODEL = "text-embedding-3-small"
-EMBEDDING_DIMENSIONS = 1536
+def _get_config() -> Config:
+    """Get code pack configuration."""
+    return get_tool_config("code", Config)
 
 
 def _get_db_path(path: str | None = None) -> tuple[Path, Path]:
     """Get the ChunkHound DuckDB path and project root.
 
+    Uses SDK resolve_cwd_path() for consistent path resolution.
+
     Path resolution follows project conventions:
         - If path is None: uses project directory (OT_CWD)
-        - If path provided: resolves as absolute or ~ path
+        - If path provided: resolves with prefix/tilde expansion
         - Database is always at {project_root}/.chunkhound/db/chunks.db
-
-    Note: ${VAR} patterns are NOT expanded. Use ~/path instead of ${HOME}/path.
 
     Args:
         path: Path to project root (default: OT_CWD)
@@ -74,47 +80,109 @@ def _get_db_path(path: str | None = None) -> tuple[Path, Path]:
     Returns:
         Tuple of (db_path, project_root)
     """
-    if path is None:
-        project_root = get_effective_cwd()
-    else:
-        project_root = Path(path).expanduser().resolve()
-    db_path = project_root / CHUNKHOUND_DB_PATH
+    config = _get_config()
+    project_root = resolve_cwd_path(".") if path is None else resolve_cwd_path(path)
+    db_path = project_root / config.db_path
     return db_path, project_root
 
 
 def _get_openai_client() -> OpenAI:
     """Get OpenAI client for embedding generation."""
+    try:
+        from openai import OpenAI
+    except ImportError as e:
+        raise ImportError(
+            "openai is required for code_search. Install with: pip install openai"
+        ) from e
+
     api_key = get_secret("OPENAI_API_KEY") or ""
-    base_url = get_secret("OPENAI_BASE_URL") or ""
     if not api_key:
         raise ValueError(
             "OPENAI_API_KEY not configured in secrets.yaml (required for code search embeddings)"
         )
-    return OpenAI(api_key=api_key, base_url=base_url or None)
+    config = _get_config()
+    return OpenAI(api_key=api_key, base_url=config.base_url or None)
+
+
+def _import_duckdb():
+    """Lazy import duckdb module."""
+    try:
+        import duckdb
+    except ImportError as e:
+        raise ImportError(
+            "duckdb is required for code_search. Install with: pip install duckdb"
+        ) from e
+    return duckdb
 
 
 def _generate_embedding(query: str) -> list[float]:
     """Generate embedding vector for a search query."""
-    with log("code.embedding", model=EMBEDDING_MODEL, queryLen=len(query)) as span:
+    config = _get_config()
+    with log("code.embedding", model=config.model, queryLen=len(query)) as span:
         client = _get_openai_client()
         response = client.embeddings.create(
-            model=EMBEDDING_MODEL,
+            model=config.model,
             input=query,
         )
         span.add(dimensions=len(response.data[0].embedding))
         return response.data[0].embedding
 
 
-def _format_result(result: dict[str, Any]) -> dict[str, Any]:
-    """Format a search result for output."""
+def _generate_embeddings_batch(queries: list[str]) -> list[list[float]]:
+    """Generate embedding vectors for multiple queries in a single API call."""
+    config = _get_config()
+    with log(
+        "code.embedding_batch", model=config.model, queryCount=len(queries)
+    ) as span:
+        client = _get_openai_client()
+        response = client.embeddings.create(
+            model=config.model,
+            input=queries,
+        )
+        embeddings = [item.embedding for item in response.data]
+        span.add(dimensions=len(embeddings[0]) if embeddings else 0)
+        return embeddings
+
+
+def _format_result(
+    result: dict[str, Any],
+    project_root: Path | None = None,
+    expand: int | None = None,
+) -> dict[str, Any]:
+    """Format a search result for output.
+
+    Args:
+        result: Raw search result from database
+        project_root: Project root for file reading (needed for expand)
+        expand: Number of context lines to include around match
+    """
+    content = result.get("content", "")
+    start_line = result.get("start_line")
+    end_line = result.get("end_line")
+
+    # Expand content if requested and we have valid line numbers
+    if expand and project_root and start_line and end_line:
+        file_path = project_root / result.get("file_path", "")
+        if file_path.exists():
+            try:
+                lines = file_path.read_text().splitlines()
+                # Calculate expanded range (1-indexed to 0-indexed)
+                exp_start = max(0, start_line - 1 - expand)
+                exp_end = min(len(lines), end_line + expand)
+                content = "\n".join(lines[exp_start:exp_end])
+                start_line = exp_start + 1
+                end_line = exp_end
+            except Exception:
+                pass  # Fall back to original content
+
     return {
         "file": result.get("file_path", "unknown"),
         "name": result.get("symbol", ""),
         "type": result.get("chunk_type", ""),
         "language": result.get("language", ""),
-        "lines": f"{result.get('start_line', '?')}-{result.get('end_line', '?')}",
+        "lines": f"{start_line or '?'}-{end_line or '?'}",
         "score": round(result.get("similarity", 0.0), 4),
-        "content": result.get("content", "")[:500],  # Truncate long content
+        "content": content[:2000] if expand else content[:500],
     }
 
 
@@ -123,6 +191,9 @@ def search(
     query: str,
     limit: int | None = None,
     language: str | None = None,
+    chunk_type: str | None = None,
+    expand: int | None = None,
+    exclude: str | None = None,
     path: str | None = None,
 ) -> str:
     """Search for code semantically in a ChunkHound-indexed project.
@@ -137,6 +208,9 @@ def search(
         query: Natural language search query (e.g., "error handling", "database connection")
         limit: Maximum number of results to return (defaults to config)
         language: Filter results by language (e.g., "python", "typescript")
+        chunk_type: Filter by type (e.g., "function", "class", "method", "comment")
+        expand: Number of context lines to include around each match
+        exclude: Pipe-separated patterns to exclude (e.g., "test|mock|fixture")
         path: Path to project root (default: cwd)
 
     Returns:
@@ -145,13 +219,16 @@ def search(
 
     Example:
         # Search in current directory
-        code.search("authentication logic")
+        code.search(query="authentication logic")
 
-        # Find Python-only results
-        code.search("database queries", language="python")
+        # Find Python functions only
+        code.search(query="database queries", language="python", chunk_type="function")
 
-        # Explicit path
-        code.search("error handling", path="/path/to/other-project")
+        # Get expanded context
+        code.search(query="error handling", expand=10)
+
+        # Exclude test files
+        code.search(query="validation", exclude="test|mock")
     """
     if limit is None:
         limit = get_tool_config("code", Config).limit
@@ -163,6 +240,9 @@ def search(
         query=query,
         limit=limit,
         language=language,
+        chunk_type=chunk_type,
+        expand=expand,
+        exclude=exclude,
     ) as s:
         # Check if project is indexed
         if not db_path.exists():
@@ -175,12 +255,14 @@ def search(
 
         try:
             # Connect to DuckDB and load vss extension
+            duckdb = _import_duckdb()
             conn = duckdb.connect(str(db_path), read_only=True)
             conn.execute("LOAD vss")
 
             # Check if required tables exist
+            config = _get_config()
             tables = [row[0] for row in conn.execute("SHOW TABLES").fetchall()]
-            embeddings_table = f"embeddings_{EMBEDDING_DIMENSIONS}"
+            embeddings_table = f"embeddings_{config.dimensions}"
 
             if "chunks" not in tables:
                 s.add("error", "no_chunks_table")
@@ -204,19 +286,31 @@ def search(
                     c.end_line,
                     f.path as file_path,
                     f.language,
-                    array_cosine_similarity(e.embedding, ?::FLOAT[{EMBEDDING_DIMENSIONS}]) as similarity
+                    array_cosine_similarity(e.embedding, ?::FLOAT[{config.dimensions}]) as similarity
                 FROM {embeddings_table} e
                 JOIN chunks c ON e.chunk_id = c.id
                 JOIN files f ON c.file_id = f.id
                 WHERE e.provider = ? AND e.model = ?
             """
 
-            params: list[Any] = [embedding, EMBEDDING_PROVIDER, EMBEDDING_MODEL]
+            params: list[Any] = [embedding, config.provider, config.model]
 
             # Apply language filter if specified
             if language:
                 sql += " AND LOWER(f.language) = LOWER(?)"
                 params.append(language)
+
+            # Apply chunk_type filter if specified
+            if chunk_type:
+                sql += " AND LOWER(c.chunk_type) = LOWER(?)"
+                params.append(chunk_type)
+
+            # Apply exclude filter if specified (pipe-separated patterns)
+            if exclude:
+                patterns = [p.strip() for p in exclude.split("|") if p.strip()]
+                for pattern in patterns:
+                    sql += " AND f.path NOT LIKE ?"
+                    params.append(f"%{pattern}%")
 
             sql += " ORDER BY similarity DESC LIMIT ?"
             params.append(limit)
@@ -242,7 +336,7 @@ def search(
                     "language": row[7],
                     "similarity": row[8],
                 }
-                formatted.append(_format_result(result))
+                formatted.append(_format_result(result, project_root, expand))
 
             # Build output
             output_lines = [f"Found {len(formatted)} results for: {query}\n"]
@@ -262,6 +356,293 @@ def search(
         except Exception as e:
             s.add("error", str(e))
             return f"Error searching code: {e}"
+
+
+def search_batch(
+    *,
+    queries: str,
+    limit: int | None = None,
+    language: str | None = None,
+    chunk_type: str | None = None,
+    expand: int | None = None,
+    exclude: str | None = None,
+    path: str | None = None,
+) -> str:
+    """Run multiple semantic searches and return merged, deduplicated results.
+
+    Uses batch embedding API (single call) for efficiency. Results are
+    deduplicated by file+lines, keeping the highest score.
+
+    Args:
+        queries: Pipe-separated search queries (e.g., "auth logic|token validation|session")
+        limit: Maximum results per query (defaults to config)
+        language: Filter by language (e.g., "python")
+        chunk_type: Filter by type (e.g., "function", "class")
+        expand: Number of context lines to include around each match
+        exclude: Pipe-separated patterns to exclude (e.g., "test|mock")
+        path: Path to project root (default: cwd)
+
+    Returns:
+        Merged results sorted by score, with duplicates removed.
+
+    Example:
+        # Multiple related queries
+        code.search_batch(queries="authentication|login|session handling")
+
+        # Exclude test files
+        code.search_batch(queries="error handling|validation", exclude="test|mock")
+    """
+    if limit is None:
+        limit = get_tool_config("code", Config).limit
+    db_path, project_root = _get_db_path(path)
+
+    # Parse pipe-separated queries
+    query_list = [q.strip() for q in queries.split("|") if q.strip()]
+    if not query_list:
+        return "Error: No valid queries provided"
+
+    with log(
+        "code.search_batch",
+        project=str(project_root),
+        queryCount=len(query_list),
+        limit=limit,
+        exclude=exclude,
+    ) as s:
+        if not db_path.exists():
+            msg = f"Project not indexed. Run: chunkhound index {project_root}"
+            s.add("error", "not_indexed")
+            return f"Error: {msg}"
+
+        try:
+            duckdb = _import_duckdb()
+            conn = duckdb.connect(str(db_path), read_only=True)
+            conn.execute("LOAD vss")
+
+            config = _get_config()
+            tables = [row[0] for row in conn.execute("SHOW TABLES").fetchall()]
+            embeddings_table = f"embeddings_{config.dimensions}"
+
+            if "chunks" not in tables:
+                s.add("error", "no_chunks_table")
+                return f"Error: Database missing 'chunks' table. Re-index with: chunkhound index {project_root}"
+
+            if embeddings_table not in tables:
+                s.add("error", "no_embeddings_table")
+                return f"Error: Database missing '{embeddings_table}' table. Re-index with: chunkhound index {project_root}"
+
+            # Generate all embeddings in a single API call
+            embeddings = _generate_embeddings_batch(query_list)
+
+            # Collect all results
+            all_results: dict[str, dict[str, Any]] = {}  # key: file:lines
+
+            for query, embedding in zip(query_list, embeddings, strict=True):
+                sql = f"""
+                    SELECT
+                        c.id as chunk_id,
+                        c.symbol,
+                        c.code as content,
+                        c.chunk_type,
+                        c.start_line,
+                        c.end_line,
+                        f.path as file_path,
+                        f.language,
+                        array_cosine_similarity(e.embedding, ?::FLOAT[{config.dimensions}]) as similarity
+                    FROM {embeddings_table} e
+                    JOIN chunks c ON e.chunk_id = c.id
+                    JOIN files f ON c.file_id = f.id
+                    WHERE e.provider = ? AND e.model = ?
+                """
+
+                params: list[Any] = [embedding, config.provider, config.model]
+
+                if language:
+                    sql += " AND LOWER(f.language) = LOWER(?)"
+                    params.append(language)
+
+                if chunk_type:
+                    sql += " AND LOWER(c.chunk_type) = LOWER(?)"
+                    params.append(chunk_type)
+
+                if exclude:
+                    patterns = [p.strip() for p in exclude.split("|") if p.strip()]
+                    for pattern in patterns:
+                        sql += " AND f.path NOT LIKE ?"
+                        params.append(f"%{pattern}%")
+
+                sql += " ORDER BY similarity DESC LIMIT ?"
+                params.append(limit)
+
+                results = conn.execute(sql, params).fetchall()
+
+                for row in results:
+                    result = {
+                        "chunk_id": row[0],
+                        "symbol": row[1],
+                        "content": row[2],
+                        "chunk_type": row[3],
+                        "start_line": row[4],
+                        "end_line": row[5],
+                        "file_path": row[6],
+                        "language": row[7],
+                        "similarity": row[8],
+                        "matched_query": query,
+                    }
+                    # Dedupe key: file path + line range
+                    key = f"{row[6]}:{row[4]}-{row[5]}"
+                    if key not in all_results or row[8] > all_results[key]["similarity"]:
+                        all_results[key] = result
+
+            if not all_results:
+                s.add("resultCount", 0)
+                return f"No results found for queries: {', '.join(query_list)}"
+
+            # Sort by similarity and format
+            sorted_results = sorted(
+                all_results.values(), key=lambda x: x["similarity"], reverse=True
+            )
+            formatted = [
+                _format_result(r, project_root, expand) for r in sorted_results
+            ]
+
+            # Build output
+            output_lines = [
+                f"Found {len(formatted)} results for {len(query_list)} queries\n"
+            ]
+            for i, r in enumerate(formatted, 1):
+                output_lines.append(
+                    f"{i}. [{r['type']}] {r['name']} ({r['language']})\n"
+                    f"   File: {r['file']}:{r['lines']}\n"
+                    f"   Score: {r['score']}\n"
+                    f"   ```\n{r['content']}\n   ```\n"
+                )
+
+            output = "\n".join(output_lines)
+            s.add("resultCount", len(formatted))
+            s.add("outputLen", len(output))
+            return output
+
+        except Exception as e:
+            s.add("error", str(e))
+            return f"Error in batch search: {e}"
+
+
+def research(
+    *,
+    query: str,
+    path: str | None = None,
+) -> str:
+    """Deep code research with LLM synthesis using ChunkHound.
+
+    Performs multi-hop semantic search and synthesizes findings using an LLM.
+    More expensive than search() but provides comprehensive analysis.
+
+    Args:
+        query: Architectural or conceptual question (e.g., "how does auth flow work")
+        path: Scope to a specific path within the project
+
+    Returns:
+        LLM-synthesized analysis of the codebase based on the query.
+
+    Example:
+        code.research(query="how does authentication flow work across services")
+        code.research(query="error handling patterns", path="src/api/")
+    """
+    db_path, project_root = _get_db_path(path)
+
+    with log("code.research", project=str(project_root), query=query) as s:
+        if not db_path.exists():
+            s.add("error", "not_indexed")
+            return f"Error: Project not indexed. Run: chunkhound index {project_root}"
+
+        try:
+            from chunkhound.tools import code_research
+        except ImportError:
+            s.add("error", "chunkhound_not_installed")
+            return (
+                "Error: chunkhound package required for research.\n"
+                "Install with: pip install chunkhound"
+            )
+
+        try:
+            result = code_research(
+                query=query,
+                project_path=str(project_root),
+                scope_path=path,
+            )
+            s.add("success", True)
+            return result
+        except Exception as e:
+            s.add("error", str(e))
+            return f"Error in code research: {e}"
+
+
+def autodoc(
+    *,
+    scope: str = ".",
+    out: str | None = None,
+    comprehensiveness: str = "standard",
+    path: str | None = None,
+) -> str:
+    """Generate architecture documentation using ChunkHound's Code Mapper.
+
+    Creates flowing documentation with code citations. Expensive operation
+    using multiple LLM calls.
+
+    Args:
+        scope: Directory scope for documentation (default: entire project)
+        out: Output file path for generated documentation
+        comprehensiveness: Level of detail - "quick", "standard", or "thorough"
+        path: Path to project root (default: cwd)
+
+    Returns:
+        Generated architecture documentation or path to output file.
+
+    Example:
+        code.autodoc(scope="src/auth/", out="docs/auth-architecture.md")
+        code.autodoc(scope=".", comprehensiveness="thorough")
+    """
+    db_path, project_root = _get_db_path(path)
+
+    with log(
+        "code.autodoc",
+        project=str(project_root),
+        scope=scope,
+        comprehensiveness=comprehensiveness,
+    ) as s:
+        if not db_path.exists():
+            s.add("error", "not_indexed")
+            return f"Error: Project not indexed. Run: chunkhound index {project_root}"
+
+        try:
+            from chunkhound.tools import code_mapper
+        except ImportError:
+            s.add("error", "chunkhound_not_installed")
+            return (
+                "Error: chunkhound package required for autodoc.\n"
+                "Install with: pip install chunkhound"
+            )
+
+        try:
+            result = code_mapper(
+                project_path=str(project_root),
+                scope_path=scope,
+                comprehensiveness=comprehensiveness,
+            )
+
+            # Write to file if output path specified
+            if out:
+                out_path = project_root / out
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text(result)
+                s.add("output_file", str(out_path))
+                return f"Documentation written to: {out_path}"
+
+            s.add("success", True)
+            return result
+        except Exception as e:
+            s.add("error", str(e))
+            return f"Error generating documentation: {e}"
 
 
 def status(*, path: str | None = None) -> str:
@@ -295,6 +676,7 @@ def status(*, path: str | None = None) -> str:
             )
 
         try:
+            duckdb = _import_duckdb()
             conn = duckdb.connect(str(db_path), read_only=True)
             tables = [row[0] for row in conn.execute("SHOW TABLES").fetchall()]
 
@@ -324,7 +706,8 @@ def status(*, path: str | None = None) -> str:
                 stats["file_count"] = file_count
 
             # Get embedding statistics
-            embeddings_table = f"embeddings_{EMBEDDING_DIMENSIONS}"
+            config = _get_config()
+            embeddings_table = f"embeddings_{config.dimensions}"
             if embeddings_table in tables:
                 emb_count = conn.execute(
                     f"SELECT COUNT(*) FROM {embeddings_table}"

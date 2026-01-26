@@ -41,6 +41,8 @@ dependencies = [
     "aiofiles>=25.1.0",
     # Docstring parsing for ot.help() and ot.tools()
     "docstring-parser>=0.17",
+    # Database engine for code_search and db tools
+    "duckdb>=1.4.3",
 ]
 
 [project.urls]

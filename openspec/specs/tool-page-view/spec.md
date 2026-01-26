@@ -2,14 +2,14 @@
 
 ## Purpose
 
-Provides LLM-friendly tools for analyzing browse session captures from `onetool-browse`. These tools enable navigation, annotation inspection, search, and comparison of page captures stored in `.browse/` directories.
+Provides LLM-friendly tools for analyzing browse session captures from `onetool-browse`. These tools enable navigation, annotation inspection, search, and comparison of page captures stored in `.onetool/sessions/` directories.
 ## Requirements
 ### Requirement: Page View List Tool
 
 The `page.list` tool SHALL list available page views.
 
 #### Scenario: List all sessions
-- **GIVEN** a `.browse/` directory with 3 sessions
+- **GIVEN** a `.onetool/sessions/` directory with 3 sessions
 - **WHEN** `page.list()` is called
 - **THEN** it returns a list of sessions with:
   - Session name/path
@@ -18,7 +18,7 @@ The `page.list` tool SHALL list available page views.
   - Latest capture URL and title
 
 #### Scenario: Output format
-- **GIVEN** sessions in .browse/
+- **GIVEN** sessions in .onetool/sessions/
 - **WHEN** `page.list()` is called
 - **THEN** output is formatted as:
 
@@ -34,7 +34,7 @@ The `page.list` tool SHALL list available page views.
   ```
 
 #### Scenario: No sessions
-- **GIVEN** an empty .browse/ directory
+- **GIVEN** an empty .onetool/sessions/ directory
 - **WHEN** `page.list()` is called
 - **THEN** it returns "No sessions found in: {path}"
 
@@ -50,9 +50,9 @@ The `page.list` tool SHALL list available page views.
 
 #### Scenario: Default sessions directory resolution
 - **GIVEN** no explicit sessions_dir or project specified
-- **AND** config `tools.page_view.sessions_dir` is `".browse"` (default)
+- **AND** config `tools.page_view.sessions_dir` is `".onetool/sessions"` (default)
 - **WHEN** `page.list()` is called
-- **THEN** it resolves `.browse` relative to project working directory (`OT_CWD` or cwd)
+- **THEN** it resolves `.onetool/sessions` relative to project working directory (`OT_CWD` or cwd)
 - **AND** falls back to home directory if not found in project
 
 ### Requirement: Page View Captures Tool
@@ -307,7 +307,7 @@ The `page.diff` tool SHALL compare two captures to show what changed.
 The `page.summary` tool SHALL provide a quick overview of a page capture with file size guidance for LLMs.
 
 #### Scenario: Get capture summary
-- **GIVEN** a page view at `.browse/2025-12-31_22-46_session_001`
+- **GIVEN** a page view at `.onetool/sessions/2025-12-31_22-46_session_001`
 - **WHEN** `page.summary(session_id="001", capture_id="001")` is called
 - **THEN** it returns a markdown summary including:
   - Page URL and title
@@ -415,7 +415,7 @@ Tools SHALL resolve `.browse` directories from configured projects.
 #### Scenario: Resolve from project name
 - **GIVEN** `ot-serve.yaml` contains `projects: { onetool: /path/to/onetool }`
 - **WHEN** `page.list(project="onetool")` is called
-- **THEN** it lists sessions from `/path/to/onetool/.browse`
+- **THEN** it lists sessions from `/path/to/onetool/.onetool/sessions`
 
 #### Scenario: Project not found
 - **GIVEN** no project named "foo" is configured

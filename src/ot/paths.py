@@ -5,6 +5,13 @@ OneTool uses a three-tier directory structure:
 - Global: ~/.onetool/ — user-wide settings, secrets
 - Project: .onetool/ — project-specific config
 
+Each .onetool/ directory uses subdirectories to organise files by purpose:
+- config/ — YAML configuration files
+- logs/ — Application log files
+- stats/ — Statistics data (stats.jsonl)
+- sessions/ — Browser session state
+- tools/ — Reserved for installed tool packs
+
 Directories are created lazily on first use, not on install.
 """
 
@@ -18,6 +25,13 @@ from pathlib import Path
 # Directory names
 GLOBAL_DIR_NAME = ".onetool"
 PROJECT_DIR_NAME = ".onetool"
+
+# Subdirectory names within .onetool/
+CONFIG_SUBDIR = "config"
+LOGS_SUBDIR = "logs"
+STATS_SUBDIR = "stats"
+SESSIONS_SUBDIR = "sessions"
+TOOLS_SUBDIR = "tools"
 
 # Package containing bundled config defaults
 BUNDLED_CONFIG_PACKAGE = "ot.config.defaults"
@@ -216,9 +230,10 @@ def create_backup(file_path: Path) -> Path:
 
 
 def ensure_global_dir(quiet: bool = False, force: bool = False) -> Path:
-    """Ensure the global OneTool directory exists.
+    """Ensure the global OneTool directory exists with subdirectory structure.
 
-    Creates ~/.onetool/ and copies template config files from global_templates.
+    Creates ~/.onetool/ with subdirectories (config/, logs/, stats/, sessions/, tools/)
+    and copies template config files from global_templates to config/.
     Templates are user-facing files with commented examples for customization.
     Subdirectories (like diagram-templates/) are NOT copied - they remain in
     bundled defaults and are accessed via config inheritance.
@@ -238,32 +253,38 @@ def ensure_global_dir(quiet: bool = False, force: bool = False) -> Path:
     if global_dir.exists() and not force:
         return global_dir
 
-    # Create directory structure
+    # Create directory structure with subdirectories
     global_dir.mkdir(parents=True, exist_ok=True)
+    subdirs = [CONFIG_SUBDIR, LOGS_SUBDIR, STATS_SUBDIR, SESSIONS_SUBDIR, TOOLS_SUBDIR]
+    for subdir in subdirs:
+        (global_dir / subdir).mkdir(exist_ok=True)
 
-    # Copy template config files from global_templates package
+    # Copy template config files to config/ subdirectory
     # Only YAML files are copied; subdirectories stay in bundled defaults
     # Files named *-template.yaml are copied without the -template suffix
     # (to avoid gitignore patterns on secrets.yaml)
+    config_dir = global_dir / CONFIG_SUBDIR
     copied_items: list[str] = []
     try:
         templates_dir = get_global_templates_dir()
         for config_file in templates_dir.glob("*.yaml"):
             # Strip -template suffix if present (e.g., secrets-template.yaml -> secrets.yaml)
             dest_name = config_file.name.replace("-template.yaml", ".yaml")
-            dest = global_dir / dest_name
+            dest = config_dir / dest_name
             # Copy if doesn't exist, or if forcing
             if not dest.exists() or force:
                 shutil.copy(config_file, dest)
-                copied_items.append(dest_name)
+                copied_items.append(f"config/{dest_name}")
     except FileNotFoundError:
         # Global templates not available (dev environment without package install)
         pass
 
-    if not quiet and copied_items:
+    if not quiet:
         # Use stderr to avoid interfering with MCP stdout
         action = "Resetting" if force else "Creating"
         print(f"{action} {global_dir}/", file=sys.stderr)
+        for subdir in subdirs:
+            print(f"  ✓ {subdir}/", file=sys.stderr)
         for item_name in copied_items:
             print(f"  ✓ {item_name}", file=sys.stderr)
 
@@ -271,9 +292,10 @@ def ensure_global_dir(quiet: bool = False, force: bool = False) -> Path:
 
 
 def ensure_project_dir(path: Path | None = None, quiet: bool = False) -> Path:
-    """Ensure the project OneTool directory exists.
+    """Ensure the project OneTool directory exists with subdirectory structure.
 
-    Creates .onetool/ in the specified directory or effective cwd.
+    Creates .onetool/ in the specified directory or effective cwd,
+    including subdirectories (config/, logs/, stats/, sessions/, tools/).
 
     Args:
         path: Project root (default: get_effective_cwd())
@@ -288,11 +310,16 @@ def ensure_project_dir(path: Path | None = None, quiet: bool = False) -> Path:
     if project_dir.exists():
         return project_dir
 
-    # Create directory structure
+    # Create directory structure with subdirectories
     project_dir.mkdir(parents=True, exist_ok=True)
+    subdirs = [CONFIG_SUBDIR, LOGS_SUBDIR, STATS_SUBDIR, SESSIONS_SUBDIR, TOOLS_SUBDIR]
+    for subdir in subdirs:
+        (project_dir / subdir).mkdir(exist_ok=True)
 
     if not quiet:
         print(f"Creating {project_dir.relative_to(project_root)}/", file=sys.stderr)
+        for subdir in subdirs:
+            print(f"  ✓ {subdir}/", file=sys.stderr)
 
     return project_dir
 
@@ -301,8 +328,8 @@ def get_config_path(cli_name: str, scope: str = "any") -> Path | None:
     """Get the config file path for a CLI.
 
     Resolution order for scope="any":
-    1. cwd/.onetool/<cli>.yaml (project-specific)
-    2. ~/.onetool/<cli>.yaml (global)
+    1. cwd/.onetool/config/<cli>.yaml (project-specific)
+    2. ~/.onetool/config/<cli>.yaml (global)
 
     Args:
         cli_name: CLI name (e.g., "ot-serve", "ot-bench")
@@ -315,13 +342,13 @@ def get_config_path(cli_name: str, scope: str = "any") -> Path | None:
 
     if scope == "project" or scope == "any":
         cwd = get_effective_cwd()
-        project_config = cwd / PROJECT_DIR_NAME / config_name
+        project_config = cwd / PROJECT_DIR_NAME / CONFIG_SUBDIR / config_name
         if project_config.exists():
             return project_config
 
     if scope == "global" or scope == "any":
         global_dir = get_global_dir()
-        global_config = global_dir / config_name
+        global_config = global_dir / CONFIG_SUBDIR / config_name
         if global_config.exists():
             return global_config
 
@@ -341,3 +368,55 @@ def expand_path(path: str) -> Path:
         Expanded absolute Path
     """
     return Path(path).expanduser().resolve()
+
+
+def get_config_dir(base_dir: Path | None = None) -> Path:
+    """Get the config directory path within a .onetool directory.
+
+    Args:
+        base_dir: Base .onetool directory (default: global dir)
+
+    Returns:
+        Path to config/ subdirectory
+    """
+    base = base_dir or get_global_dir()
+    return base / CONFIG_SUBDIR
+
+
+def get_logs_dir(base_dir: Path | None = None) -> Path:
+    """Get the logs directory path within a .onetool directory.
+
+    Args:
+        base_dir: Base .onetool directory (default: global dir)
+
+    Returns:
+        Path to logs/ subdirectory
+    """
+    base = base_dir or get_global_dir()
+    return base / LOGS_SUBDIR
+
+
+def get_stats_dir(base_dir: Path | None = None) -> Path:
+    """Get the stats directory path within a .onetool directory.
+
+    Args:
+        base_dir: Base .onetool directory (default: global dir)
+
+    Returns:
+        Path to stats/ subdirectory
+    """
+    base = base_dir or get_global_dir()
+    return base / STATS_SUBDIR
+
+
+def get_sessions_dir(base_dir: Path | None = None) -> Path:
+    """Get the sessions directory path within a .onetool directory.
+
+    Args:
+        base_dir: Base .onetool directory (default: global dir)
+
+    Returns:
+        Path to sessions/ subdirectory
+    """
+    base = base_dir or get_global_dir()
+    return base / SESSIONS_SUBDIR

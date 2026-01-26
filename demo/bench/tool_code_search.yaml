@@ -50,42 +50,31 @@ scenarios:
         prompt: |
           __ot
           ```python
-          code.search(query="mcp tool execution", max_results=5)
+          code.search(query="mcp tool execution", limit=5)
           ```
           What files handle MCP tool execution?
 
-      - name: "tool:code-search:onetool:pattern"
-        server: onetool
-        tags: [tool, code-search, onetool, pattern]
-        evaluate: code_search
-        prompt: |
-          __ot
-          ```python
-          code.search(query="def.*mcp", mode="regex", max_results=10)
-          ```
-          Find all MCP-related function definitions.
-
-      - name: "tool:code-search:onetool:file-type"
+      - name: "tool:code-search:onetool:python"
         server: onetool
         tags: [tool, code-search, onetool, filter]
         evaluate: code_search
         prompt: |
           __ot
           ```python
-          code.search(query="async def", file_pattern="*.py", max_results=10)
+          code.search(query="async function definition", language="python", limit=10)
           ```
           Find async function definitions in Python files.
 
-      - name: "tool:code-search:onetool:context"
+      - name: "tool:code-search:onetool:status"
         server: onetool
-        tags: [tool, code-search, onetool, context]
+        tags: [tool, code-search, onetool, status]
         evaluate: code_search
         prompt: |
           __ot
           ```python
-          code.search(query="class.*Tool", context_lines=3, max_results=5)
+          code.status()
           ```
-          Find Tool class definitions with surrounding context.
+          Check the code search index status.
 
 servers:
   onetool:

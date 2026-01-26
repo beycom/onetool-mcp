@@ -4,7 +4,7 @@ Loads secrets from secrets.yaml (gitignored) separate from committed configurati
 Secrets are passed to workers via JSON-RPC, not exposed as environment variables.
 
 The secrets file path is resolved from ot-serve.yaml configuration:
-- Default: secrets.yaml (sibling of ot-serve.yaml)
+- Default: secrets.yaml (sibling of ot-serve.yaml in config/ subdirectory)
 - Override via secrets_file in ot-serve.yaml
 
 Example secrets.yaml:
@@ -15,7 +15,7 @@ Example secrets.yaml:
 
 Loading Order:
     load_secrets_from_default_locations() is used during early config loading.
-    The search order is: project (.onetool/secrets.yaml) → global (~/.onetool/secrets.yaml).
+    The search order is: project (.onetool/config/secrets.yaml) → global (~/.onetool/config/secrets.yaml).
     This function is also used by mcp.py for ${VAR} expansion during config loading.
 """
 
@@ -97,8 +97,8 @@ def load_secrets_from_default_locations(silent: bool = False) -> dict[str, str]:
     """Load secrets from default project and global locations.
 
     Searches in order (first found wins):
-    1. Project: {effective_cwd}/.onetool/secrets.yaml
-    2. Global: ~/.onetool/secrets.yaml
+    1. Project: {effective_cwd}/.onetool/config/secrets.yaml
+    2. Global: ~/.onetool/config/secrets.yaml
 
     This is used during early config loading before the full config (with custom
     secrets_file path) is available. Also used by mcp.py for ${VAR} expansion.
@@ -110,12 +110,12 @@ def load_secrets_from_default_locations(silent: bool = False) -> dict[str, str]:
         Dictionary of secret name -> value (empty if no secrets found)
     """
     # Import here to avoid circular imports at module level
-    from ot.paths import get_effective_cwd, get_global_dir
+    from ot.paths import CONFIG_SUBDIR, get_effective_cwd, get_global_dir
 
     # Try project secrets first, then global
     paths_to_try = [
-        get_effective_cwd() / ".onetool" / "secrets.yaml",
-        get_global_dir() / "secrets.yaml",
+        get_effective_cwd() / ".onetool" / CONFIG_SUBDIR / "secrets.yaml",
+        get_global_dir() / CONFIG_SUBDIR / "secrets.yaml",
     ]
 
     for secrets_path in paths_to_try:

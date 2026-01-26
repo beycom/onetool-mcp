@@ -198,12 +198,14 @@ def test_include_loads_snippets_library() -> None:
     from ot.shortcuts import expand_snippet, parse_snippet
 
     # Create self-contained test with known snippets (not dependent on external files)
+    # Standard structure: .onetool/config/ot-serve.yaml with includes relative to OT_DIR
     with tempfile.TemporaryDirectory() as tmpdir:
-        config_dir = Path(tmpdir) / ".onetool"
-        config_dir.mkdir()
+        onetool_dir = Path(tmpdir) / ".onetool"
+        config_dir = onetool_dir / "config"
+        config_dir.mkdir(parents=True)
 
-        # Create a test snippets file with known content
-        test_snippets_path = config_dir / "test-snippets.yaml"
+        # Create a test snippets file in OT_DIR (includes resolve relative to .onetool/)
+        test_snippets_path = onetool_dir / "test-snippets.yaml"
         test_snippets_path.write_text(
             yaml.dump(
                 {
@@ -262,12 +264,14 @@ def test_include_inline_overrides_included() -> None:
     from ot.config.loader import load_config
 
     # Create self-contained test with known snippets (not dependent on external files)
+    # Standard structure: .onetool/config/ot-serve.yaml with includes relative to OT_DIR
     with tempfile.TemporaryDirectory() as tmpdir:
-        config_dir = Path(tmpdir) / ".onetool"
-        config_dir.mkdir()
+        onetool_dir = Path(tmpdir) / ".onetool"
+        config_dir = onetool_dir / "config"
+        config_dir.mkdir(parents=True)
 
-        # Create a test snippets file with known content
-        test_snippets_path = config_dir / "test-snippets.yaml"
+        # Create a test snippets file in OT_DIR (includes resolve relative to .onetool/)
+        test_snippets_path = onetool_dir / "test-snippets.yaml"
         test_snippets_path.write_text(
             yaml.dump(
                 {
@@ -286,7 +290,7 @@ def test_include_inline_overrides_included() -> None:
                 {
                     "version": 1,
                     "inherit": "none",  # Disable inheritance for isolated test
-                    "include": [str(test_snippets_path)],
+                    "include": ["test-snippets.yaml"],
                     "snippets": {
                         "shared_snippet": {"body": "custom.override()"},
                         "my_inline": {"body": "inline.snippet()"},

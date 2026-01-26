@@ -23,6 +23,20 @@ from ot.executor.pep723 import ToolFileInfo, categorize_tools
 from ot.executor.worker_proxy import create_worker_proxy
 from ot.paths import get_effective_cwd
 
+
+def _get_bundled_tools_dir() -> Path | None:
+    """Get the bundled tools directory from the ot_tools package.
+
+    Returns:
+        Path to ot_tools package directory, or None if not found.
+    """
+    try:
+        import ot_tools
+
+        return Path(ot_tools.__file__).parent
+    except (ImportError, AttributeError):
+        return None
+
 if TYPE_CHECKING:
     from ot.config.loader import OneToolConfig
 
@@ -50,7 +64,10 @@ _module_cache: dict[Path, tuple[LoadedTools, dict[str, float]]] = {}
 def _get_tool_files(
     tools_dir: Path | None, config: OneToolConfig | None
 ) -> tuple[set[Path], Path]:
-    """Resolve tool files from config or directory.
+    """Resolve tool files from config, bundled package, or directory.
+
+    Always includes bundled tools from ot_tools package, plus any
+    additional tools from config or explicit tools_dir.
 
     Args:
         tools_dir: Explicit tools directory path.
@@ -59,21 +76,33 @@ def _get_tool_files(
     Returns:
         Tuple of (set of resolved file paths, cache key).
     """
-    config_tool_files = config.get_tool_files() if config else []
+    tool_files: list[Path] = []
 
+    # Always include bundled tools from ot_tools package
+    bundled_dir = _get_bundled_tools_dir()
+    if bundled_dir and bundled_dir.exists():
+        bundled_files = [
+            f for f in bundled_dir.glob("*.py")
+            if f.name != "__init__.py"
+        ]
+        tool_files.extend(bundled_files)
+        logger.debug(f"Found {len(bundled_files)} bundled tools from {bundled_dir}")
+
+    # Add config-specified tools
+    config_tool_files = config.get_tool_files() if config else []
     if config_tool_files:
-        tool_files = config_tool_files
+        tool_files.extend(config_tool_files)
         cache_key = Path("__config__")
     elif tools_dir is not None:
         # Explicit tools_dir provided - use it
-        if not tools_dir.exists():
-            return set(), tools_dir
-        tools_dir = tools_dir.resolve()
-        tool_files = list(tools_dir.glob("*.py"))
+        if tools_dir.exists():
+            tools_dir = tools_dir.resolve()
+            tool_files.extend(tools_dir.glob("*.py"))
         cache_key = tools_dir
     else:
-        # No config and no explicit tools_dir - no extension tools to load
-        # The core 'ot' pack is registered separately from meta.py
+        cache_key = Path("__bundled__")
+
+    if not tool_files:
         return set(), Path("__no_tools__")
 
     current_files = {f.resolve() for f in tool_files if f.exists()}

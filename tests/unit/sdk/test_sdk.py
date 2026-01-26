@@ -344,6 +344,197 @@ class TestSdkPaths:
         result = expand_path("relative/path.txt")
         assert result == Path("relative/path.txt")
 
+    # =========================================================================
+    # New SDK Path API Tests
+    # =========================================================================
+
+    def test_get_ot_dir_uses_config_dir(self, tmp_path: Path) -> None:
+        """Should use _config_dir from context when available."""
+        import ot_sdk.config as config_module
+
+        config_dir = tmp_path / ".onetool"
+        config_module._current_config.clear()
+        config_module._current_config.update({"_config_dir": str(config_dir)})
+
+        from ot_sdk import get_ot_dir
+
+        result = get_ot_dir()
+        assert result == config_dir
+
+    def test_get_ot_dir_project_local(self, tmp_path: Path) -> None:
+        """Should use project-local .onetool if exists."""
+        import ot_sdk.config as config_module
+
+        # Create project-local .onetool
+        project_ot = tmp_path / ".onetool"
+        project_ot.mkdir()
+
+        config_module._current_config.clear()
+        config_module._current_config.update({"_project_path": str(tmp_path)})
+
+        from ot_sdk import get_ot_dir
+
+        result = get_ot_dir()
+        assert result == project_ot
+
+    def test_get_ot_dir_fallback_to_global(self, tmp_path: Path) -> None:
+        """Should fall back to global ~/.onetool/ when no project .onetool."""
+        import ot_sdk.config as config_module
+
+        # No .onetool directory in project
+        config_module._current_config.clear()
+        config_module._current_config.update({"_project_path": str(tmp_path)})
+
+        from ot_sdk import get_ot_dir
+
+        result = get_ot_dir()
+        assert result == Path.home() / ".onetool"
+
+    def test_resolve_path_default_cwd(self, tmp_path: Path) -> None:
+        """Should resolve relative path against CWD by default."""
+        import ot_sdk.config as config_module
+
+        config_module._current_config.clear()
+        config_module._current_config.update({"_project_path": str(tmp_path)})
+
+        from ot_sdk import resolve_path
+
+        result = resolve_path("data/file.txt")
+        assert result == (tmp_path / "data" / "file.txt").resolve()
+
+    def test_resolve_path_ot_dir_base(self, tmp_path: Path) -> None:
+        """Should resolve relative path against OT_DIR with base param."""
+        import ot_sdk.config as config_module
+
+        config_dir = tmp_path / ".onetool"
+        config_module._current_config.clear()
+        config_module._current_config.update({"_config_dir": str(config_dir)})
+
+        from ot_sdk import resolve_path
+
+        result = resolve_path("templates/flow.mmd", base="OT_DIR")
+        assert result == (config_dir / "templates" / "flow.mmd").resolve()
+
+    def test_resolve_path_global_base(self) -> None:
+        """Should resolve relative path against GLOBAL base."""
+        import ot_sdk.config as config_module
+
+        config_module._current_config.clear()
+
+        from ot_sdk import resolve_path
+
+        result = resolve_path("logs/app.log", base="GLOBAL")
+        assert result == (Path.home() / ".onetool" / "logs" / "app.log").resolve()
+
+    def test_resolve_path_cwd_prefix(self, tmp_path: Path) -> None:
+        """Should handle CWD prefix override."""
+        import ot_sdk.config as config_module
+
+        config_dir = tmp_path / ".onetool"
+        config_module._current_config.clear()
+        config_module._current_config.update({
+            "_project_path": str(tmp_path),
+            "_config_dir": str(config_dir),
+        })
+
+        from ot_sdk import resolve_path
+
+        # CWD prefix should override OT_DIR base
+        result = resolve_path("CWD/output.txt", base="OT_DIR")
+        assert result == (tmp_path / "output.txt").resolve()
+
+    def test_resolve_path_global_prefix(self, tmp_path: Path) -> None:
+        """Should handle GLOBAL prefix override."""
+        import ot_sdk.config as config_module
+
+        config_module._current_config.clear()
+        config_module._current_config.update({"_project_path": str(tmp_path)})
+
+        from ot_sdk import resolve_path
+
+        # GLOBAL prefix should override CWD base
+        result = resolve_path("GLOBAL/logs/app.log", base="CWD")
+        assert result == (Path.home() / ".onetool" / "logs" / "app.log").resolve()
+
+    def test_resolve_path_ot_dir_prefix(self, tmp_path: Path) -> None:
+        """Should handle OT_DIR prefix override."""
+        import ot_sdk.config as config_module
+
+        config_dir = tmp_path / ".onetool"
+        config_module._current_config.clear()
+        config_module._current_config.update({
+            "_project_path": str(tmp_path),
+            "_config_dir": str(config_dir),
+        })
+
+        from ot_sdk import resolve_path
+
+        # OT_DIR prefix should override CWD base
+        result = resolve_path("OT_DIR/templates/flow.mmd", base="CWD")
+        assert result == (config_dir / "templates" / "flow.mmd").resolve()
+
+    def test_resolve_path_tilde(self, tmp_path: Path) -> None:
+        """Should handle tilde prefix for home directory."""
+        import ot_sdk.config as config_module
+
+        config_module._current_config.clear()
+        config_module._current_config.update({"_project_path": str(tmp_path)})
+
+        from ot_sdk import resolve_path
+
+        result = resolve_path("~/documents/file.txt")
+        assert result == (Path.home() / "documents" / "file.txt").resolve()
+
+    def test_resolve_path_absolute(self, tmp_path: Path) -> None:
+        """Should return absolute path unchanged."""
+        import ot_sdk.config as config_module
+
+        config_module._current_config.clear()
+        config_module._current_config.update({"_project_path": str(tmp_path)})
+
+        from ot_sdk import resolve_path
+
+        result = resolve_path("/tmp/output.svg")
+        assert result == Path("/tmp/output.svg").resolve()
+
+    def test_resolve_cwd_path(self, tmp_path: Path) -> None:
+        """Should resolve against CWD (convenience wrapper)."""
+        import ot_sdk.config as config_module
+
+        config_module._current_config.clear()
+        config_module._current_config.update({"_project_path": str(tmp_path)})
+
+        from ot_sdk import resolve_cwd_path
+
+        result = resolve_cwd_path("data/file.txt")
+        assert result == (tmp_path / "data" / "file.txt").resolve()
+
+    def test_resolve_ot_path(self, tmp_path: Path) -> None:
+        """Should resolve against OT_DIR (convenience wrapper)."""
+        import ot_sdk.config as config_module
+
+        config_dir = tmp_path / ".onetool"
+        config_module._current_config.clear()
+        config_module._current_config.update({"_config_dir": str(config_dir)})
+
+        from ot_sdk import resolve_ot_path
+
+        result = resolve_ot_path("templates/flow.mmd")
+        assert result == (config_dir / "templates" / "flow.mmd").resolve()
+
+    def test_resolve_path_prefix_only(self, tmp_path: Path) -> None:
+        """Should handle prefix-only paths (e.g., 'CWD', 'GLOBAL')."""
+        import ot_sdk.config as config_module
+
+        config_module._current_config.clear()
+        config_module._current_config.update({"_project_path": str(tmp_path)})
+
+        from ot_sdk import resolve_path
+
+        # Just the prefix should return the base directory
+        assert resolve_path("CWD") == tmp_path
+        assert resolve_path("GLOBAL") == Path.home() / ".onetool"
+
 
 @pytest.mark.unit
 @pytest.mark.core
@@ -357,9 +548,13 @@ class TestSdkExports:
             format_error,
             get_config,
             get_config_path,
+            get_ot_dir,
             get_project_path,
             get_secret,
             http,
+            resolve_cwd_path,
+            resolve_ot_path,
+            resolve_path,
             run_command,
             truncate,
             worker_main,
@@ -375,6 +570,10 @@ class TestSdkExports:
         assert callable(truncate)
         assert callable(format_error)
         assert callable(run_command)
+        assert callable(get_ot_dir)
+        assert callable(resolve_path)
+        assert callable(resolve_cwd_path)
+        assert callable(resolve_ot_path)
         assert hasattr(http, "get")
         assert hasattr(http, "post")
 
@@ -388,10 +587,14 @@ class TestSdkExports:
             "format_error",
             "get_config",
             "get_config_path",
+            "get_ot_dir",
             "get_project_path",
             "get_secret",
             "http",
             "log",
+            "resolve_cwd_path",
+            "resolve_ot_path",
+            "resolve_path",
             "run_command",
             "truncate",
             "worker_main",

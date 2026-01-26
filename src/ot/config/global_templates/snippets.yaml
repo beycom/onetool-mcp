@@ -125,6 +125,32 @@ snippets:
     body: |
       code.search(query="{{ query }}", limit={{ limit }})
 
+  c_q:
+    description: Batch semantic search with multiple queries
+    params:
+      q: { description: "Pipe-separated queries: q1|q2|q3" }
+      limit: { default: 5, description: "Max results per query" }
+      exclude: { default: "", description: "Patterns to exclude: test|mock" }
+    body: |
+      code.search_batch(queries="{{ q }}", limit={{ limit }}{% if exclude %}, exclude="{{ exclude }}"{% endif %})
+
+  c_type:
+    description: Search code filtered by chunk type
+    params:
+      query: { description: "Natural language description" }
+      type: { default: "function", description: "Type: function, class, method, comment" }
+      lang: { default: "", description: "Language filter (e.g., python)" }
+    body: |
+      code.search(query="{{ query }}", chunk_type="{{ type }}"{% if lang %}, language="{{ lang }}"{% endif %})
+
+  c_research:
+    description: Deep code research with LLM synthesis
+    params:
+      query: { description: "Architectural question" }
+      path: { default: "", description: "Scope to path" }
+    body: |
+      code.research(query="{{ query }}"{% if path %}, path="{{ path }}"{% endif %})
+
   # ============================================================================
   # DATABASE (db_)
   # ============================================================================

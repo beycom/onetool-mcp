@@ -12,8 +12,8 @@ The system SHALL load configuration from a YAML file using a standard resolution
 - **GIVEN** no explicit config path provided
 - **AND** no `OT_SERVE_CONFIG` environment variable
 - **WHEN** the server starts
-- **THEN** it SHALL look for `cwd/.onetool/ot-serve.yaml` first
-- **AND** fall back to `~/.onetool/ot-serve.yaml` if not found
+- **THEN** it SHALL look for `cwd/.onetool/config/ot-serve.yaml` first
+- **AND** fall back to `~/.onetool/config/ot-serve.yaml` if not found
 - **AND** use bundled defaults if neither exists
 
 #### Scenario: Environment variable override
@@ -26,8 +26,8 @@ The system SHALL load configuration from a YAML file using a standard resolution
 - **GIVEN** `OT_CWD=myproject` environment variable
 - **AND** no explicit config path
 - **WHEN** the server starts
-- **THEN** it SHALL look for `myproject/.onetool/ot-serve.yaml`
-- **AND** fall back to `~/.onetool/ot-serve.yaml`
+- **THEN** it SHALL look for `myproject/.onetool/config/ot-serve.yaml`
+- **AND** fall back to `~/.onetool/config/ot-serve.yaml`
 
 #### Scenario: Custom configuration file
 - **GIVEN** `--config /path/to/config.yaml` argument
@@ -78,10 +78,21 @@ The transform() tool SHALL use OpenRouter configuration.
 The system SHALL support advanced configuration options with config-relative path resolution.
 
 #### Scenario: Custom tools directory
-- **GIVEN** `tools_dir: ["src/ot_tools/*.py", "plugins/*.py"]`
+- **GIVEN** `tools_dir: ["tools/*.py", "plugins/*.py"]`
 - **WHEN** the server starts
 - **THEN** it SHALL discover tools from all matching glob patterns
-- **DEFAULT** ["src/ot_tools/*.py"]
+- **AND** paths SHALL be resolved relative to the active .onetool directory (OT_DIR)
+- **DEFAULT** ["tools/*.py"]
+
+#### Scenario: Tools directory with CWD prefix
+- **GIVEN** `tools_dir: ["CWD/tools/*.py"]`
+- **WHEN** the server starts
+- **THEN** it SHALL resolve paths relative to the project working directory (CWD)
+
+#### Scenario: Tools directory with tilde
+- **GIVEN** `tools_dir: ["~/shared/tools/*.py"]`
+- **WHEN** the server starts
+- **THEN** it SHALL expand `~` to the user's home directory
 
 #### Scenario: Log level configuration
 - **GIVEN** `log_level: DEBUG`
@@ -582,7 +593,7 @@ The system SHALL support a `secrets_file` field for loading secrets relative to 
 #### Scenario: Default secrets file
 - **GIVEN** no `secrets_file` in configuration
 - **WHEN** the server starts
-- **THEN** it SHALL look for `secrets.yaml` in the same directory as `ot-serve.yaml`
+- **THEN** it SHALL look for `secrets.yaml` in the `config/` subdirectory (same directory as `ot-serve.yaml`)
 
 #### Scenario: Custom secrets file
 - **GIVEN** `secrets_file: ../shared/secrets.yaml`
@@ -610,14 +621,14 @@ The system SHALL support a `secrets_file` field for loading secrets relative to 
 The system SHALL track the directory containing the loaded configuration file.
 
 #### Scenario: Config loaded from file
-- **GIVEN** configuration loaded from `/project/.onetool/ot-serve.yaml`
+- **GIVEN** configuration loaded from `/project/.onetool/config/ot-serve.yaml`
 - **WHEN** relative paths are resolved
-- **THEN** they SHALL resolve relative to `/project/.onetool/`
+- **THEN** they SHALL resolve relative to `/project/.onetool/config/`
 
 #### Scenario: Config loaded from defaults
 - **GIVEN** no configuration file exists
 - **WHEN** the server starts with defaults
-- **THEN** relative paths SHALL resolve relative to `get_effective_cwd() / ".onetool"`
+- **THEN** relative paths SHALL resolve relative to `get_effective_cwd() / ".onetool" / "config"`
 
 #### Scenario: Config directory available
 - **GIVEN** configuration is loaded
@@ -687,10 +698,10 @@ The system SHALL support logging settings in YAML config instead of environment 
 - **DEFAULT** INFO
 
 #### Scenario: Log directory in config
-- **GIVEN** configuration with `log_dir: .local/logs`
+- **GIVEN** configuration with `log_dir: custom/logs`
 - **WHEN** the server starts
-- **THEN** logs SHALL be written to the specified directory
-- **DEFAULT** .local/logs
+- **THEN** logs SHALL be written to the specified directory relative to `.onetool/`
+- **DEFAULT** `logs` (logs written to `.onetool/logs/`)
 
 #### Scenario: Compact max length in config
 - **GIVEN** configuration with `compact_max_length: 200`
@@ -800,7 +811,7 @@ The system SHALL support a top-level `include:` key for merging external config 
 - **WHEN** the file is loaded
 - **THEN** the path SHALL be resolved in order:
   1. Relative to the config file directory
-  2. In `~/.onetool/`
+  2. In `~/.onetool/config/`
   3. In bundled defaults
 - **AND** `~` SHALL expand to user home directory
 
@@ -995,21 +1006,21 @@ The system SHALL resolve `include:` paths with three-tier fallback.
 
 #### Scenario: Include found in project
 - **GIVEN** project config includes `prompts.yaml`
-- **AND** `cwd/.onetool/prompts.yaml` exists
+- **AND** `cwd/.onetool/config/prompts.yaml` exists
 - **WHEN** the include is resolved
 - **THEN** the project file SHALL be used
 
 #### Scenario: Include falls back to global
 - **GIVEN** project config includes `prompts.yaml`
-- **AND** `cwd/.onetool/prompts.yaml` does NOT exist
-- **AND** `~/.onetool/prompts.yaml` exists
+- **AND** `cwd/.onetool/config/prompts.yaml` does NOT exist
+- **AND** `~/.onetool/config/prompts.yaml` exists
 - **WHEN** the include is resolved
 - **THEN** the global file SHALL be used
 
 #### Scenario: Include falls back to bundled
 - **GIVEN** project config includes `prompts.yaml`
-- **AND** `cwd/.onetool/prompts.yaml` does NOT exist
-- **AND** `~/.onetool/prompts.yaml` does NOT exist
+- **AND** `cwd/.onetool/config/prompts.yaml` does NOT exist
+- **AND** `~/.onetool/config/prompts.yaml` does NOT exist
 - **AND** bundled `prompts.yaml` exists
 - **WHEN** the include is resolved
 - **THEN** the bundled file SHALL be used
@@ -1174,5 +1185,24 @@ Statistics configuration SHALL be at the root level, not under `tools`.
 - **GIVEN** no stats configuration specified
 - **WHEN** the server starts
 - **THEN** stats SHALL use defaults from root-level schema
-- **DEFAULT** enabled: true, flush_interval_seconds: 30
+- **DEFAULT** enabled: true, flush_interval_seconds: 30, persist_dir: stats
+
+### Requirement: Stats Directory Configuration
+
+The system SHALL support a dedicated directory for statistics files.
+
+#### Scenario: Stats directory default
+- **GIVEN** no `stats.persist_dir` in configuration
+- **WHEN** the server starts
+- **THEN** stats SHALL be written to `.onetool/stats/`
+
+#### Scenario: Custom stats directory
+- **GIVEN** configuration with `stats.persist_dir: metrics`
+- **WHEN** the server starts
+- **THEN** stats SHALL be written to `.onetool/metrics/`
+
+#### Scenario: Stats directory creation
+- **GIVEN** the stats directory does not exist
+- **WHEN** the server starts
+- **THEN** the directory SHALL be created automatically
 

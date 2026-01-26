@@ -35,21 +35,53 @@ The paths module SHALL provide a function to get the effective working directory
 - **THEN** it SHALL print an error message directing the user to run `ot-serve init`
 - **AND** exit with non-zero status
 
+### Requirement: Directory Structure
+
+The `.onetool/` directory SHALL use a subdirectory structure to organise files by purpose.
+
+#### Scenario: Standard subdirectories
+- **GIVEN** a `.onetool/` directory (global or project)
+- **WHEN** the directory structure is created or validated
+- **THEN** it SHALL contain these subdirectories:
+  - `config/` - YAML configuration files
+  - `logs/` - Application log files
+  - `stats/` - Statistics data (stats.jsonl)
+  - `sessions/` - Browser session state
+  - `tools/` - Reserved for installed tool packs
+
+#### Scenario: Config files in config subdirectory
+- **GIVEN** config files like `ot-serve.yaml`, `secrets.yaml`, `snippets.yaml`
+- **WHEN** they are created or looked up
+- **THEN** they SHALL be in the `config/` subdirectory
+- **AND** paths like `~/.onetool/config/ot-serve.yaml`
+
+#### Scenario: Logs in logs subdirectory
+- **GIVEN** log files are written
+- **WHEN** the log directory is resolved
+- **THEN** logs SHALL be written to the `logs/` subdirectory
+- **AND** paths like `~/.onetool/logs/ot-serve.log`
+
+#### Scenario: Stats in stats subdirectory
+- **GIVEN** statistics are persisted
+- **WHEN** the stats file is resolved
+- **THEN** stats SHALL be written to the `stats/` subdirectory
+- **AND** paths like `~/.onetool/stats/stats.jsonl`
+
 ### Requirement: Standard Config Resolution
 
-All config loaders SHALL use a standard resolution order.
+All config loaders SHALL use a standard resolution order with subdirectory support.
 
 #### Scenario: Resolution order
 - **GIVEN** a CLI needs to load its config
 - **WHEN** no explicit path is provided
 - **THEN** it SHALL resolve in order:
   1. Environment variable (e.g., `OT_SERVE_CONFIG`)
-  2. `get_effective_cwd() / ".onetool" / "<cli>.yaml"`
-  3. `~/.onetool/<cli>.yaml`
+  2. `get_effective_cwd() / ".onetool" / "config" / "<cli>.yaml"`
+  3. `~/.onetool/config/<cli>.yaml`
   4. Built-in defaults (from bundled configs)
 
 #### Scenario: Project config takes precedence
-- **GIVEN** config exists at both `cwd/.onetool/ot-serve.yaml` and `~/.onetool/ot-serve.yaml`
+- **GIVEN** config exists at both `cwd/.onetool/config/ot-serve.yaml` and `~/.onetool/config/ot-serve.yaml`
 - **WHEN** the config is resolved
 - **THEN** the project config SHALL be used
 
@@ -57,31 +89,6 @@ All config loaders SHALL use a standard resolution order.
 - **GIVEN** no config exists in project or global directories
 - **WHEN** the config is resolved
 - **THEN** bundled defaults from `get_bundled_config_dir()` SHALL be used
-
-### Requirement: .env Loading
-
-The `load_env` function SHALL load from `.onetool/` directories as a fallback mechanism.
-
-#### Scenario: .env resolution order
-- **GIVEN** the application starts
-- **WHEN** `load_env()` is called
-- **THEN** it SHALL load `~/.onetool/.env` first
-- **AND** then load `get_effective_cwd()/.onetool/.env` to override
-- **AND** log a deprecation warning if .env files are found
-- **NOTE** secrets.yaml is the preferred mechanism for API keys
-
-#### Scenario: Project .env overrides global
-- **GIVEN** `OT_API_KEY=global` in `~/.onetool/.env`
-- **AND** `OT_API_KEY=project` in `cwd/.onetool/.env`
-- **WHEN** `load_env()` is called
-- **THEN** `OT_API_KEY` SHALL equal "project"
-
-#### Scenario: Deprecation warning
-- **GIVEN** a `.env` file exists in `~/.onetool/` or `cwd/.onetool/`
-- **WHEN** `load_env()` is called
-- **THEN** it SHALL log a warning suggesting migration to `secrets.yaml`
-
----
 
 ### Requirement: No Tree Walking
 
@@ -130,20 +137,60 @@ The paths module SHALL provide a function for tools to resolve paths relative to
 #### Scenario: Resolve relative path from project
 - **GIVEN** `OT_CWD=/project`
 - **AND** relative path `diagrams/flow.svg`
-- **WHEN** path is resolved with `get_project_path("diagrams/flow.svg")`
+- **WHEN** path is resolved with `resolve_cwd_path("diagrams/flow.svg")`
 - **THEN** result SHALL be `/project/diagrams/flow.svg`
 
 #### Scenario: Absolute path unchanged
 - **GIVEN** any project directory
 - **AND** absolute path `/tmp/output.svg`
-- **WHEN** path is resolved with `get_project_path("/tmp/output.svg")`
+- **WHEN** path is resolved with `resolve_cwd_path("/tmp/output.svg")`
 - **THEN** result SHALL be `/tmp/output.svg` (unchanged)
 
 #### Scenario: Tilde expansion
 - **GIVEN** any project directory
 - **AND** path `~/diagrams/flow.svg`
-- **WHEN** path is resolved with `get_project_path("~/diagrams/flow.svg")`
+- **WHEN** path is resolved with `resolve_cwd_path("~/diagrams/flow.svg")`
 - **THEN** `~` SHALL expand to home directory
+
+#### Scenario: CWD prefix in resolve_cwd_path
+- **GIVEN** `OT_CWD=/project`
+- **AND** path `CWD/output.txt`
+- **WHEN** `resolve_cwd_path("CWD/output.txt")` is called
+- **THEN** result SHALL be `/project/output.txt`
+
+### Requirement: Path Prefixes
+
+SDK path functions SHALL support prefixes to override the default base.
+
+#### Scenario: CWD prefix
+- **GIVEN** path `CWD/output.txt`
+- **WHEN** resolved with any SDK path function (even `resolve_ot_path`)
+- **THEN** the path SHALL resolve relative to the project working directory
+
+#### Scenario: GLOBAL prefix
+- **GIVEN** path `GLOBAL/logs/app.log`
+- **WHEN** resolved with any SDK path function
+- **THEN** the path SHALL resolve relative to `~/.onetool/`
+
+#### Scenario: OT_DIR prefix
+- **GIVEN** path `OT_DIR/templates/flow.mmd`
+- **WHEN** resolved with any SDK path function (even `resolve_cwd_path`)
+- **THEN** the path SHALL resolve relative to the active .onetool directory
+
+### Requirement: tools_dir Resolution
+
+The `tools_dir` configuration SHALL resolve relative paths against OT_DIR.
+
+#### Scenario: Relative tools_dir pattern
+- **GIVEN** config with `tools_dir: ["tools/*.py"]`
+- **AND** config loaded from `/project/.onetool/config/ot-serve.yaml`
+- **WHEN** tool files are discovered
+- **THEN** the pattern SHALL resolve to `/project/.onetool/tools/*.py`
+
+#### Scenario: Absolute tools_dir pattern
+- **GIVEN** config with `tools_dir: ["/opt/tools/*.py"]`
+- **WHEN** tool files are discovered
+- **THEN** the pattern SHALL be used as-is
 
 ### Requirement: Bundled Config Directory
 
@@ -195,7 +242,7 @@ The paths module SHALL provide access to global template configuration files for
 - **GIVEN** secrets files are gitignored (`**/secrets.yaml`)
 - **WHEN** templates are packaged
 - **THEN** secrets templates SHALL be named `*-template.yaml`
-- **AND** they SHALL be copied without the `-template` suffix to `~/.onetool/`
+- **AND** they SHALL be copied without the `-template` suffix to `~/.onetool/config/`
 
 ### Requirement: Template File Discovery
 
@@ -228,13 +275,14 @@ The paths module SHALL provide a function to create numbered backups.
 
 ### Requirement: Global Directory Bootstrap
 
-The `ensure_global_dir` function SHALL seed from global templates (not bundled defaults).
+The `ensure_global_dir` function SHALL seed from global templates into the `config/` subdirectory.
 
 #### Scenario: First run bootstrap
 - **GIVEN** `~/.onetool/` does not exist
 - **WHEN** `ensure_global_dir()` is called
 - **THEN** it SHALL create `~/.onetool/`
-- **AND** copy YAML configs from global templates
+- **AND** create `config/`, `logs/`, `stats/`, `sessions/`, `tools/` subdirectories
+- **AND** copy YAML configs from global templates to `config/`
 - **AND** rename `*-template.yaml` files to remove the suffix (e.g., `secrets-template.yaml` → `secrets.yaml`)
 - **AND** NOT copy subdirectories (diagram-templates stays in bundled defaults)
 - **AND** print creation messages to stderr
@@ -247,12 +295,13 @@ The `ensure_global_dir` function SHALL seed from global templates (not bundled d
 #### Scenario: Quiet mode
 - **GIVEN** `~/.onetool/` does not exist
 - **WHEN** `ensure_global_dir(quiet=True)` is called
-- **THEN** it SHALL create the directory without printing messages
+- **THEN** it SHALL create the directory structure without printing messages
 
 #### Scenario: Force reset
 - **GIVEN** `~/.onetool/` already exists with customized files
 - **WHEN** `ensure_global_dir(force=True)` is called
-- **THEN** it SHALL overwrite all template files with fresh copies
+- **THEN** it SHALL ensure subdirectories exist
+- **AND** overwrite template files in `config/` with fresh copies
 - **AND** print reset messages to stderr
 
 #### Scenario: CLI init reset command
@@ -273,3 +322,92 @@ The `ensure_global_dir` function SHALL seed from global templates (not bundled d
   - Snippet names
   - Alias mappings
   - MCP server names
+
+### Requirement: SDK Path Prefix Expansion
+
+The SDK paths module SHALL support path prefixes for standardised resolution.
+
+#### Scenario: Tilde prefix expansion
+- **GIVEN** a path starting with `~`
+- **WHEN** `resolve_path("~/file.txt")` is called
+- **THEN** `~` SHALL expand to the user's home directory
+- **AND** result SHALL be an absolute Path
+
+#### Scenario: CWD prefix expansion
+- **GIVEN** a path starting with `CWD`
+- **WHEN** `resolve_path("CWD/file.txt")` is called
+- **THEN** `CWD` SHALL expand to the effective working directory (OT_CWD)
+- **AND** result SHALL be an absolute Path
+
+#### Scenario: GLOBAL prefix expansion
+- **GIVEN** a path starting with `GLOBAL`
+- **WHEN** `resolve_path("GLOBAL/logs")` is called
+- **THEN** `GLOBAL` SHALL expand to `~/.onetool/`
+- **AND** result SHALL be an absolute Path
+
+#### Scenario: OT_DIR prefix expansion
+- **GIVEN** a path starting with `OT_DIR`
+- **WHEN** `resolve_path("OT_DIR/logs")` is called
+- **THEN** `OT_DIR` SHALL expand to the active .onetool directory
+- **AND** result SHALL be an absolute Path
+
+#### Scenario: OT_DIR project-first resolution
+- **GIVEN** `CWD/.onetool/` exists
+- **WHEN** `OT_DIR` prefix is expanded
+- **THEN** it SHALL resolve to `CWD/.onetool/`
+
+#### Scenario: OT_DIR global fallback
+- **GIVEN** `CWD/.onetool/` does NOT exist
+- **WHEN** `OT_DIR` prefix is expanded
+- **THEN** it SHALL resolve to `~/.onetool/`
+
+#### Scenario: Relative path with default base
+- **GIVEN** a relative path without prefix
+- **WHEN** `resolve_path("file.txt")` is called with default base
+- **THEN** it SHALL resolve relative to CWD
+- **AND** result SHALL be an absolute Path
+
+#### Scenario: Relative path with OT_DIR base
+- **GIVEN** a relative path without prefix
+- **WHEN** `resolve_path("logs/app.log", base="OT_DIR")` is called
+- **THEN** it SHALL resolve relative to OT_DIR
+- **AND** result SHALL be an absolute Path
+
+#### Scenario: Absolute path unchanged
+- **GIVEN** an absolute path
+- **WHEN** `resolve_path("/etc/config.yaml")` is called
+- **THEN** it SHALL return the path unchanged
+
+### Requirement: SDK Path Convenience Functions
+
+The SDK paths module SHALL provide convenience wrappers for common resolution patterns.
+
+#### Scenario: resolve_cwd_path for tool I/O
+- **GIVEN** a path for tool input/output
+- **WHEN** `resolve_cwd_path("output.txt")` is called
+- **THEN** it SHALL be equivalent to `resolve_path("output.txt", base="CWD")`
+
+#### Scenario: resolve_ot_path for config assets
+- **GIVEN** a path for config or logs
+- **WHEN** `resolve_ot_path("logs/app.log")` is called
+- **THEN** it SHALL be equivalent to `resolve_path("logs/app.log", base="OT_DIR")`
+
+### Requirement: SDK Directory Getters
+
+The SDK paths module SHALL provide functions to get directory paths.
+
+#### Scenario: get_ot_dir returns active directory
+- **GIVEN** `CWD/.onetool/` exists
+- **WHEN** `get_ot_dir()` is called
+- **THEN** it SHALL return `CWD/.onetool/`
+
+#### Scenario: get_ot_dir fallback to global
+- **GIVEN** `CWD/.onetool/` does NOT exist
+- **WHEN** `get_ot_dir()` is called
+- **THEN** it SHALL return `~/.onetool/`
+
+#### Scenario: get_global_dir returns global
+- **GIVEN** any context
+- **WHEN** `get_global_dir()` is called
+- **THEN** it SHALL return `~/.onetool/`
+

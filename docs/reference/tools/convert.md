@@ -138,12 +138,14 @@ convert.auto(pattern="input/**/*", output_dir="output")
 
 ## Supported Formats
 
-| Format | Extension | Converter |
-|--------|-----------|-----------|
-| PDF | `.pdf` | PyMuPDF (fitz) |
-| Word | `.docx` | python-docx |
-| PowerPoint | `.pptx` | python-pptx |
-| Excel | `.xlsx` | openpyxl |
+| Format     | Extension | Converter    | Install                 |
+|------------|-----------|--------------|-------------------------|
+| PDF        | `.pdf`    | PyMuPDF      | included                |
+| Word       | `.docx`   | python-docx  | included                |
+| PowerPoint | `.pptx`   | python-pptx  | included                |
+| Excel      | `.xlsx`   | openpyxl     | `pip install openpyxl`  |
+
+Excel conversion requires the `openpyxl` package. Install it before using `convert.excel()`.
 
 ## Features by Format
 

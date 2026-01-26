@@ -112,6 +112,16 @@ clean:
     find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # ============================================================================
+# CODE SEARCH (ChunkHound)
+# ============================================================================
+
+# Index current project for semantic code search
+index path=".":
+    @echo "=== Indexing {{ path }} for semantic code search ==="
+    OPENAI_API_KEY=$({{ _get_openai_key }}) uvx chunkhound index {{ path }} --db {{ path }}/.chunkhound/db/chunks.db --model text-embedding-3-small --base-url https://openrouter.ai/api/v1
+    @echo "=== Index complete. Use code.search() or code.status() ==="
+
+# ============================================================================
 # DEMO
 # ============================================================================
 

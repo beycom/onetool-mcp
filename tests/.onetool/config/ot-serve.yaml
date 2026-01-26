@@ -1,0 +1,10 @@
+# OneTool Test Configuration
+# Uses inherit: none to isolate tests from user's global config
+version: 1
+inherit: none
+
+# Use default tools_dir (src/ot_tools/*.py) for testing
+tools_dir:
+  - src/ot_tools/*.py
+
+log_level: INFO

@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from ot.logging import LogSpan
-from ot.paths import get_effective_cwd
+from ot_sdk import resolve_cwd_path
 from ot_tools._convert import (
     convert_excel,
     convert_pdf,
@@ -52,16 +52,19 @@ def _get_conversion_executor() -> ThreadPoolExecutor:
 def _resolve_glob(pattern: str) -> list[Path]:
     """Resolve glob pattern to list of files.
 
+    Uses SDK resolve_cwd_path() for consistent path resolution.
+
     Args:
         pattern: Glob pattern (can include ~, relative, or absolute paths)
 
     Returns:
         List of matching file paths
     """
+    cwd = resolve_cwd_path(".")
     # Expand ~ and resolve relative to project dir
     path = Path(pattern).expanduser()
     if not path.is_absolute():
-        path = get_effective_cwd() / pattern
+        path = cwd / pattern
 
     # If pattern has no glob chars and exists, return it directly
     if path.exists() and path.is_file():
@@ -89,16 +92,16 @@ def _resolve_glob(pattern: str) -> list[Path]:
         if base_parts:
             base = Path(*base_parts)
             if not base.is_absolute():
-                base = get_effective_cwd() / base
+                base = cwd / base
         else:
-            base = get_effective_cwd()
+            base = cwd
 
         glob_pattern = str(Path(*glob_parts)) if glob_parts else "*"
         return list(base.glob(glob_pattern))
 
     # Simple glob in directory
     if not parent.is_absolute():
-        parent = get_effective_cwd() / parent.relative_to(".") if str(parent) != "." else get_effective_cwd()
+        parent = cwd / parent.relative_to(".") if str(parent) != "." else cwd
 
     if parent.exists():
         return list(parent.glob(glob_pattern))
@@ -108,7 +111,7 @@ def _resolve_glob(pattern: str) -> list[Path]:
 
 def _get_source_rel(path: Path) -> str:
     """Get relative path for frontmatter source field."""
-    cwd = get_effective_cwd()
+    cwd = resolve_cwd_path(".")
     try:
         return str(path.relative_to(cwd))
     except ValueError:
@@ -116,11 +119,11 @@ def _get_source_rel(path: Path) -> str:
 
 
 def _resolve_output_dir(output_dir: str) -> Path:
-    """Resolve output directory path."""
-    path = Path(output_dir).expanduser()
-    if not path.is_absolute():
-        path = get_effective_cwd() / output_dir
-    return path
+    """Resolve output directory path.
+
+    Uses SDK resolve_cwd_path() for consistent path resolution.
+    """
+    return resolve_cwd_path(output_dir)
 
 
 async def _convert_file_async(

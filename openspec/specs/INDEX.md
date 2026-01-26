@@ -63,7 +63,6 @@ The MCP server that exposes tools for LLM code execution.
 |------|---------|
 | [tool-execution](tool-execution/spec.md) | Worker subprocess execution, JSON-RPC |
 | [tool-sdk](tool-sdk/spec.md) | SDK for building worker tools |
-| [tool-management](tool-management/spec.md) | Tool install/remove/update |
 
 ### Built-in Tools
 
@@ -123,11 +122,11 @@ Standalone CLI for browser inspection and debugging.
 | Non-Functional | 5 |
 | onetool CLI | 1 |
 | ot-serve Core | 8 |
-| Tool Infrastructure | 3 |
+| Tool Infrastructure | 2 |
 | Built-in Tools | 16 |
 | ot-bench | 8 |
 | ot-browse | 2 |
-| **Total** | **43** |
+| **Total** | **42** |
 
 ---
 

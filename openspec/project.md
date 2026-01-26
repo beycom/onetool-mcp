@@ -24,15 +24,26 @@ Python 3.11+, FastMCP, OpenAI SDK (OpenRouter), Typer, Pydantic, YAML config
 
 ## Configuration
 
-**Resolution order**: `OT_<CLI>_CONFIG` env var → `cwd/.onetool/<cli>.yaml` → `~/.onetool/<cli>.yaml` → defaults
+**Resolution order**: `OT_<CLI>_CONFIG` env var → `cwd/.onetool/config/<cli>.yaml` → `~/.onetool/config/<cli>.yaml` → defaults
 
 **Working directory**: Set `OT_CWD` to override the effective working directory (e.g., `OT_CWD=demo ot-serve`).
 
+**Directory structure**: `.onetool/` uses subdirectories to organise files by purpose:
+
+```text
+.onetool/
+├── config/     # YAML configuration files (ot-serve.yaml, secrets.yaml, etc.)
+├── logs/       # Application log files
+├── stats/      # Statistics data (stats.jsonl)
+├── sessions/   # Browser session state
+└── tools/      # Reserved for installed tool packs
+```
+
 **Locations**:
-- Project configs: `<project>/.onetool/*.yaml`
-- Global configs: `~/.onetool/*.yaml`
+- Project configs: `<project>/.onetool/config/*.yaml`
+- Global configs: `~/.onetool/config/*.yaml`
 - Bundled defaults: `src/ot/config/defaults/` (packaged with wheel)
-- Secrets: `secrets.yaml` (ot-serve) and `bench-secrets.yaml` (ot-bench) in `.onetool/`
+- Secrets: `secrets.yaml` (ot-serve) and `bench-secrets.yaml` (ot-bench) in `.onetool/config/`
 
 **Variable expansion**: `${VAR}` in config files reads from `secrets.yaml` only (not environment variables). Use `${VAR:-default}` for defaults. Paths support `~` expansion only.
 
@@ -66,4 +77,4 @@ Changes follow: Proposal → Specs → Tasks → Apply → Archive. See `openspe
 
 ---
 
-*Last Updated: 2026-01-11*
+*Last Updated: 2026-01-26*

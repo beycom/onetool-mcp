@@ -38,7 +38,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 from sqlalchemy import Engine, create_engine, inspect, text
 
-from ot_sdk import get_config, log, worker_main
+from ot_sdk import get_config, log, resolve_cwd_path, worker_main
 
 
 class Config(BaseModel):
@@ -53,6 +53,33 @@ class Config(BaseModel):
 
 # Connection pool keyed by URL - persists across calls in worker
 _engines: dict[str, Engine] = {}
+
+
+def _resolve_sqlite_url(db_url: str) -> str:
+    """Resolve relative paths in SQLite URLs.
+
+    SQLite URLs use the format sqlite:///path/to/db.
+    If the path is relative, resolve it against the project working directory.
+
+    Args:
+        db_url: Database URL string
+
+    Returns:
+        URL with resolved path if SQLite with relative path, otherwise unchanged
+    """
+    if not db_url.startswith("sqlite:///"):
+        return db_url
+
+    # Extract path from sqlite:///path
+    path = db_url[10:]  # len("sqlite:///") == 10
+
+    # Skip in-memory databases and absolute paths
+    if not path or path == ":memory:" or path.startswith("/"):
+        return db_url
+
+    # Resolve relative path against project directory
+    resolved = resolve_cwd_path(path)
+    return f"sqlite:///{resolved}"
 
 
 def _create_engine(db_url: str) -> Engine:
@@ -73,26 +100,29 @@ def _get_engine(db_url: str) -> Engine:
     """Get or create engine for given URL with retry logic."""
     global _engines
 
-    if db_url in _engines:
-        return _engines[db_url]
+    # Resolve relative paths in SQLite URLs
+    resolved_url = _resolve_sqlite_url(db_url)
 
-    with log("db.connect", db_url=db_url) as span:
+    if resolved_url in _engines:
+        return _engines[resolved_url]
+
+    with log("db.connect", db_url=resolved_url) as span:
         try:
-            _engines[db_url] = _create_engine(db_url)
+            _engines[resolved_url] = _create_engine(resolved_url)
             span.add(cached=False)
-            return _engines[db_url]
+            return _engines[resolved_url]
 
         except Exception:
             # Database might have restarted - try fresh
-            if db_url in _engines:
+            if resolved_url in _engines:
                 with contextlib.suppress(Exception):
-                    _engines[db_url].dispose()
-                del _engines[db_url]
+                    _engines[resolved_url].dispose()
+                del _engines[resolved_url]
 
             # One retry with fresh engine
             span.add(retry=True)
-            _engines[db_url] = _create_engine(db_url)
-            return _engines[db_url]
+            _engines[resolved_url] = _create_engine(resolved_url)
+            return _engines[resolved_url]
 
 
 def _format_value(val: Any) -> str:

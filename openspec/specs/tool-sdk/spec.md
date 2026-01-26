@@ -184,3 +184,81 @@ The SDK SHALL provide an `expand_path(path)` function for basic path expansion.
 - **WHEN** a tool calls `expand_path("${HOME}/config.yaml")`
 - **THEN** the SDK returns the literal path `${HOME}/config.yaml` (no variable expansion)
 
+### Requirement: Unified Path Resolution
+
+The SDK SHALL provide a `resolve_path(path, base)` function for path resolution with prefix support.
+
+#### Scenario: Default base (CWD)
+- **WHEN** a tool calls `resolve_path("data/file.txt")`
+- **THEN** the SDK resolves the path relative to the project working directory (OT_CWD)
+
+#### Scenario: OT_DIR base
+- **WHEN** a tool calls `resolve_path("templates/flow.mmd", base="OT_DIR")`
+- **THEN** the SDK resolves the path relative to the active .onetool directory
+
+#### Scenario: GLOBAL base
+- **WHEN** a tool calls `resolve_path("logs/app.log", base="GLOBAL")`
+- **THEN** the SDK resolves the path relative to ~/.onetool/
+
+#### Scenario: Prefix overrides base
+- **WHEN** a tool calls `resolve_path("GLOBAL/logs/app.log", base="CWD")`
+- **THEN** the GLOBAL prefix overrides the CWD base
+- **AND** the SDK resolves relative to ~/.onetool/
+
+#### Scenario: CWD prefix
+- **WHEN** a tool calls `resolve_path("CWD/output.txt", base="OT_DIR")`
+- **THEN** the CWD prefix overrides the OT_DIR base
+- **AND** the SDK resolves relative to the project working directory
+
+#### Scenario: OT_DIR prefix
+- **WHEN** a tool calls `resolve_path("OT_DIR/templates/flow.mmd", base="CWD")`
+- **THEN** the OT_DIR prefix overrides the CWD base
+- **AND** the SDK resolves relative to the active .onetool directory
+
+#### Scenario: Tilde prefix
+- **WHEN** a tool calls `resolve_path("~/shared/file.txt")`
+- **THEN** the SDK expands ~ to the home directory
+
+#### Scenario: Absolute path unchanged
+- **WHEN** a tool calls `resolve_path("/tmp/output.txt")`
+- **THEN** the SDK returns `/tmp/output.txt` unchanged
+
+### Requirement: CWD Path Resolution
+
+The SDK SHALL provide a `resolve_cwd_path(path)` convenience function.
+
+#### Scenario: Resolve relative to CWD
+- **WHEN** a tool calls `resolve_cwd_path("data/file.txt")`
+- **THEN** the SDK resolves the path relative to the project working directory
+- **AND** this is equivalent to `resolve_path(path, base="CWD")`
+
+### Requirement: OT_DIR Path Resolution
+
+The SDK SHALL provide a `resolve_ot_path(path)` convenience function.
+
+#### Scenario: Resolve relative to OT_DIR
+- **WHEN** a tool calls `resolve_ot_path("templates/flow.mmd")`
+- **THEN** the SDK resolves the path relative to the active .onetool directory
+- **AND** this is equivalent to `resolve_path(path, base="OT_DIR")`
+
+### Requirement: Get OT_DIR
+
+The SDK SHALL provide a `get_ot_dir()` function to get the active OneTool config directory.
+
+#### Scenario: Config dir from context
+- **GIVEN** `_config_dir` is set in the worker config
+- **WHEN** a tool calls `get_ot_dir()`
+- **THEN** the SDK returns the configured config directory path
+
+#### Scenario: Project-local .onetool
+- **GIVEN** `_config_dir` is not set
+- **AND** `.onetool/` exists in the project directory
+- **WHEN** a tool calls `get_ot_dir()`
+- **THEN** the SDK returns the project's `.onetool/` path
+
+#### Scenario: Global fallback
+- **GIVEN** `_config_dir` is not set
+- **AND** no project `.onetool/` exists
+- **WHEN** a tool calls `get_ot_dir()`
+- **THEN** the SDK returns `~/.onetool/`
+

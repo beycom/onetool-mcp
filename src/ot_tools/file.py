@@ -48,8 +48,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from ot.config import get_tool_config
-from ot.paths import get_effective_cwd
-from ot_sdk import log
+from ot_sdk import log, resolve_cwd_path
 
 
 class Config(BaseModel):
@@ -111,23 +110,23 @@ def _get_file_config() -> Config:
 def _expand_path(path: str) -> Path:
     """Resolve a file path relative to project directory.
 
+    Uses SDK resolve_cwd_path() for consistent path resolution.
+
     Path resolution follows project conventions:
         - Relative paths: resolved relative to project directory (OT_CWD)
         - Absolute paths: used as-is
         - ~ paths: expanded to home directory
+        - Prefixed paths (CWD/, GLOBAL/, OT_DIR/): resolved to respective dirs
 
     Note: ${VAR} patterns are NOT expanded. Use ~/path instead of ${HOME}/path.
 
     Args:
-        path: Path string (can contain ~)
+        path: Path string (can contain ~ or prefixes)
 
     Returns:
         Resolved absolute Path (not yet validated for existence)
     """
-    p = Path(path).expanduser()
-    if p.is_absolute():
-        return p
-    return (get_effective_cwd() / p).resolve()
+    return resolve_cwd_path(path)
 
 
 def _is_excluded(path: Path, exclude_patterns: List[str]) -> bool:  # noqa: UP006
@@ -184,16 +183,13 @@ def _validate_path(
         return None, f"Path not found: {path}"
 
     # Check against allowed directories
-    cwd = get_effective_cwd()
+    cwd = resolve_cwd_path(".")
     allowed_dirs: List[Path] = []  # noqa: UP006
 
     if cfg.allowed_dirs:
         for allowed in cfg.allowed_dirs:
-            expanded = Path(allowed).expanduser()
-            if expanded.is_absolute():
-                allowed_dirs.append(expanded.resolve())
-            else:
-                allowed_dirs.append((cwd / expanded).resolve())
+            # Use SDK path resolution for allowed_dirs too
+            allowed_dirs.append(resolve_cwd_path(allowed))
     else:
         # Default: only cwd and subdirectories
         allowed_dirs = [cwd]
