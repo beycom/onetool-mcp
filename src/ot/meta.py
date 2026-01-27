@@ -726,13 +726,22 @@ def reload() -> str:
     """
     with log("ot.reload") as s:
         import ot.config.loader
+        import ot.config.secrets
         import ot.prompts
+        import ot.registry
 
         # Clear config cache
         ot.config.loader._config = None
 
         # Clear prompts cache
         ot.prompts._prompts = None
+
+        # Clear secrets cache
+        ot.config.secrets._secrets = None
+        ot.config.secrets._early_secrets = None
+
+        # Clear tool registry cache (will rescan on next access)
+        ot.registry._registry = None
 
         # Reload to validate
         cfg = get_config()

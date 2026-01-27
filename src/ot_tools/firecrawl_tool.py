@@ -27,14 +27,26 @@ __all__ = [
     "search",
 ]
 
-import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+# Dependency declarations for CLI validation
+__ot_requires__ = {
+    "lib": [("firecrawl", "pip install firecrawl")],
+    "secrets": ["FIRECRAWL_API_KEY"],
+}
+
 from typing import Any, Literal
 
 from firecrawl import FirecrawlApp
 from pydantic import BaseModel, Field
 
-from ot_sdk import get_config, get_secret, log, worker_main
+from ot_sdk import (
+    batch_execute,
+    get_config,
+    get_secret,
+    lazy_client,
+    log,
+    normalize_items,
+    worker_main,
+)
 
 
 class Config(BaseModel):
@@ -46,33 +58,20 @@ class Config(BaseModel):
     )
 
 
-# Module-level client (lazy initialization with thread safety)
-_client: FirecrawlApp | None = None
-_client_lock = threading.Lock()
+def _create_client() -> FirecrawlApp | None:
+    """Create Firecrawl client with API key."""
+    api_key = get_secret("FIRECRAWL_API_KEY")
+    if not api_key:
+        return None
+
+    api_url = get_config("tools.firecrawl.api_url")
+    if api_url:
+        return FirecrawlApp(api_key=api_key, api_url=api_url)
+    return FirecrawlApp(api_key=api_key)
 
 
-def _get_client() -> FirecrawlApp | None:
-    """Get or create Firecrawl client with API key (thread-safe)."""
-    global _client
-    if _client is not None:
-        return _client
-
-    with _client_lock:
-        # Double-check after acquiring lock
-        if _client is not None:
-            return _client
-
-        api_key = get_secret("FIRECRAWL_API_KEY")
-        if not api_key:
-            return None
-
-        api_url = get_config("tools.firecrawl.api_url")
-        if api_url:
-            _client = FirecrawlApp(api_key=api_key, api_url=api_url)
-        else:
-            _client = FirecrawlApp(api_key=api_key)
-
-    return _client
+# Thread-safe lazy client using SDK utility
+_get_client = lazy_client(_create_client)
 
 
 def scrape(
@@ -208,13 +207,7 @@ def scrape_batch(
             ("https://example.com/page2", "Page 2"),
         ])
     """
-    # Normalize to (url, label) tuples
-    normalized: list[tuple[str, str]] = []
-    for item in urls:
-        if isinstance(item, str):
-            normalized.append((item, item))
-        else:
-            normalized.append(item)
+    normalized = normalize_items(urls)
 
     with log("firecrawl.scrape_batch", url_count=len(normalized)) as span:
 
@@ -226,16 +219,7 @@ def scrape_batch(
             )
             return label, result
 
-        results: dict[str, dict[str, Any] | str] = {}
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(_scrape_one, url, label): label
-                for url, label in normalized
-            }
-            for future in as_completed(futures):
-                label, result = future.result()
-                results[label] = result
-
+        results = batch_execute(_scrape_one, normalized, max_workers=max_workers)
         span.add(success_count=sum(1 for r in results.values() if isinstance(r, dict)))
         return results
 

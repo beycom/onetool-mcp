@@ -19,12 +19,25 @@ pack = "brave"
 
 __all__ = ["image", "local", "news", "search", "search_batch", "summarize", "video"]
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
+# Dependency declarations for CLI validation
+__ot_requires__ = {
+    "secrets": ["BRAVE_API_KEY"],
+}
+
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from ot_sdk import get_config, get_secret, http, log, worker_main
+from ot_sdk import (
+    batch_execute,
+    format_batch_results,
+    get_config,
+    get_secret,
+    http,
+    log,
+    normalize_items,
+    worker_main,
+)
 
 
 class Config(BaseModel):
@@ -561,13 +574,7 @@ def search_batch(
             ("current Copper price USD/lb today", "Copper (USD/lb)"),
         ])
     """
-    # Normalize queries to (query, label) tuples
-    normalized: list[tuple[str, str]] = []
-    for item in queries:
-        if isinstance(item, str):
-            normalized.append((item, item))
-        else:
-            normalized.append(item)
+    normalized = normalize_items(queries)
 
     with log("brave.batch", query_count=len(normalized), count=count) as s:
 
@@ -581,20 +588,8 @@ def search_batch(
             )
             return label, result
 
-        # Run queries concurrently using threads
-        results: dict[str, str] = {}
-        with ThreadPoolExecutor(max_workers=len(normalized)) as executor:
-            futures = {
-                executor.submit(_search_one, query, label): label
-                for query, label in normalized
-            }
-            for future in as_completed(futures):
-                label, result = future.result()
-                results[label] = result
-
-        # Format output preserving original order
-        sections = [f"=== {label} ===\n{results[label]}" for _, label in normalized]
-        output = "\n\n".join(sections)
+        results = batch_execute(_search_one, normalized, max_workers=len(normalized))
+        output = format_batch_results(results, normalized)
         s.add(outputLen=len(output))
         return output
 

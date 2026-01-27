@@ -149,30 +149,65 @@ Create a `.onetool/` directory in your project:
 
 ## Optional Dependencies
 
-Some tools require additional Python packages. These are installed automatically when needed, or you can install them manually for faster first use:
+Some tools require additional Python packages. When installed via `uv tool`, you must include these at install time using `--with` flags:
 
-| Tool             | Package        | Install                      |
-|------------------|----------------|------------------------------|
-| `convert.excel`  | openpyxl       | `pip install openpyxl`       |
-| `code.search`    | duckdb, openai | `pip install duckdb openai`  |
+### Document Conversion (`convert` pack)
 
-When you call a tool that requires an optional dependency, you'll see a clear error message with the install command if it's missing.
+```bash
+uv tool install onetool-mcp \
+  --with pymupdf \
+  --with python-docx \
+  --with python-pptx \
+  --with openpyxl \
+  --with Pillow
+```
+
+### Code Search (`code` pack)
+
+```bash
+uv tool install onetool-mcp \
+  --with duckdb \
+  --with openai
+```
+
+### All Optional Dependencies
+
+Install everything at once:
+
+```bash
+uv tool install onetool-mcp \
+  --with pymupdf \
+  --with python-docx \
+  --with python-pptx \
+  --with openpyxl \
+  --with Pillow \
+  --with duckdb \
+  --with openai
+```
+
+### Verify Dependencies
+
+Check which dependencies are installed:
+
+```bash
+ot-serve init validate
+```
+
+The Dependencies section shows each tool's requirements and their status (OK or missing).
+
+> **Note:** Using `pip install` after `uv tool install` won't work - the packages install to a different environment. Always use `--with` during installation.
 
 ## Feature-Specific Requirements
 
-### Semantic Code Search (`code_search`)
-
-**Python dependencies:**
-
-```bash
-pip install duckdb openai
-```
+### Semantic Code Search (`code` pack)
 
 **Requires pre-indexed codebase:**
 
 ```bash
 chunkhound index /path/to/project
 ```
+
+See [Optional Dependencies](#optional-dependencies) for installing `duckdb` and `openai`.
 
 ### Ripgrep Search
 

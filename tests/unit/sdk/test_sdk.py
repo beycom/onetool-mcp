@@ -538,12 +538,259 @@ class TestSdkPaths:
 
 @pytest.mark.unit
 @pytest.mark.core
+class TestSdkBatch:
+    """Tests for ot_sdk.batch module."""
+
+    def test_normalize_items_strings(self) -> None:
+        """Should convert strings to (value, value) tuples."""
+        from ot_sdk import normalize_items
+
+        items = ["a", "b", "c"]
+        result = normalize_items(items)
+
+        assert result == [("a", "a"), ("b", "b"), ("c", "c")]
+
+    def test_normalize_items_mixed(self) -> None:
+        """Should handle mixed strings and tuples."""
+        from ot_sdk import normalize_items
+
+        items = ["a", ("b", "Label B"), "c"]
+        result = normalize_items(items)
+
+        assert result == [("a", "a"), ("b", "Label B"), ("c", "c")]
+
+    def test_normalize_items_tuples(self) -> None:
+        """Should pass through tuples unchanged."""
+        from ot_sdk import normalize_items
+
+        items = [("x", "Label X"), ("y", "Label Y")]
+        result = normalize_items(items)
+
+        assert result == [("x", "Label X"), ("y", "Label Y")]
+
+    def test_batch_execute_simple(self) -> None:
+        """Should execute function on all items concurrently."""
+        from ot_sdk import batch_execute
+
+        def double(val: str, label: str) -> tuple[str, int]:
+            return label, int(val) * 2
+
+        items = [("1", "one"), ("2", "two"), ("3", "three")]
+        results = batch_execute(double, items)
+
+        assert results == {"one": 2, "two": 4, "three": 6}
+
+    def test_batch_execute_preserves_order(self) -> None:
+        """Should preserve input order by default."""
+        from ot_sdk import batch_execute
+
+        def identity(val: str, label: str) -> tuple[str, str]:
+            return label, val
+
+        items = [("a", "first"), ("b", "second"), ("c", "third")]
+        results = batch_execute(identity, items)
+
+        # Dict should maintain insertion order
+        assert list(results.keys()) == ["first", "second", "third"]
+
+    def test_batch_execute_empty(self) -> None:
+        """Should handle empty items list."""
+        from ot_sdk import batch_execute
+
+        def noop(val: str, label: str) -> tuple[str, str]:
+            return label, val
+
+        results = batch_execute(noop, [])
+        assert results == {}
+
+    def test_format_batch_results(self) -> None:
+        """Should format results as labeled sections."""
+        from ot_sdk import format_batch_results
+
+        results = {"A": "content a", "B": "content b"}
+        items = [("x", "A"), ("y", "B")]
+        output = format_batch_results(results, items)
+
+        assert "=== A ===" in output
+        assert "content a" in output
+        assert "=== B ===" in output
+        assert "content b" in output
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestSdkFactory:
+    """Tests for ot_sdk.factory module."""
+
+    def test_lazy_client_initializes_once(self) -> None:
+        """Should initialize client only once."""
+        from ot_sdk import lazy_client
+
+        call_count = 0
+
+        def create_client():
+            nonlocal call_count
+            call_count += 1
+            return {"client": "instance"}
+
+        get_client = lazy_client(create_client)
+
+        # First call should initialize
+        result1 = get_client()
+        assert result1 == {"client": "instance"}
+        assert call_count == 1
+
+        # Second call should return cached
+        result2 = get_client()
+        assert result2 == {"client": "instance"}
+        assert call_count == 1  # Not incremented
+
+    def test_lazy_client_returns_none_without_caching(self) -> None:
+        """Should not cache None by default."""
+        from ot_sdk import lazy_client
+
+        call_count = 0
+
+        def create_client():
+            nonlocal call_count
+            call_count += 1
+            return None
+
+        get_client = lazy_client(create_client)
+
+        # Each call should try again since None is not cached
+        get_client()
+        get_client()
+        assert call_count == 2
+
+    def test_lazy_client_allow_none(self) -> None:
+        """Should cache None when allow_none=True."""
+        from ot_sdk import lazy_client
+
+        call_count = 0
+
+        def create_client():
+            nonlocal call_count
+            call_count += 1
+            return None
+
+        get_client = lazy_client(create_client, allow_none=True)
+
+        get_client()
+        get_client()
+        assert call_count == 1  # Only called once
+
+    def test_lazy_client_class_reset(self) -> None:
+        """Should support reset for LazyClient class."""
+        from ot_sdk import LazyClient
+
+        call_count = 0
+
+        def create_client():
+            nonlocal call_count
+            call_count += 1
+            return f"client_{call_count}"
+
+        client_wrapper = LazyClient(create_client)
+
+        assert client_wrapper.get() == "client_1"
+        assert client_wrapper.get() == "client_1"
+        assert call_count == 1
+
+        client_wrapper.reset()
+        assert not client_wrapper.is_initialized
+
+        assert client_wrapper.get() == "client_2"
+        assert call_count == 2
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestSdkDeps:
+    """Tests for ot_sdk.deps module."""
+
+    def test_check_cli_available(self) -> None:
+        """Should detect available CLI tool."""
+        from ot_sdk import check_cli
+
+        # 'ls' should be available on all systems
+        result = check_cli("ls")
+        assert result.available is True
+        assert result.kind == "cli"
+        assert result.name == "ls"
+
+    def test_check_cli_unavailable(self) -> None:
+        """Should detect unavailable CLI tool."""
+        from ot_sdk import check_cli
+
+        result = check_cli("nonexistent_cli_tool_xyz")
+        assert result.available is False
+        assert "not found" in result.error
+
+    def test_check_lib_available(self) -> None:
+        """Should detect available library."""
+        from ot_sdk import check_lib
+
+        # pytest should be available since we're running tests
+        result = check_lib("pytest")
+        assert result.available is True
+        assert result.kind == "lib"
+        assert result.name == "pytest"
+
+    def test_check_lib_unavailable(self) -> None:
+        """Should detect unavailable library."""
+        from ot_sdk import check_lib
+
+        result = check_lib("nonexistent_library_xyz")
+        assert result.available is False
+        assert "not importable" in result.error
+
+    def test_ensure_cli_available(self) -> None:
+        """Should return None for available CLI."""
+        from ot_sdk import ensure_cli
+
+        result = ensure_cli("ls")
+        assert result is None
+
+    def test_ensure_cli_unavailable(self) -> None:
+        """Should return error message for unavailable CLI."""
+        from ot_sdk import ensure_cli
+
+        result = ensure_cli("nonexistent_tool", install="brew install nonexistent")
+        assert result is not None
+        assert "not found" in result
+        assert "brew install" in result
+
+    def test_ensure_lib_available(self) -> None:
+        """Should return None for available library."""
+        from ot_sdk import ensure_lib
+
+        result = ensure_lib("pytest")
+        assert result is None
+
+    def test_ensure_lib_unavailable(self) -> None:
+        """Should return error message for unavailable library."""
+        from ot_sdk import ensure_lib
+
+        result = ensure_lib("nonexistent_lib")
+        assert result is not None
+        assert "not available" in result
+        assert "pip install" in result
+
+
+@pytest.mark.unit
+@pytest.mark.core
 class TestSdkExports:
     """Tests for ot_sdk package exports."""
 
     def test_all_exports_are_importable(self) -> None:
         """Should export all documented functions."""
         from ot_sdk import (
+            # Batch
+            batch_execute,
+            format_batch_results,
+            normalize_items,
+            # Config
             expand_path,
             format_error,
             get_config,
@@ -551,10 +798,32 @@ class TestSdkExports:
             get_ot_dir,
             get_project_path,
             get_secret,
+            # Deps
+            check_cli,
+            check_deps,
+            check_lib,
+            DepsCheckResult,
+            Dependency,
+            ensure_cli,
+            ensure_lib,
+            requires_cli,
+            requires_lib,
+            # Factory
+            lazy_client,
+            LazyClient,
+            # HTTP
+            api_headers,
+            check_api_key,
             http,
+            safe_request,
+            # Packs
+            call_tool,
+            get_pack,
+            # Paths
             resolve_cwd_path,
             resolve_ot_path,
             resolve_path,
+            # Utils
             run_command,
             truncate,
             worker_main,
@@ -576,13 +845,43 @@ class TestSdkExports:
         assert callable(resolve_ot_path)
         assert hasattr(http, "get")
         assert hasattr(http, "post")
+        # New batch utilities
+        assert callable(batch_execute)
+        assert callable(normalize_items)
+        assert callable(format_batch_results)
+        # New factory utilities
+        assert callable(lazy_client)
+        assert LazyClient is not None
+        # New deps utilities
+        assert callable(check_cli)
+        assert callable(check_lib)
+        assert callable(check_deps)
+        assert callable(ensure_cli)
+        assert callable(ensure_lib)
+        assert callable(requires_cli)
+        assert callable(requires_lib)
+        assert DepsCheckResult is not None
+        assert Dependency is not None
+        # New request utilities
+        assert callable(api_headers)
+        assert callable(safe_request)
+        assert callable(check_api_key)
+        # New packs utilities
+        assert callable(get_pack)
+        assert callable(call_tool)
 
     def test_all_list_matches_exports(self) -> None:
         """Should have all exports listed in __all__."""
         import ot_sdk
 
         expected = {
+            # Batch processing
+            "batch_execute",
+            "format_batch_results",
+            "normalize_items",
+            # Caching
             "cache",
+            # Configuration
             "expand_path",
             "format_error",
             "get_config",
@@ -590,11 +889,34 @@ class TestSdkExports:
             "get_ot_dir",
             "get_project_path",
             "get_secret",
+            # Dependencies
+            "check_cli",
+            "check_deps",
+            "check_lib",
+            "DepsCheckResult",
+            "Dependency",
+            "ensure_cli",
+            "ensure_lib",
+            "requires_cli",
+            "requires_lib",
+            # Factory
+            "lazy_client",
+            "LazyClient",
+            # HTTP
+            "api_headers",
+            "check_api_key",
             "http",
+            "safe_request",
+            # Logging
             "log",
+            # Packs
+            "call_tool",
+            "get_pack",
+            # Paths
             "resolve_cwd_path",
             "resolve_ot_path",
             "resolve_path",
+            # Utils
             "run_command",
             "truncate",
             "worker_main",

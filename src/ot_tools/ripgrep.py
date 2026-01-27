@@ -14,6 +14,11 @@ pack = "ripgrep"
 
 __all__ = ["count", "files", "search", "types"]
 
+# Dependency declarations for CLI validation
+__ot_requires__ = {
+    "cli": [("rg", "brew install ripgrep")],
+}
+
 import contextlib
 import shutil
 import subprocess

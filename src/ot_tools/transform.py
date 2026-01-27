@@ -29,6 +29,12 @@ pack = "llm"
 
 __all__ = ["transform"]
 
+# Dependency declarations for CLI validation
+__ot_requires__ = {
+    "lib": [("openai", "pip install openai")],
+    "secrets": ["OPENAI_API_KEY"],
+}
+
 from typing import Any
 
 from openai import OpenAI

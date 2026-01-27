@@ -2,11 +2,32 @@
 
 from __future__ import annotations
 
+import atexit
 import os
 import signal
+import sys
 from pathlib import Path
 
 import typer
+
+
+def _suppress_shutdown_warnings() -> None:
+    """Suppress pymupdf SWIG warnings at exit.
+
+    pymupdf emits a DeprecationWarning about swigvarlink during Python's
+    interpreter shutdown. This warning is emitted at the C level during
+    garbage collection. Redirecting stderr at the fd level suppresses it.
+    """
+    try:
+        # Redirect stderr at the OS level to suppress C-level warnings
+        devnull_fd = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull_fd, 2)
+        os.close(devnull_fd)
+    except Exception:
+        pass
+
+
+atexit.register(_suppress_shutdown_warnings)
 from rich.console import Console
 
 import ot
@@ -167,7 +188,7 @@ def init_validate() -> None:
     from loguru import logger
 
     from ot.config.loader import get_config, load_config
-    from ot.config.secrets import load_secrets_from_default_locations
+    from ot.config.secrets import load_secrets
     from ot.executor.tool_loader import load_tool_registry
     from ot.paths import CONFIG_SUBDIR, get_global_dir, get_project_dir
 
@@ -261,9 +282,10 @@ def init_validate() -> None:
         console.print("\nPacks:")
         console.print(f"  [red]Error loading tools:[/red] {e}")
 
-    # Secrets (names only)
+    # Secrets (names only) - use config's secrets_file path
     try:
-        secrets = load_secrets_from_default_locations()
+        secrets_path = config.get_secrets_file_path() if config else None
+        secrets = load_secrets(secrets_path)
         if secrets:
             sorted_keys = sorted(secrets.keys())
             console.print(f"\nSecrets ({len(sorted_keys)}):")
@@ -280,8 +302,7 @@ def init_validate() -> None:
     if config and config.snippets:
         sorted_snippets = sorted(config.snippets.keys())
         console.print(f"\nSnippets ({len(sorted_snippets)}):")
-        for name in sorted_snippets:
-            console.print(f"  {name}")
+        console.print(f"  {', '.join(sorted_snippets)}")
     else:
         console.print("\nSnippets:")
         console.print("  (none)")
@@ -290,8 +311,8 @@ def init_validate() -> None:
     if config and config.alias:
         sorted_aliases = sorted(config.alias.items())
         console.print(f"\nAliases ({len(sorted_aliases)}):")
-        for name, target in sorted_aliases:
-            console.print(f"  {name} -> {target}")
+        alias_items = [f"{name} -> {target}" for name, target in sorted_aliases]
+        console.print(f"  {', '.join(alias_items)}")
     else:
         console.print("\nAliases:")
         console.print("  (none)")
@@ -300,11 +321,67 @@ def init_validate() -> None:
     if config and config.servers:
         sorted_servers = sorted(config.servers.keys())
         console.print(f"\nMCP Servers ({len(sorted_servers)}):")
-        for name in sorted_servers:
-            console.print(f"  {name}")
+        console.print(f"  {', '.join(sorted_servers)}")
     else:
         console.print("\nMCP Servers:")
         console.print("  (none)")
+
+    # Dependencies
+    try:
+        from ot_sdk.deps import check_deps
+
+        dep_results = check_deps()
+        if dep_results:
+            missing_count = sum(1 for r in dep_results if not r.ok)
+            total_count = len(dep_results)
+            if missing_count > 0:
+                console.print(
+                    f"\nDependencies ({total_count} tools, [yellow]{missing_count} missing[/yellow]):"
+                )
+            else:
+                console.print(f"\nDependencies ({total_count} tools):")
+
+            # Format with libs/clis breakdown per tool
+            sorted_results = sorted(dep_results, key=lambda r: r.tool)
+            for result in sorted_results:
+                status = "[green]OK[/green]" if result.ok else "[yellow]missing[/yellow]"
+                console.print(f"  {result.tool} - {status}")
+
+                # Group by type
+                libs = [d for d in result.dependencies if d.kind == "lib"]
+                clis = [d for d in result.dependencies if d.kind == "cli"]
+                secrets = [d for d in result.dependencies if d.kind == "secret"]
+
+                if libs:
+                    lib_items = []
+                    for d in libs:
+                        if d.available:
+                            lib_items.append(d.name)
+                        else:
+                            lib_items.append(f"[yellow]{d.name}[/yellow]")
+                    console.print(f"    libs: {', '.join(lib_items)}")
+                if clis:
+                    cli_items = []
+                    for d in clis:
+                        if d.available:
+                            cli_items.append(d.name)
+                        else:
+                            cli_items.append(f"[yellow]{d.name}[/yellow]")
+                    console.print(f"    clis: {', '.join(cli_items)}")
+                if secrets:
+                    secret_items = []
+                    for d in secrets:
+                        if d.available:
+                            secret_items.append(d.name)
+                        else:
+                            secret_items.append(f"[yellow]{d.name}[/yellow]")
+                    console.print(f"    secrets: {', '.join(secret_items)}")
+        else:
+            console.print("\nDependencies:")
+            console.print("  (no tools declare dependencies)")
+    except Exception as e:
+        console.print("\nDependencies:")
+        console.print(f"  [red]Error checking:[/red] {e}")
 
 
 @app.callback(invoke_without_command=True)

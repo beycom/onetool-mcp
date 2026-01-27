@@ -181,6 +181,9 @@ class ToolRegistry:
         # Extract __all__ list if present
         export_names = self._extract_all(tree)
 
+        # Extract __ot_requires__ dependencies
+        requires = self._extract_requires(tree)
+
         tools: list[ToolInfo] = []
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
@@ -193,6 +196,9 @@ class ToolRegistry:
                     continue
 
                 tool = parse_function(node, module_name, pack=pack)
+                # Attach module-level requires to tool
+                if requires:
+                    tool.requires = requires
                 tools.append(tool)
 
         return tools
@@ -246,6 +252,28 @@ class ToolRegistry:
                             ):
                                 names.add(elt.value)
                         return names
+        return None
+
+    def _extract_requires(self, tree: ast.Module) -> dict[str, list] | None:
+        """Extract __ot_requires__ dict from module AST.
+
+        Looks for module-level assignment: __ot_requires__ = {"cli": [...], "lib": [...]}
+
+        Args:
+            tree: Parsed AST module.
+
+        Returns:
+            Dict with 'cli' and 'lib' dependency lists if found, None otherwise.
+        """
+        for node in tree.body:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "__ot_requires__":
+                        try:
+                            # Safely evaluate the dict literal
+                            return ast.literal_eval(ast.unparse(node.value))
+                        except (ValueError, TypeError):
+                            return None
         return None
 
     def format_json(self) -> str:

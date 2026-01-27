@@ -18,6 +18,11 @@ pack = "context7"
 
 __all__ = ["doc", "search"]
 
+# Dependency declarations for CLI validation
+__ot_requires__ = {
+    "secrets": ["CONTEXT7_API_KEY"],
+}
+
 import re
 
 from pydantic import BaseModel, Field

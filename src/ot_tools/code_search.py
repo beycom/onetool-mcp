@@ -16,6 +16,15 @@ __all__ = ["autodoc", "research", "search", "search_batch", "status"]
 
 from typing import TYPE_CHECKING, Any
 
+# Dependency declarations for CLI validation
+__ot_requires__ = {
+    "lib": [
+        ("duckdb", "pip install duckdb"),
+        ("openai", "pip install openai"),
+    ],
+    "secrets": ["OPENAI_API_KEY"],
+}
+
 from pydantic import BaseModel, Field
 
 from ot.config import get_tool_config

@@ -17,14 +17,22 @@ pack = "web"
 
 __all__ = ["fetch", "fetch_batch"]
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Literal
 
 import trafilatura
 from pydantic import BaseModel, Field
 from trafilatura.settings import use_config
 
-from ot_sdk import cache, get_config, log, truncate, worker_main
+from ot_sdk import (
+    batch_execute,
+    cache,
+    format_batch_results,
+    get_config,
+    log,
+    normalize_items,
+    truncate,
+    worker_main,
+)
 
 
 class Config(BaseModel):
@@ -221,13 +229,7 @@ def fetch_batch(
             ("https://docs.pydantic.dev/latest/", "Pydantic Docs"),
         ])
     """
-    # Normalize urls to (url, label) tuples
-    normalized: list[tuple[str, str]] = []
-    for item in urls:
-        if isinstance(item, str):
-            normalized.append((item, item))
-        else:
-            normalized.append(item)
+    normalized = normalize_items(urls)
 
     with log("web.batch", urlCount=len(normalized), output_format=output_format) as s:
 
@@ -244,21 +246,8 @@ def fetch_batch(
             )
             return label, result
 
-        # Fetch all URLs concurrently
-        results: dict[str, str] = {}
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(_fetch_one, url, label): label
-                for url, label in normalized
-            }
-            for future in as_completed(futures):
-                label, result = future.result()
-                results[label] = result
-
-        # Format output preserving original order
-        sections = [f"=== {label} ===\n\n{results[label]}" for _, label in normalized]
-        output = "\n\n".join(sections)
-
+        results = batch_execute(_fetch_one, normalized, max_workers=max_workers)
+        output = format_batch_results(results, normalized)
         s.add(outputLen=len(output))
         return output
 

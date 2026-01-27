@@ -13,6 +13,18 @@ pack = "convert"
 
 __all__ = ["auto", "excel", "pdf", "powerpoint", "word"]
 
+# Dependency declarations for CLI validation
+# Use dict format for packages where import_name differs from package name
+__ot_requires__ = {
+    "lib": [
+        {"name": "pymupdf", "import_name": "fitz", "install": "pip install pymupdf"},
+        {"name": "python-docx", "import_name": "docx", "install": "pip install python-docx"},
+        {"name": "python-pptx", "import_name": "pptx", "install": "pip install python-pptx"},
+        ("openpyxl", "pip install openpyxl"),
+        {"name": "Pillow", "import_name": "PIL", "install": "pip install Pillow"},
+    ],
+}
+
 import asyncio
 import os
 from collections.abc import Callable

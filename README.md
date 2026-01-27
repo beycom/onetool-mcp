@@ -50,6 +50,14 @@ uv tool install onetool-mcp
 
 Or with pip: `pip install onetool-mcp`
 
+**With optional dependencies** (for convert, excel, code search):
+
+```bash
+uv tool install onetool-mcp \
+  --with pymupdf --with python-docx --with python-pptx \
+  --with openpyxl --with Pillow --with duckdb --with openai
+```
+
 Add to Claude Code (`~/.claude/settings.json`):
 
 ```json

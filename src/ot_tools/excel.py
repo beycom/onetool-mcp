@@ -42,6 +42,11 @@ __all__ = [
     "write",
 ]
 
+# Dependency declarations for CLI validation
+__ot_requires__ = {
+    "lib": [("openpyxl", "pip install openpyxl")],
+}
+
 import fnmatch
 import re
 from typing import TYPE_CHECKING, Any

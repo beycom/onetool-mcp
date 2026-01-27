@@ -12,14 +12,19 @@ pack = "ground"
 
 __all__ = ["dev", "docs", "reddit", "search", "search_batch"]
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 from ot.config import get_tool_config
 from ot.config.secrets import get_secret
-from ot_sdk import log
+from ot_sdk import batch_execute, format_batch_results, log, normalize_items
+
+# Dependency declarations for CLI validation
+__ot_requires__ = {
+    "lib": [{"name": "google-genai", "import_name": "google.genai", "install": "pip install google-genai"}],
+    "secrets": ["GEMINI_API_KEY"],
+}
 
 
 class Config(BaseModel):
@@ -284,13 +289,7 @@ def search_batch(
             focus="code"
         )
     """
-    # Normalize queries to (query, label) tuples
-    normalized: list[tuple[str, str]] = []
-    for item in queries:
-        if isinstance(item, str):
-            normalized.append((item, item))
-        else:
-            normalized.append(item)
+    normalized = normalize_items(queries)
 
     with log("ground.batch", query_count=len(normalized), focus=focus) as s:
 
@@ -303,20 +302,8 @@ def search_batch(
             )
             return label, result
 
-        # Run queries concurrently using threads
-        results: dict[str, str] = {}
-        with ThreadPoolExecutor(max_workers=len(normalized)) as executor:
-            futures = {
-                executor.submit(_search_one, query, label): label
-                for query, label in normalized
-            }
-            for future in as_completed(futures):
-                label, result = future.result()
-                results[label] = result
-
-        # Format output preserving original order
-        sections = [f"=== {label} ===\n{results[label]}" for _, label in normalized]
-        output = "\n\n".join(sections)
+        results = batch_execute(_search_one, normalized, max_workers=len(normalized))
+        output = format_batch_results(results, normalized)
         s.add(outputLen=len(output))
         return output
 
