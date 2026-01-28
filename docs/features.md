@@ -38,7 +38,7 @@ Reusable code templates with Jinja2 substitution. Define once, invoke anywhere w
 
 Short names for common tools. `ws` instead of `brave.web_search`. Configure in YAML.
 
-[Learn more](reference/tools/ot.md#ot-aliases)
+[Learn more](reference/tools/ot.md#otaliases)
 
 ---
 
@@ -54,25 +54,25 @@ Search, web, database, file ops, diagrams, conversions, and more. Ready to use o
 
 LLM-powered transformation. Pipe any output through AI for extraction, summarization, or reformatting.
 
-[Learn more](reference/tools/transform.md)
+[Learn more](reference/tools/llm.md)
 
 ### Web & Search
 
 Brave Search (web, news, local, images, video), Google Grounded Search, Firecrawl scraping.
 
-[Learn more](reference/tools/brave-search.md)
+[Learn more](reference/tools/brave.md)
 
 ### Code & Docs
 
 Context7 library docs, semantic code search, lightning-fast ripgrep.
 
-[Learn more](reference/tools/code-search.md)
+[Learn more](reference/tools/code.md)
 
 ### Data & Files
 
 SQL queries (any database), Excel manipulation, document conversion (PDF/Word/PPT to Markdown).
 
-[Learn more](reference/tools/database.md)
+[Learn more](reference/tools/db.md)
 
 ---
 
@@ -88,7 +88,7 @@ One well-structured file. Global and project scopes. Three-tier inheritance (bun
 
 Isolated `secrets.yaml` (gitignored). Environment variable expansion. Never logged or exposed.
 
-[Learn more](getting-started/configuration.md#secrets)
+[Learn more](getting-started/configuration.md#secrets-configuration)
 
 ### Per-Tool Settings
 
@@ -110,13 +110,13 @@ All code validated before execution. Blocks `exec`, `eval`, `subprocess`. Warns 
 
 Four-tier system: Allow, Ask, Warn, Block. Fine-grained control with fnmatch patterns.
 
-[Learn more](getting-started/security.md#configurable-policies)
+[Learn more](getting-started/security.md#3-configurable-security-policies)
 
 ### Path Boundaries
 
 File operations constrained to allowed directories. Symlink resolution. Sensitive path exclusions.
 
-[Learn more](getting-started/security.md#path-boundaries)
+[Learn more](getting-started/security.md#4-path-boundary-enforcement)
 
 ---
 
@@ -138,7 +138,7 @@ One file, one pack. No registration, no configuration. Drop a Python file, resta
 
 Tools with dependencies run in isolated subprocesses via PEP 723. Clean process state.
 
-[Learn more](extending/creating-tools.md#worker-tools)
+[Learn more](extending/creating-tools.md#extension-tools)
 
 ### Plugin Architecture
 
@@ -148,7 +148,7 @@ Build tools in separate repositories. Local dev with `.onetool/` config. Share v
 
 ### MCP Server Proxy
 
-Wrap existing MCP servers through OneTool. Get token savings while using any MCP server.
+Wrap any MCP server. Configure it with YAML. No token rot or bloat. Call it explicitly - all the goodness of OneTool, all the power of your existing MCP servers.
 
 [Learn more](getting-started/configuration.md#external-mcp-servers)
 
@@ -188,7 +188,7 @@ LogSpan context manager with automatic duration and status. Loguru-based with fi
 
 Track tool calls, success rates, context saved, cost estimates. Filter by period or tool. HTML reports.
 
-[Learn more](reference/tools/ot.md#ot-stats)
+[Learn more](reference/tools/ot.md#otstats)
 
 ### Safe Logging
 
@@ -223,21 +223,21 @@ Type hints throughout. Ruff formatting and linting. Mypy type checking. Pydantic
 | Pack | Tools | Best For |
 |------|-------|----------|
 | **brave** | `search`, `news`, `local`, `images`, `videos`, `search_batch` | Web search with AI summaries |
-| **web** | `fetch`, `fetch_batch`, `extract` | Content extraction for agents |
-| **ground** | `search` (Google + Gemini) | Grounded search with sources |
-| **context7** | `search`, `docs` | Library documentation |
 | **code** | `search` | Semantic code search |
-| **ripgrep** | `search`, `files`, `count` | Fast regex file search |
-| **llm** | `transform` | AI-powered data transformation |
-| **db** | `query`, `schema`, `tables` | SQL database queries |
-| **excel** | `create`, `read`, `write`, `formula`, ... | Full Excel control |
+| **context7** | `search`, `docs` | Library documentation |
 | **convert** | `pdf`, `word`, `pptx`, `batch` | Document to Markdown |
-| **file** | `read`, `write`, `edit`, `copy`, `move`, `delete` | Secure file operations |
-| **package** | `npm`, `pypi`, `openrouter` | Package versions |
+| **db** | `query`, `schema`, `tables` | SQL database queries |
 | **diagram** | `source`, `render` | Mermaid, PlantUML, D2 diagrams |
+| **excel** | `create`, `read`, `write`, `formula`, ... | Full Excel control |
+| **file** | `read`, `write`, `edit`, `copy`, `move`, `delete` | Secure file operations |
 | **firecrawl** | `scrape`, `crawl`, `extract` | Web scraping with schemas |
+| **ground** | `search` (Google + Gemini) | Grounded search with sources |
+| **llm** | `transform` | AI-powered data transformation |
 | **ot** | `tools`, `packs`, `config`, `health`, `stats` | Introspection & management |
+| **package** | `npm`, `pypi`, `openrouter` | Package versions |
+| **ripgrep** | `search`, `files`, `count` | Fast regex file search |
 | **scaffold** | `create`, `templates`, `list_extensions` | Extension scaffolding |
+| **web** | `fetch`, `fetch_batch`, `extract` | Content extraction for agents |
 
 ---
 
@@ -266,11 +266,3 @@ Type hints throughout. Ruff formatting and linting. Mypy type checking. Pydantic
 | **Complexity** | Container orchestration, networking, volumes | **pip install**, done |
 
 **OneTool's core insight:** The agent doesn't need tool definitions - it can write Python.
-
----
-
-## Get Started
-
-- **[Quickstart](getting-started/quickstart.md)** - Running in 2 minutes
-- **[Installation](getting-started/installation.md)** - All platforms
-- **[Configuration](getting-started/configuration.md)** - YAML schema

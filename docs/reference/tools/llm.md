@@ -1,8 +1,8 @@
-# Transform
+# LLM Tools
 
 **Data in. Structured output. One function.**
 
-LLM-powered data transformation. Takes input data and a prompt, uses an LLM to process/transform it.
+LLM-powered data transformation tools. Takes input data and a prompt, uses an LLM to process/transform it.
 
 ## Highlights
 

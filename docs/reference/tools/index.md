@@ -8,22 +8,22 @@ Every function below is callable with a single `__ot` prefix. No JSON schemas, n
 
 | Pack | Description | Documentation |
 |-----------|-------------|---------------|
-| **web** | Content extraction | [web-fetch.md](web-fetch.md) |
-| **brave** | Web, news, local search | [brave-search.md](brave-search.md) |
-| **ground** | Google grounded search | [grounding-search.md](grounding-search.md) |
+| **brave** | Web, news, local search | [brave.md](brave.md) |
+| **code** | Semantic code search | [code.md](code.md) |
 | **context7** | Library documentation | [context7.md](context7.md) |
-| **code** | Semantic code search | [code-search.md](code-search.md) |
-| **ripgrep** | Fast text/regex search | [ripgrep.md](ripgrep.md) |
-| **llm** | Data transformation | [transform.md](transform.md) |
-| **db** | Database queries | [database.md](database.md) |
-| **excel** | Excel manipulation | [excel.md](excel.md) |
 | **convert** | Document to Markdown | [convert.md](convert.md) |
-| **package** | Package versions | [package.md](package.md) |
-| **file** | File operations | [file.md](file.md) |
+| **db** | Database queries | [db.md](db.md) |
 | **diagram** | Diagram generation | [diagram.md](diagram.md) |
+| **excel** | Excel manipulation | [excel.md](excel.md) |
+| **file** | File operations | [file.md](file.md) |
 | **firecrawl** | Web scraping & crawling | [firecrawl.md](firecrawl.md) |
+| **ground** | Google grounded search | [ground.md](ground.md) |
+| **llm** | Data transformation | [llm.md](llm.md) |
 | **ot** | Internal tools | [ot.md](ot.md) |
-| **scaffold** | Extension scaffolding | [creating-tools.md](../../extending/creating-tools.md) |
+| **package** | Package versions | [package.md](package.md) |
+| **ripgrep** | Fast text/regex search | [ripgrep.md](ripgrep.md) |
+| **scaffold** | Extension scaffolding | [scaffold.md](scaffold.md) |
+| **web** | Content extraction | [web.md](web.md) |
 
 ## Quick Reference
 

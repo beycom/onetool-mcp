@@ -85,20 +85,22 @@ nav:
   - Reference:
       - Tools:
           - Overview: reference/tools/index.md
-          - Brave Search: reference/tools/brave-search.md
-          - Code Search: reference/tools/code-search.md
+          - Brave: reference/tools/brave.md
+          - Code: reference/tools/code.md
           - Context7: reference/tools/context7.md
           - Convert: reference/tools/convert.md
-          - Database: reference/tools/database.md
+          - DB: reference/tools/db.md
           - Diagram: reference/tools/diagram.md
           - Excel: reference/tools/excel.md
           - File: reference/tools/file.md
-          - Grounding Search: reference/tools/grounding-search.md
+          - Firecrawl: reference/tools/firecrawl.md
+          - Ground: reference/tools/ground.md
+          - LLM: reference/tools/llm.md
           - OT (Meta): reference/tools/ot.md
           - Package: reference/tools/package.md
           - Ripgrep: reference/tools/ripgrep.md
-          - Transform: reference/tools/transform.md
-          - Web Fetch: reference/tools/web-fetch.md
+          - Scaffold: reference/tools/scaffold.md
+          - Web: reference/tools/web.md
       - CLI:
           - Overview: reference/cli/index.md
           - ot-serve: reference/cli/ot-serve.md
