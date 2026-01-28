@@ -20,7 +20,7 @@ Each MCP server you add costs approximately $30/month in wasted tokens.
 - 18 MCP servers cause ~$485/month overhead ($485 / 18 = $27, rounded to $30)
 - Developer workload: 20 working days, 10 conversations/day, 10 turns each
 - Model: Claude Opus 4.5 @ $5/M input tokens
-- Source: [compare.md](../data/compare.md)
+- Source: [compare.md](../../data/compare.md)
 
 ---
 
@@ -34,7 +34,7 @@ OneTool reduces input token usage by 96% compared to multiple MCP servers.
 - Multi-turn (3 turns): 146,387 → 5,152 tokens = 96.5% reduction (28x)
 - Gap widens with more turns (tool definitions resent each turn)
 - 18 MCP servers vs OneTool (single tool)
-- Source: [compare.md](../data/compare.md)
+- Source: [compare.md](../../data/compare.md)
 
 **Comparison** (industry data from [Anthropic: Advanced Tool Use](https://www.anthropic.com/engineering/advanced-tool-use)):
 
@@ -50,6 +50,6 @@ OneTool reduces input token usage by 96% compared to multiple MCP servers.
 
 - 7.35c / 0.30c = 24.5x (rounded to 24x)
 - 3-turn conversation
-- Source: [compare.md](../data/compare.md)
+- Source: [compare.md](../../data/compare.md)
 
 ---

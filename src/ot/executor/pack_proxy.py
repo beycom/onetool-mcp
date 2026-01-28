@@ -13,6 +13,11 @@ from __future__ import annotations
 from functools import wraps
 from typing import TYPE_CHECKING, Any
 
+from ot.executor.param_resolver import (
+    get_mcp_tool_param_names,
+    get_tool_param_names,
+    resolve_kwargs,
+)
 from ot.stats import timed_tool_call
 
 if TYPE_CHECKING:
@@ -24,11 +29,17 @@ if TYPE_CHECKING:
 def _wrap_with_stats(
     pack_name: str, func_name: str, func: Callable[..., Any]
 ) -> Callable[..., Any]:
-    """Wrap a function to record execution-level stats."""
+    """Wrap a function to record execution-level stats and resolve param prefixes."""
     tool_name = f"{pack_name}.{func_name}"
 
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
+        # Resolve abbreviated parameter names (cached lookup)
+        if kwargs:
+            param_names = get_tool_param_names(tool_name)
+            if param_names:
+                kwargs = resolve_kwargs(kwargs, list(param_names))
+
         with timed_tool_call(tool_name):
             return func(*args, **kwargs)
 
@@ -45,10 +56,22 @@ def _create_pack_proxy(pack_name: str, pack_funcs: dict[str, Any]) -> Any:
     class PackProxy:
         """Proxy object that provides dot notation access to pack functions."""
 
+        def __init__(self) -> None:
+            # Cache wrapped functions to avoid recreating on each access
+            self._function_cache: dict[str, Callable[..., Any]] = {}
+
         def __getattr__(self, name: str) -> Any:
+            if name.startswith("_"):
+                raise AttributeError(f"Cannot access private attribute '{name}'")
+
             if name in pack_funcs:
-                # Wrap function with stats tracking
-                return _wrap_with_stats(pack_name, name, pack_funcs[name])
+                # Return cached wrapper or create and cache new one
+                if name not in self._function_cache:
+                    self._function_cache[name] = _wrap_with_stats(
+                        pack_name, name, pack_funcs[name]
+                    )
+                return self._function_cache[name]
+
             available = ", ".join(sorted(pack_funcs.keys()))
             raise AttributeError(
                 f"Function '{name}' not found in pack '{pack_name}'. "
@@ -77,13 +100,30 @@ def _create_mcp_proxy_pack(server_name: str) -> Any:
     class McpProxyPack:
         """Proxy object that routes tool calls to an MCP server."""
 
+        def __init__(self) -> None:
+            # Cache callable proxies to avoid recreating on each access
+            self._function_cache: dict[str, Callable[..., str]] = {}
+
         def __getattr__(self, tool_name: str) -> Any:
+            if tool_name.startswith("_"):
+                raise AttributeError(f"Cannot access private attribute '{tool_name}'")
+
+            if tool_name in self._function_cache:
+                return self._function_cache[tool_name]
+
             def call_proxy_tool(**kwargs: Any) -> str:
+                # Resolve abbreviated parameter names (cached lookup)
+                if kwargs:
+                    param_names = get_mcp_tool_param_names(server_name, tool_name)
+                    if param_names:
+                        kwargs = resolve_kwargs(kwargs, list(param_names))
+
                 tool_full_name = f"{server_name}.{tool_name}"
                 with timed_tool_call(tool_full_name):
                     proxy = get_proxy_manager()
                     return proxy.call_tool_sync(server_name, tool_name, kwargs)
 
+            self._function_cache[tool_name] = call_proxy_tool
             return call_proxy_tool
 
     return McpProxyPack()

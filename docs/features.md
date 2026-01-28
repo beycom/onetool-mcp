@@ -8,7 +8,7 @@ Everything you need to build powerful AI agent integrations without burning your
 
 ### 96% Token Savings
 
-Stop context rot. MCP servers uses 3-30K tokens before you start. OneTool uses ~2K tokens no matter how many packs of tools or proxy servers you use. No context rot or token bloat. [96% fewer tokens. 24x lower cost. Improved accuracy.](other/brand/claims.md).
+Stop context rot. MCP servers uses 3-30K tokens before you start. OneTool uses ~2K tokens no matter how many packs of tools or proxy servers you use. No context rot or token bloat. [96% fewer tokens. 24x lower cost. Improved accuracy.](data/compare.md).
 
 [Learn more](intro/index.md)
 
@@ -40,15 +40,25 @@ Short names for common tools. `ws` instead of `brave.web_search`. Configure in Y
 
 [Learn more](reference/tools/ot.md#otaliases)
 
+### Parameter Prefixes
+
+Use short prefixes instead of full parameter names. `p` instead of `pattern`, `i` instead of `info`. Any unambiguous prefix works.
+
+```python
+# These are equivalent
+ot.tools(pattern="brave", info="full")
+ot.tools(p="brave", i="full")
+```
+
 ---
 
 ## Built-in Tools
 
-### 15 Packs, 90+ Tools
+### Batteries Included with 100+ Tools
 
 Search, web, database, file ops, diagrams, conversions, and more. Ready to use out of the box.
 
-[Browse all tools](reference/tools/index.md)
+[Browse all tools](reference/tools/index.md) | [Full tool list](tool-reference.md)
 
 ### Smart Tools
 
@@ -215,54 +225,3 @@ Formal change proposal process. Specs define before code. Architecture decisions
 Type hints throughout. Ruff formatting and linting. Mypy type checking. Pydantic validation.
 
 [Learn more](extending/index.md)
-
----
-
-## Tool Packs
-
-| Pack | Tools | Best For |
-|------|-------|----------|
-| **brave** | `search`, `news`, `local`, `images`, `videos`, `search_batch` | Web search with AI summaries |
-| **code** | `search` | Semantic code search |
-| **context7** | `search`, `docs` | Library documentation |
-| **convert** | `pdf`, `word`, `pptx`, `batch` | Document to Markdown |
-| **db** | `query`, `schema`, `tables` | SQL database queries |
-| **diagram** | `source`, `render` | Mermaid, PlantUML, D2 diagrams |
-| **excel** | `create`, `read`, `write`, `formula`, ... | Full Excel control |
-| **file** | `read`, `write`, `edit`, `copy`, `move`, `delete` | Secure file operations |
-| **firecrawl** | `scrape`, `crawl`, `extract` | Web scraping with schemas |
-| **ground** | `search` (Google + Gemini) | Grounded search with sources |
-| **llm** | `transform` | AI-powered data transformation |
-| **ot** | `tools`, `packs`, `config`, `health`, `stats` | Introspection & management |
-| **package** | `npm`, `pypi`, `openrouter` | Package versions |
-| **ripgrep** | `search`, `files`, `count` | Fast regex file search |
-| **scaffold** | `create`, `templates`, `list_extensions` | Extension scaffolding |
-| **web** | `fetch`, `fetch_batch`, `extract` | Content extraction for agents |
-
----
-
-## How OneTool Compares
-
-### vs Anthropic's Tool Search Tool
-
-| Aspect | Tool Search Tool | OneTool |
-|--------|------------------|---------|
-| **Token Reduction** | ~85% (77K → 8.7K) | **96%** (46K → 2K) |
-| **Approach** | Defer loading, search on demand | Execute code directly - no tool definitions |
-| **Search Step** | Required (regex/BM25/embeddings) | **Not needed** - explicit calls |
-| **Tool Selection** | Agent still chooses from search results | **Developer controls** - no guessing |
-| **Implementation** | Beta API: custom tool type, `defer_loading` flag, beta headers | **Standard MCP** - works today |
-| **Adoption** | Requires ecosystem-wide API changes | **Drop-in replacement** |
-
-### vs Docker MCP Gateway
-
-| Aspect | Docker MCP Gateway | OneTool |
-|--------|-------------------|---------|
-| **Primary Focus** | Operational: containers, security | **Efficiency**: token reduction, cost |
-| **Token Overhead** | Standard MCP overhead remains | **96% reduction** |
-| **Tool Selection** | Agent enumerates and chooses | **Explicit calls** - developer controlled |
-| **Setup** | Docker Desktop + MCP Toolkit + GUI config | **Single YAML config** |
-| **Tool Catalog** | Limited curated selection | **90+ tools** built-in, extensible |
-| **Complexity** | Container orchestration, networking, volumes | **pip install**, done |
-
-**OneTool's core insight:** The agent doesn't need tool definitions - it can write Python.

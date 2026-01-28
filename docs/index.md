@@ -6,7 +6,7 @@
 
 MCP doesn't scale. Each MCP server costs ~$30/month in wasted tokens. OneTool fixes this.
 
-**[96% fewer tokens. 24x lower cost. Improved accuracy.](other/brand/claims.md)**
+**[96% fewer tokens. 24x lower cost. Improved accuracy.](data/compare.md)**
 
 ---
 
@@ -26,7 +26,7 @@ MCP doesn't scale. Each MCP server costs ~$30/month in wasted tokens. OneTool fi
 
 ## Reference
 
-- **[Tools](reference/tools/index.md)** - 15+ built-in packs
+- **[Tools](reference/tools/index.md)** - Batteries Included with 100+ Tools
 - **[CLIs](reference/cli/index.md)** - ot-serve, ot-bench
 
 ## Extend
@@ -36,15 +36,9 @@ MCP doesn't scale. Each MCP server costs ~$30/month in wasted tokens. OneTool fi
 
 ---
 
-## Built-in Packs
+## Batteries Included with 100+ Tools
 
-**Search & Web**: `brave` (web, news, local, image, video), `ground` (Google grounded), `web` (fetch, extract)
-
-**Documentation**: `context7` (library docs), `code` (semantic search), `ripgrep` (fast grep)
-
-**Data**: `db` (SQL queries), `excel` (spreadsheets), `llm` (transform)
-
-**Utilities**: `package` (npm, PyPI versions), `ot` (meta tools)
+See [Tool Reference](tool-reference.md) for the complete list of packs and tools.
 
 ---
 

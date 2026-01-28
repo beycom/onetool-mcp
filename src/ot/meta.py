@@ -996,6 +996,7 @@ def reload() -> str:
     with log("ot.reload") as s:
         import ot.config.loader
         import ot.config.secrets
+        import ot.executor.param_resolver
         import ot.prompts
         import ot.registry
 
@@ -1011,6 +1012,10 @@ def reload() -> str:
 
         # Clear tool registry cache (will rescan on next access)
         ot.registry._registry = None
+
+        # Clear param resolver cache (depends on registry)
+        ot.executor.param_resolver.get_tool_param_names.cache_clear()
+        ot.executor.param_resolver._mcp_param_cache.clear()
 
         # Reload to validate
         cfg = get_config()

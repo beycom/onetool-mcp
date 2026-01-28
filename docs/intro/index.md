@@ -43,7 +43,7 @@ One tool. Code execution. That's basically it.
 | Cost per query | $0.073 | $0.003 |
 | Tool calls | 5+ | 1 |
 
-[96% fewer tokens](../other/brand/claims.md). 24x cheaper. One call instead of five.
+[96% fewer tokens](../data/compare.md). 24x cheaper. One call instead of five.
 
 ### How it works
 
@@ -73,7 +73,7 @@ Agents write Python to call functions. No JSON schema parsing. No tool selection
 
 ## What you get
 
-- [96% fewer tokens](../other/brand/claims.md), same accuracy
+- [96% fewer tokens](../data/compare.md), same accuracy
 - Drop a Python file, get a new pack
 - AST validation before execution
 - `ot-bench` for testing LLM + MCP combinations

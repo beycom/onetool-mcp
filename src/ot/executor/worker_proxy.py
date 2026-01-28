@@ -10,6 +10,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from ot.executor.param_resolver import get_tool_param_names, resolve_kwargs
 from ot.executor.worker_pool import get_worker_pool
 from ot.stats import timed_tool_call
 
@@ -47,6 +48,13 @@ class WorkerFunctionProxy:
             Result from the function
         """
         tool_name = f"{self.tool_path.stem}.{self.function_name}"
+
+        # Resolve abbreviated parameter names (cached lookup)
+        if kwargs:
+            param_names = get_tool_param_names(tool_name)
+            if param_names:
+                kwargs = resolve_kwargs(kwargs, list(param_names))
+
         with timed_tool_call(tool_name):
             pool = get_worker_pool()
             return pool.call(

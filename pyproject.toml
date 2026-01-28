@@ -91,6 +91,7 @@ dev = [
     "pytest-cov>=7.0.0",
     "pytest-sugar>=1.1.1",
     "ruff>=0.14.14",
+    "types-aiofiles>=25.1.0.20251011",
     "types-pyyaml>=6.0.12.20250915",
 ]
 

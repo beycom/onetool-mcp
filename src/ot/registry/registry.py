@@ -254,7 +254,7 @@ class ToolRegistry:
                         return names
         return None
 
-    def _extract_requires(self, tree: ast.Module) -> dict[str, list] | None:
+    def _extract_requires(self, tree: ast.Module) -> dict[str, list[str]] | None:
         """Extract __ot_requires__ dict from module AST.
 
         Looks for module-level assignment: __ot_requires__ = {"cli": [...], "lib": [...]}
@@ -342,6 +342,16 @@ class ToolRegistry:
             ToolInfo if found, None otherwise.
         """
         return self._tools.get(name)
+
+    def register_tool(self, tool: ToolInfo) -> None:
+        """Register a tool programmatically.
+
+        Used for tools that aren't loaded from files (e.g., ot pack tools).
+
+        Args:
+            tool: ToolInfo object to register.
+        """
+        self._tools[tool.name] = tool
 
     def describe_tool(self, name: str) -> str:
         """Get detailed description of a tool.

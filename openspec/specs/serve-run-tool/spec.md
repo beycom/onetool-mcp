@@ -245,3 +245,63 @@ The runner implementation SHALL be organized into focused modules.
 - **THEN** it SHALL focus on code execution and command routing
 - **AND** it SHALL import fence, loader, and proxy functionality from dedicated modules
 
+### Requirement: Parameter Prefix Matching
+
+The system SHALL resolve abbreviated parameter names to full parameter names using prefix matching.
+
+#### Scenario: Exact parameter match
+- **GIVEN** a tool function with parameter `query`
+- **WHEN** called with `query="test"`
+- **THEN** the parameter SHALL be passed through unchanged
+
+#### Scenario: Single prefix match
+- **GIVEN** a tool function with parameter `query`
+- **WHEN** called with `q="test"`
+- **THEN** the parameter SHALL resolve to `query="test"`
+
+#### Scenario: Multiple prefix matches with first-wins
+- **GIVEN** a tool function with parameters `query_info`, `query`, `quality` (in that order)
+- **WHEN** called with `q="test"`
+- **THEN** the parameter SHALL resolve to `query_info="test"` (first in signature order)
+
+#### Scenario: Partial prefix match
+- **GIVEN** a tool function with parameters `query_info`, `query`, `quality`
+- **WHEN** called with `qual="test"`
+- **THEN** the parameter SHALL resolve to `quality="test"` (only match)
+
+#### Scenario: No match passthrough
+- **GIVEN** a tool function with parameter `query`
+- **WHEN** called with `xyz="test"`
+- **THEN** the parameter SHALL be passed through unchanged
+- **AND** the underlying function SHALL raise its normal error for unknown parameter
+
+#### Scenario: Mixed exact and prefix parameters
+- **GIVEN** a tool function with parameters `query`, `count`
+- **WHEN** called with `query="test", c=5`
+- **THEN** the parameters SHALL resolve to `query="test", count=5`
+
+### Requirement: Prefix Matching Scope
+
+Parameter prefix matching SHALL apply to all tool execution paths.
+
+#### Scenario: Internal tool prefix matching
+- **GIVEN** an internal tool (in-process, from `src/ot_tools/`)
+- **WHEN** called with abbreviated parameter names
+- **THEN** prefix matching SHALL be applied
+
+#### Scenario: Extension tool prefix matching
+- **GIVEN** an extension tool (worker subprocess, from `.onetool/tools/`)
+- **WHEN** called with abbreviated parameter names
+- **THEN** prefix matching SHALL be applied
+
+#### Scenario: MCP proxy tool prefix matching
+- **GIVEN** an MCP proxy tool
+- **WHEN** called with abbreviated parameter names
+- **THEN** prefix matching SHALL be applied using the tool's input schema
+
+#### Scenario: ot pack tool prefix matching
+- **GIVEN** an ot pack introspection tool (e.g., `ot.tools`, `ot.help`)
+- **WHEN** called with abbreviated parameter names (e.g., `p="fire"` for `pattern`)
+- **THEN** prefix matching SHALL be applied
+- **AND** the abbreviated parameter SHALL resolve to the full parameter name
+
