@@ -5,7 +5,6 @@ from __future__ import annotations
 import atexit
 import os
 import signal
-import sys
 from pathlib import Path
 
 import typer

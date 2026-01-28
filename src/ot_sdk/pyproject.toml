@@ -1,7 +1,7 @@
 [project]
 name = "ot_sdk"
 version = "1.0.0"
-description = "SDK for OneTool external worker tools"
+description = "SDK for OneTool extension tools"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Gavin Lasnitzki" }]

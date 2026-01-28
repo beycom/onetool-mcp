@@ -18,7 +18,8 @@ from pydantic import BaseModel, Field
 
 from ot.config import get_tool_config
 from ot.config.secrets import get_secret
-from ot_sdk import batch_execute, format_batch_results, log, normalize_items
+from ot.logging import LogSpan
+from ot.utils import batch_execute, format_batch_results, normalize_items
 
 # Dependency declarations for CLI validation
 __ot_requires__ = {
@@ -153,7 +154,7 @@ def _grounded_search(
     Returns:
         Formatted search results with sources
     """
-    with log(span_name, **log_extras) as s:
+    with LogSpan(span=span_name, **log_extras) as s:
         try:
             if model is None:
                 model = get_tool_config("ground", Config).model
@@ -291,7 +292,7 @@ def search_batch(
     """
     normalized = normalize_items(queries)
 
-    with log("ground.batch", query_count=len(normalized), focus=focus) as s:
+    with LogSpan(span="ground.batch", query_count=len(normalized), focus=focus) as s:
 
         def _search_one(query: str, label: str) -> tuple[str, str]:
             """Execute a single search and return (label, result)."""

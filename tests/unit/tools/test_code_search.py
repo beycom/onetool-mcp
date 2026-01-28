@@ -35,41 +35,25 @@ class TestGetDbPath:
     """Test _get_db_path path resolution function."""
 
     def test_uses_effective_cwd_by_default(self):
-        import ot_sdk.config as config_module
-
-        config_module._current_config.clear()
-        config_module._current_config.update({"_project_path": "/project"})
-
-        db_path, project_root = _get_db_path(None)
+        with patch("ot.paths.get_effective_cwd", return_value=Path("/project")):
+            db_path, project_root = _get_db_path(None)
 
         assert project_root == Path("/project")
         assert db_path == Path("/project/.chunkhound/db/chunks.db")
-        config_module._current_config.clear()
 
     def test_resolves_explicit_path(self):
-        import ot_sdk.config as config_module
-
-        config_module._current_config.clear()
-        config_module._current_config.update({"_project_path": "/somewhere/else"})
-
+        # Explicit path doesn't need mocking - it uses the provided path
         db_path, project_root = _get_db_path("/explicit/path")
 
         assert project_root == Path("/explicit/path")
         assert db_path == Path("/explicit/path/.chunkhound/db/chunks.db")
-        config_module._current_config.clear()
 
     def test_expands_tilde(self):
-        import ot_sdk.config as config_module
-
-        config_module._current_config.clear()
-        config_module._current_config.update({"_project_path": "/project"})
-
         _db_path, project_root = _get_db_path("~/myproject")
 
         # Should expand ~ to home directory
         assert "~" not in str(project_root)
         assert project_root.is_absolute()
-        config_module._current_config.clear()
 
 
 @pytest.mark.unit

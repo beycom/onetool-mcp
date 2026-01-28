@@ -420,3 +420,34 @@ def get_sessions_dir(base_dir: Path | None = None) -> Path:
     """
     base = base_dir or get_global_dir()
     return base / SESSIONS_SUBDIR
+
+
+def resolve_cwd_path(path: str) -> Path:
+    """Resolve a path relative to the project working directory (OT_CWD).
+
+    Use this for reading/writing files in the user's project.
+    This is the internal version for in-process tools - uses OT_CWD env var directly.
+
+    Args:
+        path: Path string (relative, absolute, or with ~)
+
+    Returns:
+        Resolved absolute Path
+
+    Behaviour:
+        - ~ paths: expanded to home directory
+        - Absolute paths: returned unchanged
+        - Relative paths: resolved relative to get_effective_cwd()
+
+    Example:
+        >>> resolve_cwd_path("data/file.txt")
+        PosixPath('/project/data/file.txt')
+        >>> resolve_cwd_path("/tmp/output.txt")
+        PosixPath('/tmp/output.txt')
+        >>> resolve_cwd_path("~/output.txt")
+        PosixPath('/home/user/output.txt')
+    """
+    p = Path(path).expanduser()
+    if p.is_absolute():
+        return p.resolve()
+    return (get_effective_cwd() / p).resolve()

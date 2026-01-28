@@ -63,7 +63,7 @@ _module_cache: dict[Path, tuple[LoadedTools, dict[str, float]]] = {}
 
 def _get_tool_files(
     tools_dir: Path | None, config: OneToolConfig | None
-) -> tuple[set[Path], Path]:
+) -> tuple[set[Path], set[Path], Path]:
     """Resolve tool files from config, bundled package, or directory.
 
     Always includes bundled tools from ot_tools package, plus any
@@ -74,9 +74,10 @@ def _get_tool_files(
         config: Loaded configuration (may be None).
 
     Returns:
-        Tuple of (set of resolved file paths, cache key).
+        Tuple of (all tool file paths, internal tool paths, cache key).
     """
     tool_files: list[Path] = []
+    internal_files: set[Path] = set()
 
     # Always include bundled tools from ot_tools package
     bundled_dir = _get_bundled_tools_dir()
@@ -86,9 +87,11 @@ def _get_tool_files(
             if f.name != "__init__.py"
         ]
         tool_files.extend(bundled_files)
+        # Mark bundled tools as internal (shipped with OneTool)
+        internal_files = {f.resolve() for f in bundled_files if f.exists()}
         logger.debug(f"Found {len(bundled_files)} bundled tools from {bundled_dir}")
 
-    # Add config-specified tools
+    # Add config-specified tools (these are extension tools, not internal)
     config_tool_files = config.get_tool_files() if config else []
     if config_tool_files:
         tool_files.extend(config_tool_files)
@@ -103,10 +106,10 @@ def _get_tool_files(
         cache_key = Path("__bundled__")
 
     if not tool_files:
-        return set(), Path("__no_tools__")
+        return set(), set(), Path("__no_tools__")
 
     current_files = {f.resolve() for f in tool_files if f.exists()}
-    return current_files, cache_key
+    return current_files, internal_files, cache_key
 
 
 def _check_cache(cache_key: Path, current_files: set[Path]) -> LoadedTools | None:
@@ -148,14 +151,14 @@ def _load_worker_tools(
     """Load PEP 723 tools via worker proxies.
 
     Args:
-        worker_tools: List of tool file info for worker tools.
+        worker_tools: List of tool file info for extension tools.
         config_dict: Configuration as dict.
         secrets: Secrets dict.
         packs: Packs dict to populate.
         mtimes: Modification times dict to populate.
 
     Returns:
-        Tuple of (functions dict, loaded worker tools list).
+        Tuple of (functions dict, loaded extension tools list).
     """
     functions: dict[str, Any] = {}
     loaded_workers: list[ToolFileInfo] = []
@@ -192,11 +195,11 @@ def _load_worker_tools(
 
             loaded_workers.append(tool_info)
             logger.debug(
-                f"Loaded worker tool {py_file.stem} with {len(tool_info.functions)} functions"
+                f"Loaded extension tool {py_file.stem} with {len(tool_info.functions)} functions"
             )
 
         except Exception as e:
-            logger.warning(f"Failed to load worker tool {py_file.stem}: {e}")
+            logger.warning(f"Failed to load extension tool {py_file.stem}: {e}")
 
     return functions, loaded_workers
 
@@ -267,7 +270,12 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
 
     Uses caching based on file modification times to avoid redundant loading.
     Reads `pack` module variable from each tool file to group functions.
-    Detects PEP 723 headers to route tools to worker processes.
+
+    Tool loading strategy:
+    - Internal tools (bundled with OneTool from ot_tools package): Run in-process
+      via importlib. These tools have no PEP 723 headers and use ot.* imports.
+    - Extension tools (user-created with PEP 723 headers): Run in worker
+      subprocesses with isolated dependencies. Use ot_sdk imports.
 
     The core 'ot' pack (from meta.py) is always registered regardless of config.
 
@@ -283,7 +291,7 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
     from ot.config.secrets import get_secrets
 
     config = get_config()
-    current_files, cache_key = _get_tool_files(tools_dir, config)
+    current_files, internal_files, cache_key = _get_tool_files(tools_dir, config)
 
     if not current_files:
         return LoadedTools(functions={}, packs={})
@@ -297,13 +305,15 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
     packs: dict[str, dict[str, Any]] = {}
     mtimes: dict[str, float] = {}
 
-    worker_tools, inprocess_tools = categorize_tools(list(current_files))
+    # Categorize tools: internal (bundled) vs extension (user-created)
+    # Internal tools run in-process, extension tools with PEP 723 use workers
+    worker_tools, inprocess_tools = categorize_tools(list(current_files), internal_files)
 
     secrets_path = config.get_secrets_file_path() if config else None
     secrets = get_secrets(secrets_path)
     config_dict = config.model_dump() if config else {}
 
-    # Inject path context for worker tools (used by ot_sdk path functions)
+    # Inject path context for extension tools (used by ot_sdk path functions)
     config_dict["_project_path"] = str(get_effective_cwd())
     if config and config._config_dir:
         config_dict["_config_dir"] = str(config._config_dir)

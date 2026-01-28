@@ -49,7 +49,7 @@ __ot mytool.search(query="test")
 ```
 src/
 ├── ot/           # Core library
-├── ot_sdk/       # SDK for worker tools
+├── ot_sdk/       # SDK for extension tools
 ├── ot_tools/     # Built-in tools (auto-discovered)
 ├── ot_serve/     # CLI: ot-serve
 └── ot_bench/     # CLI: ot-bench

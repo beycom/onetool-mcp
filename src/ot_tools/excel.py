@@ -1,7 +1,3 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["openpyxl>=3.1.5", "httpx>=0.27.0", "pyyaml>=6.0.0"]
-# ///
 """Excel file manipulation tools.
 
 Create, read, write Excel workbooks using openpyxl.
@@ -56,11 +52,25 @@ from openpyxl.utils import get_column_letter
 from openpyxl.utils.cell import column_index_from_string, coordinate_from_string
 from openpyxl.worksheet.cell_range import CellRange
 from openpyxl.worksheet.table import Table, TableStyleInfo
+from pydantic import BaseModel
 
-from ot_sdk import log, resolve_cwd_path, worker_main
+from ot.config import get_tool_config
+from ot.logging import LogSpan
+from ot.paths import resolve_cwd_path
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+class Config(BaseModel):
+    """Pack configuration - discovered by registry."""
+
+    pass
+
+
+def _get_config() -> Config:
+    """Get the tool configuration."""
+    return get_tool_config("excel", Config)
 
 
 def _expand_path(filepath: str) -> Path:
@@ -130,7 +140,7 @@ def create(*, filepath: str, sheet_name: str = "Sheet1") -> str:
         excel.create(filepath="output/report.xlsx")
         excel.create(filepath="data.xlsx", sheet_name="Sales")
     """
-    with log("excel.create", filepath=filepath, sheet=sheet_name) as s:
+    with LogSpan(span="excel.create", filepath=filepath, sheet=sheet_name) as s:
         try:
             _ensure_parent_dir(filepath)
             wb = Workbook()
@@ -157,7 +167,7 @@ def add_sheet(*, filepath: str, sheet_name: str) -> str:
     Example:
         excel.add_sheet(filepath="report.xlsx", sheet_name="Summary")
     """
-    with log("excel.add_sheet", filepath=filepath, sheet=sheet_name) as s:
+    with LogSpan(span="excel.add_sheet", filepath=filepath, sheet=sheet_name) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -199,7 +209,7 @@ def read(
         excel.read(filepath="data.xlsx")
         excel.read(filepath="data.xlsx", sheet_name="Sales", start_cell="B2", end_cell="D10")
     """
-    with log("excel.read", filepath=filepath, sheet=sheet_name) as s:
+    with LogSpan(span="excel.read", filepath=filepath, sheet=sheet_name) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -265,7 +275,7 @@ def write(
         excel.write(filepath="report.xlsx", data=[["Name", "Score"], ["Alice", 95]])
         excel.write(filepath="report.xlsx", data=[[1, 2, 3]], sheet_name="Numbers", start_cell="B5")
     """
-    with log("excel.write", filepath=filepath, sheet=sheet_name, rows=len(data)) as s:
+    with LogSpan(span="excel.write", filepath=filepath, sheet=sheet_name, rows=len(data)) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -318,7 +328,7 @@ def info(*, filepath: str, include_ranges: bool = False) -> str:
         excel.info(filepath="report.xlsx")
         excel.info(filepath="data.xlsx", include_ranges=True)
     """
-    with log("excel.info", filepath=filepath) as s:
+    with LogSpan(span="excel.info", filepath=filepath) as s:
         try:
             resolved = _expand_path(filepath)
             if not resolved.exists():
@@ -377,7 +387,7 @@ def formula(
         excel.formula(filepath="sales.xlsx", cell="C10", formula="=SUM(C2:C9)")
         excel.formula(filepath="data.xlsx", cell="A1", formula="=TODAY()", sheet_name="Summary")
     """
-    with log("excel.formula", filepath=filepath, cell=cell) as s:
+    with LogSpan(span="excel.formula", filepath=filepath, cell=cell) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -433,7 +443,7 @@ def cell_range(
         excel.cell_range(cell="A1", right=5, down=5)  # -> "A1:F6"
         excel.cell_range(cell="C3", left=2, up=2)     # -> "A1:C3"
     """
-    with log("excel.cell_range", cell=cell, right=right, down=down) as s:
+    with LogSpan(span="excel.cell_range", cell=cell, right=right, down=down) as s:
         try:
             r = CellRange(cell)
             r.expand(right=right, down=down, left=left, up=up)
@@ -468,7 +478,7 @@ def cell_shift(
         excel.cell_shift(cell="A1", cols=5)         # -> "F1"
         excel.cell_shift(cell="B3", rows=2, cols=3) # -> "E5"
     """
-    with log("excel.cell_shift", cell=cell, rows=rows, cols=cols) as s:
+    with LogSpan(span="excel.cell_shift", cell=cell, rows=rows, cols=cols) as s:
         try:
             r = CellRange(cell)
             r.shift(row_shift=rows, col_shift=cols)
@@ -510,7 +520,7 @@ def search(
         excel.search(filepath="data.xlsx", pattern="^ID-\\\\d+$", regex=True)
         excel.search(filepath="data.xlsx", pattern="Total", first_only=True)
     """
-    with log("excel.search", filepath=filepath, pattern=pattern) as s:
+    with LogSpan(span="excel.search", filepath=filepath, pattern=pattern) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -576,7 +586,7 @@ def tables(
     Example:
         excel.tables(filepath="sales.xlsx")
     """
-    with log("excel.tables", filepath=filepath) as s:
+    with LogSpan(span="excel.tables", filepath=filepath) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -620,7 +630,7 @@ def table_info(
     Example:
         excel.table_info(filepath="sales.xlsx", table_name="SalesData")
     """
-    with log("excel.table_info", filepath=filepath, table=table_name) as s:
+    with LogSpan(span="excel.table_info", filepath=filepath, table=table_name) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -684,7 +694,7 @@ def table_data(
         excel.table_data(filepath="sales.xlsx", table_name="SalesData")
         excel.table_data(filepath="sales.xlsx", table_name="SalesData", row_index=0)
     """
-    with log("excel.table_data", filepath=filepath, table=table_name) as s:
+    with LogSpan(span="excel.table_data", filepath=filepath, table=table_name) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -765,7 +775,7 @@ def insert_rows(
     Example:
         excel.insert_rows(filepath="data.xlsx", row=5, count=3)
     """
-    with log("excel.insert_rows", filepath=filepath, row=row, count=count) as s:
+    with LogSpan(span="excel.insert_rows", filepath=filepath, row=row, count=count) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -809,7 +819,7 @@ def delete_rows(
     Example:
         excel.delete_rows(filepath="data.xlsx", row=3, count=2)
     """
-    with log("excel.delete_rows", filepath=filepath, row=row, count=count) as s:
+    with LogSpan(span="excel.delete_rows", filepath=filepath, row=row, count=count) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -854,7 +864,7 @@ def insert_cols(
         excel.insert_cols(filepath="data.xlsx", col="C", count=2)
         excel.insert_cols(filepath="data.xlsx", col=3, count=2)
     """
-    with log("excel.insert_cols", filepath=filepath, col=col, count=count) as s:
+    with LogSpan(span="excel.insert_cols", filepath=filepath, col=col, count=count) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -900,7 +910,7 @@ def delete_cols(
     Example:
         excel.delete_cols(filepath="data.xlsx", col="B", count=2)
     """
-    with log("excel.delete_cols", filepath=filepath, col=col, count=count) as s:
+    with LogSpan(span="excel.delete_cols", filepath=filepath, col=col, count=count) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -949,7 +959,7 @@ def copy_range(
         excel.copy_range(filepath="data.xlsx", source="A1:C10", target="E1")
         excel.copy_range(filepath="data.xlsx", source="A1:C10", target="A1", target_sheet="Backup")
     """
-    with log("excel.copy_range", filepath=filepath, source=source, target=target) as s:
+    with LogSpan(span="excel.copy_range", filepath=filepath, source=source, target=target) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -1034,7 +1044,7 @@ def create_table(
     Example:
         excel.create_table(filepath="sales.xlsx", data_range="A1:E10", table_name="SalesData")
     """
-    with log("excel.create_table", filepath=filepath, range=data_range) as s:
+    with LogSpan(span="excel.create_table", filepath=filepath, range=data_range) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -1094,7 +1104,7 @@ def sheets(*, filepath: str) -> str:
     Example:
         excel.sheets(filepath="report.xlsx")
     """
-    with log("excel.sheets", filepath=filepath) as s:
+    with LogSpan(span="excel.sheets", filepath=filepath) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -1132,7 +1142,7 @@ def used_range(
     Example:
         excel.used_range(filepath="data.xlsx")
     """
-    with log("excel.used_range", filepath=filepath) as s:
+    with LogSpan(span="excel.used_range", filepath=filepath) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -1176,7 +1186,7 @@ def formulas(
     Example:
         excel.formulas(filepath="calc.xlsx")
     """
-    with log("excel.formulas", filepath=filepath) as s:
+    with LogSpan(span="excel.formulas", filepath=filepath) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -1228,7 +1238,7 @@ def hyperlinks(
     Example:
         excel.hyperlinks(filepath="links.xlsx")
     """
-    with log("excel.hyperlinks", filepath=filepath) as s:
+    with LogSpan(span="excel.hyperlinks", filepath=filepath) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -1278,7 +1288,7 @@ def merged_cells(
     Example:
         excel.merged_cells(filepath="report.xlsx")
     """
-    with log("excel.merged_cells", filepath=filepath) as s:
+    with LogSpan(span="excel.merged_cells", filepath=filepath) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -1313,7 +1323,7 @@ def named_ranges(*, filepath: str) -> str:
     Example:
         excel.named_ranges(filepath="report.xlsx")
     """
-    with log("excel.named_ranges", filepath=filepath) as s:
+    with LogSpan(span="excel.named_ranges", filepath=filepath) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -1344,7 +1354,3 @@ def named_ranges(*, filepath: str) -> str:
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
-
-
-if __name__ == "__main__":
-    worker_main()

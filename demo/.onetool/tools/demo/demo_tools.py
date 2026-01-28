@@ -1,3 +1,7 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["pyyaml>=6.0.0"]
+# ///
 """Demo tools for OneTool testing and benchmarking.
 
 These tools return deterministic but non-guessable outputs based on input.
@@ -8,8 +12,12 @@ from __future__ import annotations
 
 import hashlib
 
-# Namespace for dot notation: demo.foo(), demo.bar()
-namespace = "demo"
+from ot_sdk import worker_main
+
+# Pack for dot notation: demo.foo(), demo.bar()
+pack = "demo"
+
+__all__ = ["foo", "bar"]
 
 _FOO_WORDS = [
     "red",
@@ -88,3 +96,7 @@ def bar(*, text: str) -> str:
     h = hashlib.md5(f"bar-{text}".encode()).digest()
     index = h[0] % len(_BAR_WORDS)
     return _BAR_WORDS[index]
+
+
+if __name__ == "__main__":
+    worker_main()

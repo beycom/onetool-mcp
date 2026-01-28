@@ -390,7 +390,7 @@ The documentation SHALL include a plugin development guide for building standalo
 - **THEN** the guide SHALL explain adding the plugin path to their project or global `tools_dir`
 - **AND** glob patterns SHALL be documented (e.g., `~/plugins/myproject/src/*.py`)
 
-#### Scenario: Worker tool pattern documented
+#### Scenario: Extension tool pattern documented
 
 - **WHEN** a plugin requires isolated dependencies
 - **THEN** the guide SHALL explain the PEP 723 header pattern

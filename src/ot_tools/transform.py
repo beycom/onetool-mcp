@@ -1,7 +1,3 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["openai>=1.0.0", "httpx>=0.27.0", "pyyaml>=6.0.0"]
-# ///
 """Transform - LLM-powered data transformation.
 
 Takes input data and a prompt, uses an LLM to transform/process it.
@@ -38,8 +34,28 @@ __ot_requires__ = {
 from typing import Any
 
 from openai import OpenAI
+from pydantic import BaseModel, Field
 
-from ot_sdk import get_config, get_secret, log, worker_main
+from ot.config import get_secret, get_tool_config
+from ot.logging import LogSpan
+
+
+class Config(BaseModel):
+    """Pack configuration - discovered by registry."""
+
+    base_url: str = Field(
+        default="",
+        description="OpenAI-compatible API base URL (e.g., https://openrouter.ai/api/v1)",
+    )
+    model: str = Field(
+        default="",
+        description="Model to use for transformation (e.g., openai/gpt-4o-mini)",
+    )
+
+
+def _get_config() -> Config:
+    """Get transform pack configuration."""
+    return get_tool_config("transform", Config)
 
 
 def _get_api_config() -> tuple[str | None, str | None, str | None]:
@@ -48,9 +64,10 @@ def _get_api_config() -> tuple[str | None, str | None, str | None]:
     Returns:
         Tuple of (api_key, base_url, default_model) - all None if not configured
     """
+    config = _get_config()
     api_key = get_secret("OPENAI_API_KEY")
-    base_url = get_config("transform.base_url")
-    default_model = get_config("transform.model")
+    base_url = config.base_url or None
+    default_model = config.model or None
     return api_key, base_url, default_model
 
 
@@ -92,7 +109,7 @@ def transform(
             prompt="Summarize this in 3 bullet points"
         )
     """
-    with log("llm.transform", promptLen=len(prompt)) as s:
+    with LogSpan(span="llm.transform", promptLen=len(prompt)) as s:
         # Get API config
         api_key, base_url, default_model = _get_api_config()
 
@@ -146,7 +163,3 @@ Instructions:
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
-
-
-if __name__ == "__main__":
-    worker_main()

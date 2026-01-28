@@ -1,7 +1,3 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["httpx>=0.27.0", "pydantic>=2.0.0", "pyyaml>=6.0.0", "trafilatura>=2.0.0"]
-# ///
 """Web content extraction tools using trafilatura.
 
 Provides web page fetching with high-quality content extraction,
@@ -23,15 +19,14 @@ import trafilatura
 from pydantic import BaseModel, Field
 from trafilatura.settings import use_config
 
-from ot_sdk import (
+from ot.config import get_tool_config
+from ot.logging import LogSpan
+from ot.utils import (
     batch_execute,
     cache,
     format_batch_results,
-    get_config,
-    log,
     normalize_items,
     truncate,
-    worker_main,
 )
 
 
@@ -52,6 +47,11 @@ class Config(BaseModel):
     )
 
 
+def _get_config() -> Config:
+    """Get web pack configuration."""
+    return get_tool_config("web", Config)
+
+
 def _create_config(timeout: float) -> Any:
     """Create trafilatura config with custom settings."""
     config = use_config()
@@ -62,7 +62,7 @@ def _create_config(timeout: float) -> Any:
 @cache(ttl=300)  # Cache fetched pages for 5 minutes
 def _fetch_url_cached(url: str, timeout: float) -> str | None:
     """Fetch URL with caching to avoid redundant requests."""
-    with log("web.download", url=url, timeout=timeout) as span:
+    with LogSpan(span="web.download", url=url, timeout=timeout) as span:
         config = _create_config(timeout)
         result = trafilatura.fetch_url(url, config=config)
         span.add(success=result is not None)
@@ -122,16 +122,15 @@ def fetch(
         # Include links for research
         content = web.fetch(url, include_links=True)
     """
-    with log("web.fetch", url=url, output_format=output_format) as s:
+    with LogSpan(span="web.fetch", url=url, output_format=output_format) as s:
         try:
             # Get config values
-            web_timeout = get_config("tools.web_fetch.timeout") or 30.0
-            web_max_length = get_config("tools.web_fetch.max_length") or 50000
+            pack_config = _get_config()
 
             if timeout is None:
-                timeout = web_timeout
+                timeout = pack_config.timeout
             if max_length is None:
-                max_length = web_max_length
+                max_length = pack_config.max_length
             config = _create_config(timeout)
 
             # Fetch the page (with optional caching)
@@ -231,7 +230,7 @@ def fetch_batch(
     """
     normalized = normalize_items(urls)
 
-    with log("web.batch", urlCount=len(normalized), output_format=output_format) as s:
+    with LogSpan(span="web.batch", urlCount=len(normalized), output_format=output_format) as s:
 
         def _fetch_one(url: str, label: str) -> tuple[str, str]:
             """Fetch a single URL and return (label, result)."""
@@ -250,7 +249,3 @@ def fetch_batch(
         output = format_batch_results(results, normalized)
         s.add(outputLen=len(output))
         return output
-
-
-if __name__ == "__main__":
-    worker_main()

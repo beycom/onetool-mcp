@@ -1,4 +1,4 @@
-"""Configuration and secrets access for worker tools.
+"""Configuration and secrets access for extension tools.
 
 Config and secrets are passed to workers via the JSON-RPC request, not read
 directly from files. This ensures workers don't need filesystem access to

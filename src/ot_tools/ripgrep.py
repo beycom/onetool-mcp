@@ -31,8 +31,8 @@ if TYPE_CHECKING:
 
 from ot.config import get_tool_config
 from ot.logging import LogSpan
+from ot.paths import resolve_cwd_path
 from ot.utils.platform import get_install_hint
-from ot_sdk import resolve_cwd_path
 
 
 class Config(BaseModel):

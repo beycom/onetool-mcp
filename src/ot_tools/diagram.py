@@ -1,7 +1,3 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["aiofiles>=24.1.0", "httpx>=0.27.0", "pydantic>=2.0.0", "pyyaml>=6.0.0"]
-# ///
 """Diagram generation tools using Kroki as the rendering backend.
 
 Provides a two-stage pipeline for creating diagrams:
@@ -44,17 +40,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
+import httpx
 from pydantic import BaseModel, Field
 
-from ot_sdk import (
-    get_config,
-    get_config_path,
-    get_project_path,
-    http,
-    log,
-    truncate,
-    worker_main,
-)
+from ot.config import get_tool_config
+from ot.logging import LogSpan
+from ot.paths import get_effective_cwd, get_project_dir
+from ot.utils import truncate
 
 # ==================== Configuration Classes ====================
 
@@ -194,6 +186,23 @@ class Config(BaseModel):
         description="Named template references",
     )
 
+
+def _get_config() -> Config:
+    """Get diagram pack configuration."""
+    return get_tool_config("diagram", Config)
+
+
+# Shared HTTP client for connection pooling
+_http_client = httpx.Client(
+    timeout=30.0,
+    limits=httpx.Limits(
+        max_keepalive_connections=20,
+        max_connections=100,
+        keepalive_expiry=30.0,
+    ),
+)
+
+
 # ==================== Constants ====================
 
 # Kroki-supported diagram providers
@@ -269,6 +278,41 @@ _cached_backend: dict[str, Any] = {"url": None, "is_self_hosted": None}
 # ==================== Path Resolution ====================
 
 
+def _resolve_project_path(path_str: str) -> Path:
+    """Resolve a path relative to the project directory (OT_CWD).
+
+    Args:
+        path_str: Path string (relative, absolute, or with ~)
+
+    Returns:
+        Resolved absolute Path
+    """
+    p = Path(path_str).expanduser()
+    if p.is_absolute():
+        return p
+    return (get_effective_cwd() / p).resolve()
+
+
+def _resolve_config_path(path_str: str) -> Path:
+    """Resolve a path relative to the config directory (.onetool/).
+
+    Args:
+        path_str: Path string (relative, absolute, or with ~)
+
+    Returns:
+        Resolved absolute Path
+    """
+    p = Path(path_str).expanduser()
+    if p.is_absolute():
+        return p
+    # Try project-level .onetool first, fall back to global
+    project_ot = get_project_dir()
+    if project_ot:
+        return (project_ot / p).resolve()
+    # Fall back to project root if no .onetool dir
+    return (get_effective_cwd() / p).resolve()
+
+
 def _resolve_output_dir(output_dir: str | None) -> Path:
     """Resolve the output directory for diagrams.
 
@@ -287,9 +331,9 @@ def _resolve_output_dir(output_dir: str | None) -> Path:
         Resolved absolute Path to output directory (created if needed).
     """
     if output_dir is None:
-        output_dir = get_config("tools.diagram.output.dir") or "diagrams"
+        output_dir = _get_config().output.dir
 
-    path = get_project_path(output_dir)
+    path = _resolve_project_path(output_dir)
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -378,11 +422,10 @@ def _get_kroki_url() -> str:
     if _cached_backend["url"] is not None:
         return _cached_backend["url"]
 
-    prefer = get_config("tools.diagram.backend.prefer") or "remote"
-    remote_url = get_config("tools.diagram.backend.remote_url") or "https://kroki.io"
-    self_hosted_url = (
-        get_config("tools.diagram.backend.self_hosted_url") or "http://localhost:8000"
-    )
+    config = _get_config()
+    prefer = config.backend.prefer
+    remote_url = config.backend.remote_url
+    self_hosted_url = config.backend.self_hosted_url
 
     if prefer == "self_hosted":
         _cached_backend["url"] = self_hosted_url
@@ -390,7 +433,7 @@ def _get_kroki_url() -> str:
     elif prefer == "auto":
         # Try self-hosted first, fall back to remote
         try:
-            resp = http.get(f"{self_hosted_url}/health", timeout=2.0)
+            resp = _http_client.get(f"{self_hosted_url}/health", timeout=2.0)
             if resp.status_code == 200:
                 _cached_backend["url"] = self_hosted_url
                 _cached_backend["is_self_hosted"] = True
@@ -440,8 +483,8 @@ def _render_via_kroki(
     kroki_url = _get_kroki_url()
     url = f"{kroki_url}/{provider}/{output_format}"
 
-    with log("diagram.kroki", provider=provider, format=output_format, url=url) as span:
-        resp = http.post(
+    with LogSpan(span="diagram.kroki", provider=provider, format=output_format, url=url) as span:
+        resp = _http_client.post(
             url,
             content=source.encode("utf-8"),
             headers={"Content-Type": "text/plain"},
@@ -628,9 +671,7 @@ def _generate_filename(
     Returns:
         Generated filename.
     """
-    naming_pattern = (
-        get_config("tools.diagram.output.naming") or "{provider}_{name}_{timestamp}"
-    )
+    naming_pattern = _get_config().output.naming
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     filename = naming_pattern.format(
@@ -687,7 +728,7 @@ def generate_source(
             name="api-flow"
         )
     """
-    with log("diagram.generate_source", provider=provider, diagram_name=name) as s:
+    with LogSpan(span="diagram.generate_source", provider=provider, diagram_name=name) as s:
         try:
             _validate_provider(provider)
 
@@ -775,8 +816,8 @@ def render_diagram(
             source_file="../diagrams/mermaid_api-flow.mmd"
         )
     """
-    with log(
-        "diagram.render_diagram",
+    with LogSpan(
+        span="diagram.render_diagram",
         provider=provider,
         diagram_name=name,
         format=output_format,
@@ -842,7 +883,7 @@ def render_diagram(
                 # Start async rendering (would use asyncio in real impl)
                 # For now, just do it synchronously
                 try:
-                    timeout = get_config("tools.diagram.backend.timeout") or 30.0
+                    timeout = _get_config().backend.timeout
                     rendered = _render_via_kroki(
                         source, provider, output_format, timeout
                     )
@@ -858,7 +899,7 @@ def render_diagram(
                 return f"Rendering started. Task ID: {task_id}"
 
             # Synchronous rendering
-            timeout = get_config("tools.diagram.backend.timeout") or 30.0
+            timeout = _get_config().backend.timeout
             rendered = _render_via_kroki(source, provider, output_format, timeout)
 
             # Save output
@@ -866,9 +907,7 @@ def render_diagram(
 
             # Optionally save source alongside
             if save_source is None:
-                save_source = get_config("tools.diagram.output.save_source")
-                if save_source is None:
-                    save_source = True
+                save_source = _get_config().output.save_source
 
             source_saved = ""
             if save_source and source_file is None:
@@ -906,7 +945,7 @@ def get_render_status(*, task_id: str) -> str:
     Example:
         status = diagram.get_render_status(task_id="render-abc123")
     """
-    with log("diagram.get_render_status", task_id=task_id) as s:
+    with LogSpan(span="diagram.get_render_status", task_id=task_id) as s:
         task = _render_tasks.get(task_id)
 
         if task is None:
@@ -1000,7 +1039,7 @@ def batch_render(
             ]
         )
     """
-    with log("diagram.batch_render", count=len(sources), format=output_format) as s:
+    with LogSpan(span="diagram.batch_render", count=len(sources), format=output_format) as s:
         # Check for self-hosted requirement
         if not _is_self_hosted():
             s.add(error="requires_self_hosted")
@@ -1025,7 +1064,7 @@ def batch_render(
         # Get output directory (resolved relative to project directory)
         output_path = _resolve_output_dir(output_dir)
 
-        timeout = get_config("tools.diagram.backend.timeout") or 30.0
+        timeout = _get_config().backend.timeout
 
         # Process sources concurrently using thread pool
         with ThreadPoolExecutor(max_workers=max_concurrent) as executor:
@@ -1127,7 +1166,7 @@ def render_directory(
             recursive=True
         )
     """
-    with log("diagram.render_directory", directory=directory, pattern=pattern) as s:
+    with LogSpan(span="diagram.render_directory", directory=directory, pattern=pattern) as s:
         if not _is_self_hosted():
             s.add(error="requires_self_hosted")
             return (
@@ -1167,7 +1206,7 @@ def render_directory(
             output_path = dir_path
             output_path.mkdir(parents=True, exist_ok=True)
 
-        timeout = get_config("tools.diagram.backend.timeout") or 30.0
+        timeout = _get_config().backend.timeout
 
         # Process files concurrently - files are read just-in-time
         completed = 0
@@ -1217,27 +1256,19 @@ def get_diagram_policy() -> str:
     Example:
         policy = diagram.get_diagram_policy()
     """
-    with log("diagram.get_diagram_policy") as s:
-        policy = get_config("tools.diagram.policy")
-
-        if policy is None:
-            s.add(source="default")
-            return (
-                "NEVER use ASCII art or text-based diagrams in markdown.\n"
-                "Use the diagram tools for all visual representations.\n"
-                "Save output as SVG and reference in markdown.\n"
-                "Always generate source first, then render."
-            )
+    with LogSpan(span="diagram.get_diagram_policy") as s:
+        config = _get_config()
+        policy = config.policy
 
         result_parts = [
             "Diagram Policy",
             "=" * 40,
             "",
             "Rules:",
-            policy.get("rules", "No rules configured"),
+            policy.rules,
             "",
-            f"Preferred format: {policy.get('preferred_format', 'svg')}",
-            f"Preferred providers: {', '.join(policy.get('preferred_providers', ['mermaid', 'd2', 'plantuml']))}",
+            f"Preferred format: {policy.preferred_format}",
+            f"Preferred providers: {', '.join(policy.preferred_providers)}",
         ]
 
         s.add(source="config")
@@ -1266,8 +1297,10 @@ def get_diagram_instructions(
         # Specific provider
         mermaid_guide = diagram.get_diagram_instructions(provider="mermaid")
     """
-    with log("diagram.get_diagram_instructions", provider=provider) as s:
-        instructions = get_config("tools.diagram.instructions") or {}
+    with LogSpan(span="diagram.get_diagram_instructions", provider=provider) as s:
+        config = _get_config()
+        # Convert Pydantic models to dicts for backward compatibility
+        instructions = {k: v.model_dump() for k, v in config.instructions.items()} if config.instructions else {}
 
         # If no config, use defaults
         if not instructions:
@@ -1380,26 +1413,20 @@ def get_output_config() -> str:
     Example:
         config = diagram.get_output_config()
     """
-    with log("diagram.get_output_config") as s:
-        output_dir = get_config("tools.diagram.output.dir") or "diagrams"
-        naming = (
-            get_config("tools.diagram.output.naming") or "{provider}_{name}_{timestamp}"
-        )
-        default_format = get_config("tools.diagram.output.default_format") or "svg"
-        save_source = get_config("tools.diagram.output.save_source")
-        if save_source is None:
-            save_source = True
+    with LogSpan(span="diagram.get_output_config") as s:
+        config = _get_config()
+        output = config.output
 
         result = (
             "Diagram Output Configuration\n"
             "=" * 40 + "\n\n"
-            f"Output directory: {output_dir}\n"
-            f"Naming pattern: {naming}\n"
-            f"Default format: {default_format}\n"
-            f"Save source: {save_source}"
+            f"Output directory: {output.dir}\n"
+            f"Naming pattern: {output.naming}\n"
+            f"Default format: {output.default_format}\n"
+            f"Save source: {output.save_source}"
         )
 
-        s.add(dir=output_dir, format=default_format)
+        s.add(dir=output.dir, format=output.default_format)
         return result
 
 
@@ -1418,8 +1445,9 @@ def get_template(*, name: str) -> str:
     Example:
         template = diagram.get_template(name="api-flow")
     """
-    with log("diagram.get_template", template_name=name) as s:
-        templates = get_config("tools.diagram.templates") or {}
+    with LogSpan(span="diagram.get_template", template_name=name) as s:
+        config = _get_config()
+        templates = config.templates
 
         if name not in templates:
             s.add(found=False)
@@ -1427,21 +1455,21 @@ def get_template(*, name: str) -> str:
             return f"Template not found: {name}\nAvailable: {available}"
 
         template = templates[name]
-        file_path = template.get("file", "")
+        file_path = template.file
 
         # Try to load the template file
         if file_path:
             # Resolve relative to config directory (.onetool/)
-            path = get_config_path(file_path)
+            path = _resolve_config_path(file_path)
 
             if path.exists():
                 source = path.read_text()
                 s.add(found=True, lines=len(source.splitlines()))
                 return (
                     f"Template: {name}\n"
-                    f"Provider: {template.get('provider', 'unknown')}\n"
-                    f"Type: {template.get('diagram_type', 'unknown')}\n"
-                    f"Description: {template.get('description', '')}\n"
+                    f"Provider: {template.provider}\n"
+                    f"Type: {template.diagram_type}\n"
+                    f"Description: {template.description}\n"
                     f"\n--- Source ---\n{source}"
                 )
 
@@ -1466,7 +1494,7 @@ def list_providers(*, focus_only: bool = False) -> str:
         # Focus providers only
         focus = diagram.list_providers(focus_only=True)
     """
-    with log("diagram.list_providers", focus_only=focus_only) as s:
+    with LogSpan(span="diagram.list_providers", focus_only=focus_only) as s:
         if focus_only:
             result = (
                 "Focus Providers (with full guidance)\n"
@@ -1523,7 +1551,7 @@ def get_playground_url(
             provider="mermaid"
         )
     """
-    with log("diagram.get_playground_url", provider=provider) as s:
+    with LogSpan(span="diagram.get_playground_url", provider=provider) as s:
         if provider == "mermaid":
             url = _get_mermaid_playground_url(source)
         elif provider == "plantuml":
@@ -1537,7 +1565,3 @@ def get_playground_url(
 
         s.add(supported=True, url_length=len(url))
         return url
-
-
-if __name__ == "__main__":
-    worker_main()

@@ -1,7 +1,3 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["httpx>=0.27.0", "pydantic>=2.0.0", "pyyaml>=6.0.0"]
-# ///
 """Context7 API tools for library search and documentation.
 
 These built-in tools provide access to the Context7 documentation API
@@ -25,9 +21,12 @@ __ot_requires__ = {
 
 import re
 
+import httpx
 from pydantic import BaseModel, Field
 
-from ot_sdk import cache, get_config, get_secret, http, log, worker_main
+from ot.config import get_secret, get_tool_config
+from ot.logging import LogSpan
+from ot.utils import cache
 
 
 class Config(BaseModel):
@@ -51,8 +50,14 @@ CONTEXT7_SEARCH_URL = "https://context7.com/api/v2/search"
 CONTEXT7_DOCS_CODE_URL = "https://context7.com/api/v2/docs/code"
 CONTEXT7_DOCS_INFO_URL = "https://context7.com/api/v2/docs/info"
 
+
+def _get_config() -> Config:
+    """Get context7 pack configuration."""
+    return get_tool_config("context7", Config)
+
+
 # Shared HTTP client for connection pooling
-_client = http.client(timeout=30.0)
+_client = httpx.Client(timeout=30.0)
 
 
 def _get_api_key() -> str:
@@ -89,9 +94,9 @@ def _make_request(
         return False, "[Context7 API key not configured]"
 
     if timeout is None:
-        timeout = get_config("tools.context7.timeout") or 30.0
+        timeout = _get_config().timeout
 
-    with log("context7.request", url=url) as span:
+    with LogSpan(span="context7.request", url=url) as span:
         try:
             response = _client.get(
                 url,
@@ -234,7 +239,7 @@ def search(*, query: str) -> str:
         context7.search(query="fastapi")
         context7.search(query="react hooks")
     """
-    with log("context7.search", query=query) as s:
+    with LogSpan(span="context7.search", query=query) as s:
         success, result = _make_request(CONTEXT7_SEARCH_URL, params={"query": query})
 
         s.add(success=success)
@@ -329,7 +334,7 @@ def doc(
         # Get code examples
         context7.doc(library_key="pallets/flask", topic="blueprints", mode="code")
     """
-    with log("context7.doc", library_key=library_key, topic=topic, mode=mode) as s:
+    with LogSpan(span="context7.doc", library_key=library_key, topic=topic, mode=mode) as s:
         # Normalize and resolve library key (searches if needed)
         resolved_key = _resolve_library_key(library_key)
         s.add(resolvedKey=resolved_key)
@@ -346,7 +351,7 @@ def doc(
         normalized_topic = _normalize_topic(topic)
 
         # Clamp page and limit to valid ranges
-        config_docs_limit = get_config("tools.context7.docs_limit") or 10
+        config_docs_limit = _get_config().docs_limit
         page = max(1, min(page, 10))
         if limit is None:
             limit = config_docs_limit
@@ -387,7 +392,3 @@ def doc(
         result = str(data)
         s.add(resultLen=len(result))
         return result
-
-
-if __name__ == "__main__":
-    worker_main()

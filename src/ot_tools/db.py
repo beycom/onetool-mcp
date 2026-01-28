@@ -1,7 +1,3 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["httpx>=0.27.0", "pydantic>=2.0.0", "pyyaml>=6.0.0", "sqlalchemy>=2.0.0"]
-# ///
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -38,7 +34,9 @@ from typing import Any
 from pydantic import BaseModel, Field
 from sqlalchemy import Engine, create_engine, inspect, text
 
-from ot_sdk import get_config, log, resolve_cwd_path, worker_main
+from ot.config import get_tool_config
+from ot.logging import LogSpan
+from ot.paths import resolve_cwd_path
 
 
 class Config(BaseModel):
@@ -51,7 +49,13 @@ class Config(BaseModel):
         description="Maximum characters in query result output",
     )
 
-# Connection pool keyed by URL - persists across calls in worker
+
+def _get_config() -> Config:
+    """Get db pack configuration."""
+    return get_tool_config("db", Config)
+
+
+# Connection pool keyed by URL - persists across calls in process
 _engines: dict[str, Engine] = {}
 
 
@@ -106,7 +110,7 @@ def _get_engine(db_url: str) -> Engine:
     if resolved_url in _engines:
         return _engines[resolved_url]
 
-    with log("db.connect", db_url=resolved_url) as span:
+    with LogSpan(span="db.connect", db_url=resolved_url) as span:
         try:
             _engines[resolved_url] = _create_engine(resolved_url)
             span.add(cached=False)
@@ -151,7 +155,7 @@ def tables(*, db_url: str, filter: str | None = None) -> str:
         # Filter tables containing "user"
         db.tables(db_url="sqlite:///data.db", filter="user")
     """
-    with log("db.tables", db_url=db_url, filter=filter) as s:
+    with LogSpan(span="db.tables", db_url=db_url, filter=filter) as s:
         try:
             engine = _get_engine(db_url)
             with engine.connect() as conn:
@@ -188,7 +192,7 @@ def schema(*, table_names: list[str], db_url: str) -> str:
         # Multiple tables
         db.schema(table_names=["users", "orders"], db_url="sqlite:///data.db")
     """
-    with log("db.schema", tables=table_names, db_url=db_url) as s:
+    with LogSpan(span="db.schema", tables=table_names, db_url=db_url) as s:
         if not table_names:
             s.add(error="no_tables")
             return "Error: table_names parameter is required"
@@ -285,7 +289,7 @@ def query(*, sql: str, db_url: str, params: dict[str, Any] | None = None) -> str
             params={"status": "inactive", "id": 123}
         )
     """
-    with log("db.query", sql=sql, db_url=db_url) as s:
+    with LogSpan(span="db.query", sql=sql, db_url=db_url) as s:
         if not sql or not sql.strip():
             s.add(error="empty_query")
             return "Error: sql parameter is required"
@@ -300,7 +304,7 @@ def query(*, sql: str, db_url: str, params: dict[str, Any] | None = None) -> str
                     s.add(rowsAffected=affected)
                     return f"Success: {affected} rows affected"
 
-                max_chars = get_config("tools.db.max_chars") or 4000
+                max_chars = _get_config().max_chars
                 output, row_count, truncated = _format_query_results(
                     cursor_result, max_chars
                 )
@@ -358,7 +362,3 @@ def _format_query_results(cursor_result: Any, max_chars: int) -> tuple[str, int,
         result.append(f"Result: {row_count} rows")
 
     return "\n".join(result), row_count, truncated
-
-
-if __name__ == "__main__":
-    worker_main()

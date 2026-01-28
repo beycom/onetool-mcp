@@ -190,10 +190,10 @@ class TestExtractToolFunctions:
 
 @pytest.mark.unit
 @pytest.mark.core
-class TestWorkerToolDependencies:
-    """Tests to ensure worker tools declare all their dependencies.
+class TestExtensionToolDependencies:
+    """Tests to ensure extension tools declare all their dependencies.
 
-    Worker tools with PEP 723 headers run in isolated environments where only
+    Extension tools with PEP 723 headers run in isolated environments where only
     declared dependencies are available. If an import is missing from the
     dependencies list, the worker will crash with "Worker closed unexpectedly".
     """
@@ -255,8 +255,8 @@ class TestWorkerToolDependencies:
         # Map to import name if different
         return self.PACKAGE_TO_IMPORT.get(name, name)
 
-    def test_all_worker_tools_declare_dependencies(self) -> None:
-        """All PEP 723 worker tools must declare their third-party imports."""
+    def test_all_extension_tools_declare_dependencies(self) -> None:
+        """All PEP 723 extension tools must declare their third-party imports."""
         from pathlib import Path
 
         tools_dir = Path(__file__).parent.parent.parent.parent / "src" / "ot_tools"
@@ -271,7 +271,7 @@ class TestWorkerToolDependencies:
             # Check if it has a PEP 723 header
             metadata = parse_pep723_metadata(content)
             if metadata is None or not metadata.has_dependencies:
-                continue  # Not a worker tool
+                continue  # Not an extension tool
 
             # Extract imports and declared dependencies
             imports = self._extract_imports(content)
@@ -286,7 +286,7 @@ class TestWorkerToolDependencies:
                     errors.append(f"{tool_file.name}: imports '{imp}' but not in dependencies")
 
         if errors:
-            error_msg = "Worker tools with missing dependencies:\n" + "\n".join(
+            error_msg = "Extension tools with missing dependencies:\n" + "\n".join(
                 f"  - {e}" for e in errors
             )
             pytest.fail(error_msg)

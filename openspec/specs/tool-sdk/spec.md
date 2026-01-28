@@ -2,14 +2,14 @@
 
 ## Purpose
 
-Provides the ot_sdk package for building worker tools with isolated dependencies and JSON-RPC communication.
+Provides the ot_sdk package for building extension tools with isolated dependencies and JSON-RPC communication.
 ## Requirements
 ### Requirement: Worker Main Loop
 
-The SDK SHALL provide a `worker_main()` function that implements the standard worker message loop.
+The SDK SHALL provide a `worker_main()` function that implements the standard worker message loop for extension tools.
 
 #### Scenario: Tool entry point
-- **WHEN** a tool is executed as a subprocess
+- **WHEN** an extension tool is executed as a subprocess
 - **AND** the main block calls `worker_main()`
 - **THEN** the worker enters the JSON-RPC message loop
 - **AND** dispatches incoming requests to tool functions
@@ -17,6 +17,11 @@ The SDK SHALL provide a `worker_main()` function that implements the standard wo
 #### Scenario: Graceful shutdown
 - **WHEN** the worker receives EOF on stdin
 - **THEN** the worker exits cleanly
+
+#### Scenario: Internal tools do not use worker_main
+- **WHEN** an internal tool (shipped with onetool) is loaded
+- **THEN** it does NOT call `worker_main()`
+- **AND** executes directly in-process
 
 ### Requirement: Secret Access
 
@@ -94,7 +99,7 @@ The SDK SHALL provide caching utilities for memoization and manual cache operati
 
 ### Requirement: Utility Functions
 
-The SDK SHALL provide common utility functions for tool development.
+The SDK SHALL provide common utility functions that are shared between internal and extension tools via re-export from `ot.utils`.
 
 #### Scenario: Truncate long output
 - **WHEN** a tool calls `truncate(text, max_length=50000)`
@@ -109,6 +114,10 @@ The SDK SHALL provide common utility functions for tool development.
 - **WHEN** a tool calls `run_command(["rg", "--json", pattern, path], timeout=30)`
 - **THEN** the command is executed with the specified timeout
 - **AND** returns tuple `(returncode, stdout, stderr)`
+
+#### Scenario: Import from ot.utils
+- **WHEN** an internal tool imports `from ot.utils import truncate`
+- **THEN** it receives the same implementation as `from ot_sdk import truncate`
 
 ### Requirement: Testing Support
 
@@ -261,4 +270,57 @@ The SDK SHALL provide a `get_ot_dir()` function to get the active OneTool config
 - **AND** no project `.onetool/` exists
 - **WHEN** a tool calls `get_ot_dir()`
 - **THEN** the SDK returns `~/.onetool/`
+
+### Requirement: Shared Utilities Re-export
+
+The SDK SHALL re-export context-agnostic utilities from `ot.utils` to maintain a stable API for extension tools.
+
+#### Scenario: Truncate utilities re-export
+- **WHEN** an extension tool imports `from ot_sdk import truncate, format_error`
+- **THEN** it receives re-exports from `ot.utils.truncate`
+
+#### Scenario: Batch utilities re-export
+- **WHEN** an extension tool imports `from ot_sdk import batch_execute, normalize_items, format_batch_results`
+- **THEN** it receives re-exports from `ot.utils.batch`
+
+#### Scenario: HTTP utilities (extension-specific)
+- **WHEN** an extension tool imports `from ot_sdk import safe_request, api_headers, check_api_key`
+- **THEN** it receives extension-specific implementations from `ot_sdk.request`
+- **AND** these use `ot_sdk.config.get_secret` (JSON-RPC) rather than direct config access
+
+#### Scenario: Dependency utilities re-export
+- **WHEN** an extension tool imports `from ot_sdk import ensure_cli, ensure_lib, check_cli, check_lib`
+- **THEN** it receives re-exports from `ot.utils.deps`
+
+#### Scenario: Factory utilities re-export
+- **WHEN** an extension tool imports `from ot_sdk import lazy_client, LazyClient`
+- **THEN** it receives re-exports from `ot.utils.factory`
+
+### Requirement: SDK Purpose Documentation
+
+The SDK module docstring SHALL clarify that ot_sdk is for extension tools only.
+
+#### Scenario: Module docstring
+- **WHEN** a developer reads the ot_sdk module
+- **THEN** the docstring clearly states it is for extension tools
+- **AND** internal tools should use `ot.*` imports instead
+
+### Requirement: Context-Specific Functions
+
+The SDK SHALL provide functions that have extension-specific implementations distinct from `ot.*` equivalents.
+
+#### Scenario: Config via JSON-RPC
+- **WHEN** an extension tool calls `get_config(path)`
+- **THEN** the SDK retrieves the value from `_current_config` (set via JSON-RPC)
+- **AND** this differs from internal tools which use `ot.config.get_tool_config()`
+
+#### Scenario: Secret via JSON-RPC
+- **WHEN** an extension tool calls `get_secret(name)`
+- **THEN** the SDK retrieves the value from `_current_secrets` (set via JSON-RPC)
+- **AND** this differs from internal tools which use `ot.config.get_secret()`
+
+#### Scenario: Logging to stderr
+- **WHEN** an extension tool uses `with log("pack.func") as s:`
+- **THEN** logs are written to stderr as JSON lines for collection
+- **AND** this differs from internal tools which use `ot.logging.LogSpan`
 

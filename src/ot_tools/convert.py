@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Any
 
 from ot.logging import LogSpan
-from ot_sdk import resolve_cwd_path
+from ot.paths import resolve_cwd_path
 from ot_tools._convert import (
     convert_excel,
     convert_pdf,

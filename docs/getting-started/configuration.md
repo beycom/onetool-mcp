@@ -154,7 +154,7 @@ API_KEY: "${MY_ENV_VAR}"
 
 ### Accessing Secrets in Tools
 
-Worker tools access secrets via the SDK:
+Extension tools access secrets via the SDK:
 
 ```python
 from ot_sdk import get_secret

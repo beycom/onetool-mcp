@@ -18,13 +18,9 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 def mock_convert_config(tmp_path: Path) -> Generator[None, None, None]:
-    """Mock convert tool config - patches SDK project path."""
-    import ot_sdk.config as config_module
-
-    config_module._current_config.clear()
-    config_module._current_config.update({"_project_path": str(tmp_path)})
-    yield
-    config_module._current_config.clear()
+    """Mock convert tool config - patches effective CWD for internal tools."""
+    with patch("ot.paths.get_effective_cwd", return_value=tmp_path):
+        yield
 
 
 @pytest.fixture

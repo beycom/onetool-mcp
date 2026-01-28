@@ -19,8 +19,6 @@ if TYPE_CHECKING:
 @pytest.fixture(autouse=True)
 def mock_file_config(tmp_path: Path) -> Generator[None, None, None]:
     """Mock file tool config to allow temp directories."""
-    import ot_sdk.config as config_module
-
     from ot_tools.file import Config
 
     # Create a Config instance with test-friendly defaults
@@ -33,15 +31,12 @@ def mock_file_config(tmp_path: Path) -> Generator[None, None, None]:
         use_trash=False,  # Disable for cleaner tests
     )
 
-    # Set SDK project path for path resolution
-    config_module._current_config.clear()
-    config_module._current_config.update({"_project_path": str(tmp_path)})
-
-    # Patch the config getter
-    with patch("ot_tools.file.get_tool_config", return_value=test_config):
+    # Mock effective CWD to tmp_path for path resolution
+    with (
+        patch("ot.paths.get_effective_cwd", return_value=tmp_path),
+        patch("ot_tools.file.get_tool_config", return_value=test_config),
+    ):
         yield
-
-    config_module._current_config.clear()
 
 
 @pytest.fixture
@@ -63,7 +58,7 @@ def test_dir(tmp_path: Path) -> Path:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_pack_is_file() -> None:
     """Verify pack is correctly set."""
     from ot_tools.file import pack
@@ -72,7 +67,7 @@ def test_pack_is_file() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_all_exports() -> None:
     """Verify __all__ contains the expected public functions."""
     from ot_tools.file import __all__
@@ -98,7 +93,7 @@ def test_all_exports() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_read_file(test_file: Path) -> None:
     """Verify read returns file content with line numbers."""
     from ot_tools.file import read
@@ -113,7 +108,7 @@ def test_read_file(test_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_read_with_offset(test_file: Path) -> None:
     """Verify read respects offset parameter."""
     from ot_tools.file import read
@@ -126,7 +121,7 @@ def test_read_with_offset(test_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_read_with_limit(test_file: Path) -> None:
     """Verify read respects limit parameter."""
     from ot_tools.file import read
@@ -139,7 +134,7 @@ def test_read_with_limit(test_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_read_nonexistent_file() -> None:
     """Verify read returns error for missing file."""
     from ot_tools.file import read
@@ -150,7 +145,7 @@ def test_read_nonexistent_file() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_info_file(test_file: Path) -> None:
     """Verify info returns file metadata."""
     from ot_tools.file import info
@@ -165,7 +160,7 @@ def test_info_file(test_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_info_directory(test_dir: Path) -> None:
     """Verify info returns directory metadata."""
     from ot_tools.file import info
@@ -183,7 +178,7 @@ def test_info_directory(test_dir: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_list_directory(test_dir: Path) -> None:
     """Verify list returns directory contents."""
     from ot_tools.file import list as list_dir
@@ -196,7 +191,7 @@ def test_list_directory(test_dir: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_list_with_pattern(test_dir: Path) -> None:
     """Verify list filters by pattern."""
     from ot_tools.file import list as list_dir
@@ -208,7 +203,7 @@ def test_list_with_pattern(test_dir: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_list_recursive(test_dir: Path) -> None:
     """Verify list can search recursively."""
     from ot_tools.file import list as list_dir
@@ -219,7 +214,7 @@ def test_list_recursive(test_dir: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_tree(test_dir: Path) -> None:
     """Verify tree returns directory structure."""
     from ot_tools.file import tree
@@ -233,7 +228,7 @@ def test_tree(test_dir: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_search(test_dir: Path) -> None:
     """Verify search finds files by pattern."""
     from ot_tools.file import search
@@ -245,7 +240,7 @@ def test_search(test_dir: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_search_with_file_pattern(test_dir: Path) -> None:
     """Verify search filters by file extension."""
     from ot_tools.file import search
@@ -262,7 +257,7 @@ def test_search_with_file_pattern(test_dir: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_write_new_file(tmp_path: Path) -> None:
     """Verify write creates new file."""
     from ot_tools.file import write
@@ -276,7 +271,7 @@ def test_write_new_file(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_write_append(test_file: Path) -> None:
     """Verify write can append to file."""
     from ot_tools.file import write
@@ -291,7 +286,7 @@ def test_write_append(test_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_write_create_dirs(tmp_path: Path) -> None:
     """Verify write creates parent directories when requested."""
     from ot_tools.file import write
@@ -304,7 +299,7 @@ def test_write_create_dirs(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_edit_replace(test_file: Path) -> None:
     """Verify edit replaces text."""
     from ot_tools.file import edit
@@ -318,7 +313,7 @@ def test_edit_replace(test_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_edit_not_found(test_file: Path) -> None:
     """Verify edit returns error when text not found."""
     from ot_tools.file import edit
@@ -330,7 +325,7 @@ def test_edit_not_found(test_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_edit_multiple_occurrences(tmp_path: Path) -> None:
     """Verify edit handles multiple occurrences correctly."""
     from ot_tools.file import edit
@@ -346,7 +341,7 @@ def test_edit_multiple_occurrences(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_edit_replace_all(tmp_path: Path) -> None:
     """Verify edit can replace all occurrences."""
     from ot_tools.file import edit
@@ -367,7 +362,7 @@ def test_edit_replace_all(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_copy_file(test_file: Path, tmp_path: Path) -> None:
     """Verify copy duplicates a file."""
     from ot_tools.file import copy
@@ -381,7 +376,7 @@ def test_copy_file(test_file: Path, tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_move_file(test_file: Path, tmp_path: Path) -> None:
     """Verify move relocates a file."""
     from ot_tools.file import move
@@ -398,7 +393,7 @@ def test_move_file(test_file: Path, tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_delete_file(test_file: Path) -> None:
     """Verify delete removes a file."""
     from ot_tools.file import delete
@@ -411,7 +406,7 @@ def test_delete_file(test_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_delete_empty_directory(tmp_path: Path) -> None:
     """Verify delete removes empty directory."""
     from ot_tools.file import delete
@@ -426,7 +421,7 @@ def test_delete_empty_directory(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_delete_nonempty_directory_fails(test_dir: Path) -> None:
     """Verify delete fails for non-empty directory."""
     from ot_tools.file import delete

@@ -4,6 +4,23 @@
 
 No registration. No configuration. Drop a Python file, restart the server, call your functions.
 
+## Tool Types
+
+OneTool supports two types of tools:
+
+| Type          | Location           | Execution         | Use Case                   |
+|---------------|--------------------| ------------------|----------------------------|
+| **Internal**  | `src/ot_tools/`    | In-process        | Bundled tools with OneTool |
+| **Extension** | `.onetool/tools/`  | Worker subprocess | User-created tools         |
+
+**Extension tools** (covered below) run in isolated subprocesses with their own dependencies via PEP 723. This ensures:
+
+- Dependency isolation (your tools can't conflict with OneTool's packages)
+- Safe execution (crashes don't affect the server)
+- Clean imports (use `ot_sdk` for all OneTool functionality)
+
+If you're creating a tool for your project, follow the **Extension** pattern with PEP 723 headers.
+
 ## File Structure
 
 Each tool file follows this structure:
@@ -178,7 +195,7 @@ def _get_client() -> "OpenAI":
     return OpenAI(api_key=get_secret("OPENAI_API_KEY"))
 ```
 
-## Worker Tools
+## Extension Tools
 
 Tools with external dependencies run as isolated subprocesses using PEP 723:
 
@@ -216,7 +233,7 @@ if __name__ == "__main__":
 >
 > If you have a PEP 723 header but don't need isolated dependencies, remove the header instead of adding `worker_main()`. This lets the tool run in-process.
 
-**⚠️ Critical:** All imports must be declared in the PEP 723 `dependencies` list. Worker tools run in isolated environments where only declared dependencies are available. If you import a module (e.g., `from pydantic import BaseModel`) without declaring it in dependencies, the worker will crash with "Worker for X.py closed unexpectedly" due to `ModuleNotFoundError`.
+**⚠️ Critical:** All imports must be declared in the PEP 723 `dependencies` list. Extension tools run in isolated environments where only declared dependencies are available. If you import a module (e.g., `from pydantic import BaseModel`) without declaring it in dependencies, the worker will crash with "Worker for X.py closed unexpectedly" due to `ModuleNotFoundError`.
 
 **Common dependencies to include:**
 - `pydantic>=2.0.0` - if using `BaseModel`, `Field`, validators
@@ -227,7 +244,7 @@ Run `uv run src/ot_tools/your_tool.py` locally to verify all imports resolve bef
 
 ### SDK Exports
 
-The `ot_sdk` package provides these utilities for worker tools:
+The `ot_sdk` package provides these utilities for extension tools:
 
 | Module | Purpose |
 |--------|---------|
@@ -451,7 +468,7 @@ For "Based on" tools, include the upstream license:
 - [ ] Error handling returning strings
 - [ ] Secrets in `secrets.yaml`
 - [ ] Dependencies in `pyproject.toml` or PEP 723 (all imports declared)
-- [ ] Worker tools tested with `uv run src/ot_tools/your_tool.py`
+- [ ] Extension tools tested with `uv run src/ot_tools/your_tool.py`
 - [ ] Attribution level determined (Based on / Inspired by / Original)
 - [ ] Source header matches attribution level
 - [ ] License file in `licenses/` (if "Based on")

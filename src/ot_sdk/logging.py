@@ -1,4 +1,4 @@
-"""Structured logging for worker tools.
+"""Structured logging for extension tools.
 
 Logs are written to stderr in JSON format for collection by ot-serve.
 """

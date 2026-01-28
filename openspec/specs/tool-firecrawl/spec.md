@@ -3,21 +3,13 @@
 ## Purpose
 Web scraping, crawling, and structured extraction via the Firecrawl API. Provides single URL scraping, batch scraping, URL discovery, web search, multi-page crawling, and LLM-powered data extraction.
 ## Requirements
-### Requirement: Worker Tool Structure
+### Requirement: Internal Tool Structure
 
-The firecrawl pack SHALL be implemented as a worker tool with PEP 723 dependencies and follow OneTool conventions.
-
-#### Scenario: PEP 723 header
-- **WHEN** the tool file is created
-- **THEN** it includes a PEP 723 header declaring `firecrawl>=4.13.4` and `pydantic>=2.0.0`
+The firecrawl pack SHALL be implemented as an internal tool and follow OneTool conventions.
 
 #### Scenario: Pack and exports
 - **WHEN** the tool is loaded
 - **THEN** `pack = "firecrawl"` is declared before imports and `__all__` lists all 8 functions
-
-#### Scenario: Worker main block
-- **WHEN** the tool runs as a subprocess
-- **THEN** `worker_main()` handles JSON-RPC communication
 
 #### Scenario: Keyword-only arguments
 - **WHEN** any tool function is defined

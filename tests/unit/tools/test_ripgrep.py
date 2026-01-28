@@ -22,43 +22,28 @@ class TestResolvePath:
     """Test _resolve_path function."""
 
     def test_absolute_path_unchanged(self):
-        import ot_sdk.config as config_module
-
         from ot_tools.ripgrep import _resolve_path
 
-        config_module._current_config.clear()
-        config_module._current_config.update({"_project_path": "/project"})
-
+        # Absolute paths don't need mocking - they're returned as-is
         result = _resolve_path("/absolute/path")
 
         assert result == Path("/absolute/path")
-        config_module._current_config.clear()
 
     def test_relative_path_resolved(self):
-        import ot_sdk.config as config_module
-
         from ot_tools.ripgrep import _resolve_path
 
-        config_module._current_config.clear()
-        config_module._current_config.update({"_project_path": "/project"})
-
-        result = _resolve_path("src/main.py")
+        with patch("ot.paths.get_effective_cwd", return_value=Path("/project")):
+            result = _resolve_path("src/main.py")
 
         assert result == Path("/project/src/main.py")
-        config_module._current_config.clear()
 
     def test_dot_path_resolved(self):
-        import ot_sdk.config as config_module
-
         from ot_tools.ripgrep import _resolve_path
 
-        config_module._current_config.clear()
-        config_module._current_config.update({"_project_path": "/project"})
-
-        result = _resolve_path(".")
+        with patch("ot.paths.get_effective_cwd", return_value=Path("/project")):
+            result = _resolve_path(".")
 
         assert result == Path("/project")
-        config_module._current_config.clear()
 
 
 @pytest.mark.unit

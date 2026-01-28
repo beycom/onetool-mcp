@@ -1,11 +1,11 @@
-"""Dependency validation utilities for OneTool SDK.
+"""Dependency validation utilities for OneTool.
 
 Provides decorators and functions for declaring and checking tool dependencies.
 Supports both CLI tools (external binaries) and Python libraries.
 
 Example:
     # Decorator usage
-    from ot_sdk import requires_cli, requires_lib
+    from ot.utils import requires_cli, requires_lib
 
     @requires_cli("rg", install="brew install ripgrep")
     @requires_lib("duckdb", install="pip install duckdb")
@@ -25,7 +25,23 @@ import importlib.util
 import shutil
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+__all__ = [
+    "Dependency",
+    "DepsCheckResult",
+    "check_cli",
+    "check_deps",
+    "check_lib",
+    "check_secret",
+    "ensure_cli",
+    "ensure_lib",
+    "requires_cli",
+    "requires_lib",
+]
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -204,7 +220,7 @@ def check_secret(name: str) -> Dependency:
 
 
 def check_deps(
-    tool_path: str | None = None,
+    tool_path: str | Path | None = None,
 ) -> list[DepsCheckResult]:
     """Check dependencies for all tools or a specific tool.
 
@@ -243,8 +259,7 @@ def check_deps(
 
             bundled_dir = Path(ot_tools.__file__).parent
             bundled_files = [
-                f for f in bundled_dir.glob("*.py")
-                if f.name != "__init__.py"
+                f for f in bundled_dir.glob("*.py") if f.name != "__init__.py"
             ]
             files.extend(bundled_files)
         except ImportError:

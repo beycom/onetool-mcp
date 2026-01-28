@@ -117,7 +117,7 @@ ot-bench
 
 The server discovers your tool from the local `tools_dir` configuration.
 
-## Worker Tools (with dependencies)
+## Extension Tools (with dependencies)
 
 If your tool needs external packages, use PEP 723 headers and run as an isolated subprocess:
 
@@ -157,7 +157,7 @@ if __name__ == "__main__":
 
 ### SDK Exports
 
-The `ot_sdk` package provides utilities for worker tools:
+The `ot_sdk` package provides utilities for extension tools:
 
 | Export | Purpose |
 |--------|---------|
@@ -213,7 +213,7 @@ cd src
 python -m pytest ../test_mytool.py
 ```
 
-For worker tools, test the functions before adding `worker_main()`:
+For extension tools, test the functions before adding `worker_main()`:
 
 ```python
 # Test individual functions

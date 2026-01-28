@@ -209,7 +209,7 @@ class TestSdkCache:
 
     def test_cache_manual_get_set_clear(self) -> None:
         """Should support manual cache operations."""
-        from ot_sdk.cache import cache
+        from ot_sdk import cache
 
         # Set a value
         cache.set("my_key", "my_value", ttl=60)

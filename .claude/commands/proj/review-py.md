@@ -29,10 +29,14 @@ Process each phase sequentially. After each phase:
 
 ## Step 1: Identify Scope
 
-Use `git status` to show staged and unstaged files, then ASK the user which to review:
+Use `git status --short -uall` to show all changed files, then ASK the user which to review.
+
+**Important:** The `-uall` flag is required to expand untracked directories into individual files. Without it, git collapses directories like `src/ot/utils/` into a single entry, causing undercounting.
+
+Review options:
 
 1. **Staged files** - Only files staged for commit (recommended for pre-commit)
-2. **Changed files** - All staged + unstaged changes
+2. **Changed files** - All staged + unstaged + untracked
 3. **By component** - Filter by a specific module or directory
 4. **All files** - Full codebase review
 

@@ -1,4 +1,4 @@
-"""Path resolution utilities for worker tools.
+"""Path resolution utilities for extension tools.
 
 Provides functions for resolving paths relative to project or config directories.
 Path context is passed to workers via the JSON-RPC request config.

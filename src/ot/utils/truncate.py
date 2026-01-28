@@ -1,9 +1,11 @@
-"""Utility functions for extension tools."""
+"""Text truncation and error formatting utilities."""
 
 from __future__ import annotations
 
 import subprocess
 from typing import Any
+
+__all__ = ["format_error", "run_command", "truncate"]
 
 
 def truncate(text: str, max_length: int = 4000, indicator: str = "...") -> str:

@@ -1,7 +1,3 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["httpx>=0.27.0", "pydantic>=2.0.0", "pyyaml>=6.0.0"]
-# ///
 """Brave Search API tools.
 
 Provides web search, local search, news search, image search, video search,
@@ -26,18 +22,12 @@ __ot_requires__ = {
 
 from typing import Any, Literal
 
+import httpx
 from pydantic import BaseModel, Field
 
-from ot_sdk import (
-    batch_execute,
-    format_batch_results,
-    get_config,
-    get_secret,
-    http,
-    log,
-    normalize_items,
-    worker_main,
-)
+from ot.config import get_secret, get_tool_config
+from ot.logging import LogSpan
+from ot.utils import batch_execute, format_batch_results, normalize_items
 
 
 class Config(BaseModel):
@@ -56,11 +46,16 @@ BRAVE_API_BASE = "https://api.search.brave.com/res/v1"
 VIDEO_DESC_MAX_LENGTH = 150
 
 # Shared HTTP client for connection pooling
-_client = http.client(
+_client = httpx.Client(
     base_url=BRAVE_API_BASE,
     timeout=60.0,
     headers={"Accept": "application/json", "Accept-Encoding": "gzip"},
 )
+
+
+def _get_config() -> Config:
+    """Get brave pack configuration."""
+    return get_tool_config("brave", Config)
 
 
 def _get_api_key() -> str:
@@ -100,9 +95,11 @@ def _make_request(
         return False, "Error: BRAVE_API_KEY secret not configured"
 
     if timeout is None:
-        timeout = get_config("tools.brave.timeout") or 60.0
+        timeout = _get_config().timeout
 
-    with log("brave.request", endpoint=endpoint, query=params.get("q", "")) as span:
+    with LogSpan(
+        span="brave.request", endpoint=endpoint, query=params.get("q", "")
+    ) as span:
         try:
             response = _client.get(
                 endpoint,
@@ -576,7 +573,7 @@ def search_batch(
     """
     normalized = normalize_items(queries)
 
-    with log("brave.batch", query_count=len(normalized), count=count) as s:
+    with LogSpan(span="brave.batch", query_count=len(normalized), count=count) as s:
 
         def _search_one(query: str, label: str) -> tuple[str, str]:
             """Execute a single search and return (label, result)."""
@@ -653,7 +650,3 @@ def summarize(
             lines.append(text)
 
     return "\n".join(lines) if lines else "No summary content available."
-
-
-if __name__ == "__main__":
-    worker_main()

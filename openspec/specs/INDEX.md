@@ -62,7 +62,7 @@ The MCP server that exposes tools for LLM code execution.
 | Spec | Purpose |
 |------|---------|
 | [tool-execution](tool-execution/spec.md) | Worker subprocess execution, JSON-RPC |
-| [tool-sdk](tool-sdk/spec.md) | SDK for building worker tools |
+| [tool-sdk](tool-sdk/spec.md) | SDK for building extension tools |
 
 ### Built-in Tools
 

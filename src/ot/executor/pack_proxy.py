@@ -190,7 +190,7 @@ def build_execution_namespace(
     # Add pack proxies for dot notation
     for pack_name, pack_funcs in registry.packs.items():
         if isinstance(pack_funcs, WorkerPackProxy):
-            # Worker tools already have a proxy - use directly
+            # Extension tools already have a proxy - use directly
             namespace[pack_name] = pack_funcs
         else:
             namespace[pack_name] = _create_pack_proxy(pack_name, pack_funcs)

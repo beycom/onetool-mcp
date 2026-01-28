@@ -29,7 +29,8 @@ from pydantic import BaseModel, Field
 
 from ot.config import get_tool_config
 from ot.config.secrets import get_secret
-from ot_sdk import log, resolve_cwd_path
+from ot.logging import LogSpan
+from ot.paths import resolve_cwd_path
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -127,7 +128,7 @@ def _import_duckdb():
 def _generate_embedding(query: str) -> list[float]:
     """Generate embedding vector for a search query."""
     config = _get_config()
-    with log("code.embedding", model=config.model, queryLen=len(query)) as span:
+    with LogSpan(span="code.embedding", model=config.model, queryLen=len(query)) as span:
         client = _get_openai_client()
         response = client.embeddings.create(
             model=config.model,
@@ -140,8 +141,8 @@ def _generate_embedding(query: str) -> list[float]:
 def _generate_embeddings_batch(queries: list[str]) -> list[list[float]]:
     """Generate embedding vectors for multiple queries in a single API call."""
     config = _get_config()
-    with log(
-        "code.embedding_batch", model=config.model, queryCount=len(queries)
+    with LogSpan(
+        span="code.embedding_batch", model=config.model, queryCount=len(queries)
     ) as span:
         client = _get_openai_client()
         response = client.embeddings.create(
@@ -243,8 +244,8 @@ def search(
         limit = get_tool_config("code", Config).limit
     db_path, project_root = _get_db_path(path)
 
-    with log(
-        "code.search",
+    with LogSpan(
+        span="code.search",
         project=str(project_root),
         query=query,
         limit=limit,
@@ -410,8 +411,8 @@ def search_batch(
     if not query_list:
         return "Error: No valid queries provided"
 
-    with log(
-        "code.search_batch",
+    with LogSpan(
+        span="code.search_batch",
         project=str(project_root),
         queryCount=len(query_list),
         limit=limit,
@@ -559,7 +560,7 @@ def research(
     """
     db_path, project_root = _get_db_path(path)
 
-    with log("code.research", project=str(project_root), query=query) as s:
+    with LogSpan(span="code.research", project=str(project_root), query=query) as s:
         if not db_path.exists():
             s.add("error", "not_indexed")
             return f"Error: Project not indexed. Run: chunkhound index {project_root}"
@@ -613,8 +614,8 @@ def autodoc(
     """
     db_path, project_root = _get_db_path(path)
 
-    with log(
-        "code.autodoc",
+    with LogSpan(
+        span="code.autodoc",
         project=str(project_root),
         scope=scope,
         comprehensiveness=comprehensiveness,
@@ -673,7 +674,7 @@ def status(*, path: str | None = None) -> str:
     """
     db_path, project_root = _get_db_path(path)
 
-    with log("code.status", project=str(project_root)) as s:
+    with LogSpan(span="code.status", project=str(project_root)) as s:
         if not db_path.exists():
             s.add("indexed", False)
             return (

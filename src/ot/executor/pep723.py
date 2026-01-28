@@ -49,12 +49,23 @@ class ScriptMetadata:
 
 @dataclass
 class ToolFileInfo:
-    """Information about a tool file."""
+    """Information about a tool file.
+
+    Attributes:
+        path: Path to the tool file.
+        pack: Pack name (e.g., "brave" for brave.search).
+        functions: List of public function names.
+        is_worker: True if tool uses worker subprocess (PEP 723 with deps).
+        is_internal: True if tool is bundled with OneTool (from ot_tools package).
+        metadata: Parsed PEP 723 metadata if present.
+        config_class_source: Source code of Config class if present.
+    """
 
     path: Path
     pack: str | None = None
     functions: list[str] = field(default_factory=list)
     is_worker: bool = False
+    is_internal: bool = False
     metadata: ScriptMetadata | None = None
     config_class_source: str | None = None
 
@@ -246,20 +257,29 @@ def analyze_tool_file(path: Path) -> ToolFileInfo:
 
 def categorize_tools(
     tool_files: list[Path],
+    internal_paths: set[Path] | None = None,
 ) -> tuple[list[ToolFileInfo], list[ToolFileInfo]]:
-    """Categorize tool files into worker tools and in-process tools.
+    """Categorize tool files into extension tools and internal tools.
+
+    Internal tools (bundled with OneTool) run in-process.
+    Extension tools (user-created with PEP 723) run in worker subprocesses.
 
     Args:
-        tool_files: List of tool file paths
+        tool_files: List of tool file paths.
+        internal_paths: Set of paths that are internal tools (from ot_tools package).
+            If provided, tools in this set are marked as is_internal=True.
 
     Returns:
         Tuple of (worker_tools, inprocess_tools)
     """
     worker_tools: list[ToolFileInfo] = []
     inprocess_tools: list[ToolFileInfo] = []
+    internal_paths = internal_paths or set()
 
     for path in tool_files:
         info = analyze_tool_file(path)
+        # Mark internal tools (bundled with OneTool)
+        info.is_internal = path.resolve() in internal_paths
         if info.is_worker:
             worker_tools.append(info)
         else:

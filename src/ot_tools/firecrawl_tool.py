@@ -1,7 +1,3 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["firecrawl>=4.13.4", "pydantic>=2.0.0", "pyyaml>=6.0.0"]
-# ///
 """Web scraping, crawling, and structured extraction via Firecrawl API.
 
 Provides single URL scraping, batch scraping, URL discovery, web search,
@@ -38,15 +34,9 @@ from typing import Any, Literal
 from firecrawl import FirecrawlApp
 from pydantic import BaseModel, Field
 
-from ot_sdk import (
-    batch_execute,
-    get_config,
-    get_secret,
-    lazy_client,
-    log,
-    normalize_items,
-    worker_main,
-)
+from ot.config import get_secret, get_tool_config
+from ot.logging import LogSpan
+from ot.utils import batch_execute, lazy_client, normalize_items
 
 
 class Config(BaseModel):
@@ -58,13 +48,18 @@ class Config(BaseModel):
     )
 
 
+def _get_config() -> Config:
+    """Get firecrawl pack configuration."""
+    return get_tool_config("firecrawl", Config)
+
+
 def _create_client() -> FirecrawlApp | None:
     """Create Firecrawl client with API key."""
     api_key = get_secret("FIRECRAWL_API_KEY")
     if not api_key:
         return None
 
-    api_url = get_config("tools.firecrawl.api_url")
+    api_url = _get_config().api_url
     if api_url:
         return FirecrawlApp(api_key=api_key, api_url=api_url)
     return FirecrawlApp(api_key=api_key)
@@ -127,7 +122,7 @@ def scrape(
         # Scrape with geolocation
         firecrawl.scrape(url="https://example.com", location={"country": "US"})
     """
-    with log("firecrawl.scrape", url=url) as span:
+    with LogSpan(span="firecrawl.scrape", url=url) as span:
         client = _get_client()
         if client is None:
             return "Error: FIRECRAWL_API_KEY secret not configured"
@@ -209,7 +204,7 @@ def scrape_batch(
     """
     normalized = normalize_items(urls)
 
-    with log("firecrawl.scrape_batch", url_count=len(normalized)) as span:
+    with LogSpan(span="firecrawl.scrape_batch", url_count=len(normalized)) as span:
 
         def _scrape_one(url: str, label: str) -> tuple[str, dict[str, Any] | str]:
             result = scrape(
@@ -258,7 +253,7 @@ def map_urls(
         # Limit results
         firecrawl.map_urls(url="https://example.com", limit=100)
     """
-    with log("firecrawl.map_urls", url=url, search=search) as span:
+    with LogSpan(span="firecrawl.map_urls", url=url, search=search) as span:
         client = _get_client()
         if client is None:
             return "Error: FIRECRAWL_API_KEY secret not configured"
@@ -326,7 +321,7 @@ def search(
             scrape_options={"formats": ["markdown"]}
         )
     """
-    with log("firecrawl.search", query=query, limit=limit) as span:
+    with LogSpan(span="firecrawl.search", query=query, limit=limit) as span:
         client = _get_client()
         if client is None:
             return "Error: FIRECRAWL_API_KEY secret not configured"
@@ -393,7 +388,7 @@ def crawl(
         # Check status
         firecrawl.crawl_status(id=job["id"])
     """
-    with log("firecrawl.crawl", url=url, max_depth=max_depth, limit=limit) as span:
+    with LogSpan(span="firecrawl.crawl", url=url, max_depth=max_depth, limit=limit) as span:
         client = _get_client()
         if client is None:
             return "Error: FIRECRAWL_API_KEY secret not configured"
@@ -463,7 +458,7 @@ def crawl_status(
             for page in status["data"]:
                 print(page["url"])
     """
-    with log("firecrawl.crawl_status", job_id=id) as span:
+    with LogSpan(span="firecrawl.crawl_status", job_id=id) as span:
         client = _get_client()
         if client is None:
             return "Error: FIRECRAWL_API_KEY secret not configured"
@@ -550,7 +545,7 @@ def extract(
             }
         )
     """
-    with log("firecrawl.extract", url_count=len(urls)) as span:
+    with LogSpan(span="firecrawl.extract", url_count=len(urls)) as span:
         client = _get_client()
         if client is None:
             return "Error: FIRECRAWL_API_KEY secret not configured"
@@ -623,7 +618,7 @@ def deep_research(
             urls=["https://company1.com/pricing", "https://company2.com/pricing"]
         )
     """
-    with log("firecrawl.deep_research", prompt=prompt[:100]) as span:
+    with LogSpan(span="firecrawl.deep_research", prompt=prompt[:100]) as span:
         client = _get_client()
         if client is None:
             return "Error: FIRECRAWL_API_KEY secret not configured"
@@ -660,7 +655,3 @@ def deep_research(
             error_msg = f"Deep research failed: {e}"
             span.add(error=str(e))
             return error_msg
-
-
-if __name__ == "__main__":
-    worker_main()

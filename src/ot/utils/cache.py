@@ -1,7 +1,7 @@
-"""In-memory caching with TTL for worker tools.
+"""In-memory caching with TTL for tools.
 
 Provides both a decorator for function memoization and manual cache operations.
-Cache persists for the lifetime of the worker process.
+Cache persists for the lifetime of the process.
 """
 
 from __future__ import annotations
@@ -10,6 +10,8 @@ import functools
 import time
 from collections.abc import Callable
 from typing import Any, TypeVar
+
+__all__ = ["CacheNamespace", "cache"]
 
 F = TypeVar("F", bound=Callable[..., Any])
 

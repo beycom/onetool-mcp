@@ -1,4 +1,4 @@
-"""HTTP client utilities for worker tools.
+"""HTTP client utilities for extension tools.
 
 Provides a pre-configured httpx client with sensible defaults for tool use.
 The client is reused across calls to benefit from connection pooling.

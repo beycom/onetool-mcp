@@ -19,16 +19,16 @@ import pytest
 class TestGetApiConfig:
     """Test _get_api_config function."""
 
-    @patch("ot_tools.transform.get_config")
+    @patch("ot_tools.transform.get_tool_config")
     @patch("ot_tools.transform.get_secret")
-    def test_returns_all_config(self, mock_secret, mock_config):
-        from ot_tools.transform import _get_api_config
+    def test_returns_all_config(self, mock_secret, mock_get_tool_config):
+        from ot_tools.transform import Config, _get_api_config
 
         mock_secret.return_value = "sk-test-key"
-        mock_config.side_effect = lambda k: {
-            "transform.base_url": "https://api.openai.com/v1",
-            "transform.model": "gpt-4",
-        }.get(k)
+        mock_get_tool_config.return_value = Config(
+            base_url="https://api.openai.com/v1",
+            model="gpt-4",
+        )
 
         api_key, base_url, model = _get_api_config()
 
@@ -36,13 +36,13 @@ class TestGetApiConfig:
         assert base_url == "https://api.openai.com/v1"
         assert model == "gpt-4"
 
-    @patch("ot_tools.transform.get_config")
+    @patch("ot_tools.transform.get_tool_config")
     @patch("ot_tools.transform.get_secret")
-    def test_returns_none_for_missing(self, mock_secret, mock_config):
-        from ot_tools.transform import _get_api_config
+    def test_returns_none_for_missing(self, mock_secret, mock_get_tool_config):
+        from ot_tools.transform import Config, _get_api_config
 
         mock_secret.return_value = None
-        mock_config.return_value = None
+        mock_get_tool_config.return_value = Config(base_url="", model="")
 
         api_key, base_url, model = _get_api_config()
 

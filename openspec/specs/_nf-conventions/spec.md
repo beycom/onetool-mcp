@@ -165,8 +165,8 @@ Tools requiring API keys SHALL use secrets.yaml for configuration.
 - **WHEN** accessing secrets
 - **THEN** it SHALL use `from ot.config.secrets import get_secret`
 
-#### Scenario: Worker tools
-- **GIVEN** a worker tool
+#### Scenario: Extension tool secrets
+- **GIVEN** an extension tool
 - **WHEN** accessing secrets
 - **THEN** it SHALL use `from ot_sdk import get_secret`
 
@@ -191,8 +191,8 @@ Tools SHALL access configuration via get_config().
 - **WHEN** accessing config
 - **THEN** it SHALL use `from ot.config import get_config`
 
-#### Scenario: Worker tools
-- **GIVEN** a worker tool
+#### Scenario: Extension tool config
+- **GIVEN** an extension tool
 - **WHEN** accessing config
 - **THEN** it SHALL use `from ot_sdk import get_config`
 
@@ -279,9 +279,9 @@ Tools SHALL format output consistently.
 
 ---
 
-### Requirement: Worker Tool Requirements
+### Requirement: Extension Tool Requirements
 
-Worker tools (with PEP 723 headers) SHALL follow additional requirements.
+Extension tools (with PEP 723 headers) SHALL follow additional requirements.
 
 #### Scenario: PEP 723 header
 - **GIVEN** a tool with external dependencies
@@ -295,12 +295,12 @@ Worker tools (with PEP 723 headers) SHALL follow additional requirements.
   ```
 
 #### Scenario: Required SDK dependencies
-- **GIVEN** a worker tool
+- **GIVEN** an extension tool
 - **WHEN** listing PEP 723 dependencies
 - **THEN** it SHALL include `httpx>=0.27.0` and `pyyaml>=6.0.0`
 
-#### Scenario: Worker entry point
-- **GIVEN** a worker tool
+#### Scenario: Extension tool entry point
+- **GIVEN** an extension tool
 - **WHEN** the file is executed
 - **THEN** it SHALL include:
   ```python
@@ -309,7 +309,7 @@ Worker tools (with PEP 723 headers) SHALL follow additional requirements.
   ```
 
 #### Scenario: SDK imports
-- **GIVEN** a worker tool
+- **GIVEN** an extension tool
 - **WHEN** importing utilities
 - **THEN** it SHALL use `from ot_sdk import ...`
 - **NOT** `from ot.* import ...`

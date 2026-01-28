@@ -1,10 +1,10 @@
-"""HTTP request utilities for OneTool SDK.
+"""HTTP request utilities for OneTool.
 
 Provides standardized HTTP error handling and header construction
 for API-based tools.
 
 Example:
-    from ot_sdk import safe_request, api_headers
+    from ot.utils import safe_request, api_headers
 
     # Build API headers with authentication
     headers = api_headers("MY_API_KEY", header_name="Authorization", prefix="Bearer")
@@ -21,10 +21,14 @@ Example:
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
-from ot_sdk.config import get_secret
+from ot.config.secrets import get_secret
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+__all__ = ["api_headers", "check_api_key", "safe_request"]
 
 T = TypeVar("T")
 
@@ -61,7 +65,9 @@ def api_headers(
         # {"Authorization": "Bearer sk-..."}
 
         # Custom API key header
-        headers = api_headers("BRAVE_API_KEY", header_name="X-Subscription-Token", prefix="")
+        headers = api_headers(
+            "BRAVE_API_KEY", header_name="X-Subscription-Token", prefix=""
+        )
         # {"X-Subscription-Token": "BSA..."}
 
         # With extra headers

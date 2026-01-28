@@ -9,7 +9,7 @@ include:
   - prompts.yaml   # Tool instructions for LLM
   - snippets.yaml  # Snippet workflows
   - servers.yaml   # External MCP servers
-  # Note: diagram.yaml moved to sidecar pattern (next to diagram.py)
+  # Diagram defaults: src/ot_tools/diagram.yaml (sidecar pattern)
 
 log_level: INFO
 

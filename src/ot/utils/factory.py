@@ -1,9 +1,9 @@
-"""Factory utilities for OneTool SDK.
+"""Factory utilities for OneTool.
 
 Provides thread-safe lazy initialization patterns for API clients.
 
 Example:
-    from ot_sdk import lazy_client
+    from ot.utils import lazy_client
 
     # Define a client factory
     def create_my_client():
@@ -21,7 +21,12 @@ Example:
 from __future__ import annotations
 
 import threading
-from typing import Callable, TypeVar
+from typing import TYPE_CHECKING, TypeVar
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+__all__ = ["LazyClient", "lazy_client"]
 
 T = TypeVar("T")
 
@@ -50,14 +55,15 @@ def lazy_client(
         A callable that returns the lazily-initialized client
 
     Example:
-        from ot_sdk import lazy_client, get_secret, get_config
+        from ot.utils import lazy_client
+        from ot.config import get_secret, get_tool_config
 
         def create_firecrawl():
             from firecrawl import FirecrawlApp
             api_key = get_secret("FIRECRAWL_API_KEY")
             if not api_key:
                 return None
-            api_url = get_config("tools.firecrawl.api_url")
+            api_url = get_tool_config("firecrawl", Config).api_url
             return FirecrawlApp(api_key=api_key, api_url=api_url or None)
 
         get_firecrawl = lazy_client(create_firecrawl)
@@ -144,7 +150,7 @@ class LazyClient:
             The client instance, or None if not available
         """
         if self._initialized:
-            return self._client
+            return self._client  # type: ignore[return-value]
 
         with self._lock:
             if self._initialized:
@@ -156,7 +162,7 @@ class LazyClient:
                 self._client = result
                 self._initialized = True
 
-            return result
+            return result  # type: ignore[return-value]
 
     def reset(self) -> None:
         """Reset the client, forcing re-initialization on next access.

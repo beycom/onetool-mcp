@@ -5,17 +5,31 @@ Tests trafilatura mocks for fetch functionality.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # Skip all tests if dependencies are not available
 pytest.importorskip("trafilatura")
 
 from ot_tools.web_fetch import (
+    Config,
     fetch,
     fetch_batch,
 )
+
+
+@pytest.fixture
+def mock_web_config() -> Generator[None, None, None]:
+    """Mock web fetch configuration."""
+    test_config = Config(timeout=30.0, max_length=50000)
+    with patch("ot_tools.web_fetch.get_tool_config", return_value=test_config):
+        yield
+
 
 # -----------------------------------------------------------------------------
 # Configuration Tests
@@ -47,13 +61,7 @@ class TestFetch:
     """Test fetch function with mocked trafilatura."""
 
     @patch("ot_tools.web_fetch.trafilatura")
-    @patch("ot_tools.web_fetch.get_config")
-    def test_successful_fetch(self, mock_config, mock_trafilatura):
-        mock_config.side_effect = lambda k: {
-            "tools.web_fetch.timeout": 30.0,
-            "tools.web_fetch.max_length": 50000,
-        }.get(k)
-
+    def test_successful_fetch(self, mock_trafilatura, mock_web_config):
         mock_trafilatura.fetch_url.return_value = "<html><body>Content</body></html>"
         mock_trafilatura.extract.return_value = "Extracted content from page."
 
@@ -62,13 +70,7 @@ class TestFetch:
         assert "Extracted content" in result
 
     @patch("ot_tools.web_fetch.trafilatura")
-    @patch("ot_tools.web_fetch.get_config")
-    def test_returns_error_on_fetch_failure(self, mock_config, mock_trafilatura):
-        mock_config.side_effect = lambda k: {
-            "tools.web_fetch.timeout": 30.0,
-            "tools.web_fetch.max_length": 50000,
-        }.get(k)
-
+    def test_returns_error_on_fetch_failure(self, mock_trafilatura, mock_web_config):
         mock_trafilatura.fetch_url.return_value = None
 
         result = fetch(url="https://example.com", use_cache=False)
@@ -77,13 +79,7 @@ class TestFetch:
         assert "Failed to fetch" in result
 
     @patch("ot_tools.web_fetch.trafilatura")
-    @patch("ot_tools.web_fetch.get_config")
-    def test_returns_error_on_no_content(self, mock_config, mock_trafilatura):
-        mock_config.side_effect = lambda k: {
-            "tools.web_fetch.timeout": 30.0,
-            "tools.web_fetch.max_length": 50000,
-        }.get(k)
-
+    def test_returns_error_on_no_content(self, mock_trafilatura, mock_web_config):
         mock_trafilatura.fetch_url.return_value = "<html></html>"
         mock_trafilatura.extract.return_value = None
 
@@ -93,13 +89,7 @@ class TestFetch:
         assert "No content" in result
 
     @patch("ot_tools.web_fetch.trafilatura")
-    @patch("ot_tools.web_fetch.get_config")
-    def test_text_output_format(self, mock_config, mock_trafilatura):
-        mock_config.side_effect = lambda k: {
-            "tools.web_fetch.timeout": 30.0,
-            "tools.web_fetch.max_length": 50000,
-        }.get(k)
-
+    def test_text_output_format(self, mock_trafilatura, mock_web_config):
         mock_trafilatura.fetch_url.return_value = "<html>content</html>"
         mock_trafilatura.extract.return_value = "Plain text"
 
@@ -110,13 +100,7 @@ class TestFetch:
         assert call_args.kwargs["output_format"] == "txt"
 
     @patch("ot_tools.web_fetch.trafilatura")
-    @patch("ot_tools.web_fetch.get_config")
-    def test_markdown_output_format(self, mock_config, mock_trafilatura):
-        mock_config.side_effect = lambda k: {
-            "tools.web_fetch.timeout": 30.0,
-            "tools.web_fetch.max_length": 50000,
-        }.get(k)
-
+    def test_markdown_output_format(self, mock_trafilatura, mock_web_config):
         mock_trafilatura.fetch_url.return_value = "<html>content</html>"
         mock_trafilatura.extract.return_value = "# Heading\n\nParagraph"
 
@@ -128,13 +112,7 @@ class TestFetch:
         assert call_args.kwargs["output_format"] == "markdown"
 
     @patch("ot_tools.web_fetch.trafilatura")
-    @patch("ot_tools.web_fetch.get_config")
-    def test_include_links_option(self, mock_config, mock_trafilatura):
-        mock_config.side_effect = lambda k: {
-            "tools.web_fetch.timeout": 30.0,
-            "tools.web_fetch.max_length": 50000,
-        }.get(k)
-
+    def test_include_links_option(self, mock_trafilatura, mock_web_config):
         mock_trafilatura.fetch_url.return_value = "<html>content</html>"
         mock_trafilatura.extract.return_value = "content"
 
@@ -144,13 +122,7 @@ class TestFetch:
         assert call_args.kwargs["include_links"] is True
 
     @patch("ot_tools.web_fetch.trafilatura")
-    @patch("ot_tools.web_fetch.get_config")
-    def test_fast_option(self, mock_config, mock_trafilatura):
-        mock_config.side_effect = lambda k: {
-            "tools.web_fetch.timeout": 30.0,
-            "tools.web_fetch.max_length": 50000,
-        }.get(k)
-
+    def test_fast_option(self, mock_trafilatura, mock_web_config):
         mock_trafilatura.fetch_url.return_value = "<html>content</html>"
         mock_trafilatura.extract.return_value = "content"
 
@@ -161,29 +133,18 @@ class TestFetch:
 
     @patch("ot_tools.web_fetch.trafilatura")
     @patch("ot_tools.web_fetch.truncate")
-    @patch("ot_tools.web_fetch.get_config")
-    def test_truncates_long_content(self, mock_config, mock_truncate, mock_trafilatura):
-        mock_config.side_effect = lambda k: {
-            "tools.web_fetch.timeout": 30.0,
-            "tools.web_fetch.max_length": 100,
-        }.get(k)
-
+    def test_truncates_long_content(self, mock_truncate, mock_trafilatura, mock_web_config):
         mock_trafilatura.fetch_url.return_value = "<html>content</html>"
         mock_trafilatura.extract.return_value = "x" * 200
         mock_truncate.return_value = "x" * 100 + "...[Content truncated...]"
 
+        # Pass explicit max_length to trigger truncation (overrides config default)
         fetch(url="https://example.com", max_length=100, use_cache=False)
 
         mock_truncate.assert_called_once()
 
     @patch("ot_tools.web_fetch.trafilatura")
-    @patch("ot_tools.web_fetch.get_config")
-    def test_handles_exception(self, mock_config, mock_trafilatura):
-        mock_config.side_effect = lambda k: {
-            "tools.web_fetch.timeout": 30.0,
-            "tools.web_fetch.max_length": 50000,
-        }.get(k)
-
+    def test_handles_exception(self, mock_trafilatura, mock_web_config):
         mock_trafilatura.fetch_url.side_effect = Exception("Network error")
 
         result = fetch(url="https://example.com", use_cache=False)
@@ -192,13 +153,7 @@ class TestFetch:
         assert "Network error" in result
 
     @patch("ot_tools.web_fetch.trafilatura")
-    @patch("ot_tools.web_fetch.get_config")
-    def test_favor_precision(self, mock_config, mock_trafilatura):
-        mock_config.side_effect = lambda k: {
-            "tools.web_fetch.timeout": 30.0,
-            "tools.web_fetch.max_length": 50000,
-        }.get(k)
-
+    def test_favor_precision(self, mock_trafilatura, mock_web_config):
         mock_trafilatura.fetch_url.return_value = "<html>content</html>"
         mock_trafilatura.extract.return_value = "content"
 
@@ -208,13 +163,7 @@ class TestFetch:
         assert call_args.kwargs["favor_precision"] is True
 
     @patch("ot_tools.web_fetch.trafilatura")
-    @patch("ot_tools.web_fetch.get_config")
-    def test_target_language(self, mock_config, mock_trafilatura):
-        mock_config.side_effect = lambda k: {
-            "tools.web_fetch.timeout": 30.0,
-            "tools.web_fetch.max_length": 50000,
-        }.get(k)
-
+    def test_target_language(self, mock_trafilatura, mock_web_config):
         mock_trafilatura.fetch_url.return_value = "<html>content</html>"
         mock_trafilatura.extract.return_value = "content"
 
@@ -324,13 +273,7 @@ class TestFetchCache:
 
     @patch("ot_tools.web_fetch._fetch_url_cached")
     @patch("ot_tools.web_fetch.trafilatura")
-    @patch("ot_tools.web_fetch.get_config")
-    def test_uses_cache_by_default(self, mock_config, mock_trafilatura, mock_cached):
-        mock_config.side_effect = lambda k: {
-            "tools.web_fetch.timeout": 30.0,
-            "tools.web_fetch.max_length": 50000,
-        }.get(k)
-
+    def test_uses_cache_by_default(self, mock_trafilatura, mock_cached, mock_web_config):
         mock_cached.return_value = "<html>cached</html>"
         mock_trafilatura.extract.return_value = "Cached content"
 
@@ -339,13 +282,7 @@ class TestFetchCache:
         mock_cached.assert_called_once()
 
     @patch("ot_tools.web_fetch.trafilatura")
-    @patch("ot_tools.web_fetch.get_config")
-    def test_bypasses_cache_when_disabled(self, mock_config, mock_trafilatura):
-        mock_config.side_effect = lambda k: {
-            "tools.web_fetch.timeout": 30.0,
-            "tools.web_fetch.max_length": 50000,
-        }.get(k)
-
+    def test_bypasses_cache_when_disabled(self, mock_trafilatura, mock_web_config):
         mock_trafilatura.fetch_url.return_value = "<html>fresh</html>"
         mock_trafilatura.extract.return_value = "Fresh content"
 

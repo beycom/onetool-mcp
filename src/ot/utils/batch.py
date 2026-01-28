@@ -1,9 +1,9 @@
-"""Batch processing utilities for OneTool SDK.
+"""Batch processing utilities for OneTool.
 
 Provides concurrent execution helpers for tools that process multiple items.
 
 Example:
-    from ot_sdk import batch_execute, normalize_items
+    from ot.utils import batch_execute, normalize_items
 
     # Process URLs concurrently
     def fetch_one(url: str, label: str) -> tuple[str, str]:
@@ -18,7 +18,12 @@ Example:
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Callable, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+__all__ = ["batch_execute", "format_batch_results", "normalize_items"]
 
 T = TypeVar("T")
 R = TypeVar("R")

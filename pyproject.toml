@@ -18,31 +18,42 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    # === Core ===
     "fastmcp>=2.14.4",
     "httpx>=0.28.1",
     "loguru>=0.7.3",
     "mcp>=1.26.0",
-    "openai>=2.15.0",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.12.0",
     "pyyaml>=6.0.3",
     "rich>=14.3.1",
     "typer>=0.21.1",
-    # Browser inspector (requires: playwright install chromium)
-    "playwright>=1.57.0",
-    # Browser CLI (onetool-browse)
-    "questionary>=2.1.1",
-    "pillow>=12.1.0",
-    # Snippets template engine
-    "jinja2>=3.1.6",
-    # Gemini grounding search
-    "google-genai>=1.60.0",
-    # Message tool async file I/O
-    "aiofiles>=25.1.0",
-    # Docstring parsing for ot.help() and ot.tools()
-    "docstring-parser>=0.17",
-    # Database engine for code_search and db tools
-    "duckdb>=1.4.3",
+    "jinja2>=3.1.6",              # Snippets template engine
+    "docstring-parser>=0.17",     # ot.help() and ot.tools() docstring parsing
+    "aiofiles>=25.1.0",           # Message tool async file I/O
+
+    # === LLM & Search ===
+    "openai>=2.15.0",             # code_search embeddings, LLM tools
+    "google-genai>=1.60.0",       # grounding_search (Gemini)
+
+    # === Database ===
+    "duckdb>=1.4.3",              # code_search, db tool
+    "sqlalchemy>=2.0.46",         # db tool
+
+    # === Web ===
+    "trafilatura>=2.0.0",         # web_fetch content extraction
+    "firecrawl>=4.13.4",          # firecrawl_tool web scraping
+
+    # === Documents ===
+    "openpyxl>=3.1.5",            # excel, convert (Excel files)
+    "pymupdf>=1.26.7",            # convert (PDF)
+    "python-docx>=1.2.0",         # convert (Word)
+    "python-pptx>=1.0.2",         # convert (PowerPoint)
+
+    # === Browser ===
+    "playwright>=1.57.0",         # Browser inspector (requires: playwright install chromium)
+    "questionary>=2.1.1",         # Browser CLI (onetool-browse)
+    "pillow>=12.1.0",             # Browser CLI screenshots
 ]
 
 [project.urls]
@@ -81,16 +92,6 @@ dev = [
     "pytest-sugar>=1.1.1",
     "ruff>=0.14.14",
     "types-pyyaml>=6.0.12.20250915",
-    # Tool dependencies for testing (these use inline script metadata in production)
-    "duckdb>=1.4.3",      # for ot_tools.code_search
-    "openpyxl>=3.1.5",    # for ot_tools.excel, ot_tools.convert
-    "send2trash>=2.1.0",  # for ot_tools.file safe deletion
-    "sqlalchemy>=2.0.46", # for ot_tools.db
-    "trafilatura>=2.0.0", # for ot_tools.web_fetch
-    "firecrawl>=4.13.4",  # for ot_tools.firecrawl_tool
-    "pymupdf>=1.26.7",    # for ot_tools.convert (PDF)
-    "python-docx>=1.2.0", # for ot_tools.convert (Word)
-    "python-pptx>=1.0.2", # for ot_tools.convert (PowerPoint)
 ]
 
 [tool.ruff]
@@ -98,6 +99,8 @@ target-version = "py311"
 line-length = 88
 src = ["src", "tests"]
 cache-dir = "tmp/.ruff_cache"
+# Exclude Jinja2 templates (not valid Python)
+extend-exclude = ["src/ot/config/defaults/tool-templates/*.py"]
 
 [tool.ruff.lint]
 select = [
@@ -124,7 +127,8 @@ known-first-party = ["ot", "ot_tools", "ot_sdk", "ot_serve", "ot_bench", "ot_bro
 
 [tool.ruff.lint.per-file-ignores]
 # CLI files need Path and CaseResult at runtime for typer type annotations and callbacks
-"src/ot_serve/*.py" = ["TC001", "TCH003"]
+# E402 in cli.py is intentional - atexit.register must run before importing pymupdf
+"src/ot_serve/*.py" = ["TC001", "TCH003", "E402"]
 "src/ot_bench/*.py" = ["TC001", "TCH003"]
 # Browser CLI uses Path and Annotation at runtime, SIM105 for event handlers
 "src/ot_browse/*.py" = ["TC001", "TC003", "SIM105"]
