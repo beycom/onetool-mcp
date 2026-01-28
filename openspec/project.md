@@ -2,7 +2,7 @@
 
 ## Purpose
 
-OneTool is an MCP server exposing a single `run` tool for AI-assisted development. It addresses MCP's token bloat (~150K tokens for multiple tools) by moving execution to a cheap LLM.
+OneTool is an MCP server exposing a single `run` tool for AI-assisted development. It addresses MCP's token bloat (~46K tokens for multiple tools, [96% reduction](../docs/other/brand/claims.md)) by moving execution to a cheap LLM.
 
 **Architecture**: `run request` → `LLM codegen` → `Host exec` → `Return` (~2K tokens, 1 call)
 
@@ -72,7 +72,7 @@ Changes follow: Proposal → Specs → Tasks → Apply → Archive. See `openspe
 
 ## References
 
-- [Anthropic: Code Execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) - 98.7% token reduction
+- [Anthropic: Code Execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) - token reduction research
 - [Anthropic: Advanced Tool Use](https://www.anthropic.com/engineering/advanced-tool-use)
 
 ---

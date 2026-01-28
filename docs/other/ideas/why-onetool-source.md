@@ -11,7 +11,7 @@
 The AI coding landscape faces three converging crises:
 
 1. **Context Rot**: LLM performance degrades as input tokens increase
-2. **MCP Token Bloat**: 55K-150K tokens consumed before conversations begin
+2. **MCP Token Bloat**: 12K-25K tokens consumed before conversations begin
 3. **Vibe Coding Collapse**: 41% more debugging time for AI-generated code at scale
 
 OneTool addresses all three with one tool, code execution, and spec-driven development.
@@ -78,7 +78,7 @@ Comparison across approaches - baseline, single MCP, multiple MCP servers, and O
 **Key findings**:
 - Multiple MCP servers: **46K tokens** before conversation starts
 - OneTool: **1.9K tokens**, 100% accuracy, lowest cost, fastest time
-- Token reduction: **24x fewer tokens** than multiple-MCP approach
+- Token reduction: **96% fewer tokens** than multiple-MCP approach ([source](../brand/claims.md))
 
 ### Anthropic's Research
 
@@ -86,7 +86,7 @@ From [Code Execution with MCP](https://www.anthropic.com/engineering/code-execut
 
 > "Token usage dropped from 150,000 to 2,000 tokens when presenting tools as code APIs."
 
-**98.7% reduction**-exactly what OneTool implements.
+**96% reduction** in OneTool benchmarks ([source](../brand/claims.md)).
 
 From [Advanced Tool Use](https://www.anthropic.com/engineering/advanced-tool-use):
 
@@ -104,8 +104,8 @@ From [Advanced Tool Use](https://www.anthropic.com/engineering/advanced-tool-use
 
 ```
 Traditional MCP:
-  Load tools (55K) → Reason → Call tool → Reason → Return
-  Total: ~150K tokens, 5+ reasoning loops
+  Load tools (46K) → Reason → Call tool → Reason → Return
+  Total: ~46K tokens, 5+ reasoning loops
 
 OneTool:
   run request → Execute Python → Return
@@ -277,14 +277,14 @@ Drop a file, tool is available. No registration, no config.
 
 OneTool exists because MCP doesn't scale:
 
-| Problem              | OneTool Solution                |
-| -------------------- | ------------------------------- |
-| Tool enumeration     | One tool, code execution        |
-| Context rot          | ~2K tokens vs 150K              |
-| Vibe coding          | OpenSpec integration            |
-| Tool sprawl          | Auto-discovery, drop-in files   |
-| No package manager   | Drop-in tool files              |
-| No rigorous testing  | `ot-bench` with LLM-as-judge    |
+| Problem             | OneTool Solution                                         |
+| ------------------- | -------------------------------------------------------- |
+| Tool enumeration    | One tool, code execution                                 |
+| Context rot         | ~2K tokens vs 46K ([96% reduction](../brand/claims.md))  |
+| Vibe coding         | OpenSpec integration                                     |
+| Tool sprawl         | Auto-discovery, drop-in files                            |
+| No package manager  | Drop-in tool files                                       |
+| No rigorous testing | `ot-bench` with LLM-as-judge                             |
 
 The industry is shifting from vibe coding to agentic engineering. OneTool is built for that future.
 

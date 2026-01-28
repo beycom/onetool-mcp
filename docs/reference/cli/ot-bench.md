@@ -26,10 +26,14 @@ ot-bench run FILE [OPTIONS]
 |--------|-------------|
 | `--tui` | Interactive TUI for selecting benchmark files |
 | `--csv` | Export results to CSV in `tmp/result-YYYYMMDD-HHMM.csv` |
+| `-o, --output PATH` | Write results to YAML file |
 | `--scenario NAME` | Run only scenarios matching NAME |
 | `--task NAME` | Run only tasks matching NAME |
 | `--tag TAG` | Run only tasks with matching tag |
-| `--verbose` | Show detailed per-call metrics |
+| `-v, --verbose` | Show detailed per-call metrics |
+| `--dry-run` | Validate config without making API calls |
+| `--trace` | Show timestamped request/response cycle for debugging |
+| `--no-color` | Disable colored output (for CI/CD compatibility) |
 
 ## Task Types
 

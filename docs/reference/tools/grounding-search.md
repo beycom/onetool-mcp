@@ -16,6 +16,7 @@ Web search with Google's grounding capabilities via Gemini API. Provides current
 | Function | Description |
 |----------|-------------|
 | `ground.search(query, ...)` | General grounded web search |
+| `ground.search_batch(queries, ...)` | Multiple searches concurrently |
 | `ground.dev(query, ...)` | Developer resources (GitHub, Stack Overflow, docs) |
 | `ground.docs(query, ...)` | Official documentation lookup |
 | `ground.reddit(query, ...)` | Reddit discussions and community insights |
@@ -45,6 +46,9 @@ ground.search(query="kubernetes pod restart policy", focus="code")
 
 # Use a specific model
 ground.search(query="latest AI news", model="gemini-3.0-flash")
+
+# Batch search (multiple queries concurrently)
+ground.search_batch(queries=["fastapi", "django", "flask"], focus="code")
 
 # Developer resources search
 ground.dev(query="async/await best practices", language="python")

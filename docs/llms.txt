@@ -4,7 +4,7 @@
 
 > MCP server exposing a single `run` tool for LLM code execution.
 
-OneTool reduces MCP token usage from ~150K to ~2K by presenting tools as code APIs instead of individual tool definitions.
+OneTool reduces MCP token usage from ~46K to ~2K (96% reduction, see docs/other/brand/claims.md) by presenting tools as code APIs instead of individual tool definitions.
 
 ## Quick Start
 
@@ -22,9 +22,9 @@ __ot brave.search(query="AI news")
 
 - brave: search, news, local, image, video, search_batch, summarize
 - web: fetch, fetch_batch
-- ground: search, dev, docs, reddit
+- ground: search, search_batch, dev, docs, reddit
 - context7: search, doc
-- code: search, status
+- code: search, search_batch, research, autodoc, status
 - ripgrep: search, count, files, types
 - llm: transform
 - db: tables, schema, query
@@ -33,7 +33,9 @@ __ot brave.search(query="AI news")
 - package: npm, pypi, models, version
 - file: read, write, edit, info, list, tree, search, copy, move, delete
 - diagram: generate_source, render_diagram, list_providers (+8 more)
-- ot: tools, push, config, health, help, instructions, alias, snippet, stats
+- firecrawl: scrape, scrape_batch, map_urls, search, crawl, crawl_status, extract, deep_research
+- scaffold: create, list_extensions, templates
+- ot: tools, packs, aliases, snippets, config, health, stats, notify, reload
 
 ## Documentation
 

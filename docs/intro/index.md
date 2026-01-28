@@ -39,18 +39,18 @@ One tool. Code execution. That's basically it.
 
 | Metric | Traditional MCP | OneTool |
 | ------ | --------------- | ------- |
-| Token usage | 150,000 | 2,000 |
-| Cost per query | $0.025 | $0.002 |
+| Token usage | 46,000 | 2,000 |
+| Cost per query | $0.073 | $0.003 |
 | Tool calls | 5+ | 1 |
 
-98.7% fewer tokens. 10x cheaper. One call instead of five.
+[96% fewer tokens](../other/brand/claims.md). 24x cheaper. One call instead of five.
 
 ### How it works
 
 ```
 Traditional MCP:
-  Load tools (55K) → Reason → Call tool → Reason → Return
-  Total: ~150K tokens, 5+ reasoning loops
+  Load tools (46K) → Reason → Call tool → Reason → Return
+  Total: ~46K tokens, 5+ reasoning loops
 
 OneTool:
   run request → Execute Python → Return
@@ -73,7 +73,7 @@ Agents write Python to call functions. No JSON schema parsing. No tool selection
 
 ## What you get
 
-- 24x fewer tokens, same accuracy
+- [96% fewer tokens](../other/brand/claims.md), same accuracy
 - Drop a Python file, get a new pack
 - AST validation before execution
 - `ot-bench` for testing LLM + MCP combinations

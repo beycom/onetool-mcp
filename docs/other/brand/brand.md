@@ -69,8 +69,10 @@ Don't enumerate tools. Execute code.
 ### onetool.tagline.value
 
 ```text
-98.7% fewer tokens. Same accuracy. 10x lower cost.
+96% fewer tokens. Same accuracy. 24x lower cost.
 ```
+
+See [claims.md](claims.md) for benchmark sources.
 
 ## Repository
 
@@ -88,8 +90,8 @@ python, mcp, model-context-protocol, mcp-server, llm, code-execution, mcp-tools,
 - 15 packs
 - 90+ tools
 - 2 CLIs (ot-serve, ot-bench)
-- 98.7% token reduction
-- 10x cost reduction
+- 96% token reduction
+- 24x cost reduction
 ```
 
 ## Terminology Style Guide

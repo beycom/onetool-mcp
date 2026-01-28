@@ -6,9 +6,9 @@ Everything you need to build powerful AI agent integrations without burning your
 
 ## Hero Features
 
-### 98.7% Token Savings
+### 96% Token Savings
 
-Stop context rot. MCP servers burn 55K-150K tokens before you start. OneTool uses ~2K tokens. Same accuracy, 10x lower cost.
+Stop context rot. MCP servers uses 3-30K tokens before you start. OneTool uses ~2K tokens no matter how many packs of tools or proxy servers you use. No context rot or token bloat. [96% fewer tokens. 24x lower cost. Improved accuracy.](other/brand/claims.md).
 
 [Learn more](intro/index.md)
 
@@ -247,7 +247,7 @@ Type hints throughout. Ruff formatting and linting. Mypy type checking. Pydantic
 
 | Aspect | Tool Search Tool | OneTool |
 |--------|------------------|---------|
-| **Token Reduction** | ~85% (77K → 8.7K) | **98.7%** (150K → 2K) |
+| **Token Reduction** | ~85% (77K → 8.7K) | **96%** (46K → 2K) |
 | **Approach** | Defer loading, search on demand | Execute code directly - no tool definitions |
 | **Search Step** | Required (regex/BM25/embeddings) | **Not needed** - explicit calls |
 | **Tool Selection** | Agent still chooses from search results | **Developer controls** - no guessing |
@@ -259,7 +259,7 @@ Type hints throughout. Ruff formatting and linting. Mypy type checking. Pydantic
 | Aspect | Docker MCP Gateway | OneTool |
 |--------|-------------------|---------|
 | **Primary Focus** | Operational: containers, security | **Efficiency**: token reduction, cost |
-| **Token Overhead** | Standard MCP overhead remains | **98.7% reduction** |
+| **Token Overhead** | Standard MCP overhead remains | **96% reduction** |
 | **Tool Selection** | Agent enumerates and chooses | **Explicit calls** - developer controlled |
 | **Setup** | Docker Desktop + MCP Toolkit + GUI config | **Single YAML config** |
 | **Tool Catalog** | Limited curated selection | **90+ tools** built-in, extensible |

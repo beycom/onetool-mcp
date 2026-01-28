@@ -29,4 +29,3 @@ All CLIs follow a consistent configuration pattern:
 All CLIs support:
 
 - `-v, --version` - Show version and exit
-- `--json` - Output as JSON (where applicable)

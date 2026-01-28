@@ -1,6 +1,6 @@
 # Tools Reference
 
-**15 packs. 90+ tools. Zero tool-selection overhead.**
+**16 packs. 90+ tools. Zero tool-selection overhead.**
 
 Every function below is callable with a single `__ot` prefix. No JSON schemas, no tool discovery loops.
 

@@ -4,9 +4,9 @@
 
 **Don't enumerate tools. Execute code.**
 
-MCP doesn't scale. Connect 5 servers: 55K tokens burned. Connect 10+: 100K+ tokens gone before you say hello. OneTool fixes this.
+MCP doesn't scale. Each MCP server costs ~$30/month in wasted tokens. OneTool fixes this.
 
-**98.7% fewer tokens. Same accuracy. 10x lower cost.**
+**[96% fewer tokens. 24x lower cost. Improved accuracy.](other/brand/claims.md)**
 
 ---
 

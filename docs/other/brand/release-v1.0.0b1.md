@@ -10,9 +10,8 @@
 ### Highlights
 
 🛡️ **Stop Context Rot**
-- 98.7% token reduction (150K → 2K)
-- 10x lower cost per query
-- Single MCP call vs 5+ tool-selection loops
+- 96% token reduction - see [claims.md](claims.md)
+- Reduced tool calls and tool selection loops
 
 ⚡ **Explicit Calls**
 - Five trigger prefixes (`__ot`, `__onetool__run`, etc.)
