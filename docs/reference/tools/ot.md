@@ -15,69 +15,85 @@ Internal tools for OneTool introspection and management.
 
 | Function | Description |
 |----------|-------------|
-| `ot.tools(name, pattern, pack, compact)` | List tools, filter by pattern, or get one by name |
-| `ot.packs(name, pattern)` | List packs, filter by pattern, or get one with instructions |
-| `ot.aliases(name, pattern)` | List aliases, filter by pattern, or get one by name |
-| `ot.snippets(name, pattern)` | List snippets, filter by pattern, or get one by name |
+| `ot.tools(pattern, info)` | List tools, filter by pattern |
+| `ot.packs(pattern, info)` | List packs, filter by pattern |
+| `ot.aliases(pattern, info)` | List aliases, filter by pattern |
+| `ot.snippets(pattern, info)` | List snippets, filter by pattern |
 | `ot.config()` | Show aliases, snippets, and server names |
 | `ot.health()` | Check tool dependencies and API connectivity |
 | `ot.stats(period, tool, output)` | Get runtime usage statistics |
 | `ot.notify(topic, message)` | Publish message to configured topic |
 | `ot.reload()` | Force configuration reload |
 
+## Info Levels
+
+All discovery functions (`tools`, `packs`, `aliases`, `snippets`) support an `info` parameter:
+
+| Level | Description |
+|-------|-------------|
+| `list` | Names only (minimal context) |
+| `min` | Name + short description (default) |
+| `full` | Complete details |
+
 ## ot.tools()
 
-List all available tools with signatures, filter by pattern, or get a specific tool.
+List all available tools with signatures, filter by pattern.
 
 ```python
-# List all tools
+# List all tools (default: info="min")
 ot.tools()
-
-# Get specific tool by name (includes full documentation)
-ot.tools(name="brave.search")
 
 # Filter by name pattern (substring match)
 ot.tools(pattern="search")
 
-# Filter by pack
-ot.tools(pack="brave")
+# Filter by pack (use trailing dot)
+ot.tools(pattern="brave.")
 
-# Compact output (name and description only)
-ot.tools(compact=True)
+# Names only
+ot.tools(info="list")
+
+# Full details (signature, args, returns, example)
+ot.tools(pattern="brave.search", info="full")
 ```
 
-Returns a list of tool dicts, or a single tool dict when using `name=`.
+Returns a list of tool names (info="list") or tool dicts.
 
 ## ot.packs()
 
-List all packs or get detailed pack info with instructions.
+List all packs, filter by pattern.
 
 ```python
-# List all packs
+# List all packs (default: info="min")
 ot.packs()
-
-# Get specific pack by name (includes instructions and tool list)
-ot.packs(name="brave")
 
 # Filter by pattern
 ot.packs(pattern="brav")
+
+# Names only
+ot.packs(info="list")
+
+# Full details (instructions + tool list)
+ot.packs(pattern="brave", info="full")
 ```
 
-Returns a list of pack summaries, or detailed pack info when using `name=`.
+Returns a list of pack names (info="list") or pack summaries/details.
 
 ## ot.aliases()
 
-List aliases, filter by pattern, or get a specific alias.
+List aliases, filter by pattern.
 
 ```python
-# List all aliases
+# List all aliases (default: info="min")
 ot.aliases()
-
-# Get specific alias by name
-ot.aliases(name="ws")
 
 # Filter by pattern (matches alias name or target)
 ot.aliases(pattern="search")
+
+# Names only
+ot.aliases(info="list")
+
+# Structured output
+ot.aliases(info="full")
 ```
 
 Aliases are defined in config:
@@ -91,17 +107,20 @@ alias:
 
 ## ot.snippets()
 
-List snippets, filter by pattern, or get a specific snippet definition.
+List snippets, filter by pattern.
 
 ```python
-# List all snippets
+# List all snippets (default: info="min")
 ot.snippets()
-
-# Get specific snippet by name (shows full definition)
-ot.snippets(name="multi_search")
 
 # Filter by pattern (matches name or description)
 ot.snippets(pattern="search")
+
+# Names only
+ot.snippets(info="list")
+
+# Full definition (params, body, example)
+ot.snippets(pattern="multi_search", info="full")
 ```
 
 Snippets are defined in config:

@@ -13,54 +13,46 @@ The `ot.tools()` function SHALL list all available tools with optional filtering
 #### Scenario: List all tools
 - **GIVEN** tools are registered
 - **WHEN** `ot.tools()` is called
-- **THEN** it SHALL return YAML listing all tools
-- **AND** each entry SHALL include: `{name, signature, description, source}`
-- **AND** source SHALL be "local" or "proxy:{server}"
-
-#### Scenario: Get specific tool by name
-- **GIVEN** a name parameter
-- **WHEN** `ot.tools(name="brave.search")` is called
-- **THEN** it SHALL return a single tool dict for that exact tool
-- **AND** return an error if the tool is not found
+- **THEN** it SHALL return a list of all tools
+- **AND** default info level SHALL be `min`
 
 #### Scenario: Filter by pattern
 - **GIVEN** a pattern parameter
 - **WHEN** `ot.tools(pattern="search")` is called
-- **THEN** it SHALL return only tools with names matching the pattern (case-insensitive substring)
+- **THEN** it SHALL return only tools with names containing the pattern (case-insensitive substring)
+- **AND** pattern SHALL always perform partial matching
 
-#### Scenario: Filter by pack
-- **GIVEN** a pack parameter
-- **WHEN** `ot.tools(pack="brave")` is called
-- **THEN** it SHALL return only tools in the "brave" pack
+#### Scenario: Info level list
+- **GIVEN** `info="list"` parameter
+- **WHEN** `ot.tools(info="list")` is called
+- **THEN** it SHALL return only tool names as a list of strings
 
-#### Scenario: Compact output
-- **GIVEN** compact=True parameter
-- **WHEN** `ot.tools(compact=True)` is called
-- **THEN** it SHALL return only `{name, description}` for each tool
-- **AND** output size SHALL be significantly smaller than full output
+#### Scenario: Info level min
+- **GIVEN** `info="min"` parameter (or default)
+- **WHEN** `ot.tools()` or `ot.tools(info="min")` is called
+- **THEN** each entry SHALL include: `{name, description}`
 
-#### Scenario: Output format
-- **GIVEN** tools are found
-- **WHEN** results are returned
-- **THEN** output SHALL use YAML flow style:
-```yaml
-- {name: brave.web_search, signature: "brave.web_search(query, count=10)", description: "Search the web", source: local}
-- {name: demo.foo, signature: "demo.foo(text)", description: "Demo function", source: local}
-```
+#### Scenario: Info level full
+- **GIVEN** `info="full"` parameter
+- **WHEN** `ot.tools(info="full")` is called
+- **THEN** each entry SHALL include: `{name, signature, description, source}`
+- **AND** each entry SHALL include `{args, returns, example}` when available
+- **AND** source SHALL be "local" or "proxy:{server}"
 
 #### Scenario: Proxy tool signature from schema
 - **GIVEN** a proxy MCP server with tools exposing `inputSchema`
-- **WHEN** `ot.tools()` lists proxy tools
+- **WHEN** `ot.tools(info="full")` lists proxy tools
 - **THEN** signature SHALL be derived from schema properties (e.g., `github.search(query: str, repo: str = '...')`)
 - **AND** required parameters SHALL appear without defaults
 - **AND** optional parameters SHALL show default values or `'...'` placeholder
 
 #### Scenario: Proxy tool arguments from schema
 - **GIVEN** a proxy tool with `inputSchema` containing property descriptions
-- **WHEN** `ot.tools(name="github.search")` is called (non-compact)
+- **WHEN** `ot.tools(pattern="github.search", info="full")` is called
 - **THEN** the response SHALL include an `args` field
 - **AND** args SHALL be a list of `"param_name: description"` strings extracted from schema
-- **AND** format SHALL match local tool args output
+
+---
 
 ### Requirement: Configuration Summary
 
@@ -162,42 +154,46 @@ The tool SHALL follow [tool-conventions](../tool-conventions/spec.md) for loggin
 
 ### Requirement: Pack Discovery
 
-The `ot.packs()` function SHALL list packs or get detailed pack info with instructions.
+The `ot.packs()` function SHALL list packs with optional filtering.
 
 #### Scenario: List all packs
 - **GIVEN** packs are registered (local and proxy)
 - **WHEN** `ot.packs()` is called
-- **THEN** it SHALL return a list of pack summaries
-- **AND** each entry SHALL include: `{name, source, tool_count}`
-- **AND** source SHALL be "local" or "proxy"
-
-#### Scenario: Get specific pack by name
-- **GIVEN** a name parameter
-- **WHEN** `ot.packs(name="brave")` is called
-- **THEN** it SHALL return detailed pack info including:
-  - Pack header with name
-  - Configured instructions (if present in prompts.yaml)
-  - List of tools in the pack with descriptions
-- **AND** return an error if the pack is not found
+- **THEN** it SHALL return a list of all packs
+- **AND** default info level SHALL be `min`
 
 #### Scenario: Filter by pattern
 - **GIVEN** a pattern parameter
 - **WHEN** `ot.packs(pattern="brav")` is called
-- **THEN** it SHALL return only packs with names matching the pattern (case-insensitive substring)
+- **THEN** it SHALL return only packs with names containing the pattern (case-insensitive substring)
 
-#### Scenario: Pack not found
-- **GIVEN** an unknown pack name
-- **WHEN** `ot.packs(name="nonexistent")` is called
-- **THEN** it SHALL return an error with available packs
+#### Scenario: Info level list
+- **GIVEN** `info="list"` parameter
+- **WHEN** `ot.packs(info="list")` is called
+- **THEN** it SHALL return only pack names as a list of strings
+
+#### Scenario: Info level min
+- **GIVEN** `info="min"` parameter (or default)
+- **WHEN** `ot.packs()` or `ot.packs(info="min")` is called
+- **THEN** each entry SHALL include: `{name, source, tool_count}`
+- **AND** source SHALL be "local" or "proxy"
+
+#### Scenario: Info level full
+- **GIVEN** `info="full"` parameter
+- **WHEN** `ot.packs(pattern="brave", info="full")` is called
+- **THEN** it SHALL return detailed pack info including:
+  - Pack header with name
+  - Configured instructions (if present in prompts.yaml)
+  - List of tools in the pack with descriptions
 
 #### Scenario: Pack with configured instructions
 - **GIVEN** prompts.yaml contains instructions for pack "excel"
-- **WHEN** `ot.packs(name="excel")` is called
+- **WHEN** `ot.packs(pattern="excel", info="full")` is called
 - **THEN** it SHALL include the configured instructions text
 
 #### Scenario: Proxy pack
 - **GIVEN** a proxy server "github" is configured
-- **WHEN** `ot.packs(name="github")` is called
+- **WHEN** `ot.packs(pattern="github", info="full")` is called
 - **THEN** it SHALL list tools from the proxy server
 - **AND** show source as "proxy"
 
@@ -205,61 +201,73 @@ The `ot.packs()` function SHALL list packs or get detailed pack info with instru
 
 ### Requirement: Alias Introspection
 
-The `ot.aliases()` function SHALL list aliases, filter by pattern, or get a specific alias.
+The `ot.aliases()` function SHALL list aliases with optional filtering.
 
 #### Scenario: List all aliases
 - **GIVEN** aliases are configured
 - **WHEN** `ot.aliases()` is called with no arguments
 - **THEN** it SHALL return all alias mappings
-
-#### Scenario: Get specific alias by name
-- **GIVEN** an alias "ws" configured to "brave.web_search"
-- **WHEN** `ot.aliases(name="ws")` is called
-- **THEN** it SHALL return: `ws -> brave.web_search`
+- **AND** default info level SHALL be `min`
 
 #### Scenario: Filter by pattern
 - **GIVEN** aliases are configured
 - **WHEN** `ot.aliases(pattern="search")` is called
 - **THEN** it SHALL return only aliases where name or target matches the pattern (case-insensitive substring)
 
-#### Scenario: Alias not found
-- **GIVEN** an unknown alias name
-- **WHEN** `ot.aliases(name="xyz")` is called
-- **THEN** it SHALL return an error with available aliases
+#### Scenario: Info level list
+- **GIVEN** `info="list"` parameter
+- **WHEN** `ot.aliases(info="list")` is called
+- **THEN** it SHALL return only alias names as a list of strings
+
+#### Scenario: Info level min
+- **GIVEN** `info="min"` parameter (or default)
+- **WHEN** `ot.aliases()` or `ot.aliases(info="min")` is called
+- **THEN** it SHALL return mappings as: `alias_name -> target`
+
+#### Scenario: Info level full
+- **GIVEN** `info="full"` parameter
+- **WHEN** `ot.aliases(info="full")` is called
+- **THEN** it SHALL return structured data: `{name, target}`
 
 ---
 
 ### Requirement: Snippet Introspection
 
-The `ot.snippets()` function SHALL list snippets, filter by pattern, or get a specific snippet definition.
+The `ot.snippets()` function SHALL list snippets with optional filtering.
 
 #### Scenario: List all snippets
 - **GIVEN** snippets are configured
 - **WHEN** `ot.snippets()` is called with no arguments
 - **THEN** it SHALL return all snippet names with descriptions
-
-#### Scenario: Get specific snippet by name
-- **GIVEN** a snippet "brv_research" is configured
-- **WHEN** `ot.snippets(name="brv_research")` is called
-- **THEN** it SHALL return the snippet definition including:
-  - description
-  - params with types and defaults
-  - body template
-- **AND** it SHALL include an example expansion with defaults
+- **AND** default info level SHALL be `min`
 
 #### Scenario: Filter snippets by pattern
 - **GIVEN** snippets are configured
 - **WHEN** `ot.snippets(pattern="pkg")` is called
 - **THEN** it SHALL return only snippets where name or description matches the pattern (case-insensitive substring)
 
-#### Scenario: Snippet not found
-- **GIVEN** an unknown snippet name
-- **WHEN** `ot.snippets(name="xyz")` is called
-- **THEN** it SHALL return an error with available snippets
+#### Scenario: Info level list
+- **GIVEN** `info="list"` parameter
+- **WHEN** `ot.snippets(info="list")` is called
+- **THEN** it SHALL return only snippet names as a list of strings
+
+#### Scenario: Info level min
+- **GIVEN** `info="min"` parameter (or default)
+- **WHEN** `ot.snippets()` or `ot.snippets(info="min")` is called
+- **THEN** it SHALL return: `snippet_name: description`
+
+#### Scenario: Info level full
+- **GIVEN** `info="full"` parameter
+- **WHEN** `ot.snippets(pattern="brv_research", info="full")` is called
+- **THEN** it SHALL return the snippet definition including:
+  - description
+  - params with types and defaults
+  - body template
+  - example invocation
 
 #### Scenario: Snippet output format
 - **GIVEN** a valid snippet
-- **WHEN** definition is displayed
+- **WHEN** definition is displayed with `info="full"`
 - **THEN** output SHALL be formatted as:
 ```yaml
 name: brv_research
