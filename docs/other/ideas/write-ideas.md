@@ -60,7 +60,7 @@
 ### 2020s: AI-Assisted & Agentic Engineering
 - GitHub Copilot (2021) brought AI to coding
 - LLMs enabled natural language programming
-- Agentic Engineering (2024+): AI agents autonomously execute multi-step tasks—reading code, running tests, making commits
+- Agentic Engineering (2024+): AI agents autonomously execute multi-step tasks - reading code, running tests, making commits
 - Engineers shift from writing every line to directing, reviewing, and architecting
 
 ### The Pattern
@@ -75,7 +75,7 @@ Each era increased abstraction:
 | Waterfall → Agile | adaptive over predictive |
 | Writing code → Agentic | intent over implementation |
 
-Agentic engineering is the next abstraction layer—engineers express *what* they want, AI agents figure out *how*. The role evolves from typist to architect/reviewer, much like how compilers freed us from thinking in opcodes.
+Agentic engineering is the next abstraction layer - engineers express *what* they want, AI agents figure out *how*. The role evolves from typist to architect/reviewer, much like how compilers freed us from thinking in opcodes.
 
 ## Engineering is changing
 

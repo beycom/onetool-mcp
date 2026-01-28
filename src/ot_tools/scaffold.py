@@ -25,7 +25,7 @@ def _get_templates_dir() -> Path:
     """Get the extension templates directory."""
     from ot.paths import get_bundled_config_dir
 
-    return get_bundled_config_dir() / "tool-templates"
+    return get_bundled_config_dir() / "tool_templates"
 
 
 def _get_extension_dirs() -> list[tuple[Path, str]]:

@@ -521,16 +521,9 @@ class ConsoleReporter:
         # Create comparison table with ROUNDED box style
         table = Table(show_header=True, header_style="bold", box=box.ROUNDED)
         table.add_column("Task", min_width=16, no_wrap=True)
-        table.add_column("tags", no_wrap=True)
         table.add_column("in", justify="right", no_wrap=True)
         table.add_column("out", justify="right", no_wrap=True)
         table.add_column("tools", justify="right", no_wrap=True)
-
-        # Add context columns if per-call metrics exist
-        if has_call_metrics:
-            table.add_column("base", justify="right", no_wrap=True)
-            table.add_column("growth", justify="right", no_wrap=True)
-
         table.add_column("time", justify="right", no_wrap=True)
         table.add_column("cost", justify="right", no_wrap=True)
         table.add_column("result", justify="right", no_wrap=True)
@@ -538,7 +531,6 @@ class ConsoleReporter:
         for task_result in scenario_result.tasks:
             eval_display = self._format_eval_result(task_result)
             eval_style = self._style_eval_result(task_result)
-            tags_str = ", ".join(task_result.tags) if task_result.tags else "-"
             cost_cents = task_result.cost_usd * 100
 
             # Apply style to evaluation result
@@ -547,18 +539,10 @@ class ConsoleReporter:
 
             row = [
                 task_result.name,
-                tags_str,
                 str(task_result.input_tokens),
                 str(task_result.output_tokens),
                 str(task_result.tool_calls),
             ]
-
-            # Add context metrics if available
-            if has_call_metrics:
-                base = task_result.base_context
-                growth = task_result.context_growth_avg
-                row.append(str(base) if base else "-")
-                row.append(f"{growth:.0f}" if growth else "-")
 
             row.extend([
                 f"{task_result.duration_seconds:.0f}s",

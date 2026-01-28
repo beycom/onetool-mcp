@@ -11,7 +11,7 @@ The scaffold pack SHALL provide a `templates()` function to list available exten
 #### Scenario: List available templates
 - **WHEN** `scaffold.templates()` is called
 - **THEN** it returns a formatted list of template names and descriptions
-- **AND** templates are read from `src/ot/config/defaults/tool-templates/`
+- **AND** templates are read from `src/ot/config/defaults/tool_templates/`
 
 #### Scenario: Empty template directory
 - **WHEN** the template directory does not exist or is empty
@@ -37,7 +37,7 @@ The scaffold pack SHALL provide a `create()` function to scaffold new extensions
 
 #### Scenario: Custom template
 - **WHEN** `scaffold.create(pack="mypack", template="http")` is called
-- **THEN** it uses `tool-templates/http.py` if it exists
+- **THEN** it uses `tool_templates/http.py` if it exists
 - **AND** returns error if template not found
 
 #### Scenario: Extension already exists
@@ -87,10 +87,10 @@ Extension templates SHALL be stored in the bundled config defaults directory.
 
 #### Scenario: Template discovery
 - **WHEN** scaffold functions look for templates
-- **THEN** they use `get_config_path("tool-templates")` to find the directory
+- **THEN** they use `get_config_path("tool_templates")` to find the directory
 - **AND** templates are bundled with the onetool package
 
 #### Scenario: Template file naming
 - **WHEN** a template is referenced
-- **THEN** the file name is `<template>.py` in the tool-templates directory
+- **THEN** the file name is `<template>.py` in the tool_templates directory
 

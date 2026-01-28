@@ -20,14 +20,22 @@ def _find_bench_secrets_file() -> Path | None:
     """Find bench-secrets.yaml file.
 
     Resolution order:
-    1. .onetool/bench-secrets.yaml (project-level)
-    2. ~/.onetool/bench-secrets.yaml (global)
+    1. .onetool/config/bench-secrets.yaml (project-level, preferred)
+    2. .onetool/bench-secrets.yaml (project-level, legacy)
+    3. ~/.onetool/bench-secrets.yaml (global)
 
     Returns:
         Path to bench-secrets.yaml if found, None otherwise
     """
-    # Project-level
-    project_path = get_effective_cwd() / ".onetool" / "bench-secrets.yaml"
+    cwd = get_effective_cwd()
+
+    # Project-level (preferred location)
+    project_config_path = cwd / ".onetool" / "config" / "bench-secrets.yaml"
+    if project_config_path.exists():
+        return project_config_path
+
+    # Project-level (legacy location)
+    project_path = cwd / ".onetool" / "bench-secrets.yaml"
     if project_path.exists():
         return project_path
 

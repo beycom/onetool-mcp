@@ -1,11 +1,12 @@
 # Main Comparison Benchmark: OneTool vs MCP Ecosystem
 #
-# Demonstrates OneTool's value proposition by comparing 5 configurations:
+# Demonstrates OneTool's value proposition by comparing configurations:
 # - base: No MCP, LLM knowledge only
 # - mcp: Single MCP server (package-version)
-# - multiple-mcp: 9 MCP servers (demonstrates context bloat)
+# - multiple-mcp: 9+ MCP servers (demonstrates context bloat)
 # - onetool: OneTool with direct execution
 # - onetool-proxy: OneTool proxying to MCP server
+# - tool-search: Anthropic Tool Search Tool (defer_loading for context efficiency)
 #
 # Simplified to 2 libraries (express, httpx) for fast, reliable testing.
 # Evaluator checks for recent versions (express 5.x, httpx 0.28+) that LLMs
@@ -23,10 +24,10 @@ evaluators:
     expected: ["5.2.", "0.28."]
 
 scenarios:
-  - name: "Compare: Package Versions (npm + pypi)"
+  - name: "Impact of tool usage - one-shot"
     description: Get latest versions of express (npm) and httpx (pypi) across configurations
     tasks:
-      - name: "compare:packages:base"
+      - name: "compare:base"
         server:
         tags: [compare, base, npm, pypi]
         evaluate: version_found
@@ -35,7 +36,7 @@ scenarios:
           1. express (npm package)
           2. httpx (Python/PyPI package)
 
-      - name: "compare:packages:mcp"
+      - name: "compare:mcp"
         server: package-version
         tags: [compare, mcp, npm, pypi]
         evaluate: version_found
@@ -44,8 +45,8 @@ scenarios:
           Use check_npm_versions with: {"dependencies": {"express": "4.0.0"}}
           Use check_python_versions with: {"requirements": ["httpx==0.20.0"]}
 
-      - name: "compare:packages:multiple-mcp"
-        server: [package-version, brave-search, context7, github, fetch, sequential-thinking, filesystem, memory, plantuml, excel, ripgrep, gemini-grounding, chunkhound, mcp-alchemy]
+      - name: "compare:multiple-mcp"
+        server: [package-version, brave-search, context7, github, fetch, sequential-thinking, filesystem, memory, plantuml, excel, ripgrep, gemini-grounding, chunkhound, mcp-alchemy, magic, firecrawl, supabase, railway]
         tags: [compare, multiple-mcp, npm, pypi]
         evaluate: version_found
         prompt: |
@@ -55,7 +56,7 @@ scenarios:
           Use check_npm_versions with: {"dependencies": {"express": "4.0.0"}}
           Use check_python_versions with: {"requirements": ["httpx==0.20.0"]}
 
-      - name: "compare:packages:onetool"
+      - name: "compare:onetool"
         server: onetool
         tags: [compare, onetool, npm, pypi]
         evaluate: version_found
@@ -68,7 +69,7 @@ scenarios:
           ```
           Return only latest versions.
 
-      - name: "compare:packages:proxy"
+      - name: "compare:onetool-proxy"
         server: onetool
         tags: [compare, onetool, proxy, npm, pypi]
         evaluate: version_found
@@ -80,9 +81,13 @@ scenarios:
           {"express": npm, "httpx": pypi}
           ```
           Return only latest versions.
+ 
+  - name: "Impact of tool usage - 3-shot"
+    description: Get latest versions of express (npm) and httpx (pypi) across configurations
+    tasks:
 
-      - name: "compare:packages:multi-prompt:mcp"
-        server: [package-version, brave-search, context7, github, fetch, sequential-thinking, filesystem, memory, plantuml, excel, ripgrep, gemini-grounding, chunkhound, mcp-alchemy]
+      - name: "compare:multi-mcp"
+        server: [package-version, brave-search, context7, github, fetch, sequential-thinking, filesystem, memory, plantuml, excel, ripgrep, gemini-grounding, chunkhound, mcp-alchemy, magic, firecrawl, supabase, railway]
         tags: [compare, mcp, multi-prompt, npm, pypi]
         evaluate: version_found
         prompt: |
@@ -96,7 +101,7 @@ scenarios:
           ---PROMPT---
           Based on the previous results, state the LATEST versions NOT the current version: "express: [version], httpx: [version]".
 
-      - name: "compare:packages:multi-prompt:onetool"
+      - name: "compare:onetool"
         server: onetool
         tags: [compare, onetool, multi-prompt, npm, pypi]
         evaluate: version_found
@@ -112,6 +117,7 @@ scenarios:
           ```
           ---PROMPT---
           Based on the previous results, state the LATEST versions NOT the current version: "express: [version], httpx: [version]".
+
 
 servers:
   onetool:
@@ -138,12 +144,11 @@ servers:
       CONTEXT7_API_KEY: ${B_CONTEXT7_API_KEY}
 
   github:
-    type: http
-    url: https://api.githubcopilot.com/mcp/
-    headers:
-      Authorization: Bearer ${B_GITHUB_TOKEN}
-      Accept: application/json, text/event-stream
-      "MCP-Protocol-Version": "2025-06-18"
+    type: stdio
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: ${B_GITHUB_TOKEN}
     timeout: 60
 
   sequential-thinking:
@@ -201,4 +206,26 @@ servers:
     command: uvx
     args: ["mcp-alchemy"]
     env:
-      DB_URL: "sqlite:///demo/db/northwind.db"
+      DB_URL: "sqlite:///${OT_CWD}/db/northwind.db"
+
+  magic:
+    type: stdio
+    command: npx
+    args: ["-y", "@magicuidesign/mcp@latest"]
+
+  firecrawl:
+    type: stdio
+    command: npx
+    args: ["-y", "firecrawl-mcp"]
+    env:
+      FIRECRAWL_API_KEY: ${B_FIRECRAWL_API_KEY}
+
+  supabase:
+    type: stdio
+    command: npx
+    args: ["-y", "@supabase/mcp-server-supabase@latest", "--project-ref=${B_SUPABASE_PROJECT_REF}", "--access-token=${B_SUPABASE_ACCESS_TOKEN}"]
+
+  railway:
+    type: stdio
+    command: npx
+    args: ["-y", "@railway/mcp-server"]

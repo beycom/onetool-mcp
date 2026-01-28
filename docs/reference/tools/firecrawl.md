@@ -21,7 +21,7 @@ Scrape single pages, batch URLs, discover sitemaps, crawl sites, and extract str
 | `firecrawl.map_urls(url, ...)` | Discover URLs from a website |
 | `firecrawl.search(query, ...)` | Web search with optional scraping |
 | `firecrawl.crawl(url, ...)` | Start async crawl job |
-| `firecrawl.crawl_status(job_id)` | Check crawl job status |
+| `firecrawl.crawl_status(id=...)` | Check crawl job status |
 | `firecrawl.extract(urls, prompt, ...)` | Extract structured data with LLM |
 | `firecrawl.deep_research(prompt, ...)` | Autonomous web research |
 
@@ -73,7 +73,7 @@ firecrawl.search(query="python tutorials", limit=5)
 firecrawl.crawl(url="https://docs.example.com", max_depth=2, limit=50)
 
 # Check crawl status
-firecrawl.crawl_status(job_id="abc123")
+firecrawl.crawl_status(id="abc123")
 
 # Extract structured data
 firecrawl.extract(

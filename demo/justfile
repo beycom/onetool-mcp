@@ -1,0 +1,63 @@
+# Demo Tasks for OneTool
+# Usage: just demo::<task>
+
+set dotenv-load := true
+
+# Demo directory (source_directory for submodule compatibility)
+_dir := source_directory()
+
+# ============================================================================
+# CORE
+# ============================================================================
+
+# Show available commands
+default:
+    @just --list --unsorted
+
+# Run MCP server with demo config
+serve *args:
+    OT_CWD={{ _dir }} uv run ot-serve {{ args }}
+
+# Run benchmark scenarios (TUI picker)
+bench *args:
+    OT_CWD={{ _dir }} uv run ot-bench run --tui --csv {{ args }}
+
+# ============================================================================
+# SETUP & CLEANUP
+# ============================================================================
+
+# Download all demo assets (database, code project, PDFs, index)
+setup:
+    @echo "=== Downloading Northwind database ==="
+    @mkdir -p {{ _dir }}/db
+    curl -sL -o {{ _dir }}/db/northwind.db \
+        https://github.com/jpwhite3/northwind-SQLite3/raw/main/dist/northwind.db
+    @echo "=== Downloading OpenTelemetry demo ==="
+    curl -sL -o {{ _dir }}/opentelemetry-demo-main.zip \
+        https://github.com/open-telemetry/opentelemetry-demo/archive/refs/heads/main.zip
+    cd {{ _dir }} && unzip -q -o opentelemetry-demo-main.zip
+    @echo "=== Indexing for code search ==="
+    mkdir -p {{ _dir }}/.chunkhound
+    uvx chunkhound index {{ _dir }}/opentelemetry-demo-main \
+        --db {{ _dir }}/.chunkhound/chunks.db \
+        --model text-embedding-3-small \
+        --base-url https://openrouter.ai/api/v1
+    @echo "=== Downloading benchmark PDFs ==="
+    @mkdir -p {{ _dir }}/data
+    curl -sL -o {{ _dir }}/data/gpt3-paper.pdf https://arxiv.org/pdf/2005.14165
+    curl -sL -o {{ _dir }}/data/attention-paper.pdf https://arxiv.org/pdf/1706.03762
+    @echo "=== Demo setup complete ==="
+
+# Remove demo assets
+clean:
+    rm -rf {{ _dir }}/db/northwind.db
+    rm -rf {{ _dir }}/opentelemetry-demo-main.zip
+    rm -rf {{ _dir }}/opentelemetry-demo-main
+    rm -rf {{ _dir }}/.chunkhound
+    rm -rf {{ _dir }}/data/*.pdf
+    rm -rf {{ _dir }}/tmp/*
+    @echo "Demo assets cleaned"
+
+# Truncate log files
+logs-clean:
+    @for f in {{ _dir }}/logs/*.log; do [ -f "$f" ] && : > "$f" && echo "Truncated $f"; done || echo "No log files found"

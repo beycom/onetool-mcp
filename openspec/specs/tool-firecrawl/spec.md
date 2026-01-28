@@ -202,8 +202,8 @@ The `firecrawl.deep_research` function SHALL autonomously gather web data based 
 - **THEN** use provided URLs as starting points for research
 
 #### Scenario: Research limits
-- **WHEN** `max_urls=20` or `time_limit=300` is specified
-- **THEN** constrain research to specified URL count or time limit in seconds
+- **WHEN** `max_depth=3`, `max_urls=20`, or `time_limit=300` is specified
+- **THEN** constrain research to specified depth, URL count, or time limit in seconds
 
 ---
 

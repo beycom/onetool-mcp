@@ -31,7 +31,7 @@ __ot_requires__ = {
 
 from typing import Any, Literal
 
-from firecrawl import FirecrawlApp
+from firecrawl import Firecrawl
 from pydantic import BaseModel, Field
 
 from ot.config import get_secret, get_tool_config
@@ -53,7 +53,7 @@ def _get_config() -> Config:
     return get_tool_config("firecrawl", Config)
 
 
-def _create_client() -> FirecrawlApp | None:
+def _create_client() -> Firecrawl | None:
     """Create Firecrawl client with API key."""
     api_key = get_secret("FIRECRAWL_API_KEY")
     if not api_key:
@@ -61,8 +61,8 @@ def _create_client() -> FirecrawlApp | None:
 
     api_url = _get_config().api_url
     if api_url:
-        return FirecrawlApp(api_key=api_key, api_url=api_url)
-    return FirecrawlApp(api_key=api_key)
+        return Firecrawl(api_key=api_key, api_url=api_url)
+    return Firecrawl(api_key=api_key)
 
 
 # Thread-safe lazy client using SDK utility
@@ -128,28 +128,29 @@ def scrape(
             return "Error: FIRECRAWL_API_KEY secret not configured"
 
         try:
-            params: dict[str, Any] = {}
+            # Build kwargs for v2 API
+            kwargs: dict[str, Any] = {}
 
             if formats:
-                params["formats"] = formats
+                kwargs["formats"] = formats
             if not only_main_content:
-                params["onlyMainContent"] = False
+                kwargs["only_main_content"] = False
             if include_tags:
-                params["includeTags"] = include_tags
+                kwargs["include_tags"] = include_tags
             if exclude_tags:
-                params["excludeTags"] = exclude_tags
+                kwargs["exclude_tags"] = exclude_tags
             if wait_for is not None:
-                params["waitFor"] = wait_for
+                kwargs["wait_for"] = wait_for
             if mobile:
-                params["mobile"] = True
+                kwargs["mobile"] = True
             if skip_tls_verification:
-                params["skipTlsVerification"] = True
+                kwargs["skip_tls_verification"] = True
             if not remove_base64_images:
-                params["removeBase64Images"] = False
+                kwargs["remove_base64_images"] = False
             if location:
-                params["location"] = location
+                kwargs["location"] = location
 
-            result = client.scrape_url(url, params=params if params else None)
+            result = client.scrape(url, **kwargs)
 
             span.add(success=True)
             if isinstance(result, dict):
@@ -259,20 +260,21 @@ def map_urls(
             return "Error: FIRECRAWL_API_KEY secret not configured"
 
         try:
-            params: dict[str, Any] = {}
+            # Build kwargs for v2 API
+            kwargs: dict[str, Any] = {}
 
             if search:
-                params["search"] = search
+                kwargs["search"] = search
             if ignore_sitemap:
-                params["ignoreSitemap"] = True
+                kwargs["sitemap"] = "skip"
             if sitemap_only:
-                params["sitemapOnly"] = True
+                kwargs["sitemap"] = "only"
             if include_subdomains:
-                params["includeSubdomains"] = True
+                kwargs["include_subdomains"] = True
             if limit:
-                params["limit"] = limit
+                kwargs["limit"] = limit
 
-            result = client.map_url(url, params=params if params else None)
+            result = client.map(url, **kwargs)
 
             if isinstance(result, list):
                 span.add(url_count=len(result))
@@ -327,16 +329,17 @@ def search(
             return "Error: FIRECRAWL_API_KEY secret not configured"
 
         try:
-            params: dict[str, Any] = {"limit": limit}
+            # Build kwargs for v2 API
+            kwargs: dict[str, Any] = {"limit": limit}
 
             if lang:
-                params["lang"] = lang
+                kwargs["lang"] = lang
             if country:
-                params["country"] = country
+                kwargs["location"] = country
             if scrape_options:
-                params["scrapeOptions"] = scrape_options
+                kwargs["scrape_options"] = scrape_options
 
-            result = client.search(query, params=params)
+            result = client.search(query, **kwargs)
 
             if isinstance(result, list):
                 span.add(result_count=len(result))
@@ -394,26 +397,25 @@ def crawl(
             return "Error: FIRECRAWL_API_KEY secret not configured"
 
         try:
-            params: dict[str, Any] = {}
+            # Build kwargs for v2 API
+            kwargs: dict[str, Any] = {}
 
             if max_depth is not None:
-                params["maxDepth"] = max_depth
+                kwargs["max_discovery_depth"] = max_depth
             if limit is not None:
-                params["limit"] = limit
+                kwargs["limit"] = limit
             if include_paths:
-                params["includePaths"] = include_paths
+                kwargs["include_paths"] = include_paths
             if exclude_paths:
-                params["excludePaths"] = exclude_paths
+                kwargs["exclude_paths"] = exclude_paths
             if ignore_sitemap:
-                params["ignoreSitemap"] = True
+                kwargs["ignore_sitemap"] = True
             if scrape_options:
-                params["scrapeOptions"] = scrape_options
+                kwargs["scrape_options"] = scrape_options
             if webhook:
-                params["webhook"] = webhook
+                kwargs["webhook"] = webhook
 
-            result = client.crawl_url(
-                url, params=params if params else None, poll_interval=0
-            )
+            result = client.crawl(url, **kwargs)
 
             # Extract job info from response
             if isinstance(result, dict):
@@ -464,7 +466,7 @@ def crawl_status(
             return "Error: FIRECRAWL_API_KEY secret not configured"
 
         try:
-            result = client.check_crawl_status(id)
+            result = client.get_crawl_status(id)
 
             if isinstance(result, dict):
                 span.add(status=result.get("status"))
@@ -554,18 +556,19 @@ def extract(
             return "Error: Either prompt or schema is required"
 
         try:
-            params: dict[str, Any] = {"urls": urls}
+            # Build kwargs for v2 API
+            kwargs: dict[str, Any] = {}
 
             if prompt:
-                params["prompt"] = prompt
+                kwargs["prompt"] = prompt
             if schema:
-                params["schema"] = schema
+                kwargs["schema"] = schema
             if system_prompt:
-                params["systemPrompt"] = system_prompt
+                kwargs["system_prompt"] = system_prompt
             if allow_external_links:
-                params["allowExternalLinks"] = True
+                kwargs["allow_external_links"] = True
 
-            result = client.extract(urls, params=params)
+            result = client.extract(urls, **kwargs)
 
             if isinstance(result, dict):
                 span.add(success=True)
@@ -624,19 +627,20 @@ def deep_research(
             return "Error: FIRECRAWL_API_KEY secret not configured"
 
         try:
-            params: dict[str, Any] = {}
+            # Build kwargs for v2 API (uses 'agent' method)
+            kwargs: dict[str, Any] = {"prompt": prompt}
 
             if urls:
-                params["urls"] = urls
+                kwargs["urls"] = urls
             if max_depth is not None:
-                params["maxDepth"] = max_depth
+                kwargs["maxDepth"] = max_depth
             if max_urls is not None:
-                params["maxUrls"] = max_urls
+                kwargs["maxUrls"] = max_urls
             if time_limit is not None:
-                params["timeLimit"] = time_limit
+                kwargs["timeout"] = time_limit
 
             # The SDK's agent method corresponds to deep research
-            result = client.deep_research(prompt, params=params if params else None)
+            result = client.agent(**kwargs)
 
             if isinstance(result, dict):
                 span.add(success=True)

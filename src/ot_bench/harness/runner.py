@@ -328,7 +328,7 @@ class AgenticRunner:
         default_model: str,
         default_timeout: int,
     ) -> TaskResult:
-        """Run an LLM benchmark task.
+        """Run an agent benchmark task.
 
         Args:
             task: Task configuration (type: harness).

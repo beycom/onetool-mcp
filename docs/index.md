@@ -19,13 +19,14 @@ MCP doesn't scale. Connect 5 servers: 55K tokens burned. Connect 10+: 100K+ toke
 
 ## Learn
 
+- **[Features](features.md)** - What's in OneTool
 - **[Why OneTool](intro/index.md)** - The problem and solution
 - **[Guides](guides/explicit-calls.md)** - How-to guides
 - **[Examples](examples/index.md)** - Demo project
 
 ## Reference
 
-- **[Tools](reference/tools/index.md)** - 10 built-in packs
+- **[Tools](reference/tools/index.md)** - 15+ built-in packs
 - **[CLIs](reference/cli/index.md)** - ot-serve, ot-bench
 
 ## Extend
@@ -53,4 +54,4 @@ MCP doesn't scale. Connect 5 servers: 55K tokens burned. Connect 10+: 100K+ toke
 __ot brave.search(query="AI trends 2026")
 ```
 
-One prefix. Direct execution. No JSON schemas. No tool selection loops.
+One prefix. Direct execution. No tool definitions. No tool selection loops.

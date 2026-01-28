@@ -14,6 +14,7 @@ from ot.config.secrets import get_secret
 @pytest.mark.network
 @pytest.mark.api
 @pytest.mark.tools
+@pytest.mark.core
 class TestFirecrawlLive:
     """Live integration tests for Firecrawl tool."""
 
@@ -25,7 +26,7 @@ class TestFirecrawlLive:
 
     def test_scrape_live(self):
         """Verify Firecrawl scrape works."""
-        from ot_tools.firecrawl_tool import scrape
+        from ot_tools.firecrawl import scrape
 
         result = scrape(url="https://example.com")
 
@@ -34,7 +35,7 @@ class TestFirecrawlLive:
 
     def test_map_urls_live(self):
         """Verify Firecrawl map_urls works."""
-        from ot_tools.firecrawl_tool import map_urls
+        from ot_tools.firecrawl import map_urls
 
         result = map_urls(url="https://example.com", limit=5)
 
@@ -43,7 +44,7 @@ class TestFirecrawlLive:
 
     def test_search_live(self):
         """Verify Firecrawl search works."""
-        from ot_tools.firecrawl_tool import search
+        from ot_tools.firecrawl import search
 
         result = search(query="python programming", limit=3)
 

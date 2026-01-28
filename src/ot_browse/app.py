@@ -264,7 +264,7 @@ class BrowserInspectorCLI:
 
         if not self.config.favorites:
             console.print("[dim]No favorites configured[/dim]")
-            console.print("[dim]Add favorites to config/ot-browse.yaml[/dim]")
+            console.print("[dim]Add favorites to .onetool/config/ot-browse.yaml[/dim]")
             await pause()
             return
 

@@ -42,7 +42,7 @@ dependencies = [
 
     # === Web ===
     "trafilatura>=2.0.0",         # web_fetch content extraction
-    "firecrawl>=4.13.4",          # firecrawl_tool web scraping
+    "firecrawl>=4.13.4",          # firecrawl web scraping
 
     # === Documents ===
     "openpyxl>=3.1.5",            # excel, convert (Excel files)
@@ -100,7 +100,7 @@ line-length = 88
 src = ["src", "tests"]
 cache-dir = "tmp/.ruff_cache"
 # Exclude Jinja2 templates (not valid Python)
-extend-exclude = ["src/ot/config/defaults/tool-templates/*.py"]
+extend-exclude = ["src/ot/config/defaults/tool_templates/*.py"]
 
 [tool.ruff.lint]
 select = [
@@ -142,6 +142,8 @@ known-first-party = ["ot", "ot_tools", "ot_sdk", "ot_serve", "ot_bench", "ot_bro
 [tool.mypy]
 python_version = "3.11"
 cache_dir = "tmp/.mypy_cache"
+# Exclude Jinja2 templates (not valid Python)
+exclude = ["src/ot/config/defaults/tool_templates/"]
 strict = true
 warn_return_any = true
 warn_unused_ignores = true

@@ -1,6 +1,6 @@
 # Prompting Best Practices
 
-**Make your LLM reliable. Stop the retry loops.**
+**Make your agent reliable. Stop the retry loops.**
 
 Two rules prevent 90% of tool-calling problems. Add them to your system prompt.
 
@@ -16,12 +16,12 @@ system_prompt: |
 
 **Why these matter:**
 
-- **No retries on success:** LLMs sometimes want to "improve" results by calling the same tool again. This wastes tokens and can cause loops.
-- **No manual computation on failure:** When a tool fails, LLMs often try to compute the answer themselves (e.g., calculating a hash). This defeats the purpose of using tools and may produce incorrect results.
+- **No retries on success:** Agents sometimes want to "improve" results by calling the same tool again. This wastes tokens and can cause loops.
+- **No manual computation on failure:** When a tool fails, agents often try to compute the answer themselves (e.g., calculating a hash). This defeats the purpose of using tools and may produce incorrect results.
 
 ## Pre-Call Instructions
 
-Add context before tool calls to guide the LLM:
+Add context before tool calls to guide the agent:
 
 ```
 Calculate the SHA-256 hash of the following text:

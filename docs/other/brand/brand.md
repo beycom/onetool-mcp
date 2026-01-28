@@ -14,7 +14,7 @@ Used for: header, logo
 
 ## Brand (Internal)
 
-Project identity — used in README header, logo, internal docs.
+Project identity - used in README header, logo, internal docs.
 
 ### onetool.brand
 
@@ -30,7 +30,7 @@ One tool to rule them all, one tool to find them, one tool to bring them all, an
 
 ## Pitch (External)
 
-Value proposition — used for GitHub about, PyPI, release notes.
+Value proposition - used for GitHub about, PyPI, release notes.
 
 ### onetool.pitch
 

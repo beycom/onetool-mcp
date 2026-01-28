@@ -4,22 +4,18 @@ log_level: INFO
 
 # Favorite benchmarks for quick access via --tui
 favorites:
+  - name: Select a benchmark from bench
+    path: bench/
+    description: All benchmark files
+
   - name: Run Compare benchmark
-    path: demo/bench/compare.yaml
+    path: bench/compare.yaml
     description: Main comparison - base vs 1 MCP vs all MCPs vs OneTool
 
   - name: Run Features benchmark
-    path: demo/bench/features.yaml
+    path: bench/features.yaml
     description: OneTool features - invocation, proxy, snippets
 
-  - name: Run everything-claude-code benchmark
-    path: demo/bench/ecc.yaml
-    description: All Everything Claude Code recommended MCP servers. See https://github.com/affaan-m/everything-claude-code/blob/main/mcp-configs/mcp-servers.json
-
-  - name: Select a benchmark from demo/bench
-    path: demo/bench/
-    description: All benchmark files
-
   - name: Run all tool benchmarks
-    path: demo/bench/tool_*.yaml
+    path: bench/tool_*.yaml
     description: Run all tool tests

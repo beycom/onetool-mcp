@@ -2,7 +2,7 @@
 
 **The MCP server. One tool. Unlimited capabilities.**
 
-Exposes a single `run` tool that executes Python code. Your LLM writes code; OneTool runs it.
+Exposes a single `run` tool that executes Python code. Your agent writes code; OneTool runs it.
 
 ## Usage
 

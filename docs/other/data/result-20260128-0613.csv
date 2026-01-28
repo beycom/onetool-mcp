@@ -1,0 +1,8 @@
+scenario,task,model,server,result,total_input,total_output,llm_calls,tool_calls,duration_s,cost_usd,base_context,context_growth_avg
+Impact of tool usage - one-shot,compare:base,google/gemini-3-flash-preview,-,FAIL,33,239,1,0,4.73,0.000733,33,0.0
+Impact of tool usage - one-shot,compare:mcp,google/gemini-3-flash-preview,package-version,PASS,1520,98,2,2,7.0,0.001054,704,112.0
+Impact of tool usage - one-shot,compare:multiple-mcp,google/gemini-3-flash-preview,"package-version,brave-search,context7,github,fetch,sequential-thinking,filesystem,memory,plantuml,excel,ripgrep,gemini-grounding,chunkhound,mcp-alchemy,magic,firecrawl,supabase,railway",PASS,46130,125,2,2,11.73,0.02344,29157,-12184.0
+Impact of tool usage - one-shot,compare:onetool,google/gemini-3-flash-preview,onetool,PASS,1999,95,2,1,5.67,0.001285,913,173.0
+Impact of tool usage - one-shot,compare:onetool-proxy,google/gemini-3-flash-preview,onetool,PASS,4654,188,4,3,10.62,0.002891,887,155.3
+Impact of tool usage - 3-shot,compare:multi-mcp,google/gemini-3-flash-preview,"package-version,brave-search,context7,github,fetch,sequential-thinking,filesystem,memory,plantuml,excel,ripgrep,gemini-grounding,chunkhound,mcp-alchemy,magic,firecrawl,supabase,railway",PASS,146387,88,5,2,16.76,0.073457,29123,70.8
+Impact of tool usage - 3-shot,compare:onetool,google/gemini-3-flash-preview,onetool,PASS,5152,158,5,2,9.94,0.00305,866,80.5

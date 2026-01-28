@@ -9,7 +9,7 @@ from ot._cli import create_cli, version_callback
 
 app = create_cli(
     "ot-bench",
-    "OneTool benchmark harness for benchmarking LLM + MCP configurations.",
+    "OneTool benchmark harness for benchmarking agent + MCP configurations.",
     no_args_is_help=True,
 )
 
@@ -25,10 +25,10 @@ def main(
         help="Show version and exit.",
     ),
 ) -> None:
-    """OneTool benchmark harness for benchmarking LLM + MCP configurations.
+    """OneTool benchmark harness for benchmarking agent + MCP configurations.
 
     Commands:
-        run     - Run tasks (direct MCP calls or LLM benchmarks)
+        run     - Run tasks (direct MCP calls or agent benchmarks)
 
     Task types:
         type: direct  - Direct MCP tool invocation (no LLM)

@@ -1,6 +1,6 @@
 # Browser Inspector Tool
 
-Observe and debug frontend applications. User controls the browser, LLM observes.
+Observe and debug frontend applications. User controls the browser, agent observes.
 
 ## Setup
 
@@ -16,7 +16,7 @@ playwright install chromium
 just client
 ```
 
-Then ask the LLM to use the browser tools:
+Then ask the agent to use the browser tools:
 
 ```text
 You: Open https://example.com in a browser
@@ -48,7 +48,7 @@ __onetool__run browser_open(url="https://en.wikipedia.org/wiki/The_Age")
 ```text
 You: Open my app at localhost:3000 and check for errors
 
-# LLM opens browser, captures console errors and network failures
+# Agent opens browser, captures console errors and network failures
 ```
 
 ### Inspect an element
@@ -56,11 +56,11 @@ You: Open my app at localhost:3000 and check for errors
 ```text
 You: Enable selection mode so I can pick an element
 
-# LLM enables selection, you click element in browser
+# Agent enables selection, you click element in browser
 
 You: What styles are applied to my selection?
 
-# LLM inspects element, shows computed CSS and matched rules
+# Agent inspects element, shows computed CSS and matched rules
 ```
 
 ### Track API calls
@@ -68,11 +68,11 @@ You: What styles are applied to my selection?
 ```text
 You: Open the app and show me all API requests
 
-# LLM opens browser, you interact with the app
+# Agent opens browser, you interact with the app
 
 You: What API calls were made?
 
-# LLM shows XHR/fetch requests with request/response bodies
+# Agent shows XHR/fetch requests with request/response bodies
 ```
 
 ### Connect to existing Chrome
@@ -88,7 +88,7 @@ google-chrome --remote-debugging-port=9222
 ```text
 You: Connect to my existing Chrome browser
 
-LLM: __onetool__run browser_open(connect=True)
+Agent: __onetool__run browser_open(connect=True)
 ```
 
 ## Direct Python Usage

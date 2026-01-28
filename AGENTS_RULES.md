@@ -43,6 +43,10 @@
 - `__init__.py` required in `src/` packages
 - `__init__.py` required in `tests/` subdirs (empty, avoids name collisions)
 
+## Test URLs
+
+Do not use `example.com` - it does not resolve in this environment. Use `https://www.wikipedia.org/` instead.
+
 ## Testing
 
 Always use `uv run pytest` for proper dependency resolution (never bare `pytest` or `python -m pytest`).

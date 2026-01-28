@@ -72,7 +72,7 @@ def expand_secrets(value: str) -> str:
     if missing_vars:
         raise ValueError(
             f"Missing variables in bench-secrets.yaml: {', '.join(missing_vars)}. "
-            f"Add them to .onetool/bench-secrets.yaml or use ${{VAR:-default}} syntax."
+            f"Add them to .onetool/config/bench-secrets.yaml or use ${{VAR:-default}} syntax."
         )
 
     return result
@@ -115,19 +115,31 @@ def expand_subprocess_env(value: str) -> str:
     return pattern.sub(replace, value)
 
 
-def expand_secrets_in_dict(data: Any) -> Any:
+def expand_secrets_in_dict(data: Any, skip_keys: set[str] | None = None) -> Any:
     """Recursively expand secrets in a dict/list structure.
 
     Args:
         data: Dict, list, or scalar value.
+        skip_keys: Set of dict keys whose values should not be expanded.
+            Used to skip 'env' values which are expanded later by subprocess.
 
     Returns:
         Structure with all string values expanded.
     """
+    if skip_keys is None:
+        skip_keys = {"env"}
+
     if isinstance(data, dict):
-        return {k: expand_secrets_in_dict(v) for k, v in data.items()}
+        result = {}
+        for k, v in data.items():
+            if k in skip_keys:
+                # Don't expand these - they're handled by expand_subprocess_env later
+                result[k] = v
+            else:
+                result[k] = expand_secrets_in_dict(v, skip_keys)
+        return result
     elif isinstance(data, list):
-        return [expand_secrets_in_dict(v) for v in data]
+        return [expand_secrets_in_dict(v, skip_keys) for v in data]
     elif isinstance(data, str):
         return expand_secrets(data)
     return data

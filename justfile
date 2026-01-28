@@ -115,56 +115,17 @@ clean:
 # CODE SEARCH (ChunkHound)
 # ============================================================================
 
-# Index current project for semantic code search
+# Index current project for semantic code search (requires OPENAI_API_KEY env var)
 index path=".":
     @echo "=== Indexing {{ path }} for semantic code search ==="
-    OPENAI_API_KEY=$({{ _get_openai_key }}) uvx chunkhound index {{ path }} --db {{ path }}/.chunkhound/db/chunks.db --model text-embedding-3-small --base-url https://openrouter.ai/api/v1
+    uvx chunkhound index {{ path }} --db {{ path }}/.chunkhound/db/chunks.db --model text-embedding-3-small --base-url https://openrouter.ai/api/v1
     @echo "=== Index complete. Use code.search() or code.status() ==="
 
 # ============================================================================
-# DEMO
+# DEMO (submodule - use `just demo::task`)
 # ============================================================================
 
-# Download and setup all demo assets (database + code project + index)
-demo-setup:
-    @echo "=== Downloading Northwind database ==="
-    @mkdir -p demo/db
-    curl -L -o demo/db/northwind.db \
-        https://github.com/jpwhite3/northwind-SQLite3/raw/main/dist/northwind.db
-    @echo "=== Downloading OpenTelemetry demo ==="
-    curl -L -o demo/opentelemetry-demo-main.zip \
-        https://github.com/open-telemetry/opentelemetry-demo/archive/refs/heads/main.zip
-    @echo "=== Extracting OpenTelemetry demo ==="
-    cd demo && unzip -q -o opentelemetry-demo-main.zip
-    @echo "=== Indexing OpenTelemetry demo ==="
-    cd demo/opentelemetry-demo-main && OPENAI_API_KEY=$({{ _get_openai_key }}) uvx chunkhound index --model text-embedding-3-small --base-url https://openrouter.ai/api/v1
-    @echo "=== Downloading benchmark PDFs ==="
-    curl -L -o demo/data/gpt3-paper.pdf https://arxiv.org/pdf/2005.14165
-    curl -L -o demo/data/attention-paper.pdf https://arxiv.org/pdf/1706.03762
-    @echo "=== Demo setup complete ==="
-    @echo "Run 'just demo-bench' to run the benchmark scenarios."
-
-# Remove all demo assets (database, zip, extracted project, PDFs, logs)
-demo-clean:
-    rm -rf demo/db/northwind.db
-    rm -rf demo/opentelemetry-demo-main.zip
-    rm -rf demo/opentelemetry-demo-main
-    rm -rf demo/data/*.pdf
-    rm -rf demo/tmp/*
-    @for f in demo/logs/*.log; do [ -f "$f" ] && : > "$f"; done 2>/dev/null || true
-    @echo "Demo assets cleaned"
-
-# Run MCP server with demo project
-demo-serve *args:
-    OT_CWD=demo uv run ot-serve {{ args }}
-
-# Run benchmark scenarios (TUI picker or specific file)
-demo-bench *args:
-    OT_CWD=demo uv run ot-bench run --tui --csv {{ args }}
-
-# Truncate demo log files
-demo-logs-clean:
-    @for f in demo/logs/*.log; do [ -f "$f" ] && : > "$f" && echo "Truncated $f"; done || echo "No log files found"
+mod demo
 
 # ============================================================================
 # TOOL: DIAGRAM (Kroki Server)
@@ -219,10 +180,3 @@ ot-uninstall:
 ot-list:
     uv tool list
 
-# ============================================================================
-# INTERNAL
-# ============================================================================
-
-# Secrets file path for API keys (used by demo-otel-index)
-_secrets_file := justfile_directory() / "demo/.onetool/secrets.yaml"
-_get_openai_key := "grep 'OPENAI_API_KEY' " + _secrets_file + " | cut -d'\"' -f2"

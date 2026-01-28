@@ -101,9 +101,10 @@ def load_config(config_path: Path | str | None = None) -> BrowseConfig:
 
     Resolution order (when config_path is None):
     1. OT_BROWSE_CONFIG env var
-    2. cwd/.onetool/ot-browse.yaml
-    3. ~/.onetool/ot-browse.yaml
-    4. Built-in defaults
+    2. cwd/.onetool/config/ot-browse.yaml
+    3. cwd/.onetool/ot-browse.yaml (legacy)
+    4. ~/.onetool/ot-browse.yaml
+    5. Built-in defaults
 
     Args:
         config_path: Path to config file (overrides resolution)
@@ -117,19 +118,24 @@ def load_config(config_path: Path | str | None = None) -> BrowseConfig:
         if env_config:
             config_path = Path(env_config)
         else:
-            # Try project config: cwd/.onetool/ot-browse.yaml
             cwd = get_effective_cwd()
-            project_config = cwd / ".onetool" / "ot-browse.yaml"
+            # Try project config: cwd/.onetool/config/ot-browse.yaml (preferred)
+            project_config = cwd / ".onetool" / "config" / "ot-browse.yaml"
             if project_config.exists():
                 config_path = project_config
             else:
-                # Try global config: ~/.onetool/ot-browse.yaml
-                global_config = get_global_dir() / "ot-browse.yaml"
-                if global_config.exists():
-                    config_path = global_config
+                # Try legacy location: cwd/.onetool/ot-browse.yaml
+                legacy_config = cwd / ".onetool" / "ot-browse.yaml"
+                if legacy_config.exists():
+                    config_path = legacy_config
                 else:
-                    # No config found, use defaults
-                    return BrowseConfig()
+                    # Try global config: ~/.onetool/ot-browse.yaml
+                    global_config = get_global_dir() / "ot-browse.yaml"
+                    if global_config.exists():
+                        config_path = global_config
+                    else:
+                        # No config found, use defaults
+                        return BrowseConfig()
     else:
         config_path = Path(config_path)
 

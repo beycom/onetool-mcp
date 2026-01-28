@@ -1,6 +1,6 @@
 """FastMCP server implementation with a single 'run' tool.
 
-The LLM generates function call syntax with __ot prefix:
+The agent generates function call syntax with __ot prefix:
   __ot context7.search(query="next.js")
   __ot context7.doc(library_key="vercel/next.js", topic="routing")
   __ot `demo.upper(text="hello")`

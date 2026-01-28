@@ -18,7 +18,7 @@ OneTool takes a different approach to AI tool security:
 The fundamental security mechanism: **you see what runs**.
 
 ```python
-# The LLM generates this code - you see it before execution
+# The agent generates this code - you see it before execution
 __ot brave.web_search(query="AI security best practices")
 ```
 

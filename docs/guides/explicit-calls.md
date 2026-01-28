@@ -2,7 +2,7 @@
 
 **Write code. Call APIs. No guessing.**
 
-OneTool's `__ot` prefix gives you explicit control over tool invocation. You write the code - the LLM doesn't have to guess which tool or which parameters.
+OneTool's `__ot` prefix gives you explicit control over tool invocation. You write the code - the agent doesn't have to guess which tool or which parameters.
 
 ## Trigger Prefixes
 
@@ -118,7 +118,7 @@ __ot__run `upper(text=reverse(text="hello"))`
 
 ### Pre-Call Instructions
 
-Add context before the tool call to guide the LLM:
+Add context before the tool call to guide the agent:
 
 ```
 Calculate the SHA-256 hash of the following text:
@@ -165,8 +165,8 @@ system_prompt: |
 
 **Why these matter:**
 
-- **No retries on success:** LLMs sometimes want to "improve" results by calling the same tool again. This wastes tokens and can cause loops.
-- **No manual computation on failure:** When a tool fails, LLMs often try to compute the answer themselves (e.g., calculating a hash or Fibonacci number). This defeats the purpose of using tools and may produce incorrect results.
+- **No retries on success:** Agents sometimes want to "improve" results by calling the same tool again. This wastes tokens and can cause loops.
+- **No manual computation on failure:** When a tool fails, agents often try to compute the answer themselves (e.g., calculating a hash or Fibonacci number). This defeats the purpose of using tools and may produce incorrect results.
 
 ---
 

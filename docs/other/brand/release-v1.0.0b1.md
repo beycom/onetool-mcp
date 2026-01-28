@@ -17,7 +17,7 @@
 ⚡ **Explicit Calls**
 - Five trigger prefixes (`__ot`, `__onetool__run`, etc.)
 - Three invocation styles (simple, inline backticks, code fence)
-- No guessing — you write the code, it runs exactly that
+- No guessing - you write the code, it runs exactly that
 
 ⚙️ **Configurable Everything**
 - Per-tool timeouts, limits, behavior

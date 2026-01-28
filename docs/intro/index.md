@@ -2,7 +2,7 @@
 
 **MCP doesn't scale.**
 
-Here's the problem: every MCP server you add makes your AI dumber. Not in theory - in practice.
+Here's the problem: every MCP server you add makes your agent less effective. Not in theory - in practice.
 
 ## What's actually happening
 
@@ -57,7 +57,7 @@ OneTool:
   Total: ~2K tokens, 1 call
 ```
 
-Instead of loading 50 tool schemas, LLMs write Python:
+Instead of loading 50 tool definitions, agents write Python:
 
 ```python
 __ot brave.search(query="AI trends 2026")
@@ -65,7 +65,7 @@ __ot brave.search(query="AI trends 2026")
 
 ## The approach
 
-LLMs write Python to call functions. No JSON schema parsing. No tool selection loops. You see exactly what's being called because you wrote it.
+Agents write Python to call functions. No JSON schema parsing. No tool selection loops. You see exactly what's being called because you wrote it.
 
 15 packs built-in. Adding your own is dropping a Python file in a folder.
 

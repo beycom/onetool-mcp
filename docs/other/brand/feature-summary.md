@@ -5,9 +5,9 @@
 ```markdown
 ## Why OneTool?
 
-**Stop Context Rot** — MCP tool enumeration burns 55K-150K tokens before you start. OneTool reduces this to ~2K tokens (98.7% reduction).
+**Stop Context Rot** - MCP tool enumeration burns 55K-150K tokens before you start. OneTool reduces this to ~2K tokens (98.7% reduction).
 
-**Explicit Calls** — No tool-selection guessing games. You write `__ot brave.search(query="AI")` and that's exactly what runs. Five trigger prefixes, three invocation styles.
+**Explicit Calls** - No tool-selection guessing games. You write `__ot brave.search(query="AI")` and that's exactly what runs. Five trigger prefixes, three invocation styles.
 
 **Configurable Everything**
 - **Tools**: Per-tool timeouts, limits, and behavior
@@ -22,6 +22,6 @@
 - **AST security**: All code validated before execution
 
 **Built-in CLIs**
-- `ot-serve` — The MCP server
-- `ot-bench` — Benchmark harness (tokens, cost, accuracy)
+- `ot-serve` - The MCP server
+- `ot-bench` - Benchmark harness (tokens, cost, accuracy)
 ```

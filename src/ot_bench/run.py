@@ -1,4 +1,4 @@
-"""Run command for running LLM benchmarks with MCP servers."""
+"""Run command for running agent benchmarks with MCP servers."""
 
 from __future__ import annotations
 
@@ -58,9 +58,10 @@ def load_bench_config(config_path: Path | str | None = None) -> BenchConfig:
 
     Resolution order (when config_path is None):
     1. OT_BENCH_CONFIG env var
-    2. cwd/.onetool/ot-bench.yaml
-    3. ~/.onetool/ot-bench.yaml
-    4. Built-in defaults
+    2. cwd/.onetool/config/ot-bench.yaml
+    3. cwd/.onetool/ot-bench.yaml
+    4. ~/.onetool/ot-bench.yaml
+    5. Built-in defaults
     """
     if config_path is None:
         # Check OT_BENCH_CONFIG env var first
@@ -68,19 +69,24 @@ def load_bench_config(config_path: Path | str | None = None) -> BenchConfig:
         if env_config:
             config_path = Path(env_config)
         else:
-            # Try project config: cwd/.onetool/ot-bench.yaml
             cwd = get_effective_cwd()
-            project_config = cwd / ".onetool" / "ot-bench.yaml"
+            # Try project config: cwd/.onetool/config/ot-bench.yaml (preferred)
+            project_config = cwd / ".onetool" / "config" / "ot-bench.yaml"
             if project_config.exists():
                 config_path = project_config
             else:
-                # Try global config: ~/.onetool/ot-bench.yaml
-                global_config = get_global_dir() / "ot-bench.yaml"
-                if global_config.exists():
-                    config_path = global_config
+                # Try legacy location: cwd/.onetool/ot-bench.yaml
+                legacy_config = cwd / ".onetool" / "ot-bench.yaml"
+                if legacy_config.exists():
+                    config_path = legacy_config
                 else:
-                    # No config found, use defaults
-                    return BenchConfig()
+                    # Try global config: ~/.onetool/ot-bench.yaml
+                    global_config = get_global_dir() / "ot-bench.yaml"
+                    if global_config.exists():
+                        config_path = global_config
+                    else:
+                        # No config found, use defaults
+                        return BenchConfig()
     else:
         config_path = Path(config_path)
 
@@ -131,7 +137,7 @@ def run_tui_picker(console: Console) -> list[Path] | None:
 
     if not bench_config.favorites:
         console.print("[dim]No favorites configured[/dim]")
-        console.print("[dim]Add favorites to config/ot-bench.yaml[/dim]")
+        console.print("[dim]Add favorites to .onetool/config/ot-bench.yaml[/dim]")
         return None
 
     async def pick_favorite() -> list[Path] | None:
@@ -366,7 +372,7 @@ def run(
         help="Write results to CSV file with per-call metrics breakdown.",
     ),
 ) -> None:
-    """Run tasks (direct MCP calls or LLM benchmarks).
+    """Run tasks (direct MCP calls or agent benchmarks).
 
     Task types:
         type: direct  - Direct MCP tool invocation (no LLM)

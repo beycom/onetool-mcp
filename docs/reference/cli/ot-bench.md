@@ -2,7 +2,7 @@
 
 **Measure what matters. Tokens, cost, accuracy.**
 
-Real LLM + MCP testing. Define tasks in YAML, get objective metrics: token counts, costs, accuracy scores, timing.
+Real agent + MCP testing. Define tasks in YAML, get objective metrics: token counts, costs, accuracy scores, timing.
 
 ## Usage
 
@@ -109,7 +109,7 @@ Use `---PROMPT---` delimiter to split a task into sequential prompts. Each promp
 
 ## Configuration
 
-Configuration file: `config/ot-bench.yaml` or `.onetool/ot-bench.yaml`
+Configuration file: `.onetool/config/ot-bench.yaml` (project) or `~/.onetool/ot-bench.yaml` (global)
 
 | Variable | Description |
 |----------|-------------|

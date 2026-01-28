@@ -29,6 +29,26 @@ if TYPE_CHECKING:
 # Default timeout for MCP operations (30 seconds)
 DEFAULT_TIMEOUT = 30.0
 
+# Known server error hints for better diagnostics
+_SERVER_ERROR_HINTS: dict[str, str] = {
+    "chunkhound": (
+        "ChunkHound requires: 1) Valid OPENAI_API_KEY, "
+        "2) Indexed codebase (run 'uvx chunkhound index <path>' first)"
+    ),
+    "github": (
+        "GitHub Copilot MCP requires a token with 'Copilot Requests' permission "
+        "from an account with active Copilot subscription"
+    ),
+}
+
+
+def _enhance_error_message(server_name: str, error: str) -> str:
+    """Add helpful context to known server errors."""
+    hint = _SERVER_ERROR_HINTS.get(server_name)
+    if hint and ("closed" in error.lower() or "401" in error or "unauthorized" in error.lower()):
+        return f"{error}. Hint: {hint}"
+    return error
+
 
 @dataclass
 class MCPConnection:
@@ -194,16 +214,6 @@ async def call_tool(
     return "\n".join(text_parts)
 
 
-def _normalize_schema(schema: dict[str, Any]) -> dict[str, Any]:
-    """Pass through MCP schema unchanged.
-
-    Args:
-        schema: Input JSON schema dict.
-
-    Returns:
-        Schema unchanged.
-    """
-    return schema
 
 
 def mcp_tools_to_openai(
@@ -225,8 +235,7 @@ def mcp_tools_to_openai(
     for copy_num in range(duplicate):
         suffix = "" if copy_num == 0 else f"_{copy_num + 1}"
         for tool in tools:
-            # Normalize schema to fix any required/properties mismatches
-            parameters = _normalize_schema(tool.inputSchema)
+            parameters = tool.inputSchema
 
             openai_tool: ChatCompletionToolParam = {
                 "type": "function",
@@ -268,8 +277,7 @@ def multi_server_tools_to_openai(
             # Create prefixed name for multi-server, original name for single-server
             prefixed_name = f"{server_name}__{tool.name}" if use_prefix else tool.name
 
-            # Normalize schema
-            parameters = _normalize_schema(tool.inputSchema)
+            parameters = tool.inputSchema
 
             # Build description with server context for multi-server
             description = tool.description or ""
@@ -323,7 +331,7 @@ async def connect_to_server(
                     var_name = match.group(1)
                     raise RuntimeError(
                         f"Server {name}: Unexpanded variable ${{{var_name}}} in header. "
-                        f"Add {var_name} to .onetool/bench-secrets.yaml"
+                        f"Add {var_name} to .onetool/config/bench-secrets.yaml"
                     )
             headers[key] = value
 
@@ -617,7 +625,7 @@ class MultiServerContextManager:
         # Process results
         for name, conn_or_error in results:
             if isinstance(conn_or_error, Exception):
-                error_msg = str(conn_or_error)
+                error_msg = _enhance_error_message(name, str(conn_or_error))
                 result.health.append(
                     ServerHealth(name=name, healthy=False, error=error_msg)
                 )

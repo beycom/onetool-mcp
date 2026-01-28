@@ -1,6 +1,6 @@
 # Tools Reference
 
-**15 packs. 70+ functions. Zero tool-selection overhead.**
+**15 packs. 90+ tools. Zero tool-selection overhead.**
 
 Every function below is callable with a single `__ot` prefix. No JSON schemas, no tool discovery loops.
 
@@ -23,6 +23,7 @@ Every function below is callable with a single `__ot` prefix. No JSON schemas, n
 | **diagram** | Diagram generation | [diagram.md](diagram.md) |
 | **firecrawl** | Web scraping & crawling | [firecrawl.md](firecrawl.md) |
 | **ot** | Internal tools | [ot.md](ot.md) |
+| **scaffold** | Extension scaffolding | [creating-tools.md](../../extending/creating-tools.md) |
 
 ## Quick Reference
 
