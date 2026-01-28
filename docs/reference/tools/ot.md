@@ -15,6 +15,7 @@ Internal tools for OneTool introspection and management.
 
 | Function | Description |
 |----------|-------------|
+| `ot.help(query, info)` | Unified help - search tools, packs, snippets, aliases |
 | `ot.tools(pattern, info)` | List tools, filter by pattern |
 | `ot.packs(pattern, info)` | List packs, filter by pattern |
 | `ot.aliases(pattern, info)` | List aliases, filter by pattern |
@@ -27,13 +28,55 @@ Internal tools for OneTool introspection and management.
 
 ## Info Levels
 
-All discovery functions (`tools`, `packs`, `aliases`, `snippets`) support an `info` parameter:
+All discovery functions (`help`, `tools`, `packs`, `aliases`, `snippets`) support an `info` parameter:
 
 | Level | Description |
 |-------|-------------|
 | `list` | Names only (minimal context) |
 | `min` | Name + short description (default) |
 | `full` | Complete details |
+
+## ot.help()
+
+Unified help entry point - search across tools, packs, snippets, and aliases.
+
+```python
+# General help overview
+ot.help()
+
+# Exact tool lookup
+ot.help(query="brave.search")
+
+# Exact pack lookup
+ot.help(query="firecrawl")
+
+# Snippet lookup (prefix with $)
+ot.help(query="$b_q")
+
+# Alias lookup
+ot.help(query="ws")
+
+# Fuzzy search across all types
+ot.help(query="web fetch")
+ot.help(query="search", info="list")
+```
+
+**Behaviour:**
+
+- No query: Returns general help overview with discovery commands and examples
+- Exact tool match (contains `.`): Returns detailed tool help with signature, args, returns, example
+- Exact pack match: Returns pack help with instructions and tool list
+- Snippet match (starts with `$`): Returns snippet definition with params and body
+- Alias match: Returns alias mapping and target description
+- Fuzzy matches: Groups results by type (Tools, Packs, Snippets, Aliases)
+- No matches: Suggests using `ot.tools()`, `ot.packs()`, etc. to browse
+
+The `info` parameter controls detail level for all search results.
+
+**Documentation URLs:**
+
+Help output includes documentation URLs for tools and packs:
+`https://onetool.beycom.online/reference/tools/{pack}/`
 
 ## ot.tools()
 
