@@ -2,182 +2,210 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://onetool.beycom.online/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/examples/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/about/</loc>
+         <lastmod>2026-01-29</lastmod>
+    </url>
+    <url>
+         <loc>https://onetool.beycom.online/features/</loc>
+         <lastmod>2026-01-29</lastmod>
+    </url>
+    <url>
+         <loc>https://onetool.beycom.online/_internal/why-onetool/</loc>
+         <lastmod>2026-01-29</lastmod>
+    </url>
+    <url>
+         <loc>https://onetool.beycom.online/_internal/brand/brand/</loc>
+         <lastmod>2026-01-29</lastmod>
+    </url>
+    <url>
+         <loc>https://onetool.beycom.online/_internal/brand/claims/</loc>
+         <lastmod>2026-01-29</lastmod>
+    </url>
+    <url>
+         <loc>https://onetool.beycom.online/_internal/brand/references/</loc>
+         <lastmod>2026-01-29</lastmod>
+    </url>
+    <url>
+         <loc>https://onetool.beycom.online/_internal/brand/release-v1.0.0b1/</loc>
+         <lastmod>2026-01-29</lastmod>
+    </url>
+    <url>
+         <loc>https://onetool.beycom.online/_internal/brand/tool-packs/</loc>
+         <lastmod>2026-01-29</lastmod>
+    </url>
+    <url>
+         <loc>https://onetool.beycom.online/_internal/browse/browser-inspector/</loc>
+         <lastmod>2026-01-29</lastmod>
+    </url>
+    <url>
+         <loc>https://onetool.beycom.online/_internal/browse/ot-browse/</loc>
+         <lastmod>2026-01-29</lastmod>
+    </url>
+    <url>
+         <loc>https://onetool.beycom.online/_internal/browse/page-view/</loc>
+         <lastmod>2026-01-29</lastmod>
+    </url>
+    <url>
+         <loc>https://onetool.beycom.online/_internal/ideas/linkedin-article/</loc>
+         <lastmod>2026-01-29</lastmod>
+    </url>
+    <url>
+         <loc>https://onetool.beycom.online/_internal/ideas/why-onetool-source/</loc>
+         <lastmod>2026-01-29</lastmod>
+    </url>
+    <url>
+         <loc>https://onetool.beycom.online/_internal/ideas/write-ideas/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/extending/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/extending/creating-clis/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/extending/creating-tools/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/extending/logging/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/extending/plugins/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/extending/testing/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/getting-started/configuration/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/learn/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/getting-started/installation/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/learn/comparison/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/getting-started/quickstart/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/learn/configuration/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/getting-started/security/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/learn/database-queries/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/guides/database-queries/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/learn/examples/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/guides/explicit-calls/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/learn/explicit-calls/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/guides/prompting-best-practices/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/learn/installation/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/intro/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/learn/prompting-best-practices/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/other/brand/brand/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/learn/quickstart/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/other/brand/feature-summary/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/learn/security/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/other/brand/release-v1.0.0b1/</loc>
-         <lastmod>2026-01-24</lastmod>
-    </url>
-    <url>
-         <loc>https://onetool.beycom.online/other/brand/tool-packs/</loc>
-         <lastmod>2026-01-24</lastmod>
-    </url>
-    <url>
-         <loc>https://onetool.beycom.online/other/browse/browser-inspector/</loc>
-         <lastmod>2026-01-24</lastmod>
-    </url>
-    <url>
-         <loc>https://onetool.beycom.online/other/browse/ot-browse/</loc>
-         <lastmod>2026-01-24</lastmod>
-    </url>
-    <url>
-         <loc>https://onetool.beycom.online/other/browse/page-view/</loc>
-         <lastmod>2026-01-24</lastmod>
-    </url>
-    <url>
-         <loc>https://onetool.beycom.online/other/ideas/linkedin-article/</loc>
-         <lastmod>2026-01-24</lastmod>
-    </url>
-    <url>
-         <loc>https://onetool.beycom.online/other/ideas/why-onetool-source/</loc>
-         <lastmod>2026-01-24</lastmod>
-    </url>
-    <url>
-         <loc>https://onetool.beycom.online/other/ideas/write-ideas/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/reference/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/reference/cli/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/reference/cli/ot-bench/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/reference/cli/ot-serve/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/reference/tools/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/reference/tools/brave-search/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/reference/tools/brave/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/reference/tools/code-search/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/reference/tools/code/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/reference/tools/context7/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/reference/tools/convert/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/reference/tools/database/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/reference/tools/db/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/reference/tools/diagram/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/reference/tools/excel/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/reference/tools/file/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/reference/tools/grounding-search/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/reference/tools/firecrawl/</loc>
+         <lastmod>2026-01-29</lastmod>
+    </url>
+    <url>
+         <loc>https://onetool.beycom.online/reference/tools/ground/</loc>
+         <lastmod>2026-01-29</lastmod>
+    </url>
+    <url>
+         <loc>https://onetool.beycom.online/reference/tools/llm/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/reference/tools/ot/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/reference/tools/package/</loc>
-         <lastmod>2026-01-24</lastmod>
-    </url>
-    <url>
-         <loc>https://onetool.beycom.online/reference/tools/page/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
          <loc>https://onetool.beycom.online/reference/tools/ripgrep/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/reference/tools/transform/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/reference/tools/scaffold/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
     <url>
-         <loc>https://onetool.beycom.online/reference/tools/web-fetch/</loc>
-         <lastmod>2026-01-24</lastmod>
+         <loc>https://onetool.beycom.online/reference/tools/web/</loc>
+         <lastmod>2026-01-29</lastmod>
     </url>
 </urlset>
