@@ -88,13 +88,9 @@ def test_tools_returns_correct_signatures_for_same_named_functions() -> None:
     # Each pack's search function should have its own signature
     assert "brave.search" in tool_names
     assert "ground.search" in tool_names
-    assert "page.search" in tool_names
 
     # ground.search should mention Gemini/grounding (non-proxied function)
     assert "Gemini" in tool_descs or "grounding" in tool_descs
-
-    # page.search should mention HTML/accessibility (non-proxied function)
-    assert "accessibility" in tool_descs or "HTML" in tool_descs
 
 
 @pytest.mark.unit
@@ -144,7 +140,6 @@ def test_tools_pattern_filter_by_pack() -> None:
 
     # Should NOT have other pack tools
     assert not any(name.startswith("brave.") for name in tool_names)
-    assert not any(name.startswith("page.") for name in tool_names)
 
 
 @pytest.mark.unit

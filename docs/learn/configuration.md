@@ -325,8 +325,6 @@ tools:
   db:
     max_chars: 4000            # 100 - 100000 characters
 
-  # page_view: (beta - see docs/beta/)
-
   package:
     timeout: 30.0              # 1.0 - 120.0 seconds
 

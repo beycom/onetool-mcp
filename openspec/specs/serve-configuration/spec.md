@@ -300,7 +300,7 @@ The MCP server CLI SHALL follow the `ot-<purpose>` naming convention.
 - **GIVEN** the OneTool MCP server package
 - **WHEN** the user invokes the CLI
 - **THEN** the command SHALL be `ot-serve`
-- **AND** it SHALL be consistent with other CLIs (`ot-bench`, `ot-browse`)
+- **AND** it SHALL be consistent with other CLIs (`ot-bench`)
 
 #### Scenario: CLI help
 - **GIVEN** the user runs `ot-serve --help`
@@ -529,17 +529,6 @@ The system SHALL support tool-specific configuration via the `tools:` section, w
 - **THEN** they SHALL truncate at 8000 characters
 - **DEFAULT** 4000 (from db.py Config class)
 - **RANGE** 100 - 100000
-
-#### Scenario: Page view configuration
-- **GIVEN** configuration with:
-  ```yaml
-  tools:
-    page_view:
-      sessions_dir: .local/browser
-  ```
-- **WHEN** page_view.* functions are called
-- **THEN** they SHALL use the configured sessions directory
-- **DEFAULT** .browse (from page_view.py Config class)
 
 #### Scenario: Package tool configuration
 - **GIVEN** configuration with:

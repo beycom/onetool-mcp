@@ -38,11 +38,6 @@ The project SHALL provide CLI reference at `docs/reference/cli/`.
 - **WHEN** the user reads its doc
 - **THEN** they find commands, options, and examples
 
-#### Scenario: Beta CLIs separated
-- **GIVEN** experimental CLIs (ot-browse)
-- **WHEN** a user looks for them
-- **THEN** they find them in `docs/beta/` with stability warnings
-
 ### Requirement: README Documentation Section
 
 The README.md SHALL be concise with links to documentation.
@@ -138,11 +133,6 @@ The project SHALL document experimental features at `docs/beta/`.
 - **GIVEN** a user at `beta/index.md`
 - **WHEN** they read it
 - **THEN** they see a stability warning and list of beta features
-
-#### Scenario: Beta feature docs
-- **GIVEN** a beta feature (ot-browse, page-view, browser-inspector)
-- **WHEN** the user reads its doc
-- **THEN** they find minimal docs with explicit "may change" warnings
 
 ### Requirement: Developer Documentation
 

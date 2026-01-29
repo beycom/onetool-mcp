@@ -59,7 +59,6 @@ Every test SHALL have exactly two required markers: a speed tier and a component
   - `core` - Core library (`ot`)
   - `serve` - MCP server (`ot_serve`)
   - `bench` - Benchmark harness (`ot_bench`)
-  - `browse` - Browser inspector (`ot_browse`)
   - `pkg` - Package management
   - `spec` - OpenSpec tooling
 
@@ -78,11 +77,6 @@ Tests requiring external dependencies SHALL declare them.
 - **GIVEN** a test requires API keys
 - **WHEN** the test is defined
 - **THEN** it SHALL have the `api` marker
-
-#### Scenario: Playwright dependency
-- **GIVEN** a test requires Playwright browsers
-- **WHEN** the test is defined
-- **THEN** it SHALL have the `playwright` marker
 
 #### Scenario: Docker dependency
 - **GIVEN** a test requires Docker

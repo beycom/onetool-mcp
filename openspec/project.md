@@ -8,9 +8,9 @@ OneTool is an MCP server exposing a single `run` tool for AI-assisted developmen
 
 ## What It Provides
 
-**CLIs**: `ot-serve` (MCP server), `ot-bench` (benchmarks), `ot-browse` (browser TUI)
+**CLIs**: `ot-serve` (MCP server), `ot-bench` (benchmarks)
 
-**Built-in tools** in `src/ot_tools/`: `brave.*` (search), `web.*` (fetch), `ground.*` (Gemini), `context7.*` (docs), `code.*` (semantic search), `llm.*` (transform), `page.*` (browser), `db.*` (database), `package.*` (versions), `ripgrep.*` (grep)
+**Built-in tools** in `src/ot_tools/`: `brave.*` (search), `web.*` (fetch), `ground.*` (Gemini), `context7.*` (docs), `code.*` (semantic search), `llm.*` (transform), `db.*` (database), `package.*` (versions), `ripgrep.*` (grep)
 
 ## Tech Stack
 
@@ -19,7 +19,7 @@ Python 3.11+, FastMCP, OpenAI SDK (OpenRouter), Typer, Pydantic, YAML config
 ## Conventions
 
 - **Code**: Type hints, Google-style docstrings, Ruff linting
-- **Testing**: pytest markers (`smoke`, `unit`, `integration`) + component markers (`core`, `serve`, `bench`, `browse`)
+- **Testing**: pytest markers (`smoke`, `unit`, `integration`) + component markers (`core`, `serve`, `bench`)
 - **Git**: Feature branches `feature/[change-id]`, conventional commits
 
 ## Configuration
@@ -35,7 +35,6 @@ Python 3.11+, FastMCP, OpenAI SDK (OpenRouter), Typer, Pydantic, YAML config
 ├── config/     # YAML configuration files (ot-serve.yaml, secrets.yaml, etc.)
 ├── logs/       # Application log files
 ├── stats/      # Statistics data (stats.jsonl)
-├── sessions/   # Browser session state
 └── tools/      # Reserved for installed tool packs
 ```
 
@@ -64,7 +63,7 @@ See `docs/ot-tools.md` for full guide.
 
 **Required**: Python 3.11+, uv, FastMCP
 
-**Optional**: Brave API (`brave.*`), Context7 API (`context7.*`), Gemini API (`ground.*`), Playwright (`ot-browse`), ripgrep (`ripgrep.*`)
+**Optional**: Brave API (`brave.*`), Context7 API (`context7.*`), Gemini API (`ground.*`), ripgrep (`ripgrep.*`)
 
 ## OpenSpec Workflow
 

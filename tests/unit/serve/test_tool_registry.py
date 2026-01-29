@@ -26,7 +26,6 @@ def test_registry_has_packs() -> None:
     # Check expected packs exist
     assert "brave" in registry.packs
     assert "ot" in registry.packs
-    assert "page" in registry.packs
     assert "ground" in registry.packs
 
 
@@ -173,16 +172,12 @@ def test_registry_functions_by_full_name() -> None:
     # Should find each search function
     brave_search = get_function("brave.search")
     ground_search = get_function("ground.search")
-    page_search = get_function("page.search")
 
     assert brave_search is not None
     assert ground_search is not None
-    assert page_search is not None
 
-    # All should be different functions
+    # They should be different functions
     assert brave_search is not ground_search
-    assert brave_search is not page_search
-    assert ground_search is not page_search
 
 
 @pytest.mark.unit
@@ -221,7 +216,6 @@ def test_registry_functions_use_qualified_keys() -> None:
     # Functions dict should have keys like "brave.search", not "search"
     assert "brave.search" in registry.functions
     assert "ground.search" in registry.functions
-    assert "page.search" in registry.functions
     assert "ot.tools" in registry.functions
 
     # Each qualified key should point to the correct function

@@ -9,15 +9,11 @@
 - `/openspec/changes` - pending proposals
 - `/openspec/archive` - completed proposals
 
-## Beta (Exclude)
-
-- `ot-browse` CLI and `page` pack are beta - do not reference in docs or stats
-
 ## Spec Naming
 
 | Pattern | Example | Description |
 |---------|---------|-------------|
-| `{cli}` | `bench`, `browse` | Main spec for a CLI (`ot-{cli}`) |
+| `{cli}` | `bench` | Main spec for a CLI (`ot-{cli}`) |
 | `{cli}-{feature}` | `bench-config` | CLI feature spec |
 | `serve-{feature}` | `serve-configuration` | MCP server feature spec |
 | `tool-{name}` | `tool-brave-search` | Built-in tool spec |

@@ -1,11 +1,10 @@
 """OneTool - MCP server with single 'run' tool for LLM code generation.
 
-V3 features:
+Features:
 - Single 'run' tool for Python code execution
 - Tool discovery from src/ot_tools/ directory
 - Configurable prompts and instructions
 - Namespaces, aliases, and snippets for shortcuts
-- Browser inspector CLI (ot-browse)
 
 Usage:
     # Start MCP server (stdio transport)
@@ -14,11 +13,8 @@ Usage:
     # With config
     ot-serve --config config/ot-serve.yaml
 
-    # Run benchmarks (dev CLI)
+    # Run benchmarks
     ot-bench run harness.yaml
-
-    # Direct tool invocation (dev CLI)
-    ot-bench call tools.yaml
 """
 
 from importlib.metadata import version

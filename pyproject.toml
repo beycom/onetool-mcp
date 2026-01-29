@@ -31,6 +31,7 @@ dependencies = [
     "jinja2>=3.1.6",              # Snippets template engine
     "docstring-parser>=0.17",     # ot.help() and ot.tools() docstring parsing
     "aiofiles>=25.1.0",           # Message tool async file I/O
+    "questionary>=2.1.1",         # ot-bench interactive prompts
 
     # === LLM & Search ===
     "openai>=2.15.0",             # code_search embeddings, LLM tools
@@ -46,14 +47,11 @@ dependencies = [
 
     # === Documents ===
     "openpyxl>=3.1.5",            # excel, convert (Excel files)
+    "pillow>=12.1.0",             # convert (PDF image handling)
     "pymupdf>=1.26.7",            # convert (PDF)
     "python-docx>=1.2.0",         # convert (Word)
     "python-pptx>=1.0.2",         # convert (PowerPoint)
 
-    # === Browser ===
-    "playwright>=1.57.0",         # Browser inspector (requires: playwright install chromium)
-    "questionary>=2.1.1",         # Browser CLI (onetool-browse)
-    "pillow>=12.1.0",             # Browser CLI screenshots
 ]
 
 [project.urls]
@@ -69,14 +67,13 @@ file = ["send2trash>=2.1.0"]
 [project.scripts]
 ot-serve = "ot_serve.cli:cli"
 ot-bench = "ot_bench.cli:cli"
-ot-browse = "ot_browse.app:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ot", "src/ot_tools", "src/ot_sdk", "src/ot_serve", "src/ot_bench", "src/ot_browse"]
+packages = ["src/ot", "src/ot_tools", "src/ot_sdk", "src/ot_serve", "src/ot_bench"]
 
 [dependency-groups]
 docs = [
@@ -127,15 +124,13 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["ot", "ot_tools", "ot_sdk", "ot_serve", "ot_bench", "ot_browse"]
+known-first-party = ["ot", "ot_tools", "ot_sdk", "ot_serve", "ot_bench"]
 
 [tool.ruff.lint.per-file-ignores]
 # CLI files need Path and CaseResult at runtime for typer type annotations and callbacks
 # E402 in cli.py is intentional - atexit.register must run before importing pymupdf
 "src/ot_serve/*.py" = ["TC001", "TCH003", "E402"]
 "src/ot_bench/*.py" = ["TC001", "TCH003"]
-# Browser CLI uses Path and Annotation at runtime, SIM105 for event handlers
-"src/ot_browse/*.py" = ["TC001", "TC003", "SIM105"]
 # Tools use namespace declarations before imports for tool discovery
 "src/ot_tools/*.py" = ["E402"]
 # Executor modules use Path/Callable at runtime for tool loading and worker management
@@ -177,7 +172,6 @@ markers = [
     # Component tags (required - pick one)
     "serve: MCP server tests",
     "bench: Benchmark harness tests",
-    "browse: Browser inspector tests",
     "core: Core library tests",
     "tools: Tool implementation tests",
     "pkg: Package tests",
@@ -186,13 +180,12 @@ markers = [
     # Dependency tags (add as needed)
     "network: Requires network access",
     "api: Requires API keys",
-    "playwright: Requires playwright browsers",
     "docker: Requires Docker daemon",
 ]
 
 [tool.deptry]
 # Ignore internal packages (DEP001) - these are first-party, not external deps
-per_rule_ignores = { DEP001 = ["ot", "ot_tools", "ot_sdk", "ot_bench", "ot_browse", "ot_serve", "anyio"] }
+per_rule_ignores = { DEP001 = ["ot", "ot_tools", "ot_sdk", "ot_bench", "ot_serve", "anyio"] }
 # Map package names where import name differs
 [tool.deptry.package_module_name_map]
 pyyaml = "yaml"

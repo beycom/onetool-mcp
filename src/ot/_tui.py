@@ -1,6 +1,6 @@
 """Shared TUI primitives for interactive CLI tools.
 
-Extracted from ot_browse for reuse across ot-browse and ot-bench.
+Used by ot-bench for interactive selection prompts.
 """
 
 from __future__ import annotations

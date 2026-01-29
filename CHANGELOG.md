@@ -19,7 +19,6 @@ All notable changes to OneTool will be documented in this file.
 - Configurable allow/ask/warn/block security policies
 - Secrets isolation (never logged)
 - Benchmark harness (`ot-bench`)
-- Browser inspector (`ot-browse`)
 
 ### Changed
 

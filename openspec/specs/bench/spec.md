@@ -142,7 +142,7 @@ Benchmark files SHALL follow consistent conventions for maintainability and clar
 - **THEN** tags SHALL use the standard taxonomy:
   - Purpose: `compare`, `tool`, `feature`, `exec`, `error`
   - Server: `base`, `mcp`, `onetool`, `all-mcps`
-  - Tool: `brave`, `context7`, `web-fetch`, `package`, `page-view`, `code-search`, `transform`
+  - Tool: `brave`, `context7`, `web-fetch`, `package`, `code-search`, `transform`
   - Feature: `invoke`, `proxy`, `snippet`, `direct`, `harness`
   - Execution: `parse`, `var`, `loop`, `if`, `comp`, `import`, `return`
 

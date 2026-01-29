@@ -6,7 +6,6 @@ Defines the unified logging and observability infrastructure for OneTool. Covers
 
 CLI-specific logging requirements are defined in their respective specs:
 - [bench-logging](../bench-logging/spec.md) - ot-bench CLI output, verbose/trace modes
-- [browse-logging](../browse-logging/spec.md) - ot-browse session and navigation logging
 
 ---
 

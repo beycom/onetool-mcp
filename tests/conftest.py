@@ -2,7 +2,7 @@
 
 Every test must have:
 1. A speed tier marker (smoke, unit, integration, slow)
-2. A component marker (serve, bench, browse, pkg, core)
+2. A component marker (serve, bench, pkg, core)
 
 Tests missing required markers are automatically skipped.
 
@@ -85,7 +85,7 @@ if TYPE_CHECKING:
     from _pytest.nodes import Item
 
 SPEED_MARKERS = {"smoke", "unit", "integration", "slow"}
-COMPONENT_MARKERS = {"serve", "bench", "browse", "pkg", "core", "spec", "tools"}
+COMPONENT_MARKERS = {"serve", "bench", "pkg", "core", "spec", "tools"}
 
 
 # -----------------------------------------------------------------------------

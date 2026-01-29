@@ -8,7 +8,7 @@ Spec folder names follow these patterns:
 
 | Pattern | Example | Description |
 |---------|---------|-------------|
-| `{cli}` | `bench`, `browse` | Main spec for a CLI (maps to `ot-{cli}`) |
+| `{cli}` | `bench` | Main spec for a CLI (maps to `ot-{cli}`) |
 | `{cli}-{feature}` | `bench-config` | CLI feature spec (extracted from main spec) |
 | `serve-{feature}` | `serve-configuration` | MCP server (`ot-serve`) feature spec |
 | `tool-{name}` | `tool-brave-search` | Built-in tool spec |
@@ -79,7 +79,6 @@ The MCP server that exposes tools for LLM code execution.
 | [tool-ripgrep](tool-ripgrep/spec.md) | Text/regex search via ripgrep |
 | [tool-excel](tool-excel/spec.md) | Excel workbook operations |
 | [tool-package](tool-package/spec.md) | Package version checks (npm, PyPI, OpenRouter) |
-| [tool-page-view](tool-page-view/spec.md) | Browse session capture analysis |
 | [tool-msg](tool-msg/spec.md) | Message publishing to topic files |
 | [tool-file](tool-file/spec.md) | File operations |
 | [tool-diagram](tool-diagram/spec.md) | Diagram generation |
@@ -104,17 +103,6 @@ CLI for testing and benchmarking MCP servers.
 
 ---
 
-## ot-browse (Browser Inspector)
-
-Standalone CLI for browser inspection and debugging.
-
-| Spec | Purpose |
-|------|---------|
-| [browse](browse/spec.md) | Browser inspector, element annotation, capture |
-| [browse-logging](browse-logging/spec.md) | Session, navigation, and interaction logging |
-
----
-
 ## Spec Count Summary
 
 | Category | Count |
@@ -123,10 +111,9 @@ Standalone CLI for browser inspection and debugging.
 | onetool CLI | 1 |
 | ot-serve Core | 8 |
 | Tool Infrastructure | 2 |
-| Built-in Tools | 16 |
+| Built-in Tools | 15 |
 | ot-bench | 8 |
-| ot-browse | 2 |
-| **Total** | **42** |
+| **Total** | **39** |
 
 ---
 
@@ -137,7 +124,6 @@ Specs that have been consolidated into other specs:
 - `serve-observability` → consolidated into [_nf-observability](_nf-observability/spec.md)
 - `tool-observability` → consolidated into [_nf-observability](_nf-observability/spec.md)
 - `bench-observability` → split into [_nf-observability](_nf-observability/spec.md) and [bench-logging](bench-logging/spec.md)
-- `browse-observability` → split into [_nf-observability](_nf-observability/spec.md) and [browse-logging](browse-logging/spec.md)
 - `tool-internal` → consolidated into [tool-ot](tool-ot/spec.md)
 - `tool-info` → consolidated into [tool-ot](tool-ot/spec.md)
 - `observability` → renamed to [_nf-observability](_nf-observability/spec.md)

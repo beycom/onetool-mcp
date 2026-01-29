@@ -1,6 +1,6 @@
 """Shared CLI utilities for OneTool CLIs.
 
-Provides common patterns used across ot-serve, ot-bench, and ot-browse CLIs.
+Provides common patterns used across ot-serve and ot-bench CLIs.
 """
 
 from __future__ import annotations

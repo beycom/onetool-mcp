@@ -31,7 +31,7 @@ The paths module SHALL provide a function to get the effective working directory
 
 #### Scenario: Secondary CLIs require global config
 - **GIVEN** `~/.onetool/` does not exist
-- **WHEN** `ot-bench` or `ot-browse` starts
+- **WHEN** `ot-bench` starts
 - **THEN** it SHALL print an error message directing the user to run `ot-serve init`
 - **AND** exit with non-zero status
 
@@ -206,7 +206,7 @@ The paths module SHALL provide access to bundled default configuration files.
 - **GIVEN** the bundled config directory exists
 - **WHEN** its contents are listed
 - **THEN** it SHALL contain:
-  - `ot-serve.yaml`, `ot-bench.yaml`, `ot-browse.yaml` (minimal working configs)
+  - `ot-serve.yaml`, `ot-bench.yaml` (minimal working configs)
   - `prompts.yaml`, `snippets.yaml`, `servers.yaml`, `diagram.yaml`
   - `diagram-templates/` subdirectory
 - **NOTE** `secrets.yaml` is NOT in bundled defaults; it is in global templates only
