@@ -1,33 +1,36 @@
-<p align="center" markdown>
-  <img src="assets/onetool-logo.png" alt="OneTool" width="400">
-</p>
+<figure markdown="span">
+  ![OneTool](assets/onetool-logo.png){ width="400" }
+</figure>
+
+<!-- [![PyPI version](https://img.shields.io/pypi/v/onetool-mcp.svg)](https://pypi.org/project/onetool-mcp/) -->
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/beycom/onetool-mcp/blob/main/LICENSE)
 
 **Don't enumerate tools. Execute code.**
 
 MCP doesn't scale. Each MCP server costs ~$30/month in wasted tokens. OneTool fixes this.
 
-**[96% fewer tokens. 24x lower cost. Improved accuracy.](data/compare.md)**
+**[96% fewer tokens. 24x lower cost. Improved accuracy.](learn/comparison.md)**
 
 ---
 
 ## Get Started
 
-- **[Quickstart](getting-started/quickstart.md)** - Running in 2 minutes
-- **[Installation](getting-started/installation.md)** - All platforms
-- **[Configuration](getting-started/configuration.md)** - YAML schema
-- **[Security](getting-started/security.md)** - Security model and policies
+- **[Quickstart](learn/quickstart.md)** - Running in 2 minutes
+- **[Installation](learn/installation.md)** - All platforms
+- **[Configuration](learn/configuration.md)** - YAML schema
+- **[Security](learn/security.md)** - Security model and policies
 
 ## Learn
 
 - **[Features](features.md)** - What's in OneTool
-- **[Why OneTool](intro/index.md)** - The problem and solution
-- **[Guides](guides/explicit-calls.md)** - How-to guides
-- **[Examples](examples/index.md)** - Demo project
+- **[Guides](learn/explicit-calls.md)** - How-to guides
+- **[Examples](learn/examples.md)** - Demo project
 
 ## Reference
 
 - **[Tools](reference/tools/index.md)** - Batteries Included with 100+ Tools
-- **[CLIs](reference/cli/index.md)** - ot-serve, ot-bench
+- **[CLIs](reference/cli/ot-serve.md)** - ot-serve, ot-bench
 
 ## Extend
 
@@ -38,7 +41,7 @@ MCP doesn't scale. Each MCP server costs ~$30/month in wasted tokens. OneTool fi
 
 ## Batteries Included with 100+ Tools
 
-See [Tool Reference](tool-reference.md) for the complete list of packs and tools.
+See [Tool Reference](reference/tools/index.md) for the complete list of packs and tools.
 
 ---
 

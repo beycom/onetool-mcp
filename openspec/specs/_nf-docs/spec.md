@@ -64,12 +64,19 @@ The project SHALL provide a landing page at `docs/index.md`.
 #### Scenario: Navigation structure
 - **GIVEN** a user at `docs/index.md`
 - **WHEN** they scan the page
-- **THEN** they find links organized by: Getting Started, Guides, Reference, Examples, Beta, Extending
+- **THEN** they find content organized for: Learn, Reference, Extending
 
 #### Scenario: Section descriptions
-- **GIVEN** each section link
+- **GIVEN** each section reference
 - **WHEN** the user reads it
 - **THEN** they understand what content that section contains
+
+#### Scenario: Badges displayed
+- **GIVEN** the home page
+- **WHEN** a user views it
+- **THEN** they see shields.io badges for version, license, and Python version
+
+---
 
 ### Requirement: Tools Reference
 
@@ -158,17 +165,25 @@ The project SHALL provide developer docs at `docs/extending/`.
 
 ### Requirement: Directory Index Files
 
-Every documentation directory SHALL have an index.md file.
+Documentation subdirectories SHALL use index.md files for section landing pages; navigation SHALL be handled by `mkdocs.yml`.
 
-#### Scenario: All directories indexed
-- **GIVEN** a documentation directory
+#### Scenario: Subdirectory structure
+- **GIVEN** a documentation subdirectory (e.g., `learn/`, `reference/`)
 - **WHEN** checked
-- **THEN** it contains an index.md
+- **THEN** it MAY contain an index.md for section introduction
+- **AND** section navigation SHALL be handled by `mkdocs.yml` nav structure
 
-#### Scenario: Index content
-- **GIVEN** an index.md
-- **WHEN** read
-- **THEN** it describes the section and links to its contents
+#### Scenario: CLI reference directory
+- **GIVEN** the `reference/cli/` directory
+- **WHEN** checked
+- **THEN** it contains an index.md with CLI overview
+
+#### Scenario: Tools reference directory
+- **GIVEN** the `reference/tools/` directory
+- **WHEN** checked
+- **THEN** it contains an index.md with tools overview table
+
+---
 
 ### Requirement: Documentation Site Generation
 
@@ -193,32 +208,31 @@ The project SHALL use MkDocs Material to generate a static documentation site fr
 
 ### Requirement: Documentation Site Features
 
-The generated documentation site SHALL provide navigation, search, and theming.
-
-#### Scenario: Site navigation
-- **GIVEN** a user visiting the documentation site
-- **WHEN** they view any page
-- **THEN** they see a sidebar with section navigation
-- **AND** they see breadcrumbs showing current location
-- **AND** they can navigate to any section without page reload
-
-#### Scenario: Search functionality
-- **GIVEN** a user on the documentation site
-- **WHEN** they use the search bar
-- **THEN** results appear instantly (client-side search)
-- **AND** matching terms are highlighted in results
+The generated documentation site SHALL provide enhanced navigation, search, and theming.
 
 #### Scenario: Theme toggle
 - **GIVEN** a user on the documentation site
 - **WHEN** they click the theme toggle
-- **THEN** the site switches between light and dark modes
+- **THEN** the site switches between auto, light, and dark modes
 - **AND** their preference is remembered
 
-#### Scenario: Code blocks
-- **GIVEN** a documentation page with code examples
-- **WHEN** a user views the page
-- **THEN** code blocks have syntax highlighting
-- **AND** code blocks have a copy button
+#### Scenario: Navigation tabs
+- **GIVEN** a user on the documentation site
+- **WHEN** they view any page
+- **THEN** they see top-level navigation tabs
+- **AND** tabs remain sticky when scrolling
+
+#### Scenario: Feedback widget
+- **GIVEN** a user on any documentation page
+- **WHEN** they scroll to the bottom
+- **THEN** they see a feedback widget with thumbs up/down
+- **AND** feedback is sent to analytics
+
+#### Scenario: Typography
+- **GIVEN** the documentation site
+- **WHEN** rendered
+- **THEN** body text uses Inter font
+- **AND** code blocks use JetBrains Mono font
 
 ### Requirement: GitHub Pages Deployment
 
@@ -402,3 +416,32 @@ The documentation SHALL include a plugin development guide for building standalo
 - **WHEN** a developer needs to test their plugin
 - **THEN** the guide SHALL explain testing without a full OneTool installation
 - **AND** describe the direct function call approach
+
+### Requirement: About Page
+
+The project SHALL provide an about page at `docs/about.md`.
+
+#### Scenario: About content
+- **GIVEN** a user reading `docs/about.md`
+- **WHEN** they view the page
+- **THEN** they find project information, authors, and license details
+
+---
+
+### Requirement: Learn Section
+
+The project SHALL provide learning materials in `docs/learn/`.
+
+#### Scenario: Learn section structure
+- **GIVEN** a user navigating to the Learn section
+- **WHEN** they read `docs/learn/index.md`
+- **THEN** they find a brief introduction to the learning materials
+- **AND** navigation to subsections is handled by the nav sidebar
+
+#### Scenario: Consolidated guides
+- **GIVEN** the learn section
+- **WHEN** checked
+- **THEN** it contains quickstart, installation, configuration, security, and guides
+- **AND** examples are in `learn/examples.md`
+- **AND** comparison data is in `learn/comparison.md`
+

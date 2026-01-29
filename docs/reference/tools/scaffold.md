@@ -52,7 +52,3 @@ scaffold.create(name="shared_tool", scope="global")
 # List all installed extensions
 scaffold.list_extensions()
 ```
-
-## See Also
-
-[Creating Tools Guide](../../extending/creating-tools.md) - Full guide on building custom extensions

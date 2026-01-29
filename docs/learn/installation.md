@@ -238,5 +238,5 @@ OT_CWD=demo ot-bench run demo/bench/features.yaml
 ## Next Steps
 
 - [Configuration](configuration.md) - YAML schema and options
-- [CLI Reference](../reference/cli/index.md) - Command-line tools
-- [Examples](../examples/index.md) - Demo project usage
+- [CLI Reference](../reference/cli/ot-serve.md) - Command-line tools
+- [Examples](examples.md) - Demo project usage

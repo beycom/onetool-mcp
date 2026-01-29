@@ -72,7 +72,7 @@ ot-serve --config config/ot-serve.yaml
 
 Configuration file: `config/ot-serve.yaml` or `.onetool/ot-serve.yaml`
 
-See [Configuration Reference](../../getting-started/configuration.md) for full schema.
+See [Configuration Reference](../../learn/configuration.md) for full schema.
 
 ## Environment Variables
 

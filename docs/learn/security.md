@@ -211,7 +211,3 @@ OneTool is a developer tool, not a sandbox. It does not:
 3. **Restrict paths to project scope** - `allowed_dirs: ["."]`
 4. **Keep secrets separate** - Never commit `secrets.yaml`
 5. **Use air-gapped mode for sensitive work** - Block network tools when needed
-
-## See Also
-
-- [Configuration Reference](configuration.md) - Full YAML schema

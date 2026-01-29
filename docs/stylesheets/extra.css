@@ -1,11 +1,40 @@
 :root {
-  --md-primary-fg-color: #0A497C;
-  --md-primary-fg-color--light: #0D5A9A;
-  --md-primary-fg-color--dark: #083A63;
+  --md-primary-fg-color: #3B82F6;
+  --md-primary-fg-color--light: #60A5FA;
+  --md-primary-fg-color--dark: #2563EB;
+  --md-accent-fg-color: #8B5CF6;
 }
 
 [data-md-color-scheme="slate"] {
-  --md-primary-fg-color: #0A497C;
-  --md-primary-fg-color--light: #0D5A9A;
-  --md-primary-fg-color--dark: #083A63;
+  --md-primary-fg-color: #3B82F6;
+  --md-primary-fg-color--light: #60A5FA;
+  --md-primary-fg-color--dark: #2563EB;
+  --md-accent-fg-color: #8B5CF6;
+}
+
+/* Hide TOC sidebar globally */
+.md-sidebar--secondary {
+  display: none !important;
+}
+
+/* Expand content area when TOC is hidden */
+.md-content {
+  max-width: 100%;
+}
+
+/* Hide left nav items while keeping sidebar space */
+.md-sidebar--primary .md-sidebar__inner {
+  visibility: hidden;
+}
+
+/* Underline links */
+.md-typeset a {
+  text-decoration: underline;
+}
+
+/* Remove underline from nav links */
+.md-nav a,
+.md-header a,
+.md-footer a {
+  text-decoration: none;
 }

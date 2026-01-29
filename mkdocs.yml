@@ -1,5 +1,5 @@
 site_name: OneTool MCP
-site_description: "Don't enumerate tools. Execute code. MCP server exposing a single 'run' tool for LLM code execution."
+site_description: "Don't enumerate tools. Execute code."
 site_url: https://onetool.beycom.online
 site_dir: dist/site
 repo_name: beycom/onetool-mcp
@@ -10,29 +10,48 @@ theme:
   name: material
   custom_dir: docs/overrides
   palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default
       primary: custom
-      accent: indigo
+      accent: custom
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       primary: custom
-      accent: indigo
+      accent: custom
       toggle:
         icon: material/brightness-4
-        name: Switch to light mode
+        name: Switch to system preference
+  font:
+    text: Inter
+    code: JetBrains Mono
   features:
     - content.code.copy
     - content.code.annotate
-    - navigation.instant
+    - content.tabs.link
+    - content.tooltips
+    - content.footnote.tooltips
+    - navigation.tabs
+    - navigation.tabs.sticky
+    # Comment out during active CSS/content editing:
+    # - navigation.instant
+    # - navigation.instant.prefetch
+    # - navigation.instant.progress
+    - navigation.tracking
+    - navigation.path
+    - navigation.footer
     - navigation.sections
-    - navigation.expand
+    - navigation.indexes
     - navigation.top
     - search.highlight
     - search.suggest
+    - search.share
     - toc.follow
   icon:
     repo: fontawesome/brands/github
@@ -40,51 +59,102 @@ theme:
   logo: assets/logo-white.png
 
 plugins:
-  - search
+  - search:
+      separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
   - tags
-  - section-index
   - redirects:
       redirect_maps: {}
 
 markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
   - toc:
       permalink: true
-  - admonition
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.critic
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
   - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
-  - tables
-  - attr_list
-  - md_in_html
-  - def_list
   - pymdownx.tasklist:
       custom_checkbox: true
+  - pymdownx.tilde
+
+validation:
+  omitted_files: ignore
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  analytics:
+    provider: posthog
+    property: phc_Abm7GbXLKOv1ti9x5Su7mdQRUdUthSuJeYqV5DNAlFl
+    feedback:
+      title: Was this page helpful?
+      ratings:
+        - icon: material/thumb-up-outline
+          name: This page was helpful
+          data: 1
+          note: Thanks for your feedback!
+        - icon: material/thumb-down-outline
+          name: This page could be improved
+          data: 0
+          note: Thanks for your feedback!
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/beycom/onetool-mcp
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/onetool-mcp/
 
 nav:
-  - Home: index.md
-  - Getting Started:
-      - Quickstart: getting-started/quickstart.md
-      - Installation: getting-started/installation.md
-      - Configuration: getting-started/configuration.md
-      - Security: getting-started/security.md
-  - Introduction:
-      - Why OneTool: intro/index.md
-  - Guides:
-      - Explicit Calls: guides/explicit-calls.md
-      - Database Queries: guides/database-queries.md
-      - Prompting Best Practices: guides/prompting-best-practices.md
-  - Examples:
-      - Overview: examples/index.md
+  - OneTool: index.md
+  - Features: features.md
+  - Learn:
+      - learn/index.md
+      - Quickstart: learn/quickstart.md
+      - Installation: learn/installation.md
+      - Configuration: learn/configuration.md
+      - Security: learn/security.md
+      - Explicit Calls: learn/explicit-calls.md
+      - Database Queries: learn/database-queries.md
+      - Prompting Best Practices: learn/prompting-best-practices.md
+      - Examples: learn/examples.md
+      - Comparison: learn/comparison.md
   - Reference:
+      - reference/index.md
+      - CLIs:
+          - reference/cli/index.md
+          - ot-serve: reference/cli/ot-serve.md
+          - ot-bench: reference/cli/ot-bench.md
       - Tools:
-          - Overview: reference/tools/index.md
+          - reference/tools/index.md
           - Brave: reference/tools/brave.md
           - Code: reference/tools/code.md
           - Context7: reference/tools/context7.md
@@ -101,24 +171,11 @@ nav:
           - Ripgrep: reference/tools/ripgrep.md
           - Scaffold: reference/tools/scaffold.md
           - Web: reference/tools/web.md
-      - CLI:
-          - Overview: reference/cli/index.md
-          - ot-serve: reference/cli/ot-serve.md
-          - ot-bench: reference/cli/ot-bench.md
   - Extending:
-      - Overview: extending/index.md
+      - extending/index.md
       - Creating Tools: extending/creating-tools.md
-      - Creating CLIs: extending/creating-clis.md
+      - Plugins: extending/plugins.md
       - Logging: extending/logging.md
       - Testing: extending/testing.md
-
-extra_css:
-  - stylesheets/extra.css
-
-extra:
-  analytics:
-    provider: posthog
-    property: phc_Abm7GbXLKOv1ti9x5Su7mdQRUdUthSuJeYqV5DNAlFl
-  social:
-    - icon: fontawesome/brands/github
-      link: https://github.com/beycom/onetool-mcp
+      - Creating CLIs: extending/creating-clis.md
+  - About: about.md

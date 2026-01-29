@@ -7,10 +7,54 @@ Reusable text for GitHub, PyPI, and marketing.
 ### onetool.color.primary
 
 ```text
-#0A497C
+#3B82F6
 ```
 
-Used for: header, logo
+Tailwind Blue 500 - works excellently in both light and dark modes.
+
+Used for: header, logo, nav tabs, links
+
+### onetool.color.accent
+
+```text
+#8B5CF6
+```
+
+Tailwind Violet 500 - complementary accent for highlights, hover states.
+
+### onetool.color.success
+
+```text
+#22C55E
+```
+
+Tailwind Green 500 - success states, confirmations.
+
+### onetool.color.warning
+
+```text
+#F59E0B
+```
+
+Tailwind Amber 500 - warnings, cautions.
+
+### onetool.color.error
+
+```text
+#EF4444
+```
+
+Tailwind Red 500 - errors, destructive actions.
+
+### Color Palette Summary
+
+| Role | Hex | Tailwind |
+|------|-----|----------|
+| Primary | `#3B82F6` | Blue 500 |
+| Accent | `#8B5CF6` | Violet 500 |
+| Success | `#22C55E` | Green 500 |
+| Warning | `#F59E0B` | Amber 500 |
+| Error | `#EF4444` | Red 500 |
 
 ## Brand (Internal)
 

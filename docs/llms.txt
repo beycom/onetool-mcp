@@ -4,7 +4,7 @@
 
 > MCP server exposing a single `run` tool for LLM code execution.
 
-OneTool reduces MCP token usage from ~46K to ~2K (96% reduction, see docs/data/compare.md) by presenting tools as code APIs instead of individual tool definitions.
+OneTool reduces MCP token usage from ~46K to ~2K (96% reduction, see docs/learn/comparison.md) by presenting tools as code APIs instead of individual tool definitions.
 
 ## Quick Start
 
@@ -39,10 +39,9 @@ __ot brave.search(query="AI news")
 
 ## Documentation
 
-- Getting Started: docs/getting-started/
+- Learn: docs/learn/
 - Tools Reference: docs/reference/tools/
 - CLI Reference: docs/reference/cli/
-- Examples: docs/examples/
 - Extending: docs/extending/
 
 ## Adding Tools

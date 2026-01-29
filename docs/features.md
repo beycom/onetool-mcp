@@ -8,15 +8,13 @@ Everything you need to build powerful AI agent integrations without burning your
 
 ### 96% Token Savings
 
-Stop context rot. MCP servers uses 3-30K tokens before you start. OneTool uses ~2K tokens no matter how many packs of tools or proxy servers you use. No context rot or token bloat. [96% fewer tokens. 24x lower cost. Improved accuracy.](data/compare.md).
-
-[Learn more](intro/index.md)
+Stop context rot. MCP servers uses 3-30K tokens before you start. OneTool uses ~2K tokens no matter how many packs of tools or proxy servers you use. No context rot or token bloat. [96% fewer tokens. 24x lower cost. Improved accuracy.](learn/comparison.md).
 
 ### Code Execution Model
 
 Write Python, not tool definitions. `__ot brave.search(query="AI")` - you see exactly what runs. No tool-selection guessing.
 
-[Learn more](guides/explicit-calls.md)
+[Learn more](learn/explicit-calls.md)
 
 ---
 
@@ -26,13 +24,13 @@ Write Python, not tool definitions. `__ot brave.search(query="AI")` - you see ex
 
 Five trigger prefixes, three invocation styles. Deterministic execution - the agent generates code you can read before it runs.
 
-[Learn more](guides/explicit-calls.md)
+[Learn more](learn/explicit-calls.md)
 
 ### Powerful Snippets
 
 Reusable code templates with Jinja2 substitution. Define once, invoke anywhere with `$snippet_name`.
 
-[Learn more](getting-started/configuration.md#snippets)
+[Learn more](learn/configuration.md#snippets)
 
 ### Aliases
 
@@ -58,7 +56,7 @@ ot.tools(p="brave", i="full")
 
 Search, web, database, file ops, diagrams, conversions, and more. Ready to use out of the box.
 
-[Browse all tools](reference/tools/index.md) | [Full tool list](tool-reference.md)
+[Browse all tools](reference/tools/index.md)
 
 ### Smart Tools
 
@@ -92,19 +90,19 @@ SQL queries (any database), Excel manipulation, document conversion (PDF/Word/PP
 
 One well-structured file. Global and project scopes. Three-tier inheritance (bundled → global → project).
 
-[Learn more](getting-started/configuration.md)
+[Learn more](learn/configuration.md)
 
 ### Secrets Management
 
 Isolated `secrets.yaml` (gitignored). Environment variable expansion. Never logged or exposed.
 
-[Learn more](getting-started/configuration.md#secrets-configuration)
+[Learn more](learn/configuration.md#secrets-configuration)
 
 ### Per-Tool Settings
 
 Timeouts, limits, models - configure each tool independently. Validation at load time.
 
-[Learn more](getting-started/configuration.md#tools-configuration)
+[Learn more](learn/configuration.md#tools-configuration)
 
 ---
 
@@ -114,19 +112,19 @@ Timeouts, limits, models - configure each tool independently. Validation at load
 
 All code validated before execution. Blocks `exec`, `eval`, `subprocess`. Warns on risky patterns. ~1ms overhead.
 
-[Learn more](getting-started/security.md)
+[Learn more](learn/security.md)
 
 ### Configurable Policies
 
 Four-tier system: Allow, Ask, Warn, Block. Fine-grained control with fnmatch patterns.
 
-[Learn more](getting-started/security.md#3-configurable-security-policies)
+[Learn more](learn/security.md#3-configurable-security-policies)
 
 ### Path Boundaries
 
 File operations constrained to allowed directories. Symlink resolution. Sensitive path exclusions.
 
-[Learn more](getting-started/security.md#4-path-boundary-enforcement)
+[Learn more](learn/security.md#4-path-boundary-enforcement)
 
 ---
 
@@ -160,7 +158,7 @@ Build tools in separate repositories. Local dev with `.onetool/` config. Share v
 
 Wrap any MCP server. Configure it with YAML. No token rot or bloat. Call it explicitly - all the goodness of OneTool, all the power of your existing MCP servers.
 
-[Learn more](getting-started/configuration.md#external-mcp-servers)
+[Learn more](learn/configuration.md#external-mcp-servers)
 
 ---
 
@@ -224,4 +222,4 @@ Formal change proposal process. Specs define before code. Architecture decisions
 
 Type hints throughout. Ruff formatting and linting. Mypy type checking. Pydantic validation.
 
-[Learn more](extending/index.md)
+[Learn more](extending/creating-tools.md)

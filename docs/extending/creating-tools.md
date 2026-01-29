@@ -473,3 +473,29 @@ For "Based on" tools, include the upstream license:
 - [ ] Source header matches attribution level
 - [ ] License file in `licenses/` (if "Based on")
 - [ ] Tool doc attribution section matches source header
+
+## Architecture
+
+```text
+src/
+├── ot/           # Core library
+├── ot_sdk/       # SDK for extension tools
+├── ot_tools/     # Built-in tools (auto-discovered)
+├── ot_serve/     # CLI: ot-serve
+└── ot_bench/     # CLI: ot-bench
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Install dev dependencies: `uv sync --group dev`
+4. Make changes
+5. Run tests: `uv run pytest`
+6. Submit a pull request
+
+## Code Style
+
+- Format with `ruff format`
+- Lint with `ruff check`
+- Type check with `mypy`
