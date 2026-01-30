@@ -31,6 +31,12 @@ from ot.utils.factory import LazyClient, lazy_client
 from ot.utils.format import serialize_result
 from ot.utils.http import api_headers, check_api_key, safe_request
 from ot.utils.platform import get_install_hint
+from ot.utils.sanitize import (
+    sanitize_output,
+    sanitize_tag_closes,
+    sanitize_triggers,
+    wrap_external_content,
+)
 from ot.utils.truncate import format_error, run_command, truncate
 
 __all__ = [
@@ -65,6 +71,11 @@ __all__ = [
     "requires_lib",
     "run_command",
     "safe_request",
+    # Sanitization
+    "sanitize_output",
+    "sanitize_tag_closes",
+    "sanitize_triggers",
     "serialize_result",
     "truncate",
+    "wrap_external_content",
 ]

@@ -17,3 +17,9 @@ log_level: INFO
 transform:
   model: google/gemini-3-flash-preview
   base_url: https://openrouter.ai/api/v1
+
+# Security configuration
+security:
+  # Output sanitization for prompt injection protection
+  sanitize:
+    enabled: true                    # Enables __sanitize__ magic variable

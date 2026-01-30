@@ -348,3 +348,23 @@ The system SHALL support a `__format__` magic variable to control result seriali
 - **GIVEN** code that sets `__format__` to an unknown value
 - **WHEN** the result is serialised
 - **THEN** it SHALL fall back to default compact JSON
+
+### Requirement: Sanitisation Magic Variable
+
+The system SHALL support a `__sanitize__` magic variable to control output sanitisation.
+
+#### Scenario: Explicit enable
+- **GIVEN** code that sets `__sanitize__ = True`
+- **WHEN** the result is returned
+- **THEN** sanitisation SHALL be applied with boundary wrapping
+
+#### Scenario: Explicit disable
+- **GIVEN** code that sets `__sanitize__ = False`
+- **WHEN** the result is returned
+- **THEN** sanitisation SHALL NOT be applied
+
+#### Scenario: Default behaviour
+- **GIVEN** code that does not set `__sanitize__`
+- **WHEN** the result is returned
+- **THEN** sanitisation SHALL NOT be applied (opt-in)
+

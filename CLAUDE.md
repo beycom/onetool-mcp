@@ -20,6 +20,21 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 Read AGENTS_RULES.md for this project.
 Read AGENTS_PRIME.md for a project overview.
 
+## Tools - File Search
+
+Use OneTool ripgrep (50x faster than find+grep, with line numbers):
+
+```python
+# Search for pattern in files
+ripgrep.search(pattern="onetool", path="src/", glob="*.py")
+
+# List files only
+ripgrep.search(pattern="TODO", path=".", glob="*.{py,yaml}")
+
+# Count matches
+ripgrep.count(pattern="import", path="src/", file_type="py")
+```
+
 ## Tools - Web Search
 
 Use OneTool web search:

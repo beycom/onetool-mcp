@@ -110,6 +110,24 @@ class MsgConfig(BaseModel):
     )
 
 
+class OutputSanitizationConfig(BaseModel):
+    """Output sanitization configuration for prompt injection protection.
+
+    Protects against indirect prompt injection by sanitizing tool outputs
+    that may contain malicious payloads from external content.
+
+    Three-layer defense:
+    1. Trigger sanitization: Replace __ot, mcp__onetool patterns
+    2. Tag sanitization: Remove <external-content-*> patterns
+    3. GUID-tagged boundaries: Wrap content in unpredictable tags
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Global toggle for output sanitization",
+    )
+
+
 class SecurityConfig(BaseModel):
     """Code validation security configuration.
 
@@ -175,6 +193,12 @@ class SecurityConfig(BaseModel):
     allow: list[str] = Field(
         default_factory=list,
         description="Patterns to exempt from blocking/warning (removes from defaults)",
+    )
+
+    # Output sanitization configuration
+    sanitize: OutputSanitizationConfig = Field(
+        default_factory=OutputSanitizationConfig,
+        description="Output sanitization for prompt injection protection",
     )
 
 

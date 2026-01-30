@@ -344,8 +344,8 @@ def search(
             if isinstance(result, list):
                 span.add(result_count=len(result))
                 return result
-            # Handle SearchResponse object
-            data = getattr(result, "data", None) or []
+            # Handle SearchData object (v2 API returns .web, .news, .images)
+            data = getattr(result, "web", None) or getattr(result, "data", None) or []
             span.add(result_count=len(data))
             return data
 

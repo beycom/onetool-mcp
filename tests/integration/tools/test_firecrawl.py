@@ -43,10 +43,11 @@ class TestFirecrawlLive:
         assert isinstance(result, list) or "FIRECRAWL_API_KEY" not in result
 
     def test_search_live(self):
-        """Verify Firecrawl search works."""
+        """Verify Firecrawl search works and returns results."""
         from ot_tools.firecrawl import search
 
         result = search(query="python programming", limit=3)
 
-        # Should get a list or error (not API key error)
-        assert isinstance(result, list) or "FIRECRAWL_API_KEY" not in result
+        # Should get a non-empty list (not an error or empty results)
+        assert isinstance(result, list), f"Expected list, got {type(result)}: {result}"
+        assert len(result) > 0, "Search returned empty results"

@@ -222,11 +222,29 @@ class TestSearch:
     """Test search function with mocked SDK."""
 
     @patch("ot_tools.firecrawl._get_client")
-    def test_successful_search(self, mock_get_client):
+    def test_successful_search_list_response(self, mock_get_client):
+        """Test search when SDK returns a list directly."""
         mock_client = MagicMock()
         mock_client.search.return_value = [
             {"url": "https://result.com", "title": "Result"},
         ]
+        mock_get_client.return_value = mock_client
+
+        result = search(query="python tutorials")
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+
+    @patch("ot_tools.firecrawl._get_client")
+    def test_successful_search_v2_response(self, mock_get_client):
+        """Test search when SDK returns SearchData object (v2 API)."""
+        mock_client = MagicMock()
+        # v2 API returns SearchData with .web attribute
+        mock_response = MagicMock()
+        mock_response.web = [
+            MagicMock(url="https://result.com", title="Result", description="Desc"),
+        ]
+        mock_client.search.return_value = mock_response
         mock_get_client.return_value = mock_client
 
         result = search(query="python tutorials")

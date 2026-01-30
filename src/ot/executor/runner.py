@@ -26,7 +26,7 @@ from ot.executor.fence_processor import strip_fences
 from ot.executor.pack_proxy import build_execution_namespace
 from ot.executor.tool_loader import load_tool_functions, load_tool_registry
 from ot.logging import LogSpan
-from ot.utils import serialize_result
+from ot.utils import sanitize_output, serialize_result
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -162,8 +162,8 @@ def wrap_code_for_exec(code: str, has_explicit_return: bool) -> tuple[str, int]:
 
     indented_code = "\n".join(indented_lines)
 
-    # Add global declaration for __format__ so it can be read from outer namespace
-    global_decl = "    global __format__"
+    # Add global declarations for magic variables so they can be read from outer namespace
+    global_decl = "    global __format__, __sanitize__"
 
     # Use sentinel if no explicit return to distinguish from explicit None
     if has_explicit_return:
@@ -278,20 +278,34 @@ def execute_python_code(
         if fmt not in ("json", "json_h", "yml", "yml_h", "raw"):
             fmt = "json"  # Fall back to default for invalid format
 
+        # Read __sanitize__ from namespace (True enables boundary wrapping)
+        should_sanitize: bool = namespace.get("__sanitize__", False)
+
+        # Helper to apply sanitization if enabled
+        def _maybe_sanitize(content: str) -> str:
+            if should_sanitize:
+                return sanitize_output(content, enabled=True)
+            return content
+
         # Check for sentinel - no return value
         if result is _NO_RETURN:
             # Return stdout if available, otherwise success message
-            return stdout_output or "Code executed successfully (no return value)"
+            output = stdout_output or "Code executed successfully (no return value)"
+            return _maybe_sanitize(output)
 
         # Explicit None return (e.g., from print())
         if result is None:
             # Return stdout if available (captures print output)
-            return stdout_output or "None"
+            output = stdout_output or "None"
+            return _maybe_sanitize(output)
 
         # If we have both a result and stdout, include both
         if stdout_output:
-            return f"{stdout_output}\n{serialize_result(result, fmt)}"
-        return serialize_result(result, fmt)
+            output = f"{stdout_output}\n{serialize_result(result, fmt)}"
+        else:
+            output = serialize_result(result, fmt)
+
+        return _maybe_sanitize(output)
 
     except Exception as e:
         error_msg, line_num = _map_error_line(e, line_offset)

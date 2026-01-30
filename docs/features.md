@@ -126,6 +126,12 @@ File operations constrained to allowed directories. Symlink resolution. Sensitiv
 
 [Learn more](learn/security.md#4-path-boundary-enforcement)
 
+### Output Sanitization
+
+Automatic protection against indirect prompt injection. External content (web scraping, search results) wrapped in GUID boundaries with trigger patterns redacted.
+
+[Learn more](learn/security.md#7-output-sanitization-prompt-injection-protection)
+
 ---
 
 ## Extensibility

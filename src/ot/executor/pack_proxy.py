@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 def _wrap_with_stats(
     pack_name: str, func_name: str, func: Callable[..., Any]
 ) -> Callable[..., Any]:
-    """Wrap a function to record execution-level stats and resolve param prefixes."""
+    """Wrap a function to record execution-level stats, track calls, and resolve param prefixes."""
     tool_name = f"{pack_name}.{func_name}"
 
     @wraps(func)
@@ -112,13 +112,14 @@ def _create_mcp_proxy_pack(server_name: str) -> Any:
                 return self._function_cache[tool_name]
 
             def call_proxy_tool(**kwargs: Any) -> str:
+                tool_full_name = f"{server_name}.{tool_name}"
+
                 # Resolve abbreviated parameter names (cached lookup)
                 if kwargs:
                     param_names = get_mcp_tool_param_names(server_name, tool_name)
                     if param_names:
                         kwargs = resolve_kwargs(kwargs, list(param_names))
 
-                tool_full_name = f"{server_name}.{tool_name}"
                 with timed_tool_call(tool_full_name):
                     proxy = get_proxy_manager()
                     return proxy.call_tool_sync(server_name, tool_name, kwargs)

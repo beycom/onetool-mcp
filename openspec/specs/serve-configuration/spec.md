@@ -1195,3 +1195,23 @@ The system SHALL support a dedicated directory for statistics files.
 - **WHEN** the server starts
 - **THEN** the directory SHALL be created automatically
 
+### Requirement: Output Sanitisation Configuration
+
+The system SHALL support configuration for output sanitisation in the security section.
+
+#### Scenario: Configuration structure
+- **GIVEN** ot-serve.yaml configuration
+- **WHEN** security.sanitize section is defined
+- **THEN** it SHALL support the following structure:
+
+  ```yaml
+  security:
+    sanitize:
+      enabled: true
+  ```
+
+#### Scenario: Default enabled state
+- **GIVEN** no `security.sanitize` configuration
+- **WHEN** defaults are applied
+- **THEN** `enabled` SHALL default to `true`
+
