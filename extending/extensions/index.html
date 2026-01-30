@@ -6,11 +6,11 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Don't enumerate tools. Execute code.">
+        <meta name="description" content="96% Token Saving, 100+ tools">
       
       
       
-        <link rel="canonical" href="https://onetool.beycom.online/extending/plugins/">
+        <link rel="canonical" href="https://onetool.beycom.online/extending/extensions/">
       
       
         <link rel="prev" href="../creating-tools/">
@@ -27,7 +27,7 @@
     
     
       
-        <title>Plugins - OneTool MCP</title>
+        <title>Extensions - OneTool</title>
       
     
     
@@ -101,7 +101,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#creating-plugins" class="md-skip">
+        <a href="#creating-extensions" class="md-skip">
           Skip to content
         </a>
       
@@ -117,7 +117,7 @@
 
 <header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="OneTool MCP" class="md-header__button md-logo" aria-label="OneTool MCP" data-md-component="logo">
+    <a href="../.." title="OneTool" class="md-header__button md-logo" aria-label="OneTool" data-md-component="logo">
       
   <img src="../../assets/logo-white.png" alt="logo">
 
@@ -130,13 +130,13 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            OneTool MCP
+            OneTool
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Plugins
+              Extensions
             
           </span>
         </div>
@@ -264,7 +264,7 @@
   
     
   
-  OneTool
+  🧿 Home
 
       </a>
     </li>
@@ -405,12 +405,12 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="OneTool MCP" class="md-nav__button md-logo" aria-label="OneTool MCP" data-md-component="logo">
+    <a href="../.." title="OneTool" class="md-nav__button md-logo" aria-label="OneTool" data-md-component="logo">
       
   <img src="../../assets/logo-white.png" alt="logo">
 
     </a>
-    OneTool MCP
+    OneTool
   </label>
   
     <div class="md-nav__source">
@@ -441,7 +441,7 @@
   <span class="md-ellipsis">
     
   
-    OneTool
+    🧿 Home
   
 
     
@@ -974,14 +974,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/cli/ot-serve/" class="md-nav__link">
+      <a href="../../reference/cli/onetool/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    ot-serve
+    onetool
   
 
     
@@ -1002,14 +1002,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/cli/ot-bench/" class="md-nav__link">
+      <a href="../../reference/cli/bench/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    ot-bench
+    bench
   
 
     
@@ -1726,7 +1726,7 @@
   <span class="md-ellipsis">
     
   
-    Plugins
+    Extensions
   
 
     
@@ -1744,7 +1744,7 @@
   <span class="md-ellipsis">
     
   
-    Plugins
+    Extensions
   
 
     
@@ -1810,10 +1810,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#onetoolot-serveyaml" class="md-nav__link">
+  <a href="#onetoolonetoolyaml" class="md-nav__link">
     <span class="md-ellipsis">
       
-        .onetool/ot-serve.yaml
+        .onetool/onetool.yaml
       
     </span>
   </a>
@@ -1832,10 +1832,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#onetoolot-benchyaml" class="md-nav__link">
+  <a href="#onetoolbenchyaml" class="md-nav__link">
     <span class="md-ellipsis">
       
-        .onetool/ot-bench.yaml
+        .onetool/bench.yaml
       
     </span>
   </a>
@@ -1886,6 +1886,17 @@
     <span class="md-ellipsis">
       
         SDK Exports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#path-prefixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Path Prefixes
       
     </span>
   </a>
@@ -1948,10 +1959,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-plugin-with-implementation-modules" class="md-nav__link">
+  <a href="#example-extension-with-implementation-modules" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example: Plugin with Implementation Modules
+        Example: Extension with Implementation Modules
       
     </span>
   </a>
@@ -2152,10 +2163,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#onetoolot-serveyaml" class="md-nav__link">
+  <a href="#onetoolonetoolyaml" class="md-nav__link">
     <span class="md-ellipsis">
       
-        .onetool/ot-serve.yaml
+        .onetool/onetool.yaml
       
     </span>
   </a>
@@ -2174,10 +2185,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#onetoolot-benchyaml" class="md-nav__link">
+  <a href="#onetoolbenchyaml" class="md-nav__link">
     <span class="md-ellipsis">
       
-        .onetool/ot-bench.yaml
+        .onetool/bench.yaml
       
     </span>
   </a>
@@ -2228,6 +2239,17 @@
     <span class="md-ellipsis">
       
         SDK Exports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#path-prefixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Path Prefixes
       
     </span>
   </a>
@@ -2290,10 +2312,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-plugin-with-implementation-modules" class="md-nav__link">
+  <a href="#example-extension-with-implementation-modules" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example: Plugin with Implementation Modules
+        Example: Extension with Implementation Modules
       
     </span>
   </a>
@@ -2328,7 +2350,7 @@
       <a href="../.." class="md-path__link">
         
   <span class="md-ellipsis">
-    OneTool
+    🧿 Home
   </span>
 
       </a>
@@ -2368,11 +2390,11 @@
   
 
 
-<h1 id="creating-plugins">Creating Plugins<a class="headerlink" href="#creating-plugins" title="Permanent link">&para;</a></h1>
+<h1 id="creating-extensions">Creating Extensions<a class="headerlink" href="#creating-extensions" title="Permanent link">&para;</a></h1>
 <p><strong>Build tools in your own repository. No onetool source required.</strong></p>
-<p>Plugins let you develop OneTool tools in separate repositories while using local configuration for development and testing.</p>
+<p>Extensions let you develop OneTool tools in separate repositories while using local configuration for development and testing.</p>
 <h2 id="minimal-structure">Minimal Structure<a class="headerlink" href="#minimal-structure" title="Permanent link">&para;</a></h2>
-<p>A plugin needs just one file:</p>
+<p>An extension needs just one file:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ot-mytool/
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>└── src/
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    └── mytool.py    # One file. That&#39;s it.
@@ -2395,31 +2417,31 @@
 </span></code></pre></div>
 <p>That's the minimum. One file with a <code>pack</code> declaration and exported functions.</p>
 <h2 id="local-development-setup">Local Development Setup<a class="headerlink" href="#local-development-setup" title="Permanent link">&para;</a></h2>
-<p>For development, create a <code>.onetool/</code> directory in your plugin repository:</p>
+<p>For development, create a <code>.onetool/</code> directory in your extension repository:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>ot-mytool/
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── .onetool/
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>│   ├── ot-serve.yaml     # Server config (tools_dir, etc.)
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>│   ├── onetool.yaml     # Server config (tools_dir, etc.)
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>│   ├── secrets.yaml      # API keys for testing
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>│   └── ot-bench.yaml     # Benchmark harness config (optional)
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>├── demo.yaml             # Test scenarios (ot-bench run demo.yaml)
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>│   └── bench.yaml     # Benchmark harness config (optional)
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>├── demo.yaml             # Test scenarios (bench run demo.yaml)
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>└── src/
 </span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    └── mytool.py
 </span></code></pre></div>
-<h3 id="onetoolot-serveyaml"><code>.onetool/ot-serve.yaml</code><a class="headerlink" href="#onetoolot-serveyaml" title="Permanent link">&para;</a></h3>
-<p>Point <code>tools_dir</code> at your plugin source:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># .onetool/ot-serve.yaml</span>
+<h3 id="onetoolonetoolyaml"><code>.onetool/onetool.yaml</code><a class="headerlink" href="#onetoolonetoolyaml" title="Permanent link">&para;</a></h3>
+<p>Point <code>tools_dir</code> at your extension source:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># .onetool/onetool.yaml</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">tools_dir</span><span class="p">:</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./src/*.py</span>
 </span></code></pre></div>
-<p>Run <code>ot-serve</code> from your plugin directory. It finds <code>.onetool/ot-serve.yaml</code> automatically.</p>
+<p>Run <code>onetool</code> from your extension directory. It finds <code>.onetool/onetool.yaml</code> automatically.</p>
 <h3 id="onetoolsecretsyaml"><code>.onetool/secrets.yaml</code><a class="headerlink" href="#onetoolsecretsyaml" title="Permanent link">&para;</a></h3>
 <p>Add API keys your tool needs during development:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># .onetool/secrets.yaml</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">MY_API_KEY</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;dev-key-for-testing&quot;</span>
 </span></code></pre></div>
-<h3 id="onetoolot-benchyaml"><code>.onetool/ot-bench.yaml</code><a class="headerlink" href="#onetoolot-benchyaml" title="Permanent link">&para;</a></h3>
+<h3 id="onetoolbenchyaml"><code>.onetool/bench.yaml</code><a class="headerlink" href="#onetoolbenchyaml" title="Permanent link">&para;</a></h3>
 <p>Configure the benchmark harness (model, evaluators, server definitions):</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># .onetool/ot-bench.yaml</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># .onetool/bench.yaml</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">defaults</span><span class="p">:</span>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span>
 </span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anthropic/claude-sonnet-4</span>
@@ -2427,7 +2449,7 @@
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="nt">servers</span><span class="p">:</span>
 </span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span><span class="nt">mytool</span><span class="p">:</span>
 </span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stdio</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ot-serve</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">onetool</span>
 </span></code></pre></div>
 <h3 id="test-scenario-files">Test Scenario Files<a class="headerlink" href="#test-scenario-files" title="Permanent link">&para;</a></h3>
 <p>Define test scenarios in a separate YAML file:</p>
@@ -2439,21 +2461,21 @@
 </span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">        </span><span class="nt">server</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mytool</span>
 </span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">        </span><span class="nt">prompt</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Search</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">python</span><span class="nv"> </span><span class="s">tutorials</span><span class="nv"> </span><span class="s">using</span><span class="nv"> </span><span class="s">mytool.search&quot;</span>
 </span></code></pre></div>
-<p>Run tests with: <code>ot-bench run demo.yaml</code></p>
+<p>Run tests with: <code>bench run demo.yaml</code></p>
 <h2 id="running-locally">Running Locally<a class="headerlink" href="#running-locally" title="Permanent link">&para;</a></h2>
-<p>From your plugin directory:</p>
+<p>From your extension directory:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Start the server with your local config</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>ot-serve
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>onetool
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
 </span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># In another terminal, run benchmarks</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>ot-bench
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>bench
 </span></code></pre></div>
 <p>The server discovers your tool from the local <code>tools_dir</code> configuration.</p>
 <h2 id="extension-tools-with-dependencies">Extension Tools (with dependencies)<a class="headerlink" href="#extension-tools-with-dependencies" title="Permanent link">&para;</a></h2>
 <p>If your tool needs external packages, use PEP 723 headers and run as an isolated subprocess:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># /// script</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="c1"># requires-python = &quot;&gt;=3.11&quot;</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="c1"># dependencies = [&quot;ot-sdk&gt;=0.1.0&quot;, &quot;httpx&gt;=0.28.0&quot;, &quot;pyyaml&gt;=6.0.0&quot;]</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="c1"># dependencies = [&quot;httpx&gt;=0.28.0&quot;]</span>
 </span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># ///</span>
 </span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="sd">&quot;&quot;&quot;Tool with external dependencies.&quot;&quot;&quot;</span>
 </span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
@@ -2498,7 +2520,7 @@
 </tr>
 <tr>
 <td><code>get_config(key)</code></td>
-<td>Access configuration from <code>ot-serve.yaml</code></td>
+<td>Access configuration from <code>onetool.yaml</code></td>
 </tr>
 <tr>
 <td><code>get_secret(key)</code></td>
@@ -2517,93 +2539,135 @@
 <td>In-memory caching decorator</td>
 </tr>
 <tr>
-<td><code>get_project_path(path)</code></td>
+<td><code>resolve_cwd_path(path)</code></td>
 <td>Resolve paths relative to project directory</td>
 </tr>
 <tr>
-<td><code>get_config_path(path)</code></td>
+<td><code>resolve_ot_path(path)</code></td>
 <td>Resolve paths relative to config directory</td>
 </tr>
 </tbody>
 </table>
+<h3 id="path-prefixes">Path Prefixes<a class="headerlink" href="#path-prefixes" title="Permanent link">&para;</a></h3>
+<p>Path functions support prefixes to override the default base:</p>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Meaning</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>~</code></td>
+<td>Home directory</td>
+<td>Cross-project shared files</td>
+</tr>
+<tr>
+<td><code>CWD/</code></td>
+<td>Project working directory</td>
+<td>Tool I/O files</td>
+</tr>
+<tr>
+<td><code>GLOBAL/</code></td>
+<td><code>~/.onetool/</code></td>
+<td>Global config/logs</td>
+</tr>
+<tr>
+<td><code>OT_DIR/</code></td>
+<td>Active <code>.onetool/</code></td>
+<td>Project-first, global fallback</td>
+</tr>
+</tbody>
+</table>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ot_sdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_cwd_path</span><span class="p">,</span> <span class="n">resolve_ot_path</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="c1"># Default: relative to project directory</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">output</span> <span class="o">=</span> <span class="n">resolve_cwd_path</span><span class="p">(</span><span class="s2">&quot;output/report.txt&quot;</span><span class="p">)</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="c1"># Prefix overrides base</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="n">global_log</span> <span class="o">=</span> <span class="n">resolve_cwd_path</span><span class="p">(</span><span class="s2">&quot;GLOBAL/logs/app.log&quot;</span><span class="p">)</span>  <span class="c1"># ~/.onetool/logs/app.log</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="n">template</span> <span class="o">=</span> <span class="n">resolve_ot_path</span><span class="p">(</span><span class="s2">&quot;templates/default.mmd&quot;</span><span class="p">)</span>    <span class="c1"># .onetool/templates/default.mmd</span>
+</span></code></pre></div>
 <h2 id="consumer-installation">Consumer Installation<a class="headerlink" href="#consumer-installation" title="Permanent link">&para;</a></h2>
-<p>When users want to use your plugin, they add it to their <code>tools_dir</code>:</p>
+<p>When users want to use your extension, they add it to their <code>tools_dir</code>:</p>
 <h3 id="global-installation">Global installation<a class="headerlink" href="#global-installation" title="Permanent link">&para;</a></h3>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># ~/.onetool/ot-serve.yaml</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nt">tools_dir</span><span class="p">:</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">~/plugins/ot-mytool/src/*.py</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># ~/.onetool/onetool.yaml</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nt">tools_dir</span><span class="p">:</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">~/extensions/ot-mytool/src/*.py</span>
 </span></code></pre></div>
 <h3 id="project-specific">Project-specific<a class="headerlink" href="#project-specific" title="Permanent link">&para;</a></h3>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># project/.onetool/ot-serve.yaml</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nt">tools_dir</span><span class="p">:</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">~/plugins/ot-mytool/src/*.py</span>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./local-tools/*.py</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># project/.onetool/onetool.yaml</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="nt">tools_dir</span><span class="p">:</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">~/extensions/ot-mytool/src/*.py</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./local-tools/*.py</span>
 </span></code></pre></div>
 <p>Glob patterns work for selecting tool files.</p>
 <h2 id="testing-without-full-installation">Testing Without Full Installation<a class="headerlink" href="#testing-without-full-installation" title="Permanent link">&para;</a></h2>
-<p>Test your plugin functions directly without running <code>ot-serve</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># test_mytool.py</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">mytool</span><span class="w"> </span><span class="kn">import</span> <span class="n">search</span>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_search</span><span class="p">():</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">search</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">)</span>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    <span class="k">assert</span> <span class="s2">&quot;python&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+<p>Test your extension functions directly without running <code>onetool</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># test_mytool.py</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">mytool</span><span class="w"> </span><span class="kn">import</span> <span class="n">search</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_search</span><span class="p">():</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">search</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">)</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="k">assert</span> <span class="s2">&quot;python&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
 </span></code></pre></div>
 <p>Run with pytest:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nb">cd</span><span class="w"> </span>src
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>../test_mytool.py
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nb">cd</span><span class="w"> </span>src
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>../test_mytool.py
 </span></code></pre></div>
 <p>For extension tools, test the functions before adding <code>worker_main()</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Test individual functions</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">mytool</span><span class="w"> </span><span class="kn">import</span> <span class="n">fetch</span>
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_fetch</span><span class="p">():</span>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="c1"># Mock http if needed</span>
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">fetch</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s2">&quot;https://example.com&quot;</span><span class="p">)</span>
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="k">assert</span> <span class="n">result</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Test individual functions</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">mytool</span><span class="w"> </span><span class="kn">import</span> <span class="n">fetch</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_fetch</span><span class="p">():</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    <span class="c1"># Mock http if needed</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">fetch</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s2">&quot;https://example.com&quot;</span><span class="p">)</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>    <span class="k">assert</span> <span class="n">result</span>
 </span></code></pre></div>
-<h2 id="example-plugin-with-implementation-modules">Example: Plugin with Implementation Modules<a class="headerlink" href="#example-plugin-with-implementation-modules" title="Permanent link">&para;</a></h2>
-<p>For larger plugins, organize implementation in a subpackage:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>ot-convert/
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>├── .onetool/
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>│   ├── ot-serve.yaml
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>│   └── secrets.yaml
-</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>├── src/
-</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>│   ├── convert.py           # Main tool file (worker)
-</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>│   └── _convert/            # Implementation modules
-</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>│       ├── __init__.py
-</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>│       ├── pdf.py
-</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>│       └── word.py
-</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>└── README.md
+<h2 id="example-extension-with-implementation-modules">Example: Extension with Implementation Modules<a class="headerlink" href="#example-extension-with-implementation-modules" title="Permanent link">&para;</a></h2>
+<p>For larger extensions, organize implementation in a subpackage:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>ot-convert/
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>├── .onetool/
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>│   ├── onetool.yaml
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>│   └── secrets.yaml
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>├── src/
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>│   ├── convert.py           # Main tool file (worker)
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>│   └── _convert/            # Implementation modules
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>│       ├── __init__.py
+</span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>│       ├── pdf.py
+</span><span id="__span-15-10"><a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>│       └── word.py
+</span><span id="__span-15-11"><a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>└── README.md
 </span></code></pre></div>
 <p>The main tool file imports from the implementation package:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># /// script</span>
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="c1"># requires-python = &quot;&gt;=3.11&quot;</span>
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="c1"># dependencies = [&quot;ot-sdk&gt;=0.1.0&quot;, &quot;pymupdf&gt;=1.24.0&quot;, &quot;python-docx&gt;=1.1.0&quot;]</span>
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="c1"># ///</span>
-</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="sd">&quot;&quot;&quot;Document conversion tools.&quot;&quot;&quot;</span>
-</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>
-</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
-</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>
-</span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="n">pack</span> <span class="o">=</span> <span class="s2">&quot;convert&quot;</span>
-</span><span id="__span-15-10"><a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;pdf&quot;</span><span class="p">,</span> <span class="s2">&quot;word&quot;</span><span class="p">]</span>
-</span><span id="__span-15-11"><a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>
-</span><span id="__span-15-12"><a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ot_sdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_project_path</span><span class="p">,</span> <span class="n">log</span><span class="p">,</span> <span class="n">worker_main</span>
-</span><span id="__span-15-13"><a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a>
-</span><span id="__span-15-14"><a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a><span class="kn">from</span><span class="w"> </span><span class="nn">_convert</span><span class="w"> </span><span class="kn">import</span> <span class="n">convert_pdf</span><span class="p">,</span> <span class="n">convert_word</span>
-</span><span id="__span-15-15"><a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a>
-</span><span id="__span-15-16"><a id="__codelineno-15-16" name="__codelineno-15-16" href="#__codelineno-15-16"></a><span class="k">def</span><span class="w"> </span><span class="nf">pdf</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">pattern</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;output&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="__span-15-17"><a id="__codelineno-15-17" name="__codelineno-15-17" href="#__codelineno-15-17"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert PDF files to markdown.&quot;&quot;&quot;</span>
-</span><span id="__span-15-18"><a id="__codelineno-15-18" name="__codelineno-15-18" href="#__codelineno-15-18"></a>    <span class="k">with</span> <span class="n">log</span><span class="p">(</span><span class="s2">&quot;convert.pdf&quot;</span><span class="p">,</span> <span class="n">pattern</span><span class="o">=</span><span class="n">pattern</span><span class="p">)</span> <span class="k">as</span> <span class="n">s</span><span class="p">:</span>
-</span><span id="__span-15-19"><a id="__codelineno-15-19" name="__codelineno-15-19" href="#__codelineno-15-19"></a>        <span class="k">return</span> <span class="n">convert_pdf</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">)</span>
-</span><span id="__span-15-20"><a id="__codelineno-15-20" name="__codelineno-15-20" href="#__codelineno-15-20"></a>
-</span><span id="__span-15-21"><a id="__codelineno-15-21" name="__codelineno-15-21" href="#__codelineno-15-21"></a><span class="k">def</span><span class="w"> </span><span class="nf">word</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">pattern</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;output&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="__span-15-22"><a id="__codelineno-15-22" name="__codelineno-15-22" href="#__codelineno-15-22"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert Word documents to markdown.&quot;&quot;&quot;</span>
-</span><span id="__span-15-23"><a id="__codelineno-15-23" name="__codelineno-15-23" href="#__codelineno-15-23"></a>    <span class="k">with</span> <span class="n">log</span><span class="p">(</span><span class="s2">&quot;convert.word&quot;</span><span class="p">,</span> <span class="n">pattern</span><span class="o">=</span><span class="n">pattern</span><span class="p">)</span> <span class="k">as</span> <span class="n">s</span><span class="p">:</span>
-</span><span id="__span-15-24"><a id="__codelineno-15-24" name="__codelineno-15-24" href="#__codelineno-15-24"></a>        <span class="k">return</span> <span class="n">convert_word</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">)</span>
-</span><span id="__span-15-25"><a id="__codelineno-15-25" name="__codelineno-15-25" href="#__codelineno-15-25"></a>
-</span><span id="__span-15-26"><a id="__codelineno-15-26" name="__codelineno-15-26" href="#__codelineno-15-26"></a><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
-</span><span id="__span-15-27"><a id="__codelineno-15-27" name="__codelineno-15-27" href="#__codelineno-15-27"></a>    <span class="n">worker_main</span><span class="p">()</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># /// script</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="c1"># requires-python = &quot;&gt;=3.11&quot;</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="c1"># dependencies = [&quot;pymupdf&gt;=1.24.0&quot;, &quot;python-docx&gt;=1.1.0&quot;]</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="c1"># ///</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="sd">&quot;&quot;&quot;Document conversion tools.&quot;&quot;&quot;</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="n">pack</span> <span class="o">=</span> <span class="s2">&quot;convert&quot;</span>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;pdf&quot;</span><span class="p">,</span> <span class="s2">&quot;word&quot;</span><span class="p">]</span>
+</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>
+</span><span id="__span-16-12"><a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ot_sdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_project_path</span><span class="p">,</span> <span class="n">log</span><span class="p">,</span> <span class="n">worker_main</span>
+</span><span id="__span-16-13"><a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>
+</span><span id="__span-16-14"><a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a><span class="kn">from</span><span class="w"> </span><span class="nn">_convert</span><span class="w"> </span><span class="kn">import</span> <span class="n">convert_pdf</span><span class="p">,</span> <span class="n">convert_word</span>
+</span><span id="__span-16-15"><a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a>
+</span><span id="__span-16-16"><a id="__codelineno-16-16" name="__codelineno-16-16" href="#__codelineno-16-16"></a><span class="k">def</span><span class="w"> </span><span class="nf">pdf</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">pattern</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;output&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-16-17"><a id="__codelineno-16-17" name="__codelineno-16-17" href="#__codelineno-16-17"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert PDF files to markdown.&quot;&quot;&quot;</span>
+</span><span id="__span-16-18"><a id="__codelineno-16-18" name="__codelineno-16-18" href="#__codelineno-16-18"></a>    <span class="k">with</span> <span class="n">log</span><span class="p">(</span><span class="s2">&quot;convert.pdf&quot;</span><span class="p">,</span> <span class="n">pattern</span><span class="o">=</span><span class="n">pattern</span><span class="p">)</span> <span class="k">as</span> <span class="n">s</span><span class="p">:</span>
+</span><span id="__span-16-19"><a id="__codelineno-16-19" name="__codelineno-16-19" href="#__codelineno-16-19"></a>        <span class="k">return</span> <span class="n">convert_pdf</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">)</span>
+</span><span id="__span-16-20"><a id="__codelineno-16-20" name="__codelineno-16-20" href="#__codelineno-16-20"></a>
+</span><span id="__span-16-21"><a id="__codelineno-16-21" name="__codelineno-16-21" href="#__codelineno-16-21"></a><span class="k">def</span><span class="w"> </span><span class="nf">word</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">pattern</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;output&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-16-22"><a id="__codelineno-16-22" name="__codelineno-16-22" href="#__codelineno-16-22"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert Word documents to markdown.&quot;&quot;&quot;</span>
+</span><span id="__span-16-23"><a id="__codelineno-16-23" name="__codelineno-16-23" href="#__codelineno-16-23"></a>    <span class="k">with</span> <span class="n">log</span><span class="p">(</span><span class="s2">&quot;convert.word&quot;</span><span class="p">,</span> <span class="n">pattern</span><span class="o">=</span><span class="n">pattern</span><span class="p">)</span> <span class="k">as</span> <span class="n">s</span><span class="p">:</span>
+</span><span id="__span-16-24"><a id="__codelineno-16-24" name="__codelineno-16-24" href="#__codelineno-16-24"></a>        <span class="k">return</span> <span class="n">convert_word</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">)</span>
+</span><span id="__span-16-25"><a id="__codelineno-16-25" name="__codelineno-16-25" href="#__codelineno-16-25"></a>
+</span><span id="__span-16-26"><a id="__codelineno-16-26" name="__codelineno-16-26" href="#__codelineno-16-26"></a><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+</span><span id="__span-16-27"><a id="__codelineno-16-27" name="__codelineno-16-27" href="#__codelineno-16-27"></a>    <span class="n">worker_main</span><span class="p">()</span>
 </span></code></pre></div>
 
 

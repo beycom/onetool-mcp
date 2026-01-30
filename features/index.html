@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Don't enumerate tools. Execute code.">
+        <meta name="description" content="96% Token Saving, 100+ tools">
       
       
       
@@ -27,7 +27,7 @@
     
     
       
-        <title>Features - OneTool MCP</title>
+        <title>Features - OneTool</title>
       
     
     
@@ -117,7 +117,7 @@
 
 <header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href=".." title="OneTool MCP" class="md-header__button md-logo" aria-label="OneTool MCP" data-md-component="logo">
+    <a href=".." title="OneTool" class="md-header__button md-logo" aria-label="OneTool" data-md-component="logo">
       
   <img src="../assets/logo-white.png" alt="logo">
 
@@ -130,7 +130,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            OneTool MCP
+            OneTool
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -264,7 +264,7 @@
   
     
   
-  OneTool
+  🧿 Home
 
       </a>
     </li>
@@ -405,12 +405,12 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href=".." title="OneTool MCP" class="md-nav__button md-logo" aria-label="OneTool MCP" data-md-component="logo">
+    <a href=".." title="OneTool" class="md-nav__button md-logo" aria-label="OneTool" data-md-component="logo">
       
   <img src="../assets/logo-white.png" alt="logo">
 
     </a>
-    OneTool MCP
+    OneTool
   </label>
   
     <div class="md-nav__source">
@@ -441,7 +441,7 @@
   <span class="md-ellipsis">
     
   
-    OneTool
+    🧿 Home
   
 
     
@@ -787,6 +787,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#output-sanitization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output Sanitization
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -838,10 +849,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#plugin-architecture" class="md-nav__link">
+  <a href="#extension-architecture" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Plugin Architecture
+        Extension Architecture
       
     </span>
   </a>
@@ -877,10 +888,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#ot-bench-harness" class="md-nav__link">
+  <a href="#bench-harness" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ot-bench Harness
+        bench Harness
       
     </span>
   </a>
@@ -1515,14 +1526,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/ot-serve/" class="md-nav__link">
+      <a href="../reference/cli/onetool/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    ot-serve
+    onetool
   
 
     
@@ -1543,14 +1554,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/ot-bench/" class="md-nav__link">
+      <a href="../reference/cli/bench/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    ot-bench
+    bench
   
 
     
@@ -2246,14 +2257,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../extending/plugins/" class="md-nav__link">
+      <a href="../extending/extensions/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Plugins
+    Extensions
   
 
     
@@ -2678,6 +2689,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#output-sanitization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output Sanitization
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2729,10 +2751,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#plugin-architecture" class="md-nav__link">
+  <a href="#extension-architecture" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Plugin Architecture
+        Extension Architecture
       
     </span>
   </a>
@@ -2768,10 +2790,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#ot-bench-harness" class="md-nav__link">
+  <a href="#bench-harness" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ot-bench Harness
+        bench Harness
       
     </span>
   </a>
@@ -2998,6 +3020,9 @@
 <h3 id="path-boundaries">Path Boundaries<a class="headerlink" href="#path-boundaries" title="Permanent link">&para;</a></h3>
 <p>File operations constrained to allowed directories. Symlink resolution. Sensitive path exclusions.</p>
 <p><a href="../learn/security/#4-path-boundary-enforcement">Learn more</a></p>
+<h3 id="output-sanitization">Output Sanitization<a class="headerlink" href="#output-sanitization" title="Permanent link">&para;</a></h3>
+<p>Automatic protection against indirect prompt injection. External content (web scraping, search results) wrapped in GUID boundaries with trigger patterns redacted.</p>
+<p><a href="../learn/security/#7-output-sanitization-prompt-injection-protection">Learn more</a></p>
 <hr />
 <h2 id="extensibility">Extensibility<a class="headerlink" href="#extensibility" title="Permanent link">&para;</a></h2>
 <h3 id="drop-in-tools">Drop-in Tools<a class="headerlink" href="#drop-in-tools" title="Permanent link">&para;</a></h3>
@@ -3009,23 +3034,23 @@
 <h3 id="worker-isolation">Worker Isolation<a class="headerlink" href="#worker-isolation" title="Permanent link">&para;</a></h3>
 <p>Tools with dependencies run in isolated subprocesses via PEP 723. Clean process state.</p>
 <p><a href="../extending/creating-tools/#extension-tools">Learn more</a></p>
-<h3 id="plugin-architecture">Plugin Architecture<a class="headerlink" href="#plugin-architecture" title="Permanent link">&para;</a></h3>
+<h3 id="extension-architecture">Extension Architecture<a class="headerlink" href="#extension-architecture" title="Permanent link">&para;</a></h3>
 <p>Build tools in separate repositories. Local dev with <code>.onetool/</code> config. Share via <code>tools_dir</code> glob patterns.</p>
-<p><a href="../extending/plugins/">Learn more</a></p>
+<p><a href="../extending/extensions/">Learn more</a></p>
 <h3 id="mcp-server-proxy">MCP Server Proxy<a class="headerlink" href="#mcp-server-proxy" title="Permanent link">&para;</a></h3>
 <p>Wrap any MCP server. Configure it with YAML. No token rot or bloat. Call it explicitly - all the goodness of OneTool, all the power of your existing MCP servers.</p>
 <p><a href="../learn/configuration/#external-mcp-servers">Learn more</a></p>
 <hr />
 <h2 id="testing-benchmarking">Testing &amp; Benchmarking<a class="headerlink" href="#testing-benchmarking" title="Permanent link">&para;</a></h2>
-<h3 id="ot-bench-harness">ot-bench Harness<a class="headerlink" href="#ot-bench-harness" title="Permanent link">&para;</a></h3>
+<h3 id="bench-harness">bench Harness<a class="headerlink" href="#bench-harness" title="Permanent link">&para;</a></h3>
 <p>Real agent + MCP server testing. Define tasks in YAML, get objective metrics: token counts, costs, accuracy scores, timing.</p>
-<p><a href="../reference/cli/ot-bench/">Learn more</a></p>
+<p><a href="../reference/cli/bench/">Learn more</a></p>
 <h3 id="multi-prompt-tasks">Multi-Prompt Tasks<a class="headerlink" href="#multi-prompt-tasks" title="Permanent link">&para;</a></h3>
 <p>Sequential prompt chains with <code>---PROMPT---</code> delimiter. Conversation history accumulates. Perfect for complex workflows.</p>
-<p><a href="../reference/cli/ot-bench/#multi-prompt-tasks">Learn more</a></p>
+<p><a href="../reference/cli/bench/#multi-prompt-tasks">Learn more</a></p>
 <h3 id="ai-evaluators">AI Evaluators<a class="headerlink" href="#ai-evaluators" title="Permanent link">&para;</a></h3>
 <p>LLM-powered evaluation with customizable prompts. Compare baseline vs OneTool accuracy side-by-side.</p>
-<p><a href="../reference/cli/ot-bench/">Learn more</a></p>
+<p><a href="../reference/cli/bench/">Learn more</a></p>
 <hr />
 <h2 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h2>
 <h3 id="structured-logging">Structured Logging<a class="headerlink" href="#structured-logging" title="Permanent link">&para;</a></h3>
@@ -3136,7 +3161,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href=".." class="md-footer__link md-footer__link--prev" aria-label="Previous: OneTool">
+          <a href=".." class="md-footer__link md-footer__link--prev" aria-label="Previous: 🧿 Home">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -3146,7 +3171,7 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                OneTool
+                🧿 Home
               </div>
             </div>
           </a>

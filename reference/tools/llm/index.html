@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Don't enumerate tools. Execute code.">
+        <meta name="description" content="96% Token Saving, 100+ tools">
       
       
       
@@ -27,7 +27,7 @@
     
     
       
-        <title>LLM - OneTool MCP</title>
+        <title>LLM - OneTool</title>
       
     
     
@@ -117,7 +117,7 @@
 
 <header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="OneTool MCP" class="md-header__button md-logo" aria-label="OneTool MCP" data-md-component="logo">
+    <a href="../../.." title="OneTool" class="md-header__button md-logo" aria-label="OneTool" data-md-component="logo">
       
   <img src="../../../assets/logo-white.png" alt="logo">
 
@@ -130,7 +130,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            OneTool MCP
+            OneTool
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -264,7 +264,7 @@
   
     
   
-  OneTool
+  🧿 Home
 
       </a>
     </li>
@@ -405,12 +405,12 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="OneTool MCP" class="md-nav__button md-logo" aria-label="OneTool MCP" data-md-component="logo">
+    <a href="../../.." title="OneTool" class="md-nav__button md-logo" aria-label="OneTool" data-md-component="logo">
       
   <img src="../../../assets/logo-white.png" alt="logo">
 
     </a>
-    OneTool MCP
+    OneTool
   </label>
   
     <div class="md-nav__source">
@@ -441,7 +441,7 @@
   <span class="md-ellipsis">
     
   
-    OneTool
+    🧿 Home
   
 
     
@@ -982,14 +982,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cli/ot-serve/" class="md-nav__link">
+      <a href="../../cli/onetool/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    ot-serve
+    onetool
   
 
     
@@ -1010,14 +1010,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cli/ot-bench/" class="md-nav__link">
+      <a href="../../cli/bench/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    ot-bench
+    bench
   
 
     
@@ -1842,14 +1842,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../extending/plugins/" class="md-nav__link">
+      <a href="../../../extending/extensions/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Plugins
+    Extensions
   
 
     
@@ -2112,7 +2112,7 @@
       <a href="../../.." class="md-path__link">
         
   <span class="md-ellipsis">
-    OneTool
+    🧿 Home
   </span>
 
       </a>
@@ -2224,8 +2224,8 @@
 <h2 id="requires">Requires<a class="headerlink" href="#requires" title="Permanent link">&para;</a></h2>
 <p>Configuration (tool not available until all are set):
 - <code>OPENAI_API_KEY</code> in secrets.yaml
-- <code>transform.base_url</code> in ot-serve.yaml (e.g., <code>https://openrouter.ai/api/v1</code>)
-- <code>transform.model</code> in ot-serve.yaml (e.g., <code>openai/gpt-5-mini</code>)</p>
+- <code>transform.base_url</code> in onetool.yaml (e.g., <code>https://openrouter.ai/api/v1</code>)
+- <code>transform.model</code> in onetool.yaml (e.g., <code>openai/gpt-5-mini</code>)</p>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Extract structured data from search results</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">llm</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span>
@@ -2246,7 +2246,7 @@
 </span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
-<p>Add to <code>ot-serve.yaml</code>:</p>
+<p>Add to <code>onetool.yaml</code>:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">tools</span><span class="p">:</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">transform</span><span class="p">:</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://openrouter.ai/api/v1</span>

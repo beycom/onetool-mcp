@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Don't enumerate tools. Execute code.">
+        <meta name="description" content="96% Token Saving, 100+ tools">
       
       
       
@@ -16,7 +16,7 @@
         <link rel="prev" href="../">
       
       
-        <link rel="next" href="../plugins/">
+        <link rel="next" href="../extensions/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Creating Tools - OneTool MCP</title>
+        <title>Creating Tools - OneTool</title>
       
     
     
@@ -117,7 +117,7 @@
 
 <header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="OneTool MCP" class="md-header__button md-logo" aria-label="OneTool MCP" data-md-component="logo">
+    <a href="../.." title="OneTool" class="md-header__button md-logo" aria-label="OneTool" data-md-component="logo">
       
   <img src="../../assets/logo-white.png" alt="logo">
 
@@ -130,7 +130,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            OneTool MCP
+            OneTool
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -264,7 +264,7 @@
   
     
   
-  OneTool
+  🧿 Home
 
       </a>
     </li>
@@ -405,12 +405,12 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="OneTool MCP" class="md-nav__button md-logo" aria-label="OneTool MCP" data-md-component="logo">
+    <a href="../.." title="OneTool" class="md-nav__button md-logo" aria-label="OneTool" data-md-component="logo">
       
   <img src="../../assets/logo-white.png" alt="logo">
 
     </a>
-    OneTool MCP
+    OneTool
   </label>
   
     <div class="md-nav__source">
@@ -441,7 +441,7 @@
   <span class="md-ellipsis">
     
   
-    OneTool
+    🧿 Home
   
 
     
@@ -974,14 +974,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/cli/ot-serve/" class="md-nav__link">
+      <a href="../../reference/cli/onetool/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    ot-serve
+    onetool
   
 
     
@@ -1002,14 +1002,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/cli/ot-bench/" class="md-nav__link">
+      <a href="../../reference/cli/bench/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    ot-bench
+    bench
   
 
     
@@ -1925,6 +1925,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#path-prefixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Path Prefixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#project-paths-readingwriting-files" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2083,14 +2094,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../plugins/" class="md-nav__link">
+      <a href="../extensions/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Plugins
+    Extensions
   
 
     
@@ -2432,6 +2443,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#path-prefixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Path Prefixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#project-paths-readingwriting-files" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2602,7 +2624,7 @@
       <a href="../.." class="md-path__link">
         
   <span class="md-ellipsis">
-    OneTool
+    🧿 Home
   </span>
 
       </a>
@@ -2867,7 +2889,7 @@
 </tr>
 <tr>
 <td><code>get_config(key)</code></td>
-<td>Access configuration from <code>ot-serve.yaml</code></td>
+<td>Access configuration from <code>onetool.yaml</code></td>
 </tr>
 <tr>
 <td><code>get_secret(key)</code></td>
@@ -2886,11 +2908,11 @@
 <td>In-memory caching decorator with TTL</td>
 </tr>
 <tr>
-<td><code>get_project_path(path)</code></td>
+<td><code>resolve_cwd_path(path)</code></td>
 <td>Resolve paths relative to project directory</td>
 </tr>
 <tr>
-<td><code>get_config_path(path)</code></td>
+<td><code>resolve_ot_path(path)</code></td>
 <td>Resolve paths relative to config directory</td>
 </tr>
 </tbody>
@@ -2966,58 +2988,102 @@
 </tr>
 </tbody>
 </table>
+<h3 id="path-prefixes">Path Prefixes<a class="headerlink" href="#path-prefixes" title="Permanent link">&para;</a></h3>
+<p>Path functions support prefixes to override the default base:</p>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Meaning</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>~</code></td>
+<td>Home directory</td>
+<td>Cross-project shared files</td>
+</tr>
+<tr>
+<td><code>CWD/</code></td>
+<td>Project working directory</td>
+<td>Tool I/O files</td>
+</tr>
+<tr>
+<td><code>GLOBAL/</code></td>
+<td><code>~/.onetool/</code></td>
+<td>Global config/logs</td>
+</tr>
+<tr>
+<td><code>OT_DIR/</code></td>
+<td>Active <code>.onetool/</code></td>
+<td>Project-first, global fallback</td>
+</tr>
+</tbody>
+</table>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ot_sdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_cwd_path</span><span class="p">,</span> <span class="n">resolve_ot_path</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="c1"># Default: relative to project directory</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="n">output</span> <span class="o">=</span> <span class="n">resolve_cwd_path</span><span class="p">(</span><span class="s2">&quot;output/report.txt&quot;</span><span class="p">)</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="c1"># Prefix overrides base</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="n">global_log</span> <span class="o">=</span> <span class="n">resolve_cwd_path</span><span class="p">(</span><span class="s2">&quot;GLOBAL/logs/app.log&quot;</span><span class="p">)</span>  <span class="c1"># ~/.onetool/logs/app.log</span>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="n">template</span> <span class="o">=</span> <span class="n">resolve_ot_path</span><span class="p">(</span><span class="s2">&quot;templates/default.mmd&quot;</span><span class="p">)</span>    <span class="c1"># .onetool/templates/default.mmd</span>
+</span></code></pre></div>
 <h3 id="project-paths-readingwriting-files">Project Paths (Reading/Writing Files)<a class="headerlink" href="#project-paths-readingwriting-files" title="Permanent link">&para;</a></h3>
 <p>When reading or writing files in the user's project, resolve paths relative to the project working directory:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ot_sdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_project_path</span>
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">save_output</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">content</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output_file</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;output.txt&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Save content to a file in the project.&quot;&quot;&quot;</span>
-</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>    <span class="c1"># Resolves relative to OT_CWD (project directory)</span>
-</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>    <span class="n">path</span> <span class="o">=</span> <span class="n">get_project_path</span><span class="p">(</span><span class="n">output_file</span><span class="p">)</span>
-</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>    <span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>    <span class="n">path</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">content</span><span class="p">)</span>
-</span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Saved to </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ot_sdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_cwd_path</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">save_output</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">content</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output_file</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;output.txt&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Save content to a file in the project.&quot;&quot;&quot;</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>    <span class="c1"># Resolves relative to OT_CWD (project directory)</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>    <span class="n">path</span> <span class="o">=</span> <span class="n">resolve_cwd_path</span><span class="p">(</span><span class="n">output_file</span><span class="p">)</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>    <span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>    <span class="n">path</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">content</span><span class="p">)</span>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Saved to </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&quot;</span>
 </span></code></pre></div>
 <p><strong>Behaviour:</strong></p>
 <ul>
 <li>Relative paths → resolved relative to <code>OT_CWD</code> (or <code>cwd</code> if not set)</li>
 <li>Absolute paths → used unchanged</li>
 <li><code>~</code> → expanded to home directory</li>
+<li>Prefixes (<code>CWD/</code>, <code>GLOBAL/</code>, <code>OT_DIR/</code>) → override the default base</li>
 </ul>
 <h3 id="config-paths-loading-assets">Config Paths (Loading Assets)<a class="headerlink" href="#config-paths-loading-assets" title="Permanent link">&para;</a></h3>
 <p>When loading configuration assets like templates, schemas, or reference files defined in config, resolve paths relative to the config directory:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ot_sdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_config</span><span class="p">,</span> <span class="n">get_config_path</span>
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_template</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Load a template from config.&quot;&quot;&quot;</span>
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>    <span class="n">templates</span> <span class="o">=</span> <span class="n">get_config</span><span class="p">(</span><span class="s2">&quot;tools.mytool.templates&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
-</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>    <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">templates</span><span class="p">:</span>
-</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Template not found: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>
-</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>    <span class="c1"># Resolves relative to config directory (.onetool/)</span>
-</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>    <span class="n">template_file</span> <span class="o">=</span> <span class="n">templates</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;file&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
-</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>    <span class="n">path</span> <span class="o">=</span> <span class="n">get_config_path</span><span class="p">(</span><span class="n">template_file</span><span class="p">)</span>
-</span><span id="__span-16-12"><a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>
-</span><span id="__span-16-13"><a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>    <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-</span><span id="__span-16-14"><a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a>        <span class="k">return</span> <span class="n">path</span><span class="o">.</span><span class="n">read_text</span><span class="p">()</span>
-</span><span id="__span-16-15"><a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a>    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Template file not found: </span><span class="si">{</span><span class="n">template_file</span><span class="si">}</span><span class="s2">&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ot_sdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_config</span><span class="p">,</span> <span class="n">resolve_ot_path</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_template</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Load a template from config.&quot;&quot;&quot;</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="n">templates</span> <span class="o">=</span> <span class="n">get_config</span><span class="p">(</span><span class="s2">&quot;tools.mytool.templates&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>    <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">templates</span><span class="p">:</span>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Template not found: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>
+</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>    <span class="c1"># Resolves relative to config directory (.onetool/)</span>
+</span><span id="__span-17-10"><a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>    <span class="n">template_file</span> <span class="o">=</span> <span class="n">templates</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;file&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+</span><span id="__span-17-11"><a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>    <span class="n">path</span> <span class="o">=</span> <span class="n">resolve_ot_path</span><span class="p">(</span><span class="n">template_file</span><span class="p">)</span>
+</span><span id="__span-17-12"><a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>
+</span><span id="__span-17-13"><a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a>    <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+</span><span id="__span-17-14"><a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a>        <span class="k">return</span> <span class="n">path</span><span class="o">.</span><span class="n">read_text</span><span class="p">()</span>
+</span><span id="__span-17-15"><a id="__codelineno-17-15" name="__codelineno-17-15" href="#__codelineno-17-15"></a>    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Template file not found: </span><span class="si">{</span><span class="n">template_file</span><span class="si">}</span><span class="s2">&quot;</span>
 </span></code></pre></div>
 <p><strong>Behaviour:</strong></p>
 <ul>
 <li>Relative paths → resolved relative to config directory</li>
 <li>Absolute paths → used unchanged</li>
 <li><code>~</code> → expanded to home directory</li>
+<li>Prefixes (<code>CWD/</code>, <code>GLOBAL/</code>, <code>OT_DIR/</code>) → override the default base</li>
 </ul>
 <h3 id="main-process-tools">Main Process Tools<a class="headerlink" href="#main-process-tools" title="Permanent link">&para;</a></h3>
 <p>For tools running in the main process (not workers), use <code>ot.paths</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ot.paths</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_effective_cwd</span><span class="p">,</span> <span class="n">expand_path</span>
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">list_files</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">directory</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;List files in a directory.&quot;&quot;&quot;</span>
-</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="c1"># get_effective_cwd() returns OT_CWD or Path.cwd()</span>
-</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>    <span class="n">base</span> <span class="o">=</span> <span class="n">get_effective_cwd</span><span class="p">()</span>
-</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>    <span class="n">target</span> <span class="o">=</span> <span class="n">base</span> <span class="o">/</span> <span class="n">directory</span>
-</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>    <span class="c1"># ...</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ot.paths</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_effective_cwd</span><span class="p">,</span> <span class="n">expand_path</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">list_files</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">directory</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;List files in a directory.&quot;&quot;&quot;</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>    <span class="c1"># get_effective_cwd() returns OT_CWD or Path.cwd()</span>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>    <span class="n">base</span> <span class="o">=</span> <span class="n">get_effective_cwd</span><span class="p">()</span>
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>    <span class="n">target</span> <span class="o">=</span> <span class="n">base</span> <span class="o">/</span> <span class="n">directory</span>
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>    <span class="c1"># ...</span>
 </span></code></pre></div>
 <h3 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h3>
 <table>
@@ -3030,12 +3096,12 @@
 </thead>
 <tbody>
 <tr>
-<td><code>get_project_path()</code></td>
+<td><code>resolve_cwd_path()</code></td>
 <td><code>ot_sdk</code></td>
 <td>Project directory (<code>OT_CWD</code>)</td>
 </tr>
 <tr>
-<td><code>get_config_path()</code></td>
+<td><code>resolve_ot_path()</code></td>
 <td><code>ot_sdk</code></td>
 <td>Config directory (<code>.onetool/</code>)</td>
 </tr>
@@ -3089,25 +3155,25 @@
 </table>
 <h3 id="source-header-format">Source Header Format<a class="headerlink" href="#source-header-format" title="Permanent link">&para;</a></h3>
 <p>Add attribution to the module docstring:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Based on (code derived from upstream)</span>
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="sd">&quot;&quot;&quot;Database operations via SQLAlchemy.</span>
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="sd">Based on mcp-alchemy by Rui Machado (MPL-2.0).</span>
-</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="sd">https://github.com/runekaagaard/mcp-alchemy</span>
-</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>
-</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="c1"># Inspired by (independent implementation)</span>
-</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="sd">&quot;&quot;&quot;Secure file operations with configurable boundaries.</span>
-</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>
-</span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="sd">Inspired by fast-filesystem-mcp by efforthye (Apache 2.0).</span>
-</span><span id="__span-18-12"><a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="sd">https://github.com/efforthye/fast-filesystem-mcp</span>
-</span><span id="__span-18-13"><a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="__span-18-14"><a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>
-</span><span id="__span-18-15"><a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a><span class="c1"># Original (API wrapper or clean room)</span>
-</span><span id="__span-18-16"><a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a><span class="sd">&quot;&quot;&quot;Web search via Brave Search API.</span>
-</span><span id="__span-18-17"><a id="__codelineno-18-17" name="__codelineno-18-17" href="#__codelineno-18-17"></a>
-</span><span id="__span-18-18"><a id="__codelineno-18-18" name="__codelineno-18-18" href="#__codelineno-18-18"></a><span class="sd">API docs: https://api.search.brave.com/app/documentation</span>
-</span><span id="__span-18-19"><a id="__codelineno-18-19" name="__codelineno-18-19" href="#__codelineno-18-19"></a><span class="sd">&quot;&quot;&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Based on (code derived from upstream)</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="sd">&quot;&quot;&quot;Database operations via SQLAlchemy.</span>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="sd">Based on mcp-alchemy by Rui Machado (MPL-2.0).</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="sd">https://github.com/runekaagaard/mcp-alchemy</span>
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>
+</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="c1"># Inspired by (independent implementation)</span>
+</span><span id="__span-19-9"><a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="sd">&quot;&quot;&quot;Secure file operations with configurable boundaries.</span>
+</span><span id="__span-19-10"><a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>
+</span><span id="__span-19-11"><a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="sd">Inspired by fast-filesystem-mcp by efforthye (Apache 2.0).</span>
+</span><span id="__span-19-12"><a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a><span class="sd">https://github.com/efforthye/fast-filesystem-mcp</span>
+</span><span id="__span-19-13"><a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-19-14"><a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a>
+</span><span id="__span-19-15"><a id="__codelineno-19-15" name="__codelineno-19-15" href="#__codelineno-19-15"></a><span class="c1"># Original (API wrapper or clean room)</span>
+</span><span id="__span-19-16"><a id="__codelineno-19-16" name="__codelineno-19-16" href="#__codelineno-19-16"></a><span class="sd">&quot;&quot;&quot;Web search via Brave Search API.</span>
+</span><span id="__span-19-17"><a id="__codelineno-19-17" name="__codelineno-19-17" href="#__codelineno-19-17"></a>
+</span><span id="__span-19-18"><a id="__codelineno-19-18" name="__codelineno-19-18" href="#__codelineno-19-18"></a><span class="sd">API docs: https://api.search.brave.com/app/documentation</span>
+</span><span id="__span-19-19"><a id="__codelineno-19-19" name="__codelineno-19-19" href="#__codelineno-19-19"></a><span class="sd">&quot;&quot;&quot;</span>
 </span></code></pre></div>
 <h3 id="license-file-requirements">License File Requirements<a class="headerlink" href="#license-file-requirements" title="Permanent link">&para;</a></h3>
 <p>For "Based on" tools, include the upstream license:</p>
@@ -3157,12 +3223,12 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Tool doc attribution section matches source header</li>
 </ul>
 <h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>src/
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>├── ot/           # Core library
-</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>├── ot_sdk/       # SDK for extension tools
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>├── ot_tools/     # Built-in tools (auto-discovered)
-</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>├── ot_serve/     # CLI: ot-serve
-</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>└── ot_bench/     # CLI: ot-bench
+<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>src/
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>├── ot/           # Core library
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>├── ot_sdk/       # SDK for extension tools
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>├── ot_tools/     # Built-in tools (auto-discovered)
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>├── onetool/     # CLI: onetool
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>└── bench/     # CLI: bench
 </span></code></pre></div>
 <h2 id="contributing">Contributing<a class="headerlink" href="#contributing" title="Permanent link">&para;</a></h2>
 <ol>
@@ -3285,13 +3351,13 @@
         
         
           
-          <a href="../plugins/" class="md-footer__link md-footer__link--next" aria-label="Next: Plugins">
+          <a href="../extensions/" class="md-footer__link md-footer__link--next" aria-label="Next: Extensions">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Plugins
+                Extensions
               </div>
             </div>
             <div class="md-footer__button md-icon">

@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Don't enumerate tools. Execute code.">
+        <meta name="description" content="96% Token Saving, 100+ tools">
       
       
       
@@ -27,7 +27,7 @@
     
     
       
-        <title>Scaffold - OneTool MCP</title>
+        <title>Scaffold - OneTool</title>
       
     
     
@@ -117,7 +117,7 @@
 
 <header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="OneTool MCP" class="md-header__button md-logo" aria-label="OneTool MCP" data-md-component="logo">
+    <a href="../../.." title="OneTool" class="md-header__button md-logo" aria-label="OneTool" data-md-component="logo">
       
   <img src="../../../assets/logo-white.png" alt="logo">
 
@@ -130,7 +130,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            OneTool MCP
+            OneTool
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -264,7 +264,7 @@
   
     
   
-  OneTool
+  🧿 Home
 
       </a>
     </li>
@@ -405,12 +405,12 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="OneTool MCP" class="md-nav__button md-logo" aria-label="OneTool MCP" data-md-component="logo">
+    <a href="../../.." title="OneTool" class="md-nav__button md-logo" aria-label="OneTool" data-md-component="logo">
       
   <img src="../../../assets/logo-white.png" alt="logo">
 
     </a>
-    OneTool MCP
+    OneTool
   </label>
   
     <div class="md-nav__source">
@@ -441,7 +441,7 @@
   <span class="md-ellipsis">
     
   
-    OneTool
+    🧿 Home
   
 
     
@@ -982,14 +982,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cli/ot-serve/" class="md-nav__link">
+      <a href="../../cli/onetool/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    ot-serve
+    onetool
   
 
     
@@ -1010,14 +1010,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cli/ot-bench/" class="md-nav__link">
+      <a href="../../cli/bench/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    ot-bench
+    bench
   
 
     
@@ -1646,6 +1646,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#examples" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1820,14 +1831,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../extending/plugins/" class="md-nav__link">
+      <a href="../../../extending/extensions/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Plugins
+    Extensions
   
 
     
@@ -2030,6 +2041,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#examples" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2068,7 +2090,7 @@
       <a href="../../.." class="md-path__link">
         
   <span class="md-ellipsis">
-    OneTool
+    🧿 Home
   </span>
 
       </a>
@@ -2127,13 +2149,14 @@
 
 
 <h1 id="scaffold">Scaffold<a class="headerlink" href="#scaffold" title="Permanent link">&para;</a></h1>
-<p><strong>Create extensions. List templates. Manage your tools.</strong></p>
+<p><strong>Create extensions. Validate before reload. Manage your tools.</strong></p>
 <p>Generate new extension tools from templates with a single command. Project or global scope.</p>
 <h2 id="highlights">Highlights<a class="headerlink" href="#highlights" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Multiple templates: simple, API-integrated, worker-based</li>
+<li>Single unified template with optional sections</li>
+<li>Validation before reload catches errors early</li>
 <li>Project or global scope for extensions</li>
-<li>List existing extensions across scopes</li>
+<li>Best practices checking and warnings</li>
 <li>PEP 723 metadata support for dependencies</li>
 </ul>
 <h2 id="functions">Functions<a class="headerlink" href="#functions" title="Permanent link">&para;</a></h2>
@@ -2150,12 +2173,16 @@
 <td>Create a new extension tool from a template</td>
 </tr>
 <tr>
-<td><code>scaffold.templates()</code></td>
-<td>List available extension templates</td>
+<td><code>scaffold.validate(path)</code></td>
+<td>Validate an extension before reload</td>
 </tr>
 <tr>
-<td><code>scaffold.list_extensions()</code></td>
-<td>List installed extensions by scope</td>
+<td><code>scaffold.extensions()</code></td>
+<td>List loaded extension files</td>
+</tr>
+<tr>
+<td><code>scaffold.templates()</code></td>
+<td>List available extension templates</td>
 </tr>
 </tbody>
 </table>
@@ -2177,7 +2204,7 @@
 <tr>
 <td><code>template</code></td>
 <td>str</td>
-<td>Template name (default: <code>extension_simple</code>)</td>
+<td>Template name (default: <code>extension</code>)</td>
 </tr>
 <tr>
 <td><code>pack_name</code></td>
@@ -2199,25 +2226,34 @@
 <td>str</td>
 <td>Where to create: <code>project</code> (default) or <code>global</code></td>
 </tr>
+<tr>
+<td><code>path</code></td>
+<td>str</td>
+<td>Full path to extension file (for validate)</td>
+</tr>
 </tbody>
 </table>
 <h2 id="requires">Requires<a class="headerlink" href="#requires" title="Permanent link">&para;</a></h2>
 <p>No API key required.</p>
+<h2 id="workflow">Workflow<a class="headerlink" href="#workflow" title="Permanent link">&para;</a></h2>
+<p>The recommended workflow for creating and activating extensions:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>scaffold.create(name) → (edit) → scaffold.validate(path) → ot.reload() → use
+</span></code></pre></div>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># List available templates</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">scaffold</span><span class="o">.</span><span class="n">templates</span><span class="p">()</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Create a simple extension in project scope</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">scaffold</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;my_tool&quot;</span><span class="p">,</span> <span class="n">function</span><span class="o">=</span><span class="s2">&quot;search&quot;</span><span class="p">)</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Create an API-integrated extension</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">scaffold</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;api_tool&quot;</span><span class="p">,</span> <span class="n">template</span><span class="o">=</span><span class="s2">&quot;extension&quot;</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;MY_API_KEY&quot;</span><span class="p">)</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># Create in global scope (available to all projects)</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">scaffold</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;shared_tool&quot;</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="s2">&quot;global&quot;</span><span class="p">)</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># List all installed extensions</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="n">scaffold</span><span class="o">.</span><span class="n">list_extensions</span><span class="p">()</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># List available templates</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">scaffold</span><span class="o">.</span><span class="n">templates</span><span class="p">()</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Create an extension in project scope</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">scaffold</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;my_tool&quot;</span><span class="p">,</span> <span class="n">function</span><span class="o">=</span><span class="s2">&quot;search&quot;</span><span class="p">)</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Validate before reload</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">scaffold</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">&quot;.onetool/tools/my_tool/my_tool.py&quot;</span><span class="p">)</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># Create in global scope (available to all projects)</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="n">scaffold</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;shared_tool&quot;</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="s2">&quot;global&quot;</span><span class="p">)</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="c1"># List loaded extensions</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="n">scaffold</span><span class="o">.</span><span class="n">extensions</span><span class="p">()</span>
 </span></code></pre></div>
 
 

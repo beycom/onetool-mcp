@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Don't enumerate tools. Execute code.">
+        <meta name="description" content="96% Token Saving, 100+ tools">
       
       
       
@@ -27,7 +27,7 @@
     
     
       
-        <title>Configuration - OneTool MCP</title>
+        <title>Configuration - OneTool</title>
       
     
     
@@ -117,7 +117,7 @@
 
 <header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="OneTool MCP" class="md-header__button md-logo" aria-label="OneTool MCP" data-md-component="logo">
+    <a href="../.." title="OneTool" class="md-header__button md-logo" aria-label="OneTool" data-md-component="logo">
       
   <img src="../../assets/logo-white.png" alt="logo">
 
@@ -130,7 +130,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            OneTool MCP
+            OneTool
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -264,7 +264,7 @@
   
     
   
-  OneTool
+  🧿 Home
 
       </a>
     </li>
@@ -405,12 +405,12 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="OneTool MCP" class="md-nav__button md-logo" aria-label="OneTool MCP" data-md-component="logo">
+    <a href="../.." title="OneTool" class="md-nav__button md-logo" aria-label="OneTool" data-md-component="logo">
       
   <img src="../../assets/logo-white.png" alt="logo">
 
     </a>
-    OneTool MCP
+    OneTool
   </label>
   
     <div class="md-nav__source">
@@ -441,7 +441,7 @@
   <span class="md-ellipsis">
     
   
-    OneTool
+    🧿 Home
   
 
     
@@ -1375,14 +1375,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/cli/ot-serve/" class="md-nav__link">
+      <a href="../../reference/cli/onetool/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    ot-serve
+    onetool
   
 
     
@@ -1403,14 +1403,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/cli/ot-bench/" class="md-nav__link">
+      <a href="../../reference/cli/bench/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    ot-bench
+    bench
   
 
     
@@ -2106,14 +2106,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../extending/plugins/" class="md-nav__link">
+      <a href="../../extending/extensions/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Plugins
+    Extensions
   
 
     
@@ -2648,7 +2648,7 @@
       <a href="../.." class="md-path__link">
         
   <span class="md-ellipsis">
-    OneTool
+    🧿 Home
   </span>
 
       </a>
@@ -2703,15 +2703,15 @@
 </thead>
 <tbody>
 <tr>
-<td><code>ot-serve</code></td>
-<td><code>OT_SERVE_CONFIG</code></td>
-<td><code>.onetool/ot-serve.yaml</code></td>
-<td><code>~/.onetool/ot-serve.yaml</code>, then defaults</td>
+<td><code>onetool</code></td>
+<td><code>ONETOOL_CONFIG</code></td>
+<td><code>.onetool/onetool.yaml</code></td>
+<td><code>~/.onetool/onetool.yaml</code>, then defaults</td>
 </tr>
 <tr>
-<td><code>ot-bench</code></td>
-<td><code>OT_BENCH_CONFIG</code></td>
-<td><code>.onetool/ot-bench.yaml</code></td>
+<td><code>bench</code></td>
+<td><code>BENCH_CONFIG</code></td>
+<td><code>.onetool/bench.yaml</code></td>
 <td>Task file config</td>
 </tr>
 </tbody>
@@ -2750,12 +2750,12 @@
 <td>All installs</td>
 </tr>
 <tr>
-<td><code>~/.onetool/ot-serve.yaml</code></td>
+<td><code>~/.onetool/onetool.yaml</code></td>
 <td>Global config</td>
 <td>User</td>
 </tr>
 <tr>
-<td><code>.onetool/ot-serve.yaml</code></td>
+<td><code>.onetool/onetool.yaml</code></td>
 <td>Project config</td>
 <td>Project</td>
 </tr>
@@ -2763,10 +2763,10 @@
 </table>
 <p><strong>Windows paths:</strong> Replace <code>~/.onetool/</code> with <code>%USERPROFILE%\.onetool\</code></p>
 <h3 id="first-run-bootstrap">First Run Bootstrap<a class="headerlink" href="#first-run-bootstrap" title="Permanent link">&para;</a></h3>
-<p>On first <code>ot-serve</code> invocation, OneTool creates <code>~/.onetool/</code> with bundled default configs:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>$<span class="w"> </span>ot-serve<span class="w"> </span>--help
+<p>On first <code>onetool</code> invocation, OneTool creates <code>~/.onetool/</code> with bundled default configs:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>$<span class="w"> </span>onetool<span class="w"> </span>--help
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Creating<span class="w"> </span>~/.onetool/
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>✓<span class="w"> </span>ot-serve.yaml
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>✓<span class="w"> </span>onetool.yaml
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>✓<span class="w"> </span>prompts.yaml
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span>✓<span class="w"> </span>snippets.yaml
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span>✓<span class="w"> </span>servers.yaml
@@ -2774,11 +2774,11 @@
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span>✓<span class="w"> </span>secrets.yaml
 </span></code></pre></div>
 <p>You can also manage the global config directory manually:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>ot-serve<span class="w"> </span>init<span class="w">           </span><span class="c1"># Create ~/.onetool/ (if missing)</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>ot-serve<span class="w"> </span>init<span class="w"> </span>reset<span class="w">     </span><span class="c1"># Reset to defaults (prompts per file, offers backups)</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>ot-serve<span class="w"> </span>init<span class="w"> </span>validate<span class="w">  </span><span class="c1"># Check for errors</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>onetool<span class="w"> </span>init<span class="w">           </span><span class="c1"># Create ~/.onetool/ (if missing)</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>onetool<span class="w"> </span>init<span class="w"> </span>reset<span class="w">     </span><span class="c1"># Reset to defaults (prompts per file, offers backups)</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>onetool<span class="w"> </span>init<span class="w"> </span>validate<span class="w">  </span><span class="c1"># Check for errors</span>
 </span></code></pre></div>
-<p><strong>Note:</strong> Only <code>ot-serve</code> bootstraps the global config directory. Other tools (<code>ot-bench</code>) require <code>~/.onetool/</code> to exist and will prompt you to run <code>ot-serve init</code> first if it's missing.</p>
+<p><strong>Note:</strong> Only <code>onetool</code> bootstraps the global config directory. Other tools (<code>bench</code>) require <code>~/.onetool/</code> to exist and will prompt you to run <code>onetool init</code> first if it's missing.</p>
 <h3 id="configuration-inheritance">Configuration Inheritance<a class="headerlink" href="#configuration-inheritance" title="Permanent link">&para;</a></h3>
 <p>Project configs can inherit from global or bundled defaults using the <code>inherit</code> directive:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
@@ -2815,7 +2815,7 @@
 <li>Lists and scalars are replaced entirely</li>
 </ul>
 <h4 id="minimal-project-config-with-global-inheritance">Minimal Project Config with Global Inheritance<a class="headerlink" href="#minimal-project-config-with-global-inheritance" title="Permanent link">&para;</a></h4>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># my-project/.onetool/ot-serve.yaml</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># my-project/.onetool/onetool.yaml</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># inherit: global  (implicit default)</span>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
@@ -2824,7 +2824,7 @@
 </span></code></pre></div>
 <p>This loads project <code>tools_dir</code> while inheriting prompts, snippets, and servers from global.</p>
 <h4 id="standalone-config-no-inheritance">Standalone Config (No Inheritance)<a class="headerlink" href="#standalone-config-no-inheritance" title="Permanent link">&para;</a></h4>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># isolated/.onetool/ot-serve.yaml</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># isolated/.onetool/onetool.yaml</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nt">inherit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">none</span><span class="w">  </span><span class="c1"># Explicit: don&#39;t merge anything</span>
 </span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
@@ -2865,7 +2865,7 @@
 <td>No</td>
 </tr>
 <tr>
-<td><code>OT_SERVE_CONFIG</code></td>
+<td><code>ONETOOL_CONFIG</code></td>
 <td>Config file path override</td>
 <td>No</td>
 </tr>
@@ -3044,13 +3044,11 @@
 </span><span id="__span-14-22"><a id="__codelineno-14-22" name="__codelineno-14-22" href="#__codelineno-14-22"></a><span class="w">  </span><span class="nt">db</span><span class="p">:</span>
 </span><span id="__span-14-23"><a id="__codelineno-14-23" name="__codelineno-14-23" href="#__codelineno-14-23"></a><span class="w">    </span><span class="nt">max_chars</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4000</span><span class="w">            </span><span class="c1"># 100 - 100000 characters</span>
 </span><span id="__span-14-24"><a id="__codelineno-14-24" name="__codelineno-14-24" href="#__codelineno-14-24"></a>
-</span><span id="__span-14-25"><a id="__codelineno-14-25" name="__codelineno-14-25" href="#__codelineno-14-25"></a><span class="w">  </span><span class="c1"># page_view: (beta - see docs/beta/)</span>
-</span><span id="__span-14-26"><a id="__codelineno-14-26" name="__codelineno-14-26" href="#__codelineno-14-26"></a>
-</span><span id="__span-14-27"><a id="__codelineno-14-27" name="__codelineno-14-27" href="#__codelineno-14-27"></a><span class="w">  </span><span class="nt">package</span><span class="p">:</span>
-</span><span id="__span-14-28"><a id="__codelineno-14-28" name="__codelineno-14-28" href="#__codelineno-14-28"></a><span class="w">    </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30.0</span><span class="w">              </span><span class="c1"># 1.0 - 120.0 seconds</span>
-</span><span id="__span-14-29"><a id="__codelineno-14-29" name="__codelineno-14-29" href="#__codelineno-14-29"></a>
-</span><span id="__span-14-30"><a id="__codelineno-14-30" name="__codelineno-14-30" href="#__codelineno-14-30"></a><span class="w">  </span><span class="nt">firecrawl</span><span class="p">:</span>
-</span><span id="__span-14-31"><a id="__codelineno-14-31" name="__codelineno-14-31" href="#__codelineno-14-31"></a><span class="w">    </span><span class="nt">api_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">              </span><span class="c1"># Custom API URL for self-hosted instances</span>
+</span><span id="__span-14-25"><a id="__codelineno-14-25" name="__codelineno-14-25" href="#__codelineno-14-25"></a><span class="w">  </span><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-14-26"><a id="__codelineno-14-26" name="__codelineno-14-26" href="#__codelineno-14-26"></a><span class="w">    </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30.0</span><span class="w">              </span><span class="c1"># 1.0 - 120.0 seconds</span>
+</span><span id="__span-14-27"><a id="__codelineno-14-27" name="__codelineno-14-27" href="#__codelineno-14-27"></a>
+</span><span id="__span-14-28"><a id="__codelineno-14-28" name="__codelineno-14-28" href="#__codelineno-14-28"></a><span class="w">  </span><span class="nt">firecrawl</span><span class="p">:</span>
+</span><span id="__span-14-29"><a id="__codelineno-14-29" name="__codelineno-14-29" href="#__codelineno-14-29"></a><span class="w">    </span><span class="nt">api_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">              </span><span class="c1"># Custom API URL for self-hosted instances</span>
 </span></code></pre></div>
 <p>All tools section fields are optional. Omitted fields use defaults shown above.</p>
 <h3 id="tools-configuration-reference">Tools Configuration Reference<a class="headerlink" href="#tools-configuration-reference" title="Permanent link">&para;</a></h3>
@@ -3364,7 +3362,7 @@
 </span></code></pre></div>
 <h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
 <p>Invalid configuration values are rejected at load time with helpful error messages:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>ValueError: Invalid configuration in config/ot-serve.yaml:
+<div class="language-text highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>ValueError: Invalid configuration in config/onetool.yaml:
 </span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>  tools.brave.timeout: Input should be greater than or equal to 1
 </span></code></pre></div>
 <h2 id="example-configurations">Example Configurations<a class="headerlink" href="#example-configurations" title="Permanent link">&para;</a></h2>
