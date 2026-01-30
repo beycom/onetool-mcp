@@ -7,6 +7,7 @@ through OneTool's single `run` tool interface.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 from dataclasses import dataclass
 from typing import Any
@@ -310,6 +311,48 @@ class ProxyManager:
             self._tools_by_server.clear()
             self._initialized = False
 
+    async def reconnect(self, configs: dict[str, McpServerConfig]) -> None:
+        """Reconnect to all MCP servers.
+
+        Shuts down existing connections and reconnects with fresh config.
+
+        Args:
+            configs: Dictionary of server name -> configuration.
+        """
+        await self.shutdown()
+        await self.connect(configs)
+
+    def reconnect_sync(self, configs: dict[str, McpServerConfig]) -> None:
+        """Synchronously reconnect to all MCP servers.
+
+        Blocking wrapper for reconnect, suitable for calling from sync code.
+
+        Args:
+            configs: Dictionary of server name -> configuration.
+        """
+        loop = self._loop
+
+        # Try to get running loop if we don't have one stored
+        if loop is None:
+            with contextlib.suppress(RuntimeError):
+                loop = asyncio.get_running_loop()
+
+        if loop is None:
+            # No event loop available - just reset state, connect will happen on next use
+            self._clients.clear()
+            self._tools_by_server.clear()
+            self._initialized = False
+            return
+
+        future = asyncio.run_coroutine_threadsafe(
+            self.reconnect(configs),
+            loop,
+        )
+        try:
+            future.result(timeout=60)
+        except Exception as e:
+            logger.warning(f"Error during proxy reconnect: {e}")
+
 
 # Global proxy manager instance
 _proxy_manager: ProxyManager | None = None
@@ -331,3 +374,23 @@ def reset_proxy_manager() -> None:
     """Reset the global proxy manager (for testing)."""
     global _proxy_manager
     _proxy_manager = None
+
+
+def reconnect_proxy_manager() -> None:
+    """Reconnect the global proxy manager with fresh config.
+
+    Loads server configs from the current configuration and reconnects
+    all MCP proxy servers. Call this after modifying server config.
+    """
+    from ot.config.loader import get_config
+
+    proxy = get_proxy_manager()
+    cfg = get_config()
+
+    if cfg.servers:
+        proxy.reconnect_sync(cfg.servers)
+    else:
+        # No servers configured - just reset state
+        proxy._clients.clear()
+        proxy._tools_by_server.clear()
+        proxy._initialized = False

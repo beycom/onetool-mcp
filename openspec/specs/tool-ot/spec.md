@@ -123,6 +123,44 @@ The `ot.reload()` function SHALL force reload of all configuration.
 
 ---
 
+### Requirement: Runtime Statistics
+
+The `ot.stats()` function SHALL return aggregated runtime statistics.
+
+#### Scenario: Get all-time stats
+- **GIVEN** statistics collection is enabled
+- **WHEN** `ot.stats()` is called
+- **THEN** it SHALL return aggregated statistics including:
+  - `total_calls`: Total number of tool calls
+  - `success_rate`: Percentage of successful calls
+  - `context_saved`: Estimated context tokens saved
+  - `time_saved_ms`: Estimated time saved in milliseconds
+  - `tools`: Per-tool breakdown
+
+#### Scenario: Filter by period
+- **GIVEN** statistics collection is enabled
+- **WHEN** `ot.stats(period="day")` is called
+- **THEN** it SHALL return statistics for the specified period
+- **AND** valid periods SHALL be: "day", "week", "month", "all"
+
+#### Scenario: Filter by tool
+- **GIVEN** statistics collection is enabled
+- **WHEN** `ot.stats(tool="brave.search")` is called
+- **THEN** it SHALL return statistics filtered to that tool
+
+#### Scenario: Generate HTML report
+- **GIVEN** statistics collection is enabled
+- **WHEN** `ot.stats(output="stats.html")` is called
+- **THEN** it SHALL generate an HTML report at the specified path
+- **AND** include the path in the response as `html_report`
+
+#### Scenario: Stats disabled
+- **GIVEN** statistics collection is disabled in config
+- **WHEN** `ot.stats()` is called
+- **THEN** it SHALL return an error message indicating stats are disabled
+
+---
+
 ### Requirement: YAML Flow Style Output
 
 All `ot.*` functions SHALL format output using YAML flow style.

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OneTool Features - Bentobox Layout Demo</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      line-height: 1.6;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+      color: #fff;
+    }
+
+    .subtitle {
+      font-size: 1.1rem;
+      color: #94a3b8;
+      margin-bottom: 2rem;
+    }
+
+    h2.section-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin: 3rem 0 1rem 0;
+      color: #fff;
+    }
+
+    /* ============================================
+       BENTOBOX GRID SYSTEM
+       ============================================ */
+
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      padding: 1rem 0;
+    }
+
+    /* Card base styling */
+    .bento-card {
+      border-radius: 1.25rem;
+      padding: 1.75rem;
+      display: flex;
+      flex-direction: column;
+      min-height: 180px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .bento-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.3);
+    }
+
+    .bento-card a {
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .bento-card h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-top: 0;
+      margin-bottom: 0.75rem;
+    }
+
+    .bento-card h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-top: 0;
+      margin-bottom: 0.5rem;
+    }
+
+    .bento-card p {
+      margin: 0.5rem 0;
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+
+    /* Size variants */
+    .bento-card.span-2 { grid-column: span 2; }
+    .bento-card.span-3 { grid-column: span 3; }
+    .bento-card.span-4 { grid-column: span 4; }
+    .bento-card.tall { grid-row: span 2; }
+
+    /* Color palette - Brand aligned */
+    .bento-card.primary {
+      background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+      color: #fff;
+    }
+    .bento-card.accent {
+      background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+      color: #fff;
+    }
+    .bento-card.green {
+      background: #10B981;
+      color: #fff;
+    }
+    .bento-card.mint {
+      background: #D1FAE5;
+      color: #065F46;
+    }
+    .bento-card.sky {
+      background: #E0F2FE;
+      color: #0369A1;
+    }
+    .bento-card.rose {
+      background: #FCE7F3;
+      color: #9D174D;
+    }
+    .bento-card.amber {
+      background: #FEF3C7;
+      color: #92400E;
+    }
+    .bento-card.slate {
+      background: #1E293B;
+      color: #F1F5F9;
+    }
+
+    /* Icon styling */
+    .bento-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      opacity: 0.9;
+    }
+
+    /* Code blocks in cards */
+    .bento-card pre {
+      margin: 1rem 0 0 0;
+      border-radius: 0.5rem;
+      font-size: 0.8rem;
+      background: rgba(0,0,0,0.2);
+      padding: 0.75rem 1rem;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .bento-card.mint pre,
+    .bento-card.sky pre,
+    .bento-card.rose pre,
+    .bento-card.amber pre {
+      background: rgba(0,0,0,0.08);
+    }
+
+    /* CTA link styling */
+    .cta {
+      margin-top: auto;
+      padding-top: 1rem;
+      font-weight: 600;
+      opacity: 0.85;
+      font-size: 0.9rem;
+    }
+
+    .bento-card:hover .cta {
+      opacity: 1;
+    }
+
+    /* Stat callout */
+    .bento-stat {
+      font-size: 4rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 0.5rem;
+    }
+
+    /* Image placeholder */
+    .img-placeholder {
+      background: rgba(0,0,0,0.15);
+      border-radius: 0.75rem;
+      padding: 2rem;
+      text-align: center;
+      margin-top: auto;
+      font-size: 0.85rem;
+      opacity: 0.7;
+      border: 2px dashed rgba(0,0,0,0.2);
+    }
+
+    .bento-card.slate .img-placeholder,
+    .bento-card.primary .img-placeholder,
+    .bento-card.accent .img-placeholder,
+    .bento-card.green .img-placeholder {
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(255,255,255,0.2);
+    }
+
+    /* Responsive breakpoints */
+    @media (max-width: 1200px) {
+      .bento-grid { grid-template-columns: repeat(3, 1fr); }
+      .bento-card.span-3 { grid-column: span 3; }
+      .bento-card.span-4 { grid-column: span 3; }
+    }
+
+    @media (max-width: 900px) {
+      .bento-grid { grid-template-columns: repeat(2, 1fr); }
+      .bento-card.span-2, .bento-card.span-3, .bento-card.span-4 { grid-column: span 2; }
+    }
+
+    @media (max-width: 600px) {
+      body { padding: 1rem; }
+      .bento-grid { grid-template-columns: 1fr; }
+      .bento-card.span-2, .bento-card.span-3, .bento-card.span-4 { grid-column: span 1; }
+      .bento-card.tall { grid-row: span 1; }
+      .bento-stat { font-size: 3rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <h1>What's in OneTool?</h1>
+    <p class="subtitle">Everything you need to build powerful AI agent integrations without burning your context window.</p>
+
+    <!-- HERO SECTION -->
+    <div class="bento-grid">
+
+      <div class="bento-card green span-2 tall">
+        <span class="bento-stat">96%</span>
+        <h2>Token Savings</h2>
+        <p>MCP servers consume 3-30K tokens before you start. OneTool uses ~2K tokens no matter how many tool packs you load.</p>
+        <p>No context rot. No token bloat. 24x lower cost.</p>
+        <div class="img-placeholder">
+          <span class="mdi mdi-chart-bar"></span><br>
+          Your image: Token comparison chart
+        </div>
+        <a href="#" class="cta">See the comparison →</a>
+      </div>
+
+      <div class="bento-card primary">
+        <span class="mdi mdi-code-braces bento-icon"></span>
+        <h3>Explicit Execution</h3>
+        <p>Write Python, not tool definitions. You see exactly what runs.</p>
+        <pre>__ot brave.search(q="AI")</pre>
+      </div>
+
+      <div class="bento-card slate">
+        <span class="mdi mdi-package-variant-closed bento-icon"></span>
+        <h3>100+ Tools</h3>
+        <p>Search, web, database, files, diagrams, conversions—batteries included.</p>
+        <a href="#" class="cta">Browse tools →</a>
+      </div>
+
+      <div class="bento-card accent span-2">
+        <span class="mdi mdi-server-network bento-icon"></span>
+        <h3>MCP Server Proxy</h3>
+        <p>Wrap any existing MCP server. Configure in YAML. Call it explicitly—all the goodness of OneTool, all the power of your existing servers.</p>
+        <a href="#" class="cta">Learn more →</a>
+      </div>
+
+    </div>
+
+    <!-- DEVELOPER EXPERIENCE -->
+    <h2 class="section-title">Developer Experience</h2>
+
+    <div class="bento-grid">
+
+      <div class="bento-card sky">
+        <span class="mdi mdi-lightning-bolt bento-icon"></span>
+        <h3>Snippets</h3>
+        <p>Reusable code templates with Jinja2. Define once, invoke with <code>$snippet_name</code>.</p>
+      </div>
+
+      <div class="bento-card mint">
+        <span class="mdi mdi-rename-box bento-icon"></span>
+        <h3>Aliases</h3>
+        <p>Short names for tools. <code>ws</code> instead of <code>brave.web_search</code>.</p>
+      </div>
+
+      <div class="bento-card rose">
+        <span class="mdi mdi-text-short bento-icon"></span>
+        <h3>Prefixes</h3>
+        <p><code>p</code> instead of <code>pattern</code>. Any unambiguous prefix works.</p>
+      </div>
+
+      <div class="bento-card amber">
+        <span class="mdi mdi-file-cog bento-icon"></span>
+        <h3>Single YAML</h3>
+        <p>One config file. Three-tier inheritance: bundled → global → project.</p>
+      </div>
+
+    </div>
+
+    <!-- SECURITY -->
+    <h2 class="section-title">Security</h2>
+
+    <div class="bento-grid">
+
+      <div class="bento-card slate span-2">
+        <span class="mdi mdi-shield-check bento-icon"></span>
+        <h3>AST Code Validation</h3>
+        <p>All code validated before execution. Blocks <code>exec</code>, <code>eval</code>, <code>subprocess</code>. Warns on risky patterns. ~1ms overhead.</p>
+        <a href="#" class="cta">Security docs →</a>
+      </div>
+
+      <div class="bento-card rose">
+        <span class="mdi mdi-tune-vertical bento-icon"></span>
+        <h3>Configurable Policies</h3>
+        <p>Four tiers: Allow, Ask, Warn, Block. Fine-grained fnmatch patterns.</p>
+      </div>
+
+      <div class="bento-card sky">
+        <span class="mdi mdi-folder-lock bento-icon"></span>
+        <h3>Path Boundaries</h3>
+        <p>File ops constrained to allowed directories. Symlink-safe.</p>
+      </div>
+
+      <div class="bento-card mint span-2">
+        <span class="mdi mdi-spray bento-icon"></span>
+        <h3>Output Sanitization</h3>
+        <p>Automatic protection against indirect prompt injection. External content wrapped in GUID boundaries with triggers redacted.</p>
+      </div>
+
+    </div>
+
+    <!-- BUILT-IN TOOLS -->
+    <h2 class="section-title">Built-in Tools</h2>
+
+    <div class="bento-grid">
+
+      <div class="bento-card primary">
+        <span class="mdi mdi-magnify bento-icon"></span>
+        <h3>Web & Search</h3>
+        <p>Brave Search, Google Grounded, Firecrawl scraping.</p>
+        <a href="#" class="cta">Brave →</a>
+      </div>
+
+      <div class="bento-card accent">
+        <span class="mdi mdi-brain bento-icon"></span>
+        <h3>Smart Tools</h3>
+        <p>LLM-powered transformation. Pipe output through AI.</p>
+        <a href="#" class="cta">LLM tools →</a>
+      </div>
+
+      <div class="bento-card green">
+        <span class="mdi mdi-code-tags bento-icon"></span>
+        <h3>Code & Docs</h3>
+        <p>Context7 library docs, semantic search, ripgrep.</p>
+        <a href="#" class="cta">Code tools →</a>
+      </div>
+
+      <div class="bento-card amber">
+        <span class="mdi mdi-database bento-icon"></span>
+        <h3>Data & Files</h3>
+        <p>SQL (any DB), Excel, PDF/Word/PPT to Markdown.</p>
+        <a href="#" class="cta">DB tools →</a>
+      </div>
+
+    </div>
+
+    <!-- EXTENSIBILITY -->
+    <h2 class="section-title">Extensibility</h2>
+
+    <div class="bento-grid">
+
+      <div class="bento-card mint span-2">
+        <span class="mdi mdi-puzzle bento-icon"></span>
+        <h3>Drop-in Tools</h3>
+        <p>One file, one pack. No registration, no configuration. Drop a Python file, restart, call your functions.</p>
+        <a href="#" class="cta">Create tools →</a>
+      </div>
+
+      <div class="bento-card sky">
+        <span class="mdi mdi-cog-play bento-icon"></span>
+        <h3>Worker Isolation</h3>
+        <p>Tools with deps run in isolated subprocesses via PEP 723.</p>
+      </div>
+
+      <div class="bento-card rose">
+        <span class="mdi mdi-source-branch bento-icon"></span>
+        <h3>Extension Repos</h3>
+        <p>Build tools in separate repos. Share via <code>tools_dir</code> globs.</p>
+      </div>
+
+    </div>
+
+    <!-- TESTING & QUALITY -->
+    <h2 class="section-title">Testing & Quality</h2>
+
+    <div class="bento-grid">
+
+      <div class="bento-card accent span-2">
+        <span class="mdi mdi-test-tube bento-icon"></span>
+        <h3>bench Harness</h3>
+        <p>Real agent + MCP server testing. Define tasks in YAML, get objective metrics: tokens, costs, accuracy, timing.</p>
+        <a href="#" class="cta">Bench docs →</a>
+      </div>
+
+      <div class="bento-card slate">
+        <span class="bento-stat">1K+</span>
+        <h3>Tests</h3>
+        <p>Smoke, unit, integration tiers. Fast CI feedback.</p>
+      </div>
+
+      <div class="bento-card green">
+        <span class="mdi mdi-chart-line bento-icon"></span>
+        <h3>Runtime Stats</h3>
+        <p>Track calls, success rates, costs. HTML reports.</p>
+      </div>
+
+    </div>
+
+  </div>
+</body>
+</html>

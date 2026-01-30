@@ -1034,15 +1034,15 @@ def reload() -> str:
         # Clear tool registry cache (will rescan on next access)
         ot.registry._registry = None
 
-        # Reset MCP proxy manager (closes connections, clears tool caches)
-        ot.proxy.reset_proxy_manager()
-
         # Clear param resolver cache (depends on registry)
         ot.executor.param_resolver.get_tool_param_names.cache_clear()
         ot.executor.param_resolver._mcp_param_cache.clear()
 
         # Reload config to validate and report stats
         cfg = get_config()
+
+        # Reconnect MCP proxy servers with fresh config
+        ot.proxy.reconnect_proxy_manager()
         s.add("aliasCount", len(cfg.alias) if cfg.alias else 0)
         s.add("snippetCount", len(cfg.snippets) if cfg.snippets else 0)
         s.add("serverCount", len(cfg.servers) if cfg.servers else 0)

@@ -8,6 +8,7 @@ from ot.proxy.manager import (
     ProxyManager,
     ProxyToolInfo,
     get_proxy_manager,
+    reconnect_proxy_manager,
     reset_proxy_manager,
 )
 
@@ -15,5 +16,6 @@ __all__ = [
     "ProxyManager",
     "ProxyToolInfo",
     "get_proxy_manager",
+    "reconnect_proxy_manager",
     "reset_proxy_manager",
 ]

@@ -6,10 +6,9 @@ version: 1
 
 # Include external config files (merged left-to-right)
 # Paths are relative to OT_DIR (~/.onetool/), with fallback to bundled defaults
-# include:
-#   - config/prompts.yaml    # Tool instructions for LLM
-#   - config/snippets.yaml   # Snippet workflows
-#   - config/servers.yaml    # External MCP servers
+include:
+  - config/snippets.yaml   # Snippet workflows
+  - config/servers.yaml    # External MCP servers
 
 # log_level: INFO
 # debug_tracebacks: false  # Set to true for verbose error tracebacks
