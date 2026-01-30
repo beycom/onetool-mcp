@@ -79,6 +79,10 @@ prompts:
     2. **Batch when possible**: `foo(items=["a","b"])` not multiple calls
     3. **Return last expression**: For multi-step code, end with the value to return: `x = a(); y = b(); {"a": x, "b": y}`
 
+    ## Output Format Control
+    Set `__format__` to control result serialization:
+    Example: `__format__ = "yml_h"; brave.search(query="test")`
+
     ## Tool Output
     - Do not explain what you are about to do before calling the tool
     - Return tool output directly without commentary, formatting, or summaries unless requested

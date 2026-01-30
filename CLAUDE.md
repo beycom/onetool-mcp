@@ -25,5 +25,5 @@ Read AGENTS_PRIME.md for a project overview.
 Use OneTool web search:
 
 ```text
-__ot $b_q q=query one|query two|query three
+__ot $q_b q=query one|query two|query three
 ```

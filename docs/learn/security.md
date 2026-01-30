@@ -53,26 +53,20 @@ Code → ast.parse() → Pattern Detection → Execute or Reject
 
 ### 3. Configurable Security Policies
 
-Four-tier pattern system for fine-grained control:
+Three-tier pattern system for fine-grained control:
 
 ```yaml
 security:
-  allow: [...]     # Execute silently
-  ask: [...]       # Prompt user, show full command
-  warn: [...]      # Log warning, execute
-  block: [...]     # Reject with error
+  allow: [...]     # Execute silently (exempt from checks)
+  warned: [...]    # Log warning, execute
+  blocked: [...]   # Reject with error
 ```
 
-**Priority:** allow > ask > warn > block
+**Priority:** allow > warned > blocked
 
 **Example configurations:**
 
 ```yaml
-# Paranoid mode - confirm everything
-security:
-  ask:
-    - "*"
-
 # Air-gapped - block all network tools
 security:
   block:
@@ -81,13 +75,12 @@ security:
     - context7.*
     - ground.*
 
-# Trust file ops, ask for network
+# Trust file ops, block dangerous patterns
 security:
   allow:
     - file.*
-  ask:
-    - brave.*
-    - web_fetch.*
+  block:
+    - subprocess.*
 ```
 
 Patterns use fnmatch wildcards (`*`, `?`, `[seq]`) and work for both code patterns and tool names.
@@ -207,7 +200,7 @@ OneTool is a developer tool, not a sandbox. It does not:
 ## Recommendations
 
 1. **Review generated code** - The explicit execution model only works if you look
-2. **Use `ask` for destructive ops** - `ask: [file.write, file.delete]`
+2. **Block destructive ops** - `block: [file.delete, subprocess.*]`
 3. **Restrict paths to project scope** - `allowed_dirs: ["."]`
 4. **Keep secrets separate** - Never commit `secrets.yaml`
 5. **Use air-gapped mode for sensitive work** - Block network tools when needed

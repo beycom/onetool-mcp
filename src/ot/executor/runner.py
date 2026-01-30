@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 
     from ot.executor import SimpleExecutor
     from ot.registry import ToolRegistry
+    from ot.utils.format import FormatMode
 
 
 @dataclass
@@ -161,23 +162,28 @@ def wrap_code_for_exec(code: str, has_explicit_return: bool) -> tuple[str, int]:
 
     indented_code = "\n".join(indented_lines)
 
+    # Add global declaration for __format__ so it can be read from outer namespace
+    global_decl = "    global __format__"
+
     # Use sentinel if no explicit return to distinguish from explicit None
     if has_explicit_return:
         wrapped = f"""def __execute__():
+{global_decl}
 {indented_code}
 
 __result__ = __execute__()
 """
     else:
         wrapped = f"""def __execute__():
+{global_decl}
 {indented_code}
     return __NO_RETURN__
 
 __result__ = __execute__()
 """
 
-    # Line offset: "def __execute__():" adds 1 line before user code
-    return wrapped, 1
+    # Line offset: "def __execute__():" + global decl adds 2 lines before user code
+    return wrapped, 2
 
 
 def _map_error_line(error: Exception, line_offset: int) -> tuple[str, int | None]:
@@ -267,6 +273,11 @@ def execute_python_code(
         result = namespace.get("__result__")
         stdout_output = stdout_buffer.getvalue().strip()
 
+        # Read __format__ from namespace (default to "json" for compact output)
+        fmt: FormatMode = namespace.get("__format__", "json")
+        if fmt not in ("json", "json_h", "yml", "yml_h", "raw"):
+            fmt = "json"  # Fall back to default for invalid format
+
         # Check for sentinel - no return value
         if result is _NO_RETURN:
             # Return stdout if available, otherwise success message
@@ -279,8 +290,8 @@ def execute_python_code(
 
         # If we have both a result and stdout, include both
         if stdout_output:
-            return f"{stdout_output}\n{serialize_result(result)}"
-        return serialize_result(result)
+            return f"{stdout_output}\n{serialize_result(result, fmt)}"
+        return serialize_result(result, fmt)
 
     except Exception as e:
         error_msg, line_num = _map_error_line(e, line_offset)
@@ -289,6 +300,79 @@ def execute_python_code(
                 f"Python execution error at line {line_num}: {error_msg}"
             ) from e
         raise ValueError(f"Python execution error: {error_msg}") from e
+
+
+@dataclass
+class PreparedCommand:
+    """Result of command preparation (before execution)."""
+
+    code: str
+    original: str
+    error: str | None = None
+
+
+def prepare_command(command: str) -> PreparedCommand:
+    """Prepare a command for execution (validate but don't execute).
+
+    This performs all preprocessing steps:
+    - Strips markdown fences
+    - Expands snippets
+    - Resolves aliases
+    - Validates for security patterns
+
+    Returns:
+        PreparedCommand with prepared code and any errors.
+    """
+    from ot.config import get_config
+    from ot.executor.validator import validate_for_exec
+    from ot.shortcuts.aliases import resolve_alias
+    from ot.shortcuts.snippets import expand_snippet, is_snippet, parse_snippet
+
+    # Step 1: Check for legacy !onetool prefix (rejected)
+    stripped_cmd = command.strip()
+    if stripped_cmd.startswith("!onetool"):
+        return PreparedCommand(
+            code="",
+            original=command,
+            error="The !onetool prefix is no longer supported. "
+            "Use backtick syntax: `func(args)` or ```python\\ncode\\n```",
+        )
+
+    # Step 2: Strip fences
+    stripped, _ = strip_fences(command)
+
+    # Step 3: Load configuration for aliases and snippets
+    config = get_config()
+
+    # Step 4: Handle snippet expansion ($name key=val)
+    if is_snippet(stripped):
+        try:
+            parsed = parse_snippet(stripped)
+            stripped = expand_snippet(parsed, config)
+        except ValueError as e:
+            return PreparedCommand(
+                code="",
+                original=command,
+                error=str(e),
+            )
+
+    # Step 5: Resolve aliases (ws -> brave.web_search)
+    stripped = resolve_alias(stripped, config)
+
+    # Step 6: Validate code (but don't execute)
+    validation = validate_for_exec(stripped)
+    if not validation.valid:
+        errors = "; ".join(validation.errors)
+        return PreparedCommand(
+            code=stripped,
+            original=command,
+            error=f"Code validation failed: {errors}",
+        )
+
+    return PreparedCommand(
+        code=stripped,
+        original=command,
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -301,6 +385,9 @@ async def execute_command(
     registry: ToolRegistry,  # noqa: ARG001
     executor: SimpleExecutor,  # noqa: ARG001
     tools_dir: Path | None = None,
+    *,
+    skip_validation: bool = False,
+    prepared_code: str | None = None,
 ) -> CommandResult:
     """Execute a command through the unified runner.
 
@@ -316,49 +403,27 @@ async def execute_command(
         registry: Tool registry for looking up functions
         executor: Executor for running tool functions
         tools_dir: Path to tools directory
+        skip_validation: If True, skip validation (use when already validated)
+        prepared_code: Pre-processed code to execute (bypasses preparation steps)
 
     Returns:
         CommandResult with execution result
     """
-    from ot.config import get_config
-    from ot.shortcuts.aliases import resolve_alias
-    from ot.shortcuts.snippets import expand_snippet, is_snippet, parse_snippet
-
-    # Step 1: Check for legacy !onetool prefix (rejected)
-    stripped_cmd = command.strip()
-    if stripped_cmd.startswith("!onetool"):
-        return CommandResult(
-            command=command,
-            result="Error: The !onetool prefix is no longer supported. "
-            "Use backtick syntax: `func(args)` or ```python\\ncode\\n```",
-            executor="python",
-            success=False,
-            error_type="SyntaxError",
-        )
-
-    # Step 2: Strip fences
-    stripped, _ = strip_fences(command)
-
-    # Step 3: Load configuration for aliases and snippets
-    config = get_config()
-
-    # Step 4: Handle snippet expansion ($name key=val)
-    if is_snippet(stripped):
-        try:
-            parsed = parse_snippet(stripped)
-            stripped = expand_snippet(parsed, config)
-            logger.debug(f"Expanded snippet '{parsed.name}' to: {stripped[:100]}")
-        except ValueError as e:
+    # If prepared_code is provided, use it directly (already preprocessed)
+    if prepared_code is not None:
+        stripped = prepared_code
+    else:
+        # Use prepare_command for preprocessing
+        prepared = prepare_command(command)
+        if prepared.error:
             return CommandResult(
                 command=command,
-                result=str(e),
+                result=f"Error: {prepared.error}",
                 executor="python",
                 success=False,
                 error_type="ValueError",
             )
-
-    # Step 5: Resolve aliases (ws -> brave.web_search)
-    stripped = resolve_alias(stripped, config)
+        stripped = prepared.code
 
     # Step 6: Load tools with pack support
     tool_registry = load_tool_registry(tools_dir)
@@ -371,16 +436,24 @@ async def execute_command(
     proxy = get_proxy_manager()
     use_thread_pool = bool(proxy.servers)
 
+    # Determine validation behavior
+    should_validate = not skip_validation and prepared_code is None
+
     with LogSpan(span="runner.execute", mode="code", command=stripped[:200]) as span:
         try:
             if use_thread_pool:
                 # Run in thread pool so event loop can process proxy calls
                 result = await asyncio.to_thread(
-                    execute_python_code, stripped, tool_functions=tool_namespace
+                    execute_python_code,
+                    stripped,
+                    tool_functions=tool_namespace,
+                    validate=should_validate,
                 )
             else:
                 # Direct execution for non-proxy calls (no overhead)
-                result = execute_python_code(stripped, tool_functions=tool_namespace)
+                result = execute_python_code(
+                    stripped, tool_functions=tool_namespace, validate=should_validate
+                )
             span.add("resultLength", len(result))
             return CommandResult(
                 command=command,

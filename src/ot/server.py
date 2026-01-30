@@ -31,11 +31,12 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from loguru import logger
 
 from ot.config.loader import get_config
 from ot.executor import SimpleExecutor, execute_command
+from ot.executor.runner import prepare_command
 
 # Import logging first to remove Loguru's default console handler
 from ot.logging import LogSpan, configure_logging
@@ -271,7 +272,7 @@ def _get_run_description() -> str:
         "openWorldHint": True,
     },
 )
-async def run(command: str) -> str:
+async def run(command: str, ctx: Context) -> str:  # noqa: ARG001
     # Get registry (cached, no rescan per request) and executor
     registry = get_registry()
     executor = _get_executor()
@@ -279,8 +280,20 @@ async def run(command: str) -> str:
     # Record start time for stats
     start_time = time.monotonic()
 
-    # Execute through unified runner
-    result = await execute_command(command, registry, executor)
+    # Step 1: Prepare and validate command
+    prepared = prepare_command(command)
+
+    if prepared.error:
+        return f"Error: {prepared.error}"
+
+    # Step 2: Execute through unified runner (skip validation since already done)
+    result = await execute_command(
+        command,
+        registry,
+        executor,
+        prepared_code=prepared.code,
+        skip_validation=True,
+    )
 
     # Record run-level stats if enabled
     if _stats_writer is not None:

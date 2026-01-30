@@ -159,6 +159,8 @@ class DangerousPatternVisitor(ast.NodeVisitor):
     Pattern matching is automatic based on structure:
     - Patterns without dots match builtins and imports
     - Patterns with dots match qualified function calls
+
+    Two-tier priority: allow > warned > blocked
     """
 
     def __init__(
@@ -188,7 +190,10 @@ class DangerousPatternVisitor(ast.NodeVisitor):
         self.warned_qualified = frozenset(p for p in warned_all if _has_dot(p))
 
     def visit_Call(self, node: ast.Call) -> None:
-        """Check function calls for dangerous patterns."""
+        """Check function calls for dangerous patterns.
+
+        Priority order: blocked > warned (allow handled at setup)
+        """
         func_name = self._get_call_name(node)
 
         if not func_name:
@@ -200,6 +205,7 @@ class DangerousPatternVisitor(ast.NodeVisitor):
 
         if is_qualified:
             # Qualified call (e.g., subprocess.run) - check qualified patterns
+            # Priority: blocked > warned
             if pattern := _matches_pattern(func_name, self.blocked_qualified):
                 self.errors.append(
                     f"Line {node.lineno}: Dangerous function '{func_name}' is not "
@@ -212,6 +218,7 @@ class DangerousPatternVisitor(ast.NodeVisitor):
                 )
         else:
             # Simple call (e.g., exec) - check simple patterns (builtins)
+            # Priority: blocked > warned
             if pattern := _matches_pattern(func_name, self.blocked_simple):
                 self.errors.append(
                     f"Line {node.lineno}: Dangerous builtin '{func_name}' is not "
@@ -325,7 +332,7 @@ def validate_python_code(
             warned_set = frozenset(security_config.warned)
 
             # Pattern priority (highest to lowest):
-            # 1. allow - completely exempt, no warning
+            # 1. allow - completely exempt, no action
             # 2. warned (user) - downgrades blocked defaults to warnings
             # 3. blocked - prevents execution
             # 4. warned (default) - generates warnings

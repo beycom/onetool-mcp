@@ -113,8 +113,12 @@ class MsgConfig(BaseModel):
 class SecurityConfig(BaseModel):
     """Code validation security configuration.
 
-    Controls code validation and which patterns are blocked or warned.
-    Blocked patterns prevent code execution; warned patterns log but allow.
+    Controls code validation with three-tier pattern system:
+    - allow: Execute silently (highest priority)
+    - warned: Log warning but allow execution
+    - blocked: Reject with error (lowest priority)
+
+    Priority order: allow > warned > blocked
 
     Patterns support fnmatch wildcards:
     - '*' matches any characters (e.g., 'subprocess.*' matches 'subprocess.run')
@@ -132,11 +136,15 @@ class SecurityConfig(BaseModel):
     - blocked/warned lists EXTEND the built-in defaults (additive)
     - Adding a pattern to 'warned' downgrades it from blocked (if in defaults)
     - Use 'allow' list to exempt specific patterns entirely (no warning)
-    - This prevents accidentally removing critical security patterns
 
-    This simplified two-category design replaces the previous four categories
-    (blocked_builtins, blocked_functions, warned_functions, warned_imports).
-    The validator determines the match type based on the pattern structure.
+    Example configurations:
+        # Air-gapped mode - block network tools
+        security:
+          block: [brave.*, web_fetch.*, context7.*]
+
+        # Trust file ops
+        security:
+          allow: [file.*]
     """
 
     validate_code: bool = Field(
