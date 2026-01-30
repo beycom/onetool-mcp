@@ -46,14 +46,14 @@ Extension tools SHALL declare dependencies using PEP 723 inline script metadata.
 
 ### Requirement: Internal Tool In-Process Execution
 
-Internal tools (shipped with onetool, without PEP 723 headers) SHALL execute in-process within ot-serve with direct access to bundled dependencies.
+Internal tools (shipped with onetool, without PEP 723 headers) SHALL execute in-process within onetool with direct access to bundled dependencies.
 
 #### Scenario: Internal tool detection
 - **WHEN** a tool file in `src/ot_tools/` does NOT contain PEP 723 metadata
 - **THEN** the system loads and executes it in-process
-- **AND** it has direct access to ot-serve state
+- **AND** it has direct access to onetool state
 
-#### Scenario: Internal tool has ot-serve access
+#### Scenario: Internal tool has onetool access
 - **WHEN** an internal tool executes
 - **THEN** it can access registry, config, and LLM capabilities directly
 - **AND** uses `ot.*` imports (not `ot_sdk`)
@@ -68,12 +68,12 @@ Internal tools (shipped with onetool, without PEP 723 headers) SHALL execute in-
 Extension tools SHALL be discovered from the `.onetool/tools/` directory structure.
 
 #### Scenario: Project extension discovery
-- **WHEN** ot-serve starts
+- **WHEN** onetool starts
 - **THEN** it scans `.onetool/tools/<pack>/<pack>_tools.py` for extensions
 - **AND** loads them as worker-based tools
 
 #### Scenario: Global extension discovery
-- **WHEN** ot-serve starts
+- **WHEN** onetool starts
 - **THEN** it also scans `~/.onetool/tools/<pack>/<pack>_tools.py`
 - **AND** project extensions take precedence over global extensions
 

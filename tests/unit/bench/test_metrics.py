@@ -2,8 +2,8 @@
 
 import pytest
 
-from ot_bench.harness.metrics import LLMCallMetrics, TaskResult
-from ot_bench.harness.runner import split_prompts
+from bench.harness.metrics import LLMCallMetrics, TaskResult
+from bench.harness.runner import split_prompts
 
 # =============================================================================
 # LLMCallMetrics tests

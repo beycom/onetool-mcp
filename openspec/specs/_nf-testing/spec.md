@@ -57,8 +57,8 @@ Every test SHALL have exactly two required markers: a speed tier and a component
 - **THEN** it SHALL be one of:
   - `tools` - Tool implementations (`ot_tools`)
   - `core` - Core library (`ot`)
-  - `serve` - MCP server (`ot_serve`)
-  - `bench` - Benchmark harness (`ot_bench`)
+  - `serve` - MCP server (`onetool`)
+  - `bench` - Benchmark harness (`bench`)
   - `pkg` - Package management
   - `spec` - OpenSpec tooling
 

@@ -3,7 +3,7 @@
 Provides file reading, writing, editing, and management with configurable
 security boundaries. All paths are validated against allowed directories.
 
-Configuration via ot-serve.yaml:
+Configuration via onetool.yaml:
     tools:
       file:
         allowed_dirs: ["."]          # Allowed directories (empty = cwd only)

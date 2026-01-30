@@ -7,8 +7,8 @@ MCP server with single `run` tool for LLM Python code execution.
 - `src/ot/` - Core (executor, config, logging)
 - `src/ot_tools/` - Tools (db, excel, web, file)
 - `src/ot_sdk/` - Tool SDK
-- `src/ot_serve/` - MCP server CLI
-- `src/ot_bench/` - Benchmark CLI
+- `src/onetool/` - MCP server CLI
+- `src/bench/` - Benchmark CLI
 
 ## Config
 

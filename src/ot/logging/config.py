@@ -2,7 +2,7 @@
 
 Outputs structured JSON logs to file only.
 
-Settings from ot-serve.yaml:
+Settings from onetool.yaml:
 - log_level: INFO (default), DEBUG, WARNING, ERROR
 - log_dir: Directory for log files (default: ../logs, relative to config dir)
 """
@@ -199,7 +199,7 @@ def configure_logging(log_name: str = "onetool", level: str | None = None) -> No
         log_name: Name for the log file (e.g., "serve" -> logs/serve.log)
         level: Optional log level override. If None, uses config value.
 
-    Settings from ot-serve.yaml:
+    Settings from onetool.yaml:
     - log_level: Log level (default: INFO)
     - log_dir: Directory for log files (default: ../logs, relative to config dir)
     """

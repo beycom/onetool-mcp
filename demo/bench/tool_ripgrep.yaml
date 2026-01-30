@@ -10,7 +10,7 @@
 #
 # Requires: `rg` binary installed and in PATH
 #
-# Use with: ot-bench run demo/bench/tool_ripgrep.yaml
+# Use with: bench run demo/bench/tool_ripgrep.yaml
 
 defaults:
   timeout: 60
@@ -37,7 +37,7 @@ servers:
   onetool:
     type: stdio
     command: uv
-    args: ["run", "ot-serve"]
+    args: ["run", "onetool"]
     env:
       OT_CWD: demo
 

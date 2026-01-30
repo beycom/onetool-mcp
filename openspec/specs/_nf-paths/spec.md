@@ -25,14 +25,14 @@ The paths module SHALL provide a function to get the effective working directory
 
 #### Scenario: CLI bootstrap on first run
 - **GIVEN** `~/.onetool/` does not exist
-- **WHEN** `ot-serve` starts
+- **WHEN** `onetool` starts
 - **THEN** it SHALL call `ensure_global_dir()` to bootstrap the global directory
 - **AND** the global directory SHALL be seeded from global templates (not bundled defaults)
 
 #### Scenario: Secondary CLIs require global config
 - **GIVEN** `~/.onetool/` does not exist
-- **WHEN** `ot-bench` starts
-- **THEN** it SHALL print an error message directing the user to run `ot-serve init`
+- **WHEN** `bench` starts
+- **THEN** it SHALL print an error message directing the user to run `onetool init`
 - **AND** exit with non-zero status
 
 ### Requirement: Directory Structure
@@ -50,16 +50,16 @@ The `.onetool/` directory SHALL use a subdirectory structure to organise files b
   - `tools/` - Reserved for installed tool packs
 
 #### Scenario: Config files in config subdirectory
-- **GIVEN** config files like `ot-serve.yaml`, `secrets.yaml`, `snippets.yaml`
+- **GIVEN** config files like `onetool.yaml`, `secrets.yaml`, `snippets.yaml`
 - **WHEN** they are created or looked up
 - **THEN** they SHALL be in the `config/` subdirectory
-- **AND** paths like `~/.onetool/config/ot-serve.yaml`
+- **AND** paths like `~/.onetool/config/onetool.yaml`
 
 #### Scenario: Logs in logs subdirectory
 - **GIVEN** log files are written
 - **WHEN** the log directory is resolved
 - **THEN** logs SHALL be written to the `logs/` subdirectory
-- **AND** paths like `~/.onetool/logs/ot-serve.log`
+- **AND** paths like `~/.onetool/logs/onetool.log`
 
 #### Scenario: Stats in stats subdirectory
 - **GIVEN** statistics are persisted
@@ -75,13 +75,13 @@ All config loaders SHALL use a standard resolution order with subdirectory suppo
 - **GIVEN** a CLI needs to load its config
 - **WHEN** no explicit path is provided
 - **THEN** it SHALL resolve in order:
-  1. Environment variable (e.g., `OT_SERVE_CONFIG`)
+  1. Environment variable (e.g., `ONETOOL_CONFIG`)
   2. `get_effective_cwd() / ".onetool" / "config" / "<cli>.yaml"`
   3. `~/.onetool/config/<cli>.yaml`
   4. Built-in defaults (from bundled configs)
 
 #### Scenario: Project config takes precedence
-- **GIVEN** config exists at both `cwd/.onetool/config/ot-serve.yaml` and `~/.onetool/config/ot-serve.yaml`
+- **GIVEN** config exists at both `cwd/.onetool/config/onetool.yaml` and `~/.onetool/config/onetool.yaml`
 - **WHEN** the config is resolved
 - **THEN** the project config SHALL be used
 
@@ -183,7 +183,7 @@ The `tools_dir` configuration SHALL resolve relative paths against OT_DIR.
 
 #### Scenario: Relative tools_dir pattern
 - **GIVEN** config with `tools_dir: ["tools/*.py"]`
-- **AND** config loaded from `/project/.onetool/config/ot-serve.yaml`
+- **AND** config loaded from `/project/.onetool/config/onetool.yaml`
 - **WHEN** tool files are discovered
 - **THEN** the pattern SHALL resolve to `/project/.onetool/tools/*.py`
 
@@ -206,7 +206,7 @@ The paths module SHALL provide access to bundled default configuration files.
 - **GIVEN** the bundled config directory exists
 - **WHEN** its contents are listed
 - **THEN** it SHALL contain:
-  - `ot-serve.yaml`, `ot-bench.yaml` (minimal working configs)
+  - `onetool.yaml`, `bench.yaml` (minimal working configs)
   - `prompts.yaml`, `snippets.yaml`, `servers.yaml`, `diagram.yaml`
   - `diagram-templates/` subdirectory
 - **NOTE** `secrets.yaml` is NOT in bundled defaults; it is in global templates only
@@ -231,11 +231,11 @@ The paths module SHALL provide access to global template configuration files for
 - **GIVEN** the global templates directory exists
 - **WHEN** its contents are listed
 - **THEN** it SHALL contain:
-  - `ot-serve.yaml` (commented template with all options)
+  - `onetool.yaml` (commented template with all options)
   - `snippets.yaml` (example snippets as comments)
   - `servers.yaml` (example MCP server configs as comments)
   - `secrets-template.yaml` (API key placeholders, copied as `secrets.yaml`)
-  - `ot-bench.yaml` (bench config template)
+  - `bench.yaml` (bench config template)
   - `bench-secrets-template.yaml` (bench secrets, copied as `bench-secrets.yaml`)
 
 #### Scenario: Template files avoid gitignore
@@ -306,14 +306,14 @@ The `ensure_global_dir` function SHALL seed from global templates into the `conf
 
 #### Scenario: CLI init reset command
 - **GIVEN** a user wants to reset their global config
-- **WHEN** `ot-serve init reset` is called
+- **WHEN** `onetool init reset` is called
 - **THEN** it SHALL prompt for each existing file before overwriting (default: Y)
 - **AND** offer to create a backup before overwriting (default: Y)
 - **AND** backups SHALL be numbered (`file.bak`, `file.bak.1`, `file.bak.2`, etc.)
 
 #### Scenario: CLI init validate command
 - **GIVEN** a user wants to validate config and view status
-- **WHEN** `ot-serve init validate` is called
+- **WHEN** `onetool init validate` is called
 - **THEN** it SHALL validate configuration files for syntax errors
 - **AND** display (all sorted alphabetically with counts):
   - Global and project directory paths with existence status

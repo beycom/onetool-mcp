@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any, Literal
 import yaml
 from pydantic import BaseModel, Field, field_validator
 
-from ot_bench.secrets import get_bench_secret
+from bench.secrets import get_bench_secret
 
 if TYPE_CHECKING:
     from pathlib import Path

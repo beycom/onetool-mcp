@@ -160,7 +160,7 @@ The core: one `run` tool executes any Python code. Drop files in `tools/`, they'
 ot                              # Start server
 ```
 
-### `ot-bench` - Benchmark Harness
+### `bench` - Benchmark Harness
 
 Real LLM + MCP testing. Define tasks in YAML, get objective metrics: token counts, costs, accuracy, timing.
 
@@ -169,7 +169,7 @@ Real LLM + MCP testing. Define tasks in YAML, get objective metrics: token count
 - **Direct tasks**: invoke tools without LLM
 
 ```bash
-ot-bench run examples/bench/package_version.yaml
+bench run examples/bench/package_version.yaml
 ```
 
 ---
@@ -284,7 +284,7 @@ OneTool exists because MCP doesn't scale:
 | Vibe coding         | OpenSpec integration                                     |
 | Tool sprawl         | Auto-discovery, drop-in files                            |
 | No package manager  | Drop-in tool files                                       |
-| No rigorous testing | `ot-bench` with LLM-as-judge                             |
+| No rigorous testing | `bench` with LLM-as-judge                             |
 
 The industry is shifting from vibe coding to agentic engineering. OneTool is built for that future.
 

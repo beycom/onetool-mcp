@@ -241,7 +241,7 @@ Publish a message to a configured topic.
 ot.notify(topic="notes", message="Remember to review PR #123")
 ```
 
-Configure topics in `ot-serve.yaml`:
+Configure topics in `onetool.yaml`:
 
 ```yaml
 tools:

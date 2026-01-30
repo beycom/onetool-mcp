@@ -8,7 +8,7 @@
 #
 # Uses the Northwind sample database at demo/db/northwind.db.
 #
-# Use with: ot-bench run demo/bench/tool_db.yaml
+# Use with: bench run demo/bench/tool_db.yaml
 
 defaults:
   timeout: 60
@@ -31,7 +31,7 @@ servers:
   onetool:
     type: stdio
     command: uv
-    args: ["run", "ot-serve"]
+    args: ["run", "onetool"]
     env:
       OT_CWD: demo
 

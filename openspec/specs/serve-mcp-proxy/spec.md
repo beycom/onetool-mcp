@@ -10,7 +10,7 @@ Enable OneTool to proxy external MCP servers, exposing their tools through OneTo
 The system SHALL manage proxy MCP server connections through the server lifecycle.
 
 #### Scenario: Startup connection
-- **GIVEN** servers configured in ot-serve.yaml
+- **GIVEN** servers configured in onetool.yaml
 - **WHEN** the OneTool server starts
 - **THEN** it SHALL connect to all enabled MCP servers before accepting requests
 

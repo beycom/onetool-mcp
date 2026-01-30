@@ -133,7 +133,7 @@ python, mcp, model-context-protocol, mcp-server, llm, code-execution, mcp-tools,
 ```text
 - 15 packs
 - 90+ tools
-- 2 CLIs (ot-serve, ot-bench)
+- 2 CLIs (onetool, bench)
 - 96% token reduction
 - 24x cost reduction
 ```
@@ -185,7 +185,7 @@ Use Anthropic's standard MCP terminology consistently:
 **Correct:**
 - "The agent generates code you can review before execution"
 - "Explicit calls prevent agent tool selection errors"
-- "Real agent + MCP testing with ot-bench"
+- "Real agent + MCP testing with bench"
 - "LLM performance degrades as tokens increase" (model characteristic)
 
 **Avoid:**

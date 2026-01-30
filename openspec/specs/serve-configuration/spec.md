@@ -10,14 +10,14 @@ The system SHALL load configuration from a YAML file using a standard resolution
 
 #### Scenario: Default configuration file resolution
 - **GIVEN** no explicit config path provided
-- **AND** no `OT_SERVE_CONFIG` environment variable
+- **AND** no `ONETOOL_CONFIG` environment variable
 - **WHEN** the server starts
-- **THEN** it SHALL look for `cwd/.onetool/config/ot-serve.yaml` first
-- **AND** fall back to `~/.onetool/config/ot-serve.yaml` if not found
+- **THEN** it SHALL look for `cwd/.onetool/config/onetool.yaml` first
+- **AND** fall back to `~/.onetool/config/onetool.yaml` if not found
 - **AND** use bundled defaults if neither exists
 
 #### Scenario: Environment variable override
-- **GIVEN** `OT_SERVE_CONFIG=/path/to/config.yaml` environment variable
+- **GIVEN** `ONETOOL_CONFIG=/path/to/config.yaml` environment variable
 - **WHEN** the server starts
 - **THEN** it SHALL load from the specified path
 - **AND** skip the standard resolution order
@@ -26,8 +26,8 @@ The system SHALL load configuration from a YAML file using a standard resolution
 - **GIVEN** `OT_CWD=myproject` environment variable
 - **AND** no explicit config path
 - **WHEN** the server starts
-- **THEN** it SHALL look for `myproject/.onetool/config/ot-serve.yaml`
-- **AND** fall back to `~/.onetool/config/ot-serve.yaml`
+- **THEN** it SHALL look for `myproject/.onetool/config/onetool.yaml`
+- **AND** fall back to `~/.onetool/config/onetool.yaml`
 
 #### Scenario: Custom configuration file
 - **GIVEN** `--config /path/to/config.yaml` argument
@@ -299,17 +299,17 @@ The MCP server CLI SHALL follow the `ot-<purpose>` naming convention.
 #### Scenario: CLI command name
 - **GIVEN** the OneTool MCP server package
 - **WHEN** the user invokes the CLI
-- **THEN** the command SHALL be `ot-serve`
-- **AND** it SHALL be consistent with other CLIs (`ot-bench`)
+- **THEN** the command SHALL be `onetool`
+- **AND** it SHALL be consistent with other CLIs (`bench`)
 
 #### Scenario: CLI help
-- **GIVEN** the user runs `ot-serve --help`
+- **GIVEN** the user runs `onetool --help`
 - **WHEN** help is displayed
 - **THEN** it SHALL describe the MCP server functionality
 - **AND** it SHALL show available options including `--config` and `--version`
 
 #### Scenario: CLI version
-- **GIVEN** the user runs `ot-serve --version`
+- **GIVEN** the user runs `onetool --version`
 - **WHEN** version is displayed
 - **THEN** it SHALL show the package version
 
@@ -362,7 +362,7 @@ The system SHALL support rich project configuration with paths and attributes.
 Configuration files SHALL include a schema version for migration support.
 
 #### Scenario: Version field present
-- **GIVEN** a config file `ot-serve.yaml`
+- **GIVEN** a config file `onetool.yaml`
 - **WHEN** the file is loaded
 - **THEN** the `version` field SHALL be read if present
 - **DEFAULT** 1 if missing
@@ -582,7 +582,7 @@ The system SHALL support a `secrets_file` field for loading secrets relative to 
 #### Scenario: Default secrets file
 - **GIVEN** no `secrets_file` in configuration
 - **WHEN** the server starts
-- **THEN** it SHALL look for `secrets.yaml` in the `config/` subdirectory (same directory as `ot-serve.yaml`)
+- **THEN** it SHALL look for `secrets.yaml` in the `config/` subdirectory (same directory as `onetool.yaml`)
 
 #### Scenario: Custom secrets file
 - **GIVEN** `secrets_file: ../shared/secrets.yaml`
@@ -610,7 +610,7 @@ The system SHALL support a `secrets_file` field for loading secrets relative to 
 The system SHALL track the directory containing the loaded configuration file.
 
 #### Scenario: Config loaded from file
-- **GIVEN** configuration loaded from `/project/.onetool/config/ot-serve.yaml`
+- **GIVEN** configuration loaded from `/project/.onetool/config/onetool.yaml`
 - **WHEN** relative paths are resolved
 - **THEN** they SHALL resolve relative to `/project/.onetool/config/`
 
@@ -966,7 +966,7 @@ The system SHALL support an `inherit` directive to control config merging behavi
 #### Scenario: Explicit global inheritance
 - **GIVEN** a project config with `inherit: global`
 - **WHEN** the config is loaded
-- **THEN** it SHALL load `~/.onetool/ot-serve.yaml` first
+- **THEN** it SHALL load `~/.onetool/onetool.yaml` first
 - **AND** process its includes
 - **AND** deep merge the project config on top
 
@@ -984,7 +984,7 @@ The system SHALL support an `inherit` directive to control config merging behavi
 - **AND** only the project config SHALL be used
 
 #### Scenario: Global config inheritance
-- **GIVEN** `~/.onetool/ot-serve.yaml` with `inherit: bundled`
+- **GIVEN** `~/.onetool/onetool.yaml` with `inherit: bundled`
 - **WHEN** the global config is loaded
 - **THEN** bundled defaults SHALL be merged first
 - **AND** global overrides SHALL be applied
@@ -1109,7 +1109,7 @@ The system SHALL dynamically build `ToolsConfig` from discovered tool schemas.
 - **AND** each pack with a Config SHALL have a corresponding field
 
 #### Scenario: Unknown tool config in YAML
-- **GIVEN** a `tools.unknown_pack:` section in ot-serve.yaml
+- **GIVEN** a `tools.unknown_pack:` section in onetool.yaml
 - **AND** no tool with pack "unknown_pack" is discovered
 - **WHEN** configuration is loaded
 - **THEN** the unknown section SHALL be ignored
@@ -1117,7 +1117,7 @@ The system SHALL dynamically build `ToolsConfig` from discovered tool schemas.
 
 #### Scenario: Partial tool configuration
 - **GIVEN** a tool has Config class with defaults
-- **AND** ot-serve.yaml only specifies some fields
+- **AND** onetool.yaml only specifies some fields
 - **WHEN** configuration is loaded
 - **THEN** specified fields SHALL override defaults
 - **AND** unspecified fields SHALL use Config class defaults
@@ -1130,7 +1130,7 @@ Tools SHALL access their configuration via `get_tool_config()` at runtime.
 - **GIVEN** a tool needs its configuration
 - **WHEN** `get_tool_config("brave", Config)` is called
 - **THEN** it SHALL return a Config instance with merged values
-- **AND** values from ot-serve.yaml SHALL override defaults
+- **AND** values from onetool.yaml SHALL override defaults
 
 #### Scenario: Get tool config without schema
 - **GIVEN** a tool calls `get_tool_config("brave")`
@@ -1200,7 +1200,7 @@ The system SHALL support a dedicated directory for statistics files.
 The system SHALL support configuration for output sanitisation in the security section.
 
 #### Scenario: Configuration structure
-- **GIVEN** ot-serve.yaml configuration
+- **GIVEN** onetool.yaml configuration
 - **WHEN** security.sanitize section is defined
 - **THEN** it SHALL support the following structure:
 

@@ -38,7 +38,7 @@ The SDK SHALL provide a `get_secret(name)` function for accessing secrets from `
 
 ### Requirement: Configuration Access
 
-The SDK SHALL provide a `get_config(path)` function for accessing configuration from `ot-serve.yaml`.
+The SDK SHALL provide a `get_config(path)` function for accessing configuration from `onetool.yaml`.
 
 #### Scenario: Retrieve config value
 - **WHEN** a tool calls `get_config("tools.brave_search.timeout")`

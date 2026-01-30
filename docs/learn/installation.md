@@ -42,7 +42,7 @@ irm https://astral.sh/uv/install.ps1 | iex
 uv tool install onetool-mcp
 ```
 
-This installs `ot-serve` and `ot-bench` commands globally.
+This installs `onetool` and `bench` commands globally.
 
 ### Using pip
 
@@ -96,7 +96,7 @@ CONTEXT7_API_KEY: "c7-..."
 
 ### Transform Tool Configuration
 
-The transform tool requires explicit configuration in `ot-serve.yaml`:
+The transform tool requires explicit configuration in `onetool.yaml`:
 
 ```yaml
 tools:
@@ -117,7 +117,7 @@ Add to `~/.claude/settings.json`:
 {
   "mcpServers": {
     "onetool": {
-      "command": "ot-serve"
+      "command": "onetool"
     }
   }
 }
@@ -129,7 +129,7 @@ Add to `~/.claude/settings.json`:
 {
   "mcpServers": {
     "onetool": {
-      "command": "ot-serve",
+      "command": "onetool",
       "env": {
         "OT_BRAVE_API_KEY": "your-brave-api-key"
       }
@@ -190,7 +190,7 @@ uv tool install onetool-mcp \
 Check which dependencies are installed:
 
 ```bash
-ot-serve init validate
+onetool init validate
 ```
 
 The Dependencies section shows each tool's requirements and their status (OK or missing).
@@ -226,17 +226,17 @@ winget install BurntSushi.ripgrep.MSVC
 
 ```bash
 # Check version
-ot-serve --version
+onetool --version
 
 # Start MCP server
-ot-serve
+onetool
 
 # Run benchmarks (from source)
-OT_CWD=demo ot-bench run demo/bench/features.yaml
+OT_CWD=demo bench run demo/bench/features.yaml
 ```
 
 ## Next Steps
 
 - [Configuration](configuration.md) - YAML schema and options
-- [CLI Reference](../reference/cli/ot-serve.md) - Command-line tools
+- [CLI Reference](../reference/cli/onetool.md) - Command-line tools
 - [Examples](examples.md) - Demo project usage

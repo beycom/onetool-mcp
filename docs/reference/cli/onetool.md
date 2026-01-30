@@ -1,4 +1,4 @@
-# ot-serve
+# onetool
 
 **The MCP server. One tool. Unlimited capabilities.**
 
@@ -7,14 +7,14 @@ Exposes a single `run` tool that executes Python code. Your agent writes code; O
 ## Usage
 
 ```bash
-ot-serve [OPTIONS]
+onetool [OPTIONS]
 ```
 
 ## Options
 
 | Option | Description |
 |--------|-------------|
-| `-c, --config PATH` | Path to ot-serve.yaml configuration file |
+| `-c, --config PATH` | Path to onetool.yaml configuration file |
 | `-v, --version` | Show version and exit |
 
 ## Commands
@@ -24,10 +24,10 @@ ot-serve [OPTIONS]
 Initialize and manage global configuration in `~/.onetool/`.
 
 ```bash
-ot-serve init [subcommand]
+onetool init [subcommand]
 ```
 
-Running `ot-serve init` without a subcommand creates the global config directory.
+Running `onetool init` without a subcommand creates the global config directory.
 
 | Subcommand | Description |
 |------------|-------------|
@@ -39,7 +39,7 @@ Running `ot-serve init` without a subcommand creates the global config directory
 Creates the global config directory and copies template files if they don't already exist.
 
 ```bash
-ot-serve init
+onetool init
 ```
 
 #### init validate
@@ -47,7 +47,7 @@ ot-serve init
 Validates configuration files and displays status including packs, secrets (names only), snippets, aliases, and MCP servers.
 
 ```bash
-ot-serve init validate
+onetool init validate
 ```
 
 #### init reset
@@ -55,22 +55,22 @@ ot-serve init validate
 Resets config files in `~/.onetool/` to fresh templates. Prompts for each existing file before overwriting, with option to create backups. Backups are named `file.bak`, `file.bak.1`, `file.bak.2`, etc.
 
 ```bash
-ot-serve init reset
+onetool init reset
 ```
 
 ## Examples
 
 ```bash
 # Start MCP server (stdio)
-ot-serve
+onetool
 
 # Use specific config
-ot-serve --config config/ot-serve.yaml
+onetool --config config/onetool.yaml
 ```
 
 ## Configuration
 
-Configuration file: `config/ot-serve.yaml` or `.onetool/ot-serve.yaml`
+Configuration file: `config/onetool.yaml` or `.onetool/onetool.yaml`
 
 See [Configuration Reference](../../learn/configuration.md) for full schema.
 
@@ -78,7 +78,7 @@ See [Configuration Reference](../../learn/configuration.md) for full schema.
 
 | Variable | Description |
 |----------|-------------|
-| `OT_SERVE_CONFIG` | Config file path override |
+| `ONETOOL_CONFIG` | Config file path override |
 | `OT_LOG_LEVEL` | Log level (DEBUG/INFO/WARNING/ERROR) |
 | `OT_LOG_DIR` | Log directory path |
 

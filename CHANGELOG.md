@@ -18,7 +18,7 @@ All notable changes to OneTool will be documented in this file.
 - Worker process isolation for external dependencies
 - Configurable allow/ask/warn/block security policies
 - Secrets isolation (never logged)
-- Benchmark harness (`ot-bench`)
+- Benchmark harness (`bench`)
 
 ### Changed
 

@@ -22,11 +22,11 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 from openai import OpenAI
 
-from ot_bench.harness.metrics import EvaluationResult, TaskResult
-from ot_bench.secrets import get_bench_secret
+from bench.harness.metrics import EvaluationResult, TaskResult
+from bench.secrets import get_bench_secret
 
 if TYPE_CHECKING:
-    from ot_bench.harness.config import EvaluateConfig, HarnessConfig, TaskConfig
+    from bench.harness.config import EvaluateConfig, HarnessConfig, TaskConfig
 
 
 # =============================================================================

@@ -9,7 +9,7 @@ OneTool reduces MCP token usage from ~46K to ~2K (96% reduction, see docs/learn/
 ## Quick Start
 
 ```bash
-uv sync && uv run ot-serve
+uv sync && uv run onetool
 ```
 
 ## Invocation

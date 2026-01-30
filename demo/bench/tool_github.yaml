@@ -4,7 +4,7 @@
 # - Option A: Direct MCP (HTTP) - api.githubcopilot.com with PAT
 # - Option B: OneTool proxy - proxied via OneTool
 #
-# Use with: ot-bench run demo/bench/tool_github.yaml
+# Use with: bench run demo/bench/tool_github.yaml
 
 defaults:
   timeout: 120
@@ -58,7 +58,7 @@ servers:
   onetool:
     type: stdio
     command: uv
-    args: ["run", "ot-serve"]
+    args: ["run", "onetool"]
     env:
       OT_CWD: demo
 

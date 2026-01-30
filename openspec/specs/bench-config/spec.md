@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the YAML configuration schema for the ot-bench harness, including server connections, defaults, variable expansion, and environment handling.
+Defines the YAML configuration schema for the bench harness, including server connections, defaults, variable expansion, and environment handling.
 
 ---
 
@@ -14,19 +14,19 @@ The harness SHALL load benchmark configuration from a YAML file.
 
 #### Scenario: Load harness configuration
 - **GIVEN** a YAML file with harness configuration
-- **WHEN** `ot-bench run <file>` is executed
+- **WHEN** `bench run <file>` is executed
 - **THEN** it SHALL parse and validate the configuration
 
 #### Scenario: Multiple files via glob pattern
 - **GIVEN** a glob pattern like `demo/bench/*.yaml`
-- **WHEN** `ot-bench run demo/bench/*.yaml` is executed
+- **WHEN** `bench run demo/bench/*.yaml` is executed
 - **THEN** it SHALL expand the pattern to matching files
 - **AND** run benchmarks for each file sequentially
 - **AND** aggregate results across all files
 
 #### Scenario: Multiple explicit files
 - **GIVEN** multiple file paths
-- **WHEN** `ot-bench run file1.yaml file2.yaml` is executed
+- **WHEN** `bench run file1.yaml file2.yaml` is executed
 - **THEN** it SHALL run benchmarks for each file in order
 
 #### Scenario: Missing configuration file

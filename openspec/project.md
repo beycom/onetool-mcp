@@ -8,7 +8,7 @@ OneTool is an MCP server exposing a single `run` tool for AI-assisted developmen
 
 ## What It Provides
 
-**CLIs**: `ot-serve` (MCP server), `ot-bench` (benchmarks)
+**CLIs**: `onetool` (MCP server), `bench` (benchmarks)
 
 **Built-in tools** in `src/ot_tools/`: `brave.*` (search), `web.*` (fetch), `ground.*` (Gemini), `context7.*` (docs), `code.*` (semantic search), `llm.*` (transform), `db.*` (database), `package.*` (versions), `ripgrep.*` (grep)
 
@@ -26,13 +26,13 @@ Python 3.11+, FastMCP, OpenAI SDK (OpenRouter), Typer, Pydantic, YAML config
 
 **Resolution order**: `OT_<CLI>_CONFIG` env var → `cwd/.onetool/config/<cli>.yaml` → `~/.onetool/config/<cli>.yaml` → defaults
 
-**Working directory**: Set `OT_CWD` to override the effective working directory (e.g., `OT_CWD=demo ot-serve`).
+**Working directory**: Set `OT_CWD` to override the effective working directory (e.g., `OT_CWD=demo onetool`).
 
 **Directory structure**: `.onetool/` uses subdirectories to organise files by purpose:
 
 ```text
 .onetool/
-├── config/     # YAML configuration files (ot-serve.yaml, secrets.yaml, etc.)
+├── config/     # YAML configuration files (onetool.yaml, secrets.yaml, etc.)
 ├── logs/       # Application log files
 ├── stats/      # Statistics data (stats.jsonl)
 └── tools/      # Reserved for installed tool packs
@@ -42,7 +42,7 @@ Python 3.11+, FastMCP, OpenAI SDK (OpenRouter), Typer, Pydantic, YAML config
 - Project configs: `<project>/.onetool/config/*.yaml`
 - Global configs: `~/.onetool/config/*.yaml`
 - Bundled defaults: `src/ot/config/defaults/` (packaged with wheel)
-- Secrets: `secrets.yaml` (ot-serve) and `bench-secrets.yaml` (ot-bench) in `.onetool/config/`
+- Secrets: `secrets.yaml` (onetool) and `bench-secrets.yaml` (bench) in `.onetool/config/`
 
 **Variable expansion**: `${VAR}` in config files reads from `secrets.yaml` only (not environment variables). Use `${VAR:-default}` for defaults. Paths support `~` expansion only.
 

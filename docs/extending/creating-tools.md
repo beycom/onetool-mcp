@@ -249,7 +249,7 @@ The `ot_sdk` package provides these utilities for extension tools:
 | Module | Purpose |
 |--------|---------|
 | `worker_main` | Main loop - dispatches JSON-RPC requests to functions |
-| `get_config(key)` | Access configuration from `ot-serve.yaml` |
+| `get_config(key)` | Access configuration from `onetool.yaml` |
 | `get_secret(key)` | Access secrets from `secrets.yaml` |
 | `http` | Pre-configured httpx client with connection pooling |
 | `log(span, **kwargs)` | Structured logging context manager |
@@ -505,8 +505,8 @@ src/
 ├── ot/           # Core library
 ├── ot_sdk/       # SDK for extension tools
 ├── ot_tools/     # Built-in tools (auto-discovered)
-├── ot_serve/     # CLI: ot-serve
-└── ot_bench/     # CLI: ot-bench
+├── onetool/     # CLI: onetool
+└── bench/     # CLI: bench
 ```
 
 ## Contributing

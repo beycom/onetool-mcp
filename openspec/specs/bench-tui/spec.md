@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the TUI favorites mode and harness configuration file for ot-bench.
+Defines the TUI favorites mode and harness configuration file for bench.
 
 ---
 
@@ -14,7 +14,7 @@ The harness CLI SHALL support an interactive TUI mode for selecting benchmark fi
 
 #### Scenario: Launch TUI mode
 
-- **WHEN** user runs `ot-bench run --tui`
+- **WHEN** user runs `bench run --tui`
 - **THEN** an interactive picker displays configured favorites
 - **AND** user can select a benchmark to run
 
@@ -47,8 +47,8 @@ The harness CLI SHALL support an interactive TUI mode for selecting benchmark fi
 
 #### Scenario: No favorites configured
 
-- **GIVEN** no favorites in ot-bench.yaml
-- **WHEN** user runs `ot-bench run --tui`
+- **GIVEN** no favorites in bench.yaml
+- **WHEN** user runs `bench run --tui`
 - **THEN** a message indicates no favorites are configured
 
 ### Requirement: Harness Configuration File
@@ -58,8 +58,8 @@ The harness CLI SHALL support a configuration file for CLI settings including fa
 #### Scenario: Config file location
 
 - **WHEN** no config path specified
-- **THEN** looks for ot-bench.yaml in `config/` directory
-- **OR** uses OT_BENCH_CONFIG environment variable
+- **THEN** looks for bench.yaml in `config/` directory
+- **OR** uses BENCH_CONFIG environment variable
 
 #### Scenario: Favorites configuration
 
@@ -71,7 +71,7 @@ The harness CLI SHALL support a configuration file for CLI settings including fa
 
 #### Scenario: Favorites config format
 
-- **GIVEN** ot-bench.yaml
+- **GIVEN** bench.yaml
 - **WHEN** favorites are defined
 - **THEN** favorites are specified as:
 

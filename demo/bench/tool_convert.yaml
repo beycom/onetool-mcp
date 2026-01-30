@@ -13,7 +13,7 @@
 # - attention-paper.pdf (2.2MB, 15 pages) - "Attention Is All You Need"
 # - file_example_1MB.docx, file_example_PPT_1MB.pptx, file_example_XLS_1000.xlsx
 #
-# Use with: ot-bench run demo/bench/tool_convert.yaml
+# Use with: bench run demo/bench/tool_convert.yaml
 
 defaults:
   timeout: 120
@@ -34,7 +34,7 @@ servers:
   onetool:
     type: stdio
     command: uv
-    args: ["run", "ot-serve"]
+    args: ["run", "onetool"]
     env:
       OT_CWD: demo
 

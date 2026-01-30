@@ -42,25 +42,25 @@ For development, create a `.onetool/` directory in your extension repository:
 ```
 ot-mytool/
 ├── .onetool/
-│   ├── ot-serve.yaml     # Server config (tools_dir, etc.)
+│   ├── onetool.yaml     # Server config (tools_dir, etc.)
 │   ├── secrets.yaml      # API keys for testing
-│   └── ot-bench.yaml     # Benchmark harness config (optional)
-├── demo.yaml             # Test scenarios (ot-bench run demo.yaml)
+│   └── bench.yaml     # Benchmark harness config (optional)
+├── demo.yaml             # Test scenarios (bench run demo.yaml)
 └── src/
     └── mytool.py
 ```
 
-### `.onetool/ot-serve.yaml`
+### `.onetool/onetool.yaml`
 
 Point `tools_dir` at your extension source:
 
 ```yaml
-# .onetool/ot-serve.yaml
+# .onetool/onetool.yaml
 tools_dir:
   - ./src/*.py
 ```
 
-Run `ot-serve` from your extension directory. It finds `.onetool/ot-serve.yaml` automatically.
+Run `onetool` from your extension directory. It finds `.onetool/onetool.yaml` automatically.
 
 ### `.onetool/secrets.yaml`
 
@@ -71,12 +71,12 @@ Add API keys your tool needs during development:
 MY_API_KEY: "dev-key-for-testing"
 ```
 
-### `.onetool/ot-bench.yaml`
+### `.onetool/bench.yaml`
 
 Configure the benchmark harness (model, evaluators, server definitions):
 
 ```yaml
-# .onetool/ot-bench.yaml
+# .onetool/bench.yaml
 defaults:
   timeout: 60
   model: anthropic/claude-sonnet-4
@@ -84,7 +84,7 @@ defaults:
 servers:
   mytool:
     type: stdio
-    command: ot-serve
+    command: onetool
 ```
 
 ### Test Scenario Files
@@ -101,7 +101,7 @@ scenarios:
         prompt: "Search for python tutorials using mytool.search"
 ```
 
-Run tests with: `ot-bench run demo.yaml`
+Run tests with: `bench run demo.yaml`
 
 ## Running Locally
 
@@ -109,10 +109,10 @@ From your extension directory:
 
 ```bash
 # Start the server with your local config
-ot-serve
+onetool
 
 # In another terminal, run benchmarks
-ot-bench
+bench
 ```
 
 The server discovers your tool from the local `tools_dir` configuration.
@@ -162,7 +162,7 @@ The `ot_sdk` package provides utilities for extension tools:
 | Export | Purpose |
 |--------|---------|
 | `worker_main` | Main loop - handles JSON-RPC requests |
-| `get_config(key)` | Access configuration from `ot-serve.yaml` |
+| `get_config(key)` | Access configuration from `onetool.yaml` |
 | `get_secret(key)` | Access secrets from `secrets.yaml` |
 | `http` | Pre-configured httpx client |
 | `log(span, **kwargs)` | Structured logging context manager |
@@ -199,7 +199,7 @@ When users want to use your extension, they add it to their `tools_dir`:
 ### Global installation
 
 ```yaml
-# ~/.onetool/ot-serve.yaml
+# ~/.onetool/onetool.yaml
 tools_dir:
   - ~/extensions/ot-mytool/src/*.py
 ```
@@ -207,7 +207,7 @@ tools_dir:
 ### Project-specific
 
 ```yaml
-# project/.onetool/ot-serve.yaml
+# project/.onetool/onetool.yaml
 tools_dir:
   - ~/extensions/ot-mytool/src/*.py
   - ./local-tools/*.py
@@ -217,7 +217,7 @@ Glob patterns work for selecting tool files.
 
 ## Testing Without Full Installation
 
-Test your extension functions directly without running `ot-serve`:
+Test your extension functions directly without running `onetool`:
 
 ```python
 # test_mytool.py
@@ -254,7 +254,7 @@ For larger extensions, organize implementation in a subpackage:
 ```
 ot-convert/
 ├── .onetool/
-│   ├── ot-serve.yaml
+│   ├── onetool.yaml
 │   └── secrets.yaml
 ├── src/
 │   ├── convert.py           # Main tool file (worker)

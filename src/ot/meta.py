@@ -847,7 +847,7 @@ def notify(*, topic: str, message: str) -> str:
     """Publish a message to the matching topic file.
 
     Routes the message to a YAML file based on topic pattern matching
-    configured in ot-serve.yaml. The write happens asynchronously.
+    configured in onetool.yaml. The write happens asynchronously.
 
     Args:
         topic: Topic string for routing (e.g., "status:scan", "notes")
@@ -985,7 +985,7 @@ def reload() -> str:
     """Force reload of all configuration.
 
     Clears all cached state and reloads from disk:
-    - Configuration (ot-serve.yaml and includes)
+    - Configuration (onetool.yaml and includes)
     - Secrets (secrets.yaml)
     - Tool registry (tool files from tools_dir)
     - Prompts

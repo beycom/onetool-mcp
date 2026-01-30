@@ -54,7 +54,7 @@ Secure file operations with configurable security boundaries. Read, write, edit,
 
 ## Configuration
 
-Configure via `ot-serve.yaml`:
+Configure via `onetool.yaml`:
 
 ```yaml
 tools:

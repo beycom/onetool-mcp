@@ -28,8 +28,8 @@ LLM-powered data transformation tools. Takes input data and a prompt, uses an LL
 
 Configuration (tool not available until all are set):
 - `OPENAI_API_KEY` in secrets.yaml
-- `transform.base_url` in ot-serve.yaml (e.g., `https://openrouter.ai/api/v1`)
-- `transform.model` in ot-serve.yaml (e.g., `openai/gpt-5-mini`)
+- `transform.base_url` in onetool.yaml (e.g., `https://openrouter.ai/api/v1`)
+- `transform.model` in onetool.yaml (e.g., `openai/gpt-5-mini`)
 
 ## Examples
 
@@ -55,7 +55,7 @@ llm.transform(
 
 ## Configuration
 
-Add to `ot-serve.yaml`:
+Add to `onetool.yaml`:
 
 ```yaml
 tools:

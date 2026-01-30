@@ -11,7 +11,7 @@ from ot.logging import LogSpan
 from ot.paths import get_effective_cwd
 
 if TYPE_CHECKING:
-    from ot_bench.harness.metrics import ScenarioResult
+    from bench.harness.metrics import ScenarioResult
 
 
 def write_results_csv(

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines CLI output, verbose/trace modes, and console reporter for ot-bench.
+Defines CLI output, verbose/trace modes, and console reporter for bench.
 
 ---
 
@@ -13,7 +13,7 @@ Defines CLI output, verbose/trace modes, and console reporter for ot-bench.
 The system SHALL provide detailed CLI output for debugging.
 
 #### Scenario: Verbose tool calls
-- **GIVEN** `ot-bench run --verbose`
+- **GIVEN** `bench run --verbose`
 - **WHEN** a tool is called
 - **THEN** it SHALL display:
   - Tool name with `→` prefix
@@ -22,7 +22,7 @@ The system SHALL provide detailed CLI output for debugging.
   - Character count of result
 
 #### Scenario: Verbose server connections
-- **GIVEN** `ot-bench run --verbose`
+- **GIVEN** `bench run --verbose`
 - **WHEN** connecting to MCP servers
 - **THEN** it SHALL display:
   - Server name with loading indicator
@@ -45,7 +45,7 @@ The system SHALL provide detailed CLI output for debugging.
 The system SHALL provide timestamped request/response tracing for debugging.
 
 #### Scenario: Trace flag enabled
-- **GIVEN** `ot-bench run --trace`
+- **GIVEN** `bench run --trace`
 - **WHEN** the benchmark runs
 - **THEN** it SHALL display timestamped entries for:
   - LLM request (model, message count, tools available)
@@ -68,7 +68,7 @@ The system SHALL provide timestamped request/response tracing for debugging.
 The system SHALL support disabling ANSI colors for CI/CD compatibility.
 
 #### Scenario: No-color flag
-- **GIVEN** `ot-bench run --no-color`
+- **GIVEN** `bench run --no-color`
 - **WHEN** output is displayed
 - **THEN** it SHALL contain no ANSI escape codes
 

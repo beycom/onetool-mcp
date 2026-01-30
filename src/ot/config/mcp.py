@@ -117,7 +117,7 @@ def expand_subprocess_env(value: str) -> str:
 class McpServerConfig(BaseModel):
     """Configuration for an MCP server connection.
 
-    Compatible with ot-bench ServerConfig format, with additional
+    Compatible with bench ServerConfig format, with additional
     `enabled` field for toggling servers without removing config.
     """
 

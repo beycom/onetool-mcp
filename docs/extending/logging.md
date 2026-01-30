@@ -142,7 +142,7 @@ Logs are written in dev-friendly format to `logs/{log_name}.log` (relative to co
 
 ### Log Levels
 
-Set via `log_level` in `ot-serve.yaml` or `OT_LOG_LEVEL` environment variable:
+Set via `log_level` in `onetool.yaml` or `OT_LOG_LEVEL` environment variable:
 
 | Level | Use Case |
 |-------|----------|
@@ -153,7 +153,7 @@ Set via `log_level` in `ot-serve.yaml` or `OT_LOG_LEVEL` environment variable:
 
 ### Log Directory
 
-Set via `log_dir` in `ot-serve.yaml` or `OT_LOG_DIR` environment variable:
+Set via `log_dir` in `onetool.yaml` or `OT_LOG_DIR` environment variable:
 
 - Default: `../logs` (relative to config directory)
 - Automatically created if it doesn't exist
@@ -232,7 +232,7 @@ Applied to:
 Disable truncation with `OT_LOG_VERBOSE=true` or `log_verbose: true` in config:
 
 ```bash
-OT_LOG_VERBOSE=true ot-serve
+OT_LOG_VERBOSE=true onetool
 ```
 
 Credentials are **always** sanitized, even in verbose mode.

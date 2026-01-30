@@ -1,6 +1,6 @@
 """Shared TUI primitives for interactive CLI tools.
 
-Used by ot-bench for interactive selection prompts.
+Used by bench for interactive selection prompts.
 """
 
 from __future__ import annotations

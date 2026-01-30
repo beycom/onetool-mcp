@@ -1,6 +1,6 @@
 """Structured logging for extension tools.
 
-Logs are written to stderr in JSON format for collection by ot-serve.
+Logs are written to stderr in JSON format for collection by onetool.
 """
 
 from __future__ import annotations

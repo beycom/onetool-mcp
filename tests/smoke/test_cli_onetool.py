@@ -1,4 +1,4 @@
-"""Smoke tests for the ot-serve CLI."""
+"""Smoke tests for the onetool CLI."""
 
 from __future__ import annotations
 
@@ -9,10 +9,10 @@ import pytest
 
 @pytest.mark.smoke
 @pytest.mark.serve
-def test_ot_serve_help() -> None:
-    """Verify ot-serve --help runs successfully."""
+def test_onetool_help() -> None:
+    """Verify onetool --help runs successfully."""
     result = subprocess.run(
-        ["uv", "run", "ot-serve", "--help"],
+        ["uv", "run", "onetool", "--help"],
         capture_output=True,
         text=True,
         timeout=30,
@@ -23,16 +23,16 @@ def test_ot_serve_help() -> None:
 
 @pytest.mark.smoke
 @pytest.mark.serve
-def test_ot_serve_version() -> None:
-    """Verify ot-serve --version runs successfully."""
+def test_onetool_version() -> None:
+    """Verify onetool --version runs successfully."""
     result = subprocess.run(
-        ["uv", "run", "ot-serve", "--version"],
+        ["uv", "run", "onetool", "--version"],
         capture_output=True,
         text=True,
         timeout=30,
     )
     assert result.returncode == 0
-    assert "ot-serve" in result.stdout
+    assert "onetool" in result.stdout
 
 
 # ==================== Init Subcommand Tests ====================
@@ -40,10 +40,10 @@ def test_ot_serve_version() -> None:
 
 @pytest.mark.smoke
 @pytest.mark.serve
-def test_ot_serve_init_help() -> None:
-    """Verify ot-serve init --help runs successfully."""
+def test_onetool_init_help() -> None:
+    """Verify onetool init --help runs successfully."""
     result = subprocess.run(
-        ["uv", "run", "ot-serve", "init", "--help"],
+        ["uv", "run", "onetool", "init", "--help"],
         capture_output=True,
         text=True,
         timeout=30,

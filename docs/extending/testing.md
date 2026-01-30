@@ -31,8 +31,8 @@ Every test requires two markers: a **speed tier** and a **component tag**.
 |--------|-----------|
 | `tools` | Tool implementations (`ot_tools`) |
 | `core` | Core library (`ot`) |
-| `serve` | MCP server (`ot_serve`) |
-| `bench` | Benchmark harness (`ot_bench`) |
+| `serve` | MCP server (`onetool`) |
+| `bench` | Benchmark harness (`bench`) |
 | `pkg` | Package management |
 | `spec` | OpenSpec tooling |
 
@@ -54,7 +54,7 @@ import pytest
 @pytest.mark.serve
 def test_server_starts():
     """Verify server can start without errors."""
-    from ot_serve.server import create_server
+    from onetool.server import create_server
     server = create_server()
     assert server is not None
 ```

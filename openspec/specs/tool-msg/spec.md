@@ -68,7 +68,7 @@ Messages SHALL be stored in YAML stream format.
 
 ### Requirement: Configuration
 
-MSG SHALL be configured via the `tools.msg` section of ot-serve.yaml.
+MSG SHALL be configured via the `tools.msg` section of onetool.yaml.
 
 #### Scenario: Topic mapping configuration
 - **GIVEN** configuration:

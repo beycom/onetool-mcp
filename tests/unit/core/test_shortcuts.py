@@ -198,7 +198,7 @@ def test_include_loads_snippets_library() -> None:
     from ot.shortcuts import expand_snippet, parse_snippet
 
     # Create self-contained test with known snippets (not dependent on external files)
-    # Standard structure: .onetool/config/ot-serve.yaml with includes relative to OT_DIR
+    # Standard structure: .onetool/config/onetool.yaml with includes relative to OT_DIR
     with tempfile.TemporaryDirectory() as tmpdir:
         onetool_dir = Path(tmpdir) / ".onetool"
         config_dir = onetool_dir / "config"
@@ -227,7 +227,7 @@ def test_include_loads_snippets_library() -> None:
             )
         )
 
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(
             yaml.dump(
                 {
@@ -264,7 +264,7 @@ def test_include_inline_overrides_included() -> None:
     from ot.config.loader import load_config
 
     # Create self-contained test with known snippets (not dependent on external files)
-    # Standard structure: .onetool/config/ot-serve.yaml with includes relative to OT_DIR
+    # Standard structure: .onetool/config/onetool.yaml with includes relative to OT_DIR
     with tempfile.TemporaryDirectory() as tmpdir:
         onetool_dir = Path(tmpdir) / ".onetool"
         config_dir = onetool_dir / "config"
@@ -284,7 +284,7 @@ def test_include_inline_overrides_included() -> None:
         )
 
         # Create config with inline snippet that has same name as one in included lib
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(
             yaml.dump(
                 {

@@ -1,6 +1,6 @@
 """Shared CLI utilities for OneTool CLIs.
 
-Provides common patterns used across ot-serve and ot-bench CLIs.
+Provides common patterns used across onetool and bench CLIs.
 """
 
 from __future__ import annotations
@@ -20,13 +20,13 @@ __all__ = ["console", "create_cli", "version_callback"]
 def _is_debug_tracebacks() -> bool:
     """Check if verbose tracebacks are enabled.
 
-    Reads debug_tracebacks from ~/.onetool/ot-serve.yaml.
+    Reads debug_tracebacks from ~/.onetool/onetool.yaml.
     Returns False on any error (fail-safe for broken configs).
     """
     try:
         import yaml
 
-        config_path = Path.home() / ".onetool" / "ot-serve.yaml"
+        config_path = Path.home() / ".onetool" / "onetool.yaml"
         if not config_path.exists():
             return False
         with config_path.open() as f:
@@ -43,7 +43,7 @@ def version_callback(name: str, version: str) -> Callable[[bool], None]:
     """Create a version callback for Typer CLI.
 
     Args:
-        name: CLI name to display (e.g., "ot", "ot-bench")
+        name: CLI name to display (e.g., "ot", "bench")
         version: Version string to display
 
     Returns:
@@ -88,12 +88,12 @@ def create_cli(
         Configured Typer app
 
     Note:
-        Set debug_tracebacks: true in ~/.onetool/ot-serve.yaml for Rich
+        Set debug_tracebacks: true in ~/.onetool/onetool.yaml for Rich
         formatted tracebacks with local variables and syntax highlighting.
 
     Example:
         app = create_cli(
-            "ot-bench",
+            "bench",
             "OneTool benchmark harness.",
             no_args_is_help=True,
         )

@@ -137,7 +137,7 @@ The system SHALL generate warnings for potentially unsafe but commonly-needed fu
 
 ### Requirement: Configurable Security Patterns
 
-The system SHALL support configurable security patterns via ot-serve.yaml.
+The system SHALL support configurable security patterns via onetool.yaml.
 
 #### Scenario: Custom blocked patterns
 - **GIVEN** configuration with:
@@ -159,7 +159,7 @@ The system SHALL support configurable security patterns via ot-serve.yaml.
 - **AND** only syntax validation SHALL occur
 
 #### Scenario: Default patterns used
-- **GIVEN** no security configuration in ot-serve.yaml
+- **GIVEN** no security configuration in onetool.yaml
 - **WHEN** code is validated
 - **THEN** built-in default patterns SHALL be used
 

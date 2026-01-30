@@ -87,7 +87,7 @@ diagram.list_providers(focus_only=True)
 
 ## Configuration
 
-Add to `ot-serve.yaml`:
+Add to `onetool.yaml`:
 
 ```yaml
 tools:
@@ -118,7 +118,7 @@ curl -LO https://raw.githubusercontent.com/yuzutech/kroki/main/docker-compose.ym
 docker compose up -d
 ```
 
-Then configure `ot-serve.yaml`:
+Then configure `onetool.yaml`:
 
 ```yaml
 tools:

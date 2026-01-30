@@ -16,11 +16,11 @@ default:
 
 # Run MCP server with demo config
 serve *args:
-    OT_CWD={{ _dir }} uv run ot-serve {{ args }}
+    OT_CWD={{ _dir }} uv run onetool {{ args }}
 
 # Run benchmark scenarios (TUI picker)
 bench *args:
-    OT_CWD={{ _dir }} uv run ot-bench run --tui --csv {{ args }}
+    OT_CWD={{ _dir }} uv run bench run --tui --csv {{ args }}
 
 # ============================================================================
 # SETUP & CLEANUP

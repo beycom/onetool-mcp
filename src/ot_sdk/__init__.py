@@ -80,7 +80,7 @@ from ot.utils import (
 )
 
 # Extension-specific utilities (worker subprocess communication)
-# These use JSON-RPC to communicate with the main ot-serve process
+# These use JSON-RPC to communicate with the main onetool process
 from ot_sdk.config import get_config, get_secret
 from ot_sdk.http import http
 from ot_sdk.logging import log

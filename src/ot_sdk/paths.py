@@ -84,7 +84,7 @@ def get_ot_dir() -> Path:
     """Get the active OneTool config directory.
 
     Resolution order:
-        1. Project config dir if set in context (from ot-serve)
+        1. Project config dir if set in context (from onetool)
         2. CWD/.onetool/ if exists
         3. ~/.onetool/ (global fallback)
 
@@ -95,7 +95,7 @@ def get_ot_dir() -> Path:
         >>> get_ot_dir()
         PosixPath('/project/.onetool')
     """
-    # Check if config_dir is set in context (from ot-serve)
+    # Check if config_dir is set in context (from onetool)
     config_dir = _current_config.get("_config_dir")
     if config_dir:
         return Path(config_dir)
@@ -261,7 +261,7 @@ def get_project_path(path: str) -> Path:
     if p.is_absolute():
         return p
 
-    # Get project path from config (set by ot-serve)
+    # Get project path from config (set by onetool)
     project_path = _current_config.get("_project_path")
     if project_path:
         return (Path(project_path) / p).resolve()
@@ -298,7 +298,7 @@ def get_config_path(path: str) -> Path:
     if p.is_absolute():
         return p
 
-    # Get config directory from config (set by ot-serve)
+    # Get config directory from config (set by onetool)
     config_dir = _current_config.get("_config_dir")
     if config_dir:
         return (Path(config_dir) / p).resolve()

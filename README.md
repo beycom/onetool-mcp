@@ -39,7 +39,7 @@ Based on [Anthropic's research](https://www.anthropic.com/engineering/code-execu
 - **30-second setup** - Install with uv or pip
 - **Drop-in extensibility** - Add a Python file, get a new pack
 - **AST security** - All code validated before execution
-- **Benchmark harness** - Test LLM + MCP combinations with `ot-bench`
+- **Benchmark harness** - Test LLM + MCP combinations with `bench`
 
 ## Batteries Included with 100+ Tools
 
@@ -67,7 +67,7 @@ Add to Claude Code (`~/.claude/settings.json`):
 {
   "mcpServers": {
     "onetool": {
-      "command": "ot-serve"
+      "command": "onetool"
     }
   }
 }

@@ -332,7 +332,7 @@ def get_config_path(cli_name: str, scope: str = "any") -> Path | None:
     2. ~/.onetool/config/<cli>.yaml (global)
 
     Args:
-        cli_name: CLI name (e.g., "ot-serve", "ot-bench")
+        cli_name: CLI name (e.g., "onetool", "bench")
         scope: "global", "project", or "any" (project first, then global)
 
     Returns:

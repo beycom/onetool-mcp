@@ -22,7 +22,7 @@ Add to `~/.claude/settings.json`:
 {
   "mcpServers": {
     "onetool": {
-      "command": "ot-serve"
+      "command": "onetool"
     }
   }
 }

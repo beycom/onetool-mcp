@@ -1,6 +1,6 @@
 # OneTool Bundled Defaults
 # Minimal working config - inherited by global and project configs.
-# User customization goes in ~/.onetool/ot-serve.yaml
+# User customization goes in ~/.onetool/onetool.yaml
 
 version: 1
 

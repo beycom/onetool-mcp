@@ -13,21 +13,21 @@ from openai import OpenAI
 
 from ot.logging import LogSpan
 from ot.utils import flatten_exception_group
-from ot_bench.harness.client import (
+from bench.harness.client import (
     ServerConnectionCallback,
     call_tool,
     connect_to_servers,
     multi_server_tools_to_openai,
 )
-from ot_bench.harness.evaluate import evaluate_task, resolve_evaluator
-from ot_bench.harness.metrics import (
+from bench.harness.evaluate import evaluate_task, resolve_evaluator
+from bench.harness.metrics import (
     EvaluationResult,
     LLMCallMetrics,
     ScenarioResult,
     TaskResult,
     calculate_cost,
 )
-from ot_bench.secrets import get_bench_secret
+from bench.secrets import get_bench_secret
 
 # Delay between tasks to avoid rate limits on external APIs (OpenRouter, etc.)
 TASK_DELAY_SECONDS = 3.0
@@ -54,7 +54,7 @@ def split_prompts(prompt: str) -> list[str]:
     return [p.strip() for p in parts if p.strip()]
 
 if TYPE_CHECKING:
-    from ot_bench.harness.config import HarnessConfig, TaskConfig
+    from bench.harness.config import HarnessConfig, TaskConfig
 
 
 class ProgressCallback(Protocol):

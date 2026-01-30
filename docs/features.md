@@ -170,23 +170,23 @@ Wrap any MCP server. Configure it with YAML. No token rot or bloat. Call it expl
 
 ## Testing & Benchmarking
 
-### ot-bench Harness
+### bench Harness
 
 Real agent + MCP server testing. Define tasks in YAML, get objective metrics: token counts, costs, accuracy scores, timing.
 
-[Learn more](reference/cli/ot-bench.md)
+[Learn more](reference/cli/bench.md)
 
 ### Multi-Prompt Tasks
 
 Sequential prompt chains with `---PROMPT---` delimiter. Conversation history accumulates. Perfect for complex workflows.
 
-[Learn more](reference/cli/ot-bench.md#multi-prompt-tasks)
+[Learn more](reference/cli/bench.md#multi-prompt-tasks)
 
 ### AI Evaluators
 
 LLM-powered evaluation with customizable prompts. Compare baseline vs OneTool accuracy side-by-side.
 
-[Learn more](reference/cli/ot-bench.md)
+[Learn more](reference/cli/bench.md)
 
 ---
 

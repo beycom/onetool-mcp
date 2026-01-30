@@ -14,7 +14,7 @@ The `db.*` pack gives LLMs direct database access - explore tables, inspect sche
 
 ## Setup
 
-Configure database connections in `ot-serve.yaml`:
+Configure database connections in `onetool.yaml`:
 
 ```yaml
 projects:

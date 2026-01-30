@@ -1,5 +1,5 @@
-site_name: OneTool MCP
-site_description: "Don't enumerate tools. Execute code."
+site_name: OneTool
+site_description: "96% Token Saving, 100+ tools"
 site_url: https://onetool.beycom.online
 site_dir: dist/site
 repo_name: beycom/onetool-mcp
@@ -103,8 +103,11 @@ markdown_extensions:
       custom_checkbox: true
   - pymdownx.tilde
 
+not_in_nav: |
+  _internal/**
+
 validation:
-  omitted_files: ignore
+  omitted_files: warn
   absolute_links: warn
   unrecognized_links: warn
   anchors: warn
@@ -134,7 +137,7 @@ extra:
       link: https://pypi.org/project/onetool-mcp/
 
 nav:
-  - OneTool: index.md
+  - 🧿 Home: index.md
   - Features: features.md
   - Learn:
       - learn/index.md
@@ -151,8 +154,8 @@ nav:
       - reference/index.md
       - CLIs:
           - reference/cli/index.md
-          - ot-serve: reference/cli/ot-serve.md
-          - ot-bench: reference/cli/ot-bench.md
+          - onetool: reference/cli/onetool.md
+          - bench: reference/cli/bench.md
       - Tools:
           - reference/tools/index.md
           - Brave: reference/tools/brave.md

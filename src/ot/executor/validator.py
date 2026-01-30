@@ -5,7 +5,7 @@ Validates Python code before execution:
 - Security pattern detection (dangerous calls)
 - Optional Ruff linting integration for style warnings
 
-Security patterns are configurable via ot-serve.yaml and support wildcards:
+Security patterns are configurable via onetool.yaml and support wildcards:
 
     security:
       validate_code: true
@@ -153,7 +153,7 @@ def _get_security_config() -> SecurityConfig | None:
 class DangerousPatternVisitor(ast.NodeVisitor):
     """AST visitor that detects dangerous code patterns.
 
-    Patterns are configurable via ot-serve.yaml security section.
+    Patterns are configurable via onetool.yaml security section.
     Supports fnmatch wildcards (*, ?, [seq]).
 
     Pattern matching is automatic based on structure:
@@ -295,7 +295,7 @@ def validate_python_code(
 ) -> ValidationResult:
     """Validate Python code for syntax and security issues.
 
-    Security patterns are loaded from ot-serve.yaml configuration.
+    Security patterns are loaded from onetool.yaml configuration.
     If config is not available, built-in defaults are used.
     Patterns support fnmatch wildcards (*, ?, [seq]).
 

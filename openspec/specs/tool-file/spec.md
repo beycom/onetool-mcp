@@ -4,7 +4,7 @@
 
 Provides secure file operations for OneTool including reading, writing, editing, and file management. All paths are validated against configurable allowed directories for security.
 
-Configuration via `ot-serve.yaml`:
+Configuration via `onetool.yaml`:
 
 ```yaml
 tools:

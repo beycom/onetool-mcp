@@ -24,10 +24,10 @@ Set `OT_CWD=demo` to use the demo project's configurations:
 
 ```bash
 # Run benchmarks with demo config
-OT_CWD=demo uv run ot-bench run demo/bench/features.yaml
+OT_CWD=demo uv run bench run demo/bench/features.yaml
 
 # Start server with demo config
-OT_CWD=demo uv run ot-serve
+OT_CWD=demo uv run onetool
 
 ```
 
@@ -43,8 +43,8 @@ just eg-serve          # Start server with demo config
 ```
 demo/
   .onetool/           # OneTool configuration
-    ot-serve.yaml     # MCP server config
-    ot-bench.yaml     # Benchmark harness config
+    onetool.yaml     # MCP server config
+    bench.yaml     # Benchmark harness config
     prompts.yaml      # Prompt templates
   bench/              # Benchmark YAML files
   db/                 # Sample databases
@@ -73,7 +73,7 @@ just eg-bench
 just eg-bench-run features.yaml
 
 # Direct command
-OT_CWD=demo uv run ot-bench run demo/bench/tool_brave_search.yaml
+OT_CWD=demo uv run bench run demo/bench/tool_brave_search.yaml
 ```
 
 ## demo/db

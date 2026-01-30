@@ -2,14 +2,14 @@
 
 import pytest
 
-from ot_bench.harness.config import EvaluateConfig, HarnessConfig, TaskConfig
-from ot_bench.harness.evaluate import (
+from bench.harness.config import EvaluateConfig, HarnessConfig, TaskConfig
+from bench.harness.evaluate import (
     evaluate_deterministic,
     evaluate_regex,
     evaluate_task,
     resolve_evaluator,
 )
-from ot_bench.harness.metrics import TaskResult
+from bench.harness.metrics import TaskResult
 
 # =============================================================================
 # evaluate_regex tests

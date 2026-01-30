@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the evaluator system for ot-bench, including named evaluators, deterministic matching, and LLM-as-judge evaluation.
+Defines the evaluator system for bench, including named evaluators, deterministic matching, and LLM-as-judge evaluation.
 
 ---
 

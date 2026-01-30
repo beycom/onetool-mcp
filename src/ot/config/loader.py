@@ -1,8 +1,8 @@
 """YAML configuration loading for OneTool.
 
-Loads ot-serve.yaml with tool discovery patterns and settings.
+Loads onetool.yaml with tool discovery patterns and settings.
 
-Example ot-serve.yaml:
+Example onetool.yaml:
 
     version: 1
 
@@ -16,7 +16,7 @@ Example ot-serve.yaml:
     transform:
       model: anthropic/claude-3-5-haiku
 
-    secrets_file: secrets.yaml   # default: sibling of ot-serve.yaml
+    secrets_file: secrets.yaml   # default: sibling of onetool.yaml
 """
 
 from __future__ import annotations
@@ -285,7 +285,7 @@ class OneToolConfig(BaseModel):
         default="global",
         description=(
             "Config inheritance mode:\n"
-            "  - 'global' (default): Merge ~/.onetool/ot-serve.yaml first, then "
+            "  - 'global' (default): Merge ~/.onetool/onetool.yaml first, then "
             "bundled defaults as fallback. Use for project configs that extend user prefs.\n"
             "  - 'bundled': Merge package defaults only, skip global config. "
             "Use for reproducible configs that shouldn't depend on user settings.\n"
@@ -563,9 +563,9 @@ def _resolve_config_path(config_path: Path | str | None) -> Path | None:
 
     Resolution order:
     1. Explicit config_path if provided
-    2. OT_SERVE_CONFIG env var
-    3. cwd/.onetool/config/ot-serve.yaml
-    4. ~/.onetool/config/ot-serve.yaml
+    2. ONETOOL_CONFIG env var
+    3. cwd/.onetool/config/onetool.yaml
+    4. ~/.onetool/config/onetool.yaml
     5. None (use defaults)
 
     Args:
@@ -577,16 +577,16 @@ def _resolve_config_path(config_path: Path | str | None) -> Path | None:
     if config_path is not None:
         return Path(config_path)
 
-    env_config = os.getenv("OT_SERVE_CONFIG")
+    env_config = os.getenv("ONETOOL_CONFIG")
     if env_config:
         return Path(env_config)
 
     cwd = get_effective_cwd()
-    project_config = cwd / ".onetool" / CONFIG_SUBDIR / "ot-serve.yaml"
+    project_config = cwd / ".onetool" / CONFIG_SUBDIR / "onetool.yaml"
     if project_config.exists():
         return project_config
 
-    global_config = get_config_dir(get_global_dir()) / "ot-serve.yaml"
+    global_config = get_config_dir(get_global_dir()) / "onetool.yaml"
     if global_config.exists():
         return global_config
 
@@ -861,7 +861,7 @@ def _load_base_config(
 
     # Try global first for 'global' mode
     if inherit == "global":
-        global_config_path = get_config_dir(get_global_dir()) / "ot-serve.yaml"
+        global_config_path = get_config_dir(get_global_dir()) / "onetool.yaml"
         if global_config_path.exists():
             # Skip if this is the same file we're already loading
             if current_config_path and global_config_path.resolve() == current_config_path.resolve():
@@ -880,7 +880,7 @@ def _load_base_config(
     # Fall back to bundled for both 'global' (when global missing) and 'bundled' modes
     try:
         bundled_dir = get_bundled_config_dir()
-        bundled_config_path = bundled_dir / "ot-serve.yaml"
+        bundled_config_path = bundled_dir / "onetool.yaml"
         if bundled_config_path.exists():
             raw_data = _load_yaml_file(bundled_config_path)
             # Process includes in bundled config - bundled dir is flat (no config/ subdir)
@@ -897,15 +897,15 @@ def load_config(config_path: Path | str | None = None) -> OneToolConfig:
     """Load OneTool configuration from YAML file.
 
     Resolution order (when config_path is None):
-        1. OT_SERVE_CONFIG env var
-        2. cwd/.onetool/ot-serve.yaml (project config)
-        3. ~/.onetool/ot-serve.yaml (global config)
+        1. ONETOOL_CONFIG env var
+        2. cwd/.onetool/onetool.yaml (project config)
+        3. ~/.onetool/onetool.yaml (global config)
         4. Built-in defaults (bundled with package)
 
     Inheritance (controlled by 'inherit' field in your config):
 
         'global' (default):
-            Base: ~/.onetool/ot-serve.yaml → bundled defaults (if global missing)
+            Base: ~/.onetool/onetool.yaml → bundled defaults (if global missing)
             Your config overrides the base. Use for project configs that
             extend user preferences (API keys, timeouts, etc.).
 
@@ -920,7 +920,7 @@ def load_config(config_path: Path | str | None = None) -> OneToolConfig:
 
     Example minimal project config using global inheritance::
 
-        # .onetool/ot-serve.yaml
+        # .onetool/onetool.yaml
         version: 1
         # inherit: global  (implicit default - gets API keys from ~/.onetool/)
         tools_dir:

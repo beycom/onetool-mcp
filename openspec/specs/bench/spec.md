@@ -1,4 +1,4 @@
-# ot-bench Specification
+# bench Specification
 
 ## Purpose
 
@@ -40,7 +40,7 @@ The harness SHALL support tool-specific benchmarks using the `tool_<name>.yaml` 
 
 #### Scenario: Tool benchmark file location
 - **GIVEN** a benchmark file at `demo/bench/tool_<tool-name>.yaml`
-- **WHEN** `ot-bench run demo/bench/tool_<tool-name>.yaml` is executed
+- **WHEN** `bench run demo/bench/tool_<tool-name>.yaml` is executed
 - **THEN** it SHALL load and run the benchmark
 - **AND** the benchmark SHALL focus on demonstrating OneTool capabilities
 

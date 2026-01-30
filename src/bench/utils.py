@@ -1,4 +1,4 @@
-"""Shared utilities for ot_bench CLI commands."""
+"""Shared utilities for bench CLI commands."""
 
 from __future__ import annotations
 

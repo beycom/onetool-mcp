@@ -1,6 +1,6 @@
-"""Secrets loading for ot-bench.
+"""Secrets loading for bench.
 
-Loads bench secrets from bench-secrets.yaml, separate from ot-serve secrets.
+Loads bench secrets from bench-secrets.yaml, separate from onetool secrets.
 """
 
 from __future__ import annotations

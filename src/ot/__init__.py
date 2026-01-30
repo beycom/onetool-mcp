@@ -8,13 +8,13 @@ Features:
 
 Usage:
     # Start MCP server (stdio transport)
-    ot-serve
+    onetool
 
     # With config
-    ot-serve --config config/ot-serve.yaml
+    onetool --config config/onetool.yaml
 
     # Run benchmarks
-    ot-bench run harness.yaml
+    bench run harness.yaml
 """
 
 from importlib.metadata import PackageNotFoundError, version

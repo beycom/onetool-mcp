@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines CSV results export functionality for ot-bench.
+Defines CSV results export functionality for bench.
 
 ---
 
@@ -13,7 +13,7 @@ Defines CSV results export functionality for ot-bench.
 The harness SHALL support exporting detailed results to CSV format.
 
 #### Scenario: Enable CSV export
-- **GIVEN** user runs `ot-bench run <file> --csv`
+- **GIVEN** user runs `bench run <file> --csv`
 - **WHEN** the benchmark completes
 - **THEN** results SHALL be written to `tmp/result-{timestamp}.csv`
 - **AND** timestamp format SHALL be `YYYYMMDD-HHMM`

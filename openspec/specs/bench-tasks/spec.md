@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the scenario and task structure for ot-bench, including task types, multi-prompt tasks, and type-specific defaults.
+Defines the scenario and task structure for bench, including task types, multi-prompt tasks, and type-specific defaults.
 
 ---
 

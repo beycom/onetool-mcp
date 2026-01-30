@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from ot_bench.harness.csv_writer import write_results_csv
-from ot_bench.harness.metrics import (
+from bench.harness.csv_writer import write_results_csv
+from bench.harness.metrics import (
     EvaluationResult,
     LLMCallMetrics,
     ScenarioResult,

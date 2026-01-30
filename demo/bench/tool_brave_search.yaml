@@ -8,7 +8,7 @@
 #
 # Base/MCP comparison removed - focuses on OneTool capabilities.
 #
-# Use with: ot-bench run demo/bench/tool_brave_search.yaml
+# Use with: bench run demo/bench/tool_brave_search.yaml
 
 defaults:
   timeout: 60
@@ -23,7 +23,7 @@ servers:
   onetool:
     type: stdio
     command: uv
-    args: ["run", "ot-serve"]
+    args: ["run", "onetool"]
     env:
       OT_CWD: demo
 

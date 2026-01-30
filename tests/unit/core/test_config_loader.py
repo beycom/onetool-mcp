@@ -263,7 +263,7 @@ def test_config_dir_tracking() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         config_dir = Path(tmpdir) / ".onetool"
         config_dir.mkdir()
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(yaml.dump({"version": 1}))
 
         config = load_config(config_path)
@@ -279,11 +279,11 @@ def test_secrets_file_relative_resolution() -> None:
     from ot.config.loader import load_config
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Standard directory structure: .onetool/config/ot-serve.yaml
+        # Standard directory structure: .onetool/config/onetool.yaml
         onetool_dir = Path(tmpdir) / ".onetool"
         config_dir = onetool_dir / "config"
         config_dir.mkdir(parents=True)
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(
             yaml.dump({"version": 1, "secrets_file": "config/secrets.yaml"})
         )
@@ -305,7 +305,7 @@ def test_include_single_file() -> None:
     from ot.config.loader import load_config
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Standard structure: .onetool/config/ot-serve.yaml
+        # Standard structure: .onetool/config/onetool.yaml
         onetool_dir = Path(tmpdir) / ".onetool"
         config_dir = onetool_dir / "config"
         config_dir.mkdir(parents=True)
@@ -326,7 +326,7 @@ def test_include_single_file() -> None:
         )
 
         # Create main config with include (paths relative to OT_DIR)
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(
             yaml.dump(
                 {
@@ -350,7 +350,7 @@ def test_include_multiple_files_merge_order() -> None:
     from ot.config.loader import load_config
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Standard structure: .onetool/config/ot-serve.yaml
+        # Standard structure: .onetool/config/onetool.yaml
         onetool_dir = Path(tmpdir) / ".onetool"
         config_dir = onetool_dir / "config"
         config_dir.mkdir(parents=True)
@@ -382,7 +382,7 @@ def test_include_multiple_files_merge_order() -> None:
         )
 
         # Create main config (includes relative to OT_DIR)
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(
             yaml.dump(
                 {
@@ -409,7 +409,7 @@ def test_include_inline_overrides_included() -> None:
     from ot.config.loader import load_config
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Standard structure: .onetool/config/ot-serve.yaml
+        # Standard structure: .onetool/config/onetool.yaml
         onetool_dir = Path(tmpdir) / ".onetool"
         config_dir = onetool_dir / "config"
         config_dir.mkdir(parents=True)
@@ -428,7 +428,7 @@ def test_include_inline_overrides_included() -> None:
         )
 
         # Create main config with inline override
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(
             yaml.dump(
                 {
@@ -456,7 +456,7 @@ def test_include_nested_dicts_deep_merged() -> None:
     from ot.config.loader import load_config
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Standard structure: .onetool/config/ot-serve.yaml
+        # Standard structure: .onetool/config/onetool.yaml
         onetool_dir = Path(tmpdir) / ".onetool"
         config_dir = onetool_dir / "config"
         config_dir.mkdir(parents=True)
@@ -476,7 +476,7 @@ def test_include_nested_dicts_deep_merged() -> None:
         )
 
         # Create main config with different tool setting
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(
             yaml.dump(
                 {
@@ -505,13 +505,13 @@ def test_include_missing_file_logs_warning() -> None:
     from ot.config.loader import load_config
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Standard structure: .onetool/config/ot-serve.yaml
+        # Standard structure: .onetool/config/onetool.yaml
         onetool_dir = Path(tmpdir) / ".onetool"
         config_dir = onetool_dir / "config"
         config_dir.mkdir(parents=True)
 
         # Create config with non-existent include
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(
             yaml.dump(
                 {
@@ -536,7 +536,7 @@ def test_include_circular_detection() -> None:
     from ot.config.loader import load_config
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Standard structure: .onetool/config/ot-serve.yaml
+        # Standard structure: .onetool/config/onetool.yaml
         onetool_dir = Path(tmpdir) / ".onetool"
         config_dir = onetool_dir / "config"
         config_dir.mkdir(parents=True)
@@ -564,7 +564,7 @@ def test_include_circular_detection() -> None:
         )
 
         # Create main config
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(
             yaml.dump(
                 {
@@ -589,7 +589,7 @@ def test_include_with_prompts_section() -> None:
     from ot.config.loader import load_config
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Standard structure: .onetool/config/ot-serve.yaml
+        # Standard structure: .onetool/config/onetool.yaml
         onetool_dir = Path(tmpdir) / ".onetool"
         config_dir = onetool_dir / "config"
         config_dir.mkdir(parents=True)
@@ -608,7 +608,7 @@ def test_include_with_prompts_section() -> None:
 
         # Create main config using include instead of prompts_file
         # Use inherit: none to isolate test from bundled defaults
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(
             yaml.dump(
                 {
@@ -632,7 +632,7 @@ def test_include_with_snippets_section() -> None:
     from ot.config.loader import load_config
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Standard structure: .onetool/config/ot-serve.yaml
+        # Standard structure: .onetool/config/onetool.yaml
         onetool_dir = Path(tmpdir) / ".onetool"
         config_dir = onetool_dir / "config"
         config_dir.mkdir(parents=True)
@@ -654,7 +654,7 @@ def test_include_with_snippets_section() -> None:
 
         # Create main config using include instead of snippets_dir
         # Use inherit: none to isolate test from bundled defaults
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(
             yaml.dump(
                 {
@@ -827,7 +827,7 @@ def test_inherit_none_no_merging() -> None:
         config_dir.mkdir()
 
         # Create project config with inherit: none
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(
             yaml.dump(
                 {
@@ -856,7 +856,7 @@ def test_inherit_bundled_merges_bundled_only() -> None:
         config_dir.mkdir()
 
         # Create project config with inherit: bundled and override
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(
             yaml.dump(
                 {
@@ -886,7 +886,7 @@ def test_inherit_global_is_default() -> None:
         config_dir.mkdir()
 
         # Create project config without inherit field
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(
             yaml.dump(
                 {
@@ -915,7 +915,7 @@ def test_inherit_deep_merges_tools() -> None:
         config_dir.mkdir()
 
         # Create project config with partial tool override
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(
             yaml.dump(
                 {
@@ -946,7 +946,7 @@ def test_include_three_tier_fallback() -> None:
         config_dir.mkdir()
 
         # Create project config that includes bundled prompts.yaml
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(
             yaml.dump(
                 {

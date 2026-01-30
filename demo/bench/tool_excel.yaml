@@ -10,7 +10,7 @@
 #
 # Uses demo/data/sample_sales.xlsx for read operations.
 #
-# Use with: ot-bench run demo/bench/tool_excel.yaml
+# Use with: bench run demo/bench/tool_excel.yaml
 
 defaults:
   timeout: 60
@@ -33,7 +33,7 @@ servers:
   onetool:
     type: stdio
     command: uv
-    args: ["run", "ot-serve"]
+    args: ["run", "onetool"]
     env:
       OT_CWD: demo
 

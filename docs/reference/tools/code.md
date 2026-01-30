@@ -76,7 +76,7 @@ Semantic code search using ChunkHound indexes and DuckDB.
 
 ## Configuration
 
-In `ot-serve.yaml`:
+In `onetool.yaml`:
 
 ```yaml
 tools:

@@ -1,4 +1,4 @@
-"""Smoke tests for the ot-bench CLI."""
+"""Smoke tests for the bench CLI."""
 
 from __future__ import annotations
 
@@ -9,10 +9,10 @@ import pytest
 
 @pytest.mark.smoke
 @pytest.mark.bench
-def test_ot_bench_help() -> None:
-    """Verify ot-bench --help runs successfully."""
+def test_bench_help() -> None:
+    """Verify bench --help runs successfully."""
     result = subprocess.run(
-        ["uv", "run", "ot-bench", "--help"],
+        ["uv", "run", "bench", "--help"],
         capture_output=True,
         text=True,
         timeout=30,
@@ -23,13 +23,13 @@ def test_ot_bench_help() -> None:
 
 @pytest.mark.smoke
 @pytest.mark.bench
-def test_ot_bench_version() -> None:
-    """Verify ot-bench --version runs successfully."""
+def test_bench_version() -> None:
+    """Verify bench --version runs successfully."""
     result = subprocess.run(
-        ["uv", "run", "ot-bench", "--version"],
+        ["uv", "run", "bench", "--version"],
         capture_output=True,
         text=True,
         timeout=30,
     )
     assert result.returncode == 0
-    assert "ot-bench" in result.stdout
+    assert "bench" in result.stdout

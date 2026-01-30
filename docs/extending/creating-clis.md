@@ -11,8 +11,8 @@ All CLIs follow the `ot-<purpose>` pattern:
 | CLI | Purpose |
 |-----|---------|
 | `onetool` | Setup, configuration, upgrade |
-| `ot-serve` | MCP server |
-| `ot-bench` | Benchmark harness |
+| `onetool` | MCP server |
+| `bench` | Benchmark harness |
 
 ## Required Patterns
 
@@ -97,7 +97,7 @@ src/
 ├── ot/              # Shared library
 │   ├── _cli.py      # CLI utilities
 │   └── config/      # Configuration
-├── ot_serve/        # ot-serve CLI
+├── onetool/        # onetool CLI
 │   ├── __init__.py  # __version__ = "..."
 │   └── cli.py       # Entry point
 └── ot_example/      # Your CLI
@@ -180,7 +180,7 @@ def show():
 
 ## Multi-Command CLIs
 
-For CLIs with multiple subcommands (like `ot-bench`):
+For CLIs with multiple subcommands (like `bench`):
 
 ### Structure
 

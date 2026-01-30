@@ -8,7 +8,7 @@ import ot
 from ot._cli import create_cli, version_callback
 
 app = create_cli(
-    "ot-bench",
+    "bench",
     "OneTool benchmark harness for benchmarking agent + MCP configurations.",
     no_args_is_help=True,
 )
@@ -20,7 +20,7 @@ def main(
         None,
         "--version",
         "-v",
-        callback=version_callback("ot-bench", ot.__version__),
+        callback=version_callback("bench", ot.__version__),
         is_eager=True,
         help="Show version and exit.",
     ),
@@ -43,21 +43,21 @@ def main(
     if any(arg in sys.argv for arg in ("--help", "-h")):
         return
 
-    # Require global config directory (created by ot-serve)
+    # Require global config directory (created by onetool)
     from ot.paths import get_global_dir
 
     global_dir = get_global_dir()
     if not global_dir.exists():
         print(
             f"Error: {global_dir} not found.\n"
-            "Run 'ot-serve init' to initialize OneTool configuration.",
+            "Run 'onetool init' to initialize OneTool configuration.",
             file=sys.stderr,
         )
         raise typer.Exit(1)
 
 
 # Import subcommands to register them
-from ot_bench import run  # noqa: E402, F401
+from bench import run  # noqa: E402, F401
 
 
 def cli() -> None:

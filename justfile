@@ -20,7 +20,7 @@ check: lint typecheck test
 
 # Run the MCP server in development mode
 dev *args:
-    uv run ot-serve {{ args }}
+    uv run onetool {{ args }}
 
 # ============================================================================
 # TESTING

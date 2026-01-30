@@ -24,10 +24,10 @@ def config_dir() -> Generator[Path, None, None]:
 
 @pytest.fixture
 def write_config(config_dir: Path) -> Callable[[dict], Path]:
-    """Write a config dict to ot-serve.yaml and return the path."""
+    """Write a config dict to onetool.yaml and return the path."""
 
     def _write(data: dict) -> Path:
-        config_path = config_dir / "ot-serve.yaml"
+        config_path = config_dir / "onetool.yaml"
         config_path.write_text(yaml.dump(data))
         return config_path
 

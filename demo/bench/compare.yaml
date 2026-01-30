@@ -12,7 +12,7 @@
 # Evaluator checks for recent versions (express 5.x, httpx 0.28+) that LLMs
 # won't know from training data alone.
 #
-# Use with: ot-bench run demo/bench/compare.yaml
+# Use with: bench run demo/bench/compare.yaml
 
 defaults:
   timeout: 120
@@ -123,7 +123,7 @@ servers:
   onetool:
     type: stdio
     command: uv
-    args: ["run", "ot-serve"]
+    args: ["run", "onetool"]
     env:
       OT_CWD: demo
 

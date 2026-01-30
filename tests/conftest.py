@@ -97,8 +97,8 @@ COMPONENT_MARKERS = {"serve", "bench", "pkg", "core", "spec", "tools"}
 def reset_config_cache():
     """Reset config cache before each test to ensure test isolation.
 
-    This prevents user's global config (~/.onetool/config/ot-serve.yaml) from
-    affecting unit tests. Tests use tests/.onetool/config/ot-serve.yaml
+    This prevents user's global config (~/.onetool/config/onetool.yaml) from
+    affecting unit tests. Tests use tests/.onetool/config/onetool.yaml
     which has inherit: none to prevent global config inheritance.
     """
     import ot.config.loader as loader
@@ -110,18 +110,18 @@ def reset_config_cache():
     # Reset tool loader cache
     tool_loader._module_cache.clear()
 
-    # Set OT_SERVE_CONFIG to test config that uses inherit: none
-    test_config = _project_root / "tests" / ".onetool" / "config" / "ot-serve.yaml"
-    old_config_env = os.environ.get("OT_SERVE_CONFIG")
-    os.environ["OT_SERVE_CONFIG"] = str(test_config)
+    # Set ONETOOL_CONFIG to test config that uses inherit: none
+    test_config = _project_root / "tests" / ".onetool" / "config" / "onetool.yaml"
+    old_config_env = os.environ.get("ONETOOL_CONFIG")
+    os.environ["ONETOOL_CONFIG"] = str(test_config)
 
     yield
 
     # Restore original env and clean up
     if old_config_env is not None:
-        os.environ["OT_SERVE_CONFIG"] = old_config_env
+        os.environ["ONETOOL_CONFIG"] = old_config_env
     else:
-        os.environ.pop("OT_SERVE_CONFIG", None)
+        os.environ.pop("ONETOOL_CONFIG", None)
     loader._config = None
     tool_loader._module_cache.clear()
 

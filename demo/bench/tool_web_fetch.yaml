@@ -9,7 +9,7 @@
 #
 # Base/MCP comparison removed - focuses on OneTool capabilities.
 #
-# Use with: ot-bench run demo/bench/tool_web_fetch.yaml
+# Use with: bench run demo/bench/tool_web_fetch.yaml
 
 defaults:
   timeout: 90
@@ -24,7 +24,7 @@ servers:
   onetool:
     type: stdio
     command: uv
-    args: ["run", "ot-serve"]
+    args: ["run", "onetool"]
     env:
       OT_CWD: demo
 

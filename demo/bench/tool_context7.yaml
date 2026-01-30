@@ -5,7 +5,7 @@
 # - Topic-based documentation retrieval
 # - Code example lookup
 #
-# Use with: ot-bench run demo/bench/tool_context7.yaml
+# Use with: bench run demo/bench/tool_context7.yaml
 
 defaults:
   timeout: 120
@@ -20,7 +20,7 @@ servers:
   onetool:
     type: stdio
     command: uv
-    args: ["run", "ot-serve"]
+    args: ["run", "onetool"]
     env:
       OT_CWD: demo
 

@@ -76,5 +76,5 @@ Agents write Python to call functions. No JSON schema parsing. No tool selection
 - [96% fewer tokens](../learn/comparison.md), same accuracy
 - Drop a Python file, get a new pack
 - AST validation before execution
-- `ot-bench` for testing LLM + MCP combinations
+- `bench` for testing LLM + MCP combinations
 - Proxy mode wraps existing MCP servers

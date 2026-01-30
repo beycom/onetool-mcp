@@ -7,7 +7,7 @@
 #
 # Note: Rendering tests require Kroki (just kroki-start)
 #
-# Use with: ot-bench run demo/bench/tool_diagram.yaml
+# Use with: bench run demo/bench/tool_diagram.yaml
 
 defaults:
   timeout: 120
@@ -275,6 +275,6 @@ servers:
   onetool:
     type: stdio
     command: uv
-    args: ["run", "ot-serve"]
+    args: ["run", "onetool"]
     env:
       OT_CWD: demo

@@ -21,8 +21,8 @@ TOOL_RESPONSE_ERROR_PATTERNS = [
 if TYPE_CHECKING:
     from rich.console import Console
 
-    from ot_bench.harness.config import HarnessConfig
-    from ot_bench.harness.metrics import TaskResult
+    from bench.harness.config import HarnessConfig
+    from bench.harness.metrics import TaskResult
 
 
 def _extract_result(response: str) -> str:

@@ -26,10 +26,10 @@ Verify that all documentation accurately reflects the current implementation by 
 
 Review each CLI command against its documentation.
 
-### 1.1 ot-serve
+### 1.1 onetool
 
-Compare `src/ot_serve/` implementation with:
-- `docs/reference/cli/ot-serve.md`
+Compare `src/onetool/` implementation with:
+- `docs/reference/cli/onetool.md`
 - README.md CLI section
 - `docs/llms.txt` CLI section
 
@@ -39,10 +39,10 @@ Check for:
 - Environment variables are documented
 - Usage examples work correctly
 
-### 1.2 ot-bench
+### 1.2 bench
 
-Compare `src/ot_bench/` implementation with:
-- `docs/reference/cli/ot-bench.md`
+Compare `src/bench/` implementation with:
+- `docs/reference/cli/bench.md`
 - README.md CLI section (if mentioned)
 - `docs/llms.txt` CLI section
 

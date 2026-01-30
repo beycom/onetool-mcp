@@ -4,7 +4,7 @@
 # - Base: No server, LLM knowledge only
 # - OneTool: Grounding with Google Search via Gemini
 #
-# Use with: ot-bench run demo/bench/tool_grounding_search.yaml
+# Use with: bench run demo/bench/tool_grounding_search.yaml
 
 defaults:
   timeout: 120
@@ -122,6 +122,6 @@ servers:
   onetool:
     type: stdio
     command: uv
-    args: ["run", "ot-serve"]
+    args: ["run", "onetool"]
     env:
       OT_CWD: demo

@@ -31,10 +31,10 @@ The project SHALL provide CLI reference at `docs/reference/cli/`.
 #### Scenario: CLI overview
 - **GIVEN** a user looking for CLI help
 - **WHEN** they read `reference/cli/index.md`
-- **THEN** they find documentation for `ot-serve` and `ot-bench`
+- **THEN** they find documentation for `onetool` and `bench`
 
 #### Scenario: Individual CLI docs
-- **GIVEN** a specific CLI (ot-serve, ot-bench)
+- **GIVEN** a specific CLI (onetool, bench)
 - **WHEN** the user reads its doc
 - **THEN** they find commands, options, and examples
 
@@ -384,9 +384,9 @@ The documentation SHALL include a plugin development guide for building standalo
 #### Scenario: Local development configuration documented
 
 - **WHEN** a developer sets up their plugin project
-- **THEN** the guide SHALL explain creating `.onetool/ot-serve.yaml` with `tools_dir` pointing to the plugin source
+- **THEN** the guide SHALL explain creating `.onetool/onetool.yaml` with `tools_dir` pointing to the plugin source
 - **AND** `.onetool/secrets.yaml` for any required API keys
-- **AND** optionally `.onetool/ot-bench.yaml` for benchmark testing
+- **AND** optionally `.onetool/bench.yaml` for benchmark testing
 
 #### Scenario: Configuration for consumers documented
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the structure and patterns for internal tools shipped with OneTool. Internal tools run in-process within ot-serve with direct access to bundled dependencies.
+Defines the structure and patterns for internal tools shipped with OneTool. Internal tools run in-process within onetool with direct access to bundled dependencies.
 ## Requirements
 ### Requirement: Internal Tool Module Structure
 
@@ -106,6 +106,6 @@ Internal tools SHALL NOT use the worker subprocess pattern.
 
 #### Scenario: Direct function execution
 - **WHEN** an internal tool function is called
-- **THEN** it executes directly in the ot-serve process
+- **THEN** it executes directly in the onetool process
 - **AND** no JSON-RPC serialisation occurs
 

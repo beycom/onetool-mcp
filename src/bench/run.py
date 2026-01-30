@@ -16,12 +16,12 @@ from ot._tui import ask_select
 from ot.logging import LogSpan, configure_logging
 from ot.paths import get_effective_cwd, get_global_dir
 from ot.support import get_support_banner, get_version
-from ot_bench.cli import app
-from ot_bench.harness.config import load_config
-from ot_bench.harness.csv_writer import write_results_csv
-from ot_bench.harness.runner import AgenticRunner
-from ot_bench.reporter import ConsoleReporter
-from ot_bench.utils import run_async
+from bench.cli import app
+from bench.harness.config import load_config
+from bench.harness.csv_writer import write_results_csv
+from bench.harness.runner import AgenticRunner
+from bench.reporter import ConsoleReporter
+from bench.utils import run_async
 
 # Exit codes
 EXIT_SUCCESS = 0
@@ -46,7 +46,7 @@ class BenchFavorite(BaseModel):
 
 
 class BenchConfig(BaseModel):
-    """Configuration for ot-bench CLI."""
+    """Configuration for bench CLI."""
 
     favorites: list[BenchFavorite] = Field(
         default_factory=list, description="Favorite benchmarks"
@@ -54,34 +54,34 @@ class BenchConfig(BaseModel):
 
 
 def load_bench_config(config_path: Path | str | None = None) -> BenchConfig:
-    """Load ot-bench configuration from YAML file.
+    """Load bench configuration from YAML file.
 
     Resolution order (when config_path is None):
-    1. OT_BENCH_CONFIG env var
-    2. cwd/.onetool/config/ot-bench.yaml
-    3. cwd/.onetool/ot-bench.yaml
-    4. ~/.onetool/ot-bench.yaml
+    1. BENCH_CONFIG env var
+    2. cwd/.onetool/config/bench.yaml
+    3. cwd/.onetool/bench.yaml
+    4. ~/.onetool/bench.yaml
     5. Built-in defaults
     """
     if config_path is None:
-        # Check OT_BENCH_CONFIG env var first
-        env_config = os.getenv("OT_BENCH_CONFIG")
+        # Check BENCH_CONFIG env var first
+        env_config = os.getenv("BENCH_CONFIG")
         if env_config:
             config_path = Path(env_config)
         else:
             cwd = get_effective_cwd()
-            # Try project config: cwd/.onetool/config/ot-bench.yaml (preferred)
-            project_config = cwd / ".onetool" / "config" / "ot-bench.yaml"
+            # Try project config: cwd/.onetool/config/bench.yaml (preferred)
+            project_config = cwd / ".onetool" / "config" / "bench.yaml"
             if project_config.exists():
                 config_path = project_config
             else:
-                # Try legacy location: cwd/.onetool/ot-bench.yaml
-                legacy_config = cwd / ".onetool" / "ot-bench.yaml"
+                # Try legacy location: cwd/.onetool/bench.yaml
+                legacy_config = cwd / ".onetool" / "bench.yaml"
                 if legacy_config.exists():
                     config_path = legacy_config
                 else:
-                    # Try global config: ~/.onetool/ot-bench.yaml
-                    global_config = get_global_dir() / "ot-bench.yaml"
+                    # Try global config: ~/.onetool/bench.yaml
+                    global_config = get_global_dir() / "bench.yaml"
                     if global_config.exists():
                         config_path = global_config
                     else:
@@ -137,7 +137,7 @@ def run_tui_picker(console: Console) -> list[Path] | None:
 
     if not bench_config.favorites:
         console.print("[dim]No favorites configured[/dim]")
-        console.print("[dim]Add favorites to .onetool/config/ot-bench.yaml[/dim]")
+        console.print("[dim]Add favorites to .onetool/config/bench.yaml[/dim]")
         return None
 
     async def pick_favorite() -> list[Path] | None:
@@ -379,16 +379,16 @@ def run(
         type: harness - LLM benchmark with MCP servers (default)
 
     Examples:
-        ot-bench run config.yaml
-        ot-bench run examples/bench/*.yaml
-        ot-bench run file1.yaml file2.yaml
-        ot-bench run config.yaml --scenario "Tool Tests"
-        ot-bench run config.yaml --task "direct*"
-        ot-bench run config.yaml --tag focus
-        ot-bench run config.yaml --verbose --trace
-        ot-bench run config.yaml --dry-run
-        ot-bench run config.yaml --output results.yaml
-        ot-bench run --tui
+        bench run config.yaml
+        bench run examples/bench/*.yaml
+        bench run file1.yaml file2.yaml
+        bench run config.yaml --scenario "Tool Tests"
+        bench run config.yaml --task "direct*"
+        bench run config.yaml --tag focus
+        bench run config.yaml --verbose --trace
+        bench run config.yaml --dry-run
+        bench run config.yaml --output results.yaml
+        bench run --tui
     """
     # Initialize console with no_color option and no auto-highlighting
     console = Console(no_color=no_color, force_terminal=not no_color, highlight=False)

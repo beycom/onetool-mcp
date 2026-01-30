@@ -1,4 +1,4 @@
-# ot-bench
+# bench
 
 **Measure what matters. Tokens, cost, accuracy.**
 
@@ -7,7 +7,7 @@ Real agent + MCP testing. Define tasks in YAML, get objective metrics: token cou
 ## Usage
 
 ```bash
-ot-bench [COMMAND] [OPTIONS]
+bench [COMMAND] [OPTIONS]
 ```
 
 ## Commands
@@ -17,7 +17,7 @@ ot-bench [COMMAND] [OPTIONS]
 Run benchmark tasks from a YAML file.
 
 ```bash
-ot-bench run FILE [OPTIONS]
+bench run FILE [OPTIONS]
 ```
 
 #### Options
@@ -46,10 +46,10 @@ ot-bench run FILE [OPTIONS]
 
 ```bash
 # Run feature benchmarks
-OT_CWD=demo ot-bench run demo/bench/features.yaml
+OT_CWD=demo bench run demo/bench/features.yaml
 
 # Run specific tool benchmark
-OT_CWD=demo ot-bench run demo/bench/tool_brave_search.yaml
+OT_CWD=demo bench run demo/bench/tool_brave_search.yaml
 ```
 
 ## Benchmark File Structure
@@ -85,7 +85,7 @@ servers:
   onetool:
     type: stdio
     command: uv
-    args: ["run", "ot-serve"]
+    args: ["run", "onetool"]
 ```
 
 ### Multi-Prompt Tasks
@@ -113,11 +113,11 @@ Use `---PROMPT---` delimiter to split a task into sequential prompts. Each promp
 
 ## Configuration
 
-Configuration file: `.onetool/config/ot-bench.yaml` (project) or `~/.onetool/ot-bench.yaml` (global)
+Configuration file: `.onetool/config/bench.yaml` (project) or `~/.onetool/bench.yaml` (global)
 
 | Variable | Description |
 |----------|-------------|
-| `OT_BENCH_CONFIG` | Config file path override |
+| `BENCH_CONFIG` | Config file path override |
 
 ## Output
 

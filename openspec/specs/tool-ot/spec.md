@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the `ot` pack providing internal tool functions for accessing ot-serve state, tool discovery, configuration inspection, and system health. All output uses YAML flow style for compact, readable context that LLMs can easily parse.
+Defines the `ot` pack providing internal tool functions for accessing onetool state, tool discovery, configuration inspection, and system health. All output uses YAML flow style for compact, readable context that LLMs can easily parse.
 
 This spec consolidates `tool-internal` and `tool-info`.
 ## Requirements

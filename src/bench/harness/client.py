@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
     from openai.types.chat import ChatCompletionToolParam
 
-    from ot_bench.harness.config import ServerConfig
+    from bench.harness.config import ServerConfig
 
 
 # Default timeout for MCP operations (30 seconds)
@@ -422,7 +422,7 @@ async def connect_to_server(
             raise RuntimeError(f"Server {name}: stdio server requires command")
 
         # Build environment: PATH only + explicit config.env
-        from ot_bench.harness.config import expand_subprocess_env
+        from bench.harness.config import expand_subprocess_env
 
         env = {"PATH": os.environ.get("PATH", "")}
         for key, value in config.env.items():

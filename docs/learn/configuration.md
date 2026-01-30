@@ -8,8 +8,8 @@ All CLIs follow a consistent configuration pattern:
 
 | CLI        | Env Var           | Default Path             | Fallback                                  |
 |------------|-------------------|--------------------------|-------------------------------------------|
-| `ot-serve` | `OT_SERVE_CONFIG` | `.onetool/ot-serve.yaml` | `~/.onetool/ot-serve.yaml`, then defaults |
-| `ot-bench` | `OT_BENCH_CONFIG` | `.onetool/ot-bench.yaml` | Task file config                          |
+| `onetool` | `ONETOOL_CONFIG` | `.onetool/onetool.yaml` | `~/.onetool/onetool.yaml`, then defaults |
+| `bench` | `BENCH_CONFIG` | `.onetool/bench.yaml` | Task file config                          |
 
 **Resolution order:**
 
@@ -39,19 +39,19 @@ OneTool uses a three-tier configuration system:
 | Location                     | Purpose                      | Scope        |
 | ---------------------------- | ---------------------------- | ------------ |
 | Bundled defaults             | Read-only package defaults   | All installs |
-| `~/.onetool/ot-serve.yaml`   | Global config                | User         |
-| `.onetool/ot-serve.yaml`     | Project config               | Project      |
+| `~/.onetool/onetool.yaml`   | Global config                | User         |
+| `.onetool/onetool.yaml`     | Project config               | Project      |
 
 **Windows paths:** Replace `~/.onetool/` with `%USERPROFILE%\.onetool\`
 
 ### First Run Bootstrap
 
-On first `ot-serve` invocation, OneTool creates `~/.onetool/` with bundled default configs:
+On first `onetool` invocation, OneTool creates `~/.onetool/` with bundled default configs:
 
 ```bash
-$ ot-serve --help
+$ onetool --help
 Creating ~/.onetool/
-  ✓ ot-serve.yaml
+  ✓ onetool.yaml
   ✓ prompts.yaml
   ✓ snippets.yaml
   ✓ servers.yaml
@@ -62,12 +62,12 @@ Creating ~/.onetool/
 You can also manage the global config directory manually:
 
 ```bash
-ot-serve init           # Create ~/.onetool/ (if missing)
-ot-serve init reset     # Reset to defaults (prompts per file, offers backups)
-ot-serve init validate  # Check for errors
+onetool init           # Create ~/.onetool/ (if missing)
+onetool init reset     # Reset to defaults (prompts per file, offers backups)
+onetool init validate  # Check for errors
 ```
 
-**Note:** Only `ot-serve` bootstraps the global config directory. Other tools (`ot-bench`) require `~/.onetool/` to exist and will prompt you to run `ot-serve init` first if it's missing.
+**Note:** Only `onetool` bootstraps the global config directory. Other tools (`bench`) require `~/.onetool/` to exist and will prompt you to run `onetool init` first if it's missing.
 
 ### Configuration Inheritance
 
@@ -95,7 +95,7 @@ tools_dir:
 #### Minimal Project Config with Global Inheritance
 
 ```yaml
-# my-project/.onetool/ot-serve.yaml
+# my-project/.onetool/onetool.yaml
 version: 1
 # inherit: global  (implicit default)
 
@@ -108,7 +108,7 @@ This loads project `tools_dir` while inheriting prompts, snippets, and servers f
 #### Standalone Config (No Inheritance)
 
 ```yaml
-# isolated/.onetool/ot-serve.yaml
+# isolated/.onetool/onetool.yaml
 version: 1
 inherit: none  # Explicit: don't merge anything
 
@@ -132,7 +132,7 @@ OneTool uses environment variables for runtime settings (with `OT_` prefix):
 | `OT_LOG_LEVEL` | Log level (DEBUG/INFO/WARNING/ERROR) | No |
 | `OT_LOG_DIR` | Log directory path | No |
 | `OT_COMPACT_MAX_LENGTH` | Max value length in compact output | No |
-| `OT_SERVE_CONFIG` | Config file path override | No |
+| `ONETOOL_CONFIG` | Config file path override | No |
 | `OT_SECRETS_FILE` | Secrets file path override | No |
 
 **Note:** API keys are no longer set via environment variables. They are loaded from YAML files:
@@ -542,7 +542,7 @@ projects:
 Invalid configuration values are rejected at load time with helpful error messages:
 
 ```
-ValueError: Invalid configuration in config/ot-serve.yaml:
+ValueError: Invalid configuration in config/onetool.yaml:
   tools.brave.timeout: Input should be greater than or equal to 1
 ```
 

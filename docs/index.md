@@ -30,7 +30,7 @@ MCP doesn't scale. Each MCP server costs ~$30/month in wasted tokens. OneTool fi
 ## Reference
 
 - **[Tools](reference/tools/index.md)** - Batteries Included with 100+ Tools
-- **[CLIs](reference/cli/ot-serve.md)** - ot-serve, ot-bench
+- **[CLIs](reference/cli/onetool.md)** - onetool, bench
 
 ## Extend
 

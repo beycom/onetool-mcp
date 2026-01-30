@@ -2,7 +2,7 @@
 
 Config and secrets are passed to workers via the JSON-RPC request, not read
 directly from files. This ensures workers don't need filesystem access to
-the main ot-serve configuration.
+the main onetool configuration.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ _current_secrets: dict[str, str] = {}
 def get_secret(name: str) -> str | None:
     """Get a secret value by name.
 
-    Secrets are loaded from secrets.yaml by ot-serve and passed to workers.
+    Secrets are loaded from secrets.yaml by onetool and passed to workers.
     They are NOT available as environment variables for security.
 
     Args:
@@ -32,7 +32,7 @@ def get_secret(name: str) -> str | None:
 def get_config(path: str) -> Any:
     """Get a configuration value by dotted path.
 
-    Config is loaded from ot-serve.yaml and passed to workers.
+    Config is loaded from onetool.yaml and passed to workers.
 
     Args:
         path: Dotted path to config value (e.g., "tools.brave.timeout")

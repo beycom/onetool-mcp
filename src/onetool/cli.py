@@ -37,7 +37,7 @@ from ot.support import get_support_banner, get_version
 console = Console(stderr=True, highlight=False)
 
 app = create_cli(
-    "ot-serve",
+    "onetool",
     "OneTool MCP server - exposes a single 'run' tool for LLM code generation.",
 )
 
@@ -91,14 +91,14 @@ def init_create() -> None:
     Creates the global config directory and copies template files if they
     don't already exist. Existing files are preserved.
 
-    This is the default action when running 'ot-serve init' without a subcommand.
+    This is the default action when running 'onetool init' without a subcommand.
     """
     from ot.paths import ensure_global_dir, get_global_dir
 
     global_dir = get_global_dir()
     if global_dir.exists():
         console.print(f"Global config already exists at {global_dir}/")
-        console.print("Use 'ot-serve init reset' to reinstall templates.")
+        console.print("Use 'onetool init reset' to reinstall templates.")
         return
 
     ensure_global_dir(quiet=False, force=False)
@@ -199,7 +199,7 @@ def init_validate() -> None:
 
     # Check global config
     global_dir = get_global_dir()
-    global_config = global_dir / CONFIG_SUBDIR / "ot-serve.yaml"
+    global_config = global_dir / CONFIG_SUBDIR / "onetool.yaml"
     if global_config.exists():
         try:
             load_config(global_config)
@@ -210,7 +210,7 @@ def init_validate() -> None:
     # Check project config
     project_dir = get_project_dir()
     if project_dir:
-        project_config = project_dir / CONFIG_SUBDIR / "ot-serve.yaml"
+        project_config = project_dir / CONFIG_SUBDIR / "onetool.yaml"
         if project_config.exists():
             try:
                 load_config(project_config)
@@ -245,7 +245,7 @@ def init_validate() -> None:
 
     if not validated and not errors:
         console.print("\nNo configuration files found.")
-        console.print(f"Checked: {global_config}, .onetool/config/ot-serve.yaml")
+        console.print(f"Checked: {global_config}, .onetool/config/onetool.yaml")
         return
 
     # Load merged config for status display
@@ -390,7 +390,7 @@ def serve(
         None,
         "--version",
         "-v",
-        callback=version_callback("ot-serve", ot.__version__),
+        callback=version_callback("onetool", ot.__version__),
         is_eager=True,
         help="Show version and exit.",
     ),
@@ -398,7 +398,7 @@ def serve(
         None,
         "--config",
         "-c",
-        help="Path to ot-serve.yaml configuration file.",
+        help="Path to onetool.yaml configuration file.",
         exists=True,
         readable=True,
     ),
@@ -409,8 +409,8 @@ def serve(
     The server communicates via stdio and is typically invoked by MCP clients.
 
     Examples:
-        ot-serve
-        ot-serve --config config/ot-serve.yaml
+        onetool
+        onetool --config config/onetool.yaml
     """
     # Bootstrap global config directory on first run
     from ot.paths import ensure_global_dir

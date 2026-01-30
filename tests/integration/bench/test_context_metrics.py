@@ -10,9 +10,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ot_bench.harness.csv_writer import write_results_csv
-from ot_bench.harness.metrics import LLMCallMetrics, ScenarioResult, TaskResult
-from ot_bench.harness.runner import split_prompts
+from bench.harness.csv_writer import write_results_csv
+from bench.harness.metrics import LLMCallMetrics, ScenarioResult, TaskResult
+from bench.harness.runner import split_prompts
 
 
 @pytest.mark.unit

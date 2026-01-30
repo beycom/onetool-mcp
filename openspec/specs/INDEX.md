@@ -10,7 +10,7 @@ Spec folder names follow these patterns:
 |---------|---------|-------------|
 | `{cli}` | `bench` | Main spec for a CLI (maps to `ot-{cli}`) |
 | `{cli}-{feature}` | `bench-config` | CLI feature spec (extracted from main spec) |
-| `serve-{feature}` | `serve-configuration` | MCP server (`ot-serve`) feature spec |
+| `serve-{feature}` | `serve-configuration` | MCP server (`onetool`) feature spec |
 | `tool-{name}` | `tool-brave-search` | Built-in tool spec |
 | `_nf-{name}` | `_nf-observability` | Non-functional / cross-cutting spec (prefixed to sort together) |
 
@@ -40,7 +40,7 @@ The main CLI for configuration management.
 
 ---
 
-## ot-serve (MCP Server)
+## onetool (MCP Server)
 
 The MCP server that exposes tools for LLM code execution.
 
@@ -86,7 +86,7 @@ The MCP server that exposes tools for LLM code execution.
 
 ---
 
-## ot-bench (Benchmark Harness)
+## bench (Benchmark Harness)
 
 CLI for testing and benchmarking MCP servers.
 
@@ -109,10 +109,10 @@ CLI for testing and benchmarking MCP servers.
 |----------|-------|
 | Non-Functional | 5 |
 | onetool CLI | 1 |
-| ot-serve Core | 8 |
+| onetool Core | 8 |
 | Tool Infrastructure | 2 |
 | Built-in Tools | 15 |
-| ot-bench | 8 |
+| bench | 8 |
 | **Total** | **39** |
 
 ---

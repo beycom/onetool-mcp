@@ -12,8 +12,8 @@ Supports OpenAI API and OpenRouter (OpenAI-compatible).
 
 **Requires configuration:**
 - OPENAI_API_KEY in secrets.yaml
-- transform.base_url in ot-serve.yaml (e.g., https://openrouter.ai/api/v1)
-- transform.model in ot-serve.yaml (e.g., openai/gpt-5-mini)
+- transform.base_url in onetool.yaml (e.g., https://openrouter.ai/api/v1)
+- transform.model in onetool.yaml (e.g., openai/gpt-5-mini)
 
 Tool is not available until all three are configured.
 """

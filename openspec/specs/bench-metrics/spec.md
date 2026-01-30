@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines per-LLM-call metrics tracking and context growth analysis for ot-bench.
+Defines per-LLM-call metrics tracking and context growth analysis for bench.
 
 ---
 

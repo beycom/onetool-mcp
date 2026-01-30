@@ -10,7 +10,7 @@
 # Prefix and style tests moved to unit tests (tests/unit/test_features_triggers.py)
 # Python construct tests moved to unit tests (tests/unit/test_features_python.py)
 #
-# Use with: ot-bench run demo/bench/features.yaml
+# Use with: bench run demo/bench/features.yaml
 
 defaults:
   timeout: 60
@@ -42,7 +42,7 @@ servers:
   onetool:
     type: stdio
     command: uv
-    args: ["run", "ot-serve"]
+    args: ["run", "onetool"]
     env:
       OT_CWD: demo
 

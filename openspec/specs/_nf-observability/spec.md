@@ -5,7 +5,7 @@
 Defines the unified logging and observability infrastructure for OneTool. Covers structured JSON logging, LogSpan timing, token/cost tracking, and core logging patterns shared across all components.
 
 CLI-specific logging requirements are defined in their respective specs:
-- [bench-logging](../bench-logging/spec.md) - ot-bench CLI output, verbose/trace modes
+- [bench-logging](../bench-logging/spec.md) - bench CLI output, verbose/trace modes
 
 ---
 
