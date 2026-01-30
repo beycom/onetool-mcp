@@ -249,79 +249,6 @@ class TestSdkPaths:
         config_module._current_config.clear()
         config_module._current_config.update(original_config)
 
-    def test_get_project_path_relative(self, tmp_path: Path) -> None:
-        """Should resolve relative path against project path."""
-        import ot_sdk.config as config_module
-
-        # Use .clear() and .update() to modify in-place (paths.py has a reference)
-        config_module._current_config.clear()
-        config_module._current_config.update({"_project_path": str(tmp_path)})
-
-        from ot_sdk import get_project_path
-
-        result = get_project_path("diagrams/flow.svg")
-        assert result == tmp_path / "diagrams" / "flow.svg"
-
-    def test_get_project_path_absolute(self, tmp_path: Path) -> None:
-        """Should return absolute path unchanged."""
-        import ot_sdk.config as config_module
-
-        config_module._current_config.clear()
-        config_module._current_config.update({"_project_path": str(tmp_path)})
-
-        from ot_sdk import get_project_path
-
-        result = get_project_path("/tmp/output.svg")
-        assert result == Path("/tmp/output.svg")
-
-    def test_get_project_path_tilde(self) -> None:
-        """Should expand tilde to home directory."""
-        import ot_sdk.config as config_module
-
-        config_module._current_config.clear()
-        config_module._current_config.update({"_project_path": "/project"})
-
-        from ot_sdk import get_project_path
-
-        result = get_project_path("~/output.svg")
-        assert result == Path.home() / "output.svg"
-
-    def test_get_project_path_fallback_to_cwd(self) -> None:
-        """Should fall back to cwd when _project_path not set."""
-        import ot_sdk.config as config_module
-
-        config_module._current_config.clear()
-
-        from ot_sdk import get_project_path
-
-        result = get_project_path("output.svg")
-        assert result == (Path.cwd() / "output.svg").resolve()
-
-    def test_get_config_path_relative(self, tmp_path: Path) -> None:
-        """Should resolve relative path against config directory."""
-        import ot_sdk.config as config_module
-
-        config_dir = tmp_path / ".onetool"
-        config_module._current_config.clear()
-        config_module._current_config.update({"_config_dir": str(config_dir)})
-
-        from ot_sdk import get_config_path
-
-        result = get_config_path("templates/flow.mmd")
-        assert result == config_dir / "templates" / "flow.mmd"
-
-    def test_get_config_path_absolute(self, tmp_path: Path) -> None:
-        """Should return absolute path unchanged."""
-        import ot_sdk.config as config_module
-
-        config_module._current_config.clear()
-        config_module._current_config.update({"_config_dir": str(tmp_path)})
-
-        from ot_sdk import get_config_path
-
-        result = get_config_path("/etc/templates/flow.mmd")
-        assert result == Path("/etc/templates/flow.mmd")
-
     def test_expand_path_tilde(self) -> None:
         """Should expand tilde to home directory."""
         from ot_sdk import expand_path
@@ -794,9 +721,7 @@ class TestSdkExports:
             expand_path,
             format_error,
             get_config,
-            get_config_path,
             get_ot_dir,
-            get_project_path,
             get_secret,
             # Deps
             check_cli,
@@ -833,8 +758,6 @@ class TestSdkExports:
         assert callable(worker_main)
         assert callable(get_secret)
         assert callable(get_config)
-        assert callable(get_project_path)
-        assert callable(get_config_path)
         assert callable(expand_path)
         assert callable(truncate)
         assert callable(format_error)
@@ -885,9 +808,7 @@ class TestSdkExports:
             "expand_path",
             "format_error",
             "get_config",
-            "get_config_path",
             "get_ot_dir",
-            "get_project_path",
             "get_secret",
             # Dependencies
             "check_cli",

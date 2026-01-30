@@ -279,7 +279,7 @@ from __future__ import annotations
 pack = "convert"
 __all__ = ["pdf", "word"]
 
-from ot_sdk import get_project_path, log, worker_main
+from ot_sdk import log, resolve_cwd_path, worker_main
 
 from _convert import convert_pdf, convert_word
 

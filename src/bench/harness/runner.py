@@ -11,8 +11,6 @@ from typing import TYPE_CHECKING, Any, Protocol
 from loguru import logger
 from openai import OpenAI
 
-from ot.logging import LogSpan
-from ot.utils import flatten_exception_group
 from bench.harness.client import (
     ServerConnectionCallback,
     call_tool,
@@ -28,6 +26,8 @@ from bench.harness.metrics import (
     calculate_cost,
 )
 from bench.secrets import get_bench_secret
+from ot.logging import LogSpan
+from ot.utils import flatten_exception_group
 
 # Delay between tasks to avoid rate limits on external APIs (OpenRouter, etc.)
 TASK_DELAY_SECONDS = 3.0

@@ -87,9 +87,7 @@ from ot_sdk.logging import log
 from ot_sdk.packs import call_tool, get_pack
 from ot_sdk.paths import (
     expand_path,
-    get_config_path,
     get_ot_dir,
-    get_project_path,
     resolve_cwd_path,
     resolve_ot_path,
     resolve_path,
@@ -123,10 +121,8 @@ __all__ = [
     "format_batch_results",
     "format_error",
     "get_config",
-    "get_config_path",
     "get_ot_dir",
     "get_pack",
-    "get_project_path",
     "get_secret",
     "http",
     # Factory (from ot.utils)

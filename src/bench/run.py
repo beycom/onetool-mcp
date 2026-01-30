@@ -12,16 +12,16 @@ import yaml
 from pydantic import BaseModel, Field
 from rich.console import Console
 
-from ot._tui import ask_select
-from ot.logging import LogSpan, configure_logging
-from ot.paths import get_effective_cwd, get_global_dir
-from ot.support import get_support_banner, get_version
 from bench.cli import app
 from bench.harness.config import load_config
 from bench.harness.csv_writer import write_results_csv
 from bench.harness.runner import AgenticRunner
 from bench.reporter import ConsoleReporter
 from bench.utils import run_async
+from ot._tui import ask_select
+from ot.logging import LogSpan, configure_logging
+from ot.paths import get_effective_cwd, get_global_dir
+from ot.support import get_support_banner, get_version
 
 # Exit codes
 EXIT_SUCCESS = 0
