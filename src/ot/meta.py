@@ -984,8 +984,16 @@ def health() -> dict[str, Any]:
 def reload() -> str:
     """Force reload of all configuration.
 
-    Clears cached configuration and reloads from disk.
-    Use after modifying config files during a session.
+    Clears all cached state and reloads from disk:
+    - Configuration (ot-serve.yaml and includes)
+    - Secrets (secrets.yaml)
+    - Tool registry (tool files from tools_dir)
+    - Prompts
+    - MCP proxy connections
+    - Parameter resolution caches
+
+    Use after modifying config files, adding/removing tools, or
+    changing secrets during a session.
 
     Returns:
         Status message confirming reload
@@ -993,31 +1001,47 @@ def reload() -> str:
     Example:
         ot.reload()
     """
+    import sys
+
     with log("ot.reload") as s:
         import ot.config.loader
         import ot.config.secrets
         import ot.executor.param_resolver
+        import ot.executor.tool_loader
         import ot.prompts
+        import ot.proxy
         import ot.registry
 
-        # Clear config cache
+        # Clear config cache (must be first - other caches depend on it)
         ot.config.loader._config = None
+
+        # Clear secrets cache
+        ot.config.secrets._secrets = None
 
         # Clear prompts cache
         ot.prompts._prompts = None
 
-        # Clear secrets cache
-        ot.config.secrets._secrets = None
-        ot.config.secrets._early_secrets = None
+        # Clear tool loader module cache
+        ot.executor.tool_loader._module_cache.clear()
+
+        # Clean up dynamically loaded tool modules from sys.modules
+        # Tool loader uses "tools.{stem}" naming pattern
+        tool_modules = [name for name in sys.modules if name.startswith("tools.")]
+        for mod_name in tool_modules:
+            del sys.modules[mod_name]
+        s.add("toolModulesCleared", len(tool_modules))
 
         # Clear tool registry cache (will rescan on next access)
         ot.registry._registry = None
+
+        # Reset MCP proxy manager (closes connections, clears tool caches)
+        ot.proxy.reset_proxy_manager()
 
         # Clear param resolver cache (depends on registry)
         ot.executor.param_resolver.get_tool_param_names.cache_clear()
         ot.executor.param_resolver._mcp_param_cache.clear()
 
-        # Reload to validate
+        # Reload config to validate and report stats
         cfg = get_config()
         s.add("aliasCount", len(cfg.alias) if cfg.alias else 0)
         s.add("snippetCount", len(cfg.snippets) if cfg.snippets else 0)

@@ -17,10 +17,13 @@ Usage:
     ot-bench run harness.yaml
 """
 
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
-__version__ = version("onetool-mcp")
+try:
+    __version__ = version("onetool-mcp")
+except PackageNotFoundError:
+    __version__ = "0.0.0-dev"  # Running from source or in worker subprocess
 
 __all__ = ["__version__", "main"]
 

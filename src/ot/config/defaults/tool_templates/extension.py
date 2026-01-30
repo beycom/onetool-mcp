@@ -1,11 +1,11 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["httpx>=0.27.0", "pydantic>=2.0.0", "pyyaml>=6.0.0"]
+# dependencies = ["pydantic>=2.0.0", "pyyaml>=6.0.0"]
 # ///
 """{{description}}
 
-This is an extension tool that runs in an isolated subprocess with its own
-dependencies. Extension tools use ot_sdk for configuration and logging.
+An extension tool that runs in an isolated subprocess.
+Add dependencies to the script block above as needed.
 """
 
 from __future__ import annotations
@@ -15,88 +15,49 @@ pack = "{{pack}}"
 
 __all__ = ["{{function}}"]
 
-from typing import Any
+from ot_sdk import log, worker_main
 
-import httpx
-from pydantic import BaseModel, Field
+# --- Optional: Additional SDK imports ---
+# Uncomment the imports you need:
+# from ot_sdk import get_secret, get_config, cache
+# from ot_sdk import http, safe_request, api_headers
+# from ot_sdk import call_tool, get_pack
 
-from ot_sdk import (
-    cache,
-    get_secret,
-    log,
-    worker_main,
-)
+# --- Optional: HTTP client for API calls ---
+# Add "httpx>=0.27.0" to dependencies above, then uncomment:
+# import httpx
+# _client = httpx.Client(
+#     timeout=60.0,
+#     headers={"Accept": "application/json"},
+# )
 
-
-class Config(BaseModel):
-    """Pack configuration - discovered by registry.
-
-    Configure in ot-serve.yaml under tools.{{pack}}:
-        tools:
-          {{pack}}:
-            timeout: 60.0
-    """
-
-    timeout: float = Field(
-        default=60.0,
-        ge=1.0,
-        le=300.0,
-        description="Request timeout in seconds",
-    )
-
-
-# Shared HTTP client for connection pooling (persists across calls)
-_client = httpx.Client(
-    timeout=60.0,
-    headers={"Accept": "application/json"},
-)
-
-
-def _get_api_key() -> str:
-    """Get API key from secrets.
-
-    Configure in secrets.yaml:
-        {{API_KEY}}: "your-api-key"
-    """
-    return get_secret("{{API_KEY}}") or ""
+# --- Optional: API key configuration ---
+# def _get_api_key() -> str:
+#     """Get API key from secrets.yaml: {{API_KEY}}: "your-key" """
+#     return get_secret("{{API_KEY}}") or ""
 
 
 def {{function}}(
     *,
-    query: str,
-    timeout: float | None = None,
+    input: str,
 ) -> str:
     """{{function_description}}
 
     Args:
-        query: The query parameter
-        timeout: Request timeout in seconds (defaults to config)
+        input: The input string
 
     Returns:
-        Result string or error message
+        Processed result or error message
 
     Example:
-        {{pack}}.{{function}}(query="test")
+        {{pack}}.{{function}}(input="hello")
     """
-    api_key = _get_api_key()
-    if not api_key:
-        return "Error: {{API_KEY}} secret not configured"
-
-    with log("{{pack}}.{{function}}", query=query) as span:
+    with log("{{pack}}.{{function}}", inputLen=len(input)) as span:
         try:
-            # Make API request
-            response = _client.get(
-                "https://api.example.com/endpoint",
-                params={"q": query},
-                headers={"Authorization": f"Bearer {api_key}"},
-                timeout=timeout or 60.0,
-            )
-            response.raise_for_status()
-
-            result = response.json()
-            span.add(status=response.status_code)
-            return str(result)
-
+            # TODO: Implement your logic here
+            result = f"Processed: {input}"
+            span.add(outputLen=len(result))
+            return result
         except Exception as e:
             span.add(error=str(e))
             return f"Error: {e}"

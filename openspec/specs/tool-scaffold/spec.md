@@ -22,45 +22,74 @@ The scaffold pack SHALL provide a `templates()` function to list available exten
 The scaffold pack SHALL provide a `create()` function to scaffold new extensions from templates.
 
 #### Scenario: Create project extension
-- **WHEN** `scaffold.create(pack="mypack")` is called
-- **THEN** it creates `.onetool/tools/mypack/mypack_tools.py`
+- **WHEN** `scaffold.create(name="mypack")` is called
+- **THEN** it creates `.onetool/tools/mypack/mypack.py`
 - **AND** uses the default "extension" template
 - **AND** substitutes `{{pack}}`, `{{function}}`, `{{description}}` placeholders
 
 #### Scenario: Create global extension
-- **WHEN** `scaffold.create(pack="mypack", location="global")` is called
-- **THEN** it creates `~/.onetool/tools/mypack/mypack_tools.py`
+- **WHEN** `scaffold.create(name="mypack", scope="global")` is called
+- **THEN** it creates `~/.onetool/tools/mypack/mypack.py`
 
 #### Scenario: Custom function name
-- **WHEN** `scaffold.create(pack="mypack", function="search")` is called
+- **WHEN** `scaffold.create(name="mypack", function="search")` is called
 - **THEN** the generated file has `def search(...)` instead of `def run(...)`
 
 #### Scenario: Custom template
-- **WHEN** `scaffold.create(pack="mypack", template="http")` is called
-- **THEN** it uses `tool_templates/http.py` if it exists
+- **WHEN** `scaffold.create(name="mypack", template="custom")` is called
+- **THEN** it uses `tool_templates/custom.py` if it exists
 - **AND** returns error if template not found
 
 #### Scenario: Extension already exists
-- **WHEN** `scaffold.create(pack="mypack")` is called
-- **AND** `.onetool/tools/mypack/mypack_tools.py` already exists
+- **WHEN** `scaffold.create(name="mypack")` is called
+- **AND** `.onetool/tools/mypack/mypack.py` already exists
 - **THEN** it returns an error message without overwriting
 
 #### Scenario: Next steps guidance
 - **WHEN** an extension is successfully created
-- **THEN** the return value includes guidance on editing, restarting, and calling the new function
+- **THEN** the return value includes guidance on editing, validating, reloading, and calling the new function
 
 ### Requirement: List Extensions Function
 
-The scaffold pack SHALL provide a `list_extensions()` function to show installed extensions.
+The scaffold pack SHALL provide an `extensions()` function to show loaded extensions.
 
-#### Scenario: List project and global extensions
-- **WHEN** `scaffold.list_extensions()` is called
-- **THEN** it returns extensions from both `.onetool/tools/` and `~/.onetool/tools/`
-- **AND** shows pack name and file path for each
+#### Scenario: List loaded extensions
+- **WHEN** `scaffold.extensions()` is called
+- **THEN** it returns all extension files loaded from `tools_dir` config
+- **AND** shows full path to each file
 
-#### Scenario: No extensions installed
-- **WHEN** no extensions exist in either location
-- **THEN** it returns "(none)" under "User extensions:"
+#### Scenario: No extensions loaded
+- **WHEN** no extension files are configured in `tools_dir`
+- **THEN** it returns a message indicating no extensions are loaded
+
+### Requirement: Validate Extension Function
+
+The scaffold pack SHALL provide a `validate()` function for pre-reload validation.
+
+#### Scenario: Valid extension
+- **WHEN** `scaffold.validate(path="/path/to/extension.py")` is called
+- **AND** the extension has valid syntax and required structure
+- **THEN** it returns "Validation PASSED" with any warnings
+
+#### Scenario: Syntax error
+- **WHEN** `scaffold.validate(path="/path/to/extension.py")` is called
+- **AND** the file has a Python syntax error
+- **THEN** it returns an error with line number and message
+
+#### Scenario: Missing required structure
+- **WHEN** `scaffold.validate(path="/path/to/extension.py")` is called
+- **AND** the file is missing `pack` or `__all__`
+- **THEN** it returns "Validation FAILED" with errors
+
+#### Scenario: Missing worker_main for PEP 723 extensions
+- **WHEN** `scaffold.validate(path="/path/to/extension.py")` is called
+- **AND** the file has PEP 723 dependencies but no `worker_main()`
+- **THEN** it returns "Validation FAILED" with error
+
+#### Scenario: Best practices warnings
+- **WHEN** `scaffold.validate(path="/path/to/extension.py")` is called
+- **AND** the file violates best practices (pack after imports, missing logging)
+- **THEN** it includes warnings in the result but still passes
 
 ### Requirement: Extension Template Structure
 
@@ -87,7 +116,7 @@ Extension templates SHALL be stored in the bundled config defaults directory.
 
 #### Scenario: Template discovery
 - **WHEN** scaffold functions look for templates
-- **THEN** they use `get_config_path("tool_templates")` to find the directory
+- **THEN** they use `get_bundled_config_dir() / "tool_templates"` to find the directory
 - **AND** templates are bundled with the onetool package
 
 #### Scenario: Template file naming

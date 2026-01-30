@@ -254,8 +254,8 @@ The `ot_sdk` package provides these utilities for extension tools:
 | `http` | Pre-configured httpx client with connection pooling |
 | `log(span, **kwargs)` | Structured logging context manager |
 | `cache(ttl=seconds)` | In-memory caching decorator with TTL |
-| `get_project_path(path)` | Resolve paths relative to project directory |
-| `get_config_path(path)` | Resolve paths relative to config directory |
+| `resolve_cwd_path(path)` | Resolve paths relative to project directory |
+| `resolve_ot_path(path)` | Resolve paths relative to config directory |
 
 ### HTTP Client
 
@@ -331,17 +331,39 @@ Tools work with two path contexts:
 | **Project paths** | Reading/writing project files | `OT_CWD` (working directory) |
 | **Config paths** | Loading config assets (templates, etc.) | Config directory (`.onetool/`) |
 
+### Path Prefixes
+
+Path functions support prefixes to override the default base:
+
+| Prefix    | Meaning                   | Use Case                       |
+|-----------|---------------------------|--------------------------------|
+| `~`       | Home directory            | Cross-project shared files     |
+| `CWD/`    | Project working directory | Tool I/O files                 |
+| `GLOBAL/` | `~/.onetool/`             | Global config/logs             |
+| `OT_DIR/` | Active `.onetool/`        | Project-first, global fallback |
+
+```python
+from ot_sdk import resolve_cwd_path, resolve_ot_path
+
+# Default: relative to project directory
+output = resolve_cwd_path("output/report.txt")
+
+# Prefix overrides base
+global_log = resolve_cwd_path("GLOBAL/logs/app.log")  # ~/.onetool/logs/app.log
+template = resolve_ot_path("templates/default.mmd")    # .onetool/templates/default.mmd
+```
+
 ### Project Paths (Reading/Writing Files)
 
 When reading or writing files in the user's project, resolve paths relative to the project working directory:
 
 ```python
-from ot_sdk import get_project_path
+from ot_sdk import resolve_cwd_path
 
 def save_output(*, content: str, output_file: str = "output.txt") -> str:
     """Save content to a file in the project."""
     # Resolves relative to OT_CWD (project directory)
-    path = get_project_path(output_file)
+    path = resolve_cwd_path(output_file)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
     return f"Saved to {path}"
@@ -352,13 +374,14 @@ def save_output(*, content: str, output_file: str = "output.txt") -> str:
 - Relative paths → resolved relative to `OT_CWD` (or `cwd` if not set)
 - Absolute paths → used unchanged
 - `~` → expanded to home directory
+- Prefixes (`CWD/`, `GLOBAL/`, `OT_DIR/`) → override the default base
 
 ### Config Paths (Loading Assets)
 
 When loading configuration assets like templates, schemas, or reference files defined in config, resolve paths relative to the config directory:
 
 ```python
-from ot_sdk import get_config, get_config_path
+from ot_sdk import get_config, resolve_ot_path
 
 def get_template(*, name: str) -> str:
     """Load a template from config."""
@@ -368,7 +391,7 @@ def get_template(*, name: str) -> str:
 
     # Resolves relative to config directory (.onetool/)
     template_file = templates[name].get("file", "")
-    path = get_config_path(template_file)
+    path = resolve_ot_path(template_file)
 
     if path.exists():
         return path.read_text()
@@ -380,6 +403,7 @@ def get_template(*, name: str) -> str:
 - Relative paths → resolved relative to config directory
 - Absolute paths → used unchanged
 - `~` → expanded to home directory
+- Prefixes (`CWD/`, `GLOBAL/`, `OT_DIR/`) → override the default base
 
 ### Main Process Tools
 
@@ -398,12 +422,12 @@ def list_files(*, directory: str = ".") -> str:
 
 ### Summary
 
-| Function | Import From | Resolves Relative To |
-|----------|-------------|---------------------|
-| `get_project_path()` | `ot_sdk` | Project directory (`OT_CWD`) |
-| `get_config_path()` | `ot_sdk` | Config directory (`.onetool/`) |
-| `get_effective_cwd()` | `ot.paths` | Returns project directory |
-| `expand_path()` | `ot_sdk` | Only expands `~` |
+| Function             | Import From | Resolves Relative To           |
+|----------------------|-------------|--------------------------------|
+| `resolve_cwd_path()` | `ot_sdk`    | Project directory (`OT_CWD`)   |
+| `resolve_ot_path()`  | `ot_sdk`    | Config directory (`.onetool/`) |
+| `get_effective_cwd()`| `ot.paths`  | Returns project directory      |
+| `expand_path()`      | `ot_sdk`    | Only expands `~`               |
 
 ## Attribution & Licensing
 

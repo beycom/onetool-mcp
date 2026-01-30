@@ -174,7 +174,7 @@ nav:
   - Extending:
       - extending/index.md
       - Creating Tools: extending/creating-tools.md
-      - Plugins: extending/plugins.md
+      - Extensions: extending/extensions.md
       - Logging: extending/logging.md
       - Testing: extending/testing.md
       - Creating CLIs: extending/creating-clis.md

@@ -3,6 +3,5 @@
 Templates for creating user extension tools that run in worker subprocesses.
 
 Available templates:
-- extension.py: Full-featured template with HTTP client and API key auth
-- extension_simple.py: Simple template without external dependencies
+- extension.py: Unified template with optional sections for HTTP, API keys, etc.
 """

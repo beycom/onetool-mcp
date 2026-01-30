@@ -1,12 +1,12 @@
-# Creating Plugins
+# Creating Extensions
 
 **Build tools in your own repository. No onetool source required.**
 
-Plugins let you develop OneTool tools in separate repositories while using local configuration for development and testing.
+Extensions let you develop OneTool tools in separate repositories while using local configuration for development and testing.
 
 ## Minimal Structure
 
-A plugin needs just one file:
+An extension needs just one file:
 
 ```
 ot-mytool/
@@ -37,7 +37,7 @@ That's the minimum. One file with a `pack` declaration and exported functions.
 
 ## Local Development Setup
 
-For development, create a `.onetool/` directory in your plugin repository:
+For development, create a `.onetool/` directory in your extension repository:
 
 ```
 ot-mytool/
@@ -52,7 +52,7 @@ ot-mytool/
 
 ### `.onetool/ot-serve.yaml`
 
-Point `tools_dir` at your plugin source:
+Point `tools_dir` at your extension source:
 
 ```yaml
 # .onetool/ot-serve.yaml
@@ -60,7 +60,7 @@ tools_dir:
   - ./src/*.py
 ```
 
-Run `ot-serve` from your plugin directory. It finds `.onetool/ot-serve.yaml` automatically.
+Run `ot-serve` from your extension directory. It finds `.onetool/ot-serve.yaml` automatically.
 
 ### `.onetool/secrets.yaml`
 
@@ -105,7 +105,7 @@ Run tests with: `ot-bench run demo.yaml`
 
 ## Running Locally
 
-From your plugin directory:
+From your extension directory:
 
 ```bash
 # Start the server with your local config
@@ -124,7 +124,7 @@ If your tool needs external packages, use PEP 723 headers and run as an isolated
 ```python
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["ot-sdk>=0.1.0", "httpx>=0.28.0", "pyyaml>=6.0.0"]
+# dependencies = ["httpx>=0.28.0"]
 # ///
 """Tool with external dependencies."""
 
@@ -167,19 +167,41 @@ The `ot_sdk` package provides utilities for extension tools:
 | `http` | Pre-configured httpx client |
 | `log(span, **kwargs)` | Structured logging context manager |
 | `cache(ttl=seconds)` | In-memory caching decorator |
-| `get_project_path(path)` | Resolve paths relative to project directory |
-| `get_config_path(path)` | Resolve paths relative to config directory |
+| `resolve_cwd_path(path)` | Resolve paths relative to project directory |
+| `resolve_ot_path(path)` | Resolve paths relative to config directory |
+
+### Path Prefixes
+
+Path functions support prefixes to override the default base:
+
+| Prefix    | Meaning                  | Use Case                       |
+|-----------|--------------------------|--------------------------------|
+| `~`       | Home directory           | Cross-project shared files     |
+| `CWD/`    | Project working directory| Tool I/O files                 |
+| `GLOBAL/` | `~/.onetool/`            | Global config/logs             |
+| `OT_DIR/` | Active `.onetool/`       | Project-first, global fallback |
+
+```python
+from ot_sdk import resolve_cwd_path, resolve_ot_path
+
+# Default: relative to project directory
+output = resolve_cwd_path("output/report.txt")
+
+# Prefix overrides base
+global_log = resolve_cwd_path("GLOBAL/logs/app.log")  # ~/.onetool/logs/app.log
+template = resolve_ot_path("templates/default.mmd")    # .onetool/templates/default.mmd
+```
 
 ## Consumer Installation
 
-When users want to use your plugin, they add it to their `tools_dir`:
+When users want to use your extension, they add it to their `tools_dir`:
 
 ### Global installation
 
 ```yaml
 # ~/.onetool/ot-serve.yaml
 tools_dir:
-  - ~/plugins/ot-mytool/src/*.py
+  - ~/extensions/ot-mytool/src/*.py
 ```
 
 ### Project-specific
@@ -187,7 +209,7 @@ tools_dir:
 ```yaml
 # project/.onetool/ot-serve.yaml
 tools_dir:
-  - ~/plugins/ot-mytool/src/*.py
+  - ~/extensions/ot-mytool/src/*.py
   - ./local-tools/*.py
 ```
 
@@ -195,7 +217,7 @@ Glob patterns work for selecting tool files.
 
 ## Testing Without Full Installation
 
-Test your plugin functions directly without running `ot-serve`:
+Test your extension functions directly without running `ot-serve`:
 
 ```python
 # test_mytool.py
@@ -225,9 +247,9 @@ def test_fetch():
     assert result
 ```
 
-## Example: Plugin with Implementation Modules
+## Example: Extension with Implementation Modules
 
-For larger plugins, organize implementation in a subpackage:
+For larger extensions, organize implementation in a subpackage:
 
 ```
 ot-convert/
@@ -248,7 +270,7 @@ The main tool file imports from the implementation package:
 ```python
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["ot-sdk>=0.1.0", "pymupdf>=1.24.0", "python-docx>=1.1.0"]
+# dependencies = ["pymupdf>=1.24.0", "python-docx>=1.1.0"]
 # ///
 """Document conversion tools."""
 

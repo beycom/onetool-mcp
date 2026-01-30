@@ -148,11 +148,11 @@ Tools with dependencies run in isolated subprocesses via PEP 723. Clean process 
 
 [Learn more](extending/creating-tools.md#extension-tools)
 
-### Plugin Architecture
+### Extension Architecture
 
 Build tools in separate repositories. Local dev with `.onetool/` config. Share via `tools_dir` glob patterns.
 
-[Learn more](extending/plugins.md)
+[Learn more](extending/extensions.md)
 
 ### MCP Server Proxy
 

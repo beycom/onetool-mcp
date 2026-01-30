@@ -38,10 +38,10 @@ def write_config(config_dir: Path) -> Callable[[dict], Path]:
 def reset_secrets_cache() -> Generator[None, None, None]:
     """Reset secrets cache before and after each test."""
     try:
-        import ot.config.mcp
+        import ot.config.secrets
 
-        ot.config.mcp._early_secrets = None
+        ot.config.secrets._secrets = None
         yield
-        ot.config.mcp._early_secrets = None
+        ot.config.secrets._secrets = None
     except ImportError:
         yield
