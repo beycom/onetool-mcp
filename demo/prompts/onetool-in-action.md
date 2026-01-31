@@ -83,7 +83,7 @@ Test both tools for each task below.
 Compare and score them (out of 10) based on quality.
 
 Columns:
-Task | Claude Speed | Claude Quality | OT Speed | OT Quality | Recommended For | Call/Snippet
+Task | Claude Speed | Claude | OneTool | Recommended For | Call/Snippet
 Call/Snippet should have all parameters for both Claude and OneTool.
 
 Run searches sequentially. DO NOT provide the actual answer for each task.

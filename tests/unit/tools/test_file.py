@@ -267,6 +267,43 @@ def test_search_with_file_pattern(test_dir: Path) -> None:
     assert "file1.txt" not in result
 
 
+@pytest.mark.unit
+@pytest.mark.tools
+def test_search_glob_recursive(test_dir: Path) -> None:
+    """Verify search with glob parameter for full path matching."""
+    from ot_tools.file import search
+
+    result = search(path=str(test_dir), glob="**/*.txt")
+
+    assert "file1.txt" in result
+    assert "subdir/nested.txt" in result or "subdir\\nested.txt" in result
+    assert "file2.py" not in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_search_glob_nested_pattern(test_dir: Path) -> None:
+    """Verify search with glob matches nested directories."""
+    from ot_tools.file import search
+
+    result = search(path=str(test_dir), glob="**/nested*")
+
+    assert "nested.txt" in result
+    assert "file1.txt" not in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_search_requires_pattern_or_glob(test_dir: Path) -> None:
+    """Verify search errors when neither pattern nor glob provided."""
+    from ot_tools.file import search
+
+    result = search(path=str(test_dir))
+
+    assert "Error" in result
+    assert "pattern" in result.lower() or "glob" in result.lower()
+
+
 # =============================================================================
 # Write Operations
 # =============================================================================

@@ -200,6 +200,11 @@ def search(
 
         # Search with context
         ripgrep.search(pattern="def main", path=".", context=3, max_results=5)
+
+        # Full path glob patterns (recursive matching)
+        ripgrep.search(pattern="TODO", glob="src/**/*.py")
+        ripgrep.search(pattern="import", glob="**/*.{ts,tsx}")
+        ripgrep.search(pattern="test", glob="tests/**/test_*.py")
     """
     with LogSpan(span="ripgrep.search", pattern=pattern, path=path) as s:
         # Check rg is installed
@@ -293,6 +298,10 @@ def count(
 
         # Count all imports (including multiple per line)
         ripgrep.count(pattern="import", path=".", count_all=True, file_type="py")
+
+        # Count with full path globs
+        ripgrep.count(pattern="TODO", glob="src/**/*.py")
+        ripgrep.count(pattern="import", glob="**/*.{js,ts}")
     """
     with LogSpan(span="ripgrep.count", pattern=pattern, path=path) as s:
         # Check rg is installed
@@ -376,6 +385,11 @@ def files(
 
         # List markdown files
         ripgrep.files(path=".", glob="*.md")
+
+        # Full path glob patterns
+        ripgrep.files(glob="src/**/*.py")           # Python files under src/
+        ripgrep.files(glob="tests/**/test_*.py")    # Test files recursively
+        ripgrep.files(glob="**/*.{yaml,yml}")       # YAML files with brace expansion
     """
     with LogSpan(span="ripgrep.files", path=path) as s:
         # Check rg is installed

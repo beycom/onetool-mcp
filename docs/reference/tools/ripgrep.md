@@ -48,6 +48,29 @@ tools:
 
 - `rg` binary (install with: `brew install ripgrep`)
 
+## Glob Patterns
+
+The `glob` parameter supports full path patterns via ripgrep's `--glob` flag:
+
+| Pattern | Description |
+|---------|-------------|
+| `*.py` | Python files in search path |
+| `**/*.py` | Python files recursively |
+| `src/**/*.py` | Python files under src/ |
+| `**/test_*.py` | Test files recursively |
+| `**/*.{ts,tsx}` | TypeScript files (brace expansion) |
+| `!**/__pycache__/**` | Exclude pycache |
+
+### Comparison with Claude Glob Tool
+
+| Feature | Claude Glob | OneTool ripgrep.files |
+|---------|-------------|----------------------|
+| Pattern `src/**/*.py` | `Glob(pattern="src/**/*.py")` | `ripgrep.files(glob="src/**/*.py")` |
+| Brace expansion | `**/*.{ts,tsx}` | `**/*.{ts,tsx}` |
+| Type shortcut | N/A | `file_type="py"` |
+| Hidden files | N/A | `include_hidden=True` |
+| Returns | Absolute paths | Relative paths |
+
 ## Examples
 
 ```python
@@ -65,6 +88,12 @@ ripgrep.files(path="src/", file_type="py")
 
 # List supported file types
 ripgrep.types()
+
+# Full path glob patterns
+ripgrep.files(glob="src/**/*.py")
+ripgrep.files(glob="tests/**/test_*.py")
+ripgrep.search(pattern="TODO", glob="**/*.{js,ts}")
+ripgrep.count(pattern="import", glob="src/**/*.py")
 ```
 
 ## Source

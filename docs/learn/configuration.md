@@ -425,7 +425,7 @@ output:
 
 When a tool output exceeds `max_inline_size`, OneTool:
 
-1. Stores the full result in `.onetool/tmp/` as `.jsonl` (structured) or `.txt` (unstructured)
+1. Stores the full result in `.onetool/tmp/` as `result-{handle}.txt`
 2. Returns a summary with handle, preview, and query hint
 3. LLM can use `ot.result(handle="...")` to paginate through the full content
 

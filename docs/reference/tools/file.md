@@ -25,7 +25,7 @@ Secure file operations with configurable security boundaries. Read, write, edit,
 |----------|-------------|
 | `file.list(path, pattern, recursive, include_hidden, sort_by, reverse)` | List directory contents |
 | `file.tree(path, max_depth, include_hidden)` | Display directory tree structure |
-| `file.search(path, pattern, file_pattern, case_sensitive, max_results)` | Search for files by name pattern |
+| `file.search(path, pattern, glob, file_pattern, case_sensitive, max_results)` | Search for files by name or glob pattern |
 
 ## Write Operations
 
@@ -47,7 +47,8 @@ Secure file operations with configurable security boundaries. Read, write, edit,
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `path` | str | File or directory path (relative to cwd or absolute) |
-| `pattern` | str | Glob pattern for filtering (e.g., `*.py`, `**/*.md`) |
+| `pattern` | str | Filename pattern for filtering (e.g., `*.py`, `*test*`) |
+| `glob` | str | Full path glob pattern (e.g., `src/**/*.py`, `**/*.md`) |
 | `offset` | int | Line number to start from (1-indexed, default: 1) |
 | `limit` | int | Maximum lines to return |
 | `occurrence` | int | Which match to replace (1=first, 0=all) |
@@ -98,8 +99,13 @@ file.list(path=".", recursive=True, sort_by="size", reverse=True)
 # Display tree structure
 file.tree(path="src", max_depth=2)
 
-# Search for files
+# Search for files by filename pattern
 file.search(pattern="*test*", file_pattern="*.py")
+
+# Search with full path glob (recursive)
+file.search(glob="src/**/*.py")
+file.search(glob="tests/**/test_*.py")
+file.search(glob="**/*.{yaml,yml}")
 ```
 
 ### Writing Files

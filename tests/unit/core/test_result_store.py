@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 import tempfile
-import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -15,7 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
-from ot.executor.result_store import QueryResult, ResultMeta, ResultStore, StoredResult
+from ot.executor.result_store import QueryResult, ResultMeta, ResultStore
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -66,7 +65,6 @@ class TestStore:
         assert len(result.handle) == 12
         assert result.total_lines == 3
         assert result.size_bytes == len(content.encode())
-        assert result.format in ("jsonl", "txt")
         assert "ot.result" in result.query
 
     def test_store_creates_files(
@@ -77,7 +75,7 @@ class TestStore:
         result = result_store.store(content)
 
         # Check content file exists
-        content_file = temp_store_dir / f"result-{result.handle}.{result.format}"
+        content_file = temp_store_dir / f"result-{result.handle}.txt"
         assert content_file.exists()
         assert content_file.read_text() == content
 
@@ -88,7 +86,6 @@ class TestStore:
         meta = json.loads(meta_file.read_text())
         assert meta["handle"] == result.handle
         assert meta["total_lines"] == 2
-        assert meta["format"] == result.format
 
     def test_store_preview(
         self, result_store: ResultStore, mock_config
@@ -102,28 +99,6 @@ class TestStore:
         assert len(result.preview) == 5
         assert result.preview[0] == "line0"
         assert result.preview[4] == "line4"
-
-    def test_store_format_jsonl(
-        self, result_store: ResultStore, mock_config
-    ) -> None:
-        """Structured content stored as jsonl."""
-        # Many short uniform lines
-        lines = [f"src/file{i}.py:10:match" for i in range(20)]
-        content = "\n".join(lines)
-
-        result = result_store.store(content)
-
-        assert result.format == "jsonl"
-
-    def test_store_format_txt(
-        self, result_store: ResultStore, mock_config
-    ) -> None:
-        """Unstructured content stored as txt."""
-        # Long prose lines
-        content = "A" * 300 + "\n" + "B" * 300 + "\n" + "C" * 300
-        result = result_store.store(content)
-
-        assert result.format == "txt"
 
     def test_store_summary_with_tool(
         self, result_store: ResultStore, mock_config
@@ -349,7 +324,6 @@ class TestMeta:
         """ResultMeta converts to dict."""
         meta = ResultMeta(
             handle="abc123",
-            format="jsonl",
             total_lines=100,
             size_bytes=5000,
             created_at="2026-01-31T10:00:00Z",
@@ -359,7 +333,6 @@ class TestMeta:
         d = meta.to_dict()
 
         assert d["handle"] == "abc123"
-        assert d["format"] == "jsonl"
         assert d["total_lines"] == 100
         assert d["tool"] == "ripgrep.search"
 
@@ -367,7 +340,6 @@ class TestMeta:
         """ResultMeta creates from dict."""
         d = {
             "handle": "xyz789",
-            "format": "txt",
             "total_lines": 50,
             "size_bytes": 2500,
             "created_at": "2026-01-31T12:00:00Z",
@@ -377,28 +349,8 @@ class TestMeta:
         meta = ResultMeta.from_dict(d)
 
         assert meta.handle == "xyz789"
-        assert meta.format == "txt"
         assert meta.total_lines == 50
         assert meta.tool == "web.fetch"
-
-    def test_stored_result_to_dict(self) -> None:
-        """StoredResult converts to dict."""
-        result = StoredResult(
-            handle="abc123",
-            format="jsonl",
-            total_lines=847,
-            size_bytes=82000,
-            summary="847 matches in 42 files",
-            preview=["line1", "line2"],
-            query="ot.result(handle='abc123', offset=1, limit=50)",
-        )
-
-        d = result.to_dict()
-
-        assert d["handle"] == "abc123"
-        assert d["summary"] == "847 matches in 42 files"
-        assert d["preview"] == ["line1", "line2"]
-        assert "ot.result" in d["query"]
 
     def test_query_result_to_dict(self) -> None:
         """QueryResult converts to dict."""
@@ -416,43 +368,6 @@ class TestMeta:
         assert d["total_lines"] == 100
         assert d["returned"] == 3
         assert d["has_more"] is True
-
-
-# =============================================================================
-# FORMAT DETECTION - Auto-detection of storage format
-# =============================================================================
-
-
-@pytest.mark.unit
-@pytest.mark.core
-class TestFormatDetection:
-    """Test auto-detection of storage format."""
-
-    def test_few_lines_is_txt(
-        self, result_store: ResultStore, mock_config
-    ) -> None:
-        """Few lines detected as txt."""
-        content = "line1\nline2\nline3"  # Only 3 lines
-        result = result_store.store(content)
-        assert result.format == "txt"
-
-    def test_many_short_uniform_lines_is_jsonl(
-        self, result_store: ResultStore, mock_config
-    ) -> None:
-        """Many short uniform lines detected as jsonl."""
-        lines = [f"file{i}.py:10:match_{i}" for i in range(30)]
-        content = "\n".join(lines)
-        result = result_store.store(content)
-        assert result.format == "jsonl"
-
-    def test_long_lines_is_txt(
-        self, result_store: ResultStore, mock_config
-    ) -> None:
-        """Long lines (prose/HTML) detected as txt."""
-        lines = ["A" * 500 for _ in range(10)]
-        content = "\n".join(lines)
-        result = result_store.store(content)
-        assert result.format == "txt"
 
 
 # =============================================================================

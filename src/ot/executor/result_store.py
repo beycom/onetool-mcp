@@ -3,11 +3,10 @@
 Stores tool outputs exceeding max_inline_size to disk and provides
 a query API for paginated retrieval.
 
-Storage format:
+Storage:
     .onetool/tmp/
-    ├── result-{guid}.meta.json    # Always present
-    ├── result-{guid}.jsonl        # Structured data (many short lines)
-    └── result-{guid}.txt          # Unstructured data (prose, HTML)
+    ├── result-{guid}.meta.json    # Metadata
+    └── result-{guid}.txt          # Content
 """
 
 from __future__ import annotations
@@ -19,11 +18,9 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 from ot.config import get_config
-
-StorageFormat = Literal["jsonl", "txt"]
 
 
 @dataclass
@@ -31,7 +28,6 @@ class ResultMeta:
     """Metadata for a stored result."""
 
     handle: str
-    format: StorageFormat
     total_lines: int
     size_bytes: int
     created_at: str
@@ -41,7 +37,6 @@ class ResultMeta:
         """Convert to dictionary for JSON serialization."""
         return {
             "handle": self.handle,
-            "format": self.format,
             "total_lines": self.total_lines,
             "size_bytes": self.size_bytes,
             "created_at": self.created_at,
@@ -53,7 +48,6 @@ class ResultMeta:
         """Create from dictionary."""
         return cls(
             handle=data["handle"],
-            format=data["format"],
             total_lines=data["total_lines"],
             size_bytes=data["size_bytes"],
             created_at=data["created_at"],
@@ -66,7 +60,6 @@ class StoredResult:
     """Result from storing large output."""
 
     handle: str
-    format: StorageFormat
     total_lines: int
     size_bytes: int
     summary: str
@@ -77,7 +70,6 @@ class StoredResult:
         """Convert to summary dictionary for MCP response."""
         return {
             "handle": self.handle,
-            "format": self.format,
             "total_lines": self.total_lines,
             "size_bytes": self.size_bytes,
             "summary": self.summary,
@@ -126,10 +118,6 @@ class ResultStore:
     ) -> StoredResult:
         """Store large output to disk.
 
-        Auto-detects format based on content structure:
-        - jsonl: Many short lines of uniform structure
-        - txt: Prose, HTML, or long lines
-
         Args:
             content: The output content to store
             tool: Name of the tool that generated this output
@@ -144,23 +132,18 @@ class ResultStore:
         # Generate unique handle
         handle = uuid.uuid4().hex[:12]
 
-        # Detect format
-        format_type = self._detect_format(content)
-
         # Split into lines
         lines = content.splitlines()
         total_lines = len(lines)
         size_bytes = len(content.encode("utf-8"))
 
         # Write content file
-        ext = format_type
-        content_path = self.store_dir / f"result-{handle}.{ext}"
+        content_path = self.store_dir / f"result-{handle}.txt"
         content_path.write_text(content, encoding="utf-8")
 
         # Create and write meta file
         meta = ResultMeta(
             handle=handle,
-            format=format_type,
             total_lines=total_lines,
             size_bytes=size_bytes,
             created_at=datetime.now(UTC).isoformat(),
@@ -181,7 +164,6 @@ class ResultStore:
 
         return StoredResult(
             handle=handle,
-            format=format_type,
             total_lines=total_lines,
             size_bytes=size_bytes,
             summary=summary,
@@ -225,11 +207,11 @@ class ResultStore:
         # Check TTL
         if self._is_expired(meta):
             # Clean up expired file
-            self._delete_result(handle, meta.format)
+            self._delete_result(handle)
             raise ValueError(f"Result expired: {handle}")
 
         # Load content
-        content_path = self.store_dir / f"result-{handle}.{meta.format}"
+        content_path = self.store_dir / f"result-{handle}.txt"
         if not content_path.exists():
             raise ValueError(f"Result file missing: {handle}")
 
@@ -275,53 +257,18 @@ class ResultStore:
                 meta = ResultMeta.from_dict(meta_data)
 
                 if self._is_expired(meta):
-                    self._delete_result(meta.handle, meta.format)
+                    self._delete_result(meta.handle)
                     cleaned += 1
             except (json.JSONDecodeError, KeyError, OSError):
                 # Invalid meta file - try to clean up
                 handle = meta_path.stem.replace("result-", "").replace(".meta", "")
-                for ext in ["jsonl", "txt"]:
-                    content_path = self.store_dir / f"result-{handle}.{ext}"
-                    if content_path.exists():
-                        content_path.unlink()
+                content_path = self.store_dir / f"result-{handle}.txt"
+                if content_path.exists():
+                    content_path.unlink()
                 meta_path.unlink()
                 cleaned += 1
 
         return cleaned
-
-    def _detect_format(self, content: str) -> StorageFormat:
-        """Auto-detect storage format based on content structure.
-
-        Returns jsonl for:
-        - Many lines (>5)
-        - Short average line length (<200 chars)
-        - Lines that look like structured data
-
-        Returns txt for:
-        - Single blob or few lines
-        - Long lines (prose, HTML)
-        """
-        lines = content.splitlines()
-
-        if len(lines) < 5:
-            return "txt"
-
-        # Check average line length
-        total_length = sum(len(line) for line in lines)
-        avg_length = total_length / len(lines) if lines else 0
-
-        if avg_length > 200:
-            return "txt"
-
-        # Check if lines look structured (similar lengths, common prefixes)
-        lengths = [len(line) for line in lines[:20]]
-        if lengths:
-            variance = sum((length - avg_length) ** 2 for length in lengths) / len(lengths)
-            # Low variance suggests uniform structure
-            if variance < 2000:
-                return "jsonl"
-
-        return "txt"
 
     def _generate_summary(self, lines: list[str], tool: str) -> str:
         """Generate human-readable summary of stored content."""
@@ -357,9 +304,9 @@ class ResultStore:
 
         return age.total_seconds() > ttl
 
-    def _delete_result(self, handle: str, format_type: StorageFormat) -> None:
+    def _delete_result(self, handle: str) -> None:
         """Delete result files for a handle."""
-        content_path = self.store_dir / f"result-{handle}.{format_type}"
+        content_path = self.store_dir / f"result-{handle}.txt"
         meta_path = self.store_dir / f"result-{handle}.meta.json"
 
         if content_path.exists():

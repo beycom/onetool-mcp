@@ -388,30 +388,22 @@ The system SHALL intercept tool outputs exceeding a configurable size threshold 
 - **WHEN** the summary is returned
 - **THEN** it SHALL include:
   - `handle`: Unique identifier for querying
-  - `format`: Storage format (`jsonl` or `txt`)
   - `total_lines`: Line count of stored content
   - `size_bytes`: Size of stored content
   - `summary`: Human-readable summary (e.g., "847 matches in 42 files")
   - `preview`: First N lines (configurable via `output.preview_lines`)
   - `query`: Example query hint (e.g., `ot.result(handle='abc123', offset=1, limit=50)`)
 
-#### Scenario: Structured output detection
-- **GIVEN** a large output with many short lines of uniform structure
-- **WHEN** stored to disk
-- **THEN** the format SHALL be `jsonl`
-- **AND** the file SHALL be stored as `result-{guid}.jsonl`
-
-#### Scenario: Unstructured output detection
-- **GIVEN** a large output that is prose, HTML, or has long lines
-- **WHEN** stored to disk
-- **THEN** the format SHALL be `txt`
-- **AND** the file SHALL be stored as `result-{guid}.txt`
+#### Scenario: Content file created
+- **GIVEN** a large output is stored
+- **WHEN** storage completes
+- **THEN** the file SHALL be stored as `result-{guid}.txt`
 
 #### Scenario: Meta file created
 - **GIVEN** a large output is stored
 - **WHEN** storage completes
 - **THEN** a meta file `result-{guid}.meta.json` SHALL be created
-- **AND** meta file SHALL contain: `handle`, `format`, `total_lines`, `size_bytes`, `created_at`, `tool`
+- **AND** meta file SHALL contain: `handle`, `total_lines`, `size_bytes`, `created_at`, `tool`
 
 ### Requirement: Result Store Cleanup
 

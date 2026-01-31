@@ -727,20 +727,23 @@ def tree(
 def search(
     *,
     path: str = ".",
-    pattern: str,
+    pattern: str | None = None,
+    glob: str | None = None,
     file_pattern: str | None = None,
     case_sensitive: bool = False,
     max_results: int = 100,
 ) -> str:
-    """Search for files by name pattern.
+    """Search for files by name pattern or glob.
 
     Recursively searches for files matching the given pattern.
-    Supports glob patterns and optional file type filtering.
+    Supports filename matching with `pattern` or full path globs with `glob`.
 
     Args:
         path: Root directory to search (default: current directory)
-        pattern: Search pattern (glob-style, e.g., "*.py", "*test*")
-        file_pattern: Filter by file extension (e.g., "*.py", "*.md")
+        pattern: Filename pattern (e.g., "*test*", "config"). Matches filename only.
+        glob: Full path glob pattern (e.g., "src/**/*.py", "**/*.{yaml,yml}").
+            Supports ** for recursive matching and brace expansion.
+        file_pattern: Filter by file extension (e.g., "*.py"). Used with pattern.
         case_sensitive: If True, pattern matching is case-sensitive (default: False)
         max_results: Maximum number of results to return (default: 100)
 
@@ -750,9 +753,17 @@ def search(
     Example:
         file.search(pattern="*test*")
         file.search(pattern="config", file_pattern="*.yaml")
-        file.search(path="src", pattern="*handler*", file_pattern="*.py")
+        file.search(glob="src/**/*.py")
+        file.search(glob="tests/**/test_*.py")
     """
-    with LogSpan(span="file.search", path=path, pattern=pattern, filePattern=file_pattern) as s:
+    with LogSpan(
+        span="file.search", path=path, pattern=pattern, glob=glob, filePattern=file_pattern
+    ) as s:
+        # Validate: need either pattern or glob
+        if not pattern and not glob:
+            s.add(error="missing_pattern")
+            return "Error: Either 'pattern' or 'glob' parameter is required"
+
         resolved, error = _validate_path(path, must_exist=True)
         if error:
             s.add(error=error)
@@ -766,47 +777,75 @@ def search(
         cfg = _get_file_config()
         results: List[tuple[str, int]] = []  # noqa: UP006
 
-        # Normalize pattern for case-insensitive matching
-        search_pattern = pattern if case_sensitive else pattern.lower()
-
         try:
-            for entry in resolved.rglob("*"):
-                if len(results) >= max_results:
-                    break
+            if glob:
+                # Full path glob mode using pathlib.glob
+                for entry in resolved.glob(glob):
+                    if len(results) >= max_results:
+                        break
 
-                # Skip directories
-                if entry.is_dir():
-                    continue
+                    # Skip directories
+                    if entry.is_dir():
+                        continue
 
-                # Skip hidden files
-                if entry.name.startswith("."):
-                    continue
+                    # Skip hidden files
+                    if entry.name.startswith("."):
+                        continue
 
-                # Skip excluded patterns
-                if _is_excluded(entry, cfg.exclude_patterns):
-                    continue
+                    # Skip excluded patterns
+                    if _is_excluded(entry, cfg.exclude_patterns):
+                        continue
 
-                # Apply file pattern filter if specified
-                if file_pattern and not fnmatch.fnmatch(entry.name, file_pattern):
-                    continue
+                    # Get relative path and size
+                    try:
+                        entry_rel = entry.relative_to(resolved)
+                        entry_size = entry.stat().st_size
+                    except (ValueError, OSError):
+                        continue
 
-                # Match against search pattern (glob or substring)
-                name_to_match = entry.name if case_sensitive else entry.name.lower()
-                pattern_core = search_pattern.replace("*", "")
-                if (
-                    not fnmatch.fnmatch(name_to_match, search_pattern)
-                    and pattern_core not in name_to_match
-                ):
-                    continue
+                    results.append((str(entry_rel), entry_size))
+            else:
+                # Filename pattern mode (existing behavior)
+                assert pattern is not None  # mypy: validated above
+                search_pattern = pattern if case_sensitive else pattern.lower()
 
-                # Get relative path and size
-                try:
-                    entry_rel = entry.relative_to(resolved)
-                    entry_size = entry.stat().st_size
-                except (ValueError, OSError):
-                    continue
+                for entry in resolved.rglob("*"):
+                    if len(results) >= max_results:
+                        break
 
-                results.append((str(entry_rel), entry_size))
+                    # Skip directories
+                    if entry.is_dir():
+                        continue
+
+                    # Skip hidden files
+                    if entry.name.startswith("."):
+                        continue
+
+                    # Skip excluded patterns
+                    if _is_excluded(entry, cfg.exclude_patterns):
+                        continue
+
+                    # Apply file pattern filter if specified
+                    if file_pattern and not fnmatch.fnmatch(entry.name, file_pattern):
+                        continue
+
+                    # Match against search pattern (glob or substring)
+                    name_to_match = entry.name if case_sensitive else entry.name.lower()
+                    pattern_core = search_pattern.replace("*", "")
+                    if (
+                        not fnmatch.fnmatch(name_to_match, search_pattern)
+                        and pattern_core not in name_to_match
+                    ):
+                        continue
+
+                    # Get relative path and size
+                    try:
+                        entry_rel = entry.relative_to(resolved)
+                        entry_size = entry.stat().st_size
+                    except (ValueError, OSError):
+                        continue
+
+                    results.append((str(entry_rel), entry_size))
 
             # Sort by path
             results.sort(key=lambda x: x[0].lower())
@@ -814,7 +853,8 @@ def search(
             # Format output
             if not results:
                 s.add(resultCount=0)
-                return f"No files matching '{pattern}' found in {path}"
+                search_term = glob if glob else pattern
+                return f"No files matching '{search_term}' found in {path}"
 
             lines = []
             for rel_path, size in results:

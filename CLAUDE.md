@@ -20,6 +20,16 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 Read AGENTS_RULES.md for this project.
 Read AGENTS_PRIME.md for a project overview.
 
+## Commands
+
+Use `just` (not `make`) for project commands:
+
+```bash
+just check    # Run all checks (lint, type, test)
+just test     # Run tests
+just lint     # Run linters
+```
+
 ## Tools - File Search
 
 Use OneTool ripgrep (50x faster than find+grep, with line numbers):
