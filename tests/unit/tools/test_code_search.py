@@ -214,6 +214,28 @@ class TestConnectionCache:
         # Just verify it doesn't raise
         _clear_connection_cache()
 
+    @patch("ot_tools.code_search._import_duckdb")
+    def test_vss_extension_error_message(self, mock_import):
+        """Test that VSS extension errors provide helpful message."""
+        from ot_tools.code_search import _get_cached_connection
+
+        # Clear cache to ensure fresh connection attempt
+        _clear_connection_cache()
+
+        mock_duckdb = MagicMock()
+        mock_import.return_value = mock_duckdb
+
+        mock_conn = MagicMock()
+        mock_duckdb.connect.return_value = mock_conn
+        mock_conn.execute.side_effect = Exception("Extension 'vss' not found")
+
+        with pytest.raises(RuntimeError) as exc_info:
+            _get_cached_connection("/fake/path.db")
+
+        assert "VSS extension not available" in str(exc_info.value)
+        assert "pip install duckdb" in str(exc_info.value)
+        mock_conn.close.assert_called_once()
+
 
 @pytest.mark.unit
 @pytest.mark.tools
@@ -267,6 +289,56 @@ class TestFormatResult:
         assert formatted["file"] == "unknown"
         assert formatted["name"] == ""
         assert formatted["type"] == ""
+
+    @patch("ot_tools.code_search.get_tool_config")
+    def test_uses_configurable_content_limit(self, mock_config):
+        """Test that content truncation uses config values."""
+        from ot_tools.code_search import Config
+
+        # Set custom content limit (must respect validation: ge=100, le=10000)
+        mock_config.return_value = Config(content_limit=200, content_limit_expanded=600)
+
+        result = {
+            "file_path": "test.py",
+            "symbol": "func",
+            "chunk_type": "function",
+            "language": "python",
+            "start_line": 1,
+            "end_line": 10,
+            "similarity": 0.9,
+            "content": "x" * 1000,
+        }
+
+        # Without expand - should use content_limit (200)
+        formatted = _format_result(result)
+        assert len(formatted["content"]) == 200
+
+    @patch("ot_tools.code_search.get_tool_config")
+    def test_uses_configurable_content_limit_expanded(self, mock_config, tmp_path):
+        """Test that expanded content uses content_limit_expanded config."""
+        from ot_tools.code_search import Config
+
+        # Must respect validation: content_limit_expanded ge=500, le=20000
+        mock_config.return_value = Config(content_limit=200, content_limit_expanded=600)
+
+        # Create a test file with lots of lines
+        test_file = tmp_path / "test.py"
+        test_file.write_text("\n".join(["x" * 100] * 50))  # 50 lines of 100 chars
+
+        result = {
+            "file_path": "test.py",
+            "symbol": "func",
+            "chunk_type": "function",
+            "language": "python",
+            "start_line": 20,
+            "end_line": 30,
+            "similarity": 0.9,
+            "content": "x" * 1000,
+        }
+
+        # With expand - should use content_limit_expanded (600)
+        formatted = _format_result(result, project_root=tmp_path, expand=5)
+        assert len(formatted["content"]) == 600
 
 
 # -----------------------------------------------------------------------------

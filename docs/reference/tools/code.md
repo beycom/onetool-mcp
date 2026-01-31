@@ -89,6 +89,8 @@ tools:
     model: text-embedding-3-small
     db_path: .chunkhound/chunks.db
     dimensions: 1536
+    content_limit: 500        # Max chars without expand (100-10000)
+    content_limit_expanded: 2000  # Max chars with expand (500-20000)
 ```
 
 ## Requires

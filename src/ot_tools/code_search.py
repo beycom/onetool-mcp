@@ -76,6 +76,18 @@ class Config(BaseModel):
         default=1536,
         description="Embedding dimensions (must match model)",
     )
+    content_limit: int = Field(
+        default=500,
+        ge=100,
+        le=10000,
+        description="Maximum characters of code content to return (without expand)",
+    )
+    content_limit_expanded: int = Field(
+        default=2000,
+        ge=500,
+        le=20000,
+        description="Maximum characters of code content to return (with expand)",
+    )
 
 
 def _get_config() -> Config:
@@ -149,10 +161,22 @@ def _get_cached_connection(db_path: str) -> Any:
 
     Returns:
         DuckDB connection with vss extension loaded.
+
+    Raises:
+        RuntimeError: If VSS extension cannot be loaded.
     """
     duckdb = _import_duckdb()
     conn = duckdb.connect(db_path, read_only=True)
-    conn.execute("LOAD vss")
+    try:
+        conn.execute("LOAD vss")
+    except Exception as e:
+        conn.close()
+        if "vss" in str(e).lower() or "extension" in str(e).lower():
+            raise RuntimeError(
+                "DuckDB VSS extension not available.\n"
+                "Install with: pip install duckdb  # Version 0.9+ includes vss"
+            ) from e
+        raise
     return conn
 
 
@@ -328,7 +352,13 @@ def _format_result(
         result: Raw search result from database
         project_root: Project root for file reading (needed for expand)
         expand: Number of context lines to include around match
+
+    Returns:
+        Formatted result dict. Content is truncated to `content_limit` chars
+        (default 500) or `content_limit_expanded` chars (default 2000) when
+        expand is used. These limits are configurable via pack config.
     """
+    config = _get_config()
     content = result.get("content", "")
     start_line = result.get("start_line")
     end_line = result.get("end_line")
@@ -349,6 +379,9 @@ def _format_result(
                 # Log but don't fail - expansion is optional enhancement
                 logger.debug("Failed to expand content from %s: %s", file_path, e)
 
+    # Apply content truncation from config
+    content_limit = config.content_limit_expanded if expand else config.content_limit
+
     return {
         "file": result.get("file_path", "unknown"),
         "name": result.get("symbol", ""),
@@ -356,7 +389,7 @@ def _format_result(
         "language": result.get("language", ""),
         "lines": f"{start_line or '?'}-{end_line or '?'}",
         "score": round(result.get("similarity", 0.0), 4),
-        "content": content[:2000] if expand else content[:500],
+        "content": content[:content_limit],
     }
 
 
