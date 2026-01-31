@@ -98,6 +98,12 @@ The `web.fetch()` function SHALL support extraction configuration.
 - **THEN** it SHALL filter content by ISO 639-1 language code
 - **AND** it SHALL return None if language doesn't match
 
+#### Scenario: Include metadata
+- **GIVEN** `output_format="json"` and `include_metadata=True`
+- **WHEN** `web.fetch(url=url, output_format="json", include_metadata=True)` is called
+- **THEN** it SHALL return a JSON object with `content` and `metadata` fields
+- **AND** `metadata` SHALL include `final_url` and `content_type`
+
 ### Requirement: Batch URL Fetch
 
 The `web.fetch_batch()` function SHALL fetch multiple URLs concurrently.
@@ -125,12 +131,46 @@ The `web.fetch_batch()` function SHALL fetch multiple URLs concurrently.
 - **THEN** it SHALL use up to 10 concurrent workers
 - **AND** default max_workers is 5
 
+#### Scenario: Parameter parity with fetch
+- **GIVEN** a batch fetch request
+- **WHEN** `web.fetch_batch()` is called with any extraction option
+- **THEN** it SHALL support all `fetch()` parameters:
+  - `include_links`, `include_images`, `include_tables`
+  - `include_comments`, `include_formatting`
+  - `favor_precision`, `favor_recall`
+  - `fast`, `target_language`, `use_cache`
+- **AND** it SHALL pass all parameters to each individual fetch call
+
+#### Scenario: Conflicting batch options
+- **GIVEN** `favor_precision=True` and `favor_recall=True`
+- **WHEN** `web.fetch_batch(urls=urls, favor_precision=True, favor_recall=True)` is called
+- **THEN** it SHALL raise `ValueError` explaining the conflict
+
+### Requirement: Input Validation
+
+The `web.fetch()` function SHALL validate inputs before processing.
+
+#### Scenario: Empty URL
+- **GIVEN** an empty or whitespace-only URL
+- **WHEN** `web.fetch(url=url)` is called
+- **THEN** it SHALL raise `ValueError` with message "URL cannot be empty"
+
+#### Scenario: Malformed URL
+- **GIVEN** a URL without scheme or netloc (e.g., "example.com")
+- **WHEN** `web.fetch(url=url)` is called
+- **THEN** it SHALL raise `ValueError` with message "Invalid URL format: {url}"
+
+#### Scenario: Conflicting extraction options
+- **GIVEN** both `favor_precision=True` and `favor_recall=True`
+- **WHEN** `web.fetch(url=url, favor_precision=True, favor_recall=True)` is called
+- **THEN** it SHALL raise `ValueError` explaining the conflict
+
 ### Requirement: Error Handling
 
 The `web.fetch()` function SHALL handle errors gracefully.
 
-#### Scenario: Invalid URL
-- **GIVEN** an invalid or unreachable URL
+#### Scenario: Network failure
+- **GIVEN** a URL that cannot be fetched
 - **WHEN** `web.fetch(url=url)` is called
 - **THEN** it SHALL return an error message
 - **AND** it SHALL NOT raise an exception
@@ -139,12 +179,22 @@ The `web.fetch()` function SHALL handle errors gracefully.
 - **GIVEN** a slow URL
 - **WHEN** `web.fetch(url=url, timeout=5)` is called
 - **AND** the request exceeds 5 seconds
-- **THEN** it SHALL return a timeout error message
+- **THEN** it SHALL return a timeout error message with the timeout duration
+
+#### Scenario: Connection failure
+- **GIVEN** a URL with connection issues
+- **WHEN** `web.fetch(url=url)` is called
+- **THEN** it SHALL return a connection error message with details
 
 #### Scenario: No content extracted
 - **GIVEN** a URL where trafilatura cannot extract content
 - **WHEN** `web.fetch(url=url)` is called
 - **THEN** it SHALL return "Error: No content could be extracted from: {url}"
+
+#### Scenario: JSON error format
+- **GIVEN** `output_format="json"` and an error occurs
+- **WHEN** `web.fetch(url=url, output_format="json")` is called
+- **THEN** it SHALL return a JSON object with `error`, `url`, and `message` fields
 
 ### Requirement: trafilatura Integration
 
