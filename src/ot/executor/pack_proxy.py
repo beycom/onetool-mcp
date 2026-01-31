@@ -10,6 +10,7 @@ Used by the runner to build the execution namespace.
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from functools import wraps
 from typing import TYPE_CHECKING, Any
 
@@ -38,7 +39,7 @@ def _wrap_with_stats(
         if kwargs:
             param_names = get_tool_param_names(tool_name)
             if param_names:
-                kwargs = resolve_kwargs(kwargs, list(param_names))
+                kwargs = resolve_kwargs(kwargs, param_names)
 
         with timed_tool_call(tool_name):
             return func(*args, **kwargs)
@@ -118,7 +119,7 @@ def _create_mcp_proxy_pack(server_name: str) -> Any:
                 if kwargs:
                     param_names = get_mcp_tool_param_names(server_name, tool_name)
                     if param_names:
-                        kwargs = resolve_kwargs(kwargs, list(param_names))
+                        kwargs = resolve_kwargs(kwargs, param_names)
 
                 with timed_tool_call(tool_full_name):
                     proxy = get_proxy_manager()
@@ -195,7 +196,11 @@ def _create_proxy_introspection_pack() -> Any:
 
 
 # Cache for execution namespace: key=(registry_id, frozenset of proxy servers)
-_namespace_cache: dict[tuple[int, frozenset[str]], dict[str, Any]] = {}
+# Uses OrderedDict for proper LRU eviction
+_NAMESPACE_CACHE_MAXSIZE = 10
+_namespace_cache: OrderedDict[tuple[int, frozenset[str]], dict[str, Any]] = (
+    OrderedDict()
+)
 
 
 def build_execution_namespace(
@@ -224,6 +229,8 @@ def build_execution_namespace(
     cache_key = (id(registry), frozenset(proxy_mgr.servers))
 
     if cache_key in _namespace_cache:
+        # LRU: move to end on access
+        _namespace_cache.move_to_end(cache_key)
         return _namespace_cache[cache_key]
 
     namespace: dict[str, Any] = {}
@@ -245,11 +252,9 @@ def build_execution_namespace(
     if "proxy" not in namespace:
         namespace["proxy"] = _create_proxy_introspection_pack()
 
-    # Cache result (simple LRU: keep last 10)
-    if len(_namespace_cache) >= 10:
-        # Remove oldest entry
-        oldest_key = next(iter(_namespace_cache))
-        del _namespace_cache[oldest_key]
-
+    # Cache result with LRU eviction
     _namespace_cache[cache_key] = namespace
+    while len(_namespace_cache) > _NAMESPACE_CACHE_MAXSIZE:
+        _namespace_cache.popitem(last=False)
+
     return namespace

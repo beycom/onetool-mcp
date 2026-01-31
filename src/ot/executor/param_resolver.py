@@ -6,6 +6,8 @@ For example: q= -> query=, c= -> count=
 
 from __future__ import annotations
 
+from collections import OrderedDict
+from collections.abc import Sequence
 from functools import lru_cache
 
 
@@ -29,7 +31,9 @@ def get_tool_param_names(tool_name: str) -> tuple[str, ...]:
 
 
 # Cache for MCP tool param names: (server_name, tool_name) -> param_names
-_mcp_param_cache: dict[tuple[str, str], tuple[str, ...]] = {}
+# Uses OrderedDict for LRU eviction with bounded size
+_MCP_PARAM_CACHE_MAXSIZE = 256
+_mcp_param_cache: OrderedDict[tuple[str, str], tuple[str, ...]] = OrderedDict()
 
 
 def get_mcp_tool_param_names(server_name: str, tool_name: str) -> tuple[str, ...]:
@@ -44,23 +48,28 @@ def get_mcp_tool_param_names(server_name: str, tool_name: str) -> tuple[str, ...
     """
     cache_key = (server_name, tool_name)
     if cache_key in _mcp_param_cache:
+        _mcp_param_cache.move_to_end(cache_key)
         return _mcp_param_cache[cache_key]
 
     from ot.proxy import get_proxy_manager
 
     proxy = get_proxy_manager()
     tools = proxy.list_tools(server_name)
+    result: tuple[str, ...] = ()
     for tool in tools:
         if tool.name == tool_name:
             result = tuple(get_param_names_from_schema(tool.input_schema))
-            _mcp_param_cache[cache_key] = result
-            return result
+            break
 
-    _mcp_param_cache[cache_key] = ()
-    return ()
+    _mcp_param_cache[cache_key] = result
+    while len(_mcp_param_cache) > _MCP_PARAM_CACHE_MAXSIZE:
+        _mcp_param_cache.popitem(last=False)
+    return result
 
 
-def resolve_kwargs(kwargs: dict[str, object], param_names: list[str]) -> dict[str, object]:
+def resolve_kwargs(
+    kwargs: dict[str, object], param_names: Sequence[str]
+) -> dict[str, object]:
     """Resolve abbreviated parameter names to full parameter names.
 
     Matching rules:
@@ -70,7 +79,7 @@ def resolve_kwargs(kwargs: dict[str, object], param_names: list[str]) -> dict[st
 
     Args:
         kwargs: Dictionary of parameter names to values.
-        param_names: List of valid parameter names in signature order.
+        param_names: Sequence of valid parameter names in signature order.
 
     Returns:
         New dictionary with resolved parameter names.

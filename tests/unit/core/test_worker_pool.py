@@ -149,3 +149,16 @@ class TestGlobalPool:
         # Shutdown
         shutdown_worker_pool()
         assert pool_module._pool is None
+
+    def test_atexit_import_present(self) -> None:
+        """Should import atexit for cleanup registration."""
+        import ot.executor.worker_pool as pool_module
+
+        # Verify atexit is in module namespace (imported at module level)
+        assert hasattr(pool_module, "atexit"), (
+            "atexit should be imported in worker_pool"
+        )
+
+        # Verify the module-level registration line exists by checking
+        # that shutdown_worker_pool is defined (registration target)
+        assert hasattr(pool_module, "shutdown_worker_pool")

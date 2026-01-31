@@ -54,9 +54,7 @@ def mock_config():
 class TestStore:
     """Test storing large outputs."""
 
-    def test_store_basic(
-        self, result_store: ResultStore, mock_config
-    ) -> None:
+    def test_store_basic(self, result_store: ResultStore, mock_config) -> None:  # noqa: ARG002
         """Store basic content and get handle back."""
         content = "line1\nline2\nline3"
         result = result_store.store(content, tool="test.tool")
@@ -68,7 +66,10 @@ class TestStore:
         assert "ot.result" in result.query
 
     def test_store_creates_files(
-        self, result_store: ResultStore, temp_store_dir: Path, mock_config
+        self,
+        result_store: ResultStore,
+        temp_store_dir: Path,
+        mock_config,  # noqa: ARG002
     ) -> None:
         """Store creates content and meta files."""
         content = "test content\nline two"
@@ -87,9 +88,7 @@ class TestStore:
         assert meta["handle"] == result.handle
         assert meta["total_lines"] == 2
 
-    def test_store_preview(
-        self, result_store: ResultStore, mock_config
-    ) -> None:
+    def test_store_preview(self, result_store: ResultStore, mock_config) -> None:  # noqa: ARG002
         """Store returns preview lines."""
         lines = [f"line{i}" for i in range(20)]
         content = "\n".join(lines)
@@ -101,7 +100,9 @@ class TestStore:
         assert result.preview[4] == "line4"
 
     def test_store_summary_with_tool(
-        self, result_store: ResultStore, mock_config
+        self,
+        result_store: ResultStore,
+        mock_config,  # noqa: ARG002
     ) -> None:
         """Summary includes tool name."""
         content = "line1\nline2\nline3"
@@ -121,9 +122,7 @@ class TestStore:
 class TestQuery:
     """Test querying stored outputs."""
 
-    def test_query_basic(
-        self, result_store: ResultStore, mock_config
-    ) -> None:
+    def test_query_basic(self, result_store: ResultStore, mock_config) -> None:  # noqa: ARG002
         """Query returns content with defaults."""
         lines = [f"line{i}" for i in range(50)]
         content = "\n".join(lines)
@@ -136,9 +135,7 @@ class TestQuery:
         assert len(result.lines) <= 100  # Default limit
         assert result.lines[0] == "line0"
 
-    def test_query_offset_limit(
-        self, result_store: ResultStore, mock_config
-    ) -> None:
+    def test_query_offset_limit(self, result_store: ResultStore, mock_config) -> None:  # noqa: ARG002
         """Query with offset and limit."""
         lines = [f"line{i}" for i in range(100)]
         content = "\n".join(lines)
@@ -152,9 +149,7 @@ class TestQuery:
         assert result.lines[9] == "line19"
         assert result.has_more is True
 
-    def test_query_1_indexed(
-        self, result_store: ResultStore, mock_config
-    ) -> None:
+    def test_query_1_indexed(self, result_store: ResultStore, mock_config) -> None:  # noqa: ARG002
         """Query uses 1-indexed offset like Claude's Read tool."""
         lines = ["first", "second", "third"]
         content = "\n".join(lines)
@@ -167,7 +162,9 @@ class TestQuery:
         assert result.lines[0] == "second"
 
     def test_query_offset_zero_treated_as_one(
-        self, result_store: ResultStore, mock_config
+        self,
+        result_store: ResultStore,
+        mock_config,  # noqa: ARG002
     ) -> None:
         """Query with offset=0 treated as offset=1."""
         lines = ["first", "second", "third"]
@@ -178,9 +175,7 @@ class TestQuery:
         assert result.offset == 1
         assert result.lines[0] == "first"
 
-    def test_query_search_regex(
-        self, result_store: ResultStore, mock_config
-    ) -> None:
+    def test_query_search_regex(self, result_store: ResultStore, mock_config) -> None:  # noqa: ARG002
         """Query with regex search filter."""
         lines = [
             "error: something failed",
@@ -196,9 +191,7 @@ class TestQuery:
         assert result.total_lines == 2
         assert all("error" in line for line in result.lines)
 
-    def test_query_search_fuzzy(
-        self, result_store: ResultStore, mock_config
-    ) -> None:
+    def test_query_search_fuzzy(self, result_store: ResultStore, mock_config) -> None:  # noqa: ARG002
         """Query with fuzzy search."""
         lines = [
             "configuration settings",
@@ -215,9 +208,7 @@ class TestQuery:
         # Fuzzy match should find config-related lines
         assert any("config" in line.lower() for line in result.lines)
 
-    def test_query_has_more(
-        self, result_store: ResultStore, mock_config
-    ) -> None:
+    def test_query_has_more(self, result_store: ResultStore, mock_config) -> None:  # noqa: ARG002
         """Query indicates when more lines exist."""
         lines = [f"line{i}" for i in range(20)]
         content = "\n".join(lines)
@@ -229,15 +220,15 @@ class TestQuery:
         result = result_store.query(stored.handle, offset=15, limit=10)
         assert result.has_more is False
 
-    def test_query_invalid_handle(
-        self, result_store: ResultStore, mock_config
-    ) -> None:
+    def test_query_invalid_handle(self, result_store: ResultStore, mock_config) -> None:  # noqa: ARG002
         """Query with invalid handle raises error."""
         with pytest.raises(ValueError, match="not found"):
             result_store.query("nonexistent123")
 
     def test_query_invalid_search_pattern(
-        self, result_store: ResultStore, mock_config
+        self,
+        result_store: ResultStore,
+        mock_config,  # noqa: ARG002
     ) -> None:
         """Query with invalid regex raises error."""
         content = "test content"
@@ -257,8 +248,43 @@ class TestQuery:
 class TestCleanup:
     """Test TTL-based cleanup."""
 
+    def test_cleanup_caches_config(
+        self, result_store: ResultStore, temp_store_dir: Path
+    ) -> None:
+        """Cleanup should call get_config once, not per file."""
+        from unittest.mock import MagicMock, patch
+
+        # Create multiple result files
+        for i in range(5):
+            content_path = temp_store_dir / f"result-test{i}.txt"
+            content_path.write_text(f"content {i}")
+            meta = {
+                "handle": f"test{i}",
+                "total_lines": 1,
+                "size_bytes": 10,
+                "created_at": datetime.now(UTC).isoformat(),
+                "tool": "",
+            }
+            meta_path = temp_store_dir / f"result-test{i}.meta.json"
+            meta_path.write_text(json.dumps(meta))
+
+        # Mock get_config to track calls
+        mock_cfg = MagicMock()
+        mock_cfg.output.result_ttl = 3600
+
+        with patch(
+            "ot.executor.result_store.get_config", return_value=mock_cfg
+        ) as mock_get:
+            result_store.cleanup()
+
+            # Should only call get_config once, not 5 times
+            assert mock_get.call_count == 1
+
     def test_cleanup_removes_expired(
-        self, result_store: ResultStore, temp_store_dir: Path, mock_config
+        self,
+        result_store: ResultStore,
+        temp_store_dir: Path,
+        mock_config,  # noqa: ARG002
     ) -> None:
         """Cleanup removes files older than TTL."""
         # Store a result
@@ -279,7 +305,10 @@ class TestCleanup:
         assert not meta_path.exists()
 
     def test_cleanup_keeps_fresh(
-        self, result_store: ResultStore, temp_store_dir: Path, mock_config
+        self,
+        result_store: ResultStore,
+        temp_store_dir: Path,
+        mock_config,  # noqa: ARG002
     ) -> None:
         """Cleanup keeps files within TTL."""
         content = "test content"
@@ -293,7 +322,10 @@ class TestCleanup:
         assert meta_path.exists()
 
     def test_query_expired_raises(
-        self, result_store: ResultStore, temp_store_dir: Path, mock_config
+        self,
+        result_store: ResultStore,
+        temp_store_dir: Path,
+        mock_config,  # noqa: ARG002
     ) -> None:
         """Querying expired result raises error."""
         content = "test content"
@@ -380,7 +412,7 @@ class TestMeta:
 class TestRunnerIntegration:
     """Test integration with runner.py."""
 
-    def test_large_output_stored(self, mock_config) -> None:
+    def test_large_output_stored(self, mock_config) -> None:  # noqa: ARG002
         """Large output is stored and summary returned."""
         from unittest.mock import MagicMock, patch
 
@@ -390,23 +422,25 @@ class TestRunnerIntegration:
         mock_cfg.output.preview_lines = 5
         mock_cfg.output.result_ttl = 3600
 
-        with patch("ot.executor.runner.get_config", return_value=mock_cfg):
-            with patch("ot.executor.result_store.get_config", return_value=mock_cfg):
-                # Create a large output
-                large_content = "x" * 200
+        with (
+            patch("ot.executor.runner.get_config", return_value=mock_cfg),
+            patch("ot.executor.result_store.get_config", return_value=mock_cfg),
+        ):
+            # Create a large output
+            large_content = "x" * 200
 
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    store_dir = Path(tmpdir) / "store"
-                    store_dir.mkdir()
+            with tempfile.TemporaryDirectory() as tmpdir:
+                store_dir = Path(tmpdir) / "store"
+                store_dir.mkdir()
 
-                    store = ResultStore(store_dir=store_dir)
-                    result = store.store(large_content)
+                store = ResultStore(store_dir=store_dir)
+                result = store.store(large_content)
 
-                    assert result.handle
-                    assert result.size_bytes == 200
-                    assert "ot.result" in result.query
+                assert result.handle
+                assert result.size_bytes == 200
+                assert "ot.result" in result.query
 
-    def test_small_output_not_stored(self, mock_config) -> None:
+    def test_small_output_not_stored(self, mock_config) -> None:  # noqa: ARG002
         """Small output is returned inline, not stored."""
         # This tests the runner behavior - small outputs pass through
         small_content = "hello world"
@@ -423,7 +457,7 @@ class TestRunnerIntegration:
 class TestOtResult:
     """Test ot.result() function from meta.py."""
 
-    def test_result_basic(self, mock_config) -> None:
+    def test_result_basic(self, mock_config) -> None:  # noqa: ARG002
         """ot.result() queries stored output."""
         from unittest.mock import patch
 
@@ -446,7 +480,7 @@ class TestOtResult:
                 assert query_result["offset"] == 1
                 assert len(query_result["lines"]) <= 100
 
-    def test_result_with_offset_limit(self, mock_config) -> None:
+    def test_result_with_offset_limit(self, mock_config) -> None:  # noqa: ARG002
         """ot.result() respects offset and limit."""
         from unittest.mock import patch
 
@@ -468,7 +502,7 @@ class TestOtResult:
                 assert query_result["returned"] == 10
                 assert query_result["lines"][0] == "line10"
 
-    def test_result_with_search(self, mock_config) -> None:
+    def test_result_with_search(self, mock_config) -> None:  # noqa: ARG002
         """ot.result() filters with search pattern."""
         from unittest.mock import patch
 
@@ -489,7 +523,7 @@ class TestOtResult:
                 assert query_result["total_lines"] == 2
                 assert all("error" in line for line in query_result["lines"])
 
-    def test_result_invalid_handle(self, mock_config) -> None:
+    def test_result_invalid_handle(self, mock_config) -> None:  # noqa: ARG002
         """ot.result() raises for invalid handle."""
         from unittest.mock import patch
 

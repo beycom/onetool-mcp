@@ -8,6 +8,7 @@ Workers communicate via JSON-RPC over stdin/stdout.
 
 from __future__ import annotations
 
+import atexit
 import json
 import os
 import subprocess
@@ -31,7 +32,9 @@ def _get_io_executor() -> ThreadPoolExecutor:
     if _io_executor is None:
         with _io_executor_lock:
             if _io_executor is None:
-                _io_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="worker-io")
+                _io_executor = ThreadPoolExecutor(
+                    max_workers=4, thread_name_prefix="worker-io"
+                )
     return _io_executor
 
 
@@ -379,3 +382,7 @@ def shutdown_worker_pool() -> None:
     if _io_executor is not None:
         _io_executor.shutdown(wait=False)
         _io_executor = None
+
+
+# Register cleanup on process exit to prevent orphaned workers
+atexit.register(shutdown_worker_pool)

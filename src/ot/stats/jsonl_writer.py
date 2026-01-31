@@ -207,13 +207,16 @@ class JsonlStatsWriter:
                 return
 
             records = self._buffer.copy()
-            self._buffer.clear()
 
         try:
             await self._write_records(records)
+            # Clear buffer only after successful write to prevent data loss
+            async with self._lock:
+                del self._buffer[: len(records)]
             logger.debug(f"Flushed {len(records)} JSONL stats records")
         except Exception as e:
             # Log but don't crash - stats are not critical
+            # Buffer NOT cleared; records will retry on next flush
             logger.warning(f"Failed to write JSONL stats: {e}")
 
     async def _write_records(self, records: Sequence[dict[str, Any]]) -> None:

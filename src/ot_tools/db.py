@@ -28,6 +28,7 @@ pack = "db"
 __all__ = ["query", "schema", "tables"]
 
 import contextlib
+from collections import OrderedDict
 from datetime import date, datetime
 from typing import Any
 
@@ -56,7 +57,9 @@ def _get_config() -> Config:
 
 
 # Connection pool keyed by URL - persists across calls in process
-_engines: dict[str, Engine] = {}
+# Uses OrderedDict for LRU eviction with bounded size
+_ENGINES_MAXSIZE = 8
+_engines: OrderedDict[str, Engine] = OrderedDict()
 
 
 def _resolve_sqlite_url(db_url: str) -> str:
@@ -108,13 +111,23 @@ def _get_engine(db_url: str) -> Engine:
     resolved_url = _resolve_sqlite_url(db_url)
 
     if resolved_url in _engines:
+        # LRU: move to end on access
+        _engines.move_to_end(resolved_url)
         return _engines[resolved_url]
 
     with LogSpan(span="db.connect", db_url=resolved_url) as span:
         try:
-            _engines[resolved_url] = _create_engine(resolved_url)
+            engine = _create_engine(resolved_url)
+            _engines[resolved_url] = engine
+
+            # LRU eviction: dispose oldest engine when over maxsize
+            while len(_engines) > _ENGINES_MAXSIZE:
+                _, oldest_engine = _engines.popitem(last=False)
+                with contextlib.suppress(Exception):
+                    oldest_engine.dispose()
+
             span.add(cached=False)
-            return _engines[resolved_url]
+            return engine
 
         except Exception:
             # Database might have restarted - try fresh
@@ -125,8 +138,16 @@ def _get_engine(db_url: str) -> Engine:
 
             # One retry with fresh engine
             span.add(retry=True)
-            _engines[resolved_url] = _create_engine(resolved_url)
-            return _engines[resolved_url]
+            engine = _create_engine(resolved_url)
+            _engines[resolved_url] = engine
+
+            # LRU eviction after retry too
+            while len(_engines) > _ENGINES_MAXSIZE:
+                _, oldest_engine = _engines.popitem(last=False)
+                with contextlib.suppress(Exception):
+                    oldest_engine.dispose()
+
+            return engine
 
 
 def _format_value(val: Any) -> str:

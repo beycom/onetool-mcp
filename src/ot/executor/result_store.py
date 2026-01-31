@@ -104,6 +104,10 @@ class ResultStore:
     """Manages storage and retrieval of large tool outputs."""
 
     store_dir: Path = field(default_factory=lambda: _get_default_store_dir())
+    _store_count: int = field(default=0, repr=False)
+
+    # Run cleanup every N store calls (probabilistic cleanup)
+    _CLEANUP_INTERVAL: int = 10
 
     def __post_init__(self) -> None:
         """Ensure store directory exists."""
@@ -126,8 +130,11 @@ class ResultStore:
         Returns:
             StoredResult with handle and summary
         """
-        # Clean up expired results opportunistically
-        self.cleanup()
+        # Probabilistic cleanup: run every N store calls instead of every call
+        self._store_count += 1
+        if self._store_count >= self._CLEANUP_INTERVAL:
+            self._store_count = 0
+            self.cleanup()
 
         # Generate unique handle
         handle = uuid.uuid4().hex[:12]
@@ -250,13 +257,17 @@ class ResultStore:
         Returns:
             Number of files cleaned up
         """
+        # Cache config outside loop to avoid repeated lookups
+        config = get_config()
+        ttl = config.output.result_ttl
+
         cleaned = 0
         for meta_path in self.store_dir.glob("result-*.meta.json"):
             try:
                 meta_data = json.loads(meta_path.read_text(encoding="utf-8"))
                 meta = ResultMeta.from_dict(meta_data)
 
-                if self._is_expired(meta):
+                if self._is_expired(meta, ttl=ttl):
                     self._delete_result(meta.handle)
                     cleaned += 1
             except (json.JSONDecodeError, KeyError, OSError):
@@ -291,10 +302,16 @@ class ResultStore:
         except (json.JSONDecodeError, KeyError):
             return None
 
-    def _is_expired(self, meta: ResultMeta) -> bool:
-        """Check if a result has exceeded TTL."""
-        config = get_config()
-        ttl = config.output.result_ttl
+    def _is_expired(self, meta: ResultMeta, *, ttl: int | None = None) -> bool:
+        """Check if a result has exceeded TTL.
+
+        Args:
+            meta: Result metadata.
+            ttl: TTL in seconds, or None to read from config.
+        """
+        if ttl is None:
+            config = get_config()
+            ttl = config.output.result_ttl
 
         if ttl <= 0:
             return False  # No expiry
@@ -319,11 +336,12 @@ class ResultStore:
         scored = []
         query_lower = query.lower()
 
-        for line in lines:
+        # Pre-compute lowered lines to avoid .lower() in hot loop
+        lines_lower = [line.lower() for line in lines]
+
+        for line, line_lower in zip(lines, lines_lower, strict=True):
             # Use SequenceMatcher for fuzzy matching
-            ratio = difflib.SequenceMatcher(
-                None, query_lower, line.lower()
-            ).ratio()
+            ratio = difflib.SequenceMatcher(None, query_lower, line_lower).ratio()
             if ratio > 0.3:  # Threshold for fuzzy match
                 scored.append((ratio, line))
 

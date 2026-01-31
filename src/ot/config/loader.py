@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import glob
 import os
+import threading
 from pathlib import Path
 from typing import Any, Literal
 
@@ -718,9 +719,7 @@ def _remove_legacy_fields(data: dict[str, Any]) -> None:
             del data[key]
 
 
-def _resolve_include_path(
-    include_path_str: str, ot_dir: Path
-) -> Path | None:
+def _resolve_include_path(include_path_str: str, ot_dir: Path) -> Path | None:
     """Resolve an include path using three-tier fallback.
 
     Search order:
@@ -863,9 +862,7 @@ def _load_includes(
 
             # Recursively process nested includes (same OT_DIR for all nested includes)
             new_seen = seen_paths | {include_path}
-            include_data = _load_includes(
-                include_data, ot_dir, new_seen
-            )
+            include_data = _load_includes(include_data, ot_dir, new_seen)
 
             # Merge this include file (later overrides earlier)
             merged = _deep_merge(merged, include_data)
@@ -887,9 +884,7 @@ def _load_includes(
     return result
 
 
-def _load_base_config(
-    inherit: str, current_config_path: Path | None
-) -> dict[str, Any]:
+def _load_base_config(inherit: str, current_config_path: Path | None) -> dict[str, Any]:
     """Load base configuration for inheritance.
 
     Args:
@@ -907,15 +902,22 @@ def _load_base_config(
         global_config_path = get_config_dir(get_global_dir()) / "onetool.yaml"
         if global_config_path.exists():
             # Skip if this is the same file we're already loading
-            if current_config_path and global_config_path.resolve() == current_config_path.resolve():
-                logger.debug("Skipping global inheritance (loading global config itself)")
+            if (
+                current_config_path
+                and global_config_path.resolve() == current_config_path.resolve()
+            ):
+                logger.debug(
+                    "Skipping global inheritance (loading global config itself)"
+                )
             else:
                 try:
                     raw_data = _load_yaml_file(global_config_path)
                     # Process includes in global config - OT_DIR is ~/.onetool/
                     global_ot_dir = get_global_dir()
                     data = _load_includes(raw_data, global_ot_dir)
-                    logger.debug(f"Inherited base config from global: {global_config_path}")
+                    logger.debug(
+                        f"Inherited base config from global: {global_config_path}"
+                    )
                     return data
                 except (FileNotFoundError, ValueError) as e:
                     logger.warning(f"Failed to load global config for inheritance: {e}")
@@ -1027,10 +1029,9 @@ def load_config(config_path: Path | str | None = None) -> OneToolConfig:
 
 
 # Global config instance (singleton pattern)
-# Thread-safety: This cache is NOT thread-safe. In multi-threaded applications,
-# ensure load_config() is called once during initialization before spawning threads.
-# The `reload` parameter is intended for testing only.
+# Thread-safety: Protected by _config_lock for safe concurrent access.
 _config: OneToolConfig | None = None
+_config_lock = threading.Lock()
 
 
 def is_log_verbose() -> bool:
@@ -1051,10 +1052,10 @@ def is_log_verbose() -> bool:
     if env_verbose in ("false", "0", "no"):
         return False
 
-    # Fall back to config
-    global _config
-    if _config is not None:
-        return _config.log_verbose
+    # Fall back to config (thread-safe read)
+    with _config_lock:
+        if _config is not None:
+            return _config.log_verbose
 
     return False
 
@@ -1067,9 +1068,7 @@ def get_config(
     Returns a cached config instance. On first call, loads config from disk.
     Subsequent calls return the cached instance unless reload=True.
 
-    Thread-safety note: This function is NOT thread-safe. In multi-threaded
-    applications, call this once during initialization before spawning threads.
-    The cache uses a simple global variable without locking.
+    Thread-safety: Protected by lock for safe concurrent access.
 
     Args:
         config_path: Path to config file (only used on first load or reload).
@@ -1082,7 +1081,7 @@ def get_config(
     """
     global _config
 
-    if _config is None or reload:
-        _config = load_config(config_path)
-
-    return _config
+    with _config_lock:
+        if _config is None or reload:
+            _config = load_config(config_path)
+        return _config

@@ -52,7 +52,9 @@ class TestResolveKwargs:
 
     def test_multiple_params_resolved(self):
         """Multiple abbreviated params all get resolved."""
-        result = resolve_kwargs({"q": "test", "c": 5, "p": 1}, ["query", "count", "page"])
+        result = resolve_kwargs(
+            {"q": "test", "c": 5, "p": 1}, ["query", "count", "page"]
+        )
         assert result == {"query": "test", "count": 5, "page": 1}
 
     def test_exact_match_wins_over_prefix(self):
@@ -65,7 +67,7 @@ class TestResolveKwargs:
         """Value types are preserved during resolution."""
         result = resolve_kwargs(
             {"q": "string", "c": 42, "f": 3.14, "b": True, "n": None, "l": [1, 2]},
-            ["query", "count", "factor", "bool_val", "nullable", "list_val"]
+            ["query", "count", "factor", "bool_val", "nullable", "list_val"],
         )
         assert result == {
             "query": "string",
@@ -73,7 +75,7 @@ class TestResolveKwargs:
             "factor": 3.14,
             "bool_val": True,
             "nullable": None,
-            "list_val": [1, 2]
+            "list_val": [1, 2],
         }
 
 
@@ -89,7 +91,7 @@ class TestGetParamNamesFromSchema:
             "properties": {
                 "query": {"type": "string"},
                 "count": {"type": "integer"},
-            }
+            },
         }
         result = get_param_names_from_schema(schema)
         assert result == ["query", "count"]
@@ -120,8 +122,8 @@ class TestOtToolRegistration:
     @pytest.fixture(autouse=True)
     def clear_caches(self):
         """Clear registry and param resolver caches before each test."""
-        import ot.registry
         import ot.executor.param_resolver
+        import ot.registry
 
         ot.registry._registry = None
         ot.executor.param_resolver.get_tool_param_names.cache_clear()
@@ -177,3 +179,24 @@ class TestOtToolRegistration:
         resolved = resolve_kwargs({"q": "github"}, list(param_names))
 
         assert resolved == {"query": "github"}
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestMcpParamCacheBounds:
+    """Tests for MCP param cache size limits."""
+
+    def test_mcp_param_cache_has_maxsize(self):
+        """MCP param cache should have a defined maxsize constant."""
+        import ot.executor.param_resolver as resolver
+
+        assert hasattr(resolver, "_MCP_PARAM_CACHE_MAXSIZE")
+        assert resolver._MCP_PARAM_CACHE_MAXSIZE > 0
+
+    def test_mcp_param_cache_is_ordered_dict(self):
+        """MCP param cache should use OrderedDict for LRU semantics."""
+        from collections import OrderedDict
+
+        import ot.executor.param_resolver as resolver
+
+        assert isinstance(resolver._mcp_param_cache, OrderedDict)

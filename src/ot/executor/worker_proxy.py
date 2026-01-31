@@ -53,7 +53,7 @@ class WorkerFunctionProxy:
         if kwargs:
             param_names = get_tool_param_names(tool_name)
             if param_names:
-                kwargs = resolve_kwargs(kwargs, list(param_names))
+                kwargs = resolve_kwargs(kwargs, param_names)
 
         with timed_tool_call(tool_name):
             pool = get_worker_pool()

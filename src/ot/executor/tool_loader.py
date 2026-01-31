@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -37,6 +38,7 @@ def _get_bundled_tools_dir() -> Path | None:
     except (ImportError, AttributeError):
         return None
 
+
 if TYPE_CHECKING:
     from ot.config.loader import OneToolConfig
 
@@ -58,7 +60,26 @@ class LoadedTools:
 
 
 # Module cache: stores (LoadedTools, mtime_dict) for each tools_dir
-_module_cache: dict[Path, tuple[LoadedTools, dict[str, float]]] = {}
+# Uses OrderedDict for LRU eviction with bounded size
+_MODULE_CACHE_MAXSIZE = 16
+_module_cache: OrderedDict[Path, tuple[LoadedTools, dict[str, float]]] = OrderedDict()
+
+
+def _cache_get(key: Path) -> tuple[LoadedTools, dict[str, float]] | None:
+    """Get from cache with LRU update."""
+    if key in _module_cache:
+        _module_cache.move_to_end(key)
+        return _module_cache[key]
+    return None
+
+
+def _cache_set(key: Path, value: tuple[LoadedTools, dict[str, float]]) -> None:
+    """Set in cache with LRU eviction."""
+    if key in _module_cache:
+        _module_cache.move_to_end(key)
+    _module_cache[key] = value
+    while len(_module_cache) > _MODULE_CACHE_MAXSIZE:
+        _module_cache.popitem(last=False)
 
 
 def _get_tool_files(
@@ -82,10 +103,7 @@ def _get_tool_files(
     # Always include bundled tools from ot_tools package
     bundled_dir = _get_bundled_tools_dir()
     if bundled_dir and bundled_dir.exists():
-        bundled_files = [
-            f for f in bundled_dir.glob("*.py")
-            if f.name != "__init__.py"
-        ]
+        bundled_files = [f for f in bundled_dir.glob("*.py") if f.name != "__init__.py"]
         tool_files.extend(bundled_files)
         # Mark bundled tools as internal (shipped with OneTool)
         internal_files = {f.resolve() for f in bundled_files if f.exists()}
@@ -122,10 +140,11 @@ def _check_cache(cache_key: Path, current_files: set[Path]) -> LoadedTools | Non
     Returns:
         Cached LoadedTools if valid, None otherwise.
     """
-    if cache_key not in _module_cache:
+    cached = _cache_get(cache_key)
+    if cached is None:
         return None
 
-    cached_registry, cached_mtimes = _module_cache[cache_key]
+    cached_registry, cached_mtimes = cached
     cached_files = {Path(f) for f in cached_mtimes}
 
     if current_files != cached_files:
@@ -309,7 +328,9 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
 
     # Categorize tools: internal (bundled) vs extension (user-created)
     # Internal tools run in-process, extension tools with PEP 723 use workers
-    worker_tools, inprocess_tools = categorize_tools(list(current_files), internal_files)
+    worker_tools, inprocess_tools = categorize_tools(
+        list(current_files), internal_files
+    )
 
     secrets_path = config.get_secrets_file_path() if config else None
     secrets = get_secrets(secrets_path)
@@ -334,7 +355,7 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
     registry = LoadedTools(
         functions=functions, packs=packs, worker_tools=worker_tools_list
     )
-    _module_cache[cache_key] = (registry, mtimes)
+    _cache_set(cache_key, (registry, mtimes))
 
     return registry
 
