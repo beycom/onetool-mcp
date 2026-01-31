@@ -198,6 +198,5 @@ Find defect and suggest improvements.
 Write the improvements and defects to ./plan/fix/{pack}-fix.md
 
 Test out the following pack:
-ot
-llm 
+
 ```
