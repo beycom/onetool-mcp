@@ -91,8 +91,9 @@ def wrap_external_content(
         Content wrapped in boundary tags with sanitization applied.
         Empty content is still wrapped (boundaries always apply).
     """
-    # Generate unique boundary ID (12 hex chars = 48 bits entropy)
-    boundary_id = uuid.uuid4().hex[:12]
+    # Generate unique boundary ID (4 hex chars = 16 bits = 65,536 possibilities)
+    # Sufficient for unpredictability within a single request context
+    boundary_id = uuid.uuid4().hex[:4]
 
     # Apply sanitization layers
     content = sanitize_triggers(content)

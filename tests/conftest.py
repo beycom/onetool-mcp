@@ -70,16 +70,6 @@ _secrets_file = _project_root / "secrets.yaml"
 if _secrets_file.exists():
     os.environ.setdefault("OT_SECRETS_FILE", str(_secrets_file))
 
-    # Also load secrets into ot_sdk._current_secrets for tools that use ot_sdk.get_secret
-    try:
-        from ot.config.secrets import load_secrets
-        import ot_sdk.config as sdk_config
-
-        _loaded_secrets = load_secrets(_secrets_file)
-        sdk_config._current_secrets = _loaded_secrets
-    except ImportError:
-        # Expected when running tests in isolation or before full install
-        pass
 
 if TYPE_CHECKING:
     from _pytest.nodes import Item

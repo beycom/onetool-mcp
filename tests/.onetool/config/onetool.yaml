@@ -8,3 +8,8 @@ tools_dir:
   - src/ot_tools/*.py
 
 log_level: INFO
+
+# Disable sanitization for most tests (test_sanitize.py tests it explicitly)
+security:
+  sanitize:
+    enabled: false

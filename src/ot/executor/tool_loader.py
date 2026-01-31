@@ -274,8 +274,10 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
     Tool loading strategy:
     - Internal tools (bundled with OneTool from ot_tools package): Run in-process
       via importlib. These tools have no PEP 723 headers and use ot.* imports.
-    - Extension tools (user-created with PEP 723 headers): Run in worker
-      subprocesses with isolated dependencies. Use ot_sdk imports.
+    - Extension tools (user-created without PEP 723 headers): Run in-process
+      with full ot.* access (logging, config, inter-tool calling).
+    - Isolated tools (user-created with PEP 723 headers): Run in worker
+      subprocesses with isolated dependencies. Fully standalone, no ot imports.
 
     The core 'ot' pack (from meta.py) is always registered regardless of config.
 
@@ -313,7 +315,7 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
     secrets = get_secrets(secrets_path)
     config_dict = config.model_dump() if config else {}
 
-    # Inject path context for extension tools (used by ot_sdk path functions)
+    # Inject path context for isolated worker tools
     config_dict["_project_path"] = str(get_effective_cwd())
     if config and config._config_dir:
         config_dict["_config_dir"] = str(config._config_dir)

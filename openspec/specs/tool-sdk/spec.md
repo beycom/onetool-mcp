@@ -1,8 +1,15 @@
 # tool-sdk Specification
 
-## Purpose
+> **STATUS: REMOVED**
+>
+> The `ot_sdk` package has been removed. Extension tools now use `ot.*` imports directly.
+> Isolated tools (with PEP 723 dependencies) are fully standalone with no onetool imports.
+>
+> See: `tool-scaffold` spec for current template documentation.
 
-Provides the ot_sdk package for building extension tools with isolated dependencies and JSON-RPC communication.
+## Purpose (Historical)
+
+This spec documented the ot_sdk package for building extension tools with isolated dependencies and JSON-RPC communication. The package was removed because isolated tools run via `uv run` and cannot reliably import `ot_sdk`.
 ## Requirements
 ### Requirement: Worker Main Loop
 

@@ -1,40 +1,25 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["pydantic>=2.0.0", "pyyaml>=6.0.0"]
-# ///
 """{{description}}
 
-An extension tool that runs in an isolated subprocess.
-Add dependencies to the script block above as needed.
+An extension tool with full onetool access.
+Runs in-process with access to ot.logging, ot.config, and ot.tools.
+Uses httpx (bundled) for HTTP requests.
 """
 
 from __future__ import annotations
 
-# Pack name for dot notation: {{pack}}.{{function}}()
 pack = "{{pack}}"
+
+import httpx
 
 __all__ = ["{{function}}"]
 
-from ot_sdk import log, worker_main
+from ot.config import get_secret, get_tool_config
+from ot.logging import LogSpan
+# Optional: for calling other tools
+# from ot.tools import call_tool, get_pack
 
-# --- Optional: Additional SDK imports ---
-# Uncomment the imports you need:
-# from ot_sdk import get_secret, get_config, cache
-# from ot_sdk import http, safe_request, api_headers
-# from ot_sdk import call_tool, get_pack
-
-# --- Optional: HTTP client for API calls ---
-# Add "httpx>=0.27.0" to dependencies above, then uncomment:
-# import httpx
-# _client = httpx.Client(
-#     timeout=60.0,
-#     headers={"Accept": "application/json"},
-# )
-
-# --- Optional: API key configuration ---
-# def _get_api_key() -> str:
-#     """Get API key from secrets.yaml: {{API_KEY}}: "your-key" """
-#     return get_secret("{{API_KEY}}") or ""
+# Shared HTTP client (connection pooling)
+_client = httpx.Client(timeout=30.0, follow_redirects=True)
 
 
 def {{function}}(
@@ -52,16 +37,15 @@ def {{function}}(
     Example:
         {{pack}}.{{function}}(input="hello")
     """
-    with log("{{pack}}.{{function}}", inputLen=len(input)) as span:
+    with LogSpan(span="{{pack}}.{{function}}", inputLen=len(input)) as s:
         try:
             # TODO: Implement your logic here
+            # Access secrets: api_key = get_secret("MY_API_KEY")
+            # Access config: timeout = get_tool_config("{{pack}}", "timeout", 30.0)
+            # Call other tools: result = call_tool("llm.transform", input=text, prompt="...")
             result = f"Processed: {input}"
-            span.add(outputLen=len(result))
+            s.add(outputLen=len(result))
             return result
         except Exception as e:
-            span.add(error=str(e))
+            s.add(error=str(e))
             return f"Error: {e}"
-
-
-if __name__ == "__main__":
-    worker_main()

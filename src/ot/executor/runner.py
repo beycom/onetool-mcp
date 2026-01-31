@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from ot.config import get_config
 from ot.executor.fence_processor import strip_fences
 from ot.executor.pack_proxy import build_execution_namespace
 from ot.executor.tool_loader import load_tool_functions, load_tool_registry
@@ -278,8 +279,10 @@ def execute_python_code(
         if fmt not in ("json", "json_h", "yml", "yml_h", "raw"):
             fmt = "json"  # Fall back to default for invalid format
 
-        # Read __sanitize__ from namespace (True enables boundary wrapping)
-        should_sanitize: bool = namespace.get("__sanitize__", False)
+        # Read __sanitize__ from namespace, defaulting to config setting
+        config = get_config()
+        default_sanitize = config.security.sanitize.enabled
+        should_sanitize: bool = namespace.get("__sanitize__", default_sanitize)
 
         # Helper to apply sanitization if enabled
         def _maybe_sanitize(content: str) -> str:

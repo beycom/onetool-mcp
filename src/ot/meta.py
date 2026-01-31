@@ -23,18 +23,47 @@ import fnmatch
 import inspect
 import sys
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Literal
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from pathlib import Path
+from typing import Any, Literal
 
 import aiofiles
 import yaml
 
 from ot import __version__
 from ot.config import get_config
+from ot.logging import LogSpan
+from ot.paths import get_global_dir, get_project_dir, resolve_cwd_path
 from ot.proxy import get_proxy_manager
-from ot_sdk import log, resolve_cwd_path, resolve_ot_path
+
+# Alias for cleaner logging calls in this module
+log = LogSpan
+
+
+def resolve_ot_path(path: str) -> Path:
+    """Resolve a path relative to the OT_DIR (.onetool/ directory).
+
+    Resolution priority:
+    1. If absolute or ~ path: use as-is
+    2. If project .onetool/ exists: resolve relative to it
+    3. Fall back to global ~/.onetool/
+
+    Args:
+        path: Path string (relative, absolute, or with ~)
+
+    Returns:
+        Resolved absolute Path
+    """
+    p = Path(path).expanduser()
+    if p.is_absolute():
+        return p.resolve()
+
+    # Try project .onetool/ first
+    project_dir = get_project_dir()
+    if project_dir:
+        return (project_dir / p).resolve()
+
+    # Fall back to global
+    return (get_global_dir() / p).resolve()
 
 # Info level type for discovery functions
 InfoLevel = Literal["list", "min", "full"]
@@ -602,7 +631,7 @@ def tools(
     """
     from ot.executor.tool_loader import load_tool_registry
 
-    with log("ot.tools", pattern=pattern or None, info=info) as s:
+    with log(span="ot.tools", pattern=pattern or None, info=info) as s:
         runner_registry = load_tool_registry()
         proxy = get_proxy_manager()
 
@@ -677,7 +706,7 @@ def packs(
     from ot.executor.tool_loader import load_tool_registry
     from ot.prompts import PromptsError, get_pack_instructions, get_prompts
 
-    with log("ot.packs", pattern=pattern or None, info=info) as s:
+    with log(span="ot.packs", pattern=pattern or None, info=info) as s:
         runner_registry = load_tool_registry()
         proxy = get_proxy_manager()
 
@@ -830,7 +859,7 @@ def _match_topic_to_file(topic: str) -> Path | None:
 
 async def _write_to_file(file_path: Path, doc: dict[str, Any]) -> None:
     """Write message document to file asynchronously."""
-    with log("ot.write", file=str(file_path), topic=doc.get("topic")) as s:
+    with log(span="ot.write", file=str(file_path), topic=doc.get("topic")) as s:
         try:
             file_path.parent.mkdir(parents=True, exist_ok=True)
             async with aiofiles.open(file_path, "a") as f:
@@ -859,7 +888,7 @@ def notify(*, topic: str, message: str) -> str:
     Example:
         ot.notify(topic="notes", message="Remember to review PR #123")
     """
-    with log("ot.notify", topic=topic) as s:
+    with log(span="ot.notify", topic=topic) as s:
         file_path = _match_topic_to_file(topic)
 
         if file_path is None:
@@ -901,7 +930,7 @@ def config() -> dict[str, Any]:
     Example:
         ot.config()
     """
-    with log("ot.config") as s:
+    with log(span="ot.config") as s:
         cfg = get_config()
 
         result: dict[str, Any] = {
@@ -937,7 +966,7 @@ def health() -> dict[str, Any]:
     """
     from ot.executor.tool_loader import load_tool_registry
 
-    with log("ot.health") as s:
+    with log(span="ot.health") as s:
         from ot.executor.worker_proxy import WorkerPackProxy
 
         runner_registry = load_tool_registry()
@@ -1007,7 +1036,7 @@ def reload() -> str:
     """
     import sys
 
-    with log("ot.reload") as s:
+    with log(span="ot.reload") as s:
         import ot.config.loader
         import ot.config.secrets
         import ot.executor.param_resolver
@@ -1087,7 +1116,7 @@ def stats(
     from ot.stats import Period, StatsReader
     from ot.support import get_support_dict
 
-    with log("ot.stats", period=period, tool=tool or None) as s:
+    with log(span="ot.stats", period=period, tool=tool or None) as s:
         cfg = get_config()
 
         # Validate period
@@ -1167,7 +1196,7 @@ def aliases(
         ot.aliases(info="list")
         ot.aliases(pattern="ws", info="full")
     """
-    with log("ot.aliases", pattern=pattern or None, info=info) as s:
+    with log(span="ot.aliases", pattern=pattern or None, info=info) as s:
         cfg = get_config()
 
         if not cfg.alias:
@@ -1218,7 +1247,7 @@ def snippets(
         ot.snippets(info="list")
         ot.snippets(pattern="brv_research", info="full")
     """
-    with log("ot.snippets", pattern=pattern or None, info=info) as s:
+    with log(span="ot.snippets", pattern=pattern or None, info=info) as s:
         cfg = get_config()
 
         if not cfg.snippets:
@@ -1316,7 +1345,7 @@ def help(*, query: str = "", info: InfoLevel = "min") -> str:
         ot.help(query="$b_q")
         ot.help(query="web fetch", info="list")
     """
-    with log("ot.help", query=query or None, info=info) as s:
+    with log(span="ot.help", query=query or None, info=info) as s:
         # No query - show general help
         if not query:
             s.add("type", "general")

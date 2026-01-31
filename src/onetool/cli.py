@@ -325,63 +325,6 @@ def init_validate() -> None:
         console.print("\nMCP Servers:")
         console.print("  (none)")
 
-    # Dependencies
-    try:
-        from ot_sdk.deps import check_deps
-
-        dep_results = check_deps()
-        if dep_results:
-            missing_count = sum(1 for r in dep_results if not r.ok)
-            total_count = len(dep_results)
-            if missing_count > 0:
-                console.print(
-                    f"\nDependencies ({total_count} tools, [yellow]{missing_count} missing[/yellow]):"
-                )
-            else:
-                console.print(f"\nDependencies ({total_count} tools):")
-
-            # Format with libs/clis breakdown per tool
-            sorted_results = sorted(dep_results, key=lambda r: r.tool)
-            for result in sorted_results:
-                status = "[green]OK[/green]" if result.ok else "[yellow]missing[/yellow]"
-                console.print(f"  {result.tool} - {status}")
-
-                # Group by type
-                libs = [d for d in result.dependencies if d.kind == "lib"]
-                clis = [d for d in result.dependencies if d.kind == "cli"]
-                secrets = [d for d in result.dependencies if d.kind == "secret"]
-
-                if libs:
-                    lib_items = []
-                    for d in libs:
-                        if d.available:
-                            lib_items.append(d.name)
-                        else:
-                            lib_items.append(f"[yellow]{d.name}[/yellow]")
-                    console.print(f"    libs: {', '.join(lib_items)}")
-                if clis:
-                    cli_items = []
-                    for d in clis:
-                        if d.available:
-                            cli_items.append(d.name)
-                        else:
-                            cli_items.append(f"[yellow]{d.name}[/yellow]")
-                    console.print(f"    clis: {', '.join(cli_items)}")
-                if secrets:
-                    secret_items = []
-                    for d in secrets:
-                        if d.available:
-                            secret_items.append(d.name)
-                        else:
-                            secret_items.append(f"[yellow]{d.name}[/yellow]")
-                    console.print(f"    secrets: {', '.join(secret_items)}")
-        else:
-            console.print("\nDependencies:")
-            console.print("  (no tools declare dependencies)")
-    except Exception as e:
-        console.print("\nDependencies:")
-        console.print(f"  [red]Error checking:[/red] {e}")
-
 
 @app.callback(invoke_without_command=True)
 def serve(

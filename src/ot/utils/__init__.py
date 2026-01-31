@@ -8,8 +8,8 @@ Provides shared utilities for internal tools:
 - Dependencies: check_cli, check_lib, ensure_cli, ensure_lib
 - Factory: lazy_client, LazyClient
 
-For extension tools (user-created in .onetool/tools/), use ot_sdk which
-re-exports these utilities with additional worker-specific functionality.
+Extension tools (user-created in .onetool/tools/) can import directly from
+ot.* modules for logging, config, and inter-tool calling.
 """
 
 from ot.utils.batch import batch_execute, format_batch_results, normalize_items

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Provides the scaffold pack for creating extension tools from templates. Enables users to quickly scaffold new extensions with proper PEP 723 headers and worker patterns.
+Provides the scaffold pack for creating extension and isolated tools from templates. Enables users to quickly scaffold new tools with proper structure for in-process or subprocess execution.
 ## Requirements
 ### Requirement: List Templates Function
 
@@ -24,7 +24,7 @@ The scaffold pack SHALL provide a `create()` function to scaffold new extensions
 #### Scenario: Create project extension
 - **WHEN** `scaffold.create(name="mypack")` is called
 - **THEN** it creates `.onetool/tools/mypack/mypack.py`
-- **AND** uses the default "simple" template
+- **AND** uses the default "extension" template (in-process, full `ot.*` access)
 - **AND** substitutes `{{pack}}`, `{{function}}`, `{{description}}` placeholders
 
 #### Scenario: Create global extension
@@ -81,10 +81,15 @@ The scaffold pack SHALL provide a `validate()` function for pre-reload validatio
 - **AND** the file is missing `pack` or `__all__`
 - **THEN** it returns "Validation FAILED" with errors
 
-#### Scenario: Missing worker_main for PEP 723 extensions
-- **WHEN** `scaffold.validate(path="/path/to/extension.py")` is called
-- **AND** the file has PEP 723 dependencies but no `worker_main()`
-- **THEN** it returns "Validation FAILED" with error
+#### Scenario: Missing JSON-RPC loop for isolated tools
+- **WHEN** `scaffold.validate(path="/path/to/tool.py")` is called
+- **AND** the file has PEP 723 dependencies but no inline JSON-RPC loop
+- **THEN** it returns "Validation FAILED" with error about missing JSON-RPC loop
+
+#### Scenario: Warn about deprecated ot_sdk imports
+- **WHEN** `scaffold.validate(path="/path/to/tool.py")` is called
+- **AND** the file imports from `ot_sdk`
+- **THEN** it includes a DEPRECATED warning in the result
 
 #### Scenario: Best practices warnings
 - **WHEN** `scaffold.validate(path="/path/to/extension.py")` is called
@@ -93,22 +98,41 @@ The scaffold pack SHALL provide a `validate()` function for pre-reload validatio
 
 ### Requirement: Extension Template Structure
 
-The default extension template SHALL include all required components for a working extension.
+The extension template SHALL include all required components for in-process execution with full onetool access.
 
-#### Scenario: Template includes PEP 723 header
+#### Scenario: Extension template uses ot.* imports
 - **WHEN** the extension template is used
+- **THEN** the generated file imports from `ot.logging`, `ot.config`
+- **AND** optionally shows `ot.tools` import in comments for inter-tool calling
+
+#### Scenario: Extension template does not use worker_main
+- **WHEN** the extension template is used
+- **THEN** the generated file does NOT have `worker_main()` or `if __name__` block
+- **AND** executes in-process like bundled tools
+
+#### Scenario: Extension template includes logging
+- **WHEN** the extension template is used
+- **THEN** the generated function uses `with LogSpan(...) as s:` pattern
+- **AND** imports `LogSpan` from `ot.logging`
+
+### Requirement: Isolated Template Structure
+
+The isolated template SHALL include all required components for subprocess execution with external dependencies.
+
+#### Scenario: Isolated template is fully standalone
+- **WHEN** the isolated template is used
+- **THEN** the generated file has NO onetool imports
+- **AND** implements JSON-RPC loop inline using only stdlib
+
+#### Scenario: Isolated template has PEP 723 header
+- **WHEN** the isolated template is used
 - **THEN** the generated file has a valid `# /// script` metadata block
 - **AND** includes `requires-python` and `dependencies` fields
 
-#### Scenario: Template includes worker_main
-- **WHEN** the extension template is used
-- **THEN** the generated file has `if __name__ == "__main__": worker_main()`
-- **AND** imports `worker_main` from `ot_sdk`
-
-#### Scenario: Template includes logging
-- **WHEN** the extension template is used
-- **THEN** the generated function uses `with log(...) as s:` pattern
-- **AND** imports `log` from `ot_sdk`
+#### Scenario: Isolated template main loop
+- **WHEN** the isolated template is used
+- **THEN** the generated file has `if __name__ == "__main__":` with JSON-RPC loop
+- **AND** reads from stdin and writes to stdout as JSON
 
 ### Requirement: Template Location
 

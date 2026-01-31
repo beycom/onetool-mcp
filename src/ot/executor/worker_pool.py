@@ -91,37 +91,25 @@ class WorkerPool:
 
     Workers are spawned on first call and reused for subsequent calls.
     Idle workers are reaped after a configurable timeout.
+
+    Isolated tools communicate via JSON-RPC over stdin/stdout and are
+    fully standalone (no onetool imports).
     """
 
     def __init__(
         self,
         idle_timeout: float = 600.0,
-        sdk_path: Path | None = None,
     ) -> None:
         """Initialize the worker pool.
 
         Args:
             idle_timeout: Seconds of inactivity before reaping worker (default: 10 min)
-            sdk_path: Path to ot_sdk package (for --with injection)
         """
         self.idle_timeout = idle_timeout
-        self.sdk_path = sdk_path or self._find_sdk_path()
         self._workers: dict[Path, Worker] = {}
         self._lock = threading.Lock()
         self._reaper_thread: threading.Thread | None = None
         self._shutdown = threading.Event()
-
-    def _find_sdk_path(self) -> Path:
-        """Find the ot_sdk package path."""
-        # Try relative to this file (development)
-        dev_path = Path(__file__).parent.parent.parent / "ot_sdk"
-        if dev_path.exists():
-            return dev_path
-
-        # Fall back to installed package location
-        import ot_sdk
-
-        return Path(ot_sdk.__file__).parent
 
     def _start_reaper(self) -> None:
         """Start the background reaper thread if not already running."""
@@ -194,20 +182,11 @@ class WorkerPool:
 
         logger.debug(f"Spawning worker: {' '.join(cmd)}")
 
-        # Restricted env: PATH + PYTHONPATH only (not full os.environ)
-        # PYTHONPATH includes ot_sdk's parent so "from ot_sdk import ..." works
-        sdk_parent = str(self.sdk_path.parent)  # src/ directory
-        existing_pythonpath = os.environ.get("PYTHONPATH", "")
-        pythonpath = (
-            f"{sdk_parent}{os.pathsep}{existing_pythonpath}"
-            if existing_pythonpath
-            else sdk_parent
-        )
+        # Minimal env: PATH only (isolated tools are fully standalone)
         env = {
             "PATH": os.environ.get("PATH", ""),
-            "PYTHONPATH": pythonpath,
         }
-        # Pass through OT_CWD for path resolution
+        # Pass through OT_CWD for path resolution in tool code
         if ot_cwd := os.environ.get("OT_CWD"):
             env["OT_CWD"] = ot_cwd
 

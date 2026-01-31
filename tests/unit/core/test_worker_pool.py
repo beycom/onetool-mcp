@@ -72,13 +72,6 @@ class TestWorkerPool:
 
         assert pool.idle_timeout == 300.0
 
-    def test_find_sdk_path(self) -> None:
-        """Should find SDK path."""
-        pool = WorkerPool()
-
-        assert pool.sdk_path.exists()
-        assert pool.sdk_path.name == "ot_sdk"
-
     def test_get_stats_empty_pool(self) -> None:
         """Should return stats for empty pool."""
         pool = WorkerPool()

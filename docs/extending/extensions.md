@@ -4,6 +4,20 @@
 
 Extensions let you develop OneTool tools in separate repositories while using local configuration for development and testing.
 
+## Tool Types
+
+OneTool supports three types of tools:
+
+| Type | Description | Template | Imports |
+|------|-------------|----------|---------|
+| **Bundled Tool** | Shipped with onetool | N/A (`src/ot_tools/`) | `from ot.*` |
+| **Extension Tool** | User-built, no external deps | `extension` | `from ot.*` |
+| **Isolated Tool** | User-built, external deps | `isolated` | None (standalone) |
+
+**Extension tools** (recommended) run in-process and have full access to onetool's logging, config, and inter-tool calling APIs.
+
+**Isolated tools** run in subprocesses with their own dependencies via PEP 723. They are fully standalone with no onetool imports.
+
 ## Minimal Structure
 
 An extension needs just one file:
@@ -117,23 +131,26 @@ bench
 
 The server discovers your tool from the local `tools_dir` configuration.
 
-## Extension Tools (with dependencies)
+## Extension Tools (recommended)
 
-If your tool needs external packages, use PEP 723 headers and run as an isolated subprocess:
+Extension tools run in-process with full access to onetool's APIs:
 
 ```python
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["httpx>=0.28.0"]
-# ///
-"""Tool with external dependencies."""
+"""Tool with onetool access."""
 
 from __future__ import annotations
 
 pack = "mytool"
+
+import httpx
+
 __all__ = ["fetch"]
 
-from ot_sdk import http, log, worker_main
+from ot.config import get_secret, get_tool_config
+from ot.logging import LogSpan
+# from ot.tools import call_tool, get_pack  # For inter-tool calling
+
+_client = httpx.Client(timeout=30.0, follow_redirects=True)
 
 def fetch(*, url: str) -> str:
     """Fetch a URL.
@@ -143,54 +160,114 @@ def fetch(*, url: str) -> str:
 
     Returns:
         Page content
+
+    Example:
+        mytool.fetch(url="https://example.com")
     """
-    with log("mytool.fetch", url=url) as s:
-        response = http.get(url)
+    with LogSpan(span="mytool.fetch", url=url) as s:
+        # Access secrets
+        api_key = get_secret("MY_API_KEY")
+
+        # Access config
+        timeout = get_tool_config("mytool", "timeout", 30.0)
+
+        response = _client.get(url)
         s.add(status=response.status_code)
         return response.text
-
-if __name__ == "__main__":
-    worker_main()
 ```
 
-**Critical**: The `if __name__ == "__main__": worker_main()` block is required for any file with a PEP 723 header. Without it, the tool fails with "Worker closed unexpectedly".
+### Extension Tool APIs
 
-### SDK Exports
-
-The `ot_sdk` package provides utilities for extension tools:
-
-| Export | Purpose |
+| Import | Purpose |
 |--------|---------|
-| `worker_main` | Main loop - handles JSON-RPC requests |
-| `get_config(key)` | Access configuration from `onetool.yaml` |
-| `get_secret(key)` | Access secrets from `secrets.yaml` |
-| `http` | Pre-configured httpx client |
-| `log(span, **kwargs)` | Structured logging context manager |
-| `cache(ttl=seconds)` | In-memory caching decorator |
-| `resolve_cwd_path(path)` | Resolve paths relative to project directory |
-| `resolve_ot_path(path)` | Resolve paths relative to config directory |
+| `from ot.logging import LogSpan` | Structured logging context manager |
+| `from ot.config import get_secret` | Access secrets from `secrets.yaml` |
+| `from ot.config import get_tool_config` | Access tool config from `onetool.yaml` |
+| `from ot.tools import call_tool` | Call another tool by name |
+| `from ot.tools import get_pack` | Get a pack for multiple calls |
+| `from ot.paths import resolve_cwd_path` | Resolve paths relative to project directory |
 
-### Path Prefixes
+### Inter-Tool Calling
 
-Path functions support prefixes to override the default base:
-
-| Prefix    | Meaning                  | Use Case                       |
-|-----------|--------------------------|--------------------------------|
-| `~`       | Home directory           | Cross-project shared files     |
-| `CWD/`    | Project working directory| Tool I/O files                 |
-| `GLOBAL/` | `~/.onetool/`            | Global config/logs             |
-| `OT_DIR/` | Active `.onetool/`       | Project-first, global fallback |
+Extension tools can call other tools:
 
 ```python
-from ot_sdk import resolve_cwd_path, resolve_ot_path
+from ot.tools import call_tool, get_pack
 
-# Default: relative to project directory
-output = resolve_cwd_path("output/report.txt")
+# Call a single tool
+result = call_tool("llm.transform", input=text, prompt="Summarize")
 
-# Prefix overrides base
-global_log = resolve_cwd_path("GLOBAL/logs/app.log")  # ~/.onetool/logs/app.log
-template = resolve_ot_path("templates/default.mmd")    # .onetool/templates/default.mmd
+# Get a pack for multiple calls
+brave = get_pack("brave")
+results = brave.search(query="python tutorials")
 ```
+
+## Isolated Tools (for external dependencies)
+
+If your tool needs external packages that aren't bundled with onetool, use an isolated tool with PEP 723 headers:
+
+```python
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["numpy>=2.0.0"]
+# ///
+"""Tool with external dependencies."""
+
+from __future__ import annotations
+
+import json
+import sys
+
+import numpy as np
+
+pack = "mytool"
+__all__ = ["analyze"]
+
+def analyze(*, data: list[float]) -> str:
+    """Analyze numerical data.
+
+    Args:
+        data: List of numbers
+
+    Returns:
+        Analysis results
+
+    Example:
+        mytool.analyze(data=[1.0, 2.0, 3.0])
+    """
+    arr = np.array(data)
+    return f"Mean: {arr.mean():.2f}, Std: {arr.std():.2f}"
+
+# JSON-RPC main loop for subprocess communication
+if __name__ == "__main__":
+    _functions = {
+        "analyze": analyze,
+    }
+    for line in sys.stdin:
+        request = json.loads(line)
+        func = _functions.get(request["function"])
+        if func is None:
+            print(json.dumps({"error": f"Unknown function: {request['function']}"}), flush=True)
+            continue
+        try:
+            result = func(**request.get("kwargs", {}))
+            print(json.dumps({"result": result}), flush=True)
+        except Exception as e:
+            print(json.dumps({"error": str(e)}), flush=True)
+```
+
+**Critical**: The `if __name__ == "__main__":` block with the JSON-RPC loop is required for isolated tools. Without it, the tool fails with "Worker closed unexpectedly".
+
+### Isolated Tool Limitations
+
+Isolated tools cannot:
+
+- Access secrets (use environment variables instead)
+- Access onetool config (hardcode values)
+- Use structured logging
+- Call other tools
+
+This trade-off provides full dependency isolation and crash safety.
 
 ## Consumer Installation
 
@@ -235,16 +312,22 @@ cd src
 python -m pytest ../test_mytool.py
 ```
 
-For extension tools, test the functions before adding `worker_main()`:
+## Creating Tools with Scaffold
+
+Use the scaffold tool to generate new extensions:
 
 ```python
-# Test individual functions
-from mytool import fetch
+# Create an extension tool (in-process, recommended)
+scaffold.create(name="my_tool", function="search")
 
-def test_fetch():
-    # Mock http if needed
-    result = fetch(url="https://example.com")
-    assert result
+# Create an isolated tool (subprocess, for external deps)
+scaffold.create(name="numpy_tool", template="isolated")
+```
+
+Validate before reloading:
+
+```python
+scaffold.validate(path=".onetool/tools/my_tool/my_tool.py")
 ```
 
 ## Example: Extension with Implementation Modules
@@ -257,7 +340,7 @@ ot-convert/
 │   ├── onetool.yaml
 │   └── secrets.yaml
 ├── src/
-│   ├── convert.py           # Main tool file (worker)
+│   ├── convert.py           # Main tool file
 │   └── _convert/            # Implementation modules
 │       ├── __init__.py
 │       ├── pdf.py
@@ -268,10 +351,6 @@ ot-convert/
 The main tool file imports from the implementation package:
 
 ```python
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["pymupdf>=1.24.0", "python-docx>=1.1.0"]
-# ///
 """Document conversion tools."""
 
 from __future__ import annotations
@@ -279,20 +358,17 @@ from __future__ import annotations
 pack = "convert"
 __all__ = ["pdf", "word"]
 
-from ot_sdk import log, resolve_cwd_path, worker_main
+from ot.logging import LogSpan
 
 from _convert import convert_pdf, convert_word
 
 def pdf(*, pattern: str, output_dir: str = "output") -> str:
     """Convert PDF files to markdown."""
-    with log("convert.pdf", pattern=pattern) as s:
+    with LogSpan(span="convert.pdf", pattern=pattern) as s:
         return convert_pdf(pattern, output_dir)
 
 def word(*, pattern: str, output_dir: str = "output") -> str:
     """Convert Word documents to markdown."""
-    with log("convert.word", pattern=pattern) as s:
+    with LogSpan(span="convert.word", pattern=pattern) as s:
         return convert_word(pattern, output_dir)
-
-if __name__ == "__main__":
-    worker_main()
 ```

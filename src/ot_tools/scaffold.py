@@ -3,8 +3,8 @@
 Provides tools for creating new tools from templates.
 
 Templates:
-- simple: In-process tool with no external dependencies (default)
-- extension: Subprocess tool with PEP 723 dependencies and ot_sdk
+- extension: In-process tool with full onetool access (default, recommended)
+- isolated: Subprocess tool with PEP 723 dependencies, fully standalone
 """
 
 from __future__ import annotations
@@ -86,7 +86,7 @@ def templates() -> str:
 def create(
     *,
     name: str,
-    template: str = "simple",
+    template: str = "extension",
     pack_name: str | None = None,
     function: str = "run",
     description: str = "My extension tool",
@@ -101,7 +101,7 @@ def create(
 
     Args:
         name: Extension name (will be used as directory and file name)
-        template: Template name - "simple" (default) or "extension" (subprocess)
+        template: Template name - "extension" (default, in-process) or "isolated" (subprocess)
         pack_name: Pack name for dot notation (default: same as name)
         function: Main function name (default: run)
         description: Module description
@@ -114,7 +114,7 @@ def create(
 
     Example:
         scaffold.create(name="my_tool", function="search")
-        scaffold.create(name="api_tool", api_key="MY_API_KEY")
+        scaffold.create(name="numpy_tool", template="isolated")
     """
     with LogSpan(span="scaffold.create", name=name, template=template) as s:
         # Validate name
@@ -397,14 +397,19 @@ def validate(*, path: str) -> str:
         if not has_all:
             errors.append("Missing '__all__ = [...]' export list")
 
-        # Check 4: worker_main() if PEP 723 deps present
+        # Check 4: Isolated tools (PEP 723) need inline JSON-RPC loop
         if _has_pep723_deps(content):
-            has_worker_main = "worker_main()" in content
-            if not has_worker_main:
-                errors.append("Missing 'worker_main()' call - required for extensions with PEP 723 dependencies")
+            has_json_rpc = 'if __name__ == "__main__":' in content and "json.loads" in content
+            if not has_json_rpc:
+                errors.append("Missing inline JSON-RPC loop - required for isolated tools with PEP 723 dependencies")
 
         # Check 5: Best practices
-        checks, warnings = _check_best_practices(content, tree)
+        checks, bp_warnings = _check_best_practices(content, tree)
+        warnings.extend(bp_warnings)
+
+        # Check 6: Warn about deprecated ot_sdk imports
+        if "from ot_sdk" in content or "import ot_sdk" in content:
+            warnings.append("DEPRECATED: ot_sdk imports are deprecated. Use ot.* imports for extension tools, or inline JSON-RPC for isolated tools")
 
         # Build result showing what passed and failed
         result: list[str] = []
@@ -414,8 +419,8 @@ def validate(*, path: str) -> str:
         result.append(f"  [{'x' if has_pack else ' '}] pack = \"name\" variable")
         result.append(f"  [{'x' if has_all else ' '}] __all__ export list")
         if _has_pep723_deps(content):
-            has_worker = "worker_main()" in content
-            result.append(f"  [{'x' if has_worker else ' '}] worker_main() (PEP 723)")
+            has_json_rpc = 'if __name__ == "__main__":' in content and "json.loads" in content
+            result.append(f"  [{'x' if has_json_rpc else ' '}] inline JSON-RPC loop (isolated)")
         result.append("  [x] Python syntax valid")
         result.append(f"  [{'x' if checks.get('module_docstring', True) else ' '}] module docstring")
         result.append(f"  [{'x' if checks.get('future_annotations', True) else ' '}] from __future__ import annotations")

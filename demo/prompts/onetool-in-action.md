@@ -51,7 +51,7 @@ Explain each step so it is easy to follow what you did and why. Use 🧿 to high
 
 - Learn onetool with `ot.help(info="full")` and `scaffold.templates()`
 - Verify tools_dir is configured for ~/.onetool/tools using `ot.config()`. If not, add `~/.onetool/tools/**/*.py` to the config.
-- Scaffold a "wiki" pack using `scaffold.create(name="wiki", scope="global", template="simple")`
+- Scaffold a "wiki" pack using `scaffold.create(name="wiki", scope="global", template="extension")`
 
 - Implement these tools:
   - `page(slug, size=10)` - Fetch HTML from https://en.wikipedia.org/wiki/{slug}, truncate to size KB

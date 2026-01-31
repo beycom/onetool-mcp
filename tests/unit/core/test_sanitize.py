@@ -195,12 +195,35 @@ class TestSanitizeOutput:
 class TestSanitizeMagicVariable:
     """Test __sanitize__ magic variable integration with executor."""
 
-    def test_sanitize_not_set_skips(self, executor):
-        """Without __sanitize__, no sanitization is applied."""
-        result = executor('{"key": "value with __ot trigger"}')
-        # Without __sanitize__ = True, output is not wrapped
+    def test_sanitize_not_set_uses_config_default(self):
+        """Without __sanitize__, uses config default."""
+        from pathlib import Path
+        from unittest.mock import patch
+
+        from ot.config.loader import OneToolConfig, OutputSanitizationConfig, SecurityConfig
+        from ot.executor.runner import execute_python_code
+        from ot.executor.tool_loader import load_tool_functions
+
+        # Create config with sanitization enabled
+        mock_config = OneToolConfig(
+            security=SecurityConfig(
+                sanitize=OutputSanitizationConfig(enabled=True)
+            )
+        )
+
+        tools_dir = Path(__file__).parent.parent.parent.parent / "src" / "ot_tools"
+        tool_funcs = load_tool_functions(tools_dir)
+
+        with patch("ot.executor.runner.get_config", return_value=mock_config):
+            result = execute_python_code(
+                '{"key": "value with __ot trigger"}',
+                tool_functions=tool_funcs,
+            )
+
+        # Config has security.sanitize.enabled=True, so output is wrapped
         assert "key" in result
-        assert "<external-content-" not in result
+        assert "<external-content-" in result
+        assert "[REDACTED:trigger]" in result
 
     def test_sanitize_true_wraps(self, executor):
         """__sanitize__ = True enables wrapping and sanitization."""

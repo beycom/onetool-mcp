@@ -115,7 +115,7 @@ def test_create_extension_project_scope(mock_project_dir: Path) -> None:
     content = ext_file.read_text()
     assert 'pack = "my_tool"' in content
     assert 'def search(' in content
-    # Note: "simple" template (default) is in-process, no worker_main needed
+    # Extension template (default) is in-process, no worker_main needed
     assert "LogSpan" in content
 
 
@@ -200,8 +200,8 @@ def test_create_invalid_template(mock_project_dir: Path) -> None:
 
 @pytest.mark.unit
 @pytest.mark.tools
-def test_validate_valid_extension(tmp_path: Path) -> None:
-    """Verify validate() passes for valid extension."""
+def test_validate_extension_tool(tmp_path: Path) -> None:
+    """Verify validate() passes for extension tool using ot.* imports."""
     from ot_tools.scaffold import validate
 
     ext_file = tmp_path / "valid_tool.py"
@@ -213,7 +213,7 @@ pack = "mytool"
 
 __all__ = ["run"]
 
-from ot_sdk import log, worker_main
+from ot.logging import LogSpan
 
 
 def run(*, input: str) -> str:
@@ -228,12 +228,8 @@ def run(*, input: str) -> str:
     Example:
         mytool.run(input="test")
     """
-    with log("mytool.run") as s:
+    with LogSpan(span="mytool.run") as s:
         return f"Result: {input}"
-
-
-if __name__ == "__main__":
-    worker_main()
 ''')
 
     result = validate(path=str(ext_file))
@@ -309,11 +305,11 @@ def run(*, input: str) -> str
 
 @pytest.mark.unit
 @pytest.mark.tools
-def test_validate_missing_worker_main_with_pep723(tmp_path: Path) -> None:
-    """Verify validate() fails when PEP 723 deps present but no worker_main."""
+def test_validate_missing_json_rpc_loop_with_pep723(tmp_path: Path) -> None:
+    """Verify validate() fails when PEP 723 deps present but no JSON-RPC loop."""
     from ot_tools.scaffold import validate
 
-    ext_file = tmp_path / "no_worker.py"
+    ext_file = tmp_path / "no_loop.py"
     ext_file.write_text('''# /// script
 # requires-python = ">=3.11"
 # dependencies = ["httpx>=0.27.0"]
@@ -330,7 +326,49 @@ def run(*, input: str) -> str:
     result = validate(path=str(ext_file))
 
     assert "Validation FAILED" in result
-    assert "worker_main" in result
+    assert "JSON-RPC loop" in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_validate_warns_ot_sdk_deprecated(tmp_path: Path) -> None:
+    """Verify validate() warns about deprecated ot_sdk imports."""
+    from ot_tools.scaffold import validate
+
+    ext_file = tmp_path / "old_style.py"
+    ext_file.write_text('''"""My tool using deprecated SDK."""
+
+from __future__ import annotations
+
+pack = "mytool"
+__all__ = ["run"]
+
+from ot_sdk import log, worker_main
+
+def run(*, input: str) -> str:
+    """Run the tool.
+
+    Args:
+        input: The input
+
+    Returns:
+        The result
+
+    Example:
+        mytool.run(input="test")
+    """
+    with log("mytool.run"):
+        return input
+
+if __name__ == "__main__":
+    worker_main()
+''')
+
+    result = validate(path=str(ext_file))
+
+    # Should pass but with deprecation warning
+    assert "DEPRECATED" in result
+    assert "ot_sdk" in result
 
 
 @pytest.mark.unit
