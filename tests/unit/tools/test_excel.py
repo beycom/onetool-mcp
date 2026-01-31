@@ -33,7 +33,7 @@ def excel_file(tmp_path: Path) -> Path:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_pack_is_excel() -> None:
     """Verify pack is correctly set."""
     from ot_tools.excel import pack
@@ -42,7 +42,7 @@ def test_pack_is_excel() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_all_exports_only_public_functions() -> None:
     """Verify __all__ contains the expected public functions."""
     from ot_tools.excel import __all__
@@ -83,7 +83,7 @@ def test_all_exports_only_public_functions() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_create_workbook(excel_file: Path) -> None:
     """Verify excel.create() creates a new workbook."""
     from ot_tools.excel import create
@@ -95,7 +95,7 @@ def test_create_workbook(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_create_workbook_with_sheet_name(excel_file: Path) -> None:
     """Verify excel.create() creates workbook with custom sheet name."""
     from ot_tools.excel import create, info
@@ -107,7 +107,7 @@ def test_create_workbook_with_sheet_name(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_create_workbook_creates_parent_dirs(tmp_path: Path) -> None:
     """Verify excel.create() creates parent directories."""
     from ot_tools.excel import create
@@ -120,7 +120,7 @@ def test_create_workbook_creates_parent_dirs(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_add_sheet(excel_file: Path) -> None:
     """Verify excel.add_sheet() adds a new sheet."""
     from ot_tools.excel import add_sheet, create, info
@@ -134,7 +134,7 @@ def test_add_sheet(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_add_sheet_duplicate_error(excel_file: Path) -> None:
     """Verify excel.add_sheet() errors on duplicate sheet name."""
     from ot_tools.excel import add_sheet, create
@@ -147,7 +147,7 @@ def test_add_sheet_duplicate_error(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_add_sheet_file_not_found() -> None:
     """Verify excel.add_sheet() returns error for missing file."""
     from ot_tools.excel import add_sheet
@@ -159,7 +159,7 @@ def test_add_sheet_file_not_found() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_write_and_read(excel_file: Path) -> None:
     """Verify excel.write() and excel.read() round-trip data."""
     from ot_tools.excel import create, read, write
@@ -175,7 +175,7 @@ def test_write_and_read(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_write_to_specific_cell(excel_file: Path) -> None:
     """Verify excel.write() writes to specified start cell."""
     from ot_tools.excel import create, write
@@ -191,7 +191,7 @@ def test_write_to_specific_cell(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_write_to_specific_sheet(excel_file: Path) -> None:
     """Verify excel.write() writes to specified sheet."""
     from ot_tools.excel import add_sheet, create, read, write
@@ -211,7 +211,7 @@ def test_write_to_specific_sheet(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_write_empty_data_returns_error(excel_file: Path) -> None:
     """Verify excel.write() returns error for empty data."""
     from ot_tools.excel import create, write
@@ -224,7 +224,7 @@ def test_write_empty_data_returns_error(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_read_specific_range(excel_file: Path) -> None:
     """Verify excel.read() reads from specified range."""
     from ot_tools.excel import create, read, write
@@ -239,7 +239,7 @@ def test_read_specific_range(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_read_nonexistent_sheet_returns_error(excel_file: Path) -> None:
     """Verify excel.read() returns error for nonexistent sheet."""
     from ot_tools.excel import create, read
@@ -252,7 +252,7 @@ def test_read_nonexistent_sheet_returns_error(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_info_returns_metadata(excel_file: Path) -> None:
     """Verify excel.info() returns workbook metadata."""
     from ot_tools.excel import create, info
@@ -266,7 +266,7 @@ def test_info_returns_metadata(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_info_with_ranges(excel_file: Path) -> None:
     """Verify excel.info() includes used ranges when requested."""
     from ot_tools.excel import create, info, write
@@ -281,7 +281,7 @@ def test_info_with_ranges(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_formula(excel_file: Path) -> None:
     """Verify excel.formula() applies formula to cell."""
     from ot_tools.excel import create, formula, write
@@ -295,7 +295,7 @@ def test_formula(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_formula_auto_prepends_equals(excel_file: Path) -> None:
     """Verify excel.formula() adds = prefix if missing."""
     from ot_tools.excel import create, formula
@@ -307,7 +307,7 @@ def test_formula_auto_prepends_equals(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_formula_to_specific_sheet(excel_file: Path) -> None:
     """Verify excel.formula() applies to specified sheet."""
     from ot_tools.excel import add_sheet, create, formula
@@ -325,7 +325,7 @@ def test_formula_to_specific_sheet(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_read_nonexistent_file() -> None:
     """Verify excel.read() returns error for missing file."""
     from ot_tools.excel import read
@@ -337,7 +337,7 @@ def test_read_nonexistent_file() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_info_nonexistent_file() -> None:
     """Verify excel.info() returns error for missing file."""
     from ot_tools.excel import info
@@ -349,7 +349,7 @@ def test_info_nonexistent_file() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_write_nonexistent_file() -> None:
     """Verify excel.write() returns error for missing file."""
     from ot_tools.excel import write
@@ -361,7 +361,7 @@ def test_write_nonexistent_file() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_formula_nonexistent_file() -> None:
     """Verify excel.formula() returns error for missing file."""
     from ot_tools.excel import formula
@@ -378,7 +378,7 @@ def test_formula_nonexistent_file() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_cell_range_expand() -> None:
     """Verify cell_range expands a cell into a range."""
     from ot_tools.excel import cell_range
@@ -389,7 +389,7 @@ def test_cell_range_expand() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_cell_range_expand_left_up() -> None:
     """Verify cell_range can expand left and up."""
     from ot_tools.excel import cell_range
@@ -400,7 +400,7 @@ def test_cell_range_expand_left_up() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_cell_shift() -> None:
     """Verify cell_shift moves a cell reference."""
     from ot_tools.excel import cell_shift
@@ -411,7 +411,7 @@ def test_cell_shift() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_cell_shift_single_direction() -> None:
     """Verify cell_shift works with single direction."""
     from ot_tools.excel import cell_shift
@@ -427,7 +427,7 @@ def test_cell_shift_single_direction() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_search_wildcard(excel_file: Path) -> None:
     """Verify search finds values with wildcard pattern."""
     from ot_tools.excel import create, search, write
@@ -445,23 +445,24 @@ def test_search_wildcard(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_search_first_only(excel_file: Path) -> None:
-    """Verify search returns only first match when requested."""
+    """Verify search returns single-item list when first_only=True."""
     from ot_tools.excel import create, search, write
 
     create(filepath=str(excel_file))
     write(filepath=str(excel_file), data=[["Name"], ["Test1"], ["Test2"], ["Test3"]])
     result = search(filepath=str(excel_file), pattern="Test*", first_only=True)
 
-    result_str = _to_str(result)
-    assert "Test1" in result_str
-    # Should have cell info since it's a dict result
-    assert "cell" in result_str
+    # first_only=True returns a list with one item for API consistency
+    assert isinstance(result, list)
+    assert len(result) == 1
+    assert result[0]["value"] == "Test1"
+    assert "cell" in result[0]
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_search_regex(excel_file: Path) -> None:
     """Verify search works with regex patterns."""
     from ot_tools.excel import create, search, write
@@ -478,7 +479,7 @@ def test_search_regex(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_search_no_matches(excel_file: Path) -> None:
     """Verify search returns empty list when no matches."""
     from ot_tools.excel import create, search, write
@@ -497,7 +498,7 @@ def test_search_no_matches(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_create_table(excel_file: Path) -> None:
     """Verify create_table creates a native Excel table."""
     from ot_tools.excel import create, create_table, write
@@ -513,7 +514,7 @@ def test_create_table(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_create_table_auto_name(excel_file: Path) -> None:
     """Verify create_table auto-generates table name."""
     from ot_tools.excel import create, create_table, write
@@ -527,7 +528,7 @@ def test_create_table_auto_name(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_tables_list(excel_file: Path) -> None:
     """Verify tables lists all tables in worksheet."""
     from ot_tools.excel import create, create_table, tables, write
@@ -543,7 +544,7 @@ def test_tables_list(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_table_info(excel_file: Path) -> None:
     """Verify table_info returns detailed table information."""
     from ot_tools.excel import create, create_table, table_info, write
@@ -561,7 +562,7 @@ def test_table_info(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_table_data(excel_file: Path) -> None:
     """Verify table_data returns table contents as dicts."""
     from ot_tools.excel import create, create_table, table_data, write
@@ -580,7 +581,7 @@ def test_table_data(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_table_data_single_row(excel_file: Path) -> None:
     """Verify table_data returns single row by index."""
     from ot_tools.excel import create, create_table, table_data, write
@@ -603,7 +604,7 @@ def test_table_data_single_row(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_insert_rows(excel_file: Path) -> None:
     """Verify insert_rows adds rows at specified position."""
     from ot_tools.excel import create, insert_rows, write
@@ -616,7 +617,7 @@ def test_insert_rows(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_delete_rows(excel_file: Path) -> None:
     """Verify delete_rows removes rows at specified position."""
     from ot_tools.excel import create, delete_rows, write
@@ -629,7 +630,7 @@ def test_delete_rows(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_insert_cols(excel_file: Path) -> None:
     """Verify insert_cols adds columns at specified position."""
     from ot_tools.excel import create, insert_cols, write
@@ -642,7 +643,7 @@ def test_insert_cols(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_insert_cols_by_number(excel_file: Path) -> None:
     """Verify insert_cols works with column number."""
     from ot_tools.excel import create, insert_cols, write
@@ -652,10 +653,123 @@ def test_insert_cols_by_number(excel_file: Path) -> None:
     result = insert_cols(filepath=str(excel_file), col=2, count=1)
 
     assert "Inserted 1 column" in result
+    assert "columns" not in result  # Singular form
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
+def test_write_singular_row_grammar(excel_file: Path) -> None:
+    """Verify write uses singular 'row' for count of 1."""
+    from ot_tools.excel import create, write
+
+    create(filepath=str(excel_file))
+    result = write(filepath=str(excel_file), data=[["Single"]])
+
+    assert "Wrote 1 row" in result
+    assert "rows" not in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_insert_rows_singular_grammar(excel_file: Path) -> None:
+    """Verify insert_rows uses singular 'row' for count of 1."""
+    from ot_tools.excel import create, insert_rows
+
+    create(filepath=str(excel_file))
+    result = insert_rows(filepath=str(excel_file), row=1, count=1)
+
+    assert "Inserted 1 row" in result
+    assert "rows" not in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_delete_rows_singular_grammar(excel_file: Path) -> None:
+    """Verify delete_rows uses singular 'row' for count of 1."""
+    from ot_tools.excel import create, delete_rows, write
+
+    create(filepath=str(excel_file))
+    write(filepath=str(excel_file), data=[["A"], ["B"], ["C"]])
+    result = delete_rows(filepath=str(excel_file), row=2, count=1)
+
+    assert "Deleted 1 row" in result
+    assert "rows" not in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_delete_cols_singular_grammar(excel_file: Path) -> None:
+    """Verify delete_cols uses singular 'column' for count of 1."""
+    from ot_tools.excel import create, delete_cols, write
+
+    create(filepath=str(excel_file))
+    write(filepath=str(excel_file), data=[["A", "B", "C"]])
+    result = delete_cols(filepath=str(excel_file), col="B", count=1)
+
+    assert "Deleted 1 column" in result
+    assert "columns" not in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_write_create_if_missing(tmp_path: Path) -> None:
+    """Verify write creates file when create_if_missing=True."""
+    from ot_tools.excel import read, write
+
+    new_file = tmp_path / "new_workbook.xlsx"
+    result = write(
+        filepath=str(new_file),
+        data=[["Header"], ["Value"]],
+        create_if_missing=True,
+    )
+
+    assert "Wrote 2 rows" in result
+    assert new_file.exists()
+    # Verify data was written
+    data = read(filepath=str(new_file))
+    data_str = _to_str(data)
+    assert "Header" in data_str
+    assert "Value" in data_str
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_write_create_if_missing_with_sheet_name(tmp_path: Path) -> None:
+    """Verify write creates file with custom sheet name when create_if_missing=True."""
+    from ot_tools.excel import info, write
+
+    new_file = tmp_path / "new_with_sheet.xlsx"
+    write(
+        filepath=str(new_file),
+        data=[["Test"]],
+        sheet_name="CustomSheet",
+        create_if_missing=True,
+    )
+
+    result = info(filepath=str(new_file))
+    result_str = _to_str(result)
+    assert "CustomSheet" in result_str
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_write_create_if_missing_creates_parent_dirs(tmp_path: Path) -> None:
+    """Verify write creates parent directories when create_if_missing=True."""
+    from ot_tools.excel import write
+
+    nested_file = tmp_path / "nested" / "dir" / "new.xlsx"
+    result = write(
+        filepath=str(nested_file),
+        data=[["Data"]],
+        create_if_missing=True,
+    )
+
+    assert "Wrote 1 row" in result
+    assert nested_file.exists()
+
+
+@pytest.mark.unit
+@pytest.mark.tools
 def test_delete_cols(excel_file: Path) -> None:
     """Verify delete_cols removes columns at specified position."""
     from ot_tools.excel import create, delete_cols, write
@@ -668,7 +782,7 @@ def test_delete_cols(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_copy_range(excel_file: Path) -> None:
     """Verify copy_range copies cells to new location."""
     from ot_tools.excel import copy_range, create, read, write
@@ -686,7 +800,7 @@ def test_copy_range(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_copy_range_to_different_sheet(excel_file: Path) -> None:
     """Verify copy_range can copy to a different sheet."""
     from ot_tools.excel import add_sheet, copy_range, create, read, write
@@ -711,7 +825,7 @@ def test_copy_range_to_different_sheet(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_sheets(excel_file: Path) -> None:
     """Verify sheets lists all sheets with visibility."""
     from ot_tools.excel import add_sheet, create, sheets
@@ -729,7 +843,7 @@ def test_sheets(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_used_range(excel_file: Path) -> None:
     """Verify used_range returns the data extent."""
     from ot_tools.excel import create, used_range, write
@@ -742,7 +856,7 @@ def test_used_range(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_used_range_minimal(excel_file: Path) -> None:
     """Verify used_range returns minimal range for new sheet.
 
@@ -758,7 +872,7 @@ def test_used_range_minimal(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_formulas_list(excel_file: Path) -> None:
     """Verify formulas lists all formula cells."""
     from ot_tools.excel import create, formula, formulas, write
@@ -777,7 +891,7 @@ def test_formulas_list(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_merged_cells(excel_file: Path) -> None:
     """Verify merged_cells lists merged ranges."""
     # Create workbook and merge cells using openpyxl directly
@@ -800,7 +914,7 @@ def test_merged_cells(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_named_ranges(excel_file: Path) -> None:
     """Verify named_ranges lists defined names."""
     # Create workbook with named range using openpyxl directly
@@ -824,7 +938,7 @@ def test_named_ranges(excel_file: Path) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_hyperlinks_empty(excel_file: Path) -> None:
     """Verify hyperlinks returns empty list when no links."""
     from ot_tools.excel import create, hyperlinks, write

@@ -126,6 +126,13 @@ def _col_to_index(col: int | str) -> int:
     return column_index_from_string(col)
 
 
+def _plural(count: int, singular: str, plural: str | None = None) -> str:
+    """Return singular or plural form based on count."""
+    if count == 1:
+        return singular
+    return plural or f"{singular}s"
+
+
 def create(*, filepath: str, sheet_name: str = "Sheet1") -> str:
     """Create new Excel workbook.
 
@@ -259,6 +266,7 @@ def write(
     data: list[list[Any]],
     sheet_name: str | None = None,
     start_cell: str = "A1",
+    create_if_missing: bool = False,
 ) -> str:
     """Write data to Excel worksheet.
 
@@ -267,6 +275,7 @@ def write(
         data: List of rows, where each row is a list of values
         sheet_name: Sheet to write to (default: active sheet)
         start_cell: Starting cell reference (default: "A1")
+        create_if_missing: Create file if it doesn't exist (default: False)
 
     Returns:
         Success message with row count
@@ -274,18 +283,25 @@ def write(
     Example:
         excel.write(filepath="report.xlsx", data=[["Name", "Score"], ["Alice", 95]])
         excel.write(filepath="report.xlsx", data=[[1, 2, 3]], sheet_name="Numbers", start_cell="B5")
+        excel.write(filepath="new.xlsx", data=[["Test"]], create_if_missing=True)
     """
     with LogSpan(span="excel.write", filepath=filepath, sheet=sheet_name, rows=len(data)) as s:
         try:
-            if not _expand_path(filepath).exists():
-                s.add(error="file_not_found")
-                return f"Error: File not found: {filepath}"
+            path = _expand_path(filepath)
+            if not path.exists():
+                if not create_if_missing:
+                    s.add(error="file_not_found")
+                    return f"Error: File not found: {filepath}"
+                _ensure_parent_dir(filepath)
+                wb = Workbook()
+                if sheet_name:
+                    wb.active.title = sheet_name
+            else:
+                wb = load_workbook(path)
 
             if not data:
                 s.add(error="no_data")
                 return "Error: No data provided"
-
-            wb = load_workbook(_expand_path(filepath))
             ws, err = _get_sheet(wb, sheet_name)
             if err:
                 wb.close()
@@ -308,7 +324,7 @@ def write(
             wb.save(_expand_path(filepath))
             sheet_used = sheet_name or ws.title
             s.add(written=True)
-            return f"Wrote {len(data)} rows to {sheet_used}"
+            return f"Wrote {len(data)} {_plural(len(data), 'row')} to {sheet_used}"
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -554,7 +570,7 @@ def search(
                         matches.append({"cell": cell.coordinate, "value": text})
                         if first_only:
                             s.add(resultCount=1)
-                            return matches[0]
+                            return [matches[0]]
 
             wb.close()
             s.add(resultCount=len(matches))
@@ -792,7 +808,7 @@ def insert_rows(
             wb.save(_expand_path(filepath))
             wb.close()
             s.add(inserted=count)
-            return f"Inserted {count} rows at row {row}"
+            return f"Inserted {count} {_plural(count, 'row')} at row {row}"
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -836,7 +852,7 @@ def delete_rows(
             wb.save(_expand_path(filepath))
             wb.close()
             s.add(deleted=count)
-            return f"Deleted {count} rows starting at row {row}"
+            return f"Deleted {count} {_plural(count, 'row')} starting at row {row}"
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -883,7 +899,7 @@ def insert_cols(
             wb.save(_expand_path(filepath))
             wb.close()
             s.add(inserted=count)
-            return f"Inserted {count} columns at column {col_letter}"
+            return f"Inserted {count} {_plural(count, 'column')} at column {col_letter}"
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -929,7 +945,7 @@ def delete_cols(
             wb.save(_expand_path(filepath))
             wb.close()
             s.add(deleted=count)
-            return f"Deleted {count} columns starting at column {col_letter}"
+            return f"Deleted {count} {_plural(count, 'column')} starting at column {col_letter}"
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
