@@ -108,6 +108,11 @@ The `ot.notify()` function SHALL publish messages to configured topics.
 - **THEN** the message is routed to the matching topic file
 - **AND** appended as a YAML document
 
+#### Scenario: No matching topic
+- **GIVEN** no topic pattern matches the provided topic
+- **WHEN** `ot.notify(topic="unknown:topic", message="test")` is called
+- **THEN** it SHALL return "SKIP: no matching topic"
+
 ---
 
 ### Requirement: Reload Configuration
@@ -158,6 +163,16 @@ The `ot.stats()` function SHALL return aggregated runtime statistics.
 - **GIVEN** statistics collection is disabled in config
 - **WHEN** `ot.stats()` is called
 - **THEN** it SHALL return an error message indicating stats are disabled
+
+#### Scenario: HTML write error
+- **GIVEN** the output path is not writable
+- **WHEN** `ot.stats(output="report.html")` is called
+- **THEN** it SHALL return an error message: "Error: Cannot write to '<path>': <error>"
+
+#### Scenario: Invalid period
+- **GIVEN** an invalid period value
+- **WHEN** `ot.stats(period="invalid")` is called
+- **THEN** it SHALL return: "Error: Invalid period 'invalid'. Valid: day, week, month, all. Example: ot.stats(period='day')"
 
 ---
 
@@ -426,6 +441,8 @@ The `ot.help()` function SHALL provide unified help across tools, packs, snippet
 - **THEN** it SHALL return a message indicating no matches found
 - **AND** suggest using `ot.tools()` or `ot.packs()` to browse available items
 
+---
+
 ### Requirement: Query Stored Results
 
 The `ot.result()` function SHALL query stored large outputs with offset/limit semantics.
@@ -476,7 +493,18 @@ The `ot.result()` function SHALL query stored large outputs with offset/limit se
 - **GIVEN** a stored result
 - **WHEN** `ot.result(handle="abc123", offset=1)` is called
 - **THEN** it SHALL start from the first line (matching Claude's `Read` tool semantics)
-- **AND** offset=0 SHALL be treated as offset=1
+
+#### Scenario: Offset validation
+- **GIVEN** offset < 1
+- **WHEN** `ot.result(handle="abc123", offset=0)` is called
+- **THEN** it SHALL raise ValueError with message "offset must be >= 1 (1-indexed), got 0"
+
+#### Scenario: Limit validation
+- **GIVEN** limit < 1
+- **WHEN** `ot.result(handle="abc123", limit=0)` is called
+- **THEN** it SHALL raise ValueError with message "limit must be >= 1, got 0"
+
+---
 
 ### Requirement: Result Query Logging
 
@@ -487,4 +515,14 @@ The `ot.result()` function SHALL follow logging conventions.
 - **WHEN** LogSpan is created
 - **THEN** span name SHALL be `ot.result`
 - **AND** span SHALL include: `handle`, `offset`, `limit`, `search` (if provided)
+
+---
+
+### Requirement: Version
+
+The `ot.version()` function SHALL return the OneTool version string.
+
+#### Scenario: Get version
+- **WHEN** `ot.version()` is called
+- **THEN** it SHALL return the version string (e.g., "1.0.0")
 

@@ -52,27 +52,42 @@ def generate_html_report(stats: AggregatedStats) -> str:
     else:
         savings_str = f"${stats.savings_usd:.4f}"
 
-    # Coffee equivalent
-    coffees = stats.coffees
-    if coffees >= 1.0:
-        coffees_str = f"{coffees:.1f} coffees"
-    else:
-        coffees_str = f"{coffees:.2f} coffees"
+    # Coffee equivalent (whole number)
+    coffees = int(stats.coffees)
+    coffees_str = f"{coffees} coffee{'s' if coffees != 1 else ''}"
 
-    savings_display = f"{savings_str} ({coffees_str})"
+    coffees_display = f"☕ {coffees_str}"
 
-    # Build tool rows
-    tool_rows = ""
+    # Group tools by pack (prefix before the dot)
+    from collections import defaultdict
+
+    packs: dict[str, list] = defaultdict(list)
     for tool in stats.tools:
-        avg_duration = f"{tool.avg_duration_ms:.0f}ms"
+        pack_name = tool.tool.split(".")[0] if "." in tool.tool else "other"
+        packs[pack_name].append(tool)
+
+    # Build tool rows grouped by pack
+    tool_rows = ""
+    for pack_name in sorted(packs.keys()):
+        pack_tools = packs[pack_name]
+        pack_calls = sum(t.total_calls for t in pack_tools)
         tool_rows += f"""
+            <tr class="pack-header">
+                <td><strong>{pack_name}</strong></td>
+                <td class="num"><strong>{pack_calls:,}</strong></td>
+                <td class="num"></td>
+                <td class="num"></td>
+            </tr>"""
+        for tool in pack_tools:
+            # Show just the function name (after the dot)
+            func_name = tool.tool.split(".", 1)[1] if "." in tool.tool else tool.tool
+            avg_duration = f"{tool.avg_duration_ms:.0f}ms"
+            tool_rows += f"""
             <tr>
-                <td>{tool.tool}</td>
+                <td class="tool-name">{func_name}</td>
                 <td class="num">{tool.total_calls}</td>
                 <td class="num">{tool.success_rate:.1f}%</td>
                 <td class="num">{avg_duration}</td>
-                <td class="num">{tool.total_chars_in:,}</td>
-                <td class="num">{tool.total_chars_out:,}</td>
             </tr>"""
 
     # Period display
@@ -132,7 +147,8 @@ def generate_html_report(stats: AggregatedStats) -> str:
         .card-value.success {{ color: var(--success); }}
         .card-value.primary {{ color: var(--primary); }}
         .card-value.warning {{ color: var(--warning); }}
-        .card-sub {{ color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem; }}
+        .card-sub {{ color: var(--text-muted); font-size: 0.875rem; margin-top: 0.25rem; }}
+        .card-sub.success {{ color: var(--success); }}
         table {{
             width: 100%;
             background: var(--card-bg);
@@ -145,6 +161,8 @@ def generate_html_report(stats: AggregatedStats) -> str:
         th {{ background: var(--bg); font-weight: 600; }}
         tr:last-child td {{ border-bottom: none; }}
         .num {{ text-align: right; font-variant-numeric: tabular-nums; }}
+        .pack-header {{ background: var(--bg); }}
+        .tool-name {{ padding-left: 2rem; }}
         .empty {{ color: var(--text-muted); text-align: center; padding: 2rem; }}
         .support {{
             margin-top: 2rem;
@@ -181,11 +199,11 @@ def generate_html_report(stats: AggregatedStats) -> str:
                 <div class="card-value">{stats.total_calls:,}</div>
             </div>
             <div class="card">
-                <div class="card-label">Success Rate</div>
+                <div class="card-label">Call Success Rate</div>
                 <div class="card-value success">{stats.success_rate:.1f}%</div>
             </div>
             <div class="card">
-                <div class="card-label">Context Saved</div>
+                <div class="card-label">Tokens Saved</div>
                 <div class="card-value primary">{context_saved_str}</div>
             </div>
             <div class="card">
@@ -193,8 +211,9 @@ def generate_html_report(stats: AggregatedStats) -> str:
                 <div class="card-value primary">{time_saved_str}</div>
             </div>
             <div class="card">
-                <div class="card-label">Est. Savings</div>
-                <div class="card-value success">{savings_display}</div>
+                <div class="card-label">Money Saved</div>
+                <div class="card-value success">{savings_str}</div>
+                <div class="card-sub success">{coffees_display}</div>
             </div>
         </div>
 
@@ -206,12 +225,10 @@ def generate_html_report(stats: AggregatedStats) -> str:
                     <th class="num">Calls</th>
                     <th class="num">Success Rate</th>
                     <th class="num">Avg Duration</th>
-                    <th class="num">Chars In</th>
-                    <th class="num">Chars Out</th>
                 </tr>
             </thead>
             <tbody>
-                {tool_rows if tool_rows else '<tr><td colspan="6" class="empty">No data available</td></tr>'}
+                {tool_rows if tool_rows else '<tr><td colspan="4" class="empty">No data available</td></tr>'}
             </tbody>
         </table>
 

@@ -311,7 +311,8 @@ def test_html_report_generation() -> None:
     assert "<title>OneTool Statistics Report</title>" in html
     assert "100" in html  # total calls
     assert "95.0%" in html  # success rate
-    assert "brave.search" in html  # tool name
+    assert "<strong>brave</strong>" in html  # pack header
+    assert "search" in html  # tool function name
     assert "3.0M tokens" in html  # context saved
 
 
@@ -403,5 +404,39 @@ def test_timed_tool_call_records_error() -> None:
         assert call_kwargs["tool"] == "test.tool"
         assert call_kwargs["success"] is False
         assert call_kwargs["error_type"] == "ValueError"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_ot_stats_html_write_error() -> None:
+    """ot.stats() returns error message when HTML write fails."""
+    from unittest.mock import MagicMock, patch
+
+    # Mock config
+    mock_cfg = MagicMock()
+    mock_cfg.stats.enabled = True
+    mock_cfg.stats.context_per_call = 30000
+    mock_cfg.stats.time_overhead_per_call_ms = 4000
+    mock_cfg.stats.model = "test/model"
+    mock_cfg.stats.cost_per_million_input_tokens = 15.0
+    mock_cfg.stats.cost_per_million_output_tokens = 75.0
+    mock_cfg.stats.chars_per_token = 4.0
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        stats_path = Path(tmpdir) / "stats.jsonl"
+        stats_path.write_text("")  # Empty file
+
+        mock_cfg.get_stats_file_path.return_value = stats_path
+        # Return a read-only directory that will fail on mkdir
+        mock_cfg.get_result_store_path.return_value = Path("/nonexistent/readonly")
+
+        with patch("ot.meta.get_config", return_value=mock_cfg):
+            from ot.meta import stats
+
+            result = stats(output="report.html")
+
+            assert isinstance(result, str)
+            assert result.startswith("Error: Cannot write to")
+            assert "report.html" in result
 
 

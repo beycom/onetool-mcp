@@ -538,3 +538,23 @@ class TestOtResult:
 
                 with pytest.raises(ValueError, match="not found"):
                     result(handle="nonexistent")
+
+    def test_result_offset_validation(self, mock_config) -> None:  # noqa: ARG002
+        """ot.result() validates offset >= 1."""
+        from ot.meta import result
+
+        with pytest.raises(ValueError, match="offset must be >= 1"):
+            result(handle="abc123", offset=0)
+
+        with pytest.raises(ValueError, match="offset must be >= 1"):
+            result(handle="abc123", offset=-1)
+
+    def test_result_limit_validation(self, mock_config) -> None:  # noqa: ARG002
+        """ot.result() validates limit >= 1."""
+        from ot.meta import result
+
+        with pytest.raises(ValueError, match="limit must be >= 1"):
+            result(handle="abc123", limit=0)
+
+        with pytest.raises(ValueError, match="limit must be >= 1"):
+            result(handle="abc123", limit=-1)

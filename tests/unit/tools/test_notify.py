@@ -1,4 +1,4 @@
-"""Unit tests for msg tool.
+"""Unit tests for notify tool.
 
 Tests ot.notify() topic routing and message formatting.
 """
@@ -47,7 +47,7 @@ def empty_msg_config() -> OneToolConfig:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_notify_returns_ok_with_matching_topic(msg_config: OneToolConfig) -> None:
     """Verify notify() returns OK with file path for matching topic."""
     from ot.meta import notify
@@ -63,21 +63,21 @@ def test_notify_returns_ok_with_matching_topic(msg_config: OneToolConfig) -> Non
 
 
 @pytest.mark.unit
-@pytest.mark.serve
-def test_notify_returns_ok_no_match_when_no_pattern_matches(
+@pytest.mark.tools
+def test_notify_returns_skip_no_match_when_no_pattern_matches(
     empty_msg_config: OneToolConfig,
 ) -> None:
-    """Verify notify() returns 'OK: no matching topic' when no pattern matches."""
+    """Verify notify() returns 'SKIP: no matching topic' when no pattern matches."""
     from ot.meta import notify
 
     with patch("ot.meta.get_config", return_value=empty_msg_config):
         result = notify(topic="unknown:topic", message="test")
 
-    assert result == "OK: no matching topic"
+    assert result == "SKIP: no matching topic"
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_notify_uses_first_matching_pattern(msg_config: OneToolConfig) -> None:
     """Verify notify() uses first matching pattern (status:* before *)."""
     from ot.meta import notify
@@ -94,7 +94,7 @@ def test_notify_uses_first_matching_pattern(msg_config: OneToolConfig) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_notify_falls_through_to_catchall(msg_config: OneToolConfig) -> None:
     """Verify notify() falls through to catchall pattern."""
     from ot.meta import notify
@@ -110,7 +110,7 @@ def test_notify_falls_through_to_catchall(msg_config: OneToolConfig) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_match_topic_to_file_returns_none_for_no_match(
     empty_msg_config: OneToolConfig,
 ) -> None:
@@ -124,7 +124,7 @@ def test_match_topic_to_file_returns_none_for_no_match(
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_match_topic_to_file_returns_path_for_match(
     msg_config: OneToolConfig,
 ) -> None:
@@ -140,7 +140,7 @@ def test_match_topic_to_file_returns_path_for_match(
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_resolve_path_expands_home() -> None:
     """Verify _resolve_path expands ~ to home directory."""
     from ot.meta import _resolve_path
@@ -153,7 +153,7 @@ def test_resolve_path_expands_home() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_resolve_path_preserves_absolute() -> None:
     """Verify _resolve_path preserves absolute paths."""
     from ot.meta import _resolve_path

@@ -68,7 +68,7 @@ The MCP server that exposes tools for LLM code execution.
 
 | Spec | Purpose |
 |------|---------|
-| [tool-ot](tool-ot/spec.md) | Internal `ot.*` pack (tools, config, health, push) |
+| [tool-ot](tool-ot/spec.md) | Internal `ot.*` pack (tools, config, health, notify, version) |
 | [tool-brave-search](tool-brave-search/spec.md) | Brave Search API (web, news, local, image, video) |
 | [tool-context7](tool-context7/spec.md) | Context7 library documentation API |
 | [tool-grounding-search](tool-grounding-search/spec.md) | Google grounding via Gemini API |
@@ -79,7 +79,7 @@ The MCP server that exposes tools for LLM code execution.
 | [tool-ripgrep](tool-ripgrep/spec.md) | Text/regex search via ripgrep |
 | [tool-excel](tool-excel/spec.md) | Excel workbook operations |
 | [tool-package](tool-package/spec.md) | Package version checks (npm, PyPI, OpenRouter) |
-| [tool-msg](tool-msg/spec.md) | Message publishing to topic files |
+| [tool-notify](tool-notify/spec.md) | Message publishing to topic files |
 | [tool-file](tool-file/spec.md) | File operations |
 | [tool-diagram](tool-diagram/spec.md) | Diagram generation |
 | [tool-convert](tool-convert/spec.md) | Format conversion |

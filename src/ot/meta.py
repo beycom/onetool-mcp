@@ -106,7 +106,20 @@ __all__ = [
     "stats",
     "timed",
     "tools",
+    "version",
 ]
+
+
+def version() -> str:
+    """Return OneTool version string.
+
+    Returns:
+        Version string (e.g., "1.0.0")
+
+    Example:
+        ot.version()
+    """
+    return __version__
 
 
 def timed(func: _Callable[..., _T], **kwargs: Any) -> dict[str, Any]:
@@ -152,6 +165,7 @@ def get_ot_pack_functions() -> dict[str, Any]:
         "notify": notify,
         "reload": reload,
         "timed": timed,
+        "version": version,
     }
 
 
@@ -173,7 +187,7 @@ def _get_doc_url(pack: str) -> str:
     return f"{DOC_BASE_URL}{slug}/"
 
 
-def _fuzzy_match(query: str, candidates: list[str], threshold: float = 0.4) -> list[str]:
+def _fuzzy_match(query: str, candidates: list[str], threshold: float = 0.6) -> list[str]:
     """Return candidates that fuzzy match query, sorted by score.
 
     Args:
@@ -929,7 +943,7 @@ def notify(*, topic: str, message: str) -> str:
 
         if file_path is None:
             s.add("matched", False)
-            return "OK: no matching topic"
+            return "SKIP: no matching topic"
 
         doc = {
             "ts": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
@@ -1159,7 +1173,7 @@ def stats(
         valid_periods: list[Period] = ["day", "week", "month", "all"]
         if period not in valid_periods:
             s.add("error", "invalid_period")
-            return f"Error: Invalid period '{period}'. Use: {', '.join(valid_periods)}"
+            return f"Error: Invalid period '{period}'. Valid: day, week, month, all. Example: ot.stats(period='day')"
 
         # Check if stats are enabled
         if not cfg.stats.enabled:
@@ -1192,13 +1206,17 @@ def stats(
         if output:
             from ot.stats.html import generate_html_report
 
-            # Resolve output path relative to log directory (alongside stats.jsonl)
-            output_path = cfg.get_log_dir_path() / output
+            # Resolve output path relative to tmp directory
+            output_path = cfg.get_result_store_path() / output
             html_content = generate_html_report(aggregated)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(html_content)
-            result["html_report"] = str(output_path)
-            s.add("htmlReport", str(output_path))
+            try:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                output_path.write_text(html_content)
+                result["html_report"] = str(output_path)
+                s.add("htmlReport", str(output_path))
+            except OSError as e:
+                s.add("error", "write_failed")
+                return f"Error: Cannot write to '{output}': {e.strerror}"
 
         return result
 
@@ -1247,6 +1265,12 @@ def result(
         ot.result(handle="abc123", search="config", fuzzy=True)
     """
     from ot.executor.result_store import get_result_store
+
+    # Validate offset and limit (1-indexed)
+    if offset < 1:
+        raise ValueError(f"offset must be >= 1 (1-indexed), got {offset}")
+    if limit < 1:
+        raise ValueError(f"limit must be >= 1, got {limit}")
 
     with log(
         span="ot.result",

@@ -255,3 +255,33 @@ class TestHelpRegistration:
         from ot import meta
 
         assert "help" in meta.__all__
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestVersion:
+    """Tests for ot.version() function."""
+
+    def test_version_returns_string(self) -> None:
+        """version() returns a version string."""
+        from ot.meta import version
+
+        result = version()
+
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_version_in_pack_functions(self) -> None:
+        """version is registered in ot pack functions."""
+        from ot.meta import get_ot_pack_functions
+
+        funcs = get_ot_pack_functions()
+
+        assert "version" in funcs
+        assert callable(funcs["version"])
+
+    def test_version_in_all_exports(self) -> None:
+        """version is in __all__ exports."""
+        from ot import meta
+
+        assert "version" in meta.__all__
