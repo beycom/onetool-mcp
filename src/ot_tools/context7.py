@@ -226,25 +226,36 @@ def _normalize_topic(topic: str) -> str:
     return topic
 
 
-def search(*, query: str) -> str:
+def search(*, query: str, output_format: str = "str") -> str | dict | list:
     """Search for libraries by name in Context7.
 
     Args:
         query: The search query (e.g., 'next.js', 'react', 'vue')
+        output_format: Response format - 'str' for string (default), 'dict' for raw dict/list
 
     Returns:
-        Search results with matching libraries and their IDs
+        Search results with matching libraries and their IDs.
+        If output_format='dict', returns the raw API response (dict or list).
+        If output_format='str', returns a string representation.
 
     Example:
         context7.search(query="fastapi")
         context7.search(query="react hooks")
+        context7.search(query="flask", output_format="dict")  # Returns raw dict
     """
-    with LogSpan(span="context7.search", query=query) as s:
+    if output_format not in ("str", "dict"):
+        return f"Invalid output_format '{output_format}'. Valid options: 'str', 'dict'."
+
+    with LogSpan(span="context7.search", query=query, output_format=output_format) as s:
         success, result = _make_request(CONTEXT7_SEARCH_URL, params={"query": query})
 
         s.add(success=success)
         if not success:
             return f"{result} query={query}"
+
+        if output_format == "dict":
+            s.add(resultType=type(result).__name__)
+            return result
 
         result_str = str(result)
         s.add(resultLen=len(result_str))
@@ -298,6 +309,16 @@ def _pick_best_library(data: dict | list | None, query: str) -> str | None:
         if r.get("totalTokens", 0) > 100000:
             score += 5
 
+        # Star-based scoring (capped at 20 bonus points)
+        stars = r.get("stars", 0)
+        if stars > 0:
+            score += min(stars / 1000, 20)
+
+        # Benchmark score contribution (max ~10 bonus points)
+        benchmark = r.get("benchmarkScore", 0)
+        if benchmark > 0:
+            score += benchmark / 10
+
         return score
 
     sorted_results = sorted(results, key=score_result, reverse=True)
@@ -307,7 +328,8 @@ def _pick_best_library(data: dict | list | None, query: str) -> str | None:
     return lib_id if "/" in lib_id else None
 
 
-def _resolve_library_key(library_key: str) -> str:
+@cache(ttl=3600)  # Cache library key resolutions for 1 hour
+def _resolve_library_key(library_key: str) -> tuple[str, bool, bool]:
     """Resolve a library key, searching if needed.
 
     If the key doesn't look like a valid org/repo format,
@@ -317,7 +339,9 @@ def _resolve_library_key(library_key: str) -> str:
         library_key: Raw or partial library key
 
     Returns:
-        Resolved org/repo library key
+        Tuple of (resolved org/repo library key, was_searched, found_match).
+        was_searched is True if a search was performed to resolve the key.
+        found_match is True if search found a valid library match.
     """
     normalized = _normalize_library_key(library_key)
 
@@ -325,17 +349,19 @@ def _resolve_library_key(library_key: str) -> str:
     if "/" in normalized and len(normalized.split("/")) == 2:
         org, repo = normalized.split("/")
         if org and repo and not org.startswith("http"):
-            return normalized
+            return normalized, False, True
 
     # Otherwise, search for the library
     success, data = _make_request(CONTEXT7_SEARCH_URL, params={"query": normalized})
 
     if not success:
-        return normalized
+        return normalized, True, False
 
     # Use smart scoring to pick the best match
     best = _pick_best_library(data, normalized)
-    return best if best else normalized
+    if best:
+        return best, True, True
+    return normalized, True, False
 
 
 def doc(
@@ -346,6 +372,7 @@ def doc(
     page: int = 1,
     limit: int | None = None,
     doc_type: str = "txt",
+    version: str | None = None,
 ) -> str:
     """Fetch documentation for a library from Context7.
 
@@ -362,6 +389,7 @@ def doc(
         page: Page number for pagination (default: 1, max: 10)
         limit: Number of results per page (defaults to config, max: config docs_limit)
         doc_type: Response format 'txt' or 'json' (default: 'txt')
+        version: Optional version suffix (e.g., 'v16.0.3'). If provided, appended to library key.
 
     Returns:
         Documentation content and code examples for the requested topic
@@ -375,11 +403,29 @@ def doc(
 
         # Get code examples
         context7.doc(library_key="pallets/flask", topic="blueprints", mode="code")
+
+        # Get version-specific docs
+        context7.doc(library_key="vercel/next.js", topic="routing", version="v14")
     """
+    # Validate mode parameter
+    if mode not in ("info", "code"):
+        return f"Invalid mode '{mode}'. Valid options: 'info', 'code'."
+
+    # Validate doc_type parameter
+    if doc_type not in ("txt", "json"):
+        return f"Invalid doc_type '{doc_type}'. Valid options: 'txt', 'json'."
+
     with LogSpan(span="context7.doc", library_key=library_key, topic=topic, mode=mode) as s:
         # Normalize and resolve library key (searches if needed)
-        resolved_key = _resolve_library_key(library_key)
-        s.add(resolvedKey=resolved_key)
+        resolved_key, was_searched, found_match = _resolve_library_key(library_key)
+        s.add(resolvedKey=resolved_key, wasSearched=was_searched, foundMatch=found_match)
+
+        # If search was performed but found no match, library doesn't exist
+        if was_searched and not found_match:
+            return (
+                f"Library '{library_key}' not found. "
+                f"Use context7.search(query=\"{library_key}\") to find available libraries."
+            )
 
         # Validate resolved key has org/repo format
         if "/" not in resolved_key:
@@ -388,6 +434,15 @@ def doc(
                 f"Please use full format like 'facebook/react' or 'vercel/next.js'. "
                 f"Use context7.search(query=\"{library_key}\") to find the correct library key."
             )
+
+        # Append version suffix if provided
+        api_key = resolved_key
+        if version:
+            # Ensure version has 'v' prefix if it starts with a number
+            if version[0].isdigit():
+                version = f"v{version}"
+            api_key = f"{resolved_key}/{version}"
+            s.add(apiKey=api_key)
 
         # Normalize topic
         normalized_topic = _normalize_topic(topic)
@@ -401,7 +456,7 @@ def doc(
 
         # Select endpoint based on mode
         base_url = CONTEXT7_DOCS_INFO_URL if mode == "info" else CONTEXT7_DOCS_CODE_URL
-        url = f"{base_url}/{resolved_key}"
+        url = f"{base_url}/{api_key}"
         params: dict[str, str | int] = {
             "type": doc_type,
             "page": page,
@@ -422,7 +477,11 @@ def doc(
             # Check for "no content" responses
             if data in ("No content available", "No context data available", ""):
                 other_mode = "info" if mode == "code" else "code"
-                return f"No {mode} documentation available for this library. Try mode='{other_mode}'."
+                topic_hint = f" on topic '{topic}'" if topic else ""
+                return (
+                    f"No {mode} documentation found for '{resolved_key}'{topic_hint}. "
+                    f"Try mode='{other_mode}' or a different topic."
+                )
             s.add(resultLen=len(data))
             return data
 

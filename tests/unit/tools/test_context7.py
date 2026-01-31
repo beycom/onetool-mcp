@@ -207,6 +207,49 @@ class TestPickBestLibrary:
         ]
         assert _pick_best_library(data, "fastapi") == "fastapi/fastapi"
 
+    def test_stars_contribute_to_score(self):
+        """Libraries with more stars should rank higher."""
+        data = [
+            {"id": "/org/lib-a", "title": "Lib", "stars": 1000},
+            {"id": "/org/lib-b", "title": "Lib", "stars": 50000},  # 50k stars
+        ]
+        # lib-b should win due to higher stars (capped at 20 bonus points)
+        assert _pick_best_library(data, "lib") == "org/lib-b"
+
+    def test_benchmark_score_contributes(self):
+        """Libraries with higher benchmark scores should rank higher."""
+        data = [
+            {"id": "/org/lib-a", "title": "Lib", "benchmarkScore": 10},
+            {"id": "/org/lib-b", "title": "Lib", "benchmarkScore": 80},
+        ]
+        # lib-b should win due to higher benchmark score
+        assert _pick_best_library(data, "lib") == "org/lib-b"
+
+    def test_popular_library_priority(self):
+        """Popular libraries with high stars should be prioritized over less relevant matches."""
+        # Simulates "next" resolving to vercel/next.js instead of next-intl
+        data = [
+            {
+                "id": "/amannn/next-intl",
+                "title": "next-intl",
+                "vip": False,
+                "verified": True,
+                "trustScore": 8,
+                "stars": 2000,
+            },
+            {
+                "id": "/vercel/next.js",
+                "title": "Next.js",
+                "vip": True,
+                "verified": True,
+                "trustScore": 10,
+                "stars": 125000,
+                "benchmarkScore": 95,
+            },
+        ]
+        # vercel/next.js should win due to VIP, high trust, massive stars
+        assert _pick_best_library(data, "next") == "vercel/next.js"
+
 
 # -----------------------------------------------------------------------------
 # HTTP Mock Tests
@@ -250,6 +293,37 @@ class TestSearch:
         call_args = mock_request.call_args
         assert call_args[1]["params"]["query"] == "fastapi"
 
+    @patch("ot_tools.context7._make_request")
+    def test_output_format_dict_returns_raw_data(self, mock_request):
+        """output_format='dict' should return the raw API response."""
+        api_response = [
+            {"id": "/vercel/next.js", "title": "Next.js"},
+            {"id": "/facebook/react", "title": "React"},
+        ]
+        mock_request.return_value = (True, api_response)
+
+        result = search(query="framework", output_format="dict")
+
+        assert result == api_response
+        assert isinstance(result, list)
+
+    @patch("ot_tools.context7._make_request")
+    def test_output_format_str_returns_string(self, mock_request):
+        """output_format='str' (default) should return string representation."""
+        api_response = [{"id": "/vercel/next.js", "title": "Next.js"}]
+        mock_request.return_value = (True, api_response)
+
+        result = search(query="next")
+
+        assert isinstance(result, str)
+
+    def test_output_format_validation(self):
+        """Invalid output_format should return error."""
+        result = search(query="test", output_format="xml")
+        assert "Invalid output_format" in result
+        assert "'xml'" in result
+        assert "str" in result and "dict" in result
+
 
 @pytest.mark.unit
 @pytest.mark.tools
@@ -259,7 +333,7 @@ class TestDoc:
     @patch("ot_tools.context7._make_request")
     @patch("ot_tools.context7._resolve_library_key")
     def test_successful_doc_fetch(self, mock_resolve, mock_request):
-        mock_resolve.return_value = "vercel/next.js"
+        mock_resolve.return_value = ("vercel/next.js", False, True)
         mock_request.return_value = (True, "# Documentation\n\nThis is the docs.")
 
         result = doc(library_key="next.js")
@@ -269,7 +343,7 @@ class TestDoc:
     @patch("ot_tools.context7._make_request")
     @patch("ot_tools.context7._resolve_library_key")
     def test_returns_error_on_failure(self, mock_resolve, mock_request):
-        mock_resolve.return_value = "vercel/next.js"
+        mock_resolve.return_value = ("vercel/next.js", False, True)
         mock_request.return_value = (False, "API error")
 
         result = doc(library_key="next.js")
@@ -279,17 +353,17 @@ class TestDoc:
     @patch("ot_tools.context7._make_request")
     @patch("ot_tools.context7._resolve_library_key")
     def test_handles_no_content(self, mock_resolve, mock_request):
-        mock_resolve.return_value = "vercel/next.js"
+        mock_resolve.return_value = ("vercel/next.js", False, True)
         mock_request.return_value = (True, "No content available")
 
         result = doc(library_key="next.js")
 
-        assert "No info documentation available" in result
+        assert "No info documentation found" in result
 
     @patch("ot_tools.context7._make_request")
     @patch("ot_tools.context7._resolve_library_key")
     def test_info_mode_uses_info_endpoint(self, mock_resolve, mock_request):
-        mock_resolve.return_value = "vercel/next.js"
+        mock_resolve.return_value = ("vercel/next.js", False, True)
         mock_request.return_value = (True, "docs content")
 
         doc(library_key="next.js", mode="info")
@@ -300,7 +374,7 @@ class TestDoc:
     @patch("ot_tools.context7._make_request")
     @patch("ot_tools.context7._resolve_library_key")
     def test_code_mode_uses_code_endpoint(self, mock_resolve, mock_request):
-        mock_resolve.return_value = "vercel/next.js"
+        mock_resolve.return_value = ("vercel/next.js", False, True)
         mock_request.return_value = (True, "code examples")
 
         doc(library_key="next.js", mode="code")
@@ -311,7 +385,7 @@ class TestDoc:
     @patch("ot_tools.context7._make_request")
     @patch("ot_tools.context7._resolve_library_key")
     def test_normalizes_topic(self, mock_resolve, mock_request):
-        mock_resolve.return_value = "vercel/next.js"
+        mock_resolve.return_value = ("vercel/next.js", False, True)
         mock_request.return_value = (True, "docs")
 
         doc(library_key="next.js", topic="server-side-rendering")
@@ -325,7 +399,7 @@ class TestDoc:
     @patch("ot_tools.context7._make_request")
     @patch("ot_tools.context7._resolve_library_key")
     def test_clamps_page_and_limit(self, mock_resolve, mock_request):
-        mock_resolve.return_value = "vercel/next.js"
+        mock_resolve.return_value = ("vercel/next.js", False, True)
         mock_request.return_value = (True, "docs")
 
         doc(library_key="next.js", page=100, limit=1000)
@@ -333,6 +407,57 @@ class TestDoc:
         call_args = mock_request.call_args
         params = call_args[1]["params"]
         assert params["page"] <= 10  # Max page is 10
+
+    def test_mode_validation(self):
+        """Invalid mode should return error, not silently use code endpoint."""
+        result = doc(library_key="fastapi/fastapi", mode="invalid")
+        assert "Invalid mode" in result
+        assert "'invalid'" in result
+        assert "info" in result and "code" in result
+
+    def test_doc_type_validation(self):
+        """Invalid doc_type should return error."""
+        result = doc(library_key="fastapi/fastapi", doc_type="xml")
+        assert "Invalid doc_type" in result
+        assert "'xml'" in result
+        assert "txt" in result and "json" in result
+
+    @patch("ot_tools.context7._make_request")
+    @patch("ot_tools.context7._resolve_library_key")
+    def test_version_parameter(self, mock_resolve, mock_request):
+        """Version parameter should be appended to library key in URL."""
+        mock_resolve.return_value = ("vercel/next.js", False, True)
+        mock_request.return_value = (True, "docs")
+
+        doc(library_key="vercel/next.js", version="v14")
+
+        call_args = mock_request.call_args
+        url = call_args[0][0]
+        assert "vercel/next.js/v14" in url
+
+    @patch("ot_tools.context7._make_request")
+    @patch("ot_tools.context7._resolve_library_key")
+    def test_version_without_v_prefix(self, mock_resolve, mock_request):
+        """Version without 'v' prefix should get it added."""
+        mock_resolve.return_value = ("vercel/next.js", False, True)
+        mock_request.return_value = (True, "docs")
+
+        doc(library_key="vercel/next.js", version="14.0.0")
+
+        call_args = mock_request.call_args
+        url = call_args[0][0]
+        assert "vercel/next.js/v14.0.0" in url
+
+    @patch("ot_tools.context7._resolve_library_key")
+    def test_library_not_found_error(self, mock_resolve):
+        """When search finds no match, should return 'library not found' error early."""
+        # Simulate: user searched for "nonexistent", search found nothing useful
+        mock_resolve.return_value = ("nonexistent", True, False)  # searched, no match
+
+        result = doc(library_key="nonexistent")
+
+        assert "not found" in result.lower()
+        assert "context7.search" in result
 
 
 @pytest.mark.unit
@@ -345,9 +470,11 @@ class TestResolveLibraryKey:
         from ot_tools.context7 import _resolve_library_key
 
         # Should not make a request for valid org/repo
-        result = _resolve_library_key("vercel/next.js")
+        resolved_key, was_searched, found_match = _resolve_library_key("vercel/next.js")
 
-        assert result == "vercel/next.js"
+        assert resolved_key == "vercel/next.js"
+        assert was_searched is False
+        assert found_match is True
         mock_request.assert_not_called()
 
     @patch("ot_tools.context7._make_request")
@@ -359,9 +486,11 @@ class TestResolveLibraryKey:
             [{"id": "/fastapi/fastapi", "name": "FastAPI"}],
         )
 
-        result = _resolve_library_key("fastapi")
+        resolved_key, was_searched, found_match = _resolve_library_key("fastapi")
 
-        assert result == "fastapi/fastapi"
+        assert resolved_key == "fastapi/fastapi"
+        assert was_searched is True
+        assert found_match is True
         mock_request.assert_called_once()
 
     @patch("ot_tools.context7._make_request")
@@ -370,9 +499,24 @@ class TestResolveLibraryKey:
 
         mock_request.return_value = (False, "API error")
 
-        result = _resolve_library_key("unknown")
+        resolved_key, was_searched, found_match = _resolve_library_key("unknown")
 
-        assert result == "unknown"
+        assert resolved_key == "unknown"
+        assert was_searched is True
+        assert found_match is False
+
+    @patch("ot_tools.context7._make_request")
+    def test_returns_no_match_when_search_finds_nothing(self, mock_request):
+        from ot_tools.context7 import _resolve_library_key
+
+        # Search succeeds but returns empty results
+        mock_request.return_value = (True, [])
+
+        resolved_key, was_searched, found_match = _resolve_library_key("nonexistent")
+
+        assert resolved_key == "nonexistent"
+        assert was_searched is True
+        assert found_match is False
 
 
 # -----------------------------------------------------------------------------
