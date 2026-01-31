@@ -30,6 +30,7 @@ __ot_requires__ = {
 }
 
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 from firecrawl import Firecrawl
 from pydantic import BaseModel, Field
@@ -37,6 +38,21 @@ from pydantic import BaseModel, Field
 from ot.config import get_secret, get_tool_config
 from ot.logging import LogSpan
 from ot.utils import batch_execute, lazy_client, normalize_items
+
+
+def _validate_url(url: str) -> str | None:
+    """Return error message if URL is invalid, None otherwise."""
+    if not url or not url.strip():
+        return "URL is required and cannot be empty"
+    try:
+        parsed = urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            return f"Invalid URL: {url} (missing scheme or host)"
+        if parsed.scheme not in ("http", "https"):
+            return f"Invalid URL scheme: {parsed.scheme} (expected http/https)"
+    except Exception as e:
+        return f"Invalid URL: {e}"
+    return None
 
 
 class Config(BaseModel):
@@ -98,6 +114,7 @@ def scrape(
     include_tags: list[str] | None = None,
     exclude_tags: list[str] | None = None,
     wait_for: int | None = None,
+    timeout: int | None = None,
     mobile: bool = False,
     skip_tls_verification: bool = False,
     remove_base64_images: bool = True,
@@ -120,6 +137,7 @@ def scrape(
         include_tags: HTML tags to include (e.g., ["article", "main"])
         exclude_tags: HTML tags to exclude (e.g., ["nav", "footer"])
         wait_for: Milliseconds to wait for dynamic content
+        timeout: Request timeout in milliseconds
         mobile: Use mobile user agent
         skip_tls_verification: Skip TLS certificate validation
         remove_base64_images: Remove base64 images from markdown (default: True)
@@ -138,6 +156,10 @@ def scrape(
         # Scrape with geolocation
         firecrawl.scrape(url="https://example.com", location={"country": "US"})
     """
+    # Validate URL
+    if url_error := _validate_url(url):
+        return f"Error: {url_error}"
+
     with LogSpan(span="firecrawl.scrape", url=url) as span:
         client = _get_client()
         if client is None:
@@ -157,6 +179,8 @@ def scrape(
                 kwargs["exclude_tags"] = exclude_tags
             if wait_for is not None:
                 kwargs["wait_for"] = wait_for
+            if timeout is not None:
+                kwargs["timeout"] = timeout
             if mobile:
                 kwargs["mobile"] = True
             if skip_tls_verification:
@@ -271,6 +295,10 @@ def map_urls(
         # Limit results
         firecrawl.map_urls(url="https://example.com", limit=100)
     """
+    # Validate URL
+    if url_error := _validate_url(url):
+        return f"Error: {url_error}"
+
     with LogSpan(span="firecrawl.map_urls", url=url, search=search) as span:
         client = _get_client()
         if client is None:
@@ -408,6 +436,10 @@ def crawl(
         # Check status
         firecrawl.crawl_status(id=job["id"])
     """
+    # Validate URL
+    if url_error := _validate_url(url):
+        return f"Error: {url_error}"
+
     with LogSpan(span="firecrawl.crawl", url=url, max_depth=max_depth, limit=limit) as span:
         client = _get_client()
         if client is None:
@@ -434,18 +466,26 @@ def crawl(
 
             result = client.crawl(url, **kwargs)
 
-            # Extract job info from response
-            if isinstance(result, dict):
-                job_id = result.get("id") or result.get("jobId")
-                span.add(job_id=job_id)
-                return result
+            # Convert to dict for consistent handling
+            result_dict = _to_dict(result)
 
-            # Handle CrawlResponse object
-            job_id = getattr(result, "id", None) or getattr(result, "job_id", None)
+            # Extract job ID with multiple fallbacks
+            job_id = (
+                result_dict.get("id")
+                or result_dict.get("jobId")
+                or result_dict.get("job_id")
+            )
+
             span.add(job_id=job_id)
+
+            # If result already has data (sync completion), return as-is
+            if result_dict.get("data"):
+                return result_dict
+
+            # Return normalized response with job info
             return {
                 "id": job_id,
-                "status": getattr(result, "status", "started"),
+                "status": result_dict.get("status", "started"),
                 "url": url,
             }
 
@@ -477,6 +517,10 @@ def crawl_status(
             for page in status["data"]:
                 print(page["url"])
     """
+    # Validate job ID
+    if not id or not id.strip():
+        return "Error: Job ID is required and cannot be empty"
+
     with LogSpan(span="firecrawl.crawl_status", job_id=id) as span:
         client = _get_client()
         if client is None:
@@ -606,9 +650,8 @@ def deep_research(
     *,
     prompt: str,
     urls: list[str] | None = None,
-    max_depth: int | None = None,
-    max_urls: int | None = None,
-    time_limit: int | None = None,
+    timeout: int | None = None,
+    max_credits: int | None = None,
 ) -> dict[str, Any] | str:
     """Run autonomous deep research on a topic.
 
@@ -618,9 +661,8 @@ def deep_research(
     Args:
         prompt: Research question or topic
         urls: Starting URLs to research (optional, will search if not provided)
-        max_depth: Maximum research depth
-        max_urls: Maximum URLs to process
-        time_limit: Time limit in seconds
+        timeout: Time limit in seconds for the research
+        max_credits: Maximum credits to spend on research
 
     Returns:
         Dict with research results and sources, or error message
@@ -629,7 +671,7 @@ def deep_research(
         # Research a topic
         firecrawl.deep_research(
             prompt="What are the latest developments in quantum computing?",
-            max_urls=20
+            timeout=300
         )
 
         # Research from specific sources
@@ -649,12 +691,10 @@ def deep_research(
 
             if urls:
                 kwargs["urls"] = urls
-            if max_depth is not None:
-                kwargs["maxDepth"] = max_depth
-            if max_urls is not None:
-                kwargs["maxUrls"] = max_urls
-            if time_limit is not None:
-                kwargs["timeout"] = time_limit
+            if timeout is not None:
+                kwargs["timeout"] = timeout
+            if max_credits is not None:
+                kwargs["max_credits"] = max_credits
 
             # The SDK's agent method corresponds to deep research
             result = client.agent(**kwargs)

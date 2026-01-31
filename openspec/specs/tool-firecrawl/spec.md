@@ -63,6 +63,10 @@ The `firecrawl.scrape` function SHALL extract content from a single URL with con
 - **WHEN** `wait_for=3000` is specified
 - **THEN** wait 3 seconds for JavaScript to render before extraction
 
+#### Scenario: Request timeout
+- **WHEN** `timeout=30000` is specified
+- **THEN** abort scrape if response not received within 30 seconds
+
 ---
 
 ### Requirement: Batch URL Scraping
@@ -169,6 +173,10 @@ The `firecrawl.crawl_status` function SHALL return the current status and result
 - **WHEN** crawl job encountered an error
 - **THEN** return status "failed" with error message
 
+#### Scenario: Invalid job ID
+- **WHEN** empty or whitespace-only job ID is provided
+- **THEN** return validation error without making API call
+
 ---
 
 ### Requirement: Structured Data Extraction
@@ -202,8 +210,8 @@ The `firecrawl.deep_research` function SHALL autonomously gather web data based 
 - **THEN** use provided URLs as starting points for research
 
 #### Scenario: Research limits
-- **WHEN** `max_depth=3`, `max_urls=20`, or `time_limit=300` is specified
-- **THEN** constrain research to specified depth, URL count, or time limit in seconds
+- **WHEN** `timeout=300` or `max_credits=100` is specified
+- **THEN** constrain research to specified time limit in seconds or credit budget
 
 ---
 

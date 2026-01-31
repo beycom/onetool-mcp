@@ -27,7 +27,6 @@ from ot_tools.firecrawl import (
 
 @pytest.mark.unit
 @pytest.mark.tools
-@pytest.mark.core
 class TestClientInitialization:
     """Test client initialization and API key handling."""
 
@@ -47,7 +46,6 @@ class TestClientInitialization:
 
 @pytest.mark.unit
 @pytest.mark.tools
-@pytest.mark.core
 class TestScrape:
     """Test scrape function with mocked SDK."""
 
@@ -107,6 +105,37 @@ class TestScrape:
         assert "Scrape failed" in result
         assert "Network error" in result
 
+    @patch("ot_tools.firecrawl._get_client")
+    def test_scrape_with_timeout(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.scrape.return_value = {"markdown": "content"}
+        mock_get_client.return_value = mock_client
+
+        scrape(url="https://example.com", timeout=30000)
+
+        call_args = mock_client.scrape.call_args
+        assert call_args[1]["timeout"] == 30000
+
+    def test_scrape_validates_empty_url(self):
+        result = scrape(url="")
+
+        assert isinstance(result, str)
+        assert "Error" in result
+        assert "empty" in result.lower()
+
+    def test_scrape_validates_invalid_url_scheme(self):
+        result = scrape(url="ftp://example.com/file.txt")
+
+        assert isinstance(result, str)
+        assert "Error" in result
+        assert "http" in result.lower()
+
+    def test_scrape_validates_missing_host(self):
+        result = scrape(url="https://")
+
+        assert isinstance(result, str)
+        assert "Error" in result
+
 
 # -----------------------------------------------------------------------------
 # Scrape Batch Tests
@@ -115,7 +144,6 @@ class TestScrape:
 
 @pytest.mark.unit
 @pytest.mark.tools
-@pytest.mark.core
 class TestScrapeBatch:
     """Test scrape_batch function."""
 
@@ -157,7 +185,6 @@ class TestScrapeBatch:
 
 @pytest.mark.unit
 @pytest.mark.tools
-@pytest.mark.core
 class TestMapUrls:
     """Test map_urls function with mocked SDK."""
 
@@ -217,7 +244,6 @@ class TestMapUrls:
 
 @pytest.mark.unit
 @pytest.mark.tools
-@pytest.mark.core
 class TestSearch:
     """Test search function with mocked SDK."""
 
@@ -282,7 +308,6 @@ class TestSearch:
 
 @pytest.mark.unit
 @pytest.mark.tools
-@pytest.mark.core
 class TestCrawl:
     """Test crawl function with mocked SDK."""
 
@@ -322,14 +347,46 @@ class TestCrawl:
     def test_crawl_handles_response_object(self, mock_get_client):
         mock_client = MagicMock()
         mock_response = MagicMock()
-        mock_response.id = "job456"
-        mock_response.status = "started"
+        # Configure model_dump to return dict (used by _to_dict)
+        mock_response.model_dump.return_value = {
+            "id": "job456",
+            "status": "started",
+        }
         mock_client.crawl.return_value = mock_response
         mock_get_client.return_value = mock_client
 
         result = crawl(url="https://example.com")
 
         assert result["id"] == "job456"
+
+    @patch("ot_tools.firecrawl._get_client")
+    def test_crawl_handles_sync_completion_with_data(self, mock_get_client):
+        """Test crawl returns full response when data is already present (sync completion)."""
+        mock_client = MagicMock()
+        mock_client.crawl.return_value = {
+            "id": "job789",
+            "status": "completed",
+            "data": [{"url": "https://example.com/page1", "markdown": "content"}],
+        }
+        mock_get_client.return_value = mock_client
+
+        result = crawl(url="https://example.com", limit=1)
+
+        assert result["status"] == "completed"
+        assert "data" in result
+        assert len(result["data"]) == 1
+
+    def test_crawl_validates_empty_url(self):
+        result = crawl(url="")
+
+        assert isinstance(result, str)
+        assert "Error" in result
+
+    def test_crawl_validates_invalid_url(self):
+        result = crawl(url="not-a-url")
+
+        assert isinstance(result, str)
+        assert "Error" in result
 
 
 # -----------------------------------------------------------------------------
@@ -339,7 +396,6 @@ class TestCrawl:
 
 @pytest.mark.unit
 @pytest.mark.tools
-@pytest.mark.core
 class TestCrawlStatus:
     """Test crawl_status function with mocked SDK."""
 
@@ -372,6 +428,20 @@ class TestCrawlStatus:
 
         assert result["status"] == "scraping"
 
+    def test_crawl_status_validates_empty_id(self):
+        result = crawl_status(id="")
+
+        assert isinstance(result, str)
+        assert "Error" in result
+        assert "empty" in result.lower()
+
+    def test_crawl_status_validates_whitespace_id(self):
+        result = crawl_status(id="   ")
+
+        assert isinstance(result, str)
+        assert "Error" in result
+        assert "empty" in result.lower()
+
 
 # -----------------------------------------------------------------------------
 # Extract Tests
@@ -380,7 +450,6 @@ class TestCrawlStatus:
 
 @pytest.mark.unit
 @pytest.mark.tools
-@pytest.mark.core
 class TestExtract:
     """Test extract function with mocked SDK."""
 
@@ -432,7 +501,6 @@ class TestExtract:
 
 @pytest.mark.unit
 @pytest.mark.tools
-@pytest.mark.core
 class TestDeepResearch:
     """Test deep_research function with mocked SDK."""
 
@@ -467,14 +535,13 @@ class TestDeepResearch:
         ]
 
     @patch("ot_tools.firecrawl._get_client")
-    def test_research_with_limits(self, mock_get_client):
+    def test_research_with_timeout_and_credits(self, mock_get_client):
         mock_client = MagicMock()
         mock_client.agent.return_value = {"data": "findings"}
         mock_get_client.return_value = mock_client
 
-        deep_research(prompt="test", max_depth=3, max_urls=20, time_limit=300)
+        deep_research(prompt="test", timeout=300, max_credits=100)
 
         call_args = mock_client.agent.call_args
-        assert call_args[1]["maxDepth"] == 3
-        assert call_args[1]["maxUrls"] == 20
         assert call_args[1]["timeout"] == 300
+        assert call_args[1]["max_credits"] == 100
