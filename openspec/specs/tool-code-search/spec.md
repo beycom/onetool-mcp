@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Provides semantic code search using ChunkHound indexes. Queries existing DuckDB databases for semantic code search. Requires `OT_OPENAI_API_KEY` environment variable and projects to be indexed externally with `chunkhound index <project>`.
+Provides semantic code search using ChunkHound indexes. Queries existing DuckDB databases for semantic code search. Requires `OPENAI_API_KEY` in secrets.yaml and projects to be indexed externally with `chunkhound index <project>`.
 ## Requirements
 ### Requirement: Semantic Code Search
 
@@ -14,21 +14,21 @@ The `code.search()` function SHALL search for code semantically in a ChunkHound-
 - **THEN** it SHALL return code matches ranked by semantic similarity
 - **AND** results SHALL include file paths, line numbers, and code snippets
 
-#### Scenario: Search with project name
-- **GIVEN** a project configured in onetool.yaml
-- **WHEN** `code.search(query="error handling", project="onetool")` is called
-- **THEN** it SHALL resolve the project path from config
+#### Scenario: Search with explicit path
+- **GIVEN** an explicit project path
+- **WHEN** `code.search(query="error handling", path="/path/to/project")` is called
+- **THEN** it SHALL use the path directly
 - **AND** it SHALL search within that project
 
-#### Scenario: Search with project path
-- **GIVEN** an explicit project path
-- **WHEN** `code.search(query="query", project="/path/to/project")` is called
-- **THEN** it SHALL use the path directly
-
-#### Scenario: Default project
-- **GIVEN** no project specified
+#### Scenario: Default path
+- **GIVEN** no path specified
 - **WHEN** `code.search(query="query")` is called
 - **THEN** it SHALL use the current working directory
+
+#### Scenario: Custom database path
+- **GIVEN** a custom database location
+- **WHEN** `code.search(query="query", db="custom/path/chunks.db")` is called
+- **THEN** it SHALL use the specified database path relative to project root
 
 #### Scenario: Result limit
 - **GIVEN** a limit parameter
@@ -85,9 +85,10 @@ The `code.search()` function SHALL handle unindexed projects.
 
 #### Scenario: Missing index
 - **GIVEN** a project without ChunkHound index
-- **WHEN** `code.search(query="query", project="unindexed")` is called
+- **WHEN** `code.search(query="query", path="/path/to/unindexed")` is called
 - **THEN** it SHALL return error with indexing instructions
 - **AND** error SHALL include: "Run: chunkhound index {project_root}"
+- **AND** error SHALL include: "Expected database at: {db_path}"
 
 ### Requirement: Index Status
 
@@ -95,7 +96,7 @@ The `code.status()` function SHALL report index statistics.
 
 #### Scenario: Indexed project
 - **GIVEN** a project with ChunkHound index
-- **WHEN** `code.status(project="onetool")` is called
+- **WHEN** `code.status(path="/path/to/project")` is called
 - **THEN** it SHALL return:
   - Database path
   - File count
@@ -104,23 +105,28 @@ The `code.status()` function SHALL report index statistics.
 
 #### Scenario: Unindexed project
 - **GIVEN** a project without ChunkHound index
-- **WHEN** `code.status(project="unindexed")` is called
+- **WHEN** `code.status(path="/path/to/unindexed")` is called
 - **THEN** it SHALL return indexing instructions
+
+#### Scenario: Custom database path for status
+- **GIVEN** a custom database location
+- **WHEN** `code.status(path="/path/to/project", db="custom/chunks.db")` is called
+- **THEN** it SHALL check status at the specified database path
 
 ### Requirement: Embedding Generation
 
 The `code.search()` function SHALL generate embeddings for queries.
 
 #### Scenario: OpenAI embedding
-- **GIVEN** `OT_OPENAI_API_KEY` environment variable is set
+- **GIVEN** `OPENAI_API_KEY` is configured in secrets.yaml
 - **WHEN** a search query is executed
 - **THEN** it SHALL use text-embedding-3-small model
 - **AND** embedding dimensions SHALL be 1536
 
 #### Scenario: Missing API key
-- **GIVEN** `OT_OPENAI_API_KEY` environment variable is not set
+- **GIVEN** `OPENAI_API_KEY` is not configured in secrets.yaml
 - **WHEN** `code.search()` is called
-- **THEN** it SHALL return "OT_OPENAI_API_KEY environment variable required for code search embeddings"
+- **THEN** it SHALL return "OPENAI_API_KEY not configured in secrets.yaml (required for code search embeddings)"
 
 ### Requirement: ChunkHound Schema Compatibility
 
@@ -142,19 +148,24 @@ The `code.search()` function SHALL be compatible with ChunkHound's DuckDB schema
 - **WHEN** semantic search is performed
 - **THEN** it SHALL use `array_cosine_similarity()` for vector similarity
 
-### Requirement: Project Resolution
+### Requirement: Path Resolution
 
-The `code.search()` and `code.status()` functions SHALL resolve project references.
+The `code.search()` and `code.status()` functions SHALL resolve path references.
 
-#### Scenario: Named project
-- **GIVEN** project="onetool" in config: `projects: { onetool: ~/projects/onetool }`
+#### Scenario: Explicit path
+- **GIVEN** path="/path/to/project"
 - **WHEN** function is called
-- **THEN** it SHALL resolve to ~/projects/onetool
+- **THEN** it SHALL use the path directly
 
-#### Scenario: Unknown project name
-- **GIVEN** project="unknown" not in config
+#### Scenario: Tilde expansion
+- **GIVEN** path="~/projects/myproject"
 - **WHEN** function is called
-- **THEN** it SHALL return error listing available projects
+- **THEN** it SHALL expand ~ to the home directory
+
+#### Scenario: Default path
+- **GIVEN** no path specified
+- **WHEN** function is called
+- **THEN** it SHALL use the current working directory (OT_CWD)
 
 ### Requirement: Code Search Logging
 
@@ -166,7 +177,7 @@ The tool SHALL log search and index operations using LogSpan.
 - **THEN** it SHALL log:
   - `span: "code.search"`
   - `query`: Search query
-  - `path`: Search path
+  - `project`: Project root path
   - `resultCount`: Matches found
 
 #### Scenario: Index build logging

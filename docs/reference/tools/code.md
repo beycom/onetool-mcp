@@ -21,7 +21,7 @@ Semantic code search using ChunkHound indexes and DuckDB.
 | `code.search_batch(queries, ...)` | Batch search with multiple queries |
 | `code.research(query, ...)` | Deep research with LLM synthesis |
 | `code.autodoc(scope, ...)` | Generate architecture documentation |
-| `code.status(path)` | Check index status |
+| `code.status(path, db)` | Check index status |
 
 ## Key Parameters
 
@@ -36,6 +36,7 @@ Semantic code search using ChunkHound indexes and DuckDB.
 | `expand` | int | Context lines to include around each match |
 | `exclude` | str | Pipe-separated patterns to exclude (e.g., "test\|mock") |
 | `path` | str | Path to project root (default: cwd) |
+| `db` | str | Path to database file relative to project root |
 
 ### `code.search_batch()`
 
@@ -48,6 +49,7 @@ Semantic code search using ChunkHound indexes and DuckDB.
 | `expand` | int | Context lines around matches |
 | `exclude` | str | Patterns to exclude |
 | `path` | str | Path to project root |
+| `db` | str | Path to database file relative to project root |
 
 ### `code.research()`
 
@@ -55,6 +57,7 @@ Semantic code search using ChunkHound indexes and DuckDB.
 |-----------|------|-------------|
 | `query` | str | Architectural question |
 | `path` | str | Scope to specific path |
+| `db` | str | Path to database file relative to project root |
 
 ### `code.autodoc()`
 
@@ -64,6 +67,7 @@ Semantic code search using ChunkHound indexes and DuckDB.
 | `out` | str | Output file path |
 | `comprehensiveness` | str | "quick", "standard", or "thorough" |
 | `path` | str | Path to project root |
+| `db` | str | Path to database file relative to project root |
 
 ## Snippets
 
@@ -83,7 +87,7 @@ tools:
   code:
     base_url: https://openrouter.ai/api/v1
     model: text-embedding-3-small
-    db_path: .chunkhound/db/chunks.db
+    db_path: .chunkhound/chunks.db
     dimensions: 1536
 ```
 

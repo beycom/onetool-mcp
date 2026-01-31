@@ -14,9 +14,13 @@ import pytest
 pytest.importorskip("duckdb")
 
 from ot_tools.code_search import (
+    _build_search_sql,
+    _clear_connection_cache,
     _format_result,
     _generate_embeddings_batch,
     _get_db_path,
+    _row_to_result,
+    _validate_and_connect,
     autodoc,
     research,
     search,
@@ -39,14 +43,14 @@ class TestGetDbPath:
             db_path, project_root = _get_db_path(None)
 
         assert project_root == Path("/project")
-        assert db_path == Path("/project/.chunkhound/db/chunks.db")
+        assert db_path == Path("/project/.chunkhound/chunks.db")
 
     def test_resolves_explicit_path(self):
         # Explicit path doesn't need mocking - it uses the provided path
         db_path, project_root = _get_db_path("/explicit/path")
 
         assert project_root == Path("/explicit/path")
-        assert db_path == Path("/explicit/path/.chunkhound/db/chunks.db")
+        assert db_path == Path("/explicit/path/.chunkhound/chunks.db")
 
     def test_expands_tilde(self):
         _db_path, project_root = _get_db_path("~/myproject")
@@ -54,6 +58,161 @@ class TestGetDbPath:
         # Should expand ~ to home directory
         assert "~" not in str(project_root)
         assert project_root.is_absolute()
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestBuildSearchSql:
+    """Test _build_search_sql helper function."""
+
+    def test_builds_basic_sql(self):
+        sql, params = _build_search_sql(
+            embeddings_table="embeddings_1536",
+            dimensions=1536,
+            provider="openai",
+            model="text-embedding-3-small",
+        )
+
+        assert "embeddings_1536" in sql
+        assert "1536" in sql
+        assert "provider" in sql.lower()
+        assert params == ["openai", "text-embedding-3-small"]
+
+    def test_adds_language_filter(self):
+        sql, params = _build_search_sql(
+            embeddings_table="embeddings_1536",
+            dimensions=1536,
+            provider="openai",
+            model="text-embedding-3-small",
+            language="python",
+        )
+
+        assert "language" in sql.lower()
+        assert "python" in params
+
+    def test_adds_chunk_type_filter(self):
+        sql, params = _build_search_sql(
+            embeddings_table="embeddings_1536",
+            dimensions=1536,
+            provider="openai",
+            model="text-embedding-3-small",
+            chunk_type="function",
+        )
+
+        assert "chunk_type" in sql.lower()
+        assert "function" in params
+
+    def test_adds_exclude_patterns(self):
+        sql, params = _build_search_sql(
+            embeddings_table="embeddings_1536",
+            dimensions=1536,
+            provider="openai",
+            model="text-embedding-3-small",
+            exclude="test|mock",
+        )
+
+        assert "NOT LIKE" in sql
+        assert "%test%" in params
+        assert "%mock%" in params
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestRowToResult:
+    """Test _row_to_result helper function."""
+
+    def test_converts_row_to_dict(self):
+        row = (1, "func_name", "code content", "function", 10, 20, "path/file.py", "python", 0.95)
+        result = _row_to_result(row)
+
+        assert result["chunk_id"] == 1
+        assert result["symbol"] == "func_name"
+        assert result["content"] == "code content"
+        assert result["chunk_type"] == "function"
+        assert result["start_line"] == 10
+        assert result["end_line"] == 20
+        assert result["file_path"] == "path/file.py"
+        assert result["language"] == "python"
+        assert result["similarity"] == 0.95
+        assert "matched_query" not in result
+
+    def test_includes_matched_query(self):
+        row = (1, "func", "code", "function", 10, 20, "file.py", "python", 0.9)
+        result = _row_to_result(row, matched_query="test query")
+
+        assert result["matched_query"] == "test query"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestValidateAndConnect:
+    """Test _validate_and_connect helper function."""
+
+    @patch("ot_tools.code_search._get_cached_connection")
+    def test_raises_when_db_not_exists(self, mock_cached_conn):
+        from ot_tools.code_search import Config
+
+        mock_path = MagicMock()
+        mock_path.exists.return_value = False
+
+        with pytest.raises(ValueError, match="not indexed"):
+            _validate_and_connect(mock_path, Path("/project"), Config())
+
+    @patch("ot_tools.code_search._get_cached_connection")
+    def test_raises_when_chunks_table_missing(self, mock_cached_conn):
+        from ot_tools.code_search import Config
+
+        mock_path = MagicMock()
+        mock_path.exists.return_value = True
+
+        mock_conn = MagicMock()
+        mock_cached_conn.return_value = mock_conn
+        mock_conn.execute.return_value.fetchall.return_value = [("files",)]
+
+        with pytest.raises(ValueError, match="chunks"):
+            _validate_and_connect(mock_path, Path("/project"), Config())
+
+    @patch("ot_tools.code_search._get_cached_connection")
+    def test_raises_when_embeddings_table_missing(self, mock_cached_conn):
+        from ot_tools.code_search import Config
+
+        mock_path = MagicMock()
+        mock_path.exists.return_value = True
+
+        mock_conn = MagicMock()
+        mock_cached_conn.return_value = mock_conn
+        mock_conn.execute.return_value.fetchall.return_value = [("chunks",), ("files",)]
+
+        with pytest.raises(ValueError, match="embeddings"):
+            _validate_and_connect(mock_path, Path("/project"), Config())
+
+    @patch("ot_tools.code_search._get_cached_connection")
+    def test_returns_connection_and_table_name(self, mock_cached_conn):
+        from ot_tools.code_search import Config
+
+        mock_path = MagicMock()
+        mock_path.exists.return_value = True
+
+        mock_conn = MagicMock()
+        mock_cached_conn.return_value = mock_conn
+        mock_conn.execute.return_value.fetchall.return_value = [
+            ("chunks",), ("files",), ("embeddings_1536",)
+        ]
+
+        conn, table = _validate_and_connect(mock_path, Path("/project"), Config())
+
+        assert conn == mock_conn
+        assert table == "embeddings_1536"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestConnectionCache:
+    """Test connection caching functions."""
+
+    def test_clear_connection_cache(self):
+        # Just verify it doesn't raise
+        _clear_connection_cache()
 
 
 @pytest.mark.unit
@@ -120,12 +279,12 @@ class TestFormatResult:
 class TestSearch:
     """Test search function with mocked DuckDB."""
 
-    @patch("ot_tools.code_search._get_db_path")
-    def test_returns_error_when_not_indexed(self, mock_db_path):
-        mock_path = MagicMock()
-        mock_path.exists.return_value = False
-
-        mock_db_path.return_value = (mock_path, Path("/project"))
+    @patch("ot_tools.code_search._validate_and_connect")
+    def test_returns_error_when_not_indexed(self, mock_validate):
+        mock_validate.side_effect = ValueError(
+            "Project not indexed. Run: chunkhound index /project\n"
+            "Expected database at: /project/.chunkhound/chunks.db"
+        )
 
         result = search(query="authentication")
 
@@ -133,44 +292,30 @@ class TestSearch:
         assert "not indexed" in result
 
     @patch("ot_tools.code_search._generate_embedding")
-    @patch("ot_tools.code_search._import_duckdb")
-    @patch("ot_tools.code_search._get_db_path")
+    @patch("ot_tools.code_search._validate_and_connect")
     @patch("ot_tools.code_search.get_tool_config")
-    def test_successful_search(
-        self, mock_config, mock_db_path, mock_duckdb, mock_embed
-    ):
+    def test_successful_search(self, mock_config, mock_validate, mock_embed):
         from ot_tools.code_search import Config
 
         mock_config.return_value = Config(limit=10)
-
-        mock_path = MagicMock()
-        mock_path.exists.return_value = True
-        mock_db_path.return_value = (mock_path, Path("/project"))
-
         mock_embed.return_value = [0.1] * 1536
 
-        # _import_duckdb returns a module, so mock_duckdb.return_value is the module
-        mock_module = MagicMock()
-        mock_duckdb.return_value = mock_module
         mock_conn = MagicMock()
-        mock_module.connect.return_value = mock_conn
+        mock_validate.return_value = (mock_conn, "embeddings_1536")
 
-        # Mock tables check
-        mock_conn.execute.return_value.fetchall.side_effect = [
-            [("chunks",), ("embeddings_1536",), ("files",)],  # SHOW TABLES
-            [  # Search results
-                (
-                    1,  # chunk_id
-                    "authenticate",  # symbol
-                    "def authenticate(): pass",  # content
-                    "function",  # chunk_type
-                    10,  # start_line
-                    25,  # end_line
-                    "src/auth.py",  # file_path
-                    "python",  # language
-                    0.95,  # similarity
-                )
-            ],
+        # Mock search results
+        mock_conn.execute.return_value.fetchall.return_value = [
+            (
+                1,  # chunk_id
+                "authenticate",  # symbol
+                "def authenticate(): pass",  # content
+                "function",  # chunk_type
+                10,  # start_line
+                25,  # end_line
+                "src/auth.py",  # file_path
+                "python",  # language
+                0.95,  # similarity
+            )
         ]
 
         result = search(query="authentication logic")
@@ -178,54 +323,22 @@ class TestSearch:
         assert "authenticate" in result
         assert "src/auth.py" in result
 
-    @patch("ot_tools.code_search._import_duckdb")
-    @patch("ot_tools.code_search._get_db_path")
-    @patch("ot_tools.code_search.get_tool_config")
-    def test_returns_error_missing_chunks_table(
-        self, mock_config, mock_db_path, mock_duckdb
-    ):
-        from ot_tools.code_search import Config
-
-        mock_config.return_value = Config(limit=10)
-
-        mock_path = MagicMock()
-        mock_path.exists.return_value = True
-        mock_db_path.return_value = (mock_path, Path("/project"))
-
-        mock_module = MagicMock()
-        mock_duckdb.return_value = mock_module
-        mock_conn = MagicMock()
-        mock_module.connect.return_value = mock_conn
-
-        # No chunks table
-        mock_conn.execute.return_value.fetchall.return_value = [("files",)]
+    @patch("ot_tools.code_search._validate_and_connect")
+    def test_returns_error_missing_chunks_table(self, mock_validate):
+        mock_validate.side_effect = ValueError(
+            "Database missing 'chunks' table. Re-index with: chunkhound index /project"
+        )
 
         result = search(query="test")
 
         assert "Error" in result
         assert "chunks" in result
 
-    @patch("ot_tools.code_search._import_duckdb")
-    @patch("ot_tools.code_search._get_db_path")
-    @patch("ot_tools.code_search.get_tool_config")
-    def test_returns_error_missing_embeddings_table(
-        self, mock_config, mock_db_path, mock_duckdb
-    ):
-        from ot_tools.code_search import Config
-
-        mock_config.return_value = Config(limit=10)
-
-        mock_path = MagicMock()
-        mock_path.exists.return_value = True
-        mock_db_path.return_value = (mock_path, Path("/project"))
-
-        mock_module = MagicMock()
-        mock_duckdb.return_value = mock_module
-        mock_conn = MagicMock()
-        mock_module.connect.return_value = mock_conn
-
-        # Has chunks but no embeddings
-        mock_conn.execute.return_value.fetchall.return_value = [("chunks",), ("files",)]
+    @patch("ot_tools.code_search._validate_and_connect")
+    def test_returns_error_missing_embeddings_table(self, mock_validate):
+        mock_validate.side_effect = ValueError(
+            "Database missing 'embeddings_1536' table. Re-index with: chunkhound index /project"
+        )
 
         result = search(query="test")
 
@@ -233,67 +346,42 @@ class TestSearch:
         assert "embeddings" in result
 
     @patch("ot_tools.code_search._generate_embedding")
-    @patch("ot_tools.code_search._import_duckdb")
-    @patch("ot_tools.code_search._get_db_path")
+    @patch("ot_tools.code_search._validate_and_connect")
     @patch("ot_tools.code_search.get_tool_config")
-    def test_no_results_message(
-        self, mock_config, mock_db_path, mock_duckdb, mock_embed
-    ):
+    def test_no_results_message(self, mock_config, mock_validate, mock_embed):
         from ot_tools.code_search import Config
 
         mock_config.return_value = Config(limit=10)
-
-        mock_path = MagicMock()
-        mock_path.exists.return_value = True
-        mock_db_path.return_value = (mock_path, Path("/project"))
-
         mock_embed.return_value = [0.1] * 1536
 
-        mock_module = MagicMock()
-        mock_duckdb.return_value = mock_module
         mock_conn = MagicMock()
-        mock_module.connect.return_value = mock_conn
+        mock_validate.return_value = (mock_conn, "embeddings_1536")
 
-        mock_conn.execute.return_value.fetchall.side_effect = [
-            [("chunks",), ("embeddings_1536",), ("files",)],  # SHOW TABLES
-            [],  # Empty search results
-        ]
+        # Empty search results
+        mock_conn.execute.return_value.fetchall.return_value = []
 
         result = search(query="nonexistent concept")
 
         assert "No results found" in result
 
     @patch("ot_tools.code_search._generate_embedding")
-    @patch("ot_tools.code_search._import_duckdb")
-    @patch("ot_tools.code_search._get_db_path")
+    @patch("ot_tools.code_search._validate_and_connect")
     @patch("ot_tools.code_search.get_tool_config")
-    def test_language_filter(self, mock_config, mock_db_path, mock_duckdb, mock_embed):
+    def test_language_filter(self, mock_config, mock_validate, mock_embed):
         from ot_tools.code_search import Config
 
         mock_config.return_value = Config(limit=10)
-
-        mock_path = MagicMock()
-        mock_path.exists.return_value = True
-        mock_db_path.return_value = (mock_path, Path("/project"))
-
         mock_embed.return_value = [0.1] * 1536
 
-        mock_module = MagicMock()
-        mock_duckdb.return_value = mock_module
         mock_conn = MagicMock()
-        mock_module.connect.return_value = mock_conn
-
-        mock_conn.execute.return_value.fetchall.side_effect = [
-            [("chunks",), ("embeddings_1536",), ("files",)],
-            [],
-        ]
+        mock_validate.return_value = (mock_conn, "embeddings_1536")
+        mock_conn.execute.return_value.fetchall.return_value = []
 
         search(query="test", language="python")
 
         # Check that the SQL included language filter
         call_args = mock_conn.execute.call_args_list
-        # Calls are: LOAD vss (0), SHOW TABLES (1), search query (2)
-        sql = call_args[2][0][0]
+        sql = call_args[0][0][0]
         assert "language" in sql.lower()
 
 
@@ -319,18 +407,16 @@ class TestStatus:
         assert "not indexed" in result
         assert "chunkhound index" in result
 
-    @patch("ot_tools.code_search._import_duckdb")
+    @patch("ot_tools.code_search._get_cached_connection")
     @patch("ot_tools.code_search._get_db_path")
-    def test_returns_statistics(self, mock_db_path, mock_duckdb):
+    def test_returns_statistics(self, mock_db_path, mock_cached_conn):
         mock_path = MagicMock()
         mock_path.exists.return_value = True
 
         mock_db_path.return_value = (mock_path, Path("/project"))
 
-        mock_module = MagicMock()
-        mock_duckdb.return_value = mock_module
         mock_conn = MagicMock()
-        mock_module.connect.return_value = mock_conn
+        mock_cached_conn.return_value = mock_conn
 
         # Mock different queries
         mock_conn.execute.return_value.fetchall.side_effect = [
@@ -347,17 +433,15 @@ class TestStatus:
         assert "indexed" in result.lower()
         assert "/project" in result
 
-    @patch("ot_tools.code_search._import_duckdb")
+    @patch("ot_tools.code_search._get_cached_connection")
     @patch("ot_tools.code_search._get_db_path")
-    def test_handles_db_error(self, mock_db_path, mock_duckdb):
+    def test_handles_db_error(self, mock_db_path, mock_cached_conn):
         mock_path = MagicMock()
         mock_path.exists.return_value = True
 
         mock_db_path.return_value = (mock_path, Path("/project"))
 
-        mock_module = MagicMock()
-        mock_duckdb.return_value = mock_module
-        mock_module.connect.side_effect = Exception("Database locked")
+        mock_cached_conn.side_effect = Exception("Database locked")
 
         result = status()
 
@@ -501,69 +585,43 @@ class TestSearchNewParams:
     """Test search function with new parameters."""
 
     @patch("ot_tools.code_search._generate_embedding")
-    @patch("ot_tools.code_search._import_duckdb")
-    @patch("ot_tools.code_search._get_db_path")
+    @patch("ot_tools.code_search._validate_and_connect")
     @patch("ot_tools.code_search.get_tool_config")
-    def test_chunk_type_filter(
-        self, mock_config, mock_db_path, mock_duckdb, mock_embed
-    ):
+    def test_chunk_type_filter(self, mock_config, mock_validate, mock_embed):
         from ot_tools.code_search import Config
 
         mock_config.return_value = Config(limit=10)
-
-        mock_path = MagicMock()
-        mock_path.exists.return_value = True
-        mock_db_path.return_value = (mock_path, Path("/project"))
-
         mock_embed.return_value = [0.1] * 1536
 
-        mock_module = MagicMock()
-        mock_duckdb.return_value = mock_module
         mock_conn = MagicMock()
-        mock_module.connect.return_value = mock_conn
-
-        mock_conn.execute.return_value.fetchall.side_effect = [
-            [("chunks",), ("embeddings_1536",), ("files",)],
-            [],
-        ]
+        mock_validate.return_value = (mock_conn, "embeddings_1536")
+        mock_conn.execute.return_value.fetchall.return_value = []
 
         search(query="test", chunk_type="function")
 
         # Check that SQL included chunk_type filter
         call_args = mock_conn.execute.call_args_list
-        sql = call_args[2][0][0]
+        sql = call_args[0][0][0]
         assert "chunk_type" in sql.lower()
 
     @patch("ot_tools.code_search._generate_embedding")
-    @patch("ot_tools.code_search._import_duckdb")
-    @patch("ot_tools.code_search._get_db_path")
+    @patch("ot_tools.code_search._validate_and_connect")
     @patch("ot_tools.code_search.get_tool_config")
-    def test_exclude_filter(self, mock_config, mock_db_path, mock_duckdb, mock_embed):
+    def test_exclude_filter(self, mock_config, mock_validate, mock_embed):
         from ot_tools.code_search import Config
 
         mock_config.return_value = Config(limit=10)
-
-        mock_path = MagicMock()
-        mock_path.exists.return_value = True
-        mock_db_path.return_value = (mock_path, Path("/project"))
-
         mock_embed.return_value = [0.1] * 1536
 
-        mock_module = MagicMock()
-        mock_duckdb.return_value = mock_module
         mock_conn = MagicMock()
-        mock_module.connect.return_value = mock_conn
-
-        mock_conn.execute.return_value.fetchall.side_effect = [
-            [("chunks",), ("embeddings_1536",), ("files",)],
-            [],
-        ]
+        mock_validate.return_value = (mock_conn, "embeddings_1536")
+        mock_conn.execute.return_value.fetchall.return_value = []
 
         search(query="test", exclude="test|mock")
 
         # Check that SQL included exclude patterns
         call_args = mock_conn.execute.call_args_list
-        sql = call_args[2][0][0]
+        sql = call_args[0][0][0]
         assert "NOT LIKE" in sql
 
 
@@ -577,11 +635,12 @@ class TestSearchNewParams:
 class TestSearchBatch:
     """Test search_batch function."""
 
-    @patch("ot_tools.code_search._get_db_path")
-    def test_returns_error_when_not_indexed(self, mock_db_path):
-        mock_path = MagicMock()
-        mock_path.exists.return_value = False
-        mock_db_path.return_value = (mock_path, Path("/project"))
+    @patch("ot_tools.code_search._validate_and_connect")
+    def test_returns_error_when_not_indexed(self, mock_validate):
+        mock_validate.side_effect = ValueError(
+            "Project not indexed. Run: chunkhound index /project\n"
+            "Expected database at: /project/.chunkhound/chunks.db"
+        )
 
         result = search_batch(queries="auth|login")
 
@@ -594,30 +653,19 @@ class TestSearchBatch:
         assert "No valid queries" in result
 
     @patch("ot_tools.code_search._generate_embeddings_batch")
-    @patch("ot_tools.code_search._import_duckdb")
-    @patch("ot_tools.code_search._get_db_path")
+    @patch("ot_tools.code_search._validate_and_connect")
     @patch("ot_tools.code_search.get_tool_config")
-    def test_successful_batch_search(
-        self, mock_config, mock_db_path, mock_duckdb, mock_embed_batch
-    ):
+    def test_successful_batch_search(self, mock_config, mock_validate, mock_embed_batch):
         from ot_tools.code_search import Config
 
         mock_config.return_value = Config(limit=10)
-
-        mock_path = MagicMock()
-        mock_path.exists.return_value = True
-        mock_db_path.return_value = (mock_path, Path("/project"))
-
         mock_embed_batch.return_value = [[0.1] * 1536, [0.2] * 1536]
 
-        mock_module = MagicMock()
-        mock_duckdb.return_value = mock_module
         mock_conn = MagicMock()
-        mock_module.connect.return_value = mock_conn
+        mock_validate.return_value = (mock_conn, "embeddings_1536")
 
-        # Mock table check and two query results
+        # Mock two query results
         mock_conn.execute.return_value.fetchall.side_effect = [
-            [("chunks",), ("embeddings_1536",), ("files",)],  # SHOW TABLES
             [  # First query results
                 (1, "auth_func", "def auth(): pass", "function", 10, 15, "auth.py", "python", 0.95)
             ],
@@ -633,30 +681,19 @@ class TestSearchBatch:
         assert "2 queries" in result
 
     @patch("ot_tools.code_search._generate_embeddings_batch")
-    @patch("ot_tools.code_search._import_duckdb")
-    @patch("ot_tools.code_search._get_db_path")
+    @patch("ot_tools.code_search._validate_and_connect")
     @patch("ot_tools.code_search.get_tool_config")
-    def test_deduplicates_results(
-        self, mock_config, mock_db_path, mock_duckdb, mock_embed_batch
-    ):
+    def test_deduplicates_results(self, mock_config, mock_validate, mock_embed_batch):
         from ot_tools.code_search import Config
 
         mock_config.return_value = Config(limit=10)
-
-        mock_path = MagicMock()
-        mock_path.exists.return_value = True
-        mock_db_path.return_value = (mock_path, Path("/project"))
-
         mock_embed_batch.return_value = [[0.1] * 1536, [0.2] * 1536]
 
-        mock_module = MagicMock()
-        mock_duckdb.return_value = mock_module
         mock_conn = MagicMock()
-        mock_module.connect.return_value = mock_conn
+        mock_validate.return_value = (mock_conn, "embeddings_1536")
 
         # Both queries return the same file:lines - should keep higher score
         mock_conn.execute.return_value.fetchall.side_effect = [
-            [("chunks",), ("embeddings_1536",), ("files",)],
             [(1, "auth", "code", "function", 10, 15, "auth.py", "python", 0.85)],
             [(1, "auth", "code", "function", 10, 15, "auth.py", "python", 0.95)],
         ]
