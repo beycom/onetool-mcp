@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Provides web search with Google's grounding capabilities via Gemini API. Supports general search, developer resources, documentation lookup, and Reddit discussions. Requires `OT_GEMINI_API_KEY` environment variable.
+Provides web search with Google's grounding capabilities via Gemini API. Supports general search, developer resources, documentation lookup, and Reddit discussions. Requires `GEMINI_API_KEY` in secrets.yaml.
 
 ## Requirements
 
@@ -98,9 +98,9 @@ All grounding search functions SHALL include source citations.
 All grounding search functions SHALL require API key configuration.
 
 #### Scenario: Missing API key
-- **GIVEN** `OT_GEMINI_API_KEY` environment variable is not set
+- **GIVEN** `GEMINI_API_KEY` is not configured in secrets.yaml
 - **WHEN** any grounding search function is called
-- **THEN** it SHALL return "Error: OT_GEMINI_API_KEY environment variable not set"
+- **THEN** it SHALL raise ValueError with message "GEMINI_API_KEY not set in secrets.yaml"
 
 ### Requirement: Grounding Search Logging
 

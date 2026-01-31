@@ -115,7 +115,8 @@ def test_create_extension_project_scope(mock_project_dir: Path) -> None:
     content = ext_file.read_text()
     assert 'pack = "my_tool"' in content
     assert 'def search(' in content
-    assert "worker_main()" in content
+    # Note: "simple" template (default) is in-process, no worker_main needed
+    assert "LogSpan" in content
 
 
 @pytest.mark.unit

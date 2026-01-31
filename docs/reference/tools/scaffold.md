@@ -26,7 +26,7 @@ Generate new extension tools from templates with a single command. Project or gl
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `name` | str | Extension name (used as directory and file name) |
-| `template` | str | Template name (default: `extension`) |
+| `template` | str | Template name (default: `simple`) |
 | `pack_name` | str | Pack name for dot notation (default: same as name) |
 | `function` | str | Main function name (default: `run`) |
 | `description` | str | Module description |

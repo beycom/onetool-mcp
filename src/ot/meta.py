@@ -828,7 +828,7 @@ def _match_topic_to_file(topic: str) -> Path | None:
     return None
 
 
-async def _write_to_file(file_path: Path, doc: dict) -> None:
+async def _write_to_file(file_path: Path, doc: dict[str, Any]) -> None:
     """Write message document to file asynchronously."""
     with log("ot.write", file=str(file_path), topic=doc.get("topic")) as s:
         try:
@@ -893,7 +893,7 @@ def notify(*, topic: str, message: str) -> str:
 def config() -> dict[str, Any]:
     """Show key configuration values.
 
-    Returns aliases, snippets, and server names.
+    Returns tools_dir, include, aliases, snippets, and server names.
 
     Returns:
         Dict with configuration summary
@@ -905,6 +905,8 @@ def config() -> dict[str, Any]:
         cfg = get_config()
 
         result: dict[str, Any] = {
+            "tools_dir": cfg.tools_dir,
+            "include": cfg.include,
             "aliases": dict(cfg.alias) if cfg.alias else {},
             "snippets": {
                 name: {"description": snippet.description}
@@ -915,6 +917,8 @@ def config() -> dict[str, Any]:
             "servers": list(cfg.servers.keys()) if cfg.servers else [],
         }
 
+        s.add("toolsDirCount", len(result["tools_dir"]))
+        s.add("includeCount", len(result["include"]))
         s.add("aliasCount", len(result["aliases"]))
         s.add("snippetCount", len(result["snippets"]))
         s.add("serverCount", len(result["servers"]))

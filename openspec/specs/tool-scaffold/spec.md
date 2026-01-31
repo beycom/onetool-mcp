@@ -24,7 +24,7 @@ The scaffold pack SHALL provide a `create()` function to scaffold new extensions
 #### Scenario: Create project extension
 - **WHEN** `scaffold.create(name="mypack")` is called
 - **THEN** it creates `.onetool/tools/mypack/mypack.py`
-- **AND** uses the default "extension" template
+- **AND** uses the default "simple" template
 - **AND** substitutes `{{pack}}`, `{{function}}`, `{{description}}` placeholders
 
 #### Scenario: Create global extension

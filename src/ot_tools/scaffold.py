@@ -1,7 +1,10 @@
 """Extension scaffolding tools.
 
-Provides tools for creating new extension tools from templates.
-Extensions are user-created tools that run in isolated worker subprocesses.
+Provides tools for creating new tools from templates.
+
+Templates:
+- simple: In-process tool with no external dependencies (default)
+- extension: Subprocess tool with PEP 723 dependencies and ot_sdk
 """
 
 from __future__ import annotations
@@ -83,7 +86,7 @@ def templates() -> str:
 def create(
     *,
     name: str,
-    template: str = "extension",
+    template: str = "simple",
     pack_name: str | None = None,
     function: str = "run",
     description: str = "My extension tool",
@@ -98,7 +101,7 @@ def create(
 
     Args:
         name: Extension name (will be used as directory and file name)
-        template: Template name (default: extension)
+        template: Template name - "simple" (default) or "extension" (subprocess)
         pack_name: Pack name for dot notation (default: same as name)
         function: Main function name (default: run)
         description: Module description
@@ -324,8 +327,8 @@ def _get_exported_functions(tree: ast.Module) -> list[ast.FunctionDef]:
             for target in node.targets:
                 if isinstance(target, ast.Name) and target.id == "__all__" and isinstance(node.value, ast.List):
                     for elt in node.value.elts:
-                            if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
-                                all_names.add(elt.value)
+                        if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                            all_names.add(elt.value)
 
     # Find exported functions
     funcs: list[ast.FunctionDef] = []

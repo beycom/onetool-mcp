@@ -69,6 +69,22 @@ def _create_client() -> Firecrawl | None:
 _get_client = lazy_client(_create_client)
 
 
+def _to_dict(obj: Any) -> dict[str, Any]:
+    """Convert SDK response objects to dicts for JSON serialization."""
+    if isinstance(obj, dict):
+        return obj
+    # Pydantic v2
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    # Pydantic v1
+    if hasattr(obj, "dict"):
+        return obj.dict()
+    # Fallback for dataclasses or other objects
+    if hasattr(obj, "__dict__"):
+        return {k: v for k, v in obj.__dict__.items() if not k.startswith("_")}
+    return {"value": str(obj)}
+
+
 def scrape(
     *,
     url: str,
@@ -153,9 +169,10 @@ def scrape(
             result = client.scrape(url, **kwargs)
 
             span.add(success=True)
-            if isinstance(result, dict):
-                span.add(formats=list(result.keys()))
-            return result
+            result_dict = _to_dict(result)
+            if isinstance(result_dict, dict):
+                span.add(formats=list(result_dict.keys()))
+            return result_dict
 
         except Exception as e:
             error_msg = f"Scrape failed: {e}"
@@ -343,11 +360,11 @@ def search(
 
             if isinstance(result, list):
                 span.add(result_count=len(result))
-                return result
+                return [_to_dict(item) for item in result]
             # Handle SearchData object (v2 API returns .web, .news, .images)
             data = getattr(result, "web", None) or getattr(result, "data", None) or []
             span.add(result_count=len(data))
-            return data
+            return [_to_dict(item) for item in data]
 
         except Exception as e:
             error_msg = f"Search failed: {e}"

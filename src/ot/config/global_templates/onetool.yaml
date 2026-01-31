@@ -10,6 +10,8 @@ include:
   - config/snippets.yaml   # Snippet workflows
   - config/servers.yaml    # External MCP servers
 
+tools_dir: []
+
 # log_level: INFO
 # debug_tracebacks: false  # Set to true for verbose error tracebacks
 

@@ -421,6 +421,11 @@ def reddit(
     Searches indexed Reddit posts and comments for community discussions,
     opinions, and real-world experiences.
 
+    Tips:
+        - Use shorter, more general queries for better results
+        - Always specify a relevant subreddit for technical topics;
+          the subreddit parameter acts as important context for the grounding model
+
     Args:
         query: The Reddit search query
         subreddit: Specific subreddit to search (e.g., "programming", "python")
