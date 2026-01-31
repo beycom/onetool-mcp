@@ -235,8 +235,15 @@ def _has_pep723_deps(content: str) -> bool:
     return False
 
 
-def _check_best_practices(content: str, tree: ast.Module) -> tuple[dict[str, bool], list[str]]:
+def _check_best_practices(
+    content: str, tree: ast.Module, *, is_isolated: bool = False
+) -> tuple[dict[str, bool], list[str]]:
     """Check for best practices violations.
+
+    Args:
+        content: The file content
+        tree: The parsed AST
+        is_isolated: Whether this is an isolated tool (skips logging check)
 
     Returns:
         Tuple of (checks dict, warnings list)
@@ -273,11 +280,14 @@ def _check_best_practices(content: str, tree: ast.Module) -> tuple[dict[str, boo
     if not pack_before_imports:
         warnings.append("Best practice: 'pack = \"name\"' should appear before imports")
 
-    # Check for LogSpan or log usage
-    has_log_usage = "LogSpan" in content or "with log(" in content
-    checks["log_usage"] = has_log_usage
-    if not has_log_usage:
-        warnings.append("Best practice: Consider using LogSpan or log() for observability")
+    # Check for LogSpan or log usage (skip for isolated tools - they can't use onetool logging)
+    if is_isolated:
+        checks["log_usage"] = True  # N/A for isolated tools
+    else:
+        has_log_usage = "LogSpan" in content or "with log(" in content
+        checks["log_usage"] = has_log_usage
+        if not has_log_usage:
+            warnings.append("Best practice: Consider using LogSpan or log() for observability")
 
     # Check for raise statements (should prefer return error strings)
     has_raise = any(isinstance(node, ast.Raise) for node in ast.walk(tree))
@@ -404,7 +414,8 @@ def validate(*, path: str) -> str:
                 errors.append("Missing inline JSON-RPC loop - required for isolated tools with PEP 723 dependencies")
 
         # Check 5: Best practices
-        checks, bp_warnings = _check_best_practices(content, tree)
+        is_isolated = _has_pep723_deps(content)
+        checks, bp_warnings = _check_best_practices(content, tree, is_isolated=is_isolated)
         warnings.extend(bp_warnings)
 
         # Check 6: Warn about deprecated ot_sdk imports

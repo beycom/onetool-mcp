@@ -523,3 +523,62 @@ def test_has_pep723_deps_false_no_script() -> None:
 pack = "mytool"
 '''
     assert _has_pep723_deps(content) is False
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_validate_isolated_tool_no_logging_warning(tmp_path: Path) -> None:
+    """Verify validate() does not warn about logging for isolated tools.
+
+    Isolated tools cannot use onetool logging (LogSpan/log()) since they
+    run in a subprocess without access to onetool internals.
+    """
+    from ot_tools.scaffold import validate
+
+    ext_file = tmp_path / "isolated_tool.py"
+    ext_file.write_text('''# /// script
+# requires-python = ">=3.11"
+# dependencies = ["httpx>=0.28.0"]
+# ///
+"""My isolated tool."""
+
+from __future__ import annotations
+
+pack = "mytool"
+
+import json
+import sys
+
+__all__ = ["run"]
+
+
+def run(*, input: str) -> str:
+    """Run the tool.
+
+    Args:
+        input: Input string
+
+    Returns:
+        Result string
+
+    Example:
+        mytool.run(input="test")
+    """
+    return f"Result: {input}"
+
+
+if __name__ == "__main__":
+    for line in sys.stdin:
+        request = json.loads(line)
+        result = run(**request.get("kwargs", {}))
+        print(json.dumps({"result": result}), flush=True)
+''')
+
+    result = validate(path=str(ext_file))
+
+    assert "Validation PASSED" in result
+    # Should NOT have logging warning for isolated tools
+    assert "LogSpan" not in result
+    assert "observability" not in result
+    # Should still show logging check as passed (N/A)
+    assert "[x] logging usage" in result

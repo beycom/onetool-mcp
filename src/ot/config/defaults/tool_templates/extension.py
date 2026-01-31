@@ -11,12 +11,13 @@ pack = "{{pack}}"
 
 import httpx
 
-__all__ = ["{{function}}"]
-
 from ot.config import get_secret, get_tool_config
 from ot.logging import LogSpan
+
 # Optional: for calling other tools
 # from ot.tools import call_tool, get_pack
+
+__all__ = ["{{function}}"]
 
 # Shared HTTP client (connection pooling)
 _client = httpx.Client(timeout=30.0, follow_redirects=True)

@@ -14,10 +14,11 @@ Use environment variables for secrets and hardcode config values.
 
 from __future__ import annotations
 
-import json
-import sys
-
 pack = "{{pack}}"
+
+import json
+import os
+import sys
 
 __all__ = ["{{function}}"]
 
