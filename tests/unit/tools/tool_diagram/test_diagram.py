@@ -28,7 +28,7 @@ from ot_tools.diagram import (
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_encode_source_basic() -> None:
     """encode_source produces valid deflate + base64url encoding."""
     source = "graph TD\n    A-->B"
@@ -44,7 +44,7 @@ def test_encode_source_basic() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_encode_source_unicode() -> None:
     """encode_source handles unicode characters."""
     source = 'graph TD\n    A["Start → End"]-->B["éàü"]'
@@ -55,7 +55,7 @@ def test_encode_source_unicode() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_encode_source_empty() -> None:
     """encode_source handles empty string."""
     encoded = encode_source("")
@@ -64,7 +64,7 @@ def test_encode_source_empty() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_encode_source_large() -> None:
     """encode_source handles large diagrams."""
     # Generate a large source
@@ -80,7 +80,7 @@ def test_encode_source_large() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_mermaid_playground_url() -> None:
     """Mermaid playground URL has correct format."""
     source = "graph TD\n    A-->B"
@@ -91,7 +91,7 @@ def test_mermaid_playground_url() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_plantuml_playground_url() -> None:
     """PlantUML playground URL has correct format."""
     source = "@startuml\nAlice -> Bob: Hello\n@enduml"
@@ -102,7 +102,7 @@ def test_plantuml_playground_url() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_d2_playground_url() -> None:
     """D2 playground URL has correct format."""
     source = "a -> b: hello"
@@ -120,7 +120,7 @@ def test_d2_playground_url() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_validate_provider_valid() -> None:
     """Valid providers pass validation."""
     # Should not raise
@@ -131,7 +131,7 @@ def test_validate_provider_valid() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_validate_provider_invalid() -> None:
     """Invalid providers raise ValueError."""
     with pytest.raises(ValueError, match="Unknown provider"):
@@ -139,7 +139,7 @@ def test_validate_provider_invalid() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_validate_format_valid() -> None:
     """Valid formats pass validation."""
     # Should not raise
@@ -149,7 +149,7 @@ def test_validate_format_valid() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_validate_format_invalid() -> None:
     """Invalid formats raise ValueError."""
     with pytest.raises(ValueError, match="Unknown format"):
@@ -160,7 +160,7 @@ def test_validate_format_invalid() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_basic_source_validation_mermaid_quotes() -> None:
     """Mermaid sequence diagram quoting warning."""
     # Wrong: quotes after 'as'
@@ -171,7 +171,7 @@ def test_basic_source_validation_mermaid_quotes() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_basic_source_validation_mermaid_valid() -> None:
     """Valid Mermaid sequence diagram has no warnings."""
     source = "sequenceDiagram\n    participant WS as Web Server"
@@ -180,7 +180,7 @@ def test_basic_source_validation_mermaid_valid() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_basic_source_validation_plantuml_missing_start() -> None:
     """PlantUML without @start marker gets warning."""
     source = "Alice -> Bob: Hello"  # Missing @startuml
@@ -190,7 +190,7 @@ def test_basic_source_validation_plantuml_missing_start() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_basic_source_validation_plantuml_valid() -> None:
     """Valid PlantUML has no warnings."""
     source = "@startuml\nAlice -> Bob: Hello\n@enduml"
@@ -199,7 +199,7 @@ def test_basic_source_validation_plantuml_valid() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_basic_source_validation_d2_with_at_marker() -> None:
     """D2 with @ markers (PlantUML syntax) gets warning."""
     source = "@startuml\na -> b"  # D2 doesn't use @
@@ -212,7 +212,7 @@ def test_basic_source_validation_d2_with_at_marker() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_diagram_config_defaults() -> None:
     """DiagramConfig has correct defaults (now in diagram.py)."""
     from ot_tools.diagram import Config
@@ -238,7 +238,7 @@ def test_diagram_config_defaults() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_diagram_config_partial_override() -> None:
     """DiagramConfig partial override - config stored as dict at load time."""
     from ot.config.loader import load_config
@@ -268,7 +268,7 @@ def test_diagram_config_partial_override() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_diagram_config_instructions() -> None:
     """DiagramConfig can have provider instructions (stored as dict)."""
     from ot.config.loader import load_config
@@ -305,7 +305,7 @@ def test_diagram_config_instructions() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_diagram_config_templates() -> None:
     """DiagramConfig can have template references (stored as dict)."""
     from ot.config.loader import load_config
@@ -347,7 +347,7 @@ def test_diagram_config_templates() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_get_source_extension() -> None:
     """Source extensions are correct for providers."""
     assert _get_source_extension("mermaid") == ".mmd"
@@ -362,7 +362,7 @@ def test_get_source_extension() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_kroki_providers_constant() -> None:
     """KROKI_PROVIDERS contains expected providers."""
     # Focus providers should be in full list
@@ -381,7 +381,61 @@ def test_kroki_providers_constant() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.serve
+@pytest.mark.tools
 def test_focus_providers() -> None:
     """FOCUS_PROVIDERS has the expected providers."""
     assert FOCUS_PROVIDERS == ["mermaid", "plantuml", "d2"]
+
+
+# ==================== Output Config Tests ====================
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_get_output_config_format() -> None:
+    """get_output_config returns properly formatted output without corruption."""
+    from ot_tools.diagram import get_output_config
+
+    result = get_output_config()
+
+    # Should have header exactly once
+    assert result.count("Diagram Output Configuration") == 1
+
+    # Should have separator line
+    assert "=" * 40 in result
+
+    # Should contain expected fields
+    assert "Output directory:" in result
+    assert "Naming pattern:" in result
+    assert "Default format:" in result
+    assert "Save source:" in result
+
+
+# ==================== Cache TTL Tests ====================
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_cache_ttl_constants() -> None:
+    """Cache TTL constants are defined correctly."""
+    from ot_tools.diagram import _CACHE_TTL_SECONDS, _cached_backend
+
+    # TTL should be 5 minutes (300 seconds)
+    assert _CACHE_TTL_SECONDS == 300
+
+    # Cached backend should have timestamp field
+    assert "timestamp" in _cached_backend
+
+
+# ==================== Thread Safety Tests ====================
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_render_tasks_lock_exists() -> None:
+    """Thread safety lock exists for render tasks."""
+    from ot_tools.diagram import _render_tasks_lock
+
+    import threading
+
+    assert isinstance(_render_tasks_lock, type(threading.Lock()))

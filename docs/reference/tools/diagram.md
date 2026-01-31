@@ -59,7 +59,7 @@ All 28+ Kroki providers are available for advanced use.
 | `provider` | str | mermaid, plantuml, d2, graphviz, etc. |
 | `output_format` | str | svg (default), png, pdf |
 | `output_dir` | str | Override default output directory |
-| `async_mode` | bool | Return task ID for status polling |
+| `async_mode` | bool | Render in background thread, return task ID for status polling |
 
 ## Examples
 

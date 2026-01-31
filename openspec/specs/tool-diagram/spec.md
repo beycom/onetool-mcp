@@ -66,10 +66,11 @@ The `diagram.render_diagram()` function SHALL render source to image via Kroki.
 - **AND** it SHALL return output_file path
 
 #### Scenario: Asynchronous render
-- **GIVEN** wait=False
-- **WHEN** `diagram.render_diagram(source="...", provider="mermaid", wait=False)` is called
-- **THEN** it SHALL return immediately with task_id
-- **AND** status SHALL be "pending"
+- **GIVEN** async_mode=True
+- **WHEN** `diagram.render_diagram(source="...", provider="mermaid", async_mode=True)` is called
+- **THEN** it SHALL start rendering in a background thread
+- **AND** it SHALL return immediately with task_id
+- **AND** status SHALL be "running"
 
 #### Scenario: Kroki error handling
 - **GIVEN** invalid diagram source
@@ -97,6 +98,12 @@ The `diagram.batch_render()` function SHALL render multiple diagrams concurrentl
 - **WHEN** `diagram.batch_render(sources=[...], concurrency=5)` is called
 - **THEN** it SHALL limit concurrent requests to 5
 - **AND** default concurrency SHALL be 10
+
+#### Scenario: Thread-safe task tracking
+- **GIVEN** concurrent batch rendering
+- **WHEN** multiple threads update task progress
+- **THEN** task state updates SHALL be protected by a lock
+- **AND** progress counters SHALL be updated atomically
 
 ### Requirement: Render Directory (Self-Hosted Only)
 
@@ -252,6 +259,12 @@ The diagram tool SHALL support remote and self-hosted Kroki backends.
 - **WHEN** tool initialises
 - **THEN** it SHALL verify Kroki is reachable
 - **AND** it SHALL log backend status
+
+#### Scenario: Backend cache with TTL
+- **GIVEN** a cached backend URL
+- **WHEN** cache TTL (5 minutes) expires
+- **THEN** it SHALL re-check backend availability
+- **AND** it SHALL update cache with new result
 
 ### Requirement: Diagram Logging
 

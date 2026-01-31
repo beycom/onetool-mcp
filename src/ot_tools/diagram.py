@@ -33,6 +33,8 @@ __all__ = [
 
 import base64
 import re
+import threading
+import time
 import uuid
 import zlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -270,9 +272,12 @@ FORMAT_MIME_TYPES = {
 
 # Async task storage for batch operations
 _render_tasks: dict[str, dict[str, Any]] = {}
+_render_tasks_lock = threading.Lock()
 
 # Cached backend URL to avoid redundant health checks
-_cached_backend: dict[str, Any] = {"url": None, "is_self_hosted": None}
+# TTL-based invalidation: cache expires after _CACHE_TTL_SECONDS
+_CACHE_TTL_SECONDS = 300  # 5 minutes
+_cached_backend: dict[str, Any] = {"url": None, "is_self_hosted": None, "timestamp": 0.0}
 
 
 # ==================== Path Resolution ====================
@@ -413,13 +418,18 @@ def _encode_plantuml(source: str) -> str:
 def _get_kroki_url() -> str:
     """Get the appropriate Kroki URL based on configuration.
 
-    Uses cached result to avoid redundant health checks in batch operations.
+    Uses cached result with TTL to avoid redundant health checks in batch
+    operations while allowing recovery if a backend goes down.
 
     Returns:
         The Kroki base URL (remote or self-hosted).
     """
-    # Return cached URL if available
-    if _cached_backend["url"] is not None:
+    # Return cached URL if available and not expired
+    now = time.monotonic()
+    if (
+        _cached_backend["url"] is not None
+        and now - _cached_backend["timestamp"] < _CACHE_TTL_SECONDS
+    ):
         return _cached_backend["url"]
 
     config = _get_config()
@@ -447,6 +457,7 @@ def _get_kroki_url() -> str:
         _cached_backend["url"] = remote_url
         _cached_backend["is_self_hosted"] = False
 
+    _cached_backend["timestamp"] = now
     return _cached_backend["url"]
 
 
@@ -871,29 +882,39 @@ def render_diagram(
             # Handle async mode
             if async_mode:
                 task_id = f"render-{uuid.uuid4().hex[:8]}"
-                _render_tasks[task_id] = {
-                    "status": "running",
-                    "source": source,
-                    "provider": provider,
-                    "output_format": output_format,
-                    "output_file": str(output_file),
-                    "started_at": datetime.now().isoformat(),
-                }
+                timeout = _get_config().backend.timeout
 
-                # Start async rendering (would use asyncio in real impl)
-                # For now, just do it synchronously
-                try:
-                    timeout = _get_config().backend.timeout
-                    rendered = _render_via_kroki(
-                        source, provider, output_format, timeout
-                    )
-                    output_file.write_bytes(rendered)
+                with _render_tasks_lock:
+                    _render_tasks[task_id] = {
+                        "status": "running",
+                        "source": source,
+                        "provider": provider,
+                        "output_format": output_format,
+                        "output_file": str(output_file),
+                        "started_at": datetime.now().isoformat(),
+                    }
 
-                    _render_tasks[task_id]["status"] = "completed"
-                    _render_tasks[task_id]["completed_at"] = datetime.now().isoformat()
-                except Exception as e:
-                    _render_tasks[task_id]["status"] = "failed"
-                    _render_tasks[task_id]["error"] = str(e)
+                def _do_async_render() -> None:
+                    """Background thread worker for async rendering."""
+                    try:
+                        rendered = _render_via_kroki(
+                            source, provider, output_format, timeout
+                        )
+                        output_file.write_bytes(rendered)
+
+                        with _render_tasks_lock:
+                            _render_tasks[task_id]["status"] = "completed"
+                            _render_tasks[task_id]["completed_at"] = (
+                                datetime.now().isoformat()
+                            )
+                    except Exception as e:
+                        with _render_tasks_lock:
+                            _render_tasks[task_id]["status"] = "failed"
+                            _render_tasks[task_id]["error"] = str(e)
+
+                # Start rendering in background thread
+                thread = threading.Thread(target=_do_async_render, daemon=True)
+                thread.start()
 
                 s.add(task_id=task_id)
                 return f"Rendering started. Task ID: {task_id}"
@@ -946,11 +967,13 @@ def get_render_status(*, task_id: str) -> str:
         status = diagram.get_render_status(task_id="render-abc123")
     """
     with LogSpan(span="diagram.get_render_status", task_id=task_id) as s:
-        task = _render_tasks.get(task_id)
-
-        if task is None:
-            s.add(error="not_found")
-            return f"Task not found: {task_id}"
+        with _render_tasks_lock:
+            task = _render_tasks.get(task_id)
+            if task is None:
+                s.add(error="not_found")
+                return f"Task not found: {task_id}"
+            # Copy task data under lock to avoid races
+            task = dict(task)
 
         status = task.get("status", "unknown")
         result_parts = [
@@ -1051,15 +1074,16 @@ def batch_render(
 
         task_id = f"batch-{uuid.uuid4().hex[:8]}"
 
-        _render_tasks[task_id] = {
-            "status": "running",
-            "type": "batch",
-            "total": len(sources),
-            "completed": 0,
-            "failed": 0,
-            "results": [],
-            "started_at": datetime.now().isoformat(),
-        }
+        with _render_tasks_lock:
+            _render_tasks[task_id] = {
+                "status": "running",
+                "type": "batch",
+                "total": len(sources),
+                "completed": 0,
+                "failed": 0,
+                "results": [],
+                "started_at": datetime.now().isoformat(),
+            }
 
         # Get output directory (resolved relative to project directory)
         output_path = _resolve_output_dir(output_dir)
@@ -1077,14 +1101,16 @@ def batch_render(
 
             for future in as_completed(futures):
                 result = future.result()
-                _render_tasks[task_id]["results"].append(result)
-                if result["status"] == "success":
-                    _render_tasks[task_id]["completed"] += 1
-                else:
-                    _render_tasks[task_id]["failed"] += 1
+                with _render_tasks_lock:
+                    _render_tasks[task_id]["results"].append(result)
+                    if result["status"] == "success":
+                        _render_tasks[task_id]["completed"] += 1
+                    else:
+                        _render_tasks[task_id]["failed"] += 1
 
-        _render_tasks[task_id]["status"] = "completed"
-        _render_tasks[task_id]["completed_at"] = datetime.now().isoformat()
+        with _render_tasks_lock:
+            _render_tasks[task_id]["status"] = "completed"
+            _render_tasks[task_id]["completed_at"] = datetime.now().isoformat()
 
         completed = _render_tasks[task_id]["completed"]
         failed = _render_tasks[task_id]["failed"]
@@ -1419,11 +1445,11 @@ def get_output_config() -> str:
 
         result = (
             "Diagram Output Configuration\n"
-            "=" * 40 + "\n\n"
-            f"Output directory: {output.dir}\n"
-            f"Naming pattern: {output.naming}\n"
-            f"Default format: {output.default_format}\n"
-            f"Save source: {output.save_source}"
+            + "=" * 40 + "\n\n"
+            + f"Output directory: {output.dir}\n"
+            + f"Naming pattern: {output.naming}\n"
+            + f"Default format: {output.default_format}\n"
+            + f"Save source: {output.save_source}"
         )
 
         s.add(dir=output.dir, format=output.default_format)
@@ -1437,12 +1463,23 @@ def get_template(*, name: str) -> str:
     starting points for common diagram types.
 
     Args:
-        name: Template name (e.g., "api-flow", "c4-context").
+        name: Template name as configured in onetool.yaml.
 
     Returns:
         Template source code with metadata.
 
     Example:
+        # First configure templates in onetool.yaml:
+        # tools:
+        #   diagram:
+        #     templates:
+        #       api-flow:
+        #         provider: mermaid
+        #         diagram_type: sequence
+        #         description: API flow template
+        #         file: templates/api-flow.mmd
+        #
+        # Then load it:
         template = diagram.get_template(name="api-flow")
     """
     with LogSpan(span="diagram.get_template", template_name=name) as s:
