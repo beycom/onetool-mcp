@@ -67,6 +67,7 @@ The `brave.local()` function SHALL search for local businesses and places.
 - **GIVEN** a query with no local results
 - **WHEN** `brave.local(query=query)` is called
 - **THEN** it SHALL fall back to web search results
+- **AND** it SHALL prefix with "No local business data found. Showing web results:"
 
 ### Requirement: Image Search
 
@@ -112,6 +113,11 @@ The `brave.search_batch()` function SHALL execute multiple searches concurrently
 - **WHEN** `brave.search_batch(queries=[("gold price", "Gold")])` is called
 - **THEN** each section SHALL use the provided label
 
+#### Scenario: Empty batch
+- **GIVEN** an empty queries list
+- **WHEN** `brave.search_batch(queries=[])` is called
+- **THEN** it SHALL return "Error: No queries provided"
+
 ### Requirement: AI Summarizer
 
 The `brave.summarize()` function SHALL provide AI-generated summaries.
@@ -125,7 +131,7 @@ The `brave.summarize()` function SHALL provide AI-generated summaries.
 #### Scenario: No summary available
 - **GIVEN** a query with no summary
 - **WHEN** `brave.summarize(query=query)` is called
-- **THEN** it SHALL return "No summary available for this query."
+- **THEN** it SHALL return "No summary available. Note: AI summaries may require Brave Pro subscription."
 
 ### Requirement: Query Validation
 
@@ -140,6 +146,11 @@ All Brave Search functions SHALL validate query parameters.
 - **GIVEN** a query exceeding 50 words
 - **WHEN** any search function is called
 - **THEN** it SHALL return "Error: Query exceeds 50 word limit ({count} words)"
+
+#### Scenario: Empty query
+- **GIVEN** an empty string or whitespace-only query
+- **WHEN** any search function is called
+- **THEN** it SHALL return "Error: Query cannot be empty"
 
 ### Requirement: API Key Configuration
 

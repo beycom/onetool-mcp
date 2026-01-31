@@ -188,3 +188,16 @@ Tools to cover:
 
 Finally, list all onetool commands used with full parameters.
 ```
+### Test a Pack
+
+```
+Explain each step so it is easy to follow what you did and why. Use 🧿 to highlight these explanations.
+Learn onetool with `ot.help(info="full")`
+Find defect and suggest improvements. 
+
+Write the improvements and defects to ./plan/fix/{pack}-fix.md
+
+Test out the following pack:
+ot
+llm 
+```

@@ -80,6 +80,16 @@ class TestValidateQuery:
         fifty_words = " ".join(["word"] * 50)
         assert _validate_query(fifty_words) is None
 
+    def test_empty_query(self):
+        result = _validate_query("")
+        assert result is not None
+        assert "empty" in result.lower()
+
+    def test_whitespace_only_query(self):
+        result = _validate_query("   ")
+        assert result is not None
+        assert "empty" in result.lower()
+
 
 @pytest.mark.unit
 @pytest.mark.tools
@@ -212,7 +222,7 @@ class TestFormatLocalResults:
         assert "4.5" in result
         assert "555-1234" in result
 
-    def test_falls_back_to_web_results(self):
+    def test_falls_back_to_web_results_with_warning(self):
         data = {
             "locations": {"results": []},
             "web": {
@@ -228,7 +238,18 @@ class TestFormatLocalResults:
 
         result = _format_local_results_from_web(data)
 
+        assert "No local business data found" in result
         assert "Web Result" in result
+
+    def test_falls_back_no_warning_when_no_results(self):
+        data = {
+            "locations": {"results": []},
+            "web": {"results": []},
+        }
+
+        result = _format_local_results_from_web(data)
+
+        assert result == "No results found."
 
 
 @pytest.mark.unit
@@ -523,6 +544,12 @@ class TestSearchBatch:
         second_pos = result.find("second")
         assert first_pos < second_pos
 
+    def test_empty_queries_returns_error(self):
+        result = search_batch(queries=[])
+
+        assert "Error" in result
+        assert "No queries provided" in result
+
 
 @pytest.mark.unit
 @pytest.mark.tools
@@ -546,12 +573,13 @@ class TestSummarize:
         assert "Summary of the topic" in result
 
     @patch("ot_tools.brave_search._make_request")
-    def test_handles_no_summary(self, mock_request):
+    def test_handles_no_summary_with_pro_hint(self, mock_request):
         mock_request.return_value = (True, {"summarizer": {}})
 
         result = summarize(query="test")
 
         assert "No summary available" in result
+        assert "Pro" in result
 
     @patch("ot_tools.brave_search._make_request")
     def test_includes_result_filter(self, mock_request):

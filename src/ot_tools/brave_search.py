@@ -182,8 +182,11 @@ def _format_local_results_from_web(data: dict[str, Any]) -> str:
     results = locations.get("results", [])
 
     if not results:
-        # Fall back to web results if no locations
-        return _format_web_results(data)
+        # Inform user about fallback instead of silent switch
+        web_results = _format_web_results(data)
+        if web_results == "No results found.":
+            return web_results
+        return f"No local business data found. Showing web results:\n\n{web_results}"
 
     for i, result in enumerate(results, 1):
         name = result.get("title", "No name")
@@ -291,6 +294,8 @@ def _validate_query(query: str) -> str | None:
 
     Returns None if valid, error message if invalid.
     """
+    if not query or not query.strip():
+        return "Error: Query cannot be empty"
     if len(query) > 400:
         return f"Error: Query exceeds 400 character limit ({len(query)} chars)"
     word_count = len(query.split())
@@ -573,6 +578,9 @@ def search_batch(
     """
     normalized = normalize_items(queries)
 
+    if not normalized:
+        return "Error: No queries provided"
+
     with LogSpan(span="brave.batch", query_count=len(normalized), count=count) as s:
 
         def _search_one(query: str, label: str) -> tuple[str, str]:
@@ -634,7 +642,7 @@ def summarize(
     summarizer = data.get("summarizer", {})
 
     if not summarizer:
-        return "No summary available for this query."
+        return "No summary available. Note: AI summaries may require Brave Pro subscription."
 
     summary_type = summarizer.get("type", "")
     results = summarizer.get("results", [])
