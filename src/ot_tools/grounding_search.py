@@ -7,12 +7,17 @@ Requires GEMINI_API_KEY in secrets.yaml.
 
 from __future__ import annotations
 
+import functools
+
 # Pack for dot notation: ground.search(), ground.dev(), etc.
 pack = "ground"
 
 __all__ = ["dev", "docs", "reddit", "search", "search_batch"]
 
 from typing import Any, Literal
+
+# Type alias for output format
+OutputFormat = Literal["full", "text_only", "sources_only"]
 
 from pydantic import BaseModel, Field
 
@@ -51,12 +56,25 @@ def _get_api_key() -> str:
     return get_secret("GEMINI_API_KEY") or ""
 
 
+@functools.lru_cache(maxsize=1)
+def _get_cached_client(api_key: str) -> genai.Client:
+    """Get or create a cached Gemini client.
+
+    Args:
+        api_key: The Gemini API key (used as cache key)
+
+    Returns:
+        Cached Gemini client instance
+    """
+    return genai.Client(api_key=api_key)
+
+
 def _create_client() -> genai.Client:
-    """Create a Gemini client with API key."""
+    """Create a Gemini client with API key (cached)."""
     api_key = _get_api_key()
     if not api_key:
         raise ValueError("GEMINI_API_KEY not set in secrets.yaml")
-    return genai.Client(api_key=api_key)
+    return _get_cached_client(api_key)
 
 
 def _extract_sources(response: Any) -> list[dict[str, str]]:
@@ -96,14 +114,21 @@ def _extract_sources(response: Any) -> list[dict[str, str]]:
     return sources
 
 
-def _format_response(response: Any) -> str:
+def _format_response(
+    response: Any,
+    *,
+    output_format: OutputFormat = "full",
+    max_sources: int | None = None,
+) -> str:
     """Format Gemini response with content and sources.
 
     Args:
         response: Gemini API response object
+        output_format: Output format - "full" (default), "text_only", or "sources_only"
+        max_sources: Maximum number of sources to include (None for unlimited)
 
     Returns:
-        Formatted string with content and source citations
+        Formatted string with content and/or source citations
     """
     # Extract text content
     text = ""
@@ -116,24 +141,78 @@ def _format_response(response: Any) -> str:
             if hasattr(content, "parts") and content.parts:
                 text = "".join(getattr(part, "text", "") for part in content.parts)
 
+    # Extract sources
+    sources = _extract_sources(response)
+
+    # Handle output format
+    if output_format == "sources_only":
+        if not sources:
+            return "No sources found."
+        return _format_sources(sources, max_sources=max_sources)
+
     if not text:
         return "No results found."
 
-    # Extract and format sources
-    sources = _extract_sources(response)
+    if output_format == "text_only":
+        return text
 
+    # Full format: text + sources
     if sources:
         text += "\n\n## Sources\n"
-        seen_urls: set[str] = set()
-        for i, source in enumerate(sources, 1):
-            url = source["url"]
-            if url in seen_urls:
-                continue
-            seen_urls.add(url)
-            title = source["title"] or url
-            text += f"{i}. [{title}]({url})\n"
+        text += _format_sources(sources, max_sources=max_sources)
 
     return text
+
+
+def _format_sources(sources: list[dict[str, str]], *, max_sources: int | None = None) -> str:
+    """Format source citations with deduplication and optional limit.
+
+    Args:
+        sources: List of source dicts with 'title' and 'url' keys
+        max_sources: Maximum number of sources to include (None for unlimited)
+
+    Returns:
+        Formatted source list with numbered markdown links
+    """
+    result = ""
+    seen_urls: set[str] = set()
+    display_num = 0
+
+    for source in sources:
+        url = source["url"]
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+        display_num += 1
+
+        if max_sources is not None and display_num > max_sources:
+            break
+
+        title = source["title"] or url
+        result += f"{display_num}. [{title}]({url})\n"
+
+    return result
+
+
+def _format_error(e: Exception) -> str:
+    """Format error message with helpful context.
+
+    Args:
+        e: The exception that occurred
+
+    Returns:
+        User-friendly error message
+    """
+    error_str = str(e).lower()
+
+    if "quota" in error_str or "rate" in error_str:
+        return "Error: API quota exceeded. Try again later."
+    elif "authentication" in error_str or "api key" in error_str or "unauthorized" in error_str:
+        return "Error: Invalid GEMINI_API_KEY. Check secrets.yaml."
+    elif "timeout" in error_str:
+        return "Error: Request timed out. Try a simpler query or increase timeout."
+    else:
+        return f"Search failed: {e}"
 
 
 def _grounded_search(
@@ -141,6 +220,9 @@ def _grounded_search(
     *,
     span_name: str,
     model: str | None = None,
+    timeout: float = 30.0,
+    output_format: OutputFormat = "full",
+    max_sources: int | None = None,
     **log_extras: Any,
 ) -> str:
     """Execute a grounded search query.
@@ -149,6 +231,9 @@ def _grounded_search(
         prompt: The search prompt to send to Gemini
         span_name: Name for the log span
         model: Gemini model to use (defaults to config)
+        timeout: Request timeout in seconds (default: 30.0)
+        output_format: Output format - "full", "text_only", or "sources_only"
+        max_sources: Maximum number of sources to include (None for unlimited)
         **log_extras: Additional fields to log
 
     Returns:
@@ -163,22 +248,30 @@ def _grounded_search(
             # Configure grounding with Google Search
             google_search_tool = types.Tool(google_search=types.GoogleSearch())
 
+            # Build config with timeout
+            config = types.GenerateContentConfig(
+                tools=[google_search_tool],
+                http_options={"timeout": timeout * 1000},  # Convert to milliseconds
+            )
+
             response = client.models.generate_content(
                 model=model,
                 contents=prompt,
-                config=types.GenerateContentConfig(
-                    tools=[google_search_tool],
-                ),
+                config=config,
             )
 
-            result = _format_response(response)
-            s.add("hasResults", bool(result and result != "No results found."))
+            result = _format_response(
+                response,
+                output_format=output_format,
+                max_sources=max_sources,
+            )
+            s.add("hasResults", bool(result and result not in ("No results found.", "No sources found.")))
             s.add("resultLen", len(result))
             return result
 
         except Exception as e:
             s.add("error", str(e))
-            return f"Error: {e}"
+            return _format_error(e)
 
 
 def search(
@@ -187,6 +280,9 @@ def search(
     context: str = "",
     focus: Literal["general", "code", "documentation", "troubleshooting"] = "general",
     model: str | None = None,
+    timeout: float = 30.0,
+    max_sources: int | None = None,
+    output_format: OutputFormat = "full",
 ) -> str:
     """Search the web using Google Gemini with grounding.
 
@@ -194,7 +290,7 @@ def search(
     Results include content and source citations.
 
     Args:
-        query: The search query
+        query: The search query (cannot be empty)
         context: Additional context to refine the search (e.g., "Python async")
         focus: Search focus mode:
             - "general": General purpose search (default)
@@ -202,9 +298,15 @@ def search(
             - "documentation": Focus on official documentation
             - "troubleshooting": Focus on solving problems and debugging
         model: Gemini model to use (defaults to config, e.g., "gemini-2.5-flash")
+        timeout: Request timeout in seconds (default: 30.0)
+        max_sources: Maximum number of sources to include (None for unlimited)
+        output_format: Output format - "full" (default), "text_only", or "sources_only"
 
     Returns:
         Search results with content and source citations
+
+    Raises:
+        ValueError: If query is empty or whitespace-only
 
     Example:
         # Basic search
@@ -221,7 +323,16 @@ def search(
 
         # Use a specific model
         ground.search(query="latest AI news", model="gemini-3.0-flash")
+
+        # Get only sources
+        ground.search(query="Python tutorials", output_format="sources_only")
+
+        # Limit sources
+        ground.search(query="machine learning", max_sources=5)
     """
+    if not query or not query.strip():
+        raise ValueError("query cannot be empty")
+
     # Build the search prompt
     focus_instructions = {
         "general": "Provide a comprehensive answer with relevant information.",
@@ -243,6 +354,9 @@ def search(
         prompt,
         span_name="ground.search",
         model=model,
+        timeout=timeout,
+        output_format=output_format,
+        max_sources=max_sources,
         query=query,
         focus=focus,
     )
@@ -253,6 +367,10 @@ def search_batch(
     queries: list[tuple[str, str] | str],
     context: str = "",
     focus: Literal["general", "code", "documentation", "troubleshooting"] = "general",
+    model: str | None = None,
+    timeout: float = 30.0,
+    max_sources: int | None = None,
+    output_format: OutputFormat = "full",
 ) -> str:
     """Execute multiple grounded searches concurrently and return combined results.
 
@@ -268,9 +386,16 @@ def search_batch(
             - "code": Focus on code examples and implementations
             - "documentation": Focus on official documentation
             - "troubleshooting": Focus on solving problems and debugging
+        model: Gemini model to use (defaults to config)
+        timeout: Request timeout in seconds (default: 30.0)
+        max_sources: Maximum number of sources per query (None for unlimited)
+        output_format: Output format - "full" (default), "text_only", or "sources_only"
 
     Returns:
         Combined formatted results with labels
+
+    Raises:
+        ValueError: If queries list is empty
 
     Example:
         # Simple list of queries
@@ -289,8 +414,18 @@ def search_batch(
             context="Python web development",
             focus="code"
         )
+
+        # With model and timeout
+        ground.search_batch(
+            queries=["AI news", "ML trends"],
+            model="gemini-3.0-flash",
+            timeout=60.0
+        )
     """
     normalized = normalize_items(queries)
+
+    if not normalized:
+        raise ValueError("queries list cannot be empty")
 
     with LogSpan(span="ground.batch", query_count=len(normalized), focus=focus) as s:
 
@@ -300,6 +435,10 @@ def search_batch(
                 query=query,
                 context=context,
                 focus=focus,
+                model=model,
+                timeout=timeout,
+                max_sources=max_sources,
+                output_format=output_format,
             )
             return label, result
 
@@ -314,6 +453,9 @@ def dev(
     query: str,
     language: str = "",
     framework: str = "",
+    timeout: float = 30.0,
+    max_sources: int | None = None,
+    output_format: OutputFormat = "full",
 ) -> str:
     """Search for developer resources and documentation.
 
@@ -321,12 +463,18 @@ def dev(
     Stack Overflow discussions, and technical documentation.
 
     Args:
-        query: The technical search query
+        query: The technical search query (cannot be empty)
         language: Programming language to prioritize (e.g., "Python", "TypeScript")
         framework: Framework to prioritize (e.g., "FastAPI", "React")
+        timeout: Request timeout in seconds (default: 30.0)
+        max_sources: Maximum number of sources to include (None for unlimited)
+        output_format: Output format - "full" (default), "text_only", or "sources_only"
 
     Returns:
         Developer resources with content and source citations
+
+    Raises:
+        ValueError: If query is empty or whitespace-only
 
     Example:
         # Basic developer search
@@ -338,6 +486,9 @@ def dev(
         # Framework-specific search
         ground.dev(query="dependency injection", framework="FastAPI")
     """
+    if not query or not query.strip():
+        raise ValueError("query cannot be empty")
+
     prompt_parts = [
         f"Developer search: {query}",
         "\nFocus on: GitHub repositories, Stack Overflow, technical documentation, "
@@ -357,6 +508,9 @@ def dev(
     return _grounded_search(
         prompt,
         span_name="ground.dev",
+        timeout=timeout,
+        output_format=output_format,
+        max_sources=max_sources,
         query=query,
         language=language or None,
         framework=framework or None,
@@ -367,6 +521,9 @@ def docs(
     *,
     query: str,
     technology: str = "",
+    timeout: float = 30.0,
+    max_sources: int | None = None,
+    output_format: OutputFormat = "full",
 ) -> str:
     """Search for official documentation.
 
@@ -374,11 +531,17 @@ def docs(
     Prioritizes authoritative sources.
 
     Args:
-        query: The documentation search query
+        query: The documentation search query (cannot be empty)
         technology: Technology/library name to focus on (e.g., "React", "Django")
+        timeout: Request timeout in seconds (default: 30.0)
+        max_sources: Maximum number of sources to include (None for unlimited)
+        output_format: Output format - "full" (default), "text_only", or "sources_only"
 
     Returns:
         Documentation content with source citations
+
+    Raises:
+        ValueError: If query is empty or whitespace-only
 
     Example:
         # Basic documentation search
@@ -387,6 +550,9 @@ def docs(
         # Technology-specific docs
         ground.docs(query="hooks lifecycle", technology="React")
     """
+    if not query or not query.strip():
+        raise ValueError("query cannot be empty")
+
     prompt_parts = [f"Documentation search: {query}"]
 
     if technology:
@@ -406,6 +572,9 @@ def docs(
     return _grounded_search(
         prompt,
         span_name="ground.docs",
+        timeout=timeout,
+        output_format=output_format,
+        max_sources=max_sources,
         query=query,
         technology=technology or None,
     )
@@ -415,6 +584,9 @@ def reddit(
     *,
     query: str,
     subreddit: str = "",
+    timeout: float = 30.0,
+    max_sources: int | None = None,
+    output_format: OutputFormat = "full",
 ) -> str:
     """Search Reddit discussions.
 
@@ -427,11 +599,17 @@ def reddit(
           the subreddit parameter acts as important context for the grounding model
 
     Args:
-        query: The Reddit search query
+        query: The Reddit search query (cannot be empty)
         subreddit: Specific subreddit to search (e.g., "programming", "python")
+        timeout: Request timeout in seconds (default: 30.0)
+        max_sources: Maximum number of sources to include (None for unlimited)
+        output_format: Output format - "full" (default), "text_only", or "sources_only"
 
     Returns:
         Reddit discussion content with source citations
+
+    Raises:
+        ValueError: If query is empty or whitespace-only
 
     Example:
         # General Reddit search
@@ -440,6 +618,9 @@ def reddit(
         # Subreddit-specific search
         ground.reddit(query="FastAPI vs Flask", subreddit="python")
     """
+    if not query or not query.strip():
+        raise ValueError("query cannot be empty")
+
     prompt_parts = [f"Reddit search: {query}"]
 
     if subreddit:
@@ -457,6 +638,9 @@ def reddit(
     return _grounded_search(
         prompt,
         span_name="ground.reddit",
+        timeout=timeout,
+        output_format=output_format,
+        max_sources=max_sources,
         query=query,
         subreddit=subreddit or None,
     )
