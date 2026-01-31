@@ -175,22 +175,14 @@ API_KEY: "${MY_ENV_VAR}"
 
 ### Accessing Secrets in Tools
 
-Extension tools access secrets via the SDK:
-
-```python
-from ot_sdk import get_secret
-
-api_key = get_secret("BRAVE_API_KEY")
-if not api_key:
-    return "Error: BRAVE_API_KEY not configured in secrets.yaml"
-```
-
-In-process tools can also use `get_secret`:
+Tools access secrets via `ot.config.secrets`:
 
 ```python
 from ot.config.secrets import get_secret
 
 api_key = get_secret("BRAVE_API_KEY")
+if not api_key:
+    return "Error: BRAVE_API_KEY not configured in secrets.yaml"
 ```
 
 ## YAML Configuration Schema
@@ -364,18 +356,20 @@ All tools section fields are optional. Omitted fields use defaults shown above.
 Track runtime statistics to measure OneTool's efficiency:
 
 ```yaml
-tools:
-  stats:
-    enabled: true                    # Enable/disable statistics collection
-    persist_path: stats.jsonl        # JSONL file path (relative to config dir)
-    flush_interval_seconds: 30       # How often to write to disk
-    context_per_call: 30000          # Estimated context tokens saved per call
-    time_overhead_per_call_ms: 4000  # Estimated time overhead saved per call
-    model: anthropic/claude-opus-4.5 # Model name for cost display
-    cost_per_million_input_tokens: 15.0   # Input cost (USD)
-    cost_per_million_output_tokens: 75.0  # Output cost (USD)
-    chars_per_token: 4.0             # Characters per token estimate
+stats:
+  enabled: true                    # Enable/disable statistics collection
+  persist_dir: stats               # Directory for stats files (relative to .onetool/)
+  persist_path: stats.jsonl        # JSONL file path (within persist_dir)
+  flush_interval_seconds: 30       # How often to write to disk
+  context_per_call: 30000          # Estimated context tokens saved per call
+  time_overhead_per_call_ms: 4000  # Estimated time overhead saved per call
+  model: anthropic/claude-opus-4.5 # Model name for cost display
+  cost_per_million_input_tokens: 15.0   # Input cost (USD)
+  cost_per_million_output_tokens: 75.0  # Output cost (USD)
+  chars_per_token: 4.0             # Characters per token estimate
 ```
+
+**Note:** The `tools.stats` path is deprecated. Use root-level `stats:` instead.
 
 **What's tracked:**
 - Tool name, characters in/out, duration
@@ -414,6 +408,51 @@ cost = (input_tokens / 1M × input_cost) + (output_tokens / 1M × output_cost)
 ```
 
 The HTML report shows the estimated cost with the model name for reference.
+
+### Output Configuration
+
+Control large output handling when tool results exceed token limits:
+
+```yaml
+output:
+  max_inline_size: 50000      # Threshold in bytes (0 to disable)
+  result_store_dir: tmp       # Directory for stored results (relative to .onetool/)
+  result_ttl: 3600            # Time-to-live in seconds (0 = no expiry)
+  preview_lines: 10           # Lines to include in summary preview
+```
+
+**How it works:**
+
+When a tool output exceeds `max_inline_size`, OneTool:
+
+1. Stores the full result in `.onetool/tmp/` as `.jsonl` (structured) or `.txt` (unstructured)
+2. Returns a summary with handle, preview, and query hint
+3. LLM can use `ot.result(handle="...")` to paginate through the full content
+
+**Querying stored results:**
+
+```python
+# Get first 100 lines
+ot.result(handle="abc123")
+
+# Get lines 101-150
+ot.result(handle="abc123", offset=101, limit=50)
+
+# Filter by regex pattern
+ot.result(handle="abc123", search="error")
+
+# Fuzzy search
+ot.result(handle="abc123", search="config", fuzzy=True)
+```
+
+**Configuration reference:**
+
+| Field            | Type   | Default | Description                              |
+| ---------------- | ------ | ------- | ---------------------------------------- |
+| max_inline_size  | int    | 50000   | Threshold in bytes (0 disables)          |
+| result_store_dir | string | tmp     | Storage directory (relative to .onetool/)|
+| result_ttl       | int    | 3600    | Expiry time in seconds (0 = no expiry)   |
+| preview_lines    | int    | 10      | Lines in summary preview                 |
 
 ### Security Configuration
 

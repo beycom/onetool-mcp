@@ -13,13 +13,9 @@ OneTool supports two types of tools:
 | **Internal**  | `src/ot_tools/`    | In-process        | Bundled tools with OneTool |
 | **Extension** | `.onetool/tools/`  | Worker subprocess | User-created tools         |
 
-**Extension tools** (covered below) run in isolated subprocesses with their own dependencies via PEP 723. This ensures:
+**Extension tools** (covered below) run in-process using `ot.*` imports. For tools requiring dependency isolation, use PEP 723 headers to run as standalone subprocesses (no onetool imports).
 
-- Dependency isolation (your tools can't conflict with OneTool's packages)
-- Safe execution (crashes don't affect the server)
-- Clean imports (use `ot_sdk` for all OneTool functionality)
-
-If you're creating a tool for your project, follow the **Extension** pattern with PEP 723 headers.
+If you're creating a tool for your project, follow the **Extension** pattern.
 
 ## File Structure
 
@@ -197,108 +193,67 @@ def _get_client() -> "OpenAI":
 
 ## Extension Tools
 
-Tools with external dependencies run as isolated subprocesses using PEP 723:
+Extension tools run in-process and use `ot.*` imports:
 
 ```python
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["some-library>=1.0.0", "httpx>=0.27.0", "pyyaml>=6.0.0"]
-# ///
 """Tool module docstring."""
 
-from ot_sdk import get_config, get_secret, http, log, cache, worker_main
+from __future__ import annotations
 
 pack = "mytool"
 __all__ = ["search"]
 
-@cache(ttl=300)  # Cache results for 5 minutes
+from ot.config.secrets import get_secret
+from ot.logging import LogSpan
+
 def search(*, query: str) -> list[dict]:
     """Search for items."""
-    with log("mytool.search", query=query) as s:
+    with LogSpan(span="mytool.search", query=query) as s:
         api_key = get_secret("MY_API_KEY")
-        response = http.get(f"https://api.example.com/search?q={query}")
-        results = response.json()
+        # ... make API call ...
         s.add("resultCount", len(results))
-        return results  # Return native type directly
+        return results
+```
 
+### Isolated Tools (PEP 723)
+
+For tools requiring dependency isolation, use PEP 723 headers. These run as standalone subprocesses with **no onetool imports**:
+
+```python
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["httpx>=0.27.0"]
+# ///
+"""Isolated tool - runs via uv run with own dependencies."""
+
+import sys
+import json
+
+pack = "mytool"
+__all__ = ["search"]
+
+def search(*, query: str) -> str:
+    """Search for items."""
+    import httpx
+    response = httpx.get(f"https://api.example.com/search?q={query}")
+    return response.text
+
+# JSON-RPC stdin loop for subprocess communication
 if __name__ == "__main__":
-    worker_main()
+    for line in sys.stdin:
+        req = json.loads(line)
+        func = globals()[req["function"]]
+        try:
+            result = func(**req["kwargs"])
+            print(json.dumps({"result": result, "error": None}))
+        except Exception as e:
+            print(json.dumps({"result": None, "error": str(e)}))
+        sys.stdout.flush()
 ```
 
-> **⚠️ Critical:** The `if __name__ == "__main__": worker_main()` block is **required** for any file with a PEP 723 header. Without it, the tool will fail with "Worker for X.py closed unexpectedly" because:
-> 1. PEP 723 headers mark a tool as a worker (runs in subprocess)
-> 2. Workers communicate via stdin/stdout JSON-RPC
-> 3. `worker_main()` provides the stdin loop that handles requests
-> 4. Without it, the subprocess starts, executes module-level code, and exits immediately
->
-> If you have a PEP 723 header but don't need isolated dependencies, remove the header instead of adding `worker_main()`. This lets the tool run in-process.
+**⚠️ Critical:** All imports must be declared in the PEP 723 `dependencies` list. If you import a module without declaring it, the subprocess will crash with `ModuleNotFoundError`.
 
-**⚠️ Critical:** All imports must be declared in the PEP 723 `dependencies` list. Extension tools run in isolated environments where only declared dependencies are available. If you import a module (e.g., `from pydantic import BaseModel`) without declaring it in dependencies, the worker will crash with "Worker for X.py closed unexpectedly" due to `ModuleNotFoundError`.
-
-**Common dependencies to include:**
-- `pydantic>=2.0.0` - if using `BaseModel`, `Field`, validators
-- `httpx>=0.27.0` - if using the SDK's `http` module
-- `pyyaml>=6.0.0` - if using YAML serialization
-
-Run `uv run src/ot_tools/your_tool.py` locally to verify all imports resolve before deployment.
-
-### SDK Exports
-
-The `ot_sdk` package provides these utilities for extension tools:
-
-| Module | Purpose |
-|--------|---------|
-| `worker_main` | Main loop - dispatches JSON-RPC requests to functions |
-| `get_config(key)` | Access configuration from `onetool.yaml` |
-| `get_secret(key)` | Access secrets from `secrets.yaml` |
-| `http` | Pre-configured httpx client with connection pooling |
-| `log(span, **kwargs)` | Structured logging context manager |
-| `cache(ttl=seconds)` | In-memory caching decorator with TTL |
-| `resolve_cwd_path(path)` | Resolve paths relative to project directory |
-| `resolve_ot_path(path)` | Resolve paths relative to config directory |
-
-### HTTP Client
-
-The SDK provides a pre-configured httpx client:
-
-```python
-from ot_sdk import http
-
-# Simple requests
-response = http.get(url, params={}, headers={}, timeout=30)
-response = http.post(url, json={}, headers={})
-
-# Custom client for different settings
-client = http.client(base_url="https://api.example.com", timeout=60)
-response = client.get("/endpoint")
-```
-
-### Caching
-
-Use the `@cache` decorator for expensive operations:
-
-```python
-from ot_sdk import cache
-
-@cache(ttl=300)  # Cache for 5 minutes
-def fetch_data(*, url: str) -> str:
-    """Fetch and cache data."""
-    return http.get(url).text
-
-@cache(ttl=3600)  # Cache for 1 hour
-def expensive_computation(*, input: str) -> str:
-    """Cache expensive results."""
-    return process(input)
-```
-
-### Worker Communication Protocol
-
-Workers communicate via JSON-RPC over stdin/stdout:
-
-```json
-Request:  {"function": "name", "kwargs": {...}, "config": {...}, "secrets": {...}}
-Response: {"result": ..., "error": null} or {"result": null, "error": "message"}
-```
+Run `uv run your_tool.py` locally to verify all imports resolve.
 
 ## Configuration Access
 
@@ -343,7 +298,7 @@ Path functions support prefixes to override the default base:
 | `OT_DIR/` | Active `.onetool/`        | Project-first, global fallback |
 
 ```python
-from ot_sdk import resolve_cwd_path, resolve_ot_path
+from ot.paths import resolve_cwd_path, resolve_ot_path
 
 # Default: relative to project directory
 output = resolve_cwd_path("output/report.txt")
@@ -358,7 +313,7 @@ template = resolve_ot_path("templates/default.mmd")    # .onetool/templates/defa
 When reading or writing files in the user's project, resolve paths relative to the project working directory:
 
 ```python
-from ot_sdk import resolve_cwd_path
+from ot.paths import resolve_cwd_path
 
 def save_output(*, content: str, output_file: str = "output.txt") -> str:
     """Save content to a file in the project."""
@@ -381,11 +336,13 @@ def save_output(*, content: str, output_file: str = "output.txt") -> str:
 When loading configuration assets like templates, schemas, or reference files defined in config, resolve paths relative to the config directory:
 
 ```python
-from ot_sdk import get_config, resolve_ot_path
+from ot.config import get_tool_config
+from ot.paths import resolve_ot_path
 
 def get_template(*, name: str) -> str:
     """Load a template from config."""
-    templates = get_config("tools.mytool.templates") or {}
+    config = get_tool_config("mytool")
+    templates = getattr(config, "templates", {}) or {}
     if name not in templates:
         return f"Template not found: {name}"
 
@@ -424,10 +381,10 @@ def list_files(*, directory: str = ".") -> str:
 
 | Function             | Import From | Resolves Relative To           |
 |----------------------|-------------|--------------------------------|
-| `resolve_cwd_path()` | `ot_sdk`    | Project directory (`OT_CWD`)   |
-| `resolve_ot_path()`  | `ot_sdk`    | Config directory (`.onetool/`) |
+| `resolve_cwd_path()` | `ot.paths`  | Project directory (`OT_CWD`)   |
+| `resolve_ot_path()`  | `ot.paths`  | Config directory (`.onetool/`) |
 | `get_effective_cwd()`| `ot.paths`  | Returns project directory      |
-| `expand_path()`      | `ot_sdk`    | Only expands `~`               |
+| `expand_path()`      | `ot.paths`  | Only expands `~`               |
 
 ## Attribution & Licensing
 
@@ -502,11 +459,10 @@ For "Based on" tools, include the upstream license:
 
 ```text
 src/
-├── ot/           # Core library
-├── ot_sdk/       # SDK for extension tools
+├── ot/           # Core library (config, logging, paths, utils)
 ├── ot_tools/     # Built-in tools (auto-discovered)
-├── onetool/     # CLI: onetool
-└── bench/     # CLI: bench
+├── onetool/      # CLI: onetool
+└── bench/        # CLI: bench
 ```
 
 ## Contributing

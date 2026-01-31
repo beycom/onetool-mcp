@@ -3,6 +3,16 @@
 ## Purpose
 
 Provides fast text and regex search in files using ripgrep (`rg`). Requires the `rg` binary in PATH. Inspired by [mcp-ripgrep](https://github.com/mcollina/mcp-ripgrep) by Matteo Collina (MIT License).
+
+Configuration via `onetool.yaml`:
+
+```yaml
+tools:
+  ripgrep:
+    timeout: 60.0           # Command timeout in seconds (default: 60)
+    relative_paths: true    # Output relative paths (default: true)
+```
+
 ## Requirements
 ### Requirement: Text Search
 

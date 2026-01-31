@@ -25,6 +25,7 @@ from loguru import logger
 from ot.config import get_config
 from ot.executor.fence_processor import strip_fences
 from ot.executor.pack_proxy import build_execution_namespace
+from ot.executor.result_store import get_result_store
 from ot.executor.tool_loader import load_tool_functions, load_tool_registry
 from ot.logging import LogSpan
 from ot.utils import sanitize_output, serialize_result
@@ -117,16 +118,9 @@ def prepare_code_for_exec(
 
     if isinstance(last_stmt, ast.Expr):
         # Last statement is an expression - capture its value
-        # Use AST line numbers to find where the expression starts
+        # Use AST to find where the expression starts (handles semicolon-separated statements)
         lines = stripped.split("\n")
-
-        if len(lines) == 1:
-            # Single expression
-            return f"return {stripped}", True
-
-        # Multi-line: insert return at the START of the expression
-        # AST line numbers are 1-indexed
-        expr_start_line = last_stmt.lineno - 1  # Convert to 0-indexed
+        expr_start_line = last_stmt.lineno - 1  # AST is 1-indexed
         expr_col = last_stmt.col_offset
 
         # Insert 'return ' at the expression start position
@@ -471,6 +465,20 @@ async def execute_command(
                 result = execute_python_code(
                     stripped, tool_functions=tool_namespace, validate=should_validate
                 )
+
+            # Check for large output and store if needed
+            config = get_config()
+            max_size = config.output.max_inline_size
+            result_size = len(result.encode("utf-8"))
+
+            if max_size > 0 and result_size > max_size:
+                # Store large output and return summary
+                store = get_result_store()
+                stored = store.store(result, tool=stripped[:50])
+                result = serialize_result(stored.to_dict(), "json")
+                span.add("storedHandle", stored.handle)
+                span.add("storedSize", result_size)
+
             span.add("resultLength", len(result))
             return CommandResult(
                 command=command,

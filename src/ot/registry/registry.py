@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
@@ -254,7 +254,9 @@ class ToolRegistry:
                         return names
         return None
 
-    def _extract_requires(self, tree: ast.Module) -> dict[str, list[str]] | None:
+    def _extract_requires(
+        self, tree: ast.Module
+    ) -> dict[str, list[tuple[str, ...] | dict[str, str] | str]] | None:
         """Extract __ot_requires__ dict from module AST.
 
         Looks for module-level assignment: __ot_requires__ = {"cli": [...], "lib": [...]}
@@ -271,7 +273,11 @@ class ToolRegistry:
                     if isinstance(target, ast.Name) and target.id == "__ot_requires__":
                         try:
                             # Safely evaluate the dict literal
-                            return ast.literal_eval(ast.unparse(node.value))
+                            result = ast.literal_eval(ast.unparse(node.value))
+                            return cast(
+                                "dict[str, list[tuple[str, ...] | dict[str, str] | str]]",
+                                result,
+                            )
                         except (ValueError, TypeError):
                             return None
         return None

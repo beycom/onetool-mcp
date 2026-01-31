@@ -83,6 +83,11 @@ class Config(BaseModel):
         default=True,
         description="Move files to trash instead of permanent deletion",
     )
+    relative_paths: bool = Field(
+        default=True,
+        description="Output relative paths instead of absolute paths",
+    )
+
 
 # Optional send2trash for safe deletion
 try:
@@ -335,7 +340,7 @@ def _create_backup(path: Path) -> str | None:
 def read(
     *,
     path: str,
-    offset: int = 0,
+    offset: int = 1,
     limit: int | None = None,
     encoding: str = "utf-8",
 ) -> str:
@@ -346,7 +351,7 @@ def read(
 
     Args:
         path: Path to file (relative to cwd or absolute)
-        offset: Line number to start from (0-indexed, default: 0)
+        offset: Line number to start from (1-indexed, default: 1)
         limit: Maximum lines to return (default: all remaining)
         encoding: Text encoding (default: utf-8)
 
@@ -394,25 +399,29 @@ def read(
             lines = content.splitlines()
             total_lines = len(lines)
 
-            if offset >= total_lines:
+            # Convert 1-indexed offset to 0-indexed start position
+            start_idx = max(0, offset - 1)
+
+            if start_idx >= total_lines:
                 s.add(resultLen=0, totalLines=total_lines)
-                return f"(empty - offset {offset} >= total lines {total_lines})"
+                return f"(empty - line {offset} > total lines {total_lines})"
 
             # Apply pagination
-            end_line = offset + limit if limit else total_lines
+            end_idx = start_idx + limit if limit else total_lines
             output_lines = [
                 f"{i + 1:6d}\t{line}"
                 for i, line in enumerate(lines)
-                if offset <= i < end_line
+                if start_idx <= i < end_idx
             ]
             lines_collected = len(output_lines)
 
             result = "\n".join(output_lines)
 
             # Add pagination info if truncated
-            remaining = total_lines - (offset + lines_collected)
+            remaining = total_lines - (start_idx + lines_collected)
             if remaining > 0:
-                result += f"\n\n... ({remaining} more lines, use offset={offset + lines_collected} to continue)"
+                next_line = start_idx + lines_collected + 1  # 1-indexed
+                result += f"\n\n... ({remaining} more lines, use offset={next_line} to continue)"
 
             s.add(
                 resultLen=len(result),
@@ -448,6 +457,8 @@ def info(*, path: str) -> dict[str, Any] | str:
             return f"Error: {error}"
         assert resolved is not None  # mypy: error check above ensures this
 
+        cfg = _get_file_config()
+
         try:
             st = resolved.stat()
 
@@ -469,8 +480,19 @@ def info(*, path: str) -> dict[str, Any] | str:
             # Format permissions
             mode = stat.filemode(st.st_mode)
 
+            # Use relative path if configured
+            cwd = resolve_cwd_path(".")
+            if cfg.relative_paths:
+                try:
+                    display_path = str(resolved.relative_to(cwd))
+                except ValueError:
+                    # Path is outside cwd, use absolute
+                    display_path = str(resolved)
+            else:
+                display_path = str(resolved)
+
             info_data: dict[str, Any] = {
-                "path": str(resolved),
+                "path": display_path,
                 "type": file_type,
                 "size": st.st_size,
                 "size_readable": _format_size(st.st_size),

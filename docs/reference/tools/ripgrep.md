@@ -32,6 +32,17 @@ Fast text and regex search in files using ripgrep.
 | `glob` | str | Filter by glob pattern (e.g., "*.md") |
 | `context` | int | Lines of context around matches |
 | `max_results` | int | Limit number of matching lines |
+| `word_match` | bool | Match whole words only (default: False) |
+| `include_hidden` | bool | Search hidden files and directories (default: False) |
+
+## Configuration
+
+```yaml
+tools:
+  ripgrep:
+    timeout: 60.0           # Command timeout in seconds
+    relative_paths: true    # Output relative paths (default)
+```
 
 ## Requires
 

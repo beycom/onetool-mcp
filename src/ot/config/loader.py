@@ -202,6 +202,34 @@ class SecurityConfig(BaseModel):
     )
 
 
+class OutputConfig(BaseModel):
+    """Large output handling configuration.
+
+    When tool outputs exceed max_inline_size, they are stored to disk
+    and a summary with a query handle is returned instead.
+    """
+
+    max_inline_size: int = Field(
+        default=50000,
+        ge=0,
+        description="Max output size in bytes before storing to disk. Set to 0 to disable.",
+    )
+    result_store_dir: str = Field(
+        default="tmp",
+        description="Directory for result files (relative to .onetool/)",
+    )
+    result_ttl: int = Field(
+        default=3600,
+        ge=0,
+        description="Time-to-live in seconds for stored results (0 = no expiry)",
+    )
+    preview_lines: int = Field(
+        default=10,
+        ge=0,
+        description="Number of preview lines to include in summary",
+    )
+
+
 class StatsConfig(BaseModel):
     """Runtime statistics collection configuration."""
 
@@ -331,6 +359,11 @@ class OneToolConfig(BaseModel):
     stats: StatsConfig = Field(
         default_factory=StatsConfig,
         description="Runtime statistics collection configuration (replaces tools.stats)",
+    )
+
+    output: OutputConfig = Field(
+        default_factory=OutputConfig,
+        description="Large output handling configuration",
     )
 
     tools_dir: list[str] = Field(
@@ -556,6 +589,16 @@ class OneToolConfig(BaseModel):
             Absolute Path to stats file
         """
         return self.get_stats_dir_path() / self.stats.persist_path
+
+    def get_result_store_path(self) -> Path:
+        """Get the resolved path to the result store directory.
+
+        Path is resolved relative to the .onetool/ directory.
+
+        Returns:
+            Absolute Path to result store directory
+        """
+        return self._resolve_onetool_relative_path(self.output.result_store_dir)
 
 
 def _resolve_config_path(config_path: Path | str | None) -> Path | None:

@@ -48,6 +48,49 @@ class TestResolvePath:
 
 @pytest.mark.unit
 @pytest.mark.tools
+class TestToRelativeOutput:
+    """Test _to_relative_output function."""
+
+    def test_converts_absolute_to_relative(self):
+        from ot_tools.ripgrep import Config, _to_relative_output
+
+        with patch("ot_tools.ripgrep.get_tool_config") as mock:
+            mock.return_value = Config(relative_paths=True)
+            result = _to_relative_output(
+                "/project/src/main.py:10:match\n/project/src/utils.py:20:other",
+                Path("/project"),
+            )
+
+        assert result == "src/main.py:10:match\nsrc/utils.py:20:other"
+
+    def test_preserves_absolute_when_disabled(self):
+        from ot_tools.ripgrep import Config, _to_relative_output
+
+        with patch("ot_tools.ripgrep.get_tool_config") as mock:
+            mock.return_value = Config(relative_paths=False)
+            result = _to_relative_output(
+                "/project/src/main.py:10:match",
+                Path("/project"),
+            )
+
+        assert result == "/project/src/main.py:10:match"
+
+    def test_handles_mixed_paths(self):
+        from ot_tools.ripgrep import Config, _to_relative_output
+
+        with patch("ot_tools.ripgrep.get_tool_config") as mock:
+            mock.return_value = Config(relative_paths=True)
+            result = _to_relative_output(
+                "/project/src/main.py:10:match\n--\n/project/src/utils.py:20:other",
+                Path("/project"),
+            )
+
+        assert "src/main.py" in result
+        assert "--" in result  # Context separator preserved
+
+
+@pytest.mark.unit
+@pytest.mark.tools
 class TestCheckRgInstalled:
     """Test _check_rg_installed function."""
 
@@ -81,11 +124,11 @@ class TestCheckRgInstalled:
 
 @pytest.fixture
 def mock_ripgrep_config():
-    """Mock get_tool_config to return a Config with default timeout."""
+    """Mock get_tool_config to return a Config with default timeout and relative paths."""
     from ot_tools.ripgrep import Config
 
     with patch("ot_tools.ripgrep.get_tool_config") as mock:
-        mock.return_value = Config(timeout=30)
+        mock.return_value = Config(timeout=30, relative_paths=True)
         yield mock
 
 

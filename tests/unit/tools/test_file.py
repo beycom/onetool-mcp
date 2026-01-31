@@ -29,6 +29,7 @@ def mock_file_config(tmp_path: Path) -> Generator[None, None, None]:
         max_list_entries=1000,
         backup_on_write=False,  # Disable for cleaner tests
         use_trash=False,  # Disable for cleaner tests
+        relative_paths=True,  # Use relative paths (default)
     )
 
     # Mock effective CWD to tmp_path for path resolution
@@ -110,12 +111,27 @@ def test_read_file(test_file: Path) -> None:
 @pytest.mark.unit
 @pytest.mark.tools
 def test_read_with_offset(test_file: Path) -> None:
-    """Verify read respects offset parameter."""
+    """Verify read respects offset parameter (1-indexed, start at line N)."""
     from ot_tools.file import read
 
-    result = read(path=str(test_file), offset=1)
+    # offset=2 means start at line 2 (1-indexed)
+    result = read(path=str(test_file), offset=2)
 
     assert "Line 1" not in result
+    assert "Line 2" in result
+    assert "Line 3" in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_read_offset_default_is_line_1(test_file: Path) -> None:
+    """Verify read with offset=1 (default) starts at line 1."""
+    from ot_tools.file import read
+
+    # offset=1 means start at line 1 (the first line)
+    result = read(path=str(test_file), offset=1)
+
+    assert "Line 1" in result
     assert "Line 2" in result
     assert "Line 3" in result
 

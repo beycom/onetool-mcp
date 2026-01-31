@@ -1215,3 +1215,62 @@ The system SHALL support configuration for output sanitisation in the security s
 - **WHEN** defaults are applied
 - **THEN** `enabled` SHALL default to `true`
 
+### Requirement: Output Configuration
+
+The system SHALL support configuration for large output handling in the `output` section.
+
+#### Scenario: Default output configuration
+- **GIVEN** no `output:` section in config
+- **WHEN** configuration is loaded
+- **THEN** defaults SHALL be:
+  - `max_inline_size`: 50000 (bytes)
+  - `result_store_dir`: `tmp` (relative to `.onetool/`)
+  - `result_ttl`: 3600 (seconds)
+  - `preview_lines`: 10
+
+#### Scenario: Custom max_inline_size
+- **GIVEN** configuration:
+  ```yaml
+  output:
+    max_inline_size: 100000
+  ```
+- **WHEN** configuration is loaded
+- **THEN** large output threshold SHALL be 100000 bytes
+
+#### Scenario: Custom result_store_dir
+- **GIVEN** configuration:
+  ```yaml
+  output:
+    result_store_dir: results
+  ```
+- **WHEN** configuration is loaded
+- **THEN** results SHALL be stored in `.onetool/results/`
+
+#### Scenario: Custom result_ttl
+- **GIVEN** configuration:
+  ```yaml
+  output:
+    result_ttl: 7200
+  ```
+- **WHEN** configuration is loaded
+- **THEN** results SHALL expire after 7200 seconds (2 hours)
+
+#### Scenario: Custom preview_lines
+- **GIVEN** configuration:
+  ```yaml
+  output:
+    preview_lines: 20
+  ```
+- **WHEN** a large output is stored
+- **THEN** summary preview SHALL include first 20 lines
+
+#### Scenario: Disabled large output handling
+- **GIVEN** configuration:
+  ```yaml
+  output:
+    max_inline_size: 0
+  ```
+- **WHEN** configuration is loaded
+- **THEN** large output handling SHALL be disabled
+- **AND** all outputs SHALL be returned inline
+

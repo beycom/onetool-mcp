@@ -426,3 +426,65 @@ The `ot.help()` function SHALL provide unified help across tools, packs, snippet
 - **THEN** it SHALL return a message indicating no matches found
 - **AND** suggest using `ot.tools()` or `ot.packs()` to browse available items
 
+### Requirement: Query Stored Results
+
+The `ot.result()` function SHALL query stored large outputs with offset/limit semantics.
+
+#### Scenario: Basic query with defaults
+- **GIVEN** a stored result with handle `abc123`
+- **WHEN** `ot.result(handle="abc123")` is called
+- **THEN** it SHALL return lines 1-100 (default offset=1, limit=100)
+
+#### Scenario: Query with offset and limit
+- **GIVEN** a stored result with 500 lines
+- **WHEN** `ot.result(handle="abc123", offset=101, limit=50)` is called
+- **THEN** it SHALL return lines 101-150
+
+#### Scenario: Query with search filter
+- **GIVEN** a stored result containing lines with "error" and lines without
+- **WHEN** `ot.result(handle="abc123", search="error")` is called
+- **THEN** it SHALL return only lines matching the regex pattern "error"
+- **AND** offset/limit SHALL apply to filtered results
+
+#### Scenario: Query with fuzzy matching
+- **GIVEN** a stored result containing "configuration"
+- **WHEN** `ot.result(handle="abc123", search="config", fuzzy=True)` is called
+- **THEN** it SHALL use fuzzy matching to find similar content
+- **AND** results SHALL be sorted by match score
+
+#### Scenario: Invalid handle
+- **GIVEN** handle "nonexistent" does not exist
+- **WHEN** `ot.result(handle="nonexistent")` is called
+- **THEN** it SHALL return an error message indicating handle not found
+
+#### Scenario: Expired handle
+- **GIVEN** a stored result that has exceeded TTL
+- **WHEN** `ot.result(handle="expired123")` is called
+- **THEN** it SHALL return an error message indicating result has expired
+
+#### Scenario: Query response format
+- **GIVEN** a stored result is queried
+- **WHEN** results are returned
+- **THEN** response SHALL include:
+  - `lines`: List of matching lines
+  - `total_lines`: Total lines in stored result
+  - `returned`: Number of lines returned
+  - `offset`: Starting offset used
+  - `has_more`: Boolean indicating if more lines exist
+
+#### Scenario: 1-indexed offset
+- **GIVEN** a stored result
+- **WHEN** `ot.result(handle="abc123", offset=1)` is called
+- **THEN** it SHALL start from the first line (matching Claude's `Read` tool semantics)
+- **AND** offset=0 SHALL be treated as offset=1
+
+### Requirement: Result Query Logging
+
+The `ot.result()` function SHALL follow logging conventions.
+
+#### Scenario: Span naming
+- **GIVEN** `ot.result()` is called
+- **WHEN** LogSpan is created
+- **THEN** span name SHALL be `ot.result`
+- **AND** span SHALL include: `handle`, `offset`, `limit`, `search` (if provided)
+

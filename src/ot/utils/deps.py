@@ -299,32 +299,37 @@ def check_deps(
 
         # Check CLI dependencies
         for cli_dep in tool.requires.get("cli", []):
-            # Handle both tuple format (name, install) and dict format
+            # Handle tuple format (name, install), dict format, or string
             if isinstance(cli_dep, tuple):
                 name, install = cli_dep[0], cli_dep[1] if len(cli_dep) > 1 else ""
-            else:
+            elif isinstance(cli_dep, dict):
                 name = cli_dep.get("name", "")
                 install = cli_dep.get("install", "")
+            else:
+                name, install = str(cli_dep), ""
             dep = check_cli(name)
             dep.install = install
             tool_result.dependencies.append(dep)
 
         # Check library dependencies
         for lib_dep in tool.requires.get("lib", []):
-            # Handle both tuple format (name, install) and dict format
+            # Handle tuple format (name, install), dict format, or string
             if isinstance(lib_dep, tuple):
                 name, install = lib_dep[0], lib_dep[1] if len(lib_dep) > 1 else ""
                 import_name = ""
-            else:
+            elif isinstance(lib_dep, dict):
                 name = lib_dep.get("name", "")
                 install = lib_dep.get("install", f"pip install {name}")
                 import_name = lib_dep.get("import_name", "")
+            else:
+                name, install, import_name = str(lib_dep), "", ""
             dep = check_lib(name, import_name)
             dep.install = install or f"pip install {name}"
             tool_result.dependencies.append(dep)
 
-        # Check secret dependencies
-        for secret_name in tool.requires.get("secrets", []):
+        # Check secret dependencies (secrets are always strings)
+        for secret_item in tool.requires.get("secrets", []):
+            secret_name = str(secret_item) if not isinstance(secret_item, str) else secret_item
             dep = check_secret(secret_name)
             dep.install = "Add to secrets.yaml"
             tool_result.dependencies.append(dep)

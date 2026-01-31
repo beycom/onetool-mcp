@@ -12,23 +12,14 @@ tools:
     allowed_dirs: ["."]           # Allowed directories (empty = cwd only)
     exclude_patterns:             # Patterns to exclude (defaults shown)
       - .git
-      - .svn
-      - .hg
       - node_modules
+      - __pycache__
       - .venv
       - venv
-      - __pycache__
-      - .pytest_cache
-      - .mypy_cache
-      - "*.pyc"
-      - dist
-      - build
-      - ".env*"
-      - .DS_Store
-      - Thumbs.db
     max_file_size: 10000000       # Max file size (10MB)
     backup_on_write: true         # Create .bak before writes
     use_trash: false              # Use send2trash if available
+    relative_paths: true          # Output relative paths (default: true)
 ```
 
 ## Requirements
@@ -74,7 +65,7 @@ The `file.read()` function SHALL read file content with optional pagination.
 #### Scenario: Line-based pagination
 - **GIVEN** a file path with offset and limit
 - **WHEN** `file.read(path=path, offset=100, limit=50)` is called
-- **THEN** it SHALL return lines 101-150 (0-indexed offset)
+- **THEN** it SHALL return lines 100-149 (1-indexed offset, start at line N)
 - **AND** it SHALL show pagination info if more lines remain
 
 #### Scenario: Binary file detection
@@ -101,7 +92,7 @@ The `file.info()` function SHALL return file metadata.
 - **GIVEN** a valid file path
 - **WHEN** `file.info(path=path)` is called
 - **THEN** it SHALL return YAML with:
-  - `path`: Resolved absolute path
+  - `path`: Relative path (or absolute if `relative_paths=False` or path is outside cwd)
   - `type`: "file", "directory", or "symlink"
   - `size`: Size in bytes
   - `size_readable`: Human-readable size (e.g., "1.23 MB")

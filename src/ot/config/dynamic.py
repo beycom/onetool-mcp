@@ -8,7 +8,7 @@ discovered and used for validation.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 from pydantic import BaseModel, Field, create_model
@@ -95,7 +95,7 @@ def _compile_config_class(
         if config_class and isinstance(config_class, type) and issubclass(
             config_class, BaseModel
         ):
-            return config_class
+            return cast("type[BaseModel]", config_class)
     except Exception:
         pass
 
@@ -117,4 +117,5 @@ def get_pack_config_raw(pack: str) -> dict[str, Any]:
 
     # Try to get from tools section as raw dict
     tools_dict = config.model_dump().get("tools", {})
-    return tools_dict.get(pack, {})
+    result: dict[str, Any] = tools_dict.get(pack, {})
+    return result

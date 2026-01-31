@@ -1,7 +1,3 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["pyyaml>=6.0.0"]
-# ///
 """Demo tools for OneTool testing and benchmarking.
 
 These tools return deterministic but non-guessable outputs based on input.
@@ -11,8 +7,6 @@ Used to verify that code was actually executed rather than guessed by an LLM.
 from __future__ import annotations
 
 import hashlib
-
-from ot_sdk import worker_main
 
 # Pack for dot notation: demo.foo(), demo.bar()
 pack = "demo"
@@ -98,5 +92,3 @@ def bar(*, text: str) -> str:
     return _BAR_WORDS[index]
 
 
-if __name__ == "__main__":
-    worker_main()

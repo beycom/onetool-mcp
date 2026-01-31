@@ -106,7 +106,8 @@ def _get_raw_config(pack: str) -> dict[str, Any]:
     if hasattr(tools, pack):
         pack_config = getattr(tools, pack)
         if hasattr(pack_config, "model_dump"):
-            return pack_config.model_dump()
+            result: dict[str, Any] = pack_config.model_dump()
+            return result
         # Handle raw dict from extra fields
         if isinstance(pack_config, dict):
             return pack_config

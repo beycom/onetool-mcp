@@ -163,6 +163,38 @@ foo"""
 
 @pytest.mark.unit
 @pytest.mark.core
+class TestExecSemicolonStatements:
+    """Test semicolon-separated statements on single line."""
+
+    def test_simple_semicolon(self, executor: Callable[[str], str]) -> None:
+        """Multiple statements with semicolons returning expression."""
+        code = "foo = 5; bar = 10; foo + bar"
+        result = executor(code)
+        assert result == "15"
+
+    def test_semicolon_with_import(self, executor: Callable[[str], str]) -> None:
+        """Import and expression on single line with semicolons."""
+        code = "import math; math.pi"
+        result = executor(code)
+        assert "3.14" in result
+
+    def test_semicolon_dict_return(self, executor: Callable[[str], str]) -> None:
+        """Semicolon statements with dict expression return."""
+        code = 'foo = "hello"; bar = "world"; {"foo": foo, "bar": bar}'
+        result = executor(code)
+        assert "foo" in result
+        assert "hello" in result
+
+    def test_semicolon_timing_pattern(self, executor: Callable[[str], str]) -> None:
+        """Common timing pattern with semicolons."""
+        code = 'import time; start = time.time(); result = {"test": 123}; elapsed = time.time() - start; {"time_seconds": round(elapsed, 4), "result": result}'
+        result = executor(code)
+        assert "time_seconds" in result
+        assert "result" in result
+
+
+@pytest.mark.unit
+@pytest.mark.core
 class TestExecLoops:
     """Test for loop constructs."""
 

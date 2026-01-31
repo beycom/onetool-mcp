@@ -12,6 +12,7 @@ Functions:
     ot.config() - Show configuration summary
     ot.health() - Check system health
     ot.stats() - Get runtime statistics
+    ot.result() - Query stored large output results
     ot.notify() - Publish message to topic
     ot.reload() - Force configuration reload
 """
@@ -22,9 +23,14 @@ import asyncio
 import fnmatch
 import inspect
 import sys
+import time as _time
+from collections.abc import (
+    Callable as _Callable,  # noqa: TC003 - used at runtime in timed()
+)
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
+from typing import TypeVar as _TypeVar
 
 import aiofiles
 import yaml
@@ -34,6 +40,8 @@ from ot.config import get_config
 from ot.logging import LogSpan
 from ot.paths import get_global_dir, get_project_dir, resolve_cwd_path
 from ot.proxy import get_proxy_manager
+
+_T = _TypeVar("_T")
 
 # Alias for cleaner logging calls in this module
 log = LogSpan
@@ -93,10 +101,36 @@ __all__ = [
     "notify",
     "packs",
     "reload",
+    "result",
     "snippets",
     "stats",
+    "timed",
     "tools",
 ]
+
+
+def timed(func: _Callable[..., _T], **kwargs: Any) -> dict[str, Any]:
+    """Execute a function and return result with timing info.
+
+    Args:
+        func: The function to call (e.g., brave.search)
+        **kwargs: Keyword arguments to pass to the function
+
+    Returns:
+        Dict with 'ms' (elapsed milliseconds) and 'result' keys
+
+    Example:
+        ot.timed(brave.search, query="AI news")
+        # Returns: {"ms": 234, "result": {...}}
+    """
+    start = _time.perf_counter()
+    result = func(**kwargs)
+    elapsed = _time.perf_counter() - start
+
+    return {
+        "ms": round(elapsed * 1000),
+        "result": result,
+    }
 
 
 def get_ot_pack_functions() -> dict[str, Any]:
@@ -113,9 +147,11 @@ def get_ot_pack_functions() -> dict[str, Any]:
         "config": config,
         "health": health,
         "help": help,
+        "result": result,
         "stats": stats,
         "notify": notify,
         "reload": reload,
+        "timed": timed,
     }
 
 
@@ -1165,6 +1201,76 @@ def stats(
             s.add("htmlReport", str(output_path))
 
         return result
+
+
+# ============================================================================
+# Result Query Function
+# ============================================================================
+
+
+def result(
+    *,
+    handle: str,
+    offset: int = 1,
+    limit: int = 100,
+    search: str = "",
+    fuzzy: bool = False,
+) -> dict[str, Any]:
+    """Query stored large output results with pagination.
+
+    When tool outputs exceed max_inline_size, they are stored to disk
+    and a handle is returned. Use this function to retrieve the content
+    with offset/limit semantics matching Claude's Read tool.
+
+    Args:
+        handle: The result handle from a stored output
+        offset: Starting line number (1-indexed, like Claude's Read tool)
+        limit: Maximum lines to return (default 100)
+        search: Regex pattern to filter lines (optional)
+        fuzzy: Use fuzzy matching instead of regex (optional)
+
+    Returns:
+        Dict with:
+        - lines: List of matching lines
+        - total_lines: Total lines in stored result
+        - returned: Number of lines returned
+        - offset: Starting offset used
+        - has_more: Boolean indicating if more lines exist
+
+    Raises:
+        ValueError: If handle not found or expired
+
+    Example:
+        ot.result(handle="abc123")
+        ot.result(handle="abc123", offset=101, limit=50)
+        ot.result(handle="abc123", search="error")
+        ot.result(handle="abc123", search="config", fuzzy=True)
+    """
+    from ot.executor.result_store import get_result_store
+
+    with log(
+        span="ot.result",
+        handle=handle,
+        offset=offset,
+        limit=limit,
+        search=search if search else None,
+    ) as s:
+        store = get_result_store()
+
+        try:
+            query_result = store.query(
+                handle=handle,
+                offset=offset,
+                limit=limit,
+                search=search,
+                fuzzy=fuzzy,
+            )
+            s.add("returned", query_result.returned)
+            s.add("totalLines", query_result.total_lines)
+            return query_result.to_dict()
+        except ValueError as e:
+            s.add("error", str(e))
+            raise
 
 
 # ============================================================================

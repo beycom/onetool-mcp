@@ -48,7 +48,7 @@ Secure file operations with configurable security boundaries. Read, write, edit,
 |-----------|------|-------------|
 | `path` | str | File or directory path (relative to cwd or absolute) |
 | `pattern` | str | Glob pattern for filtering (e.g., `*.py`, `**/*.md`) |
-| `offset` | int | Line number to start from (0-indexed) |
+| `offset` | int | Line number to start from (1-indexed, default: 1) |
 | `limit` | int | Maximum lines to return |
 | `occurrence` | int | Which match to replace (1=first, 0=all) |
 
@@ -65,6 +65,7 @@ tools:
     max_list_entries: 1000       # Max entries in list/tree
     backup_on_write: true        # Create .bak before writes
     use_trash: false             # Use send2trash if available
+    relative_paths: true         # Output relative paths (default)
 ```
 
 ## Examples

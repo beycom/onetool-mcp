@@ -192,14 +192,14 @@ def mock_http_get():
 
 @pytest.fixture
 def mock_secrets():
-    """Mock ot_sdk.get_secret for API key tests.
+    """Mock ot.config.secrets.get_secret for API key tests.
 
     Usage:
         def test_api_call(mock_secrets):
             mock_secrets.return_value = "test-api-key"
             # Run test that needs API key
     """
-    with patch("ot_sdk.get_secret") as mock:
+    with patch("ot.config.secrets.get_secret") as mock:
         yield mock
 
 
@@ -233,13 +233,3 @@ def mock_config():
         yield mock
 
 
-@pytest.fixture
-def mock_ot_sdk_config():
-    """Mock ot_sdk.get_config for SDK-based tools.
-
-    Usage:
-        def test_with_sdk_config(mock_ot_sdk_config):
-            mock_ot_sdk_config.return_value = "some-value"
-    """
-    with patch("ot_sdk.get_config") as mock:
-        yield mock

@@ -368,3 +368,62 @@ The system SHALL support a `__sanitize__` magic variable to control output sanit
 - **WHEN** the result is returned
 - **THEN** sanitisation SHALL NOT be applied (opt-in)
 
+### Requirement: Large Output Handling
+
+The system SHALL intercept tool outputs exceeding a configurable size threshold and store them to disk.
+
+#### Scenario: Output below threshold
+- **GIVEN** `output.max_inline_size` is configured to 50000 bytes
+- **WHEN** a tool returns output of 10000 bytes
+- **THEN** the output SHALL be returned inline unchanged
+
+#### Scenario: Output exceeds threshold
+- **GIVEN** `output.max_inline_size` is configured to 50000 bytes
+- **WHEN** a tool returns output of 100000 bytes
+- **THEN** the output SHALL be stored to `.onetool/tmp/`
+- **AND** a summary dict SHALL be returned instead of full content
+
+#### Scenario: Summary response format
+- **GIVEN** a large output is stored
+- **WHEN** the summary is returned
+- **THEN** it SHALL include:
+  - `handle`: Unique identifier for querying
+  - `format`: Storage format (`jsonl` or `txt`)
+  - `total_lines`: Line count of stored content
+  - `size_bytes`: Size of stored content
+  - `summary`: Human-readable summary (e.g., "847 matches in 42 files")
+  - `preview`: First N lines (configurable via `output.preview_lines`)
+  - `query`: Example query hint (e.g., `ot.result(handle='abc123', offset=1, limit=50)`)
+
+#### Scenario: Structured output detection
+- **GIVEN** a large output with many short lines of uniform structure
+- **WHEN** stored to disk
+- **THEN** the format SHALL be `jsonl`
+- **AND** the file SHALL be stored as `result-{guid}.jsonl`
+
+#### Scenario: Unstructured output detection
+- **GIVEN** a large output that is prose, HTML, or has long lines
+- **WHEN** stored to disk
+- **THEN** the format SHALL be `txt`
+- **AND** the file SHALL be stored as `result-{guid}.txt`
+
+#### Scenario: Meta file created
+- **GIVEN** a large output is stored
+- **WHEN** storage completes
+- **THEN** a meta file `result-{guid}.meta.json` SHALL be created
+- **AND** meta file SHALL contain: `handle`, `format`, `total_lines`, `size_bytes`, `created_at`, `tool`
+
+### Requirement: Result Store Cleanup
+
+The system SHALL automatically clean up expired result files.
+
+#### Scenario: TTL-based expiry
+- **GIVEN** `output.result_ttl` is configured to 3600 seconds
+- **WHEN** a result file is older than TTL
+- **THEN** it SHALL be eligible for cleanup
+
+#### Scenario: Cleanup on store
+- **GIVEN** expired result files exist
+- **WHEN** a new large output is stored
+- **THEN** expired files SHALL be cleaned up
+

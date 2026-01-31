@@ -44,6 +44,10 @@ class Config(BaseModel):
         le=300.0,
         description="Command timeout in seconds",
     )
+    relative_paths: bool = Field(
+        default=True,
+        description="Output relative paths instead of absolute paths",
+    )
 
 
 def _resolve_path(path: str) -> Path:
@@ -64,6 +68,32 @@ def _resolve_path(path: str) -> Path:
         Resolved absolute Path
     """
     return resolve_cwd_path(path)
+
+
+def _to_relative_output(output: str, base_path: Path) -> str:
+    """Convert absolute paths in ripgrep output to relative paths.
+
+    Args:
+        output: Raw ripgrep output with absolute paths
+        base_path: Base path to make paths relative to
+
+    Returns:
+        Output with paths converted to relative
+    """
+    cfg = get_tool_config("ripgrep", Config)
+    if not cfg.relative_paths:
+        return output
+
+    base_str = str(base_path)
+    lines = []
+    for line in output.split("\n"):
+        if line.startswith(base_str):
+            # Convert absolute path to relative
+            rel_line = line[len(base_str) :].lstrip("/\\")
+            lines.append(rel_line)
+        else:
+            lines.append(line)
+    return "\n".join(lines)
 
 
 def _check_rg_installed() -> str | None:
@@ -223,11 +253,14 @@ def search(
             s.add("matchCount", 0)
             return "No matches found"
 
+        # Convert to relative paths if configured
+        result = _to_relative_output(output.strip(), search_path)
+
         # Count matches
-        match_count = len(output.strip().split("\n"))
+        match_count = len(result.split("\n"))
         s.add("matchCount", match_count)
 
-        return output.strip()
+        return result
 
 
 def count(
@@ -301,17 +334,20 @@ def count(
             s.add("matchCount", 0)
             return "No matches found"
 
+        # Convert to relative paths if configured
+        result = _to_relative_output(output.strip(), search_path)
+
         # Sum total matches
         total = 0
-        for line in output.strip().split("\n"):
+        for line in result.split("\n"):
             if ":" in line:
                 with contextlib.suppress(ValueError):
                     total += int(line.split(":")[-1])
 
         s.add("totalCount", total)
-        s.add("fileCount", len(output.strip().split("\n")))
+        s.add("fileCount", len(result.split("\n")))
 
-        return output.strip()
+        return result
 
 
 def files(
@@ -378,10 +414,13 @@ def files(
             s.add("fileCount", 0)
             return "No files found"
 
-        file_count = len(output.strip().split("\n"))
+        # Convert to relative paths if configured
+        result = _to_relative_output(output.strip(), search_path)
+
+        file_count = len(result.split("\n"))
         s.add("fileCount", file_count)
 
-        return output.strip()
+        return result
 
 
 def types() -> str:

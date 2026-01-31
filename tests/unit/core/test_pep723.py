@@ -198,7 +198,7 @@ class TestExtensionToolDependencies:
     dependencies list, the worker will crash with "Worker closed unexpectedly".
     """
 
-    # Modules that are always available (stdlib or provided by ot_sdk)
+    # Modules that are always available (stdlib or in-process tools can use ot.*)
     ALLOWED_MODULES = {
         # Standard library modules commonly used
         "abc", "asyncio", "base64", "collections", "concurrent", "contextlib",
@@ -211,9 +211,8 @@ class TestExtensionToolDependencies:
         "uuid", "warnings", "weakref", "xml", "zipfile", "zlib",
         # typing_extensions is often bundled
         "typing_extensions",
-        # SDK-provided modules (available in worker environment via PYTHONPATH)
-        "ot_sdk",
-        "ot",  # Main onetool package, available via PYTHONPATH
+        # onetool package (for in-process extension tools)
+        "ot",
         # __future__ is special
         "__future__",
     }

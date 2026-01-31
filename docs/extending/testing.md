@@ -91,7 +91,6 @@ tests/
 │   ├── core/                # Core library tests
 │   ├── bench/               # Benchmark harness tests
 │   ├── serve/               # MCP server tests
-│   ├── sdk/                 # SDK tests
 │   └── tools/               # Tool unit tests
 │       ├── test_brave_search.py
 │       ├── test_package.py
@@ -141,10 +140,9 @@ These fixtures are defined in `tests/conftest.py` and available to all tests:
 |---------|---------|---------------|
 | `executor` | Direct Python code execution | `executor("1 + 1")` returns `"2"` |
 | `mock_http_get` | Mock `ot.http_client.http_get` | `mock_http_get.return_value = (True, {...})` |
-| `mock_secrets` | Mock `ot_sdk.get_secret` | `mock_secrets.return_value = "test-key"` |
+| `mock_secrets` | Mock `ot.config.secrets.get_secret` | `mock_secrets.return_value = "test-key"` |
 | `mock_subprocess` | Mock `subprocess.run` | `mock_subprocess.return_value = MagicMock(returncode=0)` |
 | `mock_config` | Mock `ot.config.get_config` | `mock_config.return_value.tools.ripgrep.timeout = 30` |
-| `mock_ot_sdk_config` | Mock `ot_sdk.get_config` | `mock_ot_sdk_config.return_value = "value"` |
 
 ### Integration Fixtures
 
@@ -152,7 +150,6 @@ The `tests/integration/tools/conftest.py` provides fixtures for live API tests:
 
 - Forces reload of secrets from `secrets.yaml` for API key access
 - Sets `OT_SECRETS_FILE` environment variable
-- Loads secrets into `ot_sdk.config._current_secrets`
 
 ## Testing Patterns
 

@@ -51,7 +51,7 @@ class ToolInfo(BaseModel):
         default=None,
         description="Config class source code extracted via AST (class Config(BaseModel))",
     )
-    requires: dict[str, list] | None = Field(
+    requires: dict[str, list[tuple[str, ...] | dict[str, str] | str]] | None = Field(
         default=None,
         description="Dependencies from __ot_requires__ (cli and lib lists)",
     )
