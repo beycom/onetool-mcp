@@ -61,7 +61,8 @@ def convert_word(
 
         # Count pages (approximate - Word doesn't store exact page count)
         # Use paragraph count / 40 as rough estimate
-        page_count = max(1, len(doc.paragraphs) // 40)
+        # Note: This is stored as a string with "~" prefix to indicate estimate
+        page_count_estimate = max(1, len(doc.paragraphs) // 40)
 
         # Set up images directory
         images_dir = output_dir / f"{input_path.stem}_images"
@@ -117,7 +118,7 @@ def convert_word(
         stem=input_path.stem,
         source=source_rel,
         converted=mtime,
-        pages=page_count,
+        pages=f"~{page_count_estimate}",  # ~ indicates estimated page count
         checksum=checksum,
     )
 

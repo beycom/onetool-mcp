@@ -27,6 +27,7 @@ def convert_excel(
     source_rel: str,
     *,
     include_formulas: bool = False,
+    compute_formulas: bool = False,
 ) -> dict[str, Any]:
     """Convert Excel workbook to Markdown.
 
@@ -35,6 +36,8 @@ def convert_excel(
         output_dir: Directory for output files
         source_rel: Relative path to source for frontmatter
         include_formulas: Include cell formulas as comments
+        compute_formulas: Evaluate formulas when cached values are missing
+            (requires 'formulas' library: pip install formulas)
 
     Returns:
         Dict with 'output', 'sheets', 'rows' keys
@@ -46,12 +49,30 @@ def convert_excel(
             "openpyxl is required for convert. Install with: pip install openpyxl"
         ) from e
 
+    # Load formula model if compute_formulas is enabled
+    formula_model: Any = None
+    if compute_formulas:
+        try:
+            import formulas  # type: ignore[import-untyped]
+
+            formula_model = formulas.ExcelModel().loads(str(input_path)).finish()
+        except ImportError:
+            raise ImportError(
+                "formulas library is required for compute_formulas. "
+                "Install with: pip install formulas"
+            ) from None
+        except Exception:
+            # If formula model fails to load, continue without it
+            formula_model = None
+
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load workbook once in read-only mode for streaming
-    # - data_only=True: get computed values (no formulas)
+    # Load workbook
+    # - read_only=False when computing formulas (need full access)
+    # - data_only=True: get cached computed values (no formulas)
     # - data_only=False: get formulas as cell values (when include_formulas=True)
-    wb = load_workbook(input_path, read_only=True, data_only=not include_formulas)
+    read_only = not compute_formulas
+    wb = load_workbook(input_path, read_only=read_only, data_only=not include_formulas)
 
     # Get metadata for frontmatter
     checksum = compute_file_checksum(input_path)
@@ -64,7 +85,7 @@ def convert_excel(
     # Process each sheet (single workbook - no double loading)
     for sheet_name in wb.sheetnames:
         ws = wb[sheet_name]
-        rows = _process_sheet(writer, sheet_name, ws, include_formulas)
+        rows = _process_sheet(writer, sheet_name, ws, include_formulas, formula_model)
         total_rows += rows
 
     wb.close()
@@ -99,11 +120,19 @@ def _process_sheet(
     sheet_name: str,
     ws: Any,
     include_formulas: bool,
+    formula_model: Any = None,
 ) -> int:
     """Process a single worksheet with streaming (O(1) memory for row data).
 
     When include_formulas=True, the workbook was loaded with data_only=False,
     so formula cells contain the formula string as their value.
+
+    Args:
+        writer: IncrementalWriter for output
+        sheet_name: Name of the worksheet
+        ws: Worksheet object
+        include_formulas: Whether to include formulas in output
+        formula_model: Optional formulas.ExcelModel for computing formula values
 
     Returns:
         Number of rows processed
@@ -126,7 +155,10 @@ def _process_sheet(
 
     # Get header (first row)
     first_row = next(rows_iter)
-    header = [str(cell.value) if cell.value is not None else "" for cell in first_row]
+    header = [
+        _get_cell_value(cell, sheet_name, 1, j + 1, formula_model)
+        for j, cell in enumerate(first_row)
+    ]
     # Pad header to max_cols
     while len(header) < max_cols:
         header.append("")
@@ -152,7 +184,10 @@ def _process_sheet(
     # Stream remaining rows directly to writer
     current_row = 2  # 1-indexed, header was row 1
     for row in rows_iter:
-        row_values = [str(cell.value) if cell.value is not None else "" for cell in row]
+        row_values = [
+            _get_cell_value(cell, sheet_name, current_row, j + 1, formula_model)
+            for j, cell in enumerate(row)
+        ]
         # Pad row to max_cols
         while len(row_values) < max_cols:
             row_values.append("")
@@ -182,6 +217,52 @@ def _process_sheet(
         writer.write("```\n\n")
 
     return row_count
+
+
+def _get_cell_value(
+    cell: Any,
+    sheet_name: str,
+    row_num: int,
+    col_num: int,
+    formula_model: Any,
+) -> str:
+    """Get cell value, optionally computing from formula model.
+
+    Args:
+        cell: openpyxl cell object
+        sheet_name: Name of the worksheet (for formula lookup)
+        row_num: 1-indexed row number
+        col_num: 1-indexed column number
+        formula_model: Optional formulas.ExcelModel for computing values
+
+    Returns:
+        String representation of cell value
+    """
+    value = cell.value
+
+    # If we have a value, use it
+    if value is not None:
+        return str(value)
+
+    # If no formula model, return empty
+    if formula_model is None:
+        return ""
+
+    # Try to compute value from formula model
+    try:
+        # Build cell reference like "'Sheet1'!A1"
+        col_letter = _col_letter(col_num)
+        cell_ref = f"'{sheet_name}'!{col_letter}{row_num}"
+        computed = formula_model.calculate(cell_ref)
+        if computed is not None and computed != cell_ref:
+            # Handle numpy arrays and other types
+            if hasattr(computed, "item"):
+                computed = computed.item()
+            return str(computed)
+    except Exception:
+        pass
+
+    return ""
 
 
 def _escape_pipe(text: str) -> str:

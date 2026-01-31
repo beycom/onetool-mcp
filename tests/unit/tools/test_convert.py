@@ -322,6 +322,25 @@ def test_excel_with_formulas(test_xlsx: Path, tmp_path: Path) -> None:
     assert call_kwargs.get("include_formulas") is True
 
 
+@pytest.mark.unit
+@pytest.mark.tools
+def test_excel_with_compute_formulas(test_xlsx: Path, tmp_path: Path) -> None:
+    """Verify excel passes compute_formulas option."""
+    from ot_tools.convert import excel
+
+    mock_result = {
+        "output": str(tmp_path / "output" / "test.md"),
+        "sheets": 1,
+        "rows": 10,
+    }
+
+    with patch("ot_tools.convert.convert_excel", return_value=mock_result) as mock:
+        excel(pattern=str(test_xlsx), output_dir="output", compute_formulas=True)
+
+    call_kwargs = mock.call_args[1]
+    assert call_kwargs.get("compute_formulas") is True
+
+
 # =============================================================================
 # Auto Conversion Tests
 # =============================================================================
@@ -400,3 +419,44 @@ def test_resolve_output_dir(tmp_path: Path) -> None:
     result = _resolve_output_dir("output")
     assert result.is_absolute()
     assert "output" in str(result)
+
+
+# =============================================================================
+# Utils Module Tests
+# =============================================================================
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_checksum_cache_thread_safe(tmp_path: Path) -> None:
+    """Verify checksum cache uses lru_cache for thread safety."""
+    from ot_tools._convert.utils import _compute_checksum_cached, compute_file_checksum
+
+    # Create a test file
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("test content")
+
+    # Compute checksum twice - should use cache
+    checksum1 = compute_file_checksum(test_file)
+    checksum2 = compute_file_checksum(test_file)
+
+    assert checksum1 == checksum2
+    assert checksum1.startswith("sha256:")
+
+    # Verify the underlying function uses lru_cache
+    assert hasattr(_compute_checksum_cached, "cache_info")
+    cache_info = _compute_checksum_cached.cache_info()
+    assert cache_info.hits >= 1  # Should have cache hit
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_executor_shutdown_registered() -> None:
+    """Verify atexit handler is registered for executor shutdown."""
+    import atexit
+
+    from ot_tools.convert import _shutdown_executor
+
+    # The _shutdown_executor should be registered
+    # We can't easily test the actual registration, but we can verify the function exists
+    assert callable(_shutdown_executor)

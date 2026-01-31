@@ -13,20 +13,43 @@ import hashlib
 import io
 import re
 from datetime import UTC, datetime
-from pathlib import Path  # noqa: TC003 (used at runtime)
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-# Cache for file checksums: key=(path, mtime, size), value=checksum
-# Avoids re-reading file for checksum when conversion will read it anyway
-_checksum_cache: dict[tuple[str, float, int], str] = {}
+from functools import lru_cache
+
 _CHECKSUM_CACHE_MAX_SIZE = 100
 
 
+@lru_cache(maxsize=_CHECKSUM_CACHE_MAX_SIZE)
+def _compute_checksum_cached(
+    path_str: str,
+    mtime: float,  # noqa: ARG001 - used as cache key
+    size: int,  # noqa: ARG001 - used as cache key
+) -> str:
+    """Cached checksum computation (thread-safe via lru_cache).
+
+    Args:
+        path_str: Resolved path string
+        mtime: File modification time (for cache invalidation)
+        size: File size in bytes (for cache invalidation)
+
+    Returns:
+        Checksum in format 'sha256:abc123...'
+    """
+    path = Path(path_str)
+    sha256 = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            sha256.update(chunk)
+    return f"sha256:{sha256.hexdigest()}"
+
+
 def compute_file_checksum(path: Path) -> str:
-    """Compute SHA256 checksum of a file (with caching).
+    """Compute SHA256 checksum of a file (with thread-safe caching).
 
     Results are cached based on path+mtime+size to avoid redundant reads
     when the same file is processed multiple times.
@@ -37,30 +60,8 @@ def compute_file_checksum(path: Path) -> str:
     Returns:
         Checksum in format 'sha256:abc123...'
     """
-    # Get file stats for cache key
     stat = path.stat()
-    cache_key = (str(path.resolve()), stat.st_mtime, stat.st_size)
-
-    # Check cache first
-    if cache_key in _checksum_cache:
-        return _checksum_cache[cache_key]
-
-    # Compute checksum
-    sha256 = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            sha256.update(chunk)
-    checksum = f"sha256:{sha256.hexdigest()}"
-
-    # Cache result (with simple size limit)
-    if len(_checksum_cache) >= _CHECKSUM_CACHE_MAX_SIZE:
-        # Remove oldest entries (simple approach: clear half)
-        keys = list(_checksum_cache.keys())
-        for key in keys[: len(keys) // 2]:
-            del _checksum_cache[key]
-
-    _checksum_cache[cache_key] = checksum
-    return checksum
+    return _compute_checksum_cached(str(path.resolve()), stat.st_mtime, stat.st_size)
 
 
 def compute_image_hash(data: bytes) -> str:
@@ -126,7 +127,7 @@ def generate_frontmatter(
     *,
     source: str,
     converted: str,
-    pages: int,
+    pages: int | str,
     checksum: str,
 ) -> str:
     """Generate YAML frontmatter for converted document.
@@ -134,7 +135,7 @@ def generate_frontmatter(
     Args:
         source: Relative path to source file
         converted: ISO 8601 timestamp (source file mtime)
-        pages: Page/slide/sheet count
+        pages: Page/slide/sheet count (may be prefixed with ~ for estimates)
         checksum: SHA256 hash of source file
 
     Returns:
@@ -154,7 +155,7 @@ def generate_toc(
     main_file: str,
     source: str,
     converted: str,
-    pages: int,
+    pages: int | str,
     checksum: str,
 ) -> str:
     """Generate table of contents as a separate file with line ranges.
@@ -168,7 +169,7 @@ def generate_toc(
         main_file: Filename of the main markdown file (for linking)
         source: Original source file path (for reference)
         converted: ISO 8601 timestamp (source file mtime)
-        pages: Page/slide/sheet count
+        pages: Page/slide/sheet count (may be prefixed with ~ for estimates)
         checksum: SHA256 hash of source file
 
     Returns:
@@ -236,7 +237,7 @@ def write_toc_file(
     stem: str,
     source: str,
     converted: str,
-    pages: int,
+    pages: int | str,
     checksum: str,
 ) -> Path:
     """Write TOC to a separate file with frontmatter.
@@ -247,7 +248,7 @@ def write_toc_file(
         stem: Base filename (without extension)
         source: Original source file path
         converted: ISO 8601 timestamp (source file mtime)
-        pages: Page/slide/sheet count
+        pages: Page/slide/sheet count (may be prefixed with ~ for estimates)
         checksum: SHA256 hash of source file
 
     Returns:

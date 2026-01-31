@@ -22,10 +22,12 @@ __ot_requires__ = {
         {"name": "python-pptx", "import_name": "pptx", "install": "pip install python-pptx"},
         ("openpyxl", "pip install openpyxl"),
         {"name": "Pillow", "import_name": "PIL", "install": "pip install Pillow"},
+        {"name": "formulas", "import_name": "formulas", "install": "pip install formulas", "optional": True},
     ],
 }
 
 import asyncio
+import atexit
 import os
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -59,6 +61,17 @@ def _get_conversion_executor() -> ThreadPoolExecutor:
             thread_name_prefix="convert",
         )
     return _conversion_executor
+
+
+def _shutdown_executor() -> None:
+    """Shutdown the conversion thread pool on exit."""
+    global _conversion_executor
+    if _conversion_executor is not None:
+        _conversion_executor.shutdown(wait=False)
+        _conversion_executor = None
+
+
+atexit.register(_shutdown_executor)
 
 
 def _resolve_glob(pattern: str) -> list[Path]:
@@ -445,6 +458,7 @@ def excel(
     pattern: str,
     output_dir: str,
     include_formulas: bool = False,
+    compute_formulas: bool = False,
 ) -> str:
     """Convert Excel spreadsheets to Markdown.
 
@@ -455,6 +469,8 @@ def excel(
         pattern: Glob pattern for input files (e.g., "data/*.xlsx")
         output_dir: Directory for output files
         include_formulas: Include cell formulas as comments
+        compute_formulas: Evaluate formulas when cached values are missing
+            (requires 'formulas' library: pip install formulas)
 
     Returns:
         Conversion summary with output paths, or error message
@@ -462,12 +478,14 @@ def excel(
     Example:
         convert.excel(pattern="data/report.xlsx", output_dir="data/md")
         convert.excel(pattern="spreadsheets/*.xlsx", output_dir="output", include_formulas=True)
+        convert.excel(pattern="data/*.xlsx", output_dir="out", compute_formulas=True)
     """
     with LogSpan(
         span="convert.excel",
         pattern=pattern,
         output_dir=output_dir,
         include_formulas=include_formulas,
+        compute_formulas=compute_formulas,
     ) as s:
         files = _resolve_glob(pattern)
         if not files:
@@ -480,7 +498,9 @@ def excel(
             try:
                 source_rel = _get_source_rel(files[0])
                 result = convert_excel(
-                    files[0], out_path, source_rel, include_formulas=include_formulas
+                    files[0], out_path, source_rel,
+                    include_formulas=include_formulas,
+                    compute_formulas=compute_formulas,
                 )
                 s.add(converted=1, sheets=result["sheets"], rows=result["rows"])
                 return f"Converted {files[0].name}: {result['sheets']} sheets, {result['rows']} rows\nOutput: {result['output']}"
@@ -491,7 +511,9 @@ def excel(
         try:
             result = asyncio.run(
                 _convert_batch_async(
-                    files, out_path, convert_excel, include_formulas=include_formulas
+                    files, out_path, convert_excel,
+                    include_formulas=include_formulas,
+                    compute_formulas=compute_formulas,
                 )
             )
             s.add(converted=result["converted"], failed=result["failed"])

@@ -142,15 +142,8 @@ def _process_slide(
     for shape in slide.shapes:
         shape_type = getattr(shape, "shape_type", None)
 
-        # Text shapes
-        if hasattr(shape, "text") and shape.text and shape.text.strip():
-            # Skip title shape (already processed)
-            if shape == getattr(slide.shapes, "title", None):
-                continue
-            text_content.append(_process_text_shape(shape))
-
-        # Tables
-        elif shape_type == MSO_SHAPE_TYPE.TABLE:
+        # Tables (check FIRST - tables also have .text attribute)
+        if shape_type == MSO_SHAPE_TYPE.TABLE:
             try:
                 if hasattr(shape, "table"):
                     table_md = _process_table(shape.table)
@@ -169,6 +162,13 @@ def _process_slide(
                         images_extracted += 1
             except Exception:
                 pass
+
+        # Text shapes (check LAST - after tables and images)
+        elif hasattr(shape, "text") and shape.text and shape.text.strip():
+            # Skip title shape (already processed)
+            if shape == getattr(slide.shapes, "title", None):
+                continue
+            text_content.append(_process_text_shape(shape))
 
     # Write text content
     for text in text_content:

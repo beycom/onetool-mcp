@@ -18,7 +18,7 @@ Convert PDF, Word, PowerPoint, and Excel documents to Markdown with LLM-optimise
 | `convert.pdf(pattern, output_dir)` | Convert PDF documents to Markdown |
 | `convert.word(pattern, output_dir)` | Convert Word documents (.docx) to Markdown |
 | `convert.powerpoint(pattern, output_dir, include_notes)` | Convert PowerPoint presentations (.pptx) to Markdown |
-| `convert.excel(pattern, output_dir, include_formulas)` | Convert Excel spreadsheets (.xlsx) to Markdown |
+| `convert.excel(pattern, output_dir, include_formulas, compute_formulas)` | Convert Excel spreadsheets (.xlsx) to Markdown |
 | `convert.auto(pattern, output_dir)` | Auto-detect format and convert |
 
 ## Key Parameters
@@ -29,6 +29,7 @@ Convert PDF, Word, PowerPoint, and Excel documents to Markdown with LLM-optimise
 | `output_dir` | str | Directory for output Markdown files and images |
 | `include_notes` | bool | Include speaker notes in PowerPoint conversion |
 | `include_formulas` | bool | Include cell formulas in Excel conversion |
+| `compute_formulas` | bool | Evaluate formulas when cached values are missing (requires `formulas` library) |
 
 ## Output Format
 
@@ -124,6 +125,13 @@ convert.excel(
     output_dir="output",
     include_formulas=True
 )
+
+# Compute formula values (when cached values are missing)
+convert.excel(
+    pattern="data.xlsx",
+    output_dir="output",
+    compute_formulas=True
+)
 ```
 
 ### Auto-Detection
@@ -146,6 +154,8 @@ convert.auto(pattern="input/**/*", output_dir="output")
 | Excel      | `.xlsx`   | openpyxl     | `pip install openpyxl`  |
 
 Excel conversion requires the `openpyxl` package. Install it before using `convert.excel()`.
+
+For formula evaluation with `compute_formulas=True`, install the optional `formulas` package: `pip install formulas`
 
 ## Features by Format
 
@@ -173,6 +183,7 @@ Excel conversion requires the `openpyxl` package. Install it before using `conve
 - Streaming for large files
 - Markdown table formatting
 - Optional formula extraction
+- Formula evaluation when cached values are missing (requires `formulas` library)
 
 ## Batch Processing
 
