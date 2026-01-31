@@ -28,6 +28,7 @@ pack = "db"
 __all__ = ["query", "schema", "tables"]
 
 import contextlib
+import threading
 from collections import OrderedDict
 from datetime import date, datetime
 from typing import Any
@@ -59,6 +60,7 @@ def _get_config() -> Config:
 # Connection pool keyed by URL - persists across calls in process
 # Uses OrderedDict for LRU eviction with bounded size
 _ENGINES_MAXSIZE = 8
+_engines_lock = threading.Lock()
 _engines: OrderedDict[str, Engine] = OrderedDict()
 
 
@@ -105,19 +107,33 @@ def _create_engine(db_url: str) -> Engine:
 
 def _get_engine(db_url: str) -> Engine:
     """Get or create engine for given URL with retry logic."""
-    global _engines
-
     # Resolve relative paths in SQLite URLs
     resolved_url = _resolve_sqlite_url(db_url)
 
-    if resolved_url in _engines:
-        # LRU: move to end on access
-        _engines.move_to_end(resolved_url)
-        return _engines[resolved_url]
+    # Fast path: check cache with lock
+    with _engines_lock:
+        if resolved_url in _engines:
+            # LRU: move to end on access
+            _engines.move_to_end(resolved_url)
+            return _engines[resolved_url]
 
+    # Create engine outside lock (slow operation)
     with LogSpan(span="db.connect", db_url=resolved_url) as span:
         try:
             engine = _create_engine(resolved_url)
+        except Exception:
+            span.add(retry=True)
+            # One retry with fresh engine
+            engine = _create_engine(resolved_url)
+
+        # Double-check after acquiring lock
+        with _engines_lock:
+            if resolved_url in _engines:
+                # Another thread created it while we were waiting
+                engine.dispose()
+                _engines.move_to_end(resolved_url)
+                return _engines[resolved_url]
+
             _engines[resolved_url] = engine
 
             # LRU eviction: dispose oldest engine when over maxsize
@@ -127,26 +143,6 @@ def _get_engine(db_url: str) -> Engine:
                     oldest_engine.dispose()
 
             span.add(cached=False)
-            return engine
-
-        except Exception:
-            # Database might have restarted - try fresh
-            if resolved_url in _engines:
-                with contextlib.suppress(Exception):
-                    _engines[resolved_url].dispose()
-                del _engines[resolved_url]
-
-            # One retry with fresh engine
-            span.add(retry=True)
-            engine = _create_engine(resolved_url)
-            _engines[resolved_url] = engine
-
-            # LRU eviction after retry too
-            while len(_engines) > _ENGINES_MAXSIZE:
-                _, oldest_engine = _engines.popitem(last=False)
-                with contextlib.suppress(Exception):
-                    oldest_engine.dispose()
-
             return engine
 
 
@@ -159,12 +155,15 @@ def _format_value(val: Any) -> str:
     return str(val)
 
 
-def tables(*, db_url: str, filter: str | None = None) -> str:
+def tables(
+    *, db_url: str, filter: str | None = None, ignore_case: bool = False
+) -> str:
     """List table names in the database.
 
     Args:
         db_url: Database URL (required)
         filter: Optional substring to filter table names
+        ignore_case: If True, filter matching is case-insensitive
 
     Returns:
         Comma-separated list of table names
@@ -175,8 +174,15 @@ def tables(*, db_url: str, filter: str | None = None) -> str:
 
         # Filter tables containing "user"
         db.tables(db_url="sqlite:///data.db", filter="user")
+
+        # Case-insensitive filter
+        db.tables(db_url="sqlite:///data.db", filter="USER", ignore_case=True)
     """
     with LogSpan(span="db.tables", db_url=db_url, filter=filter) as s:
+        if not db_url or not db_url.strip():
+            s.add(error="empty_db_url")
+            return "Error: db_url parameter is required"
+
         try:
             engine = _get_engine(db_url)
             with engine.connect() as conn:
@@ -184,7 +190,11 @@ def tables(*, db_url: str, filter: str | None = None) -> str:
                 all_tables = inspector.get_table_names()
 
                 if filter:
-                    all_tables = [t for t in all_tables if filter in t]
+                    if ignore_case:
+                        filter_lower = filter.lower()
+                        all_tables = [t for t in all_tables if filter_lower in t.lower()]
+                    else:
+                        all_tables = [t for t in all_tables if filter in t]
 
                 s.add(resultCount=len(all_tables))
                 return ", ".join(all_tables) if all_tables else "No tables found"
@@ -214,6 +224,10 @@ def schema(*, table_names: list[str], db_url: str) -> str:
         db.schema(table_names=["users", "orders"], db_url="sqlite:///data.db")
     """
     with LogSpan(span="db.schema", tables=table_names, db_url=db_url) as s:
+        if not db_url or not db_url.strip():
+            s.add(error="empty_db_url")
+            return "Error: db_url parameter is required"
+
         if not table_names:
             s.add(error="no_tables")
             return "Error: table_names parameter is required"
@@ -237,20 +251,28 @@ def schema(*, table_names: list[str], db_url: str) -> str:
 
 def _format_table_schema(inspector: Any, table_name: str) -> str:
     """Format schema for a single table."""
-    columns = inspector.get_columns(table_name)
-    foreign_keys = inspector.get_foreign_keys(table_name)
-    pk_constraint = inspector.get_pk_constraint(table_name)
+    try:
+        columns = inspector.get_columns(table_name)
+    except Exception:
+        return f"{table_name}: [table not found]"
+
+    try:
+        foreign_keys = inspector.get_foreign_keys(table_name)
+        pk_constraint = inspector.get_pk_constraint(table_name)
+    except Exception:
+        foreign_keys = []
+        pk_constraint = {}
+
     primary_keys = set(pk_constraint.get("constrained_columns", []))
 
     result = [f"{table_name}:"]
 
-    # Process columns
+    # Process columns - use explicit key access to avoid mutating the dict
     show_key_only = {"nullable", "autoincrement"}
+    skip_keys = {"name", "type", "comment"}
     for column in columns:
-        if "comment" in column:
-            del column["comment"]
-        name = column.pop("name")
-        col_type = str(column.pop("type"))
+        name = column["name"]
+        col_type = str(column["type"])
 
         parts = []
         if name in primary_keys:
@@ -258,6 +280,8 @@ def _format_table_schema(inspector: Any, table_name: str) -> str:
         parts.append(col_type)
 
         for k, v in column.items():
+            if k in skip_keys:
+                continue
             if v:
                 if k in show_key_only:
                     parts.append(k)
@@ -311,6 +335,10 @@ def query(*, sql: str, db_url: str, params: dict[str, Any] | None = None) -> str
         )
     """
     with LogSpan(span="db.query", sql=sql, db_url=db_url) as s:
+        if not db_url or not db_url.strip():
+            s.add(error="empty_db_url")
+            return "Error: db_url parameter is required"
+
         if not sql or not sql.strip():
             s.add(error="empty_query")
             return "Error: sql parameter is required"
@@ -350,6 +378,7 @@ def _format_query_results(cursor_result: Any, max_chars: int) -> tuple[str, int,
     result: list[str] = []
     size = 0
     row_count = 0
+    displayed_count = 0
     truncated = False
     keys = list(cursor_result.keys())
 
@@ -370,6 +399,7 @@ def _format_query_results(cursor_result: Any, max_chars: int) -> tuple[str, int,
         if size > max_chars:
             truncated = True
         else:
+            displayed_count += 1
             result.extend(sub_result)
 
     if row_count == 0:
@@ -377,7 +407,7 @@ def _format_query_results(cursor_result: Any, max_chars: int) -> tuple[str, int,
 
     if truncated:
         result.append(
-            f"Result: showing first {len(result) // 3} of {row_count} rows (output truncated)"
+            f"Result: showing first {displayed_count} of {row_count} rows (output truncated)"
         )
     else:
         result.append(f"Result: {row_count} rows")

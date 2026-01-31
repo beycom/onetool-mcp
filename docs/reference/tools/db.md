@@ -26,6 +26,7 @@ Database introspection and query execution via SQLAlchemy. Supports any SQLAlche
 |-----------|------|-------------|
 | `db_url` | str | SQLAlchemy connection string (required) |
 | `filter` | str | Substring to filter table names (tables only) |
+| `ignore_case` | bool | Case-insensitive filter matching (tables only, default: False) |
 | `table_names` | list[str] | Tables to inspect (schema only) |
 | `params` | dict | Query parameters for safe substitution (query only) |
 
@@ -40,6 +41,9 @@ db.tables(db_url=db_url)
 
 # Filter tables
 db.tables(db_url=db_url, filter="user")
+
+# Case-insensitive filter
+db.tables(db_url=db_url, filter="USER", ignore_case=True)
 
 # Get schema for tables
 db.schema(["users", "orders"], db_url=db_url)

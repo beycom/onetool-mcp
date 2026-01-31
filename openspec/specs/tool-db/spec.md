@@ -18,6 +18,11 @@ The `db.tables()` function SHALL list table names from the connected database.
 - **WHEN** `db.tables(db_url=..., filter="user")` is called
 - **THEN** it SHALL return only table names containing "user"
 
+#### Scenario: Case-insensitive table filtering
+- **GIVEN** a valid database URL and filter parameter with ignore_case=True
+- **WHEN** `db.tables(db_url=..., filter="USER", ignore_case=True)` is called
+- **THEN** it SHALL return table names containing "user" regardless of case
+
 ### Requirement: Schema Definitions
 
 The `db.schema()` function SHALL return detailed schema information for specified tables.
@@ -41,6 +46,19 @@ The `db.schema()` function SHALL return detailed schema information for specifie
 - **GIVEN** tables with foreign key relationships
 - **WHEN** schema is retrieved
 - **THEN** relationships SHALL be displayed as `column -> referenced_table.column`
+
+#### Scenario: Non-existent table
+- **GIVEN** a table name that does not exist in the database
+- **WHEN** `db.schema(["NonExistent"], db_url=...)` is called
+- **THEN** it SHALL return `"NonExistent: [table not found]"`
+- **AND** it SHALL NOT raise an exception
+
+#### Scenario: Mixed valid and invalid tables
+- **GIVEN** a mix of existing and non-existing table names
+- **WHEN** `db.schema(["Users", "BadTable", "Orders"], db_url=...)` is called
+- **THEN** it SHALL return schema for valid tables
+- **AND** it SHALL return "[table not found]" for invalid tables
+- **AND** processing SHALL continue for all tables
 
 ### Requirement: Query Execution
 
@@ -85,6 +103,12 @@ The tool SHALL require explicit database URL parameter on all functions.
 - **GIVEN** a db function call without `db_url` parameter
 - **WHEN** the function is invoked
 - **THEN** it SHALL fail with missing parameter error
+
+#### Scenario: Empty database URL
+- **GIVEN** an empty or whitespace-only db_url parameter
+- **WHEN** `db.tables(db_url="")` or `db.query(sql="...", db_url="   ")` is called
+- **THEN** it SHALL return `"Error: db_url parameter is required"`
+- **AND** it SHALL NOT attempt to connect
 
 #### Scenario: Valid connection string
 - **GIVEN** `db_url` is a valid SQLAlchemy URL
