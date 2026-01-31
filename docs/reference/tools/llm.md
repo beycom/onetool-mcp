@@ -20,9 +20,10 @@ LLM-powered data transformation tools. Takes input data and a prompt, uses an LL
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `input` | any | Data to transform (converted to string) |
-| `prompt` | str | Instructions for transformation |
+| `input` | any | Data to transform (converted to string, required) |
+| `prompt` | str | Instructions for transformation (required) |
 | `model` | str | AI model to use (uses `transform.model` from config) |
+| `json_mode` | bool | If True, request JSON output format (default: False) |
 
 ## Requires
 
@@ -51,6 +52,13 @@ llm.transform(
     input=web.fetch(url="https://example.com/article"),
     prompt="Summarize the main points in 3 bullet points"
 )
+
+# Get JSON output with json_mode
+llm.transform(
+    input=raw_data,
+    prompt="Extract name and email fields",
+    json_mode=True
+)
 ```
 
 ## Configuration
@@ -62,6 +70,8 @@ tools:
   transform:
     base_url: https://openrouter.ai/api/v1
     model: openai/gpt-5-mini
+    timeout: 30        # API timeout in seconds (default: 30)
+    max_tokens: 4096   # Maximum tokens in response (optional)
 ```
 
 ## Source

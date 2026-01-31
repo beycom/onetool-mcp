@@ -51,6 +51,14 @@ class Config(BaseModel):
         default="",
         description="Model to use for transformation (e.g., openai/gpt-4o-mini)",
     )
+    timeout: int = Field(
+        default=30,
+        description="API timeout in seconds",
+    )
+    max_tokens: int | None = Field(
+        default=None,
+        description="Maximum tokens in response (None=no limit)",
+    )
 
 
 def _get_config() -> Config:
@@ -58,17 +66,18 @@ def _get_config() -> Config:
     return get_tool_config("transform", Config)
 
 
-def _get_api_config() -> tuple[str | None, str | None, str | None]:
+def _get_api_config() -> tuple[str | None, str | None, str | None, Config]:
     """Get API configuration from settings.
 
     Returns:
-        Tuple of (api_key, base_url, default_model) - all None if not configured
+        Tuple of (api_key, base_url, default_model, config) - api_key/base_url/model
+        are None if not configured
     """
     config = _get_config()
     api_key = get_secret("OPENAI_API_KEY")
     base_url = config.base_url or None
     default_model = config.model or None
-    return api_key, base_url, default_model
+    return api_key, base_url, default_model, config
 
 
 def transform(
@@ -76,6 +85,7 @@ def transform(
     input: Any,
     prompt: str,
     model: str | None = None,
+    json_mode: bool = False,
 ) -> str:
     """Transform input data using an LLM.
 
@@ -86,6 +96,7 @@ def transform(
         input: Data to transform (will be converted to string if not already)
         prompt: Instructions for how to transform/process the input
         model: AI model to use (uses transform.model from config if not specified)
+        json_mode: If True, request JSON output format from the model
 
     Returns:
         The LLM's response as a string, or error message if not configured
@@ -108,10 +119,29 @@ def transform(
             input=some_long_text,
             prompt="Summarize this in 3 bullet points"
         )
+
+        # Get JSON output
+        llm.transform(
+            input=data,
+            prompt="Extract name and email as JSON",
+            json_mode=True
+        )
     """
     with LogSpan(span="llm.transform", promptLen=len(prompt)) as s:
+        # Validate inputs
+        if not prompt or not prompt.strip():
+            s.add(error="empty_prompt")
+            return "Error: prompt is required and cannot be empty"
+
+        input_str = str(input)
+        if not input_str.strip():
+            s.add(error="empty_input")
+            return "Error: input is required and cannot be empty"
+
+        s.add(inputLen=len(input_str))
+
         # Get API config
-        api_key, base_url, default_model = _get_api_config()
+        api_key, base_url, default_model, config = _get_api_config()
 
         # Check if transform tool is configured
         if not api_key:
@@ -124,12 +154,8 @@ def transform(
                 "Error: Transform tool not available. Set transform.base_url in config."
             )
 
-        # Convert input to string
-        input_str = str(input)
-        s.add(inputLen=len(input_str))
-
-        # Create client
-        client = OpenAI(api_key=api_key, base_url=base_url)
+        # Create client with timeout
+        client = OpenAI(api_key=api_key, base_url=base_url, timeout=config.timeout)
 
         # Build the message
         user_message = f"""Input data:
@@ -143,23 +169,45 @@ Instructions:
             s.add(error="no_model")
             return "Error: Transform tool not available. Set transform.model in config."
 
-        s.add(model=used_model)
+        s.add(model=used_model, jsonMode=json_mode)
 
         try:
-            response = client.chat.completions.create(
-                model=used_model,
-                messages=[
+            # Build API call kwargs
+            api_kwargs: dict[str, Any] = {
+                "model": used_model,
+                "messages": [
                     {
                         "role": "system",
                         "content": "You are a data transformation assistant. Follow the user's instructions precisely. Output ONLY the requested format, no explanations.",
                     },
                     {"role": "user", "content": user_message},
                 ],
-                temperature=0.1,
-            )
+                "temperature": 0.1,
+            }
+
+            if config.max_tokens is not None:
+                api_kwargs["max_tokens"] = config.max_tokens
+
+            if json_mode:
+                api_kwargs["response_format"] = {"type": "json_object"}
+
+            response = client.chat.completions.create(**api_kwargs)
             result = response.choices[0].message.content or ""
             s.add(outputLen=len(result))
+
+            # Log token usage if available
+            if response.usage:
+                s.add(
+                    inputTokens=response.usage.prompt_tokens,
+                    outputTokens=response.usage.completion_tokens,
+                    totalTokens=response.usage.total_tokens,
+                )
+
             return result
         except Exception as e:
-            s.add(error=str(e))
-            return f"Error: {e}"
+            error_msg = str(e)
+            # Sanitize sensitive info from error messages
+            if "api_key" in error_msg.lower() or "sk-" in error_msg:
+                error_msg = "Authentication error - check OPENAI_API_KEY in secrets.yaml"
+            s.add(error=error_msg)
+            return f"Error: {error_msg}"
