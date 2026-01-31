@@ -34,8 +34,8 @@ snippets:
   c7:
     description: Fetch library documentation for a topic
     params:
-      lib: { description: "Library key in org/repo format (e.g., 'facebook/react', 'tiangolo/fastapi')" }
-      q: { default: "", description: "Specific topic to focus on" }
+      q: { default: "", description: "Topic to search for (e.g., 'hooks', 'routing')" }
+      lib: { description: "Library name or key (e.g., 'react', 'next.js', 'vercel/next.js')" }
     body: |
       context7.doc(library_key="{{ lib }}", topic="{{ q }}", mode="info")
 

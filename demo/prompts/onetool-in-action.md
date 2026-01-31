@@ -135,3 +135,56 @@ Use the current codebase (onetool-mcp) for all tests.
 
 Finally, list all Claude and OneTool commands used with full parameters.
 ```
+
+
+## Draw me a diagram
+
+```
+Title: Draw me a diagram
+Explain each step so it is easy to follow what you did and why. Use 🧿 to highlight these explanations.
+
+- Learn onetool with `ot.help(info="full")` and `ot.tools(pattern="diagram", info="full")`
+
+## Discovery Phase
+
+1. **List Providers**: Use `diagram.list_providers(focus_only=True)` to see supported diagram types
+2. **Get Instructions**: Use `diagram.get_diagram_instructions(provider="mermaid")` for syntax guidance
+3. **Check Policy**: Use `diagram.get_diagram_policy()` to understand usage rules
+4. **Check Config**: Use `diagram.get_output_config()` for output settings
+
+## Creation Phase
+
+5. **Generate Source**: Create a flowchart showing the OneTool diagram workflow itself:
+   - Use `diagram.generate_source()` to save and validate the source
+   - The diagram should show: Discovery → Creation → Render phases
+   - Include these tools: list_providers, get_instructions, generate_source, render_diagram, batch_render
+
+6. **Get Playground URL**: Use `diagram.get_playground_url()` for interactive editing
+
+## Render Phase
+
+7. **Render Diagram**: Use `diagram.render_diagram(source_file=...)` to render the saved source
+8. **Verify Output**: Confirm SVG was generated and note the file path
+
+## Comparison Table
+
+Create a table showing diagram pack capabilities:
+
+Columns:
+Tool | Purpose | Key Parameters | When to Use
+
+Tools to cover:
+- diagram.list_providers
+- diagram.get_diagram_instructions
+- diagram.get_diagram_policy
+- diagram.get_output_config
+- diagram.generate_source
+- diagram.get_playground_url
+- diagram.render_diagram
+- diagram.batch_render
+- diagram.render_directory
+- diagram.get_render_status
+- diagram.get_template
+
+Finally, list all onetool commands used with full parameters.
+```

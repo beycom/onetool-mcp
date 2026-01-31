@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Provides library search and documentation retrieval via the Context7 API. Enables semantic documentation lookup for software libraries with support for flexible input formats. Requires `OT_CONTEXT7_API_KEY` environment variable.
+Provides library search and documentation retrieval via the Context7 API. Enables semantic documentation lookup for software libraries with support for flexible input formats. Requires `CONTEXT7_API_KEY` secret.
 ## Requirements
 ### Requirement: Library Search
 
@@ -14,7 +14,7 @@ The `search()` function SHALL search for libraries by name.
 - **THEN** it SHALL return matching libraries from Context7
 
 #### Scenario: Missing API key
-- **GIVEN** `OT_CONTEXT7_API_KEY` environment variable is not set
+- **GIVEN** `CONTEXT7_API_KEY` secret is not set
 - **WHEN** `search(query="react")` is called
 - **THEN** it SHALL return "[Context7 API key not configured]"
 
@@ -147,14 +147,18 @@ The tool SHALL log all documentation operations using LogSpan.
 - **THEN** it SHALL log:
   - `span: "context7.search"`
   - `query`: Search query
-  - `resultCount`: Number of libraries found
+  - `success`: Whether request succeeded
+  - `resultLen`: Length of result string
 
 #### Scenario: Documentation fetch logging
 - **GIVEN** documentation is requested
 - **WHEN** the fetch completes
 - **THEN** it SHALL log:
   - `span: "context7.doc"`
-  - `libraryId`: Library identifier
+  - `library_key`: Original library key
   - `topic`: Requested topic
-  - `snippetCount`: Code snippets returned
+  - `mode`: Documentation mode (info/code)
+  - `resolvedKey`: Resolved org/repo key
+  - `success`: Whether request succeeded
+  - `resultLen`: Length of result string
 

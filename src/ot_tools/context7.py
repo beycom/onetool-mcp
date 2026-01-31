@@ -251,6 +251,62 @@ def search(*, query: str) -> str:
         return result_str
 
 
+def _pick_best_library(data: dict | list | None, query: str) -> str | None:
+    """Pick the best library from Context7 search response.
+
+    Handles {"results": [...]} and [...] response formats.
+
+    Scoring:
+    - Exact title match: +100
+    - Title contains query: +50
+    - VIP library: +30
+    - Verified: +20
+    - Trust score: +trustScore * 2
+    - Large corpus (>100k tokens): +5
+    """
+    # Unwrap response
+    if isinstance(data, dict):
+        results = data.get("results", [])
+    elif isinstance(data, list):
+        results = data
+    else:
+        return None
+
+    if not results:
+        return None
+
+    query_lower = query.lower()
+
+    def score_result(r: dict) -> float:
+        score = 0.0
+        title = r.get("title", "").lower()
+
+        if title == query_lower:
+            score += 100
+        elif query_lower in title:
+            score += 50
+
+        if r.get("vip"):
+            score += 30
+        if r.get("verified"):
+            score += 20
+
+        trust = r.get("trustScore", 0)
+        if trust > 0:
+            score += trust * 2
+
+        if r.get("totalTokens", 0) > 100000:
+            score += 5
+
+        return score
+
+    sorted_results = sorted(results, key=score_result, reverse=True)
+    best = sorted_results[0]
+    lib_id = best.get("id", "").lstrip("/")
+
+    return lib_id if "/" in lib_id else None
+
+
 def _resolve_library_key(library_key: str) -> str:
     """Resolve a library key, searching if needed.
 
@@ -277,23 +333,9 @@ def _resolve_library_key(library_key: str) -> str:
     if not success:
         return normalized
 
-    # Context7 returns a list of results, pick the first/best match
-    if isinstance(data, list) and len(data) > 0:
-        first = data[0]
-        if isinstance(first, dict):
-            for key_name in ("id", "key", "library_key", "path"):
-                if key_name in first:
-                    resolved = str(first[key_name]).lstrip("/")
-                    if "/" in resolved:
-                        return resolved
-    elif isinstance(data, dict):
-        for key_name in ("id", "key", "library_key", "path"):
-            if key_name in data:
-                resolved = str(data[key_name]).lstrip("/")
-                if "/" in resolved:
-                    return resolved
-
-    return normalized
+    # Use smart scoring to pick the best match
+    best = _pick_best_library(data, normalized)
+    return best if best else normalized
 
 
 def doc(

@@ -14,6 +14,7 @@ try:
     from ot_tools.context7 import (
         _normalize_library_key,
         _normalize_topic,
+        _pick_best_library,
         doc,
         search,
     )
@@ -116,6 +117,95 @@ class TestNormalizeTopic:
 
     def test_empty_string(self):
         assert _normalize_topic("") == ""
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestPickBestLibrary:
+    """Test _pick_best_library scoring function."""
+
+    def test_returns_none_for_empty_results(self):
+        assert _pick_best_library([], "react") is None
+        assert _pick_best_library({"results": []}, "react") is None
+
+    def test_returns_none_for_invalid_data(self):
+        assert _pick_best_library("invalid", "react") is None
+        assert _pick_best_library(None, "react") is None
+
+    def test_prefers_exact_title_match(self):
+        """Exact title match should win over VIP/verified."""
+        data = [
+            {"id": "/reactjs/react-window", "title": "React Window", "vip": True},
+            {"id": "/reactjs/react.dev", "title": "React", "verified": True},
+        ]
+        assert _pick_best_library(data, "react") == "reactjs/react.dev"
+
+    def test_prefers_vip_over_verified(self):
+        """VIP libraries should rank higher than just verified."""
+        data = [
+            {"id": "/org/lib-a", "title": "Other", "verified": True},
+            {"id": "/org/lib-b", "title": "Other2", "vip": True},
+        ]
+        assert _pick_best_library(data, "something") == "org/lib-b"
+
+    def test_trust_score_contributes(self):
+        """Higher trust scores should rank higher."""
+        data = [
+            {"id": "/org/lib-a", "title": "Lib", "trustScore": 5},
+            {"id": "/org/lib-b", "title": "Lib", "trustScore": 10},
+        ]
+        assert _pick_best_library(data, "lib") == "org/lib-b"
+
+    def test_handles_results_wrapper(self):
+        """Should handle {"results": [...]} format."""
+        data = {"results": [{"id": "/vercel/next.js", "title": "Next.js"}]}
+        assert _pick_best_library(data, "next.js") == "vercel/next.js"
+
+    def test_strips_leading_slash(self):
+        """Should strip leading slash from id."""
+        data = [{"id": "/facebook/react", "title": "React"}]
+        assert _pick_best_library(data, "react") == "facebook/react"
+
+    def test_returns_none_for_id_without_slash(self):
+        """Should return None if id doesn't have org/repo format."""
+        data = [{"id": "react", "title": "React"}]
+        assert _pick_best_library(data, "react") is None
+
+    def test_react_scenario(self):
+        """React search should pick reactjs/react.dev over react-window."""
+        data = [
+            {
+                "id": "/reactjs/react-window",
+                "title": "react-window",
+                "vip": False,
+                "verified": False,
+                "trustScore": 5,
+            },
+            {
+                "id": "/reactjs/react.dev",
+                "title": "React",
+                "vip": True,
+                "verified": True,
+                "trustScore": 10,
+            },
+        ]
+        assert _pick_best_library(data, "react") == "reactjs/react.dev"
+
+    def test_nextjs_scenario(self):
+        """Next.js search should pick vercel/next.js."""
+        data = [
+            {"id": "/vercel/next.js", "title": "Next.js", "vip": True, "trustScore": 10},
+            {"id": "/other/nextjs-clone", "title": "nextjs-clone", "trustScore": 3},
+        ]
+        assert _pick_best_library(data, "next.js") == "vercel/next.js"
+
+    def test_fastapi_scenario(self):
+        """FastAPI search should pick fastapi/fastapi."""
+        data = [
+            {"id": "/fastapi/fastapi", "title": "FastAPI", "verified": True, "trustScore": 9},
+            {"id": "/other/fastapi-utils", "title": "fastapi-utils", "trustScore": 4},
+        ]
+        assert _pick_best_library(data, "fastapi") == "fastapi/fastapi"
 
 
 # -----------------------------------------------------------------------------
