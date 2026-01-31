@@ -152,12 +152,17 @@ If config changes are needed:
 
 ---
 
-## Step 8: Summary
+## Step 8: OpenSpec spec check
+
+Verify that any specs in `openspec/specs/` affected by your changes are accurate and complete. Code is the source of truth—specs must match the implementation.
+
+## Step 9: Summary
 
 Present a summary of all changes:
 
 ```text
-## Applied Changes
+
+## Summary of Applied Changes
 
 ### Code
 - ✅ file.py: <summary>
@@ -175,10 +180,4 @@ Present a summary of all changes:
 ### Config
 - ✅ config.yaml: <summary>
 
-## Next Steps
-- [ ] Review changes with `git diff`
-- [ ] Run full test suite
-- [ ] Commit when ready
 ```
-
-ASK: "Would you like me to create a commit for these changes?"
