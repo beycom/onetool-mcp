@@ -135,8 +135,12 @@ def _run_rg(
 
             # rg returns 1 for no matches (not an error), 2 for actual errors
             if result.returncode == 2:
-                span.add(returncode=2, error=result.stderr.strip())
-                return False, result.stderr.strip() or "ripgrep error"
+                error_msg = result.stderr.strip() or "Unknown ripgrep error"
+                span.add(returncode=2, error=error_msg)
+                # Improve error message for common patterns
+                if "regex parse error" in error_msg:
+                    return False, f"Error: Invalid regex pattern\n{error_msg}"
+                return False, f"Error: {error_msg}"
 
             span.add(returncode=result.returncode, outputLen=len(result.stdout))
             return True, result.stdout
@@ -164,9 +168,17 @@ def search(
     file_type: str | None = None,
     glob: str | None = None,
     context: int = 0,
-    max_results: int | None = None,
+    before_context: int = 0,
+    after_context: int = 0,
+    max_per_file: int | None = None,
+    limit: int | None = None,
     word_match: bool = False,
     include_hidden: bool = False,
+    invert_match: bool = False,
+    multiline: bool = False,
+    only_matching: bool = False,
+    no_ignore: bool = False,
+    heading: bool = False,
 ) -> str:
     """Search files for patterns using ripgrep.
 
@@ -179,11 +191,21 @@ def search(
         case_sensitive: Match case-sensitively (default: True)
         fixed_strings: Treat pattern as literal string, not regex (default: False)
         file_type: Search only files of this type (e.g., "py", "js", "ts")
-        glob: Search only files matching this glob pattern (e.g., "*.ts")
+        glob: Search only files matching this glob pattern. Note: glob is applied
+            relative to `path`. Use `glob="**/*.py"` with `path="."` for absolute
+            patterns, or `glob="*.py"` with `path="src/"` for relative patterns.
         context: Number of lines to show before and after each match
-        max_results: Maximum number of matching lines to return
+        before_context: Number of lines to show before each match (overrides context)
+        after_context: Number of lines to show after each match (overrides context)
+        max_per_file: Maximum matches per file (passed to rg --max-count)
+        limit: Maximum total matching lines to return (post-processed)
         word_match: Match whole words only (default: False)
         include_hidden: Search hidden files and directories (default: False)
+        invert_match: Return lines NOT matching the pattern (default: False)
+        multiline: Match patterns spanning multiple lines (default: False)
+        only_matching: Show only the matched text, not the full line (default: False)
+        no_ignore: Don't respect .gitignore files (default: False)
+        heading: Group matches by file with headings (default: False)
 
     Returns:
         Matching lines with file paths and line numbers, or error message.
@@ -199,12 +221,17 @@ def search(
         ripgrep.search(pattern="[test]", path=".", fixed_strings=True)
 
         # Search with context
-        ripgrep.search(pattern="def main", path=".", context=3, max_results=5)
+        ripgrep.search(pattern="def main", path=".", context=3, limit=5)
 
-        # Full path glob patterns (recursive matching)
-        ripgrep.search(pattern="TODO", glob="src/**/*.py")
-        ripgrep.search(pattern="import", glob="**/*.{ts,tsx}")
-        ripgrep.search(pattern="test", glob="tests/**/test_*.py")
+        # Glob patterns are relative to path
+        ripgrep.search(pattern="TODO", glob="**/*.py", path=".")  # All .py files
+        ripgrep.search(pattern="TODO", glob="*.py", path="src/")  # Only src/*.py
+
+        # Find lines NOT containing a pattern
+        ripgrep.search(pattern="import", path=".", invert_match=True, file_type="py")
+
+        # Multiline patterns
+        ripgrep.search(pattern="def.*\\n.*return", path=".", multiline=True)
     """
     with LogSpan(span="ripgrep.search", pattern=pattern, path=path) as s:
         # Check rg is installed
@@ -234,17 +261,37 @@ def search(
         if glob:
             args.extend(["--glob", glob])
 
-        if context > 0:
+        # Context options: specific before/after take precedence over general context
+        if before_context > 0:
+            args.extend(["-B", str(before_context)])
+        if after_context > 0:
+            args.extend(["-A", str(after_context)])
+        if context > 0 and before_context == 0 and after_context == 0:
             args.extend(["--context", str(context)])
 
-        if max_results:
-            args.extend(["--max-count", str(max_results)])
+        if max_per_file:
+            args.extend(["--max-count", str(max_per_file)])
 
         if word_match:
             args.append("--word-regexp")
 
         if include_hidden:
             args.append("--hidden")
+
+        if invert_match:
+            args.append("--invert-match")
+
+        if multiline:
+            args.append("--multiline")
+
+        if only_matching:
+            args.append("--only-matching")
+
+        if no_ignore:
+            args.append("--no-ignore")
+
+        if heading:
+            args.append("--heading")
 
         args.extend([pattern, str(search_path)])
 
@@ -261,8 +308,14 @@ def search(
         # Convert to relative paths if configured
         result = _to_relative_output(output.strip(), search_path)
 
+        # Apply total limit if specified (post-process)
+        lines = result.split("\n")
+        if limit and len(lines) > limit:
+            result = "\n".join(lines[:limit])
+            result += f"\n... ({len(lines) - limit} more matches truncated)"
+
         # Count matches
-        match_count = len(result.split("\n"))
+        match_count = min(len(lines), limit) if limit else len(lines)
         s.add("matchCount", match_count)
 
         return result
@@ -276,6 +329,7 @@ def count(
     file_type: str | None = None,
     glob: str | None = None,
     include_hidden: bool = False,
+    no_ignore: bool = False,
 ) -> str:
     """Count pattern occurrences in files.
 
@@ -286,8 +340,10 @@ def count(
         path: Directory or file to search in (default: current directory)
         count_all: Count all matches per line, not just matching lines (default: False)
         file_type: Count only in files of this type (e.g., "py", "js")
-        glob: Count only in files matching this glob pattern
+        glob: Count only in files matching this glob pattern. Note: glob is applied
+            relative to `path`.
         include_hidden: Include hidden files and directories (default: False)
+        no_ignore: Don't respect .gitignore files (default: False)
 
     Returns:
         File paths with match counts, or error message.
@@ -299,9 +355,9 @@ def count(
         # Count all imports (including multiple per line)
         ripgrep.count(pattern="import", path=".", count_all=True, file_type="py")
 
-        # Count with full path globs
-        ripgrep.count(pattern="TODO", glob="src/**/*.py")
-        ripgrep.count(pattern="import", glob="**/*.{js,ts}")
+        # Count with glob patterns (relative to path)
+        ripgrep.count(pattern="TODO", glob="**/*.py", path=".")
+        ripgrep.count(pattern="import", glob="*.{js,ts}", path="src/")
     """
     with LogSpan(span="ripgrep.count", pattern=pattern, path=path) as s:
         # Check rg is installed
@@ -330,6 +386,9 @@ def count(
 
         if include_hidden:
             args.append("--hidden")
+
+        if no_ignore:
+            args.append("--no-ignore")
 
         args.extend([pattern, str(search_path)])
 
@@ -365,6 +424,8 @@ def files(
     file_type: str | None = None,
     glob: str | None = None,
     include_hidden: bool = False,
+    no_ignore: bool = False,
+    sort: str | None = None,
 ) -> str:
     """List files that would be searched.
 
@@ -373,8 +434,11 @@ def files(
     Args:
         path: Directory to list files in (default: current directory)
         file_type: List only files of this type (e.g., "py", "js")
-        glob: List only files matching this glob pattern (e.g., "*.md")
+        glob: List only files matching this glob pattern. Note: glob is applied
+            relative to `path`.
         include_hidden: Include hidden files and directories (default: False)
+        no_ignore: Don't respect .gitignore files (default: False)
+        sort: Sort files by: "path", "modified", "accessed", or "created"
 
     Returns:
         List of file paths, one per line.
@@ -386,10 +450,15 @@ def files(
         # List markdown files
         ripgrep.files(path=".", glob="*.md")
 
-        # Full path glob patterns
-        ripgrep.files(glob="src/**/*.py")           # Python files under src/
-        ripgrep.files(glob="tests/**/test_*.py")    # Test files recursively
-        ripgrep.files(glob="**/*.{yaml,yml}")       # YAML files with brace expansion
+        # Glob patterns are relative to path
+        ripgrep.files(glob="**/*.py", path=".")         # All .py files from root
+        ripgrep.files(glob="test_*.py", path="tests/")  # Test files in tests/
+
+        # List files sorted by modification time
+        ripgrep.files(path="src/", file_type="py", sort="modified")
+
+        # Include files normally ignored by .gitignore
+        ripgrep.files(path=".", no_ignore=True)
     """
     with LogSpan(span="ripgrep.files", path=path) as s:
         # Check rg is installed
@@ -415,6 +484,12 @@ def files(
 
         if include_hidden:
             args.append("--hidden")
+
+        if no_ignore:
+            args.append("--no-ignore")
+
+        if sort:
+            args.extend(["--sort", sort])
 
         args.append(str(search_path))
 

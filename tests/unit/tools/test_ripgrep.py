@@ -174,6 +174,22 @@ class TestRunRg:
         assert success is False
         assert "Invalid regex" in output
 
+    def test_regex_parse_error_improved_message(self, mock_ripgrep_config):
+        from ot_tools.ripgrep import _run_rg
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=2,
+                stdout="",
+                stderr="regex parse error:\n    (?:[invalid(regex)\n       ^\nerror: unclosed character class",
+            )
+
+            success, output = _run_rg(["[invalid(regex", "."])
+
+        assert success is False
+        assert "Error: Invalid regex pattern" in output
+        assert "regex parse error" in output
+
     def test_timeout(self, mock_ripgrep_config):
         from ot_tools.ripgrep import _run_rg
 
@@ -298,6 +314,23 @@ class TestCount:
 
         assert "No matches found" in result
 
+    @patch("ot_tools.ripgrep._run_rg")
+    @patch("ot_tools.ripgrep._check_rg_installed")
+    @patch("ot_tools.ripgrep._resolve_path")
+    def test_no_ignore_flag(self, mock_resolve, mock_check, mock_run):
+        from ot_tools.ripgrep import count
+
+        mock_check.return_value = None
+        mock_path = MagicMock()
+        mock_path.exists.return_value = True
+        mock_resolve.return_value = mock_path
+        mock_run.return_value = (True, "")
+
+        count(pattern="test", path=".", no_ignore=True)
+
+        args = mock_run.call_args[0][0]
+        assert "--no-ignore" in args
+
 
 @pytest.mark.unit
 @pytest.mark.tools
@@ -336,6 +369,41 @@ class TestFiles:
         result = files(path=".", file_type="xyz")
 
         assert "No files found" in result
+
+    @patch("ot_tools.ripgrep._run_rg")
+    @patch("ot_tools.ripgrep._check_rg_installed")
+    @patch("ot_tools.ripgrep._resolve_path")
+    def test_no_ignore_flag(self, mock_resolve, mock_check, mock_run):
+        from ot_tools.ripgrep import files
+
+        mock_check.return_value = None
+        mock_path = MagicMock()
+        mock_path.exists.return_value = True
+        mock_resolve.return_value = mock_path
+        mock_run.return_value = (True, "")
+
+        files(path=".", no_ignore=True)
+
+        args = mock_run.call_args[0][0]
+        assert "--no-ignore" in args
+
+    @patch("ot_tools.ripgrep._run_rg")
+    @patch("ot_tools.ripgrep._check_rg_installed")
+    @patch("ot_tools.ripgrep._resolve_path")
+    def test_sort_flag(self, mock_resolve, mock_check, mock_run):
+        from ot_tools.ripgrep import files
+
+        mock_check.return_value = None
+        mock_path = MagicMock()
+        mock_path.exists.return_value = True
+        mock_resolve.return_value = mock_path
+        mock_run.return_value = (True, "")
+
+        files(path=".", sort="modified")
+
+        args = mock_run.call_args[0][0]
+        assert "--sort" in args
+        assert "modified" in args
 
 
 @pytest.mark.unit
@@ -501,3 +569,161 @@ class TestSearchArguments:
 
         args = mock_run.call_args[0][0]
         assert "--hidden" in args
+
+    @patch("ot_tools.ripgrep._run_rg")
+    @patch("ot_tools.ripgrep._check_rg_installed")
+    @patch("ot_tools.ripgrep._resolve_path")
+    def test_invert_match_flag(self, mock_resolve, mock_check, mock_run):
+        from ot_tools.ripgrep import search
+
+        mock_check.return_value = None
+        mock_path = MagicMock()
+        mock_path.exists.return_value = True
+        mock_resolve.return_value = mock_path
+        mock_run.return_value = (True, "")
+
+        search(pattern="test", path=".", invert_match=True)
+
+        args = mock_run.call_args[0][0]
+        assert "--invert-match" in args
+
+    @patch("ot_tools.ripgrep._run_rg")
+    @patch("ot_tools.ripgrep._check_rg_installed")
+    @patch("ot_tools.ripgrep._resolve_path")
+    def test_multiline_flag(self, mock_resolve, mock_check, mock_run):
+        from ot_tools.ripgrep import search
+
+        mock_check.return_value = None
+        mock_path = MagicMock()
+        mock_path.exists.return_value = True
+        mock_resolve.return_value = mock_path
+        mock_run.return_value = (True, "")
+
+        search(pattern="def.*return", path=".", multiline=True)
+
+        args = mock_run.call_args[0][0]
+        assert "--multiline" in args
+
+    @patch("ot_tools.ripgrep._run_rg")
+    @patch("ot_tools.ripgrep._check_rg_installed")
+    @patch("ot_tools.ripgrep._resolve_path")
+    def test_only_matching_flag(self, mock_resolve, mock_check, mock_run):
+        from ot_tools.ripgrep import search
+
+        mock_check.return_value = None
+        mock_path = MagicMock()
+        mock_path.exists.return_value = True
+        mock_resolve.return_value = mock_path
+        mock_run.return_value = (True, "")
+
+        search(pattern="test", path=".", only_matching=True)
+
+        args = mock_run.call_args[0][0]
+        assert "--only-matching" in args
+
+    @patch("ot_tools.ripgrep._run_rg")
+    @patch("ot_tools.ripgrep._check_rg_installed")
+    @patch("ot_tools.ripgrep._resolve_path")
+    def test_no_ignore_flag(self, mock_resolve, mock_check, mock_run):
+        from ot_tools.ripgrep import search
+
+        mock_check.return_value = None
+        mock_path = MagicMock()
+        mock_path.exists.return_value = True
+        mock_resolve.return_value = mock_path
+        mock_run.return_value = (True, "")
+
+        search(pattern="test", path=".", no_ignore=True)
+
+        args = mock_run.call_args[0][0]
+        assert "--no-ignore" in args
+
+    @patch("ot_tools.ripgrep._run_rg")
+    @patch("ot_tools.ripgrep._check_rg_installed")
+    @patch("ot_tools.ripgrep._resolve_path")
+    def test_heading_flag(self, mock_resolve, mock_check, mock_run):
+        from ot_tools.ripgrep import search
+
+        mock_check.return_value = None
+        mock_path = MagicMock()
+        mock_path.exists.return_value = True
+        mock_resolve.return_value = mock_path
+        mock_run.return_value = (True, "")
+
+        search(pattern="test", path=".", heading=True)
+
+        args = mock_run.call_args[0][0]
+        assert "--heading" in args
+
+    @patch("ot_tools.ripgrep._run_rg")
+    @patch("ot_tools.ripgrep._check_rg_installed")
+    @patch("ot_tools.ripgrep._resolve_path")
+    def test_before_context_flag(self, mock_resolve, mock_check, mock_run):
+        from ot_tools.ripgrep import search
+
+        mock_check.return_value = None
+        mock_path = MagicMock()
+        mock_path.exists.return_value = True
+        mock_resolve.return_value = mock_path
+        mock_run.return_value = (True, "")
+
+        search(pattern="test", path=".", before_context=2)
+
+        args = mock_run.call_args[0][0]
+        assert "-B" in args
+        assert "2" in args
+
+    @patch("ot_tools.ripgrep._run_rg")
+    @patch("ot_tools.ripgrep._check_rg_installed")
+    @patch("ot_tools.ripgrep._resolve_path")
+    def test_after_context_flag(self, mock_resolve, mock_check, mock_run):
+        from ot_tools.ripgrep import search
+
+        mock_check.return_value = None
+        mock_path = MagicMock()
+        mock_path.exists.return_value = True
+        mock_resolve.return_value = mock_path
+        mock_run.return_value = (True, "")
+
+        search(pattern="test", path=".", after_context=3)
+
+        args = mock_run.call_args[0][0]
+        assert "-A" in args
+        assert "3" in args
+
+    @patch("ot_tools.ripgrep._run_rg")
+    @patch("ot_tools.ripgrep._check_rg_installed")
+    @patch("ot_tools.ripgrep._resolve_path")
+    def test_max_per_file_flag(self, mock_resolve, mock_check, mock_run):
+        from ot_tools.ripgrep import search
+
+        mock_check.return_value = None
+        mock_path = MagicMock()
+        mock_path.exists.return_value = True
+        mock_resolve.return_value = mock_path
+        mock_run.return_value = (True, "")
+
+        search(pattern="test", path=".", max_per_file=5)
+
+        args = mock_run.call_args[0][0]
+        assert "--max-count" in args
+        assert "5" in args
+
+    @patch("ot_tools.ripgrep._run_rg")
+    @patch("ot_tools.ripgrep._check_rg_installed")
+    @patch("ot_tools.ripgrep._resolve_path")
+    def test_limit_truncates_results(self, mock_resolve, mock_check, mock_run):
+        from ot_tools.ripgrep import search
+
+        mock_check.return_value = None
+        mock_path = MagicMock()
+        mock_path.exists.return_value = True
+        mock_resolve.return_value = mock_path
+        # Return 10 lines of output
+        mock_run.return_value = (True, "\n".join([f"file{i}.py:1:found" for i in range(10)]))
+
+        result = search(pattern="test", path=".", limit=3)
+
+        # Should only have 3 matches plus truncation message
+        assert result.count("found") == 3
+        assert "7 more matches truncated" in result

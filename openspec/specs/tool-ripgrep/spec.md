@@ -42,16 +42,27 @@ The `ripgrep.search()` function SHALL search files for patterns using ripgrep.
 - **GIVEN** a glob parameter
 - **WHEN** `ripgrep.search(pattern="TODO", path=".", glob="*.ts")` is called
 - **THEN** it SHALL search only files matching the glob
+- **NOTE**: Glob patterns are applied relative to path
 
 #### Scenario: Context lines
 - **GIVEN** a context parameter
 - **WHEN** `ripgrep.search(pattern="error", path=".", context=2)` is called
 - **THEN** it SHALL show 2 lines before and after each match
 
-#### Scenario: Max results limit
-- **GIVEN** a max_results parameter
-- **WHEN** `ripgrep.search(pattern="TODO", path=".", max_results=10)` is called
-- **THEN** it SHALL return at most 10 matching lines
+#### Scenario: Before/after context lines
+- **GIVEN** before_context or after_context parameters
+- **WHEN** `ripgrep.search(pattern="error", path=".", before_context=3, after_context=1)` is called
+- **THEN** it SHALL show 3 lines before and 1 line after each match
+
+#### Scenario: Max results per file
+- **GIVEN** a max_per_file parameter
+- **WHEN** `ripgrep.search(pattern="TODO", path=".", max_per_file=2)` is called
+- **THEN** it SHALL return at most 2 matching lines per file
+
+#### Scenario: Total results limit
+- **GIVEN** a limit parameter
+- **WHEN** `ripgrep.search(pattern="TODO", path=".", limit=10)` is called
+- **THEN** it SHALL return at most 10 total matching lines with truncation message
 
 #### Scenario: Word boundary match
 - **GIVEN** word_match=True
@@ -62,6 +73,31 @@ The `ripgrep.search()` function SHALL search files for patterns using ripgrep.
 - **GIVEN** include_hidden=True
 - **WHEN** `ripgrep.search(pattern="secret", path=".", include_hidden=True)` is called
 - **THEN** it SHALL search hidden files and directories
+
+#### Scenario: Invert match
+- **GIVEN** invert_match=True
+- **WHEN** `ripgrep.search(pattern="import", path=".", invert_match=True)` is called
+- **THEN** it SHALL return lines NOT matching the pattern
+
+#### Scenario: Multiline patterns
+- **GIVEN** multiline=True
+- **WHEN** `ripgrep.search(pattern="def.*\\n.*return", path=".", multiline=True)` is called
+- **THEN** it SHALL match patterns spanning multiple lines
+
+#### Scenario: Only matching text
+- **GIVEN** only_matching=True
+- **WHEN** `ripgrep.search(pattern="TODO.*", path=".", only_matching=True)` is called
+- **THEN** it SHALL return only the matched text, not the full line
+
+#### Scenario: No ignore gitignore
+- **GIVEN** no_ignore=True
+- **WHEN** `ripgrep.search(pattern="test", path=".", no_ignore=True)` is called
+- **THEN** it SHALL search files normally excluded by .gitignore
+
+#### Scenario: Heading output
+- **GIVEN** heading=True
+- **WHEN** `ripgrep.search(pattern="TODO", path=".", heading=True)` is called
+- **THEN** it SHALL group matches by file with headings
 
 #### Scenario: No matches found
 - **GIVEN** a pattern with no matches
@@ -81,6 +117,11 @@ The `ripgrep.count()` function SHALL count pattern occurrences in files.
 - **GIVEN** count_all=True
 - **WHEN** `ripgrep.count(pattern="import", path=".", count_all=True)` is called
 - **THEN** it SHALL count all matches per line, not just matching lines
+
+#### Scenario: Count with no_ignore
+- **GIVEN** no_ignore=True
+- **WHEN** `ripgrep.count(pattern="test", path=".", no_ignore=True)` is called
+- **THEN** it SHALL count in files normally excluded by .gitignore
 
 #### Scenario: No matches found
 - **GIVEN** a pattern with no matches
@@ -111,6 +152,17 @@ The `ripgrep.files()` function SHALL list files that would be searched.
 - **WHEN** `ripgrep.files(path=".", include_hidden=True)` is called
 - **THEN** it SHALL include hidden files and directories
 
+#### Scenario: No ignore gitignore
+- **GIVEN** no_ignore=True
+- **WHEN** `ripgrep.files(path=".", no_ignore=True)` is called
+- **THEN** it SHALL include files normally excluded by .gitignore
+
+#### Scenario: Sort files
+- **GIVEN** a sort parameter
+- **WHEN** `ripgrep.files(path=".", sort="modified")` is called
+- **THEN** it SHALL return files sorted by modification time
+- **NOTE**: Valid sort values: "path", "modified", "accessed", "created"
+
 ### Requirement: File Type Listing
 
 The `ripgrep.types()` function SHALL list supported file types.
@@ -136,7 +188,7 @@ The ripgrep tool SHALL handle errors gracefully.
 #### Scenario: Invalid regex
 - **GIVEN** an invalid regex pattern
 - **WHEN** `ripgrep.search(pattern="[invalid", path=".")` is called
-- **THEN** it SHALL return the ripgrep error message
+- **THEN** it SHALL return a user-friendly error message prefixed with "Error: Invalid regex pattern"
 
 ### Requirement: Ripgrep Tool Logging
 
