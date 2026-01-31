@@ -170,26 +170,28 @@ def _validate_path(
         must_exist: If True, path must exist
 
     Returns:
-        Tuple of (resolved_path, error_message)
-        If error, resolved_path is None
+        Tuple of (user_path, error_message)
+        If error, user_path is None
+        user_path preserves symlinks for type detection; security is validated
+        against the fully resolved path.
     """
     cfg = _get_file_config()
 
-    # Expand and resolve
+    # Build user path (preserve symlinks for type detection)
     try:
-        resolved = _expand_path(path)
-        # Always resolve to normalize ".." and follow symlinks for security
-        # resolve() works on non-existent paths too (normalizes parent components)
-        real_path = resolved.resolve()
+        cwd = resolve_cwd_path(".")
+        p = Path(path).expanduser()
+        user_path = p if p.is_absolute() else cwd / p
+        # Resolve for security validation (follows symlinks)
+        real_path = user_path.resolve()
     except (OSError, ValueError) as e:
         return None, f"Invalid path: {e}"
 
     # Check if path exists when required
-    if must_exist and not resolved.exists():
+    if must_exist and not user_path.exists():
         return None, f"Path not found: {path}"
 
     # Check against allowed directories
-    cwd = resolve_cwd_path(".")
     allowed_dirs: List[Path] = []  # noqa: UP006
 
     if cfg.allowed_dirs:
@@ -217,7 +219,7 @@ def _validate_path(
     if _is_excluded(real_path, cfg.exclude_patterns):
         return None, "Access denied: path matches exclude pattern"
 
-    return resolved, None
+    return user_path, None
 
 
 def _check_file_size(path: Path) -> str | None:
@@ -435,13 +437,16 @@ def read(
             return f"Error: {e}"
 
 
-def info(*, path: str) -> dict[str, Any] | str:
+def info(*, path: str, follow_symlinks: bool = True) -> dict[str, Any] | str:
     """Get file or directory metadata.
 
     Returns size, timestamps, permissions, and type information.
+    For symlinks, reports symlink metadata by default; use follow_symlinks=True
+    to get target metadata instead.
 
     Args:
         path: Path to file or directory
+        follow_symlinks: If True, follow symlinks to get target info (default: True)
 
     Returns:
         Dict with path, type, size, permissions, timestamps (or error string)
@@ -449,6 +454,7 @@ def info(*, path: str) -> dict[str, Any] | str:
     Example:
         file.info(path="src/main.py")
         file.info(path="./docs")
+        file.info(path="link", follow_symlinks=False)  # Get symlink metadata
     """
     with LogSpan(span="file.info", path=path) as s:
         resolved, error = _validate_path(path, must_exist=True)
@@ -460,17 +466,30 @@ def info(*, path: str) -> dict[str, Any] | str:
         cfg = _get_file_config()
 
         try:
-            st = resolved.stat()
-
             # Determine type (check symlink first - is_file/is_dir follow symlinks)
-            if resolved.is_symlink():
+            is_symlink = resolved.is_symlink()
+            if is_symlink and not follow_symlinks:
+                # Report symlink itself
                 file_type = "symlink"
+                st = resolved.lstat()
+            elif is_symlink and follow_symlinks:
+                # Follow symlink - report target type but note it's a symlink
+                st = resolved.stat()
+                if resolved.is_file():
+                    file_type = "file"
+                elif resolved.is_dir():
+                    file_type = "directory"
+                else:
+                    file_type = "other"
             elif resolved.is_file():
                 file_type = "file"
+                st = resolved.stat()
             elif resolved.is_dir():
                 file_type = "directory"
+                st = resolved.stat()
             else:
                 file_type = "other"
+                st = resolved.stat()
 
             # Format timestamps
             created = datetime.fromtimestamp(st.st_ctime, tz=UTC).isoformat()
@@ -522,10 +541,13 @@ def list(
     include_hidden: bool = False,
     sort_by: str = "name",
     reverse: bool = False,
+    follow_symlinks: bool = False,
 ) -> str:
     """List directory contents.
 
     Lists files and directories with optional filtering and sorting.
+    Symlinks are shown as type 'l' by default; use follow_symlinks=True
+    to show them as their target type ('d' or 'f').
 
     Args:
         path: Directory path (default: current directory)
@@ -534,6 +556,7 @@ def list(
         include_hidden: If True, include hidden files (default: False)
         sort_by: Sort field - "name", "type", "size", "modified" (default: "name")
         reverse: If True, reverse sort order (default: False)
+        follow_symlinks: If True, show symlinks as their target type (default: False)
 
     Returns:
         List of entries with type indicator and size
@@ -592,10 +615,11 @@ def list(
                     size = 0
                     mtime = 0
 
-                if entry.is_dir():
-                    type_ind = "d"
-                elif entry.is_symlink():
+                # Check symlink first - is_dir() follows symlinks
+                if entry.is_symlink() and not follow_symlinks:
                     type_ind = "l"
+                elif entry.is_dir():
+                    type_ind = "d"
                 else:
                     type_ind = "f"
 
@@ -731,6 +755,7 @@ def search(
     glob: str | None = None,
     file_pattern: str | None = None,
     case_sensitive: bool = False,
+    include_hidden: bool = False,
     max_results: int = 100,
 ) -> str:
     """Search for files by name pattern or glob.
@@ -745,6 +770,7 @@ def search(
             Supports ** for recursive matching and brace expansion.
         file_pattern: Filter by file extension (e.g., "*.py"). Used with pattern.
         case_sensitive: If True, pattern matching is case-sensitive (default: False)
+        include_hidden: If True, include hidden files (default: False)
         max_results: Maximum number of results to return (default: 100)
 
     Returns:
@@ -789,7 +815,7 @@ def search(
                         continue
 
                     # Skip hidden files
-                    if entry.name.startswith("."):
+                    if not include_hidden and entry.name.startswith("."):
                         continue
 
                     # Skip excluded patterns
@@ -818,7 +844,7 @@ def search(
                         continue
 
                     # Skip hidden files
-                    if entry.name.startswith("."):
+                    if not include_hidden and entry.name.startswith("."):
                         continue
 
                     # Skip excluded patterns
@@ -883,6 +909,8 @@ def write(
     content: str,
     append: bool = False,
     create_dirs: bool = False,
+    encoding: str = "utf-8",
+    dry_run: bool = False,
 ) -> str:
     """Write content to a file.
 
@@ -894,6 +922,8 @@ def write(
         content: Content to write
         append: If True, append to file (default: overwrite)
         create_dirs: If True, create parent directories (default: False)
+        encoding: Character encoding (default: utf-8)
+        dry_run: If True, show what would happen without writing (default: False)
 
     Returns:
         Success message with bytes written, or error message
@@ -924,6 +954,21 @@ def write(
                 s.add(error="parent_not_found")
                 return f"Error: Parent directory does not exist: {parent}. Use create_dirs=True to create it."
 
+        # Encode once for byte count
+        try:
+            content_bytes = content.encode(encoding)
+        except UnicodeEncodeError as e:
+            s.add(error="encoding_error")
+            return f"Error: Could not encode content with {encoding}: {e}"
+        bytes_to_write = len(content_bytes)
+
+        # Dry run mode - show what would happen
+        if dry_run:
+            action = "append" if append else "write"
+            exists = "existing" if resolved.exists() else "new"
+            s.add(dry_run=True, bytesToWrite=bytes_to_write)
+            return f"Dry run: Would {action} {bytes_to_write} bytes to {exists} file {path}"
+
         # Create backup if file exists
         if resolved.exists():
             backup_error = _create_backup(resolved)
@@ -932,10 +977,6 @@ def write(
                 return f"Error: {backup_error}"
 
         try:
-            # Encode once for byte count (P5 fix - avoid double encoding)
-            content_bytes = content.encode("utf-8")
-            bytes_written = len(content_bytes)
-
             # Use atomic write for non-append operations
             if append:
                 with resolved.open("ab") as f:
@@ -962,8 +1003,8 @@ def write(
                     raise
 
             action = "appended" if append else "wrote"
-            s.add(written=True, bytesWritten=bytes_written)
-            return f"OK: {action} {bytes_written} bytes to {path}"
+            s.add(written=True, bytesWritten=bytes_to_write)
+            return f"OK: {action} {bytes_to_write} bytes to {path}"
 
         except OSError as e:
             s.add(error=str(e))
@@ -976,6 +1017,8 @@ def edit(
     old_text: str,
     new_text: str,
     occurrence: int = 1,
+    encoding: str = "utf-8",
+    dry_run: bool = False,
 ) -> str:
     """Edit a file by replacing text.
 
@@ -988,6 +1031,8 @@ def edit(
         old_text: Exact text to find and replace
         new_text: Text to replace with
         occurrence: Which occurrence to replace (1=first, 0=all, default: 1)
+        encoding: Character encoding (default: utf-8)
+        dry_run: If True, show what would happen without editing (default: False)
 
     Returns:
         Success message showing replacement count, or error message
@@ -1012,10 +1057,10 @@ def edit(
             return "Error: old_text cannot be empty"
 
         try:
-            content = resolved.read_text(encoding="utf-8")
+            content = resolved.read_text(encoding=encoding)
         except UnicodeDecodeError as e:
             s.add(error="encoding_error")
-            return f"Error: Could not read file as UTF-8: {e}"
+            return f"Error: Could not read file with encoding {encoding}: {e}"
         except OSError as e:
             s.add(error=str(e))
             return f"Error: {e}"
@@ -1034,6 +1079,14 @@ def edit(
         if occurrence > count:
             s.add(error="occurrence_out_of_range")
             return f"Error: Requested occurrence {occurrence} but only found {count}"
+
+        # Calculate how many replacements would be made
+        replace_count = count if occurrence == 0 else 1
+
+        # Dry run mode - show what would happen
+        if dry_run:
+            s.add(dry_run=True, occurrences=count, wouldReplace=replace_count)
+            return f"Dry run: Would replace {replace_count} occurrence(s) of text in {path}"
 
         # Create backup
         backup_error = _create_backup(resolved)
@@ -1073,7 +1126,7 @@ def edit(
                 suffix=resolved.suffix,
             )
             try:
-                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                with os.fdopen(fd, "w", encoding=encoding) as f:
                     f.write(new_content)
                 shutil.copymode(str(resolved), temp_path)
                 Path(temp_path).replace(resolved)
@@ -1096,8 +1149,10 @@ def edit(
 # ============================================================================
 
 
-def delete(*, path: str, backup: bool = True) -> str:
-    """Delete a file or empty directory.
+def delete(
+    *, path: str, backup: bool = True, recursive: bool = False, dry_run: bool = False
+) -> str:
+    """Delete a file or directory.
 
     By default creates a backup before deletion. If send2trash is
     available and use_trash is enabled, moves to trash instead.
@@ -1105,6 +1160,8 @@ def delete(*, path: str, backup: bool = True) -> str:
     Args:
         path: Path to file or directory
         backup: If True, create backup before delete (default: True)
+        recursive: If True, delete non-empty directories (default: False)
+        dry_run: If True, show what would happen without deleting (default: False)
 
     Returns:
         Success message or error message
@@ -1112,6 +1169,7 @@ def delete(*, path: str, backup: bool = True) -> str:
     Example:
         file.delete(path="temp.txt")
         file.delete(path="old_file.py", backup=False)
+        file.delete(path="old_dir/", recursive=True)
     """
     with LogSpan(span="file.delete", path=path) as s:
         resolved, error = _validate_path(path, must_exist=True)
@@ -1121,6 +1179,23 @@ def delete(*, path: str, backup: bool = True) -> str:
         assert resolved is not None  # mypy: error check above ensures this
 
         cfg = _get_file_config()
+
+        # Dry run mode - show what would happen
+        if dry_run:
+            if resolved.is_file():
+                file_type = "file"
+            elif resolved.is_symlink():
+                file_type = "symlink"
+            elif resolved.is_dir():
+                file_type = "directory"
+                if not recursive and any(resolved.iterdir()):
+                    s.add(dry_run=True, error="would_fail")
+                    return f"Dry run: Would fail - directory not empty: {path}. Use recursive=True."
+            else:
+                file_type = "unknown"
+            method = "trash" if cfg.use_trash and HAS_SEND2TRASH else "delete"
+            s.add(dry_run=True, fileType=file_type, method=method)
+            return f"Dry run: Would {method} {file_type}: {path}"
 
         try:
             # Create backup if requested and it's a file
@@ -1140,11 +1215,13 @@ def delete(*, path: str, backup: bool = True) -> str:
             if resolved.is_file() or resolved.is_symlink():
                 resolved.unlink()
             elif resolved.is_dir():
-                # Only delete empty directories
-                if any(resolved.iterdir()):
+                if recursive:
+                    shutil.rmtree(resolved)
+                elif any(resolved.iterdir()):
                     s.add(error="directory_not_empty")
-                    return f"Error: Directory not empty: {path}"
-                resolved.rmdir()
+                    return f"Error: Directory not empty: {path}. Use recursive=True to delete contents."
+                else:
+                    resolved.rmdir()
             else:
                 s.add(error="unknown_type")
                 return f"Error: Cannot delete: {path}"
@@ -1157,15 +1234,18 @@ def delete(*, path: str, backup: bool = True) -> str:
             return f"Error: {e}"
 
 
-def copy(*, source: str, dest: str) -> str:
+def copy(*, source: str, dest: str, follow_symlinks: bool = True) -> str:
     """Copy a file or directory.
 
     For files, copies content and metadata. For directories, copies
-    the entire tree recursively.
+    the entire tree recursively. By default, symlinks are followed
+    (copied as their target content) for security. Use follow_symlinks=False
+    to copy symlinks as links.
 
     Args:
         source: Source path
         dest: Destination path
+        follow_symlinks: If True, copy symlink targets; if False, copy as links (default: True)
 
     Returns:
         Success message or error message
@@ -1173,6 +1253,7 @@ def copy(*, source: str, dest: str) -> str:
     Example:
         file.copy(source="config.yaml", dest="config.backup.yaml")
         file.copy(source="src/", dest="src_backup/")
+        file.copy(source="src/", dest="backup/", follow_symlinks=False)  # Preserve symlinks
     """
     with LogSpan(span="file.copy", source=source, dest=dest) as s:
         src_resolved, error = _validate_path(source, must_exist=True)
@@ -1188,19 +1269,24 @@ def copy(*, source: str, dest: str) -> str:
         assert dest_resolved is not None  # mypy: error check above ensures this
 
         try:
-            if src_resolved.is_file():
-                # Copy file with metadata
-                shutil.copy2(src_resolved, dest_resolved)
+            if src_resolved.is_file() or (src_resolved.is_symlink() and follow_symlinks):
+                # Copy file with metadata (follows symlinks by default)
+                shutil.copy2(src_resolved, dest_resolved, follow_symlinks=follow_symlinks)
                 s.add(copied=True, type="file")
                 return f"OK: Copied file: {source} -> {dest}"
+            elif src_resolved.is_symlink() and not follow_symlinks:
+                # Copy symlink as a link
+                link_target = src_resolved.readlink()
+                dest_resolved.symlink_to(link_target)
+                s.add(copied=True, type="symlink")
+                return f"OK: Copied symlink: {source} -> {dest}"
             elif src_resolved.is_dir():
                 # Copy directory tree
                 if dest_resolved.exists():
                     s.add(error="dest_exists")
                     return f"Error: Destination already exists: {dest}"
-                # S3 fix: Copy symlink targets (not symlinks) to prevent
-                # copying links that point outside allowed directories
-                shutil.copytree(src_resolved, dest_resolved, symlinks=False)
+                # symlinks=True preserves symlinks as links, False follows them
+                shutil.copytree(src_resolved, dest_resolved, symlinks=not follow_symlinks)
                 s.add(copied=True, type="directory")
                 return f"OK: Copied directory: {source} -> {dest}"
             else:

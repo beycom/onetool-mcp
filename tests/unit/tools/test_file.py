@@ -483,3 +483,206 @@ def test_delete_nonempty_directory_fails(test_dir: Path) -> None:
 
     assert "Error" in result
     assert "not empty" in result.lower()
+
+
+# =============================================================================
+# New Feature Tests
+# =============================================================================
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_list_symlink_detection(tmp_path: Path) -> None:
+    """Verify list correctly identifies symlinks as 'l' type (D1 fix)."""
+    from ot_tools.file import list as list_dir
+
+    # Create a directory and a symlink to it
+    target_dir = tmp_path / "target_dir"
+    target_dir.mkdir()
+    symlink = tmp_path / "link_to_dir"
+    symlink.symlink_to(target_dir)
+
+    result = list_dir(path=str(tmp_path))
+
+    # Symlink should be marked as 'l', not 'd'
+    assert "[l]" in result or "l " in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_list_follow_symlinks(tmp_path: Path) -> None:
+    """Verify list follow_symlinks parameter works (P2)."""
+    from ot_tools.file import list as list_dir
+
+    # Create a directory and a symlink to it
+    target_dir = tmp_path / "target_dir"
+    target_dir.mkdir()
+    symlink = tmp_path / "link_to_dir"
+    symlink.symlink_to(target_dir)
+
+    # Default: symlinks shown as 'l'
+    result = list_dir(path=str(tmp_path), follow_symlinks=False)
+    assert "link_to_dir" in result
+
+    # With follow_symlinks: symlinks shown as their target type
+    result = list_dir(path=str(tmp_path), follow_symlinks=True)
+    assert "link_to_dir" in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_info_symlink_metadata(tmp_path: Path) -> None:
+    """Verify info returns symlink metadata with lstat (D2 fix)."""
+    from ot_tools.file import info
+
+    # Create a file and a symlink to it
+    target_file = tmp_path / "target.txt"
+    target_file.write_text("x" * 1000)
+    symlink = tmp_path / "link.txt"
+    symlink.symlink_to(target_file)
+
+    # With follow_symlinks=False, should get symlink metadata (smaller size)
+    result = info(path=str(symlink), follow_symlinks=False)
+    assert isinstance(result, dict)
+    assert result["type"] == "symlink"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_search_include_hidden(tmp_path: Path) -> None:
+    """Verify search include_hidden parameter works (I1)."""
+    from ot_tools.file import search
+
+    # Create hidden and regular files
+    (tmp_path / ".hidden.txt").write_text("hidden")
+    (tmp_path / "visible.txt").write_text("visible")
+
+    # Default: hidden files excluded
+    result = search(path=str(tmp_path), pattern="*.txt")
+    assert "visible.txt" in result
+    assert ".hidden.txt" not in result
+
+    # With include_hidden: hidden files included
+    result = search(path=str(tmp_path), pattern="*.txt", include_hidden=True)
+    assert "visible.txt" in result
+    assert ".hidden.txt" in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_write_encoding(tmp_path: Path) -> None:
+    """Verify write encoding parameter works (I2)."""
+    from ot_tools.file import write
+
+    test_file = tmp_path / "test.txt"
+    content = "Hello, 世界!"
+
+    # Write with UTF-8 (default)
+    result = write(path=str(test_file), content=content)
+    assert "OK" in result
+    assert test_file.read_text(encoding="utf-8") == content
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_edit_encoding(tmp_path: Path) -> None:
+    """Verify edit encoding parameter works (I2)."""
+    from ot_tools.file import edit
+
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("Hello, 世界!", encoding="utf-8")
+
+    result = edit(path=str(test_file), old_text="世界", new_text="World")
+    assert "OK" in result
+    assert test_file.read_text(encoding="utf-8") == "Hello, World!"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_delete_recursive(tmp_path: Path) -> None:
+    """Verify delete recursive parameter works (I3)."""
+    from ot_tools.file import delete
+
+    # Create a non-empty directory
+    subdir = tmp_path / "nonempty"
+    subdir.mkdir()
+    (subdir / "file.txt").write_text("content")
+
+    # Without recursive, should fail
+    result = delete(path=str(subdir))
+    assert "Error" in result
+    assert "recursive=True" in result
+
+    # With recursive, should succeed
+    result = delete(path=str(subdir), recursive=True)
+    assert "OK" in result
+    assert not subdir.exists()
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_write_dry_run(tmp_path: Path) -> None:
+    """Verify write dry_run parameter works (P1)."""
+    from ot_tools.file import write
+
+    test_file = tmp_path / "test.txt"
+
+    result = write(path=str(test_file), content="Hello", dry_run=True)
+    assert "Dry run" in result
+    assert not test_file.exists()  # File should not be created
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_edit_dry_run(tmp_path: Path) -> None:
+    """Verify edit dry_run parameter works (P1)."""
+    from ot_tools.file import edit
+
+    test_file = tmp_path / "test.txt"
+    original = "Hello World"
+    test_file.write_text(original)
+
+    result = edit(path=str(test_file), old_text="World", new_text="Universe", dry_run=True)
+    assert "Dry run" in result
+    assert test_file.read_text() == original  # Content unchanged
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_delete_dry_run(tmp_path: Path) -> None:
+    """Verify delete dry_run parameter works (P1)."""
+    from ot_tools.file import delete
+
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("content")
+
+    result = delete(path=str(test_file), dry_run=True)
+    assert "Dry run" in result
+    assert test_file.exists()  # File should still exist
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_copy_follow_symlinks(tmp_path: Path) -> None:
+    """Verify copy follow_symlinks parameter works (P2)."""
+    from ot_tools.file import copy
+
+    # Create a file and a symlink to it
+    source_file = tmp_path / "source.txt"
+    source_file.write_text("content")
+    symlink = tmp_path / "link.txt"
+    symlink.symlink_to(source_file)
+    dest = tmp_path / "dest.txt"
+
+    # Default: follow symlinks (copy content)
+    result = copy(source=str(symlink), dest=str(dest))
+    assert "OK" in result
+    assert dest.is_file() and not dest.is_symlink()
+
+    # Clean up for next test
+    dest.unlink()
+
+    # Without follow: copy as symlink
+    result = copy(source=str(symlink), dest=str(dest), follow_symlinks=False)
+    assert "OK" in result
+    assert dest.is_symlink()

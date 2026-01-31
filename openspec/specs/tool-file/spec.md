@@ -104,6 +104,12 @@ The `file.info()` function SHALL return file metadata.
 - **WHEN** `file.info(path=path)` is called
 - **THEN** it SHALL include `target` with symlink destination
 
+#### Scenario: Follow symlinks
+- **GIVEN** a symlink with `follow_symlinks=True` (default)
+- **WHEN** `file.info(path=path)` is called
+- **THEN** it SHALL return target metadata
+- **AND** `follow_symlinks=False` SHALL return symlink metadata
+
 ### Requirement: Directory Listing
 
 The `file.list()` function SHALL list directory contents.
@@ -141,6 +147,12 @@ The `file.list()` function SHALL list directory contents.
 - **GIVEN** a directory with many entries
 - **WHEN** listing exceeds `max_list_entries`
 - **THEN** it SHALL truncate and show "(truncated at N entries)"
+
+#### Scenario: Symlink type display
+- **GIVEN** a directory with symlinks
+- **WHEN** `file.list(path=path, follow_symlinks=False)` is called (default)
+- **THEN** symlinks SHALL be shown as type 'l'
+- **AND** `follow_symlinks=True` SHALL show them as their target type
 
 ### Requirement: Directory Tree
 
@@ -181,6 +193,12 @@ The `file.search()` function SHALL search for files by name pattern.
 - **WHEN** results exceed `max_results` (default: 100)
 - **THEN** it SHALL truncate and show "(limited to N results)"
 
+#### Scenario: Hidden files
+- **GIVEN** a directory with hidden files
+- **WHEN** `file.search(pattern="*", include_hidden=False)` is called
+- **THEN** it SHALL exclude hidden files (starting with `.`)
+- **AND** `include_hidden=True` SHALL include them
+
 ### Requirement: File Writing
 
 The `file.write()` function SHALL write content to files.
@@ -211,6 +229,17 @@ The `file.write()` function SHALL write content to files.
 - **WHEN** `file.write(path=path, content=content)` is called
 - **THEN** it SHALL create `path.bak` before writing
 
+#### Scenario: Custom encoding
+- **GIVEN** a file path, content, and encoding
+- **WHEN** `file.write(path=path, content=content, encoding="latin-1")` is called
+- **THEN** it SHALL write content using the specified encoding
+
+#### Scenario: Dry run mode
+- **GIVEN** a file path with `dry_run=True`
+- **WHEN** `file.write(path=path, content=content, dry_run=True)` is called
+- **THEN** it SHALL return what would happen without writing
+- **AND** no file changes SHALL be made
+
 ### Requirement: File Editing
 
 The `file.edit()` function SHALL perform exact string replacement.
@@ -235,6 +264,17 @@ The `file.edit()` function SHALL perform exact string replacement.
 - **WHEN** `file.edit(path=path, old_text=old, new_text=new)` is called
 - **THEN** it SHALL return "Error: Text not found in file"
 
+#### Scenario: Custom encoding
+- **GIVEN** a file with non-UTF-8 encoding
+- **WHEN** `file.edit(path=path, old_text=old, new_text=new, encoding="latin-1")` is called
+- **THEN** it SHALL read and write using the specified encoding
+
+#### Scenario: Dry run mode
+- **GIVEN** a file path with `dry_run=True`
+- **WHEN** `file.edit(path=path, old_text=old, new_text=new, dry_run=True)` is called
+- **THEN** it SHALL return what would happen without editing
+- **AND** no file changes SHALL be made
+
 ### Requirement: File Deletion
 
 The `file.delete()` function SHALL delete files safely.
@@ -254,7 +294,18 @@ The `file.delete()` function SHALL delete files safely.
 #### Scenario: Non-empty directory
 - **GIVEN** a non-empty directory
 - **WHEN** `file.delete(path=path)` is called
-- **THEN** it SHALL return "Error: Directory not empty: path"
+- **THEN** it SHALL return "Error: Directory not empty: path. Use recursive=True to delete contents."
+
+#### Scenario: Recursive delete
+- **GIVEN** a non-empty directory with `recursive=True`
+- **WHEN** `file.delete(path=path, recursive=True)` is called
+- **THEN** it SHALL delete the directory and all contents
+
+#### Scenario: Dry run mode
+- **GIVEN** a file or directory with `dry_run=True`
+- **WHEN** `file.delete(path=path, dry_run=True)` is called
+- **THEN** it SHALL return what would happen without deleting
+- **AND** no file changes SHALL be made
 
 ### Requirement: File Copy
 
@@ -274,6 +325,12 @@ The `file.copy()` function SHALL copy files and directories.
 - **GIVEN** destination directory already exists
 - **WHEN** `file.copy(source=src, dest=dst)` is called for directory
 - **THEN** it SHALL return "Error: Destination already exists: dst"
+
+#### Scenario: Symlink handling
+- **GIVEN** a symlink source with `follow_symlinks=True` (default)
+- **WHEN** `file.copy(source=link, dest=dst)` is called
+- **THEN** it SHALL copy the symlink target content
+- **AND** `follow_symlinks=False` SHALL copy the symlink itself
 
 ### Requirement: File Move
 

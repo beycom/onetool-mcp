@@ -17,30 +17,30 @@ Secure file operations with configurable security boundaries. Read, write, edit,
 | Function | Description |
 |----------|-------------|
 | `file.read(path, offset, limit, encoding)` | Read file content with line numbers |
-| `file.info(path)` | Get file or directory metadata |
+| `file.info(path, follow_symlinks)` | Get file or directory metadata |
 
 ## List Operations
 
 | Function | Description |
 |----------|-------------|
-| `file.list(path, pattern, recursive, include_hidden, sort_by, reverse)` | List directory contents |
+| `file.list(path, pattern, recursive, include_hidden, sort_by, reverse, follow_symlinks)` | List directory contents |
 | `file.tree(path, max_depth, include_hidden)` | Display directory tree structure |
-| `file.search(path, pattern, glob, file_pattern, case_sensitive, max_results)` | Search for files by name or glob pattern |
+| `file.search(path, pattern, glob, file_pattern, case_sensitive, include_hidden, max_results)` | Search for files by name or glob pattern |
 
 ## Write Operations
 
 | Function | Description |
 |----------|-------------|
-| `file.write(path, content, append, create_dirs)` | Write content to file |
-| `file.edit(path, old_text, new_text, occurrence)` | Edit file by replacing text |
+| `file.write(path, content, append, create_dirs, encoding, dry_run)` | Write content to file |
+| `file.edit(path, old_text, new_text, occurrence, encoding, dry_run)` | Edit file by replacing text |
 
 ## File Management
 
 | Function | Description |
 |----------|-------------|
-| `file.copy(source, dest)` | Copy file or directory |
+| `file.copy(source, dest, follow_symlinks)` | Copy file or directory |
 | `file.move(source, dest)` | Move or rename file or directory |
-| `file.delete(path, backup)` | Delete file or empty directory |
+| `file.delete(path, backup, recursive, dry_run)` | Delete file or directory |
 
 ## Key Parameters
 
@@ -52,6 +52,11 @@ Secure file operations with configurable security boundaries. Read, write, edit,
 | `offset` | int | Line number to start from (1-indexed, default: 1) |
 | `limit` | int | Maximum lines to return |
 | `occurrence` | int | Which match to replace (1=first, 0=all) |
+| `encoding` | str | Character encoding (default: utf-8) |
+| `dry_run` | bool | Show what would happen without making changes |
+| `recursive` | bool | Delete non-empty directories |
+| `follow_symlinks` | bool | Follow symlinks or treat as links |
+| `include_hidden` | bool | Include hidden files (starting with `.`) |
 
 ## Configuration
 
@@ -143,6 +148,9 @@ file.copy(source="config.yaml", dest="config.backup.yaml")
 # Copy directory
 file.copy(source="src/", dest="src_backup/")
 
+# Copy preserving symlinks
+file.copy(source="src/", dest="backup/", follow_symlinks=False)
+
 # Move/rename file
 file.move(source="old_name.py", dest="new_name.py")
 
@@ -151,6 +159,35 @@ file.delete(path="temp.txt")
 
 # Delete without backup
 file.delete(path="temp.txt", backup=False)
+
+# Delete non-empty directory
+file.delete(path="old_dir/", recursive=True)
+```
+
+### Dry Run Mode
+
+```python
+# Preview write operation
+file.write(path="output.txt", content="data", dry_run=True)
+
+# Preview edit operation
+file.edit(path="config.py", old_text="DEBUG = False", new_text="DEBUG = True", dry_run=True)
+
+# Preview delete operation
+file.delete(path="temp.txt", dry_run=True)
+```
+
+### Symlink Handling
+
+```python
+# Get symlink metadata (not target)
+file.info(path="link.txt", follow_symlinks=False)
+
+# List showing symlinks as type 'l'
+file.list(path=".", follow_symlinks=False)
+
+# Search including hidden files
+file.search(pattern="*.conf", include_hidden=True)
 ```
 
 ## Security
