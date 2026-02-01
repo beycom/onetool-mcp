@@ -11,7 +11,7 @@ from __future__ import annotations
 # Pack for dot notation: package.version(), package.npm(), etc.
 pack = "package"
 
-__all__ = ["audit", "npm", "pypi", "version"]
+__all__ = ["audit", "models", "npm", "pypi", "version"]
 
 import re
 from concurrent.futures import ThreadPoolExecutor
@@ -182,12 +182,16 @@ def _compare_versions(current: str | None, latest: str) -> str:
     latest_parts = latest_clean.split(".")
 
     try:
-        current_major = int(re.match(r"(\d+)", current_parts[0]).group(1))  # type: ignore
-        latest_major = int(re.match(r"(\d+)", latest_parts[0]).group(1))  # type: ignore
+        current_match = re.match(r"(\d+)", current_parts[0])
+        latest_match = re.match(r"(\d+)", latest_parts[0])
 
-        if latest_major > current_major:
-            return "major_update"
-    except (AttributeError, ValueError, IndexError):
+        if current_match and latest_match:
+            current_major = int(current_match.group(1))
+            latest_major = int(latest_match.group(1))
+
+            if latest_major > current_major:
+                return "major_update"
+    except (ValueError, IndexError):
         pass
 
     return "update_available"

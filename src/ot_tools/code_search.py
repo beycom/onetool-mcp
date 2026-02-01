@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 # Pack for dot notation: code.search(), code.status()
 pack = "code"
 
-__all__ = ["autodoc", "research", "search", "search_batch", "status"]
+__all__ = ["search", "search_batch", "status"]
 
 # Dependency declarations for CLI validation
 __ot_requires__ = {
@@ -638,128 +638,6 @@ def search_batch(
             return f"Error in batch search: {e}"
 
 
-def research(
-    *,
-    query: str,
-    path: str | None = None,
-    db: str | None = None,
-) -> str:
-    """Deep code research with LLM synthesis using ChunkHound.
-
-    Performs multi-hop semantic search and synthesizes findings using an LLM.
-    More expensive than search() but provides comprehensive analysis.
-
-    Args:
-        query: Architectural or conceptual question (e.g., "how does auth flow work")
-        path: Scope to a specific path within the project
-        db: Path to database file relative to project root (default: .chunkhound/chunks.db)
-
-    Returns:
-        LLM-synthesized analysis of the codebase based on the query.
-
-    Example:
-        code.research(query="how does authentication flow work across services")
-        code.research(query="error handling patterns", path="src/api/")
-    """
-    db_path, project_root = _get_db_path(path, db)
-
-    with LogSpan(span="code.research", project=str(project_root), query=query) as s:
-        if not db_path.exists():
-            s.add("error", "not_indexed")
-            return f"Error: Project not indexed. Run: chunkhound index {project_root}"
-
-        try:
-            from chunkhound.tools import code_research
-        except ImportError:
-            s.add("error", "chunkhound_not_installed")
-            return (
-                "Error: chunkhound package required for research.\n"
-                "Install with: pip install chunkhound"
-            )
-
-        try:
-            result = code_research(
-                query=query,
-                project_path=str(project_root),
-                scope_path=path,
-            )
-            s.add("success", True)
-            return result
-        except Exception as e:
-            s.add("error", str(e))
-            return f"Error in code research: {e}"
-
-
-def autodoc(
-    *,
-    scope: str = ".",
-    out: str | None = None,
-    comprehensiveness: str = "standard",
-    path: str | None = None,
-    db: str | None = None,
-) -> str:
-    """Generate architecture documentation using ChunkHound's Code Mapper.
-
-    Creates flowing documentation with code citations. Expensive operation
-    using multiple LLM calls.
-
-    Args:
-        scope: Directory scope for documentation (default: entire project)
-        out: Output file path for generated documentation
-        comprehensiveness: Level of detail - "quick", "standard", or "thorough"
-        path: Path to project root (default: cwd)
-        db: Path to database file relative to project root (default: .chunkhound/chunks.db)
-
-    Returns:
-        Generated architecture documentation or path to output file.
-
-    Example:
-        code.autodoc(scope="src/auth/", out="docs/auth-architecture.md")
-        code.autodoc(scope=".", comprehensiveness="thorough")
-    """
-    db_path, project_root = _get_db_path(path, db)
-
-    with LogSpan(
-        span="code.autodoc",
-        project=str(project_root),
-        scope=scope,
-        comprehensiveness=comprehensiveness,
-    ) as s:
-        if not db_path.exists():
-            s.add("error", "not_indexed")
-            return f"Error: Project not indexed. Run: chunkhound index {project_root}"
-
-        try:
-            from chunkhound.tools import code_mapper
-        except ImportError:
-            s.add("error", "chunkhound_not_installed")
-            return (
-                "Error: chunkhound package required for autodoc.\n"
-                "Install with: pip install chunkhound"
-            )
-
-        try:
-            result = code_mapper(
-                project_path=str(project_root),
-                scope_path=scope,
-                comprehensiveness=comprehensiveness,
-            )
-
-            # Write to file if output path specified
-            if out:
-                out_path = project_root / out
-                out_path.parent.mkdir(parents=True, exist_ok=True)
-                out_path.write_text(result)
-                s.add("output_file", str(out_path))
-                return f"Documentation written to: {out_path}"
-
-            s.add("success", True)
-            return result
-        except Exception as e:
-            s.add("error", str(e))
-            return f"Error generating documentation: {e}"
-
-
 def status(*, path: str | None = None, db: str | None = None) -> str:
     """Check if a project has a ChunkHound index and show statistics.
 
@@ -822,6 +700,7 @@ def status(*, path: str | None = None, db: str | None = None) -> str:
                 stats["file_count"] = file_count
 
             # Get embedding statistics
+            # Note: embeddings_table is safe - derived from validated config.dimensions (int)
             config = _get_config()
             embeddings_table = f"embeddings_{config.dimensions}"
             if embeddings_table in tables:

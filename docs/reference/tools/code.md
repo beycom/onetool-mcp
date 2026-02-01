@@ -10,8 +10,6 @@ Semantic code search using ChunkHound indexes and DuckDB.
 - Vector search via DuckDB vss extension
 - Filter by language, chunk type, or exclude patterns
 - Batch search with multiple queries
-- Deep research with LLM synthesis
-- Auto-documentation generation
 
 ## Functions
 
@@ -19,8 +17,6 @@ Semantic code search using ChunkHound indexes and DuckDB.
 |----------|-------------|
 | `code.search(query, ...)` | Search code by meaning |
 | `code.search_batch(queries, ...)` | Batch search with multiple queries |
-| `code.research(query, ...)` | Deep research with LLM synthesis |
-| `code.autodoc(scope, ...)` | Generate architecture documentation |
 | `code.status(path, db)` | Check index status |
 
 ## Key Parameters
@@ -51,24 +47,6 @@ Semantic code search using ChunkHound indexes and DuckDB.
 | `path` | str | Path to project root |
 | `db` | str | Path to database file relative to project root |
 
-### `code.research()`
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `query` | str | Architectural question |
-| `path` | str | Scope to specific path |
-| `db` | str | Path to database file relative to project root |
-
-### `code.autodoc()`
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `scope` | str | Directory scope (default: ".") |
-| `out` | str | Output file path |
-| `comprehensiveness` | str | "quick", "standard", or "thorough" |
-| `path` | str | Path to project root |
-| `db` | str | Path to database file relative to project root |
-
 ## Snippets
 
 | Snippet | Description | Example |
@@ -76,7 +54,6 @@ Semantic code search using ChunkHound indexes and DuckDB.
 | `$c_search` | Basic semantic search | `$c_search query="auth logic"` |
 | `$c_q` | Batch search | `$c_q q="auth\|login\|session"` |
 | `$c_type` | Type-filtered search | `$c_type query="validation" type="function"` |
-| `$c_research` | Deep research | `$c_research query="how does auth work"` |
 
 ## Configuration
 
@@ -99,8 +76,6 @@ tools:
 
 ```bash
 pip install duckdb openai
-# For research/autodoc:
-pip install chunkhound
 ```
 
 **Secrets:**
@@ -134,15 +109,6 @@ code.search_batch(queries="auth logic|token validation|session handling")
 
 # Batch search excluding tests
 code.search_batch(queries="error handling|validation", exclude="test")
-
-# Deep research (LLM synthesis)
-code.research(query="how does authentication flow work across services")
-
-# Scoped research
-code.research(query="error handling patterns", path="src/api/")
-
-# Generate documentation
-code.autodoc(scope="src/auth/", out="docs/auth-architecture.md")
 
 # Check index status
 code.status()

@@ -236,6 +236,40 @@ class TestMapUrls:
 
         assert result == ["https://example.com/a", "https://example.com/b"]
 
+    @patch("ot_tools.firecrawl._get_client")
+    def test_map_urls_serializes_link_result_objects(self, mock_get_client):
+        """Test map_urls converts LinkResult objects to URL strings."""
+        mock_client = MagicMock()
+        # Simulate LinkResult objects with .url attribute
+        mock_link1 = MagicMock()
+        mock_link1.url = "https://example.com/page1"
+        mock_link2 = MagicMock()
+        mock_link2.url = "https://example.com/page2"
+        mock_client.map.return_value = [mock_link1, mock_link2]
+        mock_get_client.return_value = mock_client
+
+        result = map_urls(url="https://example.com")
+
+        assert result == ["https://example.com/page1", "https://example.com/page2"]
+
+    @patch("ot_tools.firecrawl._get_client")
+    def test_map_urls_handles_mixed_link_types(self, mock_get_client):
+        """Test map_urls handles mix of strings and LinkResult objects."""
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_link = MagicMock()
+        mock_link.url = "https://example.com/from-object"
+        mock_response.links = ["https://example.com/string", mock_link]
+        mock_client.map.return_value = mock_response
+        mock_get_client.return_value = mock_client
+
+        result = map_urls(url="https://example.com")
+
+        assert result == [
+            "https://example.com/string",
+            "https://example.com/from-object",
+        ]
+
 
 # -----------------------------------------------------------------------------
 # Search Tests

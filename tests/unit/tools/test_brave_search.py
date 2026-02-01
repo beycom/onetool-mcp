@@ -22,7 +22,6 @@ from ot_tools.brave_search import (
     news,
     search,
     search_batch,
-    summarize,
     video,
 )
 
@@ -549,46 +548,6 @@ class TestSearchBatch:
 
         assert "Error" in result
         assert "No queries provided" in result
-
-
-@pytest.mark.unit
-@pytest.mark.tools
-class TestSummarize:
-    """Test summarize function with mocked HTTP."""
-
-    @patch("ot_tools.brave_search._make_request")
-    def test_returns_summary(self, mock_request):
-        mock_request.return_value = (
-            True,
-            {
-                "summarizer": {
-                    "type": "general",
-                    "results": [{"text": "Summary of the topic."}],
-                }
-            },
-        )
-
-        result = summarize(query="what is python")
-
-        assert "Summary of the topic" in result
-
-    @patch("ot_tools.brave_search._make_request")
-    def test_handles_no_summary_with_pro_hint(self, mock_request):
-        mock_request.return_value = (True, {"summarizer": {}})
-
-        result = summarize(query="test")
-
-        assert "No summary available" in result
-        assert "Pro" in result
-
-    @patch("ot_tools.brave_search._make_request")
-    def test_includes_result_filter(self, mock_request):
-        mock_request.return_value = (True, {"summarizer": {}})
-
-        summarize(query="test")
-
-        call_args = mock_request.call_args
-        assert call_args[0][1]["result_filter"] == "summarizer"
 
 
 # -----------------------------------------------------------------------------

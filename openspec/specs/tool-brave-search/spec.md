@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Provides web search, news search, local search, image search, video search, and AI summarization via the Brave Search API. Requires `OT_BRAVE_API_KEY` environment variable.
+Provides web search, news search, local search, image search, video search, and batch search via the Brave Search API. Requires `BRAVE_API_KEY` secret in secrets.yaml.
 ## Requirements
 ### Requirement: Web Search
 
@@ -118,21 +118,6 @@ The `brave.search_batch()` function SHALL execute multiple searches concurrently
 - **WHEN** `brave.search_batch(queries=[])` is called
 - **THEN** it SHALL return "Error: No queries provided"
 
-### Requirement: AI Summarizer
-
-The `brave.summarize()` function SHALL provide AI-generated summaries.
-
-#### Scenario: Summary generation
-- **GIVEN** a search query
-- **WHEN** `brave.summarize(query=query)` is called
-- **THEN** it SHALL return an AI-generated summary of search results
-- **AND** it requires a Brave Search Pro plan
-
-#### Scenario: No summary available
-- **GIVEN** a query with no summary
-- **WHEN** `brave.summarize(query=query)` is called
-- **THEN** it SHALL return "No summary available. Note: AI summaries may require Brave Pro subscription."
-
 ### Requirement: Query Validation
 
 All Brave Search functions SHALL validate query parameters.
@@ -157,9 +142,9 @@ All Brave Search functions SHALL validate query parameters.
 All Brave Search functions SHALL require API key configuration.
 
 #### Scenario: Missing API key
-- **GIVEN** `OT_BRAVE_API_KEY` environment variable is not set
+- **GIVEN** `BRAVE_API_KEY` secret is not configured in secrets.yaml
 - **WHEN** any Brave search function is called
-- **THEN** it SHALL return "Error: OT_BRAVE_API_KEY environment variable not set"
+- **THEN** it SHALL return "Error: BRAVE_API_KEY secret not configured"
 
 ### Requirement: Brave Search Logging
 

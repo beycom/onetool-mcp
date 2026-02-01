@@ -1,0 +1,203 @@
+# Sanity Test Status
+# Updated by /proj:sanity command after each test run
+# Use: /proj:sanity retest=brave or /proj:sanity retest=all
+
+last_full_run: 2026-02-01
+
+packs:
+  brave:
+    status: pass
+    date: 2026-02-01
+    checks:
+      - search
+      - search_batch
+      - news
+      - image
+      - video
+      - local
+      - summarize
+    notes: summarize requires Pro subscription
+
+  code:
+    status: pass
+    date: 2026-02-01
+    checks:
+      - status
+      - search
+      - search_batch
+    notes: research function removed (required chunkhound CLI)
+
+  context7:
+    status: pass
+    date: 2026-02-01
+    checks:
+      - search
+      - doc
+
+  convert:
+    status: pass
+    date: 2026-02-01
+    checks:
+      - auto
+      - excel
+      - pdf
+      - powerpoint
+      - word
+
+  db:
+    status: pass
+    date: 2026-02-01
+    checks:
+      - tables
+      - schema
+      - query
+
+  diagram:
+    status: pass
+    date: 2026-02-01
+    checks:
+      - list_providers
+      - get_diagram_policy
+      - generate_source
+      - render_diagram
+      - get_playground_url
+      - get_diagram_instructions
+
+  excel:
+    status: pass
+    date: 2026-02-01
+    checks:
+      - info
+      - sheets
+      - read
+      - tables
+      - search
+      - used_range
+
+  file:
+    status: pass
+    date: 2026-02-01
+    checks:
+      - info
+      - list
+      - tree
+      - read
+      - search
+      - write
+      - delete
+
+  firecrawl:
+    status: partial
+    date: 2026-02-01
+    checks:
+      - scrape
+      - search
+      - extract
+    issues:
+      - map_urls has JSON serialization error
+    notes: see plan/fix/firecrawl-map_urls-serialization-error.md
+
+  github:
+    status: pass
+    date: 2026-02-01
+    checks:
+      - search_repositories
+      - search_issues
+      - get_file_contents
+
+  ground:
+    status: pass
+    date: 2026-02-01
+    checks:
+      - search
+      - dev
+      - docs
+      - reddit
+
+  llm:
+    status: pass
+    date: 2026-02-01
+    checks:
+      - transform
+
+  package:
+    status: pass
+    date: 2026-02-01
+    checks:
+      - pypi
+      - npm
+      - version
+      - audit
+
+  ripgrep:
+    status: pass
+    date: 2026-02-01
+    checks:
+      - search
+      - count
+      - files
+      - types
+
+  scaffold:
+    status: pass
+    date: 2026-02-01
+    checks:
+      - templates
+      - extensions
+      - validate
+
+  web:
+    status: pass
+    date: 2026-02-01
+    checks:
+      - fetch
+      - fetch_batch
+
+  wiki:
+    status: pass
+    date: 2026-02-01
+    checks:
+      - data
+      - page
+      - summary
+
+snippets:
+  status: pass
+  date: 2026-02-01
+  passed:
+    - pkg_pypi
+    - pkg_npm
+    - pkg_model
+    - c7_lib
+    - rg
+    - ot_status
+
+features:
+  status: pass
+  date: 2026-02-01
+  checks:
+    introspection:
+      - ot.help()
+      - ot.help(query=...)
+      - ot.tools()
+      - ot.packs()
+      - ot.snippets()
+      - ot.aliases()
+      - ot.config()
+      - ot.health()
+      - ot.stats()
+      - ot.version()
+    parameter_prefixes:
+      - "p= for pattern="
+      - "i= for info="
+    invocation:
+      - simple calls
+      - snippet expansion ($name)
+      - multi-line code
+    security:
+      - exec blocked
+      - eval blocked
+    output:
+      - __format__ control
+    config:
+      - ot.reload()

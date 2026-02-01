@@ -1,8 +1,7 @@
 """Brave Search API tools.
 
-Provides web search, local search, news search, image search, video search,
-and AI summarization via the Brave Search API.
-Requires BRAVE_API_KEY secret in secrets.yaml.
+Provides web search, local search, news search, image search, and video search
+via the Brave Search API. Requires BRAVE_API_KEY secret in secrets.yaml.
 
 API docs: https://api-dashboard.search.brave.com/app/documentation
 Reference: https://github.com/brave/brave-search-mcp-server
@@ -13,7 +12,7 @@ from __future__ import annotations
 # Pack for dot notation: brave.search(), brave.news(), etc.
 pack = "brave"
 
-__all__ = ["image", "local", "news", "search", "search_batch", "summarize", "video"]
+__all__ = ["image", "local", "news", "search", "search_batch", "video"]
 
 # Dependency declarations for CLI validation
 __ot_requires__ = {
@@ -27,7 +26,7 @@ from pydantic import BaseModel, Field
 
 from ot.config import get_secret, get_tool_config
 from ot.logging import LogSpan
-from ot.utils import batch_execute, format_batch_results, normalize_items
+from ot.utils import batch_execute, format_batch_results, lazy_client, normalize_items
 
 
 class Config(BaseModel):
@@ -45,12 +44,17 @@ BRAVE_API_BASE = "https://api.search.brave.com/res/v1"
 # Truncation length for video descriptions (147 chars + "..." = 150 total)
 VIDEO_DESC_MAX_LENGTH = 150
 
-# Shared HTTP client for connection pooling
-_client = httpx.Client(
-    base_url=BRAVE_API_BASE,
-    timeout=60.0,
-    headers={"Accept": "application/json", "Accept-Encoding": "gzip"},
-)
+def _create_http_client() -> httpx.Client:
+    """Create HTTP client for Brave API requests."""
+    return httpx.Client(
+        base_url=BRAVE_API_BASE,
+        timeout=60.0,
+        headers={"Accept": "application/json", "Accept-Encoding": "gzip"},
+    )
+
+
+# Thread-safe lazy client using SDK utility
+_get_http_client = lazy_client(_create_http_client)
 
 
 def _get_config() -> Config:
@@ -101,7 +105,10 @@ def _make_request(
         span="brave.request", endpoint=endpoint, query=params.get("q", "")
     ) as span:
         try:
-            response = _client.get(
+            client = _get_http_client()
+            if client is None:
+                return False, "Error: HTTP client not initialized"
+            response = client.get(
                 endpoint,
                 params=params,
                 headers=_get_headers(api_key),
@@ -313,7 +320,6 @@ def search(
     search_lang: str = "en",
     safesearch: Literal["off", "moderate", "strict"] = "moderate",
     freshness: Literal["pd", "pw", "pm", "py"] | None = None,
-    summary: bool = False,
 ) -> str:
     """Search the web using Brave Search API.
 
@@ -325,7 +331,6 @@ def search(
         search_lang: Language code for results (default: "en")
         safesearch: Content filter - "off", "moderate", "strict" (default: "moderate")
         freshness: Time filter - "pd" (day), "pw" (week), "pm" (month), "py" (year)
-        summary: Include AI-generated summary (requires Pro plan)
 
     Returns:
         YAML flow style search results or error message
@@ -351,8 +356,6 @@ def search(
 
     if freshness:
         params["freshness"] = freshness
-    if summary:
-        params["result_filter"] = "summarizer"
 
     success, result = _make_request("/web/search", params)
 
@@ -599,62 +602,3 @@ def search_batch(
         return output
 
 
-def summarize(
-    *,
-    query: str,
-    country: str = "US",
-    search_lang: str = "en",
-) -> str:
-    """Get an AI-generated summary for a search query.
-
-    Performs a web search and returns an AI-powered summary of the results.
-    Requires a Brave Search Pro plan.
-
-    Args:
-        query: Search query to summarize
-        country: 2-letter country code (default: "US")
-        search_lang: Language code (default: "en")
-
-    Returns:
-        AI-generated summary or error message
-
-    Example:
-        brave.summarize(query="What is quantum computing?")
-        brave.summarize(query="Latest developments in AI", country="GB")
-    """
-    if error := _validate_query(query):
-        return error
-
-    params: dict[str, Any] = {
-        "q": query,
-        "country": country,
-        "search_lang": search_lang,
-        "result_filter": "summarizer",
-    }
-
-    success, result = _make_request("/web/search", params)
-
-    if not success:
-        return str(result)
-
-    # Extract summary from response
-    data: dict[str, Any] = result  # type: ignore[assignment]
-    summarizer = data.get("summarizer", {})
-
-    if not summarizer:
-        return "No summary available. Note: AI summaries may require Brave Pro subscription."
-
-    summary_type = summarizer.get("type", "")
-    results = summarizer.get("results", [])
-
-    lines: list[str] = []
-    if summary_type:
-        lines.append(f"Summary type: {summary_type}")
-        lines.append("")
-
-    for item in results:
-        text = item.get("text", "")
-        if text:
-            lines.append(text)
-
-    return "\n".join(lines) if lines else "No summary content available."

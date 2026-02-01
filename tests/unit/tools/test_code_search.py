@@ -21,8 +21,6 @@ from ot_tools.code_search import (
     _get_db_path,
     _row_to_result,
     _validate_and_connect,
-    autodoc,
-    research,
     search,
     search_batch,
     status,
@@ -775,65 +773,3 @@ class TestSearchBatch:
         # Should only have 1 result (deduplicated)
         assert "Found 1 results" in result
         assert "0.95" in result  # Higher score kept
-
-
-# -----------------------------------------------------------------------------
-# Research and Autodoc Tests
-# -----------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-@pytest.mark.tools
-class TestResearch:
-    """Test research function."""
-
-    @patch("ot_tools.code_search._get_db_path")
-    def test_returns_error_when_not_indexed(self, mock_db_path):
-        mock_path = MagicMock()
-        mock_path.exists.return_value = False
-        mock_db_path.return_value = (mock_path, Path("/project"))
-
-        result = research(query="how does auth work")
-
-        assert "Error" in result
-        assert "not indexed" in result
-
-    @patch("ot_tools.code_search._get_db_path")
-    def test_returns_error_when_chunkhound_missing(self, mock_db_path):
-        mock_path = MagicMock()
-        mock_path.exists.return_value = True
-        mock_db_path.return_value = (mock_path, Path("/project"))
-
-        # chunkhound not installed, will raise ImportError
-        result = research(query="how does auth work")
-
-        assert "Error" in result
-        assert "chunkhound" in result.lower()
-
-
-@pytest.mark.unit
-@pytest.mark.tools
-class TestAutodoc:
-    """Test autodoc function."""
-
-    @patch("ot_tools.code_search._get_db_path")
-    def test_returns_error_when_not_indexed(self, mock_db_path):
-        mock_path = MagicMock()
-        mock_path.exists.return_value = False
-        mock_db_path.return_value = (mock_path, Path("/project"))
-
-        result = autodoc(scope="src/")
-
-        assert "Error" in result
-        assert "not indexed" in result
-
-    @patch("ot_tools.code_search._get_db_path")
-    def test_returns_error_when_chunkhound_missing(self, mock_db_path):
-        mock_path = MagicMock()
-        mock_path.exists.return_value = True
-        mock_db_path.return_value = (mock_path, Path("/project"))
-
-        result = autodoc(scope="src/")
-
-        assert "Error" in result
-        assert "chunkhound" in result.lower()

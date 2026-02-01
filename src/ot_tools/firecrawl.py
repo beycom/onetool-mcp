@@ -321,13 +321,27 @@ def map_urls(
 
             result = client.map(url, **kwargs)
 
+            # Extract links list from result
             if isinstance(result, list):
-                span.add(url_count=len(result))
-                return result
-            # Handle MapResponse object
-            links = getattr(result, "links", None) or []
-            span.add(url_count=len(links))
-            return links
+                links = result
+            else:
+                # Handle MapResponse object
+                links = getattr(result, "links", None) or []
+
+            # Convert LinkResult objects to URL strings
+            urls = []
+            for link in links:
+                if isinstance(link, str):
+                    urls.append(link)
+                elif hasattr(link, "url"):
+                    urls.append(link.url)
+                elif hasattr(link, "model_dump"):
+                    urls.append(link.model_dump().get("url", str(link)))
+                else:
+                    urls.append(str(link))
+
+            span.add(url_count=len(urls))
+            return urls
 
         except Exception as e:
             error_msg = f"Map failed: {e}"
