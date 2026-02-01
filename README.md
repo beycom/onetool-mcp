@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/onetool-logo.png" alt="OneTool" width="400">
+  <img src="https://raw.githubusercontent.com/beycom/onetool/main/docs/assets/onetool-logo.png" alt="OneTool" width="400">
 </p>
 
 <p align="center">

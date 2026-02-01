@@ -1,0 +1,4 @@
+# Gitleaks fingerprints to ignore (false positives)
+
+# Test case with fake API key string in error message
+0f43608bd7bf5b7e4fd00d4add310a18e0832054:tests/unit/tools/test_transform.py:generic-api-key:488

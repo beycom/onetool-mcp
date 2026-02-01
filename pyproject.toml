@@ -1,7 +1,7 @@
 [project]
 name = "onetool-mcp"
-version = "1.0.0b1"
-description = "One MCP, unlimited tools."
+version = "1.0.0b2"
+description = "🧿 One MCP, unlimited tools."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "GPL-3.0" }
