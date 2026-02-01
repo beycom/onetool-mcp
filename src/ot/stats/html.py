@@ -15,7 +15,7 @@ from ot.support import (
 )
 
 if TYPE_CHECKING:
-    from ot.stats.reader import AggregatedStats
+    from ot.stats.reader import AggregatedStats, ToolStats
 
 
 def generate_html_report(stats: AggregatedStats) -> str:
@@ -61,7 +61,7 @@ def generate_html_report(stats: AggregatedStats) -> str:
     # Group tools by pack (prefix before the dot)
     from collections import defaultdict
 
-    packs: dict[str, list] = defaultdict(list)
+    packs: dict[str, list[ToolStats]] = defaultdict(list)
     for tool in stats.tools:
         pack_name = tool.tool.split(".")[0] if "." in tool.tool else "other"
         packs[pack_name].append(tool)
