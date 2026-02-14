@@ -39,15 +39,28 @@ just test     # Run tests
 just lint     # Run linters
 ```
 
-## Tools
+## OneTool - Your AI-Powered Toolkit
 
-### File Search
-Use OneTool ripgrep (50x faster than find+grep, with line numbers):
-- Search for pattern in files: `ot.ripgrep.search(pattern="onetool", path="src/", glob="*.py")`
-- List files only: `ripgrep.search(pattern="TODO", path=".", glob="*.{py,yaml}")`
-- Count matches: `ripgrep.count(pattern="import", path="src/", file_type="py")`
+OneTool provides 100+ tools via MCP for file operations, web search, code search, and more.
 
-### Tools - Web Search
-- Web search: `$g q=query one|query two|query three`
+**Get the complete reference:**
+# Complete OneTool cheatsheet with all tools and examples
+__ot `ot.agent_hints()`
 
+**Quick reference:**
+- **File operations**: `file.read()`, `file.write()`, `file.search()` - prefer over `cat`, `echo >`, `find`
+- **Code search**: `ripgrep.search()` - 50× faster than `grep -r`
+- **Web search**: `brave.search()`, `web.fetch()` - prefer over `curl` or manual browsing
+- **Package info**: `package.pypi()`, `package.npm()`, `package.models()` - get package/model info
+- **Memory**: `mem.write()`, `mem.read()` - save findings across sessions
+- **Discovery**: `ot.tools()`, `ot.help(query="...")` - find available tools
 
+**When to use OneTool vs Bash:**
+- ✅ Use OneTool for: file ops, web ops, code search, package info, data processing
+- ✅ Use Bash for: git, build commands (`just`), process management, package installation
+
+**Always use keyword arguments:**
+```python
+brave.search(query="test", count=5)  # ✅ Correct
+brave.search("test", 5)              # ❌ Wrong
+```
