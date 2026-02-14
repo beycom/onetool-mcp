@@ -105,7 +105,7 @@ demo/.onetool/logs/
 demo/tmp/
 
 # Claude Code
-.claude/commands/misc/
+.claude/
 .mcp.json
 global/
 
