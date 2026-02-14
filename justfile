@@ -3,6 +3,8 @@
 
 set dotenv-load := true
 
+import? '../onetool-common/shared/scripts/common.just'
+
 # Project-local global config base (all versions stored here)
 global_base := justfile_directory() + "/global"
 
