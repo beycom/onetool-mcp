@@ -81,6 +81,7 @@ The MCP server that exposes tools for LLM code execution.
 | [tool-devtools-annotation](ottools/tool-devtools-annotation/spec.md) | Chrome DevTools inject.js annotation system |
 | [tool-devtools-util](ottools/tool-devtools-util/spec.md) | Chrome DevTools automation utilities |
 | [tool-forge](ottools/tool-forge/spec.md) | Extension scaffolding and skill installation |
+| [tool-caveman](ottools/tool-caveman/spec.md) | LLM-powered text compaction, expansion, and command-queue input (`ot_caveman` / `cm` pack) |
 | [tool-image](ottools/tool-image/spec.md) | Image loading, querying, and lifecycle management (`ot_image` pack) |
 | [tool-llm](ottools/tool-llm/spec.md) | LLM-powered data transformation |
 | [tool-mem](ottools/tool-mem/spec.md) | Persistent agent memory with semantic search |

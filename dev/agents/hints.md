@@ -59,42 +59,43 @@ openspec/       Specifications and proposals
 ## Critical Rules (Must Follow)
 
 ### Code Style
-- ✅ All tool functions: keyword-only args (`*,`)
-- ✅ Type hints: All functions must have complete type hints
-- ✅ Docstrings: Google-style for all public functions
+- All tool functions: keyword-only args (`*,`)
+- Type hints: All functions must have complete type hints
+- Docstrings: Google-style for all public functions
 
 ### Testing
-- ✅ Two markers required: speed (`smoke`|`unit`|`integration`|`slow`) + component (`core`|`bench`|`serve`|`tools`)
-- ✅ Run with: `uv run pytest` (never bare `pytest`)
-- ✅ Fixtures: Use shared fixtures from `conftest.py`
-- ✅ Test location mirrors source package: `src/otdev/` → `tests/otdev/`, `src/ottools/` → `tests/ottools/`, `src/otutil/` → `tests/otutil/`, `src/otdesign/` → `tests/otdesign/`, core → `tests/`
+- Two markers required: speed (`smoke`|`unit`|`integration`|`slow`) + component (`core`|`bench`|`serve`|`tools`)
+- Run with: `uv run pytest` (never bare `pytest`)
+- Fixtures: Use shared fixtures from `conftest.py`
+- Test location mirrors source package: `src/otdev/` → `tests/otdev/`, `src/ottools/` → `tests/ottools/`, `src/otutil/` → `tests/otutil/`, `src/otdesign/` → `tests/otdesign/`, core → `tests/`
 
 ### Paths
-- ✅ `.onetool/` paths: Use `resolve_ot_path()` from `ot.meta`
-- ✅ Project paths: Use `resolve_cwd_path()` from `ot.paths`
-- ✅ Never use: `Path.expanduser()` or bare `expand_path()` for project paths
+- `.onetool/` paths: Use `resolve_ot_path()` from `ot.meta`
+- Project paths: Use `resolve_cwd_path()` from `ot.paths`
+- **Never use** `Path.expanduser()` or bare `expand_path()` for project paths
 
 ### Logging
-- ✅ Use LogSpan: `with LogSpan(span="component.operation", key="value") as s:`
-- ✅ Span naming: `{component}.{operation}` (e.g., `brave.search.web`)
+- Use LogSpan: `with LogSpan(span="component.operation", key="value") as s:`
+- Span naming: `{component}.{operation}` (e.g., `brave.search.web`)
 
 ### Git Commits
-- ✅ Format: `type(scope): description` (no body)
-- ✅ Types: `feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `build`, `ci`, `chore`
-- ✅ Scopes: See `dev/practices/commit-scopes.md` or use `/p:stage`
+- Format: `type(scope): description` (no body)
+- Types: `feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `build`, `ci`, `chore`
+- Scopes: See `dev/practices/commit-scopes.md` or use `/p:stage`
 
 ### Shared Utilities — Check Before Implementing
-- ✅ HTTP clients: `lazy_client()` from `ot.utils.factory` (not bare globals or `@lru_cache`)
-- ✅ HTTP errors: `_format_http_error()` from `ot.http_client`
-- ✅ Truncation: `truncate()` from `ot.utils.truncate` (not `[:N] + "..."`)
-- ✅ Caching: `CacheNamespace` from `ot.utils.cache`
-- ✅ Batch ops: `batch_execute`, `normalize_items` from `ot.utils.batch`
-- ✅ Storage dirs: `resolve_ot_path()` from `ot.meta`
-- ❌ Don't reimplement duration parsing, SQLite pools, handle generation — check `ot.utils` first
+- HTTP clients: `lazy_client()` from `ot.utils.factory` (not bare globals or `@lru_cache`)
+- HTTP errors: `_format_http_error()` from `ot.http_client`
+- Truncation: `truncate()` from `ot.utils.truncate` (not `[:N] + "..."`)
+- Caching: `CacheNamespace` from `ot.utils.cache`
+- Batch ops: `batch_execute`, `normalize_items` from `ot.utils.batch`
+- Storage dirs: `resolve_ot_path()` from `ot.meta`
+- **Never reimplement** duration parsing, SQLite pools, handle generation — check `ot.utils` first
 
 ### Backwards Compatibility
-- ❌ No backwards compat - delete unused code completely
-- ❌ No renaming unused vars, no re-exports, no "removed" comments
+**Never:**
+- Add backwards-compatible fallbacks — delete unused code completely
+- Rename unused vars, re-export removed names, or add "removed" comments
 
 ---
 
@@ -144,8 +145,8 @@ openspec/       Specifications and proposals
 ## Browser Testing
 
 **Test URL for browser annotation tests:**
-- ✅ Use: `https://en.wikipedia.org/wiki/Anthropic` - Stable, reliable, good variety of selectors
-- ❌ Do NOT use: `example.com` (does not exist), Google (too complex/dynamic)
+- Use: `https://en.wikipedia.org/wiki/Anthropic` — stable, reliable, good variety of selectors
+- **Never use:** `example.com` (does not exist), Google (too complex/dynamic)
 
 **Reliable selectors for Wikipedia:**
 - Headings: `"h1"`, `"h2"`, `".mw-headline"`

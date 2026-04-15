@@ -172,6 +172,7 @@ nav:
           - Tools:
               - AWS: reference/tools/aws.md
               - Brave: reference/tools/brave.md
+              - OT Caveman: reference/tools/ot_caveman.md
               - Chrome DevTools Util: reference/tools/chrome-util.md
               - Context7: reference/tools/context7.md
               - Convert: reference/tools/convert.md

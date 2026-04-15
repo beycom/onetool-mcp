@@ -117,6 +117,7 @@ onetool direct run "brave.search(query='latest AI news')" --format raw
 | **Forge Tools**          | Build new tools as part of the conversation                   |
 | **Image Vision**         | Routes to a cheaper, better vision model via `ot_image` (`img`). Zero host tokens. Supports local files, URLs, clipboard; PNG, JPEG, GIF, WebP, TIFF, HEIC, AVIF, SVG. |
 | **Smart Context**        | `ot_context` (`ctx`) — SQLite+FTS5 store. Search and navigate large outputs without filling the context window. |
+| **Caveman Compact**      | `ot_caveman` (`cm`) — LLM-powered text compaction. 55–65% on tech prose, 25–31% on search results, 45–55% on conversational prose. `__compact__ = True` applies it to any tool call. Code blocks, URLs, and security warnings are never modified. |
 | **Smart Tools**          | Delegate to cheaper LLMs (10× savings)                        |
 | **Security Layers**      | AST validation, path boundaries, output sanitisation          |
 
@@ -142,6 +143,7 @@ onetool direct run "brave.search(query='latest AI news')" --format raw
 | `mem`         | `write`, `read`, `search`, `grep`, `ask`, `inspect`, `query` | `[util]` | Persistent memory              |
 | `ot_forge`    | `create_ext`, `validate_ext`, `install_skills` |          | Scaffold new tool packs        |
 | `ot_context` (`ctx`) | `write`, `read`, `search`, `grep`, `slice`, `toc`                 |          | Smart context store (SQLite+FTS5)   |
+| `ot_caveman` (`cm`)  | `compact`, `expand`, `input`                                      |          | LLM-powered text compaction and expansion |
 | `ot_image` (`img`)   | `load`, `load_batch`, `ask`, `summary`, `list`, `delete`, `purge` | `[util]` | Image vision via dedicated model    |
 | `ot_llm`      | `transform`, `transform_file`                  |          | LLM-powered transforms         |
 | `ot_secrets`  | `init`, `encrypt`, `audit`, `rotate`           |          | Secrets encryption             |

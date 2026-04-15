@@ -410,6 +410,9 @@ Used by brave, tavily, ground, file — use the same pattern for consistency.
 | `@lru_cache` on a client factory | `lazy_client()` (supports `.reset()`) |
 | `resolve_ot_path(x); x.mkdir(...)` | Same — just always pair them |
 | Duration strings (`"30m"`, `"2h"`) | `ot.utils.duration.parse_duration()` (if available) |
+| `len(text.split())` as token count | `tiktoken` — see Token counting above |
+| New `OpenAI()` per call | `_client_cache` dict — see OpenAI-compatible client cache above |
+| `except Exception: pass` in `_get_config` | `except Exception as e: logger.warning(...)` |
 
 ---
 
@@ -417,15 +420,15 @@ Used by brave, tavily, ground, file — use the same pattern for consistency.
 
 | Function | Import From | Resolves Relative To |
 |----------|-------------|----------------------|
-| `resolve_cwd_path()` | `ot.paths` | Project directory (`OT_CWD`) |
-| `resolve_ot_path()` | `ot.paths` | Config directory (`.onetool/`) |
-| `get_effective_cwd()` | `ot.paths` | Returns project directory |
-| `expand_path()` | `ot.paths` | Only expands `~` |
+| `resolve_cwd_path()` | `otpack` | Project directory (`OT_CWD`) |
+| `resolve_ot_path()` | `ot.meta` | Config directory (`.onetool/`) |
+| `get_effective_cwd()` | `otpack` | Returns project directory |
+| `expand_path()` | `otpack` | Only expands `~` |
 
-**Example:**
+For tools in `src/ottools/`, import path helpers from `otpack` (not `ot.paths` directly):
 
 ```python
-from ot.paths import resolve_cwd_path
+from otpack import LogSpan, get_secret, get_tool_config, resolve_cwd_path
 
 def read_file(*, path: str) -> str:
     resolved = resolve_cwd_path(path)
@@ -456,19 +459,108 @@ def search(*, query: str, timeout: float | None = None) -> str:
 
 See [Tool Configuration](tool-configuration.md) for detailed configuration patterns.
 
+### LLM config fallback pattern
+
+For tools that call an LLM, support pack-level override with fallback to the top-level
+`llm.*` config. Follow the `ot_image` pattern exactly:
+
+```python
+from loguru import logger
+from otpack import get_secret, get_tool_config
+from pydantic import BaseModel, Field
+
+class Config(BaseModel):
+    model: str = Field(default="", description="Model (empty = inherit from llm.model)")
+    base_url: str = Field(default="", description="API base URL (empty = inherit from llm.base_url)")
+    timeout: int = Field(default=30)
+
+def _get_config() -> Config:
+    from ot.config import get_llm_config
+    config = get_tool_config("mytool", Config)
+    try:
+        llm = get_llm_config()
+        updates: dict[str, str] = {}
+        if not config.base_url and llm.base_url:
+            updates["base_url"] = llm.base_url
+        if not config.model and llm.model:
+            updates["model"] = llm.model
+        if updates:
+            config = config.model_copy(update=updates)
+    except Exception as e:
+        logger.warning("Failed to load top-level llm config for mytool fallbacks: {}", e)
+    return config
+```
+
+Do not use silent `except Exception: pass` — always log a warning so misconfiguration is visible.
+
+### OpenAI-compatible client cache
+
+Cache clients by `(api_key, base_url, timeout)` to avoid a new connection pool per call:
+
+```python
+from openai import OpenAI
+
+_client_cache: dict[tuple[str, str, int], OpenAI] = {}
+
+def _get_client(config: Config) -> tuple[OpenAI, str] | tuple[None, str]:
+    """Return (client, model) or (None, error_string)."""
+    api_key = get_secret("OPENAI_API_KEY") or get_secret("OT_LLM_API_KEY")
+    if not api_key:
+        return None, "Error: mytool not configured. Set OPENAI_API_KEY in secrets.yaml."
+    if not config.base_url:
+        return None, "Error: mytool not configured. Set llm.base_url in onetool.yaml."
+    if not config.model:
+        return None, "Error: mytool not configured. Set llm.model in onetool.yaml."
+    cache_key = (api_key, config.base_url, config.timeout)
+    if cache_key not in _client_cache:
+        _client_cache[cache_key] = OpenAI(
+            api_key=api_key, base_url=config.base_url, timeout=config.timeout
+        )
+    return _client_cache[cache_key], config.model
+```
+
+Return three separate error strings — one for each missing field — with an actionable fix in each.
+Do **not** use `@functools.lru_cache` or `lazy_client()` for OpenAI clients.
+
+### Token counting
+
+Use tiktoken. Declare it as a hard dependency in `__ot_requires__` (no word-count fallback):
+
+```python
+__ot_requires__ = {"lib": [("tiktoken", "pip install tiktoken")]}
+
+def _count_tokens(text: str) -> int:
+    import tiktoken
+    try:
+        enc = tiktoken.encoding_for_model("gpt-4")
+    except KeyError:
+        enc = tiktoken.get_encoding("cl100k_base")
+    return len(enc.encode(text))
+```
+
+Do **not** use `len(text.split())` as a token count — it undercounts by 20–30% and misleads users.
+
 ---
 
 ## Testing Your Tool
 
+Test file paths depend on which source package the tool lives in:
+
+| Tool location | Unit tests | Integration tests |
+|---|---|---|
+| `src/ottools/<name>.py` | `tests/ottools/unit/tools/test_<name>.py` | `tests/integration/tools/test_<name>.py` |
+| `src/otutil/tools/<name>.py` | `tests/otutil/unit/tools/test_<name>.py` | `tests/integration/tools/test_<name>.py` |
+| `src/otdev/tools/<name>.py` | `tests/otdev/unit/tools/test_<name>.py` | `tests/otdev/integration/tools/test_<name>.py` |
+
 ```python
-# tests/unit/test_mytool.py
+# tests/ottools/unit/tools/test_mytool.py
 import pytest
-from ottools.mytool import search
 
 @pytest.mark.unit
 @pytest.mark.tools
-class TestSearch:
+class TestMyTool:
     def test_empty_query_returns_empty(self):
+        from ottools.mytool import search
         result = search(query="")
         assert result == {"results": []}
 ```
@@ -553,9 +645,12 @@ from otutil.tools._mem import Config, _close_connection
 - [ ] Error handling returning strings (not raising exceptions)
 - [ ] No `json.dumps()` calls in tool functions — return native types (`dict`, `list`, `str`)
 - [ ] Lazy imports for optional dependencies
-- [ ] Secrets accessed via `get_secret()` from `ot.config`
-- [ ] Path resolution using `resolve_cwd_path()` or `resolve_ot_path()`
+- [ ] Secrets accessed via `get_secret()` from `otpack`
+- [ ] Path resolution using `resolve_cwd_path()` (from `otpack`) or `resolve_ot_path()` (from `ot.meta`)
 - [ ] `Config` class if tool has settings
+- [ ] If calling an LLM: `_get_config()` with `llm.*` fallback + `logger.warning` on exception (not `pass`)
+- [ ] If calling an LLM: `_client_cache` dict for OpenAI client — not `@lru_cache` or new client per call
+- [ ] If counting tokens: use `tiktoken`, declare as hard dep in `__ot_requires__`
 - [ ] Unit tests with `@pytest.mark.unit` + `@pytest.mark.tools`
 - [ ] Integration tests if external APIs involved
 - [ ] Spec at `openspec/specs/tool-<name>/spec.md` (for non-trivial tools)

@@ -191,7 +191,7 @@ class DundersConfig(BaseModel):
     """Magic variable (dunder) configuration."""
 
     allow: list[str] = Field(
-        default_factory=lambda: ["__format__", "__sanitize__"],
+        default_factory=lambda: ["__format__", "__sanitize__", "__compact__"],
         description="Allowed magic variables (e.g., '__format__')",
     )
 
@@ -336,6 +336,11 @@ class OutputConfig(BaseModel):
     and a summary with a query handle is returned instead.
     """
 
+    compact: bool = Field(
+        default=False,
+        description="Apply ot_caveman compaction to all tool outputs by default. "
+        "Per-call __compact__ dunder overrides this setting.",
+    )
     max_inline_size: int = Field(
         default=5000,
         ge=0,

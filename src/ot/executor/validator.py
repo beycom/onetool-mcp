@@ -611,7 +611,7 @@ def validate_python_code(
                 warned_calls=frozenset(),
                 allowed_calls=frozenset(),
                 tool_namespaces=_get_tool_namespaces(),
-                allowed_dunders=frozenset({"__format__", "__sanitize__"}),
+                allowed_dunders=frozenset({"__format__", "__sanitize__", "__compact__"}),
             )
 
         if visitor is not None:

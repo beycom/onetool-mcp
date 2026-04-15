@@ -39,6 +39,7 @@ PACK_SHORT_NAMES: dict[str, str] = {
     "ot_direct": "direct",
     "ot_image": "img",
     "knowledge": "kb",
+    "ot_caveman": "cm",
 }
 
 DOC_SLUGS: dict[str, str] = {

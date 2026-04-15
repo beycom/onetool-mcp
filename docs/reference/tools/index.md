@@ -1,6 +1,6 @@
 # Tool Reference
 
-**26 Packs. 239 Tools.**
+**27 Packs. 242 Tools.**
 
 Complete reference of all built-in tool packs and functions.
 
@@ -10,7 +10,7 @@ Tools are split into optional install extras. Install only what you need:
 
 | Extra | Tools included |
 |-------|---------------|
-| *(core, always included)* | `ctx`, `ot`, `ot_direct`, `ot_forge`, `ot_llm`, `ot_secrets`, `ot_timer` |
+| *(core, always included)* | `ot_caveman` (alias `cm`), `ctx`, `ot`, `ot_direct`, `ot_forge`, `ot_llm`, `ot_secrets`, `ot_timer` |
 | `[util]` | `brave`, `convert`, `excel`, `file`, `ground`, `knowledge`, `mem`, `ot_image`, `tavily` |
 | `[dev]` | `aws`, `chrome_util`, `context7`, `db`, `diagram`, `package`, `play_util`, `ripgrep`, `whiteboard`, `webfetch` |
 | `[all]` | All of the above |
@@ -26,6 +26,7 @@ uv tool install 'onetool-mcp[util,dev]'  # most tools
 |------|-------|-------------|---|---------|-------|
 | [**AWS**](aws.md) | `[dev]` | AWS services via awslabs/mcp servers, activated on demand by role. | 17 | [awslabs/mcp](https://github.com/awslabs/mcp) (Apache 2.0) | `arn`, `attributes`, `check`, `login`, `mfa`, `packs`, `profile`, `profiles`, `refresh_packs`, `regions`, `roles`, `services`, `start_packs`, `stop_packs`, `use`, `values`, `whoami` |
 | [**Brave**](brave.md) | `[util]` | Web search via Brave Search API. | 5 | [brave-search-mcp-server](https://github.com/brave/brave-search-mcp-server) (MIT) | `image`, `news`, `search`, `search_batch`, `video` |
+| [**OT Caveman**](ot_caveman.md) | core | LLM-powered text compaction and expansion. | 3 | MIT | `compact`, `expand`, `input` |
 | [**Chrome DevTools Util**](chrome-util.md) | `[dev]` | Visual element annotation for the Chrome DevTools MCP server. | 5 | MIT | `clear_annotations`, `guide_user`, `highlight_element`, `inject_annotations`, `scan_annotations` |
 | [**Context7**](context7.md) | `[dev]` | Library documentation lookup. | 2 | [context7](https://github.com/upstash/context7) (MIT) | `doc`, `search` |
 | [**Convert**](convert.md) | `[util]` | Convert PDF, Word, PowerPoint, Excel to Markdown. | 5 | MIT | `auto`, `excel`, `pdf`, `powerpoint`, `word` |

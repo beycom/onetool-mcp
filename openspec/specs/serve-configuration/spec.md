@@ -1209,6 +1209,7 @@ The system SHALL support configuration for large output handling in the `output`
   - `result_ttl`: 3600 (seconds)
   - `preview_lines`: 10
   - `preview_max_chars`: 500
+  - `compact`: `false`
 
 #### Scenario: Custom max_inline_size
 - **GIVEN** configuration:
@@ -1265,6 +1266,22 @@ The system SHALL support configuration for large output handling in the `output`
 - **WHEN** configuration is loaded
 - **THEN** large output handling SHALL be disabled
 - **AND** all outputs SHALL be returned inline
+
+#### Scenario: Global compaction enabled
+- **GIVEN** configuration:
+  ```yaml
+  output:
+    compact: true
+  ```
+- **WHEN** configuration is loaded
+- **THEN** all tool outputs SHALL be passed through ot_caveman text compaction by default
+- **AND** per-call `__compact__ = False` SHALL override this and suppress compaction
+
+#### Scenario: Per-call override of global compaction
+- **GIVEN** `output.compact` is `true`
+- **AND** code that sets `__compact__ = False`
+- **WHEN** the result is returned
+- **THEN** compaction SHALL NOT be applied for that call
 
 ### Requirement: Root-Level Environment Configuration
 

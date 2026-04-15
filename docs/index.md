@@ -30,6 +30,7 @@ hide:
     - :material-package-variant: **Leaner install** — optional `[util]` and `[dev]` extras; install only the dependencies you need
     - :material-database: **Smart context store** — `ot_context` (`ctx`); SQLite+FTS5 store; search and navigate large tool outputs without filling context
     - :material-image-search: **Image vision** — `ot_image` (`img`); routes to a cheaper, better vision model; zero host tokens; supports local files, URLs, clipboard, and 8 formats (PNG, JPEG, GIF, WebP, TIFF, HEIC, AVIF, SVG)
+    - :material-text-box-minus: **Caveman compact** — `ot_caveman` (`cm`); LLM-powered text compaction; 55–65% on tech prose, 25–31% on search results; `__compact__ = True` applies it to any tool call; code blocks, URLs, and security warnings are never modified
     - :material-console: **CLI-first execution** — `onetool direct` runs any tool pack from the shell; execution host keeps state across calls for agent harnesses and automation scripts
 
     [:octicons-arrow-right-24: See everything that's new in v2](learn/whats-new-v2.md)
@@ -194,6 +195,29 @@ Persistent SQLite+FTS5 store for large tool outputs. Write once, search many tim
 ```
 
 [:octicons-arrow-right-24: ctx reference](reference/tools/ot_context.md)
+
+</div>
+
+<div class="card span-2" markdown>
+
+### :material-text-box-minus: Caveman Compact
+
+LLM-powered text compaction. One dunder compacts any tool output. Code blocks, URLs, paths, and security warnings are never modified.
+
+| Content | Reduction |
+|---|---|
+| Tech prose | 55–65% |
+| Conversational prose | 45–55% |
+| Search results | 25–31% |
+| Mixed prose + code | 15–35% |
+
+```python
+>>> __compact__ = True
+>>> brave.search(query='AI news', count=10)
+# compacted in-place; ~25–31% reduction on search snippets
+```
+
+[:octicons-arrow-right-24: ot_caveman reference](reference/tools/ot_caveman.md)
 
 </div>
 

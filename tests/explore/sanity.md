@@ -297,15 +297,15 @@ OneTool is setup correctly with all dependencies and secrets needed.
   - Example: `whiteboard.draw(input="A --> B --> C")` not `whiteboard.draw(dsl="...")`
 - **mem.flush**: Replaces `mem.cache_clear()` (removed in refactor). Flushes the background embedding queue.
   - Example: `mem.flush()` → "All pending embeddings completed"
-- **ot_context tools**: Use `select=` not `sections=` for slice; `intent=` not `query=` for transform
+- **ot_context tools**: Use `select=` not `sections=` for slice; `q=` not `question=` for ask
   - `ctx.slice(handle, select=2)` — int section number, str "N:M" line range, or heading substring
-  - `ctx.transform(handle, intent="list all section names")` — not `query=`
+  - `ctx.ask(handle, q="list all section names")` — use `ctx.ask` not `ctx.transform`; param is `q=` not `question=`
 - **whiteboard.note**: Uses `input=` not `content=` (same as draw and erase)
   - Example: `wb.note(input="n1[note:\ntext here]")` — note type must be lowercase (table/tree/seq/timeline/note)
 - **whiteboard.erase**: Uses `ids=` not `targets=`
   - Example: `wb.erase(ids=["nodeA", "nodeB"])`
 - **Large output → ctx handles**: `$f_r`, `$f_t`, `$f_g`, `$mem_r`, `$wf`, `$tav_x`, `$gh`, `$rg_count` return ctx handles for large output.
-  Use `ctx.read(handle)` to page through, `ctx.search(handle, queries=[...])` to search.
+  Use `ctx.read(handle)` to page through, `ctx.grep(handle, pattern="...")` to search.
 - **ctx parallel write contention**: Avoid calling 5+ large-output tools simultaneously — SQLite may return
   "database is locked". Retry succeeds. Filed: `wip/issues/ctx-db-locked-parallel-writes.md`
 - **`ot.tools`/`ot.help` do NOT support `info="list"`**: Only `ot.stats` has `info="list"`. Use `"min"`,

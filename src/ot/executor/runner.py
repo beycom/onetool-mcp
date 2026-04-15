@@ -55,6 +55,20 @@ class CommandResult:
 _NO_RETURN = object()
 
 
+def _apply_compact(text: str) -> str:
+    """Apply ot_caveman compaction to text. Returns original on any failure."""
+    try:
+        from ottools.ot_caveman import _compact_text
+
+        return _compact_text(text)
+    except ImportError:
+        logger.warning("ot_caveman not available for __compact__ — returning original output")
+        return text
+    except RuntimeError as e:
+        logger.warning("__compact__ failed: {} — returning original output", e)
+        return text
+
+
 # -----------------------------------------------------------------------------
 # Code Execution
 # -----------------------------------------------------------------------------
@@ -203,7 +217,7 @@ def wrap_code_for_exec(code: str, has_explicit_return: bool) -> tuple[str, int]:
     indented_code = "\n".join(indented_lines)
 
     # Add global declarations for magic variables so they can be read from outer namespace
-    global_decl = "    global __format__, __sanitize__"
+    global_decl = "    global __format__, __sanitize__, __compact__"
 
     # Use sentinel if no explicit return to distinguish from explicit None
     if has_explicit_return:
@@ -318,31 +332,27 @@ def execute_python_code(
         if fmt not in ("json", "json_h", "yml", "yml_h", "raw"):
             fmt = "json"  # Fall back to default for invalid format
 
-        # Read __sanitize__ from namespace, defaulting to config setting
+        # Read __sanitize__ and __compact__ from namespace, defaulting to config settings
         config = get_config()
-        default_sanitize = config.security.sanitize.enabled
-        should_sanitize: bool = namespace.get("__sanitize__", default_sanitize)
+        should_sanitize: bool = namespace.get("__sanitize__", config.security.sanitize.enabled)
+        should_compact: bool = namespace.get("__compact__", config.output.compact)
 
-        # Check for sentinel - no return value
+        # Determine output and raw_result
+        raw_result = None
         if result is _NO_RETURN:
-            # Return stdout if available, otherwise success message
             output = stdout_output or "Code executed successfully (no return value)"
-            return output, None, should_sanitize, fmt
-
-        # Explicit None return (e.g., from print())
-        if result is None:
-            # Return stdout if available (captures print output)
+        elif result is None:
             output = stdout_output or "None"
-            return output, None, should_sanitize, fmt
-
-        # Preserve raw result before serialization
-        raw_result = result
-
-        # If we have both a result and stdout, include both
-        if stdout_output:
-            output = f"{stdout_output}\n{serialize_result(result, fmt)}"
         else:
-            output = serialize_result(result, fmt)
+            raw_result = result
+            if stdout_output:
+                output = f"{stdout_output}\n{serialize_result(result, fmt)}"
+            else:
+                output = serialize_result(result, fmt)
+
+        # Apply compaction if requested (after serialize, before ctx-store threshold check)
+        if should_compact:
+            output = _apply_compact(output)
 
         return output, raw_result, should_sanitize, fmt
 
