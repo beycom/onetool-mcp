@@ -285,7 +285,7 @@ class TestSanitizeMagicVariable:
         tool_funcs = load_tool_functions(tools_dir)
 
         with patch("ot.executor.runner.get_config", return_value=mock_config):
-            result, _raw, should_sanitize, _fmt = execute_python_code(
+            result, _raw, should_sanitize, _fmt, _fc = execute_python_code(
                 '{"key": "value with __ot trigger"}',
                 tool_functions=tool_funcs,
             )
@@ -312,7 +312,7 @@ class TestSanitizeMagicVariable:
 
         code = f'''__sanitize__ = {sanitize_val}
 {{"key": "value"}}'''
-        _text, _raw, should_sanitize, _fmt = execute_python_code(
+        _text, _raw, should_sanitize, _fmt, _fc = execute_python_code(
             code, tool_functions=tool_funcs
         )
         assert should_sanitize is expected

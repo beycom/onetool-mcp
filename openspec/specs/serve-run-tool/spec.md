@@ -417,7 +417,7 @@ The system SHALL support a `__compact__` magic variable to transparently compact
 
 ### Requirement: Large Output Handling
 
-The system SHALL intercept tool outputs exceeding a configurable size threshold and store them to disk.
+The system SHALL intercept tool outputs exceeding a configurable size threshold and store them to disk. The system SHALL also store outputs unconditionally when `__force_context__` is set to `True`.
 
 #### Scenario: Output below threshold
 - **GIVEN** `output.max_inline_size` is configured to 5000 bytes
@@ -435,6 +435,19 @@ The system SHALL intercept tool outputs exceeding a configurable size threshold 
 - **WHEN** the tool being executed is `ot.result`
 - **THEN** the output SHALL be returned inline regardless of size
 - **AND** the output SHALL NOT be stored or re-wrapped into a second handle
+
+#### Scenario: ctx.* tools are exempt from large output gate
+- **GIVEN** `output.max_inline_size` is configured to any positive value
+- **WHEN** the tool being executed has a name beginning with `ctx.`
+- **THEN** the output SHALL be returned inline regardless of size
+- **AND** the output SHALL NOT be stored or re-wrapped into a second handle
+
+#### Scenario: __force_context__ overrides size threshold
+- **GIVEN** code sets `__force_context__ = True`
+- **AND** the output is smaller than `output.max_inline_size`
+- **WHEN** the result is returned
+- **THEN** the output SHALL be stored to `.onetool/tmp/`
+- **AND** a summary dict SHALL be returned instead of inline output
 
 #### Scenario: Summary response format
 - **GIVEN** a large output is stored

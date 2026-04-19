@@ -93,6 +93,10 @@ FALLBACK_WARNED_IMPORTS = frozenset({
     "yaml",
 })
 
+FALLBACK_ALLOWED_DUNDERS = frozenset({
+    "__format__", "__sanitize__", "__compact__", "__force_context__",
+})
+
 # Cache stdlib module names for performance (checked per qualified call)
 # Python 3.10+ has sys.stdlib_module_names; older versions get empty set
 try:
@@ -611,7 +615,7 @@ def validate_python_code(
                 warned_calls=frozenset(),
                 allowed_calls=frozenset(),
                 tool_namespaces=_get_tool_namespaces(),
-                allowed_dunders=frozenset({"__format__", "__sanitize__", "__compact__"}),
+                allowed_dunders=FALLBACK_ALLOWED_DUNDERS,
             )
 
         if visitor is not None:

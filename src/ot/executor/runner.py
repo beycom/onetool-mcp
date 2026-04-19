@@ -217,7 +217,7 @@ def wrap_code_for_exec(code: str, has_explicit_return: bool) -> tuple[str, int]:
     indented_code = "\n".join(indented_lines)
 
     # Add global declarations for magic variables so they can be read from outer namespace
-    global_decl = "    global __format__, __sanitize__, __compact__"
+    global_decl = "    global __format__, __sanitize__, __compact__, __force_context__"
 
     # Use sentinel if no explicit return to distinguish from explicit None
     if has_explicit_return:
@@ -270,7 +270,7 @@ def execute_python_code(
     tool_functions: dict[str, Any] | None = None,
     tools_dir: Path | None = None,
     validate: bool = True,
-) -> tuple[str, Any, bool, str]:
+) -> tuple[str, Any, bool, str, bool]:
     """Execute Python code with tool functions available.
 
     Args:
@@ -280,7 +280,7 @@ def execute_python_code(
         validate: Whether to validate code before execution (default True)
 
     Returns:
-        Tuple of (serialized string, raw Python object, sanitize flag, format mode)
+        Tuple of (serialized string, raw Python object, sanitize flag, format mode, force_context flag)
 
     Raises:
         ValueError: If validation fails or execution fails
@@ -332,10 +332,11 @@ def execute_python_code(
         if fmt not in ("json", "json_h", "yml", "yml_h", "raw"):
             fmt = "json"  # Fall back to default for invalid format
 
-        # Read __sanitize__ and __compact__ from namespace, defaulting to config settings
+        # Read __sanitize__, __compact__, and __force_context__ from namespace, defaulting to config settings
         config = get_config()
         should_sanitize: bool = namespace.get("__sanitize__", config.security.sanitize.enabled)
         should_compact: bool = namespace.get("__compact__", config.output.compact)
+        should_force_context: bool = namespace.get("__force_context__", False)
 
         # Determine output and raw_result
         raw_result = None
@@ -354,7 +355,7 @@ def execute_python_code(
         if should_compact:
             output = _apply_compact(output)
 
-        return output, raw_result, should_sanitize, fmt
+        return output, raw_result, should_sanitize, fmt, should_force_context
 
     except Exception as e:
         error_msg, line_num = _map_error_line(e, line_offset)
@@ -520,7 +521,7 @@ async def execute_command(
         try:
             if use_thread_pool:
                 # Run in thread pool so event loop can process proxy calls
-                text_result, raw_result, sanitize, result_fmt = await asyncio.to_thread(
+                text_result, raw_result, sanitize, result_fmt, force_context = await asyncio.to_thread(
                     execute_python_code,
                     stripped,
                     tool_functions=tool_namespace,
@@ -528,39 +529,40 @@ async def execute_command(
                 )
             else:
                 # Direct execution for non-proxy calls (no overhead)
-                text_result, raw_result, sanitize, result_fmt = execute_python_code(
+                text_result, raw_result, sanitize, result_fmt, force_context = execute_python_code(
                     stripped, tool_functions=tool_namespace, validate=should_validate
                 )
 
             # Check for large output and store if needed
             config = get_config()
             max_size = config.output.max_inline_size
-            result_size = len(text_result.encode("utf-8"))
 
             _no_deflect = (tool_name or "").startswith("ctx.") or tool_name == "ot.result"
-            if not _no_deflect and max_size > 0 and result_size > max_size:
-                # Store large output via ctx backend and return summary
-                from ot.ctx.write import ctx_write
-                ctx_content = (
-                    json.dumps(raw_result, indent=2, ensure_ascii=False)
-                    if raw_result is not None and isinstance(raw_result, (dict, list))
-                    else text_result
-                )
-                write_result = ctx_write(ctx_content, source=stripped[:50], verbose=True)
-                handle = write_result["handle"]
-                content_type = write_result.get("content_type", "text")
-                summary_dict = {
-                    "handle": handle,
-                    "total_lines": write_result["total_lines"],
-                    "size_bytes": write_result["size_bytes"],
-                    "content_type": content_type,
-                    "preview": write_result.get("preview", ""),
-                    "status": write_result.get("status", "pending"),
-                }
-                text_result = serialize_result(summary_dict, "json")
-                raw_result = summary_dict
-                span.add("storedHandle", handle)
-                span.add("storedSize", result_size)
+            if not _no_deflect:
+                result_size = len(text_result.encode("utf-8"))
+                if force_context or (max_size > 0 and result_size > max_size):
+                    # Store large output via ctx backend and return summary
+                    from ot.ctx.write import ctx_write
+                    ctx_content = (
+                        json.dumps(raw_result, indent=2, ensure_ascii=False)
+                        if raw_result is not None and isinstance(raw_result, (dict, list))
+                        else text_result
+                    )
+                    write_result = ctx_write(ctx_content, source=stripped[:50], verbose=True)
+                    handle = write_result["handle"]
+                    content_type = write_result.get("content_type", "text")
+                    summary_dict = {
+                        "handle": handle,
+                        "total_lines": write_result["total_lines"],
+                        "size_bytes": write_result["size_bytes"],
+                        "content_type": content_type,
+                        "preview": write_result.get("preview", ""),
+                        "status": write_result.get("status", "pending"),
+                    }
+                    text_result = serialize_result(summary_dict, "json")
+                    raw_result = summary_dict
+                    span.add("storedHandle", handle)
+                    span.add("storedSize", result_size)
 
             span.add("resultLength", len(text_result))
             return CommandResult(

@@ -191,7 +191,7 @@ class DundersConfig(BaseModel):
     """Magic variable (dunder) configuration."""
 
     allow: list[str] = Field(
-        default_factory=lambda: ["__format__", "__sanitize__", "__compact__"],
+        default_factory=lambda: ["__format__", "__sanitize__", "__compact__", "__force_context__"],
         description="Allowed magic variables (e.g., '__format__')",
     )
 
