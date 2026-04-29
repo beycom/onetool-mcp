@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/beycom-onetool-mcp-badge.png)](https://mseep.ai/app/beycom-onetool-mcp)
+
 <p align="center">
   <!-- mcp-name: io.github.beycom/onetool-mcp -->
   <a href="https://github.com/beycom/onetool-mcp">
