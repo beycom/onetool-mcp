@@ -24,8 +24,16 @@ Note: mcp__ot__run is NOT valid.
 
 from __future__ import annotations
 
+import contextlib
+import json
+import os
+import signal
+import socket
+import subprocess
+import sys
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -35,7 +43,7 @@ from fastmcp import Context, FastMCP
 from fastmcp.tools.tool import ToolResult
 from loguru import logger
 
-from ot.config.loader import get_config
+from ot.config.loader import get_config, get_loaded_config_path, get_loaded_secrets_path
 from ot.executor import SimpleExecutor, execute_command
 from ot.executor.runner import prepare_command
 from ot.logging import LogSpan, configure_logging
@@ -57,6 +65,180 @@ configure_logging(log_name="serve")
 
 # Global stats writer (unified JSONL for both run and tool stats)
 _stats_writer: JsonlStatsWriter | None = None
+_auto_direct_pid: int | None = None
+_auto_direct_port: int | None = None
+_auto_direct_owned: bool = False
+_AUTO_DIRECT_BOUND_PORT_ENV = "ONETOOL_DIRECT_BOUND_PORT"
+
+
+def _direct_pid_file(port: int) -> Path:
+    return Path.home() / ".onetool" / f"direct-server-{port}.pid"
+
+
+def _direct_log_file(port: int) -> Path:
+    return Path.home() / ".onetool" / f"direct-server-{port}.log"
+
+
+def _read_direct_pid_file(port: int) -> dict[str, Any] | None:
+    try:
+        parsed = json.loads(_direct_pid_file(port).read_text())
+        if not isinstance(parsed, dict):
+            return None
+        return {str(k): v for k, v in parsed.items()}
+    except Exception:
+        return None
+
+
+def _remove_direct_pid_file(port: int) -> None:
+    with contextlib.suppress(FileNotFoundError):
+        _direct_pid_file(port).unlink()
+
+
+def _is_process_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+
+
+def _kill_pid(pid: int) -> None:
+    if sys.platform == "win32":
+        import ctypes
+
+        ctypes.windll.kernel32.TerminateProcess(  # type: ignore[attr-defined]
+            ctypes.windll.kernel32.OpenProcess(1, False, pid), 0  # type: ignore[attr-defined]
+        )
+    else:
+        os.kill(pid, signal.SIGTERM)
+
+
+def _tcp_probe_once(host: str, port: int, timeout_secs: float = 0.2) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout_secs):
+            return True
+    except (OSError, ConnectionRefusedError, TimeoutError):
+        return False
+
+
+def _wait_for_direct_host_ready(
+    *,
+    pid: int,
+    host: str,
+    port: int,
+    timeout_secs: float = 5.0,
+    interval: float = 0.1,
+) -> bool:
+    """Wait for a spawned direct host to accept TCP, failing fast if it exits."""
+    deadline = time.monotonic() + timeout_secs
+    while time.monotonic() < deadline:
+        if _tcp_probe_once(host, port):
+            return True
+        if not _is_process_alive(pid):
+            return False
+        time.sleep(interval)
+    return _tcp_probe_once(host, port)
+
+
+def _write_direct_pid_file(
+    pid: int,
+    port: int,
+    config_path: Path | None,
+    secrets_path: Path | str | None,
+) -> None:
+    path = _direct_pid_file(port)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({
+            "pid": pid,
+            "port": port,
+            "config": str(config_path) if config_path is not None else None,
+            "secrets": str(secrets_path) if secrets_path is not None else None,
+            "started": time.time(),
+            "log": str(_direct_log_file(port)),
+        })
+    )
+
+
+def _spawn_direct_host(port: int) -> int:
+    config_path = get_loaded_config_path()
+    secrets_path = get_loaded_secrets_path()
+    if config_path is None:
+        raise RuntimeError("No loaded config path available for direct.host.enabled startup")
+
+    log_path = _direct_log_file(port)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    cmd = [sys.executable, "-m", "onetool.cli_commands._direct_host_worker"]
+    cmd += ["--config", str(config_path), "--port", str(port), "--host", "127.0.0.1"]
+    if secrets_path is not None:
+        cmd += ["--secrets", str(secrets_path)]
+
+    with log_path.open("a") as log_fh:
+        if sys.platform == "win32":
+            proc = subprocess.Popen(
+                cmd,
+                creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+                stdout=log_fh,
+                stderr=log_fh,
+            )
+        else:
+            proc = subprocess.Popen(
+                cmd,
+                start_new_session=True,
+                stdout=log_fh,
+                stderr=log_fh,
+            )
+
+    _write_direct_pid_file(proc.pid, port, config_path, secrets_path)
+    return proc.pid
+
+
+def _direct_candidate_ports() -> list[int]:
+    start = _config.direct.host.port
+    return list(range(start, 65536))
+
+
+def _start_auto_direct_host() -> tuple[int, int, bool]:
+    candidates = _direct_candidate_ports()
+    for port in candidates:
+        pid_info = _read_direct_pid_file(port)
+        if pid_info is not None:
+            running_pid = pid_info.get("pid")
+            if isinstance(running_pid, int) and _is_process_alive(running_pid):
+                continue
+            _remove_direct_pid_file(port)
+
+        # Skip ports already in use by unrelated processes.
+        if _tcp_probe_once("127.0.0.1", port):
+            continue
+
+        pid = _spawn_direct_host(port)
+        if _wait_for_direct_host_ready(pid=pid, host="127.0.0.1", port=port):
+            return pid, port, True
+
+        with contextlib.suppress(Exception):
+            if _is_process_alive(pid):
+                _kill_pid(pid)
+        _remove_direct_pid_file(port)
+
+    start_port = _config.direct.host.port
+    raise RuntimeError(f"Could not start direct host in configured ports {start_port}..65535")
+
+
+def _stop_auto_direct_host(pid: int, port: int) -> None:
+    with contextlib.suppress(Exception):
+        if _is_process_alive(pid):
+            _kill_pid(pid)
+            time.sleep(0.2)
+
+    pid_info = _read_direct_pid_file(port)
+    if pid_info is not None and pid_info.get("pid") == pid:
+        _remove_direct_pid_file(port)
 
 
 def _build_pack_summary() -> str:
@@ -95,7 +277,7 @@ def _get_instructions() -> str:
 @asynccontextmanager
 async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
     """Manage server lifecycle - startup and shutdown."""
-    global _stats_writer
+    global _stats_writer, _auto_direct_pid, _auto_direct_port, _auto_direct_owned
 
     with LogSpan(span="mcp.server.start") as start_span:
         # Startup: connect to proxy MCP servers in the background so FastMCP
@@ -112,6 +294,19 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
         # Pre-warm tool registry so the first run() call is served from a warm cache
         from ot.executor.tool_loader import load_tool_registry
         load_tool_registry()
+
+        # Auto mode: spawn one local direct host bound to this MCP process.
+        if _config.direct.host.enabled:
+            try:
+                auto_pid, auto_port, auto_owned = _start_auto_direct_host()
+                _auto_direct_pid = auto_pid
+                _auto_direct_port = auto_port
+                _auto_direct_owned = auto_owned
+                os.environ[_AUTO_DIRECT_BOUND_PORT_ENV] = str(auto_port)
+                source = "spawned" if auto_owned else "reused"
+                start_span.add("directAutoHost", f"127.0.0.1:{auto_port} ({source})")
+            except Exception as e:
+                raise RuntimeError(f"direct.host.enabled startup failed: {e}") from e
 
         # Fire anonymous startup telemetry (non-blocking daemon thread)
         from ot.telemetry import ping as _telemetry_ping
@@ -138,6 +333,14 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
     yield
 
     with LogSpan(span="mcp.server.stop") as stop_span:
+        if _auto_direct_owned and _auto_direct_pid is not None and _auto_direct_port is not None:
+            _stop_auto_direct_host(_auto_direct_pid, _auto_direct_port)
+            stop_span.add("directAutoHostStopped", f"127.0.0.1:{_auto_direct_port}")
+        _auto_direct_pid = None
+        _auto_direct_port = None
+        _auto_direct_owned = False
+        os.environ.pop(_AUTO_DIRECT_BOUND_PORT_ENV, None)
+
         # Shutdown: stop stats writer
         if _stats_writer is not None:
             await _stats_writer.stop()

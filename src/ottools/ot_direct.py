@@ -29,6 +29,7 @@ pack = "ot_direct"
 __all__ = ["logs", "restart", "status", "stop"]
 
 _DEFAULT_PORT = 8765
+_AUTO_DIRECT_BOUND_PORT_ENV = "ONETOOL_DIRECT_BOUND_PORT"
 
 
 # ---------------------------------------------------------------------------
@@ -108,6 +109,22 @@ def _tcp_probe_wait(host: str, port: int, timeout_secs: float = 5.0, interval: f
     return False
 
 
+def _resolve_port(port: int | None) -> int:
+    """Resolve effective port; prefer MCP-bound auto host when available."""
+    if port is not None:
+        return port
+
+    bound = os.getenv(_AUTO_DIRECT_BOUND_PORT_ENV)
+    if bound:
+        try:
+            resolved = int(bound)
+        except ValueError:
+            resolved = _DEFAULT_PORT
+        return resolved if 1 <= resolved <= 65535 else _DEFAULT_PORT
+
+    return _DEFAULT_PORT
+
+
 def _launch_host(config: str | None, secrets: str | None, port: int) -> int:
     """Spawn the execution host daemon. Returns the PID."""
     import subprocess
@@ -172,7 +189,7 @@ def _start_and_wait(
 # ---------------------------------------------------------------------------
 
 
-def stop(*, port: int = _DEFAULT_PORT) -> str:
+def stop(*, port: int | None = None) -> str:
     """Stop the running execution host.
 
     Args:
@@ -185,14 +202,15 @@ def stop(*, port: int = _DEFAULT_PORT) -> str:
         ot_direct.stop()
         ot_direct.stop(port=9000)
     """
-    with LogSpan(span="ot_direct.stop", port=port):
-        info = _read_pid_file(port)
+    resolved_port = _resolve_port(port)
+    with LogSpan(span="ot_direct.stop", port=resolved_port):
+        info = _read_pid_file(resolved_port)
         if info is None:
             return "No execution host running"
 
         pid = info["pid"]
         if not _is_process_alive(pid):
-            _remove_pid_file(port)
+            _remove_pid_file(resolved_port)
             return "Stale PID file removed (process was not running)"
 
         try:
@@ -200,11 +218,11 @@ def stop(*, port: int = _DEFAULT_PORT) -> str:
         except Exception as e:
             return f"Error: failed to stop host: {e}"
 
-        _remove_pid_file(port)
+        _remove_pid_file(resolved_port)
         return "Execution host stopped"
 
 
-def status(*, port: int = _DEFAULT_PORT) -> dict[str, Any] | str:
+def status(*, port: int | None = None) -> dict[str, Any] | str:
     """Show execution host status.
 
     Args:
@@ -217,8 +235,9 @@ def status(*, port: int = _DEFAULT_PORT) -> dict[str, Any] | str:
         ot_direct.status()
         ot_direct.status(port=9000)
     """
-    with LogSpan(span="ot_direct.status", port=port) as s:
-        info = _read_pid_file(port)
+    resolved_port = _resolve_port(port)
+    with LogSpan(span="ot_direct.status", port=resolved_port) as s:
+        info = _read_pid_file(resolved_port)
         if info is None:
             return "No execution host running"
 
@@ -232,10 +251,10 @@ def status(*, port: int = _DEFAULT_PORT) -> dict[str, Any] | str:
         return {
             "status": "running",
             "pid": pid,
-            "port": info.get("port", port),
+            "port": info.get("port", resolved_port),
             "uptime_seconds": uptime,
             "config": info.get("config"),
-            "log": info.get("log", str(_log_file(port))),
+            "log": info.get("log", str(_log_file(resolved_port))),
         }
 
 
@@ -243,7 +262,7 @@ def restart(
     *,
     config: str | None = None,
     secrets: str | None = None,
-    port: int = _DEFAULT_PORT,
+    port: int | None = None,
 ) -> dict[str, Any] | str:
     """Stop and restart the execution host.
 
@@ -262,25 +281,26 @@ def restart(
         ot_direct.restart()
         ot_direct.restart(config='new-onetool.yaml')
     """
-    with LogSpan(span="ot_direct.restart", port=port):
-        info = _read_pid_file(port)
+    resolved_port = _resolve_port(port)
+    with LogSpan(span="ot_direct.restart", port=resolved_port):
+        info = _read_pid_file(resolved_port)
         if info:
             pid = info["pid"]
             if _is_process_alive(pid):
                 with contextlib.suppress(Exception):
                     _kill_pid(pid)
                     time.sleep(0.3)
-            _remove_pid_file(port)
+            _remove_pid_file(resolved_port)
 
             if config is None and info.get("config"):
                 config = info["config"]
             if secrets is None and info.get("secrets"):
                 secrets = info["secrets"]
 
-        return _start_and_wait(config, secrets, port)
+        return _start_and_wait(config, secrets, resolved_port)
 
 
-def logs(*, port: int = _DEFAULT_PORT, lines: int = 50) -> str:
+def logs(*, port: int | None = None, lines: int = 50) -> str:
     """Return the last N lines of the execution host log.
 
     Args:
@@ -294,8 +314,9 @@ def logs(*, port: int = _DEFAULT_PORT, lines: int = 50) -> str:
         ot_direct.logs()
         ot_direct.logs(port=9000, lines=100)
     """
-    with LogSpan(span="ot_direct.logs", port=port, lines=lines):
-        log_path = _log_file(port)
+    resolved_port = _resolve_port(port)
+    with LogSpan(span="ot_direct.logs", port=resolved_port, lines=lines):
+        log_path = _log_file(resolved_port)
         if not log_path.exists():
             return f"Error: no log file found at {log_path}"
 

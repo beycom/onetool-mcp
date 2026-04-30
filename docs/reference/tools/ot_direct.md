@@ -26,7 +26,7 @@ Short alias: `direct`
 |-----------|------|---------|-------------|
 | `config` | str | `None` | Path to `onetool.yaml`; host starts with no tools if omitted |
 | `secrets` | str | `None` | Path to secrets file (optional) |
-| `port` | int | `8765` | Port the host listens on |
+| `port` | int | MCP-bound host port (or `8765` fallback) | Port the host listens on |
 | `lines` | int | `50` | Number of log lines to return (`logs()` only) |
 
 ## Configuration
@@ -38,7 +38,8 @@ Short alias: `direct`
 ### Optional
 
 - This pack does not define any pack-specific keys under `tools.ot_direct`.
-- The default port (`8765`) can be overridden per-call with the `port` parameter.
+- When called inside an MCP process with `direct.host.enabled: true`, omitted `port` resolves to that process's bound direct-host port.
+- Outside MCP auto mode, omitted `port` falls back to `8765`.
 
 ## Examples
 

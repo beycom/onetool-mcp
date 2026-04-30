@@ -15,7 +15,7 @@ The system SHALL provide `onetool direct start` to launch an HTTP execution host
 Flags:
 - `--config`/`-c` — path to `onetool.yaml`; optional (warning printed if omitted)
 - `--secrets`/`-s` — path to secrets file; optional
-- `--port`/`-p` — HTTP port (default: from `onetool.yaml` `direct.port`, fallback `8765`)
+- `--port`/`-p` — HTTP port (default: from `onetool.yaml` `direct.host.port`, fallback `8765`)
 
 The host exposes a single endpoint: `POST /run` accepting `{"command": "..."}` and returning `{"result": "...", "success": true|false}`.
 
@@ -87,6 +87,7 @@ Flags:
 
 - **WHEN** `onetool direct status` is run and the host is running
 - **THEN** it SHALL print the PID, port, uptime, and log file path
+- **AND** when available in PID metadata, it SHALL print host `config` and `secrets` paths
 - **AND** exit with code 0
 
 #### Scenario: Server not running
@@ -140,34 +141,54 @@ Flags:
 The execution host port and routing mode SHALL be configurable in `onetool.yaml` under the `direct:` section.
 
 Config fields:
-- `direct.port` — port for the local execution host (default: `8765`)
-- `direct.host` — routing mode: absent/`null` = in-process only; `"enable"` = auto-start local host on first use; `"HOST:PORT"` = route to remote server
-- `direct.timeout` — HTTP request timeout in seconds (default: `60`)
+- `direct.host.enabled` — host optimization switch (`false` = always in-process; `true` = auto-start when needed)
+- `direct.host.port` — preferred host port (default: `8765`)
+- `direct.host.timeout` — HTTP request timeout in seconds when routing to host (default: `120`)
 
 #### Scenario: Port from config
 
-- **GIVEN** `onetool.yaml` contains `direct.port: 9000`
+- **GIVEN** `onetool.yaml` contains `direct.host.port: 9000`
 - **WHEN** `onetool direct start -c onetool.yaml` is run without `--port`
 - **THEN** the server SHALL listen on port 9000
 
 #### Scenario: --port overrides config
 
-- **GIVEN** `onetool.yaml` contains `direct.port: 9000`
+- **GIVEN** `onetool.yaml` contains `direct.host.port: 9000`
 - **WHEN** `onetool direct start -c onetool.yaml --port 8765` is run
 - **THEN** the server SHALL listen on port 8765
 
 #### Scenario: Default port when not in config
 
-- **GIVEN** `onetool.yaml` does not contain a `direct.port` key
+- **GIVEN** `onetool.yaml` does not contain a `direct.host.port` key
 - **WHEN** `onetool direct start -c onetool.yaml` is run
 - **THEN** the server SHALL listen on port 8765
 
-#### Scenario: direct.host: enable — auto-start on first use
+#### Scenario: direct.host.enabled true — auto-start on first use
 
-- **GIVEN** `onetool.yaml` contains `direct.host: enable`
-- **WHEN** `onetool direct run "ot.debug()"` is run and no host is running
+- **GIVEN** `onetool.yaml` contains `direct.host.enabled: true`
+- **WHEN** `onetool direct run -c onetool.yaml "ot.debug()"` is run and no host is running
 - **THEN** the host SHALL be auto-started as a background process before routing
 - **NOTE** explicit `onetool direct start` is optional but supported for pre-warming
+
+#### Scenario: direct.host.enabled false — no auto-start
+
+- **GIVEN** `onetool.yaml` contains `direct.host.enabled: false`
+- **WHEN** `onetool direct run "ot.debug()"` is run and no host is running
+- **THEN** the command SHALL execute in-process
+
+#### Scenario: Auto allocation from preferred port to 65535
+
+- **GIVEN** `onetool.yaml` contains `direct.host.enabled: true` and `direct.host.port: 9000`
+- **WHEN** the MCP server starts
+- **THEN** it SHALL try ports in order `9000, 9001, ... , 65535` until one binds successfully
+- **AND** it SHALL fail startup with a clear error if all candidate ports are unavailable
+
+#### Scenario: Enabled startup failure aborts MCP startup
+
+- **GIVEN** `direct.host.enabled: true`
+- **AND** auto-host startup fails
+- **WHEN** MCP server startup runs
+- **THEN** MCP startup SHALL fail with a clear error
 
 ### Requirement: per-port PID and log files
 
