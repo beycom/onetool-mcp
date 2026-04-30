@@ -51,50 +51,42 @@ def security(*, check: str = "") -> dict[str, Any]:
 def server(
     *,
     status: str | None = None,
-    enable: str | None = None,
-    disable: str | None = None,
-    restart: str | None = None,
 ) -> str:
-    """List or manage runtime proxy server state.
+    """List or inspect runtime proxy server state.
 
     Without arguments, lists all configured servers with their status.
-    Accepts one action at a time: status, enable, disable, or restart.
-
-    All changes are in-memory only — state resets when OneTool restarts.
+    For state changes, use `ot_servers.enable/disable/restart`.
 
     Args:
         status: Show detailed status for a named server
-        enable: Enable a disabled server and connect it
-        disable: Disable an enabled server and disconnect it
-        restart: Disconnect and reconnect a server
 
     Returns:
-        Status report or action confirmation message
+        Status report
 
     Example:
         ot.server()                           # list all servers
         ot.server(status="devtools")          # show status for devtools
-        ot.server(enable="devtools-auto")     # enable devtools-auto
-        ot.server(disable="devtools")         # disable devtools
-        ot.server(restart="playwright")       # reconnect playwright
+        ot_servers.enable(name="github")      # enable + connect a server
+        ot_servers.disable(name="github")     # disable + disconnect
+        ot_servers.restart(name="playwright") # reconnect server
     """
     from ottools.server import server as _server
 
-    return _server(status=status, enable=enable, disable=disable, restart=restart)
+    return _server(status=status)
 
 
 def skills(
     *,
     name: str | None = None,
     pattern: str | None = None,
-    info: str = "min",
+    info: str = "default",
 ) -> str:
     """List available bundled skills or retrieve a skill's body content.
 
     Args:
         name: Skill name to retrieve body for (e.g., "ot-guide")
         pattern: Filter skills by substring match on name
-        info: Detail level — "list" (names only), "min" (+ description, default), "full" (everything)
+        info: Detail level — "min" (names only), "default" (+ description), "full" (everything)
 
     Returns:
         Skill body if name= provided; formatted list of skills otherwise

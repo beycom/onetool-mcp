@@ -41,6 +41,7 @@ Source of truth: `src/ot/config/global_templates/prompts.yaml` (`prompts.packs`)
 | `ot_forge` | `core` | Scaffold and generate code from templates |
 | `ot_image` | `core` | Vision analysis via dedicated model — load images, ask questions, get summaries; zero tokens to host session |
 | `ot_llm` | `core` | Run any text through an LLM — summarise, extract, reformat, translate |
+| `ot_servers` | `-` | Runtime proxy server controls — enable, disable, restart, and inspect one server |
 | `ot_secrets` | `core` | Store and retrieve API keys and secrets for OneTool services |
 | `ot_timer` | `core` | Time tool calls and report performance |
 | `package` | `[dev]` | Look up PyPI and npm packages, audit deps, find the latest AI models |

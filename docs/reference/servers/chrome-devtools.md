@@ -16,7 +16,7 @@ chrome_devtools:
 Or enable for the current session only:
 
 ```python
-ot.server(enable="chrome_devtools")
+ot_servers.enable(name="chrome_devtools")
 ```
 
 ## Server Config

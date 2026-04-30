@@ -35,7 +35,7 @@ Short alias: `play`
 
 ## Requires
 
-- The `playwright` MCP server must be enabled in `servers.yaml` or via `ot.server(enable="playwright")`
+- The `playwright` MCP server must be enabled in `servers.yaml` or via `ot_servers.enable(name="playwright")`
 
 ## Configuration
 
@@ -57,7 +57,7 @@ playwright:
   enabled: true
 ```
 
-Or enable for the current session only: `ot.server(enable="playwright")`
+Or enable for the current session only: `ot_servers.enable(name="playwright")`
 
 ## Examples
 

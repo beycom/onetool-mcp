@@ -34,6 +34,7 @@ PACK_SHORT_NAMES: dict[str, str] = {
     "ot_llm": "llm",
     "ot_secrets": "sec",
     "ot_timer": "tmr",
+    "ot_servers": "srv",
     "whiteboard": "wb",
     "ot_context": "ctx",
     "ot_direct": "direct",

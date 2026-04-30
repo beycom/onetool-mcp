@@ -1,14 +1,9 @@
 """Runtime server management for OneTool proxy servers.
 
-Provides enable/disable/restart/status for named MCP proxy servers.
-All changes are in-memory only — state resets on server restart.
+Provides list/status (read-only) plus enable/disable/restart helpers used by
+other surfaces.
 
-Example:
-    server()                          # list all servers and status
-    server(status="devtools")         # show status for one server
-    server(enable="devtools-auto")    # enable a disabled server
-    server(disable="devtools")        # disable an enabled server
-    server(restart="devtools")        # disconnect and reconnect a server
+All changes are in-memory only — state resets on server restart.
 """
 
 from __future__ import annotations
@@ -19,7 +14,7 @@ from ot.config.loader import get_config
 from ot.logging import LogSpan
 from ot.proxy import get_proxy_manager
 
-__all__ = ["server"]
+__all__ = ["disable", "enable", "restart", "server", "status"]
 
 
 def _get_server_info(server_name: str) -> dict[str, Any]:
@@ -45,50 +40,37 @@ def _format_server_row(
     return f"  {name}: {enabled_str}, {status_str}{tool_str}"
 
 
-def server(
-    status: str | None = None,
-    enable: str | None = None,
-    disable: str | None = None,
-    restart: str | None = None,
-) -> str:
-    """List or manage runtime proxy server state.
+def _unknown_error(name: str, configured: dict[str, Any]) -> str:
+    available = ", ".join(sorted(configured.keys()))
+    return f"Error: Unknown server '{name}'. Configured servers: {available}"
 
-    Without arguments, lists all configured servers with their status.
-    Accepts one action at a time: status, enable, disable, or restart.
 
-    All changes are in-memory only — state resets when OneTool restarts.
+def _get_env() -> tuple[dict[str, Any], Any]:
+    cfg = get_config()
+    if not cfg.servers:
+        raise ValueError("No servers configured. Add servers to servers.yaml.")
+    return cfg.servers, get_proxy_manager()
+
+
+def server(*, status: str | None = None) -> str:
+    """Read-only server view for the ot pack.
+
+    Without arguments, list all configured servers and status.
+    With status=, show details for a named server.
 
     Args:
         status: Show detailed status for a named server
-        enable: Enable a disabled server and connect it
-        disable: Disable an enabled server and disconnect it
-        restart: Disconnect and reconnect a server (re-reads config)
 
     Returns:
-        Status report or action confirmation message
-
-    Example:
-        ot.server()                           # list all servers
-        ot.server(status="devtools")          # show status for devtools
-        ot.server(enable="devtools-auto")     # enable devtools-auto
-        ot.server(disable="devtools")         # disable devtools
-        ot.server(restart="playwright")       # reconnect playwright
+        Status report
     """
-    cfg = get_config()
-    proxy = get_proxy_manager()
+    with LogSpan(span="server.view", status=status) as s:
+        try:
+            configured, proxy = _get_env()
+        except ValueError as e:
+            return str(e)
 
-    if not cfg.servers:
-        return "No servers configured. Add servers to servers.yaml."
-
-    configured = cfg.servers
-
-    def _unknown_error(name: str) -> str:
-        available = ", ".join(sorted(configured.keys()))
-        return f"Error: Unknown server '{name}'. Configured servers: {available}"
-
-    with LogSpan(span="server.start") as s:
-        # --- List all servers ---
-        if status is None and enable is None and disable is None and restart is None:
+        if status is None:
             lines = [f"Servers ({len(configured)} configured):"]
             for srv_name in sorted(configured.keys()):
                 srv_cfg = configured[srv_name]
@@ -101,71 +83,101 @@ def server(
             s.add(count=len(configured))
             return "\n".join(lines)
 
-        # --- Status for named server ---
-        if status is not None:
-            if status not in configured:
-                return _unknown_error(status)
-            srv_cfg = configured[status]
-            info = _get_server_info(status)
-            connected_str = "connected" if info["connected"] else "disconnected"
-            enabled_str = "enabled" if srv_cfg.enabled else "disabled"
-            lines = [
-                f"Server: {status}",
-                f"  State: {enabled_str}, {connected_str}",
-            ]
+        if status not in configured:
+            return _unknown_error(status, configured)
+
+        srv_cfg = configured[status]
+        info = _get_server_info(status)
+        connected_str = "connected" if info["connected"] else "disconnected"
+        enabled_str = "enabled" if srv_cfg.enabled else "disabled"
+        lines = [
+            f"Server: {status}",
+            f"  State: {enabled_str}, {connected_str}",
+        ]
+        if info["connected"]:
+            lines.append(f"  Tools: {info['tool_count']}")
+        if err := proxy.get_error(status):
+            lines.append(f"  Last error: {err}")
+        s.add(server=status, connected=info["connected"])
+        return "\n".join(lines)
+
+
+def status(*, name: str) -> str:
+    """Show detailed status for a named server."""
+    return server(status=name)
+
+
+def enable(*, name: str) -> str:
+    """Enable a disabled server and connect it."""
+    with LogSpan(span="server.enable", name=name) as s:
+        try:
+            configured, proxy = _get_env()
+        except ValueError as e:
+            return str(e)
+
+        if name not in configured:
+            return _unknown_error(name, configured)
+
+        srv_cfg = configured[name]
+        if srv_cfg.enabled:
+            info = _get_server_info(name)
             if info["connected"]:
-                lines.append(f"  Tools: {info['tool_count']}")
-            if err := proxy.get_error(status):
-                lines.append(f"  Last error: {err}")
-            s.add(server=status, connected=info["connected"])
-            return "\n".join(lines)
+                s.add(noop=True, connected=True)
+                return (
+                    f"Server '{name}' is already enabled and connected "
+                    f"({info['tool_count']} tools)."
+                )
 
-        # --- Enable a server ---
-        if enable is not None:
-            if enable not in configured:
-                return _unknown_error(enable)
-            srv_cfg = configured[enable]
-            if srv_cfg.enabled:
-                info = _get_server_info(enable)
-                if info["connected"]:
-                    s.add(server=enable, action="enable", noop=True)
-                    return f"Server '{enable}' is already enabled and connected ({info['tool_count']} tools)."
+        srv_cfg.enabled = True
+        proxy.connect_additional_sync(name, srv_cfg)
+        info = _get_server_info(name)
+        connected_str = "connected" if info["connected"] else "connection failed"
+        tool_str = f" ({info['tool_count']} tools)" if info["connected"] else ""
+        s.add(connected=info["connected"])
+        return f"Server '{name}' enabled — {connected_str}{tool_str}."
+
+
+def disable(*, name: str) -> str:
+    """Disable an enabled server and disconnect it."""
+    with LogSpan(span="server.disable", name=name) as s:
+        try:
+            configured, proxy = _get_env()
+        except ValueError as e:
+            return str(e)
+
+        if name not in configured:
+            return _unknown_error(name, configured)
+
+        srv_cfg = configured[name]
+        if not srv_cfg.enabled:
+            s.add(noop=True)
+            return f"Server '{name}' is already disabled."
+
+        srv_cfg.enabled = False
+        proxy.disconnect_server_sync(name)
+        return f"Server '{name}' disabled."
+
+
+def restart(*, name: str) -> str:
+    """Disconnect and reconnect a server."""
+    with LogSpan(span="server.restart", name=name) as s:
+        try:
+            configured, proxy = _get_env()
+        except ValueError as e:
+            return str(e)
+
+        if name not in configured:
+            return _unknown_error(name, configured)
+
+        srv_cfg = configured[name]
+        if not srv_cfg.enabled:
             srv_cfg.enabled = True
-            proxy.connect_additional_sync(enable, srv_cfg)
-            info = _get_server_info(enable)
-            connected_str = "connected" if info["connected"] else "connection failed"
-            tool_str = f" ({info['tool_count']} tools)" if info["connected"] else ""
-            s.add(server=enable, action="enable", connected=info["connected"])
-            return f"Server '{enable}' enabled — {connected_str}{tool_str}."
 
-        # --- Disable a server ---
-        if disable is not None:
-            if disable not in configured:
-                return _unknown_error(disable)
-            srv_cfg = configured[disable]
-            if not srv_cfg.enabled:
-                s.add(server=disable, action="disable", noop=True)
-                return f"Server '{disable}' is already disabled."
-            srv_cfg.enabled = False
-            proxy.disconnect_server_sync(disable)
-            s.add(server=disable, action="disable")
-            return f"Server '{disable}' disabled."
+        proxy.disconnect_server_sync(name)
+        proxy.connect_additional_sync(name, srv_cfg)
 
-        # --- Restart a server ---
-        if restart is not None:
-            if restart not in configured:
-                return _unknown_error(restart)
-            srv_cfg = configured[restart]
-            # Enable if currently disabled, then reconnect
-            was_disabled = not srv_cfg.enabled
-            if was_disabled:
-                srv_cfg.enabled = True
-            proxy.disconnect_server_sync(restart)
-            proxy.connect_additional_sync(restart, srv_cfg)
-            info = _get_server_info(restart)
-            connected_str = "connected" if info["connected"] else "connection failed"
-            tool_str = f" ({info['tool_count']} tools)" if info["connected"] else ""
-            s.add(server=restart, action="restart", connected=info["connected"])
-            return f"Server '{restart}' restarted — {connected_str}{tool_str}."
-
-        return "No action specified."
+        info = _get_server_info(name)
+        connected_str = "connected" if info["connected"] else "connection failed"
+        tool_str = f" ({info['tool_count']} tools)" if info["connected"] else ""
+        s.add(connected=info["connected"])
+        return f"Server '{name}' restarted — {connected_str}{tool_str}."

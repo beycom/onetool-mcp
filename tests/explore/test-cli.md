@@ -43,8 +43,8 @@ Config path: `.onetool/onetool.yaml`
 ### 7. proxy server tools via direct run
 - `onetool direct run -c .onetool/onetool.yaml "ot.servers()"` — list configured proxy servers
 - Enable a proxy server then call a tool through it:
-  `onetool direct run -c .onetool/onetool.yaml "ot.server(enable='github'); ot.servers()"`
+  `onetool direct run -c .onetool/onetool.yaml "ot_servers.enable(name='github'); ot.servers()"`
 - Call a proxied tool: `onetool direct run -c .onetool/onetool.yaml "github.get_me()"`
   (may fail if not authenticated — capture error message)
-- Disable: `onetool direct run -c .onetool/onetool.yaml "ot.server(disable='github')"`
+- Disable: `onetool direct run -c .onetool/onetool.yaml "ot_servers.disable(name='github')"`
 - Via background server: start server, then call proxy tool without --config flag

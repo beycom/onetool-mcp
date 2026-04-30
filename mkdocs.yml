@@ -168,6 +168,7 @@ nav:
               - OT Image: reference/tools/ot_image.md
               - OT LLM: reference/tools/ot_llm.md
               - OT Secrets: reference/tools/ot_secrets.md
+              - OT Servers: reference/tools/ot_servers.md
               - OT Timer: reference/tools/ot_timer.md
           - Tools:
               - AWS: reference/tools/aws.md

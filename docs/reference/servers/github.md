@@ -16,7 +16,7 @@ github:
 Or enable for the current session only:
 
 ```python
-ot.server(enable="github")
+ot_servers.enable(name="github")
 ```
 
 ## Server Config

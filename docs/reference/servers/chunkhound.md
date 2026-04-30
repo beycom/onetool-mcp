@@ -16,7 +16,7 @@ chunkhound:
 Or enable for the current session only:
 
 ```python
-ot.server(enable="chunkhound")
+ot_servers.enable(name="chunkhound")
 ```
 
 ## Server Config

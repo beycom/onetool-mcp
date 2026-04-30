@@ -11,9 +11,9 @@ Do sanity testing and find issues.
 
 Enable proxy servers before testing (they start disconnected):
 ```
-ot.server(enable="github")
-ot.server(enable="playwright")
-ot.server(enable="chrome_devtools")
+ot_servers.enable(name="github")
+ot_servers.enable(name="playwright")
+ot_servers.enable(name="chrome_devtools")
 ```
 
 Test out the following packs:
@@ -96,7 +96,7 @@ Do sanity testing and find issues.
 Introspection & Discovery
 - ot.help() - general help overview
 - ot.help(query="...") - exact lookup (tool, pack, snippet, alias)
-- ot.help(query="...", info="list|min|full") - info levels
+- ot.help(query="...", info="min|default|full") - info levels
 - ot.tools() - list all tools
 - ot.tools(pattern="...") - filter by pattern/prefix
 - ot.packs() - list all packs
@@ -342,24 +342,24 @@ Test data locations:
 
 Disconnected servers can be enabled at runtime without restarting OneTool:
 ```python
-ot.server(enable="github")       # enable + connect
+ot_servers.enable(name="github")       # enable + connect
 ot.server(status="github")       # check a specific server
-ot.server(restart="playwright")  # reconnect an already-enabled server
+ot_servers.restart(name="playwright")  # reconnect an already-enabled server
 ot.servers()                     # list all with current status
 ```
-Changes are in-memory only (reset on server restart). Use `ot.server(disable="name")` to disconnect.
+Changes are in-memory only (reset on server restart). Use `ot_servers.disable(name="name")` to disconnect.
 
 - **chrome_devtools** (29 tools): Browser automation via Chrome DevTools Protocol
-  - Enable: `ot.server(enable="chrome_devtools")`
+  - Enable: `ot_servers.enable(name="chrome_devtools")`
   - Key tools: list_pages, navigate_page, take_snapshot, wait_for, list_console_messages
   - `devtools.wait_for()` requires `text=` parameter (not `selector=`). Example: `devtools.wait_for(text="Python")`
   - Note: if the server fails to connect, check config — may need `--isolated` flag or a running Chrome instance at `--remote-debugging-port=9222`
 - **github** (44 tools): GitHub API integration
-  - Enable: `ot.server(enable="github")`
+  - Enable: `ot_servers.enable(name="github")`
   - Key tools: search_repositories, get_me, list_commits, get_file_contents
   - Works with both personal and organizational repositories
 - **playwright** (21 tools): Browser automation via Playwright
-  - Enable: `ot.server(enable="playwright")`
+  - Enable: `ot_servers.enable(name="playwright")`
   - Key tools: browser_navigate, browser_snapshot, browser_click, browser_type
 
 ### Test ordering to avoid reload side effects
@@ -367,7 +367,7 @@ Changes are in-memory only (reset on server restart). Use `ot.server(disable="na
 - **Test context7 and ground BEFORE calling `$reload`** — `ot.reload()` clears
   env-based secrets (GEMINI_API_KEY, CONTEXT7_API_KEY), causing all ground and context7
   tools to fail in the same session. These tools only work on fresh server startup.
-- **Enable proxy servers early** — `ot.server(enable=...)` calls at the top of the session before testing github, playwright, chrome_devtools.
+- **Enable proxy servers early** — `ot_servers.enable(name=...)` calls at the top of the session before testing github, playwright, chrome_devtools.
 - **`mem.toc` / `mem.slice`** require `toc=True` at `mem.write` time. The section index
   is only built during write. Calling `mem.write(content="# Heading\n...", toc=True)` is
   required before `mem.toc()` or `mem.slice()` will return results.
@@ -376,7 +376,7 @@ Changes are in-memory only (reset on server restart). Use `ot.server(disable="na
 
 Test these first for fast coverage (one tool from each category):
 
-0. Enable proxy servers: `ot.server(enable="github"); ot.server(enable="playwright"); ot.server(enable="chrome_devtools")`
+0. Enable proxy servers: `ot_servers.enable(name="github"); ot_servers.enable(name="playwright"); ot_servers.enable(name="chrome_devtools")`
 1. `brave.search(query="test", count=2)` - web search
 2. `ripgrep.search(pattern="TODO", path=".", limit=3)` - file search
 3. `ot.health()` - introspection

@@ -16,7 +16,7 @@ playwright:
 Or enable for the current session only:
 
 ```python
-ot.server(enable="playwright")
+ot_servers.enable(name="playwright")
 ```
 
 ## Server Config

@@ -34,7 +34,7 @@ Short alias: `chrome`
 
 ## Requires
 
-- The `chrome_devtools` MCP server must be enabled in `servers.yaml` or via `ot.server(enable="chrome_devtools")`
+- The `chrome_devtools` MCP server must be enabled in `servers.yaml` or via `ot_servers.enable(name="chrome_devtools")`
 
 ## Configuration
 
@@ -56,7 +56,7 @@ chrome_devtools:
   enabled: true
 ```
 
-Or enable for the current session only: `ot.server(enable="chrome_devtools")`
+Or enable for the current session only: `ot_servers.enable(name="chrome_devtools")`
 
 ## Examples
 
