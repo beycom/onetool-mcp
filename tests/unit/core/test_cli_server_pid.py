@@ -107,3 +107,23 @@ class TestPidFile:
         da = self._direct_app()
         alive = da._is_process_alive(2_000_000)
         assert alive is False
+
+    def test_status_includes_config_and_secrets_when_present(self) -> None:
+        da = self._direct_app()
+        with (
+            patch("onetool.cli_commands.direct_app._read_pid_file", return_value={
+                "pid": 12345,
+                "port": 8765,
+                "started": 1000.0,
+                "log": "/tmp/direct.log",
+                "config": "/tmp/onetool.yaml",
+                "secrets": "/tmp/secrets.yaml",
+            }),
+            patch("onetool.cli_commands.direct_app._is_process_alive", return_value=True),
+            patch("onetool.cli_commands.direct_app.time.time", return_value=1010.0),
+            patch("onetool.cli_commands.direct_app.err_console") as mock_console,
+        ):
+            da.direct_status(port=8765)
+            message = mock_console.print.call_args[0][0]
+            assert "Config: /tmp/onetool.yaml" in message
+            assert "Secrets: /tmp/secrets.yaml" in message

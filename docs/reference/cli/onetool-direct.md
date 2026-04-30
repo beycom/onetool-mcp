@@ -31,7 +31,7 @@ onetool direct run [OPTIONS] [COMMAND]
 | `--format MODE` | `-f` | `json_h` | Output format: `json_h`, `json`, `yml`, `yml_h`, `raw` |
 | `--no-host` | | false | Skip server routing; always run in-process (requires --config) |
 | `--sanitize` | | false | Enable output sanitization (for AI pipeline use) |
-| `--timeout N` | `-t` | from config | Server request timeout in seconds (overrides `direct.timeout`) |
+| `--timeout N` | `-t` | from config | Server request timeout in seconds (overrides `direct.host.timeout`) |
 
 **Output formats:**
 
@@ -45,7 +45,12 @@ onetool direct run [OPTIONS] [COMMAND]
 
 Format is injected into the execution namespace as `__format__`. Exit code communicates success (0) or failure (1). No envelope wrapper.
 
-**Server routing:** without `--no-host`, `direct run` probes for a running execution server and routes to it if found. Falls back to in-process when none is detected. If `direct.host: enable` is set and no server is running, one is auto-started.
+**Secrets resolution:** direct commands resolve secrets in this order:
+1. `--secrets PATH`
+2. `OT_SECRETS_FILE` environment variable
+3. `<config_dir>/secrets.yaml` (when `--config` is provided and the file exists)
+
+**Server routing:** without `--no-host`, `direct run` probes for a running execution server and routes to it if found. Falls back to in-process when none is detected. When `--config` is provided, `direct.host.enabled: true` enables auto-start if no server is running. When routing to local host (`127.0.0.1`), if the running host context (config/secrets) does not match the current run context, the host is restarted automatically to sync context before command execution.
 
 **Exit codes:**
 
@@ -231,9 +236,11 @@ onetool direct start [OPTIONS]
 |------|-------|---------|-------------|
 | `--config PATH` | `-c` | — | Path to `onetool.yaml` |
 | `--secrets PATH` | `-s` | — | Path to secrets file |
-| `--port N` | `-p` | `direct.port` or `8765` | Port to listen on |
+| `--port N` | `-p` | `direct.host.port` or `8765` | Port to listen on |
 
 Starts the HTTP execution host as a daemon, then blocks until it is ready to accept connections (up to 5 seconds). PID and log are written to `~/.onetool/direct-server-{port}.pid` and `direct-server-{port}.log`.
+
+Secrets path resolution follows the same precedence as `direct run` (`--secrets`, `OT_SECRETS_FILE`, then `<config_dir>/secrets.yaml`).
 
 When `--config` is omitted, the host starts with no tools loaded (a warning is printed).
 
@@ -261,7 +268,7 @@ Show execution server status.
 onetool direct status [--port N]
 ```
 
-Prints to stderr: `Execution server running — PID <pid>, port <port>, uptime <N>s` followed by `Log: <path>`.
+Prints to stderr: `Execution host running — PID <pid>, port <port>, uptime <N>s` followed by `Config: <path>` and `Secrets: <path>` when available, and `Log: <path>`.
 
 Exit codes: `0` running, `1` not running.
 

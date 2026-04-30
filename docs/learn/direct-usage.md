@@ -74,20 +74,27 @@ echo "ot.version()" | onetool direct run --config onetool.yaml -
 |---|---|---|
 | **Performance** | Packs re-initialised on every call | Loaded once at startup — negligible per-call overhead |
 | **State persistence** | Starts fresh each call | Module-level state survives (whiteboard canvas, DB connections, caches) |
-| **Config** | `--config` required every call | Host owns the config; callers omit `--config` |
+| **Config** | `--config` required every call | Host owns the config; callers can omit `--config` after host start (pass it when you want run-time context sync) |
 | **Best for** | One-off calls | AI agents, scripts making many sequential calls |
 
 **When NOT to use host mode:** one-off calls (in-process is simpler), or environments where a persistent background process is undesirable (CI, containers).
 
-Add `direct.host: enable` to `onetool.yaml` to auto-start the host on first use — no manual `direct start` needed.
+`direct.host.enabled` defaults to `false` in `onetool.yaml`, so direct commands run in-process by default. Set `direct.host.enabled: true` to enable host optimization on first use.
 
 ---
 
 Starting an execution host keeps tool state alive between calls — tool packs stay loaded and module-level state (e.g. whiteboard sessions) persists across multiple `direct run` invocations.
 
+Secrets resolution for direct commands uses this precedence:
+1. `--secrets`
+2. `OT_SECRETS_FILE`
+3. `<config_dir>/secrets.yaml` (when present)
+
+When `direct run` routes to local host and detects host context mismatch (config/secrets) against the current call, it automatically restarts the host to sync context before execution.
+
 ```bash
 # Start the execution host (blocks until ready, then exits)
-onetool direct start --config .onetool/onetool.yaml
+onetool direct start --config .onetool/onetool.yaml --secrets .onetool/secrets.yaml
 
 # Confirm it's running
 onetool direct status
@@ -111,8 +118,8 @@ onetool direct stop
 **Multiple hosts** on different ports:
 
 ```bash
-onetool direct start --config project-a.yaml            # port 8765
-onetool direct start --config project-b.yaml --port 9000
+onetool direct start --config project-a.yaml --secrets project-a-secrets.yaml            # port 8765
+onetool direct start --config project-b.yaml --secrets project-b-secrets.yaml --port 9000
 
 onetool direct status --port 8765
 onetool direct status --port 9000
@@ -204,7 +211,7 @@ onetool direct run --config onetool.yaml "webfetch.fetch(url='...')" --sanitize 
 
 **For AI agents calling onetool direct:**
 
-1. Start the execution host once: `onetool direct start --config onetool.yaml`
+1. Start the execution host once: `onetool direct start --config onetool.yaml --secrets secrets.yaml`
 2. Run tools without `--config` (host handles state): `onetool direct run "pack.tool(...)"`
 3. Use `--format json` for machine-readable results
 4. Exit code 0 = success, 1 = tool error, 2 = config error

@@ -160,6 +160,7 @@ def _load_config(config: Path | None, secrets: Path | None) -> object:
         err_console.print(f"[red]Config error: file not found: {config}[/red]")
         raise typer.Exit(2)
 
+    secrets = _resolve_secrets_path(config, secrets)
     if secrets is not None and not secrets.exists():
         err_console.print(f"[red]Config error: secrets file not found: {secrets}[/red]")
         raise typer.Exit(2)
@@ -171,10 +172,93 @@ def _load_config(config: Path | None, secrets: Path | None) -> object:
         raise typer.Exit(2) from e
 
 
+def _resolve_secrets_path(config: Path | None, secrets: Path | None) -> Path | None:
+    """Resolve effective secrets path for direct CLI commands.
+
+    Precedence:
+    1) explicit --secrets
+    2) OT_SECRETS_FILE env var
+    3) <config_dir>/secrets.yaml if config is provided and file exists
+    4) None
+    """
+    if secrets is not None:
+        return secrets
+
+    env_path = os.getenv("OT_SECRETS_FILE")
+    if env_path:
+        return Path(env_path).expanduser()
+
+    if config is not None:
+        candidate = config.parent / "secrets.yaml"
+        if candidate.exists():
+            return candidate
+
+    return None
+
+
+def _needs_local_host_rebind(
+    *,
+    host: str,
+    port: int,
+    resolved_config: Path | None,
+    resolved_secrets: Path | None,
+) -> bool:
+    """Return True if local host context differs from requested run context."""
+    if host != "127.0.0.1":
+        return False
+    if resolved_config is None:
+        return False
+
+    info = _read_pid_file(port)
+    if info is None:
+        return False
+
+    pid = info.get("pid")
+    if not isinstance(pid, int) or not _is_process_alive(pid):
+        return False
+
+    def _normalize_path(value: str | Path | None) -> str | None:
+        if value is None:
+            return None
+        return str(Path(value).expanduser().resolve())
+
+    running_config = _normalize_path(info.get("config"))
+    running_secrets = _normalize_path(info.get("secrets"))
+    want_config = _normalize_path(resolved_config)
+    want_secrets = _normalize_path(resolved_secrets)
+    return running_config != want_config or running_secrets != want_secrets
+
+
+def _restart_local_host_with_context(
+    *,
+    port: int,
+    config: Path | None,
+    secrets: Path | None,
+) -> None:
+    """Restart local execution host with the requested config/secrets context."""
+    info = _read_pid_file(port)
+    if info is not None:
+        pid = info.get("pid")
+        if isinstance(pid, int) and _is_process_alive(pid):
+            try:
+                _kill_pid(pid)
+                time.sleep(0.3)
+            except Exception as e:
+                err_console.print(f"[yellow]Warning: could not stop existing server:[/yellow] {e}")
+        _remove_pid_file(port)
+
+    err_console.print("[dim]Restarting execution host to sync config/secrets context...[/dim]")
+    _start_host(config, secrets, port)
+
+
 def _load_config_optional(config: Path | None, secrets: Path | None) -> None:
     """Load config if provided; silently skip if None."""
     if config is None:
         return
+    secrets = _resolve_secrets_path(config, secrets)
+    if secrets is not None and not secrets.exists():
+        err_console.print(f"[red]Config error: secrets file not found: {secrets}[/red]")
+        raise typer.Exit(2)
     import ot.logging  # noqa: F401
     from ot.config.loader import get_config
     try:
@@ -327,7 +411,11 @@ def direct_run(
     ] = False,
     timeout_opt: Annotated[
         int | None,
-        typer.Option("--timeout", "-t", help="Server request timeout in seconds (overrides direct.timeout)"),
+        typer.Option(
+            "--timeout",
+            "-t",
+            help="Server request timeout in seconds (overrides direct.host.timeout)",
+        ),
     ] = None,
 ) -> None:
     """Execute a tool command from the shell.
@@ -336,7 +424,7 @@ def direct_run(
     Pass '-' to read from stdin, or a path to an existing .py file.
 
     Without --no-host, probes for a running execution host and routes to it if
-    found. If direct.host: enable is set in config and no host is running, the
+    found. If direct.host.enabled: true is set in config and no host is running, the
     server is auto-started before routing.
 
     Examples:
@@ -357,32 +445,28 @@ def direct_run(
         err_console.print("[red]Error: no command provided.[/red]")
         raise typer.Exit(2)
 
+    resolved_secrets = _resolve_secrets_path(config, secrets)
+    if resolved_secrets is not None and not resolved_secrets.exists():
+        err_console.print(f"[red]Config error: secrets file not found: {resolved_secrets}[/red]")
+        raise typer.Exit(2)
+
     full_cmd = _build_command_with_meta(cmd_str, fmt, sanitize)
 
     # Routing: probe for server (unless --no-host)
     if not no_host:
         host = "127.0.0.1"
         port = _DEFAULT_PORT
-        timeout = 60
+        timeout = 120
         auto_start = False
 
         if config is not None and config.exists():
             try:
                 import ot.logging  # noqa: F401
                 from ot.config.loader import get_config
-                cfg = get_config(config, secrets_path=secrets)
-                port = cfg.direct.port
-                timeout = cfg.direct.timeout
-                if cfg.direct.host == "enable":
-                    auto_start = True
-                elif cfg.direct.host is not None:
-                    # HOST:PORT for remote routing
-                    parts = cfg.direct.host.rsplit(":", 1)
-                    if len(parts) == 2:
-                        host = parts[0]
-                        port = int(parts[1])
-                    else:
-                        host = cfg.direct.host
+                cfg = get_config(config, secrets_path=resolved_secrets)
+                port = cfg.direct.host.port
+                timeout = cfg.direct.host.timeout
+                auto_start = cfg.direct.host.enabled
             except Exception as e:
                 err_console.print(f"[yellow]Warning: could not read config for routing: {e}[/yellow]")
 
@@ -390,6 +474,17 @@ def direct_run(
             timeout = timeout_opt
 
         if _tcp_probe(host, port):
+            if _needs_local_host_rebind(
+                host=host,
+                port=port,
+                resolved_config=config,
+                resolved_secrets=resolved_secrets,
+            ):
+                _restart_local_host_with_context(
+                    port=port,
+                    config=config,
+                    secrets=resolved_secrets,
+                )
             try:
                 result_text, success = _run_via_server(full_cmd, host, port, timeout=timeout)
                 print(result_text)
@@ -404,7 +499,7 @@ def direct_run(
             # Start the execution host with the same config, then route
             err_console.print("[dim]Starting execution host...[/dim]")
             try:
-                _start_host(config, secrets, port)
+                _start_host(config, resolved_secrets, port)
             except typer.Exit:
                 raise
             except Exception as e:
@@ -421,7 +516,7 @@ def direct_run(
                 raise typer.Exit(1) from e
 
     # In-process execution
-    _load_config(config, secrets)
+    _load_config(config, resolved_secrets)
 
     try:
         result_text, success = _run_in_process(full_cmd)
@@ -779,7 +874,7 @@ def direct_start(
     ] = None,
     port: Annotated[
         int | None,
-        typer.Option("--port", "-p", help="Port to listen on (overrides direct.port in config)"),
+        typer.Option("--port", "-p", help="Port to listen on (overrides direct.host.port in config)"),
     ] = None,
 ) -> None:
     """Start the HTTP execution host.
@@ -788,12 +883,17 @@ def direct_start(
     PID and log are written to ~/.onetool/direct-server-{port}.pid and direct-server-{port}.log.
 
     Use 'onetool direct run' to route commands to the running host.
-    Set direct.host: enable in onetool.yaml to auto-start the host on first use.
+    Set direct.host.enabled: true in onetool.yaml to auto-start the host on first use.
 
     Examples:
         onetool direct start --config .onetool/onetool.yaml
         onetool direct start --config .onetool/onetool.yaml --port 9000
     """
+    resolved_secrets = _resolve_secrets_path(config, secrets)
+    if resolved_secrets is not None and not resolved_secrets.exists():
+        err_console.print(f"[red]Config error: secrets file not found: {resolved_secrets}[/red]")
+        raise typer.Exit(2)
+
     if config is None:
         err_console.print(
             "[yellow]Warning: no --config provided; starting with no tools loaded[/yellow]"
@@ -804,9 +904,9 @@ def direct_start(
         try:
             import ot.logging  # noqa: F401
             from ot.config.loader import get_config
-            cfg = get_config(config, secrets_path=secrets)
+            cfg = get_config(config, secrets_path=resolved_secrets)
             if resolved_port is None:
-                resolved_port = cfg.direct.port
+                resolved_port = cfg.direct.host.port
         except Exception as e:
             err_console.print(f"[red]Config error:[/red] {e}")
             raise typer.Exit(2) from e
@@ -814,7 +914,7 @@ def direct_start(
     if resolved_port is None:
         resolved_port = _DEFAULT_PORT
 
-    _start_host(config, secrets, resolved_port)
+    _start_host(config, resolved_secrets, resolved_port)
 
 
 # ---------------------------------------------------------------------------
@@ -888,7 +988,13 @@ def direct_status(
         uptime = "unknown"
 
     log = info.get("log")
+    config_path = info.get("config")
+    secrets_path = info.get("secrets")
     msg = f"Execution host running — PID {pid}, port {port_val}, uptime {uptime}"
+    if config_path:
+        msg += f"\nConfig: {config_path}"
+    if secrets_path:
+        msg += f"\nSecrets: {secrets_path}"
     if log:
         msg += f"\nLog: {log}"
     err_console.print(msg)
@@ -942,7 +1048,12 @@ def direct_restart(
         err_console.print("No execution host running; starting fresh")
         resolved_port = port if port is not None else _DEFAULT_PORT
 
-    _start_host(config, secrets, resolved_port)
+    resolved_secrets = _resolve_secrets_path(config, secrets)
+    if resolved_secrets is not None and not resolved_secrets.exists():
+        err_console.print(f"[red]Config error: secrets file not found: {resolved_secrets}[/red]")
+        raise typer.Exit(2)
+
+    _start_host(config, resolved_secrets, resolved_port)
 
 
 # ---------------------------------------------------------------------------

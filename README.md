@@ -92,7 +92,7 @@ Works as an MCP server **and** as a direct CLI — no MCP client needed. Useful 
 
 ```bash
 # Start a persistent execution host (keeps tool state across calls)
-onetool direct start --config ~/.onetool/onetool.yaml
+onetool direct start --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
 
 # Run any tool — JSON output, pipeable to jq
 onetool direct run "ot.packs()" --format json | jq '.[0].name'
@@ -256,4 +256,3 @@ If you find OneTool useful:
 ## License
 
 GPLv3
-
