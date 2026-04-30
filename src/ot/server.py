@@ -40,13 +40,17 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
 from fastmcp import Context, FastMCP
-from fastmcp.tools.tool import ToolResult
+from fastmcp.tools import ToolResult
 from loguru import logger
 
 from ot.config.loader import get_config, get_loaded_config_path, get_loaded_secrets_path
 from ot.executor import SimpleExecutor, execute_command
 from ot.executor.runner import prepare_command
 from ot.logging import LogSpan, configure_logging
+from ot.logging.mcp_logging import (
+    map_mcp_logging_level,
+    register_set_logging_level_handler,
+)
 from ot.prompts import get_prompts, get_tool_description, get_tool_examples
 from ot.proxy import get_proxy_manager
 from ot.registry import get_registry
@@ -367,30 +371,20 @@ mcp = FastMCP(
 # =============================================================================
 
 
-@mcp._mcp_server.set_logging_level()  # type: ignore[no-untyped-call,untyped-decorator]
 async def handle_set_logging_level(level: str) -> None:
     """Handle logging/setLevel requests from MCP clients.
 
     Allows clients to dynamically change the server's log level.
     """
-    # Map MCP LoggingLevel to Python logging levels
-    level_map = {
-        "debug": "DEBUG",
-        "info": "INFO",
-        "notice": "INFO",  # MCP notice -> INFO
-        "warning": "WARNING",
-        "error": "ERROR",
-        "critical": "CRITICAL",
-        "alert": "CRITICAL",  # MCP alert -> CRITICAL
-        "emergency": "CRITICAL",  # MCP emergency -> CRITICAL
-    }
-
-    log_level = level_map.get(str(level).lower(), "INFO")
+    log_level = map_mcp_logging_level(level)
     logger.info(f"Log level change requested: {level} -> {log_level}")
 
     # Reconfigure logging with new level
     configure_logging(log_name="serve", level=log_level)
     logger.info(f"Logging reconfigured at level {log_level}")
+
+
+register_set_logging_level_handler(mcp, handle_set_logging_level)
 
 
 # =============================================================================
