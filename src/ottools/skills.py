@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 __all__ = ["skills"]
+_VALID_INFO_LEVELS = {"min", "default", "full"}
 
 
 def _get_skills_dir() -> Path:
@@ -82,7 +83,7 @@ def _load_skill_index() -> dict[str, tuple[dict[str, Any], str]]:
 def skills(
     name: str | None = None,
     pattern: str | None = None,
-    info: str = "min",
+    info: str = "default",
 ) -> str:
     """List available skills or retrieve a skill's body content.
 
@@ -91,7 +92,7 @@ def skills(
     Args:
         name: Skill name to retrieve body for (e.g., "ot-guide")
         pattern: Filter skills by substring match on name
-        info: Detail level — "list" (names only), "min" (+ description, default), "full" (everything)
+        info: Detail level — "min" (names only), "default" (+ description), "full" (everything)
 
     Returns:
         Skill body if name= provided; formatted list of skills otherwise
@@ -103,6 +104,9 @@ def skills(
         skills(info="full")                       # full info for each skill
     """
     with LogSpan(span="skills.list") as s:
+        if info not in _VALID_INFO_LEVELS:
+            raise ValueError(f"info={info!r} is not valid. Use 'min', 'default', or 'full'.")
+
         index: dict[str, tuple[dict[str, Any], str]] = {**_load_skill_index()}
 
         if name is not None:
@@ -126,7 +130,7 @@ def skills(
                 continue
             description = fm.get("description", "")
             source = fm.get("source", "bundled")
-            if info == "list":
+            if info == "min":
                 results.append(stem)
             elif info == "full":
                 tags = fm.get("tags", [])
@@ -137,7 +141,7 @@ def skills(
                     else f"  path: {skills_dir / f'{stem}.md'}"
                 )
                 results.append(f"- {stem}: {description}{tags_str}\n{source_str}")
-            else:  # "min" (default)
+            else:  # "default"
                 results.append(f"- {stem}: {description}")
 
         if not results:

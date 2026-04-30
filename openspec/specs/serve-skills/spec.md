@@ -15,6 +15,14 @@ The system SHALL provide an `ot.skills()` function that lists available bundled 
 - **THEN** it SHALL return a formatted list of all bundled skills
 - **AND** each entry SHALL include the skill name and description
 
+#### Scenario: Min info level
+- **WHEN** `ot.skills(info="min")` is called
+- **THEN** it SHALL return skill names only
+
+#### Scenario: Default info level
+- **WHEN** `ot.skills(info="default")` is called
+- **THEN** it SHALL return skill name and description for each entry
+
 #### Scenario: Filter by pattern
 - **WHEN** `ot.skills(pattern="devtools")` is called
 - **THEN** it SHALL return only skills whose name contains "devtools"
@@ -22,6 +30,10 @@ The system SHALL provide an `ot.skills()` function that lists available bundled 
 #### Scenario: Full info level
 - **WHEN** `ot.skills(info="full")` is called
 - **THEN** it SHALL return name, description, tags, and source path for each skill
+
+#### Scenario: Invalid info level
+- **WHEN** `ot.skills(info="list")` is called
+- **THEN** it SHALL raise a ValueError indicating valid levels are `min`, `default`, and `full`
 
 #### Scenario: No skills match pattern
 - **WHEN** `ot.skills(pattern="nonexistent")` is called

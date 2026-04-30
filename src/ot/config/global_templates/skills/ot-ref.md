@@ -1,94 +1,64 @@
 ---
 name: ot-ref
-description: OneTool reference — error recovery, security, output control, parameter traps
+description: Optional OneTool advanced reference — recovery loops, proxy handling, security, ctx traps
 tags: [reference, cheatsheet]
 ---
 
-# OneTool Reference
+# OneTool Advanced Reference
 
-## Error Recovery
+`ot-ref` is optional. Base run instructions are sufficient for normal OneTool use.
 
-When a call fails, introspect before guessing:
-- Unknown tool? → `ot.tools(pattern="name")` or `ot.packs(pattern="name")`
-- Wrong args? → `ot.tool_info(name="pack.tool")` for signature + args — short aliases work (e.g. `ctx.ask` resolves to `ot_context.ask`)
-- General confusion? → `ot.help(query="topic")`
-- If introspection fails → report the error, don't guess or compute results yourself
+## Fast Recovery (fail-first)
 
-## Security
+1. Execute requested `pack.tool(...)` call.
+2. If it fails, inspect once with `ot.tool_info(name='pack.tool')`.
+3. If unknown/missing tool, check `ot.tools(pattern='name')` or `ot.packs(pattern='name')`.
+4. If still unclear, run `ot.help(query='topic')`.
+5. Retry once with corrected kwargs. Do not guess beyond one retry.
 
-- Python glue between tool calls works: variables, dicts, list comprehensions
-- Arbitrary imports are blocked — use pack tools instead
-- Check rules: `ot.security()` — check a name: `ot.security(check="json")`
+## Proxy Server Recovery
 
-## Output Control
+- Known disconnected server: `ot_servers.enable(name='github')` then retry once.
+- Unknown server name/status: `ot.servers()` first, then enable.
+- Discovery stays read-only in `ot.*`; state changes are in `ot_servers.*`.
+
+## Security Boundaries
+
+- Python glue is allowed (variables, dict/list transforms, last-expression returns).
+- Arbitrary imports are blocked; use pack tools instead.
+- Check policy: `ot.security()` or `ot.security(check='json')`.
+
+## Output Controls
 
 ```python
-__format__ = "yml_h"; brave.search(query="test")
-__format__ = "json"; file.read(path="data.json")
-__sanitize__ = False; file.read(path="config.yaml")
+__format__ = 'yml_h'; ot.help(query='search')
 ```
 
-Formats: `json` (default), `json_h` (pretty), `yml` (flow), `yml_h` (block), `text`
+Supported `__format__` values: `json`, `json_h`, `yml`, `yml_h`, `raw`.
 
-## Multi-Step Patterns
+Runtime dunders:
+- `__format__`: controls result serialization format (`json`, `json_h`, `yml`, `yml_h`, `raw`).
+- `__sanitize__`: toggles output sanitization (default from config). IMPORTANT use `False` only when you explicitly need raw output and trust the source.
+- `__compact__`: compacts final serialized output (default from config).
+- `__force_context__`: forces result to be stored in ctx and returned as a handle.
 
-Return the last expression to get results from chained calls:
+## ctx Handle Trap + Navigation Hints
 
+Large results may return:
 ```python
-x = brave.search(query="topic A")
-y = brave.search(query="topic B")
-{"a": x, "b": y}
+{'handle': 'b2d18a1b', ...}
 ```
 
-## Pack Extras
-
-Not all packs are installed by default.
-
-| Extra   | Packs                                                 |
-|---------|-------------------------------------------------------|
-| (core)  | mem, ot_llm, ot, package.audit                        |
-| [util]  | brave, convert, excel, file, ground                   |
-| [dev]   | context7, db, diagram, package, ripgrep, webfetch |
-
-Check loaded packs: `ot.packs()`. Install: `pip install onetool-mcp[util]`.
-
-## ctx Handles
-
-Large tool results are offloaded to ctx automatically and returned as a handle dict:
+Always pass the string handle, not the dict:
 ```python
-{"handle": "b2d18a1b", "format": "json", "size_bytes": 4200, ...}
-```
-
-**`handle` is the string ID — never pass the dict to ctx tools.**
-
-```python
-# WRONG — crashes with "File name too long" or "Handle not found: {'handle': ...}"
-h = ot.tool_info(pattern='figma')
-ctx.grep(h, pattern='page')
-
-# RIGHT — extract the string ID first
 h = ot.tool_info(pattern='figma')
 ctx.grep(handle=h['handle'], pattern='page')
 ```
 
-Navigate a handle:
-```python
-ctx.toc(handle=h['handle'])                           # structure overview
-ctx.slice(handle=h['handle'], select='10:50')         # line range (colon, NOT dash)
-ctx.slice(handle=h['handle'], select='#3')            # 3rd section by number
-ctx.slice(handle=h['handle'], select='SectionName')   # markdown section by heading
-ctx.query(handle=h['handle'], expr='key.path')        # json/yaml jmespath
-ctx.grep(handle=h['handle'], pattern='error')         # regex search
-ctx.read(handle=h['handle'], offset=1, limit=50)      # paginated raw lines
-ctx.ask(handle=h['handle'], q='What is X?')           # LLM question
-```
-
-## Parameter Traps
-
-Common wrong parameter names. When a call fails, check: `ot.tool_info(name="pack.tool")`
-
-| Call | Correct | Common mistake |
-|------|---------|----------------|
-| `ctx.ask(handle=h, q='...')` | `q=` | `question=` |
-| `ctx.query(handle=h, expr='...')` | `expr=` | `query=` |
-| `ot_image.load(img='...')` | `img=` | `path=` |
+Quick context flow:
+- `ctx.toc(handle=...)`: first pass map of sections.
+- `ctx.read(handle=..., offset=1, limit=50)`: paginated raw lines.
+- `ctx.slice(handle=..., select='10:50')`: pull exact line range.
+- `ctx.grep(handle=..., pattern='error')`: targeted search before asking.
+- `ctx.query(handle=..., expr='key.path')`: structured JSON/YAML access.
+- `ctx.ask(handle=..., q='What changed?')`: summarize or answer questions from stored content.

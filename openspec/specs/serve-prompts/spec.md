@@ -57,11 +57,12 @@ The system SHALL support externalised server instructions with a minimal footpri
 #### Scenario: Instructions are concise
 - **WHEN** the server builds the handshake instructions
 - **THEN** the resulting prompt SHALL contain at most 35 lines
-- **AND** SHALL include: identity line, trigger aliases (`>>>`, `__run`, `mcp__onetool__run`), pass-through rule, keyword-args rule, batch rule, discovery hint (`>>> ot.help(query="...")`), external content boundary warning, and tool output directive
+- **AND** SHALL include: identity line, trigger aliases (`>>>`, `__run`, `mcp__onetool__run`), pass-through rule, keyword-args rule, batch rule, discovery hint (`>>> ot.help(query="...")`), proxy recovery guidance (`ot_servers.enable(name="...")` then retry once when name is known; `ot.servers()` when unknown), external content boundary warning, and tool output directive
 
 #### Scenario: Discovery hint present
 - **WHEN** an agent is lost or encountering errors
 - **THEN** the prompt SHALL direct the agent to run `>>> ot.help(query="topic")` for discovery
+- **AND** MAY include `ot.skills(name="ot-ref")` as an optional extended reference path
 
 ### Requirement: Two-Mode Execution Model
 
@@ -213,6 +214,13 @@ The system SHALL support tool-specific descriptions and examples with minimal re
 - **WHEN** the run tool is registered
 - **THEN** it SHALL use the custom description
 
+#### Scenario: Run description includes proxy + reference guidance
+- **GIVEN** default prompts configuration
+- **WHEN** run tool description is generated
+- **THEN** it SHALL include discovery references to `ot.help(...)` and `ot.tool_info(...)`
+- **AND** it SHALL include proxy enable guidance (`ot_servers.enable(name="...")` → retry once)
+- **AND** it MAY include `ot.skills(name="ot-ref")` as an optional advanced reference
+
 #### Scenario: Tool examples
 - **GIVEN** prompts.yaml with `tools.run.examples: ["example1", "example2"]`
 - **WHEN** tool descriptions are formatted
@@ -242,6 +250,6 @@ The system SHALL support tool-specific descriptions and examples with minimal re
 **Reason:** Replaced by the new Trigger Hierarchy requirement, which documents the full `>>>` / `__run` / `mcp__onetool__run` / legacy hierarchy with rationale.
 
 ### Requirement: Discovery functions documented
-**Reason:** Discovery reference material is too detailed for the always-on prompt. Moved to the `ot-ref` skill, retrieved on-demand via `ot.skills(name="ot-ref")`.
+**Reason:** Discovery reference material is too detailed for the always-on prompt. Core guidance remains in always-on instructions; advanced edge cases live in `ot-ref`.
 
-**Migration:** Agents can access discovery guidance by invoking the `ot-ref` skill or running `>>> ot.help(query="topic")`.
+**Migration:** Agents can run `>>> ot.help(query="topic")` directly for discovery. `ot-ref` remains optional.

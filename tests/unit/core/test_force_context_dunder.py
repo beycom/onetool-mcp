@@ -153,6 +153,53 @@ class TestForceContextDunder:
         mock_write.assert_not_called()
         assert "ctx result" in result.result
 
+    def test_force_context_true_ot_help_exempt(self):
+        """Discovery calls ot.help/ot.tool_info stay inline even when forced."""
+        cfg = _make_config(max_inline_size=10)
+
+        with (
+            patch("ot.executor.runner.get_config", return_value=cfg),
+            patch("ot.executor.runner.load_tool_registry"),
+            patch("ot.executor.runner.build_execution_namespace", return_value={}),
+            patch("ot.proxy.get_proxy_manager") as mock_pm,
+            patch("ot.ctx.write.ctx_write") as mock_write,
+            patch(
+                "ot.executor.runner.execute_python_code",
+                return_value=('{"help":"value"}', None, False, "json", True),
+            ),
+        ):
+            mock_pm.return_value.servers = {}
+            from ot.executor.runner import execute_command
+
+            result = asyncio.run(execute_command("ot.help(query='proxy')"))
+
+        assert result.success, f"Command failed: {result.result}"
+        mock_write.assert_not_called()
+        assert "help" in result.result
+
+    def test_deflect_summary_includes_next_commands(self):
+        """Handle summary includes deterministic next commands."""
+        cfg = _make_config(max_inline_size=10)
+
+        with (
+            patch("ot.executor.runner.get_config", return_value=cfg),
+            patch("ot.executor.runner.load_tool_registry"),
+            patch("ot.executor.runner.build_execution_namespace", return_value={}),
+            patch("ot.proxy.get_proxy_manager") as mock_pm,
+            patch("ot.ctx.write.ctx_write", side_effect=_fake_ctx_write),
+        ):
+            mock_pm.return_value.servers = {}
+            from ot.executor.runner import execute_command
+
+            result = asyncio.run(execute_command("'this output will be deflected because threshold is tiny'"))
+
+        assert result.success, f"Command failed: {result.result}"
+        parsed = json.loads(result.result)
+        assert "next_commands" in parsed
+        assert parsed["next_commands"][0].startswith("ctx.toc(handle='")
+        assert "ctx.ask(handle='" in parsed["next_commands"][1]
+        assert "ctx.read(handle='" in parsed["next_commands"][2]
+
     def test_force_context_and_compact_compacts_then_stores(self):
         """4.5 — __compact__ = True + __force_context__ = True → compacted output stored."""
         cfg = _make_config(max_inline_size=5000, compact=False)
@@ -181,3 +228,49 @@ class TestForceContextDunder:
         )
         parsed = json.loads(result.result)
         assert "handle" in parsed
+
+    def test_discovery_calls_keep_json_default(self):
+        """Discovery calls keep compact JSON as default format."""
+        cfg = _make_config(max_inline_size=5000)
+
+        with (
+            patch("ot.executor.runner.get_config", return_value=cfg),
+            patch("ot.executor.runner.load_tool_registry"),
+            patch("ot.executor.runner.build_execution_namespace", return_value={}),
+            patch("ot.proxy.get_proxy_manager") as mock_pm,
+            patch(
+                "ot.executor.runner.execute_python_code",
+                return_value=('{"name":"ot.help"}', None, False, "json", False),
+            ) as mock_exec,
+        ):
+            mock_pm.return_value.servers = {}
+            from ot.executor.runner import execute_command
+
+            result = asyncio.run(execute_command("ot.help(query='proxy')"))
+
+        assert result.success, f"Command failed: {result.result}"
+        assert mock_exec.call_args is not None
+        assert mock_exec.call_args.kwargs["default_format"] == "json"
+
+    def test_non_discovery_calls_keep_json_default(self):
+        """Non-discovery calls keep compact JSON as default format."""
+        cfg = _make_config(max_inline_size=5000)
+
+        with (
+            patch("ot.executor.runner.get_config", return_value=cfg),
+            patch("ot.executor.runner.load_tool_registry"),
+            patch("ot.executor.runner.build_execution_namespace", return_value={}),
+            patch("ot.proxy.get_proxy_manager") as mock_pm,
+            patch(
+                "ot.executor.runner.execute_python_code",
+                return_value=('{"ok":true}', None, False, "json", False),
+            ) as mock_exec,
+        ):
+            mock_pm.return_value.servers = {}
+            from ot.executor.runner import execute_command
+
+            result = asyncio.run(execute_command("brave.search(query='python')"))
+
+        assert result.success, f"Command failed: {result.result}"
+        assert mock_exec.call_args is not None
+        assert mock_exec.call_args.kwargs["default_format"] == "json"

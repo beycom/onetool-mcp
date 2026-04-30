@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from difflib import SequenceMatcher
+from typing import Any, Literal
 
 from ot.config import get_config
 from ot.logging import LogSpan
@@ -21,13 +22,63 @@ from ot.meta._help_formatting import (
 )
 from ot.meta._introspection import aliases, snippets
 
-if TYPE_CHECKING:
-    from ot.meta._constants import InfoLevel
-
 log = LogSpan
 
+_VALID_HELP_INFO = {"min", "default", "full"}
+HelpInfoLevel = Literal["min", "default", "full"]
 
-def help(*, query: str = "", info: InfoLevel = "default") -> str:
+
+def _score_candidate(query: str, candidate: str) -> float:
+    """Score candidate text against a query."""
+    query_l = query.lower().strip()
+    cand_l = candidate.lower().strip()
+    if not query_l or not cand_l:
+        return 0.0
+    if query_l in cand_l:
+        return 1.0
+    return SequenceMatcher(None, query_l, cand_l).ratio()
+
+
+def _score_named_result(query: str, name: str, description: str = "") -> float:
+    """Score a named item using both name and description."""
+    name_score = _score_candidate(query, name)
+    desc_score = _score_candidate(query, description)
+
+    # Description matches should surface, but names remain strongest.
+    best = max(name_score, desc_score * 0.95)
+
+    # Token coverage gives partial credit for multi-word intent queries.
+    query_terms = [t for t in query.lower().split() if t]
+    if query_terms:
+        haystack = f"{name} {description}".lower()
+        covered = sum(1 for term in query_terms if term in haystack)
+        if covered:
+            coverage = covered / len(query_terms)
+            best = max(best, 0.65 + (0.25 * coverage))
+
+    return best
+
+
+def _rank_named_items(
+    query: str, items: list[dict[str, Any] | str], *, desc_key: str = "description", threshold: float = 0.6
+) -> list[str]:
+    """Return matched item names sorted by score (best first)."""
+    scored: list[tuple[str, float]] = []
+    for item in items:
+        if isinstance(item, str):
+            name = item
+            description = ""
+        else:
+            name = str(item.get("name", ""))
+            description = str(item.get(desc_key, "") or "")
+        score = _score_named_result(query, name, description)
+        if score >= threshold:
+            scored.append((name, score))
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return [name for name, _ in scored]
+
+
+def help(*, query: str = "", info: HelpInfoLevel = "default") -> str:
     """Get help on OneTool commands, tools, packs, snippets, or aliases.
 
     Provides a unified entry point for discovering and getting help on
@@ -50,6 +101,9 @@ def help(*, query: str = "", info: InfoLevel = "default") -> str:
         ot.help(query="$b_q")
         ot.help(query="web fetch", info="min")
     """
+    if info not in _VALID_HELP_INFO:
+        raise ValueError(f"info={info!r} is not valid. Use 'min', 'default', or 'full'.")
+
     with log(span="ot.help", query=query or None, info=info) as s:
         # No query - show general help
         if not query:
@@ -133,11 +187,11 @@ def help(*, query: str = "", info: InfoLevel = "default") -> str:
         all_aliases = aliases()
         all_server_names: list[str] = servers(info="min")  # type: ignore[assignment]
 
-        # Fuzzy match across types
-        matched_tools = _fuzzy_match(query, [t["name"] if isinstance(t, dict) else t for t in all_tools])
-        matched_packs = _fuzzy_match(query, [p["name"] if isinstance(p, dict) else p for p in all_packs])
-        matched_snippets = _fuzzy_match(query, [sn["name"] if isinstance(sn, dict) else sn for sn in all_snippets])
-        matched_aliases = _fuzzy_match(query, [a["name"] if isinstance(a, dict) else a for a in all_aliases])
+        # Fuzzy match across types (name + description where available)
+        matched_tools = _rank_named_items(query, all_tools)
+        matched_packs = _rank_named_items(query, all_packs)
+        matched_snippets = _rank_named_items(query, all_snippets)
+        matched_aliases = _rank_named_items(query, all_aliases, desc_key="target")
         matched_servers = _fuzzy_match(query, all_server_names)
 
         total_matches = (

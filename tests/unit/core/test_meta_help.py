@@ -84,6 +84,39 @@ class TestHelp:
         assert "ot.tools()" in result
         assert "ot.packs()" in result
 
+    def test_proxy_query_matches_server_tools_by_description(self) -> None:
+        """Description matching surfaces proxy/server discovery tools."""
+        from ot.meta import help
+
+        result = help(query="proxy")
+
+        assert "Search results" in result
+        assert "ot.server" in result
+        assert "ot.servers" in result
+
+    def test_server_intent_no_match_shows_enable_flow(self) -> None:
+        """No-match server intent includes enable guidance."""
+        from ot.meta import _format_search_results
+
+        result = _format_search_results(
+            query="proxy enable flow",
+            tools_results=[],
+            packs_results=[],
+            snippets_results=[],
+            aliases_results=[],
+            info="default",
+        )
+
+        assert "ot.servers()" in result
+        assert "ot_servers.enable(name=\"github\")" in result
+
+    def test_info_level_list_rejected(self) -> None:
+        """info='list' is invalid for ot.help()."""
+        from ot.meta import help
+
+        with pytest.raises(ValueError, match="info='list' is not valid"):
+            help(query="search", info="list")  # type: ignore[arg-type]
+
     def test_info_level_min(self) -> None:
         """info='min' returns names only in search results."""
         from ot.meta import help

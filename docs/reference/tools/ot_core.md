@@ -19,7 +19,11 @@ Core tools for OneTool introspection and management.
 | `ot.packs(pattern, info)` | List packs (local + MCP), filter by pattern |
 | `ot.pack_info(name, info)` | Get detailed info for a specific pack |
 | `ot.servers(pattern, info)` | List MCP proxy servers, filter by pattern |
-| `ot.server(status, enable, disable, restart)` | Manage runtime proxy server state |
+| `ot.server(status)` | Read-only runtime proxy server view |
+| `ot_servers.enable(name)` | Enable and connect one proxy server |
+| `ot_servers.disable(name)` | Disable and disconnect one proxy server |
+| `ot_servers.restart(name)` | Reconnect one proxy server |
+| `ot_servers.status(name)` | Detailed status for one proxy server |
 | `ot.aliases(pattern, info)` | List aliases, filter by pattern |
 | `ot.snippets(pattern, info)` | List snippets, filter by pattern |
 | `ot.snippet_info(name, pattern, info)` | Get full definition for a specific snippet |
@@ -63,6 +67,9 @@ All discovery functions (`help`, `tools`, `tool_info`, `packs`, `pack_info`, `al
 - **List functions** (`tools`, `packs`, `aliases`, `snippets`): return many items compactly; `default` gives `{name, description}`.
 - **Detail functions** (`tool_info`, `pack_info`, `snippet_info`): return deep info like signatures, args, body; `default` gives `{name, signature, args, description, source}`.
 
+When called through `run` with no explicit `__format__`, results default to compact JSON (`json`).
+Set `__format__` explicitly to override (for example `json_h`, `yml`, or `yml_h`).
+
 ## ot.help()
 
 Unified help entry point - search across tools, packs, servers, snippets, and aliases.
@@ -100,8 +107,8 @@ ot.help(query="search", info="min")
 - Exact pack match: Returns pack help with instructions and tool list
 - Snippet match (starts with `$`): Returns snippet definition with params and body
 - Alias match: Returns alias mapping and target description
-- Fuzzy matches: Groups results by type (Tools, Packs, Snippets, Aliases)
-- No matches: Suggests using `ot.tools()`, `ot.packs()`, `ot.servers()`, etc. to browse
+- Fuzzy matches: Groups results by type (Tools, Packs, Snippets, Aliases, Servers) and matches name + description intent
+- No matches: Suggests `ot.tools()`, `ot.packs()`, `ot.servers()`, etc. to browse; server/proxy intent also includes `ot_servers.enable(name="...")` recovery
 
 The `info` parameter controls detail level for all search results.
 
@@ -197,7 +204,7 @@ For guidance, instructions, and examples, use `ot.help(query="<server_name>")` i
 
 ## ot.server()
 
-Manage runtime proxy server state. All changes are in-memory only and reset when OneTool restarts.
+Read-only runtime proxy server view.
 
 ```python
 # List all servers with status
@@ -206,17 +213,16 @@ ot.server()
 # Show detailed status for a server
 ot.server(status="devtools")
 
-# Enable a disabled server and connect it
-ot.server(enable="devtools-auto")
-
-# Disable an enabled server and disconnect it
-ot.server(disable="devtools")
-
-# Reconnect a server
-ot.server(restart="playwright")
 ```
 
-Only one action (`status`, `enable`, `disable`, `restart`) can be provided per call.
+For state changes, use `ot_servers`:
+
+```python
+ot_servers.enable(name="devtools-auto")
+ot_servers.disable(name="devtools")
+ot_servers.restart(name="playwright")
+ot_servers.status(name="playwright")
+```
 
 ## ot.aliases()
 
@@ -301,6 +307,12 @@ List available bundled skill stubs or retrieve a skill's body content.
 ```python
 # List all skills
 ot.skills()
+
+# Names only
+ot.skills(info="min")
+
+# Default listing (name + description)
+ot.skills(info="default")
 
 # Filter by pattern
 ot.skills(pattern="ot-")

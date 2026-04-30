@@ -93,6 +93,13 @@ The system SHALL capture results from any valid Python expression or statement a
 - **THEN** the list SHALL be serialized to compact JSON using `serialize_result()`
 - **AND** the result SHALL NOT contain double-escaped JSON
 
+#### Scenario: Discovery calls keep JSON default format
+- **GIVEN** a discovery/introspection call (`ot.help`, `ot.tool_info`, `ot.tools`, `ot.packs`, `ot.pack_info`, `ot.servers`, `ot.aliases`, `ot.snippets`, `ot.snippet_info`, `ot.skills`)
+- **AND** no explicit `__format__` is set in the executed code
+- **WHEN** the result is captured by the runner
+- **THEN** the runner SHALL default to compact JSON (`json`)
+- **AND** explicit `__format__` SHALL still override this default
+
 #### Scenario: String passthrough
 - **GIVEN** a tool function that returns a plain string
 - **WHEN** the result is captured by the runner
@@ -442,6 +449,12 @@ The system SHALL intercept tool outputs exceeding a configurable size threshold 
 - **THEN** the output SHALL be returned inline regardless of size
 - **AND** the output SHALL NOT be stored or re-wrapped into a second handle
 
+#### Scenario: Discovery tools are exempt from large output gate
+- **GIVEN** `output.max_inline_size` is configured to any positive value
+- **WHEN** the tool being executed is `ot.help` or `ot.tool_info`
+- **THEN** the output SHALL be returned inline regardless of size
+- **AND** the output SHALL NOT be stored or re-wrapped into a second handle
+
 #### Scenario: __force_context__ overrides size threshold
 - **GIVEN** code sets `__force_context__ = True`
 - **AND** the output is smaller than `output.max_inline_size`
@@ -456,9 +469,13 @@ The system SHALL intercept tool outputs exceeding a configurable size threshold 
   - `handle`: Unique identifier for querying
   - `total_lines`: Line count of stored content
   - `size_bytes`: Size of stored content
-  - `summary`: Human-readable summary (e.g., "847 matches in 42 files")
+  - `content_type`: Stored content type
   - `preview`: First N lines (configurable via `output.preview_lines`)
-  - `query`: Example query hint (e.g., `ot.result(handle='abc123', offset=1, limit=50)`)
+  - `status`: Handle availability state
+  - `next_commands`: Ordered follow-up commands:
+    - `ctx.toc(handle='...')`
+    - `ctx.ask(handle='...', q='...')`
+    - `ctx.read(handle='...', limit=80)`
 
 #### Scenario: Content file created
 - **GIVEN** a large output is stored
@@ -484,4 +501,3 @@ The system SHALL automatically clean up expired result files.
 - **GIVEN** expired result files exist
 - **WHEN** a new large output is stored
 - **THEN** expired files SHALL be cleaned up
-

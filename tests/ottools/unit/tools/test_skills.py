@@ -93,7 +93,7 @@ def test_skills_list_all(fake_skills_dir: Path) -> None:
 @pytest.mark.unit
 @pytest.mark.tools
 def test_skills_list_includes_description(fake_skills_dir: Path) -> None:
-    """skills() default (info=min) includes description."""
+    """skills() default (info=default) includes description."""
     from ottools.skills import skills
 
     with _patch_skills_dir(fake_skills_dir):
@@ -130,11 +130,11 @@ def test_skills_pattern_no_match(fake_skills_dir: Path) -> None:
 @pytest.mark.unit
 @pytest.mark.tools
 def test_skills_info_list(fake_skills_dir: Path) -> None:
-    """skills(info='list') returns names only."""
+    """skills(info='min') returns names only."""
     from ottools.skills import skills
 
     with _patch_skills_dir(fake_skills_dir):
-        result = skills(info="list")
+        result = skills(info="min")
 
     assert "my-skill" in result
     # Description should NOT be in list-only output
@@ -153,6 +153,17 @@ def test_skills_info_full(fake_skills_dir: Path) -> None:
     assert "my-skill" in result
     assert "test" in result  # tag
     assert "path" in result.lower()
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_skills_rejects_list_info(fake_skills_dir: Path) -> None:
+    """skills(info='list') is invalid after info-level standardization."""
+    from ottools.skills import skills
+
+    with _patch_skills_dir(fake_skills_dir):
+        with pytest.raises(ValueError, match="info='list' is not valid"):
+            skills(info="list")
 
 
 # =============================================================================
@@ -203,7 +214,7 @@ def test_bundled_skills_exist() -> None:
     skills_dir = get_global_templates_dir() / "skills"
     assert skills_dir.exists(), "skills/ directory must exist in global_templates"
 
-    expected = {"ot-ref"}
+    expected = {"ot-cm", "ot-ref"}
     found = {f.stem for f in skills_dir.glob("*.md")}
     assert expected.issubset(found), f"Missing bundled skills: {expected - found}"
 

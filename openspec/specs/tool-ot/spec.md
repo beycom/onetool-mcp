@@ -600,6 +600,8 @@ The `ot.help()` function SHALL provide unified help across tools, packs, snippet
   - Packs matching the query
   - Snippets matching the query
   - Aliases matching the query
+  - Servers matching the query
+- **AND** matching SHALL consider both names and descriptions for tools/packs/snippets/aliases
 
 #### Scenario: Fuzzy matching with typos
 - **GIVEN** a query with typos (e.g., `scaffoldl`, `frirecrawl`)
@@ -641,6 +643,14 @@ The `ot.help()` function SHALL provide unified help across tools, packs, snippet
 - **WHEN** `ot.help(query="xyznonexistent")` is called
 - **THEN** it SHALL return a message indicating no matches found
 - **AND** suggest using `ot.tools()` or `ot.packs()` to browse available items
+
+#### Scenario: No matches with proxy/server intent
+- **GIVEN** a no-match query containing proxy/server intent terms
+- **WHEN** `ot.help(query="proxy enable flow")` is called
+- **THEN** fallback guidance SHALL include:
+  - `ot.servers()`
+  - `ot_servers.enable(name="...")`
+  - `ot.help(query="<server_name>")`
 
 ---
 

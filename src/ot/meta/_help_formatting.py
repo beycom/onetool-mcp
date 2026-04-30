@@ -65,6 +65,13 @@ def _format_general_help() -> str:
     """
     return """# OneTool Help
 
+## First 60 Seconds
+  ot.health()                   - Check runtime health
+  ot.help(query="task")         - Find right tool for goal
+  ot.servers()                  - Check MCP proxy server status
+  ot_servers.enable(name="github") - Enable disconnected server
+  ot.tool_info(name="pack.tool") - Confirm signature + args
+
 ## Discovery
   ot.tools()                    - List all tools
   ot.tools(pattern="webfetch")  - Filter by pattern
@@ -72,6 +79,7 @@ def _format_general_help() -> str:
   ot.packs()                    - List all packs (local + MCP)
   ot.pack_info(name="brave")    - Pack details + instructions
   ot.servers()                  - List MCP proxy servers
+  ot_servers.enable(name="...") - Enable + connect a proxy server
   ot.snippets()                 - List all snippets
   ot.snippet_info(name="brv")   - Snippet details
   ot.aliases()                  - List all aliases
@@ -90,6 +98,25 @@ def _format_general_help() -> str:
 ## Tips
   - Use keyword args: func(arg=value)
   - Batch when possible: func(items=[...])"""
+
+
+def _is_server_intent_query(query: str) -> bool:
+    """Return True when query suggests proxy/server connectivity intent."""
+    q = query.lower()
+    keywords = (
+        "proxy",
+        "server",
+        "mcp",
+        "enable",
+        "disable",
+        "connect",
+        "connection",
+        "disconnected",
+        "github",
+        "playwright",
+        "chrome_devtools",
+    )
+    return any(k in q for k in keywords)
 
 
 def _format_tool_help(tool_info: dict[str, Any], pack: str) -> str:
@@ -418,6 +445,12 @@ def _format_search_results(
     if not any([tools_results, packs_results, snippets_results, aliases_results, servers_results]):
         lines.append("No matches found.")
         lines.append("")
+        if _is_server_intent_query(query):
+            lines.append("Try proxy recovery:")
+            lines.append("  ot_servers.enable(name=\"github\")  - Enable + connect known server")
+            lines.append("  ot.servers()                       - Use only if server name/status unknown")
+            lines.append("  ot.help(query=\"github\")      - See server tools + guidance")
+            lines.append("")
         lines.append("Try browsing with:")
         lines.append("  ot.tools()    - List all tools")
         lines.append("  ot.packs()    - List all packs (local + MCP)")

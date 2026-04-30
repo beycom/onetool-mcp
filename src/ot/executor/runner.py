@@ -116,6 +116,39 @@ def _normalize_code(code: str, tree: ast.Module) -> tuple[str, ast.Module]:
     return normalized, ast.parse(normalized)
 
 
+def _call_name(func: ast.expr) -> str | None:
+    """Return dotted function path for a call target when representable."""
+    if isinstance(func, ast.Name):
+        return func.id
+    if isinstance(func, ast.Attribute):
+        parts: list[str] = []
+        node: ast.expr = func
+        while isinstance(node, ast.Attribute):
+            parts.append(node.attr)
+            node = node.value
+        if isinstance(node, ast.Name):
+            parts.append(node.id)
+            return ".".join(reversed(parts))
+    return None
+
+
+def _extract_single_call_name(code: str) -> str | None:
+    """Extract call target when code is exactly one top-level call expression."""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return None
+
+    if len(tree.body) != 1:
+        return None
+
+    stmt = tree.body[0]
+    if not isinstance(stmt, ast.Expr) or not isinstance(stmt.value, ast.Call):
+        return None
+
+    return _call_name(stmt.value.func)
+
+
 def _has_top_level_return(tree: ast.Module) -> bool:
     """Check for return statements at top level only (not inside functions/classes).
 
@@ -270,6 +303,7 @@ def execute_python_code(
     tool_functions: dict[str, Any] | None = None,
     tools_dir: Path | None = None,
     validate: bool = True,
+    default_format: FormatMode = "json",
 ) -> tuple[str, Any, bool, str, bool]:
     """Execute Python code with tool functions available.
 
@@ -278,6 +312,7 @@ def execute_python_code(
         tool_functions: Pre-loaded tool functions (optional)
         tools_dir: Path to tools directory for loading functions
         validate: Whether to validate code before execution (default True)
+        default_format: Format used when code does not set __format__
 
     Returns:
         Tuple of (serialized string, raw Python object, sanitize flag, format mode, force_context flag)
@@ -327,10 +362,10 @@ def execute_python_code(
         result = namespace.get("__result__")
         stdout_output = stdout_buffer.getvalue().strip()
 
-        # Read __format__ from namespace (default to "json" for compact output)
-        fmt: FormatMode = namespace.get("__format__", "json")
+        # Read __format__ from namespace.
+        fmt: FormatMode = namespace.get("__format__", default_format)
         if fmt not in ("json", "json_h", "yml", "yml_h", "raw"):
-            fmt = "json"  # Fall back to default for invalid format
+            fmt = default_format if default_format in ("json", "json_h", "yml", "yml_h", "raw") else "json"
 
         # Read __sanitize__, __compact__, and __force_context__ from namespace, defaulting to config settings
         config = get_config()
@@ -509,13 +544,8 @@ async def execute_command(
     # Determine validation behavior
     should_validate = not skip_validation and prepared_code is None
 
-    # Extract tool name from command (e.g., "brave.search(query=...)" -> "brave.search")
-    # Only extract for single-line commands to avoid misleading results for code blocks
-    tool_name = None
-    if "(" in stripped:
-        prefix = stripped.split("(")[0].strip()
-        if "\n" not in prefix:
-            tool_name = prefix
+    # Extract tool name only for single top-level call commands.
+    tool_name = _extract_single_call_name(stripped)
 
     with LogSpan(span="runner.execute", command=stripped, tool=tool_name) as span:
         try:
@@ -526,18 +556,26 @@ async def execute_command(
                     stripped,
                     tool_functions=tool_namespace,
                     validate=should_validate,
+                    default_format="json",
                 )
             else:
                 # Direct execution for non-proxy calls (no overhead)
                 text_result, raw_result, sanitize, result_fmt, force_context = execute_python_code(
-                    stripped, tool_functions=tool_namespace, validate=should_validate
+                    stripped,
+                    tool_functions=tool_namespace,
+                    validate=should_validate,
+                    default_format="json",
                 )
 
             # Check for large output and store if needed
             config = get_config()
             max_size = config.output.max_inline_size
 
-            _no_deflect = (tool_name or "").startswith("ctx.") or tool_name == "ot.result"
+            _no_deflect = (tool_name or "").startswith("ctx.") or tool_name in {
+                "ot.result",
+                "ot.help",
+                "ot.tool_info",
+            }
             if not _no_deflect:
                 result_size = len(text_result.encode("utf-8"))
                 if force_context or (max_size > 0 and result_size > max_size):
@@ -558,6 +596,11 @@ async def execute_command(
                         "content_type": content_type,
                         "preview": write_result.get("preview", ""),
                         "status": write_result.get("status", "pending"),
+                        "next_commands": [
+                            f"ctx.toc(handle='{handle}')",
+                            f"ctx.ask(handle='{handle}', q='What matters most here?')",
+                            f"ctx.read(handle='{handle}', limit=80)",
+                        ],
                     }
                     text_result = serialize_result(summary_dict, "json")
                     raw_result = summary_dict
