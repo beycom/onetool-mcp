@@ -41,14 +41,14 @@ servers:
   #   command: npx
   #   args: ["-y", "chrome-devtools-mcp@latest", "--isolated", "--viewport=1280x720"]
   #   timeout: 120
-  #   enabled: false  # Enable with: ot.server(enable="chrome_devtools_isolated")
+  #   enabled: false  # Enable with: ot_servers.enable(name="chrome_devtools_isolated")
   #
   # chrome_devtools_auto:
   #   type: stdio
   #   command: npx
   #   args: ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--channel=beta"]
   #   timeout: 120
-  #   enabled: false  # Enable with: ot.server(enable="chrome_devtools_auto")
+  #   enabled: false  # Enable with: ot_servers.enable(name="chrome_devtools_auto")
 
 
   # =============================================================================
@@ -91,6 +91,66 @@ servers:
       Requires GITHUB_TOKEN in secrets.yaml. Always specify owner and repo.
       Use list/search tools before individual gets. Search before creating issues or PRs.
       PR workflow: branch → push_files → create_pull_request.
+
+
+  # =============================================================================
+  # AZURE MCP SERVER (Official — microsoft/mcp)
+  # =============================================================================
+  # 276 tools across 57 Azure services: compute, storage, AKS, Cosmos DB,
+  # Monitor/KQL, App Service, Container Apps, AI Foundry, App Config, and more.
+  #
+  # Docs:   https://learn.microsoft.com/azure/developer/azure-mcp-server/overview
+  # Source: https://github.com/microsoft/mcp/tree/main/servers/Azure.Mcp.Server
+  # Tools:  https://learn.microsoft.com/azure/developer/azure-mcp-server/tools/
+  #
+  # SETUP — pick one auth method:
+  #
+  #   Local dev (recommended):
+  #     az login                         # Azure CLI — picked up automatically
+  #
+  #   Service principal (CI/CD):
+  #     Add to ~/.onetool/secrets.yaml:
+  #       AZURE_CLIENT_ID: "<app-id>"
+  #       AZURE_CLIENT_SECRET: "<secret>"
+  #       AZURE_TENANT_ID: "<tenant-id>"
+  #
+  #   Subscription scoping (optional):
+  #     Add to ~/.onetool/secrets.yaml:
+  #       AZURE_SUBSCRIPTION_ID: "<subscription-id>"
+  #
+  # FILTERING (add to args if needed):
+  #   - "--namespace"
+  #   - "storage"                        # only expose storage tools
+  #   - "--namespace"
+  #   - "keyvault"                       # stack --namespace flags to add more
+  #   - "--mode"
+  #   - "all"                            # expose all 276 tools individually (default: namespace)
+  #   - "--read-only"                    # read-only operations only
+  #   - "--cloud"
+  #   - "AzureUSGovernment"              # sovereign cloud support
+  #
+  azure:
+    type: stdio
+    command: uvx
+    args:
+      - "--from"
+      - "msmcp-azure"
+      - "azmcp"
+      - "server"
+      - "start"
+    inherit_env: true
+    env:
+      AZURE_MCP_COLLECT_TELEMETRY_MICROSOFT: "false"
+    timeout: 120
+    enabled: false
+    description: "Azure MCP Server — 276 tools across 57 Azure services (compute, storage, AKS, Cosmos DB, Monitor, AI Foundry)"
+    source: https://github.com/microsoft/mcp
+    instructions: |
+      Auth: run `az login` locally, or set AZURE_CLIENT_ID / AZURE_CLIENT_SECRET / AZURE_TENANT_ID for service principal.
+      Set AZURE_SUBSCRIPTION_ID to scope to a default subscription.
+      Tools are namespaced by Azure service (e.g. storage, compute, keyvault).
+      To filter services: add --namespace <service> to args. To expose all ops individually: add --mode all.
+      Docs: https://learn.microsoft.com/azure/developer/azure-mcp-server/
 
 
   # =============================================================================
