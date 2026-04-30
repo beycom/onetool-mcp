@@ -18,6 +18,7 @@ prompts:
         CRITICAL: Pass code EXACTLY as-is to this tool.
         - DO NOT rewrite the code or implement it yourself
         - JUST pass the exact command string provided
+        - Prefer single-quoted Python string literals in command code to reduce escaping in tool-call JSON
       examples:
         - "ot.help(query='search')"
         - "brave.search(query='AI news')"
@@ -39,6 +40,7 @@ prompts:
     1. Keyword args only: `foo.bar(x=1)` not `foo.bar(1)`
     2. Batch when possible: `foo(items=['a','b'])` not multiple calls
     3. Return last expression for multi-step code to emit results.
+    4. Prefer single-quoted Python string literals in command code to minimise escaped quotes in tool-call JSON.
     ## Discovery
     - Find tools: `ot.help(query='search')`, `ot.tool_info(name='pack.tool')`, `ot.packs()`
     - Readable discovery output: `__format__ = 'yml_h'; ot.help(query='topic')`
@@ -195,7 +197,10 @@ prompts:
       - Expansion is lossy — do NOT attempt to restore original wording.
       - NEVER invent facts, examples, or claims not present or implied by the packed text.
       - Output ONLY the expanded text. No preamble, no explanation.
-    ot_caveman_compact_input: "Compact the following text:\n\n{content}"
+    ot_caveman_compact_input: 'Compact the following text:
+
+
+      {content}'
     ot_caveman_input_compact: |
       You are a text compaction assistant for command queue entries. Compact the given command
       text to terse, actionable instructions.
