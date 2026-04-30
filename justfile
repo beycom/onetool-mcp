@@ -45,7 +45,7 @@ test-unit:
 test-int *args:
     uv run --all-extras pytest -m integration {{ args }}
 
-# Run caveman skill eval (baseline vs ot_cm vs jb_caveman). Use --reset-baseline to regenerate cached baseline.
+# Run caveman skill eval (baseline vs ot-cm vs jb_caveman). Use --reset-baseline to regenerate cached baseline.
 eval-caveman *args:
     uv run python scripts/eval_caveman_skill.py {{ args }}
 

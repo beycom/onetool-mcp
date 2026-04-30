@@ -1,5 +1,5 @@
 ---
-name: ot_cm
+name: ot-cm
 description: Switch to terse caveman-style responses for the rest of this session. Drops filler, articles, hedging. Fragments OK.
 ---
 

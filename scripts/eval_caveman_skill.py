@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Caveman skill eval: ot_cm vs JuliusBrussee caveman vs baseline.
+"""Caveman skill eval: ot-cm vs JuliusBrussee caveman vs baseline.
 
 Baseline is fixed on first run and reused on subsequent runs so the
 denominator is stable. Pass --reset-baseline to regenerate it.
 
 Runs 10 prompts in 3 arms (skill arms always fresh, parallel):
   __baseline__  — no system prompt (cached after first run)
-  ot_cm         — .claude/skills/ot_cm/SKILL.md
+  ot-cm         — .claude/skills/ot-cm/SKILL.md
   jb_caveman    — JuliusBrussee/caveman SKILL.md (fetched from GitHub)
 
 Usage:
@@ -35,7 +35,7 @@ import tiktoken
 
 _REPO_ROOT = Path(__file__).parents[1]
 _RESET_BASELINE = "--reset-baseline" in sys.argv
-_OT_CM_SKILL_PATH = _REPO_ROOT / ".claude" / "skills" / "ot_cm" / "SKILL.md"
+_OT_CM_SKILL_PATH = _REPO_ROOT / ".claude" / "skills" / "ot-cm" / "SKILL.md"
 _JB_SKILL_URL = "https://raw.githubusercontent.com/JuliusBrussee/caveman/main/skills/caveman/SKILL.md"
 _SNAPSHOT_PATH = Path(__file__).parent / "snapshots" / "skill_eval.json"
 
@@ -107,7 +107,7 @@ def main() -> None:
     if not shutil.which(cli):
         print(f"Error: '{cli}' not on PATH", file=sys.stderr); sys.exit(1)
     if not _OT_CM_SKILL_PATH.exists():
-        print(f"Error: ot_cm skill not found: {_OT_CM_SKILL_PATH}", file=sys.stderr); sys.exit(1)
+        print(f"Error: ot-cm skill not found: {_OT_CM_SKILL_PATH}", file=sys.stderr); sys.exit(1)
 
     ot_cm_body = _strip_frontmatter(_OT_CM_SKILL_PATH.read_text(encoding="utf-8"))
     jb_body = _fetch_jb_skill()
@@ -129,19 +129,19 @@ def main() -> None:
         print("Running: __baseline__...")
         responses["__baseline__"] = _run_arm(None, cli, model)
 
-    for arm, system_prompt in [("ot_cm", ot_cm_body), ("jb_caveman", jb_body)]:
+    for arm, system_prompt in [("ot-cm", ot_cm_body), ("jb_caveman", jb_body)]:
         print(f"Running: {arm}...")
         responses[arm] = _run_arm(system_prompt, cli, model)
 
     counts = {arm: [_tokens(r) for r in responses[arm]] for arm in responses}
-    ot_savings = _median_savings(counts["__baseline__"], counts["ot_cm"])
+    ot_savings = _median_savings(counts["__baseline__"], counts["ot-cm"])
     jb_savings = _median_savings(counts["__baseline__"], counts["jb_caveman"])
 
     w = 52
-    print(f"\n{'Prompt':<{w}} {'base':>6} {'ot_cm':>6} {'ot%':>5} {'jb':>6} {'jb%':>5}")
+    print(f"\n{'Prompt':<{w}} {'base':>6} {'ot-cm':>6} {'ot%':>5} {'jb':>6} {'jb%':>5}")
     print("-" * (w + 32))
     for i, p in enumerate(_PROMPTS):
-        b, o, j = counts["__baseline__"][i], counts["ot_cm"][i], counts["jb_caveman"][i]
+        b, o, j = counts["__baseline__"][i], counts["ot-cm"][i], counts["jb_caveman"][i]
         print(f"{p[:w-1]:<{w}} {b:>6} {o:>6} {(b-o)/b*100:>4.0f}% {j:>6} {(b-j)/b*100:>4.0f}%")
     print("-" * (w + 32))
     print(f"{'Median savings':<{w}} {'':>6} {'':>6} {ot_savings:>4.1f}% {'':>6} {jb_savings:>4.1f}%\n")
@@ -152,7 +152,7 @@ def main() -> None:
         "prompts": _PROMPTS,
         "arms": responses,
         "token_counts": counts,
-        "savings_pct": {"ot_cm_vs_baseline_median": round(ot_savings, 2), "jb_caveman_vs_baseline_median": round(jb_savings, 2)},
+        "savings_pct": {"ot-cm_vs_baseline_median": round(ot_savings, 2), "jb_caveman_vs_baseline_median": round(jb_savings, 2)},
     }, indent=2), encoding="utf-8")
     print(f"Snapshot → {_SNAPSHOT_PATH}")
 

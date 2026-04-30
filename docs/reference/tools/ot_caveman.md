@@ -191,7 +191,7 @@ There are four ways to apply caveman compaction:
 | **Explicit call** | `cm.compact(text=...)` or `cm.compact(src=...)` | One-off compaction of a specific value or file |
 | **Ask compact** | `ctx.ask(handle, q=...)` then `cm.compact(text=answer)` | Compact an LLM answer about stored search/fetch results |
 | **`__compact__` dunder** | `__compact__ = True` at the top of a code block | Compact the entire output of a code block automatically |
-| **`/ot_cm` skill** | `/ot_cm` in chat | Switch Claude's own responses to terse caveman-speak for the session |
+| **`/ot-cm` skill** | `/ot-cm` in chat | Switch Claude's own responses to terse caveman-speak for the session |
 
 ### Explicit call
 
@@ -261,14 +261,14 @@ output:
 
 Override per-call with `__compact__ = False` to skip compaction for a specific block.
 
-### `/ot_cm` skill
+### `/ot-cm` skill
 
-The `/ot_cm` skill switches Claude's own prose responses to terse caveman-speak for the rest
+The `/ot-cm` skill switches Claude's own prose responses to terse caveman-speak for the rest
 of the session. It is a Claude behavioural instruction — it does not call `cm.compact()` and
 does not count tokens.
 
 ```
-/ot_cm
+/ot-cm
 ```
 
 Apply at the start of a session to reduce verbose explanations in Claude's replies.
