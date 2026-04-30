@@ -516,39 +516,43 @@ class McpServerConfig(BaseModel):
 # ==================== Direct Configuration ====================
 
 
-class DirectConfig(BaseModel):
-    """Direct mode configuration for `onetool direct` commands."""
+class DirectHostConfig(BaseModel):
+    """Execution host optimization settings for `onetool direct`."""
 
-    host: str | None = Field(
-        default=None,
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = Field(
+        default=False,
+        strict=True,
         description=(
-            "Execution server routing mode. "
-            "'enable' auto-starts a local server on first `direct run`; "
-            "'HOST:PORT' routes to a remote server. "
-            "Absent (default) runs all commands in-process."
+            "Enable execution host optimization. "
+            "When false, direct commands always execute in-process."
         ),
     )
-
-    @field_validator("host")
-    @classmethod
-    def _validate_host(cls, v: str | None) -> str | None:
-        if v is None or v == "enable":
-            return v
-        if ":" not in v:
-            raise ValueError(
-                f"direct.host must be null, 'enable', or 'HOST:PORT' (got {v!r})"
-            )
-        return v
     port: int = Field(
         default=8765,
         ge=1,
         le=65535,
-        description="Port for the local execution server",
+        description=(
+            "Preferred host port. "
+            "Managed startup tries this port first, then increments until a free port is found."
+        ),
     )
     timeout: int = Field(
-        default=60,
+        default=120,
         ge=1,
-        description="HTTP request timeout in seconds when routing to the execution server",
+        description="HTTP request timeout in seconds when routing to the execution host.",
+    )
+
+
+class DirectConfig(BaseModel):
+    """Direct mode configuration for `onetool direct` commands."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    host: DirectHostConfig = Field(
+        default_factory=DirectHostConfig,
+        description="Execution host optimization settings for direct CLI commands.",
     )
 
 

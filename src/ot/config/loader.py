@@ -424,6 +424,16 @@ def get_config(
         return _config
 
 
+def get_loaded_config_path() -> Path | None:
+    """Return the most recently loaded config path, if any."""
+    return _config_path
+
+
+def get_loaded_secrets_path() -> Path | str | None:
+    """Return the most recently loaded secrets path, if any."""
+    return _secrets_path
+
+
 def is_log_verbose() -> bool:
     """Check if verbose logging is enabled.
 

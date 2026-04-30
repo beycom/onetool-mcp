@@ -14,6 +14,13 @@ tools_dir: []
 
 # log_level: INFO
 
+# Direct CLI host optimization (optional)
+direct:
+  host:
+    enabled: false  # true enables host optimization for `onetool direct run`
+    port: 8765      # preferred host port; managed startup probes upward to 65535
+    timeout: 120    # seconds for host-routed direct requests
+
 # Tool-specific configuration
 # tools:
 #   # ot_llm — LLM calls from within OneTool (code generation, transforms, etc.)

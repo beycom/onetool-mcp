@@ -472,16 +472,17 @@ Settings for the `onetool direct` subcommand group. Configure under `direct` in 
 
 ```yaml
 direct:
-  host: null    # Routing mode: null=in-process only, "enable"=auto-start local server, "HOST:PORT"=remote
-  port: 8765    # Port for the local execution server
-  timeout: 60   # HTTP request timeout in seconds for `direct run` → server routing
+  host:
+    enabled: false  # false=in-process only, true=allow host optimization
+    port: 8765      # Preferred local host port
+    timeout: 120    # HTTP request timeout in seconds for `direct run` host routing
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `direct.host` | string or null | `null` | Routing mode: absent = in-process only; `"enable"` = auto-start a local server on first use; `"HOST:PORT"` = route to a remote server. Any other value raises a config error. |
-| `direct.port` | int (1–65535) | `8765` | Port for the local execution server |
-| `direct.timeout` | int (≥1) | `60` | HTTP request timeout in seconds when routing to a server |
+| `direct.host.enabled` | bool | `false` | Host optimization switch. `false` forces in-process execution; `true` enables host routing/auto-start. |
+| `direct.host.port` | int (1–65535) | `8765` | Preferred host port. Direct CLI host start/run use this exact port; MCP-managed auto-host startup may probe upward to find a free port. |
+| `direct.host.timeout` | int (≥1) | `120` | HTTP request timeout in seconds when routing to a host |
 
 ## Statistics Configuration
 
