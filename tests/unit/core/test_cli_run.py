@@ -44,6 +44,48 @@ class TestCommandWithMeta:
 
 @pytest.mark.unit
 @pytest.mark.core
+class TestPrepareCommandWithMetaWrappedSnippet:
+    """Regression tests for direct-run metadata + snippet commands."""
+
+    def test_meta_wrapped_snippet_expands_before_validation(self) -> None:
+        from ot.config import OneToolConfig, SnippetDef, SnippetParam
+        from ot.executor.runner import prepare_command
+
+        cfg = OneToolConfig(
+            snippets={
+                "g": SnippetDef(
+                    body='ground.search(query="{{ query }}")',
+                    params={"query": SnippetParam()},
+                )
+            }
+        )
+
+        command = "__format__ = 'json_h'; __sanitize__ = False\n$g q=test"
+
+        with patch("ot.config.get_config", return_value=cfg):
+            prepared = prepare_command(command)
+
+        assert prepared.error is None
+        assert "__format__ = 'json_h'" in prepared.code
+        assert "__sanitize__ = False" in prepared.code
+        assert "ground.search(query='test')" in prepared.code
+
+    def test_meta_wrapped_unknown_snippet_returns_snippet_error(self) -> None:
+        from ot.config import OneToolConfig
+        from ot.executor.runner import prepare_command
+
+        cfg = OneToolConfig(snippets={})
+        command = "__format__ = 'json_h'; __sanitize__ = False\n$does_not_exist q=test"
+
+        with patch("ot.config.get_config", return_value=cfg):
+            prepared = prepare_command(command)
+
+        assert prepared.error is not None
+        assert "Unknown snippet 'does_not_exist'" in prepared.error
+
+
+@pytest.mark.unit
+@pytest.mark.core
 class TestResolveCommandSource:
     """Tests for _resolve_command_source."""
 

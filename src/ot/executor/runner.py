@@ -17,6 +17,7 @@ import ast
 import asyncio
 import io
 import json
+import re
 from contextlib import redirect_stdout
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -53,6 +54,35 @@ class CommandResult:
 
 # Sentinel value to distinguish explicit None return from no return
 _NO_RETURN = object()
+
+
+_DIRECT_META_PREFIX_RE = re.compile(
+    r"^__format__\s*=\s*(['\"])(json_h|json|yml|yml_h|raw)\1\s*;\s*__sanitize__\s*=\s*(True|False)\s*$"
+)
+
+
+def _split_meta_wrapped_snippet(code: str) -> tuple[str, str] | None:
+    """Extract direct-run metadata prefix and snippet body when present.
+
+    Returns:
+        (prefix_line, snippet_command) when code is:
+            __format__='...'; __sanitize__=...
+            $snippet ...
+        None for all other inputs.
+    """
+    lines = code.splitlines()
+    if len(lines) < 2:
+        return None
+
+    prefix = lines[0].strip()
+    if not _DIRECT_META_PREFIX_RE.match(prefix):
+        return None
+
+    snippet_code = "\n".join(lines[1:]).strip()
+    if not snippet_code.startswith("$"):
+        return None
+
+    return prefix, snippet_code
 
 
 def _apply_compact(text: str) -> str:
@@ -445,10 +475,19 @@ def prepare_command(command: str) -> PreparedCommand:
     config = get_config()
 
     # Step 4: Handle snippet expansion ($name key=val)
-    if is_snippet(stripped):
+    # direct run prepends __format__/__sanitize__ metadata before command text,
+    # so detect that wrapper and expand snippets from the wrapped body.
+    snippet_target = stripped
+    meta_prefix: str | None = None
+    wrapped = _split_meta_wrapped_snippet(stripped)
+    if wrapped is not None:
+        meta_prefix, snippet_target = wrapped
+
+    if is_snippet(snippet_target):
         try:
-            parsed = parse_snippet(stripped)
-            stripped = expand_snippet(parsed, config)
+            parsed = parse_snippet(snippet_target)
+            expanded = expand_snippet(parsed, config)
+            stripped = f"{meta_prefix}\n{expanded}" if meta_prefix else expanded
         except ValueError as e:
             return PreparedCommand(
                 code="",

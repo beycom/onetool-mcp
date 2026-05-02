@@ -41,6 +41,12 @@ The format is injected into the execution namespace as `__format__` before the c
 - **WHEN** `onetool direct run "brave.search(query='test')"` is run
 - **THEN** the command string SHALL be accepted as a positional argument without any `-C` or `--command` flag
 
+#### Scenario: Snippet command with metadata prefix
+
+- **WHEN** `onetool direct run -c onetool.yaml '$br q="python|fastapi"'` is run
+- **THEN** the snippet SHALL be expanded before code validation/execution
+- **AND** `--format` and `--sanitize` metadata injection SHALL remain active for the expanded command
+
 #### Scenario: Stdin via dash
 
 - **WHEN** `echo "ot.debug()" | onetool direct run -c onetool.yaml -` is run
