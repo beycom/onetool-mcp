@@ -10,6 +10,8 @@ Short alias: `g`
 - Automatic source citations with numbered references
 - Specialized searches for dev resources, docs, and Reddit
 - URL deduplication in results
+- Structured `search_batch()` envelope with retry metadata
+- Schema-constrained extraction mode with optional field provenance
 
 ## Functions
 
@@ -32,6 +34,10 @@ Short alias: `g`
 | `timeout` | float | Request timeout in seconds (default: 30.0) |
 | `max_sources` | int | Maximum number of sources to include (default: unlimited) |
 | `output_format` | str | "full" (default), "text_only", or "sources_only" |
+| `retries` | int | Batch mode only. Retry count for transient failures (default: 0) |
+| `retry_delay_ms` | int | Batch mode only. Base backoff delay in milliseconds (default: 250) |
+| `extract_schema` | dict | Optional schema-constrained extraction mode for search/search_batch |
+| `return_provenance` | bool | Include per-field provenance (`source_url`, `snippet`, `confidence`) |
 | `language` | str | Filter for dev search |
 | `framework` | str | Filter for dev search |
 | `technology` | str | Filter for docs search |
@@ -84,6 +90,21 @@ ground.search_batch(queries=["fastapi", "django", "flask"], focus="code")
 
 # Batch with model and timeout
 ground.search_batch(queries=["AI news", "ML trends"], model="gemini-3.0-flash", timeout=60.0)
+
+# Batch with retry controls
+ground.search_batch(queries=["q1", "q2"], retries=1, retry_delay_ms=200)
+
+# Schema-constrained extraction with provenance
+ground.search(
+    query="Find contact details",
+    extract_schema={
+        "fields": [
+            {"name": "name", "type": "string", "required": True},
+            {"name": "email", "type": "string", "required": True},
+        ]
+    },
+    return_provenance=True,
+)
 
 # Developer resources search
 ground.dev(query="async/await best practices", language="python")

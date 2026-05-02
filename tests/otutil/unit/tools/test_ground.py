@@ -12,6 +12,7 @@ import pytest
 pytest.importorskip("google.genai", reason="google-genai not installed ([util] extra)")
 
 from otutil.tools.ground import (
+    _extract_structured_data,
     _extract_sources,
     _format_error,
     _format_response,
@@ -560,22 +561,68 @@ class TestSearchBatchModel:
     """Test model parameter in search_batch."""
 
     @patch("otutil.tools.ground.search")
-    @patch("otutil.tools.ground.batch_execute")
-    @patch("otutil.tools.ground.format_batch_results")
-    def test_search_batch_passes_model(self, mock_format, mock_batch, mock_search):
+    @patch("otutil.tools.ground.batch_execute_enveloped")
+    def test_search_batch_passes_model(self, mock_batch, mock_search):
         """search_batch() should pass model parameter to search()."""
-        mock_batch.return_value = [("query1", "result1")]
-        mock_format.return_value = "formatted"
+        mock_batch.return_value = {"results": [], "meta": {"success_count": 0, "error_count": 0}}
 
         search_batch(queries=["test"], model="gemini-3.0-flash")
 
-        # Extract the function passed to batch_execute and call it
+        # Extract the function passed to batch_execute_enveloped and call it
         search_fn = mock_batch.call_args[0][0]
         search_fn("test query", "label")
 
         # Verify model was passed
         call_kwargs = mock_search.call_args[1]
         assert call_kwargs["model"] == "gemini-3.0-flash"
+
+    @patch("otutil.tools.ground.search")
+    def test_search_batch_structured_envelope(self, mock_search):
+        mock_search.return_value = "Result"
+        result = search_batch(queries=["q1", "q2"])
+
+        assert isinstance(result, dict)
+        assert result["meta"]["query_count"] == 2
+        assert result["results"][0]["query"] == "q1"
+        assert result["results"][1]["query"] == "q2"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestStructuredExtraction:
+    def test_extract_structured_data_required_and_optional(self):
+        result = _extract_structured_data(
+            text="name: Alice\nemail: alice@example.com",
+            sources=[{"title": "src", "url": "https://example.invalid"}],
+            extract_schema={
+                "fields": [
+                    {"name": "name", "type": "string", "required": True},
+                    {"name": "phone", "type": "string", "required": False},
+                ]
+            },
+            return_provenance=True,
+        )
+
+        assert result["data"]["name"] == "Alice"
+        assert result["data"]["phone"] is None
+        assert result["errors"] == []
+        assert "provenance" in result
+        assert result["provenance"]["name"]["source_url"] == "https://example.invalid"
+
+    @patch("otutil.tools.ground._grounded_search")
+    def test_search_passes_extract_schema(self, mock_grounded):
+        mock_grounded.return_value = {"mode": "structured_extraction", "data": {}, "errors": []}
+        schema = {"fields": [{"name": "email", "type": "string", "required": True}]}
+
+        search(query="contact info", extract_schema=schema, return_provenance=True)
+
+        kwargs = mock_grounded.call_args.kwargs
+        assert kwargs["extract_schema"] == schema
+        assert kwargs["return_provenance"] is True
+
+    def test_search_rejects_invalid_extract_schema(self):
+        result = search(query="x", extract_schema={"fields": []})
+        assert "extract_schema.fields must be a non-empty list" in result
 
 
 # -----------------------------------------------------------------------------

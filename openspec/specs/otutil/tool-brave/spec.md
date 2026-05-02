@@ -33,6 +33,12 @@ The `brave.search()` function SHALL search the web using Brave Search API.
 - **AND** a date range string "YYYY-MM-DDtoYYYY-MM-DD" (e.g. "2024-01-01to2024-06-30") is also accepted
 - **AND** invalid freshness values SHALL return an error message
 
+#### Scenario: Text-only output format
+- **GIVEN** a search query
+- **WHEN** `brave.search(query=query, output_format="text_only")` is called
+- **THEN** it SHALL return plain text search content without source list formatting
+- **AND** valid `output_format` values for web search are "full", "text_only", "sources_only"
+
 #### Scenario: Safe search
 - **GIVEN** a search query and safesearch parameter
 - **WHEN** `brave.search(query=query, safesearch="strict")` is called
@@ -137,6 +143,11 @@ The `brave.search_batch()` function SHALL execute multiple searches concurrently
 - **AND** invalid `safesearch` values SHALL return an error message
 - **AND** invalid `count` values SHALL return an error message
 
+#### Scenario: Batch text-only output format
+- **GIVEN** a list of queries
+- **WHEN** `brave.search_batch(queries=["q1", "q2"], output_format="text_only")` is called
+- **THEN** it SHALL forward `output_format="text_only"` to each `brave.search()` call
+
 ### Requirement: Query Validation
 
 All Brave Search functions SHALL validate query parameters.
@@ -209,4 +220,3 @@ The tool SHALL log all API operations using LogSpan.
   - `span: "brave.request"`
   - `endpoint`: API endpoint
   - `status`: HTTP status code
-

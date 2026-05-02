@@ -13,7 +13,16 @@ Extension tools (user-created in .onetool/tools/) can import directly from
 ot.* modules for logging, config, and inter-tool calling.
 """
 
-from ot.utils.batch import batch_execute, format_batch_results, normalize_items
+from ot.utils.batch import (
+    BatchEnvelope,
+    BatchError,
+    BatchMeta,
+    BatchResultItem,
+    batch_execute,
+    batch_execute_enveloped,
+    format_batch_results,
+    normalize_items,
+)
 from ot.utils.cache import Cache, cache
 from ot.utils.deps import (
     Dependency,
@@ -45,6 +54,10 @@ from ot.utils.truncate import format_error, run_command, truncate
 
 __all__ = [
     "DEFAULT_EXCLUDE_PATTERNS",
+    "BatchEnvelope",
+    "BatchError",
+    "BatchMeta",
+    "BatchResultItem",
     "Cache",
     "Dependency",
     "DepsCheckResult",
@@ -52,6 +65,7 @@ __all__ = [
     "SqlitePool",
     "api_headers",
     "batch_execute",
+    "batch_execute_enveloped",
     "cache",
     "check_api_key",
     "check_cli",

@@ -25,6 +25,7 @@ __ot_requires__ = {
     "secrets": ["TAVILY_API_KEY"],
 }
 
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Literal
@@ -33,7 +34,7 @@ import httpx
 from otpack import (
     LogSpan,
     _format_http_error,
-    batch_execute,
+    batch_execute_enveloped,
     format_batch_results,
     get_tool_config,
     lazy_client,
@@ -66,6 +67,9 @@ _OUTPUT_FORMAT_VALUES = frozenset(["full", "text_only", "sources_only"])
 _EXTRACT_FORMAT_VALUES = frozenset(["markdown", "text"])
 _EXTRACT_DEPTH_VALUES = frozenset(["basic", "advanced"])
 _RESEARCH_MODEL_VALUES = frozenset(["mini", "pro", "auto"])
+_SUPPORTED_EXTRACT_TYPES = frozenset(["string", "number", "boolean"])
+_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+_NUMBER_RE = re.compile(r"-?\d+(?:\.\d+)?")
 
 # Pre-sorted for error messages
 _SEARCH_DEPTH_LIST = sorted(_SEARCH_DEPTH_VALUES)
@@ -294,6 +298,105 @@ def _format_extract_results(data: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _validate_extract_schema(extract_schema: dict[str, Any] | None) -> str | None:
+    """Validate extraction schema shape and supported field types."""
+    if extract_schema is None:
+        return None
+    fields = extract_schema.get("fields")
+    if not isinstance(fields, list) or not fields:
+        return "Error: extract_schema.fields must be a non-empty list"
+    for field in fields:
+        if not isinstance(field, dict):
+            return "Error: each extract_schema field must be an object"
+        name = field.get("name")
+        field_type = field.get("type", "string")
+        if not isinstance(name, str) or not name.strip():
+            return "Error: each extract_schema field requires a non-empty string name"
+        if field_type not in _SUPPORTED_EXTRACT_TYPES:
+            return (
+                f"Error: unsupported extract_schema field type '{field_type}'. "
+                f"Use {sorted(_SUPPORTED_EXTRACT_TYPES)}"
+            )
+    return None
+
+
+def _extract_structured_data(
+    *,
+    text: str,
+    sources: list[dict[str, Any]],
+    extract_schema: dict[str, Any],
+    return_provenance: bool,
+) -> dict[str, Any]:
+    """Extract structured fields from Tavily text using a constrained schema."""
+    data: dict[str, Any] = {}
+    errors: list[dict[str, str]] = []
+    provenance: dict[str, dict[str, Any]] = {}
+    source_url = sources[0].get("url") if sources else None
+    confidence = sources[0].get("score") if sources else None
+
+    for field in extract_schema.get("fields", []):
+        name = str(field.get("name", "")).strip()
+        field_type = str(field.get("type", "string"))
+        required = bool(field.get("required", False))
+        lowered_name = name.lower()
+        value: Any = None
+        snippet: str = ""
+
+        if field_type == "boolean":
+            for token in ("true", "false"):
+                idx = text.lower().find(token)
+                if idx >= 0:
+                    value = token == "true"
+                    snippet = text[max(0, idx - 20):idx + len(token) + 20].strip()
+                    break
+        elif field_type == "number":
+            match = _NUMBER_RE.search(text)
+            if match:
+                snippet = match.group(0)
+                value = float(snippet) if "." in snippet else int(snippet)
+        else:
+            if "email" in lowered_name:
+                match = _EMAIL_RE.search(text)
+                if match:
+                    value = match.group(0)
+                    snippet = value
+            if value is None:
+                key_match = re.search(
+                    rf"{re.escape(name)}\s*[:=-]\s*(.+)",
+                    text,
+                    flags=re.IGNORECASE,
+                )
+                if key_match:
+                    value = key_match.group(1).strip().splitlines()[0]
+                    snippet = value
+
+        data[name] = value
+        if required and value in (None, ""):
+            errors.append(
+                {
+                    "field": name,
+                    "error_code": "required_field_missing",
+                    "error_message": f"Required field '{name}' could not be extracted",
+                }
+            )
+
+        if return_provenance:
+            provenance[name] = {
+                "source_url": source_url,
+                "snippet": snippet,
+                "confidence": confidence,
+            }
+
+    result: dict[str, Any] = {
+        "mode": "structured_extraction",
+        "data": data,
+        "errors": errors,
+    }
+    if return_provenance:
+        result["provenance"] = provenance
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Validators
 # ---------------------------------------------------------------------------
@@ -396,7 +499,9 @@ def search(
     days: int = 3,
     include_domains: list[str] | None = None,
     exclude_domains: list[str] | None = None,
-) -> str:
+    extract_schema: dict[str, Any] | None = None,
+    return_provenance: bool = False,
+) -> dict[str, Any] | str:
     """Search the web using Tavily AI-powered search API.
 
     Returns an AI-synthesised answer alongside numbered results and sources.
@@ -450,6 +555,8 @@ def search(
         return error
     if error := _validate_days(days):
         return error
+    if error := _validate_extract_schema(extract_schema):
+        return error
 
     payload: dict[str, Any] = {
         "query": query,
@@ -474,6 +581,23 @@ def search(
             return str(result)
 
         output = _format_search_results(result, output_format, min_score, max_sources=max_sources)
+
+        if extract_schema is not None:
+            sources = result.get("results", []) or []
+            extract_text_parts: list[str] = []
+            answer = result.get("answer", "")
+            if isinstance(answer, str) and answer:
+                extract_text_parts.append(answer)
+            for entry in sources:
+                content = entry.get("content", "")
+                if isinstance(content, str) and content:
+                    extract_text_parts.append(content)
+            return _extract_structured_data(
+                text="\n".join(extract_text_parts),
+                sources=sources,
+                extract_schema=extract_schema,
+                return_provenance=return_provenance,
+            )
 
         filtered = result.get("results", [])
         if min_score is not None:
@@ -635,7 +759,11 @@ def search_batch(
     min_score: float | None = None,
     max_sources: int | None = None,
     time_range: str | None = None,
-) -> str:
+    extract_schema: dict[str, Any] | None = None,
+    return_provenance: bool = False,
+    retries: int = 0,
+    retry_delay_ms: int = 250,
+) -> dict[str, Any] | str:
     """Execute multiple Tavily searches concurrently and return combined results.
 
     Queries are executed in parallel using threads for better performance.
@@ -656,7 +784,7 @@ def search_batch(
         time_range: Filter results by time - "day", "week", "month", "year"
 
     Returns:
-        Combined formatted results with labels, or error message
+        Structured batch result envelope with `results[]` and `meta`, or error
 
     Example:
         # Simple list of queries
@@ -685,6 +813,8 @@ def search_batch(
         return error
     if error := _validate_time_range(time_range):
         return error
+    if error := _validate_extract_schema(extract_schema):
+        return error
 
     normalized = normalize_items(queries)
 
@@ -698,8 +828,8 @@ def search_batch(
         span="tavily.batch", query_count=len(normalized), max_results=max_results
     ) as s:
 
-        def _search_one(query: str, label: str) -> tuple[str, str]:
-            result = search(
+        def _search_one(query: str, _label: str) -> str:
+            return search(
                 query=query,
                 max_results=max_results,
                 search_depth=search_depth,
@@ -708,12 +838,18 @@ def search_batch(
                 min_score=min_score,
                 max_sources=max_sources,
                 time_range=time_range,
+                extract_schema=extract_schema,
+                return_provenance=return_provenance,
             )
-            return label, result
 
-        results = batch_execute(_search_one, normalized, max_workers=min(len(normalized), 10))
-        output = format_batch_results(results, normalized)
-        s.add(outputLen=len(output))
+        output = batch_execute_enveloped(
+            _search_one,
+            normalized,
+            retries=retries,
+            retry_delay_ms=retry_delay_ms,
+            max_workers=min(len(normalized), 10),
+        )
+        s.add(successCount=output["meta"]["success_count"], errorCount=output["meta"]["error_count"])
         return output
 
 

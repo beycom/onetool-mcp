@@ -271,6 +271,26 @@ class TestFormatWebResults:
         assert "1. First" in result
         assert "2. Second" in result
 
+    def test_text_only_omits_sources_and_urls(self):
+        data = {
+            "web": {
+                "results": [
+                    {
+                        "title": "Python Tutorial",
+                        "url": "https://docs.python.org/3/tutorial",
+                        "description": "Learn Python",
+                    }
+                ]
+            }
+        }
+
+        result = _format_web_results(data, output_format="text_only")
+
+        assert "Python Tutorial" in result
+        assert "Learn Python" in result
+        assert "https://docs.python.org/3/tutorial" not in result
+        assert "## Sources" not in result
+
 
 @pytest.mark.unit
 @pytest.mark.tools
@@ -550,6 +570,30 @@ class TestSearch:
         result = search(query="test", freshness="yesterday")
         assert "Invalid freshness" in result
 
+    @patch("otutil.tools.brave._make_request")
+    def test_output_format_text_only(self, mock_request):
+        mock_request.return_value = (
+            True,
+            {
+                "web": {
+                    "results": [
+                        {
+                            "title": "Result",
+                            "url": "https://en.wikipedia.org/wiki/Test",
+                            "description": "Description",
+                        }
+                    ]
+                }
+            },
+        )
+
+        result = search(query="test query", output_format="text_only")
+
+        assert "Result" in result
+        assert "Description" in result
+        assert "https://en.wikipedia.org/wiki/Test" not in result
+        assert "## Sources" not in result
+
 
 @pytest.mark.unit
 @pytest.mark.tools
@@ -684,8 +728,10 @@ class TestSearchBatch:
         result = search_batch(queries=["query1", "query2"])
 
         assert mock_search.call_count == 2
-        assert "query1" in result
-        assert "query2" in result
+        assert isinstance(result, dict)
+        assert result["meta"]["query_count"] == 2
+        assert result["results"][0]["query"] == "query1"
+        assert result["results"][1]["query"] == "query2"
 
     @patch("otutil.tools.brave.search")
     def test_handles_tuples_with_labels(self, mock_search):
@@ -693,7 +739,7 @@ class TestSearchBatch:
 
         result = search_batch(queries=[("actual query", "Custom Label")])
 
-        assert "Custom Label" in result
+        assert result["results"][0]["label"] == "Custom Label"
 
     @patch("otutil.tools.brave.search")
     def test_preserves_order(self, mock_search):
@@ -701,10 +747,8 @@ class TestSearchBatch:
 
         result = search_batch(queries=["first", "second"])
 
-        # Check that first appears before second
-        first_pos = result.find("first")
-        second_pos = result.find("second")
-        assert first_pos < second_pos
+        assert result["results"][0]["query"] == "first"
+        assert result["results"][1]["query"] == "second"
 
     def test_empty_queries_returns_error(self):
         result = search_batch(queries=[])
@@ -741,8 +785,7 @@ class TestSearchBatch:
 
         result = search_batch(queries=[("rust programming", "")])
 
-        assert "rust programming" in result
-        assert "===  ===" not in result
+        assert result["results"][0]["label"] == "rust programming"
 
     def test_rejects_invalid_count(self):
         result = search_batch(queries=["test"], count=0)
@@ -751,6 +794,63 @@ class TestSearchBatch:
     def test_rejects_invalid_safesearch(self):
         result = search_batch(queries=["test"], safesearch="invalid")
         assert "Invalid safesearch" in result
+
+    @patch("otutil.tools.brave.search")
+    def test_forwards_text_only_output_format(self, mock_search):
+        mock_search.return_value = "Result"
+
+        search_batch(queries=["test"], output_format="text_only")
+
+        call_kwargs = mock_search.call_args.kwargs
+        assert call_kwargs["output_format"] == "text_only"
+
+    @patch("otutil.tools.brave.search")
+    def test_retries_transient_timeout(self, mock_search):
+        mock_search.side_effect = [
+            "Error: Request timed out. Try again.",
+            "Recovered result",
+        ]
+
+        result = search_batch(queries=["test"], retries=1, retry_delay_ms=0)
+
+        assert result["results"][0]["status"] == "ok"
+        assert result["results"][0]["attempts"] == 2
+        assert result["results"][0]["retried"] is True
+
+    @patch("otutil.tools.brave.search")
+    def test_error_envelope_after_retries_exhausted(self, mock_search):
+        mock_search.return_value = "Error: HTTP 500 Internal Server Error"
+
+        result = search_batch(queries=["test"], retries=1, retry_delay_ms=0)
+
+        item = result["results"][0]
+        assert item["status"] == "error"
+        assert item["final_failure"] is True
+        assert item["error"] is not None
+        assert item["error"]["error_code"] == "http_5xx"
+
+    @patch("otutil.tools.brave.search")
+    def test_duplicate_labels_preserved(self, mock_search):
+        mock_search.return_value = "Result"
+
+        result = search_batch(
+            queries=[("query1", "dup"), ("query2", "dup")],
+            retry_delay_ms=0,
+        )
+
+        assert len(result["results"]) == 2
+        assert result["results"][0]["label"] == "dup"
+        assert result["results"][1]["label"] == "dup"
+
+    @patch("otutil.tools.brave.search")
+    def test_partial_success_meta(self, mock_search):
+        mock_search.side_effect = ["Result", "Error: HTTP 500 Internal Server Error"]
+
+        result = search_batch(queries=["q1", "q2"], retries=0, retry_delay_ms=0)
+
+        assert result["meta"]["success_count"] == 1
+        assert result["meta"]["error_count"] == 1
+        assert result["meta"]["partial_success"] is True
 
 
 # -----------------------------------------------------------------------------

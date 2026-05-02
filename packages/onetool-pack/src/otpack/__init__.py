@@ -10,7 +10,16 @@ All symbols are importable directly from otpack:
     from otpack import batch_execute, check_cli, ensure_lib, is_log_verbose
 """
 
-from otpack.batch import batch_execute, format_batch_results, normalize_items
+from otpack.batch import (
+    BatchEnvelope,
+    BatchError,
+    BatchMeta,
+    BatchResultItem,
+    batch_execute,
+    batch_execute_enveloped,
+    format_batch_results,
+    normalize_items,
+)
 from otpack.cache import Cache, cache
 from otpack.config import (
     configure_standalone,
@@ -53,7 +62,12 @@ __all__ = [
     "LogSpan",
     "_format_http_error",
     "api_headers",
+    "BatchEnvelope",
+    "BatchError",
+    "BatchMeta",
+    "BatchResultItem",
     "batch_execute",
+    "batch_execute_enveloped",
     "cache",
     "check_api_key",
     "check_cli",

@@ -22,14 +22,13 @@ __ot_requires__ = {
 import re
 from typing import Any, Literal
 
-OutputFormat = Literal["full", "sources_only"]
+OutputFormat = Literal["full", "text_only", "sources_only"]
 
 import httpx
 from otpack import (
     LogSpan,
     _format_http_error,
-    batch_execute,
-    format_batch_results,
+    batch_execute_enveloped,
     get_tool_config,
     lazy_client,
     normalize_items,
@@ -165,6 +164,17 @@ def _format_web_results(
     if output_format == "sources_only":
         return _format_sources(results, max_sources=max_sources) or "No sources found."
 
+    if output_format == "text_only":
+        lines: list[str] = []
+        for result in results:
+            title = result.get("title", "No title")
+            description = result.get("description", "")
+            lines.append(title)
+            if description:
+                lines.append(description)
+            lines.append("")
+        return "\n".join(lines).strip()
+
     lines: list[str] = []
     for i, result in enumerate(results, 1):
         title = result.get("title", "No title")
@@ -212,6 +222,19 @@ def _format_news_results(
     if output_format == "sources_only":
         return _format_sources(results, max_sources=max_sources) or "No sources found."
 
+    if output_format == "text_only":
+        lines: list[str] = []
+        for result in results:
+            title = result.get("title", "No title")
+            source = result.get("meta_url", {}).get("hostname", "")
+            age = result.get("age", "")
+            lines.append(title)
+            details = ", ".join(part for part in [source, age] if part)
+            if details:
+                lines.append(details)
+            lines.append("")
+        return "\n".join(lines).strip()
+
     lines: list[str] = []
     for i, result in enumerate(results, 1):
         title = result.get("title", "No title")
@@ -249,6 +272,17 @@ def _format_image_results(
 
     if output_format == "sources_only":
         return _format_sources(results, max_sources=max_sources) or "No sources found."
+
+    if output_format == "text_only":
+        lines: list[str] = []
+        for result in results:
+            title = result.get("title", "") or "No title"
+            source = result.get("source", "")
+            lines.append(title)
+            if source:
+                lines.append(f"Source: {source}")
+            lines.append("")
+        return "\n".join(lines).strip()
 
     lines: list[str] = []
     for i, result in enumerate(results, 1):
@@ -290,6 +324,17 @@ def _format_video_results(
     if output_format == "sources_only":
         return _format_sources(results, max_sources=max_sources) or "No sources found."
 
+    if output_format == "text_only":
+        lines: list[str] = []
+        for result in results:
+            title = result.get("title", "No title")
+            description = result.get("description", "")
+            lines.append(title)
+            if description:
+                lines.append(truncate(description, VIDEO_DESC_MAX_LENGTH))
+            lines.append("")
+        return "\n".join(lines).strip()
+
     lines: list[str] = []
     for i, result in enumerate(results, 1):
         title = result.get("title", "No title")
@@ -324,7 +369,7 @@ _DATE_RANGE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}to\d{4}-\d{2}-\d{2}$")
 _FRESHNESS_VALUES = frozenset(["pd", "pw", "pm", "py"])
 _SAFESEARCH_WEB_VALUES = frozenset(["off", "moderate", "strict"])
 _SAFESEARCH_IMAGE_VALUES = frozenset(["off", "strict"])
-_OUTPUT_FORMAT_VALUES = frozenset(["full", "sources_only"])
+_OUTPUT_FORMAT_VALUES = frozenset(["full", "text_only", "sources_only"])
 _COUNTRY_RE = re.compile(r"^[A-Z]{2}$")
 
 
@@ -421,6 +466,7 @@ def search(
         output_format: Controls response structure:
             - "full" (default): numbered results with titles, ages, URLs, descriptions,
               and a ## Sources section
+            - "text_only": plain text titles and descriptions (no URLs/source list)
             - "sources_only": numbered markdown link list of sources only
         max_sources: Maximum number of sources in the ## Sources section or
             sources_only list (default: None, all sources)
@@ -500,6 +546,7 @@ def news(
         output_format: Controls response structure:
             - "full" (default): numbered results with source, age, and URL;
               [BREAKING] and [LIVE] flags when applicable
+            - "text_only": plain text titles with source/age context (no URLs/source list)
             - "sources_only": numbered markdown link list of sources only
         max_sources: Maximum number of sources in sources_only list (default: None)
 
@@ -570,6 +617,7 @@ def image(
         safesearch: Content filter - "off" or "strict" (default: "strict")
         output_format: Controls response structure:
             - "full" (default): title, confidence, size, source, image URL, page URL
+            - "text_only": plain text titles with source labels (no URLs/source list)
             - "sources_only": numbered markdown link list of page URLs only
         max_sources: Maximum number of sources in sources_only list (default: None)
 
@@ -630,6 +678,7 @@ def video(
             or date range "YYYY-MM-DDtoYYYY-MM-DD" (e.g. "2024-01-01to2024-06-30")
         output_format: Controls response structure:
             - "full" (default): title, creator, duration, views, description, URL
+            - "text_only": plain text titles and descriptions (no URLs/source list)
             - "sources_only": numbered markdown link list of video URLs only
         max_sources: Maximum number of sources in sources_only list (default: None)
 
@@ -679,7 +728,9 @@ def search_batch(
     freshness: str | None = None,
     output_format: OutputFormat = "full",
     max_sources: int | None = None,
-) -> str:
+    retries: int = 0,
+    retry_delay_ms: int = 250,
+) -> dict[str, Any] | str:
     """Execute multiple web searches concurrently and return combined results.
 
     Queries are executed in parallel using threads for better performance.
@@ -695,11 +746,11 @@ def search_batch(
         freshness: Time filter - "pd" (day), "pw" (week), "pm" (month), "py" (year),
             or date range "YYYY-MM-DDtoYYYY-MM-DD" (e.g. "2024-01-01to2024-06-30")
         output_format: Controls response structure for each query - "full" (default)
-            or "sources_only" (see brave.search for details)
+            "text_only", or "sources_only" (see brave.search for details)
         max_sources: Maximum number of sources per query (default: None)
 
     Returns:
-        Combined formatted results with labels
+        Structured batch result envelope with `results[]` and `meta`
 
     Example:
         # Simple list of queries
@@ -734,9 +785,9 @@ def search_batch(
 
     with LogSpan(span="brave.batch", queryCount=len(normalized), count=count) as s:
 
-        def _search_one(query: str, label: str) -> tuple[str, str]:
-            """Execute a single search and return (label, result)."""
-            result = search(
+        def _search_one(query: str, _label: str) -> str:
+            """Execute a single search and return raw result payload."""
+            return search(
                 query=query,
                 count=count,
                 country=country,
@@ -746,11 +797,13 @@ def search_batch(
                 output_format=output_format,
                 max_sources=max_sources,
             )
-            return label, result
 
-        results = batch_execute(_search_one, normalized, max_workers=len(normalized))
-        output = format_batch_results(results, normalized)
-        s.add(outputLen=len(output))
+        output = batch_execute_enveloped(
+            _search_one,
+            normalized,
+            retries=retries,
+            retry_delay_ms=retry_delay_ms,
+            max_workers=min(len(normalized), 10),
+        )
+        s.add(successCount=output["meta"]["success_count"], errorCount=output["meta"]["error_count"])
         return output
-
-

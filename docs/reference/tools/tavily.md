@@ -8,8 +8,10 @@ Short alias: `tav`
 
 - AI-synthesised answer + numbered results + sources in one call
 - Three topic modes: general, news, finance
+- Batch search returns structured `results[]` + `meta`, with retry metadata
 - Batch search and batch extraction with concurrent execution
 - Deep research via async polling (`research()`)
+- Schema-constrained extraction mode with optional field provenance
 
 ## Functions
 
@@ -37,6 +39,10 @@ Short alias: `tav`
 | `days` | int | For news topic, how many days back to search (1-30, default: 3) |
 | `include_domains` | list[str] | Restrict results to these domains |
 | `exclude_domains` | list[str] | Exclude results from these domains |
+| `retries` | int | Batch mode only. Retry count for transient failures (default: 0) |
+| `retry_delay_ms` | int | Batch mode only. Base backoff delay in milliseconds (default: 250) |
+| `extract_schema` | dict | Optional schema-constrained extraction mode for search/search_batch |
+| `return_provenance` | bool | Include per-field provenance (`source_url`, `snippet`, `confidence`) |
 
 ### extract / extract_batch
 
@@ -124,6 +130,21 @@ tavily.search_batch(queries=[
     ("Python 3.13 new features", "Python 3.13"),
     ("uv python package manager", "uv"),
 ], output_format="sources_only")
+
+# Batch with retry controls
+tavily.search_batch(queries=["q1", "q2"], retries=1, retry_delay_ms=200)
+
+# Schema-constrained extraction with provenance
+tavily.search(
+    query="Find contact details",
+    extract_schema={
+        "fields": [
+            {"name": "name", "type": "string", "required": True},
+            {"name": "email", "type": "string", "required": True},
+        ]
+    },
+    return_provenance=True,
+)
 
 # Deep research (async polling, may take minutes)
 tavily.research(input="How does Rust's borrow checker work?")

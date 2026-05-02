@@ -546,6 +546,64 @@ class TestSearch:
         assert "## Sources" in result
         assert "[A](https://a.com)" in result
 
+    def test_search_extract_schema_with_provenance(self):
+        response_data = {
+            "answer": "name: Alice email: alice@example.com",
+            "results": [
+                {
+                    "title": "Profile",
+                    "url": "https://people.invalid/alice",
+                    "content": "name: Alice email: alice@example.com",
+                    "score": 0.87,
+                }
+            ],
+        }
+        mock_client = MagicMock()
+        mock_client.post.return_value = _make_mock_response(response_data)
+
+        with (
+            patch("otutil.tools.tavily._get_http_client", return_value=mock_client),
+            patch("otutil.tools.tavily.require_api_key", return_value=("test-key", None)),
+        ):
+            result = search(
+                query="alice contact",
+                extract_schema={
+                    "fields": [
+                        {"name": "name", "type": "string", "required": True},
+                        {"name": "email", "type": "string", "required": True},
+                    ]
+                },
+                return_provenance=True,
+            )
+
+        assert result["mode"] == "structured_extraction"
+        assert result["data"]["email"] == "alice@example.com"
+        assert result["provenance"]["email"]["source_url"] == "https://people.invalid/alice"
+
+    def test_search_extract_schema_required_field_missing(self):
+        response_data = {
+            "answer": "No contact info available.",
+            "results": [{"title": "X", "url": "https://x.invalid", "content": "No email", "score": 0.2}],
+        }
+        mock_client = MagicMock()
+        mock_client.post.return_value = _make_mock_response(response_data)
+
+        with (
+            patch("otutil.tools.tavily._get_http_client", return_value=mock_client),
+            patch("otutil.tools.tavily.require_api_key", return_value=("test-key", None)),
+        ):
+            result = search(
+                query="missing email",
+                extract_schema={"fields": [{"name": "email", "type": "string", "required": True}]},
+            )
+
+        assert result["errors"]
+        assert result["errors"][0]["error_code"] == "required_field_missing"
+
+    def test_search_extract_schema_validation_error(self):
+        result = search(query="x", extract_schema={"fields": []})
+        assert "extract_schema.fields must be a non-empty list" in result
+
 
 @pytest.mark.unit
 @pytest.mark.tools
@@ -675,7 +733,10 @@ class TestSearchBatch:
         ):
             result = search_batch(queries=["python", "javascript"])
 
-        assert "python" in result.lower() or "Result" in result
+        assert isinstance(result, dict)
+        assert result["meta"]["query_count"] == 2
+        assert result["results"][0]["query"] == "python"
+        assert result["results"][1]["query"] == "javascript"
 
     def test_validation_error_invalid_depth(self):
         result = search_batch(queries=["test"], search_depth="bad")
@@ -701,7 +762,7 @@ class TestSearchBatch:
                 queries=[("Python 3.13 features", "Python 3.13")]
             )
 
-        assert "Python 3.13" in result
+        assert result["results"][0]["label"] == "Python 3.13"
 
     def test_empty_label_falls_back_to_query(self):
         response_data = {"results": [], "answer": ""}
@@ -714,7 +775,7 @@ class TestSearchBatch:
         ):
             result = search_batch(queries=[("some query", "")])
 
-        assert "some query" in result
+        assert result["results"][0]["label"] == "some query"
 
     def test_output_format_forwarded(self):
         response_data = {
@@ -730,7 +791,24 @@ class TestSearchBatch:
         ):
             result = search_batch(queries=["q"], output_format="text_only")
 
-        assert "The answer." in result
+        assert result["results"][0]["status"] == "ok"
+        assert result["results"][0]["data"] == "The answer."
+
+    def test_retry_envelope_on_transient_error(self):
+        mock_client = MagicMock()
+        fail = MagicMock()
+        fail.raise_for_status.side_effect = Exception("timeout")
+        ok = _make_mock_response({"answer": "ok", "results": []})
+        mock_client.post.side_effect = [fail, ok]
+
+        with (
+            patch("otutil.tools.tavily._get_http_client", return_value=mock_client),
+            patch("otutil.tools.tavily.require_api_key", return_value=("test-key", None)),
+        ):
+            result = search_batch(queries=["q"], retries=1, retry_delay_ms=0)
+
+        assert result["results"][0]["status"] == "ok"
+        assert result["results"][0]["attempts"] == 2
 
 
 @pytest.mark.unit
