@@ -1,6 +1,6 @@
-# File vs Mem vs Claude Native Benchmark
+# File vs Mem vs Harness-native Benchmark
 
-Three-way like-for-like comparison: `file` pack vs `mem` pack vs Claude Native tools.
+Three-way like-for-like comparison: `file` pack vs `mem` pack vs Harness-native tools.
 Focus is agent wall-clock cost using identical timing methodology for all three.
 
 ---
@@ -10,9 +10,9 @@ Focus is agent wall-clock cost using identical timing methodology for all three.
 Discover available tools:
 
 ```
-ot.tools(pattern="mem", info="core")
-ot.tools(pattern="file", info="core")
-ot.tools(pattern="timer", info="core")
+ot.tools(pattern="mem", info="min")
+ot.tools(pattern="file", info="min")
+ot.tools(pattern="timer", info="min")
 ```
 
 Load dev docs into mem (setup only, not timed):
@@ -38,7 +38,7 @@ mem.xxx(...)
 ot_timer.elapsed(name="tN-mem", store_as="tN-mem")
 
 ot_timer.start(name="tN-native")
-<Claude Native Read or Grep>
+<Harness-native Read or Grep>
 ot_timer.elapsed(name="tN-native", store_as="tN-native")
 ```
 

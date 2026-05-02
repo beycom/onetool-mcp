@@ -42,7 +42,7 @@ playwright.browser_navigate(url="https://en.wikipedia.org/wiki/Anthropic")
 
 # 2. Dismiss any existing dialogs (cleanup from previous tests)
 try:
-    playwright.handle_dialog(action="dismiss")
+    playwright.browser_handle_dialog(accept=False)
 except:
     pass  # No dialog present, continue
 ```
@@ -144,7 +144,7 @@ p7 = play_util.scan_annotations()
 # Expect: empty list []
 
 # 8. Take screenshot for verification
-playwright.take_screenshot()
+playwright.browser_take_screenshot()
 
 # Print summary
 {
@@ -179,11 +179,11 @@ chrome_devtools.take_screenshot()
 
 **Prompt dialog appears during testing:**
 - **Cause:** User manually pressed CMD-I/Ctrl+I during test
-- **Solution:** Run `chrome_devtools.handle_dialog(action="dismiss")` or `playwright.handle_dialog(action="dismiss")`
+- **Solution:** Run `chrome_devtools.handle_dialog(action="dismiss")` or `playwright.browser_handle_dialog(accept=False)`
 - **Prevention:** Do not interact with browser during automated tests
 
 **"No page selected" error (DevTools):**
-- **Solution:** Create a new page with `chrome_devtools.new_page(url="https://example.com")`
+- **Solution:** Create a new page with `chrome_devtools.new_page(url="https://en.wikipedia.org/wiki/Anthropic")`
 - Or list and select existing page: `chrome_devtools.list_pages()` → `chrome_devtools.select_page(page_id=N)`
 
 **"The selected page has been closed" error:**
@@ -224,7 +224,7 @@ except:
 # Playwright cleanup
 try:
     play_util.clear_annotations()
-    playwright.handle_dialog(action="dismiss")
+    playwright.browser_handle_dialog(accept=False)
 except:
     pass
 ```

@@ -1,6 +1,6 @@
 # Vision Comparison
 
-Compare `img.ask` (ot_image tool) vs Claude's built-in direct image attachment for answering
+Compare `img.ask` (ot_image tool) vs Harness-native direct image attachment for answering
 questions about an image.
 
 ---
@@ -9,7 +9,7 @@ questions about an image.
 
 Glob `tests/data/products-*.*` and list the files found. Ask the user to pick one.
 
-Wait for the user to select a file before proceeding.
+If running unattended, default to `tests/data/products-full.png` and continue.
 
 ---
 
@@ -17,42 +17,37 @@ Wait for the user to select a file before proceeding.
 
 **IMPORTANT: Every numbered step MUST be run inside its own subagent (Agent tool call).** This
 ensures each step executes in a separate turn, flushing to JSONL before the next measurement is
-taken. Never call `cld.start_usage`, `tmr.start`, `img.ask`, `tmr.elapsed`, or
-`cld.elapsed_usage` directly in the main conversation — always delegate to a subagent.
+taken. Never call `tmr.start`, `img.ask`, or `tmr.elapsed` directly in the main conversation —
+always delegate to a subagent.
 
 Steps 1 and 2 within each approach may be launched as parallel subagents. Step 3 must wait for
 steps 1–2 to complete. Steps 4 and 5 must wait for step 3 to complete, and may be parallel.
 
-**Note:** `img.ask` executes via its own API client in a separate session — `cld.elapsed_usage`
-will always return 0 tokens for Approach A. This is expected and noted as a known limitation.
+**Note:** `img.ask` executes via its own API client in a separate session.
 
 **Approach A — `img.ask`:**
 ```
-1. [subagent] cld.start_usage(name="A")
-2. [subagent] tmr.start(name="A")
-   --- wait for 1+2 ---
+1. [subagent] tmr.start(name="A")
+   --- wait for 1 ---
 3. [subagent] img.ask(img="<image_path>", q=["<grid question — see below>"])
    --- wait for 3 ---
 4. [subagent] tmr.elapsed(name="A")
-5. [subagent] cld.elapsed_usage(name="A")
 ```
 
 **Approach B — Direct attachment:**
 ```
-1. [subagent] cld.start_usage(name="B")
-2. [subagent] tmr.start(name="B")
-   --- wait for 1+2 ---
+1. [subagent] tmr.start(name="B")
+   --- wait for 1 ---
 3. [subagent] Read(file_path="<image_path>")
               Then answer the grid question below from the rendered image.
    --- wait for 3 ---
 4. [subagent] tmr.elapsed(name="B")
-5. [subagent] cld.elapsed_usage(name="B")
 ```
 
 Step 3 for Approach B requires a subagent that reads the image file and answers the question in
 the same turn. Steps 4 and 5 must come **after** that subagent completes.
 
-Run Approach A first (steps 1–5), then Approach B (steps 1–5).
+Run Approach A first (steps 1–4), then Approach B (steps 1–4).
 
 ---
 
@@ -101,8 +96,3 @@ Summary line: `X / Y cells correct (Z%)` — where Y = total cells in the img.as
 | Metric | img.ask | Direct |
 | :--- | ---: | ---: |
 | Time (s) | | |
-| Total tokens | 0 (cross-session) | |
-| Cost (USD) | N/A (cross-session) | |
-| Output tokens | N/A | |
-| Cache read tokens | N/A | |
-| Cache create tokens | N/A | |
