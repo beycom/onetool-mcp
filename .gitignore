@@ -10,6 +10,7 @@ Thumbs.db
 # Editor directories and files
 .idea/
 .vscode/
+.obsidian/
 *.swp
 *.swo
 *.swn
