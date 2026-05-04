@@ -11,6 +11,7 @@ import shlex
 import shutil
 import subprocess
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -81,6 +82,7 @@ from otdev.tools._arch.validate import validate_entities
 
 _SAFE_ID_FRAGMENT_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 _UNSAFE_PATH_CHARS_RE = re.compile(r"[;\|&`$<>\r\n]")
+_MAX_RENDER_WORKERS = 6
 
 
 @dataclass(slots=True)
@@ -467,6 +469,40 @@ def _execute_render_engine(
     }
 
 
+def _execute_render_jobs(
+    *,
+    jobs: list[tuple[int, RenderTargetConfig, dict[str, Any]]],
+    max_workers: int,
+) -> tuple[bool, dict[int, dict[str, Any]]]:
+    """Run render jobs concurrently and return results indexed by input order."""
+    if not jobs:
+        return True, {}
+
+    worker_count = max(1, min(max_workers, len(jobs)))
+    results: dict[int, dict[str, Any]] = {}
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        future_map = {
+            executor.submit(
+                _execute_render_engine,
+                target_config=target_config,
+                render_context=render_context,
+            ): idx
+            for idx, target_config, render_context in jobs
+        }
+
+        for future in as_completed(future_map):
+            idx = future_map[future]
+            ok, render_result = future.result()
+            if not ok:
+                for pending in future_map:
+                    if not pending.done():
+                        pending.cancel()
+                return False, render_result
+            results[idx] = render_result
+
+    return True, results
+
+
 def _generate_solution(
     *,
     output_root: Path,
@@ -586,7 +622,9 @@ def _generate_solution(
         )
 
         svg_by_level: dict[str, str] = {}
-        for level in (_LEVEL_SYS, _LEVEL_APP, _LEVEL_CMP):
+        level_jobs: list[tuple[int, RenderTargetConfig, dict[str, Any]]] = []
+        level_outputs: list[tuple[str, Path, Path]] = []
+        for idx, level in enumerate((_LEVEL_SYS, _LEVEL_APP, _LEVEL_CMP)):
             d2_text = _build_system_d2(
                 system_id=system_id,
                 level=level,
@@ -606,21 +644,33 @@ def _generate_solution(
                 work_dir=str(output_root),
                 template_dir=str(template_dir),
             )
-            ok, render_result = _execute_render_engine(
-                target_config=render_target,
-                render_context=render_context,
-            )
-            if not ok:
-                return _error_payload(
-                    operation="generate",
-                    code=render_result["code"],
-                    message=render_result["message"],
-                    details=render_result["details"],
-                )
+            level_outputs.append((level, d2_path, svg_path))
+            level_jobs.append((idx, render_target, render_context))
 
+        ok, render_result = _execute_render_jobs(
+            jobs=level_jobs,
+            max_workers=3,
+        )
+        if not ok:
+            return _error_payload(
+                operation="generate",
+                code=render_result["code"],
+                message=render_result["message"],
+                details=render_result["details"],
+            )
+
+        for level, d2_path, svg_path in level_outputs:
             generated_files.append(str(d2_path))
             generated_files.append(str(svg_path))
             svg_by_level[level] = _svg_markup(svg_path.read_text(encoding="utf-8"))
+
+            if not svg_by_level[level]:
+                return _error_payload(
+                    operation="generate",
+                    code="render_output_error",
+                    message=f"Rendered SVG for level '{level}' is empty.",
+                    details={"system_id": system_id, "level": level},
+                )
 
         base_context = _build_solution_system_context(
             system_id=system_id,
@@ -704,6 +754,7 @@ def _render_workbook_diagrams(
     generated_files: list[str] = []
     by_system: dict[str, list[dict[str, str]]] = {}
 
+    prepared: list[tuple[_WorkbookDiagramSpec, int, str, Path]] = []
     for idx, spec in enumerate(diagram_specs, start=1):
         system_id_issue = _validate_system_id_fragment(
             value=spec.system_id,
@@ -728,7 +779,10 @@ def _render_workbook_diagrams(
             safe_name = f"diagram-{idx}"
         svg_name = f"{spec.system_id}-{idx:02d}-{safe_name}.svg"
         output_path = diagram_dir / svg_name
+        prepared.append((spec, idx, svg_name, output_path))
 
+    jobs: list[tuple[int, RenderTargetConfig, dict[str, Any]]] = []
+    for job_idx, (spec, _, _, output_path) in enumerate(prepared):
         render_context = _build_render_context(
             model_payload=model_payload,
             target_config=target_config,
@@ -737,18 +791,21 @@ def _render_workbook_diagrams(
             work_dir=str(output_root),
             template_dir=str(spec.source_path.parent),
         )
-        ok, render_result = _execute_render_engine(
-            target_config=target_config,
-            render_context=render_context,
-        )
-        if not ok:
-            return _error_payload(
-                operation="generate",
-                code=render_result["code"],
-                message=render_result["message"],
-                details=render_result["details"],
-            )
+        jobs.append((job_idx, target_config, render_context))
 
+    ok, render_result = _execute_render_jobs(
+        jobs=jobs,
+        max_workers=_MAX_RENDER_WORKERS,
+    )
+    if not ok:
+        return _error_payload(
+            operation="generate",
+            code=render_result["code"],
+            message=render_result["message"],
+            details=render_result["details"],
+        )
+
+    for spec, _, svg_name, output_path in prepared:
         generated_files.append(str(output_path))
         diagram_markup = _svg_markup(output_path.read_text(encoding="utf-8"))
         by_system.setdefault(spec.system_id, []).append(
@@ -760,6 +817,14 @@ def _render_workbook_diagrams(
                 "svg_path": f"images/{svg_name}",
             }
         )
+
+        if not diagram_markup:
+            return _error_payload(
+                operation="generate",
+                code="render_output_error",
+                message="Rendered workbook diagram SVG is empty.",
+                details={"system_id": spec.system_id, "source": str(spec.source_path)},
+            )
 
     return {"ok": True, "files": generated_files, "by_system": by_system}
 
