@@ -6,22 +6,28 @@ Defines how tools are organized and discovered. Tools are auto-discovered from t
 ## Requirements
 ### Requirement: Tool Auto-Discovery
 
-OneTool SHALL auto-discover tools from Python files in the `src/ottools/` directory.
+OneTool SHALL auto-discover tools from bundled core packs and installed domain extra packs.
 
-#### Scenario: Tool discovery on startup
-- **GIVEN** Python files in the `src/ottools/` directory
+#### Scenario: Core tool discovery on startup
+- **GIVEN** Python files in the bundled `src/ottools/` package
 - **WHEN** the server starts
-- **THEN** it SHALL scan all `.py` files for public functions with docstrings
+- **THEN** it SHALL scan tool modules for public callable functions with docstrings
 
-#### Scenario: New tool detection
-- **GIVEN** a new `.py` file added to `src/ottools/`
-- **WHEN** a tool call is made or registry is rescanned
-- **THEN** the new tool SHALL be discovered and available
+#### Scenario: Domain extra tool discovery on startup
+- **GIVEN** installed domain packages exposing `otdev.tools` and/or `otutil.tools`
+- **WHEN** the server starts
+- **THEN** it SHALL include those pack modules in discovery
+- **AND** pack namespaces from those modules SHALL be callable
+
+#### Scenario: New domain tool pack detection
+- **GIVEN** a new pack module is added under `otdev.tools` or `otutil.tools`
+- **WHEN** tool loading or registry rescan occurs
+- **THEN** the new pack SHALL be discoverable and callable without additional registry wiring changes
 
 #### Scenario: Tool removal
-- **GIVEN** a `.py` file removed from `src/ottools/`
+- **GIVEN** a previously discovered pack module is removed
 - **WHEN** the registry is rescanned
-- **THEN** the tool SHALL no longer be available
+- **THEN** the removed pack SHALL no longer be available
 
 ### Requirement: Tool Metadata Extraction
 

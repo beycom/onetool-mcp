@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="text-3xl font-bold mb-6">{{ system.name }}</h1>
+
+{% if metadata_data %}
+<div class="mb-6">
+    <div id="metadata-table" class="ag-theme-alpine"></div>
+</div>
+{% endif %}
+
+{% if system.applications %}
+<div class="mb-6">
+    <h2 class="text-lg font-semibold mb-2 cursor-pointer select-none" data-collapse="applications-content"><span class="collapse-icon mr-1">&#9654;</span>Applications & Components</h2>
+    <div id="applications-content" style="display: none;" data-collapsed="true">
+        <div class="flex justify-end mb-2">
+            <button type="button" class="btn btn-xs btn-outline" onclick="downloadTableXLSX('applications-table', 'applications.xlsx')">Export XLSX</button>
+        </div>
+        <div id="applications-table" class="ag-theme-alpine"></div>
+    </div>
+</div>
+{% endif %}
+
+{% if system.components %}
+<div class="mb-6">
+    <h2 class="text-lg font-semibold mb-2 cursor-pointer select-none" data-collapse="components-content"><span class="collapse-icon mr-1">&#9660;</span>Components</h2>
+    <div id="components-content">
+        <div class="flex justify-end mb-2">
+            <button type="button" class="btn btn-xs btn-outline" onclick="downloadTableXLSX('components-table', 'components.xlsx')">Export XLSX</button>
+        </div>
+        <div id="components-table" class="ag-theme-alpine"></div>
+    </div>
+</div>
+{% endif %}
+
+{% if integrations %}
+<div class="mb-6">
+    <h2 class="text-lg font-semibold mb-2 cursor-pointer select-none" data-collapse="integrations-content"><span class="collapse-icon mr-1">&#9654;</span>Integrations</h2>
+    <div id="integrations-content" style="display: none;" data-collapsed="true">
+        <div class="flex justify-end mb-2">
+            <button type="button" class="btn btn-xs btn-outline" onclick="downloadTableXLSX('integrations-table', 'integrations.xlsx')">Export XLSX</button>
+        </div>
+        <div id="integrations-table" class="ag-theme-alpine"></div>
+    </div>
+</div>
+{% endif %}
+
+{% if diagrams %}
+<div class="mb-4">
+    <h2 class="text-lg font-semibold mb-2 cursor-pointer select-none" data-collapse="diagrams-content"><span class="collapse-icon mr-1">&#9660;</span>Diagrams</h2>
+    <div id="diagrams-content">
+        <div role="tablist" class="tabs tabs-bordered mb-4" data-tab-group="diagram-tabs">
+            {% for diagram in diagrams %}
+            <input type="radio" name="diagram-tabs" role="tab" class="tab" aria-label="{{ diagram.label }}" {% if loop.first %}checked{% endif %} data-tab-group="diagram-tabs" data-tab-target="diagram-{{ diagram.level }}">
+            {% endfor %}
+        </div>
+        {% for diagram in diagrams %}
+        <div id="diagram-{{ diagram.level }}" class="diagram-tab-content" data-tab-group="diagram-tabs" {% if not loop.first %}style="display: none;"{% endif %}>
+            <div class="diagram-panel border border-base-300 rounded-lg p-4">
+                <div class="flex justify-end gap-1 mb-2">
+                    <button type="button" class="btn btn-xs btn-ghost" onclick="zoomIn(this)">+ Zoom</button>
+                    <button type="button" class="btn btn-xs btn-ghost" onclick="zoomOut(this)">- Zoom</button>
+                    <button type="button" class="btn btn-xs btn-ghost" onclick="resetZoom(this)">Reset</button>
+                    <button type="button" class="btn btn-xs btn-outline" onclick="printDiagram(this)">Print</button>
+                </div>
+                {% if diagram.description %}
+                <div class="text-sm text-base-content/80 mb-3">{{ diagram.description|safe }}</div>
+                {% endif %}
+                {% if diagram.svg %}
+                <div class="diagram-container min-h-[400px] overflow-hidden border border-base-200 rounded" tabindex="0">{{ diagram.svg|safe }}</div>
+                {% else %}
+                <div class="diagram-container min-h-[400px] overflow-hidden border border-base-200 rounded" data-svg-src="{{ diagram.svg_path }}" tabindex="0">
+                    <div class="flex items-center justify-center h-full text-base-content/50">Loading diagram...</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if additional_diagrams %}
+<div class="mb-4">
+    <h2 class="text-lg font-semibold mb-2 cursor-pointer select-none" data-collapse="additional-diagrams-content"><span class="collapse-icon mr-1">&#9660;</span>Additional Diagrams</h2>
+    <div id="additional-diagrams-content">
+        <div role="tablist" class="tabs tabs-bordered mb-4" data-tab-group="additional-diagram-tabs">
+            {% for diagram in additional_diagrams %}
+            <input type="radio" name="additional-diagram-tabs" role="tab" class="tab" aria-label="{{ diagram.label }}" {% if loop.first %}checked{% endif %} data-tab-group="additional-diagram-tabs" data-tab-target="additional-diagram-{{ diagram.level }}">
+            {% endfor %}
+        </div>
+        {% for diagram in additional_diagrams %}
+        <div id="additional-diagram-{{ diagram.level }}" class="diagram-tab-content" data-tab-group="additional-diagram-tabs" {% if not loop.first %}style="display: none;"{% endif %}>
+            <div class="diagram-panel border border-base-300 rounded-lg p-4">
+                <div class="flex justify-end gap-1 mb-2">
+                    <button type="button" class="btn btn-xs btn-ghost" onclick="zoomIn(this)">+ Zoom</button>
+                    <button type="button" class="btn btn-xs btn-ghost" onclick="zoomOut(this)">- Zoom</button>
+                    <button type="button" class="btn btn-xs btn-ghost" onclick="resetZoom(this)">Reset</button>
+                    <button type="button" class="btn btn-xs btn-outline" onclick="printDiagram(this)">Print</button>
+                </div>
+                {% if diagram.description %}
+                <div class="text-sm text-base-content/80 mb-3">{{ diagram.description|safe }}</div>
+                {% endif %}
+                {% if diagram.svg %}
+                <div class="diagram-container min-h-[400px] overflow-hidden border border-base-200 rounded" tabindex="0">{{ diagram.svg|safe }}</div>
+                {% else %}
+                <div class="diagram-container min-h-[400px] overflow-hidden border border-base-200 rounded" data-svg-src="{{ diagram.svg_path }}" tabindex="0">
+                    <div class="flex items-center justify-center h-full text-base-content/50">Loading diagram...</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    {% if metadata_data %}
+    initAgGridTable('metadata-table', {{ metadata_data|tojson }}, {{ metadata_columns|tojson }}, {pagination: false});
+    {% endif %}
+
+    {% if system.applications %}
+    initAgGridTable('applications-table', {{ applications_data|tojson }}, {{ applications_columns|tojson }});
+    {% endif %}
+
+    {% if system.components %}
+    initAgGridTable('components-table', {{ components_data|tojson }}, {{ components_columns|tojson }});
+    {% endif %}
+
+    {% if integrations %}
+    initAgGridTable('integrations-table', {{ integrations_data|tojson }}, {{ integrations_columns|tojson }});
+    {% endif %}
+
+    initDiagramPanZoom();
+    initCollapse();
+    initDiagramTabs();
+});
+</script>
+
+<footer class="mt-8 pt-4 border-t border-base-300 text-sm text-base-content/50">
+    Generated: {{ generated_at }}
+</footer>
+{% endblock %}

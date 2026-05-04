@@ -19,9 +19,10 @@ def test_import_package() -> None:
 @pytest.mark.smoke
 def test_import_tool_modules() -> None:
     """Test that all tool modules can be imported."""
-    from otdev.tools import context7, db, diagram, package, ripgrep, webfetch
+    from otdev.tools import arch, context7, db, diagram, package, ripgrep, webfetch
 
     # Check pack names (alphabetical order)
+    assert arch.pack == "arch"
     assert context7.pack == "context7"
     assert db.pack == "db"
     assert diagram.pack == "diagram"

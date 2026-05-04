@@ -2250,10 +2250,13 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
+    { name = "beautifulsoup4" },
     { name = "boto3" },
     { name = "filelock" },
     { name = "formulas" },
     { name = "google-genai" },
+    { name = "lxml" },
+    { name = "markdown" },
     { name = "openpyxl" },
     { name = "pathspec" },
     { name = "pymupdf" },
@@ -2267,8 +2270,12 @@ all = [
     { name = "trafilatura" },
 ]
 dev = [
+    { name = "beautifulsoup4" },
     { name = "boto3" },
     { name = "filelock" },
+    { name = "lxml" },
+    { name = "markdown" },
+    { name = "openpyxl" },
     { name = "sqlalchemy" },
     { name = "tabulate" },
     { name = "trafilatura" },
@@ -2313,6 +2320,7 @@ docs = [
 
 [package.metadata]
 requires-dist = [
+    { name = "beautifulsoup4", marker = "extra == 'dev'", specifier = ">=4.14.3" },
     { name = "boto3", marker = "extra == 'dev'", specifier = ">=1.42.97" },
     { name = "crawl4ai", marker = "extra == 'scrape'", specifier = ">=0.8.6" },
     { name = "docstring-parser", specifier = ">=0.18.0" },
@@ -2325,9 +2333,12 @@ requires-dist = [
     { name = "jmespath", specifier = ">=1.1.0" },
     { name = "keyring", specifier = ">=25.7.0" },
     { name = "loguru", specifier = ">=0.7.3" },
+    { name = "lxml", marker = "extra == 'dev'", specifier = ">=5.3,<6" },
+    { name = "markdown", marker = "extra == 'dev'", specifier = ">=3.9" },
     { name = "mcp", specifier = ">=1.27.0" },
     { name = "onetool-mcp", extras = ["util", "dev"], marker = "extra == 'all'" },
     { name = "openai", specifier = ">=2.32.0" },
+    { name = "openpyxl", marker = "extra == 'dev'", specifier = ">=3.1.5" },
     { name = "openpyxl", marker = "extra == 'util'", specifier = ">=3.1.5" },
     { name = "pathspec", marker = "extra == 'util'", specifier = ">=1.1.1" },
     { name = "pillow", specifier = ">=12.2.0" },

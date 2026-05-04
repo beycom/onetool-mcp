@@ -1,0 +1,65 @@
+{# System-level D2 source template.
+   Naming convention: system.d2.j2
+   Context contract:
+   - model.system_view: title_name, level_name, user_nodes, external_nodes, system_blocks, integration_edges
+   - profile_data: tools.arch.profiles.<name>.data mapping #}
+{% include "styles.d2" %}
+
+title: {{ model.system_view.title_name }} - {{ model.system_view.level_name }} View {
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+direction: {{ profile_data.direction | default(profile_data.system_diagram_direction | default("right")) }}
+
+{% for user in model.system_view.user_nodes -%}
+"{{ user.id }}": {{ user.label }} {
+  class: Person
+}
+
+{% endfor -%}
+{% for ext in model.system_view.external_nodes -%}
+"{{ ext.id }}": {{ ext.label }} {
+  class: External
+}
+
+{% endfor -%}
+{% for block in model.system_view.system_blocks -%}
+"{{ block.id }}": {{ block.label }} {
+  class: System
+{% if block.placeholder -%}
+  "_placeholder_{{ block.id }}": " " {
+    class: AppPlaceholder
+  }
+{% endif -%}
+{% for direct in block.direct_components -%}
+  "{{ direct.id }}": {{ direct.label }} {
+    class: {{ direct.class }}
+  }
+{% endfor -%}
+{% for app in block.apps -%}
+  "{{ app.id }}": {{ app.label }} {
+    class: App
+{% for cmp in app.components -%}
+    "{{ cmp.id }}": {{ cmp.label }} {
+      class: {{ cmp.class }}
+    }
+{% endfor -%}
+  }
+{% endfor -%}
+}
+
+{% endfor -%}
+{% for edge in model.system_view.integration_edges -%}
+{{ edge.src_path }} -> {{ edge.dst_path }}: "{{ edge.label }}" {
+  class: {{ edge.direction_class }}
+{% if edge.source_arrowhead_id -%}
+  source-arrowhead.label: "{{ edge.source_arrowhead_id }}"
+{% endif -%}
+{% if edge.target_arrowhead_id -%}
+  target-arrowhead.label: "{{ edge.target_arrowhead_id }}"
+{% endif -%}
+}
+{% endfor -%}

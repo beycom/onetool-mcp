@@ -1,0 +1,49 @@
+sys:
+- id: sys_core
+  name: Core Platform
+  tags: core,shared
+- id: sys_legacy
+  name: Legacy Platform
+  tags: deprecated
+app:
+- id: app_api
+  name: Public API
+  sys: sys_core
+  tags: core
+- id: app_admin
+  name: Admin Portal
+  sys: sys_core
+  tags: internal
+- id: app_old
+  name: Old App
+  sys: sys_legacy
+  tags: deprecated
+cmp:
+- id: cmp_auth
+  name: Auth Service
+  app: app_api
+  tags: core
+- id: cmp_ui
+  name: UI Layer
+  app: app_admin
+  tags: internal
+- id: cmp_old
+  name: Old Worker
+  app: app_old
+  tags: deprecated
+int:
+- id: int_auth_ui
+  name: Auth to UI
+  src: cmp_auth
+  dst: cmp_ui
+  tags: core
+- id: int_user_api
+  name: User to API
+  src: usr_ops
+  dst: app_api
+  tags: core
+usr:
+- id: usr_ops
+  name: Operations User
+  app: app_admin
+  tags: core

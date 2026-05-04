@@ -171,6 +171,7 @@ nav:
               - OT Servers: reference/tools/ot_servers.md
               - OT Timer: reference/tools/ot_timer.md
           - Tools:
+              - Arch: reference/tools/arch.md
               - AWS: reference/tools/aws.md
               - Brave: reference/tools/brave.md
               - OT Caveman: reference/tools/ot_caveman.md

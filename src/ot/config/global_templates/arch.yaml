@@ -1,0 +1,21 @@
+# Arch tool configuration
+# Provides canonical defaults for architecture generation.
+
+tools:
+  arch:
+    output_dir: architecture-output
+    default_profile: simple
+    profiles:
+      simple:
+        solution_report: arch-templates/solution/default/index.html.j2
+        system_report: arch-templates/solution/default/system.html.j2
+        system_diagram: arch-templates/d2/system.d2.j2
+        system_engine: d2 {{ input }} {{ output }} --layout elk
+        diagram_engine: d2 {{ input }} {{ output }} --layout elk
+        data:
+          merge_integrations: true
+          show_integration_labels: true
+          integration_labels: "[{{ row.key }}] {{ row.name }} ({{ row.type }})"
+          show_arrowhead_labels: true
+          arrowhead_labels: "{{ row.key }}"
+          direction: up
