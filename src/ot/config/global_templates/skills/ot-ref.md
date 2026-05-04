@@ -28,6 +28,22 @@ tags: [reference, cheatsheet]
 - Arbitrary imports are blocked; use pack tools instead.
 - Check policy: `ot.security()` or `ot.security(check='json')`.
 
+## Decision Boundary: `run` vs Local Python
+
+Use `run` for:
+- Direct `pack.tool(...)` calls
+- Short composition around tool calls (small variable prep, one-pass mapping, final expression return)
+- Discovery and recovery flows (`ot.help`, `ot.tool_info`, `ot_servers.enable`)
+
+Use local Python files for:
+- Standard file manipulation or ETL-style transforms
+- Large inline datasets (long row lists, embedded workbook payloads)
+- Multi-step remapping/normalization logic that should be reviewed in git
+- Reusable generation pipelines (scenario builders, workbook assemblers)
+
+Tie-break rule:
+- If most of the code is custom manipulation and only a small part is tool invocation, move it to local Python and keep `run` calls thin/tool-centric.
+
 ## Output Controls
 
 ```python

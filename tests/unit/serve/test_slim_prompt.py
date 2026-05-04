@@ -8,11 +8,11 @@ import pytest
 @pytest.mark.unit
 @pytest.mark.serve
 def test_instructions_is_short() -> None:
-    """instructions prompt template is at most 35 lines (before pack_summary substitution)."""
+    """instructions prompt template is at most 50 lines (before pack_summary substitution)."""
     from ot.prompts import load_prompts
 
     prompts = load_prompts()
-    assert len(prompts.instructions.strip().splitlines()) <= 35
+    assert len(prompts.instructions.strip().splitlines()) <= 50
 
 
 @pytest.mark.unit

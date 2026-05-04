@@ -5,7 +5,7 @@ TTL-expiring, BM25-indexed storage for large tool outputs. Replace context-windo
 ## Highlights
 
 - Handles large outputs (API responses, logs, docs) without saturating the context window
-- BM25 search with three-layer fallback: Porter FTS5 → trigram FTS5 → Levenshtein correction
+- `ctx.query()` for structured JSON/YAML extraction using JMESPath
 - ~1ms write latency — indexing runs in a background daemon thread
 - TTL-expiring handles (default 3600s); no-expiry with `ttl=0`
 - Large content (>256KB) spills to disk automatically; handle stays the same
@@ -22,7 +22,7 @@ TTL-expiring, BM25-indexed storage for large tool outputs. Replace context-windo
 | `ctx.append(handle, content)` | Append content and re-index |
 | `ctx.read(handle, offset, limit, tail, mode)` | Paginated raw content, metadata, or TOC |
 | `ctx.toc(handle)` | Numbered section index with vocabulary hints |
-| `ctx.search(handle, queries, limit)` | BM25 section search with three-layer fallback |
+| `ctx.query(handle, expr)` | Evaluate JMESPath expression against JSON/YAML handles |
 | `ctx.grep(handle, pattern, context, fuzzy)` | Regex or fuzzy line search |
 | `ctx.slice(handle, select)` | Extract by section number, heading, or line range |
 | `ctx.ask(handle, q, model)` | Multi-question LLM query over stored content (optional) |
@@ -54,15 +54,14 @@ Returns a dict with `handle`, `size_bytes`, `total_lines`, `status`, and `abstra
 | `tail` | int | Return last N lines; overrides offset/limit |
 | `mode` | str | `"toc"` → section index; `"meta"` → metadata only |
 
-### `ctx.search()`
+### `ctx.query()`
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `handle` | str | Handle from ctx.write() |
-| `queries` | list[str] | One or more search queries |
-| `limit` | int | Max results per query (default 5) |
+| `expr` | str | JMESPath expression (for example `items[0].name`) |
 
-Returns sections with `title`, `snippet`, `score`, and `matchLayer` (`porter`/`trigram`/`fuzzy`).
+Returns `{handle, expr, result}` on success, or an error payload when format/expr is invalid.
 
 ### `ctx.grep()`
 
@@ -122,7 +121,7 @@ tools:
 ```python
 # Store API response and search it
 h = ctx.write(big_json_output, source="api")
-ctx.search(h["handle"], queries=["error", "timeout"])
+ctx.query(h["handle"], expr="items[?status == 'active'].name")
 
 # Read a log file page-by-page
 h = ctx.write(log_content, source="logs")

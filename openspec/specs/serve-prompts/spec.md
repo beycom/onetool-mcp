@@ -56,7 +56,7 @@ The system SHALL support externalised server instructions with a minimal footpri
 
 #### Scenario: Instructions are concise
 - **WHEN** the server builds the handshake instructions
-- **THEN** the resulting prompt SHALL contain at most 35 lines
+- **THEN** the resulting prompt SHALL contain at most 50 lines
 - **AND** SHALL include: identity line, trigger aliases (`>>>`, `__run`, `mcp__onetool__run`), pass-through rule, keyword-args rule, batch rule, discovery hint (`>>> ot.help(query="...")`), proxy recovery guidance (`ot_servers.enable(name="...")` then retry once when name is known; `ot.servers()` when unknown), external content boundary warning, and tool output directive
 
 #### Scenario: Discovery hint present

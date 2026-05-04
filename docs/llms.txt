@@ -26,6 +26,7 @@ Source of truth: `src/ot/config/global_templates/prompts.yaml` (`prompts.packs`)
 | Pack | Extra | Description |
 |---|---|---|
 | `ot` | `core` | ** Discover tools, packs. Get the help you need to call them correctly. The BEST PLACE to start. ** |
+| `arch` | `[dev]` | Architecture workflows for Excel ingest, validation, generation, round-trip, and bundling |
 | `aws` | `[dev]` | Manage AWS resources — dynamically enable any of their 50+ dedicated MCP tools |
 | `brave` | `[util]` | Search the web, news, and images — fast, private, with batch support |
 | `chrome_util` | `[dev]` | Annotate and highlight page elements via Chrome DevTools |
@@ -36,12 +37,14 @@ Source of truth: `src/ot/config/global_templates/prompts.yaml` (`prompts.packs`)
 | `excel` | `[util]` | Work with Excel files — read, write, search, pivot, and set formulas |
 | `file` | `[util]` | Read, write, edit, copy, move, and delete files; browse directory trees |
 | `ground` | `[util]` | Research any topic with Google AI-grounded search and source citations |
+| `knowledge` | `[util]` | Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis |
 | `mem` | `[util]` | Persistent topic-based memory — write, search, grep, slice, and organise |
 | `ot_context` | `core` | Smart context store — ask, read, search, grep large tool responses without filling context window; format-aware toc/slice/query for json, yaml, and markdown |
+| `ot_direct` | `core` | Manage the local HTTP execution host from within a tool session |
 | `ot_forge` | `core` | Scaffold and generate code from templates |
 | `ot_image` | `core` | Vision analysis via dedicated model — load images, ask questions, get summaries; zero tokens to host session |
 | `ot_llm` | `core` | Run any text through an LLM — summarise, extract, reformat, translate |
-| `ot_servers` | `-` | Runtime proxy server controls — enable, disable, restart, and inspect one server |
+| `ot_servers` | `core` | Runtime proxy server controls — enable, disable, restart, and inspect one server |
 | `ot_secrets` | `core` | Store and retrieve API keys and secrets for OneTool services |
 | `ot_timer` | `core` | Time tool calls and report performance |
 | `package` | `[dev]` | Look up PyPI and npm packages, audit deps, find the latest AI models |
@@ -50,7 +53,7 @@ Source of truth: `src/ot/config/global_templates/prompts.yaml` (`prompts.packs`)
 | `tavily` | `[util]` | Search the web with Tavily AI — clean results, answer summaries, URL extraction |
 | `webfetch` | `[dev]` | Fetch any URL and extract clean, readable content |
 | `whiteboard` | `[dev]` | Live whiteboard using Excalidraw — you can **draw** diagrams with a powerful DSL, assisted by AI |
-| `ot_caveman` | `-` | Caveman — LLM-powered text compaction and expansion. |
+| `ot_caveman` | `core` | Caveman — LLM-powered text compaction and expansion. |
 <!-- END GENERATED:PACK_SUMMARY -->
 
 ## Documentation

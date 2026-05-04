@@ -1,6 +1,6 @@
 # Tool Reference
 
-**28 Packs. 246 Tools.**
+**29 Packs. 251 Tools.**
 
 Complete reference of all built-in tool packs and functions.
 
@@ -11,8 +11,8 @@ Tools are split into optional install extras. Install only what you need:
 | Extra | Tools included |
 |-------|---------------|
 | *(core, always included)* | `ot_caveman` (alias `cm`), `ctx`, `ot`, `ot_direct`, `ot_forge`, `ot_llm`, `ot_secrets`, `ot_servers`, `ot_timer` |
-| `[util]` | `brave`, `convert`, `excel`, `file`, `ground`, `knowledge`, `mem`, `ot_image`, `tavily` |
-| `[dev]` | `aws`, `chrome_util`, `context7`, `db`, `diagram`, `package`, `play_util`, `ripgrep`, `whiteboard`, `webfetch` |
+| `[util]` | `brave`, `convert`, `excel`, `file`, `ground`, `knowledge`, `mem`, `tavily` |
+| `[dev]` | `arch`, `aws`, `chrome_util`, `context7`, `db`, `diagram`, `package`, `play_util`, `ripgrep`, `whiteboard`, `webfetch` |
 | `[all]` | All of the above |
 
 ```bash
@@ -24,6 +24,7 @@ uv tool install 'onetool-mcp[util,dev]'  # most tools
 
 | Pack | Extra | Description | Tool Count | Credits | Tools |
 |------|-------|-------------|---|---------|-------|
+| [**Arch**](arch.md) | `[dev]` | Architecture workflows for Excel ingest, validation, generation, round-trip, and bundling. | 5 | MIT | `bundle_solution`, `export_yaml`, `generate`, `import_yaml`, `validate` |
 | [**AWS**](aws.md) | `[dev]` | AWS services via awslabs/mcp servers, activated on demand by role. | 17 | [awslabs/mcp](https://github.com/awslabs/mcp) (Apache 2.0) | `arn`, `attributes`, `check`, `login`, `mfa`, `packs`, `profile`, `profiles`, `refresh_packs`, `regions`, `roles`, `services`, `start_packs`, `stop_packs`, `use`, `values`, `whoami` |
 | [**Brave**](brave.md) | `[util]` | Web search via Brave Search API. | 5 | [brave-search-mcp-server](https://github.com/brave/brave-search-mcp-server) (MIT) | `image`, `news`, `search`, `search_batch`, `video` |
 | [**OT Caveman**](ot_caveman.md) | core | LLM-powered text compaction and expansion. | 3 | MIT | `compact`, `expand`, `input` |
@@ -37,11 +38,11 @@ uv tool install 'onetool-mcp[util,dev]'  # most tools
 | [**Ground**](ground.md) | `[util]` | Grounded search with sources. | 5 | [Google Gemini](https://ai.google.dev/) (MIT) | `dev`, `docs`, `reddit`, `search`, `search_batch` |
 | [**Knowledge**](knowledge.md) | `[util]` | Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis. | 15 | MIT | `append`, `ask`, `dbs`, `delete`, `grep`, `info`, `list`, `read`, `related`, `search`, `slice`, `stats`, `toc`, `update`, `write` |
 | [**Mem**](mem.md) | `[util]` | Persistent AI agent memory with semantic search. | 29 | MIT | `append`, `ask`, `context`, `count`, `decay`, `delete`, `export`, `flush`, `grep`, `index`, `inspect`, `list`, `query`, `read`, `read_batch`, `refresh`, `reindex`, `restore`, `search`, `slice`, `slice_batch`, `snap`, `stale`, `stats`, `toc`, `update`, `update_batch`, `write`, `write_batch` |
-| [**OT Context**](ot_context.md) | core | TTL-expiring, BM25-indexed storage for large tool outputs. | 13 | MIT | `append`, `ask`, `delete`, `grep`, `inspect`, `list`, `purge`, `read`, `search`, `slice`, `stats`, `toc`, `write` |
+| [**OT Context**](ot_context.md) | core | TTL-expiring, BM25-indexed storage for large tool outputs. | 13 | MIT | `append`, `ask`, `delete`, `grep`, `inspect`, `list`, `purge`, `query`, `read`, `slice`, `stats`, `toc`, `write` |
 | [**OT Direct**](ot_direct.md) | core | Manage the local HTTP execution host from within a tool session. | 4 | MIT | `logs`, `restart`, `status`, `stop` |
 | [**OT Core**](ot_core.md) | core | Introspection and management tools. | 19 | MIT | `aliases`, `config`, `debug`, `health`, `help`, `pack_info`, `packs`, `reload`, `result`, `security`, `server`, `servers`, `skills`, `snippet_info`, `snippets`, `stats`, `tool_info`, `tools`, `version` |
 | [**OT Forge**](ot_forge.md) | core | Create, validate, and install extension tools and skill stubs. | 3 | MIT | `create_ext`, `install_skills`, `validate_ext` |
-| [**OT Image**](ot_image.md) | `[util]` | Load images and ask vision questions via OpenAI-compatible API. | 9 | MIT | `ask`, `clip_ask`, `clip_view`, `delete`, `list`, `load`, `load_batch`, `purge`, `summary` |
+| [**OT Image**](ot_image.md) | core | Load images and ask vision questions via OpenAI-compatible API. | 9 | MIT | `ask`, `clip_ask`, `clip_view`, `delete`, `list`, `load`, `load_batch`, `purge`, `summary` |
 | [**OT LLM**](ot_llm.md) | core | AI-powered data transformation. | 2 | MIT | `transform`, `transform_file` |
 | [**OT Secrets**](ot_secrets.md) | core | Age-encrypted secrets management. | 5 | MIT | `audit`, `encrypt`, `init`, `rotate`, `status` |
 | [**OT Servers**](ot_servers.md) | core | Runtime proxy server state changes (enable, disable, restart, status). | 4 | MIT | `disable`, `enable`, `restart`, `status` |
