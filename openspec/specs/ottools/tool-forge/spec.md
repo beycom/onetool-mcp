@@ -12,7 +12,7 @@ The ot_forge pack SHALL provide a `create_ext()` function to create new extensio
 
 #### Scenario: Create project extension
 - **WHEN** `ot_forge.create_ext(name="mypack")` is called
-- **THEN** it creates `.onetool/tools/mypack/mypack.py`
+- **THEN** it creates an extension file in a path compatible with active `tools_dir` glob patterns
 - **AND** uses the `extension` template (in-process, full `ot.*` access)
 - **AND** substitutes `{{pack}}`, `{{function}}`, `{{description}}` placeholders
 
@@ -22,8 +22,13 @@ The ot_forge pack SHALL provide a `create_ext()` function to create new extensio
 
 #### Scenario: Extension already exists
 - **WHEN** `ot_forge.create_ext(name="mypack")` is called
-- **AND** `.onetool/tools/mypack/mypack.py` already exists
+- **AND** the computed scaffold path already exists
 - **THEN** it returns an error message without overwriting
+
+#### Scenario: Common flat tools_dir compatibility
+- **GIVEN** `tools_dir` contains `tools/*.py`
+- **WHEN** `ot_forge.create_ext(name="mypack")` is called
+- **THEN** it SHALL scaffold to `.onetool/tools/mypack.py` so `ot.reload()` can discover it immediately
 
 #### Scenario: Next steps guidance
 - **WHEN** an extension is successfully created

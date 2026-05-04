@@ -25,7 +25,7 @@ Short alias: `forge`
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `name` | str | Extension name (used as directory and file name) |
+| `name` | str | Extension name (used in scaffold file path) |
 | `pack_name` | str | Pack name for dot notation (default: same as name) |
 | `function` | str | Main function name (default: `run`) |
 | `description` | str | Module description |
@@ -71,6 +71,7 @@ ot_forge.create_ext(name) → (edit) → ot_forge.validate_ext(path) → ot.relo
 ### Defaults
 
 - OneTool uses the built-in defaults for Forge.
+- `create_ext` chooses a scaffold path compatible with active `tools_dir` globs (for example `tools/*.py` -> `.onetool/tools/<name>.py`).
 
 ## Examples
 
@@ -79,7 +80,7 @@ ot_forge.create_ext(name) → (edit) → ot_forge.validate_ext(path) → ot.relo
 ot_forge.create_ext(name="my_tool", function="search")
 
 # Validate before reload
-ot_forge.validate_ext(path=".onetool/tools/my_tool/my_tool.py")
+ot_forge.validate_ext(path=".onetool/tools/my_tool.py")
 
 # List available skills (use ot.skills, not ot_forge)
 ot.skills()

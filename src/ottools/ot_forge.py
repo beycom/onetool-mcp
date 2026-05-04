@@ -6,6 +6,7 @@ Provides tools for creating and validating new in-process extension tools.
 from __future__ import annotations
 
 import ast
+import fnmatch
 import re
 from pathlib import Path
 
@@ -26,6 +27,42 @@ def _get_templates_dir() -> Path:
     return get_global_templates_dir() / "tool_templates"
 
 
+def _resolve_tools_pattern(pattern: str, config_dir: Path) -> str:
+    """Resolve tools_dir glob patterns the same way config does."""
+    expanded = Path(pattern).expanduser()
+    if expanded.is_absolute():
+        return str(expanded)
+    return str(config_dir / pattern)
+
+
+def _select_extension_file_path(name: str) -> Path:
+    """Choose an extension file path that matches configured tools_dir globs."""
+    from ot.config.loader import get_config
+
+    try:
+        config = get_config()
+        patterns = list(config.tools_dir) if config.tools_dir else ["tools/*.py"]
+    except Exception:
+        patterns = ["tools/*.py"]
+    config_dir = get_config_dir()
+    base_tools_dir = config_dir / "tools"
+
+    # Prefer flat layout when possible because default config is tools/*.py.
+    flat_candidate = base_tools_dir / f"{name}.py"
+    nested_candidate = base_tools_dir / name / f"{name}.py"
+    candidates = [flat_candidate, nested_candidate]
+
+    resolved_patterns = [_resolve_tools_pattern(pattern, config_dir) for pattern in patterns]
+
+    for candidate in candidates:
+        candidate_str = str(candidate)
+        if any(fnmatch.fnmatch(candidate_str, pattern) for pattern in resolved_patterns):
+            return candidate
+
+    # Fallback keeps previous behavior if no configured pattern matches candidates.
+    return nested_candidate
+
+
 def create_ext(
     *,
     name: str,
@@ -37,7 +74,7 @@ def create_ext(
 ) -> str:
     """Create a new extension tool.
 
-    Creates a new in-process extension in .onetool/tools/{name}/{name}.py.
+    Creates a new in-process extension in a path compatible with tools_dir globs.
 
     Args:
         name: Extension name (will be used as directory and file name)
@@ -66,11 +103,9 @@ def create_ext(
         if not template_file.exists():
             return "Error: Extension template not found"
 
-        # Determine output directory (always uses ot dir from loaded config)
-        base_dir = get_config_dir() / "tools"
-
-        ext_dir = base_dir / name
-        ext_file = ext_dir / f"{name}.py"
+        # Determine output path from active tools_dir patterns
+        ext_file = _select_extension_file_path(name)
+        ext_dir = ext_file.parent
 
         # Check if already exists
         if ext_file.exists():

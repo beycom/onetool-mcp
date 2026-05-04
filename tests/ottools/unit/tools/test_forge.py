@@ -129,6 +129,34 @@ def test_create_ext_next_steps_reference_forge(mock_ot_dir: Path) -> None:
     assert "ot_forge.validate_ext" in result
 
 
+@pytest.mark.unit
+@pytest.mark.tools
+def test_create_ext_uses_flat_layout_for_tools_star_py(mock_ot_dir: Path) -> None:
+    """tools/*.py patterns should scaffold flat files for immediate discovery."""
+    from ottools.ot_forge import create_ext
+
+    cfg = type("Cfg", (), {"tools_dir": ["tools/*.py"]})()
+    with patch("ot.config.loader.get_config", return_value=cfg):
+        result = create_ext(name="flat_tool")
+
+    assert "Created extension:" in result
+    assert (mock_ot_dir / "tools" / "flat_tool.py").exists()
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_create_ext_uses_nested_layout_for_tools_star_star_py(mock_ot_dir: Path) -> None:
+    """tools/*/*.py patterns should scaffold nested files."""
+    from ottools.ot_forge import create_ext
+
+    cfg = type("Cfg", (), {"tools_dir": ["tools/*/*.py"]})()
+    with patch("ot.config.loader.get_config", return_value=cfg):
+        result = create_ext(name="nested_tool")
+
+    assert "Created extension:" in result
+    assert (mock_ot_dir / "tools" / "nested_tool" / "nested_tool.py").exists()
+
+
 # =============================================================================
 # validate_ext() Tests
 # =============================================================================
