@@ -99,6 +99,21 @@ The `ripgrep.search()` function SHALL search files for patterns using ripgrep.
 - **WHEN** `ripgrep.search(pattern="TODO", path=".", heading=True)` is called
 - **THEN** it SHALL group matches by file with headings
 
+#### Scenario: Follow symlinks
+- **GIVEN** follow_symlinks=True
+- **WHEN** `ripgrep.search(pattern="TODO", path=".", follow_symlinks=True)` is called
+- **THEN** it SHALL follow symlinked files/directories during search
+
+#### Scenario: Smart case
+- **GIVEN** smart_case=True
+- **WHEN** `ripgrep.search(pattern="todo", path=".", smart_case=True)` is called
+- **THEN** it SHALL use ripgrep smart-case behavior
+
+#### Scenario: Filenames only
+- **GIVEN** filenames_only=True
+- **WHEN** `ripgrep.search(pattern="TODO", path=".", filenames_only=True)` is called
+- **THEN** it SHALL return only file paths containing matches
+
 #### Scenario: No matches found
 - **GIVEN** a pattern with no matches
 - **WHEN** `ripgrep.search(pattern="nonexistent_xyz", path=".")` is called

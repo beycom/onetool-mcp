@@ -176,6 +176,9 @@ def search(
     only_matching: bool = False,
     no_ignore: bool = False,
     heading: bool = False,
+    follow_symlinks: bool = False,
+    smart_case: bool = False,
+    filenames_only: bool = False,
 ) -> str:
     """Search files for patterns using ripgrep.
 
@@ -203,6 +206,9 @@ def search(
         only_matching: Show only the matched text, not the full line (default: False)
         no_ignore: Don't respect .gitignore files (default: False)
         heading: Group matches by file with headings (default: False)
+        follow_symlinks: Follow symlinks while traversing directories (default: False)
+        smart_case: Use smart-case matching (default: False)
+        filenames_only: Show only file names containing matches (default: False)
 
     Returns:
         Matching lines with file paths and line numbers, or error message.
@@ -246,7 +252,9 @@ def search(
         # Build arguments
         args = ["--line-number", "--with-filename"]
 
-        if not case_sensitive:
+        if smart_case:
+            args.append("--smart-case")
+        elif not case_sensitive:
             args.append("--ignore-case")
 
         if fixed_strings:
@@ -289,6 +297,12 @@ def search(
 
         if heading:
             args.append("--heading")
+
+        if follow_symlinks:
+            args.append("--follow")
+
+        if filenames_only:
+            args.append("--files-with-matches")
 
         args.extend([pattern, str(search_path)])
 

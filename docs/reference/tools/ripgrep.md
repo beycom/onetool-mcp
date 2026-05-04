@@ -31,9 +31,12 @@ Short alias: `rg`
 | `file_type` | str | Filter by type (e.g., "py", "js", "ts") |
 | `glob` | str | Filter by glob pattern (e.g., "*.md") |
 | `context` | int | Lines of context around matches |
-| `max_results` | int | Limit number of matching lines |
+| `limit` | int | Limit number of matching lines |
 | `word_match` | bool | Match whole words only (default: False) |
 | `include_hidden` | bool | Search hidden files and directories (default: False) |
+| `follow_symlinks` | bool | Follow symlinks while traversing directories (default: False) |
+| `smart_case` | bool | Smart-case matching (case-insensitive unless pattern has uppercase) |
+| `filenames_only` | bool | Return only file names that contain matches |
 
 ## Requires
 
@@ -109,6 +112,15 @@ ripgrep.files(glob="src/**/*.py")
 ripgrep.files(glob="tests/**/test_*.py")
 ripgrep.search(pattern="TODO", glob="**/*.{js,ts}")
 ripgrep.count(pattern="import", glob="src/**/*.py")
+
+# Follow symlinks + smart case + file-level triage
+ripgrep.search(
+    pattern="auth",
+    path=".",
+    follow_symlinks=True,
+    smart_case=True,
+    filenames_only=True,
+)
 ```
 
 ## Inspired by
