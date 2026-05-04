@@ -108,6 +108,13 @@ The `webfetch.fetch()` function SHALL support extraction configuration.
 - **WHEN** `webfetch.fetch(url=url, output_format="json", include_metadata=True)` is called
 - **THEN** it SHALL return a JSON object with `content` and `metadata` fields
 - **AND** `metadata` SHALL include `final_url` and `content_type`
+- **AND** when present, extracted article fields (`title`, `author`, `date`) SHALL be included in `metadata`
+
+#### Scenario: Loopback fetch failure guidance
+- **GIVEN** a loopback URL such as `http://127.0.0.1:18888/...` or `http://localhost:...`
+- **WHEN** fetching fails
+- **THEN** the error message SHALL explicitly identify loopback context
+- **AND** it SHALL include actionable guidance about loopback restrictions in some runtimes
 
 ### Requirement: Batch URL Fetch
 
@@ -288,4 +295,3 @@ The tool SHALL log all fetch operations using LogSpan.
   - `output_format`: Requested output format
   - `contentLen`: Extracted content length (if successful)
   - `cached`: Whether cache was used
-

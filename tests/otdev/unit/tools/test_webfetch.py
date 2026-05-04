@@ -260,3 +260,40 @@ class TestFetch:
 
         data = json.loads(result)
         assert data["metadata"]["content_type"] == "text/html; charset=utf-8"
+
+    def test_fetch_metadata_includes_extracted_article_fields(self):
+        import json
+
+        from otdev.tools.webfetch import fetch
+
+        payload = '{"title":"Hello","author":"Ada","date":"2026-01-01","text":"Body"}'
+        with (
+            patch("otdev.tools.webfetch._require_trafilatura"),
+            patch(
+                "otdev.tools.webfetch._fetch_url_cached",
+                return_value=("<html><body>Hello</body></html>", "text/html"),
+            ),
+            patch("trafilatura.extract", return_value=payload),
+        ):
+            result = fetch(
+                url="https://test.invalid/page",
+                output_format="json",
+                include_metadata=True,
+            )
+
+        data = json.loads(result)
+        assert data["metadata"]["title"] == "Hello"
+        assert data["metadata"]["author"] == "Ada"
+        assert data["metadata"]["date"] == "2026-01-01"
+
+    def test_fetch_loopback_failure_has_actionable_message(self):
+        from otdev.tools.webfetch import fetch
+
+        with (
+            patch("otdev.tools.webfetch._require_trafilatura"),
+            patch("otdev.tools.webfetch._fetch_url_cached", return_value=(None, None)),
+        ):
+            result = fetch(url="http://127.0.0.1:18888/injection-web.html")
+
+        assert "loopback" in result.lower()
+        assert "restricted" in result.lower() or "block" in result.lower()

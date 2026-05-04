@@ -29,7 +29,7 @@ Short alias: `wf`
 | `include_tables` | bool | Include tables in output (default: True) |
 | `include_comments` | bool | Include comments section |
 | `include_formatting` | bool | Preserve headers/lists (default: True) |
-| `include_metadata` | bool | Include HTTP metadata in JSON output |
+| `include_metadata` | bool | Include HTTP and extracted article metadata in JSON output |
 | `favor_precision` | bool | Prefer accuracy over completeness |
 | `favor_recall` | bool | Prefer completeness over accuracy |
 | `fast` | bool | Skip fallback extraction for speed |
@@ -104,6 +104,14 @@ webfetch.fetch_batch(
 webfetch.fetch(url="https://pypi.org/pypi/requests/json")
 webfetch.fetch(url="https://docs.python.org/robots.txt")
 ```
+
+When `include_metadata=True` with `output_format="json"`, metadata includes:
+- transport fields: `final_url`, `content_type`
+- extracted fields when available: `title`, `author`, `date`
+
+Loopback note:
+- `http://127.0.0.1/...`, `http://localhost/...`, and `http://[::1]/...` may be blocked in some runtimes.
+- Failures now return an explicit loopback-oriented message with alternatives.
 
 ## Based on
 

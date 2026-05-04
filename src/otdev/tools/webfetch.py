@@ -88,6 +88,13 @@ def _validate_url(url: str) -> str | None:
     return None
 
 
+def _is_loopback_url(url: str) -> bool:
+    """Return True when URL points to a local loopback host."""
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    return host in {"127.0.0.1", "localhost", "::1"}
+
+
 def _validate_options(favor_precision: bool, favor_recall: bool) -> str | None:
     """Validate mutually exclusive options.
 
@@ -245,6 +252,12 @@ def fetch(
 
             if downloaded is None:
                 s.add(error="fetch_failed")
+                if _is_loopback_url(url):
+                    return (
+                        f"Error: Failed to fetch loopback URL: {url}. "
+                        "This runtime may block local loopback networking; "
+                        "use a publicly reachable fixture URL or load local files with file tools."
+                    )
                 return f"Error: Failed to fetch URL: {url}"
 
             # For non-HTML content, return raw content directly (no extraction needed)
@@ -285,12 +298,19 @@ def fetch(
                     content_data = json.loads(result)
                 except json.JSONDecodeError:
                     content_data = result
+                extracted_metadata: dict[str, Any] = {}
+                if isinstance(content_data, dict):
+                    for field in ("title", "author", "date"):
+                        value = content_data.get(field)
+                        if value not in (None, ""):
+                            extracted_metadata[field] = value
                 result = json.dumps(
                     {
                         "content": content_data,
                         "metadata": {
                             "final_url": url,
                             "content_type": content_type,
+                            **extracted_metadata,
                         },
                     }
                 )
@@ -309,6 +329,11 @@ def fetch(
             return f"Error: Timeout after {timeout}s fetching: {url}"
         except ConnectionError as e:
             s.add(error="connection_failed")
+            if _is_loopback_url(url):
+                return (
+                    f"Error: Connection failed for loopback URL {url}: {e}. "
+                    "Loopback networking may be restricted in this runtime."
+                )
             return f"Error: Connection failed for {url}: {e}"
         except Exception as e:
             s.add(error=str(e))
