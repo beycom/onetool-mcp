@@ -811,7 +811,7 @@ def build_solution_system_context(
     integrations_data: list[dict[str, Any]] = []
     for int_row in system_integrations:
         entry: dict[str, Any] = {
-            "seq": str(int_row.get("key") or "").strip(),
+            "key": str(int_row.get("key") or "").strip(),
             "id": str(int_row.get("id") or ""),
             "name": str(int_row.get("name") or int_row.get("id") or "integration"),
             "consumer": _integration_src(int_row),
@@ -856,7 +856,7 @@ def build_solution_system_context(
     ]
 
     int_columns = [
-        {"title": "#", "field": "seq", "minWidth": 60, "maxWidth": 80, "sort": "asc"},
+        {"title": "Key", "field": "key", "minWidth": 100, "maxWidth": 120, "sort": "asc"},
         {"title": "ID", "field": "id", "minWidth": 120},
         {"title": "Name", "field": "name", "minWidth": 150},
         {"title": "Consumer", "field": "consumer", "minWidth": 120},

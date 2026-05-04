@@ -455,7 +455,7 @@ class TestGenerate:
         assert '-> "sys_b": "" {' in rendered
         assert "Flow One (api)" not in rendered
 
-    def test_solution_system_context_uses_integration_key_in_hash_column(self) -> None:
+    def test_solution_system_context_uses_integration_key_field(self) -> None:
         from otdev.tools.arch import _build_entity_graph, _build_solution_system_context
 
         entities: dict[str, list[dict[str, object]]] = {
@@ -484,7 +484,9 @@ class TestGenerate:
             workbook_diagrams=[],
         )
 
-        assert context["integrations_data"][0]["seq"] == "K-01"
+        assert context["integrations_data"][0]["key"] == "K-01"
+        assert context["integrations_columns"][0]["title"] == "Key"
+        assert context["integrations_columns"][0]["field"] == "key"
         assert [item["label"] for item in context["diagrams"]] == ["System", "Application", "Component"]
         assert context["additional_diagrams"] == []
 

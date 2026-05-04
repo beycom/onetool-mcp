@@ -241,15 +241,15 @@ The system SHALL support tool-specific descriptions and examples with minimal re
 - **WHEN** tool description and instructions are generated
 - **THEN** critical pass-through rules ("DO NOT rewrite", "JUST pass the exact command") SHALL appear in both for redundancy
 
-## Removed Requirements
+## Change Notes
 
-### Requirement: Canonical Format Documentation
+### Removed: Canonical Format Documentation
 **Reason:** Superseded by Two-Mode Execution Model + Trigger Hierarchy requirements. The old three code styles (simple, backtick, fence) are replaced by the two-mode framing. Backtick style is dropped. The canonical reference format (`mcp__onetool__run(command='...')`) is retained only as an example of direct MCP invocation.
 
-### Requirement: Explicit Trigger Documentation (v1)
+### Removed: Explicit Trigger Documentation (v1)
 **Reason:** Replaced by the new Trigger Hierarchy requirement, which documents the full `>>>` / `__run` / `mcp__onetool__run` / legacy hierarchy with rationale.
 
-### Requirement: Discovery functions documented
+### Removed: Discovery functions documented
 **Reason:** Discovery reference material is too detailed for the always-on prompt. Core guidance remains in always-on instructions; advanced edge cases live in `ot-ref`.
 
 **Migration:** Agents can run `>>> ot.help(query="topic")` directly for discovery. `ot-ref` remains optional.

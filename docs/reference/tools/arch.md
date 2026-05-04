@@ -116,7 +116,7 @@ tools:
   - otherwise explicit `profile` when provided
   - otherwise `tools.arch.default_profile`
 - Relative template/style paths first resolve under the active config directory; missing relative paths fall back to bundled `global_templates/arch-templates` assets.
-- Integration table `#` values come from the integration row `key` field.
+- Integration table `Key` values come from the integration row `key` field.
 - Engine command templates run via argv execution (`shell=False`) after rendering.
 - Legacy placeholder aliases in engine commands (for example `${{input_file}}`) are not supported. Use Jinja placeholders only: `{{ input }}` and `{{ output }}`.
 - Unknown/removed config keys, removed values, invalid enum values, and missing required command-template variables fail fast with explicit structured errors.

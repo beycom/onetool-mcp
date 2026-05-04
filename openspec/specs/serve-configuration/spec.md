@@ -34,7 +34,7 @@ The system SHALL load configuration from a YAML file using a standard resolution
 
 ### Requirement: Config Include Fallback to Package Defaults
 
-> **Terminology:** The **config dir** is `config_path.parent` — the directory that contains `onetool.yaml`. All relative includes resolve from here. This directory is conventionally named `.onetool/` but the code treats it as `config_path.parent`; do not hardcode `.onetool` in implementation.
+The system SHALL treat the **config dir** as `config_path.parent` (the directory containing `onetool.yaml`) and resolve all relative include paths from that directory.
 
 When an include path is not found in the config dir, the system SHALL fall back to the matching path in the package's `global_templates/` directory.
 
@@ -112,21 +112,21 @@ The system SHALL support a graceful cold start without requiring prior initialis
 - **THEN** it SHALL load configuration normally
 - **AND** no initialization prompt SHALL be shown
 
-## Removed Requirements
+## Change Notes
 
-### Requirement: DevTools Server Instructions Field
+### Removed: DevTools Server Instructions Field
 
 **Reason**: Server `instructions:` fields are removed from `servers.yaml`. DevTools usage guidance moves to the `ot-chrome-devtools-mcp` skill, retrieved on-demand via `ot.skills(name="ot-chrome-devtools-mcp")`.
 
 **Migration**: Run `scaffold.skills(install="ot-chrome-devtools-mcp")` to install a stub, or call `>>> ot.skills(name="ot-chrome-devtools-mcp")` directly.
 
-### Requirement: Playwright Server Instructions Field
+### Removed: Playwright Server Instructions Field
 
 **Reason**: Server `instructions:` fields are removed from `servers.yaml`. Playwright usage guidance moves to the `ot-playwright-mcp` skill, retrieved on-demand via `ot.skills(name="ot-playwright-mcp")`.
 
 **Migration**: Run `scaffold.skills(install="ot-playwright-mcp")` to install a stub, or call `>>> ot.skills(name="ot-playwright-mcp")` directly.
 
-### Requirement: Config Version Migration Detection
+### Removed: Config Version Migration Detection
 
 The system SHALL detect incompatible config versions.
 
@@ -142,7 +142,7 @@ The system SHALL detect incompatible config versions.
 - **WHEN** configuration is loaded
 - **THEN** version 1 SHALL be assumed
 
-### Requirement: Execution Settings
+### Removed: Execution Settings
 
 The system SHALL use direct (host) execution.
 
@@ -151,7 +151,7 @@ The system SHALL use direct (host) execution.
 - **WHEN** execution starts
 - **THEN** it SHALL use default timeout (120s)
 
-### Requirement: Transform Tool Configuration
+### Removed: Transform Tool Configuration
 
 The transform() tool SHALL use OpenAI-compatible API configuration via `tools.transform`.
 
@@ -184,7 +184,7 @@ The transform() tool SHALL use OpenAI-compatible API configuration via `tools.tr
 - **WHEN** llm.transform() is called
 - **THEN** it SHALL use the key for API calls
 
-### Requirement: Advanced Configuration
+### Removed: Advanced Configuration
 
 The system SHALL support advanced configuration options with config-relative path resolution.
 
@@ -218,7 +218,7 @@ The system SHALL support advanced configuration options with config-relative pat
 - **THEN** it SHALL skip syntax validation before execution
 - **DEFAULT** true
 
-### Requirement: Configuration Validation
+### Removed: Configuration Validation
 
 The system SHALL validate configuration on load.
 
@@ -232,7 +232,7 @@ The system SHALL validate configuration on load.
 - **WHEN** configuration loads
 - **THEN** it SHALL fail with validation error (expected format: 512m, 1g, etc.)
 
-### Requirement: Tool Discovery Configuration
+### Removed: Tool Discovery Configuration
 
 OneTool SHALL discover tools from configurable glob patterns with sensible defaults.
 
@@ -251,7 +251,7 @@ OneTool SHALL discover tools from configurable glob patterns with sensible defau
 - **WHEN** OneTool loads configuration
 - **THEN** it SHALL exclude files starting with underscore
 
-### Requirement: Execution Validation Configuration
+### Removed: Execution Validation Configuration
 
 The system SHALL support configurable pre-execution validation.
 
@@ -270,7 +270,7 @@ The system SHALL support configurable pre-execution validation.
 - **WHEN** code is validated
 - **THEN** optional ruff linting SHALL be skipped
 
-### Requirement: Enhanced Logging Configuration
+### Removed: Enhanced Logging Configuration
 
 The system SHALL support enhanced logging configuration.
 
@@ -290,7 +290,7 @@ The system SHALL support enhanced logging configuration.
 - **THEN** logs SHALL be written to the specified file
 - **DEFAULT** `.local/logs/ot.log`
 
-### Requirement: Server Metadata Configuration
+### Removed: Server Metadata Configuration
 
 The system SHALL support server metadata in configuration.
 
@@ -304,7 +304,7 @@ The system SHALL support server metadata in configuration.
 - **WHEN** the server starts
 - **THEN** it SHALL load instructions from the specified file
 
-### Requirement: V1 Minimal Configuration
+### Removed: V1 Minimal Configuration
 
 The system SHALL support a minimal V1 configuration schema.
 
@@ -322,7 +322,7 @@ The system SHALL support a minimal V1 configuration schema.
 - **WHEN** the server starts
 - **THEN** it SHALL load tools from ./tools and environment from .env
 
-### Requirement: MCP Server Proxying Configuration
+### Removed: MCP Server Proxying Configuration
 
 The system SHALL support configuration for proxying external MCP servers.
 
@@ -428,7 +428,7 @@ The system SHALL support configuration for proxying external MCP servers.
 - **THEN** connection SHALL timeout after 30 seconds
 - **DEFAULT** 60 seconds
 
-### Requirement: MCP Proxy Error Handling
+### Removed: MCP Proxy Error Handling
 
 The system SHALL handle MCP proxy configuration errors gracefully.
 
@@ -447,7 +447,7 @@ The system SHALL handle MCP proxy configuration errors gracefully.
 - **WHEN** configuration is loaded
 - **THEN** it SHALL fail with validation error
 
-### Requirement: CLI Entry Point Naming
+### Removed: CLI Entry Point Naming
 
 The MCP server CLI SHALL follow the `ot-<purpose>` naming convention.
 
@@ -468,7 +468,7 @@ The MCP server CLI SHALL follow the `ot-<purpose>` naming convention.
 - **WHEN** version is displayed
 - **THEN** it SHALL show the package version
 
-### Requirement: Config Schema Version
+### Removed: Config Schema Version
 
 Configuration files SHALL include a schema version for migration support.
 
@@ -488,7 +488,7 @@ Configuration files SHALL include a schema version for migration support.
 - **WHEN** the file is written
 - **THEN** it SHALL include `version: 1` as the first field
 
-### Requirement: Tool Dependency Metadata
+### Removed: Tool Dependency Metadata
 
 Tools SHALL declare their dependencies for verification by `onetool check`.
 
@@ -519,7 +519,7 @@ Tools SHALL declare their dependencies for verification by `onetool check`.
 - **WHEN** the tool is loaded
 - **THEN** missing `__onetool_requires__` SHALL be treated as no requirements
 
-### Requirement: Configuration Validation (modified)
+### Removed: Configuration Validation (modified)
 
 The system SHALL validate configuration on load using discovered tool schemas.
 
@@ -535,7 +535,7 @@ The system SHALL validate configuration on load using discovered tool schemas.
 - **THEN** it SHALL fail with validation error from CodeConfig schema
 - **AND** indicate min is 1
 
-### Requirement: Tools Configuration Section
+### Removed: Tools Configuration Section
 
 The system SHALL support tool-specific configuration via the `tools:` section, with schemas discovered from tool files.
 
@@ -663,7 +663,7 @@ The system SHALL support tool-specific configuration via the `tools:` section, w
 - **THEN** it SHALL fail with validation error from the tool's Config class
 - **AND** error message SHALL indicate the field and constraint
 
-### Requirement: Cross-Platform Install Hints
+### Removed: Cross-Platform Install Hints
 
 The system SHALL provide platform-appropriate installation instructions for external dependencies.
 
@@ -685,7 +685,7 @@ The system SHALL provide platform-appropriate installation instructions for exte
 - **WHEN** ripgrep.* function is called
 - **THEN** error SHALL include: "winget install" or "scoop install"
 
-### Requirement: Secrets File Configuration
+### Removed: Secrets File Configuration
 
 The system SHALL support a `secrets_file` field for loading secrets relative to the config file.
 
@@ -715,7 +715,7 @@ The system SHALL support a `secrets_file` field for loading secrets relative to 
 - **THEN** it SHALL continue with empty secrets (no error)
 - **AND** log a debug message about missing secrets file
 
-### Requirement: Config Directory Tracking
+### Removed: Config Directory Tracking
 
 The system SHALL track the directory containing the loaded configuration file.
 
@@ -734,7 +734,7 @@ The system SHALL track the directory containing the loaded configuration file.
 - **WHEN** code needs the config directory
 - **THEN** it SHALL be available via a method on the config object
 
-### Requirement: Runtime Variable Expansion
+### Removed: Runtime Variable Expansion
 
 The system SHALL expand `${VAR}` patterns at runtime when values are used, not during config load.
 
@@ -778,7 +778,7 @@ The system SHALL expand `${VAR}` patterns at runtime when values are used, not d
 - **THEN** MY_VAR from os.environ SHALL NOT be used
 - **AND** error or default SHALL apply
 
-### Requirement: Subprocess Environment Pass-through
+### Removed: Subprocess Environment Pass-through
 
 The system SHALL support explicit environment pass-through for subprocess env sections.
 
@@ -800,7 +800,7 @@ The system SHALL support explicit environment pass-through for subprocess env se
 - **WHEN** the subprocess is spawned
 - **THEN** the secrets.yaml value SHALL be used
 
-### Requirement: Logging Configuration in YAML
+### Removed: Logging Configuration in YAML
 
 The system SHALL support logging settings in YAML config and environment variable overrides.
 
@@ -842,7 +842,7 @@ The system SHALL support logging settings in YAML config and environment variabl
 - **AND** the env var SHALL take priority over `compact_max_length` in YAML
 - **AND** non-integer values SHALL be ignored (config default used instead)
 
-### Requirement: Remote GitHub MCP Server Configuration
+### Removed: Remote GitHub MCP Server Configuration
 
 The system SHALL support configuration for the Remote GitHub MCP Server as a documented example.
 
@@ -880,7 +880,7 @@ The system SHALL support configuration for the Remote GitHub MCP Server as a doc
 - **WHEN** the server starts
 - **THEN** the token SHALL be expanded from secrets
 
-### Requirement: Config Include
+### Removed: Config Include
 
 The system SHALL support a top-level `include:` key for merging external config files.
 
@@ -961,7 +961,7 @@ The system SHALL support a top-level `include:` key for merging external config 
 - **WHEN** the config is loaded
 - **THEN** loading SHALL proceed normally with no external files
 
-### Requirement: Security Configuration
+### Removed: Security Configuration
 
 The system SHALL support allowlist-based security configuration via security.yaml.
 
@@ -1006,7 +1006,7 @@ The system SHALL support allowlist-based security configuration via security.yam
 - **THEN** they SHALL be matched using fnmatch semantics
 - **EXAMPLE** `pickle.*` matches `pickle.load`, `pickle.loads`, etc.
 
-### Requirement: Tool-Local Configuration Schema
+### Removed: Tool-Local Configuration Schema
 
 Tools SHALL declare their configuration schema in the tool file itself using a Pydantic `Config` class.
 
@@ -1036,7 +1036,7 @@ Tools SHALL declare their configuration schema in the tool file itself using a P
 - **THEN** it SHALL be named `Config` (not `BraveConfig`, `ToolConfig`, etc.)
 - **AND** it SHALL inherit from `pydantic.BaseModel`
 
-### Requirement: Dynamic Tool Configuration Building
+### Removed: Dynamic Tool Configuration Building
 
 The system SHALL dynamically build `ToolsConfig` from discovered tool schemas.
 
@@ -1060,7 +1060,7 @@ The system SHALL dynamically build `ToolsConfig` from discovered tool schemas.
 - **THEN** specified fields SHALL override defaults
 - **AND** unspecified fields SHALL use Config class defaults
 
-### Requirement: Runtime Tool Config Access
+### Removed: Runtime Tool Config Access
 
 Tools SHALL access their configuration via `get_tool_config()` at runtime.
 
@@ -1083,7 +1083,7 @@ Tools SHALL access their configuration via `get_tool_config()` at runtime.
 - **THEN** the section SHALL be preserved (extra="allow")
 - **AND** no error SHALL occur
 
-### Requirement: Top-Level LLM Configuration
+### Removed: Top-Level LLM Configuration
 
 The config SHALL support a top-level `llm:` key providing shared defaults inherited by all LLM-using tools (`ot_llm`, `ot_image`, `mem`, `knowledge`).
 
@@ -1137,7 +1137,7 @@ llm:
 - **THEN** the following tools SHALL participate in inheritance: `ot_llm`, `ot_image`, `mem`, `knowledge`
 - **AND** tools that do not use an LLM SHALL ignore the `llm:` section
 
-### Requirement: Stats Configuration Location
+### Removed: Stats Configuration Location
 
 Statistics configuration SHALL be at the root level.
 
@@ -1157,7 +1157,7 @@ Statistics configuration SHALL be at the root level.
 - **THEN** stats SHALL use defaults from Pydantic model
 - **DEFAULT** enabled: true, flush_interval_seconds: 30, persist_dir: stats
 
-### Requirement: Stats Directory Configuration
+### Removed: Stats Directory Configuration
 
 The system SHALL support a dedicated directory for statistics files.
 
@@ -1176,7 +1176,7 @@ The system SHALL support a dedicated directory for statistics files.
 - **WHEN** the server starts
 - **THEN** the directory SHALL be created automatically
 
-### Requirement: Output Sanitisation Configuration
+### Removed: Output Sanitisation Configuration
 
 The system SHALL support configuration for output sanitisation in the security section.
 
@@ -1196,7 +1196,7 @@ The system SHALL support configuration for output sanitisation in the security s
 - **WHEN** defaults are applied
 - **THEN** `enabled` SHALL default to `true`
 
-### Requirement: Output Configuration
+### Removed: Output Configuration
 
 The system SHALL support configuration for large output handling in the `output` section.
 
@@ -1283,7 +1283,7 @@ The system SHALL support configuration for large output handling in the `output`
 - **WHEN** the result is returned
 - **THEN** compaction SHALL NOT be applied for that call
 
-### Requirement: Root-Level Environment Configuration
+### Removed: Root-Level Environment Configuration
 
 The system SHALL support a root-level `env:` section for shared subprocess environment variables.
 
@@ -1324,7 +1324,7 @@ The system SHALL support a root-level `env:` section for shared subprocess envir
 - **WHEN** a stdio server is spawned
 - **THEN** subprocess SHALL receive only `PATH` plus server-specific env
 
-### Requirement: DevTools Server Template Documentation
+### Removed: DevTools Server Template Documentation
 
 The `servers.yaml` global template SHALL include comprehensive inline documentation for the Chrome DevTools MCP server entry.
 
@@ -1347,7 +1347,7 @@ The `servers.yaml` global template SHALL include comprehensive inline documentat
 - **THEN** they find a quick reference for `chrome_util` functions (inject, highlight, scan, clear)
 - **AND** a note about Ctrl+I / Cmd+I for manual annotation
 
-### Requirement: Playwright Server Template
+### Removed: Playwright Server Template
 
 The `servers.yaml` global template SHALL include a commented-out Playwright MCP server entry.
 
@@ -1364,7 +1364,7 @@ The `servers.yaml` global template SHALL include a commented-out Playwright MCP 
 - **THEN** they find a quick reference for `play_util` functions (inject, highlight, scan, clear)
 - **AND** a note that `play_util` is the Playwright equivalent of `chrome_util`
 
-### Requirement: DevTools Server Instructions Field
+### Removed: DevTools Server Instructions Field
 
 The DevTools server entry SHALL include an `instructions` field summarising capabilities for AI assistants.
 
@@ -1373,7 +1373,7 @@ The DevTools server entry SHALL include an `instructions` field summarising capa
 - **WHEN** read by an AI assistant
 - **THEN** it includes tool count, `chrome_util` element highlighting API, connection modes, and best-use-case guidance
 
-### Requirement: Playwright Server Instructions Field
+### Removed: Playwright Server Instructions Field
 
 The Playwright server entry SHALL include an `instructions` field summarising capabilities for AI assistants.
 
@@ -1383,7 +1383,7 @@ The Playwright server entry SHALL include an `instructions` field summarising ca
 - **THEN** it includes `play_util` element highlighting API and best-use-case guidance
 - **AND** it notes that `play_util` is independent from `chrome_util` (no fallback between them)
 
-### Requirement: Transparent Per-Value Decryption of Secrets
+### Removed: Transparent Per-Value Decryption of Secrets
 
 The secrets loader SHALL transparently decrypt `age1enc:`-prefixed values in `secrets.yaml` using an age X25519 identity from the OS keychain, without requiring any change to the `--secrets` flag or file path.
 
