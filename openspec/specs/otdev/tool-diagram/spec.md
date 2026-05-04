@@ -13,20 +13,14 @@ The `diagram.generate_source()` function SHALL create diagram source code and sa
 - **THEN** it SHALL save the source to a file with appropriate extension
 - **AND** it SHALL return the source file path and playground URL
 
-#### Scenario: Explicit output file
-- **GIVEN** an output_file parameter
-- **WHEN** `diagram.generate_source(source="...", provider="mermaid", output_file="docs/diagrams/flow.mmd")` is called
-- **THEN** it SHALL save to the specified path
+#### Scenario: Explicit output directory override
+- **GIVEN** an output_dir parameter
+- **WHEN** `diagram.generate_source(source="...", provider="mermaid", name="flow", output_dir="docs/diagrams")` is called
+- **THEN** it SHALL save the generated source under the specified directory
 - **AND** parent directories SHALL be created if needed
 
-#### Scenario: Source from file
-- **GIVEN** source_type="file" and a file path
-- **WHEN** `diagram.generate_source(source="path/to/diagram.mmd", provider="mermaid", source_type="file")` is called
-- **THEN** it SHALL read source from the file
-- **AND** it SHALL validate basic syntax for the provider
-
 #### Scenario: Auto-naming
-- **GIVEN** no output_file specified
+- **GIVEN** no output_dir override
 - **WHEN** `diagram.generate_source(source="...", provider="mermaid")` is called
 - **THEN** it SHALL generate filename using output.naming pattern from config
 - **AND** file SHALL be saved to output.dir from config
@@ -48,9 +42,10 @@ The `diagram.render_diagram()` function SHALL render source to image via Kroki.
 - **AND** it SHALL return output file path
 
 #### Scenario: Render from file
-- **GIVEN** source_type="file"
-- **WHEN** `diagram.render_diagram(source="diagram.mmd", provider="mermaid", source_type="file")` is called
+- **GIVEN** source_file input
+- **WHEN** `diagram.render_diagram(source_file="diagram.mmd")` is called
 - **THEN** it SHALL read source from file
+- **AND** it SHALL infer provider from file extension where possible
 - **AND** it SHALL render via Kroki
 
 #### Scenario: Output format selection
@@ -60,10 +55,10 @@ The `diagram.render_diagram()` function SHALL render source to image via Kroki.
 - **AND** default format SHALL be "svg"
 
 #### Scenario: Synchronous render (default)
-- **GIVEN** wait=True (default)
+- **GIVEN** async_mode=False (default)
 - **WHEN** `diagram.render_diagram(source="...", provider="mermaid")` is called
 - **THEN** it SHALL wait for rendering to complete
-- **AND** it SHALL return output_file path
+- **AND** it SHALL return output path details
 
 #### Scenario: Asynchronous render
 - **GIVEN** async_mode=True
@@ -94,10 +89,10 @@ The `diagram.batch_render()` function SHALL render multiple diagrams concurrentl
 - **THEN** it SHALL return "Error: batch_render requires self-hosted Kroki"
 
 #### Scenario: Concurrency control
-- **GIVEN** concurrency parameter
-- **WHEN** `diagram.batch_render(sources=[...], concurrency=5)` is called
+- **GIVEN** max_concurrent parameter
+- **WHEN** `diagram.batch_render(sources=[...], max_concurrent=5)` is called
 - **THEN** it SHALL limit concurrent requests to 5
-- **AND** default concurrency SHALL be 10
+- **AND** default max_concurrent SHALL be 5
 
 #### Scenario: Thread-safe task tracking
 - **GIVEN** concurrent batch rendering
@@ -124,7 +119,13 @@ The `diagram.render_directory()` function SHALL render all diagram sources in a 
 - **GIVEN** pattern parameter
 - **WHEN** `diagram.render_directory(directory="...", pattern="*.mmd")` is called
 - **THEN** it SHALL only render files matching the pattern
-- **AND** default pattern SHALL be "*.mmd,*.puml,*.d2"
+- **AND** default pattern SHALL be "*"
+- **AND** extension filtering SHALL still limit processing to known diagram source extensions
+
+#### Scenario: Compound extension discovery
+- **GIVEN** source files ending in `.vg.json` or `.vl.json`
+- **WHEN** `diagram.render_directory(...)` is called
+- **THEN** it SHALL discover and render those files
 
 #### Scenario: Remote backend restriction
 - **GIVEN** remote Kroki is configured
@@ -144,12 +145,12 @@ The `diagram.get_render_status()` function SHALL report async render progress.
 - **GIVEN** a completed batch render
 - **WHEN** `diagram.get_render_status(task_id="batch-xyz")` is called
 - **THEN** status SHALL be "completed"
-- **AND** results SHALL include output file paths
+- **AND** response SHALL include batch progress counters and result summary fields
 
 #### Scenario: Unknown task
 - **GIVEN** an invalid task_id
 - **WHEN** `diagram.get_render_status(task_id="invalid")` is called
-- **THEN** it SHALL return "Error: Unknown task ID"
+- **THEN** it SHALL return a "Task not found" error message
 
 ### Requirement: Get Diagram Policy
 
@@ -346,4 +347,3 @@ The diagram tool SHALL resolve template file paths with a two-step fallback.
 - **GIVEN** template config `templates.flow.file` is `/etc/templates/flow.mmd`
 - **WHEN** `diagram.get_template(name="flow")` is called
 - **THEN** it SHALL load from `/etc/templates/flow.mmd` (unchanged)
-

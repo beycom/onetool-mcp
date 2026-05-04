@@ -669,6 +669,19 @@ def _get_source_extension(provider: str) -> str:
     return PROVIDER_EXTENSIONS.get(provider, f".{provider}")
 
 
+def _match_source_extension(path: Path) -> str | None:
+    """Return the configured source extension that matches a path.
+
+    Supports compound extensions such as .vg.json and .vl.json by matching
+    against the full file name suffix instead of Path.suffix.
+    """
+    lower_name = path.name.lower()
+    for ext in sorted(DIAGRAM_EXTENSIONS, key=len, reverse=True):
+        if lower_name.endswith(ext):
+            return ext
+    return None
+
+
 def _generate_filename(
     name: str, provider: str, output_format: str, is_source: bool = False
 ) -> str:
@@ -855,11 +868,11 @@ def render_diagram(
 
                 # Infer provider from extension
                 if provider is None:
-                    ext = file_path.suffix.lower()
+                    ext = _match_source_extension(file_path)
                     provider = EXTENSION_TO_PROVIDER.get(ext)
                     if provider is None:
                         raise ValueError(
-                            f"Cannot infer provider from extension '{ext}'. "
+                            f"Cannot infer provider from extension '{file_path.suffix.lower()}'. "
                             "Please specify provider explicitly."
                         )
 
@@ -995,6 +1008,21 @@ def get_render_status(*, task_id: str) -> str:
             result_parts.append(f"Error: {task.get('error')}")
         elif status == "running":
             result_parts.append(f"Started: {task.get('started_at')}")
+
+        if task.get("type") == "batch":
+            result_parts.append(f"Total: {task.get('total', 0)}")
+            result_parts.append(f"Completed: {task.get('completed', 0)}")
+            result_parts.append(f"Failed: {task.get('failed', 0)}")
+            results = task.get("results", [])
+            if isinstance(results, list):
+                result_parts.append(f"Results: {len(results)} items")
+                success_count = sum(
+                    1 for item in results if isinstance(item, dict) and item.get("status") == "success"
+                )
+                failed_count = sum(
+                    1 for item in results if isinstance(item, dict) and item.get("status") == "failed"
+                )
+                result_parts.append(f"Result summary: success={success_count}, failed={failed_count}")
 
         s.add(status=status)
         return "\n".join(result_parts)
@@ -1221,8 +1249,9 @@ def render_directory(
         # Filter to known diagram extensions and pair with provider
         file_provider_pairs: list[tuple[Path, str]] = []
         for f in files:
-            if f.suffix in DIAGRAM_EXTENSIONS:
-                provider = EXTENSION_TO_PROVIDER.get(f.suffix)
+            matched_ext = _match_source_extension(f)
+            if matched_ext is not None:
+                provider = EXTENSION_TO_PROVIDER.get(matched_ext)
                 if provider:
                     file_provider_pairs.append((f, provider))
 
@@ -1546,13 +1575,17 @@ def list_providers(*, focus_only: bool = False) -> str:
     """
     with LogSpan(span="diagram.list_providers", focusOnly=focus_only) as s:
         if focus_only:
-            result = (
-                "Focus Providers (with full guidance)\n"
-                "=" * 40 + "\n\n"
-                "- mermaid: Flowcharts, sequences, state, Gantt, mindmaps\n"
-                "- plantuml: UML diagrams, C4 architecture\n"
-                "- d2: Modern architecture diagrams with auto-layout\n"
-                "\nUse diagram.get_diagram_instructions(provider='...') for details."
+            result = "\n".join(
+                [
+                    "Focus Providers (with full guidance)",
+                    "=" * 40,
+                    "",
+                    "- mermaid: Flowcharts, sequences, state, Gantt, mindmaps",
+                    "- plantuml: UML diagrams, C4 architecture",
+                    "- d2: Modern architecture diagrams with auto-layout",
+                    "",
+                    "Use diagram.get_diagram_instructions(provider='...') for details.",
+                ]
             )
             s.add(count=len(FOCUS_PROVIDERS))
             return result
