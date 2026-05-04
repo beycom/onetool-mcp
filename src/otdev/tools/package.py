@@ -18,13 +18,15 @@ import json
 import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from otpack import LogSpan, get_tool_config
+from otpack import LogSpan, get_tool_config, resolve_cwd_path
 from pydantic import BaseModel, Field
 
 from ot.http_client import http_get
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class Config(BaseModel):
@@ -116,7 +118,7 @@ def _parse_dependency_string(dep: str) -> tuple[str | None, str]:
     dep = dep.split(";")[0].strip()  # Remove environment markers
 
     # Match: name[extras]version_spec or name version_spec
-    match = re.match(r"^([a-zA-Z0-9_-]+)(?:\[[^\]]+\])?\s*(.*)$", dep)
+    match = re.match(r"^([a-zA-Z0-9_.-]+)(?:\[[^\]]+\])?\s*(.*)$", dep)
     if match:
         name = match.group(1).lower().replace("_", "-")
         version_spec = match.group(2).strip()
@@ -241,7 +243,7 @@ def audit(
         package.audit(path="./frontend", registry="npm")
     """
     with LogSpan(span="package.audit", path=path, registry=registry) as span:
-        base_path = Path(path).resolve()
+        base_path = resolve_cwd_path(path)
 
         # Determine registry and manifest
         if registry:
@@ -579,6 +581,9 @@ def version(
 
     with LogSpan(span="package.version", registry=registry, count=len(pkg_list)):
         results: list[dict[str, Any]] = []
+
+        if not pkg_list:
+            return []
 
         if registry in ("npm", "pypi"):
             with ThreadPoolExecutor(max_workers=min(len(pkg_list), 20)) as executor:

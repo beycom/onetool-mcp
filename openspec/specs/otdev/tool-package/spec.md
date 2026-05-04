@@ -85,6 +85,12 @@ The `version()` function SHALL check latest versions for packages from any suppo
 - **WHEN** `version(registry="npm", packages={"react": "^18.0.0"})` is called
 - **THEN** it SHALL return both current and latest versions for comparison
 
+#### Scenario: Empty package input
+- **GIVEN** an empty package list
+- **WHEN** `version(registry="npm", packages=[])` is called
+- **THEN** it SHALL return an empty list
+- **AND** it SHALL NOT construct a zero-worker thread pool
+
 ### Requirement: Package Tool Logging
 
 The package tools SHALL log all operations using LogSpan.
@@ -148,8 +154,17 @@ The `audit()` function SHALL audit project dependencies against latest registry 
 - **WHEN** `audit()` is called
 - **THEN** it SHALL parse package names and version constraints (e.g., `requests>=2.28.0`)
 
+#### Scenario: Dotted Python package names
+- **GIVEN** dependencies such as `zope.interface>=6.0`
+- **WHEN** dependencies are parsed from manifests
+- **THEN** dotted package names SHALL be parsed correctly
+
 #### Scenario: package.json sections
 - **GIVEN** package.json with dependencies and devDependencies
 - **WHEN** `audit()` is called
 - **THEN** it SHALL parse packages from both sections
 
+#### Scenario: Path resolution for audit
+- **GIVEN** a relative `path` argument
+- **WHEN** `audit(path="relative/project")` is called
+- **THEN** the path SHALL be resolved using project cwd path resolution helpers
