@@ -101,6 +101,15 @@ class TestTables:
         result = db.tables(db_url="")
         assert isinstance(result, str) and result.startswith("Error:")
 
+    def test_include_row_count(self, db_url: str) -> None:
+        from otdev.tools import db
+
+        result = db.tables(db_url=db_url, include_row_count=True)
+        assert isinstance(result, list)
+        rows_by_name = {row["table_name"]: row["row_count"] for row in result}
+        assert rows_by_name["users"] == 3
+        assert rows_by_name["orders"] == 3
+
 
 class TestSchema:
     """db.schema() returns column and relationship info for tables."""
@@ -228,3 +237,22 @@ class TestQuery:
 
         result = db.query(sql="", db_url=db_url)
         assert isinstance(result, str) and result.startswith("Error:")
+
+
+class TestSample:
+    """db.sample() returns quick preview rows."""
+
+    def test_sample_returns_rows(self, db_url: str) -> None:
+        from otdev.tools import db
+
+        result = db.sample(table="users", db_url=db_url, limit=2)
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert {"id", "name", "email", "active"}.issubset(result[0].keys())
+
+    def test_sample_requires_positive_limit(self, db_url: str) -> None:
+        from otdev.tools import db
+
+        result = db.sample(table="users", db_url=db_url, limit=0)
+        assert isinstance(result, str)
+        assert result.startswith("Error:")

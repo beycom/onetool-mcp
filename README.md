@@ -134,7 +134,7 @@ onetool direct run "brave.search(query='latest AI news')" --format raw
 | `chrome_util` | `highlight_element`, `guide_user`              | `[dev]`  | Browser annotations (DevTools) |
 | `context7`    | `search`, `doc`                                | `[dev]`  | Library documentation          |
 | `convert`     | `pdf_to_md`, `docx_to_md`, `pptx_to_md`        | `[util]` | Document conversion            |
-| `db`          | `query`, `schema`, `tables`                    | `[dev]`  | Database operations            |
+| `db`          | `query`, `schema`, `tables`, `sample`          | `[dev]`  | Database operations            |
 | `diagram`     | `create`, `get_playground_url`                 | `[dev]`  | Mermaid / Kroki diagrams       |
 | `excel`       | `read`, `write`, `query`                       | `[util]` | Excel files                    |
 | `file`        | `read`, `write`, `grep`, `slice`, `toc`        | `[util]` | File operations                |

@@ -23,6 +23,12 @@ The `db.tables()` function SHALL list table names from the connected database.
 - **WHEN** `db.tables(db_url=..., filter="USER", ignore_case=True)` is called
 - **THEN** it SHALL return table names containing "user" regardless of case
 
+#### Scenario: Optional row counts in table listing
+- **GIVEN** a valid database URL
+- **WHEN** `db.tables(db_url=..., include_row_count=True)` is called
+- **THEN** it SHALL return structured rows with `table_name` and `row_count`
+- **AND** row counts SHALL be integer values
+
 ### Requirement: Schema Definitions
 
 The `db.schema()` function SHALL return detailed schema information for specified tables.
@@ -94,6 +100,20 @@ The `db.query()` function SHALL execute SQL queries and return formatted results
 - **GIVEN** an invalid SQL query
 - **WHEN** query is executed
 - **THEN** it SHALL return "Error: {message}"
+
+### Requirement: Table Sampling
+
+The `db.sample()` function SHALL return quick preview rows for a single table.
+
+#### Scenario: Sample rows
+- **GIVEN** a valid database URL and existing table
+- **WHEN** `db.sample(table="users", db_url=..., limit=10)` is called
+- **THEN** it SHALL return up to `limit` rows as `list[dict]`
+
+#### Scenario: Invalid sample limit
+- **GIVEN** a non-positive limit value
+- **WHEN** `db.sample(table="users", db_url=..., limit=0)` is called
+- **THEN** it SHALL return an explicit error message
 
 ### Requirement: Connection Configuration
 
@@ -185,4 +205,3 @@ The tool SHALL expand path prefixes in SQLite database URLs.
 - **GIVEN** a non-SQLite URL: `postgresql://localhost/db`
 - **WHEN** `db.query("SELECT 1", db_url="postgresql://localhost/db")` is called
 - **THEN** the URL SHALL be passed to SQLAlchemy unchanged
-

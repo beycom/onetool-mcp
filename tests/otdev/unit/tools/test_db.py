@@ -20,7 +20,7 @@ class TestDbPack:
 
         # DB should export query, tables, schema and other functions
         assert hasattr(db, "__all__")
-        expected = {"query", "tables", "schema"}
+        expected = {"query", "tables", "schema", "sample"}
         assert expected.issubset(set(db.__all__))
 
     def test_functions_are_callable(self):

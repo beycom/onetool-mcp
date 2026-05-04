@@ -25,7 +25,7 @@ from __future__ import annotations
 # Pack for dot notation: db.tables(), db.schema(), db.query()
 pack = "db"
 
-__all__ = ["query", "schema", "tables"]
+__all__ = ["query", "sample", "schema", "tables"]
 
 import contextlib
 import threading
@@ -178,17 +178,22 @@ def _convert_value_for_json(val: Any) -> Any:
 
 
 def tables(
-    *, db_url: str, filter: str | None = None, ignore_case: bool = False
-) -> list[str] | str:
+    *,
+    db_url: str,
+    filter: str | None = None,
+    ignore_case: bool = False,
+    include_row_count: bool = False,
+) -> list[str] | list[dict[str, Any]] | str:
     """List table names in the database.
 
     Args:
         db_url: Database URL (required)
         filter: Optional substring to filter table names
         ignore_case: If True, filter matching is case-insensitive
+        include_row_count: If True, include row counts for each table
 
     Returns:
-        List of table names, or error string
+        List of table names, list of table/count dicts, or error string
 
     Example:
         # List all tables
@@ -201,7 +206,12 @@ def tables(
         db.tables(db_url="sqlite:///data.db", filter="USER", ignore_case=True)
     """
     _require_sqlalchemy()
-    with LogSpan(span="db.tables", dbUrl=db_url, filter=filter) as s:
+    with LogSpan(
+        span="db.tables",
+        dbUrl=db_url,
+        filter=filter,
+        includeRowCount=include_row_count,
+    ) as s:
         if not db_url or not db_url.strip():
             s.add(error="empty_db_url")
             return "Error: db_url parameter is required"
@@ -221,8 +231,22 @@ def tables(
                     else:
                         all_tables = [t for t in all_tables if filter in t]
 
-                s.add(resultCount=len(all_tables))
-                return all_tables
+                if not include_row_count:
+                    s.add(resultCount=len(all_tables))
+                    return all_tables
+
+                from sqlalchemy import MetaData, Table, func, select
+
+                rows: list[dict[str, Any]] = []
+                for table_name in all_tables:
+                    table = Table(table_name, MetaData(), autoload_with=conn)
+                    row_count = conn.execute(
+                        select(func.count()).select_from(table)
+                    ).scalar_one()
+                    rows.append({"table_name": table_name, "row_count": int(row_count)})
+
+                s.add(resultCount=len(rows))
+                return rows
 
         except Exception as e:
             s.add(error=str(e))
@@ -332,6 +356,51 @@ def _get_table_schema(inspector: Any, table_name: str) -> dict[str, Any]:
     }
 
 
+def sample(
+    *,
+    table: str,
+    db_url: str,
+    limit: int = 10,
+) -> list[dict[str, Any]] | str:
+    """Fetch a quick sample of rows from a table.
+
+    Args:
+        table: Table name to sample
+        db_url: Database URL (required)
+        limit: Maximum rows to return (default: 10)
+
+    Returns:
+        List of sampled rows, or error string
+    """
+    _require_sqlalchemy()
+    with LogSpan(span="db.sample", table=table, dbUrl=db_url, limit=limit) as s:
+        if not db_url or not db_url.strip():
+            s.add(error="empty_db_url")
+            return "Error: db_url parameter is required"
+
+        if not table or not table.strip():
+            s.add(error="empty_table")
+            return "Error: table parameter is required"
+
+        if limit <= 0:
+            s.add(error="invalid_limit")
+            return "Error: limit must be greater than 0"
+
+        try:
+            from sqlalchemy import MetaData, Table, select
+
+            engine = _get_engine(db_url)
+            with engine.connect() as conn:
+                table_ref = Table(table, MetaData(), autoload_with=conn)
+                cursor_result = conn.execute(select(table_ref).limit(limit))
+                rows_data, _, _ = _convert_query_results_to_json(cursor_result, limit)
+                s.add(resultCount=len(rows_data))
+                return rows_data
+        except Exception as e:
+            s.add(error=str(e))
+            return f"Error: {e}"
+
+
 
 
 def query(*, sql: str, db_url: str, params: dict[str, Any] | None = None) -> dict[str, Any] | list[dict[str, Any]] | str:
@@ -439,5 +508,4 @@ def _convert_query_results_to_json(
             truncated = True
 
     return rows_data, row_count, truncated
-
 

@@ -14,6 +14,7 @@ Database introspection and query execution via SQLAlchemy. Supports any SQLAlche
 | Function | Description |
 |----------|-------------|
 | `db.tables(db_url, ...)` | List table names in the database |
+| `db.sample(table, db_url, limit=10)` | Return sample rows from one table |
 | `db.schema(table_names, db_url)` | Get schema definitions for tables |
 | `db.query(sql, db_url, ...)` | Execute SQL and return formatted results |
 
@@ -24,7 +25,10 @@ Database introspection and query execution via SQLAlchemy. Supports any SQLAlche
 | `db_url` | str | SQLAlchemy connection string (required) |
 | `filter` | str | Substring to filter table names (tables only) |
 | `ignore_case` | bool | Case-insensitive filter matching (tables only, default: False) |
+| `include_row_count` | bool | Include row counts in `db.tables()` output (default: False) |
 | `table_names` | list[str] | Tables to inspect (schema only) |
+| `table` | str | Table to preview (sample only) |
+| `limit` | int | Max rows to return for `db.sample()` (default: 10) |
 | `params` | dict | Query parameters for safe substitution (query only) |
 
 ## Project Configuration
@@ -85,13 +89,19 @@ db.tables(db_url=db_url)
 # Filter tables
 db.tables(db_url=db_url, filter="user")
 
+# Include table row counts
+db.tables(db_url=db_url, include_row_count=True)
+
+# Sample rows from one table
+db.sample(table="users", db_url=db_url, limit=5)
+
 # Get schema for tables
-db.schema(["users", "orders"], db_url=db_url)
+db.schema(table_names=["users", "orders"], db_url=db_url)
 
 # Execute queries (parameterized for safety)
-db.query("SELECT * FROM users LIMIT 5", db_url=db_url)
+db.query(sql="SELECT * FROM users LIMIT 5", db_url=db_url)
 db.query(
-    "SELECT * FROM users WHERE status = :status",
+    sql="SELECT * FROM users WHERE status = :status",
     db_url=db_url,
     params={"status": "active"}
 )
