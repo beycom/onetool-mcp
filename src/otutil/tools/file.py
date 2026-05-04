@@ -306,6 +306,7 @@ def read(
     offset: int = 1,
     limit: int | None = None,
     encoding: str = "utf-8",
+    line_numbers: bool = False,
 ) -> str:
     """Read file content with optional offset and limit.
 
@@ -317,9 +318,10 @@ def read(
         offset: Line number to start from (1-indexed, default: 1)
         limit: Maximum lines to return (default: all remaining)
         encoding: Text encoding (default: utf-8)
+        line_numbers: If True, prefix each line with a line number
 
     Returns:
-        File content with line numbers, or error message
+        File content, or error message
 
     Example:
         file.read(path="src/main.py")
@@ -371,11 +373,20 @@ def read(
 
             # Apply pagination
             end_idx = start_idx + limit if limit else total_lines
-            output_lines = [
-                f"{i + 1:6d}\t{line}"
+            selected_lines = [
+                line
                 for i, line in enumerate(lines)
                 if start_idx <= i < end_idx
             ]
+            output_lines = (
+                [
+                    f"{i + 1:6d}\t{line}"
+                    for i, line in enumerate(lines)
+                    if start_idx <= i < end_idx
+                ]
+                if line_numbers
+                else selected_lines
+            )
             lines_collected = len(output_lines)
 
             result = "\n".join(output_lines)

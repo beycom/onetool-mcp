@@ -15,7 +15,7 @@ Short alias: `f`
 
 | Function | Description |
 |----------|-------------|
-| `file.read(path, offset, limit, encoding)` | Read file content with line numbers |
+| `file.read(path, offset, limit, encoding, line_numbers)` | Read file content (raw by default) |
 | `file.read_batch(paths, glob, encoding, max_files)` | Read multiple files in a single call |
 | `file.info(path, follow_symlinks)` | Get file or directory metadata |
 
@@ -65,6 +65,7 @@ Short alias: `f`
 | `glob` | str | Glob pattern to filter files, always recursive (e.g., `*.py`, `*.md`, `src/**/*.py`) |
 | `offset` | int | Line number to start from (1-indexed, default: 1) |
 | `limit` | int | Maximum lines to return |
+| `line_numbers` | bool | Include line-number prefixes in `file.read` output (default: `False`) |
 | `occurrence` | int | Which match to replace (1=first, 0=all) |
 | `encoding` | str | Character encoding (default: utf-8) |
 | `dry_run` | bool | Show what would happen without making changes |
@@ -118,11 +119,14 @@ tools:
 ### Reading Files
 
 ```python
-# Read entire file with line numbers
+# Read entire file (raw content)
 file.read(path="src/main.py")
 
 # Read with pagination (lines 100-150)
 file.read(path="large_file.log", offset=100, limit=50)
+
+# Read with line numbers (opt-in)
+file.read(path="src/main.py", line_numbers=True)
 
 # Get file metadata
 file.info(path="config.yaml")

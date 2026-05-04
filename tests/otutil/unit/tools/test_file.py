@@ -101,7 +101,7 @@ def test_all_exports() -> None:
 @pytest.mark.unit
 @pytest.mark.tools
 def test_read_file(test_file: Path) -> None:
-    """Verify read returns file content with line numbers."""
+    """Verify read returns raw file content by default."""
     from otutil.tools.file import read
 
     result = read(path=str(test_file))
@@ -109,8 +109,21 @@ def test_read_file(test_file: Path) -> None:
     assert "Line 1" in result
     assert "Line 2" in result
     assert "Line 3" in result
-    # Line numbers should be present
-    assert "1\t" in result or "1→" in result
+    assert "1\t" not in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_read_file_with_line_numbers(test_file: Path) -> None:
+    """Verify read can include line numbers when requested."""
+    from otutil.tools.file import read
+
+    result = read(path=str(test_file), line_numbers=True)
+
+    assert "Line 1" in result
+    assert "Line 2" in result
+    assert "Line 3" in result
+    assert "1\t" in result
 
 
 @pytest.mark.unit

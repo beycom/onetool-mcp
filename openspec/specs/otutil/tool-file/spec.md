@@ -60,7 +60,12 @@ The `file.read()` function SHALL read file content with optional pagination.
 #### Scenario: Basic read
 - **GIVEN** a valid file path
 - **WHEN** `file.read(path=path)` is called
-- **THEN** it SHALL return file content with line numbers
+- **THEN** it SHALL return raw file content lines (no line-number prefix)
+
+#### Scenario: Line numbers opt-in
+- **GIVEN** a valid file path
+- **WHEN** `file.read(path=path, line_numbers=True)` is called
+- **THEN** it SHALL prefix each line with its line number
 
 #### Scenario: Line-based pagination
 - **GIVEN** a file path with offset and limit
