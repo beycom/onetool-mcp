@@ -80,6 +80,59 @@ class TestBuildExecutionNamespaceAliases:
         proxy_keys = {k for k in ns if k not in ("proxy",)}
         assert proxy_keys == {"github"}
 
+    def test_configured_disconnected_server_is_still_exposed(self) -> None:
+        """Configured servers should be present in namespace before connection."""
+        from ot.executor.pack_proxy import build_execution_namespace, reset
+
+        reset()
+
+        mock_proxy = MagicMock()
+        mock_proxy.servers = []
+        mock_proxy.list_tools.return_value = []
+
+        mock_registry = MagicMock()
+        mock_registry.packs = {}
+
+        cfg = MagicMock()
+        cfg.servers = {"github": MagicMock(tool_prefix=None)}
+
+        with (
+            patch("ot.proxy.get_proxy_manager", return_value=mock_proxy),
+            patch("ot.executor.pack_proxy.get_config", return_value=cfg),
+        ):
+            ns = build_execution_namespace(mock_registry)
+
+        assert "github" in ns
+
+    def test_cache_refreshes_when_configured_servers_change(self) -> None:
+        """Cache key should account for configured servers, not only connected servers."""
+        from ot.executor.pack_proxy import build_execution_namespace, reset
+
+        reset()
+
+        mock_proxy = MagicMock()
+        mock_proxy.servers = []
+        mock_proxy.list_tools.return_value = []
+
+        mock_registry = MagicMock()
+        mock_registry.packs = {}
+
+        cfg = MagicMock()
+        cfg.servers = {}
+
+        with (
+            patch("ot.proxy.get_proxy_manager", return_value=mock_proxy),
+            patch("ot.executor.pack_proxy.get_config", return_value=cfg),
+        ):
+            first = build_execution_namespace(mock_registry)
+            assert "github" not in first
+
+            # Same registry and same connected-server set, but config changed.
+            cfg.servers = {"github": MagicMock(tool_prefix=None)}
+            second = build_execution_namespace(mock_registry)
+
+        assert "github" in second
+
     def test_short_name_alias_not_overwritten_by_local_pack(self) -> None:
         """Short-name alias should not overwrite an existing local pack."""
         from ot.executor.pack_proxy import build_execution_namespace, reset

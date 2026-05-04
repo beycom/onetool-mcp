@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 import typer
@@ -82,6 +82,126 @@ class TestPrepareCommandWithMetaWrappedSnippet:
 
         assert prepared.error is not None
         assert "Unknown snippet 'does_not_exist'" in prepared.error
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestNestedRunSnippetExpansion:
+    """Regression tests for __run('$snippet ...') expansion."""
+
+    def test_nested_run_expands_snippet(self) -> None:
+        from ot.config import OneToolConfig, SnippetDef
+        from ot.executor.runner import execute_python_code
+
+        cfg = OneToolConfig(snippets={"sum_two": SnippetDef(body="1 + 1")})
+        with (
+            patch("ot.config.get_config", return_value=cfg),
+            patch("ot.executor.runner.get_config", return_value=cfg),
+        ):
+            output, raw, *_ = execute_python_code(
+                "__run('$sum_two')",
+                tool_functions={},
+                validate=False,
+            )
+
+        assert output == "2"
+        assert raw == 2
+
+    def test_nested_run_unknown_snippet_surfaces_clear_error(self) -> None:
+        from ot.config import OneToolConfig
+        from ot.executor.runner import execute_python_code
+
+        cfg = OneToolConfig(snippets={})
+        with (
+            patch("ot.config.get_config", return_value=cfg),
+            patch("ot.executor.runner.get_config", return_value=cfg),
+        ):
+            with pytest.raises(ValueError) as exc:
+                execute_python_code("__run('$missing')", tool_functions={}, validate=False)
+
+        assert "Unknown snippet 'missing'" in str(exc.value)
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestSameCommandProxyEnable:
+    """Regression tests for enabling proxy server then calling its pack in one command."""
+
+    def test_enable_then_pack_call_in_same_command(self) -> None:
+        from ot.config import OneToolConfig
+        from ot.executor.pack_proxy import build_execution_namespace, reset
+        from ot.executor.runner import execute_python_code
+        from ot.proxy.manager import ProxyToolInfo
+
+        class FakeProxyManager:
+            def __init__(self) -> None:
+                self.servers: list[str] = []
+
+            def connect_additional_sync(self, name: str, _config: object) -> str:
+                if name not in self.servers:
+                    self.servers.append(name)
+                return "ok"
+
+            def list_tools(self, server_name: str) -> list[ProxyToolInfo]:
+                if server_name in self.servers:
+                    return [
+                        ProxyToolInfo(
+                            server=server_name,
+                            name="search_repositories",
+                            description="",
+                            input_schema={},
+                        )
+                    ]
+                return []
+
+            def call_tool_sync(
+                self,
+                server_name: str,
+                tool_name: str,
+                kwargs: dict[str, object],
+                *,
+                timeout: float | None = None,
+            ) -> dict[str, object]:
+                return {
+                    "server": server_name,
+                    "tool": tool_name,
+                    "kwargs": kwargs,
+                    "timeout": timeout,
+                }
+
+            def get_server_timeout(self, _server_name: str) -> float:
+                return 30.0
+
+        def _enable_server(*, name: str) -> str:
+            fake_proxy.connect_additional_sync(name, object())
+            return f"enabled {name}"
+
+        reset()
+        fake_proxy = FakeProxyManager()
+        mock_registry = MagicMock()
+        mock_registry.packs = {"ot_servers": {"enable": _enable_server}}
+
+        cfg = MagicMock()
+        cfg.servers = {"github": MagicMock(tool_prefix=None)}
+
+        with (
+            patch("ot.proxy.get_proxy_manager", return_value=fake_proxy),
+            patch("ot.executor.pack_proxy.get_config", return_value=cfg),
+            patch("ot.executor.runner.get_config", return_value=OneToolConfig()),
+        ):
+            namespace = build_execution_namespace(mock_registry)
+            output, raw, *_ = execute_python_code(
+                "ot_servers.enable(name='github')\n"
+                "github.search_repositories(query='onetool-mcp')",
+                tool_functions=namespace,
+                validate=False,
+            )
+
+        assert output
+        assert isinstance(raw, dict)
+        assert raw["server"] == "github"
+        assert raw["tool"] == "search_repositories"
+        assert raw["kwargs"] == {"query": "onetool-mcp"}
 
 
 @pytest.mark.unit

@@ -40,3 +40,4 @@ ot_servers.disable(name="github")
 
 - All changes are in-memory only and reset when OneTool restarts.
 - If you don't know the server name, use `ot.servers()` first.
+- After `ot_servers.enable(name="...")`, the server pack is available immediately in the same command block.

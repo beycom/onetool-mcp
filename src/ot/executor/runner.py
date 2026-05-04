@@ -378,6 +378,23 @@ def execute_python_code(
         "__NO_RETURN__": _NO_RETURN,
     }
 
+    def _nested_run(command: str) -> Any:
+        """Execute a nested OneTool command string from Python workflows."""
+        if not isinstance(command, str) or not command.strip():
+            raise ValueError("__run(command) requires a non-empty command string")
+
+        prepared = prepare_command(command)
+        if prepared.error:
+            raise ValueError(prepared.error)
+
+        nested_code, nested_has_return = prepare_code_for_exec(prepared.code)
+        nested_wrapped_code, _ = wrap_code_for_exec(nested_code, nested_has_return)
+        exec(nested_wrapped_code, namespace)
+        nested_result = namespace.get("__result__", _NO_RETURN)
+        return None if nested_result is _NO_RETURN else nested_result
+
+    namespace["__run"] = _nested_run
+
     # Step 4: Prepare code for result capture (reuse AST if available)
     prepared_code, has_return = prepare_code_for_exec(code, tree=ast_tree)
 

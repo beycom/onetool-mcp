@@ -43,6 +43,15 @@ Prefix with `$` and pass `key=value` params:
 - **Prefix abbreviation:** `co` resolves to `context`, `pa` to `path`, etc. if unambiguous
 - **Pipe separates multiple values** in batch snippets: `$br q=react|vue|svelte`
 
+### Snippets Inside Python Workflows
+
+You can execute snippet commands from multiline Python via `__run(...)`:
+
+```python
+__run("$rg p=TODO ft=py")
+__run("$wf url=https://docs.python.org")
+```
+
 ## Standard Snippets
 
 All snippets included in `config/snippets.yaml`:

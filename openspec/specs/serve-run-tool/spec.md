@@ -178,6 +178,11 @@ The system SHALL resolve dot-notation packs to actual tool functions.
 - **WHEN** run() processes `brave.search(query="test")`
 - **THEN** it SHALL call the brave-specific search function
 
+#### Scenario: Enabled proxy server pack available in same command
+- **GIVEN** a configured proxy server pack `github` is initially disconnected
+- **WHEN** code executes `ot_servers.enable(name="github")` then `github.search_repositories(query="tooling")` in the same run() command
+- **THEN** the `github` pack SHALL be available for immediate resolution in that same command
+
 ### Requirement: Alias Resolution
 
 The system SHALL resolve configured aliases to their target functions.
@@ -200,6 +205,11 @@ The system SHALL expand snippet templates using Jinja2.
 - **GIVEN** command `$wsq q1=AI q2=ML p=Compare` where `wsq` snippet is configured
 - **WHEN** run() processes the command
 - **THEN** it SHALL expand the snippet template and execute the result
+
+#### Scenario: Snippet expansion inside multiline python workflow
+- **GIVEN** a multiline run() command with normal python statements and `result = __run("$wsq q1=AI q2=ML p=Compare")`
+- **WHEN** run() executes the command
+- **THEN** `__run(...)` SHALL expand and execute the snippet command and return its tool result to the caller
 
 ### Requirement: Project Pack Proxy
 

@@ -243,10 +243,13 @@ def _create_proxy_introspection_pack() -> Any:
     return ProxyIntrospectionPack()
 
 
-# Cache for execution namespace: key=(registry_id, frozenset of proxy servers)
+# Cache for execution namespace:
+# key=(registry_id, connected_proxy_servers, configured_server_fingerprint)
 # Uses OrderedDict for proper LRU eviction
 _NAMESPACE_CACHE_MAXSIZE = 10
-_namespace_cache: OrderedDict[tuple[int, frozenset[str]], dict[str, Any]] = (
+_namespace_cache: OrderedDict[
+    tuple[int, frozenset[str], frozenset[tuple[str, str | None]]], dict[str, Any]
+] = (
     OrderedDict()
 )
 
@@ -256,8 +259,9 @@ def build_execution_namespace(
 ) -> dict[str, Any]:
     """Build execution namespace with pack proxies for dot notation access.
 
-    Results are cached based on registry identity and proxy server configuration.
-    Cache is invalidated when registry changes or proxy servers are added/removed.
+    Results are cached based on registry identity, connected proxy servers, and
+    configured server fingerprints (name + tool_prefix).
+    Cache is invalidated when any of those dimensions change.
 
     Provides dot notation access to tools:
     - brave.web_search(query="test")  # pack access
@@ -272,16 +276,26 @@ def build_execution_namespace(
     from ot.executor.worker_proxy import WorkerPackProxy
     from ot.proxy import get_proxy_manager
 
-    # Check cache - key is registry identity + current proxy servers
+    config = get_config()
+    configured_servers = config.servers or {}
+    configured_server_fingerprint = frozenset(
+        (server_name, server_cfg.tool_prefix)
+        for server_name, server_cfg in configured_servers.items()
+    )
+
+    # Check cache - key is registry identity + current proxy servers + configured servers
     proxy_mgr = get_proxy_manager()
-    cache_key = (id(registry), frozenset(proxy_mgr.servers))
+    cache_key = (
+        id(registry),
+        frozenset(proxy_mgr.servers),
+        configured_server_fingerprint,
+    )
 
     if cache_key in _namespace_cache:
         # LRU: move to end on access
         _namespace_cache.move_to_end(cache_key)
         return _namespace_cache[cache_key]
 
-    config = get_config()
     namespace: dict[str, Any] = {}
 
     from ot.meta._constants import PACK_SHORT_NAMES
@@ -299,9 +313,14 @@ def build_execution_namespace(
         if full_name in namespace and short_name not in namespace:
             namespace[short_name] = namespace[full_name]
 
-    # Add MCP proxy packs (only if not already defined locally)
-    for server_name in proxy_mgr.servers:
-        server_cfg = (config.servers or {}).get(server_name)
+    # Add MCP proxy packs (only if not already defined locally).
+    # Include configured servers up-front so packs can be used immediately
+    # after ot_servers.enable(...) within the same command block.
+    configured_server_names = set(configured_servers.keys())
+    known_servers = sorted(set(proxy_mgr.servers) | configured_server_names)
+
+    for server_name in known_servers:
+        server_cfg = configured_servers.get(server_name)
         tool_prefix = server_cfg.tool_prefix if server_cfg else None
 
         # Compute the Python-safe identifier for this server.
