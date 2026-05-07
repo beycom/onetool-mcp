@@ -9,7 +9,7 @@ Short alias: `img`
 - Load images from file paths, URLs, or the clipboard once; reference by handle for follow-up questions
 - Ask multiple questions in a single model call — answers returned as paired question/answer list
 - Structured summaries (text, mode, type, colours) extracted and cached in `meta.json`
-- Clipboard shortcuts `clip_ask()` and `clip_view()` — no handle juggling needed
+- Clipboard shortcuts `clip_ask()` and `clip_view()` — no handle juggling needed; clipboard is re-read each call and deduplicated when unchanged
 
 ## Functions
 

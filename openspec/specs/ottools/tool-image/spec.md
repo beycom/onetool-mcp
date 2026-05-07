@@ -144,12 +144,14 @@ model and return answers.
 - **THEN** it SHALL auto-load the clipboard image, then proceed with the question
 - **AND** the returned handle SHALL match what `image.load(img="clip")` would return
 
-#### Scenario: `"clip"` shorthand — reuse existing
+#### Scenario: `"clip"` shorthand — refresh clipboard each call
 
-- **GIVEN** `image.load(img="clip")` was called earlier this session returning
-  `"#img_a3f7b2c4"`
-- **WHEN** `image.ask(img="clip", q="What is this?")` is called
-- **THEN** it SHALL reuse `"#img_a3f7b2c4"` without reloading the clipboard
+- **GIVEN** `image.load(img="clip")` or `image.ask(img="clip", ...)` was called
+  earlier this session
+- **WHEN** `image.ask(img="clip", q="What is this?")` is called again
+- **THEN** it SHALL read current clipboard bytes again before answering
+- **AND** if clipboard bytes are unchanged, it SHALL return the existing handle via hash dedup
+- **AND** if clipboard bytes changed, it SHALL return the handle for the new clipboard image
 
 #### Scenario: Unknown handle
 
@@ -310,5 +312,4 @@ The `ot_image` pack SHALL be configurable via `onetool.yaml` under `tools.ot_ima
 - **WHEN** `tools.ot_image.max_edge: 800` is set in config
 - **AND** `image.load(img="~/large.png")` is called with a 2000×1500px image
 - **THEN** the model-upload bytes SHALL be resized to fit within 800px on the long edge
-
 

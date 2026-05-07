@@ -30,7 +30,9 @@ from .store import (
 )
 from .vision import ask_questions, extract_summary
 
-# Track last clipboard handle so ask(img="clip") can reuse without re-loading
+# Track last clipboard handle for metadata/observability only.
+# Clipboard reads for ask/summary always refresh via load(img="clip"),
+# which deduplicates unchanged content by hash.
 _clip_handle: str | None = None
 
 
@@ -321,15 +323,13 @@ def ask(
         # Resolve handle name
         handle_name: str
         if img in ("clip", "clipboard"):
-            # Reuse existing clipboard handle or auto-load
-            if _clip_handle is not None and load_meta(_clip_handle) is not None:
-                handle_name = _clip_handle
-            else:
-                result = load(img="clip", max_edge=max_edge)
-                if "error" in result:
-                    s.add(error=result["error"])
-                    return {"error": result["error"], "handle": "clip"}
-                handle_name = result["handle"].lstrip("#")
+            # Always re-read clipboard to pick up latest content.
+            # load() deduplicates unchanged bytes and updates _clip_handle.
+            result = load(img="clip", max_edge=max_edge)
+            if "error" in result:
+                s.add(error=result["error"])
+                return {"error": result["error"], "handle": "clip"}
+            handle_name = result["handle"].lstrip("#")
         elif img.startswith("#"):
             handle_name = img[1:]
         elif load_meta(img) is not None:
@@ -391,14 +391,13 @@ def summary(*, img: str) -> dict[str, Any]:
         # Resolve handle name
         handle_name: str
         if img in ("clip", "clipboard"):
-            if _clip_handle is not None and load_meta(_clip_handle) is not None:
-                handle_name = _clip_handle
-            else:
-                result = load(img="clip")
-                if "error" in result:
-                    s.add(error=result["error"])
-                    return {"error": result["error"], "handle": "clip"}
-                handle_name = result["handle"].lstrip("#")
+            # Always re-read clipboard to pick up latest content.
+            # load() deduplicates unchanged bytes and updates _clip_handle.
+            result = load(img="clip")
+            if "error" in result:
+                s.add(error=result["error"])
+                return {"error": result["error"], "handle": "clip"}
+            handle_name = result["handle"].lstrip("#")
         elif img.startswith("#"):
             handle_name = img[1:]
         elif load_meta(img) is not None:

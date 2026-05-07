@@ -1005,6 +1005,27 @@ class TestAsk:
         assert "result" in result
         assert result["result"] == [{"question": "Describe the image.", "answer": "A red square."}]
 
+    def test_clip_ask_refreshes_clipboard_each_call(self, tmp_path: Path) -> None:
+        from ottools._image import store, tools
+        from ottools._image.config import Config
+
+        img_a = _make_png_bytes()
+        img_b = _make_png_bytes(101, 100)
+
+        with (
+            patch.object(store, "_images_dir", return_value=tmp_path),
+            patch("ottools._image.tools.get_image_config") as mock_cfg,
+            patch("ottools._image.tools.ask_questions", return_value=["ok"]),
+            patch("ottools._image.sources._grab_clipboard", side_effect=[img_a, img_b]) as mock_clip,
+        ):
+            mock_cfg.return_value = Config(session_cache_size=10, model="openai/gpt-4o-mini")
+            tools._clip_handle = None
+            first = tools.ask(img="clip", q="q1")
+            second = tools.ask(img="clip", q="q2")
+
+        assert first["handle"] != second["handle"]
+        assert mock_clip.call_count == 2
+
 
 @pytest.mark.unit
 @pytest.mark.tools
@@ -1124,6 +1145,38 @@ class TestSummary:
             tools.clip_view()
 
         mock_summary.assert_called_once_with(img="clip")
+
+    def test_clip_summary_refreshes_clipboard_each_call(self, tmp_path: Path) -> None:
+        from ottools._image import store, tools
+        from ottools._image.config import Config
+
+        img_a = _make_png_bytes()
+        img_b = _make_png_bytes(101, 100)
+
+        summary_payload = {
+            "type": "ui",
+            "mode": "light",
+            "colours": ["green"],
+            "description": "desc",
+            "content": "content",
+        }
+        mock_resp = MagicMock()
+        mock_resp.choices[0].message.content = json.dumps(summary_payload)
+
+        with (
+            patch.object(store, "_images_dir", return_value=tmp_path),
+            patch("ottools._image.tools.get_image_config", return_value=Config(session_cache_size=10, model="openai/gpt-4o-mini")),
+            patch("ottools._image.sources._grab_clipboard", side_effect=[img_a, img_b]) as mock_clip,
+            patch("ottools._image.vision.OpenAI") as MockOAI,
+            patch("ottools._image.tools.threading.Thread"),
+        ):
+            MockOAI.return_value.chat.completions.create.return_value = mock_resp
+            tools._clip_handle = None
+            first = tools.summary(img="clip")
+            second = tools.summary(img="clip")
+
+        assert first["handle"] != second["handle"]
+        assert mock_clip.call_count == 2
 
 
 # ---------------------------------------------------------------------------
