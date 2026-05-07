@@ -165,7 +165,9 @@ def _kb_setup(conn: sqlite3.Connection) -> None:
         sqlite_vec.load(conn)
         conn.enable_load_extension(False)
         config = _get_config()
-        dims = config.dimensions
+        dims = int(config.dimensions)
+        if dims <= 0:
+            raise ValueError(f"knowledge dimensions must be > 0, got {dims}")
         conn.execute(f"""
             CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vec USING vec0(
                 chunk_id TEXT PRIMARY KEY,

@@ -258,6 +258,12 @@ The diagram tool SHALL support remote and self-hosted Kroki backends.
 - **THEN** it SHALL use kroki.io API
 - **AND** batch operations SHALL be disabled
 
+#### Scenario: Runtime cache reset on ot.reload
+- **GIVEN** backend selection cache has a previously resolved URL
+- **WHEN** `ot.reload()` is called
+- **THEN** diagram backend runtime cache SHALL be cleared
+- **AND** the next render operation SHALL resolve backend selection from current configuration
+
 #### Scenario: Self-hosted backend
 - **GIVEN** backend.prefer="self_hosted" and self_hosted_url configured
 - **WHEN** diagrams are rendered

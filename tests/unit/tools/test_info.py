@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -371,6 +371,23 @@ def test_reload_clears_config() -> None:
 
     assert "OK" in result
     assert "reloaded" in result.lower()
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_reload_resets_runtime_tool_caches() -> None:
+    """Verify ot.reload() resets runtime caches used by tool modules."""
+    from ot.meta import reload
+
+    with (
+        patch("otdev.tools.diagram.reset_runtime_cache") as mock_diag_reset,
+        patch("otutil.tools._knowledge.retrieval.reset_runtime_cache") as mock_kb_reset,
+    ):
+        result = reload()
+
+    assert "OK" in result
+    mock_diag_reset.assert_called_once_with()
+    mock_kb_reset.assert_called_once_with()
 
 
 # ============================================================================

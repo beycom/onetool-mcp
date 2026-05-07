@@ -235,3 +235,16 @@ class TestDiagramRegressionFixes:
         assert "Focus Providers (with full guidance)" in result
         assert "=" * 40 in result
         assert "=Focus Providers" not in result
+
+    def test_reset_runtime_cache_clears_backend_cache(self):
+        from otdev.tools import diagram
+
+        diagram._cached_backend["url"] = "https://cached.example.test"  # noqa: SLF001
+        diagram._cached_backend["is_self_hosted"] = True  # noqa: SLF001
+        diagram._cached_backend["timestamp"] = 123.0  # noqa: SLF001
+
+        diagram.reset_runtime_cache()
+
+        assert diagram._cached_backend["url"] is None  # noqa: SLF001
+        assert diagram._cached_backend["is_self_hosted"] is None  # noqa: SLF001
+        assert diagram._cached_backend["timestamp"] == 0.0  # noqa: SLF001

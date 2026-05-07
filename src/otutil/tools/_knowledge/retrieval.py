@@ -9,7 +9,7 @@ from otpack import LogSpan
 from ot.utils.factory import lazy_client
 
 from .config import _get_config
-from .db import deserialize_meta, deserialize_tags, get_connection
+from .db import deserialize_meta, deserialize_tags, get_connection, use_connection
 from .search import apply_metadata_filters, search_fts, search_hybrid, search_vec
 
 if TYPE_CHECKING:
@@ -35,6 +35,15 @@ def _create_llm_client() -> OpenAI | None:
 
 
 _get_llm_client = lazy_client(_create_llm_client)
+
+
+def reset_runtime_cache() -> None:
+    """Reset module-level runtime caches.
+
+    Called by ot.reload() so rotated credentials/base URLs are picked up
+    without requiring a process restart.
+    """
+    _get_llm_client.reset()
 
 
 def search(
@@ -93,7 +102,7 @@ def search(
             # Increment hit_count asynchronously (fire-and-forget)
             if results:
                 ids = [r["id"] for r in results]
-                _increment_hit_counts(conn, ids)
+                _increment_hit_counts(db, ids)
 
             s.add("resultCount", len(results))
             if not results:
@@ -378,17 +387,20 @@ def _synthesise(query: str, context: str) -> str:
         return f"(Synthesis failed: {e})\n\nRetrieved context:\n{context[:2000]}"
 
 
-def _increment_hit_counts(conn: Any, chunk_ids: list[str]) -> None:
+def _increment_hit_counts(db_name: str, chunk_ids: list[str]) -> None:
     """Increment hit_count for retrieved chunks (fire-and-forget)."""
     try:
+        if not chunk_ids:
+            return
         placeholders = ", ".join("?" for _ in chunk_ids)
-        conn.execute(
-            f"UPDATE chunks SET hit_count = hit_count + 1 WHERE id IN ({placeholders})",
-            chunk_ids,
-        )
-        conn.commit()
+        with use_connection(db_name) as conn:
+            conn.execute(
+                f"UPDATE chunks SET hit_count = hit_count + 1 WHERE id IN ({placeholders})",
+                chunk_ids,
+            )
+            conn.commit()
     except Exception:
         pass
 
 
-__all__ = ["ask", "related", "search"]
+__all__ = ["ask", "related", "reset_runtime_cache", "search"]

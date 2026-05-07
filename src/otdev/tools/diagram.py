@@ -276,6 +276,17 @@ _CACHE_TTL_SECONDS = 300  # 5 minutes
 _cached_backend: dict[str, Any] = {"url": None, "is_self_hosted": None, "timestamp": 0.0}
 
 
+def reset_runtime_cache() -> None:
+    """Reset module-level runtime caches.
+
+    Called by ot.reload() so backend preference/url changes take effect
+    immediately without waiting for TTL expiry.
+    """
+    _cached_backend["url"] = None
+    _cached_backend["is_self_hosted"] = None
+    _cached_backend["timestamp"] = 0.0
+
+
 # ==================== Path Resolution ====================
 
 

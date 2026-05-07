@@ -148,6 +148,12 @@ The `ot.reload()` function SHALL force reload of all configuration.
 - **AND** reload from disk
 - **AND** return "OK: Configuration reloaded"
 
+#### Scenario: Reload clears tool runtime caches
+- **GIVEN** tool modules hold runtime caches derived from configuration or secrets
+- **WHEN** `ot.reload()` is called
+- **THEN** `ot.reload()` SHALL clear those runtime caches
+- **AND** subsequent tool calls SHALL use current config/secrets values
+
 ---
 
 ### Requirement: Runtime Statistics

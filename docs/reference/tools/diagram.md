@@ -186,3 +186,5 @@ tools:
       prefer: self_hosted
       self_hosted_url: http://localhost:8000
 ```
+
+After changing diagram backend settings, run `ot.reload()` to apply them immediately in the current session.

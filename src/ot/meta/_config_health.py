@@ -149,6 +149,8 @@ def reload() -> str:
         import ot.prompts
         import ot.proxy
         import ot.registry
+        import otdev.tools.diagram
+        import otutil.tools._knowledge.retrieval
         from ot.utils.cache import cache as _ot_cache
 
         # Clear in dependency order (config first, others depend on it)
@@ -159,6 +161,8 @@ def reload() -> str:
         ot.executor.tool_loader.reset()
         ot.executor.validator.reset()
         ot.executor.pack_proxy.reset()  # Releases stale namespace/proxy references
+        otdev.tools.diagram.reset_runtime_cache()
+        otutil.tools._knowledge.retrieval.reset_runtime_cache()
 
         # Clear param resolver cache
         ot.executor.param_resolver.get_tool_param_names.cache_clear()

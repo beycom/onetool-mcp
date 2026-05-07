@@ -141,6 +141,22 @@ class TestKnowledgeDBSchema:
         rows = conn.execute("SELECT id FROM chunks WHERE topic = 'same/topic'").fetchall()
         assert len(rows) == 2
 
+    def test_kb_setup_rejects_non_positive_dimensions(self):
+        from otutil.tools._knowledge.db import _kb_setup
+
+        conn = MagicMock()
+        fake_vec = MagicMock()
+        cfg = MagicMock()
+        cfg.dimensions = 0
+
+        with (
+            patch("otutil.tools._knowledge.db._check_vec_available", return_value=True),
+            patch("otutil.tools._knowledge.db._get_config", return_value=cfg),
+            patch.dict("sys.modules", {"sqlite_vec": fake_vec}),
+            pytest.raises(ValueError, match="knowledge dimensions must be > 0"),
+        ):
+            _kb_setup(conn)
+
 
 # ===========================================================================
 # 3.3 — Chunker: heading splits, frontmatter, sidecar
@@ -1200,6 +1216,14 @@ class TestKnowledgeRetrieval:
         with patch("otutil.tools._knowledge.retrieval.get_connection", return_value=conn):
             result = search(q="test", db="test", mode="invalid")
         assert "Error" in result
+
+    def test_reset_runtime_cache_resets_lazy_llm_client(self):
+        from otutil.tools._knowledge import retrieval
+
+        with patch.object(retrieval._get_llm_client, "reset") as mock_reset:
+            retrieval.reset_runtime_cache()
+
+        mock_reset.assert_called_once_with()
 
 
 # ===========================================================================

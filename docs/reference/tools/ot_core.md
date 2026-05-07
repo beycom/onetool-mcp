@@ -469,6 +469,7 @@ ot.reload()
 ```
 
 Clears cached configuration and reloads from disk. Use after modifying config files during a session.
+It also resets selected tool runtime caches that depend on config/secrets so subsequent calls pick up current values immediately.
 
 ## ot.security()
 
