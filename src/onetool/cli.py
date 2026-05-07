@@ -77,6 +77,7 @@ def _setup_signal_handlers() -> None:
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
 
+
 app.add_typer(direct_app, name="direct", rich_help_panel="Direct")
 app.add_typer(kb_app, name="kb", rich_help_panel="Knowledge Base")
 
@@ -109,7 +110,9 @@ def _safe_copy(src: Path, dest: Path) -> None:
     if dest.exists():
         bak = _next_bak(dest)
         dest.rename(bak)
-        console.print(f"  [yellow]![/yellow] {dest.name} exists → backed up as {bak.name}")
+        console.print(
+            f"  [yellow]![/yellow] {dest.name} exists → backed up as {bak.name}"
+        )
     shutil.copy(src, dest)
 
 
@@ -118,7 +121,9 @@ def _safe_write(dest: Path, content: str) -> None:
     if dest.exists():
         bak = _next_bak(dest)
         dest.rename(bak)
-        console.print(f"  [yellow]![/yellow] {dest.name} exists → backed up as {bak.name}")
+        console.print(
+            f"  [yellow]![/yellow] {dest.name} exists → backed up as {bak.name}"
+        )
     dest.write_text(content)
 
 
@@ -142,9 +147,7 @@ def _write_onetool_yaml(config_path: Path, includes: list[str]) -> None:
     _safe_write(config_path, updated)
 
 
-def _copy_servers_yaml(
-    ot_dir: Path, server_names: list[str]
-) -> None:
+def _copy_servers_yaml(ot_dir: Path, server_names: list[str]) -> None:
     """Copy servers.yaml with only the requested server blocks."""
     import yaml
 
@@ -153,12 +156,16 @@ def _copy_servers_yaml(
     templates_dir = get_global_templates_dir()
     src = templates_dir / "servers.yaml"
     if not src.exists():
-        console.print("[yellow]Warning: servers.yaml not found in package templates[/yellow]")
+        console.print(
+            "[yellow]Warning: servers.yaml not found in package templates[/yellow]"
+        )
         return
 
     raw = yaml.safe_load(src.read_text())
     if not isinstance(raw, dict):
-        console.print("[yellow]Warning: servers.yaml is not a YAML mapping, skipping[/yellow]")
+        console.print(
+            "[yellow]Warning: servers.yaml is not a YAML mapping, skipping[/yellow]"
+        )
         return
     all_servers = raw.get("servers", {})
 
@@ -177,8 +184,13 @@ def _copy_servers_yaml(
         console.print(f"  Available: {', '.join(sorted(all_servers.keys()))}")
 
     dest = ot_dir / "servers.yaml"
-    _safe_write(dest, yaml.dump({"servers": selected}, default_flow_style=False, sort_keys=False))
-    console.print(f"  [green]✓[/green] servers.yaml (servers: {', '.join(selected.keys())})")
+    _safe_write(
+        dest,
+        yaml.dump({"servers": selected}, default_flow_style=False, sort_keys=False),
+    )
+    console.print(
+        f"  [green]✓[/green] servers.yaml (servers: {', '.join(selected.keys())})"
+    )
 
 
 def _copy_file(ot_dir: Path, filename: str) -> bool:
@@ -223,12 +235,13 @@ def _copy_diagram(ot_dir: Path) -> bool:
         if dest_templates.exists():
             bak = _next_bak(dest_templates)
             dest_templates.rename(bak)
-            console.print(f"  [yellow]![/yellow] diagram-templates/ exists → backed up as {bak.name}")
+            console.print(
+                f"  [yellow]![/yellow] diagram-templates/ exists → backed up as {bak.name}"
+            )
         shutil.copytree(src_templates, dest_templates)
         console.print("  [green]✓[/green] diagram-templates/")
 
     return True
-
 
 
 @init_app.callback()
@@ -290,18 +303,15 @@ def init_callback(
 
         console.print(f"\nSetting up OneTool config at [bold]{ot_dir}/[/bold]\n")
         _exts = [
-            ("prompts.yaml",  "prompt templates"),
-            ("servers.yaml",  "MCP proxy server configs"),
+            ("prompts.yaml", "prompt templates"),
+            ("servers.yaml", "MCP proxy server configs"),
             ("security.yaml", "custom security rules"),
-            ("diagram.yaml",  "diagram tool config"),
+            ("diagram.yaml", "diagram tool config"),
             ("snippets.yaml", "code snippets"),
         ]
         choices = [
             questionary.Choice("None           (no extensions)", value=None),
-            *[
-                questionary.Choice(f"{v:<14}  {desc}", value=v)
-                for v, desc in _exts
-            ],
+            *[questionary.Choice(f"{v:<14}  {desc}", value=v) for v, desc in _exts],
         ]
         selected_ext = ask_checkbox("Which extensions to configure?", choices)
 
@@ -582,7 +592,9 @@ def serve(
                 console.print(f"Run 'onetool init --config {config}' when ready.")
                 raise typer.Exit(1)
         else:
-            console.print(f"OneTool not initialized. Run: onetool init --config {config}")
+            console.print(
+                f"OneTool not initialized. Run: onetool init --config {config}"
+            )
             raise typer.Exit(1)
 
     # Remove loguru's default stderr handler before any logging occurs

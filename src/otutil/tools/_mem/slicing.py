@@ -12,7 +12,7 @@ from otutil.tools._content_util import resolve_slice as _resolve_slice
 from otutil.tools._content_util import selector_label as _selector_label
 
 from .content import _decode_sections
-from .db import _deserialize_meta, _get_connection
+from .db import _deserialize_meta, _use_connection
 from .read import _READ_COLUMNS
 
 _builtins_list = builtins.list
@@ -42,34 +42,33 @@ def toc(
 
     with LogSpan(span="mem.toc", topic=topic) as s:
         try:
-            conn = _get_connection()
+            with _use_connection() as conn:
+                if id:
+                    row = conn.execute(
+                        f"SELECT {_READ_COLUMNS} FROM memories WHERE id = ?", [id]
+                    ).fetchone()
+                else:
+                    row = conn.execute(
+                        f"SELECT {_READ_COLUMNS} FROM memories WHERE topic = ?", [topic]
+                    ).fetchone()
 
-            if id:
-                row = conn.execute(
-                    f"SELECT {_READ_COLUMNS} FROM memories WHERE id = ?", [id]
-                ).fetchone()
-            else:
-                row = conn.execute(
-                    f"SELECT {_READ_COLUMNS} FROM memories WHERE topic = ?", [topic]
-                ).fetchone()
+                if not row:
+                    s.add("found", False)
+                    return f"No memory found for topic '{topic}'" if not id else f"No memory found with id '{id}'"
 
-            if not row:
-                s.add("found", False)
-                return f"No memory found for topic '{topic}'" if not id else f"No memory found with id '{id}'"
+                row_meta = _deserialize_meta(row[9])
+                sections = _decode_sections(row_meta.get("sections", ""))
+                result = _build_toc(sections, row[2].count("\n") + 1)
 
-            row_meta = _deserialize_meta(row[9])
-            sections = _decode_sections(row_meta.get("sections", ""))
-            result = _build_toc(sections, row[2].count("\n") + 1)
+                # Staleness detection
+                status = _check_staleness(row_meta)
+                if status == "stale":
+                    result += "\n\nWarning: Source file has been modified since this memory was stored. Consider re-writing with mem.write()."
+                elif status == "missing":
+                    result += "\n\nWarning: Source file no longer exists."
 
-            # Staleness detection
-            status = _check_staleness(row_meta)
-            if status == "stale":
-                result += "\n\nWarning: Source file has been modified since this memory was stored. Consider re-writing with mem.write()."
-            elif status == "missing":
-                result += "\n\nWarning: Source file no longer exists."
-
-            s.add("sections", len(sections))
-            return result
+                s.add("sections", len(sections))
+                return result
 
         except Exception as e:
             s.add("error", str(e))
@@ -106,40 +105,39 @@ def slice(
     """
     with LogSpan(span="mem.slice", topic=topic) as s:
         try:
-            conn = _get_connection()
+            with _use_connection() as conn:
+                if id:
+                    row = conn.execute(
+                        f"SELECT {_READ_COLUMNS} FROM memories WHERE id = ?", [id]
+                    ).fetchone()
+                else:
+                    row = conn.execute(
+                        f"SELECT {_READ_COLUMNS} FROM memories WHERE topic = ?", [topic]
+                    ).fetchone()
 
-            if id:
-                row = conn.execute(
-                    f"SELECT {_READ_COLUMNS} FROM memories WHERE id = ?", [id]
-                ).fetchone()
-            else:
-                row = conn.execute(
-                    f"SELECT {_READ_COLUMNS} FROM memories WHERE topic = ?", [topic]
-                ).fetchone()
+                if not row:
+                    s.add("found", False)
+                    return f"No memory found for topic '{topic}'" if not id else f"No memory found with id '{id}'"
 
-            if not row:
-                s.add("found", False)
-                return f"No memory found for topic '{topic}'" if not id else f"No memory found with id '{id}'"
+                content = row[2]
+                lines = content.split("\n")
+                row_meta = _deserialize_meta(row[9])
+                sections = _decode_sections(row_meta.get("sections", ""))
 
-            content = row[2]
-            lines = content.split("\n")
-            row_meta = _deserialize_meta(row[9])
-            sections = _decode_sections(row_meta.get("sections", ""))
+                # Normalise select to a sequence
+                selectors: _builtins_list[int | str] = select if type(select) is _builtins_list else [select]  # type: ignore[assignment]
 
-            # Normalise select to a sequence
-            selectors: _builtins_list[int | str] = select if type(select) is _builtins_list else [select]  # type: ignore[assignment]
+                extracted_parts: list[str] = []
+                for sel in selectors:
+                    part = _resolve_slice(sel, lines, sections)
+                    if part is not None:
+                        extracted_parts.append(part)
 
-            extracted_parts: list[str] = []
-            for sel in selectors:
-                part = _resolve_slice(sel, lines, sections)
-                if part is not None:
-                    extracted_parts.append(part)
+                if not extracted_parts:
+                    return "No matching content found for the given selector(s)"
 
-            if not extracted_parts:
-                return "No matching content found for the given selector(s)"
-
-            s.add("parts", len(extracted_parts))
-            return "\n\n".join(extracted_parts)
+                s.add("parts", len(extracted_parts))
+                return "\n\n".join(extracted_parts)
 
         except Exception as e:
             s.add("error", str(e))
@@ -210,40 +208,39 @@ def slice_batch(
 
             # Batch fetch all needed rows
             row_map: dict[str, Any] = {}  # keyed by topic or id
-            conn = _get_connection()
-
             topic_keys = sorted(topic_keys_set)
             id_keys = sorted(id_keys_set)
 
-            if topic_keys or id_keys:
-                conditions = []
-                params: _builtins_list[Any] = []
-                if topic_keys:
-                    placeholders = ", ".join("?" for _ in topic_keys)
-                    conditions.append(f"topic IN ({placeholders})")
-                    params.extend(topic_keys)
-                if id_keys:
-                    placeholders = ", ".join("?" for _ in id_keys)
-                    conditions.append(f"id IN ({placeholders})")
-                    params.extend(id_keys)
+            with _use_connection() as conn:
+                if topic_keys or id_keys:
+                    conditions = []
+                    params: _builtins_list[Any] = []
+                    if topic_keys:
+                        placeholders = ", ".join("?" for _ in topic_keys)
+                        conditions.append(f"topic IN ({placeholders})")
+                        params.extend(topic_keys)
+                    if id_keys:
+                        placeholders = ", ".join("?" for _ in id_keys)
+                        conditions.append(f"id IN ({placeholders})")
+                        params.extend(id_keys)
 
-                sql = f"SELECT {_READ_COLUMNS} FROM memories WHERE {' OR '.join(conditions)}"
-                rows = conn.execute(sql, params).fetchall()
+                    sql = f"SELECT {_READ_COLUMNS} FROM memories WHERE {' OR '.join(conditions)}"
+                    rows = conn.execute(sql, params).fetchall()
 
-                # Index by topic and id
-                for row in rows:
-                    row_map[f"topic:{row[1]}"] = row
-                    row_map[f"id:{row[0]}"] = row
+                    # Index by topic and id
+                    for row in rows:
+                        row_map[f"topic:{row[1]}"] = row
+                        row_map[f"id:{row[0]}"] = row
 
-                # Increment access counts
-                if rows:
-                    row_ids = [r[0] for r in rows]
-                    id_placeholders = ", ".join("?" for _ in row_ids)
-                    conn.execute(
-                        f"UPDATE memories SET access_count = access_count + 1, last_accessed = datetime('now') WHERE id IN ({id_placeholders})",
-                        row_ids,
-                    )
-                    conn.commit()
+                    # Increment access counts
+                    if rows:
+                        row_ids = [r[0] for r in rows]
+                        id_placeholders = ", ".join("?" for _ in row_ids)
+                        conn.execute(
+                            f"UPDATE memories SET access_count = access_count + 1, last_accessed = datetime('now') WHERE id IN ({id_placeholders})",
+                            row_ids,
+                        )
+                        conn.commit()
 
             # Process each item
             result_parts: _builtins_list[str] = []

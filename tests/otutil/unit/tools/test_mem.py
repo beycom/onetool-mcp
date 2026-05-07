@@ -25,7 +25,7 @@ from otutil.tools._mem.content import (
     _validate_category,
     _validate_tags,
 )
-from otutil.tools._mem.db import _deserialize_meta, _serialize_meta
+from otutil.tools._mem.db import _deserialize_meta, _has_column, _serialize_meta
 
 
 @pytest.fixture()
@@ -161,6 +161,17 @@ class TestValidateCategory:
             _validate_category("invalid")
 
 
+@pytest.mark.unit
+@pytest.mark.tools
+class TestMemDBIdentifiers:
+    """Validate safe identifier handling in mem DB helpers."""
+
+    def test_has_column_rejects_invalid_identifier(self):
+        conn = MagicMock()
+        with pytest.raises(ValueError, match="invalid table identifier"):
+            _has_column(conn, 'memories"; DROP TABLE memories;--', "topic")
+
+
 # ---------------------------------------------------------------------------
 # CRUD operation tests with mocked SQLite
 # ---------------------------------------------------------------------------
@@ -196,7 +207,7 @@ class TestWrite:
         from otutil.tools.mem import write
 
         conn = MagicMock()
-        mock_conn.return_value.__enter__.return_value = conn
+        mock_conn.return_value = conn
         conn.execute.return_value.fetchone.return_value = ("existing-id",)
 
         result = write(topic="test/topic", content="test content")
@@ -249,7 +260,7 @@ class TestWrite:
         from otutil.tools.mem import write
 
         conn = MagicMock()
-        mock_conn.return_value.__enter__.return_value = conn
+        mock_conn.return_value = conn
 
         result = write(topic="test", file=str(tmp_path / "nonexistent.txt"))
 
@@ -262,12 +273,12 @@ class TestWrite:
 class TestRead:
     """Test mem.read() with mocked database."""
 
-    @patch("otutil.tools._mem.read._get_connection")
+    @patch("otutil.tools._mem.read._use_connection")
     def test_reads_by_topic(self, mock_conn):
         from otutil.tools.mem import read
 
         conn = MagicMock()
-        mock_conn.return_value = conn
+        mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
             "id-123", "test/topic", "memory content", "note",
             '["tag1"]', 5, 3, datetime.now().isoformat(), datetime.now().isoformat(), '{}',
@@ -277,12 +288,12 @@ class TestRead:
 
         assert result == "memory content"
 
-    @patch("otutil.tools._mem.read._get_connection")
+    @patch("otutil.tools._mem.read._use_connection")
     def test_reads_by_topic_with_meta(self, mock_conn):
         from otutil.tools.mem import read
 
         conn = MagicMock()
-        mock_conn.return_value = conn
+        mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
             "id-123", "test/topic", "memory content", "note",
             '["tag1"]', 5, 3, datetime.now().isoformat(), datetime.now().isoformat(), '{}',
@@ -296,12 +307,12 @@ class TestRead:
         assert "memory content" in result
         assert "id-123" in result
 
-    @patch("otutil.tools._mem.read._get_connection")
+    @patch("otutil.tools._mem.read._use_connection")
     def test_reads_by_id(self, mock_conn):
         from otutil.tools.mem import read
 
         conn = MagicMock()
-        mock_conn.return_value = conn
+        mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
             "id-123", "test/topic", "content", "rule",
             '[]', 7, 1, datetime.now().isoformat(), datetime.now().isoformat(), '{}',
@@ -311,25 +322,25 @@ class TestRead:
 
         assert result == "content"
 
-    @patch("otutil.tools._mem.read._get_connection")
+    @patch("otutil.tools._mem.read._use_connection")
     def test_not_found(self, mock_conn):
         from otutil.tools.mem import read
 
         conn = MagicMock()
-        mock_conn.return_value = conn
+        mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchone.return_value = None
 
         result = read(topic="nonexistent")
 
         assert "No memory found" in result
 
-    @patch("otutil.tools._mem.read._get_connection")
+    @patch("otutil.tools._mem.read._use_connection")
     def test_reads_by_wildcard_topic(self, mock_conn):
         """Wildcard topic routes through LIKE, not exact match."""
         from otutil.tools.mem import read
 
         conn = MagicMock()
-        mock_conn.return_value = conn
+        mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
             "id-456", "projects/onetool/rules", "rule content", "rule",
             '[]', 8, 1, datetime.now().isoformat(), datetime.now().isoformat(), '{}',
@@ -341,13 +352,13 @@ class TestRead:
         sql_call = conn.execute.call_args_list[0][0][0]
         assert "LIKE" in sql_call
 
-    @patch("otutil.tools._mem.read._get_connection")
+    @patch("otutil.tools._mem.read._use_connection")
     def test_reads_use_created_at_desc_ordering(self, mock_conn):
         """read() uses ORDER BY created_at DESC so latest row wins."""
         from otutil.tools.mem import read
 
         conn = MagicMock()
-        mock_conn.return_value = conn
+        mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
             "id-789", "test/topic", "latest content", "note",
             '[]', 5, 0, datetime.now().isoformat(), datetime.now().isoformat(), '{}',
@@ -365,12 +376,12 @@ class TestRead:
 class TestReadBatch:
     """Test mem.read_batch() with mocked database."""
 
-    @patch("otutil.tools._mem.read._get_connection")
+    @patch("otutil.tools._mem.read._use_connection")
     def test_reads_by_topic_prefix(self, mock_conn):
         from otutil.tools.mem import read_batch
 
         conn = MagicMock()
-        mock_conn.return_value = conn
+        mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
             ("id-1", "proj/a", "content a", "note", '["tag1"]', 5, 2, datetime.now().isoformat(), datetime.now().isoformat(), '{}'),
             ("id-2", "proj/b", "content b", "rule", '[]', 8, 0, datetime.now().isoformat(), datetime.now().isoformat(), '{}'),
@@ -382,12 +393,12 @@ class TestReadBatch:
         assert "content a" in result
         assert "content b" in result
 
-    @patch("otutil.tools._mem.read._get_connection")
+    @patch("otutil.tools._mem.read._use_connection")
     def test_reads_by_ids(self, mock_conn):
         from otutil.tools.mem import read_batch
 
         conn = MagicMock()
-        mock_conn.return_value = conn
+        mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
             ("id-1", "proj/a", "content a", "note", '[]', 5, 1, datetime.now().isoformat(), datetime.now().isoformat(), '{}'),
         ]
@@ -397,12 +408,12 @@ class TestReadBatch:
         assert "Read 1 memory" in result
         assert "content a" in result
 
-    @patch("otutil.tools._mem.read._get_connection")
+    @patch("otutil.tools._mem.read._use_connection")
     def test_reads_with_meta(self, mock_conn):
         from otutil.tools.mem import read_batch
 
         conn = MagicMock()
-        mock_conn.return_value = conn
+        mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
             ("id-1", "proj/a", "content a", "note", '["tag1"]', 5, 3, datetime.now().isoformat(), datetime.now().isoformat(), '{}'),
         ]
@@ -414,12 +425,12 @@ class TestReadBatch:
         assert "Tags: tag1" in result
         assert "content a" in result
 
-    @patch("otutil.tools._mem.read._get_connection")
+    @patch("otutil.tools._mem.read._use_connection")
     def test_empty_result(self, mock_conn):
         from otutil.tools.mem import read_batch
 
         conn = MagicMock()
-        mock_conn.return_value = conn
+        mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = []
 
         result = read_batch(topic="nonexistent/")
@@ -458,12 +469,12 @@ class TestReadBatch:
         assert "Error" in result
         assert "ids cannot be combined" in result
 
-    @patch("otutil.tools._mem.read._get_connection")
+    @patch("otutil.tools._mem.read._use_connection")
     def test_filters_by_category(self, mock_conn):
         from otutil.tools.mem import read_batch
 
         conn = MagicMock()
-        mock_conn.return_value = conn
+        mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
             ("id-1", "proj/a", "rule content", "rule", '[]', 5, 1, datetime.now().isoformat(), datetime.now().isoformat(), '{}'),
         ]
@@ -476,12 +487,12 @@ class TestReadBatch:
         sql_arg = conn.execute.call_args_list[0][0][0]
         assert "category = ?" in sql_arg
 
-    @patch("otutil.tools._mem.read._get_connection")
+    @patch("otutil.tools._mem.read._use_connection")
     def test_filters_by_tags(self, mock_conn):
         from otutil.tools.mem import read_batch
 
         conn = MagicMock()
-        mock_conn.return_value = conn
+        mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
             ("id-1", "proj/a", "tagged content", "note", '["tag1"]', 5, 1, datetime.now().isoformat(), datetime.now().isoformat(), '{}'),
         ]
@@ -493,12 +504,12 @@ class TestReadBatch:
         sql_arg = conn.execute.call_args_list[0][0][0]
         assert "json_each" in sql_arg
 
-    @patch("otutil.tools._mem.read._get_connection")
+    @patch("otutil.tools._mem.read._use_connection")
     def test_combined_topic_and_category(self, mock_conn):
         from otutil.tools.mem import read_batch
 
         conn = MagicMock()
-        mock_conn.return_value = conn
+        mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
             ("id-1", "proj/a", "combined content", "rule", '[]', 5, 1, datetime.now().isoformat(), datetime.now().isoformat(), '{}'),
         ]
@@ -2033,13 +2044,13 @@ class TestBuildToc:
 class TestTocFunction:
     """Test mem.toc() with mocked database."""
 
-    @patch("otutil.tools._mem.slicing._get_connection")
+    @patch("otutil.tools._mem.slicing._use_connection")
     def test_returns_toc(self, mock_conn):
         from otutil.tools.mem import toc
 
         sections_str = _encode_sections(_parse_headings(SAMPLE_MD))
         conn = MagicMock()
-        mock_conn.return_value = conn
+        mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
             "id-1", "spec", SAMPLE_MD, "note", '[]', 5, 0,
             datetime.now().isoformat(), datetime.now().isoformat(),
@@ -2051,18 +2062,18 @@ class TestTocFunction:
         assert "Requirements" in result
         assert "4 sections" in result
 
-    @patch("otutil.tools._mem.slicing._get_connection")
+    @patch("otutil.tools._mem.slicing._use_connection")
     def test_not_found(self, mock_conn):
         from otutil.tools.mem import toc
 
         conn = MagicMock()
-        mock_conn.return_value = conn
+        mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchone.return_value = None
 
         result = toc(topic="nonexistent")
         assert "No memory found" in result
 
-    @patch("otutil.tools._mem.slicing._get_connection")
+    @patch("otutil.tools._mem.slicing._use_connection")
     def test_staleness_warning(self, mock_conn, tmp_path):
         from otutil.tools.mem import toc
 
@@ -2071,7 +2082,7 @@ class TestTocFunction:
         old_mtime = str(source_file.stat().st_mtime - 100)  # pretend stored mtime is older
 
         conn = MagicMock()
-        mock_conn.return_value = conn
+        mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
             "id-1", "spec", SAMPLE_MD, "note", '[]', 5, 0,
             datetime.now().isoformat(), datetime.now().isoformat(),
@@ -2096,9 +2107,9 @@ class TestSliceFunction:
             datetime.now().isoformat(), datetime.now().isoformat(),
             _serialize_meta({"sections": sections_str, "section_count": "4"}),
         )
-        with patch("otutil.tools._mem.slicing._get_connection") as mock_conn:
+        with patch("otutil.tools._mem.slicing._use_connection") as mock_conn:
             conn = MagicMock()
-            mock_conn.return_value = conn
+            mock_conn.return_value.__enter__.return_value = conn
             conn.execute.return_value.fetchone.return_value = row
             yield
 
@@ -2147,12 +2158,12 @@ class TestSliceFunction:
         result = slice(topic="spec", select="nonexistent heading")
         assert "No matching content" in result
 
-    @patch("otutil.tools._mem.slicing._get_connection")
+    @patch("otutil.tools._mem.slicing._use_connection")
     def test_slice_not_found(self, mock_conn):
         from otutil.tools.mem import slice
 
         conn = MagicMock()
-        mock_conn.return_value = conn
+        mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchone.return_value = None
 
         result = slice(topic="nonexistent", select=1)
@@ -2916,9 +2927,9 @@ class TestSliceBatch:
                                meta='{"sections": "Setup:1-3|Run:5-7", "section_count": "2"}')
         rows = [row_a, row_b]
 
-        with patch("otutil.tools._mem.slicing._get_connection") as mock_conn:
+        with patch("otutil.tools._mem.slicing._use_connection") as mock_conn:
             conn = MagicMock()
-            mock_conn.return_value = conn
+            mock_conn.return_value.__enter__.return_value = conn
             conn.execute.return_value.fetchall.return_value = rows
             result = slice_batch(items=[
                 {"topic": "docs/a.md", "select": "Intro"},
@@ -2933,9 +2944,9 @@ class TestSliceBatch:
         from otutil.tools.mem import slice_batch
 
         row = _make_read_row(id="1", topic="docs/a.md", content="# H1\n\nLine2\n\n# H2\n\nLine6\nLine7")
-        with patch("otutil.tools._mem.slicing._get_connection") as mock_conn:
+        with patch("otutil.tools._mem.slicing._use_connection") as mock_conn:
             conn = MagicMock()
-            mock_conn.return_value = conn
+            mock_conn.return_value.__enter__.return_value = conn
             conn.execute.return_value.fetchall.return_value = [row]
             result = slice_batch(items=[
                 {"topic": "docs/a.md", "select": 1},
@@ -2952,9 +2963,9 @@ class TestSliceBatch:
         from otutil.tools.mem import slice_batch
 
         row = _make_read_row(id="1", topic="docs/a.md")
-        with patch("otutil.tools._mem.slicing._get_connection") as mock_conn:
+        with patch("otutil.tools._mem.slicing._use_connection") as mock_conn:
             conn = MagicMock()
-            mock_conn.return_value = conn
+            mock_conn.return_value.__enter__.return_value = conn
             conn.execute.return_value.fetchall.return_value = [row]
             result = slice_batch(items=[
                 {"topic": "docs/a.md", "select": "H1"},
@@ -2969,9 +2980,9 @@ class TestSliceBatch:
         from otutil.tools.mem import slice_batch
 
         row = _make_read_row(id="1", topic="docs/a.md")
-        with patch("otutil.tools._mem.slicing._get_connection") as mock_conn:
+        with patch("otutil.tools._mem.slicing._use_connection") as mock_conn:
             conn = MagicMock()
-            mock_conn.return_value = conn
+            mock_conn.return_value.__enter__.return_value = conn
             conn.execute.return_value.fetchall.return_value = [row]
             result = slice_batch(items=[
                 {"topic": "docs/a.md", "select": "NonExistentHeading"},
@@ -2998,9 +3009,9 @@ class TestSliceBatch:
         from otutil.tools.mem import slice_batch
 
         row = _make_read_row(id="1", topic="docs/a.md")
-        with patch("otutil.tools._mem.slicing._get_connection") as mock_conn:
+        with patch("otutil.tools._mem.slicing._use_connection") as mock_conn:
             conn = MagicMock()
-            mock_conn.return_value = conn
+            mock_conn.return_value.__enter__.return_value = conn
             conn.execute.return_value.fetchall.return_value = [row]
             result = slice_batch(items=[
                 {"topic": "docs/a.md"},
@@ -3009,5 +3020,3 @@ class TestSliceBatch:
 
         assert "'select' is required" in result
         assert "docs/a.md [H1]" in result
-
-

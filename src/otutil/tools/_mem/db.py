@@ -4,6 +4,7 @@ from __future__ import annotations
 import builtins
 import json
 import math
+import re
 import struct
 from typing import TYPE_CHECKING
 
@@ -15,6 +16,7 @@ if TYPE_CHECKING:
 from ot.utils.sqlite_pool import SqlitePool
 
 _builtins_list = builtins.list
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _get_db_path():
@@ -75,7 +77,9 @@ def _close_connection() -> None:
 
 def _has_column(conn: sqlite3.Connection, table: str, column: str) -> bool:
     """Check if a column exists in a SQLite table."""
-    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    if not _IDENTIFIER_RE.fullmatch(table):
+        raise ValueError(f"invalid table identifier: {table}")
+    rows = conn.execute(f'PRAGMA table_info("{table}")').fetchall()
     return any(r[1] == column for r in rows)
 
 

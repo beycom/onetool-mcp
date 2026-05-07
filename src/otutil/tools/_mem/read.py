@@ -7,7 +7,7 @@ from typing import Any
 from otpack import LogSpan
 
 from .content import _tags_filter_sql, _topic_filter
-from .db import _deserialize_tags, _get_connection
+from .db import _deserialize_tags, _use_connection
 
 _builtins_list = builtins.list
 
@@ -54,33 +54,32 @@ def read(
 
     with LogSpan(span="mem.read", topic=topic) as s:
         try:
-            conn = _get_connection()
+            with _use_connection() as conn:
+                if id:
+                    row = conn.execute(
+                        f"SELECT {_READ_COLUMNS} FROM memories WHERE id = ?",
+                        [id],
+                    ).fetchone()
+                else:
+                    topic_sql, topic_params = _topic_filter(topic)
+                    row = conn.execute(
+                        f"SELECT {_READ_COLUMNS} FROM memories WHERE 1=1{topic_sql} ORDER BY created_at DESC LIMIT 1",
+                        topic_params,
+                    ).fetchone()
 
-            if id:
-                row = conn.execute(
-                    f"SELECT {_READ_COLUMNS} FROM memories WHERE id = ?",
-                    [id],
-                ).fetchone()
-            else:
-                topic_sql, topic_params = _topic_filter(topic)
-                row = conn.execute(
-                    f"SELECT {_READ_COLUMNS} FROM memories WHERE 1=1{topic_sql} ORDER BY created_at DESC LIMIT 1",
-                    topic_params,
-                ).fetchone()
+                if not row:
+                    s.add("found", False)
+                    return f"No memory found for topic '{topic}'" if not id else f"No memory found with id '{id}'"
 
-            if not row:
-                s.add("found", False)
-                return f"No memory found for topic '{topic}'" if not id else f"No memory found with id '{id}'"
+                # Increment access count
+                conn.execute(
+                    "UPDATE memories SET access_count = access_count + 1, last_accessed = datetime('now') WHERE id = ?",
+                    [row[0]],
+                )
+                conn.commit()
 
-            # Increment access count
-            conn.execute(
-                "UPDATE memories SET access_count = access_count + 1, last_accessed = datetime('now') WHERE id = ?",
-                [row[0]],
-            )
-            conn.commit()
-
-            # Update row with incremented access_count for accurate display
-            row = (*row[:6], row[6] + 1, *row[7:])
+                # Update row with incremented access_count for accurate display
+                row = (*row[:6], row[6] + 1, *row[7:])
 
             s.add("found", True)
             s.add("memoryId", row[0])
@@ -159,46 +158,45 @@ def read_batch(
 
     with LogSpan(span="mem.read_batch", topic=topic, limit=limit) as s:
         try:
-            conn = _get_connection()
+            with _use_connection() as conn:
+                if ids:
+                    placeholders = ", ".join("?" for _ in ids)
+                    sql = f"SELECT {_READ_COLUMNS} FROM memories WHERE id IN ({placeholders})"
+                    params: _builtins_list[Any] = _builtins_list(ids)
+                else:
+                    sql = f"SELECT {_READ_COLUMNS} FROM memories WHERE 1=1"
+                    params = []
 
-            if ids:
-                placeholders = ", ".join("?" for _ in ids)
-                sql = f"SELECT {_READ_COLUMNS} FROM memories WHERE id IN ({placeholders})"
-                params: _builtins_list[Any] = _builtins_list(ids)
-            else:
-                sql = f"SELECT {_READ_COLUMNS} FROM memories WHERE 1=1"
-                params = []
+                    topic_sql, topic_params = _topic_filter(topic)
+                    sql += topic_sql
+                    params.extend(topic_params)
 
-                topic_sql, topic_params = _topic_filter(topic)
-                sql += topic_sql
-                params.extend(topic_params)
+                    if category:
+                        sql += " AND category = ?"
+                        params.append(category)
 
-                if category:
-                    sql += " AND category = ?"
-                    params.append(category)
+                    if tags:
+                        tags_sql, tags_params = _tags_filter_sql(tags)
+                        sql += tags_sql
+                        params.extend(tags_params)
 
-                if tags:
-                    tags_sql, tags_params = _tags_filter_sql(tags)
-                    sql += tags_sql
-                    params.extend(tags_params)
+                sql += " ORDER BY topic ASC LIMIT ?"
+                params.append(limit)
 
-            sql += " ORDER BY topic ASC LIMIT ?"
-            params.append(limit)
+                rows = conn.execute(sql, params).fetchall()
 
-            rows = conn.execute(sql, params).fetchall()
+                if not rows:
+                    s.add("found", 0)
+                    return "No memories found matching filters"
 
-            if not rows:
-                s.add("found", 0)
-                return "No memories found matching filters"
-
-            # Increment access counts
-            row_ids = [r[0] for r in rows]
-            placeholders = ", ".join("?" for _ in row_ids)
-            conn.execute(
-                f"UPDATE memories SET access_count = access_count + 1, last_accessed = datetime('now') WHERE id IN ({placeholders})",
-                row_ids,
-            )
-            conn.commit()
+                # Increment access counts
+                row_ids = [r[0] for r in rows]
+                placeholders = ", ".join("?" for _ in row_ids)
+                conn.execute(
+                    f"UPDATE memories SET access_count = access_count + 1, last_accessed = datetime('now') WHERE id IN ({placeholders})",
+                    row_ids,
+                )
+                conn.commit()
 
             s.add("found", len(rows))
 
