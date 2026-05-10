@@ -45,3 +45,17 @@ direct:
 #           direction: up
 #   # mem — persistent memory (semantic search and recall)
 #   # mem: {}
+#   # chat_ops — telemetry ingest/reporting defaults (optional [dev] extra)
+#   chat_ops:
+#     storage:
+#       db: .onetool/chat-ops/chat-ops.db
+#     providers:
+#       codex:
+#         provider_dir: "${HOME}/.codex/sessions"
+#         parser_file: "builtin:codex_parser"
+#     analysis:
+#       default_category: GENERAL
+#       categories: []
+#       signals: []
+#     reporting:
+#       output_dir: chat-ops/reports

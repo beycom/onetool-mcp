@@ -25,6 +25,7 @@ PACK_SHORT_NAMES: dict[str, str] = {
     "diagram": "diag",
     "package": "pkg",
     "ripgrep": "rg",
+    "chat_ops": "co",
     "chrome_util": "chrome",
     "play_util": "play",
     "convert": "cv",

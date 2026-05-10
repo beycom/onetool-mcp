@@ -108,6 +108,7 @@ The MCP server that exposes tools for LLM code execution.
 |------|---------|
 | [aws-pack](aws-pack/spec.md) | AWS tool pack: credential management, identity queries, ARN utilities, AWS MCP sub-servers |
 | [tool-context7](otdev/tool-context7/spec.md) | Context7 library documentation API |
+| [tool-chat-ops](otdev/tool-chat-ops/spec.md) | Chat telemetry ingest, projections, and reporting |
 | [tool-db](otdev/tool-db/spec.md) | SQL database queries via SQLAlchemy |
 | [tool-diagram](otdev/tool-diagram/spec.md) | Diagram generation |
 | [tool-excalidraw](otdev/tool-excalidraw/spec.md) | Live diagram drawing on excalidraw.com via pydoll (Chrome CDP) (`whiteboard` pack, short alias `wb`) |
@@ -145,9 +146,9 @@ CLI for testing and benchmarking MCP servers.
 | Built-in Tools (core) | 2 |
 | Built-in Tools (ottools) | 9 |
 | Domain Tools [util] | 8 |
-| Domain Tools [dev] | 8 |
+| Domain Tools [dev] | 9 |
 | bench | 8 |
-| **Total** | **54** |
+| **Total** | **55** |
 
 ---
 
