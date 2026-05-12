@@ -1,6 +1,6 @@
 # Architecture Overview
 
-OneTool is a single MCP server that exposes 100+ tools through one `run` endpoint. Instead of LLMs reading verbose tool schemas (~3K-30K tokens per server), agents write Python code:
+OneTool is a single MCP server that exposes configured tool packs through one `run` endpoint. Instead of LLMs reading verbose tool schemas (~3K-30K tokens per server), agents write Python code:
 
 ```python
 >>> brave.search(query="react docs")
@@ -74,19 +74,31 @@ src/
     stats/                   #   Execution statistics (JSONL)
     utils/                   #   Format, sanitise, validation helpers
 
-  ottools/                  # Built-in tool packs (15+ packs, 100+ tools)
-    brave_search.py          #   Web/news/image search
-    context7.py              #   Library documentation
-    convert.py               #   Document conversion (PDF, DOCX, PPTX)
-    db.py                    #   Database operations (SQLite, PostgreSQL, etc.)
-    diagram.py               #   Mermaid/PlantUML diagrams
+  ottools/                  # Base tool packs
+    ot_direct.py             #   Direct host execution helpers
+    ot_forge.py              #   Extension scaffolding and validation
+    ot_image.py              #   Image loading, inspection, generation, lifecycle
+    ot_llm.py                #   LLM-powered transforms
+    ot_secrets.py            #   Secret management
+    ot_servers.py            #   External MCP server management
+    ot_timer.py              #   Named stopwatch timers
+    server.py                #   MCP server metadata/resources
+    skills.py                #   Skills loading and lookup
+
+  otdev/tools/              # Optional [dev] tool packs
+    context7.py              #   Library documentation lookup
+    db.py                    #   Database operations
+    diagram.py               #   Diagram generation
+    ripgrep.py               #   Fast code search
+    webfetch.py              #   Web page fetching
+
+  otutil/tools/             # Optional [util] tool packs
+    brave.py                 #   Brave web/news/image/video search
+    convert.py               #   Document conversion
     excel.py                 #   Excel file handling
     file.py                  #   Filesystem operations
-    grounding_search.py      #   Google Grounding
-    mem.py                   #   Persistent vector memory
-    ripgrep.py               #   Fast regex search
-    transform.py             #   LLM-powered transforms
-    webfetch.py              #   Web page fetching
+    ground.py                #   Gemini grounding search
+    mem.py                   #   Persistent memory tools
 
   onetool/                   # MCP server CLI (onetool.cli:cli)
 
@@ -103,4 +115,4 @@ packages/onetool-bench/src/bench/  # Benchmark harness (internal)
 | [Registry System](registry-system.md) | AST-based tool discovery (sequence diagram) |
 | [Proxy Flow](proxy-flow.md) | External MCP server communication (sequence diagram) |
 | [Security Model](security-model.md) | Four-layer defence, validation, sanitisation |
-| [Configuration](configuration.md) | Config files, resolution, output formatting |
+| [Configuration Architecture](configuration-architecture.md) | Config files, resolution, output formatting |

@@ -2,7 +2,7 @@
 
 **Primary use:** Load this file for immediate context about the project.
 
-**For detailed info:** Use `mem.search(query="your topic")` or browse `dev/` directory.
+**For detailed info:** Use `dev/index.md` to choose the right guide. If available, use `mem.search(query="your topic")` for semantic search.
 
 ---
 
@@ -24,11 +24,10 @@
 ```
 src/
   ot/           Core framework (executor, config, logging, registry)
-  ottools/     Built-in tool packs (15+ packs, 100+ tools)
+  ottools/     Base tool packs
   onetool/      MCP server CLI
-  otdev/        [dev] extra: context7, db, diagram, package, ripgrep, web
-  otutil/       [util] extra: brave, convert, excel, file, ground, tavily
-  otdesign/     [design] extra: figma
+  otdev/        [dev] extra: arch, aws, chrome, context7, db, diagram, package, play, ripgrep, webfetch
+  otutil/       [util] extra: brave, convert, ctx, excel, file, ground, knowledge, mem, tavily
 
 packages/
   onetool-bench/  Benchmark harness (internal, not installed)
@@ -50,7 +49,8 @@ openspec/       Specifications and proposals
 | **Rules** | `dev/agents/hints.md` | This file - quick reference |
 | **Tools** | `src/ottools/*.py` | Built-in tool packs |
 | **Core** | `src/ot/executor/runner.py` | Main execution engine |
-| **Server** | `src/onetool/server.py` | MCP server |
+| **Server** | `src/ot/server.py` | FastMCP server runtime |
+| **CLI** | `src/onetool/cli.py` | `onetool` command entry point |
 | **Tests** | `tests/{smoke,unit,integration}/` | Test organization |
 | **Specs** | `openspec/specs/` | Feature specifications |
 
@@ -67,7 +67,7 @@ openspec/       Specifications and proposals
 - Two markers required: speed (`smoke`|`unit`|`integration`|`slow`) + component (`core`|`bench`|`serve`|`tools`)
 - Run with: `uv run pytest` (never bare `pytest`)
 - Fixtures: Use shared fixtures from `conftest.py`
-- Test location mirrors source package: `src/otdev/` → `tests/otdev/`, `src/ottools/` → `tests/ottools/`, `src/otutil/` → `tests/otutil/`, `src/otdesign/` → `tests/otdesign/`, core → `tests/`
+- Test location mirrors source package: `src/otdev/` → `tests/otdev/`, `src/ottools/` → `tests/ottools/`, `src/otutil/` → `tests/otutil/`, core → `tests/`
 
 ### Paths
 - `.onetool/` paths: Use `resolve_ot_path()` from `ot.meta`
@@ -103,11 +103,11 @@ openspec/       Specifications and proposals
 
 ### Need to find something?
 
-| I need... | Use mem.search() | Or read file |
+| I need... | Search query if available | Or read file |
 |-----------|------------------|--------------|
-| How to create a tool | `query="create tool pack"` | `dev/project/guides/creating-tools.md` |
+| How to create a tool | `query="create tool pack"` | `dev/project/guides/tool-development.md` |
 | OneTool architecture | `query="request pipeline"` | `dev/project/arch/index.md` |
-| Tool packs info | `query="tool packs"` | `dev/project/brand/tool-packs.md` |
+| Tool packs info | `query="tool packs"` | `docs/reference/tools/index.md` |
 | Testing guide | `query="test markers fixtures"` | `dev/practices/testing.md` |
 | Git workflow | `query="git merge strategy"` | `dev/practices/git.md` |
 | Commit scope | `query="commit scope for X"` | `dev/practices/commit-scopes.md` |
@@ -117,11 +117,11 @@ openspec/       Specifications and proposals
 ### Common Tasks
 
 **Create a new tool:**
-1. Add file: `src/ottools/mypack.py` (or `src/otdev/tools/`, `src/otutil/tools/`, `src/otdesign/tools/`)
+1. Add file: `src/ottools/mypack.py` (or `src/otdev/tools/`, `src/otutil/tools/`)
 2. Declare: `pack = "mypack"` and `__all__ = ["func1", "func2"]`
 3. Functions: Keyword-only args, type hints, docstrings, LogSpan
 4. Test: mirror source under `tests/` — e.g. `src/otdev/tools/foo.py` → `tests/otdev/unit/tools/test_foo.py`
-5. Details: `mem.search(query="create tool pack")` or `dev/project/guides/creating-tools.md`
+5. Details: `dev/project/guides/tool-development.md` or `mem.search(query="create tool pack")` if semantic search is available
 
 **Run tests for my changes:**
 1. Smoke: `uv run pytest -m smoke` (fast, always run first)
@@ -132,13 +132,13 @@ openspec/       Specifications and proposals
 1. Stage files: `git add <files>`
 2. Or use: `/p:stage` (agent suggests commit message)
 3. Format: `type(scope): description`
-4. Scopes: `mem.search(query="commit scope")` or `dev/practices/commit-scopes.md`
+4. Scopes: `dev/practices/commit-scopes.md` or `mem.search(query="commit scope")` if semantic search is available
 
 **Understand architecture:**
 1. Overview: `dev/project/arch/index.md`
 2. Core concepts: `dev/project/arch/core-concepts.md`
 3. Request flow: `dev/project/arch/request-pipeline.md`
-4. Search: `mem.search(query="architecture X")`
+4. Search: `mem.search(query="architecture X")` if semantic search is available
 
 ---
 
@@ -199,7 +199,7 @@ If two tools normalize to same form (e.g., `list-accounts` + `list_accounts`):
 **For development practices:**
 - Git, testing, Python style: Browse `dev/practices/`
 
-**For anything else:** Use `mem.search(query="your question")`
+**For anything else:** Use `dev/index.md`, or `mem.search(query="your question")` if semantic search is available.
 
 **File structure:** See `dev/index.md` for complete table of contents
 
@@ -211,8 +211,3 @@ If two tools normalize to same form (e.g., `list-accounts` + `list_accounts`):
 - `dev/index.md` - Full dev docs table of contents
 - `CLAUDE.md` - Instructions for Claude Code agents
 - `README.md` - Project overview for users
-
----
-
-**Last updated:** 2026-02-09
-**Maintained by:** Contributors (update when major structure changes)

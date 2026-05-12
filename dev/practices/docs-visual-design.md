@@ -1,4 +1,4 @@
-# Design System
+# Documentation Visual Design
 
 Visual design tokens for OneTool documentation.
 

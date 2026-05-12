@@ -1,4 +1,4 @@
-# Tool Reference Docs
+# Tool Reference Documentation
 
 Standard format for `docs/reference/tools/<pack>.md` files. Follow this structure exactly so all tool docs are consistent.
 
@@ -171,6 +171,10 @@ brave.search_batch(queries=["react hooks", "vue composition api"])
 - Show at least one batch/multi-item call if the pack has one
 - Show domain filters, output format options, or other important optional params if present
 
+When documenting tools that do concurrent, async, or background work, describe the user-facing synchronous contract rather than the implementation detail. For example, say "renders files concurrently and returns when complete" for sync batch work, or "starts a background render and returns a task ID" only when the function actually returns before work completes and has a status function that can observe progress.
+
+If a function queues work, document how users can check completion, failures, pending items, dropped jobs, or timeouts. Do not describe a blocking function as async just because it uses threads or async libraries internally.
+
 ---
 
 ### ## CLI
@@ -236,5 +240,5 @@ When creating or updating a tool reference doc:
 ---
 
 **Related:**
-- [Creating Tools](creating-tools.md) — full tool creation guide
+- [Creating Tools](tool-development.md) — full tool creation guide
 - [Tool Configuration](tool-configuration.md) — adding config to tools

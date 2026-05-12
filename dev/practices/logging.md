@@ -300,5 +300,5 @@ This creates:
 ---
 
 **Related:**
-- [Creating Tools](../project/guides/creating-tools.md) - LogSpan usage in tools
+- [Tool Development](../project/guides/tool-development.md) - LogSpan usage in tools
 - Configuration: `onetool.yaml` → `log_level`, `log_dir`, `log_verbose`

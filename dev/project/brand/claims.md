@@ -48,7 +48,7 @@ OneTool reduces input token usage by 96% compared to multiple MCP servers.
 
 **Assumptions:**
 
-- 7.35c / 0.30c = 24.5x (rounded to 30x per latest benchmark 2026-02-23)
+- 7.35c / 0.30c = 24.5x (presented as "up to 30x" in marketing copy)
 - 3-turn conversation
 - Source: [compare.md](../../../docs/learn/comparison.md)
 

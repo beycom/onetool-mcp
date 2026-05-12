@@ -19,26 +19,31 @@ Core execution engine, configuration, logging, and inter-tool API.
 | `meta/` | Metadata, health, and introspection helpers | `_help.py`, `_stats.py`, `_config_health.py` |
 | `proxy/` | External MCP server support | `manager.py` |
 
-### Tool Packs (`src/ottools/`)
+### Base Tool Packs (`src/ottools/`)
 
 Built-in core packs bundled with base install.
 
-| Pack | Description | Key Functions |
-|------|-------------|---------------|
-| `ot_forge.py` | Extension scaffolding and validation | `create_ext()`, `validate_ext()`, `install_skill()` |
-| `ot_llm.py` | LLM-powered transformation tools | `transform()`, `transform_file()` |
-| `ot_secrets.py` | Secret management utilities | `init()`, `encrypt()`, `audit()` |
-| `ot_timer.py` | Named stopwatch timers | `start()`, `elapsed()`, `list()` |
-| `server.py` | MCP server metadata/resources | prompt/resource helpers |
-| `skills.py` | Skills loading and lookup | skill registry helpers |
+| Pack | Description |
+|------|-------------|
+| `ot_direct.py` | Direct host execution helpers |
+| `ot_forge.py` | Extension scaffolding and validation |
+| `ot_image.py` | Image loading, inspection, generation, and lifecycle helpers |
+| `ot_llm.py` | LLM-powered transformation tools |
+| `ot_secrets.py` | Secret management utilities |
+| `ot_servers.py` | External MCP server management |
+| `ot_timer.py` | Named stopwatch timers |
+| `server.py` | MCP server metadata/resources |
+| `skills.py` | Skills loading and lookup |
 
-### MCP Server (`src/onetool/`)
+### MCP Server and CLI
 
-Standalone CLI wrapper.
+FastMCP server runtime lives in `src/ot/`; the installed `onetool` command lives in `src/onetool/`.
 
 | File | Purpose |
 |------|---------|
-| `cli.py` | onetool CLI entry point and commands |
+| `src/ot/server.py` | FastMCP server runtime and single `run` tool |
+| `src/onetool/cli.py` | `onetool` CLI entry point and commands |
+| `src/onetool/cli_commands/` | CLI command implementations |
 
 ### Benchmark Harness (`packages/onetool-bench/src/bench/`)
 
@@ -57,13 +62,17 @@ Tool packs for developer-focused features. Installed via `pip install onetool-mc
 
 | Pack | Description |
 |------|-------------|
+| `tools/arch.py` | Architecture model export and validation |
+| `tools/aws_util.py` | AWS utility operations |
+| `tools/chrome_util.py` | Chrome utility operations |
 | `tools/context7.py` | Context7 documentation lookup |
 | `tools/db.py` | Database operations (SQLAlchemy) |
 | `tools/diagram.py` | Diagram generation (Kroki) |
+| `tools/excalidraw.py` | Excalidraw scene generation and export |
 | `tools/package.py` | Package version checking |
+| `tools/play_util.py` | Playwright utility operations |
 | `tools/ripgrep.py` | Fast code search |
 | `tools/webfetch.py` | Web scraping (trafilatura) |
-| `tools/worktree.py` | Git worktree management for parallel agents |
 
 ### Util Extras (`src/otutil/`) — optional `[util]`
 
@@ -73,9 +82,12 @@ Tool packs for document and file utilities. Installed via `pip install onetool-m
 |------|-------------|
 | `tools/brave.py` | Brave web search |
 | `tools/convert.py` | Document conversion (PDF/DOCX/PPTX→MD) |
+| `tools/ctx.py` | Context store operations |
 | `tools/excel.py` | Excel file handling |
 | `tools/file.py` | File operations |
 | `tools/ground.py` | Gemini grounding search |
+| `tools/knowledge.py` | Knowledge extraction utilities |
+| `tools/mem.py` | Persistent memory tools |
 | `tools/tavily.py` | Tavily AI search and URL extraction |
 
 ---
@@ -113,7 +125,7 @@ Each test root has the same layout:
 **Component markers:** `core`, `bench`, `serve`, `tools`
 
 **Rule:** Always place tests under the root that matches the source package.
-A test for `src/otdev/tools/worktree.py` → `tests/otdev/unit/tools/test_worktree.py`.
+A test for `src/otdev/tools/webfetch.py` → `tests/otdev/unit/tools/test_webfetch.py`.
 
 ---
 
@@ -154,7 +166,8 @@ A test for `src/otdev/tools/worktree.py` → `tests/otdev/unit/tools/test_worktr
 ## Quick Navigation
 
 **Need to modify:**
-- Tool pack → `src/ottools/<pack>.py`
+- Base tool pack → `src/ottools/<pack>.py`
+- Extra tool pack → `src/otdev/tools/<pack>.py` or `src/otutil/tools/<pack>.py`
 - Core executor → `src/ot/executor/runner.py`
 - MCP server runtime → `src/ot/server.py`
 - onetool CLI → `src/onetool/cli.py`
@@ -163,10 +176,6 @@ A test for `src/otdev/tools/worktree.py` → `tests/otdev/unit/tools/test_worktr
 
 **Need to understand:**
 - Architecture → `dev/project/arch/index.md`
-- How to create tools → `dev/project/guides/creating-tools.md`
+- How to create tools → `dev/project/guides/tool-development.md`
 - Testing guide → `dev/practices/testing.md`
 - Git workflow → `dev/practices/git.md`
-
----
-
-**Last updated:** 2026-02-09

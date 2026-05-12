@@ -21,7 +21,7 @@ This single-page reference provides:
 
 ### Need More Detail?
 
-Use `mem.search(query="your topic")` to search all dev docs semantically.
+Start with [../index.md](../index.md) to choose the smallest authoritative guide. If a semantic memory tool is available, use `mem.search(query="your topic")` to search dev docs.
 
 **Examples:**
 ```python
@@ -35,7 +35,7 @@ mem.search(query="OneTool architecture")
 
 See [project-map.md](project-map.md) for:
 - Complete source code organization
-- All tool packs and their functions
+- Tool pack locations and ownership boundaries
 - Configuration file reference
 - Test directory structure
 
@@ -52,9 +52,9 @@ Browse the dev docs:
 
 | File | Lines | Load When | Purpose |
 |------|-------|-----------|---------|
-| [hints.md](hints.md) | ~150 | Always | Single-page quick reference |
-| [project-map.md](project-map.md) | ~100 | Need structure | Detailed project layout |
-| [index.md](index.md) | ~50 | Getting oriented | This file - how to use agents/ |
+| [hints.md](hints.md) | ~200 | Always | Single-page quick reference |
+| [project-map.md](project-map.md) | ~170 | Need structure | Detailed project layout |
+| [index.md](index.md) | ~75 | Getting oriented | This file - how to use agents/ |
 
 ---
 
@@ -65,9 +65,9 @@ Browse the dev docs:
 **Solution:** Navigation layer that provides:
 1. **Minimal context** - Hints file covers 80% of tasks
 2. **Smart pointers** - Links to detailed docs when needed
-3. **Search integration** - Use mem.search() for deep dives
+3. **Search integration** - Use semantic search when available for deep dives
 
-**Design principle:** Load `hints.md` first, use mem.search() for details, browse `dev/` for deep understanding.
+**Design principle:** Load `hints.md` first, use `dev/index.md` for authoritative routing, and browse `dev/` for deep understanding.
 
 ---
 

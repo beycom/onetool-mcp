@@ -97,13 +97,18 @@ tests/
 │   ├── core/                # Core library tests
 │   ├── serve/               # MCP server tests
 │   └── tools/               # Tool unit tests
-│       ├── test_brave_search.py
 │       ├── test_package.py
 │       └── ...
+├── otutil/unit/tools/       # util extra tool unit tests
+│   ├── test_brave.py
+│   └── ...
+├── otdev/unit/tools/        # dev extra tool unit tests
+│   ├── test_context7.py
+│   └── ...
 └── integration/             # End-to-end tests (real dependencies)
     └── tools/               # Tool integration tests
         ├── conftest.py      # Secrets loading for API tests
-        ├── test_brave_search.py
+        ├── test_brave.py
         └── ...
 ```
 
@@ -204,7 +209,7 @@ class TestPackageLive:
 ```python
 @pytest.mark.integration
 @pytest.mark.tools
-def test_brave_search(request):
+def test_brave_live(request):
     require(
         get_secret("BRAVE_API_KEY") is not None,
         "BRAVE_API_KEY not configured",

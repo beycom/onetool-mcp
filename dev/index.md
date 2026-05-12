@@ -12,6 +12,24 @@ just check      # Lint + typecheck + test
 just dev        # Run MCP server in dev mode
 ```
 
+For the full command reference, use [practices/justfile.md](practices/justfile.md).
+
+## Which File To Use
+
+Start with the smallest file that answers the question:
+
+| Need | Use | Why |
+|------|-----|-----|
+| Immediate agent context | [agents/hints.md](agents/hints.md) | One-page commands, rules, structure, and common paths |
+| Full source/test layout | [agents/project-map.md](agents/project-map.md) | Directory map and ownership boundaries |
+| Architecture or execution flow | [project/arch/index.md](project/arch/index.md) | Entry point to request pipeline, routing, registry, proxy, security, and config architecture |
+| Creating or changing tools | [project/guides/index.md](project/guides/index.md) | Routes to creating tools, tool config, reference docs, attribution, and review guidance |
+| Generic development practice | [practices/index.md](practices/index.md) | Routes to testing, Python style, git, logging, CLI, docs, release, and just commands |
+| Brand, terminology, claims, links | [project/brand/index.md](project/brand/index.md) | OneTool wording, claims, taglines, and external references |
+| Tool reference content | [../docs/reference/tools/index.md](../docs/reference/tools/index.md) | User-facing pack/tool descriptions and per-tool docs |
+
+When updating docs, update the authoritative guide and link to it from indexes. Do not copy detailed guidance into multiple files.
+
 ---
 
 ## Documentation Principles
@@ -44,7 +62,7 @@ rg "your new content" dev/ -l
 
 Each topic has ONE authoritative doc:
 - Just commands → `practices/justfile.md`
-- Tool creation → `project/guides/creating-tools.md`
+- Tool creation → `project/guides/tool-development.md`
 - Testing patterns → `practices/testing.md`
 - Git workflow → `practices/git.md`
 
@@ -119,7 +137,7 @@ rg '\[.*\]\([^http].*\.md.*\)' dev/ -A 1
 
 ## Documentation Structure
 
-### 📍 Where to Put New Content
+### Where to Put New Content
 
 Use this decision tree:
 
@@ -146,7 +164,7 @@ Use this decision tree:
 
 ## Section Guide
 
-### 🤖 agents/ - Navigation Layer
+### agents/ - Navigation Layer
 
 **Purpose:** Quick reference for AI agents to navigate the docs
 
@@ -169,7 +187,7 @@ Use this decision tree:
 
 ---
 
-### 🔧 project/ - OneTool-Specific Domain Knowledge
+### project/ - OneTool-Specific Domain Knowledge
 
 **Purpose:** Everything unique to OneTool that wouldn't apply to other projects
 
@@ -184,7 +202,7 @@ Use this decision tree:
 | [registry-system.md](project/arch/registry-system.md) | AST-based tool discovery | Understanding tool loading |
 | [proxy-flow.md](project/arch/proxy-flow.md) | External MCP server communication | Working with proxies |
 | [security-model.md](project/arch/security-model.md) | Four-layer defense, validation | Security deep dive |
-| [configuration.md](project/arch/configuration.md) | Config system architecture | Understanding config |
+| [configuration-architecture.md](project/arch/configuration-architecture.md) | Config system architecture | Understanding config |
 
 **What belongs here:**
 - OneTool's unique architecture and design decisions
@@ -204,9 +222,11 @@ Use this decision tree:
 | File | What's Inside | When to Read |
 |------|--------------|--------------|
 | [index.md](project/guides/index.md) | Guide overview | Finding the right guide |
-| [creating-tools.md](project/guides/creating-tools.md) | Building OneTool tool packs | Creating a new tool |
-| [configuration.md](project/guides/configuration.md) | OneTool configuration system | Configuring OneTool |
+| [tool-development.md](project/guides/tool-development.md) | Building OneTool tool packs | Creating a new tool |
+| [onetool-configuration.md](project/guides/onetool-configuration.md) | OneTool configuration system | Configuring OneTool |
 | [tool-configuration.md](project/guides/tool-configuration.md) | Tool-specific config | Adding tool config |
+| [tool-reference-docs.md](project/guides/tool-reference-docs.md) | Tool reference documentation | Writing `docs/reference/tools/` pages |
+| [upstream-tool-review.md](project/guides/upstream-tool-review.md) | Upstream tool API review tracker | Checking source projects for changes |
 | [attribution.md](project/guides/attribution.md) | License handling for derived tools | Attributing third-party code |
 
 **What belongs here:**
@@ -221,32 +241,30 @@ Use this decision tree:
 - ❌ "Python docstring format" (use practices/python-style.md)
 - ❌ "How to write pytest tests" (use practices/testing.md)
 
-#### project/brand/ - Brand Assets & Tool Descriptions
+#### project/brand/ - Brand Assets
 
 | File | What's Inside | When to Read |
 |------|--------------|--------------|
 | [index.md](project/brand/index.md) | Brand overview | Brand work |
 | [terminology.md](project/brand/terminology.md) | OneTool terminology guide | Writing docs/marketing |
 | [claims.md](project/brand/claims.md) | Benchmark-backed claims | Marketing materials |
-| [links.md](project/brand/links.md) | External references | Finding resources |
-| [tool-packs.md](project/brand/tool-packs.md) | Tool pack descriptions | Writing about tools |
+| [external-references.md](project/brand/external-references.md) | External references | Finding resources |
 
 **What belongs here:**
 - Brand identity, messaging, taglines
 - OneTool-specific terminology
-- Tool pack descriptions for marketing
 - Claims with benchmark evidence
 
 **Examples:**
-- ✅ "OneTool tool pack descriptions"
 - ✅ "Terminology: 'pack' vs 'tool' vs 'function'"
 - ✅ "Brand claims: '96% token reduction'"
 - ❌ "How to use the tool packs" (use project/guides/)
 - ❌ "Architecture of tool packs" (use project/arch/)
+- ❌ "Tool reference descriptions" (use docs/reference/tools/)
 
 ---
 
-### 🛠️ practices/ - Generic Development Practices
+### practices/ - Generic Development Practices
 
 **Purpose:** Development workflows and standards that could apply to any Python project
 
@@ -261,6 +279,8 @@ Use this decision tree:
 | [cli-patterns.md](practices/cli-patterns.md) | CLI development patterns | Building CLIs |
 | [justfile.md](practices/justfile.md) | Just command reference | Using just |
 | [release.md](practices/release.md) | Release and publishing workflow | Releasing versions |
+| [docs-writing.md](practices/docs-writing.md) | Documentation writing practice | Writing docs |
+| [docs-visual-design.md](practices/docs-visual-design.md) | Documentation visual design tokens | Styling docs |
 
 **What belongs here:**
 - Generic development workflows (git, testing, Python style)
@@ -308,5 +328,3 @@ mem.search(query="git workflow")
 - Dev practices: `practices/`
 
 ---
-
-**Last updated:** 2026-02-09

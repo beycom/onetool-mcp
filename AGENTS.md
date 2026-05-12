@@ -14,17 +14,17 @@
   - Reference specifics as file_path:line when citing code.
   - When useful, suggest high-value additions (tests, validation, docs, safety/perf checks) in one short list.
   - End each turn with 1–2 sentences: what changed and what’s next.
-- Tools
-  - If `onetool-mcp` enabled: use first.
-  - Discover capabilities with `ot.help()` + `ot.servers()`.
-  - Critical tools: `ground.search`, `webfetch.fetch`, `ripgrep.search`.
 
 ## Project
 
-Read dev/agents/hints.md for quick reference (commands, rules, project structure).
-Read dev/agents/project-map.md for detailed project structure.
-Read dev/index.md for complete dev docs navigation.
-Read dev/project/guides/index.md before creating tools — it links to creating-tools.md, which covers shared utilities to check before implementing common patterns (HTTP clients, caching, truncation, etc.).
+The `dev/` directory is the canonical source for project guidance. Use it before inventing patterns or relying on memory:
+
+- Read `dev/index.md` first when deciding which dev documentation file to use.
+- Read `dev/agents/hints.md` for quick reference (commands, rules, project structure).
+- Read `dev/agents/project-map.md` for detailed project structure.
+- Read `dev/project/guides/index.md` before creating or changing tools; it links to `tool-development.md`, `tool-configuration.md`, shared utilities, reference-doc rules, attribution, and upstream review guidance.
+- Use `dev/practices/index.md` for generic development practices: testing, Python style, logging, CLI patterns, docs, releases, and just commands.
+- Use `dev/project/arch/index.md` for system architecture and execution flow.
 
 ## Commands
 

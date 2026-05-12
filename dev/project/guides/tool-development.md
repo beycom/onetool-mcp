@@ -1,6 +1,6 @@
-# Creating Tools
+# Tool Development
 
-Guide for creating tools bundled with OneTool in `src/ottools/`.
+Guide for creating tools bundled with OneTool or optional extras.
 
 ---
 
@@ -8,9 +8,11 @@ Guide for creating tools bundled with OneTool in `src/ottools/`.
 
 ```
 src/ottools/<name>.py
+src/otdev/tools/<name>.py
+src/otutil/tools/<name>.py
 ```
 
-One file per pack. The filename doesn't need to match the pack name (e.g., `brave_search.py` declares `pack = "brave"`).
+One file per pack. The filename usually matches the pack name; when it does not, the module still declares the exported namespace with `pack = "<name>"`.
 
 ---
 
@@ -136,6 +138,23 @@ def search(
 def search(query: str, count: int = 10) -> str:
     ...
 ```
+
+---
+
+## Sync Public API, Async Internals
+
+Tool functions exposed through `__all__` should be ordinary synchronous functions. OneTool invokes pack tools from an async MCP runner, and exposing `async def` tools or returning coroutine objects creates unclear serialization and lifecycle behavior.
+
+It is fine for the implementation behind a sync tool to use concurrency:
+
+- Use `ThreadPoolExecutor` for parallel blocking I/O or CPU-adjacent work.
+- Use a bounded worker thread for libraries that require their own event loop.
+- Keep background work observable with status, stats, or a flush/wait command when users need completion guarantees.
+- Bound concurrency and queue sizes; surface dropped, failed, pending, and timed-out work in tool output or stats.
+- Treat internal concurrency as an implementation detail unless it changes the user-facing contract.
+- Keep batch docs aligned with behavior: blocking batch functions should not claim task polling, and task IDs should only be returned for work that continues after the function returns.
+
+Avoid calling `asyncio.run(...)` directly inside a public sync tool. When the tool is called through MCP, the caller may already be inside OneTool's event loop, which can raise `asyncio.run() cannot be called from a running event loop`. If an async library is required, run the async coroutine in a dedicated worker thread or provide a small bridge helper that is safe both with and without an already-running event loop.
 
 ---
 
@@ -654,7 +673,7 @@ from otutil.tools._mem import Config, _close_connection
 - [ ] Unit tests with `@pytest.mark.unit` + `@pytest.mark.tools`
 - [ ] Integration tests if external APIs involved
 - [ ] Spec at `openspec/specs/tool-<name>/spec.md` (for non-trivial tools)
-- [ ] Reference doc at `docs/reference/tools/<pack>.md` (see [Tool Reference Docs](tool-ref-docs.md))
+- [ ] Reference doc at `docs/reference/tools/<pack>.md` (see [Tool Reference Docs](tool-reference-docs.md))
 - [ ] Attribution level determined (see [Attribution](attribution.md))
 - [ ] Update `src/ot/config/global_templates/agent-hints.md` if adding user-facing tools
 - [ ] `just check` passes

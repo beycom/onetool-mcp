@@ -11,8 +11,9 @@ Brand assets, messaging, and reference materials for OneTool.
 | **This file** | Snippets, taglines, quick reference |
 | [terminology.md](terminology.md) | Terminology style guide |
 | [claims.md](claims.md) | Benchmark evidence for marketing claims |
-| [links.md](links.md) | External references and resources |
-| [tool-packs.md](tool-packs.md) | Tool pack descriptions |
+| [external-references.md](external-references.md) | External references and resources |
+
+For user-facing tool pack descriptions, use [docs/reference/tools/index.md](../../../docs/reference/tools/index.md).
 
 **Documentation styling:** See main docs for design system and best practices.
 
@@ -28,8 +29,8 @@ One tool to rule them all
 
 ### External Pitch
 
-`🧿 One MCP for developers - No tool tax, no context rot. 
-100+ tools including Brave, Google, Context7, Excalidraw, AWS, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more.`
+`🧿 One MCP for developers - No tool tax, no context rot.
+Configured packs can include Brave, Google grounding, Context7, Excalidraw, AWS, Version Checker, Excel, File Ops, Database, Playwright, Chrome utility tools, and more.`
 
 ---
 
@@ -66,7 +67,7 @@ Details and methodology: [claims.md](claims.md)
 ## Short Descriptions
 
 ```text
-🧿 One MCP for developers - No tool tax, no context rot. 100+ tools including Brave, Google, Context7, Excalidraw, AWS, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more.
+🧿 One MCP for developers - No tool tax, no context rot. Configured packs can include Brave, Google grounding, Context7, Excalidraw, AWS, Version Checker, Excel, File Ops, Database, Playwright, Chrome utility tools, and more.
 ```
 
 ## GitHub Tags
@@ -80,8 +81,7 @@ python, mcp, model-context-protocol, mcp-server, llm, code-execution, mcp-tools,
 ## Stats
 
 ```text
-- 15+ packs
-- 100+ tools
+- Current configured inventory: 29 packs, 252 tools (`uv run python scripts/list_tool_inventory.py --output -`)
 - 1 CLI (onetool)
 - 96% token reduction
 - 30x cost reduction

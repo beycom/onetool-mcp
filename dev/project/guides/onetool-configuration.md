@@ -1,4 +1,4 @@
-# Configuration
+# OneTool Configuration
 
 ## Config Resolution
 

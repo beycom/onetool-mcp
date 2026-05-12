@@ -5,9 +5,9 @@
 A **pack** is a namespace grouping related tool functions. Each tool file declares a `pack` variable and exports public functions:
 
 ```python
-# src/ottools/brave_search.py
+# src/otutil/tools/brave.py
 pack = "brave"
-__all__ = ["search", "news", "search_batch"]
+__all__ = ["search", "news", "image", "video", "search_batch"]
 
 def search(*, query: str, count: int = 10) -> dict: ...
 def news(*, query: str, count: int = 10) -> dict: ...
@@ -23,11 +23,11 @@ Short names for frequently-used functions, defined in config:
 
 ```yaml
 alias:
-  ws: brave.web_search
+  ws: brave.search
   fr: file.read
 ```
 
-Usage: `ws(query="test")` expands to `brave.web_search(query="test")`
+Usage: `ws(query="test")` expands to `brave.search(query="test")`
 
 Resolved via regex before execution. Sorted longest-first to avoid partial matches.
 

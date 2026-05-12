@@ -55,7 +55,7 @@ sequenceDiagram
         R->>E: exec(prepared_code, namespace)
         E->>P: namespace["brave"].search(query="test")
         P->>P: resolve & wrap with stats
-        P->>T: brave_search.search(query="test")
+        P->>T: brave.search(query="test")
         T->>T: HTTP call to Brave API
         T-->>P: {web: [{title: ...}]}
         P-->>E: result

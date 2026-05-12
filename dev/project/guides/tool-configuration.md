@@ -1,6 +1,6 @@
 # Tool Configuration
 
-How to add settings, secrets, and path resolution to a tool pack. For the overall config architecture, see [Configuration](../arch/configuration.md).
+How to add settings, secrets, and path resolution to a tool pack. For the overall config architecture, see [Configuration](../arch/configuration-architecture.md).
 
 ## Defining a Config Class
 

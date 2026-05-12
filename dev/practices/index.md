@@ -12,8 +12,8 @@ Generic development workflows and standards that could apply to any Python proje
 | [Commit Scopes](commit-scopes.md) | Comprehensive conventional commit scope reference |
 | [Release](release.md) | Release and publishing workflow |
 | [Justfile](justfile.md) | Just command reference |
-| [Docs Writing](docs-writing.md) | MkDocs Material features and best practices |
-| [Docs Design](docs-design.md) | Design system for documentation site |
+| [Documentation Writing](docs-writing.md) | MkDocs Material features and best practices |
+| [Documentation Visual Design](docs-visual-design.md) | Design system for documentation site |
 
 ---
 
@@ -40,8 +40,8 @@ Generic development workflows and standards that could apply to any Python proje
 | Use just commands | [Justfile](justfile.md) |
 | Release a version | [Release](release.md) |
 | Build a CLI | [CLI Patterns](cli-patterns.md) |
-| Write documentation | [Docs Writing](docs-writing.md) |
-| Apply docs design system | [Docs Design](docs-design.md) |
+| Write documentation | [Documentation Writing](docs-writing.md) |
+| Apply docs design system | [Documentation Visual Design](docs-visual-design.md) |
 
 ---
 

@@ -1,4 +1,4 @@
-# Best Practices
+# Documentation Writing
 
 Best practices for writing and maintaining OneTool documentation with MkDocs Material.
 
