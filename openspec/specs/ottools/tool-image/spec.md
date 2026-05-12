@@ -192,6 +192,21 @@ in `meta.json`, and return immediately on repeat calls.
 - **THEN** it SHALL return the cached summary with `"cached": true`
 - **AND** SHALL NOT make a vision model API call
 
+#### Scenario: `"clip"` summary — refresh clipboard each call
+
+- **GIVEN** `image.load(img="clip")`, `image.ask(img="clip", ...)`, or `image.summary(img="clip")`
+  was called earlier this session
+- **WHEN** `image.summary(img="clip")` is called again
+- **THEN** it SHALL read current clipboard bytes again before summarising
+- **AND** if clipboard bytes are unchanged, it SHALL return the existing handle via hash dedup
+- **AND** if clipboard bytes changed, it SHALL return the handle for the new clipboard image
+
+#### Scenario: `clip_view()` delegates to clipboard summary
+
+- **WHEN** `image.clip_view()` is called
+- **THEN** it SHALL behave exactly like `image.summary(img="clip")`
+- **AND** it SHALL return the same response shape as `image.summary()`
+
 #### Scenario: Summary JSON keys
 
 - **WHEN** a summary is returned
@@ -312,4 +327,3 @@ The `ot_image` pack SHALL be configurable via `onetool.yaml` under `tools.ot_ima
 - **WHEN** `tools.ot_image.max_edge: 800` is set in config
 - **AND** `image.load(img="~/large.png")` is called with a 2000×1500px image
 - **THEN** the model-upload bytes SHALL be resized to fit within 800px on the long edge
-

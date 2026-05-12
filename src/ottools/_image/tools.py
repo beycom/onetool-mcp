@@ -393,7 +393,7 @@ def summary(*, img: str) -> dict[str, Any]:
         if img in ("clip", "clipboard"):
             # Always re-read clipboard to pick up latest content.
             # load() deduplicates unchanged bytes and updates _clip_handle.
-            result = load(img="clip")
+            result = load(img="clip", max_edge=config.max_edge)
             if "error" in result:
                 s.add(error=result["error"])
                 return {"error": result["error"], "handle": "clip"}
