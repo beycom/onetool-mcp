@@ -1,6 +1,6 @@
 # Tool Reference
 
-**29 Packs. 256 Tools.**
+**29 Packs. 254 Tools.**
 
 Complete reference of all built-in tool packs and functions.
 
