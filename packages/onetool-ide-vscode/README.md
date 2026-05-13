@@ -79,7 +79,7 @@ Set `tools.ide.base_url` only as an explicit debug override. When it is set, One
 
 ## Security
 
-The extension and Python pack share `~/.onetool/ide/auth.key`. Requests and responses are signed with HMAC-SHA256, the key is never sent over HTTP, and replayed request nonces are rejected.
+The extension and Python pack share `ide/auth.key` under the configured OneTool directory. Set VS Code `onetoolIde.otDir` to match the Python pack's active OneTool directory; if unset, the extension uses `~/.onetool`. Requests and responses are signed with HMAC-SHA256, the key is never sent over HTTP, and replayed request nonces are rejected.
 
 ## Links
 

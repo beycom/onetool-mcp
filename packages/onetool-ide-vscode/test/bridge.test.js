@@ -29,7 +29,7 @@ const { ensureHmacKey, signHttpMessage, verifyHttpMessage } = require("../dist/a
 const { IdeBridgeServer } = require("../dist/bridge");
 
 async function request(port, method, requestPath, body, nonce) {
-  const key = ensureHmacKey("ide");
+  const key = ensureHmacKey("ide", tempHome);
   const bodyBuffer = Buffer.from(body || "");
   const headers = signHttpMessage({
     key,
@@ -81,14 +81,14 @@ async function unsignedRequest(port) {
   await new Promise((resolve) => blocker.listen(0, "127.0.0.1", resolve));
   const busyPort = blocker.address().port;
 
-  const bridge = new IdeBridgeServer(() => "onetool-mcp", busyPort, 2);
+  const bridge = new IdeBridgeServer(() => "onetool-mcp", busyPort, 2, tempHome);
   const port = await bridge.start();
   assert.equal(port, busyPort + 1);
 
   const health = await request(port, "GET", "/health", "", "health-one");
   assert.equal(health.statusCode, 200);
   verifyHttpMessage({
-    key: ensureHmacKey("ide"),
+    key: ensureHmacKey("ide", tempHome),
     statusCode: 200,
     path: "/health",
     body: health.body,

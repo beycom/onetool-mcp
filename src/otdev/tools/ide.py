@@ -37,6 +37,17 @@ from otpack import (
 )
 from pydantic import BaseModel, Field, ValidationError
 
+
+def register_services(registry: object) -> None:
+    """Register IDE output handling policy."""
+    from ot.services import OutputPolicy
+
+    registry.register_output_policy(  # type: ignore[attr-defined]
+        lambda tool_name: OutputPolicy(allow_sanitize=False)
+        if tool_name.startswith("ide.")
+        else None
+    )
+
 from ot.utils import lazy_client
 
 PROTOCOL_VERSION = 1
@@ -78,7 +89,6 @@ class Config(BaseModel):
         le=30.0,
         description="Bridge request timeout in seconds.",
     )
-
 
 class IdeStateError(RuntimeError):
     """Raised when the IDE bridge or response contract is invalid."""
@@ -212,7 +222,9 @@ def _validate_include(include: IncludeArg) -> set[IncludeName]:
 
 def _auth_key() -> bytes:
     """Return the IDE bridge HMAC key."""
-    return ensure_hmac_key("ide")
+    from ot.meta import resolve_ot_path
+
+    return ensure_hmac_key("ide", base_dir=resolve_ot_path("."))
 
 
 def _json_bytes(payload: object) -> bytes:

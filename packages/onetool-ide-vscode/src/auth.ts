@@ -29,11 +29,15 @@ export class NonceCache {
   }
 }
 
-export function ensureHmacKey(namespace: string): Buffer {
+export function resolveOtDir(otDir?: string): string {
+  return path.resolve(expandHome(otDir || path.join(os.homedir(), ".onetool")));
+}
+
+export function ensureHmacKey(namespace: string, otDir?: string): Buffer {
   if (!namespace || namespace.includes("/") || namespace.includes("\\")) {
     throw new Error("HMAC key namespace must be a simple name");
   }
-  const dir = path.join(os.homedir(), ".onetool", namespace);
+  const dir = path.join(resolveOtDir(otDir), namespace);
   const file = path.join(dir, "auth.key");
   if (fs.existsSync(file)) {
     return decodeKey(fs.readFileSync(file, "utf8").trim());
@@ -60,6 +64,16 @@ export function ensureHmacKey(namespace: string): Buffer {
     }
     throw error;
   }
+}
+
+function expandHome(value: string): string {
+  if (value === "~") {
+    return os.homedir();
+  }
+  if (value.startsWith("~/") || value.startsWith("~\\")) {
+    return path.join(os.homedir(), value.slice(2));
+  }
+  return value;
 }
 
 export function signHttpMessage(args: {

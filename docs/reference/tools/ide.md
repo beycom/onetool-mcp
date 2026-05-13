@@ -7,7 +7,7 @@ Read-only VS Code state retrieval through the local OneTool IDE Bridge extension
 - Connect once to a VS Code workspace id, then call state helpers without repeating the id
 - Persists the selected default id in `.onetool/state.yaml` for the current project
 - Auto-discovers the active bridge across a small loopback port range
-- Authenticates local bridge traffic with `~/.onetool/ide/auth.key`
+- Authenticates local bridge traffic with `ide/auth.key` under the active OneTool directory
 - Retrieves live active-editor, selection, workspace, and viewport state
 - Warns on workspace mismatch while still returning absolute paths
 
@@ -126,6 +126,10 @@ The extension derives its connection id from the workspace name, such as `onetoo
 
 Python discovers bridges through authenticated `GET /health` checks and connects to the first bridge whose `connection.id` matches. Duplicate connection ids use first-match semantics.
 
+Set the VS Code `onetoolIde.otDir` setting to the OneTool directory that should
+share `ide/auth.key` with the Python pack. If unset, the extension uses
+`~/.onetool`.
+
 The extension artifact version is independent from the `onetool-mcp` Python package version. Its base version is `1.0.0`; local builds use generated `1.0.0-dev.<build>` versions so repeated local installs replace earlier local builds without `--force`.
 
 The bridge protocol version is separate from the extension artifact version. Python and TypeScript both require protocol `1`; mismatches fail clearly instead of falling back to older bridge shapes.
@@ -133,7 +137,7 @@ The bridge protocol version is separate from the extension artifact version. Pyt
 ## Caveats
 
 - The bridge is read-only and exposes only authenticated `/health` and `/state` endpoints.
-- The auth key is local machine state and is not stored in `.onetool/state.yaml` or `onetool.yaml`.
+- The auth key is stored at `ide/auth.key` under the active OneTool directory and is not stored in `.onetool/state.yaml` or `onetool.yaml`.
 - Discovered ports are runtime-only and are not persisted.
 - The v1 bridge does not expose terminal state, diagnostics, full file contents, editor mutation, or WebSocket streaming.
 - If `active_editor.document.dirty` is `true`, `selection.text` reflects the live editor buffer, but later file reads from disk may be stale for non-selected content.

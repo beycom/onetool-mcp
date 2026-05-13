@@ -99,6 +99,18 @@ class TestIdePack:
         ]
         assert not hasattr(ide, "context")
 
+    def test_auth_key_uses_config_scoped_base_dir(self, tmp_path: Path) -> None:
+        from otdev.tools import ide
+
+        config_dir = tmp_path / ".onetool"
+        with (
+            patch("otdev.tools.ide.ensure_hmac_key", return_value=b"x" * 32) as ensure_key,
+            patch("ot.meta.resolve_ot_path", return_value=config_dir),
+        ):
+            assert ide._auth_key() == b"x" * 32
+
+        ensure_key.assert_called_once_with("ide", base_dir=config_dir)
+
     def test_connect_sets_and_persists_default_connection(self) -> None:
         from otdev.tools import ide
 

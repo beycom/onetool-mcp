@@ -1,3 +1,4 @@
+import * as path from "node:path";
 import * as vscode from "vscode";
 import { IdeBridgeServer } from "./bridge";
 import { getDefaultConnectionId } from "./snapshot";
@@ -10,9 +11,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const config = vscode.workspace.getConfiguration("onetoolIde");
   const portStart = config.get<number>("portStart", 58764);
   const portCount = config.get<number>("portCount", 10);
+  const otDir = resolveOtDir(config.get<string>("otDir", ""));
   connectionId = getDefaultConnectionId();
 
-  bridge = new IdeBridgeServer(() => connectionId, portStart, portCount);
+  bridge = new IdeBridgeServer(() => connectionId, portStart, portCount, otDir || undefined);
   const port = await bridge.start();
 
   statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -31,6 +33,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   );
 
   vscode.window.setStatusBarMessage(`OneTool IDE bridge listening on 127.0.0.1:${port}`, 3000);
+}
+
+function resolveOtDir(value: string): string {
+  if (!value || value.startsWith("~") || path.isAbsolute(value)) {
+    return value;
+  }
+  const workspace = vscode.workspace.workspaceFolders?.[0]?.uri;
+  if (workspace?.scheme === "file") {
+    return path.join(workspace.fsPath, value);
+  }
+  return value;
 }
 
 export async function deactivate(): Promise<void> {

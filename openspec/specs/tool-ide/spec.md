@@ -92,6 +92,13 @@ The system SHALL route IDE state requests to a specific VS Code connection using
 ### Requirement: Authenticated read-only bridge
 The system SHALL use an authenticated read-only HTTP bridge on `127.0.0.1` for IDE state retrieval.
 
+The Python `ide` pack SHALL use the shared HMAC key at `ide/auth.key` under
+the active OT_DIR, resolved with `resolve_ot_path(".")`.
+
+The VS Code companion extension SHALL support `onetoolIde.otDir` as the
+OneTool directory containing `ide/auth.key`. When `onetoolIde.otDir` is unset,
+the extension SHALL default to `~/.onetool`.
+
 #### Scenario: Bridge request uses get_state
 - **WHEN** `ide.state(id="ot1")` is called
 - **THEN** the pack SHALL use the `get_state` bridge operation on `POST /state`

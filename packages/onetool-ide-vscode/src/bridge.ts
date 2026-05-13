@@ -12,13 +12,16 @@ export class IdeBridgeServer {
   private server: http.Server | undefined;
   private port: number | undefined;
   private readonly requestNonces = new NonceCache();
-  private readonly key = ensureHmacKey("ide");
+  private readonly key: Buffer;
 
   constructor(
     private readonly getConnectionId: () => string,
     private readonly portStart: number,
     private readonly portCount: number,
-  ) {}
+    otDir?: string,
+  ) {
+    this.key = ensureHmacKey("ide", otDir);
+  }
 
   async start(): Promise<number> {
     if (this.server) {

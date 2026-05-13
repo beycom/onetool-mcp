@@ -19,6 +19,11 @@ assert.equal(key.length, 32);
 assert.deepEqual(ensureHmacKey("ide"), key);
 assert.ok(fs.existsSync(path.join(tempHome, ".onetool", "ide", "auth.key")));
 
+const tempAuthDir = fs.mkdtempSync(path.join(os.tmpdir(), "ot-ide-auth-dir-"));
+const scopedKey = ensureHmacKey("ide", tempAuthDir);
+assert.equal(scopedKey.length, 32);
+assert.ok(fs.existsSync(path.join(tempAuthDir, "ide", "auth.key")));
+
 const body = Buffer.from('{"ok":true}');
 const headers = signHttpMessage({
   key,
