@@ -6,7 +6,6 @@ from typing import Any
 
 from ot.meta._constants import (
     DOC_BASE_URL,
-    DOC_SLUGS,
     SERVER_DOC_BASE_URL,
     InfoLevel,
 )
@@ -24,7 +23,12 @@ def _get_doc_url(pack: str) -> str:
     Returns:
         Documentation URL for the pack
     """
-    slug = DOC_SLUGS.get(pack, pack)
+    try:
+        from ot.executor.tool_loader import load_tool_registry
+
+        slug = load_tool_registry().doc_slugs.get(pack, pack)
+    except Exception:
+        slug = pack
     return f"{DOC_BASE_URL}{slug}/"
 
 

@@ -7,7 +7,6 @@
   - Prioritize code quality: correct, simple, readable, maintainable.
   - Avoid backward-compatibility shims or legacy aliases unless explicitly requested.
 - Execution:
-  - Before first tool call, send one sentence with immediate plan.
   - During execution, send brief milestone updates only for findings, direction changes, or blockers.
   - For tasks with 3+ steps, keep a task list with exactly one item in_progress and mark items done immediately.
 - Response:

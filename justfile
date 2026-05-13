@@ -3,8 +3,8 @@
 
 set dotenv-load := true
 
-# Project-local global config base (all versions stored here)
-global_base := justfile_directory() + "/global"
+# Project-local OneTool config base
+ot_config := justfile_directory() + "/.onetool/onetool.yaml"
 
 # Default: show available commands
 default:
@@ -23,7 +23,7 @@ check: lint typecheck test
 
 # Run the MCP server in development mode (uses dev config)
 dev *args:
-    uv run onetool --config {{ global_base }}/dev/onetool.yaml {{ args }}
+    uv run onetool --config {{ ot_config }} {{ args }}
 
 # ============================================================================
 # TESTING
@@ -127,10 +127,6 @@ docs-clean:
 docs-deploy:
     uv run mkdocs gh-deploy --force
 
-# Regenerate the OpenSpec specifications viewer HTML
-docs-specs:
-    uv run python scripts/generate_specs_html.py
-
 # ============================================================================
 # BUILD & RELEASE
 # ============================================================================
@@ -208,7 +204,7 @@ ot-inspector:
 [arg("config", long)]
 ot v="" config="" *args:
     {{ if v == "" { "uv run onetool" } else { "uvx --from onetool-mcp==" + v + " onetool" } }} \
-        --config {{ if config == "" { global_base + "/.onetool/onetool.yaml" } else { config } }} \
+        --config {{ if config == "" { ot_config } else { config } }} \
         {{ args }}
 
 # Install as global uv tool

@@ -9,7 +9,7 @@ Steps:
 2. Scaffold: `ot_forge.create_ext(name="wiki")`
 3. Implement:
    - `page(slug, size=10)` — fetch https://en.wikipedia.org/wiki/{slug}, truncate to size KB
-   - `summary(slug, prompt)` — use `call_tool("llm.transform", ...)` to summarize page content
+   - `summary(slug, prompt)` — use `call_tool("ot_llm.transform", data=..., prompt=...)` to summarize page content
    - `data(slug)` — fetch JSON from https://en.wikipedia.org/api/rest_v1/page/summary/{slug}
    - Use httpx.Client for HTTP, LogSpan for logging, return error strings on failure
 4. Validate: `ot_forge.validate_ext(path=...)`

@@ -31,7 +31,7 @@ hide:
     - :material-database: **Smart context store** — `ot_context` (`ctx`); SQLite+FTS5 store; search and navigate large tool outputs without filling context
     - :material-image-search: **Image vision** — `ot_image` (`img`); routes to a cheaper, better vision model; zero host tokens; supports local files, URLs, clipboard, and 8 formats (PNG, JPEG, GIF, WebP, TIFF, HEIC, AVIF, SVG)
     - :material-text-box-minus: **Caveman compact** — `ot_caveman` (`cm`); LLM-powered text compaction; 55–65% on tech prose, 25–31% on search results; `__compact__ = True` applies it to any tool call; code blocks, URLs, and security warnings are never modified
-    - :material-console: **CLI-first execution** — `onetool direct` runs any tool pack from the shell; execution host keeps state across calls for agent harnesses and automation scripts
+    - :material-console: **CLI-first execution** — `onetool direct run --port` bridges shell commands into a running MCP process for agent harnesses
 
     [:octicons-arrow-right-24: See everything that's new in v2](learn/whats-new-v2.md)
 
@@ -134,13 +134,12 @@ Single, well-structured [YAML config](learn/configuration.md) with global and pr
 
 ### :material-console: CLI-First Execution
 
-Run any OneTool pack from the shell — no MCP client, no AI in the loop.
-Persistent execution host keeps state across calls. Pipe JSON to scripts,
-agents, or other tools.
+Run any OneTool pack from the shell through an already-running MCP process.
+The MCP-owned direct API keeps loaded config, secrets, proxy connections, and
+state in one process. Pipe JSON to scripts, agents, or other tools.
 
 ```bash
-onetool direct start -c onetool.yaml --wait
-onetool direct run "ot.packs()" --format json | jq '.[0].name'
+onetool direct run --port 8765 "ot.packs()" --format json | jq '.[0].name'
 ```
 
 [:octicons-arrow-right-24: Direct usage guide](learn/direct-usage.md)

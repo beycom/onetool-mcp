@@ -20,6 +20,7 @@ Environment:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
@@ -28,7 +29,7 @@ import subprocess
 import sys
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import tiktoken
@@ -97,7 +98,7 @@ def _tokens(text: str) -> int:
 
 
 def _median_savings(base: list[int], target: list[int]) -> float:
-    return statistics.median((b - t) / b * 100 for b, t in zip(base, target) if b > 0)
+    return statistics.median((b - t) / b * 100 for b, t in zip(base, target, strict=True) if b > 0)
 
 
 def main() -> None:
@@ -105,9 +106,11 @@ def main() -> None:
     model = os.environ.get("CAVEMAN_EVAL_MODEL", "claude-sonnet-4-6")
 
     if not shutil.which(cli):
-        print(f"Error: '{cli}' not on PATH", file=sys.stderr); sys.exit(1)
+        print(f"Error: '{cli}' not on PATH", file=sys.stderr)
+        sys.exit(1)
     if not _OT_CM_SKILL_PATH.exists():
-        print(f"Error: ot-cm skill not found: {_OT_CM_SKILL_PATH}", file=sys.stderr); sys.exit(1)
+        print(f"Error: ot-cm skill not found: {_OT_CM_SKILL_PATH}", file=sys.stderr)
+        sys.exit(1)
 
     ot_cm_body = _strip_frontmatter(_OT_CM_SKILL_PATH.read_text(encoding="utf-8"))
     jb_body = _fetch_jb_skill()
@@ -117,10 +120,8 @@ def main() -> None:
     # Load cached baseline if available and not resetting
     cached = None
     if _SNAPSHOT_PATH.exists() and not _RESET_BASELINE:
-        try:
+        with contextlib.suppress(Exception):
             cached = json.loads(_SNAPSHOT_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            pass
 
     if cached and cached.get("prompts") == _PROMPTS and "__baseline__" in cached.get("arms", {}):
         print("Using cached baseline (pass --reset-baseline to regenerate).")
@@ -148,7 +149,7 @@ def main() -> None:
 
     _SNAPSHOT_PATH.parent.mkdir(parents=True, exist_ok=True)
     _SNAPSHOT_PATH.write_text(json.dumps({
-        "metadata": {"generated_at": datetime.now(timezone.utc).isoformat(), "model": model, "n_prompts": len(_PROMPTS)},
+        "metadata": {"generated_at": datetime.now(UTC).isoformat(), "model": model, "n_prompts": len(_PROMPTS)},
         "prompts": _PROMPTS,
         "arms": responses,
         "token_counts": counts,

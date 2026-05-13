@@ -59,7 +59,6 @@ def _tool_inventory(
     include_descriptions: bool,
 ) -> list[dict[str, Any]]:
     from ot.meta import pack_info, packs, tool_info
-    from ot.meta._constants import PACK_SHORT_NAMES
 
     pack_rows = packs(info="full")
     inventory: list[dict[str, Any]] = []
@@ -90,7 +89,7 @@ def _tool_inventory(
         inventory.append(
             {
                 "pack": pack_name,
-                "short": PACK_SHORT_NAMES.get(pack_name),
+                "short": pack_row.get("short"),
                 "source": pack_detail.get("source", pack_row.get("source", "")),
                 "tools": tools,
             }

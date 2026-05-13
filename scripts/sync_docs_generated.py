@@ -8,11 +8,11 @@ Current generated blocks:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import inspect
-from pathlib import Path
 import re
 import sys
+from dataclasses import dataclass
+from pathlib import Path
 
 import yaml
 
@@ -37,7 +37,6 @@ DOC_MAP = {
     "ground": "ground.md",
     "knowledge": "knowledge.md",
     "mem": "mem.md",
-    "ot_direct": "ot_direct.md",
     "tavily": "tavily.md",
     "aws": "aws.md",
     "chrome_util": "chrome-util.md",
@@ -55,7 +54,6 @@ EXTRA_MAP = {
     "ot": "core",
     "arch": "[dev]",
     "ot_context": "core",
-    "ot_direct": "core",
     "ot_forge": "core",
     "ot_image": "core",
     "ot_llm": "core",

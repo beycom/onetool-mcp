@@ -40,7 +40,6 @@ just docs-serve-stop  # stop docs server
 just docs-build       # build docs (strict mode)
 just docs-clean       # clean and rebuild
 just docs-deploy      # deploy to GitHub Pages
-just docs-specs       # regenerate OpenSpec specs HTML
 ```
 
 ## Build & Release

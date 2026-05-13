@@ -253,28 +253,15 @@ def check_deps(
     else:
         files = []
 
-        # Always include bundled tools from ottools package
-        try:
-            import ottools
-
-            bundled_dir = Path(ottools.__file__).parent
-            bundled_files = [
-                f for f in bundled_dir.glob("*.py") if f.name != "__init__.py"
-            ]
-            files.extend(bundled_files)
-        except ImportError:
-            pass
-
-        # Add config-specified tools
         try:
             from ot.config.loader import get_config
+            from ot.executor.tool_loader import _get_tool_files
 
             config = get_config()
-            if config:
-                config_files = config.get_tool_files()
-                files.extend(config_files)
+            current_files, _internal_files, _cache_key = _get_tool_files(None, config)
+            files.extend(sorted(current_files))
         except Exception:
-            pass  # Config may not be available, use bundled tools only
+            pass
 
         if not files:
             return results

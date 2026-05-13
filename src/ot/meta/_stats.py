@@ -201,8 +201,7 @@ def result(
         ot.result(handle="abc123", search="fail", context=3)# matches + 3 lines around each
         ot.result(handle="abc123", tail=20)                 # last 20 lines
     """
-    from ot.ctx.grep import ctx_grep
-    from ot.ctx.read import ctx_read
+    from ot.executor.result_store import get_result_store
 
     # Validate offset and limit (1-indexed)
     if offset < 1:
@@ -220,60 +219,19 @@ def result(
         context=context if context > 0 else None,
     ) as s:
         try:
-            if search:
-                if fuzzy:
-                    raise ValueError(
-                        "fuzzy=True is no longer supported; "
-                        "use ctx.ask() for natural-language queries or ctx.grep() for regex."
-                    )
-                # Delegate to ctx_grep for search/context
-                grep_result = ctx_grep(handle, search, context=context)
-                if "error" in grep_result:
-                    raise ValueError(grep_result["error"])
-                all_lines = grep_result["content"].splitlines() if grep_result["content"] else []
-                total = len(all_lines)
-                if tail > 0:
-                    offset = max(1, total - tail + 1)
-                    limit = tail
-                start = offset - 1
-                end = start + limit
-                chunk = all_lines[start:end]
-                returned = len(chunk)
-                has_more = end < total
-                end_line = offset + returned - 1
-                pct = int((end_line / total) * 100) if total > 0 else 100
-                result: dict[str, Any] = {
-                    "content": "\n".join(chunk),
-                    "total_lines": total,
-                    "returned": returned,
-                    "offset": offset,
-                    "has_more": has_more,
-                    "progress": f"lines {offset}-{end_line} of {total} ({pct}%)",
-                    "total_size_bytes": 0,
-                }
-                if has_more:
-                    next_offset = offset + returned
-                    result["next_query"] = (
-                        f"ot.result(handle='{handle}', search={search!r}, "
-                        f"offset={next_offset}, limit={limit})"
-                    )
-                s.add("returned", returned)
-                s.add("totalLines", total)
-                return result
-            else:
-                # Delegate to ctx_read for pagination/tail
-                read_result = ctx_read(handle, offset=offset, limit=limit, tail=tail)
-                if "error" in read_result:
-                    raise ValueError(read_result["error"])
-                s.add("returned", read_result["returned"])
-                s.add("totalLines", read_result["total_lines"])
-                # Map next_query from ctx.read to ot.result format
-                if read_result.get("next_query"):
-                    next_offset = read_result["offset"] + read_result["returned"]
-                    read_result["next_query"] = (
-                        f"ot.result(handle='{handle}', offset={next_offset}, limit={limit})"
-                    )
-                return read_result
+            query_result = get_result_store().query(
+                handle,
+                offset=offset,
+                limit=limit,
+                search=search,
+                fuzzy=fuzzy,
+                tail=tail,
+                context=context,
+            )
+            result = query_result.to_dict() if hasattr(query_result, "to_dict") else dict(query_result)
+            s.add("returned", result["returned"])
+            s.add("totalLines", result["total_lines"])
+            return result
         except ValueError as e:
             s.add("error", str(e))
             raise

@@ -163,7 +163,6 @@ nav:
           - OT Tools:
               - OT Context: reference/tools/ot_context.md
               - OT Core: reference/tools/ot_core.md
-              - OT Direct: reference/tools/ot_direct.md
               - OT Forge: reference/tools/ot_forge.md
               - OT Image: reference/tools/ot_image.md
               - OT LLM: reference/tools/ot_llm.md
@@ -183,6 +182,7 @@ nav:
               - Excel: reference/tools/excel.md
               - File: reference/tools/file.md
               - Ground: reference/tools/ground.md
+              - IDE: reference/tools/ide.md
               - Knowledge: reference/tools/knowledge.md
               - Mem: reference/tools/mem.md
               - Package: reference/tools/package.md

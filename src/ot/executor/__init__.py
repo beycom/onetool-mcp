@@ -1,6 +1,5 @@
 """Execution engines for OneTool.
 
-Provides direct host execution via SimpleExecutor.
 The unified runner provides a single entry point for all command execution.
 """
 

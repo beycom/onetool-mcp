@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from ot.config import get_config
 from ot.logging import LogSpan
-from ot.meta._discovery import _SHORT_TO_FULL, packs, servers, tools
+from ot.meta._discovery import _resolve_pack_alias, packs, servers, tools
 from ot.meta._help_formatting import (
     _format_alias_help,
     _format_general_help,
@@ -116,7 +116,10 @@ def help(*, query: str = "", info: HelpInfoLevel = "default") -> str:
         if "." in query:
             from ot.meta._discovery import tool_info as _tool_info
             pack_prefix, _, tool_suffix = query.partition(".")
-            resolved_tool_query = f"{_SHORT_TO_FULL.get(pack_prefix, pack_prefix)}.{tool_suffix}"
+            from ot.executor.tool_loader import load_tool_registry
+
+            resolved_pack = _resolve_pack_alias(pack_prefix, load_tool_registry())
+            resolved_tool_query = f"{resolved_pack}.{tool_suffix}"
             detail = _tool_info(name=resolved_tool_query, info="full")
             if detail:
                 assert isinstance(detail, dict)
@@ -148,7 +151,9 @@ def help(*, query: str = "", info: HelpInfoLevel = "default") -> str:
             )
 
         # Check for exact pack match (also resolves short aliases like "img" → "ot_image")
-        resolved_query = _SHORT_TO_FULL.get(query, query)
+        from ot.executor.tool_loader import load_tool_registry
+
+        resolved_query = _resolve_pack_alias(query, load_tool_registry())
 
         pack_names = packs(info="min")
         if resolved_query in pack_names:

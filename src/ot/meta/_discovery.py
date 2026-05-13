@@ -7,13 +7,9 @@ from typing import TYPE_CHECKING, Any
 
 from ot.config import get_config
 from ot.logging import LogSpan
-from ot.meta._constants import PACK_SHORT_NAMES
 from ot.meta._constants import safe_server_name as _safe_server_name
 from ot.meta._tool_discovery import _build_proxy_tool_info, _build_tool_info
 from ot.proxy import get_proxy_manager
-
-# Reverse mapping: short alias → full pack name (e.g. "ctx" → "ot_context")
-_SHORT_TO_FULL: dict[str, str] = {alias: full for full, alias in PACK_SHORT_NAMES.items()}
 
 if TYPE_CHECKING:
     from ot.meta._constants import InfoLevel, ServerInfoLevel
@@ -23,6 +19,26 @@ log = LogSpan
 
 _VALID_INFO_LEVELS = {"min", "default", "full"}
 _VALID_SERVER_INFO_LEVELS = {"min", "default", "full", "resources", "prompts"}
+
+
+def _alias_to_full(registry: Any) -> dict[str, str]:
+    """Build alias → canonical pack mapping from loaded pack metadata."""
+    result: dict[str, str] = {}
+    for pack, aliases in getattr(registry, "pack_aliases", {}).items():
+        for alias in aliases:
+            result[alias] = pack
+    return result
+
+
+def _resolve_pack_alias(value: str, registry: Any) -> str:
+    """Resolve a pack alias in a pack or tool pattern."""
+    if not value:
+        return value
+    aliases = _alias_to_full(registry)
+    if "." in value:
+        prefix, _, suffix = value.partition(".")
+        return f"{aliases.get(prefix, prefix)}.{suffix}"
+    return aliases.get(value, value)
 
 
 def tools(
@@ -56,13 +72,11 @@ def tools(
 
     from ot.executor.tool_loader import load_tool_registry
 
-    # Resolve short alias to full pack name for filtering
-    resolved_pattern = _SHORT_TO_FULL.get(pattern, pattern) if pattern else pattern
-    resolved_lower = resolved_pattern.lower() if resolved_pattern else ""
-
     with log(span="ot.tools", pattern=pattern or None, info=info) as s:
         runner_registry = load_tool_registry()
         proxy = get_proxy_manager()
+        resolved_pattern = _resolve_pack_alias(pattern, runner_registry) if pattern else pattern
+        resolved_lower = resolved_pattern.lower() if resolved_pattern else ""
 
         tools_list: list[dict[str, Any] | str] = []
 
@@ -139,20 +153,13 @@ def tool_info(
     if info not in _VALID_INFO_LEVELS:
         raise ValueError(f"info={info!r} is not valid. Use 'min', 'default', or 'full'.")
 
-    filter_pattern = name or pattern
-    # Resolve short alias: "ctx" → "ot_context", "ctx.ask" → "ot_context.ask"
-    if filter_pattern:
-        if "." in filter_pattern:
-            prefix, _, suffix = filter_pattern.partition(".")
-            resolved = _SHORT_TO_FULL.get(prefix, prefix)
-            filter_pattern = f"{resolved}.{suffix}"
-        else:
-            filter_pattern = _SHORT_TO_FULL.get(filter_pattern, filter_pattern)
-    filter_lower = filter_pattern.lower() if filter_pattern else ""
-
     with log(span="ot.tool_info", name=name or None, pattern=pattern or None, info=info) as s:
         runner_registry = load_tool_registry()
         proxy = get_proxy_manager()
+        filter_pattern = name or pattern
+        if filter_pattern:
+            filter_pattern = _resolve_pack_alias(filter_pattern, runner_registry)
+        filter_lower = filter_pattern.lower() if filter_pattern else ""
 
         results: list[dict[str, Any]] = []
 
@@ -249,7 +256,7 @@ def packs(
         all_pack_names = sorted(local_packs | proxy_packs)
 
         # Filter by pattern (resolve short alias)
-        resolved_pat = _SHORT_TO_FULL.get(pattern, pattern) if pattern else pattern
+        resolved_pat = _resolve_pack_alias(pattern, runner_registry) if pattern else pattern
         if resolved_pat:
             all_pack_names = [p for p in all_pack_names if resolved_pat.lower() in p.lower()]
 
@@ -265,8 +272,6 @@ def packs(
         except PromptsError:
             packs_descriptions = {}
 
-        from ot.meta._constants import PACK_SHORT_NAMES
-
         packs_list: list[dict[str, Any] | str] = []
 
         for pack_name in all_pack_names:
@@ -278,7 +283,8 @@ def packs(
             if not description and is_local:
                 description = _get_pack_module_description(runner_registry, pack_name)
 
-            short = PACK_SHORT_NAMES.get(pack_name)
+            aliases = getattr(runner_registry, "pack_aliases", {}).get(pack_name, ())
+            short = aliases[0] if aliases else None
 
             if info == "default":
                 entry: dict[str, Any] = {"name": pack_name, "description": description or "(no description)"}
@@ -330,11 +336,9 @@ def pack_info(
     from ot.executor.tool_loader import load_tool_registry
     from ot.prompts import PromptsError, get_pack_instructions, get_prompts
 
-    # Resolve short alias
-    name = _SHORT_TO_FULL.get(name, name) if name else name
-
     with log(span="ot.pack_info", name=name or None, info=info) as s:
         runner_registry = load_tool_registry()
+        name = _resolve_pack_alias(name, runner_registry) if name else name
         proxy = get_proxy_manager()
         cfg = get_config()
 

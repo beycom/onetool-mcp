@@ -122,8 +122,8 @@ class TestServersDefaultRedesign:
 
         assert "type" not in result[0]
 
-    def test_aws_server_call_as_strips_prefix(self) -> None:
-        """aws-iam → call_as = 'iam' (not 'aws_iam')."""
+    def test_aws_server_call_as_uses_generic_underscore_alias(self) -> None:
+        """aws-iam → call_as = 'aws_iam'."""
         from ot.meta import servers
 
         proxy = _make_proxy()
@@ -134,7 +134,7 @@ class TestServersDefaultRedesign:
             with patch("ot.meta._discovery.get_config", return_value=cfg):
                 result = servers(info="default")
 
-        assert result[0]["call_as"] == "iam"
+        assert result[0]["call_as"] == "aws_iam"
 
 
 @pytest.mark.unit
@@ -285,11 +285,10 @@ class TestPackProxyRegistrationWarning:
         user_warnings = [w for w in caught if issubclass(w.category, UserWarning)]
         assert len(user_warnings) == 0
 
-    def test_aws_server_no_warning(self) -> None:
-        """aws-* servers do not emit a warning (they get short-name aliases)."""
+    def test_aws_server_warns_like_any_hyphenated_server(self) -> None:
+        """aws-* servers use the same generic hyphen warning."""
         _, caught = self._build_namespace(["aws-iam"])
-        user_warnings = [w for w in caught if issubclass(w.category, UserWarning)]
-        assert len(user_warnings) == 0
+        assert any(issubclass(w.category, UserWarning) for w in caught)
 
 
 @pytest.mark.unit

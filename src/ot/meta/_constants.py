@@ -12,44 +12,6 @@ ServerInfoLevel = Literal["min", "default", "full", "resources", "prompts"]
 # Pack name for dot notation: ot.tools(), ot.packs(), etc.
 PACK_NAME = "ot"
 
-# Documentation URL mapping for packs with misaligned slugs
-# Short-name aliases for packs with verbose names.
-# Injected into the execution namespace so e.g. `wf.fetch()` == `webfetch.fetch()`.
-# Packs already short (db, mem, aws, ot) are not listed here.
-PACK_SHORT_NAMES: dict[str, str] = {
-    "brave": "br",
-    "context7": "c7",
-    "webfetch": "wf",
-    "tavily": "tav",
-    "ground": "g",
-    "diagram": "diag",
-    "package": "pkg",
-    "ripgrep": "rg",
-    "chrome_util": "chrome",
-    "play_util": "play",
-    "convert": "cv",
-    "excel": "xls",
-    "file": "f",
-    "ot_forge": "forge",
-    "ot_llm": "llm",
-    "ot_secrets": "sec",
-    "ot_timer": "tmr",
-    "ot_servers": "srv",
-    "whiteboard": "wb",
-    "ot_context": "ctx",
-    "ot_direct": "direct",
-    "ot_image": "img",
-    "knowledge": "kb",
-    "ot_caveman": "cm",
-}
-
-DOC_SLUGS: dict[str, str] = {
-    "brave": "brave-search",
-    "db": "database",
-    "ground": "grounding-search",
-    "webfetch": "web-fetch",
-}
-
 DOC_BASE_URL = "https://onetool.beycom.online/reference/tools/"
 SERVER_DOC_BASE_URL = "https://onetool.beycom.online/reference/servers/"
 
@@ -57,10 +19,8 @@ SERVER_DOC_BASE_URL = "https://onetool.beycom.online/reference/servers/"
 def safe_server_name(server_name: str) -> str:
     """Return the Python-safe identifier for an MCP server name.
 
-    aws-iam → iam, aws-cost-explorer → cost_explorer, my-server → my_server.
+    my-server → my_server.
     """
-    if server_name.startswith("aws-"):
-        return server_name[4:].replace("-", "_")
     return server_name.replace("-", "_")
 
 

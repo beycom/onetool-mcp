@@ -17,15 +17,26 @@ ot_servers.enable(name="chrome_devtools")
 ```
 
 Test out the following packs:
-Packs: brave, context7, convert, db, chrome_devtools, diagram, excel, file, github, ground, knowledge, ot_llm, mem, ot, ot_context, ot_image, package, playwright, ripgrep, ot_forge, tavily, webfetch, whiteboard
+Packs: arch, aws, brave, chrome_util, context7, convert, db, diagram, excel, file, ground, ide, knowledge, mem, ot, ot_caveman, ot_context, ot_forge, ot_image, ot_llm, ot_secrets, ot_servers, ot_timer, package, play_util, ripgrep, tavily, webfetch, whiteboard
+
+Test out the following proxy servers separately:
+Proxy servers: chrome_devtools, github, playwright
 
 When testing:
+- arch: validate a workbook from tests/data/ if present, otherwise run `ot.tools(pattern="arch.", info="full")` and note missing fixture coverage.
+- aws: use read-only/config inspection first (`aws.profiles()`, `aws.profile()`, `aws.regions()`, `aws.services()`); only call login/start/stop tools if explicitly safe for the local environment.
+- chrome_util: with a known browser page if available, test scan_annotations, inject_annotations, clear_annotations; if no Chrome session is available, verify help/signatures and note as environment gap.
 - convert with files at tests/data/
 - db with db at tests/data/northwind.db (25MB, download via `just test-setup`)
 - excel with files at tests/data/
+- ide: test read-only connection/state helpers (`ide.get_state()`, `ide.paths()`, `ide.workspace()`); if no IDE bridge is connected, note as environment gap.
 - mem: use `tmp/test/` topic prefix for all writes. Test write, read, list, search, toc, slice, snap/restore, stale/refresh, write_batch, read_batch, slice_batch, stats, export/load, update, delete, decay, context, flush. Clean up with `mem.delete(topic="tmp/", confirm=True)` when done.
 - diagram: list_providers, get_template, generate_source, render_diagram, get_playground_url
+- ot_caveman: compact and expand short inline text; do not use protected content as the primary assertion.
 - ot_forge: create_ext, validate_ext, install_skills
+- ot_secrets: test status and audit; avoid rotate/encrypt/init on real secrets unless using a temporary file.
+- ot_servers: status/list a configured server; enable/restart/disable only for explicit proxy-server test cases.
+- ot_timer: start, elapsed, list, clear with a unique temporary timer name.
 - webfetch with a known URL like https://en.wikipedia.org/wiki/Python_(programming_language)
 - chrome_devtools with a known URL like https://en.wikipedia.org/wiki/Python_(programming_language)
 - playwright with a known URL like https://en.wikipedia.org/wiki/Python_(programming_language)

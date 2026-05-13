@@ -18,9 +18,9 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from ot.config.loader import get_config
-from ot.executor.tool_loader import load_tool_registry
-from ot.executor.worker_proxy import WorkerPackProxy
+from ot.config.loader import get_config  # noqa: E402
+from ot.executor.tool_loader import load_tool_registry  # noqa: E402
+from ot.executor.worker_proxy import WorkerPackProxy  # noqa: E402
 
 DOC = ROOT / "docs/reference/tools/index.md"
 
@@ -42,6 +42,7 @@ NAME_TO_PACK = {
     "File": "file",
     "OT Forge": "ot_forge",
     "Ground": "ground",
+    "IDE": "ide",
     "OT LLM": "ot_llm",
     "Mem": "mem",
     "OT Core": "ot",
