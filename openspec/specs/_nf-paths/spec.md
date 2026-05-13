@@ -390,6 +390,10 @@ The SDK paths module SHALL provide convenience wrappers for common resolution pa
 - **WHEN** `otpack` resolves the default state file path
 - **THEN** it SHALL use `resolve_cwd_path(".onetool/state.yaml")`
 
+#### Scenario: Project-local state version first
+- **WHEN** `otpack` writes `.onetool/state.yaml`
+- **THEN** the YAML document SHALL place `version` before `packs`
+
 #### Scenario: resolve_ot_path for config assets
 - **GIVEN** a path for config or logs
 - **WHEN** `resolve_ot_path("logs/app.log")` is called

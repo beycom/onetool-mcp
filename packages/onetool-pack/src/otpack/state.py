@@ -86,4 +86,4 @@ def set_state(pack: str, key: str, value: Any, *, state_path: Path | None = None
     pack_state[key] = value
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(yaml.safe_dump(data, sort_keys=True))
+    path.write_text(yaml.safe_dump(data, sort_keys=False))

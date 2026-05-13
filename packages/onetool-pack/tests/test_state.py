@@ -34,10 +34,12 @@ def test_state_writes_pack_scoped_values(tmp_path: Path, monkeypatch: pytest.Mon
     state.set_state("bridge", "connection_id", "onetool-mcp")
 
     path = tmp_path / ".onetool" / "state.yaml"
-    data = yaml.safe_load(path.read_text())
+    content = path.read_text()
+    data = yaml.safe_load(content)
+    assert content.startswith("version: 1\npacks:\n")
     assert data == {
-        "packs": {"bridge": {"connection_id": "onetool-mcp"}},
         "version": 1,
+        "packs": {"bridge": {"connection_id": "onetool-mcp"}},
     }
     assert state.get_state("bridge", "connection_id") == "onetool-mcp"
 
