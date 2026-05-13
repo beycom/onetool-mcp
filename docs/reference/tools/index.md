@@ -1,6 +1,6 @@
 # Tool Reference
 
-**30 Packs. 260 Tools.**
+**29 Packs. 256 Tools.**
 
 Complete reference of all built-in tool packs and functions.
 
@@ -10,7 +10,7 @@ Tools are split into optional install extras. Install only what you need:
 
 | Extra | Tools included |
 |-------|---------------|
-| *(core, always included)* | `ot_caveman` (alias `cm`), `ctx`, `ot`, `ot_direct`, `ot_forge`, `ot_llm`, `ot_secrets`, `ot_servers`, `ot_timer` |
+| *(core, always included)* | `ot_caveman` (alias `cm`), `ctx`, `ot`, `ot_forge`, `ot_llm`, `ot_secrets`, `ot_servers`, `ot_timer` |
 | `[util]` | `brave`, `convert`, `excel`, `file`, `ground`, `knowledge`, `mem`, `tavily` |
 | `[dev]` | `arch`, `aws`, `chrome_util`, `context7`, `db`, `diagram`, `ide`, `package`, `play_util`, `ripgrep`, `whiteboard`, `webfetch` |
 | `[all]` | All of the above |
@@ -38,9 +38,8 @@ uv tool install 'onetool-mcp[util,dev]'  # most tools
 | [**Ground**](ground.md) | `[util]` | Grounded search with sources. | 5 | [Google Gemini](https://ai.google.dev/) (MIT) | `dev`, `docs`, `reddit`, `search`, `search_batch` |
 | [**IDE**](ide.md) | `[dev]` | Read-only VS Code state retrieval through a local companion bridge. | 8 | GPL-3.0 | `connect`, `editor`, `file`, `get_state`, `paths`, `sel`, `state`, `workspace` |
 | [**Knowledge**](knowledge.md) | `[util]` | Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis. | 15 | MIT | `append`, `ask`, `dbs`, `delete`, `grep`, `info`, `list`, `read`, `related`, `search`, `slice`, `stats`, `toc`, `update`, `write` |
-| [**Mem**](mem.md) | `[util]` | Persistent AI agent memory with semantic search. | 29 | MIT | `append`, `ask`, `context`, `count`, `decay`, `delete`, `export`, `flush`, `grep`, `index`, `inspect`, `list`, `query`, `read`, `read_batch`, `refresh`, `reindex`, `restore`, `search`, `slice`, `slice_batch`, `snap`, `stale`, `stats`, `toc`, `update`, `update_batch`, `write`, `write_batch` |
+| [**Mem**](mem.md) | `[util]` | Persistent AI agent memory with semantic search. | 29 | MIT | `append`, `ask`, `context`, `count`, `decay`, `delete`, `export`, `flush`, `grep`, `inspect`, `load`, `list`, `query`, `read`, `read_batch`, `refresh`, `reindex`, `restore`, `search`, `slice`, `slice_batch`, `snap`, `stale`, `stats`, `toc`, `update`, `update_batch`, `write`, `write_batch` |
 | [**OT Context**](ot_context.md) | core | TTL-expiring, BM25-indexed storage for large tool outputs. | 13 | MIT | `append`, `ask`, `delete`, `grep`, `inspect`, `list`, `purge`, `query`, `read`, `slice`, `stats`, `toc`, `write` |
-| [**OT Direct**](ot_direct.md) | core | Manage the local HTTP execution host from within a tool session. | 4 | MIT | `logs`, `restart`, `status`, `stop` |
 | [**OT Core**](ot_core.md) | core | Introspection and management tools. | 19 | MIT | `aliases`, `config`, `debug`, `health`, `help`, `pack_info`, `packs`, `reload`, `result`, `security`, `server`, `servers`, `skills`, `snippet_info`, `snippets`, `stats`, `tool_info`, `tools`, `version` |
 | [**OT Forge**](ot_forge.md) | core | Create, validate, and install extension tools and skill stubs. | 3 | MIT | `create_ext`, `install_skills`, `validate_ext` |
 | [**OT Image**](ot_image.md) | core | Load images and ask vision questions via OpenAI-compatible API. | 9 | MIT | `ask`, `clip_ask`, `clip_view`, `delete`, `list`, `load`, `load_batch`, `purge`, `summary` |

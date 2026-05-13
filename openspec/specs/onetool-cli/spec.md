@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the main `onetool` CLI. Provides the MCP server entry point, the `init` subcommand group for configuration management, the `kb` subcommand group for knowledge base management, and the `direct` subcommand group for direct tool execution and execution server management.
+Defines the main `onetool` CLI. Provides the MCP server entry point, the `init` subcommand group for configuration management, the `kb` subcommand group for knowledge base management, and the `direct` subcommand group for direct tool execution.
 
 ---
 
@@ -17,6 +17,19 @@ The system SHALL provide a `onetool` CLI command.
 - **WHEN** `onetool` is executed with no arguments and no subcommand
 - **THEN** it SHALL start the MCP server over stdio
 
+#### Scenario: Startup config validation failure
+- **GIVEN** `onetool --config /path/to/onetool.yaml` is launched by an MCP client
+- **AND** config loading fails before the MCP handshake
+- **WHEN** the process exits
+- **THEN** stderr SHALL include a compact config error diagnostic
+- **AND** `<config-dir>/logs/serve.log` SHALL record the config path and error message
+
+#### Scenario: Termination signal
+- **GIVEN** the stdio MCP server process receives SIGINT or SIGTERM
+- **WHEN** the signal is handled
+- **THEN** the process SHALL unwind through normal server shutdown
+- **AND** FastMCP lifespan cleanup SHALL be able to close proxied transports
+
 #### Scenario: Help output
 - **GIVEN** `onetool --help` is executed
 - **WHEN** help is displayed
@@ -30,7 +43,7 @@ The system SHALL provide a `onetool` CLI command.
 
 ### Requirement: direct subcommand group
 
-The `onetool` CLI SHALL provide a `direct` subcommand group for direct tool execution and execution server management.
+The `onetool` CLI SHALL provide a `direct` subcommand group for sending commands to an already-running MCP-owned direct API.
 
 #### Scenario: direct group in help
 
@@ -41,90 +54,7 @@ The `onetool` CLI SHALL provide a `direct` subcommand group for direct tool exec
 #### Scenario: direct group help
 
 - **WHEN** `onetool direct --help` is run
-- **THEN** it SHALL list `run`, `repl`, `list`, `search`, `help`, `servers`, `start`, `stop`, `status`, `restart`, and `logs` as available commands
-
-### Requirement: direct list
-
-The system SHALL provide `onetool direct list [PATTERN]` to enumerate available tools from the shell.
-
-Flags:
-- `--config`/`-c` — path to `onetool.yaml`; optional (built-in packs shown without config)
-- `--info`/`-i` — info level: `min` (default, names only), `full` (signature + description)
-
-Output: one `pack.tool` per line (pipe-friendly).
-
-#### Scenario: List all tools
-
-- **WHEN** `onetool direct list` is run
-- **THEN** all available tools SHALL be printed, one per line as `pack.tool`
-
-#### Scenario: Filter by pack name
-
-- **WHEN** `onetool direct list brave` is run
-- **THEN** only tools in the `brave` pack SHALL be printed
-
-#### Scenario: Filter by glob pattern
-
-- **WHEN** `onetool direct list "brave.*"` is run
-- **THEN** tools matching the glob SHALL be printed
-
-#### Scenario: Full info
-
-- **WHEN** `onetool direct list --info full` is run
-- **THEN** each line SHALL include the function signature and a one-line docstring
-
-### Requirement: direct search
-
-The system SHALL provide `onetool direct search QUERY` to find tools by name or description.
-
-Flags:
-- `--config`/`-c` — path to `onetool.yaml`; optional
-
-#### Scenario: Search for tools
-
-- **WHEN** `onetool direct search "web search"` is run
-- **THEN** tools whose name or description matches the query SHALL be printed
-
-### Requirement: direct help
-
-The system SHALL provide `onetool direct help [QUERY]` to display tool signatures and docstrings.
-
-Flags:
-- `--config`/`-c` — path to `onetool.yaml`; optional
-- `--info`/`-i` — info level: `min`, `default`, `full` (default: `full`)
-
-#### Scenario: Help for a specific tool
-
-- **WHEN** `onetool direct help brave.search` is run
-- **THEN** the full signature, parameter descriptions, and docstring SHALL be printed
-
-#### Scenario: Help for a pack
-
-- **WHEN** `onetool direct help brave` is run
-- **THEN** all tools in the pack with their descriptions SHALL be printed
-
-#### Scenario: Fuzzy search
-
-- **WHEN** `onetool direct help "web search"` is run
-- **THEN** matching tools SHALL be shown ordered by relevance
-
-### Requirement: direct servers
-
-The system SHALL provide `onetool direct servers [PATTERN]` to inspect configured proxy server status.
-
-Flags:
-- `--config`/`-c` — path to `onetool.yaml`; optional
-- `--info`/`-i` — info level: `min`, `default` (default), `full`
-
-#### Scenario: List servers
-
-- **WHEN** `onetool direct servers -c onetool.yaml` is run
-- **THEN** configured proxy servers SHALL be listed with name, enabled state, and connection status
-
-#### Scenario: Filter by name pattern
-
-- **WHEN** `onetool direct servers github` is run
-- **THEN** only servers matching the pattern SHALL be shown
+- **THEN** it SHALL list `run` as the only available direct subcommand
 
 ---
 

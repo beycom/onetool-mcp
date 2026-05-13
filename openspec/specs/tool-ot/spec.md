@@ -23,7 +23,7 @@ The `ot.tools()` function SHALL list all available tools with optional filtering
 - **AND** pattern SHALL always perform partial matching
 
 #### Scenario: Short alias resolves to full pack name
-- **GIVEN** a short alias from `PACK_SHORT_NAMES` (e.g. `"ctx"` for `"ot_context"`)
+- **GIVEN** a pack metadata short alias (e.g. `"ctx"` for `"ot_context"`)
 - **WHEN** `ot.tools(pattern="ctx")` is called
 - **THEN** it SHALL resolve the alias and return the same results as `ot.tools(pattern="ot_context")`
 
@@ -61,7 +61,7 @@ The `ot.tool_info()` function SHALL return detailed info (signature + args) for 
 - **THEN** it SHALL return a list of dicts for all matching tools
 
 #### Scenario: Short alias resolves in pattern and name
-- **GIVEN** a short alias from `PACK_SHORT_NAMES` (e.g. `"ctx"` for `"ot_context"`)
+- **GIVEN** a pack metadata short alias (e.g. `"ctx"` for `"ot_context"`)
 - **WHEN** `ot.tool_info(pattern="ctx")` or `ot.tool_info(name="ctx.ask")` is called
 - **THEN** it SHALL resolve the alias and match against the full pack name
 
@@ -290,7 +290,7 @@ The `ot.packs()` function SHALL list packs with optional filtering. The `ot.pack
 
 ### Requirement: ot_image pack has short alias `img`
 
-The `ot_image` pack SHALL be registered in `PACK_SHORT_NAMES` with the short alias `img`,
+The `ot_image` pack SHALL declare the short alias `img` in pack metadata,
 consistent with the short-alias convention applied to other verbose pack names.
 
 #### Scenario: Short alias appears in packs full output
@@ -363,7 +363,7 @@ The `ot.servers()` function SHALL list configured MCP proxy servers with optiona
 - **GIVEN** `info="default"` parameter (or no info parameter)
 - **WHEN** `ot.servers()` or `ot.servers(info="default")` is called
 - **THEN** each entry SHALL include: `{name, status, enabled}`
-- **AND** `call_as` SHALL be included only when the server name contains hyphens (e.g. `aws-iam` → `call_as: "iam"`)
+- **AND** `call_as` SHALL be included only when the server name contains hyphens (e.g. `aws-iam` → `call_as: "aws_iam"`)
 - **AND** `tool_count` SHALL be included only when the server is connected
 - **AND** `error` SHALL be included only when the server is disconnected and has an error
 - **AND** `type` SHALL NOT be included (not useful to agents)
@@ -662,7 +662,7 @@ The `ot.help()` function SHALL provide unified help across tools, packs, snippet
 
 ### Requirement: Query Stored Results
 
-The `ot.result()` function SHALL query stored large outputs with pagination, filtering, and navigation hints. It delegates to the `ctx` pack backend.
+The `ot.result()` function SHALL query stored large outputs with pagination, filtering, and navigation hints through the configured result-store backend. The default backend is owned by the `ctx` pack.
 
 #### Scenario: Basic query with defaults
 - **GIVEN** a stored result with handle `abc123`

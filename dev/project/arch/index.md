@@ -75,7 +75,6 @@ src/
     utils/                   #   Format, sanitise, validation helpers
 
   ottools/                  # Base tool packs
-    ot_direct.py             #   Direct host execution helpers
     ot_forge.py              #   Extension scaffolding and validation
     ot_image.py              #   Image loading, inspection, generation, lifecycle
     ot_llm.py                #   LLM-powered transforms

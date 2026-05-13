@@ -115,10 +115,10 @@ short form — for instance, in a "Flags" reference table that lists both forms 
 
 ```bash
 # CORRECT — long flags in examples
-onetool direct run --config onetool.yaml "ot.packs()" --format json
+onetool direct run --port 8765 "ot.packs()" --format json
 
 # WRONG — short flags in examples
-onetool direct run -c onetool.yaml "ot.packs()" -f json
+onetool direct run -p 8765 "ot.packs()" -f json
 ```
 
 The one permitted exception: a flags reference table that lists both forms:

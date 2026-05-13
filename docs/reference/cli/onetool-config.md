@@ -466,23 +466,25 @@ snippets:
     body: "brave.search(query='test')"  # Inline overrides included
 ```
 
-## Execution Server Configuration
+## Direct API Configuration
 
-Settings for the `onetool direct` subcommand group. Configure under `direct` in `onetool.yaml`.
+Settings for the MCP-owned direct API used by `onetool direct run --port`.
+Configure under `direct` in `onetool.yaml`.
 
 ```yaml
 direct:
   host:
-    enabled: false  # false=in-process only, true=allow host optimization
-    port: 8765      # Preferred local host port
-    timeout: 120    # HTTP request timeout in seconds for `direct run` host routing
+    enabled: false  # true binds the authenticated loopback API from the MCP process
+    port: 8765      # Preferred API port; MCP startup probes upward if occupied
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `direct.host.enabled` | bool | `false` | Host optimization switch. `false` forces in-process execution; `true` enables host routing/auto-start. |
-| `direct.host.port` | int (1–65535) | `8765` | Preferred host port. Direct CLI host start/run use this exact port; MCP-managed auto-host startup may probe upward to find a free port. |
-| `direct.host.timeout` | int (≥1) | `120` | HTTP request timeout in seconds when routing to a host |
+| `direct.host.enabled` | bool | `false` | Bind the MCP-owned authenticated loopback direct API when the MCP process starts. |
+| `direct.host.port` | int (1-65535) | `8765` | Preferred direct API port. MCP startup tries this port first, then increments until one binds. |
+
+Unrecognised config attributes are ignored with warnings that identify the dotted
+path. Recognised attributes with invalid values still fail validation.
 
 ## Statistics Configuration
 

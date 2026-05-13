@@ -2,7 +2,8 @@
 
 ## Purpose
 
-Defines the `onetool direct run` command for direct tool execution from the shell. Supports in-process execution and optional routing to a running execution server.
+Defines `onetool direct run` as a secure CLI bridge into an already-running
+OneTool MCP process. Execution always happens inside that MCP process.
 
 ---
 
@@ -10,157 +11,105 @@ Defines the `onetool direct run` command for direct tool execution from the shel
 
 ### Requirement: direct run command
 
-The system SHALL provide `onetool direct run COMMAND` for direct tool execution from the shell.
+The system SHALL provide `onetool direct run --port PORT COMMAND` for direct
+tool execution from the shell.
 
-`COMMAND` is a positional argument (not a flag). Passing `-` as the command reads from stdin. Passing a path to an existing `.py` file reads the file contents and executes them.
+`COMMAND` is positional. Passing `-` reads from stdin. Passing a path to an
+existing `.py` file reads the file contents and executes them.
 
 Flags:
-- `--config`/`-c` — path to `onetool.yaml`; required when running in-process (no server)
-- `--secrets`/`-s` — path to secrets file; optional
+- `--port`/`-p` — required target MCP direct API port
+- `--ot-dir` — absolute OneTool directory containing `mcp-direct/auth.key`; default `~/.onetool`
 - `--format`/`-f` — output format: `json_h` (default), `json`, `yml`, `yml_h`, `raw`
-- `--no-host` — skip server auto-detect, always run in-process
-- `--sanitize` — enable output sanitization (default: off; use when feeding output to an AI pipeline)
-- `--timeout`/`-t` — server request timeout in seconds (overrides `direct.host.timeout` in config)
+- `--sanitize` — enable output sanitization
+- `--timeout`/`-t` — direct API request timeout in seconds
 
-Secrets resolution for direct commands SHALL follow this precedence:
-1. explicit `--secrets`
-2. `OT_SECRETS_FILE` environment variable
-3. `<config_dir>/secrets.yaml` when `--config` is provided and the file exists
-4. none
+#### Scenario: Basic execution through MCP process
 
-The format is injected into the execution namespace as `__format__` before the command runs, so the executor serialises the result with the chosen mode. Exit code communicates success/failure; no envelope wrapper is added around the result.
+- **GIVEN** an MCP process exposes the direct API on port `8765`
+- **WHEN** `onetool direct run --port 8765 "ot.version()"` is run
+- **THEN** the command SHALL be sent to signed HTTP `POST /run`
+- **AND** execution SHALL occur inside the MCP process
+- **AND** stdout SHALL contain the MCP result
+- **AND** exit code SHALL be `0` when the MCP run succeeds
 
-#### Scenario: Basic execution
+#### Scenario: Target port required
 
-- **WHEN** `onetool direct run -c onetool.yaml "ot.debug()"` is run
-- **THEN** the command SHALL execute and print the result to stdout
-- **AND** exit with code 0
-
-#### Scenario: Positional command — no flag needed
-
-- **WHEN** `onetool direct run "brave.search(query='test')"` is run
-- **THEN** the command string SHALL be accepted as a positional argument without any `-C` or `--command` flag
-
-#### Scenario: Snippet command with metadata prefix
-
-- **WHEN** `onetool direct run -c onetool.yaml '$br q="python|fastapi"'` is run
-- **THEN** the snippet SHALL be expanded before code validation/execution
-- **AND** `--format` and `--sanitize` metadata injection SHALL remain active for the expanded command
+- **WHEN** `onetool direct run "ot.version()"` is run
+- **THEN** the command SHALL exit with code `2`
+- **AND** the error SHALL clearly state that the target port is required
 
 #### Scenario: Stdin via dash
 
-- **WHEN** `echo "ot.debug()" | onetool direct run -c onetool.yaml -` is run
-- **THEN** the command SHALL be read from stdin and executed
-- **AND** the result SHALL be printed to stdout
+- **WHEN** `echo "ot.version()" | onetool direct run --port 8765 -` is run
+- **THEN** the command SHALL be read from stdin and sent to the MCP direct API
 
 #### Scenario: .py file path
 
-- **WHEN** `onetool direct run -c onetool.yaml script.py` is run and `script.py` exists
-- **THEN** the file contents SHALL be read and executed as the command
+- **WHEN** `onetool direct run --port 8765 script.py` is run and `script.py` exists
+- **THEN** the file contents SHALL be sent as the command
 - **AND** non-existent paths with `.py` extension SHALL be treated as literal command strings
 
-#### Scenario: Default format (json_h)
+#### Scenario: Output shaping
 
-- **WHEN** `onetool direct run -c onetool.yaml "ot.debug()"` is run with no `--format`
-- **THEN** the result SHALL be serialised as human-readable JSON (2-space indent)
-- **AND** no success/duration envelope SHALL wrap the output
+- **WHEN** `--format` or `--sanitize` is provided
+- **THEN** those values SHALL be sent in the direct API JSON request body
+- **AND** the MCP process SHALL apply them to the command result
 
-#### Scenario: Raw format
+#### Scenario: Invalid format
 
-- **WHEN** `onetool direct run -c onetool.yaml "ot.debug()" --format raw` is run
-- **THEN** the raw result string SHALL be printed to stdout with no serialisation
+- **WHEN** `--format` is set to an unsupported value
+- **THEN** the command SHALL exit with code `2`
+- **AND** print an error listing valid values
 
-#### Scenario: JSON compact format
+### Requirement: authenticated direct API client
 
-- **WHEN** `onetool direct run -c onetool.yaml "ot.debug()" --format json` is run
-- **THEN** output SHALL be compact JSON (no whitespace)
+`onetool direct run` SHALL connect only to `127.0.0.1:PORT` and use the
+`mcp-direct` HMAC key from `OT_DIR/mcp-direct/auth.key`. The client-side
+OT_DIR SHALL come from `--ot-dir`, defaulting to `~/.onetool`.
 
-#### Scenario: YAML format
+`--ot-dir` SHALL be an explicit absolute directory selector after `~`
+expansion. It SHALL NOT load OneTool config and SHALL NOT resolve relative to
+cwd or `.onetool`. Relative `--ot-dir` values SHALL fail with a clear argument
+error.
 
-- **WHEN** `onetool direct run -c onetool.yaml "ot.debug()" --format yml` is run
-- **THEN** output SHALL be YAML
+Before `/run`, the client SHALL perform signed `/health` and `/ready` checks.
+The client SHALL verify signed responses before printing or trusting response
+content.
 
-#### Scenario: Invalid format — exit code 2
+#### Scenario: Unreachable selected port
 
-- **WHEN** `--format` is set to an unsupported value (e.g. `text`, `yaml`)
-- **THEN** the command SHALL exit with code 2 and print an error listing valid values
+- **WHEN** no service is listening on the selected port
+- **THEN** the command SHALL fail clearly
 
-#### Scenario: Sanitize flag
+#### Scenario: Non-OneTool or unauthenticated service
 
-- **WHEN** `onetool direct run --sanitize -c onetool.yaml "ot.debug()"` is run
-- **THEN** output sanitization SHALL be applied (boundary tags, trigger neutralisation)
-- **AND** without `--sanitize`, sanitization SHALL be off by default
+- **WHEN** a service is listening but signed health/readiness fails
+- **THEN** the command SHALL fail clearly as an authentication or protocol error
+- **AND** no command SHALL be sent without valid authentication
 
-#### Scenario: Tool execution error — exit code 1
+#### Scenario: Protocol mismatch
 
-- **WHEN** the executed command raises an error during tool execution
-- **THEN** the error message SHALL be printed to stderr
-- **AND** the process SHALL exit with code 1
+- **WHEN** `/health` or `/run` returns a different direct protocol version
+- **THEN** the command SHALL fail clearly with a protocol mismatch
+- **AND** `/ready` SHALL still be signed and parseable before it is trusted
 
-#### Scenario: Config error — exit code 2
+#### Scenario: Execution failure
 
-- **WHEN** `--config` path does not exist or the YAML is invalid
-- **THEN** an error message SHALL be printed to stderr
-- **AND** the process SHALL exit with code 2
+- **WHEN** `/run` returns `{"protocol_version":1,"success":false,"result":"..."}`
+- **THEN** the result SHALL be printed
+- **AND** the CLI SHALL exit with code `1`
 
-#### Scenario: Missing secrets file — exit code 2
+### Requirement: request and response shape
 
-- **WHEN** `--secrets` path is provided but does not exist
-- **THEN** an error message SHALL be printed to stderr
-- **AND** the process SHALL exit with code 2
+The `/run` request body SHALL be compact JSON:
 
-#### Scenario: Environment-provided secrets path missing — exit code 2
+```json
+{"protocol_version":1,"operation":"run","command":"...","format":"json_h","sanitize":false}
+```
 
-- **WHEN** `OT_SECRETS_FILE` points to a non-existent file
-- **THEN** an error message SHALL be printed to stderr
-- **AND** the process SHALL exit with code 2
+The `/run` response body SHALL be small JSON:
 
-### Requirement: direct run server routing
-
-Without `--no-host`, `onetool direct run` SHALL probe for a running execution server on the configured port before executing in-process.
-
-#### Scenario: Server running — routes to server
-
-- **WHEN** an execution server is running on the configured port
-- **AND** `onetool direct run "ot.debug()"` is run without `--no-host`
-- **THEN** the command string (with `__format__` and `__sanitize__` prepended) SHALL be sent to the server via HTTP POST `/run`
-- **AND** the server's result SHALL be printed to stdout
-
-#### Scenario: Local host context mismatch — restart to sync
-
-- **GIVEN** routing target is local host (`127.0.0.1`)
-- **AND** a running host exists with different `config` or `secrets` context than the current direct run request
-- **WHEN** `onetool direct run ...` is executed
-- **THEN** the CLI SHALL restart the local host with the requested context before sending the command
-- **AND** routing SHALL proceed to the restarted host
-
-#### Scenario: Server not running — runs in-process
-
-- **WHEN** no execution server is running on the configured port
-- **AND** `onetool direct run -c onetool.yaml "ot.debug()"` is run without `--no-host`
-- **THEN** the command SHALL execute in-process
-- **AND** no error SHALL be reported about the missing server
-
-#### Scenario: direct.host.enabled true — auto-starts server
-
-- **GIVEN** `onetool.yaml` contains `direct.host.enabled: true`
-- **WHEN** `onetool direct run -c onetool.yaml "ot.debug()"` is run and no server is running
-- **THEN** the server SHALL be auto-started in the background before routing
-
-#### Scenario: direct.host.enabled false — no auto-start
-
-- **GIVEN** `onetool.yaml` contains `direct.host.enabled: false`
-- **WHEN** `onetool direct run "ot.debug()"` is run and no server is running
-- **THEN** the command SHALL execute in-process
-- **AND** the CLI SHALL NOT auto-start a server
-
-#### Scenario: --no-host skips probe
-
-- **WHEN** `onetool direct run -c onetool.yaml --no-host "ot.debug()"` is run
-- **THEN** no TCP probe SHALL be performed
-- **AND** the command SHALL always execute in-process regardless of server state
-
-#### Scenario: --timeout overrides config
-
-- **WHEN** `onetool direct run --timeout 120 "ot.debug()"` is run routing to a server
-- **THEN** the HTTP request timeout SHALL be 120 seconds regardless of `direct.host.timeout` in config
+```json
+{"protocol_version":1,"result":"...","success":true,"duration_ms":12}
+```

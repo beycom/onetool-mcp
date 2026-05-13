@@ -444,22 +444,22 @@ The system SHALL intercept tool outputs exceeding a configurable size threshold 
 #### Scenario: Output exceeds threshold
 - **GIVEN** `output.max_inline_size` is configured to 5000 bytes
 - **WHEN** a tool returns output of 20000 bytes
-- **THEN** the output SHALL be stored to `.onetool/tmp/`
+- **THEN** the output SHALL be stored through the configured result-store backend
 - **AND** a summary dict SHALL be returned instead of full content
 
-#### Scenario: ot.result is exempt from large output gate
+#### Scenario: output policy hook exempts ot.result from large output gate
 - **GIVEN** `output.max_inline_size` is configured to any positive value
 - **WHEN** the tool being executed is `ot.result`
 - **THEN** the output SHALL be returned inline regardless of size
 - **AND** the output SHALL NOT be stored or re-wrapped into a second handle
 
-#### Scenario: ctx.* tools are exempt from large output gate
+#### Scenario: output policy hook exempts ctx tools from large output gate
 - **GIVEN** `output.max_inline_size` is configured to any positive value
-- **WHEN** the tool being executed has a name beginning with `ctx.`
+- **WHEN** the tool being executed has a canonical or alias ctx name
 - **THEN** the output SHALL be returned inline regardless of size
 - **AND** the output SHALL NOT be stored or re-wrapped into a second handle
 
-#### Scenario: Discovery tools are exempt from large output gate
+#### Scenario: output policy hook exempts discovery tools from large output gate
 - **GIVEN** `output.max_inline_size` is configured to any positive value
 - **WHEN** the tool being executed is `ot.help` or `ot.tool_info`
 - **THEN** the output SHALL be returned inline regardless of size
@@ -469,11 +469,11 @@ The system SHALL intercept tool outputs exceeding a configurable size threshold 
 - **GIVEN** code sets `__force_context__ = True`
 - **AND** the output is smaller than `output.max_inline_size`
 - **WHEN** the result is returned
-- **THEN** the output SHALL be stored to `.onetool/tmp/`
+- **THEN** the output SHALL be stored through the configured result-store backend
 - **AND** a summary dict SHALL be returned instead of inline output
 
 #### Scenario: Summary response format
-- **GIVEN** a large output is stored
+- **GIVEN** a large output is stored by the default ctx result-store backend
 - **WHEN** the summary is returned
 - **THEN** it SHALL include:
   - `handle`: Unique identifier for querying

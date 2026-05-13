@@ -120,6 +120,7 @@ The `ProxyManager` SHALL support disconnecting a single server without affecting
 - **WHEN** `proxy_manager.disconnect_server_sync(name)` is called
 - **AND** `name` is currently connected
 - **THEN** the server SHALL be disconnected and its tools unregistered
+- **AND** the underlying transport SHALL be closed when the client exposes a close hook
 - **AND** no other connected server SHALL be disconnected
 - **AND** the method SHALL return `"disconnected"`
 

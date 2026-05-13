@@ -25,7 +25,6 @@ Built-in core packs bundled with base install.
 
 | Pack | Description |
 |------|-------------|
-| `ot_direct.py` | Direct host execution helpers |
 | `ot_forge.py` | Extension scaffolding and validation |
 | `ot_image.py` | Image loading, inspection, generation, and lifecycle helpers |
 | `ot_llm.py` | LLM-powered transformation tools |

@@ -195,7 +195,7 @@ Returns server information (operational view):
 - `name` - Server name from config
 - `status` - Connection status (connected/disconnected)
 - `enabled` - Whether server is enabled
-- `call_as` - Python-safe identifier (only when name has hyphens, e.g. `aws-iam` → `iam`)
+- `call_as` - Python-safe identifier (only when name has hyphens, e.g. `aws-iam` → `aws_iam`)
 - `tool_count` - Number of available tools (only when connected)
 - `error` - Connection error (only when disconnected with error)
 
@@ -413,7 +413,7 @@ Returns JSON with:
 
 ## ot.result()
 
-Query stored large output with pagination, search, and filtering. When a tool output exceeds `max_inline_size`, OneTool stores it and returns a handle. Use `ot.result()` to retrieve the content — you do not need to page through everything.
+Query stored large output with pagination, search, and filtering. When a tool output exceeds `max_inline_size`, OneTool stores it through the configured result-store backend and returns a handle. The default backend is `ctx`, so stored summaries include `ctx.toc`, `ctx.ask`, and `ctx.read` follow-up commands.
 
 ```python
 # First 100 lines (default)

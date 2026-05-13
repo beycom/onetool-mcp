@@ -71,13 +71,61 @@ mytool:
 
 | Function | Use For |
 |----------|---------|
-| `resolve_ot_path()` | Paths relative to `.onetool/` (databases, logs, stats) |
-| `resolve_cwd_path()` | User-supplied file paths |
-| `expand_path()` | Only for arbitrary user paths (spreadsheets, etc.) |
+| `resolve_ot_path()` | OneTool-owned files under the active `.onetool/` directory: databases, logs, stats, auth keys, runtime files |
+| `resolve_cwd_path()` | Project files under the effective working directory: user-supplied inputs/outputs, project-local state, generated artifacts |
+| `expand_path()` | Arbitrary external paths where neither OT_DIR nor project cwd semantics apply |
 
 Never use `Path.expanduser()` directly. The resolvers honour `OT_GLOBAL_DIR` and project-level `.onetool/` directories.
 
 Use relative defaults (e.g., `mem.db`) not absolute ones (e.g., `~/.onetool/mem.db`).
+
+Use `resolve_ot_path()` when the file belongs to OneTool's active configuration/runtime directory:
+
+```python
+from ot.meta import resolve_ot_path
+
+db_path = resolve_ot_path("mem.db")              # <OT_DIR>/mem.db
+auth_key = resolve_ot_path("ide/auth.key")       # <OT_DIR>/ide/auth.key
+log_path = resolve_ot_path("logs/serve.log")     # <OT_DIR>/logs/serve.log
+```
+
+Use `resolve_cwd_path()` when the path is supplied by a caller or belongs to the user's project tree:
+
+```python
+from otpack import resolve_cwd_path
+
+source = resolve_cwd_path(user_path)             # user-supplied file path
+state = resolve_cwd_path(".onetool/state.yaml")  # project-local state
+output = resolve_cwd_path("reports/out.md")      # project artifact
+```
+
+Use `expand_path()` only when the path is intentionally outside both OneTool's OT_DIR and the project tree:
+
+```python
+from otpack import expand_path
+
+workbook = expand_path("~/Downloads/input.xlsx")
+```
+
+If a path is project-relative, do not use `expand_path()`. If a path is OneTool-owned, do not use `resolve_cwd_path()`.
+
+## Project State
+
+`otpack` provides `get_state(pack, key)` and `set_state(pack, key, value)` for small project-local runtime state, such as a selected IDE connection id.
+
+State is not OneTool config and is not read from `onetool.yaml`. It lives under the effective project working directory:
+
+```text
+<effective project cwd>/.onetool/state.yaml
+```
+
+Because this is project-relative data, resolve the default path with:
+
+```python
+from otpack import resolve_cwd_path
+
+state_path = resolve_cwd_path(".onetool/state.yaml")
+```
 
 ## Secrets
 
