@@ -149,11 +149,17 @@ def reload() -> str:
         import ot.prompts
         import ot.proxy
         import ot.registry
-        import otdev.tools.diagram
-        import otutil.tools._knowledge.retrieval
+        from ot.services import get_services, reset_services
         from ot.utils.cache import cache as _ot_cache
 
         # Clear in dependency order (config first, others depend on it)
+        reset_services()
+        ot.executor.tool_loader.reset()
+        ot.executor.tool_loader.load_tool_registry()
+        services = get_services()
+        services.run_reload_hooks()
+        reset_services()
+
         ot.config.reset()  # Clears both config and secrets
         ot.prompts.reset()
         _ot_cache.clear()  # Clears skills index and other TTL-cached data
@@ -161,8 +167,6 @@ def reload() -> str:
         ot.executor.tool_loader.reset()
         ot.executor.validator.reset()
         ot.executor.pack_proxy.reset()  # Releases stale namespace/proxy references
-        otdev.tools.diagram.reset_runtime_cache()
-        otutil.tools._knowledge.retrieval.reset_runtime_cache()
 
         # Clear param resolver cache
         ot.executor.param_resolver.get_tool_param_names.cache_clear()

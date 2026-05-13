@@ -6,6 +6,7 @@ import atexit
 import os
 import signal
 import warnings
+from datetime import UTC, datetime
 
 warnings.filterwarnings("ignore", message="builtin type.*has no __module__ attribute")
 from pathlib import Path
@@ -69,13 +70,24 @@ def _setup_signal_handlers() -> None:
         """Handle termination signals gracefully."""
         sig_name = signal.Signals(signum).name
         console.print(f"\nReceived {sig_name}, shutting down...")
-        # Use os._exit() for immediate termination - sys.exit() doesn't work
-        # well with asyncio event loops and can require multiple Ctrl+C presses
-        os._exit(0)
+        raise KeyboardInterrupt
 
     # Handle SIGINT (Ctrl+C) and SIGTERM
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
+
+
+def _write_startup_config_error(config: Path, error: Exception) -> None:
+    """Write pre-handshake config failures to the serve log location."""
+    log_dir = config.parent / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "serve.log"
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    with log_file.open("a", encoding="utf-8") as f:
+        f.write(
+            f"{timestamp} | ERROR  | cli | mcp.startup.config_error | "
+            f"config={config} | error={error}\n"
+        )
 
 
 app.add_typer(direct_app, name="direct", rich_help_panel="Direct")
@@ -381,7 +393,7 @@ def init_validate(
     validated: list[str] = []
 
     try:
-        get_config(config, secrets_path=secrets)
+        get_config(config, reload=True, secrets_path=secrets)
         validated.append(str(config))
     except Exception as e:
         errors.append(f"{config}: {e}")
@@ -603,7 +615,12 @@ def serve(
     # Load config (secrets threaded through load_config)
     from ot.config.loader import get_config
 
-    get_config(config, secrets_path=secrets)
+    try:
+        get_config(config, reload=True, secrets_path=secrets)
+    except Exception as e:
+        _write_startup_config_error(config, e)
+        console.print(f"[red]Error loading config:[/red] {e}")
+        raise typer.Exit(1) from e
 
     # Set up signal handlers for clean exit (before starting server)
     _setup_signal_handlers()

@@ -517,42 +517,34 @@ class McpServerConfig(BaseModel):
 
 
 class DirectHostConfig(BaseModel):
-    """Execution host optimization settings for `onetool direct`."""
+    """MCP-owned direct API settings for `onetool direct run`."""
 
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool = Field(
         default=False,
         strict=True,
-        description=(
-            "Enable execution host optimization. "
-            "When false, direct commands always execute in-process."
-        ),
+        description="Bind an authenticated loopback direct API from the MCP process.",
     )
     port: int = Field(
         default=8765,
         ge=1,
         le=65535,
         description=(
-            "Preferred host port. "
-            "Managed startup tries this port first, then increments until a free port is found."
+            "Preferred MCP direct API port. "
+            "MCP startup tries this port first, then increments until a free port is found."
         ),
-    )
-    timeout: int = Field(
-        default=120,
-        ge=1,
-        description="HTTP request timeout in seconds when routing to the execution host.",
     )
 
 
 class DirectConfig(BaseModel):
-    """Direct mode configuration for `onetool direct` commands."""
+    """Direct API configuration for MCP-owned direct execution."""
 
     model_config = ConfigDict(extra="forbid")
 
     host: DirectHostConfig = Field(
         default_factory=DirectHostConfig,
-        description="Execution host optimization settings for direct CLI commands.",
+        description="MCP-owned direct API settings.",
     )
 
 
@@ -621,7 +613,7 @@ class OneToolConfig(BaseModel):
 
     direct: DirectConfig = Field(
         default_factory=DirectConfig,
-        description="Direct mode configuration (execution server routing)",
+        description="MCP-owned direct API configuration",
     )
 
     tools: ToolsConfig = Field(

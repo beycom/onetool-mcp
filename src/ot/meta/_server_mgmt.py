@@ -70,7 +70,7 @@ def server(
         ot_servers.disable(name="github")     # disable + disconnect
         ot_servers.restart(name="playwright") # reconnect server
     """
-    from ottools.server import server as _server
+    from ot.meta._server_services import server as _server
 
     return _server(status=status)
 
@@ -97,6 +97,6 @@ def skills(
         ot.skills(name="ot-chrome-devtools-mcp")     # retrieve body
         ot.skills(info="full")                       # full info for each skill
     """
-    from ottools.skills import skills as _skills
+    from ot.meta._skills_services import skills as _skills
 
     return _skills(name=name, pattern=pattern, info=info)

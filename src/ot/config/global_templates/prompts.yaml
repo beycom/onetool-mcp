@@ -79,7 +79,6 @@ prompts:
     knowledge: "Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis"
     mem: "Persistent topic-based memory — write, search, grep, slice, and organise"
     ot_context: "Smart context store — ask, read, search, grep large tool responses without filling context window; format-aware toc/slice/query for json, yaml, and markdown"
-    ot_direct: "Manage the local HTTP execution host from within a tool session"
     ot_forge: "Scaffold and generate code from templates"
     ot_image: "Vision analysis via dedicated model — load images, ask questions, get summaries; zero tokens to host session"
     ot_llm: "Run any text through an LLM — summarise, extract, reformat, translate"

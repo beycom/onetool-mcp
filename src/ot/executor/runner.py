@@ -86,15 +86,15 @@ def _split_meta_wrapped_snippet(code: str) -> tuple[str, str] | None:
 
 
 def _apply_compact(text: str) -> str:
-    """Apply ot_caveman compaction to text. Returns original on any failure."""
+    """Apply registered compaction to text. Returns original on any failure."""
     try:
-        from ottools.ot_caveman import _compact_text
+        from ot.services import get_services
 
-        return _compact_text(text)
-    except ImportError:
-        logger.warning("ot_caveman not available for __compact__ — returning original output")
-        return text
+        return get_services().compact(text)
     except RuntimeError as e:
+        logger.warning("__compact__ failed: {} — returning original output", e)
+        return text
+    except Exception as e:
         logger.warning("__compact__ failed: {} — returning original output", e)
         return text
 
@@ -627,41 +627,25 @@ async def execute_command(
             config = get_config()
             max_size = config.output.max_inline_size
 
-            _no_deflect = (tool_name or "").startswith("ctx.") or tool_name in {
-                "ot.result",
-                "ot.help",
-                "ot.tool_info",
-            }
-            _no_sanitize = (tool_name or "").startswith("ide.")
-            if not _no_deflect:
+            from ot.services import get_services
+
+            output_policy = get_services().output_policy_for(tool_name)
+            if output_policy.allow_deflect:
                 result_size = len(text_result.encode("utf-8"))
                 if force_context or (max_size > 0 and result_size > max_size):
-                    # Store large output via ctx backend and return summary
-                    from ot.ctx.write import ctx_write
+                    from ot.executor.result_store import get_result_store
+
                     ctx_content = (
                         json.dumps(raw_result, indent=2, ensure_ascii=False)
                         if raw_result is not None and isinstance(raw_result, (dict, list))
                         else text_result
                     )
-                    write_result = ctx_write(ctx_content, source=stripped[:50], verbose=True)
-                    handle = write_result["handle"]
-                    content_type = write_result.get("content_type", "text")
-                    summary_dict = {
-                        "handle": handle,
-                        "total_lines": write_result["total_lines"],
-                        "size_bytes": write_result["size_bytes"],
-                        "content_type": content_type,
-                        "preview": write_result.get("preview", ""),
-                        "status": write_result.get("status", "pending"),
-                        "next_commands": [
-                            f"ctx.toc(handle='{handle}')",
-                            f"ctx.ask(handle='{handle}', q='What matters most here?')",
-                            f"ctx.read(handle='{handle}', limit=80)",
-                        ],
-                    }
+                    result_store = get_result_store()
+                    stored = result_store.store(ctx_content, tool=stripped[:50])
+                    summary_dict = result_store.format_store_response(stored)
                     text_result = serialize_result(summary_dict, "json")
                     raw_result = summary_dict
-                    span.add("storedHandle", handle)
+                    span.add("storedHandle", summary_dict.get("handle"))
                     span.add("storedSize", result_size)
 
             span.add("resultLength", len(text_result))
@@ -671,7 +655,7 @@ async def execute_command(
                 raw=raw_result,
                 executor="python",
                 success=True,
-                should_sanitize=sanitize and not _no_sanitize,
+                should_sanitize=sanitize and output_policy.allow_sanitize,
                 format=result_fmt,
             )
         except Exception as e:

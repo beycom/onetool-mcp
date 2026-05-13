@@ -1,8 +1,10 @@
-"""Unit tests for onetool direct start/restart wait behaviour."""
+"""Unit tests for MCP-owned direct API startup and auth configuration."""
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,77 +12,71 @@ import pytest
 
 @pytest.mark.unit
 @pytest.mark.core
-class TestDirectStart:
-    """_start_host() always calls _tcp_probe_wait — no --wait flag required."""
+def test_direct_auth_key_uses_mcp_direct_namespace() -> None:
+    """Direct API auth must use the dedicated config-scoped mcp-direct namespace."""
+    from ot.direct_auth import direct_auth_key
 
-    def test_start_calls_tcp_probe_wait(self, tmp_path: Path) -> None:
-        """_start_host invokes _tcp_probe_wait unconditionally."""
-        from onetool.cli_commands.direct_app import _start_host
+    with (
+        patch("ot.direct_auth.ensure_hmac_key", return_value=b"x" * 32) as mock_key,
+        patch("ot.meta.resolve_ot_path", return_value=Path("/tmp/project/.onetool")),
+    ):
+        assert direct_auth_key() == b"x" * 32
 
-        mock_proc = MagicMock()
-        mock_proc.pid = 12345
-
-        with (
-            patch("subprocess.Popen", return_value=mock_proc),
-            patch("onetool.cli_commands.direct_app._write_pid_file"),
-            patch("onetool.cli_commands.direct_app._tcp_probe_wait", return_value=True) as mock_wait,
-            patch("onetool.cli_commands.direct_app.err_console"),
-        ):
-            _start_host(None, None, 8765)
-            mock_wait.assert_called_once_with("127.0.0.1", 8765)
-
-    def test_start_exits_1_on_timeout(self, tmp_path: Path) -> None:
-        """_start_host raises Exit(1) if _tcp_probe_wait returns False."""
-        import typer
-        from onetool.cli_commands.direct_app import _start_host
-
-        mock_proc = MagicMock()
-        mock_proc.pid = 12345
-
-        with (
-            patch("subprocess.Popen", return_value=mock_proc),
-            patch("onetool.cli_commands.direct_app._write_pid_file"),
-            patch("onetool.cli_commands.direct_app._tcp_probe_wait", return_value=False),
-            patch("onetool.cli_commands.direct_app.err_console"),
-        ):
-            with pytest.raises(typer.Exit) as exc_info:
-                _start_host(None, None, 8765)
-            assert exc_info.value.exit_code == 1
-
-    def test_start_exits_0_when_ready(self, tmp_path: Path) -> None:
-        """_start_host returns normally (exit 0) when host becomes ready."""
-        from onetool.cli_commands.direct_app import _start_host
-
-        mock_proc = MagicMock()
-        mock_proc.pid = 12345
-
-        with (
-            patch("subprocess.Popen", return_value=mock_proc),
-            patch("onetool.cli_commands.direct_app._write_pid_file"),
-            patch("onetool.cli_commands.direct_app._tcp_probe_wait", return_value=True),
-            patch("onetool.cli_commands.direct_app.err_console"),
-        ):
-            # Should not raise
-            _start_host(None, None, 8765)
+    mock_key.assert_called_once_with("mcp-direct", base_dir=Path("/tmp/project/.onetool"))
 
 
 @pytest.mark.unit
 @pytest.mark.core
-class TestDirectRestart:
-    """direct_restart always waits via _start_host → _tcp_probe_wait."""
+def test_start_direct_api_skips_occupied_port() -> None:
+    """MCP direct API startup should try the next port when preferred is occupied."""
+    from ot import server
 
-    def test_restart_calls_tcp_probe_wait(self, tmp_path: Path) -> None:
-        """direct_restart invokes _tcp_probe_wait unconditionally."""
-        from onetool.cli_commands.direct_app import _start_host
+    fake_server = MagicMock()
+    fake_server.started = True
+    fake_thread = MagicMock()
+    fake_thread.is_alive.return_value = True
 
-        mock_proc = MagicMock()
-        mock_proc.pid = 99999
+    with (
+        patch.object(server, "_direct_candidate_ports", return_value=[8770, 8771]),
+        patch.object(server, "_tcp_port_bound", side_effect=[True, False]),
+        patch.object(server, "_direct_health_probe_once", return_value=True),
+        patch("uvicorn.Server", return_value=fake_server),
+        patch("threading.Thread", return_value=fake_thread),
+    ):
+        _, _, port = server._start_direct_api()
 
-        with (
-            patch("subprocess.Popen", return_value=mock_proc),
-            patch("onetool.cli_commands.direct_app._write_pid_file"),
-            patch("onetool.cli_commands.direct_app._tcp_probe_wait", return_value=True) as mock_wait,
-            patch("onetool.cli_commands.direct_app.err_console"),
-        ):
-            _start_host(None, None, 9000)
-            mock_wait.assert_called_once_with("127.0.0.1", 9000)
+    assert port == 8771
+    fake_thread.start.assert_called_once()
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_direct_api_failure_is_degraded_in_lifespan() -> None:
+    """MCP lifespan should continue when direct API startup fails."""
+    from ot import server
+
+    async def _run_lifespan() -> None:
+        async with server._lifespan(SimpleNamespace()):
+            pass
+
+    cfg = SimpleNamespace(
+        servers={},
+        prompts=[],
+        direct=SimpleNamespace(host=SimpleNamespace(enabled=True)),
+        stats=SimpleNamespace(enabled=False),
+    )
+
+    with (
+        patch.object(server, "_config", cfg),
+        patch.object(server, "get_proxy_manager", return_value=SimpleNamespace(
+            connect_background=lambda _servers: None,
+            servers={},
+            is_connecting=False,
+        )),
+        patch.object(server, "get_registry", return_value=SimpleNamespace(tools={})),
+        patch("ot.executor.tool_loader.load_tool_registry"),
+        patch.object(server, "_start_direct_api", side_effect=RuntimeError("boom")),
+        patch("ot.telemetry.ping"),
+        patch.object(server, "logger"),
+    ):
+        asyncio.run(_run_lifespan())
