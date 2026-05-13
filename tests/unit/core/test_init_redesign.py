@@ -489,3 +489,49 @@ def test_serve_missing_config_interactive_accepted_calls_ensure_ot_dir(tmp_path:
 
     assert mock_ensure.call_count == 1
     assert "Initialized" in result.output
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_signal_handler_interrupts_for_lifespan_cleanup() -> None:
+    """SIGTERM/SIGINT handlers should unwind instead of forcing process exit."""
+    import signal
+    from unittest.mock import patch
+
+    from onetool.cli import _setup_signal_handlers
+
+    handlers = {}
+
+    def capture_handler(signum: int, handler: object) -> None:
+        handlers[signum] = handler
+
+    with patch("signal.signal", side_effect=capture_handler):
+        _setup_signal_handlers()
+
+    assert signal.SIGINT in handlers
+    assert signal.SIGTERM in handlers
+    with pytest.raises(KeyboardInterrupt):
+        handlers[signal.SIGTERM](signal.SIGTERM, None)
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_serve_config_error_is_written_to_serve_log(tmp_path: Path) -> None:
+    """Pre-handshake config failures should leave a diagnostic in serve.log."""
+    from typer.testing import CliRunner
+
+    from onetool.cli import app
+
+    ot_dir = tmp_path / ".onetool"
+    ot_dir.mkdir()
+    config_path = ot_dir / "onetool.yaml"
+    config_path.write_text("version: 2\ndirect:\n  host:\n    port: 70000\n")
+
+    result = CliRunner().invoke(app, ["--config", str(config_path)])
+
+    assert result.exit_code == 1
+    assert "Error loading config" in result.output
+    log_text = (ot_dir / "logs" / "serve.log").read_text()
+    assert "mcp.startup.config_error" in log_text
+    assert str(config_path) in log_text
+    assert "70000" in log_text

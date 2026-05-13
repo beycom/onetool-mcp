@@ -32,6 +32,22 @@ The system SHALL load configuration from a YAML file using a standard resolution
 - **THEN** it SHALL prompt user to initialise (interactive mode)
 - **OR** exit with error message (non-interactive mode)
 
+### Requirement: Unknown Config Attributes
+
+The system SHALL ignore unrecognised configuration attributes and report them as warnings.
+
+#### Scenario: Unknown nested attribute
+- **GIVEN** `onetool.yaml` contains an unrecognised nested attribute
+- **WHEN** configuration is loaded
+- **THEN** the attribute SHALL be ignored
+- **AND** a warning SHALL identify the dotted config path
+- **AND** recognised sibling attributes SHALL still be applied
+
+#### Scenario: Invalid recognised attribute
+- **GIVEN** `onetool.yaml` contains a recognised attribute with an invalid value
+- **WHEN** configuration is loaded
+- **THEN** loading SHALL fail with a validation error
+
 ### Requirement: Config Include Fallback to Package Defaults
 
 The system SHALL treat the **config dir** as `config_path.parent` (the directory containing `onetool.yaml`) and resolve all relative include paths from that directory.

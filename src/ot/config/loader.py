@@ -26,8 +26,10 @@ from __future__ import annotations
 
 import os
 import threading
+import warnings
 from pathlib import Path
-from typing import Any, TypeVar, overload
+from types import UnionType
+from typing import Any, TypeVar, Union, get_args, get_origin, overload
 
 import yaml
 from loguru import logger
@@ -43,6 +45,88 @@ CURRENT_CONFIG_VERSION = 2
 MAX_INCLUDE_DEPTH = 5
 
 T = TypeVar("T", bound=BaseModel)
+
+
+def _is_model_type(annotation: Any) -> type[BaseModel] | None:
+    """Return the Pydantic model class for an annotation, if present."""
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        return annotation
+
+    origin = get_origin(annotation)
+    if origin in (Union, UnionType):
+        for arg in get_args(annotation):
+            model_type = _is_model_type(arg)
+            if model_type is not None:
+                return model_type
+
+    return None
+
+
+def _dict_value_model_type(annotation: Any) -> type[BaseModel] | None:
+    """Return the value model for dict-like annotations, if present."""
+    origin = get_origin(annotation)
+    if origin is not dict:
+        return None
+
+    args = get_args(annotation)
+    if len(args) != 2:
+        return None
+    return _is_model_type(args[1])
+
+
+def _strip_unknown_fields(
+    data: Any,
+    model_type: type[BaseModel],
+    path: str = "",
+) -> tuple[Any, list[str]]:
+    """Strip unknown fields for strict config models before validation.
+
+    Tool configuration intentionally allows arbitrary pack keys, so models with
+    ``extra="allow"`` are preserved as-is.
+    """
+    if not isinstance(data, dict):
+        return data, []
+
+    extra_mode = model_type.model_config.get("extra")
+    if extra_mode == "allow":
+        return data, []
+
+    cleaned: dict[str, Any] = {}
+    warnings_out: list[str] = []
+    fields = model_type.model_fields
+
+    for key, value in data.items():
+        key_path = f"{path}.{key}" if path else str(key)
+        field = fields.get(key)
+        if field is None:
+            warnings_out.append(f"Unrecognised config attribute ignored: {key_path}")
+            continue
+
+        nested_model = _is_model_type(field.annotation)
+        if nested_model is not None:
+            cleaned_value, nested_warnings = _strip_unknown_fields(
+                value, nested_model, key_path
+            )
+            cleaned[key] = cleaned_value
+            warnings_out.extend(nested_warnings)
+            continue
+
+        dict_value_model = _dict_value_model_type(field.annotation)
+        if dict_value_model is not None and isinstance(value, dict):
+            cleaned_dict: dict[str, Any] = {}
+            for item_key, item_value in value.items():
+                item_path = f"{key_path}.{item_key}"
+                cleaned_value, nested_warnings = _strip_unknown_fields(
+                    item_value, dict_value_model, item_path
+                )
+                cleaned_dict[item_key] = cleaned_value
+                warnings_out.extend(nested_warnings)
+            cleaned[key] = cleaned_dict
+            continue
+
+        cleaned[key] = value
+
+    return cleaned, warnings_out
 
 
 def _load_yaml_file(config_path: Path) -> dict[str, Any]:
@@ -352,6 +436,13 @@ def load_config(
     flattened_data = _flatten_arrays_recursive(merged_data)
 
     _validate_version(flattened_data)
+
+    flattened_data, unknown_warnings = _strip_unknown_fields(
+        flattened_data, OneToolConfig
+    )
+    for warning in unknown_warnings:
+        warnings.warn(warning, UserWarning, stacklevel=2)
+        logger.warning(warning)
 
     try:
         config = OneToolConfig.model_validate(flattened_data)
