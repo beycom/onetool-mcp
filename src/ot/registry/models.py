@@ -55,3 +55,11 @@ class ToolInfo(BaseModel):
         default=None,
         description="Dependencies from __ot_requires__ (cli and lib lists)",
     )
+
+
+class PackMetadata(BaseModel):
+    """Static metadata declared by a pack module."""
+
+    pack: str
+    aliases: tuple[str, ...] = Field(default_factory=tuple)
+    doc_slug: str | None = None

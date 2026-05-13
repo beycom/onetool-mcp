@@ -1103,9 +1103,9 @@ class TestCtxAsk:
         h = _write_handle(store, "The answer is 42.")
 
         mock_transform = MagicMock(return_value="42")
-        with patch("ottools.ot_llm.transform", mock_transform, create=True):
-            with patch.dict("sys.modules", {"ottools.ot_llm": MagicMock(transform=mock_transform)}):
-                result = ctx_ask(h, q="What is the answer?", store=store)
+        with patch("ot.services.get_services") as mock_services:
+            mock_services.return_value.llm_transform = mock_transform
+            result = ctx_ask(h, q="What is the answer?", store=store)
         # Either success (if ot_llm is importable) or ot_llm not installed error
         assert "handle" in result
 
@@ -1135,8 +1135,10 @@ class TestCtxAsk:
         store = _make_store(tmp_path)
         h = _write_handle(store, "Some content.")
 
-        # Ensure ottools.ot_llm is not importable
-        with patch.dict("sys.modules", {"ottools.ot_llm": None}):
+        with patch("ot.services.get_services") as mock_services:
+            mock_services.return_value.llm_transform.side_effect = RuntimeError(
+                "No LLM service registered"
+            )
             result = ctx_ask(h, q="Question?", store=store)
         assert "error" in result
-        assert "ot_llm" in result["error"].lower()
+        assert "llm service" in result["error"].lower()

@@ -32,6 +32,7 @@ class ToolRegistry:
         """
         self._tools_path = tools_path or Path("src/ottools")
         self._tools: dict[str, ToolInfo] = {}
+        self._pack_metadata: dict[str, Any] = {}
 
     @property
     def tools_path(self) -> Path:
@@ -42,6 +43,11 @@ class ToolRegistry:
     def tools(self) -> dict[str, ToolInfo]:
         """Return dictionary of registered tools by name."""
         return self._tools.copy()
+
+    @property
+    def pack_metadata(self) -> dict[str, Any]:
+        """Return static pack metadata by pack name."""
+        return self._pack_metadata.copy()
 
     def scan_files(self, files: list[Path]) -> list[ToolInfo]:
         """Scan specific Python files and register public functions.
@@ -55,6 +61,7 @@ class ToolRegistry:
         # Track previous state to detect changes
         previous_tools = dict(self._tools)
         self._tools.clear()
+        self._pack_metadata.clear()
 
         for py_file in files:
             if not py_file.exists():
@@ -64,6 +71,9 @@ class ToolRegistry:
                 continue
             try:
                 tools = self.parse_file(py_file)
+                metadata = self._extract_pack_metadata(py_file)
+                if metadata is not None:
+                    self._pack_metadata[metadata["pack"]] = metadata
                 for tool in tools:
                     if tool.name in self._tools:
                         logger.warning(
@@ -281,6 +291,39 @@ class ToolRegistry:
                         except (ValueError, TypeError):
                             return None
         return None
+
+    def _extract_pack_metadata(self, path: Path) -> dict[str, Any] | None:
+        """Extract pack aliases and doc slug from a module."""
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(path))
+        pack = self._extract_pack(tree)
+        if not pack:
+            return None
+
+        aliases: tuple[str, ...] = ()
+        doc_slug: str | None = None
+        for node in tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            for target in node.targets:
+                if not isinstance(target, ast.Name):
+                    continue
+                if target.id == "pack_aliases":
+                    try:
+                        value = ast.literal_eval(node.value)
+                    except (ValueError, TypeError):
+                        value = ()
+                    if isinstance(value, (tuple, list)):
+                        aliases = tuple(str(item) for item in value)
+                elif target.id == "doc_slug":
+                    try:
+                        value = ast.literal_eval(node.value)
+                    except (ValueError, TypeError):
+                        value = None
+                    if value is not None:
+                        doc_slug = str(value)
+
+        return {"pack": pack, "aliases": aliases, "doc_slug": doc_slug}
 
     def format_json(self) -> str:
         """Format registry as JSON for LLM context.

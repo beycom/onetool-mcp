@@ -79,6 +79,8 @@ class LoadedTools:
     extension_tools: list[ToolFileInfo] = field(
         default_factory=list
     )  # User extension tools (non-internal inprocess)
+    pack_aliases: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    doc_slugs: dict[str, str] = field(default_factory=dict)
 
 
 # Module cache: stores (LoadedTools, mtime_dict, last_validated) for each tools_dir
@@ -269,7 +271,7 @@ def _load_inprocess_tools(
     inprocess_tools: list[ToolFileInfo],
     packs: dict[str, dict[str, Any]],
     mtimes: dict[str, float],
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], dict[str, tuple[str, ...]], dict[str, str]]:
     """Load regular Python tools via importlib.
 
     Args:
@@ -281,6 +283,8 @@ def _load_inprocess_tools(
         Functions dict with loaded tools.
     """
     functions: dict[str, Any] = {}
+    pack_aliases: dict[str, tuple[str, ...]] = {}
+    doc_slugs: dict[str, str] = {}
 
     for tool_info in inprocess_tools:
         py_file = tool_info.path
@@ -299,6 +303,18 @@ def _load_inprocess_tools(
             spec.loader.exec_module(module)
 
             pack = getattr(module, "pack", None)
+            aliases = getattr(module, "pack_aliases", ())
+            if pack and aliases:
+                pack_aliases[pack] = tuple(str(alias) for alias in aliases)
+            doc_slug = getattr(module, "doc_slug", None)
+            if pack and doc_slug:
+                doc_slugs[pack] = str(doc_slug)
+
+            register_services = getattr(module, "register_services", None)
+            if callable(register_services):
+                from ot.services import get_services
+
+                register_services(get_services())
             if pack and pack in packs:
                 logger.warning(
                     f"Pack collision: '{pack}' already defined, "
@@ -324,7 +340,7 @@ def _load_inprocess_tools(
         except Exception as e:
             logger.warning(f"Failed to load tool module {py_file.stem}: {e}")
 
-    return functions
+    return functions, pack_aliases, doc_slugs
 
 
 def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
@@ -386,7 +402,9 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
     worker_funcs, worker_tools_list = _load_worker_tools(
         worker_tools, config_dict, secrets, packs, mtimes
     )
-    inprocess_funcs = _load_inprocess_tools(inprocess_tools, packs, mtimes)
+    inprocess_funcs, pack_aliases, doc_slugs = _load_inprocess_tools(
+        inprocess_tools, packs, mtimes
+    )
 
     functions = {**worker_funcs, **inprocess_funcs}
 
@@ -399,6 +417,8 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
         packs=packs,
         worker_tools=worker_tools_list,
         extension_tools=[t for t in inprocess_tools if not t.is_internal],
+        pack_aliases=pack_aliases,
+        doc_slugs=doc_slugs,
     )
     _cache_set(cache_key, (registry, mtimes, time.time()))
 
@@ -418,9 +438,15 @@ def _register_ot_pack(packs: dict[str, dict[str, Any]]) -> dict[str, Any]:
         Functions dict with ot.* entries.
     """
     from ot.meta import PACK_NAME, get_ot_pack_functions
+    from ot.services import OutputPolicy, get_services
 
     ot_functions = get_ot_pack_functions()
     packs[PACK_NAME] = ot_functions
+    get_services().register_output_policy(
+        lambda tool_name: OutputPolicy(allow_deflect=False)
+        if tool_name in {"ot.result", "ot.help", "ot.tool_info"}
+        else None
+    )
 
     # Build full function names
     return {f"{PACK_NAME}.{name}": func for name, func in ot_functions.items()}

@@ -376,18 +376,18 @@ def test_reload_clears_config() -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 def test_reload_resets_runtime_tool_caches() -> None:
-    """Verify ot.reload() resets runtime caches used by tool modules."""
+    """Verify ot.reload() invokes registered runtime cache hooks."""
     from ot.meta import reload
 
-    with (
-        patch("otdev.tools.diagram.reset_runtime_cache") as mock_diag_reset,
-        patch("otutil.tools._knowledge.retrieval.reset_runtime_cache") as mock_kb_reset,
-    ):
+    hook = MagicMock()
+    with patch("ot.executor.tool_loader.load_tool_registry") as mock_load:
+        from ot.services import get_services
+
+        mock_load.side_effect = lambda: get_services().register_reload_hook(hook)
         result = reload()
 
     assert "OK" in result
-    mock_diag_reset.assert_called_once_with()
-    mock_kb_reset.assert_called_once_with()
+    hook.assert_called_once_with()
 
 
 # ============================================================================

@@ -108,20 +108,17 @@ def ctx_ask(
             )
 
         try:
-            from ottools.ot_llm import transform as llm_transform
-        except ImportError:
-            err = (
-                "ot_llm is not installed. "
-                "Install the ot_llm pack and configure base_url and model to use ctx.ask."
-            )
-            s.add(error=err)
-            return {"handle": handle, "error": err}
+            from ot.services import get_services
 
-        try:
-            raw = llm_transform(data=content, prompt=prompt, model=model)
+            raw = get_services().llm_transform(data=content, prompt=prompt, model=model)
         except Exception as e:
             err_str = str(e)
-            if any(k in err_str.lower() for k in ("not configured", "api_key", "base_url")):
+            if "no llm service registered" in err_str.lower():
+                err = (
+                    "No LLM service is registered. "
+                    "Install and load an LLM-capable pack such as ot_llm to use ctx.ask."
+                )
+            elif any(k in err_str.lower() for k in ("not configured", "api_key", "base_url")):
                 err = (
                     "ot_llm is not configured. "
                     "Set ot_llm.base_url, ot_llm.model, and OPENAI_API_KEY in secrets.yaml. "

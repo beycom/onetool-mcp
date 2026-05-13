@@ -1,12 +1,11 @@
-"""Large output result store for OneTool — thin wrapper over the ctx pack.
-
-The ResultStore class provides a stable interface over the ctx flat-file backend.
-"""
+"""Backend-neutral large output result-store types and accessors."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+
+from ot.services import ResultStoreBackend, get_services
 
 
 @dataclass
@@ -19,6 +18,7 @@ class StoredResult:
     summary: str
     preview: str
     status: str = "ready"
+    content_type: str = "text"
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to summary dictionary for MCP response."""
@@ -29,6 +29,7 @@ class StoredResult:
             "summary": self.summary,
             "preview": self.preview,
             "status": self.status,
+            "content_type": self.content_type,
         }
 
 
@@ -44,6 +45,7 @@ class QueryResult:
     handle: str = ""
     limit: int = 100
     total_size_bytes: int = 0
+    next_query: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for MCP response."""
@@ -58,17 +60,26 @@ class QueryResult:
             "progress": f"lines {self.offset}-{end} of {self.total_lines} ({pct}%)",
             "total_size_bytes": self.total_size_bytes,
         }
-        if self.has_more and self.handle:
+        if self.next_query:
+            result["next_query"] = self.next_query
+        elif self.has_more and self.handle:
             next_offset = self.offset + self.returned
             result["next_query"] = (
-                f"ctx.read('{self.handle}', offset={next_offset}, limit={self.limit})"
+                f"ot.result(handle='{self.handle}', offset={next_offset}, limit={self.limit})"
             )
         return result
 
 
-@dataclass
 class ResultStore:
-    """Manages storage and retrieval of large tool outputs via the ctx backend."""
+    """Compatibility wrapper over the registered result-store backend."""
+
+    def _backend(self) -> ResultStoreBackend:
+        from ot.ctx.result_backend import CtxResultStoreBackend
+
+        backend = get_services().result_store_backend
+        if backend is not None and backend is not self:
+            return backend
+        return CtxResultStoreBackend()
 
     def store(
         self,
@@ -76,53 +87,9 @@ class ResultStore:
         *,
         tool: str = "",
         preview_lines: int | None = None,
-    ) -> StoredResult:
-        """Store large output via ctx backend.
-
-        Args:
-            content: The output content to store
-            tool: Name of the tool that generated this output
-            preview_lines: Number of preview lines (default from config)
-
-        Returns:
-            StoredResult with handle and summary
-        """
-        from ot.config import get_config
-        from ot.ctx.write import ctx_write
-
-        config_obj = get_config()
-        if preview_lines is None:
-            preview_lines = config_obj.output.preview_lines
-
-        write_result = ctx_write(content, source=tool)
-
-        handle = write_result["handle"]
-        total_lines = write_result["total_lines"]
-        size_bytes = write_result["size_bytes"]
-
-        # Build preview respecting preview_lines
-        lines = content.splitlines()
-        raw_preview = lines[:preview_lines]
-        preview_max_chars = config_obj.output.preview_max_chars
-        if preview_max_chars > 0:
-            preview_lines_truncated = [
-                line[:preview_max_chars] + "…" if len(line) > preview_max_chars else line
-                for line in raw_preview
-            ]
-        else:
-            preview_lines_truncated = raw_preview
-        preview = "\n".join(preview_lines_truncated)
-
-        summary = f"{total_lines} lines from {tool}" if tool else f"{total_lines} lines stored"
-
-        return StoredResult(
-            handle=handle,
-            total_lines=total_lines,
-            size_bytes=size_bytes,
-            summary=summary,
-            preview=preview,  # str
-            status=write_result.get("status", "pending"),
-        )
+    ) -> Any:
+        """Store content through the active backend."""
+        return self._backend().store(content, tool=tool, preview_lines=preview_lines)
 
     def query(
         self,
@@ -134,83 +101,33 @@ class ResultStore:
         fuzzy: bool = False,
         tail: int = 0,
         context: int = 0,
-    ) -> QueryResult:
-        """Query stored result via ctx backend.
-
-        Args:
-            handle: The result handle
-            offset: Starting line (1-indexed)
-            limit: Max lines to return
-            search: Regex pattern or fuzzy query
-            fuzzy: Use fuzzy matching
-            tail: Return last N lines
-            context: Context lines around search matches
-
-        Returns:
-            QueryResult with matching lines
-
-        Raises:
-            ValueError: If handle not found or expired
-        """
-        if search:
-            if fuzzy:
-                raise ValueError(
-                    "fuzzy=True is no longer supported; "
-                    "use ctx.ask() for natural-language queries or ctx.grep() for regex."
-                )
-            from ot.ctx.grep import ctx_grep
-            result = ctx_grep(handle, search, context=context)
-            if "error" in result:
-                raise ValueError(result["error"])
-            all_lines = result["content"].splitlines() if result["content"] else []
-            total = len(all_lines)
-            if tail > 0:
-                offset = max(1, total - tail + 1)
-                limit = tail
-            start = offset - 1
-            end = start + limit
-            chunk = all_lines[start:end]
-            return QueryResult(
-                content="\n".join(chunk),
-                total_lines=total,
-                returned=len(chunk),
-                offset=offset,
-                has_more=end < total,
-                handle=handle,
-                limit=limit,
-                total_size_bytes=0,
-            )
-
-        from ot.ctx.read import ctx_read
-        result = ctx_read(handle, offset=offset, limit=limit, tail=tail)
-        if "error" in result:
-            raise ValueError(result["error"])
-
-        return QueryResult(
-            content=result["content"],
-            total_lines=result["total_lines"],
-            returned=result["returned"],
-            offset=result["offset"],
-            has_more=result["has_more"],
-            handle=handle,
+    ) -> Any:
+        """Query content through the active backend."""
+        return self._backend().query(
+            handle,
+            offset=offset,
             limit=limit,
-            total_size_bytes=result.get("total_size_bytes", 0),
+            search=search,
+            fuzzy=fuzzy,
+            tail=tail,
+            context=context,
         )
 
     def cleanup(self) -> int:
-        """Delete expired entries from the ctx DB and compact it."""
-        from ot.ctx.maintenance import ctx_purge
-        result = ctx_purge()
-        return int(result.get("deleted", 0))
+        """Clean expired content through the active backend."""
+        return self._backend().cleanup()
+
+    def format_store_response(self, stored: Any) -> dict[str, Any]:
+        """Format stored-result metadata through the active backend."""
+        return self._backend().format_store_response(stored)
 
 
-# Global singleton instance
-_store: ResultStore | None = None
-
-
-def get_result_store() -> ResultStore:
-    """Get or create the global result store instance."""
-    global _store
-    if _store is None:
-        _store = ResultStore()
-    return _store
+def get_result_store() -> ResultStoreBackend:
+    """Return the registered result-store backend."""
+    backend = get_services().result_store_backend
+    if backend is None:
+        # ctx is the built-in result backend for large outputs. The dependency is
+        # isolated here so executor callers target the backend-neutral interface.
+        backend = ResultStore()
+        get_services().register_result_store(backend)
+    return backend

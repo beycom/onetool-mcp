@@ -263,7 +263,7 @@ content of a `json` or `yaml` handle and return the matched value.
 
 ### Requirement: Multi-question LLM Query
 
-The `ctx.ask()` function SHALL accept one or more questions about stored content, send them to `ot_llm` in a single call, and return structured question/answer pairs — mirroring the `img.ask` interface for text content.
+The `ctx.ask()` function SHALL accept one or more questions about stored content, send them to the configured LLM service in a single call, and return structured question/answer pairs — mirroring the `img.ask` interface for text content.
 
 #### Scenario: Single question string
 
@@ -273,20 +273,20 @@ The `ctx.ask()` function SHALL accept one or more questions about stored content
 #### Scenario: Batch questions list
 
 - **WHEN** `ctx.ask(h, q=["What is the recommended entry point?", "What are common mistakes?"])` is called
-- **THEN** it SHALL send both questions in a single `ot_llm` call
+- **THEN** it SHALL send both questions in a single LLM service call
 - **AND** return `{"handle": h, "result": [{"question": "...", "answer": "..."}, {"question": "...", "answer": "..."}]}`
 - **AND** the order of results SHALL match the order of questions provided
 
 #### Scenario: Model override
 
 - **WHEN** `ctx.ask(h, q="...", model="haiku")` is called
-- **THEN** it SHALL use the specified model for the `ot_llm` call
-- **AND** fall back to the `ot_llm` configured default if `model=None`
+- **THEN** it SHALL pass the specified model to the LLM service
+- **AND** fall back to the LLM service configured default if `model=None`
 
-#### Scenario: ot_llm not configured
+#### Scenario: LLM service not configured
 
-- **WHEN** `ctx.ask(h, q="...")` is called and `ot_llm` is not configured
-- **THEN** it SHALL return `{"handle": h, "error": "<message explaining ot_llm must be configured>"}`
+- **WHEN** `ctx.ask(h, q="...")` is called and no LLM service is configured
+- **THEN** it SHALL return `{"handle": h, "error": "<message explaining an LLM service must be configured>"}`
 - **AND** it SHALL NOT raise an unhandled exception
 
 #### Scenario: Unknown handle
