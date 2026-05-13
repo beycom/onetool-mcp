@@ -2,9 +2,12 @@
 # Run `just` to see available commands
 
 set dotenv-load := true
+set positional-arguments := true
 
 # Project-local OneTool config base
 ot_config := justfile_directory() + "/.onetool/onetool.yaml"
+ot_dir := justfile_directory() + "/.onetool"
+direct_port := "8765"
 
 # Default: show available commands
 default:
@@ -203,9 +206,23 @@ ot-inspector:
 [arg("v", long)]
 [arg("config", long)]
 ot v="" config="" *args:
-    {{ if v == "" { "uv run onetool" } else { "uvx --from onetool-mcp==" + v + " onetool" } }} \
-        --config {{ if config == "" { ot_config } else { config } }} \
-        {{ args }}
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shift 2
+    config_path={{ quote(if config == "" { ot_config } else { config }) }}
+    if [[ -z {{ quote(v) }} ]]; then
+        exec uv run onetool --config "$config_path" "$@"
+    fi
+    exec uvx --from {{ quote("onetool-mcp==" + v) }} onetool --config "$config_path" "$@"
+
+# Run a command through this repo's MCP-owned direct API
+ot-direct *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    exec uv run onetool --config {{ quote(ot_config) }} direct run \
+        --port {{ quote(direct_port) }} \
+        --ot-dir {{ quote(ot_dir) }} \
+        "$@"
 
 # Install as global uv tool
 ot-install:

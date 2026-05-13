@@ -54,6 +54,7 @@ just clean    # clean build artefacts and caches
 ```bash
 just ot [args]              # run local dev onetool
 just ot --v 1.0.0rc2 init   # run specific published version
+just ot-direct "ot.packs()" # run via repo-local direct API
 just ot-install             # install as global uv tool
 just ot-uninstall           # uninstall global tool
 just ot-list                # list global uv tools
