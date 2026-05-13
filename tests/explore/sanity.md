@@ -29,7 +29,7 @@ When testing:
 - convert with files at tests/data/
 - db with db at tests/data/northwind.db (25MB, download via `just test-setup`)
 - excel with files at tests/data/
-- ide: test read-only connection/state helpers (`ide.get_state()`, `ide.paths()`, `ide.workspace()`); if no IDE bridge is connected, note as environment gap.
+- ide: test read-only connection/state helpers (`ide.state()`, `ide.sel()`, `ide.workspace()`); if no IDE bridge is connected, note as environment gap.
 - mem: use `tmp/test/` topic prefix for all writes. Test write, read, list, search, toc, slice, snap/restore, stale/refresh, write_batch, read_batch, slice_batch, stats, export/load, update, delete, decay, context, flush. Clean up with `mem.delete(topic="tmp/", confirm=True)` when done.
 - diagram: list_providers, get_template, generate_source, render_diagram, get_playground_url
 - ot_caveman: compact and expand short inline text; do not use protected content as the primary assertion.

@@ -16,20 +16,17 @@ Read-only VS Code state retrieval through the local OneTool IDE Bridge extension
 | Function | Description |
 |----------|-------------|
 | `ide.connect(id)` | Select, validate, and persist the default VS Code connection |
-| `ide.state(id=None, include="all")` | Return validated structured IDE state |
-| `ide.get_state(id=None, include="all")` | Alias for `ide.state()` |
+| `ide.state(id=None)` | Return validated structured IDE state |
 | `ide.sel(id=None)` | Return the active selection as plain text |
 | `ide.file(id=None)` | Return active document metadata as plain text |
 | `ide.editor(id=None)` | Return active editor metadata and visible ranges as plain text |
 | `ide.workspace(id=None)` | Return workspace metadata as plain text |
-| `ide.paths(id=None)` | Return useful workspace/editor/selection paths as plain text |
 
 ## Key Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `id` | str | Optional connection id. Overrides the default from `ide.connect(id=...)` for one call. |
-| `include` | str or list | `"all"` or a list containing `connection`, `selection`, `active_editor`, and `workspace` |
 
 ## Requires
 
@@ -61,15 +58,22 @@ tools:
 # Select the default IDE connection once
 ide.connect(id="onetool-mcp")
 
-# Return all supported structured IDE state sections
+# Return the full structured IDE state snapshot
 ide.state()
 
 # Override the connection for one call
 ide.sel(id="docs")
-
-# Return only workspace metadata
-ide.state(include=["workspace"])
 ```
+
+Example `ide.sel()` output:
+
+```text
+"selected code" from "/repo/src/app.py"
+range: 0:0-2:10
+```
+
+For multiple selections, each selected text/range pair is returned as a separate
+block using the same format.
 
 Example state shape:
 
@@ -100,7 +104,8 @@ Example state shape:
         "start_line": 0,
         "start_character": 0,
         "end_line": 2,
-        "end_character": 10
+        "end_character": 10,
+        "text": "selected code"
       }
     ],
     "text": "selected code"

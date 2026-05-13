@@ -7,15 +7,13 @@ __all__ = [
     "connect",
     "editor",
     "file",
-    "get_state",
-    "paths",
     "sel",
     "state",
     "workspace",
 ]
 
 import json
-from typing import Any, Literal
+from typing import Any
 from urllib.parse import urljoin
 
 import httpx
@@ -43,10 +41,11 @@ def register_services(registry: object) -> None:
     from ot.services import OutputPolicy
 
     registry.register_output_policy(  # type: ignore[attr-defined]
-        lambda tool_name: OutputPolicy(allow_sanitize=False)
-        if tool_name.startswith("ide.")
-        else None
+        lambda tool_name: (
+            OutputPolicy(allow_sanitize=False) if tool_name.startswith("ide.") else None
+        )
     )
+
 
 from ot.utils import lazy_client
 
@@ -55,10 +54,6 @@ DEFAULT_PORT_START = 58764
 DEFAULT_PORT_COUNT = 10
 STATE_PACK = "ide"
 STATE_CONNECTION_ID = "connection_id"
-INCLUDE_VALUES = {"connection", "selection", "active_editor", "workspace"}
-
-IncludeName = Literal["connection", "selection", "active_editor", "workspace"]
-IncludeArg = Literal["all"] | list[IncludeName]
 DEFAULT_CONNECTION_ID: str | None = None
 DISCOVERED_BASE_URLS: dict[str, str] = {}
 _RESPONSE_NONCES = NonceCache()
@@ -89,6 +84,7 @@ class Config(BaseModel):
         le=30.0,
         description="Bridge request timeout in seconds.",
     )
+
 
 class IdeStateError(RuntimeError):
     """Raised when the IDE bridge or response contract is invalid."""
@@ -131,12 +127,13 @@ class ActiveEditor(BaseModel):
 
 
 class SelectionRange(BaseModel):
-    """One editor selection range."""
+    """One editor selection range and selected text."""
 
     start_line: int
     start_character: int
     end_line: int
     end_character: int
+    text: str
 
 
 class Selection(BaseModel):
@@ -202,24 +199,6 @@ def _scan_base_urls(cfg: Config) -> list[str]:
     ]
 
 
-def _validate_include(include: IncludeArg) -> set[IncludeName]:
-    """Validate requested sections and expand all."""
-    if include == "all":
-        return {"connection", "selection", "active_editor", "workspace"}
-    if not isinstance(include, list):
-        raise ValueError(
-            'include must be "all" or a list containing connection, selection, active_editor, workspace'
-        )
-
-    invalid = [item for item in include if item not in INCLUDE_VALUES]
-    if invalid:
-        accepted = ", ".join(sorted(INCLUDE_VALUES))
-        raise ValueError(
-            f"Invalid include value(s): {', '.join(invalid)}. Accepted values: all, {accepted}"
-        )
-    return set(include)
-
-
 def _auth_key() -> bytes:
     """Return the IDE bridge HMAC key."""
     from ot.meta import resolve_ot_path
@@ -229,7 +208,9 @@ def _auth_key() -> bytes:
 
 def _json_bytes(payload: object) -> bytes:
     """Return stable compact JSON bytes for bridge signing."""
-    return json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode(
+        "utf-8"
+    )
 
 
 def _signed_headers(
@@ -387,7 +368,11 @@ def _bridge_get_state(*, connection_id: str) -> BridgeResponse:
     except IdeStateError as exc:
         if _get_config().base_url:
             raise
-        if "authentication failed" not in str(exc) and "unavailable" not in str(exc) and "Unknown IDE connection" not in str(exc):
+        if (
+            "authentication failed" not in str(exc)
+            and "unavailable" not in str(exc)
+            and "Unknown IDE connection" not in str(exc)
+        ):
             raise
         DISCOVERED_BASE_URLS.pop(connection_id, None)
         base_url = _discover_base_url(connection_id=connection_id, force=True)
@@ -403,30 +388,25 @@ def _resolve_connection_id(id: str | None) -> str:
     stored = get_project_state(STATE_PACK, STATE_CONNECTION_ID)
     if isinstance(stored, str) and stored:
         return stored
-    raise IdeStateError("No IDE connection selected. Run ide.connect(id=...) or pass id=... to this call.")
+    raise IdeStateError(
+        "No IDE connection selected. Run ide.connect(id=...) or pass id=... to this call."
+    )
 
 
-def _filter_snapshot(
-    snapshot: Snapshot,
-    requested: set[IncludeName],
-) -> dict[str, Any]:
-    """Apply OneTool-side include filtering."""
-    result: dict[str, Any] = {}
-    if "connection" in requested:
-        result["connection"] = snapshot.connection.model_dump()
-    if "selection" in requested:
-        result["selection"] = (
+def _snapshot_dict(snapshot: Snapshot) -> dict[str, Any]:
+    """Return the full validated state snapshot."""
+    return {
+        "connection": snapshot.connection.model_dump(),
+        "selection": (
             snapshot.selection.model_dump() if snapshot.selection is not None else None
-        )
-    if "active_editor" in requested:
-        result["active_editor"] = (
+        ),
+        "active_editor": (
             snapshot.active_editor.model_dump()
             if snapshot.active_editor is not None
             else None
-        )
-    if "workspace" in requested:
-        result["workspace"] = snapshot.workspace.model_dump()
-    return result
+        ),
+        "workspace": snapshot.workspace.model_dump(),
+    }
 
 
 def _workspace_warning(snapshot: Snapshot) -> str | None:
@@ -461,22 +441,19 @@ def connect(*, id: str) -> dict[str, Any]:
         return response.snapshot.connection.model_dump()
 
 
-def state(*, id: str | None = None, include: IncludeArg = "all") -> dict[str, Any]:
+def state(*, id: str | None = None) -> dict[str, Any]:
     """Return read-only state from a VS Code IDE connection.
 
     Args:
         id: Optional connection id. Uses the default from `connect()` when omitted.
-        include: "all" or a list containing connection, selection, active_editor,
-            and workspace.
 
     Returns:
-        Validated IDE state snapshot filtered to requested sections.
+        Full validated IDE state snapshot.
     """
-    requested = _validate_include(include)
     connection_id = _resolve_connection_id(id)
-    with LogSpan(span="ide.state", connectionId=connection_id, include=include) as span:
+    with LogSpan(span="ide.state", connectionId=connection_id) as span:
         response = _bridge_get_state(connection_id=connection_id)
-        result = _filter_snapshot(response.snapshot, requested)
+        result = _snapshot_dict(response.snapshot)
         warning = _workspace_warning(response.snapshot)
         if warning is not None:
             result["warnings"] = [warning]
@@ -485,26 +462,25 @@ def state(*, id: str | None = None, include: IncludeArg = "all") -> dict[str, An
         return result
 
 
-def get_state(*, id: str | None = None, include: IncludeArg = "all") -> dict[str, Any]:
-    """Return read-only state from a VS Code IDE connection."""
-    return state(id=id, include=include)
-
-
 def sel(*, id: str | None = None) -> str:
     """Return the active editor selection state."""
-    selection = state(id=id, include=["selection"])["selection"]
+    selection = state(id=id)["selection"]
     if selection is None:
         return "No active selection."
-    ranges = ", ".join(
-        f"{item['start_line']}:{item['start_character']}-{item['end_line']}:{item['end_character']}"
-        for item in selection["ranges"]
-    )
-    return f"{selection['path']}\nRanges: {ranges}\n\n{selection['text']}"
+    ranges = selection["ranges"]
+    blocks = []
+    for item in ranges:
+        range_text = (
+            f"{item['start_line']}:{item['start_character']}-"
+            f"{item['end_line']}:{item['end_character']}"
+        )
+        blocks.append(f'"{item["text"]}" from "{selection["path"]}"\nrange: {range_text}')
+    return "\n\n".join(blocks)
 
 
 def file(*, id: str | None = None) -> str:
     """Return the active editor document metadata."""
-    active_editor = state(id=id, include=["active_editor"])["active_editor"]
+    active_editor = state(id=id)["active_editor"]
     if active_editor is None:
         return "No active editor."
     document = active_editor["document"]
@@ -514,12 +490,12 @@ def file(*, id: str | None = None) -> str:
     if document["untitled"]:
         flags.append("untitled")
     suffix = f" ({', '.join(flags)})" if flags else ""
-    return f"{document['path']}{suffix}"
+    return f'"{document["path"]}"{suffix}'
 
 
 def editor(*, id: str | None = None) -> str:
     """Return active editor metadata and visible ranges."""
-    active_editor = state(id=id, include=["active_editor"])["active_editor"]
+    active_editor = state(id=id)["active_editor"]
     if active_editor is None:
         return "No active editor."
     document = active_editor["document"]
@@ -527,28 +503,14 @@ def editor(*, id: str | None = None) -> str:
         f"{item['start_line']}-{item['end_line']}"
         for item in active_editor["visible_ranges"]
     )
-    return f"{document['path']}\nVisible ranges: {ranges or 'none'}"
+    return f'"{document["path"]}", visible ranges: {ranges or "none"}'
 
 
 def workspace(*, id: str | None = None) -> str:
     """Return VS Code workspace metadata."""
-    workspace_state = state(id=id, include=["workspace"])["workspace"]
-    lines = [workspace_state["name"] or "Unnamed workspace"]
-    if workspace_state["workspace_file"]:
-        lines.append(f"Workspace file: {workspace_state['workspace_file']}")
-    lines.extend(workspace_state["workspace_folders"])
-    return "\n".join(lines)
-
-
-def paths(*, id: str | None = None) -> str:
-    """Return useful paths from the current IDE state."""
-    snapshot = state(id=id, include=["workspace", "active_editor", "selection"])
-    result: list[str] = []
-    result.extend(snapshot["workspace"]["workspace_folders"])
-    active_editor = snapshot["active_editor"]
-    if active_editor is not None:
-        result.append(active_editor["document"]["path"])
-    selection = snapshot["selection"]
-    if selection is not None:
-        result.append(selection["path"])
-    return "\n".join(dict.fromkeys(result))
+    workspace_state = state(id=id)["workspace"]
+    name = workspace_state["name"] or "Unnamed workspace"
+    folders = ", ".join(
+        f'"{folder}"' for folder in workspace_state["workspace_folders"]
+    )
+    return f"{name} at {folders or 'no workspace folder'}"

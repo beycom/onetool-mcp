@@ -51,8 +51,10 @@ ide.sel()
 ide.file()
 ide.editor()
 ide.workspace()
-ide.paths()
 ```
+
+`ide.sel()` returns each selection as selected text from the quoted file path
+followed by its range. Multiple selections are returned as separate blocks.
 
 To copy the connection id, run **OneTool IDE: Show or Copy Connection ID** or click the status bar item.
 
@@ -64,6 +66,7 @@ The extension exposes these VS Code settings:
 |---------|---------|-------------|
 | `onetoolIde.portStart` | `58764` | First loopback HTTP port to try for the bridge. |
 | `onetoolIde.portCount` | `10` | Number of loopback HTTP ports to try. |
+| `onetoolIde.otDir` | `""` | OneTool directory containing the shared IDE auth key. Leave blank to use `~/.onetool`. |
 
 The OneTool side uses the same defaults:
 

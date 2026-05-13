@@ -30,6 +30,7 @@ export interface Snapshot {
       start_character: number;
       end_line: number;
       end_character: number;
+      text: string;
     }>;
     text: string;
   } | null;
@@ -82,6 +83,7 @@ export function buildSnapshot(connectionId: string): Snapshot {
             start_character: selectionRange.start.character,
             end_line: selectionRange.end.line,
             end_character: selectionRange.end.character,
+            text: editor.document.getText(selectionRange),
           })),
           text: nonEmptySelections.map((selectionRange) => editor.document.getText(selectionRange)).join("\n"),
         }

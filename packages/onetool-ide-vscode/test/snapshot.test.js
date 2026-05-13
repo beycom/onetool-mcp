@@ -63,6 +63,7 @@ assert.deepEqual(snapshot.selection.ranges, [
     start_character: 2,
     end_line: 2,
     end_character: 3,
+    text: "selected code",
   },
 ]);
 assert.equal(snapshot.selection.text, "selected code");

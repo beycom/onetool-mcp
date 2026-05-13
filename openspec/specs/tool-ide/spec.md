@@ -31,39 +31,34 @@ The system SHALL expose `ide.connect(id=...)` to select a user-facing VS Code co
 - **AND** the stored default SHALL remain `main`
 
 ### Requirement: IDE state tool contract
-The system SHALL expose `ide.state()` and `ide.get_state()` in the `[dev]` surface to retrieve read-only structured IDE state.
+The system SHALL expose `ide.state()` in the `[dev]` surface to retrieve read-only structured IDE state.
 
-#### Scenario: Default include behavior
-- **WHEN** `ide.state(id="ot1")` is called without `include`
-- **THEN** the tool SHALL behave as `include="all"`
-
-#### Scenario: Explicit include list
-- **WHEN** `ide.state(id="ot1", include=["selection", "active_editor"])` is called
-- **THEN** the tool SHALL return only the requested sections from the validated state snapshot
+#### Scenario: Full state snapshot
+- **WHEN** `ide.state(id="ot1")` is called
+- **THEN** the tool SHALL return `connection`, `selection`, `active_editor`, and `workspace` from the validated state snapshot
 
 #### Scenario: Structured state is not externally wrapped
-- **WHEN** callers use `ide.state()` or `ide.get_state()`
+- **WHEN** callers use `ide.state()`
 - **THEN** the tool SHALL return structured IDE state that is not wrapped in external-content boundaries
 
 #### Scenario: Focused state helpers
-- **WHEN** callers use `ide.sel()`, `ide.file()`, `ide.editor()`, `ide.workspace()`, or `ide.paths()`
+- **WHEN** callers use `ide.sel()`, `ide.file()`, `ide.editor()`, or `ide.workspace()`
 - **THEN** each helper SHALL use the same default/override connection resolution as `ide.state()`
 - **AND** each helper SHALL return concise plain text that is not wrapped in external-content boundaries
 
-### Requirement: Include validation and grouping
-The system SHALL accept only `"all"` or a list of `connection`, `selection`, `active_editor`, and `workspace` for `ide.state(include=...)`.
+#### Scenario: Selection helper format
+- **WHEN** `ide.sel(id="ot1")` is called with an active selection
+- **THEN** selected text SHALL be returned from the quoted file path followed by its range
+- **AND** multiple selections SHALL be returned as separate selected-text/range blocks in order
+- **AND** selected text SHALL NOT be truncated
 
-#### Scenario: Include all expands to all supported sections
-- **WHEN** `ide.state(id="ot1", include="all")` is called
-- **THEN** the response SHALL include `connection`, `selection`, `active_editor`, and `workspace`
+#### Scenario: File helper format
+- **WHEN** `ide.file(id="ot1")` is called with an active editor
+- **THEN** the tool SHALL return the active file path quoted
 
-#### Scenario: Workspace include covers workspace metadata
-- **WHEN** `ide.state(id="ot1", include=["workspace"])` is called
-- **THEN** the response SHALL include grouped `workspace.name`, `workspace.workspace_folders`, and `workspace.workspace_file`
-
-#### Scenario: Invalid include value rejected
-- **WHEN** `ide.state(id="ot1", include=["selection", "diagnostics"])` is called
-- **THEN** the tool SHALL fail with a validation error listing the accepted include values
+#### Scenario: Workspace helper format
+- **WHEN** `ide.workspace(id="ot1")` is called for a workspace with multiple folders
+- **THEN** the tool SHALL return the workspace name followed by all workspace folders as comma-separated quoted paths
 
 ### Requirement: Bridge discovery and routing
 The system SHALL route IDE state requests to a specific VS Code connection using a user-facing connection id discovered over loopback.
@@ -145,6 +140,7 @@ The system SHALL normalize the bridge response to a grouped snapshot shape conta
 - **AND** `workspace` SHALL include `name`, `workspace_folders`, and `workspace_file`
 - **AND** `active_editor` SHALL include `visible_ranges` and `document.path`, `document.dirty`, and `document.untitled`
 - **AND** `selection` SHALL include `path`, `ranges`, and `text`
+- **AND** each `selection.ranges` entry SHALL include start/end coordinates and that range's selected `text`
 
 #### Scenario: Absent singular values normalize to null
 - **WHEN** the IDE has no active text editor or no active editor selection
@@ -164,6 +160,7 @@ The system SHALL represent the active editor selection with path, ranges, and se
 #### Scenario: Multiple selections returned in order
 - **WHEN** there are multiple active text selections in the editor
 - **THEN** `selection.ranges` SHALL preserve those ranges in editor order
+- **AND** each `selection.ranges` entry SHALL preserve its own selected text
 - **AND** `selection.text` SHALL concatenate the selected text fragments in the same order
 
 #### Scenario: No active selection

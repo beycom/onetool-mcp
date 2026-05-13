@@ -48,10 +48,17 @@ Module._load = function load(request, parent, isMain) {
 };
 
 const { activate, deactivate } = require("../dist/extension");
+const packageJson = require("../package.json");
 
 (async () => {
   assert.equal(writtenText, undefined);
   assert.equal(statusMessage, undefined);
+  assert.deepEqual(packageJson.contributes.configuration.properties["onetoolIde.otDir"], {
+    type: "string",
+    default: "",
+    description:
+      "OneTool directory containing the shared IDE auth key. Relative paths resolve from the first workspace folder. Leave blank to use ~/.onetool.",
+  });
 
   const context = { subscriptions: [] };
   await activate(context);

@@ -2,7 +2,7 @@
   "name": "onetool-ide-vscode",
   "displayName": "OneTool IDE Bridge",
   "publisher": "beycom",
-  "version": "1.0.0-dev.20260513011439",
+  "version": "1.0.0-dev.20260513221341",
   "description": "VS Code IDE integration for OneTool MCP.",
   "license": "GPL-3.0",
   "icon": "assets/logo.png",

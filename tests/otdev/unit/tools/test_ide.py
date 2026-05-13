@@ -14,14 +14,17 @@ OTHER_CONNECTION_ID = "lib"
 BASE_URL = "http://127.0.0.1:58764/"
 
 
-def _snapshot(connection_id: str = CONNECTION_ID) -> dict[str, object]:
+def _snapshot(
+    connection_id: str = CONNECTION_ID,
+    workspace_folders: list[str] | None = None,
+) -> dict[str, object]:
     return {
         "protocol_version": 1,
         "snapshot": {
             "connection": {"id": connection_id},
             "workspace": {
                 "name": "onetool-mcp",
-                "workspace_folders": ["/repo"],
+                "workspace_folders": workspace_folders or ["/repo"],
                 "workspace_file": None,
             },
             "active_editor": {
@@ -40,12 +43,14 @@ def _snapshot(connection_id: str = CONNECTION_ID) -> dict[str, object]:
                         "start_character": 0,
                         "end_line": 0,
                         "end_character": 5,
+                        "text": "first",
                     },
                     {
                         "start_line": 2,
                         "start_character": 1,
                         "end_line": 2,
                         "end_character": 4,
+                        "text": "second",
                     },
                 ],
                 "text": "first\nsecond",
@@ -91,20 +96,22 @@ class TestIdePack:
             "connect",
             "editor",
             "file",
-            "get_state",
-            "paths",
             "sel",
             "state",
             "workspace",
         ]
         assert not hasattr(ide, "context")
+        assert not hasattr(ide, "get_state")
+        assert not hasattr(ide, "paths")
 
     def test_auth_key_uses_config_scoped_base_dir(self, tmp_path: Path) -> None:
         from otdev.tools import ide
 
         config_dir = tmp_path / ".onetool"
         with (
-            patch("otdev.tools.ide.ensure_hmac_key", return_value=b"x" * 32) as ensure_key,
+            patch(
+                "otdev.tools.ide.ensure_hmac_key", return_value=b"x" * 32
+            ) as ensure_key,
             patch("ot.meta.resolve_ot_path", return_value=config_dir),
         ):
             assert ide._auth_key() == b"x" * 32
@@ -195,7 +202,8 @@ class TestIdePack:
 
         _, kwargs = client.post.call_args
         assert json.loads(kwargs["content"])["connection_id"] == OTHER_CONNECTION_ID
-        assert "first\nsecond" in result
+        assert '"first" from "/repo/src/app.py"' in result
+        assert '"second" from "/repo/src/app.py"' in result
         set_project_state.assert_not_called()
 
     def test_missing_default_failure(self) -> None:
@@ -222,7 +230,7 @@ class TestIdePack:
         ):
             state(id=CONNECTION_ID)
 
-    def test_include_filtering_and_workspace_grouping(self) -> None:
+    def test_state_returns_all_sections(self) -> None:
         from otdev.tools import ide
 
         client = Mock()
@@ -235,25 +243,7 @@ class TestIdePack:
             patch("otdev.tools.ide._get_http_client", return_value=client),
             patch("otdev.tools.ide.get_effective_cwd", return_value=Path("/repo")),
         ):
-            result = ide.state(id=CONNECTION_ID, include=["workspace"])
-
-        assert set(result) == {"workspace"}
-        assert result["workspace"]["workspace_folders"] == ["/repo"]
-
-    def test_include_all_returns_all_sections(self) -> None:
-        from otdev.tools import ide
-
-        client = Mock()
-        client.post.return_value = _mock_response(200, _snapshot())
-
-        with (
-            patch("otdev.tools.ide._discover_base_url", return_value=BASE_URL),
-            patch("otdev.tools.ide._verify_response"),
-            patch("otdev.tools.ide._signed_headers", return_value={}),
-            patch("otdev.tools.ide._get_http_client", return_value=client),
-            patch("otdev.tools.ide.get_effective_cwd", return_value=Path("/repo")),
-        ):
-            result = ide.get_state(id=CONNECTION_ID, include="all")
+            result = ide.state(id=CONNECTION_ID)
 
         assert set(result) == {
             "connection",
@@ -261,12 +251,7 @@ class TestIdePack:
             "active_editor",
             "workspace",
         }
-
-    def test_invalid_include_rejected(self) -> None:
-        from otdev.tools import ide
-
-        with pytest.raises(ValueError, match="Accepted values"):
-            ide.state(id=CONNECTION_ID, include=["selection", "diagnostics"])  # type: ignore[list-item]
+        assert result["workspace"]["workspace_folders"] == ["/repo"]
 
     def test_absent_nullable_state_normalizes(self) -> None:
         from otdev.tools import ide
@@ -310,13 +295,36 @@ class TestIdePack:
             patch("otdev.tools.ide._get_http_client", return_value=client),
             patch("otdev.tools.ide.get_effective_cwd", return_value=Path("/repo")),
         ):
-            assert ide.file(id=CONNECTION_ID) == "/repo/src/app.py (dirty)"
-            assert "Visible ranges: 0-40" in ide.editor(id=CONNECTION_ID)
-            assert ide.workspace(id=CONNECTION_ID).splitlines()[0] == "onetool-mcp"
-            assert ide.paths(id=CONNECTION_ID).splitlines() == [
-                "/repo",
-                "/repo/src/app.py",
-            ]
+            assert ide.file(id=CONNECTION_ID) == '"/repo/src/app.py" (dirty)'
+            assert (
+                ide.editor(id=CONNECTION_ID)
+                == '"/repo/src/app.py", visible ranges: 0-40'
+            )
+            assert ide.workspace(id=CONNECTION_ID) == 'onetool-mcp at "/repo"'
+            assert ide.sel(id=CONNECTION_ID) == (
+                '"first" from "/repo/src/app.py"\n'
+                "range: 0:0-0:5\n\n"
+                '"second" from "/repo/src/app.py"\n'
+                "range: 2:1-2:4"
+            )
+
+    def test_workspace_helper_lists_multiple_folders(self) -> None:
+        from otdev.tools import ide
+
+        client = Mock()
+        client.post.return_value = _mock_response(
+            200,
+            _snapshot(workspace_folders=["/repo", "/lib"]),
+        )
+
+        with (
+            patch("otdev.tools.ide._discover_base_url", return_value=BASE_URL),
+            patch("otdev.tools.ide._verify_response"),
+            patch("otdev.tools.ide._signed_headers", return_value={}),
+            patch("otdev.tools.ide._get_http_client", return_value=client),
+            patch("otdev.tools.ide.get_effective_cwd", return_value=Path("/repo")),
+        ):
+            assert ide.workspace(id=CONNECTION_ID) == 'onetool-mcp at "/repo", "/lib"'
 
     def test_workspace_mismatch_warns_but_state_remains(self) -> None:
         from otdev.tools import ide
@@ -454,9 +462,15 @@ class TestIdePack:
         with (
             patch(
                 "otdev.tools.ide._request_state",
-                side_effect=[ide.IdeStateError("IDE bridge authentication failed"), parsed],
+                side_effect=[
+                    ide.IdeStateError("IDE bridge authentication failed"),
+                    parsed,
+                ],
             ),
-            patch("otdev.tools.ide._discover_base_url", side_effect=[BASE_URL, "http://127.0.0.1:58765/"]),
+            patch(
+                "otdev.tools.ide._discover_base_url",
+                side_effect=[BASE_URL, "http://127.0.0.1:58765/"],
+            ),
         ):
             result = ide._bridge_get_state(connection_id=CONNECTION_ID)
 
@@ -473,5 +487,7 @@ class TestIdePack:
     def test_explicit_base_url_overrides_discovery(self) -> None:
         from otdev.tools import ide
 
-        with patch("otdev.tools.ide._get_config", return_value=ide.Config(base_url=BASE_URL)):
+        with patch(
+            "otdev.tools.ide._get_config", return_value=ide.Config(base_url=BASE_URL)
+        ):
             assert ide._discover_base_url(connection_id=CONNECTION_ID) == BASE_URL
