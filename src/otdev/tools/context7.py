@@ -11,6 +11,7 @@ from __future__ import annotations
 
 # Pack for dot notation: context7.search(), context7.doc()
 pack = "context7"
+pack_aliases = ("c7",)
 
 __all__ = ["doc", "search"]
 

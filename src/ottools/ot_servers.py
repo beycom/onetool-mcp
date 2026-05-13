@@ -13,6 +13,7 @@ from ottools.server import restart as _restart
 from ottools.server import status as _status
 
 pack = "ot_servers"
+pack_aliases = ("srv",)
 
 __all__ = ["disable", "enable", "restart", "status"]
 

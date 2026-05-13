@@ -22,8 +22,14 @@ from __future__ import annotations
 
 # Pack for dot notation: ot_llm.transform()
 pack = "ot_llm"
+pack_aliases = ("llm",)
 
 __all__ = ["transform", "transform_file"]
+
+
+def register_services(registry: object) -> None:
+    """Register ot_llm as the default LLM transform service."""
+    registry.register_llm(transform)  # type: ignore[attr-defined]
 
 # Dependency declarations for CLI validation
 __ot_requires__ = {

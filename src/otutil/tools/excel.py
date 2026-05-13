@@ -10,6 +10,7 @@ from __future__ import annotations
 
 # Pack for dot notation: excel.create(), excel.read(), etc.
 pack = "excel"
+pack_aliases = ("xls",)
 
 __all__ = [
     "add_sheet",

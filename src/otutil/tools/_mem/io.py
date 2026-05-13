@@ -109,7 +109,7 @@ def _export_yaml(rows: list[tuple]) -> str:
     return "\n".join(lines)
 
 
-def index(
+def load(
     *,
     file: str,
 ) -> str:
@@ -124,9 +124,9 @@ def index(
         Import summary.
 
     Example:
-        mem.index(file="memories.yaml")
+        mem.load(file="memories.yaml")
     """
-    with LogSpan(span="mem.index", file=file) as s:
+    with LogSpan(span="mem.load", file=file) as s:
         try:
             try:
                 import yaml
@@ -212,4 +212,4 @@ def index(
             return f"Error importing memories: {e}"
 
 
-__all__ = ["_export_yaml", "export", "index"]
+__all__ = ["_export_yaml", "export", "load"]

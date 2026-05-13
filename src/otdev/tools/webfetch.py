@@ -10,6 +10,8 @@ from __future__ import annotations
 
 # Pack for dot notation: webfetch.fetch(), webfetch.fetch_batch()
 pack = "webfetch"
+pack_aliases = ("wf",)
+doc_slug = "web-fetch"
 
 __all__ = ["fetch", "fetch_batch"]
 

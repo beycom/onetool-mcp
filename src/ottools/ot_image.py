@@ -20,6 +20,7 @@ from __future__ import annotations
 # Pack name for dot notation: ot_image.load(), ot_image.ask(), etc.
 # Must appear before other imports.
 pack = "ot_image"
+pack_aliases = ("img",)
 
 __all__ = ["ask", "clip_ask", "clip_view", "delete", "list", "load", "load_batch", "purge", "summary"]
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 # Pack declaration MUST be before other imports
 pack = "whiteboard"
+pack_aliases = ("wb",)
 
 __all__ = [
     "align",
@@ -1300,6 +1301,26 @@ def note(*, input: str, background: str = _NOTE_DEFAULT_BG) -> str:
             y_cursor += h + 20
 
         inserted = len(shape_payloads)
+        if inserted:
+            state = _session.load()
+            shapes = state["shapes"]
+            max_y = float(state.get("canvas_max_y", 60.0))
+            for payload in shape_payloads:
+                shapes[payload["id"]] = {
+                    "label": payload["label"],
+                    "classes": [],
+                    "shape": payload["shape"],
+                    "style": payload["styleProps"],
+                }
+                max_y = max(max_y, float(payload["y"]) + float(payload["h"]))
+            _session.save({
+                "shapes": shapes,
+                "edges": state["edges"],
+                "groups": state["groups"],
+                "edge_keys": state["edge_keys"],
+                "canvas_max_y": max_y,
+            })
+
         for payload in shape_payloads:
             _js_batch_draw(shapes=[payload], edges=[], subgraphs=[])
 

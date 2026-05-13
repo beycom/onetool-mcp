@@ -11,6 +11,8 @@ from __future__ import annotations
 
 # Pack for dot notation: brave.search(), brave.news(), etc.
 pack = "brave"
+pack_aliases = ("br",)
+doc_slug = "brave-search"
 
 __all__ = ["image", "news", "search", "search_batch", "video"]
 

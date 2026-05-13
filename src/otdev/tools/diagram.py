@@ -16,6 +16,7 @@ from __future__ import annotations
 
 # Pack for dot notation: diagram.generate_source(), diagram.render(), etc.
 pack = "diagram"
+pack_aliases = ("diag",)
 
 __all__ = [
     "batch_render",
@@ -30,6 +31,11 @@ __all__ = [
     "render_diagram",
     "render_directory",
 ]
+
+
+def register_services(registry: object) -> None:
+    """Register diagram runtime cache reset hook."""
+    registry.register_reload_hook(reset_runtime_cache)  # type: ignore[attr-defined]
 
 import base64
 import re

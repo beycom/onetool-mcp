@@ -138,6 +138,11 @@ defaults to beige (`#f5f5dc`).
 - **WHEN** a `note` block with paragraph text is provided
 - **THEN** word-wrapped text (default 60 chars) SHALL appear on canvas
 
+#### Scenario: Note persists in session state
+- **WHEN** `whiteboard.note(input="n1[note:\nhello\n]")` is called
+- **THEN** element `n1` SHALL be stored in the session state
+- **AND** `whiteboard.erase(ids=["n1"])` SHALL remove it by ID
+
 #### Scenario: Unknown block type
 - **WHEN** a block type not in `{table, tree, seq, timeline, note}` is used
 - **THEN** an error string naming the unsupported type SHALL be returned

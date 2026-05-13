@@ -9,6 +9,7 @@ For Playwright, use the ``play_util`` pack instead.
 from __future__ import annotations
 
 pack = "chrome_util"
+pack_aliases = ("chrome",)
 
 __all__ = [
     "clear_annotations",

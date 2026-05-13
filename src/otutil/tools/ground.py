@@ -9,6 +9,8 @@ from __future__ import annotations
 
 # Pack for dot notation: ground.search(), ground.dev(), etc.
 pack = "ground"
+pack_aliases = ("g",)
+doc_slug = "grounding-search"
 
 __all__ = ["dev", "docs", "reddit", "search", "search_batch"]
 

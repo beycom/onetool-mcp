@@ -26,9 +26,9 @@ __all__ = [
     "export",
     "flush",
     "grep",
-    "index",
     "inspect",
     "list",
+    "load",
     "query",
     "read",
     "read_batch",
@@ -62,7 +62,7 @@ from .config import VALID_CATEGORIES, Config
 from .db import _close_connection, _get_connection  # noqa: F401
 from .formatting import stale
 from .inspect import inspect
-from .io import export, index
+from .io import export, load
 from .lifecycle import decay, flush, reindex, stats
 from .listing import count, list
 from .maintenance import context, update_batch

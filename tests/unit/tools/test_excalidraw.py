@@ -1243,6 +1243,28 @@ class TestNoteToolParsing:
         assert shapes[0]["id"] == "t"
         assert shapes[0]["styleProps"]["fontFamily"] == 3  # code font
 
+    def test_note_persists_shape_so_erase_can_remove_it(self, tmp_path: Any) -> None:
+        from otdev.tools import excalidraw
+        from otdev.tools._excalidraw import session as _sess
+
+        _reset_exc_state()
+
+        with (
+            patch.object(_sess, "_whiteboard_dir", return_value=tmp_path),
+            patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+            patch("otdev.tools.excalidraw._js_batch_draw"),
+        ):
+            result = excalidraw.note(input="n1[note:\nSanity note\n]")
+            state = _sess.load()
+            erase_result = excalidraw.erase(ids=["n1"])
+            after = _sess.load()
+
+        assert result == "inserted 1 note(s)"
+        assert "n1" in state["shapes"]
+        assert state["shapes"]["n1"]["label"] == "Sanity note"
+        assert erase_result == "erased 1 element(s)"
+        assert "n1" not in after["shapes"]
+
     def test_note_multiblock_draws_each_block_separately(self) -> None:
         """note() with multiple blocks calls _js_batch_draw once per block.
 

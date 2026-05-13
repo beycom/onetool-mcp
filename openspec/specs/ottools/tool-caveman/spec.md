@@ -156,7 +156,7 @@ The `ot_caveman` pack SHALL declare `openai` and `tiktoken` in `__ot_requires__[
 
 ### Requirement: ot_caveman pack is registered with short alias cm
 
-The `ot_caveman` pack SHALL be accessible as `cm` in the execution namespace (via `PACK_SHORT_NAMES`) so that `cm.compact(...)`, `cm.expand(...)`, and `cm.input(...)` all work.
+The `ot_caveman` pack SHALL declare the metadata alias `cm` so that `cm.compact(...)`, `cm.expand(...)`, and `cm.input(...)` all work.
 
 #### Scenario: Short alias resolves to ot_caveman pack
 - **WHEN** `cm.compact(text="hello")` is called in the onetool executor

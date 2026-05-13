@@ -20,6 +20,7 @@ from typing import Any
 from otpack import LogSpan
 
 pack = "ot_timer"
+pack_aliases = ("tmr",)
 
 __all__ = ["clear", "elapsed", "list", "start"]
 

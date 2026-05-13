@@ -17,6 +17,7 @@ from __future__ import annotations
 
 # Pack for dot notation: tavily.search(), tavily.extract(), etc.
 pack = "tavily"
+pack_aliases = ("tav",)
 
 __all__ = ["extract", "extract_batch", "research", "search", "search_batch"]
 

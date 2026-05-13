@@ -41,10 +41,10 @@ Persistent memory for AI agents with SQLite storage and optional semantic search
 | `mem.update_batch(search_text, replace_text, ...)` | Batch search-and-replace (recomputes toc if sections exist) |
 | `mem.decay(dry_run)` | Apply importance decay (never increases relevance) |
 | `mem.stats()` | Show statistics |
-| `mem.index(topic, ...)` | Backfill embeddings for un-embedded memories (scoped) |
 | `mem.reindex(...)` | Reindex all un-embedded memories |
 | `mem.flush()` | Wait for background embeddings to complete |
 | `mem.export(topic, output)` | Export to YAML |
+| `mem.load(file)` | Import YAML exported by `mem.export()` |
 | `mem.snap(output, topic, ext, on_conflict)` | Snapshot memories to directory with index.yaml |
 | `mem.restore(input, topic, overwrite)` | Restore memories from snap directory |
 | `mem.stale(topic)` | Check which file-backed memories are outdated |
@@ -175,6 +175,12 @@ Returns a numbered section index with line ranges. Warns if the source file has 
 | `input` | str | Input directory path containing index.yaml (required) |
 | `topic` | str | Override base topic (remaps topic prefix) |
 | `overwrite` | bool | Overwrite existing memories with same topic+hash (default: False) |
+
+### `mem.load()`
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `file` | str | YAML file produced by `mem.export(output=...)` |
 
 ### `mem.stale()`
 
@@ -313,6 +319,9 @@ mem.context(topic="projects/onetool/", limit=10)
 # Export backup
 mem.export(output="memories.yaml")
 
+# Load exported backup
+mem.load(file="memories.yaml")
+
 # Snapshot to directory (one file per memory + index.yaml)
 mem.snap(output="backup/consult", topic="consult/")
 
@@ -437,8 +446,8 @@ To backfill embeddings for existing memories:
 
 ```python
 mem.reindex()                                  # Backfill all un-embedded memories
-mem.index(topic="projects/", dry_run=True)     # Preview scoped backfill
-mem.index(topic="projects/", dry_run=False)    # Run scoped backfill
+mem.reindex(topic="projects/", dry_run=True)   # Preview scoped backfill
+mem.reindex(topic="projects/", dry_run=False)  # Run scoped backfill
 ```
 
 When embeddings are disabled, `mem.search(mode="semantic")` and `mem.search(mode="hybrid")` return a helpful message. Pattern search always works regardless of embedding state.

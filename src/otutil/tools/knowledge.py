@@ -10,6 +10,7 @@ from __future__ import annotations
 
 # Pack name for dot notation: kb.search(), kb.index(), etc.
 pack = "knowledge"
+pack_aliases = ("kb",)
 
 __all__ = [
     "append",
@@ -28,6 +29,13 @@ __all__ = [
     "update",
     "write",
 ]
+
+
+def register_services(registry: object) -> None:
+    """Register knowledge runtime cache reset hook."""
+    from otutil.tools._knowledge.retrieval import reset_runtime_cache
+
+    registry.register_reload_hook(reset_runtime_cache)  # type: ignore[attr-defined]
 
 # Dependency declarations for CLI validation
 __ot_requires__ = {

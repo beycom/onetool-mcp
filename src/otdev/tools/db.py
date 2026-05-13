@@ -24,6 +24,7 @@ from __future__ import annotations
 
 # Pack for dot notation: db.tables(), db.schema(), db.query()
 pack = "db"
+doc_slug = "database"
 
 __all__ = ["query", "sample", "schema", "tables"]
 
@@ -508,4 +509,3 @@ def _convert_query_results_to_json(
             truncated = True
 
     return rows_data, row_count, truncated
-

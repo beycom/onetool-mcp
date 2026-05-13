@@ -9,6 +9,7 @@ For Chrome DevTools, use the ``chrome_util`` pack instead.
 from __future__ import annotations
 
 pack = "play_util"
+pack_aliases = ("play",)
 
 __all__ = [
     "clear_annotations",

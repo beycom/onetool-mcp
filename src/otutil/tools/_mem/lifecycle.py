@@ -196,7 +196,7 @@ def reindex(
 ) -> str:
     """Backfill or update vector embeddings for memories missing them.
 
-    Use after enabling embeddings_enabled or after mem.index() to generate
+    Use after enabling embeddings_enabled or after mem.load() to generate
     embeddings for imported records.
 
     Args:

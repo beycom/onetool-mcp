@@ -1271,14 +1271,14 @@ class TestExport:
 
 @pytest.mark.unit
 @pytest.mark.tools
-class TestIndex:
-    """Test mem.index() YAML import."""
+class TestLoad:
+    """Test mem.load() YAML import."""
 
     @pytest.mark.usefixtures("_mock_cwd")
     def test_file_not_found(self, tmp_path):
-        from otutil.tools.mem import index
+        from otutil.tools.mem import load
 
-        result = index(file=str(tmp_path / "nonexistent.yaml"))
+        result = load(file=str(tmp_path / "nonexistent.yaml"))
         assert "Error" in result
         assert "not found" in result.lower()
 
@@ -1286,7 +1286,7 @@ class TestIndex:
     @patch("otutil.tools._mem.io._maybe_embed")
     @patch("otutil.tools._mem.io._use_connection")
     def test_imports_from_yaml(self, mock_conn, mock_embed, tmp_path):
-        from otutil.tools.mem import index
+        from otutil.tools.mem import load
 
         mock_embed.return_value = None
         conn = MagicMock()
@@ -1303,9 +1303,86 @@ class TestIndex:
             '    relevance: 7\n'
         )
 
-        result = index(file=str(yaml_file))
+        result = load(file=str(yaml_file))
 
         assert "Imported 1 memories" in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestLoadExport:
+    """Test mem.load() export surface."""
+
+    def test_load_is_exported(self) -> None:
+        from otutil.tools import mem
+
+        assert "load" in mem.__all__
+        assert callable(mem.load)
+
+    @pytest.mark.usefixtures("_mock_cwd")
+    @patch("otutil.tools._mem.io._maybe_embed")
+    @patch("otutil.tools._mem.io._use_connection")
+    def test_load_imports_export_yaml_and_restores_meta(self, mock_conn, mock_embed, tmp_path):
+        from otutil.tools.mem import load
+
+        mock_embed.return_value = None
+        conn = MagicMock()
+        mock_conn.return_value.__enter__.return_value = conn
+        conn.execute.return_value.fetchone.return_value = None
+
+        yaml_file = tmp_path / "memories.yaml"
+        yaml_file.write_text(
+            'memories:\n'
+            '  - id: "mem-1"\n'
+            '    topic: "test/topic"\n'
+            '    content: |-\n'
+            '      imported content\n'
+            '    category: "note"\n'
+            '    tags: ["imported"]\n'
+            '    relevance: 7\n'
+            '    access_count: 2\n'
+            '    created_at: "2026-05-13 00:00:00"\n'
+            '    updated_at: "2026-05-13 00:00:00"\n'
+            '    meta: \'{"sections": "Intro:1-2"}\'\n'
+        )
+
+        result = load(file=str(yaml_file))
+
+        assert "Imported 1 memories" in result
+        insert_calls = [c for c in conn.execute.call_args_list if "INSERT" in str(c)]
+        assert len(insert_calls) == 1
+        params = insert_calls[0][0][1]
+        assert params[0] == "mem-1"
+        assert params[1] == "test/topic"
+        assert params[4] == "note"
+        assert params[5] == '["imported"]'
+        assert params[6] == 7
+        assert params[8] == '{"sections": "Intro:1-2"}'
+
+    @pytest.mark.usefixtures("_mock_cwd")
+    @patch("otutil.tools._mem.io._maybe_embed")
+    @patch("otutil.tools._mem.io._use_connection")
+    def test_load_skips_duplicates(self, mock_conn, mock_embed, tmp_path):
+        from otutil.tools.mem import load
+
+        mock_embed.return_value = None
+        conn = MagicMock()
+        mock_conn.return_value.__enter__.return_value = conn
+        conn.execute.return_value.fetchone.return_value = ("existing-id",)
+
+        yaml_file = tmp_path / "memories.yaml"
+        yaml_file.write_text(
+            'memories:\n'
+            '  - topic: "test/topic"\n'
+            '    content: "imported content"\n'
+            '    category: "note"\n'
+        )
+
+        result = load(file=str(yaml_file))
+
+        assert "Imported 0 memories, skipped 1 duplicates" in result
+        insert_calls = [c for c in conn.execute.call_args_list if "INSERT" in str(c)]
+        assert insert_calls == []
 
 
 @pytest.mark.unit
@@ -1832,10 +1909,10 @@ class TestFilePathSecurity:
         assert "Error" in result
         assert "outside allowed directories" in result
 
-    def test_index_rejects_path_outside_cwd(self):
-        from otutil.tools.mem import index
+    def test_load_rejects_path_outside_cwd(self):
+        from otutil.tools.mem import load
 
-        result = index(file="/etc/shadow")
+        result = load(file="/etc/shadow")
 
         assert "Error" in result
         assert "not found" in result.lower() or "outside allowed" in result

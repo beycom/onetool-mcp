@@ -18,8 +18,14 @@ from __future__ import annotations
 # Pack name for dot notation: cm.compact(), cm.expand(), cm.input()
 # Must appear before other imports.
 pack = "ot_caveman"
+pack_aliases = ("cm",)
 
 __all__ = ["compact", "expand", "input"]
+
+
+def register_services(registry: object) -> None:
+    """Register caveman as the default output compaction service."""
+    registry.register_compaction(_compact_text)  # type: ignore[attr-defined]
 
 # Dependency declarations for CLI validation
 __ot_requires__ = {

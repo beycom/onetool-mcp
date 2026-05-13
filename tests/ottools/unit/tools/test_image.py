@@ -1321,9 +1321,9 @@ class TestLifecycle:
 @pytest.mark.unit
 @pytest.mark.tools
 class TestPackConstants:
-    """Verify image is registered in PACK_SHORT_NAMES."""
+    """Verify image declares metadata aliases."""
 
     def test_image_short_alias(self) -> None:
-        from ot.meta._constants import PACK_SHORT_NAMES
+        import ottools.ot_image as image
 
-        assert PACK_SHORT_NAMES.get("ot_image") == "img"
+        assert image.pack_aliases == ("img",)

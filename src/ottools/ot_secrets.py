@@ -17,6 +17,7 @@ from otpack import LogSpan
 
 # Pack for dot notation: ot_secrets.init(), ot_secrets.encrypt(), etc.
 pack = "ot_secrets"
+pack_aliases = ("sec",)
 
 __all__ = ["audit", "encrypt", "init", "rotate", "status"]
 

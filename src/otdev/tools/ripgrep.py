@@ -11,6 +11,7 @@ from __future__ import annotations
 
 # Pack for dot notation: ripgrep.search(), ripgrep.count(), etc.
 pack = "ripgrep"
+pack_aliases = ("rg",)
 
 __all__ = ["count", "files", "search", "types"]
 

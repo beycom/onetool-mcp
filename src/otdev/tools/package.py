@@ -11,6 +11,7 @@ from __future__ import annotations
 
 # Pack for dot notation: package.version(), package.npm(), etc.
 pack = "package"
+pack_aliases = ("pkg",)
 
 __all__ = ["audit", "models", "npm", "pypi", "version"]
 

@@ -147,7 +147,7 @@ whiteboard.help()
 
 ### `note(input, background)`
 
-Insert ASCII-rendered text annotations below any existing diagram content.
+Insert ASCII-rendered text annotations below any existing diagram content. Notes are stored in session state and can be removed with `whiteboard.erase(ids=[...])` using the note block ID.
 
 ```python
 whiteboard.note(input="""
@@ -424,7 +424,7 @@ content...
 ]
 ```
 
-One or more blocks per call. Each becomes a code-font rectangle placed below the diagram.
+One or more blocks per call. Each becomes a code-font rectangle placed below the diagram and is addressable by its block ID.
 
 ### `table` — CSV grid
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 # Pack for dot notation: convert.pdf(), convert.word(), etc.
 pack = "convert"
+pack_aliases = ("cv",)
 
 __all__ = ["auto", "excel", "pdf", "powerpoint", "word"]
 

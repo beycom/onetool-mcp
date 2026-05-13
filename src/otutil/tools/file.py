@@ -22,6 +22,7 @@ from __future__ import annotations
 from typing import List  # noqa: UP035
 
 pack = "file"
+pack_aliases = ("f",)
 
 __all__ = [
     "copy",

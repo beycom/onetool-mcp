@@ -16,6 +16,7 @@ from ot.paths import get_config_dir
 
 # Pack for dot notation: ot_forge.create_ext(), ot_forge.validate_ext(), ot_forge.install_skills()
 pack = "ot_forge"
+pack_aliases = ("forge",)
 
 __all__ = ["create_ext", "install_skills", "validate_ext"]
 
