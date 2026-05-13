@@ -17,14 +17,26 @@ def test_ensure_hmac_key_creates_and_reuses_key(tmp_path: Path, monkeypatch: pyt
 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
-    first = auth.ensure_hmac_key("ide")
-    second = auth.ensure_hmac_key("ide")
+    first = auth.ensure_hmac_key("bridge")
+    second = auth.ensure_hmac_key("bridge")
 
     assert len(first) == 32
     assert second == first
-    path = tmp_path / ".onetool" / "ide" / "auth.key"
+    path = tmp_path / ".onetool" / "bridge" / "auth.key"
     assert base64.b64decode(path.read_text().strip()) == first
     assert stat.S_IMODE(path.stat().st_mode) & 0o077 == 0
+
+
+@pytest.mark.unit
+@pytest.mark.pkg
+def test_ensure_hmac_key_accepts_base_dir(tmp_path: Path) -> None:
+    """ensure_hmac_key can store keys under a caller-selected root."""
+    import otpack.auth as auth
+
+    key = auth.ensure_hmac_key("bridge", base_dir=tmp_path / "keys")
+
+    path = tmp_path / "keys" / "bridge" / "auth.key"
+    assert base64.b64decode(path.read_text().strip()) == key
 
 
 @pytest.mark.unit
@@ -146,3 +158,31 @@ def test_nonce_cache_rejects_replay() -> None:
 
     with pytest.raises(HmacAuthError, match="Replayed OneTool auth nonce"):
         cache.check("nonce", now=1001)
+
+
+@pytest.mark.unit
+@pytest.mark.pkg
+def test_nonce_cache_discards_oldest_when_max_entries_reached() -> None:
+    """NonceCache remains bounded after TTL cleanup."""
+    from otpack.auth import HmacAuthError, NonceCache
+
+    cache = NonceCache(ttl_seconds=60, max_entries=2)
+    cache.check("one", now=1000)
+    cache.check("two", now=1001)
+    cache.check("three", now=1002)
+
+    cache.check("one", now=1003)
+    with pytest.raises(HmacAuthError, match="Replayed OneTool auth nonce"):
+        cache.check("one", now=1003)
+    with pytest.raises(HmacAuthError, match="Replayed OneTool auth nonce"):
+        cache.check("three", now=1003)
+
+
+@pytest.mark.unit
+@pytest.mark.pkg
+def test_nonce_cache_rejects_invalid_max_entries() -> None:
+    """NonceCache requires a positive bound."""
+    from otpack.auth import NonceCache
+
+    with pytest.raises(ValueError, match="max_entries"):
+        NonceCache(max_entries=0)

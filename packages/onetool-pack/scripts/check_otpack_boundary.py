@@ -17,6 +17,9 @@ import sys
 from pathlib import Path
 
 
+FORBIDDEN_ROOTS = ("ot", "ottools", "otutil", "otdev")
+
+
 def get_ot_imports(tree: ast.Module) -> list[tuple[int, str]]:
     """Find all top-level ot.* imports in an AST.
 
@@ -39,17 +42,21 @@ def get_ot_imports(tree: ast.Module) -> list[tuple[int, str]]:
 
 
 def _is_ot_import(node: ast.stmt) -> tuple[bool, str]:
-    """Check if a statement is an ot.* import.
+    """Check if a statement imports OneTool runtime packages.
 
     Returns (is_ot_import, repr_string).
     """
     if isinstance(node, ast.Import):
         for alias in node.names:
-            if alias.name == "ot" or alias.name.startswith("ot."):
+            if alias.name in FORBIDDEN_ROOTS or alias.name.startswith(
+                tuple(f"{root}." for root in FORBIDDEN_ROOTS)
+            ):
                 return True, f"import {alias.name}"
     elif isinstance(node, ast.ImportFrom):
         module = node.module or ""
-        if module == "ot" or module.startswith("ot."):
+        if module in FORBIDDEN_ROOTS or module.startswith(
+            tuple(f"{root}." for root in FORBIDDEN_ROOTS)
+        ):
             names = ", ".join(a.name for a in node.names)
             return True, f"from {module} import {names}"
     return False, ""
@@ -106,7 +113,8 @@ def check_file(path: Path, *, allow_ot_imports: bool) -> list[str]:
     if allow_ot_imports:
         # These files may have ot.* imports, but only inside try/except
         # The get_ot_imports function already handles this
-        pass
+        for line_no, repr_str in get_ot_imports(tree):
+            errors.append(f"{path}:{line_no}: forbidden bare ot.* import: {repr_str}")
     else:
         # No ot.* imports allowed at all
         for node in ast.walk(tree):

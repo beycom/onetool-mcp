@@ -385,6 +385,11 @@ The SDK paths module SHALL provide convenience wrappers for common resolution pa
 - **WHEN** `resolve_cwd_path("output.txt")` is called
 - **THEN** it SHALL be equivalent to `resolve_path("output.txt", base="CWD")`
 
+#### Scenario: resolve_cwd_path for project-local state
+- **GIVEN** project-local runtime state belongs under the effective project working directory
+- **WHEN** `otpack` resolves the default state file path
+- **THEN** it SHALL use `resolve_cwd_path(".onetool/state.yaml")`
+
 #### Scenario: resolve_ot_path for config assets
 - **GIVEN** a path for config or logs
 - **WHEN** `resolve_ot_path("logs/app.log")` is called

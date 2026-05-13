@@ -17,9 +17,9 @@ Example:
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Any, Literal, TypedDict, TypeVar
 
 if TYPE_CHECKING:

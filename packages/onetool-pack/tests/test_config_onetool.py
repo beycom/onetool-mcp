@@ -24,6 +24,8 @@ def test_get_tool_config_delegates_to_ot_config() -> None:
         mock_ot_config.get_tool_config = MagicMock(return_value=fake_config)
 
         import sys
+        original_ot = sys.modules.get("ot")
+        original_ot_config = sys.modules.get("ot.config")
 
         sys.modules["ot"] = MagicMock()
         sys.modules["ot.config"] = mock_ot_config
@@ -40,12 +42,18 @@ def test_get_tool_config_delegates_to_ot_config() -> None:
             with patch.object(
                 mock_ot_config, "get_tool_config", return_value=fake_config
             ) as ot_mock:
-                result = cfg.get_tool_config("brave", FakeConfig)
+                result = cfg.get_tool_config("sample_pack", FakeConfig)
                 # The result should come from the ot.config delegation
                 assert result is not None
         finally:
-            sys.modules.pop("ot", None)
-            sys.modules.pop("ot.config", None)
+            if original_ot is None:
+                sys.modules.pop("ot", None)
+            else:
+                sys.modules["ot"] = original_ot
+            if original_ot_config is None:
+                sys.modules.pop("ot.config", None)
+            else:
+                sys.modules["ot.config"] = original_ot_config
 
 
 @pytest.mark.unit
@@ -57,6 +65,9 @@ def test_get_secret_delegates_to_ot_config() -> None:
     mock_secrets = MagicMock()
     mock_secrets.get_secret = MagicMock(return_value="test-api-key")
 
+    original_ot = sys.modules.get("ot")
+    original_ot_config = sys.modules.get("ot.config")
+    original_secrets = sys.modules.get("ot.config.secrets")
     sys.modules["ot"] = MagicMock()
     sys.modules["ot.config"] = MagicMock()
     sys.modules["ot.config.secrets"] = mock_secrets
@@ -71,9 +82,18 @@ def test_get_secret_delegates_to_ot_config() -> None:
         result = cfg.get_secret("MY_API_KEY")
         mock_secrets.get_secret.assert_called_once_with("MY_API_KEY")
     finally:
-        sys.modules.pop("ot", None)
-        sys.modules.pop("ot.config", None)
-        sys.modules.pop("ot.config.secrets", None)
+        if original_ot is None:
+            sys.modules.pop("ot", None)
+        else:
+            sys.modules["ot"] = original_ot
+        if original_ot_config is None:
+            sys.modules.pop("ot.config", None)
+        else:
+            sys.modules["ot.config"] = original_ot_config
+        if original_secrets is None:
+            sys.modules.pop("ot.config.secrets", None)
+        else:
+            sys.modules["ot.config.secrets"] = original_secrets
         import importlib
 
         import otpack.config as cfg

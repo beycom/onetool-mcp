@@ -33,13 +33,17 @@ class HmacAuthError(ValueError):
 class NonceCache:
     """Small in-memory nonce replay cache."""
 
-    def __init__(self, *, ttl_seconds: float = 60.0) -> None:
+    def __init__(self, *, ttl_seconds: float = 60.0, max_entries: int = 4096) -> None:
         """Create a nonce cache.
 
         Args:
             ttl_seconds: How long nonces remain invalid for replay.
+            max_entries: Maximum nonces retained after TTL cleanup.
         """
+        if max_entries < 1:
+            raise ValueError("NonceCache max_entries must be at least 1")
         self.ttl_seconds = ttl_seconds
+        self.max_entries = max_entries
         self._seen: dict[str, float] = {}
 
     def check(self, nonce: str, *, now: float | None = None) -> None:
@@ -56,17 +60,22 @@ class NonceCache:
         if nonce in self._seen:
             raise HmacAuthError("Replayed OneTool auth nonce")
         self._seen[nonce] = current
+        if len(self._seen) > self.max_entries:
+            oldest = min(self._seen, key=self._seen.__getitem__)
+            self._seen.pop(oldest, None)
 
 
-def ensure_hmac_key(namespace: str) -> bytes:
+def ensure_hmac_key(namespace: str, *, base_dir: Path | None = None) -> bytes:
     """Read or create the local HMAC key for a namespace.
 
-    Keys are stored at ``~/.onetool/<namespace>/auth.key``.
+    Keys are stored at ``<base_dir>/<namespace>/auth.key``. When ``base_dir``
+    is omitted, the OneTool default ``~/.onetool`` is used.
     """
     if not namespace or "/" in namespace or "\\" in namespace:
         raise ValueError("HMAC key namespace must be a simple name")
 
-    path = Path.home() / ".onetool" / namespace / "auth.key"
+    root = Path.home() / ".onetool" if base_dir is None else base_dir
+    path = root / namespace / "auth.key"
     if path.exists():
         return _decode_key(path.read_text().strip())
 

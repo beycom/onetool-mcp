@@ -9,7 +9,7 @@ Defines the `knowledge` pack (`kb` short alias), a retrieval-augmented knowledge
 ## Requirements
 
 ### Requirement: Pack registration and short alias
-The `knowledge` pack SHALL be registered in the tool loader and available under the short alias `kb` via `PACK_SHORT_NAMES`.
+The `knowledge` pack SHALL be registered in the tool loader and available under the metadata-declared short alias `kb`.
 
 #### Scenario: Short alias resolves to pack
 - **WHEN** a user calls `kb.search(...)` in the execution namespace
