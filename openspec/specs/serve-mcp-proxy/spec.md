@@ -12,7 +12,8 @@ The system SHALL manage proxy MCP server connections through the server lifecycl
 #### Scenario: Startup connection
 - **GIVEN** servers configured in onetool.yaml
 - **WHEN** the OneTool server starts
-- **THEN** it SHALL connect to all enabled MCP servers before accepting requests
+- **THEN** it SHALL begin connecting to all enabled MCP servers
+- **AND** readiness/status surfaces SHALL distinguish proxy servers that are connected, connecting, or failed
 
 #### Scenario: Startup connection failure
 - **GIVEN** an MCP server that fails to connect
@@ -29,7 +30,8 @@ The system SHALL manage proxy MCP server connections through the server lifecycl
 #### Scenario: Parallel connection
 - **GIVEN** multiple MCP servers configured
 - **WHEN** the OneTool server starts
-- **THEN** connections MAY be established in parallel for faster startup
+- **THEN** connections SHALL be established independently so one slow server does not delay unrelated servers
+- **AND** failures SHALL be recorded per server without failing unrelated connections
 
 ### Requirement: Pack Tool Access
 
@@ -117,19 +119,19 @@ The system SHALL expose MCP servers via Python-accessible namespace aliases when
 
 Server names with hyphens cannot be used as Python variable names (e.g., `aws-iam` is parsed as subtraction, not a namespace). The system SHALL register Python-safe aliases so users can call tools via dot notation.
 
-#### Scenario: aws-* server gets short-name underscore alias
+#### Scenario: hyphenated server gets generic underscore alias
 
-- **GIVEN** an `aws-*` MCP server is connected (e.g., `aws-cost-explorer`)
+- **GIVEN** a hyphenated MCP server is connected (e.g., `aws-cost-explorer`)
 - **WHEN** the execution namespace is built
-- **THEN** the short name with hyphens replaced by underscores SHALL be accessible as a variable (e.g., `cost_explorer`)
-- **AND** `aws-iam` → `iam`, `aws-cost-explorer` → `cost_explorer`, `aws-well-architected` → `well_architected`
+- **THEN** the full name with hyphens replaced by underscores SHALL be accessible as a variable (e.g., `aws_cost_explorer`)
+- **AND** `aws-iam` → `aws_iam`, `aws-cost-explorer` → `aws_cost_explorer`, `aws-well-architected` → `aws_well_architected`
 
 #### Scenario: Non-aws hyphenated server gets underscore primary + warning
 
 - **GIVEN** a non-aws MCP server whose name contains hyphens (e.g., `my-server`)
 - **WHEN** the execution namespace is built
 - **THEN** the underscore form SHALL be the primary namespace key (e.g., `my_server`)
-- **AND** the original hyphen name SHALL also be accessible as an alias
+- **AND** the original hyphen name SHALL also be accessible as an exact server-name key for namespace-dictionary lookups
 - **AND** a `UserWarning` SHALL be emitted advising to rename the config key to underscore form
 
 #### Scenario: Alias does not overwrite existing local pack
@@ -138,7 +140,7 @@ Server names with hyphens cannot be used as Python variable names (e.g., `aws-ia
 - **AND** an `aws-iam` server is connected
 - **WHEN** the execution namespace is built
 - **THEN** the existing `iam` local pack SHALL take precedence
-- **AND** `aws-iam` SHALL still be accessible via the full hyphenated key (internal use only)
+- **AND** `aws-iam` SHALL still be accessible via the full hyphenated key for exact server-name access
 
 ### Requirement: Tool Prefix Omission
 

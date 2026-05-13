@@ -116,6 +116,33 @@ class ProxyManager:
         """Return native instructions from the server's InitializeResult, or ''."""
         return self._server_instructions.get(server, "")
 
+    def readiness(self, configured_servers: list[str] | tuple[str, ...]) -> dict[str, Any]:
+        """Return proxy readiness and per-server connection state."""
+        servers: dict[str, Any] = {}
+        for name in configured_servers:
+            if name in self._clients:
+                servers[name] = {
+                    "status": "connected",
+                    "tool_count": len(self._tools_by_server.get(name, [])),
+                }
+            elif error := self._errors.get(name):
+                servers[name] = {"status": "failed", "error": error}
+            elif self.is_connecting:
+                servers[name] = {"status": "connecting"}
+            else:
+                servers[name] = {"status": "disconnected"}
+
+        failed = sum(1 for state in servers.values() if state["status"] == "failed")
+        connected = sum(1 for state in servers.values() if state["status"] == "connected")
+        return {
+            "ready": not self.is_connecting,
+            "status": "degraded" if failed else "ok",
+            "configured": len(configured_servers),
+            "connected": connected,
+            "failed": failed,
+            "servers": servers,
+        }
+
     def list_tools(self, server: str | None = None) -> list[ProxyToolInfo]:
         """List available tools from proxied servers.
 
@@ -429,19 +456,24 @@ class ProxyManager:
                 connected = 0
                 failed = 0
 
-                for name, config in enabled_configs.items():
+                async def connect_one(name: str, config: McpServerConfig) -> bool:
                     try:
                         await self._connect_server(name, config)
-                        connected += 1
                         self._errors.pop(name, None)  # Clear any previous error
+                        return True
                     except asyncio.CancelledError:
-                        failed += 1
                         self._errors[name] = "cancelled"
                         raise
                     except Exception as e:
-                        failed += 1
                         self._errors[name] = str(e)
                         logger.warning(f"Failed to connect to MCP server '{name}': {e}")
+                        return False
+
+                results = await asyncio.gather(
+                    *(connect_one(name, config) for name, config in enabled_configs.items())
+                )
+                connected = sum(1 for result in results if result)
+                failed = len(results) - connected
 
                 span.add("connected", connected)
                 span.add("failed", failed)
@@ -517,11 +549,7 @@ class ProxyManager:
         if not config.url:
             raise RuntimeError(f"Server {name}: HTTP server requires url")
 
-        # Auto-upgrade http:// to https://
         url = config.url
-        if url.startswith("http://"):
-            url = "https://" + url[7:]
-            logger.debug(f"Upgraded {name} URL to HTTPS: {url}")
 
         # Expand secrets in headers
         headers = {}
@@ -602,6 +630,12 @@ class ProxyManager:
         self._initialized = False
         self._connect_task = None
 
+    async def _close_client_transport(self, client: Client) -> None:  # type: ignore[type-arg]
+        """Close the underlying transport when FastMCP exposes an async close hook."""
+        transport = getattr(client, "transport", None)
+        if transport is not None and hasattr(transport, "close"):
+            await transport.close()
+
     async def shutdown(self) -> None:
         """Disconnect from all MCP servers."""
         # Cancel background connect task if still running
@@ -618,12 +652,9 @@ class ProxyManager:
             for name, client in list(self._clients.items()):
                 try:
                     await client.__aexit__(None, None, None)  # type: ignore[no-untyped-call]
-                    # transport.close() terminates the subprocess. Required for stdio
-                    # servers because keep_alive=True (the fastmcp default) leaves the
-                    # process running after __aexit__ exits the session.
-                    transport = getattr(client, "transport", None)
-                    if transport is not None and hasattr(transport, "close"):
-                        await transport.close()
+                    # transport.close() terminates stdio subprocesses left alive by
+                    # FastMCP keep_alive after __aexit__ exits the session.
+                    await self._close_client_transport(client)
                     logger.debug(f"Disconnected from MCP server '{name}'")
                 except (Exception, asyncio.CancelledError) as e:
                     logger.debug(f"Error disconnecting from '{name}': {e}")
@@ -705,8 +736,10 @@ class ProxyManager:
         self._tools_by_server.pop(name, None)
         self._errors.pop(name, None)
         self._server_instructions.pop(name, None)
+        self._server_timeouts.pop(name, None)
         try:
             await client.__aexit__(None, None, None)  # type: ignore[no-untyped-call]
+            await self._close_client_transport(client)
             logger.debug(f"Disconnected from MCP server '{name}'")
         except Exception as e:
             logger.debug(f"Error disconnecting from '{name}': {e}")

@@ -298,8 +298,6 @@ def build_execution_namespace(
 
     namespace: dict[str, Any] = {}
 
-    from ot.meta._constants import PACK_SHORT_NAMES
-
     # Add pack proxies for dot notation
     for pack_name, pack_funcs in registry.packs.items():
         if isinstance(pack_funcs, WorkerPackProxy):
@@ -308,10 +306,11 @@ def build_execution_namespace(
         else:
             namespace[pack_name] = _create_pack_proxy(pack_name, pack_funcs)
 
-    # Inject short-name aliases (e.g. wf → webfetch, wb → whiteboard)
-    for full_name, short_name in PACK_SHORT_NAMES.items():
-        if full_name in namespace and short_name not in namespace:
-            namespace[short_name] = namespace[full_name]
+    # Inject aliases declared beside each pack, e.g. wf → webfetch.
+    for full_name, aliases in getattr(registry, "pack_aliases", {}).items():
+        for alias in aliases:
+            if full_name in namespace and alias not in namespace:
+                namespace[alias] = namespace[full_name]
 
     # Add MCP proxy packs (only if not already defined locally).
     # Include configured servers up-front so packs can be used immediately
@@ -324,11 +323,7 @@ def build_execution_namespace(
         tool_prefix = server_cfg.tool_prefix if server_cfg else None
 
         # Compute the Python-safe identifier for this server.
-        # aws-* servers: strip prefix and normalise hyphens (aws-iam → iam).
-        # Other hyphenated servers: replace hyphens with underscores (my-server → my_server).
-        if server_name.startswith("aws-"):
-            safe_name = server_name[4:].replace("-", "_")
-        elif "-" in server_name:
+        if "-" in server_name:
             safe_name = server_name.replace("-", "_")
             warnings.warn(
                 f"Server '{server_name}' uses hyphens — rename to '{safe_name}' in servers.yaml. "
@@ -339,8 +334,9 @@ def build_execution_namespace(
         else:
             safe_name = server_name
 
-        # Register under safe name (primary) so agents can call it directly.
-        # Keep the original hyphen name as an alias for backward compatibility.
+        # Register both spellings intentionally: safe_name gives Python dot
+        # access (`aws_iam.tool()`), while the original key preserves exact
+        # server-name lookup for callers using namespace dictionaries.
         if safe_name not in namespace:
             namespace[safe_name] = _create_mcp_proxy_pack(server_name, tool_prefix)
         if safe_name != server_name and server_name not in namespace:

@@ -24,6 +24,7 @@ class TestBuildExecutionNamespaceAliases:
 
         mock_registry = MagicMock()
         mock_registry.packs = {}
+        mock_registry.pack_aliases = {}
 
         mock_config = MagicMock()
         mock_config.servers = {}
@@ -36,31 +37,35 @@ class TestBuildExecutionNamespaceAliases:
 
         return ns
 
-    def test_aws_iam_adds_short_name_alias(self) -> None:
-        """aws-iam server should create 'iam' alias (not 'aws_iam')."""
+    @pytest.mark.filterwarnings("ignore:Server.*uses hyphens:UserWarning")
+    def test_aws_iam_uses_generic_underscore_alias(self) -> None:
+        """aws-iam server should create generic aws_iam alias."""
         ns = self._build_namespace(["aws-iam"])
 
-        assert "iam" in ns
+        assert "aws_iam" in ns
         assert "aws-iam" in ns
 
-    def test_aws_cost_explorer_adds_underscore_short_name(self) -> None:
-        """aws-cost-explorer server should create 'cost_explorer' alias."""
+    @pytest.mark.filterwarnings("ignore:Server.*uses hyphens:UserWarning")
+    def test_aws_cost_explorer_uses_generic_underscore_alias(self) -> None:
+        """aws-cost-explorer server should create aws_cost_explorer alias."""
         ns = self._build_namespace(["aws-cost-explorer"])
 
-        assert "cost_explorer" in ns
+        assert "aws_cost_explorer" in ns
         assert "aws-cost-explorer" in ns
 
-    def test_aws_well_architected_adds_short_name(self) -> None:
-        """aws-well-architected server should create 'well_architected' alias."""
+    @pytest.mark.filterwarnings("ignore:Server.*uses hyphens:UserWarning")
+    def test_aws_well_architected_uses_generic_underscore_alias(self) -> None:
+        """aws-well-architected server should create aws_well_architected alias."""
         ns = self._build_namespace(["aws-well-architected"])
 
-        assert "well_architected" in ns
+        assert "aws_well_architected" in ns
 
-    def test_aws_single_word_server_adds_short_name(self) -> None:
-        """aws-billing server (no hyphen in short name) should create 'billing' alias."""
+    @pytest.mark.filterwarnings("ignore:Server.*uses hyphens:UserWarning")
+    def test_aws_single_word_server_uses_generic_underscore_alias(self) -> None:
+        """aws-billing server should create aws_billing alias."""
         ns = self._build_namespace(["aws-billing"])
 
-        assert "billing" in ns
+        assert "aws_billing" in ns
         assert "aws-billing" in ns
 
     @pytest.mark.filterwarnings("ignore:Server.*uses hyphens:UserWarning")
@@ -92,6 +97,7 @@ class TestBuildExecutionNamespaceAliases:
 
         mock_registry = MagicMock()
         mock_registry.packs = {}
+        mock_registry.pack_aliases = {}
 
         cfg = MagicMock()
         cfg.servers = {"github": MagicMock(tool_prefix=None)}
@@ -116,6 +122,7 @@ class TestBuildExecutionNamespaceAliases:
 
         mock_registry = MagicMock()
         mock_registry.packs = {}
+        mock_registry.pack_aliases = {}
 
         cfg = MagicMock()
         cfg.servers = {}
@@ -146,6 +153,7 @@ class TestBuildExecutionNamespaceAliases:
         mock_registry = MagicMock()
         existing_pack = object()
         mock_registry.packs = {"iam": existing_pack}
+        mock_registry.pack_aliases = {}
 
         mock_config = MagicMock()
         mock_config.servers = {}
@@ -159,27 +167,29 @@ class TestBuildExecutionNamespaceAliases:
         # 'iam' key exists (either from local pack or alias — local pack wins)
         assert "iam" in ns
 
-    def test_multiple_aws_servers_all_get_aliases(self) -> None:
-        """All aws-* servers should each get a short-name alias."""
+    @pytest.mark.filterwarnings("ignore:Server.*uses hyphens:UserWarning")
+    def test_multiple_aws_servers_all_get_generic_aliases(self) -> None:
+        """All aws-* servers should each get generic aliases."""
         ns = self._build_namespace(["aws-iam", "aws-cost-explorer", "aws-cloudtrail"])
 
-        assert "iam" in ns
-        assert "cost_explorer" in ns
-        assert "cloudtrail" in ns
+        assert "aws_iam" in ns
+        assert "aws_cost_explorer" in ns
+        assert "aws_cloudtrail" in ns
 
+    @pytest.mark.filterwarnings("ignore:Server.*uses hyphens:UserWarning")
     def test_alias_proxy_is_callable(self) -> None:
         """The namespace alias should be an object supporting attribute access."""
         ns = self._build_namespace(["aws-iam"])
 
         # Both the full server name and alias should be pack proxy objects
-        assert ns["iam"] is not None
-        assert hasattr(ns["iam"], "__getattr__") or callable(getattr(ns["iam"], "__class__", None))
+        assert ns["aws_iam"] is not None
+        assert hasattr(ns["aws_iam"], "__getattr__") or callable(getattr(ns["aws_iam"], "__class__", None))
 
 
 @pytest.mark.unit
 @pytest.mark.core
 class TestPackShortNameAliases:
-    """Tests for PACK_SHORT_NAMES injection in build_execution_namespace."""
+    """Tests for metadata-backed alias injection in build_execution_namespace."""
 
     def _build_namespace_with_packs(self, packs: dict) -> dict:
         from ot.executor.pack_proxy import build_execution_namespace, reset
@@ -191,6 +201,11 @@ class TestPackShortNameAliases:
 
         mock_registry = MagicMock()
         mock_registry.packs = packs
+        mock_registry.pack_aliases = {
+            "whiteboard": ("wb",),
+            "webfetch": ("wf",),
+            "brave": ("br",),
+        }
 
         mock_config = MagicMock()
         mock_config.servers = {}
@@ -225,7 +240,7 @@ class TestPackShortNameAliases:
         """Short alias is only injected when the full pack is present."""
         ns = self._build_namespace_with_packs({"brave": {"search": MagicMock()}})
 
-        assert "br" in ns   # brave → br is in PACK_SHORT_NAMES
+        assert "br" in ns
         assert "wb" not in ns  # whiteboard not loaded → wb not injected
 
     def test_short_alias_does_not_overwrite_existing_pack(self) -> None:
@@ -240,12 +255,16 @@ class TestPackShortNameAliases:
         # 'wb' key should be the explicitly loaded pack, not the alias
         assert ns["wb"] is not ns["whiteboard"]
 
-    def test_all_short_names_in_constants_are_valid_identifiers(self) -> None:
-        """All short names in PACK_SHORT_NAMES must be valid Python identifiers."""
-        from ot.meta._constants import PACK_SHORT_NAMES
-
-        for full, short in PACK_SHORT_NAMES.items():
-            assert short.isidentifier(), f"Short name '{short}' for '{full}' is not a valid identifier"
+    def test_all_metadata_aliases_are_valid_identifiers(self) -> None:
+        """All declared aliases must be valid Python identifiers."""
+        aliases = {
+            "whiteboard": ("wb",),
+            "webfetch": ("wf",),
+            "brave": ("br",),
+        }
+        for full, pack_aliases in aliases.items():
+            for alias in pack_aliases:
+                assert alias.isidentifier(), f"Alias '{alias}' for '{full}' is not a valid identifier"
 
 
 @pytest.mark.unit

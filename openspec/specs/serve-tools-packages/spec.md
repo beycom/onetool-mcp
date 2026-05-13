@@ -48,6 +48,17 @@ OneTool SHALL extract metadata from tool functions using AST parsing.
 - **WHEN** the tool is discovered
 - **THEN** the file SHALL NOT be executed (AST parsing only)
 
+#### Scenario: Pack metadata extraction
+- **GIVEN** a pack module declares `pack_aliases` or `doc_slug` beside `pack = "..."`
+- **WHEN** the tool registry scans the module
+- **THEN** aliases and doc slug metadata SHALL be available to execution, help, and pack discovery surfaces
+
+#### Scenario: Runtime service registration
+- **GIVEN** a loaded pack module exposes `register_services(registry)`
+- **WHEN** the execution tool loader imports the module
+- **THEN** it SHALL call the registration function explicitly
+- **AND** packs MAY register output policy, result-store, compaction, LLM, or reload hooks without core importing concrete pack modules
+
 ### Requirement: Keyword-Only Arguments
 
 All tool functions SHALL use keyword-only arguments.
@@ -63,4 +74,3 @@ All tool functions SHALL use keyword-only arguments.
 - **WHEN** defined
 - **THEN** it SHALL use `*` to enforce keyword-only arguments
 - **EXAMPLE** `def my_tool(*, arg1: str, arg2: int) -> str:`
-

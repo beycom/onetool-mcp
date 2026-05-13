@@ -294,10 +294,10 @@ class TestProxyManagerAuth:
 
     @patch("ot.proxy.manager.StreamableHttpTransport")
     @patch("ot.proxy.manager.Client")
-    def test_http_url_upgrade_to_https(
+    def test_http_url_preserved(
         self, mock_client: MagicMock, mock_transport: MagicMock
     ) -> None:
-        """Should upgrade http:// to https:// automatically."""
+        """Should preserve explicitly configured HTTP URLs."""
         from ot.config.models import McpServerConfig
 
         manager = ProxyManager()
@@ -308,10 +308,9 @@ class TestProxyManagerAuth:
 
         manager._create_http_client("test", config)
 
-        # Verify URL was upgraded to HTTPS
         mock_transport.assert_called_once()
         call_kwargs = mock_transport.call_args[1]
-        assert call_kwargs["url"] == "https://test.invalid/mcp"
+        assert call_kwargs["url"] == "http://test.invalid/mcp"
 
 
 @pytest.mark.unit
@@ -736,6 +735,58 @@ class TestProxyManagerBackgroundConnect:
 
         assert manager._connect_task is None
 
+    @pytest.mark.asyncio
+    async def test_connect_runs_servers_concurrently_and_records_failures(self) -> None:
+        """Should connect independent proxy servers without waiting sequentially."""
+        from ot.config.models import McpServerConfig
+
+        manager = ProxyManager()
+        started: set[str] = set()
+        release = asyncio.Event()
+
+        async def fake_connect(name: str, _config: McpServerConfig) -> None:
+            started.add(name)
+            if len(started) == 3:
+                release.set()
+            await asyncio.wait_for(release.wait(), timeout=1)
+            if name == "bad":
+                raise RuntimeError("boom")
+            manager._clients[name] = MagicMock()
+            manager._tools_by_server[name] = []
+
+        configs = {
+            "one": McpServerConfig(type="stdio", command="uvx", args=["one"]),
+            "two": McpServerConfig(type="stdio", command="uvx", args=["two"]),
+            "bad": McpServerConfig(type="stdio", command="uvx", args=["bad"]),
+        }
+
+        with patch.object(manager, "_connect_server", side_effect=fake_connect):
+            await manager.connect(configs)
+
+        assert started == {"one", "two", "bad"}
+        assert set(manager._clients) == {"one", "two"}
+        assert manager._errors["bad"] == "boom"
+        assert manager._initialized is True
+
+    def test_readiness_reports_connecting_connected_and_failed_servers(self) -> None:
+        """Should expose proxy readiness separate from HTTP health."""
+        manager = ProxyManager()
+        manager._clients = {"ok": MagicMock()}
+        manager._tools_by_server = {"ok": [MagicMock(), MagicMock()]}
+        manager._errors = {"bad": "boom"}
+        manager._connect_task = MagicMock()
+        manager._connect_task.done.return_value = False
+
+        result = manager.readiness(("ok", "bad", "pending"))
+
+        assert result["ready"] is False
+        assert result["status"] == "degraded"
+        assert result["connected"] == 1
+        assert result["failed"] == 1
+        assert result["servers"]["ok"] == {"status": "connected", "tool_count": 2}
+        assert result["servers"]["bad"] == {"status": "failed", "error": "boom"}
+        assert result["servers"]["pending"] == {"status": "connecting"}
+
 
 @pytest.mark.unit
 @pytest.mark.core
@@ -840,15 +891,20 @@ class TestProxyManagerIncrementalConnect:
 
         manager = ProxyManager()
         mock_client = AsyncMock()
+        mock_client.transport = AsyncMock()
         mock_tool = MagicMock(spec=types.Tool)
         manager._clients = {"aws-iam": mock_client}
         manager._tools_by_server = {"aws-iam": [mock_tool]}
+        manager._server_timeouts = {"aws-iam": 120.0}
 
         result = await manager.disconnect_server("aws-iam")
 
         assert result == "disconnected"
         assert "aws-iam" not in manager._clients
         assert "aws-iam" not in manager._tools_by_server
+        assert "aws-iam" not in manager._server_timeouts
+        mock_client.__aexit__.assert_awaited_once_with(None, None, None)
+        mock_client.transport.close.assert_awaited_once_with()
 
     @pytest.mark.asyncio
     async def test_disconnect_server_does_not_affect_other_servers(self) -> None:
