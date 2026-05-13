@@ -632,6 +632,7 @@ async def execute_command(
                 "ot.help",
                 "ot.tool_info",
             }
+            _no_sanitize = (tool_name or "").startswith("ide.")
             if not _no_deflect:
                 result_size = len(text_result.encode("utf-8"))
                 if force_context or (max_size > 0 and result_size > max_size):
@@ -670,7 +671,7 @@ async def execute_command(
                 raw=raw_result,
                 executor="python",
                 success=True,
-                should_sanitize=sanitize,
+                should_sanitize=sanitize and not _no_sanitize,
                 format=result_fmt,
             )
         except Exception as e:

@@ -7,6 +7,7 @@ Usage:
 """
 
 import argparse
+import importlib.util
 import re
 import shutil
 import subprocess
@@ -69,6 +70,17 @@ def clean_build_dirs() -> list[str]:
     return removed
 
 
+def build_vscode_extension() -> Path:
+    """Build the VS Code companion extension and copy the VSIX into dist."""
+    script_path = PROJECT_ROOT / "scripts" / "build_ide_vscode.py"
+    spec = importlib.util.spec_from_file_location("build_ide_vscode", script_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("Unable to load scripts/build_ide_vscode.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.build_extension()
+
+
 def main():
     global DRY_RUN
 
@@ -105,6 +117,16 @@ def main():
         print(f"  Removing: {', '.join(removed)}")
     run("uv build")
     print()
+    print("─" * 40)
+    print("Step 1b: Build VS Code extension")
+    print("─" * 40)
+    if DRY_RUN:
+        run("uv run python scripts/build_ide_vscode.py")
+        print("  Would copy generated .vsix to dist/")
+    else:
+        vsix_path = build_vscode_extension()
+        print(f"  Built VSIX: {vsix_path.relative_to(PROJECT_ROOT)}")
+    print()
 
     # Step 2: Git
     if confirm(f"Commit, tag v{version}, and push to GitHub?"):
@@ -134,10 +156,14 @@ def main():
                 notes_file = PROJECT_ROOT / "tmp" / "release-notes.md"
                 notes_file.parent.mkdir(exist_ok=True)
                 notes_file.write_text(notes)
-            run(f'gh release create "v{version}" --title "v{version}" --notes-file tmp/release-notes.md')
+            run(
+                f'gh release create "v{version}" dist/* --title "v{version}" --notes-file tmp/release-notes.md'
+            )
         else:
             print(f"  Warning: Version {version} not found in CHANGELOG.md")
-            run(f'gh release create "v{version}" --title "v{version}" --generate-notes')
+            run(
+                f'gh release create "v{version}" dist/* --title "v{version}" --generate-notes'
+            )
         print()
 
     # Step 4: PyPI (before MCP Registry — registry validates package exists on PyPI)

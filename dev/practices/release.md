@@ -17,6 +17,7 @@ just release::prep 1.0.0b2
 ```
 
 - Updates version in `pyproject.toml` and `server.json`
+- Leaves the VS Code companion extension on its independent version stream
 - Generates changelog from git commits (via git-cliff)
 - Opens `CHANGELOG.md` and `tmp/changelog-entry.md` in editor
 - Copy/paste the generated entry into CHANGELOG.md
@@ -44,9 +45,9 @@ just release::publish 1.0.0b2 --force  # Actually publish
 ```
 
 Prompts before each step:
-1. Build package (`uv build`)
+1. Build package artifacts (`uv build` plus the VS Code companion VSIX)
 2. Commit, tag, push to GitHub
-3. Create GitHub release
+3. Create GitHub release with `dist/*` artifacts attached
 4. Publish to PyPI (`uv publish`) — MCP Registry validates PyPI package exists
 5. Publish to MCP Registry
 6. Deploy docs to GitHub Pages
@@ -61,10 +62,12 @@ just release::changelog            # Preview changelog
 just release::sanity               # Run sanity tests only
 ```
 
+The VS Code companion extension does not share the root package version. Use `just build-ide-vscode` to generate a local `1.0.0-dev.<build>` VSIX that can replace earlier local builds without `--force`.
+
 ## Individual Publish Steps
 
 ```bash
-just release::build     # uv build
+just release::build     # uv build + VS Code companion VSIX
 just release::pypi      # uv publish
 just release::tag 1.0.0b2  # Commit, tag, push
 just release::mcp       # mcp-publisher publish
@@ -80,4 +83,3 @@ After release, verify at:
 - MCP Registry: https://registry.modelcontextprotocol.io
 - GitHub: https://github.com/beycom/onetool/releases
 - Docs: https://onetool.beycom.online
-

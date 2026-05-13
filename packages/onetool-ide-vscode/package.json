@@ -1,0 +1,82 @@
+{
+  "name": "onetool-ide-vscode",
+  "displayName": "OneTool IDE Bridge",
+  "publisher": "beycom",
+  "version": "1.0.0-dev.20260513011439",
+  "description": "VS Code IDE integration for OneTool MCP.",
+  "license": "GPL-3.0",
+  "icon": "assets/logo.png",
+  "author": {
+    "name": "Gavin Las",
+    "email": "beycom99@gmail.com"
+  },
+  "homepage": "https://github.com/beycom/onetool-mcp",
+  "bugs": {
+    "url": "https://github.com/beycom/onetool-mcp/issues"
+  },
+  "documentation": "https://onetool.beycom.online",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "llm",
+    "tools",
+    "model-context-protocol",
+    "agents",
+    "vscode",
+    "ide"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/beycom/onetool-mcp.git",
+    "directory": "packages/onetool-ide-vscode"
+  },
+  "engines": {
+    "vscode": ">=1.85.0"
+  },
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:onetoolIde.showConnection"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "onetoolIde.showConnection",
+        "title": "Show or Copy Connection ID",
+        "category": "OneTool IDE"
+      }
+    ],
+    "configuration": {
+      "title": "OneTool IDE Bridge",
+      "properties": {
+        "onetoolIde.portStart": {
+          "type": "number",
+          "default": 58764,
+          "minimum": 1024,
+          "maximum": 65535,
+          "description": "First loopback HTTP port to try for the OneTool IDE bridge."
+        },
+        "onetoolIde.portCount": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Number of loopback HTTP ports to try for the OneTool IDE bridge."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npm run compile && node test/snapshot.test.js && node test/auth.test.js && node test/bridge.test.js && node test/extension.test.js",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.3",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.6.0",
+    "typescript": "^5.8.3"
+  }
+}

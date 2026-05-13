@@ -41,6 +41,7 @@ check:
     just lint
     just typecheck
     just test-all
+    cd packages/onetool-ide-vscode && npm install && npm test
     just secrets-check
     just docs-sync
     uv run mkdocs build --strict
@@ -58,19 +59,20 @@ publish version *args:
 # INDIVIDUAL PUBLISH STEPS (escape hatches)
 # ============================================================================
 
-# Set version in pyproject.toml, server.json, onetool-pack, and onetool-bench
+# Set version in pyproject.toml, server.json, and package workspaces
 set-version version:
     @echo "Setting version to {{ version }}"
     sed -i '' 's/^version = ".*"/version = "{{ version }}"/' pyproject.toml
     sed -i '' 's/"version": ".*"/"version": "{{ version }}"/g' server.json
     sed -i '' 's/^version = ".*"/version = "{{ version }}"/' packages/onetool-pack/pyproject.toml
     sed -i '' 's/^version = ".*"/version = "{{ version }}"/' packages/onetool-bench/pyproject.toml
-    @echo "Updated pyproject.toml, server.json, packages/onetool-pack/pyproject.toml, and packages/onetool-bench/pyproject.toml"
+    @echo "Updated pyproject.toml, server.json, and package pyprojects. VS Code extension version is independent."
 
 # Build package
 build:
     rm -rf dist/ build/ *.egg-info
     uv build
+    just build-ide-vscode
 
 # Publish to PyPI
 pypi:

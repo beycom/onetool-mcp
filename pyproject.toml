@@ -9,7 +9,7 @@ license = { text = "GPL-3.0" }
 authors = [{ name = "Gavin Las", email = "beycom99@gmail.com" }]
 keywords = ["mcp", "mcp-server", "llm", "code-execution", "tools", "model-context-protocol", "token-efficiency", "context-rot", "agents"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3",

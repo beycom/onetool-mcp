@@ -139,6 +139,10 @@ docs-specs:
 build:
     uv build
 
+# Build the OneTool IDE Bridge VS Code extension package
+build-ide-vscode:
+    uv run python scripts/build_ide_vscode.py
+
 # Bundle inject.js annotation script (requires npm install in src/ot/assets/)
 build-inject:
     cd src/ot/assets && npm run build

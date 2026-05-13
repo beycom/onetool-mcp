@@ -1,0 +1,8 @@
+.vscode/**
+.vscode-test/**
+node_modules/**
+src/**
+test/**
+tsconfig.json
+*.map
+*.vsix

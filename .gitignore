@@ -75,9 +75,11 @@ htmlcov/
 
 # Package manager files
 package-lock.json
+!packages/onetool-ide-vscode/package-lock.json
 yarn.lock
 pnpm-lock.yaml
 composer.lock
+*.vsix
 
 # IDE specific
 .vs/
