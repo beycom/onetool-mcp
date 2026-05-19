@@ -39,7 +39,8 @@ just lint     # Run linters
 
 **Never add backward-compatible fallbacks unless explicitly asked.**
 
-- Removed API values, parameter names, or config keys must raise a clear error — not silently work
+- Removed API values or parameter names should fail through the current API/signature/validation path
+- Removed config keys should be removed cleanly; do not add legacy-key detectors or migration-specific errors unless explicitly requested
 - No aliases, shims, or "treat old value as new value" logic
 - No `_deprecated`, `_legacy`, or transitional code paths
 - When something is renamed or removed, delete it — do not keep the old name working
@@ -47,7 +48,7 @@ just lint     # Run linters
 Examples of what NOT to do:
 - Old `info="list"` silently treated as `"full"` → wrong; raise `ValueError` immediately
 - Renamed parameter kept working under old name → wrong; raise `TypeError` with a clear message
-- Removed config key silently ignored → wrong; raise a config error
+- Removed config key accepted as an alias or fallback → wrong; delete the old-key path
 
 The goal is a simple, clean codebase. Backward compat adds hidden complexity and makes bugs harder to find.
 
