@@ -76,6 +76,7 @@ prompts:
     excel: "Work with Excel files — read, write, search, pivot, and set formulas"
     file: "Read, write, edit, copy, move, and delete files; browse directory trees"
     ground: "Research any topic with Google AI-grounded search and source citations"
+    handoff: "Delegate one focused Codex worker task and inspect file-backed results"
     knowledge: "Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis"
     mem: "Persistent topic-based memory — write, search, grep, slice, and organise"
     ot_context: "Smart context store — ask, read, search, grep large tool responses without filling context window; format-aware toc/slice/query for json, yaml, and markdown"

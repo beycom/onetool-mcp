@@ -13,6 +13,23 @@ from ot.proxy import get_proxy_manager
 
 log = LogSpan
 
+_RELOADABLE_INTERNAL_MODULE_PREFIXES = ("ot.handoff",)
+
+
+def _clear_reloadable_internal_modules() -> int:
+    """Remove reloadable internal modules so dev reload picks up source edits."""
+    module_names = [
+        name
+        for name in sys.modules
+        if any(
+            name == prefix or name.startswith(f"{prefix}.")
+            for prefix in _RELOADABLE_INTERNAL_MODULE_PREFIXES
+        )
+    ]
+    for module_name in module_names:
+        del sys.modules[module_name]
+    return len(module_names)
+
 
 def config() -> dict[str, Any]:
     """Show key configuration values.
@@ -159,6 +176,7 @@ def reload() -> str:
         services = get_services()
         services.run_reload_hooks()
         reset_services()
+        internal_modules_cleared = _clear_reloadable_internal_modules()
 
         ot.config.reset()  # Clears both config and secrets
         ot.prompts.reset()
@@ -178,6 +196,7 @@ def reload() -> str:
         for mod_name in tool_modules:
             del sys.modules[mod_name]
         s.add("toolModulesCleared", len(tool_modules))
+        s.add("internalModulesCleared", internal_modules_cleared)
 
         # Reload config to validate and report stats
         cfg = get_config()

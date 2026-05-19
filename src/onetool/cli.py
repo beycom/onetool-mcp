@@ -12,6 +12,8 @@ warnings.filterwarnings("ignore", message="builtin type.*has no __module__ attri
 from pathlib import Path
 
 import typer
+from fastmcp import Context, FastMCP
+from fastmcp.tools import ToolResult
 
 from onetool.cli_commands.direct_app import direct_app
 from onetool.kb import kb_app
@@ -100,6 +102,42 @@ init_app = typer.Typer(
     invoke_without_command=True,
 )
 app.add_typer(init_app, rich_help_panel="Configuration")
+
+
+@app.command("child", rich_help_panel="Runtime")
+def child(
+    url: str = typer.Option(
+        ...,
+        "--url",
+        help="Parent OneTool direct API base URL.",
+    ),
+) -> None:
+    """Run a restricted child MCP server that forwards run calls to a parent."""
+    from ot.handoff.child_proxy import forward_run
+    from ot.utils import sanitize_output
+
+    child_mcp = FastMCP(
+        name="ot-child",
+        instructions="Restricted OneTool child runtime. Use only the run tool.",
+    )
+
+    @child_mcp.tool(
+        description="Run OneTool code through the parent OneTool runtime.",
+        annotations={
+            "title": "OneTool child run",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+    )
+    async def run(command: str, ctx: Context) -> ToolResult:  # noqa: ARG001
+        payload = await forward_run(command=command, direct_url=url)
+        result = str(payload.get("result", ""))
+        text = sanitize_output(result, enabled=False, fmt="json_h")
+        return ToolResult(content=text)
+
+    child_mcp.run(show_banner=False)
 
 
 def _next_bak(path: Path) -> Path:

@@ -112,6 +112,34 @@ class TestProxyManagerReconnectSync:
             # (the mock doesn't actually schedule it)
             call_args[0][0].close()
 
+    @pytest.mark.asyncio
+    async def test_reconnect_sync_from_same_loop_schedules_without_blocking(self) -> None:
+        """Should not block waiting on the same event loop during reconnect."""
+        from ot.config.models import McpServerConfig
+
+        manager = ProxyManager()
+        manager._loop = asyncio.get_running_loop()
+        manager._clients = {"old": MagicMock()}
+        manager._tools_by_server = {"old": [MagicMock()]}
+
+        async def fake_connect(_configs: dict[str, McpServerConfig]) -> None:
+            await asyncio.sleep(0)
+
+        configs = {
+            "next": McpServerConfig(type="stdio", command="uvx", args=["next"]),
+        }
+        with (
+            patch("asyncio.run_coroutine_threadsafe") as mock_threadsafe,
+            patch.object(manager, "connect", side_effect=fake_connect) as mock_connect,
+        ):
+            manager.reconnect_sync(configs)
+            await asyncio.wait_for(manager._connect_task, timeout=1)
+
+        mock_threadsafe.assert_not_called()
+        mock_connect.assert_called_once_with(configs)
+        assert manager._clients == {}
+        assert manager._tools_by_server == {}
+
 
 @pytest.mark.unit
 @pytest.mark.core

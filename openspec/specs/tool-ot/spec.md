@@ -154,6 +154,18 @@ The `ot.reload()` function SHALL force reload of all configuration.
 - **THEN** `ot.reload()` SHALL clear those runtime caches
 - **AND** subsequent tool calls SHALL use current config/secrets values
 
+#### Scenario: Reload clears reloadable internal helper modules
+- **GIVEN** a reloadable internal pack uses helper modules with process-global runtime state
+- **WHEN** `ot.reload()` is called
+- **THEN** `ot.reload()` SHALL remove those helper modules from the import cache after running registered reload hooks
+- **AND** subsequent tool calls SHALL import the current helper module source
+
+#### Scenario: Reload does not block MCP run event loop
+- **GIVEN** `ot.reload()` is executed through the MCP `run()` tool
+- **WHEN** proxy server reconnect is required
+- **THEN** reload SHALL NOT block waiting on the same event loop that must run the reconnect coroutine
+- **AND** reload SHALL return without waiting for the reconnect timeout
+
 ---
 
 ### Requirement: Runtime Statistics

@@ -1,6 +1,6 @@
 # Tool Reference
 
-**29 Packs. 254 Tools.**
+**30 Packs. 260 Tools.**
 
 Complete reference of all built-in tool packs and functions.
 
@@ -10,7 +10,7 @@ Tools are split into optional install extras. Install only what you need:
 
 | Extra | Tools included |
 |-------|---------------|
-| *(core, always included)* | `ot_caveman` (alias `cm`), `ctx`, `ot`, `ot_forge`, `ot_llm`, `ot_secrets`, `ot_servers`, `ot_timer` |
+| *(core, always included)* | `handoff`, `ot_caveman` (alias `cm`), `ctx`, `ot`, `ot_forge`, `ot_llm`, `ot_secrets`, `ot_servers`, `ot_timer` |
 | `[util]` | `brave`, `convert`, `excel`, `file`, `ground`, `knowledge`, `mem`, `tavily` |
 | `[dev]` | `arch`, `aws`, `chrome_util`, `context7`, `db`, `diagram`, `ide`, `package`, `play_util`, `ripgrep`, `whiteboard`, `webfetch` |
 | `[all]` | All of the above |
@@ -36,6 +36,7 @@ uv tool install 'onetool-mcp[util,dev]'  # most tools
 | [**Excel**](excel.md) | `[util]` | Full Excel control. | 24 | [openpyxl](https://github.com/theorchard/openpyxl) (MIT) | `add_sheet`, `cell_range`, `cell_shift`, `copy_range`, `create`, `create_table`, `delete_cols`, `delete_rows`, `formula`, `formulas`, `hyperlinks`, `info`, `insert_cols`, `insert_rows`, `merged_cells`, `named_ranges`, `read`, `search`, `sheets`, `table_data`, `table_info`, `tables`, `used_range`, `write` |
 | [**File**](file.md) | `[util]` | Secure file operations with path boundary enforcement. | 15 | MIT | `copy`, `delete`, `edit`, `grep`, `info`, `list`, `move`, `read`, `read_batch`, `search`, `slice`, `slice_batch`, `toc`, `tree`, `write` |
 | [**Ground**](ground.md) | `[util]` | Grounded search with sources. | 5 | [Google Gemini](https://ai.google.dev/) (MIT) | `dev`, `docs`, `reddit`, `search`, `search_batch` |
+| [**Handoff**](handoff.md) | core | Codex worker delegation with file-backed result inspection. | 6 | MIT | `cancel`, `check`, `clear`, `read_index`, `search_index`, `submit` |
 | [**IDE**](ide.md) | `[dev]` | Read-only VS Code state retrieval through a local companion bridge. | 6 | GPL-3.0 | `connect`, `editor`, `file`, `sel`, `state`, `workspace` |
 | [**Knowledge**](knowledge.md) | `[util]` | Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis. | 15 | MIT | `append`, `ask`, `dbs`, `delete`, `grep`, `info`, `list`, `read`, `related`, `search`, `slice`, `stats`, `toc`, `update`, `write` |
 | [**Mem**](mem.md) | `[util]` | Persistent AI agent memory with semantic search. | 29 | MIT | `append`, `ask`, `context`, `count`, `decay`, `delete`, `export`, `flush`, `grep`, `inspect`, `load`, `list`, `query`, `read`, `read_batch`, `refresh`, `reindex`, `restore`, `search`, `slice`, `slice_batch`, `snap`, `stale`, `stats`, `toc`, `update`, `update_batch`, `write`, `write_batch` |

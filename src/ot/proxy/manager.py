@@ -797,6 +797,13 @@ class ProxyManager:
             self._reset_state()
             return
 
+        with contextlib.suppress(RuntimeError):
+            running_loop = asyncio.get_running_loop()
+            if running_loop is loop:
+                self._reset_state()
+                self._connect_task = loop.create_task(self.connect(configs))
+                return
+
         future = asyncio.run_coroutine_threadsafe(
             self.reconnect(configs),
             loop,
