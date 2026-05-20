@@ -75,23 +75,24 @@ test-coverage:
 
 # Lint code with ruff
 lint:
-    uv run ruff check src/
+    uv run ruff check src/ packages/ot-harness/src packages/ot-harness/tests
 
 # Lint and auto-fix issues
 lint-fix:
-    uv run ruff check --fix src/
+    uv run ruff check --fix src/ packages/ot-harness/src packages/ot-harness/tests
 
 # Format code with ruff
 fmt:
-    uv run ruff format src/
+    uv run ruff format src/ packages/ot-harness/src packages/ot-harness/tests
 
 # Check formatting without changes
 fmt-check:
-    uv run ruff format --check src/
+    uv run ruff format --check src/ packages/ot-harness/src packages/ot-harness/tests
 
 # Type check with mypy
 typecheck:
     uv run mypy
+    uv run mypy --config-file packages/ot-harness/pyproject.toml packages/ot-harness/src
 
 # Check for unused dependencies
 deps-check:

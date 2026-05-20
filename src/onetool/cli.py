@@ -212,6 +212,11 @@ def serve_command(
         "--path",
         help="Streamable HTTP MCP endpoint path.",
     ),
+    ot_dir: Path | None = typer.Option(
+        None,
+        "--ot-dir",
+        help="OneTool directory containing mcp-direct/auth.key.",
+    ),
 ) -> None:
     """Run the OneTool root MCP server."""
     _start_root_runtime(
@@ -222,7 +227,6 @@ def serve_command(
         port=port,
         path=path,
     )
-
 
 def _next_bak(path: Path) -> Path:
     """Return the next available .bak path for *path* (avoids collisions)."""
