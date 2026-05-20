@@ -115,15 +115,16 @@ dev = [
 default-groups = ["dev", "docs"]
 
 [tool.uv.workspace]
-members = ["packages/onetool-pack", "packages/onetool-bench"]
+members = ["packages/onetool-pack", "packages/onetool-bench", "packages/ot-harness"]
 
 [tool.uv.sources]
 onetool-pack = { workspace = true }
+ot-harness = { workspace = true }
 
 [tool.ruff]
 target-version = "py312"
 line-length = 88
-src = ["src", "tests"]
+src = ["src", "tests", "packages/ot-harness/src"]
 cache-dir = "tmp/.ruff_cache"
 # Exclude Jinja2 templates (not valid Python)
 extend-exclude = ["src/ot/config/global_templates/tool_templates/*.py"]
@@ -150,7 +151,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["ot", "ottools", "onetool", "otdev", "otutil"]
+known-first-party = ["ot", "ottools", "onetool", "otdev", "otutil", "ot_harness"]
 
 [tool.ruff.lint.per-file-ignores]
 # CLI files need Path and CaseResult at runtime for typer type annotations and callbacks
@@ -188,8 +189,8 @@ module = "questionary"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "packages/onetool-pack/tests", "packages/onetool-bench/tests"]
-pythonpath = ["src", "packages/onetool-pack/src", "packages/onetool-bench/src"]
+testpaths = ["tests", "packages/onetool-pack/tests", "packages/onetool-bench/tests", "packages/ot-harness/tests"]
+pythonpath = ["src", "packages/onetool-pack/src", "packages/onetool-bench/src", "packages/ot-harness/src"]
 addopts = "-v"
 asyncio_mode = "auto"
 cache_dir = "tmp/.pytest_cache"

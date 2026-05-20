@@ -1,0 +1,4 @@
+id: codex-base
+kind: codex-base
+description: Codex without OneTool MCP or non-neutral skills.
+neutral_skills_dir: ../skills/neutral

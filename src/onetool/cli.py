@@ -111,6 +111,11 @@ def child(
         "--url",
         help="Parent OneTool direct API base URL.",
     ),
+    ot_dir: Path | None = typer.Option(
+        None,
+        "--ot-dir",
+        help="OneTool directory containing mcp-direct/auth.key.",
+    ),
 ) -> None:
     """Run a restricted child MCP server that forwards run calls to a parent."""
     from ot.handoff.child_proxy import forward_run
@@ -132,7 +137,7 @@ def child(
         },
     )
     async def run(command: str, ctx: Context) -> ToolResult:  # noqa: ARG001
-        payload = await forward_run(command=command, direct_url=url)
+        payload = await forward_run(command=command, direct_url=url, base_dir=ot_dir)
         result = str(payload.get("result", ""))
         text = sanitize_output(result, enabled=False, fmt="json_h")
         return ToolResult(content=text)

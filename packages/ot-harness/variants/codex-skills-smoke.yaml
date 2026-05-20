@@ -1,0 +1,4 @@
+id: codex-skills-smoke
+kind: codex-skills
+description: Codex with the smoke skill directory injected.
+skills_dir: ../skills/smoke

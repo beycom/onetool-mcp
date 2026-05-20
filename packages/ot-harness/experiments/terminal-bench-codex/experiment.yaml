@@ -1,0 +1,19 @@
+name: terminal-bench-codex-smoke
+harbor:
+  dataset: terminal-bench
+  agent: codex
+  model: gpt-5.2
+task_file: tasks.yaml
+variants:
+  - id: codex-base
+    path: ../../variants/codex-base.yaml
+  - id: codex-onetool-mcp
+    path: ../../variants/codex-onetool-mcp.yaml
+  - id: codex-skills-smoke
+    path: ../../variants/codex-skills-smoke.yaml
+repetitions: 1
+timeout_seconds: 3600
+metrics:
+  verifier_required: true
+  tokens_required: false
+  cost_required: false
