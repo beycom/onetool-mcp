@@ -240,6 +240,7 @@ class HandoffRuntime:
             task = task.strip()
             if not task:
                 return {"status": "error", "error": "task must not be empty"}
+            self._poll_runner()
             if len(self._outstanding()) >= self.config.limits.max_queue_depth:
                 return {
                     "status": "error",
@@ -321,6 +322,8 @@ class HandoffRuntime:
             effective_timeout = min(desired, self.config.limits.max_check_wait_seconds)
         timed_out = False
         with self._lock:
+            self._poll_runner()
+            self._start_queued_tasks()
             while True:
                 if wait:
                     self._poll_runner()

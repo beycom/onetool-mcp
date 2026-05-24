@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import json
+import sys
+import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from pathlib import Path as PathType
 
 from ot.direct_api import PROTOCOL_VERSION
 from ot.direct_auth import RUN_PATH, signed_headers, verify_response
+from ot.logging import LogSpan
 
 
 @dataclass(frozen=True)
@@ -35,13 +40,29 @@ def current_direct_url() -> str | None:
     return None
 
 
-def build_child_proxy(*, direct_url: str) -> ChildProxy:
+def current_parent_ot_dir() -> str:
+    """Return the current root process OneTool directory."""
+    from ot.meta import resolve_ot_path
+
+    return str(resolve_ot_path("."))
+
+
+def current_onetool_command() -> str:
+    """Return the absolute OneTool executable paired with this Python runtime."""
+    script = Path(sys.executable).with_name("onetool")
+    if script.exists():
+        return str(script)
+    return "onetool"
+
+
+def build_child_proxy(*, direct_url: str, parent_ot_dir: str | None = None) -> ChildProxy:
     """Build child OneTool MCP config for a delegated worker."""
+    ot_dir = parent_ot_dir or current_parent_ot_dir()
     mcp_config = {
         "mcpServers": {
             "onetool": {
-                "command": "onetool",
-                "args": ["child", "--url", direct_url],
+                "command": current_onetool_command(),
+                "args": ["child", "--url", direct_url, "--ot-dir", ot_dir],
                 "allowed_tools": ["run"],
             }
         }
@@ -65,11 +86,13 @@ async def forward_run(
     direct_url: str,
     fmt: str = "json_h",
     sanitize: bool = False,
-    base_dir: Path | None = None,
+    base_dir: PathType | None = None,
 ) -> dict[str, Any]:
     """Forward one child run request to the root direct API."""
     import httpx
 
+    start = time.monotonic()
+    parsed_url = urlparse(direct_url)
     body = json.dumps(
         {
             "protocol_version": PROTOCOL_VERSION,
@@ -80,18 +103,36 @@ async def forward_run(
         },
         separators=(",", ":"),
     ).encode("utf-8")
-    headers = signed_headers(method="POST", path=RUN_PATH, body=body, base_dir=base_dir)
-    async with httpx.AsyncClient(timeout=60) as client:
-        response = await client.post(
-            f"{direct_url}{RUN_PATH}", content=body, headers=headers
+    with LogSpan(
+        span="child.forward.run",
+        parentHost=parsed_url.hostname or "",
+        parentPort=parsed_url.port or "",
+    ) as span:
+        headers = signed_headers(method="POST", path=RUN_PATH, body=body, base_dir=base_dir)
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                response = await client.post(
+                    f"{direct_url}{RUN_PATH}", content=body, headers=headers
+                )
+            verify_response(
+                path=RUN_PATH,
+                body=response.content,
+                headers=dict(response.headers),
+                status_code=response.status_code,
+                base_dir=base_dir,
+            )
+        except Exception as e:
+            span.add(
+                success=False,
+                durationMs=int((time.monotonic() - start) * 1000),
+                errorClass=type(e).__name__,
+            )
+            raise
+        span.add(
+            success=True,
+            durationMs=int((time.monotonic() - start) * 1000),
+            statusCode=response.status_code,
         )
-    verify_response(
-        path=RUN_PATH,
-        body=response.content,
-        headers=dict(response.headers),
-        status_code=response.status_code,
-        base_dir=base_dir,
-    )
     payload = response.json()
     if not isinstance(payload, dict):
         raise RuntimeError("invalid direct API response")

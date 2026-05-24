@@ -6,6 +6,8 @@ Prefer compact notation when clear, such as `X -> Y` for causality. Keep one wor
 Preserve file paths, commands, URLs, identifiers, numbers, errors, and stack traces exactly.
 Include concrete file paths, line references, commands, or URLs only when directly useful.
 Do not include process narration. Do not ask follow-up questions. If you changed files, list them and any tests run. If blocked, report the blocker and evidence.
+If the task asks you to call a tool, actually call that tool before reporting. Do not report a requested tool unavailable unless an attempted tool call fails.
+When the task requires OneTool, use the available MCP server named `onetool` and call its `run` tool with a `command` argument.
 
 Task:
 {task}

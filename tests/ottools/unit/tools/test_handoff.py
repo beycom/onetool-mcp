@@ -47,6 +47,8 @@ class FakeRunner:
                 "child",
                 "--url",
                 "http://127.0.0.1:8765",
+                "--ot-dir",
+                "/tmp/project/.onetool",
             ]
         self.submitted.append(record.id)
         return f"runner-{record.id}"
@@ -252,6 +254,10 @@ def runtime(
         "ot.handoff.child_proxy.current_direct_url",
         lambda: "http://127.0.0.1:8765",
     )
+    monkeypatch.setattr(
+        "ot.handoff.child_proxy.current_parent_ot_dir",
+        lambda: "/tmp/project/.onetool",
+    )
     cfg = Config()
     fake = FakeRunner()
     return HandoffRuntime(config=cfg, cwd=tmp_path, runner=fake), fake
@@ -324,6 +330,26 @@ def test_reset_runtime_clears_cached_handoff_runtime(
 
 @pytest.mark.unit
 @pytest.mark.tools
+def test_build_child_proxy_includes_parent_ot_dir() -> None:
+    from ot.handoff.child_proxy import build_child_proxy
+
+    proxy = build_child_proxy(
+        direct_url="http://127.0.0.1:8765",
+        parent_ot_dir="/tmp/project/.onetool",
+    )
+
+    assert proxy.mcp_config["mcpServers"]["onetool"]["command"].endswith("onetool")
+    assert proxy.mcp_config["mcpServers"]["onetool"]["args"] == [
+        "child",
+        "--url",
+        "http://127.0.0.1:8765",
+        "--ot-dir",
+        "/tmp/project/.onetool",
+    ]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
 def test_codex_runner_submits_and_collects_completion(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -341,7 +367,13 @@ def test_codex_runner_submits_and_collects_completion(
             "mcpServers": {
                 "onetool": {
                     "command": "onetool",
-                    "args": ["child", "--url", "http://127.0.0.1:8765"],
+                    "args": [
+                        "child",
+                        "--url",
+                        "http://127.0.0.1:8765",
+                        "--ot-dir",
+                        str(tmp_path / ".onetool"),
+                    ],
                     "env": {"EXISTING": "1"},
                     "allowed_tools": ["run"],
                 }
@@ -364,7 +396,7 @@ def test_codex_runner_submits_and_collects_completion(
     assert overrides["mcp_servers.onetool.command"] == '"onetool"'
     assert (
         overrides["mcp_servers.onetool.args"]
-        == '["child","--url","http://127.0.0.1:8765"]'
+        == f'["child","--url","http://127.0.0.1:8765","--ot-dir","{tmp_path / ".onetool"}"]'
     )
     assert overrides["mcp_servers.onetool.enabled_tools"] == '["run"]'
     assert "mcp_servers.onetool.disabled_packs" not in overrides
@@ -458,6 +490,9 @@ def test_config_rejects_unknown_values_and_renders_prompt() -> None:
     assert Config().defaults.worker_prompt == default_prompt
     assert "{task}" in default_prompt
     assert "{context}" in default_prompt
+    assert "actually call that tool before reporting" in default_prompt
+    assert "available MCP server named `onetool`" in default_prompt
+    assert "call its `run` tool with a `command` argument" in default_prompt
 
 
 @pytest.mark.unit
@@ -562,6 +597,34 @@ def test_check_wait_completion_and_remaining_cap(
     assert result["remaining_count"] == 1
     assert result["remaining_ids"] == [two["id"]]
     assert result["timed_out"] is False
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_check_non_blocking_polls_completed_work_and_starts_queue(
+    runtime: tuple[HandoffRuntime, FakeRunner],
+) -> None:
+    rt, fake = runtime
+    rt.config.limits.max_workers = 1
+    one = rt.submit(task="one")
+    two = rt.submit(task="two")
+    assert len(fake.submitted) == 1
+
+    fake.completions.append(
+        RunnerCompletion(
+            task_id=one["id"],
+            status="completed",
+            body="Done with first task.",
+            summary="First task ready",
+        )
+    )
+
+    result = rt.check(wait=False)
+
+    assert result["completed_count"] == 1
+    assert result["ready"][0]["id"] == one["id"]
+    assert result["remaining_ids"] == [two["id"]]
+    assert len(fake.submitted) == 2
 
 
 @pytest.mark.unit
@@ -677,6 +740,10 @@ def test_restart_abandons_non_terminal(
     monkeypatch.setattr(
         "ot.handoff.child_proxy.current_direct_url",
         lambda: "http://127.0.0.1:8765",
+    )
+    monkeypatch.setattr(
+        "ot.handoff.child_proxy.current_parent_ot_dir",
+        lambda: "/tmp/project/.onetool",
     )
     first = HandoffRuntime(config=Config(), cwd=tmp_path, runner=FakeRunner())
     submitted = first.submit(task="pending")

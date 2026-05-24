@@ -96,7 +96,7 @@ tools:
 
 ### Defaults
 
-- If `tools.handoff` is omitted, handoff uses Codex app-server over stdio, best-effort child OneTool MCP access for `run`, one worker, a 10-item queue, and 14-day cleanup.
+- If `tools.handoff` is omitted, handoff uses Codex app-server over stdio, best-effort child OneTool MCP access through MCP server `onetool`, tool `run`, one worker, a 10-item queue, and 14-day cleanup. Worker prompts instruct Codex to use the available MCP server named `onetool` and call its `run` tool with a `command` argument.
 - Runtime files are stored under OneTool-owned paths such as `runtime/handoff/index.jsonl` and `runtime/handoff/results/`.
 - `check()` returns summaries and paths by default; full worker output lives in the result Markdown file.
 - `ot.reload()` resets handoff's in-memory runtime and runner state. File-backed index and result artifacts remain available for inspection.
