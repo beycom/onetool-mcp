@@ -2,8 +2,8 @@
 
 Exploratory tests for the OneTool runtime CLI surface. Spawn the actual CLI
 commands and verify that `onetool serve` works over both stdio and Streamable
-HTTP, and that `onetool direct` and `onetool child` still execute real tool pack
-calls through the running root process without starting independent roots.
+HTTP, and that `onetool direct` still executes real tool pack calls through the
+running root process without starting independent roots.
 
 ## Setup
 
@@ -66,11 +66,11 @@ in one runtime mode and fails in another, file it as a runtime defect.
 
 ### 1. Help and command structure
 
-- `onetool --help` - confirm `serve`, `child`, `direct`, and `init` are visible
+- `onetool --help` - confirm `serve`, `direct`, and `init` are visible
 - `onetool serve --help` - confirm `--config`, `--secrets`, `--transport`, `--host`, `--port`, and `--path`
 - `onetool direct --help` - confirm `run` is visible
 - `onetool direct run --help` - confirm `--port`, `--ot-dir`, `--format`, `--sanitize`, and `--timeout`
-- `onetool child --help` - confirm `--url` and `--ot-dir` are required
+- `onetool removed-runtime --help` - confirm removed commands fail through normal unknown-command handling
 - `onetool serve-http --help` - confirm removed command fails through normal unknown-command handling
 
 ### 2. stdio root server
@@ -144,29 +144,6 @@ Error checks:
 - `onetool direct run --ot-dir "$OT_DIR" --port 8765 --format bad "ot.version()"` fails for bad format
 - `onetool direct run --ot-dir "$OT_DIR" --port 1 "ot.version()"` fails for unreachable port without executing user code
 
-### 5. child CLI against running root
-
-Run child mode through an MCP stdio client:
-
-```bash
-onetool child --url http://127.0.0.1:8765 --ot-dir "$OT_DIR"
-```
-
-Verify through the child MCP client:
-
-- `list_tools` exposes only `run`
-- `run` with `ot.debug()` succeeds by forwarding to the parent Direct API
-- `run` with every Required Tool Pack Probe succeeds or is classified as an environment gap
-- child logs do not include auth key material or command bodies by default
-- the parent root process remains the only process with full config, secrets, registry, proxy state, and stats behavior
-
-Error checks:
-
-- `onetool child --url http://127.0.0.1:8765` fails before startup because `--ot-dir` is required
-- `onetool child --url http://127.0.0.1:8765 --ot-dir .onetool` fails before startup because `--ot-dir` must resolve to an absolute path
-- using an `--ot-dir` with the wrong `mcp-direct/auth.key` fails authentication without executing user code
-- using a parent URL where Direct API is disabled or unreachable fails clearly
-
 ## Failure Triage
 
 For each failure, classify it as:
@@ -174,7 +151,6 @@ For each failure, classify it as:
 - CLI contract bug
 - runtime transport bug
 - Direct API auth or reachability bug
-- child forwarding bug
 - test setup bug
 - environment gap
 

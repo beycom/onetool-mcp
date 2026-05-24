@@ -99,47 +99,13 @@ The `onetool` CLI SHALL provide a `direct` subcommand group for sending commands
 - **WHEN** `onetool direct --help` is run
 - **THEN** it SHALL list `run` as the only available direct subcommand
 
-### Requirement: Child Runtime Command
-
-The `onetool` CLI SHALL provide a restricted `child` command for worker MCP
-access that forwards `run` calls to the parent Direct API.
-
-#### Scenario: Child requires parent URL and auth directory
-- **WHEN** `onetool child` is executed
-- **THEN** it SHALL require `--url <parent-direct-url>`
-- **AND** it SHALL require `--ot-dir <parent-ot-dir>`
-- **AND** `--ot-dir` SHALL identify the parent OneTool directory containing
-  `mcp-direct/auth.key`
-
-#### Scenario: Child rejects missing ot-dir
-- **WHEN** `onetool child --url <parent-direct-url>` is executed without
-  `--ot-dir`
-- **THEN** it SHALL fail before starting the child MCP server
-- **AND** the error SHALL explain that child mode needs the parent OneTool
-  directory to use the parent Direct API auth key
-
-#### Scenario: Child rejects relative ot-dir
-- **WHEN** `onetool child --url <parent-direct-url> --ot-dir .onetool` is
-  executed
-- **THEN** it SHALL fail before starting the child MCP server
-- **AND** the error SHALL explain that `--ot-dir` must be absolute after `~`
-  expansion
-
-#### Scenario: Child exposes only run
-- **WHEN** the child MCP server starts
-- **THEN** it SHALL expose only the restricted `run` tool
-- **AND** each `run` call SHALL forward to the parent Direct API URL
-- **AND** forwarded requests SHALL be signed with the key from the explicit
-  parent `--ot-dir`
-
 ### Requirement: Runtime Mode Documentation
 
 The user-facing CLI documentation SHALL describe the runtime modes consistently.
 
 #### Scenario: Runtime mode table
 - **WHEN** users read the CLI documentation
-- **THEN** they SHALL find a comparison of `stdio`, `http`, `direct`, and
-  `child`
+- **THEN** they SHALL find a comparison of `stdio`, `http`, and `direct`
 - **AND** the table SHALL describe purpose, transport, auth, port or bind,
   config, entry point, and when to use each mode
 
@@ -158,6 +124,7 @@ The user-facing CLI documentation SHALL describe the runtime modes consistently.
 - **THEN** it SHALL connect with a Streamable HTTP MCP client
 - **AND** it SHALL list tools and verify the `run` tool is present
 - **AND** it SHALL call `run` successfully over Streamable HTTP
+- **AND** it SHALL verify proxy/server status through the Streamable HTTP root
 
 ---
 

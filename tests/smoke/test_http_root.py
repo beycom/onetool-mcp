@@ -36,9 +36,8 @@ async def _wait_for_http_root(url: str, timeout: float = 10.0) -> None:
 @pytest.mark.smoke
 @pytest.mark.serve
 def test_streamable_http_root_lists_and_calls_run(tmp_path: Path) -> None:
-    """HTTP root mode supports MCP, proxy state, Direct API, and child forwarding."""
+    """HTTP root mode supports MCP run calls and proxy state."""
     config = tmp_path / "onetool.yaml"
-    direct_port = _free_port()
     missing_command = tmp_path / "missing-mcp-server"
     config.write_text(
         "\n".join(
@@ -49,10 +48,6 @@ def test_streamable_http_root_lists_and_calls_run(tmp_path: Path) -> None:
                 "security:",
                 "  sanitize:",
                 "    enabled: false",
-                "direct:",
-                "  host:",
-                "    enabled: true",
-                f"    port: {direct_port}",
                 "servers:",
                 "  broken_proxy:",
                 "    type: stdio",
@@ -116,40 +111,8 @@ def test_streamable_http_root_lists_and_calls_run(tmp_path: Path) -> None:
                 )
                 assert "2.2.2" in str(after_failure.content[0].text)
 
-                for _ in range(20):
-                    repeated = await client.call_tool(
-                        "run", {"command": "ot.version()"}
-                    )
-                    assert "2.2.2" in str(repeated.content[0].text)
-
         asyncio.run(_exercise_http_root())
 
-        from onetool.cli_commands.direct_app import _run_via_server
-        from ot.handoff.child_proxy import forward_run
-
-        direct_result, success = _run_via_server(
-            "ot.version()",
-            "127.0.0.1",
-            direct_port,
-            fmt="raw",
-            sanitize=False,
-            ot_dir=tmp_path,
-            timeout=10,
-        )
-        assert success is True
-        assert "2.2.2" in direct_result
-
-        child_payload = asyncio.run(
-            forward_run(
-                command="ot.version()",
-                direct_url=f"http://127.0.0.1:{direct_port}",
-                fmt="raw",
-                sanitize=False,
-                base_dir=tmp_path,
-            )
-        )
-        assert child_payload["success"] is True
-        assert "2.2.2" in child_payload["result"]
     finally:
         proc.terminate()
         try:

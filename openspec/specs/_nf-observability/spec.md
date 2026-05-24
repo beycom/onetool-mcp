@@ -239,7 +239,7 @@ The logging system SHALL integrate with FastMCP Context when available.
 
 The system SHALL log MCP server lifecycle events with enough mode-specific
 context to distinguish stdio root, Streamable HTTP root, Direct API sidecar,
-child forwarding, proxy state, and shutdown cleanup.
+proxy state, and shutdown cleanup.
 
 #### Scenario: Server start logging
 - **GIVEN** the MCP server is starting
@@ -262,14 +262,6 @@ child forwarding, proxy state, and shutdown cleanup.
 - **WHEN** Direct API is disabled, ready, degraded, or stopped
 - **THEN** logs SHALL identify that state separately from root MCP transport logs
 - **AND** ready logs SHALL include the selected loopback URL
-
-#### Scenario: Child forwarding logging
-- **GIVEN** `onetool child` forwards a run request to the parent Direct API
-- **WHEN** the request succeeds or fails
-- **THEN** logs SHALL include parent URL host and port, success or failure,
-  duration, and error class where applicable
-- **AND** logs SHALL NOT include auth key material
-- **AND** logs SHALL NOT include command bodies by default
 
 #### Scenario: Proxy state logging under HTTP mode
 - **GIVEN** Streamable HTTP root mode is running

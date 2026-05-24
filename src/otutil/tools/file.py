@@ -565,7 +565,7 @@ def resolve(
         file.resolve(glob="src/**/*.py", multi="all")
         file.resolve(path="dev/practices", match="cli pattern", multi="first")
         file.resolve(match="tlf")
-        file.resolve(match=["wip 2026", "handoff strat"], multi="first")
+        file.resolve(match=["wip 2026", "runtime strat"], multi="first")
     """
     selector_count = int(glob is not None) + int(match is not None)
     with LogSpan(

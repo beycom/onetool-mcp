@@ -6,7 +6,6 @@ especially when multiple packs have functions with the same name.
 
 from __future__ import annotations
 
-import sys
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
@@ -389,31 +388,6 @@ def test_reload_resets_runtime_tool_caches() -> None:
 
     assert "OK" in result
     hook.assert_called_once_with()
-
-
-@pytest.mark.unit
-@pytest.mark.serve
-def test_reload_clears_reloadable_internal_modules() -> None:
-    """Verify ot.reload() drops reloadable internal modules from sys.modules."""
-    from ot.meta._config_health import _clear_reloadable_internal_modules
-
-    sentinel = MagicMock()
-    with patch.dict(
-        sys.modules,
-        {
-            "ot.handoff": sentinel,
-            "ot.handoff.runtime": sentinel,
-            "ot.handoff.codex_runner": sentinel,
-            "ot.config": sentinel,
-        },
-    ):
-        cleared = _clear_reloadable_internal_modules()
-
-        assert cleared == 3
-        assert "ot.handoff" not in sys.modules
-        assert "ot.handoff.runtime" not in sys.modules
-        assert "ot.handoff.codex_runner" not in sys.modules
-        assert sys.modules["ot.config"] is sentinel
 
 
 # ============================================================================

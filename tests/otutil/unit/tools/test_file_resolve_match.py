@@ -33,8 +33,8 @@ def test_fzy_scorer_supports_space_separated_quick_open_query() -> None:
     paths = [
         "wip/backups/chat_ops-pre-v3-20260506-111941.zip",
         "wip/notes/onetool-mcp-2026.md",
-        "wip/test-output/compare-handoff-20260516.md",
-        "wip/test-output/handoff-pack-test-2026-05-23.md",
+        "wip/test-output/compare-runtime-20260516.md",
+        "wip/test-output/runtime-pack-test-2026-05-23.md",
     ]
 
     results = fuzzy_match("wip 2026", paths, limit=4)
@@ -42,8 +42,8 @@ def test_fzy_scorer_supports_space_separated_quick_open_query() -> None:
     assert [item.value for item in results] == [
         "wip/notes/onetool-mcp-2026.md",
         "wip/backups/chat_ops-pre-v3-20260506-111941.zip",
-        "wip/test-output/compare-handoff-20260516.md",
-        "wip/test-output/handoff-pack-test-2026-05-23.md",
+        "wip/test-output/compare-runtime-20260516.md",
+        "wip/test-output/runtime-pack-test-2026-05-23.md",
     ]
 
 

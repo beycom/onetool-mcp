@@ -37,18 +37,6 @@ onetool serve -t http -c .onetool/onetool.yaml --host 127.0.0.1 --port 8767 --pa
 | `--port PORT` | `8767` | Streamable HTTP root bind port |
 | `--path PATH` | `/mcp` | Streamable HTTP MCP endpoint path |
 
-### child
-
-Run a restricted stdio MCP shim for worker access. It exposes only `run` and
-forwards signed requests to the parent Direct API.
-
-```bash
-onetool child --url http://127.0.0.1:8765 --ot-dir /path/to/parent/.onetool
-```
-
-`--url` and `--ot-dir` are required. `--ot-dir` must be the parent OneTool
-directory containing `mcp-direct/auth.key`.
-
 ### init
 
 Initialize and manage the OneTool configuration directory.
@@ -99,13 +87,12 @@ onetool serve --transport http --config .onetool/onetool.yaml --host 127.0.0.1 -
 | Mode | Purpose | Transport | Auth | Port or bind | Config shape | Entry point | Recommended use |
 |------|---------|-----------|------|--------------|--------------|-------------|-----------------|
 | `stdio` | Root MCP server | MCP over stdio | MCP client process boundary | none | command + args | `onetool serve --config .onetool/onetool.yaml` | Default local MCP setup |
-| `http` | Root MCP server | MCP Streamable HTTP | none in this mode | `127.0.0.1:8767/mcp` by default | URL | `onetool serve --transport http --config .onetool/onetool.yaml` | Containerized or remote-capable MCP clients |
-| `direct` | Private run sidecar owned by root MCP process | Signed HTTP, not MCP | HMAC key in `.onetool/mcp-direct/auth.key` | `127.0.0.1:8765` preferred by default | CLI target port | `onetool direct run --port 8765 "ot.version()"` | Scripts and harnesses calling a running root process |
-| `child` | Restricted worker MCP shim | MCP over stdio to worker, signed HTTP to parent | Parent Direct API HMAC key via `--ot-dir` | parent Direct API URL | command + args | `onetool child --url http://127.0.0.1:8765 --ot-dir /path/to/.onetool` | Delegated workers that should only receive `run` |
+| `http` | Root MCP server | MCP Streamable HTTP | none in this mode | `127.0.0.1:8767/mcp` by default | URL | `onetool serve --transport http --config .onetool/onetool.yaml` | Harnesses, containers, and URL-only MCP clients |
+| `direct` | Private signed client into the root MCP process | Signed HTTP, not MCP | HMAC key in `.onetool/mcp-direct/auth.key` | `127.0.0.1:8765` preferred by default | CLI target port | `onetool direct run --port 8765 "ot.version()"` | Scripts and harnesses calling a running root process |
 
 Use `stdio` for normal local MCP client configuration. Use `http` when the MCP
 client needs a URL instead of a command it can spawn. Direct API is private
-process access for `direct` and `child`; it is not an MCP HTTP transport.
+process access for `direct`; it is not an MCP HTTP transport.
 
 ## Configuration
 

@@ -34,8 +34,8 @@ the configured port first, then increment until a free port is found.
 - **GIVEN** stdio or HTTP root MCP startup ran with `direct.host.enabled: false`
 - **WHEN** `onetool direct run` targets that process
 - **THEN** the command SHALL fail without executing user code
-- **AND** the error SHALL identify `direct.host.enabled` as the missing
-  requirement
+- **AND** the error SHALL clearly identify that the Direct API target is
+  unavailable or unreachable
 
 #### Scenario: Direct API enabled under stdio root
 
@@ -155,62 +155,3 @@ limit before command execution.
 
 Multiple MCP processes SHALL be supported by binding distinct ports; users
 select the target process with `onetool direct run --port PORT`.
-
-### Requirement: Direct API Supports Child Forwarding
-
-The Direct API SHALL support signed child forwarding from restricted child MCP
-servers without depending on the parent root MCP transport.
-
-#### Scenario: Handoff child forwards run call
-
-- **GIVEN** the root OneTool process is running with `direct.host.enabled: true`
-- **WHEN** a handoff worker invokes the child OneTool `run` tool
-- **THEN** the child MCP process SHALL forward the call to the root Direct API
-- **AND** the forwarded call SHALL execute in the root OneTool process
-
-#### Scenario: Handoff worker uses root process resources
-
-- **WHEN** a forwarded run call executes
-- **THEN** it SHALL use the root process's loaded config, secrets, proxy
-  connections, registry, state, and stats behavior
-- **AND** it SHALL NOT start a second independent OneTool root process
-
-#### Scenario: Child forwards to stdio root parent
-
-- **GIVEN** a parent MCP process running in stdio root mode
-- **AND** `direct.host.enabled: true`
-- **WHEN** a child MCP server signs a run request with the parent
-  `<ot-dir>/mcp-direct/auth.key`
-- **THEN** the Direct API SHALL execute the request through the parent MCP
-  process
-
-#### Scenario: Child forwards to HTTP root parent
-
-- **GIVEN** a parent MCP process running in Streamable HTTP root mode
-- **AND** `direct.host.enabled: true`
-- **WHEN** a child MCP server signs a run request with the parent
-  `<ot-dir>/mcp-direct/auth.key`
-- **THEN** the Direct API SHALL execute the request through the parent MCP
-  process
-
-#### Scenario: Child forwarding unavailable when Direct API disabled
-
-- **GIVEN** a parent MCP process running in stdio or Streamable HTTP root mode
-- **AND** `direct.host.enabled: false`
-- **WHEN** a child MCP server attempts to forward a run request to the parent
-- **THEN** the request SHALL fail without executing user code
-- **AND** the child-facing error SHALL identify `direct.host.enabled` or parent
-  URL reachability as the missing requirement
-
-#### Scenario: Child auth mismatch rejected
-
-- **WHEN** a child MCP server signs a run request with an auth key from the wrong
-  OneTool directory
-- **THEN** the Direct API SHALL reject the request before command execution
-- **AND** the child-facing error SHALL identify an authentication failure without
-  logging key material
-
-#### Scenario: Handoff child remains private
-
-- **WHEN** the public MCP tool list is requested from the root OneTool server
-- **THEN** the child forwarding interface SHALL NOT be exposed as a public tool

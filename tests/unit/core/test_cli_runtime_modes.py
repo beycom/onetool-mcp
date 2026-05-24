@@ -165,19 +165,3 @@ def test_serve_http_command_is_removed(tmp_path: Path) -> None:
     assert "No such command" in result.output
     run_root_server.assert_not_called()
 
-
-@pytest.mark.unit
-@pytest.mark.serve
-def test_child_requires_absolute_ot_dir() -> None:
-    """Child mode requires the parent OneTool directory explicitly."""
-    from onetool.cli import app
-
-    with patch("onetool.cli.FastMCP") as fastmcp:
-        result = CliRunner().invoke(
-            app,
-            ["child", "--url", "http://127.0.0.1:8765", "--ot-dir", ".onetool"],
-        )
-
-    assert result.exit_code == 2
-    assert "child mode requires --ot-dir" in result.output
-    fastmcp.assert_not_called()
