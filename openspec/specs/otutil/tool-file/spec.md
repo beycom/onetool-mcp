@@ -204,6 +204,74 @@ The `file.search()` function SHALL search for files by name pattern.
 - **THEN** it SHALL exclude hidden files (starting with `.`)
 - **AND** `include_hidden=True` SHALL include them
 
+### Requirement: File Reference Resolution
+
+The `file.resolve()` function SHALL resolve exact/glob references and fuzzy quick-open references to path strings.
+
+#### Scenario: Selector validation
+- **GIVEN** neither `glob` nor `match` is provided
+- **WHEN** `file.resolve()` is called
+- **THEN** it SHALL return an error string
+- **AND** providing both `glob` and `match` SHALL return an error string
+
+#### Scenario: Glob reference
+- **GIVEN** an exact path or glob pattern
+- **WHEN** `file.resolve(glob="src/**/*.py", multi="all")` is called
+- **THEN** it SHALL return matching file paths sorted deterministically by case-insensitive path order
+- **AND** exact file paths SHALL be accepted by the same code path as glob patterns
+
+#### Scenario: Scoped glob reference
+- **GIVEN** a directory path and a relative glob pattern
+- **WHEN** `file.resolve(path="dev/guides", glob="tool-*.md", multi="all")` is called
+- **THEN** it SHALL resolve the relative glob from the supplied path root
+- **AND** returned relative paths SHALL remain relative to the effective cwd when possible
+- **AND** absolute glob patterns SHALL still resolve from the filesystem root
+
+#### Scenario: Fuzzy quick-open reference
+- **GIVEN** files under the effective cwd
+- **WHEN** `file.resolve(match="tlf")` is called
+- **THEN** it SHALL fuzzy-match against relative candidate paths using fzy-style path scoring
+- **AND** match results SHALL be sorted by fuzzy score descending, then case-insensitive path order
+
+#### Scenario: Scoped fuzzy quick-open reference
+- **GIVEN** a directory path and files inside and outside that directory
+- **WHEN** `file.resolve(path="dev/practices", match="cli-pattern")` is called
+- **THEN** it SHALL build fuzzy candidates only from files under the supplied path root
+- **AND** returned relative paths SHALL remain relative to the effective cwd when possible
+
+#### Scenario: Invalid path root
+- **GIVEN** a missing path or file path
+- **WHEN** `file.resolve(path=path, match="query")` is called
+- **THEN** it SHALL return an error string
+
+#### Scenario: Result shape
+- **GIVEN** a single-string selector
+- **WHEN** `multi` is `"error"` or `"first"`
+- **THEN** `file.resolve()` SHALL return a single path string when resolution succeeds
+- **AND** `multi="all"` SHALL return a list of path strings
+- **AND** list selector input SHALL always return a flat list in input order
+
+#### Scenario: Multiple matches
+- **GIVEN** a selector with multiple matches
+- **WHEN** `file.resolve(..., multi="error")` is called
+- **THEN** it SHALL return an error string with numbered candidate paths
+- **AND** the error SHALL suggest `multi="first"` or `multi="all"`
+
+#### Scenario: Filtering
+- **GIVEN** hidden files, gitignored files, and files matching `exclude_patterns`
+- **WHEN** `file.resolve()` resolves candidates
+- **THEN** it SHALL skip hidden path segments unless `include_hidden=True`
+- **AND** it SHALL honor `.gitignore` when `gitignore=True`
+- **AND** it SHALL include gitignored files when `gitignore=False`
+- **AND** it SHALL always apply `exclude_patterns`
+
+#### Scenario: Path type
+- **GIVEN** a matching file under the effective cwd
+- **WHEN** `file.resolve(path_type="relative")` is called
+- **THEN** it SHALL return cwd-relative paths when possible
+- **AND** `path_type="absolute"` SHALL return absolute paths
+- **AND** invalid `path_type` values SHALL return an error string
+
 ### Requirement: Content Grep
 
 The `file.grep()` function SHALL search file contents using pure-Python regex (no external binaries required).

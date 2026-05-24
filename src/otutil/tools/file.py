@@ -34,6 +34,7 @@ __all__ = [
     "move",
     "read",
     "read_batch",
+    "resolve",
     "search",
     "slice",
     "slice_batch",
@@ -42,6 +43,7 @@ __all__ = [
     "write",
 ]
 
+import builtins
 import fnmatch
 import os
 import re
@@ -69,6 +71,7 @@ from otutil.tools._content_util import (
     resolve_slice,
     selector_label,
 )
+from otutil.tools._file_resolve_match import fuzzy_match
 
 
 class Config(BaseModel):
@@ -294,6 +297,368 @@ def _create_backup(path: Path) -> str | None:
         return f"Backup failed: {e}"
 
     return None
+
+
+# ============================================================================
+# File Reference Resolution
+# ============================================================================
+
+
+def _has_hidden_segment(path: Path) -> bool:
+    """Return whether any path segment is hidden."""
+    return any(part.startswith(".") for part in path.parts if part not in {".", ".."})
+
+
+def _display_path(path: Path, *, cwd: Path, path_type: str) -> str:
+    """Format a resolved path according to the requested path type."""
+    if path_type == "absolute":
+        return str(path)
+    try:
+        return str(path.relative_to(cwd))
+    except ValueError:
+        return str(path)
+
+
+def _gitignore_matches(
+    path: Path,
+    *,
+    cwd: Path,
+    gi_spec: pathspec.PathSpec | None,
+) -> bool:
+    """Return whether a path is matched by the loaded cwd .gitignore."""
+    if gi_spec is None:
+        return False
+    try:
+        rel = path.relative_to(cwd)
+    except ValueError:
+        rel = path
+    return gi_spec.match_file(str(rel))
+
+
+def _should_skip_resolve_dir(
+    path: Path,
+    *,
+    cwd: Path,
+    cfg: Config,
+    include_hidden: bool,
+    gi_spec: pathspec.PathSpec | None,
+) -> bool:
+    """Return whether traversal should avoid a candidate directory."""
+    try:
+        resolved_path = path.resolve()
+    except OSError:
+        return True
+    if not include_hidden:
+        try:
+            rel = resolved_path.relative_to(cwd)
+        except ValueError:
+            rel = resolved_path
+        if _has_hidden_segment(rel):
+            return True
+    if is_path_excluded(resolved_path, cfg.exclude_patterns):
+        return True
+    return _gitignore_matches(resolved_path, cwd=cwd, gi_spec=gi_spec)
+
+
+def _validated_resolve_candidate(
+    entry: Path,
+    *,
+    cwd: Path,
+    cfg: Config,
+    include_hidden: bool,
+    gi_spec: pathspec.PathSpec | None,
+) -> Path | None:
+    """Validate and filter one file reference candidate."""
+    if not entry.is_file():
+        return None
+    try:
+        resolved_entry = entry.resolve()
+    except OSError:
+        return None
+    if not include_hidden:
+        try:
+            rel = resolved_entry.relative_to(cwd)
+        except ValueError:
+            rel = resolved_entry
+        if _has_hidden_segment(rel):
+            return None
+    if is_path_excluded(resolved_entry, cfg.exclude_patterns):
+        return None
+    if _gitignore_matches(resolved_entry, cwd=cwd, gi_spec=gi_spec):
+        return None
+    validated, error = _validate_path(str(resolved_entry), must_exist=True)
+    if error or validated is None:
+        return None
+    return validated
+
+
+def _dedupe_paths(paths: list[Path]) -> list[Path]:
+    """Deduplicate paths by resolved absolute path while preserving order."""
+    seen: set[Path] = set()
+    deduped: list[Path] = []
+    for path in paths:
+        try:
+            key = path.resolve()
+        except OSError:
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(path)
+    return deduped
+
+
+def _glob_resolve_candidates(
+    pattern: str,
+    *,
+    root: Path,
+    cwd: Path,
+    cfg: Config,
+    include_hidden: bool,
+    gi_spec: pathspec.PathSpec | None,
+    max_results: int,
+) -> list[Path]:
+    """Resolve one exact or glob pattern to validated file candidates."""
+    raw_pattern = Path(pattern)
+    if raw_pattern.is_absolute():
+        glob_root = Path(raw_pattern.anchor)
+        glob_pattern = str(raw_pattern.relative_to(glob_root))
+    else:
+        glob_root = root
+        glob_pattern = pattern
+
+    matches: list[Path] = []
+    try:
+        entries = glob_root.glob(glob_pattern)
+        for entry in entries:
+            candidate = _validated_resolve_candidate(
+                entry,
+                cwd=cwd,
+                cfg=cfg,
+                include_hidden=include_hidden,
+                gi_spec=gi_spec,
+            )
+            if candidate is not None:
+                matches.append(candidate)
+    except (OSError, ValueError):
+        return []
+
+    matches = _dedupe_paths(matches)
+    matches.sort(key=lambda path: _display_path(path, cwd=cwd, path_type="relative").lower())
+    return matches[:max_results] if max_results > 0 else []
+
+
+def _all_resolve_candidates(
+    *,
+    root: Path,
+    cwd: Path,
+    cfg: Config,
+    include_hidden: bool,
+    gi_spec: pathspec.PathSpec | None,
+) -> list[Path]:
+    """Build the validated candidate set for fuzzy file reference matching."""
+    candidates: list[Path] = []
+    try:
+        for current_root, dir_names, file_names in os.walk(root):
+            current_path = Path(current_root)
+            dir_names[:] = [
+                dir_name
+                for dir_name in dir_names
+                if not _should_skip_resolve_dir(
+                    current_path / dir_name,
+                    cwd=cwd,
+                    cfg=cfg,
+                    include_hidden=include_hidden,
+                    gi_spec=gi_spec,
+                )
+            ]
+            for file_name in file_names:
+                candidate = _validated_resolve_candidate(
+                    current_path / file_name,
+                    cwd=cwd,
+                    cfg=cfg,
+                    include_hidden=include_hidden,
+                    gi_spec=gi_spec,
+                )
+                if candidate is not None:
+                    candidates.append(candidate)
+    except OSError:
+        return []
+    return _dedupe_paths(candidates)
+
+
+def _match_resolve_candidates(
+    query: str,
+    *,
+    candidates: list[Path],
+    cwd: Path,
+    max_results: int,
+) -> list[Path]:
+    """Resolve one fuzzy quick-open query to ranked file candidates."""
+    haystack_to_path = {
+        _display_path(path, cwd=cwd, path_type="relative"): path for path in candidates
+    }
+    matches = fuzzy_match(query, builtins.list(haystack_to_path), limit=max_results)
+    return [haystack_to_path[match.value] for match in matches]
+
+
+def _format_resolve_error(selector: str, candidates: list[str]) -> str:
+    """Format a multi-match error with numbered candidate paths."""
+    lines = [f"Error: Multiple files matched '{selector}':"]
+    lines.extend(f"{idx}. {candidate}" for idx, candidate in enumerate(candidates, start=1))
+    lines.append("Use multi='first' or multi='all' to choose how to handle multiple matches.")
+    return "\n".join(lines)
+
+
+def _select_resolve_result(
+    selector: str,
+    paths: list[Path],
+    *,
+    cwd: Path,
+    path_type: str,
+    multi: str,
+) -> str | list[str]:
+    """Apply multi behavior to one selector's resolved paths."""
+    display_paths = [_display_path(path, cwd=cwd, path_type=path_type) for path in paths]
+    if multi == "all":
+        return display_paths
+    if not display_paths:
+        return f"Error: No files matched '{selector}'"
+    if multi == "first":
+        return display_paths[0]
+    if len(display_paths) == 1:
+        return display_paths[0]
+    return _format_resolve_error(selector, display_paths)
+
+
+def resolve(
+    *,
+    path: str = ".",
+    glob: str | list[str] | None = None,
+    match: str | list[str] | None = None,
+    gitignore: bool = True,
+    include_hidden: bool = False,
+    path_type: str = "relative",
+    multi: str = "error",
+    max_results: int = 50,
+) -> str | list[str]:
+    """Resolve file references to path strings.
+
+    Accepts exact/glob path references or fuzzy quick-open style matches and
+    returns path strings suitable for follow-up file operations.
+
+    Args:
+        path: Root directory for relative glob and fuzzy match discovery.
+        glob: Exact path, glob string, or list of glob strings.
+        match: Fuzzy quick-open query or list of queries.
+        gitignore: If True, skip files matched by .gitignore at cwd (default: True).
+        include_hidden: If True, include hidden files and path segments.
+        path_type: "relative" for cwd-relative paths when possible, or "absolute".
+        multi: "error" for exactly one match, "first" for the first match, or
+            "all" for all matches.
+        max_results: Maximum matches per input string.
+
+    Returns:
+        A path string, list of path strings, or an error message.
+
+    Example:
+        file.resolve(glob="src/**/*.py", multi="all")
+        file.resolve(path="dev/practices", match="cli pattern", multi="first")
+        file.resolve(match="tlf")
+        file.resolve(match=["wip 2026", "handoff strat"], multi="first")
+    """
+    selector_count = int(glob is not None) + int(match is not None)
+    with LogSpan(
+        span="file.resolve",
+        path=path,
+        mode="glob" if glob is not None else "match" if match is not None else "none",
+        pathType=path_type,
+        multi=multi,
+    ) as s:
+        if selector_count == 0:
+            s.add(error="missing_selector")
+            return "Error: Exactly one of 'glob' or 'match' is required"
+        if selector_count > 1:
+            s.add(error="ambiguous_selector")
+            return "Error: Provide exactly one of 'glob' or 'match', not both"
+        if path_type not in {"relative", "absolute"}:
+            s.add(error="invalid_path_type")
+            return "Error: path_type must be 'relative' or 'absolute'"
+        if multi not in {"error", "first", "all"}:
+            s.add(error="invalid_multi")
+            return "Error: multi must be 'error', 'first', or 'all'"
+        if max_results <= 0:
+            s.add(error="invalid_max_results")
+            return "Error: max_results must be greater than 0"
+
+        cfg = _get_file_config()
+        cwd = _expand_path(".")
+        root, error = _validate_path(path, must_exist=True)
+        if error:
+            s.add(error=error)
+            return f"Error: {error}"
+        assert root is not None
+        if not root.is_dir():
+            s.add(error="not_a_directory")
+            return f"Error: Not a directory: {path}"
+        gi_spec = _load_gitignore(cwd) if gitignore else None
+        selector_input = glob if glob is not None else match
+        is_list_input = isinstance(selector_input, builtins.list)
+        selectors = selector_input if is_list_input else [selector_input]
+
+        if any(not isinstance(item, str) or not item for item in selectors):
+            s.add(error="invalid_selector")
+            return "Error: selectors must be non-empty strings"
+
+        results: list[str] = []
+        fuzzy_candidates: list[Path] | None = None
+        for selector in selectors:
+            assert isinstance(selector, str)
+            if glob is not None:
+                paths = _glob_resolve_candidates(
+                    selector,
+                    root=root,
+                    cwd=cwd,
+                    cfg=cfg,
+                    include_hidden=include_hidden,
+                    gi_spec=gi_spec,
+                    max_results=max_results,
+                )
+            else:
+                if fuzzy_candidates is None:
+                    fuzzy_candidates = _all_resolve_candidates(
+                        root=root,
+                        cwd=cwd,
+                        cfg=cfg,
+                        include_hidden=include_hidden,
+                        gi_spec=gi_spec,
+                    )
+                paths = _match_resolve_candidates(
+                    selector,
+                    candidates=fuzzy_candidates,
+                    cwd=cwd,
+                    max_results=max_results,
+                )
+
+            selected = _select_resolve_result(
+                selector,
+                paths,
+                cwd=cwd,
+                path_type=path_type,
+                multi=multi,
+            )
+            if isinstance(selected, str) and selected.startswith("Error:"):
+                s.add(error="resolve_failed")
+                return selected
+            if isinstance(selected, builtins.list):
+                results.extend(selected)
+            else:
+                results.append(selected)
+
+        s.add(resultCount=len(results))
+        if is_list_input or multi == "all":
+            return results
+        return results[0]
 
 
 # ============================================================================

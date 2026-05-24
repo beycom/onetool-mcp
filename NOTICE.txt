@@ -59,5 +59,14 @@ https://github.com/sammcj/mcp-package-version
 Used in: tools/package.py (package version checking patterns)
 
 ================================================================================
+pfzy
+================================================================================
+Copyright (c) 2021 Kevin Zhuang
+Licensed under the MIT License
+https://github.com/kazhala/pfzy
+
+Used in: otutil/tools/_file_resolve_match.py (fzy-style fuzzy path matching)
+
+================================================================================
 
 Full license texts are available in the licenses/ directory.

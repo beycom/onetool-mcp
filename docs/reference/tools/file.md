@@ -23,6 +23,7 @@ Short alias: `f`
 
 | Function | Description |
 |----------|-------------|
+| `file.resolve(path, glob, match, gitignore, include_hidden, path_type, multi, max_results)` | Resolve exact/glob or fuzzy quick-open file references to path strings |
 | `file.grep(pattern, path, glob, context, case_sensitive, max_matches, fixed_strings, gitignore)` | Search file contents with regex (pure Python) |
 
 ## Section Navigation
@@ -62,7 +63,10 @@ Short alias: `f`
 |-----------|------|-------------|
 | `path` | str | File or directory path (relative to cwd or absolute) |
 | `pattern` | str | Filename pattern for filtering (e.g., `*.py`, `*test*`) |
-| `glob` | str | Glob pattern to filter files, always recursive (e.g., `*.py`, `*.md`, `src/**/*.py`) |
+| `glob` | str\|list[str] | Glob pattern to filter files; `file.resolve` also accepts a list of glob selectors |
+| `match` | str\|list[str] | Fuzzy quick-open query or queries for `file.resolve` |
+| `path_type` | str | Path output for `file.resolve`: `relative` or `absolute` (default: `relative`) |
+| `multi` | str | Match handling for `file.resolve`: `error`, `first`, or `all` (default: `error`) |
 | `offset` | int | Line number to start from (1-indexed, default: 1) |
 | `limit` | int | Maximum lines to return |
 | `line_numbers` | bool | Include line-number prefixes in `file.read` output (default: `False`) |
@@ -165,6 +169,27 @@ file.read_batch(paths=["src/a.py", "src/b.py"])
 # Read by glob pattern
 file.read_batch(glob="src/**/*.py", max_files=10)  # "*.py" also works
 file.read_batch(glob="docs/*.md")  # recurses into docs/ subdirs
+```
+
+### Resolving File References
+
+```python
+# Resolve one file path from an exact path or glob
+file.resolve(glob="src/otutil/tools/file.py")
+
+# Resolve multiple paths for follow-up file operations
+file.resolve(glob="tests/otutil/**/*.py", multi="all")
+
+# Fuzzy quick-open matching
+file.resolve(match="tlf")       # e.g. tests/unit/core/test_log_format.py
+file.resolve(match="wip 2026")  # space-separated quick-open query
+
+# Scope a file reference lookup to a known directory
+file.resolve(path="dev/practices", match="cli-pattern", multi="first")
+file.resolve(path="dev/project/guides", glob="tool-*.md", multi="all")
+
+# Return absolute paths or include gitignored files
+file.resolve(glob="wip/**/*.log", path_type="absolute", gitignore=False, multi="all")
 ```
 
 ### Searching File Contents
