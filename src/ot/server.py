@@ -29,6 +29,7 @@ import socket
 import threading
 import time
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -67,6 +68,40 @@ _stats_writer: JsonlStatsWriter | None = None
 _direct_api_server: Any | None = None
 _direct_api_thread: threading.Thread | None = None
 _direct_api_port: int | None = None
+_root_runtime: RootRuntime | None = None
+
+
+@dataclass(frozen=True)
+class RootRuntime:
+    """Root MCP transport settings for lifecycle logs."""
+
+    transport: str
+    host: str | None = None
+    port: int | None = None
+    path: str | None = None
+
+    @property
+    def url(self) -> str | None:
+        """Return the client URL for HTTP root mode."""
+        if self.transport != "streamable-http":
+            return None
+        return f"http://{self.host}:{self.port}{self.path}"
+
+
+def _is_loopback_host(host: str) -> bool:
+    return host in {"127.0.0.1", "localhost", "::1"}
+
+
+def validate_http_root_options(*, host: str, port: int, path: str) -> None:
+    """Validate Streamable HTTP root options before server startup."""
+    if not host or host.strip() != host:
+        raise ValueError("--host must be a non-empty hostname or IP address")
+    if port < 1 or port > 65535:
+        raise ValueError("--port must be between 1 and 65535")
+    if not path.startswith("/"):
+        raise ValueError("--path must start with '/'")
+    if "?" in path or "#" in path or any(ch.isspace() for ch in path):
+        raise ValueError("--path must be a URL path without whitespace, query, or fragment")
 
 
 def _direct_health_probe_once(host: str, port: int, timeout_secs: float = 0.2) -> bool:
@@ -208,7 +243,25 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
     """Manage server lifecycle - startup and shutdown."""
     global _stats_writer, _direct_api_server, _direct_api_thread, _direct_api_port
 
-    with LogSpan(span="mcp.server.start") as start_span:
+    runtime = _root_runtime or RootRuntime(transport="stdio")
+
+    with LogSpan(span="mcp.server.start", transport=runtime.transport) as start_span:
+        start_time = time.monotonic()
+        if runtime.transport == "streamable-http":
+            start_span.add(
+                host=runtime.host,
+                port=runtime.port,
+                path=runtime.path,
+                url=runtime.url,
+            )
+            if runtime.host and not _is_loopback_host(runtime.host):
+                logger.warning(
+                    "mcp.http_root.non_loopback_bind | host={} | port={} | path={} | url={}",
+                    runtime.host,
+                    runtime.port,
+                    runtime.path,
+                    runtime.url,
+                )
         # Startup: connect to proxy MCP servers in the background so FastMCP
         # can begin handling MCP protocol messages immediately.
         proxy = get_proxy_manager()
@@ -237,7 +290,7 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
                 start_span.add("directApi", "degraded")
                 start_span.add("directApiError", str(e))
         else:
-            logger.info("direct.api.disabled")
+            logger.info("direct.api.disabled | rootTransport={}", runtime.transport)
 
         # Fire anonymous startup telemetry (non-blocking daemon thread)
         from ot.telemetry import ping as _telemetry_ping
@@ -263,7 +316,8 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
 
     yield
 
-    with LogSpan(span="mcp.server.stop") as stop_span:
+    with LogSpan(span="mcp.server.stop", transport=runtime.transport) as stop_span:
+        stop_span.add(duration=round(time.monotonic() - start_time, 3))
         if (
             _direct_api_server is not None
             and _direct_api_thread is not None
@@ -467,4 +521,48 @@ async def run(command: str, ctx: Context) -> ToolResult:  # noqa: ARG001
 
 def main() -> None:
     """Run the MCP server over stdio transport."""
-    mcp.run(show_banner=False)
+    run_root_server()
+
+
+def run_root_server(
+    *,
+    transport: str = "stdio",
+    host: str = "127.0.0.1",
+    port: int = 8767,
+    path: str = "/mcp",
+) -> None:
+    """Run the shared root MCP server over stdio or Streamable HTTP."""
+    global _root_runtime
+
+    if transport == "stdio":
+        _root_runtime = RootRuntime(transport="stdio")
+        mcp.run(transport="stdio", show_banner=False)
+        return
+
+    if transport == "streamable-http":
+        validate_http_root_options(host=host, port=port, path=path)
+        _root_runtime = RootRuntime(
+            transport="streamable-http",
+            host=host,
+            port=port,
+            path=path,
+        )
+        logger.info(
+            "mcp.http_root.start | host={} | port={} | path={} | url=http://{}:{}{}",
+            host,
+            port,
+            path,
+            host,
+            port,
+            path,
+        )
+        mcp.run(
+            transport="streamable-http",
+            show_banner=False,
+            host=host,
+            port=port,
+            path=path,
+        )
+        return
+
+    raise ValueError(f"Unsupported root MCP transport: {transport}")

@@ -80,3 +80,107 @@ def test_direct_api_failure_is_degraded_in_lifespan() -> None:
         patch.object(server, "logger"),
     ):
         asyncio.run(_run_lifespan())
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_run_root_server_uses_streamable_http_transport() -> None:
+    """HTTP root mode should run the shared FastMCP instance over Streamable HTTP."""
+    from ot import server
+
+    with patch.object(server.mcp, "run") as mcp_run:
+        server.run_root_server(
+            transport="streamable-http",
+            host="127.0.0.1",
+            port=8767,
+            path="/mcp",
+        )
+
+    mcp_run.assert_called_once_with(
+        transport="streamable-http",
+        show_banner=False,
+        host="127.0.0.1",
+        port=8767,
+        path="/mcp",
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_http_root_option_validation_rejects_bad_path() -> None:
+    """HTTP root path must be an MCP endpoint path."""
+    from ot.server import validate_http_root_options
+
+    with pytest.raises(ValueError, match="--path must start"):
+        validate_http_root_options(host="127.0.0.1", port=8767, path="mcp")
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_http_root_lifespan_logs_transport_and_non_loopback_warning() -> None:
+    """HTTP root startup logs include transport-specific URL fields and bind warning."""
+    from ot import server
+
+    async def _run_lifespan() -> None:
+        async with server._lifespan(SimpleNamespace()):
+            pass
+
+    cfg = SimpleNamespace(
+        servers={},
+        prompts=[],
+        direct=SimpleNamespace(host=SimpleNamespace(enabled=False)),
+        stats=SimpleNamespace(enabled=False),
+    )
+    spans: list[tuple[str, dict[str, object]]] = []
+
+    class FakeSpan:
+        def __init__(self, *, span: str, **values: object) -> None:
+            self.name = span
+            self.values = dict(values)
+
+        def __enter__(self) -> "FakeSpan":
+            spans.append((self.name, self.values))
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def add(self, *args: object, **values: object) -> None:
+            if args and isinstance(args[0], dict):
+                self.values.update(args[0])
+            self.values.update(values)
+
+    runtime = server.RootRuntime(
+        transport="streamable-http",
+        host="0.0.0.0",
+        port=8767,
+        path="/mcp",
+    )
+    proxy = SimpleNamespace(
+        connect_background=lambda _servers: None,
+        servers={},
+        is_connecting=False,
+    )
+
+    with (
+        patch.object(server, "_config", cfg),
+        patch.object(server, "_root_runtime", runtime),
+        patch.object(server, "LogSpan", FakeSpan),
+        patch.object(server, "get_proxy_manager", return_value=proxy),
+        patch.object(server, "get_registry", return_value=SimpleNamespace(tools={})),
+        patch("ot.executor.tool_loader.load_tool_registry"),
+        patch("ot.telemetry.ping"),
+        patch.object(server, "logger") as logger,
+    ):
+        asyncio.run(_run_lifespan())
+
+    start = next(values for name, values in spans if name == "mcp.server.start")
+    stop = next(values for name, values in spans if name == "mcp.server.stop")
+    assert start["transport"] == "streamable-http"
+    assert start["host"] == "0.0.0.0"
+    assert start["port"] == 8767
+    assert start["path"] == "/mcp"
+    assert start["url"] == "http://0.0.0.0:8767/mcp"
+    assert stop["transport"] == "streamable-http"
+    assert "duration" in stop
+    logger.warning.assert_called_once()

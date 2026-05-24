@@ -92,6 +92,79 @@ def _write_startup_config_error(config: Path, error: Exception) -> None:
         )
 
 
+def _validate_http_root_options(*, host: str, port: int, path: str) -> None:
+    """Validate HTTP root options without importing the server module."""
+    if not host or host.strip() != host:
+        raise ValueError("--host must be a non-empty hostname or IP address")
+    if port < 1 or port > 65535:
+        raise ValueError("--port must be between 1 and 65535")
+    if not path.startswith("/"):
+        raise ValueError("--path must start with '/'")
+    if "?" in path or "#" in path or any(ch.isspace() for ch in path):
+        raise ValueError("--path must be a URL path without whitespace, query, or fragment")
+
+
+def _load_runtime_config(config: Path, secrets: Path | None) -> None:
+    """Load root runtime configuration before starting MCP transport."""
+    from ot.config.loader import get_config
+
+    try:
+        get_config(config, reload=True, secrets_path=secrets)
+    except Exception as e:
+        _write_startup_config_error(config, e)
+        console.print(f"[red]Error loading config:[/red] {e}")
+        raise typer.Exit(1) from e
+
+
+def _ensure_runtime_config_exists(config: Path) -> None:
+    """Fail if root runtime config is missing."""
+    if not config.exists():
+        console.print(f"OneTool not initialized. Run: onetool init --config {config}")
+        raise typer.Exit(1)
+
+
+def _start_root_runtime(
+    *,
+    config: Path,
+    secrets: Path | None,
+    transport: str,
+    host: str,
+    port: int,
+    path: str,
+) -> None:
+    """Start root MCP runtime with shared config loading and banner behavior."""
+    if transport not in {"stdio", "http"}:
+        console.print("[red]Error:[/red] --transport must be 'stdio' or 'http'")
+        raise typer.Exit(2)
+    if transport == "http":
+        try:
+            _validate_http_root_options(host=host, port=port, path=path)
+        except ValueError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(2) from e
+
+    _ensure_runtime_config_exists(config)
+    _load_runtime_config(config, secrets)
+    _setup_signal_handlers()
+    _print_startup_banner()
+
+    from ot.server import run_root_server
+
+    if transport == "stdio":
+        run_root_server(transport="stdio")
+        return
+
+    if transport == "http":
+        console.print(f"[cyan]Streamable HTTP root MCP:[/cyan] http://{host}:{port}{path}")
+        run_root_server(
+            transport="streamable-http",
+            host=host,
+            port=port,
+            path=path,
+        )
+        return
+
+
 app.add_typer(direct_app, name="direct", rich_help_panel="Direct")
 app.add_typer(kb_app, name="kb", rich_help_panel="Knowledge Base")
 
@@ -111,10 +184,26 @@ def child(
         "--url",
         help="Parent OneTool direct API base URL.",
     ),
+    ot_dir: Path = typer.Option(
+        ...,
+        "--ot-dir",
+        help="Absolute parent OneTool directory containing mcp-direct/auth.key.",
+    ),
 ) -> None:
     """Run a restricted child MCP server that forwards run calls to a parent."""
     from ot.handoff.child_proxy import forward_run
+    from ot.paths import expand_path
     from ot.utils import sanitize_output
+
+    if not str(ot_dir).startswith("~") and not ot_dir.is_absolute():
+        console.print(
+            "[red]Error: child mode requires --ot-dir as an absolute path after ~ expansion.[/red]"
+        )
+        raise typer.Exit(2)
+    parent_ot_dir = expand_path(str(ot_dir))
+    if not parent_ot_dir.is_absolute():
+        console.print("[red]Error: --ot-dir must resolve to an absolute path.[/red]")
+        raise typer.Exit(2)
 
     child_mcp = FastMCP(
         name="ot-child",
@@ -132,12 +221,61 @@ def child(
         },
     )
     async def run(command: str, ctx: Context) -> ToolResult:  # noqa: ARG001
-        payload = await forward_run(command=command, direct_url=url)
+        payload = await forward_run(command=command, direct_url=url, base_dir=parent_ot_dir)
         result = str(payload.get("result", ""))
         text = sanitize_output(result, enabled=False, fmt="json_h")
         return ToolResult(content=text)
 
     child_mcp.run(show_banner=False)
+
+
+@app.command("serve", rich_help_panel="Runtime")
+def serve_command(
+    config: Path = typer.Option(
+        ...,
+        "--config",
+        "-c",
+        help="Path to onetool.yaml configuration file.",
+    ),
+    secrets: Path | None = typer.Option(
+        None,
+        "--secrets",
+        "-s",
+        help="Path to secrets file. If omitted, no secrets are loaded.",
+    ),
+    transport: str = typer.Option(
+        "stdio",
+        "--transport",
+        "-t",
+        help="Root MCP transport: stdio or http.",
+    ),
+    host: str = typer.Option(
+        "127.0.0.1",
+        "--host",
+        help="Streamable HTTP root bind host.",
+    ),
+    port: int = typer.Option(
+        8767,
+        "--port",
+        min=1,
+        max=65535,
+        help="Streamable HTTP root bind port.",
+    ),
+    path: str = typer.Option(
+        "/mcp",
+        "--path",
+        help="Streamable HTTP MCP endpoint path.",
+    ),
+) -> None:
+    """Run the OneTool root MCP server."""
+    _start_root_runtime(
+        config=config,
+        secrets=secrets,
+        transport=transport,
+        host=host,
+        port=port,
+        path=path,
+    )
 
 
 def _next_bak(path: Path) -> Path:
@@ -588,7 +726,7 @@ def init_validate(
 
 
 @app.callback(invoke_without_command=True)
-def serve(
+def root_callback(
     ctx: typer.Context,
     _version: bool | None = typer.Option(
         None,
@@ -617,8 +755,8 @@ def serve(
     The server communicates via stdio and is typically invoked by MCP clients.
 
     Examples:
-        onetool --config /path/to/.onetool/onetool.yaml
-        onetool --config /path/to/.onetool/onetool.yaml --secrets /path/to/.onetool/secrets.yaml
+        onetool serve --config /path/to/.onetool/onetool.yaml
+        onetool serve --config /path/to/.onetool/onetool.yaml --secrets /path/to/.onetool/secrets.yaml
     """
     # Only run if no subcommand was invoked (handles --help automatically)
     if ctx.invoked_subcommand is not None:
@@ -626,7 +764,7 @@ def serve(
 
     if config is None:
         console.print("[red]Error: Missing option '--config' / '-c'.[/red]")
-        console.print("Usage: onetool --config /path/to/.onetool/onetool.yaml")
+        console.print("Usage: onetool serve --config /path/to/.onetool/onetool.yaml")
         raise typer.Exit(1)
     if not config.exists():
         if _stdin_is_tty():
@@ -647,29 +785,20 @@ def serve(
             )
             raise typer.Exit(1)
 
+    console.print(
+        "[yellow]Warning:[/yellow] prefer explicit runtime invocation: "
+        f"onetool serve --config {config}"
+    )
+
     # Remove loguru's default stderr handler before any logging occurs
     import ot.logging  # noqa: F401
-
-    # Load config (secrets threaded through load_config)
-    from ot.config.loader import get_config
-
-    try:
-        get_config(config, reload=True, secrets_path=secrets)
-    except Exception as e:
-        _write_startup_config_error(config, e)
-        console.print(f"[red]Error loading config:[/red] {e}")
-        raise typer.Exit(1) from e
-
-    # Set up signal handlers for clean exit (before starting server)
+    _load_runtime_config(config, secrets)
     _setup_signal_handlers()
-
-    # Print startup banner to stderr (stdout is for MCP JSON-RPC)
     _print_startup_banner()
 
-    # Import here to avoid circular imports and only load when needed
-    from ot.server import main as server_main
+    from ot.server import run_root_server
 
-    server_main()
+    run_root_server(transport="stdio")
 
 
 def cli() -> None:

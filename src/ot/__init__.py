@@ -8,10 +8,10 @@ Features:
 
 Usage:
     # Start MCP server (stdio transport)
-    onetool
+    onetool serve --config config/onetool.yaml
 
-    # With config
-    onetool --config config/onetool.yaml
+    # With config and secrets
+    onetool serve --config config/onetool.yaml --secrets config/secrets.yaml
 
     # Run benchmarks
     bench run harness.yaml

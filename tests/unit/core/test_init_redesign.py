@@ -416,8 +416,8 @@ def test_init_config_creates_missing_directory(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_serve_missing_config_non_interactive_exits(tmp_path: Path) -> None:
-    """onetool serve with missing config and non-TTY stdin prints message and exits 1."""
+def test_root_invocation_missing_config_non_interactive_exits(tmp_path: Path) -> None:
+    """Root compatibility invocation with missing config exits 1."""
     from unittest.mock import patch
 
     from typer.testing import CliRunner
@@ -436,8 +436,10 @@ def test_serve_missing_config_non_interactive_exits(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_serve_missing_config_interactive_declined_exits(tmp_path: Path) -> None:
-    """onetool serve with missing config in TTY mode, user declines init — exits 1."""
+def test_root_invocation_missing_config_interactive_declined_exits(
+    tmp_path: Path,
+) -> None:
+    """Root compatibility invocation with missing config exits when init is declined."""
     from unittest.mock import patch
 
     from typer.testing import CliRunner
@@ -456,8 +458,10 @@ def test_serve_missing_config_interactive_declined_exits(tmp_path: Path) -> None
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_serve_missing_config_interactive_accepted_calls_ensure_ot_dir(tmp_path: Path) -> None:
-    """onetool serve with missing config in TTY mode, user accepts — ensure_ot_dir is called."""
+def test_root_invocation_missing_config_interactive_accepted_calls_ensure_ot_dir(
+    tmp_path: Path,
+) -> None:
+    """Root compatibility invocation with missing config can initialize in TTY mode."""
     from unittest.mock import MagicMock, patch
 
     from typer.testing import CliRunner
@@ -475,7 +479,7 @@ def test_serve_missing_config_interactive_accepted_calls_ensure_ot_dir(tmp_path:
     import types
 
     fake_server = types.ModuleType("ot.server")
-    fake_server.main = MagicMock()
+    fake_server.run_root_server = MagicMock()
 
     with (
         patch("onetool.cli._stdin_is_tty", return_value=True),
@@ -489,6 +493,27 @@ def test_serve_missing_config_interactive_accepted_calls_ensure_ot_dir(tmp_path:
 
     assert mock_ensure.call_count == 1
     assert "Initialized" in result.output
+    fake_server.run_root_server.assert_called_once_with(transport="stdio")
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_serve_missing_config_fails_fast(tmp_path: Path) -> None:
+    """Explicit serve command with missing config fails without interactive init."""
+    from unittest.mock import patch
+
+    from typer.testing import CliRunner
+
+    from onetool.cli import app
+
+    config_path = tmp_path / ".onetool" / "onetool.yaml"
+
+    with patch("onetool.cli._stdin_is_tty", return_value=True):
+        result = CliRunner().invoke(app, ["serve", "--config", str(config_path)])
+
+    assert result.exit_code == 1
+    assert "OneTool not initialized" in result.output
+    assert "Initialize now?" not in result.output
 
 
 @pytest.mark.unit

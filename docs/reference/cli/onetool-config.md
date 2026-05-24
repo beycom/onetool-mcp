@@ -286,7 +286,7 @@ tools:
 API keys stored separately in `secrets.yaml` (gitignored). Pass the path via `--secrets`:
 
 ```bash
-onetool --config .onetool/onetool.yaml --secrets .onetool/secrets.yaml
+onetool serve --config .onetool/onetool.yaml --secrets .onetool/secrets.yaml
 ```
 
 ```yaml

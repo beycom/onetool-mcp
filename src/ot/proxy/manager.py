@@ -10,6 +10,7 @@ import asyncio
 import contextlib
 import json
 import os
+import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -80,6 +81,7 @@ class ProxyManager:
         self._initialized = False
         self._loop: asyncio.AbstractEventLoop | None = None
         self._connect_task: asyncio.Task[None] | None = None
+        self._mutation_lock = threading.RLock()
 
     @property
     def servers(self) -> list[str]:
@@ -511,15 +513,15 @@ class ProxyManager:
                 tools = await client.list_tools()
                 tools = [_strip_ctx_from_schema(t) for t in tools]
 
-                self._clients[name] = client
-                self._tools_by_server[name] = tools
-                self._server_timeouts[name] = float(config.timeout)
-
                 # Capture native instructions from InitializeResult (MCP standard)
                 init_result = getattr(client, "initialize_result", None)
-                self._server_instructions[name] = (
-                    (init_result.instructions or "") if init_result else ""
-                )
+                with self._mutation_lock:
+                    self._clients[name] = client
+                    self._tools_by_server[name] = tools
+                    self._server_timeouts[name] = float(config.timeout)
+                    self._server_instructions[name] = (
+                        (init_result.instructions or "") if init_result else ""
+                    )
 
                 span.add("toolCount", len(tools))
                 logger.info(
@@ -622,13 +624,14 @@ class ProxyManager:
 
     def _reset_state(self) -> None:
         """Reset all connection state without disconnecting (for cases where loop is unavailable)."""
-        self._clients.clear()
-        self._tools_by_server.clear()
-        self._errors.clear()
-        self._server_timeouts.clear()
-        self._server_instructions.clear()
-        self._initialized = False
-        self._connect_task = None
+        with self._mutation_lock:
+            self._clients.clear()
+            self._tools_by_server.clear()
+            self._errors.clear()
+            self._server_timeouts.clear()
+            self._server_instructions.clear()
+            self._initialized = False
+            self._connect_task = None
 
     async def _close_client_transport(self, client: Client) -> None:  # type: ignore[type-arg]
         """Close the underlying transport when FastMCP exposes an async close hook."""
@@ -659,12 +662,13 @@ class ProxyManager:
                 except (Exception, asyncio.CancelledError) as e:
                     logger.debug(f"Error disconnecting from '{name}': {e}")
 
-            self._clients.clear()
-            self._tools_by_server.clear()
-            self._errors.clear()
-            self._server_timeouts.clear()
-            self._server_instructions.clear()
-            self._initialized = False
+            with self._mutation_lock:
+                self._clients.clear()
+                self._tools_by_server.clear()
+                self._errors.clear()
+                self._server_timeouts.clear()
+                self._server_instructions.clear()
+                self._initialized = False
 
     async def reconnect(self, configs: dict[str, McpServerConfig]) -> None:
         """Reconnect to all MCP servers.
@@ -687,17 +691,20 @@ class ProxyManager:
         Returns:
             Status string: "ok (N tools)", "already connected", "disabled", or "failed: <reason>".
         """
-        if name in self._clients:
-            return "already connected"
-        if not config.enabled:
-            return "disabled"
+        with self._mutation_lock:
+            if name in self._clients:
+                return "already connected"
+            if not config.enabled:
+                return "disabled"
         try:
             await self._connect_server(name, config)
-            self._errors.pop(name, None)
-            tool_count = len(self._tools_by_server.get(name, []))
+            with self._mutation_lock:
+                self._errors.pop(name, None)
+                tool_count = len(self._tools_by_server.get(name, []))
             return f"ok ({tool_count} tools)"
         except Exception as e:
-            self._errors[name] = str(e)
+            with self._mutation_lock:
+                self._errors[name] = str(e)
             logger.warning(f"Failed to connect to MCP server '{name}': {e}")
             return f"failed: {e}"
 
@@ -730,13 +737,14 @@ class ProxyManager:
         Returns:
             Status string: "disconnected" or "not connected".
         """
-        if name not in self._clients:
-            return "not connected"
-        client = self._clients.pop(name)
-        self._tools_by_server.pop(name, None)
-        self._errors.pop(name, None)
-        self._server_instructions.pop(name, None)
-        self._server_timeouts.pop(name, None)
+        with self._mutation_lock:
+            if name not in self._clients:
+                return "not connected"
+            client = self._clients.pop(name)
+            self._tools_by_server.pop(name, None)
+            self._errors.pop(name, None)
+            self._server_instructions.pop(name, None)
+            self._server_timeouts.pop(name, None)
         try:
             await client.__aexit__(None, None, None)  # type: ignore[no-untyped-call]
             await self._close_client_transport(client)
@@ -757,7 +765,9 @@ class ProxyManager:
             Status string: "disconnected" or "not connected".
         """
         if self._loop is None or not self._loop.is_running():
-            if name in self._clients:
+            with self._mutation_lock:
+                if name not in self._clients:
+                    return "not connected"
                 self._clients.pop(name)
                 self._tools_by_server.pop(name, None)
                 self._errors.pop(name, None)
@@ -768,7 +778,6 @@ class ProxyManager:
                     "no running event loop; underlying transport may not be closed."
                 )
                 return "disconnected"
-            return "not connected"
         future = asyncio.run_coroutine_threadsafe(
             self.disconnect_server(name),
             self._loop,

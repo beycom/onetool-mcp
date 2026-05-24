@@ -12,7 +12,8 @@ Defines the MCP-owned direct API exposed by a running OneTool MCP process when
 ### Requirement: MCP-owned direct API startup
 
 When `direct.host.enabled: true`, MCP startup SHALL bind an authenticated local
-HTTP API inside the MCP process.
+HTTP API inside the MCP process, regardless of whether the root MCP transport is
+stdio or Streamable HTTP.
 
 Config fields:
 - `direct.host.enabled` — bind the MCP direct API when true
@@ -24,29 +25,50 @@ the configured port first, then increment until a free port is found.
 #### Scenario: Direct API disabled
 
 - **GIVEN** `direct.host.enabled: false`
-- **WHEN** MCP startup runs
+- **WHEN** stdio or HTTP root MCP startup runs
 - **THEN** no direct API listener SHALL be started
 - **AND** startup logs SHALL state that the direct API is disabled
 
-#### Scenario: Direct API enabled
+#### Scenario: Direct client unavailable when disabled
 
-- **GIVEN** `direct.host.enabled: true` and `direct.host.port: 9000`
+- **GIVEN** stdio or HTTP root MCP startup ran with `direct.host.enabled: false`
+- **WHEN** `onetool direct run` targets that process
+- **THEN** the command SHALL fail without executing user code
+- **AND** the error SHALL identify `direct.host.enabled` as the missing
+  requirement
+
+#### Scenario: Direct API enabled under stdio root
+
+- **GIVEN** stdio root mode
+- **AND** `direct.host.enabled: true` and `direct.host.port: 9000`
 - **WHEN** MCP startup runs
 - **THEN** it SHALL try ports `9000, 9001, ...` until one binds
-- **AND** startup logs SHALL include the configured port, candidates tried, occupied ports skipped, and successful base URL
+- **AND** startup logs SHALL include the configured port, candidates tried,
+  occupied ports skipped, and successful base URL
+
+#### Scenario: Direct API enabled under HTTP root
+
+- **GIVEN** Streamable HTTP root mode
+- **AND** `direct.host.enabled: true` and `direct.host.port: 9000`
+- **WHEN** MCP startup runs
+- **THEN** it SHALL try ports `9000, 9001, ...` until one binds
+- **AND** startup logs SHALL include the configured port, candidates tried,
+  occupied ports skipped, and successful base URL
+- **AND** the Direct API URL SHALL be logged separately from the MCP Streamable
+  HTTP URL
 
 #### Scenario: Startup failure degrades MCP startup
 
 - **GIVEN** `direct.host.enabled: true`
 - **AND** direct API startup fails
-- **WHEN** MCP startup runs
+- **WHEN** stdio or HTTP root MCP startup runs
 - **THEN** MCP startup SHALL continue
 - **AND** logs SHALL include the direct API degradation error
 
 #### Scenario: MCP shutdown closes listener
 
 - **GIVEN** the MCP-owned direct API is running
-- **WHEN** MCP shutdown runs
+- **WHEN** stdio or HTTP root MCP shutdown runs
 - **THEN** the direct API listener SHALL be stopped with the MCP process
 
 ### Requirement: authenticated API endpoints
@@ -113,12 +135,82 @@ limit before command execution.
 - **THEN** it SHALL return a signed HTTP `413`
 - **AND** SHALL NOT execute the command
 
-#### Scenario: Execute command via MCP process
+#### Scenario: Execute command via stdio root process
 
+- **GIVEN** the parent MCP process is running in stdio root mode
 - **WHEN** signed `POST /run` receives a valid run request
-- **THEN** the command SHALL execute in the MCP process using that process's loaded config, secrets, proxy connections, registry, state, and stats behavior
+- **THEN** the command SHALL execute in the MCP process using that process's
+  loaded config, secrets, proxy connections, registry, state, and stats behavior
+- **AND** command success SHALL return `success: true`
+- **AND** execution failure SHALL return `success: false`
+
+#### Scenario: Execute command via HTTP root process
+
+- **GIVEN** the parent MCP process is running in Streamable HTTP root mode
+- **WHEN** signed `POST /run` receives a valid run request
+- **THEN** the command SHALL execute in the MCP process using that process's
+  loaded config, secrets, proxy connections, registry, state, and stats behavior
 - **AND** command success SHALL return `success: true`
 - **AND** execution failure SHALL return `success: false`
 
 Multiple MCP processes SHALL be supported by binding distinct ports; users
 select the target process with `onetool direct run --port PORT`.
+
+### Requirement: Direct API Supports Child Forwarding
+
+The Direct API SHALL support signed child forwarding from restricted child MCP
+servers without depending on the parent root MCP transport.
+
+#### Scenario: Handoff child forwards run call
+
+- **GIVEN** the root OneTool process is running with `direct.host.enabled: true`
+- **WHEN** a handoff worker invokes the child OneTool `run` tool
+- **THEN** the child MCP process SHALL forward the call to the root Direct API
+- **AND** the forwarded call SHALL execute in the root OneTool process
+
+#### Scenario: Handoff worker uses root process resources
+
+- **WHEN** a forwarded run call executes
+- **THEN** it SHALL use the root process's loaded config, secrets, proxy
+  connections, registry, state, and stats behavior
+- **AND** it SHALL NOT start a second independent OneTool root process
+
+#### Scenario: Child forwards to stdio root parent
+
+- **GIVEN** a parent MCP process running in stdio root mode
+- **AND** `direct.host.enabled: true`
+- **WHEN** a child MCP server signs a run request with the parent
+  `<ot-dir>/mcp-direct/auth.key`
+- **THEN** the Direct API SHALL execute the request through the parent MCP
+  process
+
+#### Scenario: Child forwards to HTTP root parent
+
+- **GIVEN** a parent MCP process running in Streamable HTTP root mode
+- **AND** `direct.host.enabled: true`
+- **WHEN** a child MCP server signs a run request with the parent
+  `<ot-dir>/mcp-direct/auth.key`
+- **THEN** the Direct API SHALL execute the request through the parent MCP
+  process
+
+#### Scenario: Child forwarding unavailable when Direct API disabled
+
+- **GIVEN** a parent MCP process running in stdio or Streamable HTTP root mode
+- **AND** `direct.host.enabled: false`
+- **WHEN** a child MCP server attempts to forward a run request to the parent
+- **THEN** the request SHALL fail without executing user code
+- **AND** the child-facing error SHALL identify `direct.host.enabled` or parent
+  URL reachability as the missing requirement
+
+#### Scenario: Child auth mismatch rejected
+
+- **WHEN** a child MCP server signs a run request with an auth key from the wrong
+  OneTool directory
+- **THEN** the Direct API SHALL reject the request before command execution
+- **AND** the child-facing error SHALL identify an authentication failure without
+  logging key material
+
+#### Scenario: Handoff child remains private
+
+- **WHEN** the public MCP tool list is requested from the root OneTool server
+- **THEN** the child forwarding interface SHALL NOT be exposed as a public tool

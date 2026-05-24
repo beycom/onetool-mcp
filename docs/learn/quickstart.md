@@ -77,7 +77,7 @@ This checks your configuration is correct.
 ## 6. Connect to Claude Code
 
 ```bash
-claude mcp add onetool -- onetool --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
+claude mcp add onetool -- onetool serve --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
 ```
 
 Or manually add to `~/.claude/mcp.json`:
@@ -87,7 +87,7 @@ Or manually add to `~/.claude/mcp.json`:
   "mcpServers": {
     "onetool": {
       "command": "onetool",
-      "args": ["--config", "/Users/yourname/.onetool/onetool.yaml", "--secrets", "/Users/yourname/.onetool/secrets.yaml"]
+      "args": ["serve", "--config", "/Users/yourname/.onetool/onetool.yaml", "--secrets", "/Users/yourname/.onetool/secrets.yaml"]
     }
   }
 }

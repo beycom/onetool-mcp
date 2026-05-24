@@ -8,6 +8,7 @@ All changes are in-memory only — state resets on server restart.
 
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 from ot.config.loader import get_config
@@ -15,6 +16,8 @@ from ot.logging import LogSpan
 from ot.proxy import get_proxy_manager
 
 __all__ = ["disable", "enable", "restart", "server", "status"]
+
+_SERVER_MUTATION_LOCK = threading.RLock()
 
 
 def _get_server_info(server_name: str) -> dict[str, Any]:
@@ -109,7 +112,7 @@ def status(*, name: str) -> str:
 
 def enable(*, name: str) -> str:
     """Enable a disabled server and connect it."""
-    with LogSpan(span="server.enable", name=name) as s:
+    with LogSpan(span="server.enable", name=name) as s, _SERVER_MUTATION_LOCK:
         try:
             configured, proxy = _get_env()
         except ValueError as e:
@@ -139,7 +142,7 @@ def enable(*, name: str) -> str:
 
 def disable(*, name: str) -> str:
     """Disable an enabled server and disconnect it."""
-    with LogSpan(span="server.disable", name=name) as s:
+    with LogSpan(span="server.disable", name=name) as s, _SERVER_MUTATION_LOCK:
         try:
             configured, proxy = _get_env()
         except ValueError as e:
@@ -160,7 +163,7 @@ def disable(*, name: str) -> str:
 
 def restart(*, name: str) -> str:
     """Disconnect and reconnect a server."""
-    with LogSpan(span="server.restart", name=name) as s:
+    with LogSpan(span="server.restart", name=name) as s, _SERVER_MUTATION_LOCK:
         try:
             configured, proxy = _get_env()
         except ValueError as e:

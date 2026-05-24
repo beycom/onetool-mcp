@@ -237,15 +237,45 @@ The logging system SHALL integrate with FastMCP Context when available.
 
 ### Requirement: MCP Server Lifecycle Logging
 
-The system SHALL log MCP server lifecycle events.
+The system SHALL log MCP server lifecycle events with enough mode-specific
+context to distinguish stdio root, Streamable HTTP root, Direct API sidecar,
+child forwarding, proxy state, and shutdown cleanup.
 
 #### Scenario: Server start logging
 - **GIVEN** the MCP server is starting
 - **WHEN** initialization completes
 - **THEN** it SHALL log:
   - `span: "mcp.server.start"`
-  - `transport`: Transport type (stdio, sse)
+  - `transport`: Transport type (`stdio` or `streamable-http`)
   - `toolCount`: Number of registered tools
+  - config path where available
+  - whether a secrets path was supplied
+
+#### Scenario: HTTP root start logging
+- **GIVEN** Streamable HTTP root mode is starting
+- **WHEN** the HTTP server is ready to accept MCP clients
+- **THEN** startup logs SHALL include bind host, port, path, and full client URL
+- **AND** startup logs SHALL warn when the bind host is not loopback
+
+#### Scenario: Direct API sidecar logging
+- **GIVEN** Direct API startup is evaluated during root MCP startup
+- **WHEN** Direct API is disabled, ready, degraded, or stopped
+- **THEN** logs SHALL identify that state separately from root MCP transport logs
+- **AND** ready logs SHALL include the selected loopback URL
+
+#### Scenario: Child forwarding logging
+- **GIVEN** `onetool child` forwards a run request to the parent Direct API
+- **WHEN** the request succeeds or fails
+- **THEN** logs SHALL include parent URL host and port, success or failure,
+  duration, and error class where applicable
+- **AND** logs SHALL NOT include auth key material
+- **AND** logs SHALL NOT include command bodies by default
+
+#### Scenario: Proxy state logging under HTTP mode
+- **GIVEN** Streamable HTTP root mode is running
+- **WHEN** proxy servers connect, fail, enable, disable, restart, or shut down
+- **THEN** logs SHALL record server name, operation, status, transport, tool
+  count when connected, and cleanup result where applicable
 
 #### Scenario: Server stop logging
 - **GIVEN** the MCP server is running
@@ -253,6 +283,9 @@ The system SHALL log MCP server lifecycle events.
 - **THEN** it SHALL log:
   - `span: "mcp.server.stop"`
   - `duration`: Total server uptime
+  - Direct API stop result when applicable
+  - stats writer stop result when applicable
+  - proxy disconnect count and cleanup result when applicable
 
 ### Requirement: Tool Resolution Logging
 

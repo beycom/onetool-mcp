@@ -8,7 +8,9 @@ Defines read-only `ot.server()` status views plus mutable `ot_servers.*` actions
 
 ### Requirement: Server Listing
 
-The system SHALL provide an `ot.server()` function that lists all configured proxy servers and their status.
+The system SHALL provide an `ot.server()` function that lists all configured
+proxy servers and their status under both stdio root mode and Streamable HTTP
+root mode.
 
 #### Scenario: ot.server is read-only
 - **WHEN** `ot.server()` and `ot.server(status="...")` are used
@@ -20,6 +22,13 @@ The system SHALL provide an `ot.server()` function that lists all configured pro
 - **THEN** it SHALL return a formatted list of all configured servers
 - **AND** each entry SHALL include the server name, enabled state, and connection status (connected/disconnected)
 - **AND** connected servers SHALL show the number of tools they expose
+
+#### Scenario: List servers under HTTP root mode
+- **GIVEN** OneTool is running in Streamable HTTP root mode
+- **WHEN** `ot.server()` is called through the root MCP server
+- **THEN** it SHALL report the current in-memory proxy server state
+- **AND** it SHALL NOT block unrelated HTTP MCP requests while reading that state
+- **AND** it SHALL NOT mutate proxy configuration or runtime state
 
 ### Requirement: Server Status Query
 
@@ -35,7 +44,9 @@ The system SHALL support querying detailed status for a single named server.
 
 ### Requirement: Runtime Server Enable/Disable
 
-The system SHALL support enabling and disabling named proxy servers at runtime without restarting the MCP server.
+The system SHALL support enabling and disabling named proxy servers at runtime
+without restarting the MCP server, including under concurrent Streamable HTTP
+root requests.
 
 #### Scenario: Enable a disabled server
 - **WHEN** `ot_servers.enable(name="devtools-auto")` is called
@@ -50,6 +61,15 @@ The system SHALL support enabling and disabling named proxy servers at runtime w
 - **THEN** it SHALL set the server's enabled flag to false in-memory
 - **AND** disconnect the server
 - **AND** return a confirmation message
+
+#### Scenario: Concurrent HTTP root mutations
+- **GIVEN** OneTool is running in Streamable HTTP root mode
+- **WHEN** multiple clients concurrently call `ot_servers.enable`,
+  `ot_servers.disable`, or `ot_servers.restart` for the same proxy server
+- **THEN** those mutations SHALL be serialized or otherwise protected
+- **AND** the final in-memory server state SHALL be consistent
+- **AND** no proxy subprocess, transport, or registered tool mapping SHALL be
+  left orphaned or duplicated
 
 #### Scenario: Enable already-enabled server
 - **WHEN** `ot_servers.enable(name="devtools-auto")` is called
@@ -71,9 +91,17 @@ The system SHALL support enabling and disabling named proxy servers at runtime w
 - **THEN** the YAML configuration file SHALL NOT be modified
 - **AND** the change SHALL be lost when the MCP server restarts
 
+#### Scenario: HTTP root mutation does not modify YAML
+- **GIVEN** OneTool is running in Streamable HTTP root mode
+- **WHEN** `ot_servers.enable(name="devtools-auto")` or
+  `ot_servers.disable(name="devtools-auto")` is called
+- **THEN** the YAML configuration file SHALL NOT be modified
+- **AND** the change SHALL be lost when the MCP server restarts
+
 ### Requirement: Server Restart
 
-The system SHALL support restarting a named proxy server.
+The system SHALL support restarting a named proxy server under both stdio root
+mode and Streamable HTTP root mode.
 
 #### Scenario: Restart a connected server
 - **WHEN** `ot_servers.restart(name="devtools-isolated")` is called
@@ -85,6 +113,14 @@ The system SHALL support restarting a named proxy server.
 - **AND** the server is currently disconnected
 - **THEN** it SHALL attempt to connect the server
 - **AND** report success or failure
+
+#### Scenario: Concurrent HTTP root restart
+- **GIVEN** OneTool is running in Streamable HTTP root mode
+- **WHEN** a proxy server restart races with status reads or enable/disable
+  requests for the same server
+- **THEN** runtime state SHALL remain internally consistent
+- **AND** status reads SHALL return either the previous, connecting, failed, or
+  connected state without raising an unhandled concurrency error
 
 ### Requirement: Incremental server connect
 The `ProxyManager` SHALL support connecting a single new server without disconnecting or reconnecting any existing server connections.

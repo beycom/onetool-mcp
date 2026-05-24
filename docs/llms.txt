@@ -9,7 +9,7 @@ OneTool reduces tool-definition context overhead by exposing tools as Python API
 ```bash
 uv tool install 'onetool-mcp[all]'
 onetool init --config ~/.onetool
-onetool --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
+onetool serve --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
 ```
 
 ## Invocation
