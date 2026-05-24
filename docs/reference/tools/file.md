@@ -198,6 +198,9 @@ file.resolve(glob="wip/**/*.log", path_type="absolute", gitignore=False, multi="
 # Search for a regex pattern (glob always recurses — "*.py" == "**/*.py")
 file.grep(pattern="LogSpan", path="src/", glob="*.py")
 
+# One rg-style match per line with no context separators
+file.grep(pattern="def ", path="src/", glob="*.py", context=0, max_matches=5000)
+
 # Case-insensitive with context lines
 file.grep(pattern="TODO", path=".", context=3, case_sensitive=False)
 
@@ -213,6 +216,10 @@ file.grep(pattern="error", path=".", gitignore=False)
 # Explicitly opt in (same as default)
 file.grep(pattern="secret", path=".", gitignore=True)
 ```
+
+`file.grep` is a pure-Python search, not a native `rg` wrapper. It follows
+OneTool file safety policy, skips binary and oversized files, respects
+`.gitignore` by default, and uses `max_matches` as the public total match cap.
 
 ### Navigating Sections
 

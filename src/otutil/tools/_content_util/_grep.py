@@ -12,7 +12,7 @@ def grep_lines(
     content: str,
     regex: re.Pattern[str],
     context: int = 2,
-    max_groups: int = 10,
+    max_groups: int | None = None,
 ) -> list[list[tuple[int, str, bool]]]:
     """Find regex matches in content and return grouped context windows.
 
@@ -20,7 +20,8 @@ def grep_lines(
         content: Text content to search
         regex: Compiled regex pattern
         context: Number of context lines before/after each match
-        max_groups: Maximum number of match groups to return
+        max_groups: Maximum number of match groups to return. None means no
+            group cap.
 
     Returns:
         List of groups; each group is a list of (lineno_1based, line, is_match) tuples.
@@ -46,7 +47,7 @@ def grep_lines(
         else:
             ranges.append((start, end))
 
-    if len(ranges) > max_groups:
+    if max_groups is not None and len(ranges) > max_groups:
         ranges = ranges[:max_groups]
 
     match_set = set(match_line_idxs)

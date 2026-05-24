@@ -1158,6 +1158,54 @@ def test_grep_context_lines(grep_dir: Path) -> None:
 
 @pytest.mark.unit
 @pytest.mark.tools
+def test_grep_context_zero_returns_all_match_groups(tmp_path: Path) -> None:
+    """context=0 returns all matches allowed by max_matches."""
+    from otutil.tools.file import grep
+
+    lines = [f"def func_{idx}(): pass" for idx in range(12)]
+    (tmp_path / "many.py").write_text("\n".join(lines) + "\n")
+
+    result = grep(pattern="def ", path=str(tmp_path), context=0, max_matches=20)
+
+    assert result.count("many.py:") == 12
+    assert "many.py:12: def func_11(): pass" in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_grep_context_zero_has_no_blank_group_separators(tmp_path: Path) -> None:
+    """context=0 uses one match per line without blank group separators."""
+    from otutil.tools.file import grep
+
+    (tmp_path / "many.py").write_text("def one(): pass\nx = 1\ndef two(): pass\n")
+
+    result = grep(pattern="def ", path=str(tmp_path), context=0)
+
+    assert result.splitlines() == [
+        "many.py:1: def one(): pass",
+        "many.py:3: def two(): pass",
+    ]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_grep_max_matches_caps_total_output(tmp_path: Path) -> None:
+    """max_matches remains the public total result cap."""
+    from otutil.tools.file import grep
+
+    lines = [f"def func_{idx}(): pass" for idx in range(5)]
+    (tmp_path / "many.py").write_text("\n".join(lines) + "\n")
+
+    result = grep(pattern="def ", path=str(tmp_path), context=0, max_matches=3)
+
+    assert result.count("many.py:") == 3
+    assert "many.py:3: def func_2(): pass" in result
+    assert "many.py:4: def func_3(): pass" not in result
+    assert "... (stopped at 3 matches)" in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
 def test_grep_no_match(grep_dir: Path) -> None:
     """Returns 'No matches found' when pattern not in any file."""
     from otutil.tools.file import grep

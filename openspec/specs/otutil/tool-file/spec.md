@@ -317,6 +317,14 @@ The `file.grep()` function SHALL search file contents using pure-Python regex (n
 - **GIVEN** many matches across files
 - **WHEN** matches exceed `max_matches` (default: 500)
 - **THEN** it SHALL stop and append a truncation notice
+- **AND** it SHALL NOT apply any additional hidden per-file or per-group cap
+
+#### Scenario: Zero context output format
+- **GIVEN** a file with multiple non-adjacent matching lines
+- **WHEN** `file.grep(pattern="foo", context=0)` is called
+- **THEN** each match SHALL be returned as one line in `filename:lineno: line`
+  format
+- **AND** blank separator lines SHALL NOT be inserted between match lines
 
 #### Scenario: Gitignore respected by default
 - **GIVEN** a `.gitignore` at the search root listing `ignored.py`

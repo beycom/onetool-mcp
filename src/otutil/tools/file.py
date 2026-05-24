@@ -1353,12 +1353,19 @@ def grep(
                     break
                 block_lines: list[str] = []
                 for lineno, line, is_match in group:
+                    if is_match and total_matches >= max_matches:
+                        break
                     if is_match:
                         block_lines.append(f"{display}:{lineno}: {line}")
                         total_matches += 1
                     else:
                         block_lines.append(f"{display}-{lineno}- {line}")
-                output_parts.append("\n".join(block_lines))
+                if not block_lines:
+                    continue
+                if context == 0:
+                    output_parts.extend(block_lines)
+                else:
+                    output_parts.append("\n".join(block_lines))
 
         if not output_parts:
             s.add(resultCount=0)
@@ -1368,7 +1375,8 @@ def grep(
             output_parts.append(f"\n... (stopped at {max_matches} matches)")
 
         s.add(resultCount=total_matches)
-        return "\n\n".join(output_parts)
+        separator = "\n" if context == 0 else "\n\n"
+        return separator.join(output_parts)
 
 
 def read_batch(
