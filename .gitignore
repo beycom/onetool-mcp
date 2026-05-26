@@ -138,3 +138,4 @@ tests/explore/*-results.md
 
 # Test data (downloaded via `just test::setup`)
 tests/data/
+.localhist/

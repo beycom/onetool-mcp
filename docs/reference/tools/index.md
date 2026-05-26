@@ -1,6 +1,6 @@
 # Tool Reference
 
-**29 Packs. 255 Tools.**
+**30 Packs. 269 Tools.**
 
 Complete reference of all built-in tool packs and functions.
 
@@ -12,7 +12,7 @@ Tools are split into optional install extras. Install only what you need:
 |-------|---------------|
 | *(core, always included)* | `ot_caveman` (alias `cm`), `ctx`, `ot`, `ot_forge`, `ot_llm`, `ot_secrets`, `ot_servers`, `ot_timer` |
 | `[util]` | `brave`, `convert`, `excel`, `file`, `ground`, `knowledge`, `mem`, `tavily` |
-| `[dev]` | `arch`, `aws`, `chrome_util`, `context7`, `db`, `diagram`, `ide`, `package`, `play_util`, `ripgrep`, `whiteboard`, `webfetch` |
+| `[dev]` | `arch`, `aws`, `chrome_util`, `context7`, `db`, `diagram`, `ide`, `localhist`, `package`, `play_util`, `ripgrep`, `whiteboard`, `webfetch` |
 | `[all]` | All of the above |
 
 ```bash
@@ -38,6 +38,7 @@ uv tool install 'onetool-mcp[util,dev]'  # most tools
 | [**Ground**](ground.md) | `[util]` | Grounded search with sources. | 5 | [Google Gemini](https://ai.google.dev/) (MIT) | `dev`, `docs`, `reddit`, `search`, `search_batch` |
 | [**IDE**](ide.md) | `[dev]` | Read-only VS Code state retrieval through a local companion bridge. | 6 | GPL-3.0 | `connect`, `editor`, `file`, `sel`, `state`, `workspace` |
 | [**Knowledge**](knowledge.md) | `[util]` | Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis. | 15 | MIT | `append`, `ask`, `dbs`, `delete`, `grep`, `info`, `list`, `read`, `related`, `search`, `slice`, `stats`, `toc`, `update`, `write` |
+| [**Localhist**](localhist.md) | `[dev]` | Project-local history snapshots backed by an independent Git database. | 14 | MIT | `add_exclude`, `add_force_include`, `autosave_list`, `autosave_start`, `autosave_stop`, `diff`, `history`, `info`, `init`, `log`, `restore`, `save`, `show`, `status` |
 | [**Mem**](mem.md) | `[util]` | Persistent AI agent memory with semantic search. | 29 | MIT | `append`, `ask`, `context`, `count`, `decay`, `delete`, `export`, `flush`, `grep`, `inspect`, `load`, `list`, `query`, `read`, `read_batch`, `refresh`, `reindex`, `restore`, `search`, `slice`, `slice_batch`, `snap`, `stale`, `stats`, `toc`, `update`, `update_batch`, `write`, `write_batch` |
 | [**OT Context**](ot_context.md) | core | TTL-expiring, BM25-indexed storage for large tool outputs. | 13 | MIT | `append`, `ask`, `delete`, `grep`, `inspect`, `list`, `purge`, `query`, `read`, `slice`, `stats`, `toc`, `write` |
 | [**OT Core**](ot_core.md) | core | Introspection and management tools. | 19 | MIT | `aliases`, `config`, `debug`, `health`, `help`, `pack_info`, `packs`, `reload`, `result`, `security`, `server`, `servers`, `skills`, `snippet_info`, `snippets`, `stats`, `tool_info`, `tools`, `version` |

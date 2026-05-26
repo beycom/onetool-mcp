@@ -184,6 +184,7 @@ nav:
               - Ground: reference/tools/ground.md
               - IDE: reference/tools/ide.md
               - Knowledge: reference/tools/knowledge.md
+              - Localhist: reference/tools/localhist.md
               - Mem: reference/tools/mem.md
               - Package: reference/tools/package.md
               - Playwright Util: reference/tools/play-util.md
