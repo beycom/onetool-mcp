@@ -97,6 +97,7 @@ credentials/
 docs/_wip/
 scratch/
 diagrams/
+.localhist/
 msg/
 plan/
 wip/
