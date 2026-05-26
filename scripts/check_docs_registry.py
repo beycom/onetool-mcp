@@ -42,7 +42,6 @@ NAME_TO_PACK = {
     "File": "file",
     "OT Forge": "ot_forge",
     "Ground": "ground",
-    "IDE": "ide",
     "OT LLM": "ot_llm",
     "Mem": "mem",
     "OT Core": "ot",

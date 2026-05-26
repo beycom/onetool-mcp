@@ -7,7 +7,6 @@ Usage:
 """
 
 import argparse
-import importlib.util
 import re
 import shutil
 import subprocess
@@ -70,17 +69,6 @@ def clean_build_dirs() -> list[str]:
     return removed
 
 
-def build_vscode_extension() -> Path:
-    """Build the VS Code companion extension and copy the VSIX into dist."""
-    script_path = PROJECT_ROOT / "scripts" / "build_ide_vscode.py"
-    spec = importlib.util.spec_from_file_location("build_ide_vscode", script_path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError("Unable to load scripts/build_ide_vscode.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.build_extension()
-
-
 def main():
     global DRY_RUN
 
@@ -116,16 +104,6 @@ def main():
     if removed:
         print(f"  Removing: {', '.join(removed)}")
     run("uv build")
-    print()
-    print("─" * 40)
-    print("Step 1b: Build VS Code extension")
-    print("─" * 40)
-    if DRY_RUN:
-        run("uv run python scripts/build_ide_vscode.py")
-        print("  Would copy generated .vsix to dist/")
-    else:
-        vsix_path = build_vscode_extension()
-        print(f"  Built VSIX: {vsix_path.relative_to(PROJECT_ROOT)}")
     print()
 
     # Step 2: Git

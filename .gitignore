@@ -75,7 +75,6 @@ htmlcov/
 
 # Package manager files
 package-lock.json
-!packages/onetool-ide-vscode/package-lock.json
 yarn.lock
 pnpm-lock.yaml
 composer.lock
@@ -98,6 +97,7 @@ credentials/
 docs/_wip/
 scratch/
 diagrams/
+.localhist/
 msg/
 plan/
 wip/
