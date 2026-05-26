@@ -85,7 +85,6 @@ Use `resolve_ot_path()` when the file belongs to OneTool's active configuration/
 from ot.meta import resolve_ot_path
 
 db_path = resolve_ot_path("mem.db")              # <OT_DIR>/mem.db
-auth_key = resolve_ot_path("ide/auth.key")       # <OT_DIR>/ide/auth.key
 log_path = resolve_ot_path("logs/serve.log")     # <OT_DIR>/logs/serve.log
 ```
 
@@ -111,7 +110,7 @@ If a path is project-relative, do not use `expand_path()`. If a path is OneTool-
 
 ## Project State
 
-`otpack` provides `get_state(pack, key)` and `set_state(pack, key, value)` for small project-local runtime state, such as a selected IDE connection id.
+`otpack` provides `get_state(pack, key)` and `set_state(pack, key, value)` for small project-local runtime state.
 
 State is not OneTool config and is not read from `onetool.yaml`. It lives under the effective project working directory:
 

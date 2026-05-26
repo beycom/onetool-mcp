@@ -41,7 +41,6 @@ check:
     just lint
     just typecheck
     just test-all
-    cd packages/onetool-ide-vscode && npm install && npm test
     just secrets-check
     just docs-sync
     uv run mkdocs build --strict
@@ -66,13 +65,12 @@ set-version version:
     sed -i '' 's/"version": ".*"/"version": "{{ version }}"/g' server.json
     sed -i '' 's/^version = ".*"/version = "{{ version }}"/' packages/onetool-pack/pyproject.toml
     sed -i '' 's/^version = ".*"/version = "{{ version }}"/' packages/onetool-bench/pyproject.toml
-    @echo "Updated pyproject.toml, server.json, and package pyprojects. VS Code extension version is independent."
+    @echo "Updated pyproject.toml, server.json, and package pyprojects."
 
 # Build package
 build:
     rm -rf dist/ build/ *.egg-info
     uv build
-    just build-ide-vscode
 
 # Publish to PyPI
 pypi:

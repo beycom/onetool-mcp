@@ -177,55 +177,6 @@ class TestForceContextDunder:
         mock_write.assert_not_called()
         assert "help" in result.result
 
-    def test_ide_focused_helpers_disable_sanitization(self):
-        """IDE helper calls return inline text without external-content wrapping."""
-        cfg = _make_config(max_inline_size=5000)
-        cfg.security.sanitize.enabled = True
-
-        with (
-            patch("ot.executor.runner.get_config", return_value=cfg),
-            patch("ot.executor.runner.load_tool_registry"),
-            patch("ot.executor.runner.build_execution_namespace", return_value={}),
-            patch("ot.proxy.get_proxy_manager") as mock_pm,
-            patch(
-                "ot.executor.runner.execute_python_code",
-                return_value=("/repo/src/app.py", "/repo/src/app.py", True, "json", False),
-            ),
-        ):
-            mock_pm.return_value.servers = {}
-            from ot.executor.runner import execute_command
-
-            result = asyncio.run(execute_command("ide.file()"))
-
-        assert result.success, f"Command failed: {result.result}"
-        assert result.should_sanitize is False
-        assert result.result == "/repo/src/app.py"
-
-    def test_ide_state_disables_sanitization(self):
-        """ide.state() returns structured IDE state without external-content wrapping."""
-        cfg = _make_config(max_inline_size=5000)
-        cfg.security.sanitize.enabled = True
-        state_json = '{"connection":{"id":"onetool-mcp"}}'
-
-        with (
-            patch("ot.executor.runner.get_config", return_value=cfg),
-            patch("ot.executor.runner.load_tool_registry"),
-            patch("ot.executor.runner.build_execution_namespace", return_value={}),
-            patch("ot.proxy.get_proxy_manager") as mock_pm,
-            patch(
-                "ot.executor.runner.execute_python_code",
-                return_value=(state_json, {"connection": {"id": "onetool-mcp"}}, True, "json", False),
-            ),
-        ):
-            mock_pm.return_value.servers = {}
-            from ot.executor.runner import execute_command
-
-            result = asyncio.run(execute_command("ide.state()"))
-
-        assert result.success, f"Command failed: {result.result}"
-        assert result.should_sanitize is False
-        assert result.result == state_json
-
     def test_deflect_summary_includes_next_commands(self):
         """Handle summary includes deterministic next commands."""
         cfg = _make_config(max_inline_size=10)

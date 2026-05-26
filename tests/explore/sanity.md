@@ -17,7 +17,7 @@ ot_servers.enable(name="chrome_devtools")
 ```
 
 Test out the following packs:
-Packs: arch, aws, brave, chrome_util, context7, convert, db, diagram, excel, file, ground, ide, knowledge, mem, ot, ot_caveman, ot_context, ot_forge, ot_image, ot_llm, ot_secrets, ot_servers, ot_timer, package, play_util, ripgrep, tavily, webfetch, whiteboard
+Packs: arch, aws, brave, chrome_util, context7, convert, db, diagram, excel, file, ground, knowledge, mem, ot, ot_caveman, ot_context, ot_forge, ot_image, ot_llm, ot_secrets, ot_servers, ot_timer, package, play_util, ripgrep, tavily, webfetch, whiteboard
 
 Test out the following proxy servers separately:
 Proxy servers: chrome_devtools, github, playwright
@@ -29,7 +29,6 @@ When testing:
 - convert with files at tests/data/
 - db with db at tests/data/northwind.db (25MB, download via `just test-setup`)
 - excel with files at tests/data/
-- ide: test read-only connection/state helpers (`ide.state()`, `ide.sel()`, `ide.workspace()`); if no IDE bridge is connected, note as environment gap.
 - mem: use `tmp/test/` topic prefix for all writes. Test write, read, list, search, toc, slice, snap/restore, stale/refresh, write_batch, read_batch, slice_batch, stats, export/load, update, delete, decay, context, flush. Clean up with `mem.delete(topic="tmp/", confirm=True)` when done.
 - diagram: list_providers, get_template, generate_source, render_diagram, get_playground_url
 - ot_caveman: compact and expand short inline text; do not use protected content as the primary assertion.
