@@ -172,12 +172,8 @@ def reload() -> str:
         ot.executor.param_resolver.get_tool_param_names.cache_clear()
         ot.executor.param_resolver._mcp_param_cache.clear()
 
-        # Clean up dynamically loaded tool modules from sys.modules
-        # Tool loader uses "ot_tool.{parent}.{stem}" naming pattern
-        tool_modules = [name for name in sys.modules if name.startswith("ot_tool.")]
-        for mod_name in tool_modules:
-            del sys.modules[mod_name]
-        s.add("toolModulesCleared", len(tool_modules))
+        tool_modules_cleared = ot.executor.tool_loader.clear_reloadable_tool_modules()
+        s.add("toolModulesCleared", tool_modules_cleared)
 
         # Reload config to validate and report stats
         cfg = get_config()

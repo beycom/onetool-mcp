@@ -390,6 +390,36 @@ def test_reload_resets_runtime_tool_caches() -> None:
     hook.assert_called_once_with()
 
 
+@pytest.mark.unit
+@pytest.mark.serve
+def test_reload_clears_tool_and_helper_modules() -> None:
+    """Verify ot.reload() clears tool modules and owned helper packages."""
+    import sys
+    from types import ModuleType
+
+    from ot.meta import reload
+
+    module_names = [
+        "ot_tool.tools.custom",
+        "ottools.ot_timer",
+        "otdev.tools._localhist.core",
+        "otutil.tools.file",
+    ]
+    unrelated = "otdev.not_tools"
+    for name in module_names:
+        sys.modules[name] = ModuleType(name)
+    sentinel = ModuleType(unrelated)
+    sys.modules[unrelated] = sentinel
+
+    result = reload()
+
+    assert "OK" in result
+    for name in module_names:
+        assert name not in sys.modules
+    assert sys.modules[unrelated] is sentinel
+    del sys.modules[unrelated]
+
+
 # ============================================================================
 # Aliases and Snippets Tests
 # ============================================================================
