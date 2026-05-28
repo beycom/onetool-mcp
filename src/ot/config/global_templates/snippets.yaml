@@ -14,8 +14,8 @@ snippets:
       count: { default: 10, description: "Results per query" }
     body: |
       __format__="yml_h";__sanitize__=False
-      {% set _qs = q.split('|') | map('trim') | list %}
-      br.search_batch(queries=[{% for item in _qs %}"{{ item }}"{% if not loop.last %}, {% endif %}{% endfor %}], count={{ count }})
+      _queries = [item.strip() for item in {{ q | tojson }}.split("|") if item.strip()]
+      br.search_batch(queries=_queries, count=int({{ count | tojson }}))
 
 
   # ============================================================================
@@ -29,7 +29,7 @@ snippets:
       q: { default: "", description: "Natural language question for semantic reranking (e.g., 'How do I configure middleware?')" }
     body: |
       __format__="yml_h";__sanitize__=False
-      c7.doc(library_id="{{ lib }}", query="{{ q }}")
+      c7.doc(library_id={{ lib | tojson }}, query={{ q | tojson }})
 
   # ============================================================================
   # GROUND SEARCH (g)
@@ -43,8 +43,8 @@ snippets:
       focus: { default: "general", description: "Focus mode: general, code, documentation, troubleshooting" }
     body: |
       __format__="yml_h";__sanitize__=False
-      {% set _qs = q.split('|') | map('trim') | list %}
-      g.search_batch(queries=[{% for item in _qs %}"{{ item }}"{% if not loop.last %}, {% endif %}{% endfor %}], context="{{ tech }}", focus="{{ focus }}")
+      _queries = [item.strip() for item in {{ q | tojson }}.split("|") if item.strip()]
+      g.search_batch(queries=_queries, context={{ tech | tojson }}, focus={{ focus | tojson }})
 
   # ============================================================================
   # TAVILY SEARCH (tav)
@@ -58,8 +58,8 @@ snippets:
       count: { default: 5, description: "Max results per query" }
     body: |
       __format__="yml_h";__sanitize__=False
-      {% set _qs = q.split('|') | map('trim') | list %}
-      tav.search_batch(queries=[{% for item in _qs %}"{{ item }}"{% if not loop.last %}, {% endif %}{% endfor %}], max_results={{ count }}, search_depth="{{ depth }}")
+      _queries = [item.strip() for item in {{ q | tojson }}.split("|") if item.strip()]
+      tav.search_batch(queries=_queries, max_results=int({{ count | tojson }}), search_depth={{ depth | tojson }})
 
   tav_x:
     description: Extract clean content from one or more URLs via Tavily (pipe-separate multiple)
@@ -68,8 +68,8 @@ snippets:
       depth: { default: "basic", description: "Extraction depth: basic or advanced" }
     body: |
       __format__="yml_h";__sanitize__=False
-      {% set _urls = url.split('|') | map('trim') | list %}
-      tav.extract(urls=[{% for u in _urls %}"{{ u }}"{% if not loop.last %}, {% endif %}{% endfor %}], extract_depth="{{ depth }}")
+      _urls = [item.strip() for item in {{ url | tojson }}.split("|") if item.strip()]
+      tav.extract(urls=_urls, extract_depth={{ depth | tojson }})
 
   # ============================================================================
   # PACKAGE (pkg)
@@ -81,7 +81,7 @@ snippets:
       path: { default: ".", description: "Project directory path" }
     body: |
       __format__="yml_h";__sanitize__=False
-      pkg.audit(path="{{ path }}")
+      pkg.audit(path={{ path | tojson }})
 
   pkg_npm:
     description: Check latest npm package versions
@@ -89,8 +89,8 @@ snippets:
       packages: { description: "Comma-separated package names" }
     body: |
       __format__="yml_h";__sanitize__=False
-      {% set _pkgs = packages.split(',') | map('trim') | list %}
-      pkg.npm(packages=[{% for p in _pkgs %}"{{ p }}"{% if not loop.last %}, {% endif %}{% endfor %}])
+      _packages = [item.strip() for item in {{ packages | tojson }}.split(",") if item.strip()]
+      pkg.npm(packages=_packages)
 
   pkg_py:
     description: Check latest PyPI package versions
@@ -98,8 +98,8 @@ snippets:
       packages: { description: "Comma-separated package names" }
     body: |
       __format__="yml_h";__sanitize__=False
-      {% set _pkgs = packages.split(',') | map('trim') | list %}
-      pkg.pypi(packages=[{% for p in _pkgs %}"{{ p }}"{% if not loop.last %}, {% endif %}{% endfor %}])
+      _packages = [item.strip() for item in {{ packages | tojson }}.split(",") if item.strip()]
+      pkg.pypi(packages=_packages)
 
   pkg_m:
     description: Search OpenRouter for AI models
@@ -108,7 +108,7 @@ snippets:
       provider: { default: "", description: "Filter by provider" }
     body: |
       __format__="yml_h";__sanitize__=False
-      pkg.models(query="{{ q }}", provider="{{ provider }}", limit=10)
+      pkg.models(query={{ q | tojson }}, provider={{ provider | tojson }}, limit=10)
 
   # ============================================================================
   # WEB FETCH (wf)
@@ -123,12 +123,15 @@ snippets:
       max: { default: "", description: "Max length per URL" }
     body: |
       __format__="yml_h";__sanitize__=False
-      {% set _urls = url.split('|') | map('trim') | list %}
-      {% if _urls | length == 1 %}
-      wf.fetch(url="{{ _urls[0] }}", output_format="{{ format }}", include_links={{ links }}{% if max %}, max_length={{ max }}{% endif %})
-      {% else %}
-      wf.fetch_batch(urls=[{% for u in _urls %}"{{ u }}"{% if not loop.last %}, {% endif %}{% endfor %}], output_format="{{ format }}", include_links={{ links }}{% if max %}, max_length={{ max }}{% endif %})
-      {% endif %}
+      _urls = [item.strip() for item in {{ url | tojson }}.split("|") if item.strip()]
+      _kwargs = {"output_format": {{ format | tojson }}, "include_links": {{ links }}}
+      if {{ max | tojson }}:
+          _kwargs["max_length"] = int({{ max | tojson }})
+      if len(_urls) == 1:
+          _result = wf.fetch(url=_urls[0], **_kwargs)
+      else:
+          _result = wf.fetch_batch(urls=_urls, **_kwargs)
+      _result
 
   wf_d:
     description: Extract structured data from a web page
@@ -137,8 +140,8 @@ snippets:
       schema: { description: "What to extract (e.g., 'prices as {item, price}')" }
     body: |
       __format__="yml_h";__sanitize__=False
-      content = wf.fetch(url="{{ url }}", include_tables=True)
-      llm.transform(data=content, prompt="Extract {{ schema }} as YAML")
+      content = wf.fetch(url={{ url | tojson }}, include_tables=True)
+      llm.transform(data=content, prompt="Extract " + {{ schema | tojson }} + " as YAML")
 
   wf_s:
     description: Fetch and summarize a web page
@@ -147,8 +150,11 @@ snippets:
       focus: { default: "", description: "What to focus on" }
     body: |
       __format__="yml_h";__sanitize__=False
-      content = wf.fetch(url="{{ url }}", output_format="markdown", fast=True)
-      llm.transform(data=content, prompt="Summarize this page concisely{% if focus %}, focusing on {{ focus }}{% endif %}")
+      content = wf.fetch(url={{ url | tojson }}, output_format="markdown", fast=True)
+      prompt = "Summarize this page concisely"
+      if {{ focus | tojson }}:
+          prompt += ", focusing on " + {{ focus | tojson }}
+      llm.transform(data=content, prompt=prompt)
 
   # ============================================================================
   # CONVERT (cv)
@@ -161,7 +167,7 @@ snippets:
       output_dir: { description: "Output directory for converted files" }
     body: |
       __format__="yml_h";__sanitize__=False
-      cv.auto(pattern="{{ file }}", output_dir="{{ output_dir }}")
+      cv.auto(pattern={{ file | tojson }}, output_dir={{ output_dir | tojson }})
 
   # ============================================================================
   # MEM (mem)
@@ -175,7 +181,10 @@ snippets:
       topic: { default: "", description: "Topic prefix filter (e.g., 'projects/')" }
     body: |
       __format__="yml_h";__sanitize__=False
-      mem.search(query="{{ q }}", mode="{{ mode }}"{% if topic %}, topic="{{ topic }}"{% endif %})
+      _kwargs = {"query": {{ q | tojson }}, "mode": {{ mode | tojson }}}
+      if {{ topic | tojson }}:
+          _kwargs["topic"] = {{ topic | tojson }}
+      mem.search(**_kwargs)
 
   mem_g:
     description: Regex grep across memory content (finds exact text or patterns)
@@ -186,7 +195,12 @@ snippets:
     body: |
       __format__="yml_h";__sanitize__=False
       # i=True maps to case_sensitive=False (inverted param name in mem.grep)
-      mem.grep(pattern="{{ p }}"{% if topic %}, topic="{{ topic }}"{% endif %}{% if i %}, case_sensitive=False{% endif %})
+      _kwargs = {"pattern": {{ p | tojson }}}
+      if {{ topic | tojson }}:
+          _kwargs["topic"] = {{ topic | tojson }}
+      if {{ i }}:
+          _kwargs["case_sensitive"] = False
+      mem.grep(**_kwargs)
 
   mem_r:
     description: Read a memory topic by exact path
@@ -195,7 +209,10 @@ snippets:
       meta: { default: false, description: "Include metadata header (topic, category, tags)" }
     body: |
       __format__="yml_h";__sanitize__=False
-      mem.read(topic="{{ topic }}"{% if meta %}, meta=True{% endif %})
+      _kwargs = {"topic": {{ topic | tojson }}}
+      if {{ meta }}:
+          _kwargs["meta"] = True
+      mem.read(**_kwargs)
 
   mem_w:
     description: Write a file into memory under a topic
@@ -205,7 +222,7 @@ snippets:
       category: { default: "note", description: "Category: rule, context, decision, mistake, discovery, note" }
     body: |
       __format__="yml_h";__sanitize__=False
-      mem.write(topic="{{ topic }}", file="{{ file }}", category="{{ category }}")
+      mem.write(topic={{ topic | tojson }}, file={{ file | tojson }}, category={{ category | tojson }})
 
   mem_l:
     description: List all memory topics
@@ -226,7 +243,12 @@ snippets:
       limit: { default: "", description: "Max lines to return" }
     body: |
       __format__="yml_h";__sanitize__=False
-      f.read(path="{{ path }}"{% if offset %}, offset={{ offset }}{% endif %}{% if limit %}, limit={{ limit }}{% endif %})
+      _kwargs = {"path": {{ path | tojson }}}
+      if {{ offset | tojson }}:
+          _kwargs["offset"] = int({{ offset | tojson }})
+      if {{ limit | tojson }}:
+          _kwargs["limit"] = int({{ limit | tojson }})
+      f.read(**_kwargs)
 
   f_t:
     description: Show directory tree
@@ -235,7 +257,7 @@ snippets:
       depth: { default: 3, description: "Max depth" }
     body: |
       __format__="yml_h";__sanitize__=False
-      f.tree(path="{{ path }}", max_depth={{ depth }})
+      f.tree(path={{ path | tojson }}, max_depth=int({{ depth | tojson }}))
 
   f_g:
     description: Search file contents for a pattern (no external tools required)
@@ -246,7 +268,12 @@ snippets:
       i: { default: false, description: "Case-insensitive search" }
     body: |
       __format__="yml_h";__sanitize__=False
-      f.grep(pattern="{{ p }}", path="{{ path }}"{% if glob %}, glob="{{ glob }}"{% endif %}{% if i %}, case_sensitive=False{% endif %})
+      _kwargs = {"pattern": {{ p | tojson }}, "path": {{ path | tojson }}}
+      if {{ glob | tojson }}:
+          _kwargs["glob"] = {{ glob | tojson }}
+      if {{ i }}:
+          _kwargs["case_sensitive"] = False
+      f.grep(**_kwargs)
 
   # ============================================================================
   # INTERNAL TOOLS (ot)
@@ -259,7 +286,7 @@ snippets:
       info: { default: "default", description: "Detail level: min, default, or full" }
     body: |
       __format__="yml_h";__sanitize__=False
-      ot.help(query="{{ q }}", info="{{ info }}")
+      ot.help(query={{ q | tojson }}, info={{ info | tojson }})
 
   tool:
     description: Show exact tool signature and arguments, or search tools by pattern
@@ -269,13 +296,15 @@ snippets:
       info: { default: "default", description: "Detail level: min, default, or full" }
     body: |
       __format__="yml_h";__sanitize__=False
-      {% if name and pattern %}
-      "Error: provide name or pattern, not both"
-      {% elif name %}
-      ot.tool_info(name="{{ name }}", info="{{ info }}")
-      {% else %}
-      ot.tool_info(pattern="{{ pattern }}", info="{{ info }}")
-      {% endif %}
+      _name = {{ name | tojson }}
+      _pattern = {{ pattern | tojson }}
+      if _name and _pattern:
+          _result = "Error: provide name or pattern, not both"
+      elif _name:
+          _result = ot.tool_info(name=_name, info={{ info | tojson }})
+      else:
+          _result = ot.tool_info(pattern=_pattern, info={{ info | tojson }})
+      _result
 
   servers:
     description: List configured MCP proxy servers and connection status
@@ -284,7 +313,7 @@ snippets:
       info: { default: "default", description: "Detail level: min, default, full, resources, or prompts" }
     body: |
       __format__="yml_h";__sanitize__=False
-      ot.servers(pattern="{{ pattern }}", info="{{ info }}")
+      ot.servers(pattern={{ pattern | tojson }}, info={{ info | tojson }})
 
   server_on:
     description: Enable and connect a configured MCP proxy server
@@ -292,7 +321,7 @@ snippets:
       name: { description: "Configured server name, such as github" }
     body: |
       __format__="yml_h";__sanitize__=False
-      ot_servers.enable(name="{{ name }}")
+      ot_servers.enable(name={{ name | tojson }})
 
   server_off:
     description: Disable a configured MCP proxy server
@@ -300,7 +329,7 @@ snippets:
       name: { description: "Configured server name, such as github" }
     body: |
       __format__="yml_h";__sanitize__=False
-      ot_servers.disable(name="{{ name }}")
+      ot_servers.disable(name={{ name | tojson }})
 
   reload:
     description: Reload OneTool configuration and tools
