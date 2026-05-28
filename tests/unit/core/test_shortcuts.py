@@ -59,7 +59,7 @@ def test_parse_snippet_basic() -> None:
     """Verify parse_snippet extracts name and params."""
     from ot.shortcuts import parse_snippet
 
-    result = parse_snippet("$wsq q=AI topic=ML")
+    result = parse_snippet(":wsq q=AI topic=ML")
 
     assert result.name == "wsq"
     assert result.params == {"q": "AI", "topic": "ML"}
@@ -72,17 +72,17 @@ def test_parse_snippet_strips_quotes() -> None:
     from ot.shortcuts import parse_snippet
 
     # Double quotes
-    result = parse_snippet('$pkg packages="react, express"')
+    result = parse_snippet(':pkg packages="react, express"')
     assert result.name == "pkg"
     assert result.params == {"packages": "react, express"}
 
     # Single quotes
-    result = parse_snippet("$pkg packages='react, express'")
+    result = parse_snippet(":pkg packages='react, express'")
     assert result.name == "pkg"
     assert result.params == {"packages": "react, express"}
 
     # Mixed quoted and unquoted
-    result = parse_snippet('$test name="Alice" count=5')
+    result = parse_snippet(':test name="Alice" count=5')
     assert result.params == {"name": "Alice", "count": "5"}
 
 
@@ -92,7 +92,7 @@ def test_parse_snippet_multiline_strips_quotes() -> None:
     """Verify parse_snippet strips outer quotes in multiline format."""
     from ot.shortcuts import parse_snippet
 
-    code = '''$pkg
+    code = ''':pkg
 packages: "react, express"
 limit: 10'''
 
@@ -108,17 +108,17 @@ def test_parse_snippet_underscore_name() -> None:
     from ot.shortcuts import parse_snippet
 
     # Single-line with params
-    result = parse_snippet("$rg_count p=def ft=py")
+    result = parse_snippet(":rg_count p=def ft=py")
     assert result.name == "rg_count"
     assert result.params == {"p": "def", "ft": "py"}
 
     # Multi-segment underscore
-    result = parse_snippet("$mem_s q=asyncio")
+    result = parse_snippet(":mem_s q=asyncio")
     assert result.name == "mem_s"
     assert result.params == {"q": "asyncio"}
 
     # No params
-    result = parse_snippet("$f_t")
+    result = parse_snippet(":f_t")
     assert result.name == "f_t"
     assert result.params == {}
 
@@ -129,11 +129,11 @@ def test_parse_snippet_hyphenated_name() -> None:
     """Verify parse_snippet correctly handles hyphenated snippet names (user-defined)."""
     from ot.shortcuts import parse_snippet
 
-    result = parse_snippet("$my-snippet p=def")
+    result = parse_snippet(":my-snippet p=def")
     assert result.name == "my-snippet"
     assert result.params == {"p": "def"}
 
-    result = parse_snippet("$a-b-c")
+    result = parse_snippet(":a-b-c")
     assert result.name == "a-b-c"
     assert result.params == {}
 
@@ -145,19 +145,19 @@ def test_parse_snippet_equals_in_quoted_value() -> None:
     from ot.shortcuts import parse_snippet
 
     # = inside double-quoted value
-    result = parse_snippet('$rg p="key=value" path=src')
+    result = parse_snippet(':rg p="key=value" path=src')
     assert result.params == {"p": "key=value", "path": "src"}
 
     # = inside single-quoted value
-    result = parse_snippet("$rg p='url=https' path=src")
+    result = parse_snippet(":rg p='url=https' path=src")
     assert result.params == {"p": "url=https", "path": "src"}
 
     # Multiple = signs in quoted value
-    result = parse_snippet('$rg p="a=b=c" path=src')
+    result = parse_snippet(':rg p="a=b=c" path=src')
     assert result.params == {"p": "a=b=c", "path": "src"}
 
     # = in first param, no subsequent params
-    result = parse_snippet('$rg p="key=val"')
+    result = parse_snippet(':rg p="key=val"')
     assert result.params == {"p": "key=val"}
 
 
@@ -167,7 +167,7 @@ def test_parse_snippet_no_params() -> None:
     """Verify parse_snippet works with no parameters."""
     from ot.shortcuts import parse_snippet
 
-    result = parse_snippet("$simple")
+    result = parse_snippet(":simple")
 
     assert result.name == "simple"
     assert result.params == {}
@@ -179,7 +179,7 @@ def test_parse_snippet_multiline() -> None:
     """Verify parse_snippet handles multiline format."""
     from ot.shortcuts import parse_snippet
 
-    code = """$wsq
+    code = """:wsq
 q: What is AI?
 topic: Machine Learning"""
 
@@ -215,7 +215,7 @@ def test_expand_snippet_basic() -> None:
         }
     )
 
-    parsed = parse_snippet("$test_snip name=Alice")
+    parsed = parse_snippet(":test_snip name=Alice")
     result = expand_snippet(parsed, config)
 
     assert result == 'demo.call(name="Alice")'
@@ -239,7 +239,7 @@ def test_expand_snippet_with_defaults() -> None:
     )
 
     # Without providing count - should use default
-    parsed = parse_snippet("$count_snip")
+    parsed = parse_snippet(":count_snip")
     result = expand_snippet(parsed, config)
 
     assert result == "demo.items(count=5)"
@@ -267,7 +267,7 @@ def test_expand_snippet_prefix_resolution() -> None:
     )
 
     # Prefix match: 'q' resolves to 'query'
-    parsed = parse_snippet("$g q=test")
+    parsed = parse_snippet(":g q=test")
     result = expand_snippet(parsed, config)
     assert result == 'ground.search(query="test")'
 
@@ -293,7 +293,7 @@ def test_expand_snippet_prefix_resolution_exact_wins() -> None:
     )
 
     # Exact match: 'query' resolves to 'query', not 'quality'
-    parsed = parse_snippet("$x query=abc")
+    parsed = parse_snippet(":x query=abc")
     result = expand_snippet(parsed, config)
     assert 'query="abc"' in result
     assert 'quality=""' in result
@@ -320,7 +320,7 @@ def test_expand_snippet_prefix_resolution_first_in_order_wins() -> None:
     )
 
     # 'q' is a prefix of both 'quality' and 'query'; first in definition order wins
-    parsed = parse_snippet("$x q=abc")
+    parsed = parse_snippet(":x q=abc")
     result = expand_snippet(parsed, config)
     assert 'quality="abc"' in result
 
@@ -346,22 +346,22 @@ def test_expand_snippet_boolean_normalization() -> None:
     )
 
     # links=true (YAML style) should render as True (valid Python)
-    parsed = parse_snippet("$wf url=http://localhost links=true")
+    parsed = parse_snippet(":wf url=http://localhost links=true")
     result = expand_snippet(parsed, config)
     assert "include_links=True" in result
 
     # links=false (YAML style) should render as False (valid Python)
-    parsed = parse_snippet("$wf url=http://localhost links=false")
+    parsed = parse_snippet(":wf url=http://localhost links=false")
     result = expand_snippet(parsed, config)
     assert "include_links=False" in result
 
     # Default (no links param) uses the bool default → False
-    parsed = parse_snippet("$wf url=http://localhost")
+    parsed = parse_snippet(":wf url=http://localhost")
     result = expand_snippet(parsed, config)
     assert "include_links=False" in result
 
     # Python-style True also works
-    parsed = parse_snippet("$wf url=http://localhost links=True")
+    parsed = parse_snippet(":wf url=http://localhost links=True")
     result = expand_snippet(parsed, config)
     assert "include_links=True" in result
 
@@ -425,7 +425,7 @@ def test_include_loads_snippets_library() -> None:
     assert "test_todos" in config.snippets, "Snippet 'test_todos' not loaded"
 
     # Verify we can expand a snippet from the library
-    parsed = parse_snippet("$test_find pattern=search")
+    parsed = parse_snippet(":test_find pattern=search")
     result = expand_snippet(parsed, config)
 
     assert 'ot.tools(pattern="search"' in result

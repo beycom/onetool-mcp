@@ -233,3 +233,21 @@ def test_bundled_skills_have_frontmatter() -> None:
         assert "name" in fm, f"{skill_file.name} missing 'name' in frontmatter"
         assert "description" in fm, f"{skill_file.name} missing 'description' in frontmatter"
         assert body.strip(), f"{skill_file.name} has empty body"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_ot_ref_frontmatter_triggers_direct_run_requests() -> None:
+    """ot-ref frontmatter includes direct OneTool run trigger terms."""
+    from ot.paths import get_global_templates_dir
+    from ottools.skills import _parse_frontmatter
+
+    content = (get_global_templates_dir() / "skills" / "ot-ref.md").read_text()
+    fm, body = _parse_frontmatter(content)
+    description = fm["description"]
+
+    assert "__run" in description
+    assert "MCP run" in description
+    assert "direct pack calls" in description
+    assert "run-vs-local-script" in description
+    assert "OneTool `__run`/MCP run request" in body

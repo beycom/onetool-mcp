@@ -188,6 +188,33 @@ class TestBuildExecutionNamespaceAliases:
 
 @pytest.mark.unit
 @pytest.mark.core
+def test_ot_pack_nested_tool_error_points_to_direct_pack_syntax() -> None:
+    """Accidental ot.<pack> access tells callers to use direct pack syntax."""
+    from ot.executor.pack_proxy import build_execution_namespace, reset
+
+    reset()
+    mock_proxy = MagicMock()
+    mock_proxy.servers = []
+
+    mock_registry = MagicMock()
+    mock_registry.packs = {"ot": {"help": MagicMock()}}
+    mock_registry.pack_aliases = {}
+
+    mock_config = MagicMock()
+    mock_config.servers = {}
+
+    with (
+        patch("ot.proxy.get_proxy_manager", return_value=mock_proxy),
+        patch("ot.executor.pack_proxy.get_config", return_value=mock_config),
+    ):
+        ns = build_execution_namespace(mock_registry)
+
+    with pytest.raises(AttributeError, match=r"use direct pack syntax"):
+        _ = ns["ot"].brave
+
+
+@pytest.mark.unit
+@pytest.mark.core
 class TestPackShortNameAliases:
     """Tests for metadata-backed alias injection in build_execution_namespace."""
 

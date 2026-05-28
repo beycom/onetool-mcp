@@ -392,7 +392,7 @@ def _get_skill_stub_template() -> str:
     if not tmpl.exists():
         return (
             "---\nname: {{ name }}\ndescription: {{ description }}\n---\n\n"
-            "To load this skill: `>>> ot.skills(name=\"{{ name }}\")`\n"
+            "To load this skill: `__run ot.skills(name=\"{{ name }}\")`\n"
         )
     return tmpl.read_text(encoding="utf-8")
 

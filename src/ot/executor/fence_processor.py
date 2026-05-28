@@ -1,7 +1,7 @@
 """Fence processing for command execution.
 
 Handles stripping of:
-- Execution trigger prefixes (>>>, __run, __ot, __onetool, mcp__onetool__run)
+- Execution trigger prefixes (__run, __r, __ot)
 - Markdown code fences (triple backticks with/without language)
 - Inline backticks (single and double)
 
@@ -17,19 +17,13 @@ def strip_fences(command: str) -> tuple[str, bool]:
     """Strip execution prefixes, markdown code fences, and inline backticks.
 
     Execution trigger prefixes (stripped first):
-        >>>                  - Python REPL symbol; recommended human-friendly form
-        __run                - short form following __(tool) pattern; systematic
-        __ot                 - legacy; kept for backward compat; not in docs
-        __ot__run            - legacy variant
-        __onetool            - legacy full name
-        __onetool__run       - legacy full name explicit
-        mcp__onetool__run    - canonical MCP tool name
+        __run                - canonical explicit invocation form
+        __r                  - concise alias
+        __ot                 - OneTool alias
 
     Each prefix supports two invocation styles:
         <prefix> func(arg="value")     - simple call
         <prefix> + code fence          - multi-line code fence
-
-    Note: mcp__ot__run is NOT a valid prefix.
 
     Markdown fences (stripped after prefix):
         ```python
@@ -50,14 +44,8 @@ def strip_fences(command: str) -> tuple[str, bool]:
     stripped = command.strip().replace("\r\n", "\n").replace("\r", "\n")
     anything_stripped = False
 
-    # Strip execution trigger prefixes:
-    # - >>> (Python REPL symbol; recommended)
-    # - __run (short form; systematic)
-    # - __ot, __ot__run (legacy short name)
-    # - __onetool, __onetool__run (legacy full name)
-    # - mcp__onetool__run (canonical MCP call)
-    # Note: mcp__ot__run is NOT valid
-    prefix_pattern = r"^(?:mcp__onetool__run|__onetool(?:__run)?|__ot(?:__run)?|__run|>>>)\s*"
+    # Strip only the supported explicit invocation prefixes.
+    prefix_pattern = r"^(?:__run|__r|__ot)(?=\s|`|$)\s*"
     match = re.match(prefix_pattern, stripped)
     if match:
         stripped = stripped[match.end() :].strip()

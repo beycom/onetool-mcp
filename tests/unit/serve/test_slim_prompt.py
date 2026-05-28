@@ -18,17 +18,105 @@ def test_instructions_is_short() -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 def test_instructions_has_required_elements() -> None:
-    """instructions contains trigger, discovery hint, and boundary warning."""
+    """instructions contains invocation, reference, security, and boundary guidance."""
     from ot.prompts import load_prompts
 
     prompts = load_prompts()
     text = prompts.instructions
 
-    assert ">>>" in text, "Missing trigger in instructions"
-    assert "ot.help(" in text, "Missing discovery hint in instructions"
+    assert "run(command=" in text, "Missing MCP run preference in instructions"
+    assert "ot.skills(name='ot-ref')" in text, "Missing optional ot-ref pointer"
+    assert "ot.security()" in text, "Missing security check pointer"
     assert "external-content" in text or "boundary" in text.lower(), (
         "Missing external content boundary warning in instructions"
     )
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_run_description_has_invocation_contract() -> None:
+    """run tool description carries the critical invocation contract."""
+    from ot.prompts import load_prompts
+
+    prompts = load_prompts()
+    desc = prompts.tools["run"].description or ""
+
+    assert "__run" in desc
+    assert "__r" in desc
+    assert "__ot" in desc
+    assert ":name" in desc
+    assert "Call shape: `pack.tool(arg=value)`, not `ot.pack.tool(...)`." in desc
+    assert "Do not guess tool names, parameter names, or allowed values." in desc
+    assert "Mode by shape:" in desc
+    assert "run(command=" in desc
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_run_description_documents_shape_based_modes() -> None:
+    """run description distinguishes code, snippet, and natural-language modes by shape."""
+    from ot.prompts import load_prompts
+
+    prompts = load_prompts()
+    desc = prompts.tools["run"].description or ""
+
+    assert "Mode by shape:" in desc
+    assert "Fenced/backticked content" in desc
+    assert "literal Python code" in desc
+    assert "Valid unfenced Python is also code" in desc
+    assert ":name key=value" in desc
+    assert "not Python" in desc
+    assert "plain strings" in desc
+    assert "natural-language intent" in desc
+    assert "OneTool resolves param prefixes" in desc
+    assert "keyword-only tools" in desc
+    assert "Do not send obvious syntax failures" in desc
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_run_description_avoids_old_unscoped_pass_through_rule() -> None:
+    """run description does not use broad pass-through wording for all input."""
+    from ot.prompts import load_prompts
+
+    prompts = load_prompts()
+    desc = prompts.tools["run"].description or ""
+
+    assert "Pass code EXACTLY as-is" not in desc
+    assert "JUST pass the exact command string" not in desc
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_instructions_stay_concise_and_defer_contract() -> None:
+    """Server instructions stay short and defer full invocation details to run."""
+    from ot.prompts import load_prompts
+
+    prompts = load_prompts()
+    text = prompts.instructions
+
+    assert len(text.strip().splitlines()) <= 50
+    assert "Follow the `run` tool description first" in text
+    assert "The `run` tool description is authoritative" in text
+    assert "Mode by shape" not in text
+    assert "natural-language intent" not in text
+    assert "Large results may return handle dicts" not in text
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_ot_ref_contains_advanced_recovery_not_core_contract() -> None:
+    """ot-ref carries advanced reference details without owning normal invocation."""
+    from ot.paths import get_global_templates_dir
+
+    text = (get_global_templates_dir() / "skills" / "ot-ref.md").read_text()
+
+    assert "Close-call recovery" in text
+    assert "Param prefixes" in text
+    assert "first in signature/schema order wins" in text
+    assert "__format__ = 'yml_h'; ot.help(query='topic')" in text
+    assert "OneTool `__run`/MCP run request" in text
+    assert "Natural language to code" not in text
 
 
 @pytest.mark.unit

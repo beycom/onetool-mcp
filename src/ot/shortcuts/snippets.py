@@ -1,8 +1,8 @@
 """Snippet parsing and expansion for OneTool shortcuts.
 
 Handles snippet syntax parsing and Jinja2 template expansion:
-- Single-line: $wsq q1=AI q2=ML p=Compare
-- Multi-line: $wsq\nq1: AI\nq2: ML\np: Compare
+- Single-line: :wsq q1=AI q2=ML p=Compare
+- Multi-line: :wsq\nq1: AI\nq2: ML\np: Compare
 """
 
 from __future__ import annotations
@@ -36,25 +36,24 @@ class ParsedSnippet:
 
 
 def is_snippet(code: str) -> bool:
-    """Check if code is a snippet invocation (starts with $).
+    """Check if code is a snippet invocation (starts with :).
 
     Args:
         code: Code to check
 
     Returns:
-        True if code starts with $ (snippet syntax)
+        True if code starts with : (snippet syntax)
     """
     stripped = code.strip()
-    # Must start with $ but not be $variable inside other code
-    return stripped.startswith("$") and not stripped.startswith("${")
+    return stripped.startswith(":")
 
 
 def parse_snippet(code: str) -> ParsedSnippet:
     """Parse a snippet invocation into name and parameters.
 
     Supports two syntaxes:
-    - Single-line: $name key=value key2=value2
-    - Multi-line: $name\\nkey: value\\nkey2: value2
+    - Single-line: :name key=value key2=value2
+    - Multi-line: :name\\nkey: value\\nkey2: value2
 
     Args:
         code: Snippet invocation string
@@ -67,10 +66,10 @@ def parse_snippet(code: str) -> ParsedSnippet:
     """
     stripped = code.strip()
 
-    if not stripped.startswith("$"):
-        raise ValueError(f"Snippet must start with $: {stripped[:50]}")
+    if not stripped.startswith(":"):
+        raise ValueError(f"Snippet must start with ':': {stripped[:50]}")
 
-    # Remove $ prefix
+    # Remove : prefix
     content = stripped[1:]
 
     # Check for multi-line (has newline after snippet name)
