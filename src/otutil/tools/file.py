@@ -52,7 +52,7 @@ import stat
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pathspec
 from otpack import (
@@ -72,6 +72,8 @@ from otutil.tools._content_util import (
     selector_label,
 )
 from otutil.tools._file_resolve_match import fuzzy_match
+
+ResolveKind = Literal["file", "dir"]
 
 
 class Config(BaseModel):
@@ -363,13 +365,16 @@ def _should_skip_resolve_dir(
 def _validated_resolve_candidate(
     entry: Path,
     *,
+    kind: ResolveKind,
     cwd: Path,
     cfg: Config,
     include_hidden: bool,
     gi_spec: pathspec.PathSpec | None,
 ) -> Path | None:
-    """Validate and filter one file reference candidate."""
-    if not entry.is_file():
+    """Validate and filter one file or directory reference candidate."""
+    if kind == "file" and not entry.is_file():
+        return None
+    if kind == "dir" and not entry.is_dir():
         return None
     try:
         resolved_entry = entry.resolve()
@@ -411,6 +416,7 @@ def _dedupe_paths(paths: list[Path]) -> list[Path]:
 def _glob_resolve_candidates(
     pattern: str,
     *,
+    kind: ResolveKind,
     root: Path,
     cwd: Path,
     cfg: Config,
@@ -418,7 +424,7 @@ def _glob_resolve_candidates(
     gi_spec: pathspec.PathSpec | None,
     max_results: int,
 ) -> list[Path]:
-    """Resolve one exact or glob pattern to validated file candidates."""
+    """Resolve one exact or glob pattern to validated file or dir candidates."""
     raw_pattern = Path(pattern)
     if raw_pattern.is_absolute():
         glob_root = Path(raw_pattern.anchor)
@@ -433,6 +439,7 @@ def _glob_resolve_candidates(
         for entry in entries:
             candidate = _validated_resolve_candidate(
                 entry,
+                kind=kind,
                 cwd=cwd,
                 cfg=cfg,
                 include_hidden=include_hidden,
@@ -450,31 +457,48 @@ def _glob_resolve_candidates(
 
 def _all_resolve_candidates(
     *,
+    kind: ResolveKind,
     root: Path,
     cwd: Path,
     cfg: Config,
     include_hidden: bool,
     gi_spec: pathspec.PathSpec | None,
 ) -> list[Path]:
-    """Build the validated candidate set for fuzzy file reference matching."""
+    """Build the validated candidate set for fuzzy path reference matching."""
     candidates: list[Path] = []
     try:
         for current_root, dir_names, file_names in os.walk(root):
             current_path = Path(current_root)
-            dir_names[:] = [
-                dir_name
-                for dir_name in dir_names
-                if not _should_skip_resolve_dir(
-                    current_path / dir_name,
+            validated_dirs: list[str] = []
+            for dir_name in dir_names:
+                dir_path = current_path / dir_name
+                if _should_skip_resolve_dir(
+                    dir_path,
                     cwd=cwd,
                     cfg=cfg,
                     include_hidden=include_hidden,
                     gi_spec=gi_spec,
-                )
-            ]
+                ):
+                    continue
+                validated_dirs.append(dir_name)
+                if kind == "dir":
+                    candidate = _validated_resolve_candidate(
+                        dir_path,
+                        kind=kind,
+                        cwd=cwd,
+                        cfg=cfg,
+                        include_hidden=include_hidden,
+                        gi_spec=gi_spec,
+                    )
+                    if candidate is not None:
+                        candidates.append(candidate)
+            dir_names[:] = validated_dirs
+            if kind == "dir":
+                continue
             for file_name in file_names:
                 candidate = _validated_resolve_candidate(
                     current_path / file_name,
+                    kind=kind,
                     cwd=cwd,
                     cfg=cfg,
                     include_hidden=include_hidden,
@@ -536,13 +560,14 @@ def resolve(
     path: str = ".",
     glob: str | list[str] | None = None,
     match: str | list[str] | None = None,
+    kind: ResolveKind = "file",
     gitignore: bool = True,
-    include_hidden: bool = False,
+    include_hidden: bool = True,
     path_type: str = "relative",
-    multi: str = "error",
-    max_results: int = 50,
+    multi: str = "all",
+    max_results: int = 10,
 ) -> str | list[str]:
-    """Resolve file references to path strings.
+    """Resolve file or directory references to path strings.
 
     Accepts exact/glob path references or fuzzy quick-open style matches and
     returns path strings suitable for follow-up file operations.
@@ -551,7 +576,8 @@ def resolve(
         path: Root directory for relative glob and fuzzy match discovery.
         glob: Exact path, glob string, or list of glob strings.
         match: Fuzzy quick-open query or list of queries.
-        gitignore: If True, skip files matched by .gitignore at cwd (default: True).
+        kind: "file" to resolve files, or "dir" to resolve directories.
+        gitignore: If True, skip paths matched by .gitignore at cwd (default: True).
         include_hidden: If True, include hidden files and path segments.
         path_type: "relative" for cwd-relative paths when possible, or "absolute".
         multi: "error" for exactly one match, "first" for the first match, or
@@ -563,6 +589,7 @@ def resolve(
 
     Example:
         file.resolve(glob="src/**/*.py", multi="all")
+        file.resolve(glob="src/**", kind="dir")
         file.resolve(path="dev/practices", match="cli pattern", multi="first")
         file.resolve(match="tlf")
         file.resolve(match=["wip 2026", "runtime strat"], multi="first")
@@ -572,6 +599,7 @@ def resolve(
         span="file.resolve",
         path=path,
         mode="glob" if glob is not None else "match" if match is not None else "none",
+        kind=kind,
         pathType=path_type,
         multi=multi,
     ) as s:
@@ -581,6 +609,9 @@ def resolve(
         if selector_count > 1:
             s.add(error="ambiguous_selector")
             return "Error: Provide exactly one of 'glob' or 'match', not both"
+        if kind not in {"file", "dir"}:
+            s.add(error="invalid_kind")
+            return "Error: kind must be 'file' or 'dir'"
         if path_type not in {"relative", "absolute"}:
             s.add(error="invalid_path_type")
             return "Error: path_type must be 'relative' or 'absolute'"
@@ -617,6 +648,7 @@ def resolve(
             if glob is not None:
                 paths = _glob_resolve_candidates(
                     selector,
+                    kind=kind,
                     root=root,
                     cwd=cwd,
                     cfg=cfg,
@@ -627,6 +659,7 @@ def resolve(
             else:
                 if fuzzy_candidates is None:
                     fuzzy_candidates = _all_resolve_candidates(
+                        kind=kind,
                         root=root,
                         cwd=cwd,
                         cfg=cfg,

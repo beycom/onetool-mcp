@@ -610,6 +610,7 @@ def test_resolve_rejects_invalid_path_type_and_multi() -> None:
 
     assert "path_type" in resolve(glob="*.py", path_type="full")
     assert "multi" in resolve(glob="*.py", multi="many")
+    assert "kind" in resolve(glob="*.py", kind="folder")  # type: ignore[arg-type]
 
 
 @pytest.mark.unit
@@ -622,22 +623,78 @@ def test_resolve_glob_exact_file_returns_relative_path(tmp_path: Path) -> None:
 
     result = resolve(glob="notes.md")
 
-    assert result == "notes.md"
+    assert result == ["notes.md"]
 
 
 @pytest.mark.unit
 @pytest.mark.tools
-def test_resolve_glob_all_returns_sorted_relative_paths(tmp_path: Path) -> None:
-    """resolve glob mode returns deterministic sorted paths with multi=all."""
+def test_resolve_glob_defaults_to_all_sorted_relative_paths(tmp_path: Path) -> None:
+    """resolve glob mode returns deterministic sorted paths by default."""
     from otutil.tools.file import resolve
 
     (tmp_path / "b.py").write_text("b")
     (tmp_path / "A.py").write_text("a")
     (tmp_path / "notes.txt").write_text("notes")
 
-    result = resolve(glob="*.py", multi="all")
+    result = resolve(glob="*.py")
 
     assert result == ["A.py", "b.py"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_defaults_to_max_ten_results(tmp_path: Path) -> None:
+    """resolve caps default result sets at ten matches."""
+    from otutil.tools.file import resolve
+
+    for idx in range(12):
+        (tmp_path / f"item-{idx:02}.py").write_text("item")
+
+    result = resolve(glob="*.py")
+
+    assert result == [f"item-{idx:02}.py" for idx in range(10)]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_kind_file_returns_files_only(tmp_path: Path) -> None:
+    """kind=file filters glob candidates to files."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "main.py").write_text("print('ok')\n")
+
+    result = resolve(glob="src*", kind="file")
+
+    assert result == []
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_kind_dir_returns_directories_only(tmp_path: Path) -> None:
+    """kind=dir filters glob candidates to directories."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src.py").write_text("not a directory")
+
+    result = resolve(glob="src*", kind="dir")
+
+    assert result == ["src"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_match_honors_dir_kind(tmp_path: Path) -> None:
+    """match mode can resolve directory candidates."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / "docs" / "reference" / "tools").mkdir(parents=True)
+    (tmp_path / "docs" / "reference.md").write_text("file")
+
+    result = resolve(match="docs tools", kind="dir")
+
+    assert result == ["docs/reference/tools"]
 
 
 @pytest.mark.unit
@@ -663,7 +720,7 @@ def test_resolve_multi_error_reports_candidates(tmp_path: Path) -> None:
     (tmp_path / "alpha.py").write_text("a")
     (tmp_path / "beta.py").write_text("b")
 
-    result = resolve(glob="*.py")
+    result = resolve(glob="*.py", multi="error")
 
     assert isinstance(result, str)
     assert "Multiple files matched" in result
@@ -698,7 +755,7 @@ def test_resolve_absolute_path_type_returns_absolute_path(tmp_path: Path) -> Non
 
     result = resolve(glob="notes.md", path_type="absolute")
 
-    assert result == str(target)
+    assert result == [str(target)]
 
 
 @pytest.mark.unit
@@ -713,7 +770,7 @@ def test_resolve_glob_absolute_pattern(tmp_path: Path) -> None:
 
     result = resolve(glob=str(tmp_path / "src" / "*.py"))
 
-    assert result == "src/main.py"
+    assert result == ["src/main.py"]
 
 
 @pytest.mark.unit
@@ -764,7 +821,7 @@ def test_resolve_path_root_does_not_change_absolute_glob(tmp_path: Path) -> None
 
     result = resolve(path="dev", glob=str(tmp_path / "src" / "*.py"))
 
-    assert result == "src/main.py"
+    assert result == ["src/main.py"]
 
 
 @pytest.mark.unit
@@ -776,7 +833,7 @@ def test_resolve_glob_tilde_pattern_is_not_expanded(tmp_path: Path) -> None:
     (tmp_path / "~").mkdir()
     (tmp_path / "~" / "notes.md").write_text("literal tilde")
 
-    assert resolve(glob="~/*.md") == "~/notes.md"
+    assert resolve(glob="~/*.md") == ["~/notes.md"]
 
 
 @pytest.mark.unit
@@ -828,7 +885,7 @@ def test_resolve_match_path_root_excludes_outside_candidates(tmp_path: Path) -> 
 
     result = resolve(path="wip", match="cli-pattern")
 
-    assert result == "Error: No files matched 'cli-pattern'"
+    assert result == []
 
 
 @pytest.mark.unit
@@ -856,7 +913,7 @@ def test_resolve_match_space_separated_query(tmp_path: Path) -> None:
 
     result = resolve(match="wip 2026")
 
-    assert result == "wip/notes/onetool-mcp-2026.md"
+    assert result == ["wip/notes/onetool-mcp-2026.md"]
 
 
 @pytest.mark.unit
@@ -869,8 +926,8 @@ def test_resolve_gitignore_true_skips_ignored(tmp_path: Path) -> None:
     (tmp_path / "ignored.py").write_text("ignored")
     (tmp_path / "visible.py").write_text("visible")
 
-    assert resolve(glob="*.py", multi="all", gitignore=True) == ["visible.py"]
-    assert resolve(match="ignored", gitignore=True) == "Error: No files matched 'ignored'"
+    assert resolve(glob="*.py", gitignore=True) == ["visible.py"]
+    assert resolve(match="ignored", gitignore=True) == []
 
 
 @pytest.mark.unit
@@ -885,7 +942,7 @@ def test_resolve_gitignore_false_includes_ignored(tmp_path: Path) -> None:
 
     result = resolve(glob="logs/*.log", gitignore=False)
 
-    assert result == "logs/app.log"
+    assert result == ["logs/app.log"]
 
 
 @pytest.mark.unit
@@ -898,11 +955,11 @@ def test_resolve_include_hidden_controls_hidden_segments(tmp_path: Path) -> None
     (tmp_path / ".hidden" / "note.md").write_text("hidden")
     (tmp_path / "visible.md").write_text("visible")
 
-    assert resolve(glob="**/*.md", multi="all") == ["visible.md"]
-    assert resolve(glob="**/*.md", multi="all", include_hidden=True) == [
+    assert resolve(glob="**/*.md") == [
         ".hidden/note.md",
         "visible.md",
     ]
+    assert resolve(glob="**/*.md", include_hidden=False) == ["visible.md"]
 
 
 @pytest.mark.unit
@@ -914,8 +971,8 @@ def test_resolve_match_prunes_hidden_directories(tmp_path: Path) -> None:
     (tmp_path / ".hidden").mkdir()
     (tmp_path / ".hidden" / "secret-target.md").write_text("hidden")
 
-    assert resolve(match="secret-target") == "Error: No files matched 'secret-target'"
-    assert resolve(match="secret-target", include_hidden=True) == ".hidden/secret-target.md"
+    assert resolve(match="secret-target") == [".hidden/secret-target.md"]
+    assert resolve(match="secret-target", include_hidden=False) == []
 
 
 @pytest.mark.unit
@@ -928,8 +985,8 @@ def test_resolve_match_prunes_gitignored_directories(tmp_path: Path) -> None:
     (tmp_path / "build").mkdir()
     (tmp_path / "build" / "generated-target.py").write_text("generated")
 
-    assert resolve(match="generated-target") == "Error: No files matched 'generated-target'"
-    assert resolve(match="generated-target", gitignore=False) == "build/generated-target.py"
+    assert resolve(match="generated-target") == []
+    assert resolve(match="generated-target", gitignore=False) == ["build/generated-target.py"]
 
 
 @pytest.mark.unit
@@ -942,7 +999,7 @@ def test_resolve_respects_exclude_patterns(tmp_path: Path) -> None:
     (tmp_path / "__pycache__" / "cached.py").write_text("cached")
     (tmp_path / "main.py").write_text("main")
 
-    result = resolve(glob="**/*.py", multi="all", include_hidden=True, gitignore=False)
+    result = resolve(glob="**/*.py", gitignore=False)
 
     assert result == ["main.py"]
 
@@ -956,9 +1013,7 @@ def test_resolve_match_prunes_excluded_directories(tmp_path: Path) -> None:
     (tmp_path / "__pycache__").mkdir()
     (tmp_path / "__pycache__" / "package-target.py").write_text("module")
 
-    assert resolve(match="package-target", include_hidden=True, gitignore=False) == (
-        "Error: No files matched 'package-target'"
-    )
+    assert resolve(match="package-target", gitignore=False) == []
 
 
 @pytest.mark.unit

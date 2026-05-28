@@ -206,7 +206,7 @@ The `file.search()` function SHALL search for files by name pattern.
 
 ### Requirement: File Reference Resolution
 
-The `file.resolve()` function SHALL resolve exact/glob references and fuzzy quick-open references to path strings.
+The `file.resolve()` function SHALL resolve exact/glob references and fuzzy quick-open references to file or directory path strings.
 
 #### Scenario: Selector validation
 - **GIVEN** neither `glob` nor `match` is provided
@@ -216,22 +216,31 @@ The `file.resolve()` function SHALL resolve exact/glob references and fuzzy quic
 
 #### Scenario: Glob reference
 - **GIVEN** an exact path or glob pattern
-- **WHEN** `file.resolve(glob="src/**/*.py", multi="all")` is called
+- **WHEN** `file.resolve(glob="src/**/*.py")` is called
 - **THEN** it SHALL return matching file paths sorted deterministically by case-insensitive path order
 - **AND** exact file paths SHALL be accepted by the same code path as glob patterns
+- **AND** by default it SHALL return at most 10 paths per selector
 
 #### Scenario: Scoped glob reference
 - **GIVEN** a directory path and a relative glob pattern
-- **WHEN** `file.resolve(path="dev/guides", glob="tool-*.md", multi="all")` is called
+- **WHEN** `file.resolve(path="dev/guides", glob="tool-*.md")` is called
 - **THEN** it SHALL resolve the relative glob from the supplied path root
 - **AND** returned relative paths SHALL remain relative to the effective cwd when possible
 - **AND** absolute glob patterns SHALL still resolve from the filesystem root
+
+#### Scenario: Directory reference
+- **GIVEN** matching directory and file candidates
+- **WHEN** `file.resolve(glob="src/**", kind="dir")` is called
+- **THEN** it SHALL return only matching directory paths
+- **AND** `kind="file"` SHALL return only matching file paths
+- **AND** invalid `kind` values SHALL return an error string
 
 #### Scenario: Fuzzy quick-open reference
 - **GIVEN** files under the effective cwd
 - **WHEN** `file.resolve(match="tlf")` is called
 - **THEN** it SHALL fuzzy-match against relative candidate paths using fzy-style path scoring
 - **AND** match results SHALL be sorted by fuzzy score descending, then case-insensitive path order
+- **AND** by default it SHALL return at most 10 paths per selector
 
 #### Scenario: Scoped fuzzy quick-open reference
 - **GIVEN** a directory path and files inside and outside that directory
@@ -246,9 +255,11 @@ The `file.resolve()` function SHALL resolve exact/glob references and fuzzy quic
 
 #### Scenario: Result shape
 - **GIVEN** a single-string selector
-- **WHEN** `multi` is `"error"` or `"first"`
-- **THEN** `file.resolve()` SHALL return a single path string when resolution succeeds
-- **AND** `multi="all"` SHALL return a list of path strings
+- **WHEN** `multi` is omitted or set to `"all"`
+- **THEN** `file.resolve()` SHALL return a list of path strings
+- **AND** no matches SHALL return an empty list
+- **AND** `multi="first"` SHALL return a single path string when resolution succeeds
+- **AND** `multi="error"` SHALL return a single path string only when exactly one path resolves
 - **AND** list selector input SHALL always return a flat list in input order
 
 #### Scenario: Multiple matches
@@ -260,10 +271,17 @@ The `file.resolve()` function SHALL resolve exact/glob references and fuzzy quic
 #### Scenario: Filtering
 - **GIVEN** hidden files, gitignored files, and files matching `exclude_patterns`
 - **WHEN** `file.resolve()` resolves candidates
-- **THEN** it SHALL skip hidden path segments unless `include_hidden=True`
+- **THEN** it SHALL include hidden path segments by default
+- **AND** it SHALL skip hidden path segments when `include_hidden=False`
 - **AND** it SHALL honor `.gitignore` when `gitignore=True`
 - **AND** it SHALL include gitignored files when `gitignore=False`
 - **AND** it SHALL always apply `exclude_patterns`
+
+#### Scenario: Result limit
+- **GIVEN** more matches than `max_results`
+- **WHEN** `file.resolve(max_results=10)` is called
+- **THEN** it SHALL return at most 10 matches per selector
+- **AND** invalid non-positive `max_results` values SHALL return an error string
 
 #### Scenario: Path type
 - **GIVEN** a matching file under the effective cwd
