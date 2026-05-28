@@ -30,6 +30,15 @@ The scraping pipeline SHALL use Crawl4AI's `AsyncWebCrawler` with `BFSDeepCrawlS
   - `<slug>.md` — `fit_markdown` content (fallback to `raw_markdown` if `fit_markdown` is empty)
   - `<slug>.meta.yaml` — sidecar with exactly `url`, `source`, and `crawled_at`
 
+#### Scenario: Scrape called inside a running event loop
+- **GIVEN** OneTool is already executing inside an event loop
+- **WHEN** `run_scrape()` is called
+- **THEN** the async crawl work SHALL complete without calling `asyncio.run()` on the running loop
+
+#### Scenario: Crawler cleanup on page-processing failure
+- **WHEN** page processing raises after `AsyncWebCrawler` has entered its async context
+- **THEN** the crawler context manager SHALL still exit
+
 #### Scenario: URL slug generation
 - **WHEN** a page URL is converted to a filename
 - **THEN** the slug SHALL be derived from the URL path with `.html` and `.htm` extensions stripped

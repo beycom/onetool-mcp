@@ -96,7 +96,7 @@ Benchmark files SHALL follow consistent conventions for maintainability and clar
 #### Scenario: Standard invocation format
 - **GIVEN** a benchmark task (except invocation method tests)
 - **WHEN** invoking OneTool
-- **THEN** it SHALL use `>>>` + code fence format
+- **THEN** it SHALL use `__run` + code fence format
 - **AND** code SHALL use explicit return as the final expression
 
 #### Scenario: Task naming convention

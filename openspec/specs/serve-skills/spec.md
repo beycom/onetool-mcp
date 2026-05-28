@@ -64,6 +64,17 @@ The system SHALL bundle an initial set of skills for on-demand discovery and ser
 #### Scenario: ot-ref skill bundled
 - **WHEN** `ot.skills()` is called
 - **THEN** `ot-ref` SHALL be listed
+
+#### Scenario: ot-ref direct run discoverability
+- **WHEN** bundled `ot-ref` frontmatter is parsed
+- **THEN** its description SHALL include trigger terms for `__run`, MCP `run`, direct pack calls, and run-vs-local-script decisions
+
+#### Scenario: ot-ref advanced reference scope
+- **WHEN** `ot.skills(name="ot-ref")` is called
+- **THEN** the returned body SHALL include advanced recovery, proxy handling, security, output, and ctx guidance
+- **AND** it SHALL open with guidance that it applies when a OneTool `__run`/MCP run request needs advanced recovery or decision-boundary help
+- **AND** it SHALL include parameter prefix matching and readable discovery hints
+- **AND** it SHALL NOT be the only place where normal invocation modes are documented
 - **AND** its content SHALL include error recovery patterns, security allowlist guidance, output format/sanitisation controls, multi-step patterns, pack extras, and parameter traps
 
 #### Scenario: ot-chrome-devtools-mcp skill bundled

@@ -148,6 +148,12 @@ The `brave.search_batch()` function SHALL execute multiple searches concurrently
 - **WHEN** `brave.search_batch(queries=["q1", "q2"], output_format="text_only")` is called
 - **THEN** it SHALL forward `output_format="text_only"` to each `brave.search()` call
 
+#### Scenario: Batch retry guardrails
+- **WHEN** `brave.search_batch()` is called with retry controls
+- **THEN** `retries` MUST be an integer in range 0-3
+- **AND** `retry_delay_ms` MUST be in range 0-10000
+- **AND** values outside these ranges SHALL return an error before batch work starts
+
 ### Requirement: Query Validation
 
 All Brave Search functions SHALL validate query parameters.

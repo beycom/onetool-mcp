@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the YAML-based prompts configuration system for the MCP server. Covers server instructions, tool descriptions, prompt templates, and the trigger hierarchy for the `run` tool. Version 2 introduces a two-mode execution model (Snippets vs Code), a new trigger hierarchy (`>>>`, `__run`), and snippet param prefix resolution.
+Defines the YAML-based prompts configuration system for the MCP server. Covers server instructions, tool descriptions, prompt templates, and the invocation contract for the `run` tool. Version 3 keeps server instructions concise, makes the `run` tool description authoritative, and uses colon-prefixed snippet invocations.
 
 ## Requirements
 
@@ -49,65 +49,85 @@ The system SHALL support externalised server instructions with a minimal footpri
 - **WHEN** instructions are requested
 - **THEN** it SHALL return default instructions
 
-#### Scenario: Trigger pattern in default
+#### Scenario: Invocation contract referenced in default
 - **GIVEN** no prompts.yaml or no instructions key
 - **WHEN** default instructions are used
-- **THEN** they SHALL include the `>>>` trigger and `mcp__onetool__run` canonical name
+- **THEN** they SHALL direct agents to follow the `run` tool description first
+- **AND** the `run` tool description SHALL include the supported prefixes `__run`, `__r`, and `__ot`
 
 #### Scenario: Instructions are concise
 - **WHEN** the server builds the handshake instructions
 - **THEN** the resulting prompt SHALL contain at most 50 lines
-- **AND** SHALL include: identity line, trigger aliases (`>>>`, `__run`, `mcp__onetool__run`), pass-through rule, keyword-args rule, batch rule, discovery hint (`>>> ot.help(query="...")`), proxy recovery guidance (`ot_servers.enable(name="...")` then retry once when name is known; `ot.servers()` when unknown), external content boundary warning, and tool output directive
+- **AND** SHALL orient agents to use `run(command=...)` for available `pack.tool(...)` calls and light orchestration
+- **AND** SHALL reserve local scripts for heavy repo/file transformations or reusable generation logic
+- **AND** SHALL state that the `run` tool description is authoritative for invocation syntax, no-guessing, and pass-through behavior
+- **AND** SHALL include an optional `ot.skills(name="ot-ref")` pointer and an external content boundary warning
 
 #### Scenario: Discovery hint present
 - **WHEN** an agent is lost or encountering errors
-- **THEN** the prompt SHALL direct the agent to run `>>> ot.help(query="topic")` for discovery
+- **THEN** the prompt SHALL direct the agent to run `ot.help(query="topic")` for discovery
 - **AND** MAY include `ot.skills(name="ot-ref")` as an optional extended reference path
 
-### Requirement: Two-Mode Execution Model
+### Requirement: Three-Mode Execution Model
 
-The server instructions SHALL describe two distinct execution modes as first-class, separate systems.
+The run tool description SHALL describe three distinct invocation modes by input shape.
 
-#### Scenario: Mode 1 — Snippets documented
+#### Scenario: Mode 1 — Code documented
 - **GIVEN** prompts.yaml instructions
 - **WHEN** loaded
-- **THEN** they SHALL describe Snippets as Jinja2 templates invoked with `>>> $name key=value`
+- **THEN** the run tool description SHALL describe fenced or backticked content as literal Python code
+- **AND** SHALL document that valid unfenced Python is also code
+- **AND** SHALL document that Python syntax applies (strings must be quoted)
+- **AND** SHALL document that short param names are resolved by pack proxy prefix matching
+
+#### Scenario: Mode 2 — Snippets documented
+- **GIVEN** prompts.yaml instructions
+- **WHEN** loaded
+- **THEN** the run tool description SHALL describe Snippets as Jinja2 templates invoked with `:name key=value`
 - **AND** SHALL document that values are plain strings (Python syntax does not apply)
 - **AND** SHALL document that outer quotes are stripped (`q=abc` ≡ `q="abc"`)
 - **AND** SHALL document that param names support prefix abbreviation
 - **AND** SHALL document that per-template features (e.g. pipe batch) are not snippet language features
 
-#### Scenario: Mode 2 — Code documented
+#### Scenario: Mode 3 — Natural language to code documented
 - **GIVEN** prompts.yaml instructions
 - **WHEN** loaded
-- **THEN** they SHALL describe Code as direct Python execution via `>>> pack.fn(key="val")`
-- **AND** SHALL document that Python syntax applies (strings must be quoted)
-- **AND** SHALL document that short param names are resolved by pack proxy prefix matching
-- **AND** SHALL document that keyword arguments only are accepted
+- **THEN** the run tool description SHALL explain that free-form requests naming OneTool or a tool ask the agent to synthesize code
+- **AND** SHALL require known or discovered signatures for tool-call synthesis
+- **AND** SHALL direct agents to call `ot.tool_info(name="pack.tool")` or `ot.help(query="pack.tool")` when args are unknown
+- **AND** SHALL direct agents to ask the user when required args remain ambiguous
 
 #### Scenario: Modes are separate
 - **GIVEN** prompts.yaml instructions
 - **WHEN** loaded
-- **THEN** the two modes SHALL be presented as separate systems with different rules
+- **THEN** the three modes SHALL be presented by shape with different rules
 - **AND** SHALL NOT conflate snippet string-value rules with Python code syntax rules
 
-### Requirement: Trigger Hierarchy
+### Requirement: Invocation Contract
 
-The server instructions SHALL document the full trigger hierarchy with rationale.
+The run tool description SHALL document the complete invocation contract.
 
-#### Scenario: Trigger hierarchy documented
+#### Scenario: Supported prefixes documented
 - **GIVEN** prompts.yaml instructions
 - **WHEN** loaded
-- **THEN** they SHALL identify `>>>` as the recommended human-friendly trigger (Python REPL symbol)
-- **AND** SHALL identify `__run` as the systematic short form following the `__(tool)` pattern
-- **AND** SHALL identify `mcp__onetool__run` as the canonical MCP name (`mcp__(server)__(tool)`)
-- **AND** SHALL identify `__ot`, `__onetool` etc. as legacy triggers kept for backward compat only
+- **THEN** the run tool description SHALL identify `__run` as the canonical trigger
+- **AND** SHALL identify `__r` and `__ot` as supported aliases
+- **AND** SHALL document `:name key=value` as snippet syntax
+- **AND** SHALL state that connected agents should call MCP `run(command=...)`
+- **AND** SHALL state that direct pack calls use `pack.tool(arg=value)`, not `ot.pack.tool(...)`
+- **AND** SHALL state that agents must not guess tool names, parameter names, or allowed values when they are unknown
 
-#### Scenario: Legacy triggers not advertised
+#### Scenario: Tool call repair documented
+- **GIVEN** default prompts configuration
+- **WHEN** run tool description is generated
+- **THEN** it SHALL direct agents to repair obvious tool-call shape issues using known or discovered signatures
+- **AND** SHALL document that keyword-only tools must be called with keyword args, not positional args
+- **AND** SHALL document that obvious syntax failures should not be sent just to fail
+
+#### Scenario: Removed triggers not advertised
 - **GIVEN** the default prompts template
 - **WHEN** instructions are generated
-- **THEN** `__ot` and `__onetool` SHALL NOT appear as recommended forms
-- **AND** SHALL be kept working (recognised by the fence processor) without documentation
+- **THEN** `>>>`, `__onetool`, `__ot__run`, `__onetool__run`, and `mcp__onetool__run` SHALL NOT appear as supported runtime prefixes
 
 ### Requirement: Snippet Param Prefix Resolution
 
@@ -115,7 +135,7 @@ The system SHALL resolve abbreviated snippet param names using prefix matching.
 
 #### Scenario: Abbreviated param resolved
 - **GIVEN** a snippet with param `query` defined in snippets.yaml
-- **WHEN** the user invokes `>>> $snip q=test`
+- **WHEN** the user invokes `__run :snip q=test`
 - **THEN** `q` SHALL be resolved to `query` (prefix match, single candidate)
 
 #### Scenario: Exact match wins
@@ -133,20 +153,20 @@ The system SHALL resolve abbreviated snippet param names using prefix matching.
 - **WHEN** the user invokes with an unknown param name
 - **THEN** the unknown param SHALL pass through; the existing warning SHALL be emitted
 
-### Requirement: MCP Tool Naming Convention
+### Requirement: MCP Tool Calling Convention
 
-The server instructions SHALL document the MCP tool naming pattern and its derived short forms.
+The prompts SHALL prefer direct MCP calls to the OneTool `run` tool.
 
-#### Scenario: Canonical name documented
+#### Scenario: MCP call shape documented
 - **GIVEN** prompts.yaml instructions
 - **WHEN** loaded
-- **THEN** they SHALL specify the MCP tool name as `mcp__onetool__run`
+- **THEN** they SHALL specify the call shape as `run(command='<code>')`
 
-#### Scenario: Convention explained
+#### Scenario: Local execution discouraged for tool calls
 - **GIVEN** prompts.yaml instructions
 - **WHEN** loaded
-- **THEN** they SHALL explain the `mcp__<server>__<tool>` pattern
-- **AND** SHALL explain that `__run` is the derived short form (`__(tool)` pattern)
+- **THEN** they SHALL direct connected agents to use MCP `run(command=...)` for OneTool calls
+- **AND** SHALL reserve local scripts for heavy repo/file transformations
 
 ### Requirement: Prompt Templates
 
@@ -234,22 +254,23 @@ The system SHALL support tool-specific descriptions and examples with minimal re
 #### Scenario: Trigger documentation placement
 - **GIVEN** default prompts configuration
 - **WHEN** the run tool description is generated
-- **THEN** trigger patterns SHALL be documented in instructions only (not duplicated in tool description)
+- **THEN** trigger patterns SHALL be documented in the run tool description, not duplicated in the server instructions
 
-#### Scenario: Critical rules in both
+#### Scenario: Critical rules in run tool description
 - **GIVEN** default prompts configuration
 - **WHEN** tool description and instructions are generated
-- **THEN** critical pass-through rules ("DO NOT rewrite", "JUST pass the exact command") SHALL appear in both for redundancy
+- **THEN** critical invocation modes and repair rules SHALL appear in the run tool description
+- **AND** broad unscoped pass-through rules such as "JUST pass the exact command" SHALL NOT be required
 
 ## Change Notes
 
 ### Removed: Canonical Format Documentation
-**Reason:** Superseded by Two-Mode Execution Model + Trigger Hierarchy requirements. The old three code styles (simple, backtick, fence) are replaced by the two-mode framing. Backtick style is dropped. The canonical reference format (`mcp__onetool__run(command='...')`) is retained only as an example of direct MCP invocation.
+**Reason:** Superseded by the direct `run(command=...)` MCP calling convention and the authoritative run tool description.
 
 ### Removed: Explicit Trigger Documentation (v1)
-**Reason:** Replaced by the new Trigger Hierarchy requirement, which documents the full `>>>` / `__run` / `mcp__onetool__run` / legacy hierarchy with rationale.
+**Reason:** Replaced by the invocation contract requirement, which documents `__run`, `__r`, `__ot`, and colon-prefixed snippets.
 
 ### Removed: Discovery functions documented
 **Reason:** Discovery reference material is too detailed for the always-on prompt. Core guidance remains in always-on instructions; advanced edge cases live in `ot-ref`.
 
-**Migration:** Agents can run `>>> ot.help(query="topic")` directly for discovery. `ot-ref` remains optional.
+**Migration:** Agents can run `ot.help(query="topic")` through `run(command=...)` directly for discovery. `ot-ref` remains optional.

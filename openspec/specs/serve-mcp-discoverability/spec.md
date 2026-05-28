@@ -49,7 +49,7 @@ The server SHALL expose an MCP prompt for generating batch web search code.
 #### Scenario: Generate batch search code
 - **GIVEN** an MCP client requests the `batch_search` prompt
 - **WHEN** the client provides `topics=["AI", "ML"]` and `count=5`
-- **THEN** it SHALL return a properly formatted `__onetool__run` code block
+- **THEN** it SHALL return code intended for `run(command=...)`
 - **AND** the code SHALL call `brave_web_search` for each topic
 - **AND** the code SHALL collect results into a dictionary
 
@@ -66,8 +66,8 @@ The server SHALL expose an MCP prompt for fetch-and-transform patterns.
 
 #### Scenario: Generate transform code
 - **GIVEN** an MCP client requests the `transform_data` prompt
-- **WHEN** the client provides `urls=["https://example.com"]` and `instruction="Extract titles"`
-- **THEN** it SHALL return a properly formatted `__onetool__run` code block
+- **WHEN** the client provides `urls=["https://www.python.org"]` and `instruction="Extract titles"`
+- **THEN** it SHALL return code intended for `run(command=...)`
 - **AND** the code SHALL call `webfetch.fetch` for each URL
 - **AND** the code SHALL include the instruction as a comment for LLM processing
 
