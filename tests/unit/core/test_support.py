@@ -36,3 +36,15 @@ class TestGetSupportBanner:
         result = get_support_banner()
 
         assert "☕" in result
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_startup_message_points_to_status_diagnostics() -> None:
+    """Startup support line includes diagnostics next steps."""
+    from ot.support import get_startup_message
+
+    result = get_startup_message()
+
+    assert "logs/serve.log" in result
+    assert "ot.status()" in result
