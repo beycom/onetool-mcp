@@ -13,6 +13,11 @@ include:
 # Example: ["tools/*.py"] loads all Python files in .onetool/tools/
 tools_dir: []
 
+llm:
+  base_url: https://api.openai.com/v1
+  model: gpt-5.4-nano
+  embedding_model: text-embedding-3-small
+
 # log_level: INFO
 
 # MCP-owned direct API (optional)
@@ -20,27 +25,3 @@ direct:
   host:
     enabled: false  # true binds an authenticated loopback API from the MCP process
     port: 8765      # preferred API port; MCP startup probes upward to 65535
-
-# Tool-specific configuration
-# tools:
-#   # ot_llm — LLM calls from within OneTool (code generation, transforms, etc.)
-#   ot_llm:
-#     model: google/gemini-3-flash-preview
-#     base_url: https://openrouter.ai/api/v1
-#   # arch — architecture workbook generation (optional inline override)
-#   arch:
-#     output_dir: tmp/arch/output
-#     default_profile: simple
-#     profiles:
-#       simple:
-#         system_engine: d2 {{ input }} {{ output }} --layout elk
-#         diagram_engine: d2 {{ input }} {{ output }} --layout elk
-#         data:
-#           merge_integrations: true
-#           show_integration_labels: false
-#           integration_labels: "[{{ row.key }}] {{ row.name }}"
-#           show_arrowhead_labels: true
-#           arrowhead_labels: "{{ row.key }}"
-#           direction: up
-#   # mem — persistent memory (semantic search and recall)
-#   # mem: {}

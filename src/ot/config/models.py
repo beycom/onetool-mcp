@@ -1,6 +1,7 @@
-"""Pydantic models for OneTool configuration with embedded defaults.
+"""Pydantic models for OneTool configuration.
 
-All default values are embedded directly in model definitions (single source of truth).
+Scalar operational defaults live in model definitions. Large prompts and
+templates live in template files.
 """
 
 from __future__ import annotations
@@ -48,9 +49,9 @@ class LlmConfig(BaseModel):
     Configure once here instead of repeating in every tool section.
     """
 
-    model: str = Field(default="", description="Default completion model (e.g. google/gemini-2-flash-preview)")
-    embedding_model: str = Field(default="", description="Default embedding model (e.g. text-embedding-3-small)")
-    base_url: str = Field(default="", description="OpenAI-compatible API base URL (e.g. https://openrouter.ai/api/v1)")
+    model: str = Field(default="gpt-5.4-nano", description="Default completion model")
+    embedding_model: str = Field(default="text-embedding-3-small", description="Default embedding model")
+    base_url: str = Field(default="https://api.openai.com/v1", description="OpenAI-compatible API base URL")
     max_tokens: int = Field(default=4096, description="Max output tokens")
 
 
