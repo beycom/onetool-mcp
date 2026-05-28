@@ -348,11 +348,11 @@ class OutputConfig(BaseModel):
         description="Max output size in bytes before storing to disk. Set to 0 to disable.",
     )
     result_store_dir: str = Field(
-        default="tmp",
+        default="runtime/reports",
         description="Directory for result files (relative to .onetool/)",
     )
     sessions_dir: str = Field(
-        default="sessions",
+        default="runtime/sessions",
         description="Directory for session subdirectories (relative to .onetool/)",
     )
     session_retention_days: int = Field(
@@ -400,7 +400,7 @@ class StatsConfig(BaseModel):
         description="Enable statistics collection",
     )
     persist_dir: str = Field(
-        default="stats",
+        default="runtime/stats",
         description="Directory for stats files (relative to .onetool/)",
     )
     persist_path: str = Field(
@@ -655,7 +655,7 @@ class OneToolConfig(BaseModel):
         default="INFO", description="Logging level"
     )
     log_dir: str = Field(
-        default="logs",
+        default="runtime/logs",
         description="Directory for log files (relative to .onetool/)",
     )
     compact_max_length: int = Field(

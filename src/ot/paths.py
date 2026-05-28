@@ -6,12 +6,14 @@ OneTool uses an explicit config-file model:
 - Pass ``--config <file>`` to every command to specify the config location.
 
 Each .onetool/ directory uses subdirectories to organise files by purpose:
-- logs/ — Application log files
-- stats/ — Statistics data (stats.jsonl)
 - tools/ — Custom tool packs
+- runtime/ — Logs, stats, sessions, and reports
+- data/ — Tool-owned config-scoped data stores
+- templates/ — Editable overrides for packaged templates
 
 Directories are created lazily on first use via ``ensure_ot_dir()``.
-Templates in ot.config.global_templates are copied to the ot dir on init.
+Only explicitly user-editable templates in ot.config.global_templates are copied
+to the ot dir on init.
 """
 
 from __future__ import annotations
@@ -22,9 +24,25 @@ from importlib import resources
 from pathlib import Path
 
 # Subdirectory names within .onetool/
-LOGS_SUBDIR = "logs"
-STATS_SUBDIR = "stats"
+RUNTIME_SUBDIR = "runtime"
+DATA_SUBDIR = "data"
+TEMPLATES_SUBDIR = "templates"
 TOOLS_SUBDIR = "tools"
+
+INIT_TEMPLATE_FILES = (
+    "onetool.yaml",
+    "secrets-template.yaml",
+    "servers.yaml",
+    "snippets.yaml",
+    "prompts.yaml",
+    "security.yaml",
+    "arch.yaml",
+    "diagram.yaml",
+)
+INIT_TEMPLATE_DIRS = {
+    "arch-templates": "templates/arch",
+    "diagram-templates": "templates/diagram",
+}
 
 # Package containing global templates (copied to ot dir on init)
 GLOBAL_TEMPLATES_PACKAGE = "ot.config.global_templates"
@@ -100,8 +118,8 @@ def get_global_templates_dir() -> Path:
 
     Global templates are user-facing config files with commented examples,
     copied to the ot dir on init. These provide documentation and examples
-    for configuration. Also contains subdirectories like diagram-templates/
-    and tool_templates/ for tool-specific resources.
+    for configuration. Also contains packaged resource subdirectories like
+    diagram-templates/ and tool_templates/.
 
     Returns:
         Path to global templates directory (read-only package data)
@@ -124,6 +142,39 @@ def get_config_dir() -> Path:
     from ot.config.loader import get_config
 
     return get_config()._config_dir
+
+
+def _validate_relative_fragment(value: str, *, label: str) -> Path:
+    """Return a clean relative path fragment for OneTool-owned subtrees."""
+    path = Path(value)
+    if not value or path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+        raise ValueError(f"{label} must be a non-empty relative path fragment: {value!r}")
+    return path
+
+
+def get_ot_runtime_dir(kind: str) -> Path:
+    """Return a runtime directory under OT_DIR/runtime/."""
+    return get_config_dir() / RUNTIME_SUBDIR / _validate_relative_fragment(kind, label="runtime kind")
+
+
+def get_ot_data_dir(kind: str) -> Path:
+    """Return a tool-owned data directory under OT_DIR/data/."""
+    return get_config_dir() / DATA_SUBDIR / _validate_relative_fragment(kind, label="data kind")
+
+
+def get_ot_template_dir(kind: str) -> Path:
+    """Return an editable template override directory under OT_DIR/templates/."""
+    return get_config_dir() / TEMPLATES_SUBDIR / _validate_relative_fragment(kind, label="template kind")
+
+
+def get_project_state_dir(pack: str) -> Path:
+    """Return a project-local pack state directory under CWD/.onetool/state/."""
+    return get_effective_cwd() / ".onetool" / "state" / _validate_relative_fragment(pack, label="pack")
+
+
+def get_project_artifact_dir(kind: str) -> Path:
+    """Return a generated artifact directory under the effective project CWD."""
+    return get_effective_cwd() / _validate_relative_fragment(kind, label="artifact kind")
 
 
 def get_effective_cwd() -> Path:
@@ -151,7 +202,10 @@ def get_template_files() -> list[tuple[Path, str]]:
     try:
         templates_dir = get_global_templates_dir()
         result = []
-        for config_file in sorted(templates_dir.glob("*.yaml")) + sorted(templates_dir.glob("*.md")):
+        for name in INIT_TEMPLATE_FILES:
+            config_file = templates_dir / name
+            if not config_file.is_file():
+                continue
             dest_name = config_file.name.replace("-template.yaml", ".yaml")
             result.append((config_file, dest_name))
         return result
@@ -192,9 +246,9 @@ def create_backup(file_path: Path) -> Path:
 def ensure_ot_dir(config_path: Path, quiet: bool = False, force: bool = False) -> Path:
     """Ensure the OneTool directory exists at config_path.parent.
 
-    Creates config_path.parent with subdirectories (logs/, stats/, tools/)
-    and copies template config files from global_templates into it.
-    Templates are user-facing files with commented examples for customization.
+    Creates config_path.parent with the tools/ subdirectory, copies explicit
+    user-editable config files from global_templates into it, and copies
+    explicit editable template override directories under templates/.
 
     Args:
         config_path: Path to the onetool.yaml config file (directory is config_path.parent)
@@ -208,47 +262,39 @@ def ensure_ot_dir(config_path: Path, quiet: bool = False, force: bool = False) -
 
     ot_dir = config_path.parent
 
-    # If directory exists and not forcing, return early
-    if ot_dir.exists() and not force:
-        return ot_dir
-
     import stat
 
-    # Create directory structure with subdirectories
     ot_dir.mkdir(parents=True, exist_ok=True)
-    subdirs = [LOGS_SUBDIR, STATS_SUBDIR, TOOLS_SUBDIR]
+    subdirs = [TOOLS_SUBDIR]
     for subdir in subdirs:
         (ot_dir / subdir).mkdir(exist_ok=True)
 
-    # Copy template config files flat into ot dir
-    # YAML and Markdown files are copied from global_templates/
-    # Files named *-template.yaml are copied without the -template suffix
     copied_items: list[str] = []
     try:
         templates_dir = get_global_templates_dir()
-        for config_file in sorted(templates_dir.glob("*.yaml")) + sorted(templates_dir.glob("*.md")):
-            # Strip -template suffix if present (e.g., secrets-template.yaml -> secrets.yaml)
+        for name in INIT_TEMPLATE_FILES:
+            config_file = templates_dir / name
+            if not config_file.is_file():
+                continue
             dest_name = config_file.name.replace("-template.yaml", ".yaml")
             dest = ot_dir / dest_name
-            # Copy if doesn't exist, or if forcing
             if not dest.exists() or force:
                 shutil.copy(config_file, dest)
-                # Set secrets.yaml to 0600 (owner read/write only)
                 if dest_name == "secrets.yaml":
                     dest.chmod(stat.S_IRUSR | stat.S_IWUSR)
                 copied_items.append(dest_name)
 
-        # Copy resource subdirectories (e.g., diagram-templates/)
-        for template_subdir in templates_dir.iterdir():
-            if template_subdir.is_dir() and not template_subdir.name.startswith("_"):
-                if template_subdir.name == "tool_templates":
-                    continue
-                dest_subdir = ot_dir / template_subdir.name
-                if not dest_subdir.exists() or force:
-                    if dest_subdir.exists():
-                        shutil.rmtree(dest_subdir)
-                    shutil.copytree(template_subdir, dest_subdir)
-                    copied_items.append(f"{template_subdir.name}/")
+        for src_name, dest_name in INIT_TEMPLATE_DIRS.items():
+            template_subdir = templates_dir / src_name
+            if not template_subdir.is_dir():
+                continue
+            dest_subdir = ot_dir / dest_name
+            if not dest_subdir.exists() or force:
+                if dest_subdir.exists():
+                    shutil.rmtree(dest_subdir)
+                dest_subdir.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copytree(template_subdir, dest_subdir)
+                copied_items.append(f"{dest_name}/")
     except FileNotFoundError:
         # Global templates not available (dev environment without package install)
         pass
@@ -274,7 +320,7 @@ def get_logs_dir(base_dir: Path) -> Path:
     Returns:
         Path to logs/ subdirectory
     """
-    return base_dir / LOGS_SUBDIR
+    return base_dir / RUNTIME_SUBDIR / "logs"
 
 
 def get_stats_dir(base_dir: Path) -> Path:
@@ -286,7 +332,7 @@ def get_stats_dir(base_dir: Path) -> Path:
     Returns:
         Path to stats/ subdirectory
     """
-    return base_dir / STATS_SUBDIR
+    return base_dir / RUNTIME_SUBDIR / "stats"
 
 
 def expand_path(path: str) -> Path:

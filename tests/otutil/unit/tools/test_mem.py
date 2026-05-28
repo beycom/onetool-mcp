@@ -95,6 +95,12 @@ class TestTopicFilter:
 
 @pytest.mark.unit
 @pytest.mark.tools
+def test_config_default_db_path_is_data_scoped() -> None:
+    assert Config().db_path == "data/mem/default.db"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
 @patch("otutil.tools._mem.content._get_config", return_value=Config())
 class TestRedact:
     """Test _redact secret/PII redaction."""

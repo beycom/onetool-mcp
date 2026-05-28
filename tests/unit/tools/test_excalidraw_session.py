@@ -140,6 +140,15 @@ class TestCwdKeyDerivation:
         expected = hashlib.sha256(cwd.encode()).hexdigest()[:12]
         assert _sess.cwd_key() == expected
 
+    def test_cwd_key_uses_effective_cwd(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("OT_CWD", str(tmp_path))
+        expected = hashlib.sha256(str(tmp_path).encode()).hexdigest()[:12]
+        assert _sess.cwd_key() == expected
+
+    def test_whiteboard_dir_is_project_state(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("OT_CWD", str(tmp_path))
+        assert _sess._whiteboard_dir() == tmp_path / ".onetool" / "state" / "whiteboard"
+
     def test_different_cwd_gives_different_key(self, tmp_path: Any) -> None:
         cwd = os.path.realpath(os.getcwd())
         cwd_key = hashlib.sha256(cwd.encode()).hexdigest()[:12]

@@ -125,7 +125,7 @@ The `ot.status()` function SHALL check status of OneTool components.
 version: "1.0.0"
 runtime: {python: "3.11.x", cwd: /current/working/directory, root_mcp: true}
 config: {path: /path/to/onetool.yaml, dir: /path/to/config, include: []}
-storage: {log_file: /path/to/logs/serve.log, stats_file: /path/to/stats.jsonl, result_store: ctx}
+storage: {log_file: /path/to/runtime/logs/serve.log, stats_file: /path/to/runtime/stats/stats.jsonl, result_store: ctx}
 registry: {status: ok, tool_count: 15}
 proxy: {status: ok, server_count: 1, servers: {proxy_package_version: connected}}
 direct_api: {enabled: true, port: 8765, url: "http://127.0.0.1:8765"}
@@ -928,29 +928,3 @@ The `ot.debug()` function SHALL provide comprehensive debug information about th
 - **WHEN** LogSpan is created
 - **THEN** span name SHALL be `ot.debug`
 - **AND** span SHALL include `version` attribute from result
-
-### Requirement: Agent Cheatsheet
-
-The `ot.cheatsheet()` function SHALL return a project-agnostic reference document for AI agents using OneTool.
-
-#### Scenario: Return cheatsheet content
-- **GIVEN** the cheatsheet file exists at `~/.onetool/config/cheatsheet.md`
-- **WHEN** `ot.cheatsheet()` is called
-- **THEN** it SHALL return the full markdown content of the file
-
-#### Scenario: Fallback to package template
-- **GIVEN** no user-editable cheatsheet exists at `~/.onetool/config/cheatsheet.md`
-- **WHEN** `ot.cheatsheet()` is called
-- **THEN** it SHALL fall back to reading from the package's global_templates directory
-
-#### Scenario: User-editable
-- **GIVEN** the cheatsheet is copied to `~/.onetool/config/` during init
-- **WHEN** a user edits `~/.onetool/config/cheatsheet.md`
-- **THEN** subsequent calls to `ot.cheatsheet()` SHALL return the modified content
-
-#### Scenario: Content principles
-- **GIVEN** the shipped cheatsheet content
-- **THEN** it SHALL use keyword-only argument examples
-- **AND** it SHALL NOT reference snippets (tools only)
-- **AND** it SHALL NOT include project-specific paths or data
-- **AND** every example SHALL be a valid, copy-pasteable function call

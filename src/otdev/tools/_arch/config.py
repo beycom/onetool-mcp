@@ -22,15 +22,15 @@ class ArchProfileConfig(_ArchBaseModel):
     """Profile-specific settings."""
 
     solution_report: str = Field(
-        default="arch-templates/solution/default/index.html.j2",
+        default="templates/arch/solution/default/index.html.j2",
         description="Solution report page template file",
     )
     system_report: str = Field(
-        default="arch-templates/solution/default/system.html.j2",
+        default="templates/arch/solution/default/system.html.j2",
         description="System report page template file",
     )
     system_diagram: str = Field(
-        default="arch-templates/d2/system.d2.j2",
+        default="templates/arch/d2/system.d2.j2",
         description="System D2 template file path",
     )
     system_engine: str = Field(
@@ -51,7 +51,7 @@ class ArchConfig(_ArchBaseModel):
     """Strict tools.arch configuration model."""
 
     output_dir: str = Field(
-        default="architecture-output",
+        default="arch",
         description="Default output directory for generated architecture files",
     )
     default_profile: str = Field(
@@ -177,7 +177,7 @@ def _resolve_config_relative(path_str: str) -> Path:
 
 
 def resolve_path_with_fallback(*, configured_path: str, fallback_relative: str) -> Path:
-    """Resolve path with config-dir then bundled fallback behavior."""
+    """Resolve a template path with editable override then bundled default behavior."""
     raw = Path(configured_path).expanduser()
 
     if raw.is_absolute():
@@ -190,12 +190,15 @@ def resolve_path_with_fallback(*, configured_path: str, fallback_relative: str) 
     if config_candidate.exists():
         return config_candidate
 
+    if not Path(configured_path).as_posix().startswith("templates/arch/"):
+        raise ConfigResolutionError(f"Configured relative path not found: {configured_path}")
+
     fallback = (get_global_templates_dir() / fallback_relative).resolve()
     if fallback.exists():
         return fallback
 
     raise ConfigResolutionError(
-        f"Configured relative path not found in config dir and fallback missing: {configured_path}"
+        f"Editable template override and bundled fallback missing: {configured_path}"
     )
 
 

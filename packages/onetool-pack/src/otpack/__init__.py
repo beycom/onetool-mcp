@@ -14,6 +14,7 @@ from otpack.auth import (
     HmacAuthError,
     NonceCache,
     ensure_hmac_key,
+    ensure_hmac_key_file,
     sign_http_message,
     verify_http_message,
 )
@@ -54,7 +55,13 @@ from otpack.http import (
     safe_request,
 )
 from otpack.logging import LogEntry, LogSpan
-from otpack.paths import expand_path, get_effective_cwd, resolve_cwd_path
+from otpack.paths import (
+    expand_path,
+    get_effective_cwd,
+    get_project_artifact_dir,
+    get_project_state_dir,
+    resolve_cwd_path,
+)
 from otpack.pathsec import DEFAULT_EXCLUDE_PATTERNS, is_path_excluded, validate_path
 from otpack.platform import get_install_hint
 from otpack.state import get_state, set_state
@@ -86,12 +93,15 @@ __all__ = [
     "configure_standalone",
     "ensure_cli",
     "ensure_hmac_key",
+    "ensure_hmac_key_file",
     "ensure_lib",
     "expand_path",
     "format_batch_results",
     "format_error",
     "get_effective_cwd",
     "get_install_hint",
+    "get_project_artifact_dir",
+    "get_project_state_dir",
     "get_secret",
     "get_state",
     "get_tool_config",

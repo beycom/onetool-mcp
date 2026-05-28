@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines file-backed session state for the whiteboard pack. Board state is persisted in session files at `~/.onetool/whiteboard/{key}.json` rather than in module-level memory, enabling state to survive across process boundaries (e.g. multiple `onetool direct run` invocations).
+Defines file-backed session state for the whiteboard pack. Board state is persisted in project-local session files at `{CWD}/.onetool/state/whiteboard/{key}.json` rather than in module-level memory, enabling state to survive across process boundaries (e.g. multiple `onetool direct run` invocations).
 
 ---
 
@@ -10,7 +10,7 @@ Defines file-backed session state for the whiteboard pack. Board state is persis
 
 ### Requirement: Whiteboard file-backed session state
 
-Whiteboard board state SHALL be persisted in user-invisible session files at `~/.onetool/whiteboard/{key}.json` rather than in module-level memory.
+Whiteboard board state SHALL be persisted in project-local session files at `{CWD}/.onetool/state/whiteboard/{key}.json` rather than in module-level memory.
 
 State operations (draw, erase, label, group) SHALL load state from the session file, apply changes, and write back. No Playwright browser SHALL be required for state operations.
 
@@ -39,13 +39,13 @@ Render operations (share, export, screenshot) SHALL load state from the session 
 #### Scenario: Default board keyed by CWD
 
 - **WHEN** `wb.draw(input='...')` is called without a `board=` argument
-- **THEN** state SHALL be stored in `~/.onetool/whiteboard/<cwd-key>.json`
+- **THEN** state SHALL be stored in `{CWD}/.onetool/state/whiteboard/<cwd-key>.json`
 - **WHERE** `<cwd-key>` is a deterministic key derived from the current working directory
 
 #### Scenario: Named board
 
 - **WHEN** `wb.draw(input='...', board='arch')` is called
-- **THEN** state SHALL be stored in `~/.onetool/whiteboard/arch.json`
+- **THEN** state SHALL be stored in `{CWD}/.onetool/state/whiteboard/arch.json`
 - **AND** subsequent calls with `board='arch'` SHALL operate on that same state
 
 #### Scenario: share launches browser
@@ -73,7 +73,7 @@ The whiteboard pack SHALL provide `wb.boards()` and `wb.clear()` tools for sessi
 #### Scenario: Clear named board
 
 - **WHEN** `wb.clear(board='arch')` is called
-- **THEN** `~/.onetool/whiteboard/arch.json` SHALL be deleted
+- **THEN** `{CWD}/.onetool/state/whiteboard/arch.json` SHALL be deleted
 - **AND** the return value SHALL confirm the board was cleared
 
 #### Scenario: Clear non-existent board

@@ -790,6 +790,20 @@ class TestKnowledgeConfig:
         assert "docs" in result
         assert "Project docs" in result
 
+    def test_default_db_path_is_data_scoped(self, tmp_path: Path) -> None:
+        from otutil.tools._knowledge.db import _resolve_db_path
+
+        with (
+            patch("otutil.tools._knowledge.config._get_config") as mock_cfg,
+            patch("ot.meta.resolve_ot_path", side_effect=lambda path: tmp_path / path),
+        ):
+            cfg = MagicMock()
+            cfg.kb = {}
+            mock_cfg.return_value = cfg
+            result = _resolve_db_path("docs")
+
+        assert result == tmp_path / "data" / "knowledge" / "docs.db"
+
 
 # ===========================================================================
 # 6.3 — CRUD round-trips and listing shapes

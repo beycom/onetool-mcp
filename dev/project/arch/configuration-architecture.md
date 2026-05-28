@@ -2,15 +2,15 @@
 
 ## Resolution Order
 
-Global-only in V2 (no project-level config):
+Explicit config-file model:
 
 1. `ONETOOL_CONFIG` env var
 2. `--config` CLI argument
-3. `~/.onetool/config/onetool.yaml`
+3. User-selected default such as `~/.onetool/onetool.yaml`
 
 ## Config Files
 
-All under `.onetool/config/`:
+All under the active OneTool config directory (`{OT_DIR}`):
 
 | File | Purpose |
 |------|---------|
@@ -76,10 +76,10 @@ from otpack import get_state, set_state
 This state is not config and is not loaded from `onetool.yaml`. It is stored at:
 
 ```text
-<effective project cwd>/.onetool/state.yaml
+<effective project cwd>/.onetool/state/<pack>/state.yaml
 ```
 
-Default state path resolution should use `resolve_cwd_path(".onetool/state.yaml")` because the file follows the effective project cwd.
+Default state directory resolution should use `get_project_state_dir(pack)` because the directory follows the effective project cwd.
 
 ## Key Files
 

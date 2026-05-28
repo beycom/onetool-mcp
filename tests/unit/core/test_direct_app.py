@@ -12,17 +12,17 @@ import pytest
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_direct_auth_key_uses_mcp_direct_namespace() -> None:
-    """Direct API auth must use the dedicated config-scoped mcp-direct namespace."""
+def test_direct_auth_key_uses_config_scoped_auth_file() -> None:
+    """Direct API auth must use the dedicated config-scoped auth key file."""
     from ot.direct_auth import direct_auth_key
 
     with (
-        patch("ot.direct_auth.ensure_hmac_key", return_value=b"x" * 32) as mock_key,
+        patch("ot.direct_auth.ensure_hmac_key_file", return_value=b"x" * 32) as mock_key,
         patch("ot.meta.resolve_ot_path", return_value=Path("/tmp/project/.onetool")),
     ):
         assert direct_auth_key() == b"x" * 32
 
-    mock_key.assert_called_once_with("mcp-direct", base_dir=Path("/tmp/project/.onetool"))
+    mock_key.assert_called_once_with(Path("/tmp/project/.onetool/auth/mcp-direct.key"))
 
 
 @pytest.mark.unit
@@ -193,7 +193,7 @@ def test_http_root_lifespan_logs_transport_and_non_loopback_warning() -> None:
             self.name = span
             self.values = dict(values)
 
-        def __enter__(self) -> "FakeSpan":
+        def __enter__(self) -> FakeSpan:
             spans.append((self.name, self.values))
             return self
 

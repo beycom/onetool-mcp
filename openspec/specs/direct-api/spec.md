@@ -78,10 +78,8 @@ The API SHALL expose:
 - signed `GET /ready`
 - signed `POST /run`
 
-Requests and responses SHALL use OneTool HMAC headers with the `mcp-direct`
-auth namespace. The HMAC key SHALL be stored at
-`mcp-direct/auth.key` under the active OT_DIR using `resolve_ot_path(".")`
-as the `otpack.ensure_hmac_key("mcp-direct", base_dir=...)` base directory.
+Requests and responses SHALL use OneTool HMAC headers. The HMAC key SHALL be
+stored at `auth/mcp-direct.key` under the active OT_DIR.
 
 Every request SHALL verify method, path, body hash, timestamp, nonce, and
 signature before doing work. Replayed nonces SHALL be rejected. Every response,

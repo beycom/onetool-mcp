@@ -196,12 +196,12 @@ def configure_logging(log_name: str = "onetool", level: str | None = None) -> No
     """Configure Loguru for file-only output with dev-friendly format.
 
     Args:
-        log_name: Name for the log file (e.g., "serve" -> logs/serve.log)
+        log_name: Name for the log file (e.g., "serve" -> runtime/logs/serve.log)
         level: Optional log level override. If None, uses config value.
 
     Settings from onetool.yaml:
     - log_level: Log level (default: INFO)
-    - log_dir: Directory for log files (default: ../logs, relative to config dir)
+    - log_dir: Directory for log files (default: runtime/logs, relative to config dir)
     """
     logger.remove()
 

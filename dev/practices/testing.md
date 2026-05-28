@@ -425,7 +425,7 @@ def test_two():
 
 ## Config Isolation
 
-Tests use `tests/.onetool/config/onetool.yaml` with `inherit: none` to ensure isolation from user configs.
+Tests use the flat `tests/.onetool/onetool.yaml` fixture to ensure isolation from user configs.
 
 ---
 

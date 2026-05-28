@@ -2,15 +2,15 @@
 
 ## Config Resolution
 
-Global-only (no project-level config in V2):
+Explicit config-file model:
 
 1. `ONETOOL_CONFIG` env var
 2. `--config` CLI argument
-3. `~/.onetool/config/onetool.yaml`
+3. User-selected default such as `~/.onetool/onetool.yaml`
 
 ## Config Files
 
-All under `.onetool/config/`:
+All under the active OneTool config directory (`{OT_DIR}`):
 
 | File | Purpose |
 |------|---------|
@@ -88,21 +88,26 @@ The root template stays minimal: scalar shared defaults such as `llm.model`, `ll
 
 | Function | Use For |
 |----------|---------|
-| `resolve_ot_path()` | OneTool-owned files under the active `.onetool/` directory: databases, logs, stats, auth keys, runtime files |
+| `resolve_ot_path()` | Existing config-relative strings and explicit OT_DIR paths |
+| `get_ot_runtime_dir(kind)` | Runtime directories under `runtime/`: logs, stats, sessions, reports |
+| `get_ot_data_dir(kind)` | Config-scoped data stores under `data/` |
+| `get_ot_template_dir(kind)` | Editable template override directories under `templates/` |
 | `resolve_cwd_path()` | Project files under the effective working directory: user-supplied inputs/outputs, project-local state, generated artifacts |
+| `get_project_state_dir(pack)` | Pack-owned project state under `.onetool/state/{pack}/` |
+| `get_project_artifact_dir(kind)` | Generated project artifacts under `{CWD}` |
 | `expand_path()` | Arbitrary external paths where neither OT_DIR nor project cwd semantics apply |
 
-Never use `Path.expanduser()` directly. The resolvers honour `OT_GLOBAL_DIR` and project-level `.onetool/` directories.
+Never use `Path.expanduser()` directly. The resolvers honour the active OneTool config directory and effective project cwd.
 
-Use relative defaults (e.g., `mem.db`) not absolute ones (e.g., `~/.onetool/mem.db`).
+Use relative defaults (e.g., `data/mem/default.db`) not absolute ones (e.g., `~/.onetool/mem.db`).
 
 Use `resolve_ot_path()` when the file belongs to OneTool's active configuration/runtime directory:
 
 ```python
 from ot.meta import resolve_ot_path
 
-db_path = resolve_ot_path("mem.db")              # <OT_DIR>/mem.db
-log_path = resolve_ot_path("logs/serve.log")     # <OT_DIR>/logs/serve.log
+db_path = resolve_ot_path("data/mem/default.db")       # <OT_DIR>/data/mem/default.db
+log_path = resolve_ot_path("runtime/logs/serve.log")   # <OT_DIR>/runtime/logs/serve.log
 ```
 
 Use `resolve_cwd_path()` when the path is supplied by a caller or belongs to the user's project tree:
@@ -111,7 +116,7 @@ Use `resolve_cwd_path()` when the path is supplied by a caller or belongs to the
 from otpack import resolve_cwd_path
 
 source = resolve_cwd_path(user_path)             # user-supplied file path
-state = resolve_cwd_path(".onetool/state.yaml")  # project-local state
+state = resolve_cwd_path(".onetool/state/my_pack/state.yaml")   # project-local state
 output = resolve_cwd_path("reports/out.md")      # project artifact
 ```
 
@@ -132,15 +137,15 @@ If a path is project-relative, do not use `expand_path()`. If a path is OneTool-
 State is not OneTool config and is not read from `onetool.yaml`. It lives under the effective project working directory:
 
 ```text
-<effective project cwd>/.onetool/state.yaml
+<effective project cwd>/.onetool/state/<pack>/state.yaml
 ```
 
-Because this is project-relative data, resolve the default path with:
+Because this is project-relative data, resolve pack-owned directories with:
 
 ```python
-from otpack import resolve_cwd_path
+from otpack import get_project_state_dir
 
-state_path = resolve_cwd_path(".onetool/state.yaml")
+state_path = get_project_state_dir("my_pack") / "state.yaml"
 ```
 
 ## Secrets

@@ -93,6 +93,36 @@ class TestCreateBackup:
 
 @pytest.mark.unit
 @pytest.mark.core
+class TestPathHelpers:
+    """Tests for canonical OneTool file layout helpers."""
+
+    def test_project_state_and_artifact_dirs_use_effective_cwd(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from ot.paths import get_project_artifact_dir, get_project_state_dir
+
+        monkeypatch.setenv("OT_CWD", str(tmp_path))
+
+        assert get_project_state_dir("localhist") == tmp_path / ".onetool" / "state" / "localhist"
+        assert get_project_artifact_dir("arch") == tmp_path / "arch"
+
+    def test_ot_scoped_helpers_use_config_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        from ot.config.models import OneToolConfig
+        from ot.paths import get_ot_data_dir, get_ot_runtime_dir, get_ot_template_dir
+
+        config = OneToolConfig()
+        config._config_dir = tmp_path / ".onetool"
+        monkeypatch.setattr("ot.config.loader.get_config", lambda: config)
+
+        assert get_ot_runtime_dir("logs") == tmp_path / ".onetool" / "runtime" / "logs"
+        assert get_ot_data_dir("mem") == tmp_path / ".onetool" / "data" / "mem"
+        assert get_ot_template_dir("arch") == tmp_path / ".onetool" / "templates" / "arch"
+
+
+@pytest.mark.unit
+@pytest.mark.core
 class TestEnsureOtDir:
     """Tests for ensure_ot_dir()."""
 
@@ -106,17 +136,18 @@ class TestEnsureOtDir:
         assert result == tmp_path / ".onetool"
         assert result.exists()
 
-    def test_creates_subdirectories(self, tmp_path: Path) -> None:
-        """Creates logs/, stats/, tools/ subdirectories."""
+    def test_creates_only_init_subdirectories(self, tmp_path: Path) -> None:
+        """Creates init-owned subdirectories and leaves runtime dirs lazy."""
         from ot.paths import ensure_ot_dir
 
         config_path = tmp_path / ".onetool" / "onetool.yaml"
         ensure_ot_dir(config_path, quiet=True)
 
         ot_dir = tmp_path / ".onetool"
-        assert (ot_dir / "logs").exists()
-        assert (ot_dir / "stats").exists()
         assert (ot_dir / "tools").exists()
+        assert not (ot_dir / "logs").exists()
+        assert not (ot_dir / "stats").exists()
+        assert not (ot_dir / "runtime").exists()
 
     def test_copies_yaml_files(self, tmp_path: Path) -> None:
         """Copies YAML template files flat into ot dir."""
@@ -127,9 +158,27 @@ class TestEnsureOtDir:
 
         ot_dir = tmp_path / ".onetool"
         assert (ot_dir / "onetool.yaml").exists()
+        assert (ot_dir / "secrets.yaml").exists()
+        assert not (ot_dir / "skills.md").exists()
 
-    def test_existing_dir_not_recreated(self, tmp_path: Path) -> None:
-        """Existing directory is not recreated when force=False."""
+    def test_copies_only_explicit_template_dirs(self, tmp_path: Path) -> None:
+        """Copies editable template overrides, not package-only resources."""
+        from ot.paths import ensure_ot_dir
+
+        config_path = tmp_path / ".onetool" / "onetool.yaml"
+        ensure_ot_dir(config_path, quiet=True)
+
+        ot_dir = tmp_path / ".onetool"
+        assert (ot_dir / "templates" / "arch").is_dir()
+        assert (ot_dir / "templates" / "diagram").is_dir()
+        assert not (ot_dir / "arch-templates").exists()
+        assert not (ot_dir / "diagram-templates").exists()
+        assert not (ot_dir / "skills").exists()
+        assert not (ot_dir / "tool_templates").exists()
+        assert not (ot_dir / "__pycache__").exists()
+
+    def test_existing_dir_preserves_existing_files(self, tmp_path: Path) -> None:
+        """Existing files are preserved when force=False."""
         from ot.paths import ensure_ot_dir
 
         ot_dir = tmp_path / ".onetool"

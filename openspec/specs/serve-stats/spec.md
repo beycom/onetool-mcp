@@ -31,7 +31,7 @@ The server SHALL support configuration for statistics collection.
 - **GIVEN** no stats configuration specified
 - **WHEN** the server starts
 - **THEN** stats SHALL be enabled with defaults:
-  - persist_dir: "stats" (relative to `.onetool/`)
+  - persist_dir: "runtime/stats" (relative to `.onetool/`)
   - persist_path: "stats.jsonl" (filename within persist_dir)
   - flush_interval_seconds: 30
   - context_per_call: 30000
@@ -40,7 +40,7 @@ The server SHALL support configuration for statistics collection.
 #### Scenario: Stats file location
 - **GIVEN** default configuration
 - **WHEN** stats are flushed
-- **THEN** records SHALL be written to `.onetool/stats/stats.jsonl`
+- **THEN** records SHALL be written to `.onetool/runtime/stats/stats.jsonl`
 
 ### Requirement: Statistics Aggregation
 

@@ -225,7 +225,7 @@ The `diagram.get_template()` function SHALL return diagram starter templates.
 - **AND** it SHALL list available templates
 
 #### Scenario: Template file resolution
-- **GIVEN** template config with `file: diagram-templates/api-flow.mmd`
+- **GIVEN** template config with `file: templates/diagram/api-flow.mmd`
 - **WHEN** `diagram.get_template(name="api-flow")` is called
 - **THEN** it SHALL first resolve path relative to `.onetool/` config directory
 - **AND** if not found locally, it SHALL fall back to the bundled `global_templates/` directory

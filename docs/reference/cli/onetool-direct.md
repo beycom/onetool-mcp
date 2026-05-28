@@ -29,7 +29,7 @@ onetool direct run --port PORT [OPTIONS] [COMMAND]
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--port PORT` | `-p` | required | Target MCP direct API port |
-| `--ot-dir PATH` | | `~/.onetool` | Absolute OneTool directory containing `mcp-direct/auth.key` |
+| `--ot-dir PATH` | | `~/.onetool` | Absolute OneTool directory containing `auth/mcp-direct.key` |
 | `--format MODE` | `-f` | `json_h` | `json_h`, `json`, `yml`, `yml_h`, or `raw` |
 | `--sanitize` | | false | Enable output sanitization |
 | `--timeout N` | `-t` | `120` | Direct API request timeout in seconds |

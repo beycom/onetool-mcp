@@ -26,21 +26,17 @@ def test_state_returns_default_when_missing(tmp_path: Path, monkeypatch: pytest.
 @pytest.mark.unit
 @pytest.mark.pkg
 def test_state_writes_pack_scoped_values(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """set_state creates .onetool/state.yaml and scopes values by pack."""
+    """set_state creates .onetool/state/{pack}/state.yaml with pack-owned values."""
     import otpack.state as state
 
     monkeypatch.setenv("OT_CWD", str(tmp_path))
 
     state.set_state("bridge", "connection_id", "onetool-mcp")
 
-    path = tmp_path / ".onetool" / "state.yaml"
+    path = tmp_path / ".onetool" / "state" / "bridge" / "state.yaml"
     content = path.read_text()
     data = yaml.safe_load(content)
-    assert content.startswith("version: 1\npacks:\n")
-    assert data == {
-        "version": 1,
-        "packs": {"bridge": {"connection_id": "onetool-mcp"}},
-    }
+    assert data == {"connection_id": "onetool-mcp"}
     assert state.get_state("bridge", "connection_id") == "onetool-mcp"
 
 
@@ -58,17 +54,16 @@ def test_state_accepts_explicit_path(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 @pytest.mark.pkg
-def test_state_rejects_unsupported_version(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Only state version 1 is accepted."""
+def test_state_ignores_stale_shared_state_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Legacy shared state files are not read as aliases."""
     import otpack.state as state
 
     monkeypatch.setenv("OT_CWD", str(tmp_path))
     path = tmp_path / ".onetool" / "state.yaml"
-    path.parent.mkdir()
+    path.parent.mkdir(parents=True)
     path.write_text("version: 2\npacks: {}\n")
 
-    with pytest.raises(ValueError, match="Unsupported OneTool state version"):
-        state.get_state("bridge", "connection_id")
+    assert state.get_state("bridge", "connection_id", "default") == "default"
 
 
 @pytest.mark.unit
@@ -78,8 +73,8 @@ def test_state_rejects_malformed_yaml(tmp_path: Path, monkeypatch: pytest.Monkey
     import otpack.state as state
 
     monkeypatch.setenv("OT_CWD", str(tmp_path))
-    path = tmp_path / ".onetool" / "state.yaml"
-    path.parent.mkdir()
+    path = tmp_path / ".onetool" / "state" / "bridge" / "state.yaml"
+    path.parent.mkdir(parents=True)
     path.write_text("version: [")
 
     with pytest.raises(ValueError, match="Malformed OneTool state file"):

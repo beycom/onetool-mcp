@@ -9,7 +9,7 @@ from hashlib import sha256
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from otpack import get_tool_config, resolve_cwd_path
+from otpack import get_project_state_dir, get_tool_config, resolve_cwd_path
 from pydantic import BaseModel, ConfigDict, Field
 
 if TYPE_CHECKING:
@@ -110,7 +110,7 @@ def resolve_paths(config: Config | None = None) -> Paths:
         raise ValueError("git_dir must not be the primary .git directory")
     # Localhist state is intentionally project-root scoped so explicit autosave
     # paths can manage independent watchers without relying on the caller cwd.
-    state_dir = project_root / ".onetool" / "state" / "localhist"
+    state_dir = get_project_state_dir("localhist")
     return Paths(
         project_root=project_root,
         git_dir=git_dir,

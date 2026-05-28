@@ -791,14 +791,14 @@ def test_get_log_dir_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.unit
 @pytest.mark.core
 def test_get_log_dir_default_when_no_config(monkeypatch: pytest.MonkeyPatch) -> None:
-    """get_log_dir returns 'logs' when no env var and no config loaded."""
+    """get_log_dir returns the runtime log path when no env var and no config loaded."""
     import ot.config.loader as loader_module
     from ot.config.loader import get_log_dir
 
     monkeypatch.delenv("OT_LOG_DIR", raising=False)
     loader_module._config = None
     try:
-        assert get_log_dir() == "logs"
+        assert get_log_dir() == "runtime/logs"
     finally:
         loader_module._config = None
 

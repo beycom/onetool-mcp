@@ -756,7 +756,11 @@ class TestGenerate:
 
 
 class TestTemplateResolution:
-    def test_relative_path_falls_back_to_bundled(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def test_template_override_path_falls_back_to_bundled(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
         missing_config_dir = tmp_path / "cfg"
         bundled = tmp_path / "bundled"
         bundled.mkdir(parents=True)
@@ -768,10 +772,27 @@ class TestTemplateResolution:
         monkeypatch.setattr("otdev.tools._arch.config.get_global_templates_dir", lambda: bundled)
 
         path = resolve_path_with_fallback(
-            configured_path="arch-templates/solution/default",
+            configured_path="templates/arch/solution/default",
             fallback_relative="arch-templates/solution/default",
         )
         assert path == target.resolve()
+
+    def test_missing_custom_relative_path_has_no_fallback(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        missing_config_dir = tmp_path / "cfg"
+        bundled = tmp_path / "bundled"
+        bundled.mkdir(parents=True)
+        monkeypatch.setattr("otdev.tools._arch.config.get_config_dir", lambda: missing_config_dir)
+        monkeypatch.setattr("otdev.tools._arch.config.get_global_templates_dir", lambda: bundled)
+
+        with pytest.raises(ConfigResolutionError, match="Configured relative path not found"):
+            resolve_path_with_fallback(
+                configured_path="arch-templates/solution/default",
+                fallback_relative="arch-templates/solution/default",
+            )
 
     def test_absolute_missing_path_has_no_fallback(self, tmp_path: Path) -> None:
         missing = tmp_path / "missing" / "template.j2"

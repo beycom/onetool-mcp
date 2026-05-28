@@ -63,7 +63,7 @@ stdio transport and SHALL support Streamable HTTP root mode through
 - **AND** config loading fails before the MCP handshake
 - **WHEN** the process exits
 - **THEN** stderr SHALL include a compact config error diagnostic
-- **AND** `<config-dir>/logs/serve.log` SHALL record the config path and error message
+- **AND** `<config-dir>/runtime/logs/serve.log` SHALL record the config path and error message
 
 #### Scenario: Termination signal
 - **GIVEN** the stdio or HTTP MCP server process receives SIGINT or SIGTERM
@@ -155,11 +155,11 @@ Existing files in the target directory SHALL be backed up to `<filename>.bak` (o
 - **AND** write an `onetool.yaml` that includes only the materialised YAML files
 - **AND** if the user cancels (Ctrl+C) at the checkbox, exit with code 0 without writing any files
 
-#### Scenario: diagram.yaml sidecar directory
+#### Scenario: diagram.yaml editable template directory
 - **GIVEN** the user selects `diagram.yaml` during init
 - **WHEN** init materialises `diagram.yaml`
-- **THEN** it SHALL also copy the `diagram-templates/` directory from package templates into the config dir alongside `diagram.yaml`
-- **AND** if `diagram-templates/` already exists it SHALL be backed up using the standard `.bak` scheme before overwriting
+- **THEN** it SHALL also copy packaged diagram templates into `templates/diagram/` under the config dir
+- **AND** if `templates/diagram/` already exists it SHALL be backed up using the standard `.bak` scheme before overwriting
 
 #### Scenario: Conflict handling
 - **GIVEN** a file already exists in the target directory

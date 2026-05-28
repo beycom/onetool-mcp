@@ -79,7 +79,7 @@ def _setup_signal_handlers() -> None:
 
 def _write_startup_config_error(config: Path, error: Exception) -> None:
     """Write pre-handshake config failures to the serve log location."""
-    log_dir = config.parent / "logs"
+    log_dir = config.parent / "runtime" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "serve.log"
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
@@ -348,7 +348,7 @@ def _copy_file(ot_dir: Path, filename: str) -> bool:
 
 
 def _copy_diagram(ot_dir: Path) -> bool:
-    """Copy diagram.yaml and diagram-templates/ directory. Returns True if success."""
+    """Copy diagram.yaml and editable diagram templates. Returns True if success."""
     import shutil
 
     from ot.paths import get_global_templates_dir
@@ -365,15 +365,16 @@ def _copy_diagram(ot_dir: Path) -> bool:
 
     src_templates = templates_dir / "diagram-templates"
     if src_templates.exists():
-        dest_templates = ot_dir / "diagram-templates"
+        dest_templates = ot_dir / "templates" / "diagram"
         if dest_templates.exists():
             bak = _next_bak(dest_templates)
             dest_templates.rename(bak)
             console.print(
-                f"  [yellow]![/yellow] diagram-templates/ exists → backed up as {bak.name}"
+                f"  [yellow]![/yellow] templates/diagram/ exists → backed up as {bak.name}"
             )
+        dest_templates.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(src_templates, dest_templates)
-        console.print("  [green]✓[/green] diagram-templates/")
+        console.print("  [green]✓[/green] templates/diagram/")
 
     return True
 

@@ -41,6 +41,23 @@ def test_ensure_hmac_key_accepts_base_dir(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 @pytest.mark.pkg
+def test_ensure_hmac_key_file_accepts_explicit_path(tmp_path: Path) -> None:
+    """ensure_hmac_key_file can store a key at an explicit path."""
+    import otpack.auth as auth
+
+    path = tmp_path / "keys" / "bridge.key"
+
+    first = auth.ensure_hmac_key_file(path)
+    second = auth.ensure_hmac_key_file(path)
+
+    assert len(first) == 32
+    assert second == first
+    assert base64.b64decode(path.read_text().strip()) == first
+    assert stat.S_IMODE(path.stat().st_mode) & 0o077 == 0
+
+
+@pytest.mark.unit
+@pytest.mark.pkg
 def test_verify_accepts_signed_request() -> None:
     """A matching signed request verifies successfully."""
     from otpack.auth import sign_http_message, verify_http_message

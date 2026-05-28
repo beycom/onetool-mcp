@@ -218,7 +218,7 @@ Extract sections from multiple memories in a single call.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `tools.mem.db_path` | string | `mem.db` | SQLite database path, relative to the OneTool directory. |
+| `tools.mem.db_path` | string | `data/mem/default.db` | SQLite database path, relative to the OneTool directory. |
 | `tools.mem.model` | string | `""` | Embedding model. Falls back to `llm.embedding_model`; built-in default: `text-embedding-3-small`. |
 | `tools.mem.base_url` | string | `""` | OpenAI-compatible embeddings API base URL. Falls back to `llm.base_url`. |
 | `tools.mem.dimensions` | int | `1536` | Embedding dimensions. Must match the configured model. |
@@ -239,7 +239,7 @@ Extract sections from multiple memories in a single call.
 ```yaml
 tools:
   mem:
-    db_path: mem.db
+    db_path: data/mem/default.db
     model: text-embedding-3-small
     base_url: https://openrouter.ai/api/v1
     dimensions: 1536

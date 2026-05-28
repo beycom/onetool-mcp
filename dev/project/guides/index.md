@@ -25,6 +25,7 @@ OneTool configuration system.
 | Guide | Topic |
 |-------|-------|
 | [Configuration](onetool-configuration.md) | OneTool configuration system overview |
+| [File Layout](onetool-file-layout.md) | Canonical ownership rules for config, runtime, data, state, artifacts, and templates |
 | [Tool Configuration](tool-configuration.md) | Tool-specific config patterns |
 
 ---
@@ -35,6 +36,7 @@ OneTool configuration system.
 |--------------|-----|
 | Create a new tool pack | [Tool Development](tool-development.md) |
 | Add configuration to my tool | [Tool Configuration](tool-configuration.md) |
+| Choose where a file should live | [File Layout](onetool-file-layout.md) |
 | Write a reference doc for my tool | [Tool Reference Documentation](tool-reference-docs.md) |
 | Handle third-party code licenses | [Attribution](attribution.md) |
 | Configure OneTool | [Configuration](onetool-configuration.md) |

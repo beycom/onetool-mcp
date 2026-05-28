@@ -41,7 +41,7 @@ def get_startup_message() -> str:
     """
     return (
         f"{SUPPORT_MESSAGE_SHORT}: {KOFI_URL} | "
-        "Diagnostics: see logs/serve.log and run ot.status()"
+        "Diagnostics: see runtime/logs/serve.log and run ot.status()"
     )
 
 

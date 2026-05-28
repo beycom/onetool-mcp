@@ -54,7 +54,7 @@ def test_copy_file_security(tmp_path: Path) -> None:
 @pytest.mark.unit
 @pytest.mark.core
 def test_copy_diagram_copies_yaml_and_templates(tmp_path: Path) -> None:
-    """_copy_diagram copies diagram.yaml and diagram-templates/ directory."""
+    """_copy_diagram copies diagram.yaml and templates/diagram/ directory."""
     from onetool.cli import _copy_diagram
 
     ot_dir = tmp_path / ".onetool"
@@ -64,28 +64,28 @@ def test_copy_diagram_copies_yaml_and_templates(tmp_path: Path) -> None:
 
     assert result is True
     assert (ot_dir / "diagram.yaml").exists()
-    assert (ot_dir / "diagram-templates").is_dir()
+    assert (ot_dir / "templates" / "diagram").is_dir()
     # At least one template file should be present
-    templates = list((ot_dir / "diagram-templates").iterdir())
+    templates = list((ot_dir / "templates" / "diagram").iterdir())
     assert len(templates) > 0
 
 
 @pytest.mark.unit
 @pytest.mark.core
 def test_copy_diagram_backs_up_existing_templates(tmp_path: Path) -> None:
-    """_copy_diagram backs up existing diagram-templates/ before overwriting."""
+    """_copy_diagram backs up existing templates/diagram/ before overwriting."""
     from onetool.cli import _copy_diagram
 
     ot_dir = tmp_path / ".onetool"
     ot_dir.mkdir()
-    existing_templates = ot_dir / "diagram-templates"
-    existing_templates.mkdir()
+    existing_templates = ot_dir / "templates" / "diagram"
+    existing_templates.mkdir(parents=True)
     (existing_templates / "custom.mmd").write_text("# custom")
 
     _copy_diagram(ot_dir)
 
-    assert (ot_dir / "diagram-templates").is_dir()
-    bak = ot_dir / "diagram-templates.bak"
+    assert (ot_dir / "templates" / "diagram").is_dir()
+    bak = ot_dir / "templates" / "diagram.bak"
     assert bak.exists()
     assert (bak / "custom.mmd").read_text() == "# custom"
 
@@ -556,7 +556,7 @@ def test_serve_config_error_is_written_to_serve_log(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "Error loading config" in result.output
-    log_text = (ot_dir / "logs" / "serve.log").read_text()
+    log_text = (ot_dir / "runtime" / "logs" / "serve.log").read_text()
     assert "mcp.startup.config_error" in log_text
     assert str(config_path) in log_text
     assert "70000" in log_text

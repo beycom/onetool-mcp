@@ -25,7 +25,7 @@ The `mem.write()` function SHALL store memories with topic, content, and metadat
 
 #### Scenario: Write from file
 - **GIVEN** a file path
-- **WHEN** `mem.write(topic="config", file="~/.onetool/config/onetool.yaml")` is called
+- **WHEN** `mem.write(topic="config", file="~/.onetool/onetool.yaml")` is called
 - **THEN** it SHALL read content from the file
 - **AND** store it as a memory
 - **AND** auto-populate `source`, `source_mtime`, and `content_type` in meta
@@ -803,7 +803,7 @@ Parameters: `pattern` (str, required), `topic` (str|None), `category` (str|None)
 ```yaml
 tools:
   mem:
-    db_path: mem.db  # relative to .onetool/
+    db_path: data/mem/default.db  # relative to .onetool/
     model: ""      # inherits from llm.embedding_model; default: text-embedding-3-small
     base_url: ""   # inherits from top-level llm.base_url
     dimensions: 1536

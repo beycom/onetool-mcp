@@ -46,5 +46,5 @@ def test_startup_message_points_to_status_diagnostics() -> None:
 
     result = get_startup_message()
 
-    assert "logs/serve.log" in result
+    assert "runtime/logs/serve.log" in result
     assert "ot.status()" in result

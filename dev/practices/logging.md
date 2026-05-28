@@ -68,12 +68,12 @@ Initializes Loguru for file-only output with dev-friendly formatting.
 from ot.logging import configure_logging
 
 # In your CLI entry point
-configure_logging(log_name="serve")  # Creates logs/serve.log
+configure_logging(log_name="serve")  # Creates runtime/logs/serve.log
 ```
 
 **Environment variables:**
 - `OT_LOG_LEVEL`: Log level (default: INFO)
-- `OT_LOG_DIR`: Directory for log files (default: ../logs, relative to config dir)
+- `OT_LOG_DIR`: Directory for log files (default: `runtime/logs`, relative to config dir)
 - `OT_LOG_VERBOSE`: Disable truncation, show full values (default: false)
 
 ---
@@ -193,7 +193,7 @@ Set via `log_level` in `onetool.yaml` or `OT_LOG_LEVEL` environment variable:
 
 Set via `log_dir` in `onetool.yaml` or `OT_LOG_DIR` environment variable:
 
-- Default: `../logs` (relative to config directory)
+- Default: `runtime/logs` (relative to config directory)
 - Automatically created if it doesn't exist
 - Supports `~` expansion for home directory
 

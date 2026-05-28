@@ -579,7 +579,7 @@ def get_log_dir() -> str:
     Priority:
     - OT_LOG_DIR environment variable (highest priority)
     - log_dir field in config file
-    - Default: "logs"
+    - Default: "runtime/logs"
 
     Returns:
         Log directory path string (relative or absolute)
@@ -592,7 +592,7 @@ def get_log_dir() -> str:
         if _config is not None:
             return _config.log_dir
 
-    return "logs"
+    return "runtime/logs"
 
 
 def get_compact_max_length() -> int:

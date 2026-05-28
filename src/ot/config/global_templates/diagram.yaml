@@ -128,28 +128,28 @@ tools:
         provider: mermaid
         diagram_type: sequence
         description: REST API request/response flow
-        file: diagram-templates/api-flow.mmd
+        file: templates/diagram/api-flow.mmd
 
       state-machine:
         provider: mermaid
         diagram_type: state
         description: State machine diagram
-        file: diagram-templates/state-machine.mmd
+        file: templates/diagram/state-machine.mmd
 
       class-diagram:
         provider: mermaid
         diagram_type: class
         description: Class/data model diagram
-        file: diagram-templates/class-diagram.mmd
+        file: templates/diagram/class-diagram.mmd
 
       project-gantt:
         provider: mermaid
         diagram_type: gantt
         description: Project timeline Gantt chart
-        file: diagram-templates/project-gantt.mmd
+        file: templates/diagram/project-gantt.mmd
 
       feature-mindmap:
         provider: mermaid
         diagram_type: mindmap
         description: Feature brainstorming mindmap
-        file: diagram-templates/feature-mindmap.mmd
+        file: templates/diagram/feature-mindmap.mmd

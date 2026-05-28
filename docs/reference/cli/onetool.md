@@ -88,7 +88,7 @@ onetool serve --transport http --config .onetool/onetool.yaml --host 127.0.0.1 -
 |------|---------|-----------|------|--------------|--------------|-------------|-----------------|
 | `stdio` | Root MCP server | MCP over stdio | MCP client process boundary | none | command + args | `onetool serve --config .onetool/onetool.yaml` | Default local MCP setup |
 | `http` | Root MCP server | MCP Streamable HTTP | none in this mode | `127.0.0.1:8767/mcp` by default | URL | `onetool serve --transport http --config .onetool/onetool.yaml` | Harnesses, containers, and URL-only MCP clients |
-| `direct` | Private signed client into the root MCP process | Signed HTTP, not MCP | HMAC key in `.onetool/mcp-direct/auth.key` | `127.0.0.1:8765` preferred by default | CLI target port | `onetool direct run --port 8765 "ot.version()"` | Scripts and harnesses calling a running root process |
+| `direct` | Private signed client into the root MCP process | Signed HTTP, not MCP | HMAC key in `.onetool/auth/mcp-direct.key` | `127.0.0.1:8765` preferred by default | CLI target port | `onetool direct run --port 8765 "ot.version()"` | Scripts and harnesses calling a running root process |
 
 Use `stdio` for normal local MCP client configuration. Use `http` when the MCP
 client needs a URL instead of a command it can spawn. Direct API is private

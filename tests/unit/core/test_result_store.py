@@ -432,6 +432,13 @@ class TestOutputConfigDefaults:
 
         assert OutputConfig().preview_max_chars == 500
 
+    def test_storage_defaults_are_runtime_scoped(self) -> None:
+        from ot.config.models import OutputConfig
+
+        config = OutputConfig()
+        assert config.sessions_dir == "runtime/sessions"
+        assert config.result_store_dir == "runtime/reports"
+
 
 # =============================================================================
 # PREVIEW TRUNCATION

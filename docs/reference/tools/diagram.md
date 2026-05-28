@@ -143,7 +143,7 @@ diagram.get_render_status(task_id="batch-abc123")
 
 ## Templates
 
-OneTool includes built-in diagram templates for common patterns. Templates are installed to a `diagram-templates/` directory inside your config directory during `onetool init`.
+OneTool includes built-in diagram templates for common patterns. Editable overrides are installed to `templates/diagram/` inside your config directory during `onetool init`.
 
 **Available templates:**
 
@@ -163,7 +163,7 @@ OneTool includes built-in diagram templates for common patterns. Templates are i
 diagram.get_template(name="api-flow")
 ```
 
-Templates can be customized by editing files in the `diagram-templates/` directory inside your config directory.
+Templates can be customized by editing files in the `templates/diagram/` directory inside your config directory.
 
 ## Self-Hosted Setup
 

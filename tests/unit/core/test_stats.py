@@ -355,6 +355,7 @@ def test_stats_config_defaults() -> None:
     config = StatsConfig()
 
     assert config.enabled is True
+    assert config.persist_dir == "runtime/stats"
     assert config.persist_path == "stats.jsonl"
     assert config.flush_interval_seconds == 30
     assert config.context_per_call == 30000
