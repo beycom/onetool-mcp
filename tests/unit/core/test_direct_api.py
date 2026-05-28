@@ -34,7 +34,13 @@ def test_ready_endpoint_reports_proxy_readiness() -> None:
             "bad": {"status": "failed", "error": "boom"},
         },
     }
-    cfg = SimpleNamespace(servers={"ok": object(), "bad": object()})
+    cfg = SimpleNamespace(
+        servers={
+            "ok": SimpleNamespace(enabled=True),
+            "bad": SimpleNamespace(enabled=True),
+            "disabled": SimpleNamespace(enabled=False),
+        }
+    )
 
     with (
         patch("ot.config.get_config", return_value=cfg),

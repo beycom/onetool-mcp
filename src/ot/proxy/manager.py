@@ -856,7 +856,12 @@ def reconnect_proxy_manager() -> None:
     proxy = get_proxy_manager()
     cfg = get_config()
 
-    if cfg.servers:
-        proxy.reconnect_sync(cfg.servers)
+    enabled_servers = (
+        {name: config for name, config in cfg.servers.items() if config.enabled}
+        if cfg.servers
+        else {}
+    )
+    if enabled_servers:
+        proxy.reconnect_sync(enabled_servers)
     else:
         proxy._reset_state()

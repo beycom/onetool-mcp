@@ -293,9 +293,12 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
         # Startup: connect to proxy MCP servers in the background so FastMCP
         # can begin handling MCP protocol messages immediately.
         proxy = get_proxy_manager()
-        if _config.servers:
-            proxy.connect_background(_config.servers)
-            start_span.add("proxyCount", len(_config.servers))
+        enabled_servers = {
+            name: config for name, config in _config.servers.items() if config.enabled
+        }
+        if enabled_servers:
+            proxy.connect_background(enabled_servers)
+            start_span.add("proxyCount", len(enabled_servers))
 
         # Log tool count from registry
         registry = get_registry()
@@ -344,7 +347,7 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
 
         _log_startup_diagnostics(
             tool_count=len(registry.tools),
-            proxy_count=len(_config.servers),
+            proxy_count=len(enabled_servers),
             direct_status=direct_status,
             direct_port=_direct_api_port,
         )

@@ -67,6 +67,9 @@ def status() -> dict[str, Any]:
         runner_registry = load_tool_registry()
         proxy = get_proxy_manager()
         cfg = get_config()
+        enabled_servers = {
+            name: server for name, server in cfg.servers.items() if server.enabled
+        }
 
         # Count functions, handling both dict and WorkerPackProxy
         tool_count = 0
@@ -78,7 +81,7 @@ def status() -> dict[str, Any]:
         warnings_out: list[str] = []
 
         server_statuses: dict[str, Any] = {}
-        for server_name in cfg.servers:
+        for server_name in enabled_servers:
             conn = proxy.get_connection(server_name)
             if conn:
                 server_statuses[server_name] = "connected"
@@ -117,7 +120,7 @@ def status() -> dict[str, Any]:
         }
         proxy_status: dict[str, Any] = {
             "status": "ok" if proxy_ok else "degraded",
-            "server_count": len(cfg.servers),
+            "server_count": len(enabled_servers),
             "connected_count": sum(1 for state in server_statuses.values() if state == "connected"),
             "background_connecting": proxy.is_connecting,
         }

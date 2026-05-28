@@ -88,6 +88,53 @@ def test_direct_api_failure_is_degraded_in_lifespan() -> None:
 
 @pytest.mark.unit
 @pytest.mark.core
+def test_lifespan_does_not_connect_disabled_proxy_servers() -> None:
+    """MCP startup should not schedule proxy connections for disabled servers."""
+    from ot import server
+    from ot.config.models import McpServerConfig
+
+    async def _run_lifespan() -> None:
+        async with server._lifespan(SimpleNamespace()):
+            pass
+
+    cfg = SimpleNamespace(
+        _config_dir=Path("/tmp/onetool/config"),
+        servers={
+            "disabled": McpServerConfig(
+                type="stdio",
+                command="uvx",
+                args=["disabled"],
+                enabled=False,
+            )
+        },
+        include=[],
+        prompts=[],
+        direct=SimpleNamespace(host=SimpleNamespace(enabled=False)),
+        stats=SimpleNamespace(enabled=False),
+        get_log_dir_path=lambda: Path("/tmp/onetool/logs"),
+        get_stats_file_path=lambda: Path("/tmp/onetool/stats.jsonl"),
+    )
+    proxy = SimpleNamespace(
+        connect_background=MagicMock(),
+        servers={},
+        is_connecting=False,
+    )
+
+    with (
+        patch.object(server, "_config", cfg),
+        patch.object(server, "get_proxy_manager", return_value=proxy),
+        patch.object(server, "get_registry", return_value=SimpleNamespace(tools={})),
+        patch("ot.executor.tool_loader.load_tool_registry"),
+        patch("ot.telemetry.ping"),
+        patch.object(server, "logger"),
+    ):
+        asyncio.run(_run_lifespan())
+
+    proxy.connect_background.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.core
 def test_run_root_server_uses_streamable_http_transport() -> None:
     """HTTP root mode should run the shared FastMCP instance over Streamable HTTP."""
     from ot import server

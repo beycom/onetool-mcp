@@ -143,6 +143,66 @@ class TestProxyManagerReconnectSync:
 
 @pytest.mark.unit
 @pytest.mark.core
+def test_reconnect_proxy_manager_skips_reconnect_when_all_servers_disabled() -> None:
+    """Global reconnect should not schedule async reconnect for disabled servers."""
+    from types import SimpleNamespace
+
+    from ot.config.models import McpServerConfig
+    from ot.proxy.manager import reconnect_proxy_manager
+
+    proxy = MagicMock()
+    cfg = SimpleNamespace(
+        servers={
+            "disabled": McpServerConfig(
+                type="stdio",
+                command="uvx",
+                args=["disabled"],
+                enabled=False,
+            )
+        }
+    )
+
+    with (
+        patch("ot.config.loader.get_config", return_value=cfg),
+        patch("ot.proxy.manager.get_proxy_manager", return_value=proxy),
+    ):
+        reconnect_proxy_manager()
+
+    proxy.reconnect_sync.assert_not_called()
+    proxy._reset_state.assert_called_once_with()
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_reconnect_proxy_manager_reconnects_only_enabled_servers() -> None:
+    """Global reconnect passes only enabled server configs to ProxyManager."""
+    from types import SimpleNamespace
+
+    from ot.config.models import McpServerConfig
+    from ot.proxy.manager import reconnect_proxy_manager
+
+    enabled = McpServerConfig(type="stdio", command="uvx", args=["enabled"])
+    disabled = McpServerConfig(
+        type="stdio",
+        command="uvx",
+        args=["disabled"],
+        enabled=False,
+    )
+    proxy = MagicMock()
+    cfg = SimpleNamespace(servers={"enabled": enabled, "disabled": disabled})
+
+    with (
+        patch("ot.config.loader.get_config", return_value=cfg),
+        patch("ot.proxy.manager.get_proxy_manager", return_value=proxy),
+    ):
+        reconnect_proxy_manager()
+
+    proxy.reconnect_sync.assert_called_once_with({"enabled": enabled})
+    proxy._reset_state.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.core
 class TestProxyManagerListTools:
     """Tests for list_tools method."""
 
