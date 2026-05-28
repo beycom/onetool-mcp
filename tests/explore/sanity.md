@@ -30,7 +30,7 @@ When testing:
 - db with db at tests/data/northwind.db (25MB, download via `just test-setup`)
 - excel with files at tests/data/
 - ide: test read-only connection/state helpers (`ide.state()`, `ide.sel()`, `ide.workspace()`); if no IDE bridge is connected, note as environment gap.
-- mem: use `tmp/test/` topic prefix for all writes. Test write, read, list, search, toc, slice, snap/restore, stale/refresh, write_batch, read_batch, slice_batch, stats, export/load, update, delete, decay, context, flush. Clean up with `mem.delete(topic="tmp/", confirm=True)` when done.
+- mem: use `tmp/test/` topic prefix for all writes. Test write, read, list, search, toc, slice, snapshot/restore, stale/refresh, write_batch, read_batch, slice_batch, stats, dump/load, update, delete, decay, context, flush. Clean up with `mem.delete(topic="tmp/", confirm=True)` when done.
 - diagram: list_providers, get_template, generate_source, render_diagram, get_playground_url
 - ot_caveman: compact and expand short inline text; do not use protected content as the primary assertion.
 - ot_forge: create_ext, validate_ext, install_skills
@@ -56,44 +56,44 @@ Do sanity testing and find issues.
 Test the following snippets:
 
 Search snippets:
-- $br q="test query"
-- $g q="test query"
-- $gh q="onetool"
-- $tav q="test query"
-- $tav_x url="https://en.wikipedia.org/wiki/Python_(programming_language)"
+- :br q="test query"
+- :g q="test query"
+- :tav q="test query"
+- :tav_x url="https://en.wikipedia.org/wiki/Python_(programming_language)"
 
 Documentation snippets:
-- $c7 lib="facebook/react" q="hooks"
+- :c7 lib="facebook/react" q="hooks"
 
 Package snippets:
-- $pkg_py packages="requests"
-- $pkg_npm packages="react"
-- $pkg_m q="claude"
-- $pkg_a
+- :pkg_py packages="requests"
+- :pkg_npm packages="react"
+- :pkg_m q="claude"
+- :pkg_a
 
 File/code snippets:
-- $rg p="TODO"
-- $rg_count p="import" ft="py"
-- $wf url="https://en.wikipedia.org/wiki/Python_(programming_language)"
-- $wf_s url="https://en.wikipedia.org/wiki/Python_(programming_language)"
-- $wf_d url="https://en.wikipedia.org/wiki/Python_(programming_language)" schema="section headings"
-- $f_t
-- $f_r path="README.md"
-- $f_g p="TODO"
+- :wf url="https://en.wikipedia.org/wiki/Python_(programming_language)"
+- :wf_s url="https://en.wikipedia.org/wiki/Python_(programming_language)"
+- :wf_d url="https://en.wikipedia.org/wiki/Python_(programming_language)" schema="section headings"
+- :f_t
+- :f_r path="README.md"
+- :f_g p="TODO"
 
 Convert snippets:
-- $cv file="tests/data/file_example_1MB.docx" output_dir="tmp/sanity-cv/"
+- :cv file="tests/data/file_example_1MB.docx" output_dir="tmp/sanity-cv/"
 
 Memory snippets:
-- $mem_w topic="tmp/test/snip" file="README.md" category="note"
-- $mem_r topic="tmp/test/snip"
-- $mem_l
-- $mem_g p="TODO"
-- $mem_s q="onetool features"
+- :mem_w topic="tmp/test/snip" file="README.md" category="note"
+- :mem_r topic="tmp/test/snip"
+- :mem_l
+- :mem_g p="TODO"
+- :mem_s q="onetool features"
 
 System snippets:
-- $status
-- $reload
+- :help q="web search"
+- :tool name="ot.help"
+- :servers
+- :status
+- :reload
 
 ```
 
@@ -116,7 +116,7 @@ Introspection & Discovery
 - ot.servers() - list MCP proxy servers
 - ot.servers(pattern="...") - filter by pattern
 - ot.config() - show config (aliases, snippets, servers)
-- ot.health() - system health check
+- ot.status() - system status check
 - ot.debug() - comprehensive debug info
 - ot.version() - version string
 
@@ -124,17 +124,16 @@ Parameter Prefixes
 - Short prefixes work: ot.tools(p="brave", i="full") equivalent to ot.tools(pattern="brave", info="full")
 
 Trigger Prefixes (invocation styles)
-- >>> - recommended (Python REPL symbol)
-- __run - systematic short form
-- mcp__onetool__run - canonical MCP call
-- __ot, __onetool__run - legacy (backward compat)
+- __run - canonical trigger
+- __r - short alias
+- __ot - named alias
 
 Invocation Styles
-- Simple call: >>> func(arg=val)
+- Simple call: __run func(arg=val)
 - Code fence: multi-line Python blocks
 
 Snippet Expansion
-- $snippet_name param=value expands server-side
+- :snippet_name param=value expands server-side
 
 Output Format Control
 - __format__ = "yml_h"; ... controls serialization
@@ -245,9 +244,9 @@ OneTool is setup correctly with all dependencies and secrets needed.
   - Example: `mem.read_batch(topic="tmp/test/", meta=True)` - read multiple memories
   - Example: `mem.update(topic="tmp/test/smoke", content="updated")` - update existing memory
   - Example: `mem.context(topic="tmp/test/", limit=3)` - load most-accessed memories
-  - Example: `mem.snap(output="tmp/test-snap", topic="tmp/test/")` - snapshot to directory
-  - Example: `mem.restore(input="tmp/test-snap")` - restore from snapshot
-  - Example: `mem.export(topic="tmp/test/smoke")` - export to YAML
+  - Example: `mem.snapshot(output="tmp/test-snapshot", topic="tmp/test/")` - snapshot to directory
+  - Example: `mem.restore(input="tmp/test-snapshot")` - restore from snapshot
+  - Example: `mem.dump(topic="tmp/test/smoke")` - dump to YAML
   - Example: `mem.load(file="memories.yaml")` - import from YAML
   - Example: `mem.refresh(topic="tmp/test/", dry_run=True)` - check for stale file-backed memories
   - Example: `mem.decay(dry_run=True)` - preview importance decay
@@ -275,18 +274,19 @@ OneTool is setup correctly with all dependencies and secrets needed.
   - Example: `ot_forge.validate_ext(path=".onetool/tools/my_tool/my_tool.py")` - validate before reload
   - Example: `ot.packs()` - lists extensions with `is_extension` and `path`
 - **Snippets use abbreviated parameter names** (by design):
-  - `$rg` and `$rg_count` use `p=` for pattern (not `pattern=`)
-  - `$br`, `$g`, `$gh`, `$tav`, `$mem_s` use `q=` for query (not `query=`)
-  - `$c7` uses `lib=` for library_id and `q=` for query
-  - `$pkg_py` and `$pkg_npm` use `packages=` (comma-separated string, not list)
-  - `$wf` uses `url=` for URLs (pipe-separated for batch)
-  - `$mem_g` and `$f_g` use `p=` for pattern
-  - `$mem_r` uses `topic=` for exact topic path
-  - `$mem_w` uses `topic=` and `file=` (writes a file into memory)
-  - `$cv` uses `file=` for source glob and `output_dir=` for output
-  - `$tav_x` uses `url=` (pipe-separated for batch extraction)
-  - `$reload` and `$status` take no parameters
-  - Example: `$rg p="TODO" ft="py"` not `$rg pattern="TODO" file_type="py"`
+  - `:br`, `:g`, `:tav`, `:mem_s` use `q=` for query (not `query=`)
+  - `:c7` uses `lib=` for library_id and `q=` for query
+  - `:pkg_py` and `:pkg_npm` use `packages=` (comma-separated string, not list)
+  - `:wf` uses `url=` for URLs (pipe-separated for batch)
+  - `:mem_g` and `:f_g` use `p=` for pattern
+  - `:mem_r` uses `topic=` for exact topic path
+  - `:mem_w` uses `topic=` and `file=` (writes a file into memory)
+  - `:cv` uses `file=` for source glob and `output_dir=` for output
+  - `:tav_x` uses `url=` (pipe-separated for batch extraction)
+  - `:help` uses `q=` for help search
+  - `:tool` uses `name=` for exact lookup or `pattern=` for search
+  - `:reload` and `:status` take no parameters
+  - Example: `:tool name="brave.search" info="full"` for exact signature help
 - **db tools**: Use SQLite URL format `sqlite:///path/to/db`
   - Example: `db.tables(db_url="sqlite:///tests/data/northwind.db")`
   - Example: `db.query(sql="SELECT * FROM Customers LIMIT 3", db_url="sqlite:///tests/data/northwind.db")`
@@ -315,7 +315,7 @@ OneTool is setup correctly with all dependencies and secrets needed.
   - Example: `wb.note(input="n1[note:\ntext here]")` — note type must be lowercase (table/tree/seq/timeline/note)
 - **whiteboard.erase**: Uses `ids=` not `targets=`
   - Example: `wb.erase(ids=["nodeA", "nodeB"])`
-- **Large output → ctx handles**: `$f_r`, `$f_t`, `$f_g`, `$mem_r`, `$wf`, `$tav_x`, `$gh`, `$rg_count` return ctx handles for large output.
+- **Large output → ctx handles**: `:f_r`, `:f_t`, `:f_g`, `:mem_r`, `:wf`, `:tav_x` return ctx handles for large output.
   Use `ctx.read(handle)` to page through, `ctx.grep(handle, pattern="...")` to search.
 - **ctx parallel write contention**: Avoid calling 5+ large-output tools simultaneously — SQLite may return
   "database is locked". Retry succeeds. Filed: `wip/issues/ctx-db-locked-parallel-writes.md`
@@ -375,7 +375,7 @@ Changes are in-memory only (reset on server restart). Use `ot_servers.disable(na
 
 ### Test ordering to avoid reload side effects
 
-- **Test context7 and ground BEFORE calling `$reload`** — `ot.reload()` clears
+- **Test context7 and ground BEFORE calling `:reload`** - `ot.reload()` clears
   env-based secrets (GEMINI_API_KEY, CONTEXT7_API_KEY), causing all ground and context7
   tools to fail in the same session. These tools only work on fresh server startup.
 - **Enable proxy servers early** — `ot_servers.enable(name=...)` calls at the top of the session before testing github, playwright, chrome_devtools.
@@ -390,8 +390,8 @@ Test these first for fast coverage (one tool from each category):
 0. Enable proxy servers: `ot_servers.enable(name="github"); ot_servers.enable(name="playwright"); ot_servers.enable(name="chrome_devtools")`
 1. `brave.search(query="test", count=2)` - web search
 2. `ripgrep.search(pattern="TODO", path=".", limit=3)` - file search
-3. `ot.health()` - introspection
-4. `$pkg_py packages="requests"` - snippets
+3. `ot.status()` - introspection
+4. `:pkg_py packages="requests"` - snippets
 5. `file.tree(path=".", max_depth=1)` - filesystem
 6. `mem.write(topic="tmp/test/smoke", content="hello")` then `mem.read(topic="tmp/test/smoke")` then `mem.delete(topic="tmp/", confirm=True)` - memory
 7. `db.tables(db_url="sqlite:///tests/data/northwind.db")` - database

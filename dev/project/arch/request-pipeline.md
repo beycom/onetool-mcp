@@ -1,16 +1,17 @@
 # Request Processing Pipeline
 
-Every call flows through a seven-stage pipeline from client to response.
+Every call flows through an eight-stage pipeline from client to response.
 
 ## Stages
 
-1. **Fence stripping** - Remove trigger prefix (`>>>`, `__run`, legacy `__ot`), markdown fences, backticks
-2. **Validation** - AST-based security checks against allowlists
-3. **Code preparation** - Parse Python, auto-wrap last expression as return
-4. **Namespace building** - Load tool packs as proxy objects
-5. **Execution** - Run code in sandboxed namespace via `exec()`
-6. **Serialisation** - Convert result to JSON/YAML/raw string
-7. **Statistics** - Record execution timing and metadata
+1. **Input normalisation** - Remove trigger prefix (`__run`, `__r`, `__ot`), markdown fences, and backticks
+2. **Snippet expansion** - Expand `:name key=value` snippets into Python when the normalised command starts with `:`
+3. **Validation** - AST-based security checks against allowlists
+4. **Code preparation** - Parse Python, auto-wrap last expression as return
+5. **Namespace building** - Load tool packs as proxy objects
+6. **Execution** - Run code in sandboxed namespace via `exec()`
+7. **Serialisation** - Convert result to JSON/YAML/raw string
+8. **Statistics** - Record execution timing and metadata
 
 ## Sequence Diagram
 
@@ -27,7 +28,7 @@ sequenceDiagram
     participant E as Executor
     participant T as Tool Function
 
-    C->>M: run(command=">>> brave.search(query='test')")
+    C->>M: run(command="__run brave.search(query='test')")
     M->>S: Handle tool call
 
     rect rgb(240, 248, 255)
@@ -79,7 +80,7 @@ sequenceDiagram
 |------|------|
 | `src/ot/server.py` | FastMCP server, `run()` entry point |
 | `src/ot/executor/runner.py` | Orchestrates prepare + execute |
-| `src/ot/executor/fence_processor.py` | Strips trigger prefix, fences, backticks |
+| `src/ot/executor/fence_processor.py` | Strips trigger prefixes, fences, and backticks |
 | `src/ot/executor/validator.py` | AST-based security validation |
 | `src/ot/executor/pack_proxy.py` | Builds dot-notation namespace |
 | `src/ot/utils/format.py` | Result serialisation (JSON/YAML/raw) |

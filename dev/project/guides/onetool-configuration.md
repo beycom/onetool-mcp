@@ -14,12 +14,24 @@ All under `.onetool/config/`:
 
 | File | Purpose |
 |------|---------|
-| `onetool.yaml` | Main config (version, tools_dir, includes) |
+| `onetool.yaml` | Main config (version, includes, root settings such as `llm`, `stats`, `env`) |
 | `security.yaml` | Validation allowlists (builtins, imports, calls) |
-| `prompts.yaml` | System instructions for MCP |
+| `prompts.yaml` | MCP prompt surfaces: `tools.run.description`, server `instructions`, templates, and pack descriptions |
 | `snippets.yaml` | Snippet template definitions |
 | `servers.yaml` | External MCP server definitions |
 | `secrets.yaml` | API keys and credentials |
+
+## Prompt Surface Ownership
+
+`prompts.yaml` has multiple prompt surfaces with different priority and token budgets:
+
+| Surface | Put Here |
+|---------|----------|
+| `tools.run.description` | Critical first-call invocation contract: code mode, snippet mode, natural-language-to-code mode, discovery fallback, and keyword-only repair rules |
+| `instructions` | Concise server-level orientation: follow the run description, prefer MCP `run(command=...)`, discovery/safety pointers, output boundary warning |
+| `skills/ot-ref.md` | Optional advanced reference for recovery loops, proxy handling, security checks, output controls, ctx handles, and param-prefix details |
+
+Do not duplicate long guidance across all three. If a rule affects whether the first tool call is shaped correctly, it belongs in `tools.run.description`.
 
 ## Includes
 
@@ -62,10 +74,15 @@ config = get_tool_config("mytool", Config)
 3. Users set values in `onetool.yaml`:
 
 ```yaml
-mytool:
-  timeout: 30.0
-  max_results: 50
+tools:
+  mytool:
+    timeout: 30.0
+    max_results: 50
 ```
+
+Pack config belongs under `tools.<pack>`. Unknown typed pack keys fail visibly when the pack reads its config, unless that config schema explicitly allows extra fields. Recognised keys with invalid values also fail visibly. Do not keep legacy config aliases or compatibility mappings.
+
+The root template stays minimal: scalar shared defaults such as `llm.model`, `llm.embedding_model`, and `llm.base_url` are allowed; broad commented examples for every pack are not.
 
 ## Path Resolution
 

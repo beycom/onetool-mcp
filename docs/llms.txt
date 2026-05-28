@@ -15,7 +15,7 @@ onetool --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
 ## Invocation
 
 ```python
->>> brave.search(query="AI news")
+__run brave.search(query="AI news")
 ```
 
 ## Packs

@@ -5,7 +5,7 @@ Core tools for OneTool introspection and management.
 ## Highlights
 
 - List and filter available tools, packs, servers, aliases, and snippets
-- Check system health, API connectivity, and security rules
+- Check runtime status, API connectivity, and security rules
 - Query stored large outputs with pagination and search
 - Unified `ot.help()` entry point for discovery across all resource types
 
@@ -13,7 +13,7 @@ Core tools for OneTool introspection and management.
 
 | Function | Description |
 |----------|-------------|
-| `ot.help(query, info)` | Unified help - search tools, packs, servers, snippets, aliases |
+| `ot.help(query, info, ask)` | Unified help - search tools, packs, servers, snippets, aliases; optional ask mode |
 | `ot.tools(pattern, info)` | List tools, filter by pattern |
 | `ot.tool_info(name, pattern, info)` | Get detailed info (signature, args) for one or more tools |
 | `ot.packs(pattern, info)` | List packs (local + MCP), filter by pattern |
@@ -29,8 +29,8 @@ Core tools for OneTool introspection and management.
 | `ot.snippet_info(name, pattern, info)` | Get full definition for a specific snippet |
 | `ot.skills(name, pattern, info)` | List bundled skills or retrieve a skill body |
 | `ot.config()` | Show aliases, snippets, and server names |
-| `ot.debug(enable, line_limit)` | Toggle debug tracebacks and traceback line limits |
-| `ot.health()` | Check tool dependencies and API connectivity |
+| `ot.debug(verbose, env_vars, dependencies, prompts)` | Show debug diagnostics |
+| `ot.status()` | Check runtime status |
 | `ot.version()` | Show OneTool version information |
 | `ot.stats(period, tool, output, info)` | Get runtime usage statistics |
 | `ot.result(handle, ...)` | Query stored large output with pagination and search |
@@ -88,8 +88,8 @@ ot.help(query="brave")
 ot.help(query="chrome_devtools")
 ot.help(query="github")
 
-# Snippet lookup (prefix with $)
-ot.help(query="$b_q")
+# Snippet lookup (prefix with :)
+ot.help(query=":b_q")
 
 # Alias lookup
 ot.help(query="ws")
@@ -105,12 +105,12 @@ ot.help(query="search", info="min")
 - Exact server match: Returns server help with status, source, instructions, and tool list
 - Exact tool match (contains `.`): Returns detailed tool help with signature, args, returns, example
 - Exact pack match: Returns pack help with instructions and tool list
-- Snippet match (starts with `$`): Returns snippet definition with params and body
+- Snippet match (starts with `:`): Returns snippet definition with params and body
 - Alias match: Returns alias mapping and target description
 - Fuzzy matches: Groups results by type (Tools, Packs, Snippets, Aliases, Servers) and matches name + description intent
 - No matches: Suggests `ot.tools()`, `ot.packs()`, `ot.servers()`, etc. to browse; server/proxy intent also includes `ot_servers.enable(name="...")` recovery
 
-The `info` parameter controls detail level for all search results.
+The `info` parameter controls detail level for all search results. `ask` optionally answers a question using the narrowed deterministic help text; it does not call an LLM when `ask` is empty.
 
 **Documentation URLs:**
 
@@ -283,7 +283,7 @@ path: {default: ".", description: "Search path"}
 ```
 
 The `example` field includes required params plus the first optional param with a
-meaningful (non-empty, non-false) default, e.g. `$rg p="..." path=.`.
+meaningful (non-empty, non-false) default, e.g. `:tool name="..." info=default`.
 
 Snippets are defined in config:
 
@@ -340,28 +340,30 @@ Returns JSON with:
 - `snippets` - available snippet templates
 - `servers` - configured MCP server names
 
-## ot.health()
+## ot.status()
 
-Check system health and API connectivity.
+Check runtime status.
 
 ```python
-ot.health()
+ot.status()
 ```
 
 Returns status of:
 - OneTool version and Python version
+- Config, storage, root MCP transport, and direct API state
 - Registry status and tool count
 - Proxy status and server connections
+- Warnings for degraded runtime components
 
 ## ot.debug()
 
-Control traceback verbosity for errors during this session.
+Show installation and runtime diagnostics.
 
 ```python
-ot.debug()                 # Show current debug settings
-ot.debug(enable=True)      # Enable full tracebacks
-ot.debug(enable=False)     # Disable full tracebacks
-ot.debug(line_limit=20)    # Set traceback line limit
+ot.debug()
+ot.debug(verbose=True)
+ot.debug(env_vars=True, dependencies=True)
+ot.debug(prompts=True)
 ```
 
 ## ot.version()

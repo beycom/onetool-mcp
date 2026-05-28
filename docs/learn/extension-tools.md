@@ -137,7 +137,7 @@ def fetch(*, url: str) -> str:
         Page content
 
     Example:
-        mytool.fetch(url="https://example.com")
+        mytool.fetch(url="https://www.wikipedia.org/")
     """
     with LogSpan(span="mytool.fetch", url=url) as s:
         # Access secrets

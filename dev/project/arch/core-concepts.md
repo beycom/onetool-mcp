@@ -47,9 +47,9 @@ snippets:
       {"q1": r1, "q2": r2}
 ```
 
-Usage: `$compare q1=AI q2=ML`
+Usage: `__run :compare q1=AI q2=ML`
 
-Snippets support single-line (`$name k=v`) and multi-line (`$name\nk: v`) syntax.
+Snippets support single-line (`:name k=v`) and multi-line (`:name\nk: v`) syntax. Snippet values are plain strings; Python syntax applies only after the template expands.
 
 ## Execution Namespace
 
