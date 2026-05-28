@@ -130,6 +130,26 @@ def test_debug_all_flags():
 @pytest.mark.smoke
 @pytest.mark.unit
 @pytest.mark.core
+def test_debug_prompts():
+    """Test prompts flag includes prompt diagnostics."""
+    result = debug(prompts=True)
+
+    assert "prompts" in result
+    prompts = result["prompts"]
+    assert prompts["source"] in {"inline", "file"}
+    assert "sha256" in prompts
+    assert "instructions_excerpt" in prompts
+    assert "run_description_excerpt" in prompts
+    assert "checks" in prompts
+    assert prompts["checks"]["has_run_contract"] is True
+    assert prompts["checks"]["has_canonical_trigger"] is True
+    assert prompts["checks"]["has_natural_language_mode"] is True
+    assert prompts["checks"]["has_keyword_only_repair"] is True
+
+
+@pytest.mark.smoke
+@pytest.mark.unit
+@pytest.mark.core
 def test_debug_runtime_timing():
     """Test runtime timing information is valid."""
     result = debug()

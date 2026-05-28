@@ -10,6 +10,7 @@ from ot.logging import LogSpan
 from ot.meta._discovery import _resolve_pack_alias, packs, servers, tools
 from ot.meta._help_formatting import (
     _format_alias_help,
+    _format_direct_run_help,
     _format_general_help,
     _format_pack_help,
     _format_search_results,
@@ -17,6 +18,7 @@ from ot.meta._help_formatting import (
     _format_snippet_help,
     _format_tool_help,
     _fuzzy_match,
+    _is_direct_run_query,
     _item_matches,
     _snippet_matches,
 )
@@ -78,7 +80,62 @@ def _rank_named_items(
     return [name for name, _ in scored]
 
 
-def help(*, query: str = "", info: HelpInfoLevel = "default") -> str:
+def _with_ask_answer(base_help: str, ask: str) -> str:
+    """Answer a question using only the deterministic help text as context."""
+    ask = ask.strip()
+    if not ask:
+        return base_help
+
+    try:
+        from openai import OpenAI
+
+        from ot.config import get_llm_config, get_secret
+
+        llm = get_llm_config()
+        api_key = get_secret("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY is not configured")
+        if not llm.base_url:
+            raise ValueError("llm.base_url is not configured")
+        if not llm.model:
+            raise ValueError("llm.model is not configured")
+
+        client = OpenAI(api_key=api_key, base_url=llm.base_url, timeout=30)
+        response = client.chat.completions.create(
+            model=llm.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Answer the user's OneTool help question using only the "
+                        "provided help text. Be concise. If the help text does "
+                        "not contain the answer, say what is missing."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Question:\n{ask}\n\n"
+                        f"Help text:\n{base_help}"
+                    ),
+                },
+            ],
+            temperature=0.1,
+            max_tokens=llm.max_tokens,
+        )
+        answer = response.choices[0].message.content or ""
+        if not answer.strip():
+            raise ValueError("LLM returned an empty answer")
+        return f"{base_help}\n\n## Ask Answer\n\n{answer.strip()}"
+    except Exception as e:
+        return (
+            f"{base_help}\n\n"
+            "## Ask Unavailable\n\n"
+            f"Could not answer ask={ask!r} with an LLM: {e}"
+        )
+
+
+def help(*, query: str = "", info: HelpInfoLevel = "default", ask: str = "") -> str:
     """Get help on OneTool commands, tools, packs, snippets, or aliases.
 
     Provides a unified entry point for discovering and getting help on
@@ -90,6 +147,8 @@ def help(*, query: str = "", info: HelpInfoLevel = "default") -> str:
                Empty string shows general help overview.
         info: Detail level - "min" (names only), "default" (name + description,
               default), "full" (everything).
+        ask: Optional natural-language question to answer using only the
+             deterministic help text narrowed by query.
 
     Returns:
         Formatted help text
@@ -98,19 +157,24 @@ def help(*, query: str = "", info: HelpInfoLevel = "default") -> str:
         ot.help()
         ot.help(query="brave.search")
         ot.help(query="brave")
-        ot.help(query="$b_q")
+        ot.help(query=":b_q")
         ot.help(query="web fetch", info="min")
+        ot.help(query="brave", ask="Which search function should I call?")
     """
     if info not in _VALID_HELP_INFO:
         raise ValueError(f"info={info!r} is not valid. Use 'min', 'default', or 'full'.")
 
-    with log(span="ot.help", query=query or None, info=info) as s:
+    with log(span="ot.help", query=query or None, info=info, ask=bool(ask)) as s:
         # No query - show general help
         if not query:
             s.add("type", "general")
-            return _format_general_help()
+            return _with_ask_answer(_format_general_help(), ask)
 
         cfg = get_config()
+
+        if _is_direct_run_query(query):
+            s.add("type", "direct_run")
+            return _with_ask_answer(_format_direct_run_help(), ask)
 
         # Check for exact tool match (contains "."); resolve short alias prefix
         if "." in query:
@@ -126,7 +190,7 @@ def help(*, query: str = "", info: HelpInfoLevel = "default") -> str:
                 pack = resolved_tool_query.split(".")[0]
                 s.add("type", "tool")
                 s.add("match", resolved_tool_query)
-                return _format_tool_help(detail, pack)
+                return _with_ask_answer(_format_tool_help(detail, pack), ask)
 
         # Check for exact server match (MCP proxy servers).
         # Try exact, then normalize hyphens→underscores (canonical form),
@@ -146,8 +210,11 @@ def help(*, query: str = "", info: HelpInfoLevel = "default") -> str:
             native_instructions = _proxy.get_server_instructions(query_as_server)
             s.add("type", "server")
             s.add("match", query_as_server)
-            return _format_server_help(
-                query_as_server, server_cfg, status, proxy_tools, native_instructions
+            return _with_ask_answer(
+                _format_server_help(
+                    query_as_server, server_cfg, status, proxy_tools, native_instructions
+                ),
+                ask,
             )
 
         # Check for exact pack match (also resolves short aliases like "img" → "ot_image")
@@ -162,25 +229,25 @@ def help(*, query: str = "", info: HelpInfoLevel = "default") -> str:
             if pi and "error" not in pi:
                 s.add("type", "pack")
                 s.add("match", resolved_query)
-                return _format_pack_help(resolved_query, pi)
+                return _with_ask_answer(_format_pack_help(resolved_query, pi), ask)
 
-        # Check for snippet match (starts with "$")
-        if query.startswith("$"):
-            snippet_name = query[1:]  # Remove "$"
+        # Check for snippet match (starts with ":")
+        if query.startswith(":"):
+            snippet_name = query[1:]  # Remove ":"
             from ot.meta._introspection import snippet_info as _snippet_info
             si = _snippet_info(name=snippet_name, info="full")
             if "error" not in si:
                 assert isinstance(si, dict)
                 s.add("type", "snippet")
                 s.add("match", query)
-                return _format_snippet_help(si)
+                return _with_ask_answer(_format_snippet_help(si), ask)
 
         # Check for exact alias match
         if cfg.alias and query in cfg.alias:
             target = cfg.alias[query]
             s.add("type", "alias")
             s.add("match", query)
-            return _format_alias_help(query, target)
+            return _with_ask_answer(_format_alias_help(query, target), ask)
 
         # Fuzzy search across all types
         s.add("type", "search")
@@ -212,12 +279,15 @@ def help(*, query: str = "", info: HelpInfoLevel = "default") -> str:
         aliases_results = [a for a in all_aliases if _item_matches(a, matched_aliases)]
         servers_results = [n for n in all_server_names if n in matched_servers]
 
-        return _format_search_results(
-            query=query,
-            tools_results=tools_results,
-            packs_results=packs_results,
-            snippets_results=snippets_results,
-            aliases_results=aliases_results,
-            info=info,
-            servers_results=servers_results,
+        return _with_ask_answer(
+            _format_search_results(
+                query=query,
+                tools_results=tools_results,
+                packs_results=packs_results,
+                snippets_results=snippets_results,
+                aliases_results=aliases_results,
+                info=info,
+                servers_results=servers_results,
+            ),
+            ask,
         )

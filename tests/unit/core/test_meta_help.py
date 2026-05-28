@@ -27,6 +27,7 @@ class TestHelp:
         assert "## Tips" in result
         assert "tool_info" in result
         assert "pack_info" in result
+        assert "ot.status()" in result
 
     def test_tool_lookup_exact(self) -> None:
         """Exact tool name returns detailed tool help."""
@@ -110,6 +111,21 @@ class TestHelp:
         assert "ot.servers()" in result
         assert "ot_servers.enable(name=\"github\")" in result
 
+    @pytest.mark.parametrize("query", ["__run", "__r", "__ot", "run", "direct command", "snippet"])
+    def test_direct_run_queries_return_invocation_help(self, query: str) -> None:
+        """Direct run trigger queries surface deterministic invocation guidance."""
+        from ot.meta import help
+
+        result = help(query=query)
+
+        assert "# Direct OneTool Invocation" in result
+        assert "__run <code>" in result
+        assert "__r <code>" in result
+        assert "__ot <code>" in result
+        assert ":snippet key=value" in result
+        assert "ot.tool_info(name='pack.tool')" in result
+        assert "onetool direct" in result
+
     def test_info_level_list_rejected(self) -> None:
         """info='list' is invalid for ot.help()."""
         from ot.meta import help
@@ -125,6 +141,23 @@ class TestHelp:
 
         # Should have search results or pack details
         assert isinstance(result, str)
+
+    def test_help_ask_empty_is_deterministic(self) -> None:
+        """Empty ask preserves deterministic help output."""
+        from ot.meta import help
+
+        assert help(query="ot") == help(query="ot", ask="")
+
+    def test_help_ask_unavailable_appends_note(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Non-empty ask falls back to deterministic help when LLM is unavailable."""
+        from ot.meta import help
+
+        monkeypatch.setattr("ot.config.get_secret", lambda _name: "")
+
+        result = help(query="ot", ask="Which function checks status?")
+
+        assert "# ot pack" in result
+        assert "## Ask Unavailable" in result
 
 
 @pytest.mark.unit

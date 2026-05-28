@@ -93,7 +93,7 @@ def _build_snippet_detail(name: str, snippet_def: Any, info: InfoLevel) -> dict[
         if param_def.default is not None and param_def.default not in _trivial:
             example_args.append(f"{param_name}={param_def.default}")
             break
-    example = f"${name}"
+    example = f":{name}"
     if example_args:
         example += " " + " ".join(example_args)
 
@@ -202,7 +202,7 @@ def snippet_info(
     Use name= for exact lookup (returns dict), pattern= for bulk lookup (returns list).
 
     Args:
-        name: Exact snippet name (without $ prefix, e.g., "rg"). Returns a single dict.
+        name: Exact snippet name (without : prefix, e.g., "rg"). Returns a single dict.
         pattern: Substring filter for snippet names/descriptions. Returns a list of dicts.
         info: Output verbosity level - "min" (name + description + param names),
               "default" (+ param details with required flag + example, default), or
@@ -245,8 +245,8 @@ def snippet_info(
             s.add("found", False)
             available = sorted(cfg.snippets.keys()) if cfg.snippets else []
             hint = ""
-            if name.startswith("$"):
-                hint = f" Did you mean '{name[1:]}'? Use name= without the '$' prefix."
+            if name.startswith(":"):
+                hint = f" Did you mean '{name[1:]}'? Use name= without the ':' prefix."
             return {
                 "error": f"Snippet '{name}' not found.{hint}",
                 "available": available,
