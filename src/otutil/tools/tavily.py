@@ -52,7 +52,7 @@ class Config(BaseModel):
     """Pack configuration - discovered by registry."""
 
     timeout: float = Field(
-        default=60.0,
+        default=180.0,
         ge=1.0,
         le=300.0,
         description="Request timeout in seconds",
@@ -150,12 +150,14 @@ def _make_request(
 def _make_get_request(
     path: str,
     params: dict[str, Any] | None = None,
+    timeout: float | None = None,
 ) -> tuple[bool, dict[str, Any] | str]:
     """Make HTTP GET request to Tavily API (used for polling).
 
     Args:
         path: API path (e.g., "/research/task_id")
         params: Query parameters
+        timeout: Request timeout in seconds
 
     Returns:
         Tuple of (success, result). If success, result is parsed JSON dict.
@@ -172,6 +174,7 @@ def _make_get_request(
         response = client.get(
             path,
             params={**(params or {}), "api_key": api_key},
+            timeout=timeout,
         )
         response.raise_for_status()
         return True, response.json()
@@ -445,6 +448,41 @@ def _validate_days(days: int) -> str | None:
     if 1 <= days <= 30:
         return None
     return f"Error: days must be between 1 and 30 (got {days})"
+
+
+def _validate_batch_retry_controls(retries: int, retry_delay_ms: int) -> str | None:
+    """Validate batch retry guardrails."""
+    if (
+        not isinstance(retries, int)
+        or isinstance(retries, bool)
+        or not 0 <= retries <= 3
+    ):
+        return f"Error: retries must be between 0 and 3 (got {retries})"
+    if (
+        not isinstance(retry_delay_ms, int)
+        or isinstance(retry_delay_ms, bool)
+        or not 0 <= retry_delay_ms <= 10_000
+    ):
+        return (
+            "Error: retry_delay_ms must be between 0 and 10000 "
+            f"(got {retry_delay_ms})"
+        )
+    return None
+
+
+def _validate_research_timeout(timeout_seconds: int) -> str | None:
+    """Validate Tavily research total timeout guardrail."""
+    if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool):
+        return (
+            "Error: timeout_seconds must be between 10 and 1800 "
+            f"(got {timeout_seconds})"
+        )
+    if 10 <= timeout_seconds <= 1_800:
+        return None
+    return (
+        "Error: timeout_seconds must be between 10 and 1800 "
+        f"(got {timeout_seconds})"
+    )
 
 
 def _validate_urls(urls: list[str]) -> str | None:
@@ -816,6 +854,8 @@ def search_batch(
         return error
     if error := _validate_extract_schema(extract_schema):
         return error
+    if error := _validate_batch_retry_controls(retries, retry_delay_ms):
+        return error
 
     normalized = normalize_items(queries)
 
@@ -894,6 +934,8 @@ def research(
         return "Error: input cannot be empty"
     if error := _validate_research_model(model):
         return error
+    if error := _validate_research_timeout(timeout_seconds):
+        return error
 
     _, err = require_api_key("TAVILY_API_KEY")
     if err:
@@ -935,10 +977,22 @@ def research(
                 s.add(elapsed=round(elapsed, 1), status="timeout")
                 return f"Error: research timed out after {timeout_seconds} seconds"
 
-            time.sleep(wait_time)
+            remaining = timeout_seconds - elapsed
+            sleep_for = min(wait_time, remaining)
+            if sleep_for > 0:
+                time.sleep(sleep_for)
             wait_time = min(wait_time * 1.5, max_wait)
 
-            poll_success, poll_result = _make_get_request(f"/research/{task_id}")
+            remaining = timeout_seconds - (time.monotonic() - start_time)
+            if remaining <= 0:
+                s.add(elapsed=timeout_seconds, status="timeout")
+                return f"Error: research timed out after {timeout_seconds} seconds"
+
+            poll_timeout = max(0.1, min(_get_config().timeout, remaining))
+            poll_success, poll_result = _make_get_request(
+                f"/research/{task_id}",
+                timeout=poll_timeout,
+            )
 
             if not poll_success:
                 continue

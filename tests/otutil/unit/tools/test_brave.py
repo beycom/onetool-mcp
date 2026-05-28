@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from otutil.tools.brave import (
+    Config,
     _FRESHNESS_VALUES,
     _SAFESEARCH_IMAGE_VALUES,
     _SAFESEARCH_WEB_VALUES,
@@ -40,6 +41,9 @@ from otutil.tools.brave import (
 @pytest.mark.tools
 class TestClamp:
     """Test _clamp value clamping function."""
+
+    def test_default_timeout_is_180(self):
+        assert Config().timeout == 180.0
 
     def test_value_within_range(self):
         assert _clamp(5, 1, 10) == 5
@@ -795,6 +799,22 @@ class TestSearchBatch:
         result = search_batch(queries=["test"], safesearch="invalid")
         assert "Invalid safesearch" in result
 
+    def test_rejects_invalid_retry_controls(self):
+        result = search_batch(queries=["test"], retries=-1)
+        assert "retries must be between 0 and 3" in result
+
+        result = search_batch(queries=["test"], retries="x")  # type: ignore[arg-type]
+        assert "retries must be between 0 and 3" in result
+
+        result = search_batch(queries=["test"], retries=4)
+        assert "retries must be between 0 and 3" in result
+
+        result = search_batch(queries=["test"], retry_delay_ms=10_001)
+        assert "retry_delay_ms must be between 0 and 10000" in result
+
+        result = search_batch(queries=["test"], retry_delay_ms="x")  # type: ignore[arg-type]
+        assert "retry_delay_ms must be between 0 and 10000" in result
+
     @patch("otutil.tools.brave.search")
     def test_forwards_text_only_output_format(self, mock_search):
         mock_search.return_value = "Result"
@@ -803,6 +823,18 @@ class TestSearchBatch:
 
         call_kwargs = mock_search.call_args.kwargs
         assert call_kwargs["output_format"] == "text_only"
+
+    @patch("otutil.tools.brave.search")
+    def test_accepts_retry_control_upper_bounds(self, mock_search):
+        mock_search.return_value = "Result"
+
+        result = search_batch(
+            queries=["test"],
+            retries=3,
+            retry_delay_ms=10_000,
+        )
+
+        assert result["meta"]["retries"] == 3
 
     @patch("otutil.tools.brave.search")
     def test_retries_transient_timeout(self, mock_search):
