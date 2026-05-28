@@ -141,7 +141,7 @@ def load_secrets(
 
         logger.debug(f"Decrypted {len(encrypted_keys)} encrypted secret(s)")
 
-    logger.info(f"Loaded {len(secrets)} secrets")
+    logger.debug(f"Loaded {len(secrets)} secrets")
     return secrets
 
 

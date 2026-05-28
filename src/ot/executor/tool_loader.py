@@ -24,6 +24,7 @@ from loguru import logger
 
 from ot.executor.pep723 import ToolFileInfo, categorize_tools
 from ot.executor.worker_proxy import create_worker_proxy
+from ot.logging import LogEntry
 from ot.paths import get_effective_cwd
 
 
@@ -269,7 +270,13 @@ def _load_worker_tools(
             )
 
         except Exception as e:
-            logger.warning(f"Failed to load extension tool {py_file.stem}: {e}")
+            logger.warning(
+                LogEntry(
+                    event="tool_loader.extension_load.failed",
+                    module=py_file.stem,
+                    path=py_file,
+                ).failure(e)
+            )
 
     return functions, loaded_workers
 
@@ -345,7 +352,13 @@ def _load_inprocess_tools(
                         functions[name] = obj
 
         except Exception as e:
-            logger.warning(f"Failed to load tool module {py_file.stem}: {e}")
+            logger.warning(
+                LogEntry(
+                    event="tool_loader.module_load.failed",
+                    module=py_file.stem,
+                    path=py_file,
+                ).failure(e)
+            )
 
     return functions, pack_aliases, doc_slugs
 

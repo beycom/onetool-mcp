@@ -267,7 +267,7 @@ def _resolve_include_path(include_path_str: str, ot_dir: Path) -> Path | None:
         global_templates_dir = get_global_templates_dir()
         fallback = (global_templates_dir / include_path).resolve()
         if fallback.exists():
-            logger.info(
+            logger.debug(
                 f"Include resolved (package default): {include_path_str} -> {fallback}"
             )
             return fallback
@@ -454,7 +454,7 @@ def load_config(
     # Load secrets if --secrets path provided
     get_secrets(secrets_path, reload=True)
 
-    logger.info(f"Config loaded: version {config.version}")
+    logger.debug(f"Config loaded: version {config.version}")
 
     return config
 

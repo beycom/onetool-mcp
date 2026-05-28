@@ -21,9 +21,11 @@ from loguru import logger
 from mcp import types
 
 from ot.config import expand_vars
-from ot.logging import LogSpan
+from ot.logging import LogEntry, LogSpan
 
 if TYPE_CHECKING:
+    from concurrent.futures import Future
+
     from ot.config.models import McpServerConfig
 
 
@@ -206,7 +208,12 @@ class ProxyManager:
                 )
             except TimeoutError:
                 logger.error(
-                    f"Proxy tool timeout | server={server} | tool={tool} | timeout={timeout}s"
+                    LogEntry(
+                        event="proxy.tool.timeout",
+                        server=server,
+                        tool=tool,
+                        timeout=timeout,
+                    ).failure(error_type="TimeoutError", error_message="proxy tool call timed out")
                 )
                 raise TimeoutError(
                     f"Tool {server}.{tool} timed out after {timeout}s"
@@ -271,10 +278,22 @@ class ProxyManager:
                 self.call_tool(server, tool, arguments, timeout),
                 self._loop,
             )
-            fut.add_done_callback(
-                lambda f: logger.warning("fire_and_forget {}/{} failed: {}", server, tool, f.exception())
-                if f.exception() else None
-            )
+
+            def log_fire_and_forget_failure(
+                future: Future[str | dict[str, Any] | list[Any]],
+            ) -> None:
+                exc = future.exception()
+                if exc is None:
+                    return
+                logger.warning(
+                    LogEntry(
+                        event="proxy.tool.fire_and_forget_failed",
+                        server=server,
+                        tool=tool,
+                    ).failure(error_type=type(exc).__name__, error_message=str(exc))
+                )
+
+            fut.add_done_callback(log_fire_and_forget_failure)
             return "started"
 
         future = asyncio.run_coroutine_threadsafe(
@@ -468,7 +487,9 @@ class ProxyManager:
                         raise
                     except Exception as e:
                         self._errors[name] = str(e)
-                        logger.warning(f"Failed to connect to MCP server '{name}': {e}")
+                        logger.warning(
+                            LogEntry(event="proxy.connect.failed", server=name).failure(e)
+                        )
                         return False
 
                 results = await asyncio.gather(
@@ -525,7 +546,12 @@ class ProxyManager:
 
                 span.add("toolCount", len(tools))
                 logger.info(
-                    f"Connected to {config.type} MCP server '{name}' with {len(tools)} tools"
+                    LogEntry(
+                        event="proxy.connect.ready",
+                        server=name,
+                        serverType=config.type,
+                        toolCount=len(tools),
+                    ).success()
                 )
 
             except BaseException:
@@ -705,7 +731,7 @@ class ProxyManager:
         except Exception as e:
             with self._mutation_lock:
                 self._errors[name] = str(e)
-            logger.warning(f"Failed to connect to MCP server '{name}': {e}")
+            logger.warning(LogEntry(event="proxy.connect.failed", server=name).failure(e))
             return f"failed: {e}"
 
     def connect_additional_sync(self, name: str, config: McpServerConfig) -> str:
@@ -820,7 +846,13 @@ class ProxyManager:
         try:
             future.result(timeout=60)
         except Exception as e:
-            logger.warning(f"Error during proxy reconnect: {e}")
+            logger.warning(
+                LogEntry(
+                    event="proxy.reconnect.failed",
+                    serverCount=len(configs),
+                    reconnectPath="threadsafe",
+                ).failure(e)
+            )
 
 
 # Global proxy manager instance

@@ -44,6 +44,7 @@ DEFAULT_LIMIT = 120
 
 # URL credential pattern: scheme://user:pass@host
 URL_WITH_CREDS = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*://)([^:]+):([^@]+)@(.+)$")
+_WHITESPACE_RE = re.compile(r"\s+")
 
 
 def _get_field_limit(field_name: str) -> int:
@@ -133,6 +134,11 @@ def format_value(value: Any, field_name: str = "", max_length: int | None = None
     return value[: max_length - 3] + "..."
 
 
+def single_line_value(value: str) -> str:
+    """Collapse embedded whitespace so a formatted log field stays one line."""
+    return _WHITESPACE_RE.sub(" ", value).strip()
+
+
 def sanitize_for_output(value: Any, field_name: str = "") -> Any:
     """Sanitize a value by masking credentials.
 
@@ -189,3 +195,37 @@ def format_log_entry(
             formatted[key] = format_value(sanitized, key)
 
     return formatted
+
+
+def format_dev_value(value: Any, field_name: str = "", verbose: bool = False) -> str:
+    """Format a value for the dev-friendly log sink.
+
+    Preserves raw values in LogEntry while ensuring emitted values are scalar,
+    sanitized, truncated, and single-line.
+    """
+    if isinstance(value, dict):
+        items = [
+            f"{single_line_value(str(key))}={format_dev_value(item, str(key), verbose)}"
+            for key, item in list(value.items())[:10]
+        ]
+        if len(value) > 10:
+            items.append("...")
+        return "{" + ", ".join(items) + "}"
+
+    if isinstance(value, list):
+        items = [
+            format_dev_value(item, field_name, verbose)
+            for item in value[:10]
+        ]
+        if len(value) > 10:
+            items.append("...")
+        return "[" + ", ".join(items) + "]"
+
+    sanitized = sanitize_for_output(value, field_name)
+    if not verbose:
+        sanitized = format_value(sanitized, field_name)
+
+    if isinstance(sanitized, str):
+        return single_line_value(sanitized)
+
+    return single_line_value(str(sanitized))

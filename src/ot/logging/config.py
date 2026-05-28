@@ -19,6 +19,7 @@ from typing import Any
 from loguru import logger
 
 from ot.config.loader import get_config, get_log_dir, get_log_level
+from ot.logging.format import format_dev_value
 
 
 class InterceptHandler(logging.Handler):
@@ -161,27 +162,18 @@ def dev_formatter(record: dict[str, Any]) -> str:
     if span:
         parts.append(str(span))
 
+    verbose = bool(getattr(get_config(), "log_verbose", False))
+
     # Format remaining fields
     for k, v in fields.items():
         if k == "duration" and v == 0.0:
             continue
-        if isinstance(v, list):
-            if len(v) > 10:
-                list_items = ", ".join(str(x) for x in v[:10])
-                parts.append(f"{k}=[{list_items}, ...]")
-            else:
-                parts.append(f"{k}={v}")
-        elif isinstance(v, dict):
-            # Show full dict: key={k1=v1, k2=v2, ...}
-            dict_items: list[str] = [f"{dk}={dv}" for dk, dv in list(v.items())[:10]]
-            if len(v) > 10:
-                dict_items.append("...")
-            parts.append(f"{k}={{{', '.join(dict_items)}}}")
-        elif k == "message":
+        formatted = format_dev_value(v, k, verbose=verbose)
+        if k == "message":
             # Plain message without key=
-            parts.append(str(v))
+            parts.append(formatted)
         else:
-            parts.append(f"{k}={v}")
+            parts.append(f"{k}={formatted}")
 
     return " | ".join(parts)
 
@@ -239,8 +231,16 @@ def configure_logging(log_name: str = "onetool", level: str | None = None) -> No
         logging.getLogger(logger_name).handlers = [InterceptHandler()]
         logging.getLogger(logger_name).propagate = False
 
-    # Silence noisy HTTP/network loggers - set to WARNING to suppress DEBUG spam
-    for logger_name in ["httpcore", "httpx", "hpack"]:
+    # Silence noisy framework/client loggers - set to WARNING to suppress request chatter.
+    for logger_name in [
+        "httpcore",
+        "httpx",
+        "mcp",
+        "anyio",
+        "hpack",
+        "openai",
+        "openai._base_client",
+    ]:
         logging.getLogger(logger_name).setLevel(logging.WARNING)
 
     logger.debug("Logging configured", level=level, file=str(log_file))

@@ -36,7 +36,7 @@ from loguru import logger
 from ot.config.loader import get_config
 from ot.executor import SimpleExecutor, execute_command
 from ot.executor.runner import prepare_command
-from ot.logging import LogSpan, configure_logging
+from ot.logging import LogEntry, LogSpan, configure_logging
 from ot.logging.mcp_logging import (
     map_mcp_logging_level,
     register_set_logging_level_handler,
@@ -119,20 +119,22 @@ def _direct_health_probe_once(host: str, port: int, timeout_secs: float = 0.2) -
             )
             payload: dict[str, Any] = json.loads(body.decode("utf-8"))
             healthy = payload.get("status") == "ok"
-            logger.info("direct.api.health_probe | port={} | healthy={}", port, healthy)
+            logger.debug(LogEntry(event="direct.api.health_probe", port=port, healthy=healthy))
             return healthy
     except Exception as e:
-        logger.info("direct.api.health_probe | port={} | healthy=False | error={}", port, e)
+        logger.debug(
+            LogEntry(event="direct.api.health_probe", port=port, healthy=False).failure(e)
+        )
         return False
 
 
 def _tcp_port_bound(host: str, port: int, timeout_secs: float = 0.1) -> bool:
     try:
         with socket.create_connection((host, port), timeout=timeout_secs):
-            logger.info("direct.api.port_bound | port={} | bound=True", port)
+            logger.debug(LogEntry(event="direct.api.port_bound", port=port, bound=True))
             return True
     except (OSError, ConnectionRefusedError, TimeoutError):
-        logger.info("direct.api.port_bound | port={} | bound=False", port)
+        logger.debug(LogEntry(event="direct.api.port_bound", port=port, bound=False))
         return False
 
 
@@ -147,17 +149,19 @@ def _start_direct_api() -> tuple[Any, threading.Thread, int]:
 
     from ot.direct_api import create_app
 
-    logger.info(
-        "direct.api.start.begin | configuredPort={} | candidateCount={}",
-        _config.direct.host.port,
-        65536 - _config.direct.host.port,
+    logger.debug(
+        LogEntry(
+            event="direct.api.start.begin",
+            configuredPort=_config.direct.host.port,
+            candidateCount=65536 - _config.direct.host.port,
+        )
     )
     for port in _direct_candidate_ports():
         if _tcp_port_bound("127.0.0.1", port):
-            logger.info("direct.api.port.occupied_skipped | port={}", port)
+            logger.debug(LogEntry(event="direct.api.port.occupied_skipped", port=port))
             continue
 
-        logger.info("direct.api.candidate | port={}", port)
+        logger.debug(LogEntry(event="direct.api.candidate", port=port))
         config = uvicorn.Config(
             create_app(),
             host="127.0.0.1",
@@ -173,9 +177,11 @@ def _start_direct_api() -> tuple[Any, threading.Thread, int]:
         while time.monotonic() < deadline:
             if server.started and _direct_health_probe_once("127.0.0.1", port):
                 logger.info(
-                    "direct.api.ready | port={} | baseUrl=http://127.0.0.1:{}",
-                    port,
-                    port,
+                    LogEntry(
+                        event="direct.api.ready",
+                        port=port,
+                        baseUrl=f"http://127.0.0.1:{port}",
+                    ).success()
                 )
                 return server, thread, port
             if not thread.is_alive():
@@ -193,10 +199,10 @@ def _start_direct_api() -> tuple[Any, threading.Thread, int]:
 
 def _stop_direct_api(server: Any, thread: threading.Thread, port: int) -> None:
     """Stop the embedded direct API listener."""
-    logger.info("direct.api.stop.begin | port={}", port)
+    logger.debug(LogEntry(event="direct.api.stop.begin", port=port))
     server.should_exit = True
     thread.join(timeout=5.0)
-    logger.info("direct.api.stop.done | port={}", port)
+    logger.info(LogEntry(event="direct.api.stop.done", port=port).success())
 
 
 def _build_pack_summary() -> str:
@@ -247,22 +253,26 @@ def _log_startup_diagnostics(
     config_path = get_loaded_config_path()
     prompts_info = _get_prompts_info()
     logger.info(
-        "mcp.startup.diagnostics | transport=stdio | configDir={} | configFile={} | includeCount={} | logPath={} | statsEnabled={} | statsPath={} | registryToolCount={} | proxyConfigured={} | proxyBackground={} | directConfigured={} | directStatus={} | directPort={} | promptSource={} | promptPath={} | promptHash={} | statusTool=ot.status",
-        cfg._config_dir,
-        config_path,
-        len(cfg.include),
-        cfg.get_log_dir_path() / "serve.log",
-        cfg.stats.enabled,
-        cfg.get_stats_file_path(),
-        tool_count,
-        proxy_count,
-        bool(proxy_count),
-        cfg.direct.host.enabled,
-        direct_status,
-        direct_port,
-        prompts_info.get("source"),
-        prompts_info.get("path"),
-        prompts_info.get("sha256"),
+        LogEntry(
+            event="mcp.startup.diagnostics",
+            transport="stdio",
+            configDir=cfg._config_dir,
+            configFile=config_path,
+            includeCount=len(cfg.include),
+            logPath=cfg.get_log_dir_path() / "serve.log",
+            statsEnabled=cfg.stats.enabled,
+            statsPath=cfg.get_stats_file_path(),
+            registryToolCount=tool_count,
+            proxyConfigured=proxy_count,
+            proxyBackground=bool(proxy_count),
+            directConfigured=cfg.direct.host.enabled,
+            directStatus=direct_status,
+            directPort=direct_port,
+            promptSource=prompts_info.get("source"),
+            promptPath=prompts_info.get("path"),
+            promptHash=prompts_info.get("sha256"),
+            statusTool="ot.status",
+        )
     )
 
 
@@ -319,12 +329,14 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
                 start_span.add("directApi", f"http://127.0.0.1:{api_port}")
                 direct_status = "ready"
             except Exception as e:
-                logger.error("direct.api.degraded | error={}", e)
+                logger.error(LogEntry(event="direct.api.degraded").failure(e))
                 start_span.add("directApi", "degraded")
                 start_span.add("directApiError", str(e))
                 direct_status = "degraded"
         else:
-            logger.info("direct.api.disabled | rootTransport={}", runtime.transport)
+            logger.debug(
+                LogEntry(event="direct.api.disabled", rootTransport=runtime.transport)
+            )
 
         # Fire anonymous startup telemetry (non-blocking daemon thread)
         from ot.telemetry import ping as _telemetry_ping
@@ -353,7 +365,7 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
         )
 
         # Log support message
-        logger.info(get_startup_message())
+        logger.info(LogEntry(event="mcp.support_message", message=get_startup_message()))
 
     yield
 
@@ -589,13 +601,13 @@ def run_root_server(
             path=path,
         )
         logger.info(
-            "mcp.http_root.start | host={} | port={} | path={} | url=http://{}:{}{}",
-            host,
-            port,
-            path,
-            host,
-            port,
-            path,
+            LogEntry(
+                event="mcp.http_root.start",
+                host=host,
+                port=port,
+                path=path,
+                url=f"http://{host}:{port}{path}",
+            )
         )
         mcp.run(
             transport="streamable-http",

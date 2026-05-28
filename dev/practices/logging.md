@@ -62,7 +62,7 @@ entry.failure(error=str(exception))
 
 ### configure_logging(log_name)
 
-Initializes Loguru for file-only output with dev-friendly formatting.
+Initializes Loguru for file-only runtime output with dev-friendly formatting.
 
 ```python
 from ot.logging import configure_logging
@@ -160,7 +160,7 @@ async def execute_tool(ctx, tool_name: str, args: dict) -> str:
 
 ## Log Output
 
-Logs are written in dev-friendly format to `logs/{log_name}.log` (relative to config directory):
+Runtime logs are written in dev-friendly single-line format to `logs/{log_name}.log` (relative to config directory):
 
 ```text
 12:34:56.789 | INFO   | server:54  | mcp.server.start | status=SUCCESS | duration=0.042
@@ -169,10 +169,12 @@ Logs are written in dev-friendly format to `logs/{log_name}.log` (relative to co
 ```
 
 **Characteristics:**
-- JSON structured format only
+- One physical line per log event
+- Structured fields rendered as dev-friendly `key=value` output
 - File-only (no console output from library code)
 - Automatic duration calculation for spans
 - Sensitive data (URLs, API keys) sanitised automatically
+- Full raw values stay in `LogEntry`; truncation, sanitization, and newline collapsing happen at output formatting time
 
 ---
 
@@ -210,7 +212,7 @@ retention="5 days"    # Keep logs for 5 days
 
 ## Output Formatting
 
-Log output is automatically formatted with truncation and credential sanitization at output time. Full values are preserved in `LogEntry` for programmatic access.
+Log output is automatically formatted with truncation, credential sanitization, and single-line normalization at output time. Full values are preserved in `LogEntry` for programmatic access.
 
 ### Truncation Limits
 
@@ -245,7 +247,7 @@ Disable truncation with `OT_LOG_VERBOSE=true` or `log_verbose: true` in config:
 OT_LOG_VERBOSE=true onetool
 ```
 
-Credentials are **always** sanitized, even in verbose mode.
+Credentials are **always** sanitized, even in verbose mode. Runtime dev logs still collapse embedded newlines so each event remains one physical line.
 
 ### Formatting Functions
 
@@ -271,7 +273,7 @@ The logging system intercepts standard Python logging and redirects to Loguru:
 **Intercepted loggers** (redirected to Loguru):
 - `fastmcp`, `mcp`, `uvicorn`
 
-**Silenced loggers** (set to WARNING level):
+**Silenced loggers** (set to WARNING level in runtime logging):
 - `httpcore`, `httpx`, `hpack` - HTTP transport noise
 - `openai`, `openai._base_client` - API client noise
 - `anyio`, `mcp` - Async framework noise
@@ -294,8 +296,10 @@ configure_test_logging(
 ```
 
 This creates:
-- `logs/{module_name}.log` - JSON structured logs
-- Optional `logs/{module_name}.dev.log` - Dev-friendly format (if `dev_file=True`)
+- `logs/{module_name}.log` - JSON structured logs for machine-readable assertions and inspection
+- Optional `logs/{module_name}.dev.log` - Dev-friendly single-line format (if `dev_file=True`)
+
+Runtime logging intentionally uses the dev-friendly sink as its primary file output. Test logging keeps JSON as the primary sink so tests and tooling can inspect structured records directly.
 
 ---
 

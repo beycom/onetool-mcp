@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the unified logging and observability infrastructure for OneTool. Covers structured JSON logging, LogSpan timing, token/cost tracking, and core logging patterns shared across all components.
+Defines the unified logging and observability infrastructure for OneTool. Covers structured runtime and test logging, LogSpan timing, token/cost tracking, and core logging patterns shared across all components.
 
 CLI-specific logging requirements are defined in their respective specs:
 - [bench-logging](../bench-logging/spec.md) - bench CLI output, verbose/trace modes
@@ -13,24 +13,25 @@ CLI-specific logging requirements are defined in their respective specs:
 
 <!-- Section: Core Infrastructure -->
 
-### Requirement: Structured JSON Logging
+### Requirement: Structured Runtime Logging
 
-The system SHALL log all operations as structured JSON for machine parsing.
+The system SHALL preserve structured fields for logged operations and render runtime logs as dev-friendly single-line records.
 
-#### Scenario: Log entry format
+#### Scenario: Runtime log entry format
 - **GIVEN** any logged operation
 - **WHEN** the log is written
-- **THEN** it SHALL be valid JSON with `span`, `duration`, and context fields
+- **THEN** the runtime log line SHALL include the span or event, duration when available, and context fields
+- **AND** embedded newlines in field values SHALL NOT create additional physical log lines
 
 #### Scenario: Log file output
-- **GIVEN** `OT_LOG_FILE` environment variable set
+- **GIVEN** the server runs with runtime logging configured
 - **WHEN** the server runs
-- **THEN** all logs SHALL be written to the specified file in JSON format
+- **THEN** logs SHALL be written to `logs/{cli_name}.log` in dev-friendly single-line format
 
-#### Scenario: Console output
-- **GIVEN** `--verbose` flag or `OT_LOG_LEVEL=DEBUG`
-- **WHEN** the server runs
-- **THEN** logs SHALL also appear on console in human-readable format
+#### Scenario: Test log entry format
+- **GIVEN** test logging is configured
+- **WHEN** test logs are written
+- **THEN** the primary test log file SHALL contain JSON structured records for machine parsing
 
 ### Requirement: Log Span Timing
 
@@ -153,9 +154,9 @@ The system SHALL support configurable logging.
 - **THEN** truncation SHALL be disabled (full values shown)
 
 #### Scenario: Log rotation
-- **GIVEN** `OT_LOG_FILE` is configured
+- **GIVEN** runtime logging is configured
 - **WHEN** the log file grows
-- **THEN** it SHALL support standard log rotation tools (logrotate compatible)
+- **THEN** the logging sink SHALL rotate files according to the configured runtime policy
 
 ### Requirement: CLI Logging Initialization
 
@@ -370,7 +371,7 @@ The system SHALL format log output with truncation and sanitisation at write tim
 
 #### Scenario: Field-based truncation
 - **GIVEN** a log entry with a `path` field containing 300 characters
-- **WHEN** the entry is written to file or console
+- **WHEN** the entry is written to a configured sink
 - **THEN** the value SHALL be truncated to 200 characters with `...` suffix
 
 #### Scenario: URL truncation

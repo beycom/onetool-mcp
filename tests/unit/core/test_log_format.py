@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from ot.logging.format import (
+    format_dev_value,
     format_log_entry,
     format_value,
     sanitize_for_output,
@@ -148,3 +149,34 @@ class TestFormatLogEntry:
         assert "***:***@" in result["url"]
         # Path should be truncated
         assert len(result["path"]) <= 203  # 200 + "..."
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestFormatDevValue:
+    """Test dev-friendly single-line value formatting."""
+
+    def test_string_newlines_are_collapsed(self):
+        """Multiline strings become one physical log-line field."""
+        result = format_dev_value("first\nsecond\tthird", "command")
+        assert result == "first second third"
+
+    def test_list_newlines_are_collapsed(self):
+        """Lists containing multiline strings are emitted on one line."""
+        result = format_dev_value(["first\nsecond", "third"], "items")
+        assert result == "[first second, third]"
+
+    def test_dict_newlines_are_collapsed(self):
+        """Dicts containing multiline strings are emitted on one line."""
+        result = format_dev_value({"command": "alpha\nbeta"}, "metadata")
+        assert result == "{command=alpha beta}"
+
+    def test_dev_value_sanitizes_and_truncates(self):
+        """Dev formatting keeps credential masking and field limits."""
+        result = format_dev_value(
+            "https://user:secret@api.test.invalid/" + ("x" * 200),
+            "url",
+        )
+        assert "***:***@" in result
+        assert "secret" not in result
+        assert len(result) <= 120
