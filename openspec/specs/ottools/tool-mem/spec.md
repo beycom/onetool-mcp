@@ -365,17 +365,17 @@ The `mem.decay()` function SHALL apply time-based importance decay.
 - **THEN** new score = relevance * 0.5^(age/half_life) * (1 + log(access+1) * 0.1)
 - **AND** result is clamped to range [1, original_relevance] (decay never increases relevance)
 
-### Requirement: Export and Import
+### Requirement: Dump and Import
 
-The `mem.export()` function SHALL output YAML. The `mem.load()` function SHALL import from YAML, always skipping duplicates.
+The `mem.dump()` function SHALL output YAML. The `mem.load()` function SHALL import from YAML, always skipping duplicates.
 
-#### Scenario: Export to YAML
-- **WHEN** `mem.export()` is called
+#### Scenario: Dump to YAML
+- **WHEN** `mem.dump()` is called
 - **THEN** it SHALL output all memories in YAML format
 - **AND** it SHALL include the `meta` column in the YAML output
 
-#### Scenario: Export to file
-- **WHEN** `mem.export(output="memories.yaml")` is called
+#### Scenario: Dump to file
+- **WHEN** `mem.dump(output="memories.yaml")` is called
 - **THEN** it SHALL write YAML to the specified file
 
 #### Scenario: Import from YAML
@@ -383,42 +383,42 @@ The `mem.export()` function SHALL output YAML. The `mem.load()` function SHALL i
 - **THEN** it SHALL import memories, skipping duplicates
 - **AND** it SHALL restore the `meta` column from the YAML if present
 
-### Requirement: Snap and Restore
+### Requirement: Snapshot and Restore
 
-The `mem.snap()` and `mem.restore()` functions SHALL provide lossless file-based round-trip of memories with full metadata preservation.
+The `mem.snapshot()` and `mem.restore()` functions SHALL provide lossless file-based round-trip of memories with full metadata preservation.
 
-#### Scenario: Snap creates files and index
-- **WHEN** `mem.snap(output="backup/consult", topic="consult/")` is called
+#### Scenario: Snapshot creates files and index
+- **WHEN** `mem.snapshot(output="backup/consult", topic="consult/")` is called
 - **THEN** it SHALL create one file per memory in the output directory
 - **AND** it SHALL strip the topic filter prefix from file paths
 - **AND** it SHALL write an `index.yaml` containing metadata (topic, file, category, tags, relevance, meta) for each memory
 
-#### Scenario: Snap without topic filter
-- **WHEN** `mem.snap(output="backup/all")` is called
-- **THEN** it SHALL snap all memories
+#### Scenario: Snapshot without topic filter
+- **WHEN** `mem.snapshot(output="backup/all")` is called
+- **THEN** it SHALL snapshot all memories
 - **AND** use the full topic as the file path (no extension appended by default)
 
-#### Scenario: Snap custom extension
-- **WHEN** `mem.snap(output="backup/config", ext=".yaml")` is called
+#### Scenario: Snapshot custom extension
+- **WHEN** `mem.snapshot(output="backup/config", ext=".yaml")` is called
 - **THEN** content files SHALL have the specified extension appended to the topic path
 - **NOTE** `ext` defaults to `""` — the topic itself is the file path
 
-#### Scenario: Snap skip existing
+#### Scenario: Snapshot skip existing
 - **GIVEN** a file already exists at the output path
-- **WHEN** `mem.snap(output="dir", on_conflict="skip")` is called
+- **WHEN** `mem.snapshot(output="dir", on_conflict="skip")` is called
 - **THEN** it SHALL skip writing that file but still include it in the index
 
-#### Scenario: Snap overwrite existing
+#### Scenario: Snapshot overwrite existing
 - **GIVEN** a file already exists at the output path
-- **WHEN** `mem.snap(output="dir", on_conflict="overwrite")` is called
+- **WHEN** `mem.snapshot(output="dir", on_conflict="overwrite")` is called
 - **THEN** it SHALL overwrite the existing file
 
-#### Scenario: Snap nested topics
+#### Scenario: Snapshot nested topics
 - **GIVEN** memories with nested topic paths (e.g., `consult/sub/deep`)
-- **WHEN** `mem.snap(output="dir", topic="consult/")` is called
+- **WHEN** `mem.snapshot(output="dir", topic="consult/")` is called
 - **THEN** it SHALL preserve the directory hierarchy (e.g., `sub/deep`)
 
-#### Scenario: Restore from snap
+#### Scenario: Restore from snapshot
 - **WHEN** `mem.restore(input="backup/consult")` is called
 - **THEN** it SHALL read `index.yaml` from the directory
 - **AND** recreate each memory with its original topic, category, tags, relevance, and meta
@@ -444,7 +444,7 @@ The `mem.snap()` and `mem.restore()` functions SHALL provide lossless file-based
 
 #### Scenario: Round-trip lossless
 - **GIVEN** memories with specific content, category, tags, and relevance
-- **WHEN** `mem.snap()` followed by `mem.restore()` is performed
+- **WHEN** `mem.snapshot()` followed by `mem.restore()` is performed
 - **THEN** all metadata SHALL be preserved identically
 
 ### Requirement: Read Cache

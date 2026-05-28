@@ -99,7 +99,7 @@ The project SHALL provide task-oriented guides in `docs/learn/`.
 #### Scenario: Explicit calls guide
 - **GIVEN** a user wanting to understand explicit invocation
 - **WHEN** they read `learn/explicit-calls.md`
-- **THEN** they learn how to use the `>>>` trigger
+- **THEN** they learn how to use the `__run` trigger
 
 #### Scenario: Security guide
 - **GIVEN** a user concerned about security

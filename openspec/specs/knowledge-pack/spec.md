@@ -321,7 +321,7 @@ Each `KBProjectConfig` SHALL contain:
 
 `topic_roots` entries accept a full URL or bare path prefix. During indexing, the first matching root is stripped from each chunk's canonical topic to derive the stored topic.
 
-The legacy `databases:` and `scrape:` top-level keys SHALL raise a validation error with a migration message.
+Unknown fields in `tools.knowledge` and nested knowledge config models SHALL raise validation errors. Removed top-level keys such as `databases:` and `scrape:` SHALL be treated as unknown fields, with no compatibility migration path.
 
 #### Scenario: KB project config resolves db path
 - **WHEN** `tools.knowledge.kb.rhino.db.path: scratch/rhino-db/rhino.db` is configured
@@ -354,9 +354,9 @@ The legacy `databases:` and `scrape:` top-level keys SHALL raise a validation er
 - **WHEN** `tools.knowledge` has no `kb` key
 - **THEN** `kb.dbs()` returns an empty list (not an error)
 
-#### Scenario: Legacy databases/scrape keys raise error
+#### Scenario: Removed databases/scrape keys raise validation error
 - **WHEN** `tools.knowledge.databases` or `tools.knowledge.scrape` is set at the top level
-- **THEN** a validation error is raised with a message directing the user to migrate to `tools.knowledge.kb`
+- **THEN** a validation error is raised for extra inputs
 
 #### Scenario: model and base_url fall back to top-level llm config
 - **WHEN** `tools.knowledge.model` is not set
@@ -365,24 +365,6 @@ The legacy `databases:` and `scrape:` top-level keys SHALL raise a validation er
 - **THEN** the API base URL is inherited from `llm.base_url` in the top-level `llm:` config block
 - **WHEN** `tools.knowledge.enrich_model` is not set
 - **THEN** the synthesis model for `kb.ask()` is inherited from `llm.model` in the top-level `llm:` config block
-
-#### Scenario: Named source resolves output dir
-- **WHEN** `tools.knowledge.scrape.sources.mysite.output_dir` is set
-- **THEN** `onetool kb scrape mysite` writes to that directory
-
-#### Scenario: Missing output_dir uses convention
-- **WHEN** `tools.knowledge.scrape.sources.mysite` has no `output_dir`
-- **THEN** `onetool kb scrape mysite` writes to `.onetool/scrape/mysite/`
-
-#### Scenario: Unknown source name raises error
-- **WHEN** `onetool kb scrape unknown` is run and `unknown` is not in `tools.knowledge.scrape.sources`
-- **THEN** the command exits with: `"No source 'unknown' in tools.knowledge.scrape.sources"`
-
-#### Scenario: Missing scrape key is not an error
-- **WHEN** `tools.knowledge` has no `scrape` key
-- **THEN** `onetool kb scrape <named-source>` raises the unknown-source error (not a config parse error)
-
----
 
 ### Requirement: Error handling — missing sqlite-vec
 If `sqlite-vec` is not installed, all `knowledge` tools that require vector search SHALL raise a clear error with install instructions.

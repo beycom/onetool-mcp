@@ -70,7 +70,7 @@ def _format_general_help() -> str:
     return """# OneTool Help
 
 ## First 60 Seconds
-  ot.health()                   - Check runtime health
+  ot.status()                   - Check runtime status
   ot.help(query="task")         - Find right tool for goal
   ot.servers()                  - Check MCP proxy server status
   ot_servers.enable(name="github") - Enable disconnected server
@@ -97,7 +97,7 @@ def _format_general_help() -> str:
 ## Quick Examples
   brave.search(query="AI news")
   webfetch.fetch(url="https://...")
-  $b_q q=search terms
+  :b_q q=search terms
 
 ## Tips
   - Use keyword args: func(arg=value)
@@ -121,6 +121,67 @@ def _is_server_intent_query(query: str) -> bool:
         "chrome_devtools",
     )
     return any(k in q for k in keywords)
+
+
+def _is_direct_run_query(query: str) -> bool:
+    """Return True when query asks about direct OneTool run invocation."""
+    q = query.lower().strip()
+    exact_terms = {
+        "__run",
+        "__r",
+        "__ot",
+        "run",
+        "mcp run",
+        "run tool",
+        "direct run",
+        "direct command",
+        "direct invocation",
+        "onetool run",
+        "snippet",
+        "snippets",
+    }
+    if q in exact_terms:
+        return True
+    keywords = (
+        "__run",
+        "__r",
+        "__ot",
+        "mcp run",
+        "direct onetool",
+        "direct invocation",
+        "direct command",
+        "colon snippet",
+        "snippet syntax",
+    )
+    return any(k in q for k in keywords)
+
+
+def _format_direct_run_help() -> str:
+    """Format deterministic help for direct OneTool run invocation."""
+    return """# Direct OneTool Invocation
+
+Use MCP `run(command='...')` for direct OneTool pack calls from a connected agent.
+Use the `onetool direct` CLI only when you explicitly want the CLI workflow.
+
+## Triggers
+  __run <code>       - canonical user-facing trigger
+  __r <code>         - short alias
+  __ot <code>        - OneTool alias
+
+## Call Shapes
+  pack.tool(arg=value)     - direct tool call
+  :snippet key=value       - snippet invocation
+
+Use direct pack syntax such as `ground.search(q='price of gold')`, not `ot.ground.search(...)`.
+Snippet values are plain strings until the template renders Python.
+
+## Discovery
+  ot.tool_info(name='pack.tool') - confirm exact signature and arguments
+  ot.help(query='topic')         - search tools, packs, snippets, aliases, and servers
+  ot.servers()                   - check proxy server status
+
+Do not guess tool names, argument names, or allowed values. If they are unknown, inspect first.
+For a known disconnected proxy server, run `ot_servers.enable(name='github')` then retry once."""
 
 
 def _format_tool_help(tool_info: dict[str, Any], pack: str) -> str:
@@ -421,14 +482,14 @@ def _format_search_results(
         lines.append("## Snippets")
         for snippet in snippets_results:
             if isinstance(snippet, str):
-                lines.append(f"- ${snippet}")
+                lines.append(f"- :{snippet}")
             elif isinstance(snippet, dict):
                 name = snippet.get("name", "")
                 desc = snippet.get("description", "")
                 if desc and desc != "(no description)" and info == "default":
-                    lines.append(f"- ${name}: {desc}")
+                    lines.append(f"- :{name}: {desc}")
                 else:
-                    lines.append(f"- ${name}")
+                    lines.append(f"- :{name}")
         lines.append("")
 
     if aliases_results:

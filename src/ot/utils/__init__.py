@@ -13,6 +13,7 @@ Extension tools (user-created in .onetool/tools/) can import directly from
 ot.* modules for logging, config, and inter-tool calling.
 """
 
+from ot.utils.async_bridge import run_coro_sync
 from ot.utils.batch import (
     BatchEnvelope,
     BatchError,
@@ -87,6 +88,7 @@ __all__ = [
     "requires_cli",
     "requires_lib",
     "run_command",
+    "run_coro_sync",
     "safe_request",
     "sanitize_output",
     "sanitize_tag_closes",

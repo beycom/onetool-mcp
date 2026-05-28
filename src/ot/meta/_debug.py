@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import getpass
+import hashlib
 import os
 import platform
 import sys
@@ -155,11 +156,49 @@ def _get_runtime_info() -> dict[str, Any]:
     }
 
 
+def _get_prompts_info() -> dict[str, Any]:
+    """Get prompt source diagnostics and critical rule checks."""
+    from ot.prompts import _get_template_prompts_path, get_prompts
+
+    cfg = get_config()
+    source = "inline" if cfg.prompts is not None else "file"
+    path = None
+    if cfg.prompts is None:
+        candidate = resolve_cwd_path("config/prompts.yaml")
+        path_obj = candidate if candidate.exists() else _get_template_prompts_path()
+        path = str(path_obj)
+
+    prompts = get_prompts(inline_prompts=cfg.prompts)
+    run_prompt = prompts.tools.get("run")
+    run_desc = run_prompt.description if run_prompt else ""
+    instructions = prompts.instructions
+    combined = f"{instructions}\n\n{run_desc or ''}"
+    digest = hashlib.sha256(combined.encode("utf-8")).hexdigest()
+    checks = {
+        "has_run_contract": "Mode by shape:" in (run_desc or ""),
+        "has_canonical_trigger": "__run" in combined,
+        "has_snippet_colon": ":name" in combined or ":snippet" in combined,
+        "has_direct_tool_intent": "use ot pack.tool" in combined,
+        "has_mcp_preference": "run(command=" in combined,
+        "has_natural_language_mode": "natural-language intent" in (run_desc or ""),
+        "has_keyword_only_repair": "keyword-only tools" in (run_desc or ""),
+    }
+    return {
+        "source": source,
+        "path": path,
+        "sha256": digest,
+        "instructions_excerpt": instructions.strip()[:500],
+        "run_description_excerpt": (run_desc or "").strip()[:500],
+        "checks": checks,
+    }
+
+
 def debug(
     *,
     verbose: bool = False,
     env_vars: bool = False,
     dependencies: bool = False,
+    prompts: bool = False,
 ) -> dict[str, Any]:
     """Get comprehensive debug information about this OneTool installation.
 
@@ -170,6 +209,7 @@ def debug(
         verbose: Include detailed configuration information
         env_vars: Include relevant environment variables
         dependencies: Include dependency versions
+        prompts: Include prompt source diagnostics and critical rule checks
 
     Returns:
         Structured debug information with sections:
@@ -184,7 +224,7 @@ def debug(
         ot.debug()
         ot.debug(verbose=True, env_vars=True)
     """
-    with log(span="ot.debug", verbose=verbose) as s:
+    with log(span="ot.debug", verbose=verbose, prompts=prompts) as s:
         result: dict[str, Any] = {
             "version": _get_version_info(),
             "paths": _get_paths_info(),
@@ -212,6 +252,9 @@ def debug(
                 except PackageNotFoundError:
                     deps[pkg] = "not installed"
             result["dependencies"] = deps
+
+        if prompts:
+            result["prompts"] = _get_prompts_info()
 
         version_str = result["version"].get("version", "unknown")
         s.add("version", version_str)

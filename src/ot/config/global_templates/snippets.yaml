@@ -72,33 +72,6 @@ snippets:
       tav.extract(urls=[{% for u in _urls %}"{{ u }}"{% if not loop.last %}, {% endif %}{% endfor %}], extract_depth="{{ depth }}")
 
   # ============================================================================
-  # RIPGREP (rg)
-  # ============================================================================
-
-  rg:
-    description: Search files with ripgrep
-    params:
-      p: { description: "Regex pattern to search for" }
-      path: { default: ".", description: "Search path" }
-      glob: { default: "", description: "File glob filter (e.g., '*.py', '*.{ts,tsx}')" }
-      ft: { default: "", description: "File type filter (py, ts, js, etc.)" }
-      ctx: { default: 0, description: "Lines of context before/after match" }
-      count: { default: "", description: "Max matching lines to return" }
-      i: { default: false, description: "Case-insensitive search" }
-    body: |
-      __format__="yml_h";__sanitize__=False
-      rg.search(pattern="{{ p }}", path="{{ path }}"{% if glob %}, glob="{{ glob }}"{% endif %}{% if ft %}, file_type="{{ ft }}"{% endif %}{% if ctx %}, context={{ ctx }}{% endif %}{% if count %}, limit={{ count }}{% endif %}{% if i %}, case_sensitive=False{% endif %})
-
-  rg_count:
-    description: Count pattern occurrences by file
-    params:
-      p: { description: "Pattern to count" }
-      ft: { default: "", description: "File type filter (py, ts, etc.)" }
-    body: |
-      __format__="yml_h";__sanitize__=False
-      {% if ft %}rg.count(pattern="{{ p }}", file_type="{{ ft }}"){% else %}rg.count(pattern="{{ p }}"){% endif %}
-
-  # ============================================================================
   # PACKAGE (pkg)
   # ============================================================================
 
@@ -276,35 +249,58 @@ snippets:
       f.grep(pattern="{{ p }}", path="{{ path }}"{% if glob %}, glob="{{ glob }}"{% endif %}{% if i %}, case_sensitive=False{% endif %})
 
   # ============================================================================
-  # GITHUB (gh)
-  # ============================================================================
-
-  gh:
-    description: Search GitHub repositories and return URLs/info for multiple pages
-    params:
-      q: { description: "GitHub search query" }
-      count: { default: 1, description: "Number of pages to fetch (30 results per page)" }
-    body: |
-      __format__="yml_h";__sanitize__=False
-      import json
-      results = []
-      for page in range(1, {{ count }} + 1):
-          r = github.search_repositories(query="{{ q }}", page=page, perPage=30)
-          data = json.loads(r) if isinstance(r, str) else r
-          for repo in data.get("items", []):
-              results.append({
-                  "name": repo["full_name"],
-                  "url": repo["html_url"],
-                  "description": repo.get("description") or "",
-                  "stars": repo.get("stargazers_count", 0),
-                  "updated": repo.get("updated_at", "")[:10]
-              })
-      {"total": len(results), "repos": results}
-
-
-  # ============================================================================
   # INTERNAL TOOLS (ot)
   # ============================================================================
+
+  help:
+    description: Search OneTool help for tools, packs, snippets, aliases, and servers
+    params:
+      q: { default: "", description: "Topic, tool, pack, snippet, alias, or server to search" }
+      info: { default: "default", description: "Detail level: min, default, or full" }
+    body: |
+      __format__="yml_h";__sanitize__=False
+      ot.help(query="{{ q }}", info="{{ info }}")
+
+  tool:
+    description: Show exact tool signature and arguments, or search tools by pattern
+    params:
+      name: { default: "", description: "Exact tool name such as ot.help or brave.search" }
+      pattern: { default: "", description: "Tool search pattern when name is unknown" }
+      info: { default: "default", description: "Detail level: min, default, or full" }
+    body: |
+      __format__="yml_h";__sanitize__=False
+      {% if name and pattern %}
+      "Error: provide name or pattern, not both"
+      {% elif name %}
+      ot.tool_info(name="{{ name }}", info="{{ info }}")
+      {% else %}
+      ot.tool_info(pattern="{{ pattern }}", info="{{ info }}")
+      {% endif %}
+
+  servers:
+    description: List configured MCP proxy servers and connection status
+    params:
+      pattern: { default: "", description: "Optional server name filter" }
+      info: { default: "default", description: "Detail level: min, default, full, resources, or prompts" }
+    body: |
+      __format__="yml_h";__sanitize__=False
+      ot.servers(pattern="{{ pattern }}", info="{{ info }}")
+
+  server_on:
+    description: Enable and connect a configured MCP proxy server
+    params:
+      name: { description: "Configured server name, such as github" }
+    body: |
+      __format__="yml_h";__sanitize__=False
+      ot_servers.enable(name="{{ name }}")
+
+  server_off:
+    description: Disable a configured MCP proxy server
+    params:
+      name: { description: "Configured server name, such as github" }
+    body: |
+      __format__="yml_h";__sanitize__=False
+      ot_servers.disable(name="{{ name }}")
 
   reload:
     description: Reload OneTool configuration and tools
@@ -318,4 +314,4 @@ snippets:
     params: {}
     body: |
       __format__="yml_h";__sanitize__=False
-      {"health": ot.health(), "config": ot.config()}
+      {"status": ot.status(), "config": ot.config()}

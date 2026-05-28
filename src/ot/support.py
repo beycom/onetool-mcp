@@ -39,7 +39,10 @@ def get_startup_message() -> str:
     Returns:
         Formatted startup message with support link
     """
-    return f"{SUPPORT_MESSAGE_SHORT}: {KOFI_URL}"
+    return (
+        f"{SUPPORT_MESSAGE_SHORT}: {KOFI_URL} | "
+        "Diagnostics: see logs/serve.log and run ot.status()"
+    )
 
 
 def get_support_banner() -> str:

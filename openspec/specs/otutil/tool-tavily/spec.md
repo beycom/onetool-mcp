@@ -103,12 +103,18 @@ The `tavily.search_batch()` function SHALL execute multiple searches concurrentl
 - **WHEN** `tavily.search_batch(queries=queries, output_format="sources_only", min_score=0.5)` is called
 - **THEN** it SHALL forward those parameters to each individual `tavily.search()` call
 
+#### Scenario: Batch retry guardrails
+- **WHEN** `tavily.search_batch()` is called with retry controls
+- **THEN** `retries` MUST be an integer in range 0-3
+- **AND** `retry_delay_ms` MUST be in range 0-10000
+- **AND** values outside these ranges SHALL return an error before batch work starts
+
 ### Requirement: URL Content Extraction
 
 The `tavily.extract()` function SHALL extract raw textual content from URLs.
 
 #### Scenario: Single URL extraction
-- **WHEN** `tavily.extract(urls=["https://example.com"])` is called
+- **WHEN** `tavily.extract(urls=["https://docs.python.org/3/"])` is called
 - **THEN** it SHALL return the raw content of that URL
 
 #### Scenario: Multiple URL extraction
@@ -166,10 +172,16 @@ The `tavily.research()` function SHALL perform comprehensive multi-source resear
 #### Scenario: Configurable timeout
 - **WHEN** `tavily.research(input=task, timeout_seconds=600)` is called
 - **THEN** it SHALL wait up to 600 seconds before returning a timeout error
+- **AND** `timeout_seconds` MUST be in range 10-1800
 
 #### Scenario: Timeout exceeded
 - **GIVEN** the research task does not complete within the timeout
 - **THEN** it SHALL return `"Error: research timed out after {N} seconds"`
+
+#### Scenario: Polling respects remaining deadline
+- **WHEN** Tavily research polling waits and sends status GET requests
+- **THEN** each sleep SHALL be clamped to the remaining timeout budget
+- **AND** each polling GET request SHALL pass a timeout based on the remaining budget
 
 #### Scenario: Empty input validation
 - **WHEN** `tavily.research(input="")` is called
@@ -191,6 +203,7 @@ The `tavily.research()` function SHALL perform comprehensive multi-source resear
 | `format` | "markdown", "text" | Any other value |
 | `extract_depth` | "basic", "advanced" | Any other value |
 | `model` | "mini", "pro", "auto" | Any other value |
+| `timeout_seconds` | 10-1800 | Outside range |
 
 ## Logging
 

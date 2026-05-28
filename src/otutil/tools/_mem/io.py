@@ -1,4 +1,4 @@
-"""Memory export and load (YAML I/O)."""
+"""Memory dump and load (YAML I/O)."""
 from __future__ import annotations
 
 import json
@@ -21,25 +21,25 @@ from .db import (
 from .embedding import _maybe_embed
 
 
-def export(
+def dump(
     *,
     topic: str | None = None,
     output: str | None = None,
 ) -> str:
-    """Export memories to YAML format.
+    """Dump memories to YAML format.
 
     Args:
         topic: Optional topic prefix filter
         output: Output file path (default: prints to stdout)
 
     Returns:
-        Exported content or file path confirmation.
+        Dumped content or file path confirmation.
 
     Example:
-        mem.export(output="memories.yaml")
-        mem.export(topic="projects/onetool/")
+        mem.dump(output="memories.yaml")
+        mem.dump(topic="projects/onetool/")
     """
-    with LogSpan(span="mem.export", topic=topic) as s:
+    with LogSpan(span="mem.dump", topic=topic) as s:
         try:
             conn = _get_connection()
 
@@ -60,7 +60,7 @@ def export(
             rows = conn.execute(sql, params).fetchall()
 
             if not rows:
-                return "No memories to export"
+                return "No memories to dump"
 
             s.add("memoryCount", len(rows))
 
@@ -73,13 +73,13 @@ def export(
                 assert validated_path is not None
                 validated_path.parent.mkdir(parents=True, exist_ok=True)
                 validated_path.write_text(content, encoding="utf-8")
-                return f"Exported {len(rows)} memories to {validated_path}"
+                return f"Dumped {len(rows)} memories to {validated_path}"
 
             return content
 
         except Exception as e:
             s.add("error", str(e))
-            return f"Error exporting memories: {e}"
+            return f"Error dumping memories: {e}"
 
 
 def _export_yaml(rows: list[tuple]) -> str:
@@ -212,4 +212,4 @@ def load(
             return f"Error importing memories: {e}"
 
 
-__all__ = ["_export_yaml", "export", "load"]
+__all__ = ["_export_yaml", "dump", "load"]

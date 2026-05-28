@@ -31,11 +31,11 @@ Short alias: `g`
 | `context` | str | Additional context to refine search (search/batch only) |
 | `focus` | str | "general", "code", "documentation", "troubleshooting" (search/batch only) |
 | `model` | str | Gemini model to use, e.g., "gemini-2.5-pro" (search/batch) |
-| `timeout` | float | Request timeout in seconds (default: 30.0) |
+| `timeout` | float | Request timeout in seconds (1.0-300.0, default: 180.0) |
 | `max_sources` | int | Maximum number of sources to include (default: unlimited) |
 | `output_format` | str | "full" (default), "text_only", or "sources_only" |
-| `retries` | int | Batch mode only. Retry count for transient failures (default: 0) |
-| `retry_delay_ms` | int | Batch mode only. Base backoff delay in milliseconds (default: 250) |
+| `retries` | int | Batch mode only. Retry count for transient failures (non-negative, default: 0) |
+| `retry_delay_ms` | int | Batch mode only. Base backoff delay in milliseconds (0-10000, default: 250) |
 | `extract_schema` | dict | Optional schema-constrained extraction mode for search/search_batch |
 | `return_provenance` | bool | Include per-field provenance (`source_url`, `snippet`, `confidence`) |
 | `language` | str | Filter for dev search |
@@ -59,16 +59,18 @@ Short alias: `g`
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `tools.ground.model` | string | `gemini-2.5-flash` | Default Gemini model used when a tool call does not pass `model=`. |
+| `tools.ground.timeout` | float | `180.0` | Default request timeout in seconds when a tool call does not pass `timeout=`. |
 
 ```yaml
 tools:
   ground:
     model: gemini-2.5-flash
+    timeout: 180.0
 ```
 
 ### Defaults
 
-- If `tools.ground` is omitted, grounding search uses `gemini-2.5-flash`.
+- If `tools.ground` is omitted, grounding search uses `gemini-2.5-flash` and a 180 second request timeout.
 
 ## Examples
 

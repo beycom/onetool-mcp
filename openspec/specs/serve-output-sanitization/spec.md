@@ -15,16 +15,20 @@ The system SHALL sanitise trigger patterns in tool outputs to prevent indirect p
 - **WHEN** sanitisation is applied
 - **THEN** it SHALL be replaced with `[REDACTED:trigger] file.delete(path="x")`
 
-#### Scenario: MCP trigger pattern
+#### Scenario: MCP trigger-like pattern
 - **GIVEN** tool output containing `mcp__onetool__run(command="...")`
 - **WHEN** sanitisation is applied
-- **THEN** it SHALL be replaced with `[REDACTED:trigger]__run(command="...")`
+- **THEN** the `mcp__onetool__run` token SHALL be replaced with `[REDACTED:trigger]`
 
-#### Scenario: >>> tool-call trigger pattern
+#### Scenario: Short run trigger pattern
+- **GIVEN** tool output containing `__r file.write(path="x", content="y")`
+- **WHEN** sanitisation is applied
+- **THEN** `__r` SHALL be replaced with `[REDACTED:trigger]`
+
+#### Scenario: Removed REPL marker is not sanitized
 - **GIVEN** tool output containing `>>> file.write(path="x", content="y")` (or any `>>> pack.tool(` form)
 - **WHEN** sanitisation is applied
-- **THEN** `>>> file.write(` SHALL be replaced with `[REDACTED:trigger]`
-- **AND** bare `>>>` without a `pack.tool(` call (e.g. `>>> x = 1`) SHALL NOT be replaced
+- **THEN** `>>>` SHALL NOT be treated as a OneTool trigger
 
 #### Scenario: Case sensitivity
 - **GIVEN** tool output containing `__OT` or `__Ot` (mixed case)

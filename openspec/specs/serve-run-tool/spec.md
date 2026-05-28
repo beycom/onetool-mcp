@@ -106,7 +106,7 @@ The system SHALL capture results from any valid Python expression or statement a
 - **THEN** the string SHALL be returned as-is without additional serialization
 
 #### Scenario: Composed tool results
-- **GIVEN** code like `{"health": ot.health(), "config": ot.config()}`
+- **GIVEN** code like `{"status": ot.status(), "config": ot.config()}`
 - **WHEN** each tool returns a native dict
 - **THEN** the composed result SHALL be a single clean JSON object
 - **AND** nested values SHALL NOT be double-escaped strings
@@ -183,6 +183,11 @@ The system SHALL resolve dot-notation packs to actual tool functions.
 - **WHEN** code executes `ot_servers.enable(name="github")` then `github.search_repositories(query="tooling")` in the same run() command
 - **THEN** the `github` pack SHALL be available for immediate resolution in that same command
 
+#### Scenario: Nested ot pack access rejected with direct syntax hint
+- **GIVEN** a pack named `ground` exists
+- **WHEN** code attempts `ot.ground.search(query="test")`
+- **THEN** execution SHALL fail with a message directing callers to use direct pack syntax such as `ground.search(...)`
+
 ### Requirement: Alias Resolution
 
 The system SHALL resolve configured aliases to their target functions.
@@ -202,12 +207,12 @@ The system SHALL resolve configured aliases to their target functions.
 The system SHALL expand snippet templates using Jinja2.
 
 #### Scenario: Snippet invocation
-- **GIVEN** command `$wsq q1=AI q2=ML p=Compare` where `wsq` snippet is configured
+- **GIVEN** command `:wsq q1=AI q2=ML p=Compare` where `wsq` snippet is configured
 - **WHEN** run() processes the command
 - **THEN** it SHALL expand the snippet template and execute the result
 
 #### Scenario: Snippet expansion inside multiline python workflow
-- **GIVEN** a multiline run() command with normal python statements and `result = __run("$wsq q1=AI q2=ML p=Compare")`
+- **GIVEN** a multiline run() command with normal python statements and `result = __run(":wsq q1=AI q2=ML p=Compare")`
 - **WHEN** run() executes the command
 - **THEN** `__run(...)` SHALL expand and execute the snippet command and return its tool result to the caller
 

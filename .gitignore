@@ -125,6 +125,7 @@ demo/tmp/
 .opencode/
 .codex/
 .chunkhound/
+.localhist/
 .mcp.json
 .playwright-mcp/
 

@@ -13,7 +13,7 @@ Functions:
     ot.snippets() - List snippet definitions
     ot.snippet_info() - Detailed info for a snippet
     ot.config() - Show configuration summary
-    ot.health() - Check system health
+    ot.status() - Check runtime status
     ot.stats() - Get runtime statistics
     ot.result() - Query stored large output results
     ot.reload() - Force configuration reload
@@ -26,7 +26,7 @@ from typing import Any
 
 from ot import __version__
 from ot.logging import LogSpan
-from ot.meta._config_health import config, health, reload
+from ot.meta._config_health import config, reload, status
 from ot.meta._constants import PACK_NAME, resolve_ot_path
 from ot.meta._debug import debug
 from ot.meta._discovery import pack_info, packs, servers, tool_info, tools
@@ -69,7 +69,6 @@ __all__ = [
     "config",
     "debug",
     "get_ot_pack_functions",
-    "health",
     "help",
     "pack_info",
     "packs",
@@ -83,6 +82,7 @@ __all__ = [
     "snippet_info",
     "snippets",
     "stats",
+    "status",
     "tool_info",
     "tools",
     "version",
@@ -120,11 +120,11 @@ def get_ot_pack_functions() -> dict[str, Any]:
         "skills": skills,
         "config": config,
         "debug": debug,
-        "health": health,
         "help": help,
         "result": result,
         "security": security,
         "stats": stats,
+        "status": status,
         "reload": reload,
         "version": version,
     }

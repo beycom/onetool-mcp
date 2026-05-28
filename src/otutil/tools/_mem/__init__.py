@@ -23,7 +23,7 @@ __all__ = [
     "count",
     "decay",
     "delete",
-    "export",
+    "dump",
     "flush",
     "grep",
     "inspect",
@@ -38,7 +38,7 @@ __all__ = [
     "search",
     "slice",
     "slice_batch",
-    "snap",
+    "snapshot",
     "stale",
     "stats",
     "toc",
@@ -62,7 +62,7 @@ from .config import VALID_CATEGORIES, Config
 from .db import _close_connection, _get_connection  # noqa: F401
 from .formatting import stale
 from .inspect import inspect
-from .io import export, load
+from .io import dump, load
 from .lifecycle import decay, flush, reindex, stats
 from .listing import count, list
 from .maintenance import context, update_batch
@@ -72,5 +72,5 @@ from .read import read, read_batch
 from .refresh import refresh
 from .search import grep, search
 from .slicing import slice, slice_batch, toc
-from .snapshots import restore, snap
+from .snapshots import restore, snapshot
 from .write import write, write_batch

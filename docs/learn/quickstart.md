@@ -101,10 +101,10 @@ Start Claude Code and run `/mcp`. You should see OneTool listed as a connected M
 
 ## 8. Use It
 
-Try a simple health check:
+Try a simple status check:
 
 ```
->>> ot.health()
+__run ot.status()
 ```
 
 Or use a prompt like this to ask the agent to help you use OneTool. Note: the `ubad=` parameter is intentional to demonstrate how OneTool handles errors.
@@ -117,12 +117,12 @@ Use OneTool ot.help() with info="full" to understand how best to use OneTool too
 Finally, list all OneTool commands used.
 
 Commands:
->>> ot.health()
->>> ot.help()
->>> ot.help(q="webfetch.fetch", i="full")
->>> webfetch.fetch(ubad="https://onetool.beycom.online/")
->>> webfetch.fetch(u="https://onetool.beycom.online/")
->>> $pkg_npm packages=react,typescript
+__run ot.status()
+__run ot.help()
+__run ot.help(q="webfetch.fetch", i="full")
+__run webfetch.fetch(ubad="https://onetool.beycom.online/")
+__run webfetch.fetch(u="https://onetool.beycom.online/")
+__run :pkg_npm packages=react,typescript
 
 ```
 

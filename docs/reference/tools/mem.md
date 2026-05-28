@@ -12,8 +12,8 @@ Persistent memory for AI agents with SQLite storage and optional semantic search
 - Chunk-and-average embeddings for large content (full document semantics preserved)
 - In-memory read cache with TTL and LRU eviction (auto-invalidated on writes)
 - Importance decay based on age and access patterns
-- YAML export/import
-- File-based snap/restore with lossless round-trip
+- YAML dump/load
+- File-based snapshot/restore with lossless round-trip
 - Section navigation: table of contents, section slicing, and staleness detection
 - Extensible `meta` column for key-value metadata per memory
 
@@ -43,10 +43,10 @@ Persistent memory for AI agents with SQLite storage and optional semantic search
 | `mem.stats()` | Show statistics |
 | `mem.reindex(...)` | Reindex all un-embedded memories |
 | `mem.flush()` | Wait for background embeddings to complete |
-| `mem.export(topic, output)` | Export to YAML |
-| `mem.load(file)` | Import YAML exported by `mem.export()` |
-| `mem.snap(output, topic, ext, on_conflict)` | Snapshot memories to directory with index.yaml |
-| `mem.restore(input, topic, overwrite)` | Restore memories from snap directory |
+| `mem.dump(topic, output)` | Dump to YAML |
+| `mem.load(file)` | Import YAML dumped by `mem.dump()` |
+| `mem.snapshot(output, topic, ext, on_conflict)` | Snapshot memories to directory with index.yaml |
+| `mem.restore(input, topic, overwrite)` | Restore memories from snapshot directory |
 | `mem.stale(topic)` | Check which file-backed memories are outdated |
 | `mem.refresh(topic, dry_run)` | Re-read source files for stale memories |
 | `mem.slice_batch(items)` | Extract sections from multiple memories in one call |
@@ -159,7 +159,7 @@ Returns a numbered section index with line ranges. Warns if the source file has 
 | `topic` | str | Optional topic prefix scope |
 | `dry_run` | bool | Preview only (default: True) |
 
-### `mem.snap()`
+### `mem.snapshot()`
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -180,7 +180,7 @@ Returns a numbered section index with line ranges. Warns if the source file has 
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `file` | str | YAML file produced by `mem.export(output=...)` |
+| `file` | str | YAML file produced by `mem.dump(output=...)` |
 
 ### `mem.stale()`
 
@@ -316,16 +316,16 @@ mem.read_batch(ids=["abc-123", "def-456"], meta=True)
 # Load context for session
 mem.context(topic="projects/onetool/", limit=10)
 
-# Export backup
-mem.export(output="memories.yaml")
+# Dump backup
+mem.dump(output="memories.yaml")
 
-# Load exported backup
+# Load dumped backup
 mem.load(file="memories.yaml")
 
 # Snapshot to directory (one file per memory + index.yaml)
-mem.snap(output="backup/consult", topic="consult/")
+mem.snapshot(output="backup/consult", topic="consult/")
 
-# Restore from snap
+# Restore from snapshot
 mem.restore(input="backup/consult", topic="consult")
 
 # Batch update

@@ -1898,6 +1898,7 @@ def _make_fake_playwright_modules() -> dict[str, MagicMock]:
     fake_sync_api.sync_playwright = fake_sync_playwright
     fake_playwright = MagicMock()
     fake_playwright.sync_api = fake_sync_api
+    fake_playwright._test_browser = fake_browser
     return {
         "playwright": fake_playwright,
         "playwright.sync_api": fake_sync_api,
@@ -2101,6 +2102,21 @@ class TestScrapeProjectCLI:
             result = self._invoke(["scrape", "myproject"])
         assert result.exit_code != 0
         assert "playwright install chromium" in result.output
+
+    def test_playwright_probe_closes_browser_when_scrape_fails(self):
+        import sys
+        cfg = self._make_cfg(sources={"src-a": self._make_cfg().kb["myproject"].scrape.sources["src-a"]})
+        fake_modules = _make_fake_playwright_modules()
+        fake_browser = fake_modules["playwright"]._test_browser
+        with (
+            patch("otutil.tools._knowledge.config._get_config", return_value=cfg),
+            patch("otutil.tools._knowledge.scraper.run_scrape", side_effect=RuntimeError("crawl failed")),
+            patch.dict(sys.modules, fake_modules),
+        ):
+            result = self._invoke(["scrape", "myproject", "--only", "src-a"])
+
+        assert result.exit_code != 0
+        fake_browser.close.assert_called_once()
 
 
 @pytest.mark.unit
@@ -2390,6 +2406,201 @@ class TestDebugFlag:
         from otutil.tools._knowledge.scraper import run_scrape
         assert "debug" in inspect.signature(run_scrape).parameters
         assert inspect.signature(run_scrape).parameters["debug"].default is False
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestScrapeAsyncBridge:
+    async def test_run_scrape_completes_inside_running_loop(self, tmp_path: Path):
+        from otutil.tools._knowledge.scraper import ScrapeResult, run_scrape
+
+        async def fake_run(**_kwargs: Any) -> ScrapeResult:
+            return ScrapeResult(written=1, source_name="docs")
+
+        with patch("otutil.tools._knowledge.scraper._run_scrape_async", side_effect=fake_run):
+            result = run_scrape(
+                url="https://docs.example.test/",
+                output_dir=tmp_path,
+                source_name="docs",
+            )
+
+        assert result.written == 1
+
+    async def test_run_scrape_propagates_async_exception(self, tmp_path: Path):
+        from otutil.tools._knowledge.scraper import run_scrape
+
+        async def fake_run(**_kwargs: Any) -> None:
+            raise RuntimeError("scrape failed")
+
+        with (
+            patch("otutil.tools._knowledge.scraper._run_scrape_async", side_effect=fake_run),
+            pytest.raises(RuntimeError, match="scrape failed"),
+        ):
+            run_scrape(
+                url="https://docs.example.test/",
+                output_dir=tmp_path,
+                source_name="docs",
+            )
+
+
+def _make_fake_crawl4ai_modules(*, deep: bool = False) -> tuple[dict[str, Any], MagicMock]:
+    """Create fake crawl4ai modules with observable crawler cleanup."""
+    import types
+
+    crawler_instance = MagicMock()
+    crawler_instance.__aenter__ = MagicMock(return_value=crawler_instance)
+    crawler_instance.__aexit__ = MagicMock(return_value=False)
+
+    page = MagicMock()
+    page.success = True
+    page.url = "https://docs.example.test/page"
+    page.metadata = {}
+    page.markdown = MagicMock(fit_markdown="content", raw_markdown="content")
+
+    if deep:
+        async def _page_iter() -> Any:
+            yield page
+
+        async def arun(*_args: Any, **_kwargs: Any) -> Any:
+            return _page_iter()
+    else:
+        async def arun(*_args: Any, **_kwargs: Any) -> list[Any]:
+            return [page]
+
+    crawler_instance.arun = MagicMock(side_effect=arun)
+
+    class FakeAsyncWebCrawler:
+        def __init__(self, **_kwargs: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> Any:
+            return crawler_instance
+
+        async def __aexit__(self, *args: Any) -> bool:
+            return bool(crawler_instance.__aexit__(*args))
+
+    class FakeConfig:
+        def __init__(self, **kwargs: Any) -> None:
+            self.kwargs = kwargs
+
+    class FakeCacheMode:
+        ENABLED = "enabled"
+        DISABLED = "disabled"
+
+    crawl4ai = types.ModuleType("crawl4ai")
+    crawl4ai.AsyncWebCrawler = FakeAsyncWebCrawler
+    crawl4ai.BrowserConfig = FakeConfig
+    crawl4ai.CacheMode = FakeCacheMode
+    crawl4ai.CrawlerRunConfig = FakeConfig
+
+    modules: dict[str, Any] = {
+        "crawl4ai": crawl4ai,
+        "crawl4ai.content_filter_strategy": types.SimpleNamespace(PruningContentFilter=FakeConfig),
+        "crawl4ai.markdown_generation_strategy": types.SimpleNamespace(DefaultMarkdownGenerator=FakeConfig),
+    }
+    if deep:
+        modules.update({
+            "crawl4ai.deep_crawling": types.SimpleNamespace(
+                BFSDeepCrawlStrategy=FakeConfig,
+                DFSDeepCrawlStrategy=FakeConfig,
+            ),
+            "crawl4ai.deep_crawling.filters": types.SimpleNamespace(
+                DomainFilter=FakeConfig,
+                FilterChain=lambda filters: filters,
+                URLPatternFilter=FakeConfig,
+            ),
+        })
+    return modules, crawler_instance
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestScraperContextManagerCleanup:
+    async def test_seed_url_scrape_closes_crawler_when_write_fails(self, tmp_path: Path):
+        import sys
+        from otutil.tools._knowledge.scraper import _run_scrape_async
+
+        fake_modules, crawler = _make_fake_crawl4ai_modules()
+        with (
+            patch.dict(sys.modules, fake_modules),
+            patch("otutil.tools._knowledge.scraper._write_page", side_effect=RuntimeError("write failed")),
+            pytest.raises(RuntimeError, match="write failed"),
+        ):
+            await _run_scrape_async(
+                url="https://docs.example.test/",
+                output_dir=tmp_path,
+                source_name="docs",
+                depth=1,
+                max_pages=1,
+                url_prefix="",
+                check_robots_txt=True,
+                delay_min=0,
+                delay_max=0,
+                user_agent="",
+                wait_for="",
+                page_timeout=30000,
+                cache=False,
+                process_iframes=False,
+                content_filter_threshold=0.48,
+                min_word_threshold=50,
+                crawl_strategy="seed_urls",
+                seed_urls=["https://docs.example.test/page"],
+                score={},
+                css_selector="",
+                js_code="",
+                include_images=False,
+                resume=False,
+                flat_files=False,
+                on_page=None,
+                category=None,
+                tags=[],
+                debug=False,
+            )
+
+        crawler.__aexit__.assert_called_once()
+
+    async def test_deep_scrape_closes_crawler_when_write_fails(self, tmp_path: Path):
+        import sys
+        from otutil.tools._knowledge.scraper import _run_scrape_async
+
+        fake_modules, crawler = _make_fake_crawl4ai_modules(deep=True)
+        with (
+            patch.dict(sys.modules, fake_modules),
+            patch("otutil.tools._knowledge.scraper._write_page", side_effect=RuntimeError("write failed")),
+            pytest.raises(RuntimeError, match="write failed"),
+        ):
+            await _run_scrape_async(
+                url="https://docs.example.test/",
+                output_dir=tmp_path,
+                source_name="docs",
+                depth=1,
+                max_pages=1,
+                url_prefix="",
+                check_robots_txt=True,
+                delay_min=0,
+                delay_max=0,
+                user_agent="",
+                wait_for="",
+                page_timeout=30000,
+                cache=False,
+                process_iframes=False,
+                content_filter_threshold=0.48,
+                min_word_threshold=50,
+                crawl_strategy="bfs",
+                seed_urls=[],
+                score={},
+                css_selector="",
+                js_code="",
+                include_images=False,
+                resume=False,
+                flat_files=False,
+                on_page=None,
+                category=None,
+                tags=[],
+                debug=False,
+            )
+
+        crawler.__aexit__.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -2866,23 +3077,23 @@ class TestCanonicalize:
 @pytest.mark.unit
 @pytest.mark.tools
 class TestKBProjectConfig:
-    """Config unit tests: KBProjectConfig round-trip, legacy key errors."""
+    """Config unit tests: KBProjectConfig round-trip and schema validation."""
 
     def test_kb_project_config_round_trip(self):
         from otutil.tools._knowledge.config import Config, KBProjectConfig, DBConfig
         cfg = Config(kb={"docs": KBProjectConfig(db=DBConfig(path="mem/docs.db"))})
         assert cfg.kb["docs"].db.path == "mem/docs.db"
 
-    def test_legacy_databases_key_raises(self):
+    def test_unknown_databases_key_raises_schema_error(self):
         from pydantic import ValidationError
         from otutil.tools._knowledge.config import Config, DBConfig
-        with pytest.raises(ValidationError, match="databases"):
+        with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
             Config(databases={"docs": DBConfig(path="mem/docs.db")})
 
-    def test_legacy_scrape_key_raises(self):
+    def test_unknown_scrape_key_raises_schema_error(self):
         from pydantic import ValidationError
         from otutil.tools._knowledge.config import Config, ScrapeProjectConfig, ScrapeSourceConfig
-        with pytest.raises(ValidationError, match="scrape"):
+        with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
             Config(scrape={"docs": ScrapeProjectConfig(
                 output_base_dir="/tmp",
                 sources={"s": ScrapeSourceConfig(url="https://docs.example.test/")},

@@ -25,10 +25,15 @@ def _get_config() -> Config:
 Users set values in `onetool.yaml`:
 
 ```yaml
-mytool:
-  timeout: 30.0
-  max_results: 50
+tools:
+  mytool:
+    timeout: 30.0
+    max_results: 50
 ```
+
+Keep pack defaults in the tool's Pydantic `Config` class. Shared LLM defaults live in the top-level `llm:` config model and package template. Do not add commented per-pack examples to the root `onetool.yaml` template.
+
+Unknown fields in a typed `tools.<pack>` config raise configuration errors, unless that config schema explicitly allows extra fields. Recognised fields with invalid values also raise configuration errors instead of silently falling back to defaults. Remove or rename invalid fields instead of accepting legacy aliases.
 
 ## Accessing Secrets
 

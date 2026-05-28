@@ -1,222 +1,67 @@
-"""Unit tests for OneTool trigger prefixes and invocation styles.
-
-Tests the fence processor without LLM involvement:
-- All 7 trigger prefixes (>>>, __run, __ot, __ot__run, __onetool, __onetool__run, mcp__onetool__run)
-- Invocation styles (simple call, inline backticks, code fence)
-- Whitespace and CRLF robustness
-
-Migrated from demo/bench/features.yaml prefix/style tests to provide:
-- Faster feedback (seconds vs minutes)
-- Deterministic results (no LLM variance)
-- No API costs
-"""
+"""Unit tests for OneTool trigger prefixes and invocation styles."""
 
 from __future__ import annotations
 
 import pytest
 
-# =============================================================================
-# TRIGGER PREFIXES - All 5 prefix forms
-# =============================================================================
-
 
 @pytest.mark.unit
 @pytest.mark.core
 class TestPrefixStripping:
-    """Test stripping of all 5 trigger prefixes."""
+    """Test supported explicit invocation prefixes."""
 
-    def test_ot_prefix(self) -> None:
-        """__ot prefix is stripped."""
+    @pytest.mark.parametrize("prefix", ["__run", "__r", "__ot"])
+    def test_supported_prefixes_are_stripped(self, prefix: str) -> None:
+        """Supported prefixes are stripped before execution."""
         from ot.executor.fence_processor import strip_fences
 
-        # Simple call
-        stripped, changed = strip_fences("__ot demo.foo()")
+        stripped, changed = strip_fences(f"{prefix} demo.foo()")
+
         assert stripped == "demo.foo()"
         assert changed is True
 
-        # With backticks
-        stripped, changed = strip_fences("__ot `demo.foo()`")
-        assert stripped == "demo.foo()"
-        assert changed is True
-
-    def test_ot_run_prefix(self) -> None:
-        """__ot__run prefix is stripped."""
+    @pytest.mark.parametrize(
+        "prefix",
+        [">>>", "__ot__run", "__onetool", "__onetool__run", "mcp__onetool__run"],
+    )
+    def test_removed_prefixes_are_not_stripped(self, prefix: str) -> None:
+        """Removed prefixes are not accepted as runtime trigger syntax."""
         from ot.executor.fence_processor import strip_fences
 
-        # Simple call
-        stripped, changed = strip_fences("__ot__run demo.foo()")
-        assert stripped == "demo.foo()"
-        assert changed is True
+        stripped, changed = strip_fences(f"{prefix} demo.foo()")
 
-        # With backticks
-        stripped, changed = strip_fences("__ot__run `demo.foo()`")
-        assert stripped == "demo.foo()"
-        assert changed is True
-
-    def test_onetool_prefix(self) -> None:
-        """__onetool prefix is stripped."""
-        from ot.executor.fence_processor import strip_fences
-
-        # Simple call
-        stripped, changed = strip_fences("__onetool demo.foo()")
-        assert stripped == "demo.foo()"
-        assert changed is True
-
-        # With backticks
-        stripped, changed = strip_fences("__onetool `demo.foo()`")
-        assert stripped == "demo.foo()"
-        assert changed is True
-
-    def test_onetool_run_prefix(self) -> None:
-        """__onetool__run prefix (full explicit) is stripped."""
-        from ot.executor.fence_processor import strip_fences
-
-        # Simple call
-        stripped, changed = strip_fences("__onetool__run demo.foo()")
-        assert stripped == "demo.foo()"
-        assert changed is True
-
-        # With backticks
-        stripped, changed = strip_fences("__onetool__run `demo.foo()`")
-        assert stripped == "demo.foo()"
-        assert changed is True
-
-    def test_mcp_onetool_run_prefix(self) -> None:
-        """mcp__onetool__run prefix (explicit MCP) is stripped."""
-        from ot.executor.fence_processor import strip_fences
-
-        # Simple call
-        stripped, changed = strip_fences("mcp__onetool__run demo.foo()")
-        assert stripped == "demo.foo()"
-        assert changed is True
-
-        # With backticks
-        stripped, changed = strip_fences("mcp__onetool__run `demo.foo()`")
-        assert stripped == "demo.foo()"
-        assert changed is True
-
-    def test_invalid_prefix_not_stripped(self) -> None:
-        """mcp__ot__run is NOT a valid prefix and should not be stripped."""
-        from ot.executor.fence_processor import strip_fences
-
-        # This is intentionally invalid - mcp__ot__run is not supported
-        stripped, changed = strip_fences("mcp__ot__run demo.foo()")
-        # The prefix should NOT be stripped since it's invalid
-        assert "mcp__ot__run" in stripped
+        assert stripped == f"{prefix} demo.foo()"
         assert changed is False
-
-
-# =============================================================================
-# INVOCATION STYLES - Simple, Backticks, Code Fence
-# =============================================================================
 
 
 @pytest.mark.unit
 @pytest.mark.core
 class TestInvocationStyles:
-    """Test all 3 invocation styles for command execution."""
-
-    def test_simple_call_style(self) -> None:
-        """Simple direct call after prefix."""
-        from ot.executor.fence_processor import strip_fences
-
-        # Direct function call
-        stripped, changed = strip_fences("__ot demo.foo(text='hello')")
-        assert stripped == "demo.foo(text='hello')"
-        assert changed is True
-
-        # With method chaining
-        stripped, changed = strip_fences("__ot demo.foo()[::-1].upper()")
-        assert stripped == "demo.foo()[::-1].upper()"
-        assert changed is True
+    """Test code wrappers still strip after a supported prefix."""
 
     def test_inline_backticks_style(self) -> None:
-        """Code wrapped in inline backticks."""
+        """Code wrapped in inline backticks is stripped."""
         from ot.executor.fence_processor import strip_fences
 
-        # Single backticks
-        stripped, changed = strip_fences("__ot `demo.foo()`")
+        stripped, changed = strip_fences("__run `demo.foo()`")
+
         assert stripped == "demo.foo()"
         assert changed is True
 
-        # Complex expression
-        stripped, changed = strip_fences("__ot `demo.foo()[::-1].upper()`")
-        assert stripped == "demo.foo()[::-1].upper()"
-        assert changed is True
-
     def test_code_fence_style(self) -> None:
-        """Multi-line code in fenced block."""
+        """Multi-line code in fenced block is stripped."""
         from ot.executor.fence_processor import strip_fences
 
-        # Code fence with python language
-        code = """__ot
+        code = """__run
 ```python
 msg = "hello"
 demo.foo(text=msg)
 ```"""
         stripped, changed = strip_fences(code)
+
         assert 'msg = "hello"' in stripped
         assert "demo.foo(text=msg)" in stripped
         assert changed is True
-
-        # Code fence without language specifier
-        code = """__ot
-```
-demo.foo()
-```"""
-        stripped, changed = strip_fences(code)
-        assert stripped == "demo.foo()"
-        assert changed is True
-
-    def test_double_backticks_style(self) -> None:
-        """Double backticks for escaping."""
-        from ot.executor.fence_processor import strip_fences
-
-        # Double backtick wrapper `` `code` `` - strips outer delimiters
-        stripped, changed = strip_fences("`` `demo.foo()` ``")
-        # The outer "`` `" and "` ``" are stripped, leaving inner content
-        assert stripped == "demo.foo()"
-        assert changed is True
-
-        # Plain double backticks strip to inner content
-        stripped, changed = strip_fences("``demo.foo()``")
-        assert stripped == "demo.foo()"
-        assert changed is True
-
-
-# =============================================================================
-# COMBINED PREFIX + STYLE TESTS
-# =============================================================================
-
-
-@pytest.mark.unit
-@pytest.mark.core
-class TestCombinedPrefixStyle:
-    """Test combinations of prefixes and styles."""
-
-    def test_all_prefixes_with_fence(self) -> None:
-        """All prefixes work with code fence style."""
-        from ot.executor.fence_processor import strip_fences
-
-        prefixes = [
-            "__ot",
-            "__ot__run",
-            "__onetool",
-            "__onetool__run",
-            "mcp__onetool__run",
-        ]
-
-        for prefix in prefixes:
-            code = f"""{prefix}
-```python
-x = 1 + 1
-x
-```"""
-            stripped, changed = strip_fences(code)
-            assert "x = 1 + 1" in stripped
-            assert "x" in stripped
-            assert prefix not in stripped
-            assert changed is True
 
     def test_no_prefix_still_strips_fence(self) -> None:
         """Code fence without prefix still gets fence stripped."""
@@ -226,124 +71,15 @@ x
 demo.foo()
 ```"""
         stripped, changed = strip_fences(code)
+
         assert stripped == "demo.foo()"
         assert changed is True
 
-    def test_whitespace_handling(self) -> None:
-        """Whitespace is handled correctly."""
+    def test_double_backticks_style(self) -> None:
+        """Double backticks strip to inner content."""
         from ot.executor.fence_processor import strip_fences
 
-        # Extra whitespace between prefix and code
-        stripped, changed = strip_fences("__ot    demo.foo()")
+        stripped, changed = strip_fences("``demo.foo()``")
+
         assert stripped == "demo.foo()"
-        assert changed is True
-
-        # Leading/trailing whitespace
-        stripped, changed = strip_fences("  __ot demo.foo()  ")
-        assert stripped == "demo.foo()"
-        assert changed is True
-
-
-# =============================================================================
-# NEW TRIGGERS: >>> and __run
-# =============================================================================
-
-
-@pytest.mark.unit
-@pytest.mark.core
-class TestNewTriggers:
-    """Test the new >>> and __run trigger prefixes."""
-
-    def test_arrow_prefix_with_space(self) -> None:
-        """>>> with space is stripped."""
-        from ot.executor.fence_processor import strip_fences
-
-        stripped, changed = strip_fences(">>> brave.search(q='x')")
-        assert stripped == "brave.search(q='x')"
-        assert changed is True
-
-    def test_arrow_prefix_no_space(self) -> None:
-        """>>> without space is stripped."""
-        from ot.executor.fence_processor import strip_fences
-
-        stripped, changed = strip_fences(">>>brave.search(q='x')")
-        assert stripped == "brave.search(q='x')"
-        assert changed is True
-
-    def test_run_prefix(self) -> None:
-        """__run prefix is stripped."""
-        from ot.executor.fence_processor import strip_fences
-
-        stripped, changed = strip_fences("__run brave.search(q='x')")
-        assert stripped == "brave.search(q='x')"
-        assert changed is True
-
-
-# =============================================================================
-# WHITESPACE ROBUSTNESS
-# =============================================================================
-
-
-@pytest.mark.unit
-@pytest.mark.core
-class TestWhitespaceRobustness:
-    """Test that whitespace and line-ending variations are handled."""
-
-    def test_arrow_with_newline(self) -> None:
-        """>>> followed by newline before content."""
-        from ot.executor.fence_processor import strip_fences
-
-        stripped, changed = strip_fences(">>>\nbrave.search(q='x')")
-        assert stripped == "brave.search(q='x')"
-        assert changed is True
-
-    def test_arrow_with_crlf(self) -> None:
-        """>>> followed by CRLF before content."""
-        from ot.executor.fence_processor import strip_fences
-
-        stripped, changed = strip_fences(">>>\r\nbrave.search(q='x')")
-        assert stripped == "brave.search(q='x')"
-        assert changed is True
-
-    def test_arrow_with_multiple_blank_lines(self) -> None:
-        """>>> followed by multiple blank lines before content."""
-        from ot.executor.fence_processor import strip_fences
-
-        stripped, changed = strip_fences(">>>\n\n\nbrave.search(q='x')")
-        assert stripped == "brave.search(q='x')"
-        assert changed is True
-
-    def test_run_with_newline(self) -> None:
-        """__run followed by newline before content."""
-        from ot.executor.fence_processor import strip_fences
-
-        stripped, changed = strip_fences("__run\nbrave.search(q='x')")
-        assert stripped == "brave.search(q='x')"
-        assert changed is True
-
-    def test_arrow_with_fence_after_newline(self) -> None:
-        """>>> then newline then fenced block."""
-        from ot.executor.fence_processor import strip_fences
-
-        code = ">>>\n```python\nbrave.search(q='x')\n```"
-        stripped, changed = strip_fences(code)
-        assert stripped == "brave.search(q='x')"
-        assert changed is True
-
-    def test_arrow_with_fence_after_crlf(self) -> None:
-        """>>> then CRLF then fenced block."""
-        from ot.executor.fence_processor import strip_fences
-
-        code = ">>>\r\n```python\nbrave.search(q='x')\n```"
-        stripped, changed = strip_fences(code)
-        assert stripped == "brave.search(q='x')"
-        assert changed is True
-
-    def test_arrow_with_fence_after_multiple_blank_lines(self) -> None:
-        """>>> then multiple blank lines then fenced block."""
-        from ot.executor.fence_processor import strip_fences
-
-        code = ">>>\n\n```python\nbrave.search(q='x')\n```"
-        stripped, changed = strip_fences(code)
-        assert stripped == "brave.search(q='x')"
         assert changed is True

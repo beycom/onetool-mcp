@@ -30,8 +30,8 @@ Short alias: `br`
 | `freshness` | str | "pd" (day), "pw" (week), "pm" (month), "py" (year), or "YYYY-MM-DDtoYYYY-MM-DD" date range |
 | `safesearch` | str | "off", "moderate", "strict" |
 | `output_format` | str | "full" (default), "text_only", or "sources_only" |
-| `retries` | int | Batch mode only. Retry count for transient failures (default: 0) |
-| `retry_delay_ms` | int | Batch mode only. Base backoff delay in milliseconds (default: 250) |
+| `retries` | int | Batch mode only. Retry count for transient failures (non-negative, default: 0) |
+| `retry_delay_ms` | int | Batch mode only. Base backoff delay in milliseconds (0-10000, default: 250) |
 
 ## Requires
 
@@ -47,12 +47,12 @@ Short alias: `br`
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `tools.brave.timeout` | float | `60.0` | Request timeout in seconds. Range: `1.0-300.0`. |
+| `tools.brave.timeout` | float | `180.0` | Request timeout in seconds. Range: `1.0-300.0`. |
 
 ```yaml
 tools:
   brave:
-    timeout: 60.0
+    timeout: 180.0
 ```
 
 ### Defaults

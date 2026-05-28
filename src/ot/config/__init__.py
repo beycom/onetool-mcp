@@ -7,7 +7,7 @@ Key changes from V1:
 - Global-only configuration (no project configs or inheritance)
 - Root-level env: section for subprocess environment variables
 - Runtime variable expansion (happens in get_tool_config(), not load_config())
-- Defaults embedded in Pydantic models (no template files)
+- Scalar defaults embedded in Pydantic models; larger prompts/templates live in package files
 - Depth-limited includes (no circular detection)
 
 Usage:
@@ -28,7 +28,7 @@ Usage:
     # For variable expansion (secrets.yaml → env: section):
     from ot.config import expand_vars
 
-    api_url = expand_vars("https://api.example.com?key=${API_KEY}")
+    api_url = expand_vars("https://api.service.test?key=${API_KEY}")
 """
 
 from ot.config.loader import (

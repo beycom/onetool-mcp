@@ -215,9 +215,9 @@ def cmd_scrape(
             sync_playwright,  # type: ignore[import-not-found]
         )
         with sync_playwright() as pw:
+            browser = None
             try:
                 browser = pw.chromium.launch(headless=True)
-                browser.close()
             except Exception as exc:
                 if "executable doesn't exist" in str(exc) or "not found" in str(exc).lower():
                     console.print(
@@ -225,6 +225,9 @@ def cmd_scrape(
                     )
                     raise typer.Exit(1) from exc
                 raise
+            finally:
+                if browser is not None:
+                    browser.close()
     except ImportError as exc:
         console.print(
             "[red]Playwright is required. Install with:[/red] pip install 'onetool\\[scrape]'"

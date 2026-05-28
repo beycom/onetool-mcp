@@ -1220,12 +1220,12 @@ class TestStats:
 
 @pytest.mark.unit
 @pytest.mark.tools
-class TestExport:
-    """Test mem.export() YAML output."""
+class TestDump:
+    """Test mem.dump() YAML output."""
 
     @patch("otutil.tools._mem.io._get_connection")
-    def test_export_yaml(self, mock_conn):
-        from otutil.tools.mem import export
+    def test_dump_yaml(self, mock_conn):
+        from otutil.tools.mem import dump
 
         conn = MagicMock()
         mock_conn.return_value = conn
@@ -1233,7 +1233,7 @@ class TestExport:
             ("id-1", "topic/one", "content one", "note", '["tag1"]', 5, 2, datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
         ]
 
-        result = export()
+        result = dump()
 
         assert "memories:" in result
         assert "topic/one" in result
@@ -1241,8 +1241,8 @@ class TestExport:
 
     @pytest.mark.usefixtures("_mock_cwd")
     @patch("otutil.tools._mem.io._get_connection")
-    def test_export_to_file(self, mock_conn, tmp_path):
-        from otutil.tools.mem import export
+    def test_dump_to_file(self, mock_conn, tmp_path):
+        from otutil.tools.mem import dump
 
         conn = MagicMock()
         mock_conn.return_value = conn
@@ -1251,22 +1251,22 @@ class TestExport:
         ]
 
         out_file = tmp_path / "export.yaml"
-        result = export(output=str(out_file))
+        result = dump(output=str(out_file))
 
-        assert "Exported 1 memories" in result
+        assert "Dumped 1 memories" in result
         assert out_file.exists()
 
     @patch("otutil.tools._mem.io._get_connection")
-    def test_empty_export(self, mock_conn):
-        from otutil.tools.mem import export
+    def test_empty_dump(self, mock_conn):
+        from otutil.tools.mem import dump
 
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = []
 
-        result = export()
+        result = dump()
 
-        assert "No memories to export" in result
+        assert "No memories to dump" in result
 
 
 @pytest.mark.unit
@@ -1310,8 +1310,8 @@ class TestLoad:
 
 @pytest.mark.unit
 @pytest.mark.tools
-class TestLoadExport:
-    """Test mem.load() export surface."""
+class TestLoadDump:
+    """Test mem.load() dump surface."""
 
     def test_load_is_exported(self) -> None:
         from otutil.tools import mem
@@ -1387,13 +1387,13 @@ class TestLoadExport:
 
 @pytest.mark.unit
 @pytest.mark.tools
-class TestSnap:
-    """Test mem.snap() file-based export."""
+class TestSnapshot:
+    """Test mem.snapshot() file-based snapshot."""
 
     @pytest.mark.usefixtures("_mock_cwd")
     @patch("otutil.tools._mem.snapshots._get_connection")
     def test_snapshot_creates_files_and_index(self, mock_conn, tmp_path):
-        from otutil.tools.mem import snap
+        from otutil.tools.mem import snapshot
 
         conn = MagicMock()
         mock_conn.return_value = conn
@@ -1403,9 +1403,9 @@ class TestSnap:
         ]
 
         out_dir = tmp_path / "backup"
-        result = snap(output=str(out_dir))
+        result = snapshot(output=str(out_dir))
 
-        assert "Snap 1 memories" in result
+        assert "Snapshot 1 memories" in result
         assert (out_dir / "docs/readme").exists()
         assert (out_dir / "docs/readme").read_text() == "# README content"
         assert (out_dir / "index.yaml").exists()
@@ -1415,7 +1415,7 @@ class TestSnap:
     @pytest.mark.usefixtures("_mock_cwd")
     @patch("otutil.tools._mem.snapshots._get_connection")
     def test_snapshot_with_topic_filter(self, mock_conn, tmp_path):
-        from otutil.tools.mem import snap
+        from otutil.tools.mem import snapshot
 
         conn = MagicMock()
         mock_conn.return_value = conn
@@ -1427,9 +1427,9 @@ class TestSnap:
         ]
 
         out_dir = tmp_path / "snap"
-        result = snap(output=str(out_dir), topic="consult/")
+        result = snapshot(output=str(out_dir), topic="consult/")
 
-        assert "Snap 2 memories" in result
+        assert "Snapshot 2 memories" in result
         # Topic prefix stripped: "consult/ask" -> "ask"
         assert (out_dir / "ask").exists()
         assert (out_dir / "mem-tool").exists()
@@ -1437,7 +1437,7 @@ class TestSnap:
     @pytest.mark.usefixtures("_mock_cwd")
     @patch("otutil.tools._mem.snapshots._get_connection")
     def test_snapshot_skip_existing(self, mock_conn, tmp_path):
-        from otutil.tools.mem import snap
+        from otutil.tools.mem import snapshot
 
         conn = MagicMock()
         mock_conn.return_value = conn
@@ -1451,7 +1451,7 @@ class TestSnap:
         (out_dir / "notes").mkdir()
         (out_dir / "notes/a").write_text("existing")
 
-        result = snap(output=str(out_dir), on_conflict="skip")
+        result = snapshot(output=str(out_dir), on_conflict="skip")
 
         assert "1 skipped" in result
         assert (out_dir / "notes/a").read_text() == "existing"
@@ -1459,7 +1459,7 @@ class TestSnap:
     @pytest.mark.usefixtures("_mock_cwd")
     @patch("otutil.tools._mem.snapshots._get_connection")
     def test_snapshot_overwrite_existing(self, mock_conn, tmp_path):
-        from otutil.tools.mem import snap
+        from otutil.tools.mem import snapshot
 
         conn = MagicMock()
         mock_conn.return_value = conn
@@ -1473,7 +1473,7 @@ class TestSnap:
         (out_dir / "notes").mkdir()
         (out_dir / "notes/a").write_text("old content")
 
-        result = snap(output=str(out_dir), on_conflict="overwrite")
+        result = snapshot(output=str(out_dir), on_conflict="overwrite")
 
         assert "1 written" in result
         assert (out_dir / "notes/a").read_text() == "new content"
@@ -1481,7 +1481,7 @@ class TestSnap:
     @pytest.mark.usefixtures("_mock_cwd")
     @patch("otutil.tools._mem.snapshots._get_connection")
     def test_snapshot_nested_topics(self, mock_conn, tmp_path):
-        from otutil.tools.mem import snap
+        from otutil.tools.mem import snapshot
 
         conn = MagicMock()
         mock_conn.return_value = conn
@@ -1491,9 +1491,9 @@ class TestSnap:
         ]
 
         out_dir = tmp_path / "snap"
-        result = snap(output=str(out_dir), topic="consult/")
+        result = snapshot(output=str(out_dir), topic="consult/")
 
-        assert "Snap 1 memories" in result
+        assert "Snapshot 1 memories" in result
         assert (out_dir / "sub/deep").exists()
         assert (out_dir / "sub/deep").read_text() == "deep content"
 
@@ -1502,7 +1502,7 @@ class TestSnap:
     def test_snapshot_meta_special_chars_round_trips(self, mock_conn, tmp_path):
         """meta with pipes, colons, and quotes must survive YAML round-trip."""
         import yaml
-        from otutil.tools.mem import snap
+        from otutil.tools.mem import snapshot
 
         conn = MagicMock()
         mock_conn.return_value = conn
@@ -1513,9 +1513,9 @@ class TestSnap:
         ]
 
         out_dir = tmp_path / "snap"
-        result = snap(output=str(out_dir))
+        result = snapshot(output=str(out_dir))
 
-        assert "Snap 1 memories" in result
+        assert "Snapshot 1 memories" in result
         # Verify index.yaml parses cleanly
         index_data = yaml.safe_load((out_dir / "index.yaml").read_text())
         assert index_data is not None
@@ -1895,8 +1895,8 @@ class TestFilePathSecurity:
         assert "not found" in result.lower() or "outside allowed" in result
 
     @patch("otutil.tools._mem.io._get_connection")
-    def test_export_rejects_path_outside_cwd(self, mock_conn):
-        from otutil.tools.mem import export
+    def test_dump_rejects_path_outside_cwd(self, mock_conn):
+        from otutil.tools.mem import dump
 
         conn = MagicMock()
         mock_conn.return_value = conn
@@ -1904,7 +1904,7 @@ class TestFilePathSecurity:
             ("id-1", "topic/one", "content", "note", '[]', 5, 0, datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
         ]
 
-        result = export(output="/tmp/evil_export.yaml")
+        result = dump(output="/tmp/evil_export.yaml")
 
         assert "Error" in result
         assert "outside allowed directories" in result
@@ -1982,7 +1982,7 @@ class TestWriteValidation:
 
 @pytest.mark.unit
 @pytest.mark.tools
-class TestExportYaml:
+class TestDumpYaml:
     """Test _export_yaml handles multi-line content."""
 
     def test_multiline_content_uses_block_scalar(self):

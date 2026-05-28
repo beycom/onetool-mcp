@@ -134,13 +134,13 @@ The system SHALL support a graceful cold start without requiring prior initialis
 
 **Reason**: Server `instructions:` fields are removed from `servers.yaml`. DevTools usage guidance moves to the `ot-chrome-devtools-mcp` skill, retrieved on-demand via `ot.skills(name="ot-chrome-devtools-mcp")`.
 
-**Migration**: Run `scaffold.skills(install="ot-chrome-devtools-mcp")` to install a stub, or call `>>> ot.skills(name="ot-chrome-devtools-mcp")` directly.
+**Migration**: Run `scaffold.skills(install="ot-chrome-devtools-mcp")` to install a stub, or call `__run ot.skills(name="ot-chrome-devtools-mcp")` directly.
 
 ### Removed: Playwright Server Instructions Field
 
 **Reason**: Server `instructions:` fields are removed from `servers.yaml`. Playwright usage guidance moves to the `ot-playwright-mcp` skill, retrieved on-demand via `ot.skills(name="ot-playwright-mcp")`.
 
-**Migration**: Run `scaffold.skills(install="ot-playwright-mcp")` to install a stub, or call `>>> ot.skills(name="ot-playwright-mcp")` directly.
+**Migration**: Run `scaffold.skills(install="ot-playwright-mcp")` to install a stub, or call `__run ot.skills(name="ot-playwright-mcp")` directly.
 
 ### Removed: Config Version Migration Detection
 
@@ -535,20 +535,25 @@ Tools SHALL declare their dependencies for verification by `onetool check`.
 - **WHEN** the tool is loaded
 - **THEN** missing `__onetool_requires__` SHALL be treated as no requirements
 
-### Removed: Configuration Validation (modified)
+### Removed: Tool Configuration Validation (modified)
 
-The system SHALL validate configuration on load using discovered tool schemas.
+The system SHALL preserve raw tool configuration on load and validate typed pack
+configuration when a tool accesses it through `get_tool_config(pack, Config)`.
+Unknown typed pack keys SHALL fail validation when `get_tool_config(pack, Config)`
+is called, unless that config schema explicitly allows extra fields. Recognised
+keys with invalid values SHALL also fail validation when
+`get_tool_config(pack, Config)` is called.
 
 #### Scenario: Tool timeout out of range
 - **GIVEN** config with `tools.brave.timeout: 500`
-- **WHEN** configuration loads
-- **THEN** it SHALL fail with validation error from BraveConfig schema
+- **WHEN** `get_tool_config("brave", Config)` is called
+- **THEN** it SHALL fail with validation error from the Brave Config schema
 - **AND** indicate max is 300.0
 
 #### Scenario: Tool limit out of range
 - **GIVEN** config with `tools.code.limit: 0`
-- **WHEN** configuration loads
-- **THEN** it SHALL fail with validation error from CodeConfig schema
+- **WHEN** `get_tool_config("code", Config)` is called
+- **THEN** it SHALL fail with validation error from the Code Config schema
 - **AND** indicate min is 1
 
 ### Removed: Tools Configuration Section
@@ -581,7 +586,7 @@ The system SHALL support tool-specific configuration via the `tools:` section, w
   ```
 - **WHEN** brave.* functions are called
 - **THEN** they SHALL use 120 second timeout
-- **DEFAULT** 60.0 seconds (from brave_search.py Config class)
+- **DEFAULT** 180.0 seconds (from brave_search.py Config class)
 - **RANGE** 1.0 - 300.0 seconds
 
 #### Scenario: Grounding search model configuration
@@ -590,10 +595,13 @@ The system SHALL support tool-specific configuration via the `tools:` section, w
   tools:
     ground:
       model: gemini-2.0-flash
+      timeout: 120.0
   ```
 - **WHEN** ground.search() is called
 - **THEN** it SHALL use the configured model
 - **DEFAULT** gemini-2.5-flash (from grounding_search.py Config class)
+- **AND** it SHALL use the configured timeout when no timeout argument is passed
+- **DEFAULT** 180.0 seconds (from grounding_search.py Config class)
 
 #### Scenario: Context7 configuration
 - **GIVEN** configuration with:
@@ -675,9 +683,21 @@ The system SHALL support tool-specific configuration via the `tools:` section, w
     brave:
       timeout: -5
   ```
-- **WHEN** configuration is loaded
+- **WHEN** `get_tool_config("brave", Config)` is called
 - **THEN** it SHALL fail with validation error from the tool's Config class
 - **AND** error message SHALL indicate the field and constraint
+
+#### Scenario: Unknown tool configuration value
+- **GIVEN** configuration with an unknown value:
+  ```yaml
+  tools:
+    brave:
+      timeout: 180.0
+      unknown_option: true
+  ```
+- **WHEN** `get_tool_config("brave", Config)` is called
+- **THEN** it SHALL fail with a configuration error
+- **AND** the error SHALL identify `tools.brave.unknown_option`
 
 ### Removed: Cross-Platform Install Hints
 
@@ -776,10 +796,10 @@ The system SHALL expand `${VAR}` patterns at runtime when values are used, not d
 - **AND** no expansion SHALL occur
 
 #### Scenario: Expansion at point of use
-- **GIVEN** tool config with `api_url: "https://api.example.com/${API_VERSION}"`
+- **GIVEN** tool config with `api_url: "https://api.service.test/${API_VERSION}"`
 - **AND** `API_VERSION: "v2"` in secrets.yaml
 - **WHEN** `get_tool_config("mytool")` is called
-- **THEN** returned config SHALL have `api_url: "https://api.example.com/v2"`
+- **THEN** returned config SHALL have `api_url: "https://api.service.test/v2"`
 
 #### Scenario: Default value syntax
 - **GIVEN** `${VAR:-default}` in a tool config value
@@ -1034,7 +1054,7 @@ Tools SHALL declare their configuration schema in the tool file itself using a P
   pack = "brave"
 
   class Config(BaseModel):
-      timeout: float = Field(default=60.0, ge=1.0, le=300.0)
+      timeout: float = Field(default=180.0, ge=1.0, le=300.0)
   ```
 - **WHEN** the tool is discovered by the registry
 - **THEN** the Config class SHALL be extracted via AST
@@ -1052,27 +1072,29 @@ Tools SHALL declare their configuration schema in the tool file itself using a P
 - **THEN** it SHALL be named `Config` (not `BraveConfig`, `ToolConfig`, etc.)
 - **AND** it SHALL inherit from `pydantic.BaseModel`
 
-### Removed: Dynamic Tool Configuration Building
+### Removed: Runtime Tool Configuration Storage
 
-The system SHALL dynamically build `ToolsConfig` from discovered tool schemas.
+The system SHALL preserve `tools:` configuration as raw per-pack dictionaries at
+load time. Typed validation SHALL happen only when a tool requests its config
+through `get_tool_config(pack, Config)`.
 
-#### Scenario: Build ToolsConfig from registry
-- **GIVEN** multiple tools with Config classes are discovered
+#### Scenario: Preserve pack config dictionaries
+- **GIVEN** multiple packs are configured under `tools:`
 - **WHEN** configuration is loaded
-- **THEN** `ToolsConfig` SHALL be dynamically generated
-- **AND** each pack with a Config SHALL have a corresponding field
+- **THEN** each pack section SHALL be preserved as raw configuration data
+- **AND** no pack-specific schema validation SHALL run during configuration load
 
 #### Scenario: Unknown tool config in YAML
 - **GIVEN** a `tools.unknown_pack:` section in onetool.yaml
 - **AND** no tool with pack "unknown_pack" is discovered
 - **WHEN** configuration is loaded
-- **THEN** the unknown section SHALL be ignored
-- **AND** a debug log message SHALL be emitted
+- **THEN** the unknown section SHALL be preserved as raw configuration data
+- **AND** no error SHALL occur
 
 #### Scenario: Partial tool configuration
 - **GIVEN** a tool has Config class with defaults
 - **AND** onetool.yaml only specifies some fields
-- **WHEN** configuration is loaded
+- **WHEN** `get_tool_config()` is called with that Config class
 - **THEN** specified fields SHALL override defaults
 - **AND** unspecified fields SHALL use Config class defaults
 
@@ -1085,6 +1107,19 @@ Tools SHALL access their configuration via `get_tool_config()` at runtime.
 - **WHEN** `get_tool_config("brave", Config)` is called
 - **THEN** it SHALL return a Config instance with merged values
 - **AND** values from onetool.yaml SHALL override defaults
+
+#### Scenario: Invalid typed tool config fails visibly
+- **GIVEN** `tools.brave.timeout: "not-a-number"` is configured
+- **AND** the `brave` Config schema expects a numeric timeout
+- **WHEN** `get_tool_config("brave", Config)` is called
+- **THEN** it SHALL raise a configuration error instead of silently falling back to defaults
+
+#### Scenario: Unknown typed tool config fails visibly
+- **GIVEN** `tools.brave.unknown_option: true` is configured
+- **AND** the `brave` Config schema has no `unknown_option` field
+- **WHEN** `get_tool_config("brave", Config)` is called
+- **THEN** it SHALL raise a configuration error
+- **AND** the error SHALL identify `tools.brave.unknown_option`
 
 #### Scenario: Get tool config without schema
 - **GIVEN** a tool calls `get_tool_config("brave")`
@@ -1105,9 +1140,9 @@ The config SHALL support a top-level `llm:` key providing shared defaults inheri
 
 ```yaml
 llm:
-  model: ""            # default chat/completion model
-  embedding_model: ""  # default embedding model (e.g. text-embedding-3-small)
-  base_url: ""         # OpenAI-compatible API base URL
+  model: gpt-5.4-nano
+  embedding_model: text-embedding-3-small
+  base_url: https://api.openai.com/v1
   api_key: ""          # API key (prefer secrets file)
 ```
 
@@ -1125,12 +1160,12 @@ llm:
 - **GIVEN** no `llm:` section in onetool.yaml
 - **WHEN** the server starts
 - **THEN** it SHALL start without error
-- **AND** each tool SHALL use its own tool-specific config directly
+- **AND** the built-in LLM defaults SHALL be used
 
 #### Scenario: Inherited fields
 - **GIVEN** a top-level `llm:` section
 - **WHEN** an LLM-using tool resolves its configuration
-- **THEN** the following fields SHALL be inheritable: `model`, `base_url`, `api_key`
+- **THEN** the following fields SHALL be inheritable: `model`, `embedding_model`, `base_url`, `api_key`
 
 #### Scenario: Resolution order
 - **GIVEN** an LLM-using tool needs a config field (e.g. `model`)
@@ -1138,7 +1173,8 @@ llm:
 - **THEN** the resolution order SHALL be:
   1. Tool-specific config (`tools.<pack>.model`)
   2. Top-level LLM config (`llm.model`)
-  3. Error if required and not found at either level
+  3. Built-in `LlmConfig` default when available
+  4. Error if required and not found at any level
 
 #### Scenario: API key always from secrets
 - **GIVEN** `llm.api_key` is set in `onetool.yaml`

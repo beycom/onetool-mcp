@@ -1,4 +1,4 @@
-"""Configuration, health, and reload functions."""
+"""Configuration, status, and reload functions."""
 
 from __future__ import annotations
 
@@ -50,18 +50,18 @@ def config() -> dict[str, Any]:
         return result
 
 
-def health() -> dict[str, Any]:
-    """Check health of OneTool components.
+def status() -> dict[str, Any]:
+    """Report cheap runtime status for OneTool components.
 
     Returns:
-        Dict with component status for registry and proxy
+        Dict with runtime, registry, proxy, config, storage, direct API, and warnings.
 
     Example:
-        ot.health()
+        ot.status()
     """
     from ot.executor.tool_loader import load_tool_registry
 
-    with log(span="ot.health") as s:
+    with log(span="ot.status") as s:
         from ot.executor.worker_proxy import WorkerPackProxy
 
         runner_registry = load_tool_registry()
@@ -75,10 +75,7 @@ def health() -> dict[str, Any]:
                 tool_count += len(funcs.functions)
             else:
                 tool_count += len(funcs)
-        registry_status = {
-            "status": "ok",
-            "tool_count": tool_count,
-        }
+        warnings_out: list[str] = []
 
         server_statuses: dict[str, Any] = {}
         for server_name in cfg.servers:
@@ -89,25 +86,76 @@ def health() -> dict[str, Any]:
                 error = proxy.get_error(server_name)
                 server_statuses[server_name] = {"status": "disconnected", "error": error} if error else "disconnected"
 
-        proxy_status: dict[str, Any] = {
-            "status": "ok"
-            if all(
-                (s == "connected" if isinstance(s, str) else s.get("status") == "connected")
-                for s in server_statuses.values()
+        proxy_ok = (
+            all(
+                state == "connected"
+                if isinstance(state, str)
+                else state.get("status") == "connected"
+                for state in server_statuses.values()
             )
             or not server_statuses
-            else "degraded",
+        )
+        if not proxy_ok:
+            warnings_out.append("One or more configured proxy servers are disconnected.")
+
+        direct_status: dict[str, Any] = {
+            "configured": cfg.direct.host.enabled,
+            "status": "disabled",
+        }
+        server_module = sys.modules.get("ot.server")
+        if cfg.direct.host.enabled:
+            port = getattr(server_module, "_direct_api_port", None) if server_module else None
+            direct_status["status"] = "ready" if port else "degraded"
+            direct_status["port"] = port
+            if not port:
+                warnings_out.append("Direct API is enabled but no bound port is recorded.")
+
+        registry_status = {
+            "status": "ok",
+            "pack_count": len(runner_registry.packs),
+            "tool_count": tool_count,
+        }
+        proxy_status: dict[str, Any] = {
+            "status": "ok" if proxy_ok else "degraded",
             "server_count": len(cfg.servers),
+            "connected_count": sum(1 for state in server_statuses.values() if state == "connected"),
+            "background_connecting": proxy.is_connecting,
         }
         if server_statuses:
             proxy_status["servers"] = server_statuses
 
+        config_path = None
+        try:
+            from ot.config.loader import get_loaded_config_path
+
+            loaded_path = get_loaded_config_path()
+            config_path = str(loaded_path) if loaded_path else None
+        except Exception:
+            pass
+
         result = {
             "version": __version__,
-            "python": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
-            "cwd": str(resolve_cwd_path(".")),
+            "runtime": {
+                "python": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+                "cwd": str(resolve_cwd_path(".")),
+                "root_mcp": {"transport": "stdio"},
+            },
+            "config": {
+                "path": config_path,
+                "dir": str(cfg._config_dir),
+                "include_count": len(cfg.include),
+                "tools_dir_count": len(cfg.tools_dir),
+            },
+            "storage": {
+                "log_dir": str(cfg.get_log_dir_path()),
+                "stats_path": str(cfg.get_stats_file_path()),
+                "stats_enabled": cfg.stats.enabled,
+                "result_store": str(cfg.get_result_store_path()),
+            },
             "registry": registry_status,
             "proxy": proxy_status,
+            "direct_api": direct_status,
+            "warnings": warnings_out,
         }
 
         s.add("registryOk", registry_status["status"] == "ok")

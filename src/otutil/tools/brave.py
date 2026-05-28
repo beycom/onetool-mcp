@@ -44,7 +44,7 @@ class Config(BaseModel):
     """Pack configuration - discovered by registry."""
 
     timeout: float = Field(
-        default=60.0,
+        default=180.0,
         ge=1.0,
         le=300.0,
         description="Request timeout in seconds",
@@ -59,7 +59,7 @@ def _create_http_client() -> httpx.Client:
     """Create HTTP client for Brave API requests."""
     return httpx.Client(
         base_url=BRAVE_API_BASE,
-        timeout=60.0,
+        timeout=180.0,
         headers={"Accept": "application/json", "Accept-Encoding": "gzip"},
     )
 
@@ -399,6 +399,26 @@ def _validate_count(count: int) -> str | None:
     if 1 <= count <= 20:
         return None
     return f"Error: count must be between 1 and 20 (got {count})"
+
+
+def _validate_batch_retry_controls(retries: int, retry_delay_ms: int) -> str | None:
+    """Validate batch retry guardrails."""
+    if (
+        not isinstance(retries, int)
+        or isinstance(retries, bool)
+        or not 0 <= retries <= 3
+    ):
+        return f"Error: retries must be between 0 and 3 (got {retries})"
+    if (
+        not isinstance(retry_delay_ms, int)
+        or isinstance(retry_delay_ms, bool)
+        or not 0 <= retry_delay_ms <= 10_000
+    ):
+        return (
+            "Error: retry_delay_ms must be between 0 and 10000 "
+            f"(got {retry_delay_ms})"
+        )
+    return None
 
 
 def _validate_offset(offset: int) -> str | None:
@@ -775,6 +795,8 @@ def search_batch(
     if error := _validate_freshness(freshness):
         return error
     if error := _validate_output_format(output_format):
+        return error
+    if error := _validate_batch_retry_controls(retries, retry_delay_ms):
         return error
 
     normalized = normalize_items(queries)

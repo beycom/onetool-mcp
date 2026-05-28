@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from otutil.tools.tavily import (
+    Config,
     _EXTRACT_DEPTH_VALUES,
     _EXTRACT_FORMAT_VALUES,
     _OUTPUT_FORMAT_VALUES,
@@ -46,6 +47,9 @@ from otutil.tools.tavily import (
 @pytest.mark.unit
 @pytest.mark.tools
 class TestValidateQuery:
+    def test_default_timeout_is_180(self):
+        assert Config().timeout == 180.0
+
     def test_valid_query(self):
         assert _validate_query("python best practices") is None
 
@@ -746,6 +750,22 @@ class TestSearchBatch:
         result = search_batch(queries=[])
         assert "Error" in result
 
+    def test_rejects_invalid_retry_controls(self):
+        result = search_batch(queries=["test"], retries=-1)
+        assert "retries must be between 0 and 3" in result
+
+        result = search_batch(queries=["test"], retries="x")  # type: ignore[arg-type]
+        assert "retries must be between 0 and 3" in result
+
+        result = search_batch(queries=["test"], retries=4)
+        assert "retries must be between 0 and 3" in result
+
+        result = search_batch(queries=["test"], retry_delay_ms=10_001)
+        assert "retry_delay_ms must be between 0 and 10000" in result
+
+        result = search_batch(queries=["test"], retry_delay_ms="x")  # type: ignore[arg-type]
+        assert "retry_delay_ms must be between 0 and 10000" in result
+
     def test_tuple_queries_with_labels(self):
         response_data = {
             "results": [{"title": "R", "url": "https://x.com", "content": "..."}],
@@ -794,6 +814,18 @@ class TestSearchBatch:
         assert result["results"][0]["status"] == "ok"
         assert result["results"][0]["data"] == "The answer."
 
+    @patch("otutil.tools.tavily.search")
+    def test_accepts_retry_control_upper_bounds(self, mock_search):
+        mock_search.return_value = "Result"
+
+        result = search_batch(
+            queries=["q"],
+            retries=3,
+            retry_delay_ms=10_000,
+        )
+
+        assert result["meta"]["retries"] == 3
+
     def test_retry_envelope_on_transient_error(self):
         mock_client = MagicMock()
         fail = MagicMock()
@@ -823,6 +855,17 @@ class TestResearch:
         result = research(input="some topic", model="turbo")
         assert "Error" in result
         assert "turbo" in result
+
+    def test_validation_error_invalid_timeout(self):
+        result = research(input="some topic", timeout_seconds=0)
+        assert "timeout_seconds must be between 10 and 1800" in result
+
+    def test_validation_error_non_integer_timeout(self):
+        result = research(input="some topic", timeout_seconds="x")  # type: ignore[arg-type]
+        assert "timeout_seconds must be between 10 and 1800" in result
+
+        result = research(input="some topic", timeout_seconds=True)  # type: ignore[arg-type]
+        assert "timeout_seconds must be between 10 and 1800" in result
 
     def test_missing_api_key(self):
         with patch("otutil.tools.tavily.require_api_key", return_value=("", "Error: TAVILY_API_KEY secret not configured")):
@@ -882,10 +925,29 @@ class TestResearch:
             patch("otutil.tools.tavily.time.sleep"),
             patch("otutil.tools.tavily.time.monotonic", side_effect=time_values),
         ):
-            result = research(input="Some topic", timeout_seconds=5)
+            result = research(input="Some topic", timeout_seconds=10)
 
         assert "timed out" in result
-        assert "5" in result
+        assert "10" in result
+
+    def test_polling_uses_remaining_budget_for_sleep_and_get_timeout(self):
+        """Research polling should clamp sleep and GET timeout to remaining budget."""
+        start_response = {"id": "task-123", "status": "processing"}
+        poll_response = {"status": "completed", "content": "Research complete."}
+        monotonic_values = iter([0.0, 58.0, 59.5, 59.5, 59.5])
+
+        with (
+            patch("otutil.tools.tavily._make_request", return_value=(True, start_response)),
+            patch("otutil.tools.tavily._make_get_request", return_value=(True, poll_response)) as mock_get,
+            patch("otutil.tools.tavily.require_api_key", return_value=("test-key", None)),
+            patch("otutil.tools.tavily.time.sleep") as mock_sleep,
+            patch("otutil.tools.tavily.time.monotonic", side_effect=monotonic_values),
+        ):
+            result = research(input="Some topic", timeout_seconds=60)
+
+        assert "Research complete." in result
+        mock_sleep.assert_called_once_with(2.0)
+        assert mock_get.call_args.kwargs["timeout"] == 0.5
 
     def test_research_task_failed(self):
         """Research task fails on server side."""
