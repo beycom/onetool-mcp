@@ -679,12 +679,21 @@ def get_tool_config(pack: str, schema: type[T] | None = None) -> T | dict[str, A
     if schema is None:
         return expanded_config
 
+    _cleaned_config, unknown_warnings = _strip_unknown_fields(
+        expanded_config,
+        schema,
+        f"tools.{pack}",
+    )
+    if unknown_warnings:
+        raise ValueError(
+            f"Invalid tools.{pack} configuration: " + "; ".join(unknown_warnings)
+        )
+
     # Validate and return typed config instance
     try:
         return schema.model_validate(expanded_config)
-    except Exception:
-        # If validation fails, return defaults from schema
-        return schema()
+    except Exception as e:
+        raise ValueError(f"Invalid tools.{pack} configuration: {e}") from e
 
 
 def _get_raw_config(pack: str) -> dict[str, Any]:

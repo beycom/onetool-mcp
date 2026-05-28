@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the `ot` pack providing internal tool functions for accessing onetool state, tool discovery, configuration inspection, and system health. All output uses YAML flow style for compact, readable context that LLMs can easily parse.
+Defines the `ot` pack providing internal tool functions for accessing onetool state, tool discovery, configuration inspection, and system status. All output uses YAML flow style for compact, readable context that LLMs can easily parse.
 
 This spec consolidates `tool-internal` and `tool-info`.
 ## Requirements
@@ -113,25 +113,28 @@ servers: [proxy_package_version]
 
 ---
 
-### Requirement: Health Check
+### Requirement: Status Check
 
-The `ot.health()` function SHALL check health of OneTool components.
+The `ot.status()` function SHALL check status of OneTool components.
 
-#### Scenario: Show health
+#### Scenario: Show status
 - **GIVEN** OneTool is running
-- **WHEN** `ot.health()` is called
-- **THEN** it SHALL return YAML with component status:
+- **WHEN** `ot.status()` is called
+- **THEN** it SHALL return a structured status dict with runtime, config, storage, registry, proxy, direct API, and warnings sections:
 ```yaml
 version: "1.0.0"
-python: "3.11.x"
-cwd: /current/working/directory
+runtime: {python: "3.11.x", cwd: /current/working/directory, root_mcp: true}
+config: {path: /path/to/onetool.yaml, dir: /path/to/config, include: []}
+storage: {log_file: /path/to/logs/serve.log, stats_file: /path/to/stats.jsonl, result_store: ctx}
 registry: {status: ok, tool_count: 15}
 proxy: {status: ok, server_count: 1, servers: {proxy_package_version: connected}}
+direct_api: {enabled: true, port: 8765, url: "http://127.0.0.1:8765"}
+warnings: []
 ```
 
 #### Scenario: Disconnected server
 - **GIVEN** an MCP server is configured but not connected
-- **WHEN** `ot.health()` is called
+- **WHEN** `ot.status()` is called
 - **THEN** server status SHALL show "disconnected"
 - **AND** proxy status SHALL show "degraded"
 
@@ -262,7 +265,7 @@ The tool SHALL follow [_nf-conventions](../_nf-conventions/spec.md) for logging.
 #### Scenario: Span naming
 - **GIVEN** an ot function is called
 - **WHEN** LogSpan is created
-- **THEN** span name SHALL be `ot.{function_name}` (e.g., `ot.tools`, `ot.health`)
+- **THEN** span name SHALL be `ot.{function_name}` (e.g., `ot.tools`, `ot.status`)
 
 ---
 
@@ -522,10 +525,10 @@ The `ot.snippet_info()` function SHALL return detailed info for one or more snip
 - **WHEN** `ot.snippet_info(name="rg", pattern="rg")` is called
 - **THEN** it SHALL return `{"error": "Provide either name= or pattern=, not both."}`
 
-#### Scenario: Dollar-prefix hint
-- **GIVEN** `name="$rg"` (with `$` prefix, as used in snippet invocation syntax)
-- **WHEN** `ot.snippet_info(name="$rg")` is called
-- **THEN** it SHALL return an error dict including a hint: `"Did you mean 'rg'? Use name= without the '$' prefix."`
+#### Scenario: Colon-prefix hint
+- **GIVEN** `name=":help"` (with `:` prefix, as used in snippet invocation syntax)
+- **WHEN** `ot.snippet_info(name=":help")` is called
+- **THEN** it SHALL return an error dict including a hint: `"Did you mean 'help'? Use name= without the ':' prefix."`
 
 #### Scenario: Info level default
 - **GIVEN** `info="default"` parameter (or no info parameter)
@@ -545,7 +548,7 @@ description: Search web and extract structured findings
 params:
   topic: {required: true, description: "Topic to research"}
   count: {default: 5, description: "Number of sources"}
-example: "$brv_research topic=\"...\" count=5"
+example: ":brv_research topic=\"...\" count=5"
 ```
 
 ### Requirement: Unified Help
@@ -560,6 +563,20 @@ The `ot.help()` function SHALL provide unified help across tools, packs, snippet
   - Info level documentation
   - Quick examples
   - Usage tips
+- **AND** it SHALL be deterministic and not call an LLM
+
+#### Scenario: Ask mode with LLM available
+- **GIVEN** `ask` is a non-empty question
+- **AND** an OpenAI-compatible API key is configured
+- **WHEN** `ot.help(ask="how do I search?")` is called
+- **THEN** it SHALL append an LLM-generated answer grounded in deterministic OneTool help context
+
+#### Scenario: Ask mode unavailable
+- **GIVEN** `ask` is a non-empty question
+- **AND** no OpenAI-compatible API key is configured
+- **WHEN** `ot.help(ask="how do I search?")` is called
+- **THEN** it SHALL still return deterministic help context
+- **AND** it SHALL include an explicit ask-unavailable message
 
 #### Scenario: Exact tool lookup
 - **GIVEN** a query matching a tool name exactly (e.g., `brave.search`)
@@ -593,8 +610,8 @@ The `ot.help()` function SHALL provide unified help across tools, packs, snippet
   - Documentation URL
 
 #### Scenario: Snippet lookup
-- **GIVEN** a query starting with `$` (e.g., `$b_q`)
-- **WHEN** `ot.help(query="$b_q")` is called
+- **GIVEN** a query starting with `:` (e.g., `:b_q`)
+- **WHEN** `ot.help(query=":b_q")` is called
 - **THEN** it SHALL return snippet help including:
   - Snippet name
   - Description
@@ -620,6 +637,13 @@ The `ot.help()` function SHALL provide unified help across tools, packs, snippet
   - Aliases matching the query
   - Servers matching the query
 - **AND** matching SHALL consider both names and descriptions for tools/packs/snippets/aliases
+
+#### Scenario: Direct run invocation help
+- **GIVEN** a query for direct invocation syntax such as `__run`, `__r`, `__ot`, `run`, `direct command`, or `snippet`
+- **WHEN** `ot.help(query=...)` is called
+- **THEN** it SHALL return deterministic direct OneTool invocation guidance
+- **AND** the guidance SHALL include `__run <code>`, `__r <code>`, `__ot <code>`, `:snippet key=value`, direct `pack.tool(arg=value)` call shape, and `ot.tool_info(name="pack.tool")` discovery
+- **AND** the guidance SHALL distinguish connected-agent MCP `run(command=...)` usage from the explicit `onetool direct` CLI workflow
 
 #### Scenario: Fuzzy matching with typos
 - **GIVEN** a query with typos (e.g., `scaffoldl`, `frirecrawl`)
@@ -867,6 +891,12 @@ The `ot.debug()` function SHALL provide comprehensive debug information about th
   - requests
   - openai
 - **AND** missing packages SHALL show "not installed"
+
+#### Scenario: Prompt diagnostics
+- **GIVEN** `prompts=True` parameter
+- **WHEN** `ot.debug(prompts=True)` is called
+- **THEN** it SHALL include a `prompts` section with source, path when file-backed, sha256, excerpts, and checks for the critical run invocation contract
+- **AND** the checks SHALL include canonical trigger, colon snippet syntax, MCP run preference, natural-language mode, and keyword-only repair coverage
 
 #### Scenario: Module load time tracking
 - **GIVEN** OneTool has been running

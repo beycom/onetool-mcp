@@ -16,10 +16,22 @@ All under `.onetool/config/`:
 |------|---------|
 | `onetool.yaml` | Main config (version, tools_dir, includes, aliases) |
 | `security.yaml` | Validation allowlists (builtins, imports, calls) |
-| `prompts.yaml` | MCP system instructions |
+| `prompts.yaml` | MCP prompt surfaces: run tool contract, server instructions, templates, pack descriptions |
 | `snippets.yaml` | Snippet template definitions |
 | `servers.yaml` | External MCP server definitions |
 | `secrets.yaml` | API keys and credentials |
+
+## Prompt Surfaces
+
+Prompt guidance is split by priority:
+
+| Surface | Responsibility |
+|---------|----------------|
+| `tools.run.description` | Authoritative invocation contract for first-call behavior: run code, execute snippet, natural language to code, discovery fallback, keyword-only repair |
+| `instructions` | Short MCP handshake orientation that points agents to the run description and core safety/discovery guidance |
+| `global_templates/skills/ot-ref.md` | Optional advanced reference loaded on demand via `ot.skills(name="ot-ref")` |
+
+Keep critical first-call behavior in `tools.run.description`; keep advanced recovery/detail in `ot-ref`; keep server instructions concise.
 
 ## Includes
 

@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 from otpack import get_tool_config
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 VALID_CATEGORIES = {"reference", "rule", "note", "mistake"}
 
@@ -190,6 +190,8 @@ class KBProjectConfig(BaseModel):
 class Config(BaseModel):
     """Pack configuration - discovered by registry."""
 
+    model_config = ConfigDict(extra="forbid")
+
     kb: dict[str, KBProjectConfig] = Field(
         default_factory=dict,
         description="Named KB projects. Each key is a project name; each value bundles db:, scrape:, and index: config.",
@@ -241,19 +243,6 @@ class Config(BaseModel):
             "Set to 0 to disable merging."
         ),
     )
-
-    @model_validator(mode="before")
-    @classmethod
-    def _check_legacy_keys(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            legacy = [k for k in ("databases", "scrape") if k in data]
-            if legacy:
-                keys = ", ".join(f"tools.knowledge.{k}" for k in legacy)
-                raise ValueError(
-                    f"{keys} is no longer supported. "
-                    "Migrate to tools.knowledge.kb — each project entry contains db:, scrape:, and index: sections."
-                )
-        return data
 
 
 def _get_config() -> Config:

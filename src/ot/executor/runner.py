@@ -67,7 +67,7 @@ def _split_meta_wrapped_snippet(code: str) -> tuple[str, str] | None:
     Returns:
         (prefix_line, snippet_command) when code is:
             __format__='...'; __sanitize__=...
-            $snippet ...
+            :snippet ...
         None for all other inputs.
     """
     lines = code.splitlines()
@@ -79,7 +79,7 @@ def _split_meta_wrapped_snippet(code: str) -> tuple[str, str] | None:
         return None
 
     snippet_code = "\n".join(lines[1:]).strip()
-    if not snippet_code.startswith("$"):
+    if not snippet_code.startswith(":"):
         return None
 
     return prefix, snippet_code
@@ -491,7 +491,7 @@ def prepare_command(command: str) -> PreparedCommand:
     # Step 3: Load configuration for aliases and snippets
     config = get_config()
 
-    # Step 4: Handle snippet expansion ($name key=val)
+    # Step 4: Handle snippet expansion (:name key=val)
     # direct run prepends __format__/__sanitize__ metadata before command text,
     # so detect that wrapper and expand snippets from the wrapped body.
     snippet_target = stripped
@@ -557,7 +557,7 @@ async def execute_command(
     This is the single entry point for all command execution:
     - Strips markdown fences
     - Rejects legacy !onetool prefix
-    - Expands snippets ($name key=val)
+    - Expands snippets (:name key=val)
     - Resolves aliases (ws -> brave.web_search)
     - Executes as Python code with namespace support
 

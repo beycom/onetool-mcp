@@ -18,7 +18,7 @@ TTL-expiring, BM25-indexed storage for large tool outputs. Replace context-windo
 
 | Function | Description |
 |----------|-------------|
-| `ctx.write(content, source, intent)` | Store content, return handle + preview |
+| `ctx.write(content, source, verbose)` | Store content, return handle + optional preview |
 | `ctx.append(handle, content)` | Append content and re-index |
 | `ctx.read(handle, offset, limit, tail, mode)` | Paginated raw content, metadata, or TOC |
 | `ctx.toc(handle)` | Numbered section index with vocabulary hints |
@@ -40,7 +40,7 @@ TTL-expiring, BM25-indexed storage for large tool outputs. Replace context-windo
 |-----------|------|-------------|
 | `content` | str | Content to store |
 | `source` | str | Optional label (e.g. "brave", "api") for filtering |
-| `intent` | str | Optional intent — calls ot_llm immediately and returns `answer` field |
+| `verbose` | bool | Include a short preview in the returned payload |
 
 Returns a dict with `handle`, `size_bytes`, `total_lines`, `status`, and `abstract` (populated asynchronously). Pass `verbose=True` to also include `preview` (first 5 non-empty lines).
 

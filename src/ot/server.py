@@ -1,11 +1,10 @@
 """FastMCP server implementation with a single 'run' tool.
 
-The agent generates function call syntax with >>> prefix:
-  >>> context7.search(query="next.js")
-  >>> context7.doc(library_key="vercel/next.js", topic="routing")
+The agent passes Python code to run(command=...):
+  context7.search(query="next.js")
+  context7.doc(library_key="vercel/next.js", topic="routing")
 
 Or Python code blocks:
-  >>>
   ```python
   metals = ["Gold", "Silver", "Bronze"]
   results = {}
@@ -14,12 +13,7 @@ Or Python code blocks:
   return results
   ```
 
-Or direct MCP calls:
-  mcp__onetool__run(command='brave.web_search(query="test")')
-
-Supported prefixes: >>>, __run, mcp__onetool__run
-Legacy (backward compat, not advertised): __ot, __ot__run, __onetool, __onetool__run
-Note: mcp__ot__run is NOT valid.
+Supported explicit prefixes stripped from command text: __run, __r, __ot.
 """
 
 from __future__ import annotations
@@ -238,6 +232,40 @@ def _get_instructions() -> str:
     return instructions.strip()
 
 
+def _log_startup_diagnostics(
+    *,
+    tool_count: int,
+    proxy_count: int,
+    direct_status: str,
+    direct_port: int | None,
+) -> None:
+    """Log concise startup diagnostics for support and debugging."""
+    from ot.config.loader import get_loaded_config_path
+    from ot.meta._debug import _get_prompts_info
+
+    cfg = _config
+    config_path = get_loaded_config_path()
+    prompts_info = _get_prompts_info()
+    logger.info(
+        "mcp.startup.diagnostics | transport=stdio | configDir={} | configFile={} | includeCount={} | logPath={} | statsEnabled={} | statsPath={} | registryToolCount={} | proxyConfigured={} | proxyBackground={} | directConfigured={} | directStatus={} | directPort={} | promptSource={} | promptPath={} | promptHash={} | statusTool=ot.status",
+        cfg._config_dir,
+        config_path,
+        len(cfg.include),
+        cfg.get_log_dir_path() / "serve.log",
+        cfg.stats.enabled,
+        cfg.get_stats_file_path(),
+        tool_count,
+        proxy_count,
+        bool(proxy_count),
+        cfg.direct.host.enabled,
+        direct_status,
+        direct_port,
+        prompts_info.get("source"),
+        prompts_info.get("path"),
+        prompts_info.get("sha256"),
+    )
+
+
 @asynccontextmanager
 async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
     """Manage server lifecycle - startup and shutdown."""
@@ -278,6 +306,7 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
         load_tool_registry()
 
         # Direct API mode: bind one local HTTP listener owned by this MCP process.
+        direct_status = "disabled"
         if _config.direct.host.enabled:
             try:
                 api_server, api_thread, api_port = _start_direct_api()
@@ -285,10 +314,12 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
                 _direct_api_thread = api_thread
                 _direct_api_port = api_port
                 start_span.add("directApi", f"http://127.0.0.1:{api_port}")
+                direct_status = "ready"
             except Exception as e:
                 logger.error("direct.api.degraded | error={}", e)
                 start_span.add("directApi", "degraded")
                 start_span.add("directApiError", str(e))
+                direct_status = "degraded"
         else:
             logger.info("direct.api.disabled | rootTransport={}", runtime.transport)
 
@@ -310,6 +341,13 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
 
             start_span.add("statsEnabled", True)
             start_span.add("statsPath", str(stats_path))
+
+        _log_startup_diagnostics(
+            tool_count=len(registry.tools),
+            proxy_count=len(_config.servers),
+            direct_status=direct_status,
+            direct_port=_direct_api_port,
+        )
 
         # Log support message
         logger.info(get_startup_message())

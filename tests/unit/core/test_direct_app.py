@@ -60,10 +60,14 @@ def test_direct_api_failure_is_degraded_in_lifespan() -> None:
             pass
 
     cfg = SimpleNamespace(
+        _config_dir=Path("/tmp/onetool/config"),
         servers={},
+        include=[],
         prompts=[],
         direct=SimpleNamespace(host=SimpleNamespace(enabled=True)),
         stats=SimpleNamespace(enabled=False),
+        get_log_dir_path=lambda: Path("/tmp/onetool/logs"),
+        get_stats_file_path=lambda: Path("/tmp/onetool/stats.jsonl"),
     )
 
     with (
@@ -126,10 +130,14 @@ def test_http_root_lifespan_logs_transport_and_non_loopback_warning() -> None:
             pass
 
     cfg = SimpleNamespace(
+        _config_dir=Path("/tmp/onetool/config"),
         servers={},
+        include=[],
         prompts=[],
         direct=SimpleNamespace(host=SimpleNamespace(enabled=False)),
         stats=SimpleNamespace(enabled=False),
+        get_log_dir_path=lambda: Path("/tmp/onetool/logs"),
+        get_stats_file_path=lambda: Path("/tmp/onetool/stats.jsonl"),
     )
     spans: list[tuple[str, dict[str, object]]] = []
 

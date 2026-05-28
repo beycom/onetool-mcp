@@ -52,55 +52,36 @@ except:
 Run the full annotation cycle via Chrome DevTools:
 
 ```python
-# 1. Inject (fresh)
-r1 = chrome_util.inject_annotations()
-# Expect: {success: true, ready: true, version: "2.0.0"}
-
-# 2. Inject (idempotent)
-r2 = chrome_util.inject_annotations()
-# Expect: {success: true, ready: true, version: "2.0.0"}
-
-# 3. Highlight with custom element_id and color
-r3 = chrome_util.highlight_element(selector="a", label="Test link", color="blue", element_id="test-1")
-# Expect: {success: true, count: >= 1, ids: ["test-1-0", "test-1-1", ...]}
-# Note: Multiple matches get indexed IDs
-
-# 4. Scan annotations
-r4 = chrome_util.scan_annotations()
-# Expect: list with annotations containing: id, label, selector, content, tagName, color
-# Verify: len(r4) >= 1
-
-# 5. Guide user (multi-step) - use simple selectors
-r5 = chrome_util.guide_user(
-    task="Navigate",
-    steps=[
-        {"selector": "h1", "label": "Step 1: Heading", "color": "orange"},
-        {"selector": "p", "label": "Step 2: Paragraph", "color": "green"}
-    ]
-)
-# Expect: {task: "Navigate", total: 2, highlighted: 2, results: [...]}
-
-# 6. Clear all annotations
-r6 = chrome_util.clear_annotations()
-# Expect: {success: true, cleared: >= 1}
-
-# 7. Verify cleared
-r7 = chrome_util.scan_annotations()
-# Expect: empty list []
-
-# 8. Take screenshot for verification
-chrome_devtools.take_screenshot()
-
-# Print summary
-{
-    "inject": r1.get("version"),
-    "idempotent": r2.get("ready"),
-    "highlighted": r3.get("count"),
-    "scanned": len(r4),
-    "guide_steps": r5.get("highlighted"),
-    "cleared": r6.get("cleared"),
-    "final_count": len(r7)
-}
+try:
+    r1 = chrome_util.inject_annotations()
+    r2 = chrome_util.inject_annotations()
+    r3 = chrome_util.highlight_element(selector="a", label="Test link", color="blue", element_id="test-1")
+    r4 = chrome_util.scan_annotations()
+    r5 = chrome_util.guide_user(
+        task="Navigate",
+        steps=[
+            {"selector": "h1", "label": "Step 1: Heading", "color": "orange"},
+            {"selector": "p", "label": "Step 2: Paragraph", "color": "green"},
+        ],
+    )
+    r6 = chrome_util.clear_annotations()
+    r7 = chrome_util.scan_annotations()
+    chrome_devtools.take_screenshot()
+    {
+        "inject": r1.get("version"),
+        "idempotent": r2.get("ready"),
+        "highlighted": r3.get("count"),
+        "scanned": len(r4),
+        "guide_steps": r5.get("highlighted"),
+        "cleared": r6.get("cleared"),
+        "final_count": len(r7),
+    }
+finally:
+    try:
+        chrome_util.clear_annotations()
+        chrome_devtools.handle_dialog(action="dismiss")
+    except Exception:
+        pass
 ```
 
 ## Test: play_util
@@ -108,54 +89,36 @@ chrome_devtools.take_screenshot()
 Run the same cycle via Playwright:
 
 ```python
-# 1. Inject (fresh)
-p1 = play_util.inject_annotations()
-# Expect: {success: true, ready: true, version: "2.0.0"}
-
-# 2. Inject (idempotent)
-p2 = play_util.inject_annotations()
-# Expect: {success: true, ready: true, version: "2.0.0"}
-
-# 3. Highlight with custom element_id and color
-p3 = play_util.highlight_element(selector="a", label="Test link", color="blue", element_id="test-1")
-# Expect: {success: true, count: >= 1, ids: ["test-1-0", "test-1-1", ...]}
-
-# 4. Scan annotations
-p4 = play_util.scan_annotations()
-# Expect: list with annotations containing: id, label, selector, content, tagName, color
-# Verify: len(p4) >= 1
-
-# 5. Guide user (multi-step) - use simple selectors
-p5 = play_util.guide_user(
-    task="Navigate",
-    steps=[
-        {"selector": "h1", "label": "Step 1: Heading", "color": "orange"},
-        {"selector": "p", "label": "Step 2: Paragraph", "color": "green"}
-    ]
-)
-# Expect: {task: "Navigate", total: 2, highlighted: 2, results: [...]}
-
-# 6. Clear all annotations
-p6 = play_util.clear_annotations()
-# Expect: {success: true, cleared: >= 1}
-
-# 7. Verify cleared
-p7 = play_util.scan_annotations()
-# Expect: empty list []
-
-# 8. Take screenshot for verification
-playwright.browser_take_screenshot()
-
-# Print summary
-{
-    "inject": p1.get("version"),
-    "idempotent": p2.get("ready"),
-    "highlighted": p3.get("count"),
-    "scanned": len(p4),
-    "guide_steps": p5.get("highlighted"),
-    "cleared": p6.get("cleared"),
-    "final_count": len(p7)
-}
+try:
+    p1 = play_util.inject_annotations()
+    p2 = play_util.inject_annotations()
+    p3 = play_util.highlight_element(selector="a", label="Test link", color="blue", element_id="test-1")
+    p4 = play_util.scan_annotations()
+    p5 = play_util.guide_user(
+        task="Navigate",
+        steps=[
+            {"selector": "h1", "label": "Step 1: Heading", "color": "orange"},
+            {"selector": "p", "label": "Step 2: Paragraph", "color": "green"},
+        ],
+    )
+    p6 = play_util.clear_annotations()
+    p7 = play_util.scan_annotations()
+    playwright.browser_take_screenshot()
+    {
+        "inject": p1.get("version"),
+        "idempotent": p2.get("ready"),
+        "highlighted": p3.get("count"),
+        "scanned": len(p4),
+        "guide_steps": p5.get("highlighted"),
+        "cleared": p6.get("cleared"),
+        "final_count": len(p7),
+    }
+finally:
+    try:
+        play_util.clear_annotations()
+        playwright.browser_handle_dialog(accept=False)
+    except Exception:
+        pass
 ```
 
 ## Expected results

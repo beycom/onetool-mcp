@@ -54,8 +54,8 @@ class TestGetApiConfig:
         api_key, base_url, model, config = _get_api_config()
 
         assert api_key is None
-        assert base_url is None
-        assert model is None
+        assert base_url == "https://api.openai.com/v1"
+        assert model == "gpt-5.4-nano"
         assert config.timeout == 30  # Default
         assert config.max_tokens is None  # Default
 

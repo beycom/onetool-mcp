@@ -44,11 +44,51 @@ class Config(BaseModel):
         default="gemini-2.5-flash",
         description="Gemini model for grounding search (e.g., gemini-2.5-flash)",
     )
+    timeout: float = Field(
+        default=180.0,
+        ge=1.0,
+        le=300.0,
+        description="Default Gemini request timeout in seconds",
+    )
 
 
 _SUPPORTED_EXTRACT_TYPES = frozenset({"string", "number", "boolean"})
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _NUMBER_RE = re.compile(r"-?\d+(?:\.\d+)?")
+
+
+def _validate_request_timeout(timeout: float) -> str | None:
+    """Validate request timeout guardrails."""
+    if not isinstance(timeout, int | float) or isinstance(timeout, bool):
+        return f"Error: timeout must be between 1.0 and 300.0 seconds (got {timeout})"
+    if 1.0 <= timeout <= 300.0:
+        return None
+    return f"Error: timeout must be between 1.0 and 300.0 seconds (got {timeout})"
+
+
+def _get_config() -> Config:
+    """Return validated ground pack configuration."""
+    return get_tool_config("ground", Config)
+
+
+def _validate_batch_retry_controls(retries: int, retry_delay_ms: int) -> str | None:
+    """Validate batch retry guardrails."""
+    if (
+        not isinstance(retries, int)
+        or isinstance(retries, bool)
+        or not 0 <= retries <= 3
+    ):
+        return f"Error: retries must be between 0 and 3 (got {retries})"
+    if (
+        not isinstance(retry_delay_ms, int)
+        or isinstance(retry_delay_ms, bool)
+        or not 0 <= retry_delay_ms <= 10_000
+    ):
+        return (
+            "Error: retry_delay_ms must be between 0 and 10000 "
+            f"(got {retry_delay_ms})"
+        )
+    return None
 
 
 def _validate_extract_schema(extract_schema: dict[str, Any] | None) -> str | None:
@@ -299,15 +339,18 @@ def _format_error(e: Exception) -> str:
         User-friendly error message
     """
     error_str = str(e).lower()
+    original = str(e)
 
-    if "quota" in error_str or "rate" in error_str:
+    if "invalid tools.ground configuration" in error_str:
+        return f"Search failed: {original}"
+    elif "quota" in error_str or "rate" in error_str:
         return "Error: API quota exceeded. Try again later."
     elif "authentication" in error_str or "api key" in error_str or "unauthorized" in error_str:
         return "Error: Invalid GEMINI_API_KEY. Check secrets.yaml."
     elif "timeout" in error_str:
         return "Error: Request timed out. Try a simpler query or increase timeout."
     else:
-        return f"Search failed: {e}"
+        return f"Search failed: {original}"
 
 
 def _grounded_search(
@@ -315,7 +358,7 @@ def _grounded_search(
     *,
     span_name: str,
     model: str | None = None,
-    timeout: float = 30.0,
+    timeout: float | None = None,
     output_format: OutputFormat = "full",
     max_sources: int | None = None,
     extract_schema: dict[str, Any] | None = None,
@@ -328,7 +371,7 @@ def _grounded_search(
         prompt: The search prompt to send to Gemini
         span_name: Name for the log span
         model: Gemini model to use (defaults to config)
-        timeout: Request timeout in seconds (default: 30.0)
+        timeout: Request timeout in seconds (defaults to tools.ground.timeout)
         output_format: Output format - "full", "text_only", or "sources_only"
         max_sources: Maximum number of sources to include (None for unlimited)
         **log_extras: Additional fields to log
@@ -341,8 +384,17 @@ def _grounded_search(
 
     with LogSpan(span=span_name, **log_extras) as s:
         try:
+            cfg: Config | None = None
+            if model is None or timeout is None:
+                cfg = _get_config()
             if model is None:
-                model = get_tool_config("ground", Config).model
+                assert cfg is not None
+                model = cfg.model
+            if timeout is None:
+                assert cfg is not None
+                timeout = cfg.timeout
+            if error := _validate_request_timeout(timeout):
+                return error
             client = _get_client()
 
             # Configure grounding with Google Search
@@ -393,7 +445,7 @@ def search(
     context: str = "",
     focus: Literal["general", "code", "documentation", "troubleshooting"] = "general",
     model: str | None = None,
-    timeout: float = 30.0,
+    timeout: float | None = None,
     max_sources: int | None = None,
     output_format: OutputFormat = "full",
     extract_schema: dict[str, Any] | None = None,
@@ -413,7 +465,7 @@ def search(
             - "documentation": Focus on official documentation
             - "troubleshooting": Focus on solving problems and debugging
         model: Gemini model to use (defaults to config, e.g., "gemini-2.5-flash")
-        timeout: Request timeout in seconds (default: 30.0)
+        timeout: Request timeout in seconds (defaults to tools.ground.timeout)
         max_sources: Maximum number of sources to include (None for unlimited)
         output_format: Output format - "full" (default), "text_only", or "sources_only"
 
@@ -485,7 +537,7 @@ def search_batch(
     context: str = "",
     focus: Literal["general", "code", "documentation", "troubleshooting"] = "general",
     model: str | None = None,
-    timeout: float = 30.0,
+    timeout: float | None = None,
     max_sources: int | None = None,
     output_format: OutputFormat = "full",
     extract_schema: dict[str, Any] | None = None,
@@ -508,7 +560,7 @@ def search_batch(
             - "documentation": Focus on official documentation
             - "troubleshooting": Focus on solving problems and debugging
         model: Gemini model to use (defaults to config)
-        timeout: Request timeout in seconds (default: 30.0)
+        timeout: Request timeout in seconds (defaults to tools.ground.timeout)
         max_sources: Maximum number of sources per query (None for unlimited)
         output_format: Output format - "full" (default), "text_only", or "sources_only"
 
@@ -544,6 +596,14 @@ def search_batch(
 
     if not normalized:
         return "Error: queries list cannot be empty"
+    try:
+        request_timeout = _get_config().timeout if timeout is None else timeout
+    except Exception as e:
+        return _format_error(e)
+    if error := _validate_request_timeout(request_timeout):
+        return error
+    if error := _validate_batch_retry_controls(retries, retry_delay_ms):
+        return error
     if error := _validate_extract_schema(extract_schema):
         return error
 
@@ -556,7 +616,7 @@ def search_batch(
                 context=context,
                 focus=focus,
                 model=model,
-                timeout=timeout,
+                timeout=request_timeout,
                 max_sources=max_sources,
                 output_format=output_format,
                 extract_schema=extract_schema,
@@ -579,7 +639,7 @@ def dev(
     query: str,
     language: str = "",
     framework: str = "",
-    timeout: float = 30.0,
+    timeout: float | None = None,
     max_sources: int | None = None,
     output_format: OutputFormat = "full",
 ) -> str:
@@ -592,7 +652,7 @@ def dev(
         query: The technical search query (cannot be empty)
         language: Programming language to prioritize (e.g., "Python", "TypeScript")
         framework: Framework to prioritize (e.g., "FastAPI", "React")
-        timeout: Request timeout in seconds (default: 30.0)
+        timeout: Request timeout in seconds (defaults to tools.ground.timeout)
         max_sources: Maximum number of sources to include (None for unlimited)
         output_format: Output format - "full" (default), "text_only", or "sources_only"
 
@@ -644,7 +704,7 @@ def docs(
     *,
     query: str,
     technology: str = "",
-    timeout: float = 30.0,
+    timeout: float | None = None,
     max_sources: int | None = None,
     output_format: OutputFormat = "full",
 ) -> str:
@@ -656,7 +716,7 @@ def docs(
     Args:
         query: The documentation search query (cannot be empty)
         technology: Technology/library name to focus on (e.g., "React", "Django")
-        timeout: Request timeout in seconds (default: 30.0)
+        timeout: Request timeout in seconds (defaults to tools.ground.timeout)
         max_sources: Maximum number of sources to include (None for unlimited)
         output_format: Output format - "full" (default), "text_only", or "sources_only"
 
@@ -704,7 +764,7 @@ def reddit(
     *,
     query: str,
     subreddit: str = "",
-    timeout: float = 30.0,
+    timeout: float | None = None,
     max_sources: int | None = None,
     output_format: OutputFormat = "full",
 ) -> str:
@@ -721,7 +781,7 @@ def reddit(
     Args:
         query: The Reddit search query (cannot be empty)
         subreddit: Specific subreddit to search (e.g., "programming", "python")
-        timeout: Request timeout in seconds (default: 30.0)
+        timeout: Request timeout in seconds (defaults to tools.ground.timeout)
         max_sources: Maximum number of sources to include (None for unlimited)
         output_format: Output format - "full" (default), "text_only", or "sources_only"
 

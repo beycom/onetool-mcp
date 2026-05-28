@@ -10,11 +10,11 @@ These packs are entirely new in v2.
 
 AWS publishes 57 official MCP servers (awslabs) covering everything from S3 and Lambda to Bedrock and Cost Explorer. Without OneTool, using even one of them means paying the full tool tax on every request — and configuring credentials, profiles, SSO, and MFA manually for each. This pack gives you dynamic access to all 57 through a single interface with a fixed, minimal token footprint. Pick servers individually or activate curated role-based bundles (finops, security, compute, data, ml, and 13 more). Credential pre-flight, SSO login, MFA sessions, and profile switching are all handled automatically.
 
-```python
->>> aws_util.whoami()
->>> aws_util.login(profile="dev")
->>> aws_util.start_packs(role="finops")
->>> aws_util.profiles()
+```text
+__run aws_util.whoami()
+__run aws_util.login(profile="dev")
+__run aws_util.start_packs(role="finops")
+__run aws_util.profiles()
 ```
 
 Also provides `check`, `use`, `mfa`, `roles`, `packs`, `stop_packs`, `refresh_packs`, `services`, `regions`, `arn`, `attributes`, and `values`.
@@ -23,12 +23,12 @@ Also provides `check`, `use`, `mfa`, `roles`, `packs`, `stop_packs`, `refresh_pa
 
 Turns Excalidraw into a tool-driven canvas. Agents can generate architecture diagrams, flowcharts, and sketches using a Mermaid-compatible DSL, then screenshot or save the result — all without manual drawing. Useful for visual planning, documentation, and sharing ideas that are easier to show than describe.
 
-```python
->>> whiteboard.open()
->>> whiteboard.draw(input="A --> B --> C")
->>> whiteboard.screenshot()
->>> whiteboard.save(path="arch.json")
->>> whiteboard.close()
+```text
+__run whiteboard.open()
+__run whiteboard.draw(input="A --> B --> C")
+__run whiteboard.screenshot()
+__run whiteboard.save(path="arch.json")
+__run whiteboard.close()
 ```
 
 Also provides `load`, `clear`, `erase`, `note`, `scroll`, `zoom`, `fit`, `layout`, `align`, `read_scene`, and `hard_reset`. Short alias: `wb`.
@@ -37,13 +37,13 @@ Also provides `load`, `clear`, `erase`, `note`, `scroll`, `zoom`, `fit`, `layout
 
 Tavily is an AI-native search API optimised for LLM pipelines. Results come back clean — titles, URLs, content snippets, and an AI-synthesised answer — all in one call. `output_format` controls the response structure (`"full"`, `"text_only"`, `"sources_only"`), matching the convention used by the `ground` pack. `search_batch()` runs multiple queries in parallel with section labels. `extract_batch()` fetches multiple URL sets concurrently. `research()` submits a deep research task and polls until complete.
 
-```python
->>> tavily.search(query="LLM context window research", output_format="text_only")
->>> tavily.search(query="AI news", topic="news", time_range="week", min_score=0.7)
->>> tavily.search_batch(queries=["React 19 features", "Vue 4 roadmap"])
->>> tavily.extract(urls=["https://example.com/article"])
->>> tavily.extract_batch(url_sets=[(["https://docs.a.com"], "A"), (["https://docs.b.com"], "B")])
->>> tavily.research(input="How does Rust's ownership model work?", model="mini")
+```text
+__run tavily.search(query="LLM context window research", output_format="text_only")
+__run tavily.search(query="AI news", topic="news", time_range="week", min_score=0.7)
+__run tavily.search_batch(queries=["React 19 features", "Vue 4 roadmap"])
+__run tavily.extract(urls=["https://docs.python.org/3/"])
+__run tavily.extract_batch(url_sets=[(["https://docs.a.com"], "A"), (["https://docs.b.com"], "B")])
+__run tavily.research(input="How does Rust's ownership model work?", model="mini")
 ```
 
 Requires a `TAVILY_API_KEY` in `secrets.yaml`. Supports topic filters (`general`, `news`, `finance`), domain allow/block lists, time range filtering, relevance score threshold (`min_score`), and configurable result depth.
@@ -52,62 +52,62 @@ Requires a `TAVILY_API_KEY` in `secrets.yaml`. Supports topic filters (`general`
 
 Two packs that bring visual annotation to browser automation. Inject overlays onto any page, highlight elements with labels and colours, and display step-by-step guidance panels — one driven by Chrome DevTools Protocol, the other by Playwright. The benefit is the same: agents can visually mark up a page to show users exactly what they're looking at or guide them through a multi-step UI workflow.
 
-```python
->>> chrome_util.inject_annotations()
->>> chrome_util.highlight_element(selector="h1", label="Title")
->>> chrome_util.guide_user(instructions="Click the login button")
->>> chrome_util.scan_annotations()
+```text
+__run chrome_util.inject_annotations()
+__run chrome_util.highlight_element(selector="h1", label="Title")
+__run chrome_util.guide_user(instructions="Click the login button")
+__run chrome_util.scan_annotations()
 ```
 
 ### skills — Bundled skill guides
 
 v1 supported user-defined skill files but they were fragile and hard to maintain. v2 replaces them with curated, bundled skill guides covering AWS, Chrome DevTools, Playwright, and more. These are structured Markdown documents that give your LLM the context it needs to use external MCP servers correctly — no manual setup required.
 
-```python
->>> skills.skills()                     # list all skills
->>> skills.skills(name="ot-aws-mcp")   # get full skill content
+```text
+__run skills.skills()                     # list all skills
+__run skills.skills(name="ot-aws-mcp")   # get full skill content
 ```
 
 ### ot_secrets — Secret encryption
 
 In v1, API keys sat in plain text in `secrets.yaml`. If that file was accidentally committed or shared, every key was exposed. v2 adds transparent age encryption backed by your OS keychain. You generate an identity once, encrypt your secrets file in-place, and from that point on OneTool decrypts values automatically at load time. You can audit which values are still plain, rotate keys, and check keychain status — all without leaving the tool.
 
-```python
->>> ot_secrets.init()                          # generate key, store in keychain
->>> ot_secrets.encrypt(file="secrets.yaml")    # encrypt plain values in-place
->>> ot_secrets.audit(file="secrets.yaml")      # check which values are encrypted
->>> ot_secrets.rotate(file="secrets.yaml")     # rotate to a new key
->>> ot_secrets.status()                        # keychain status
+```text
+__run ot_secrets.init()                          # generate key, store in keychain
+__run ot_secrets.encrypt(file="secrets.yaml")    # encrypt plain values in-place
+__run ot_secrets.audit(file="secrets.yaml")      # check which values are encrypted
+__run ot_secrets.rotate(file="secrets.yaml")     # rotate to a new key
+__run ot_secrets.status()                        # keychain status
 ```
 
 ### ot_forge — Extension scaffolding
 
 Generates the boilerplate for new tool packs — file structure, type hints, keyword-only args, docstrings — so you can focus on the logic. Also validates extensions before reload, catching issues early.
 
-```python
->>> ot_forge.create_ext(name="my_pack", pack_name="mypack", function="hello")
->>> ot_forge.validate_ext(path="src/mypack.py")
+```text
+__run ot_forge.create_ext(name="my_pack", pack_name="mypack", function="hello")
+__run ot_forge.validate_ext(path="src/mypack.py")
 ```
 
 ### ot_timer — Named timers
 
 Simple named timers that persist across tool calls. Start a timer before a long operation, check elapsed time after, and compare results. Useful for profiling builds, API calls, or any workflow where you want to measure duration without leaving the conversation.
 
-```python
->>> ot_timer.start(name="build")
->>> ot_timer.elapsed(name="build")
->>> ot_timer.list()
+```text
+__run ot_timer.start(name="build")
+__run ot_timer.elapsed(name="build")
+__run ot_timer.list()
 ```
 
 ### knowledge — RAG knowledge base `[util]`
 
 Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis. Index documentation from scraped sites or write personal annotations, then search with keyword, semantic, or combined (hybrid) modes. `knowledge.ask()` retrieves relevant chunks and synthesises a concise answer with source citations. Link-graph traversal via `knowledge.related()` follows markdown hyperlinks between topics.
 
-```python
->>> knowledge.search(q='context managers', db='docs')
->>> knowledge.ask(q='How do I configure authentication?', db='docs')
->>> knowledge.write(topic='python/tips/loops', content='Use enumerate()', db='docs', category='rule')
->>> knowledge.dbs()
+```text
+__run knowledge.search(q='context managers', db='docs')
+__run knowledge.ask(q='How do I configure authentication?', db='docs')
+__run knowledge.write(topic='python/tips/loops', content='Use enumerate()', db='docs', category='rule')
+__run knowledge.dbs()
 ```
 
 Also provides `read`, `update`, `append`, `delete`, `grep`, `related`, `list`, `toc`, `slice`, `stats`, `info`. Short alias: `kb`.
@@ -116,11 +116,10 @@ Also provides `read`, `update`, `append`, `delete`, `grep`, `related`, `list`, `
 
 Persistent SQLite + FTS5 store for large tool outputs. TTL-expiring, BM25-indexed. Write, search, grep, and navigate results across tool calls without burning your context window.
 
-```python
->>> ctx.write(content="...", source="research")
->>> ctx.search("async error handling")
->>> ctx.grep(pattern="def.*handler")
->>> ctx.read("abc123", offset=50)
+```text
+__run h = ctx.write(content="...", source="research"); ctx.grep(handle=h["handle"], pattern="async error handling")
+__run ctx.grep(handle="abc123", pattern="def.*handler")
+__run ctx.read(handle="abc123", offset=50)
 ```
 
 Short alias: `ctx`.
@@ -139,10 +138,10 @@ Benchmark (4-column product price grid, 20 cells):
 | Cell accuracy (of 20) | **~100%** | **25%**           |
 | Speed                 | 41s       | 34s               |
 
-```python
->>> img.load("diagram.png")
->>> img.ask(handle="diag_01", question="What services are in this architecture?")
->>> img.summary(handle="diag_01")
+```text
+__run img.load(img="diagram.png")
+__run img.ask(img="#diag_01", q="What services are in this architecture?")
+__run img.summary(img="#diag_01")
 ```
 
 Supports PNG, JPG, SVG, HEIC, AVIF, TIFF. Short alias: `img`.
@@ -195,12 +194,12 @@ Adds `get_playground_url(source)` which generates a shareable Kroki playground l
 
 Runs ELK.js in the browser to automatically position all nodes, then calls `fit()`. Works on the full canvas or a selection.
 
-```python
->>> wb.layout()                                    # layered, top-to-bottom
->>> wb.layout(direction="RIGHT", gap_layer=120)    # left-to-right pipeline
->>> wb.layout(algorithm="stress")                  # spring-based, undirected
->>> wb.layout(algorithm="mrtree", direction="DOWN")
->>> wb.layout(direction="RIGHT", arrow_type="elbow")
+```text
+__run wb.layout()                                    # layered, top-to-bottom
+__run wb.layout(direction="RIGHT", gap_layer=120)    # left-to-right pipeline
+__run wb.layout(algorithm="stress")                  # spring-based, undirected
+__run wb.layout(algorithm="mrtree", direction="DOWN")
+__run wb.layout(direction="RIGHT", arrow_type="elbow")
 ```
 
 | Parameter        | Default            | Options                                                                  |
@@ -362,17 +361,13 @@ The config directory changed from `~/.onetool/config/` to `~/.onetool/` (flat la
 
 ### Trigger prefix change
 
-The `__ot` prefix is deprecated. Use `>>>` instead:
+`__run` is the canonical explicit invocation prefix. `__r` and `__ot` are also supported aliases:
 
-```python
-# v1
+```text
+__run brave.search(query="test")
+__r brave.search(query="test")
 __ot brave.search(query="test")
-
-# v2 (recommended)
->>> brave.search(query="test")
 ```
-
-`__ot` still works for backward compatibility but is no longer documented or recommended.
 
 ### User-defined skills removed
 
@@ -398,4 +393,4 @@ The base `onetool-mcp` install is significantly lighter. Install `[all]` to get 
 2. Add `version: 2` to `onetool.yaml`
 3. Move config from `~/.onetool/config/` to `~/.onetool/` (or re-run `onetool init`)
 4. Update MCP client config to pass `--config` and `--secrets` flags
-5. Replace `__ot` with `>>>` in any saved prompts or documentation
+5. Replace `__ot` with `__run` in any saved prompts or documentation

@@ -41,7 +41,9 @@ The `ground.search()` function SHALL perform grounded web searches using Google 
 - **GIVEN** a search query and timeout parameter
 - **WHEN** `ground.search(query=query, timeout=60.0)` is called
 - **THEN** it SHALL use the specified timeout for the API request
-- **AND** if timeout is not specified, it SHALL default to 30.0 seconds
+- **AND** if timeout is not specified, it SHALL use `tools.ground.timeout`
+- **AND** `tools.ground.timeout` SHALL default to 180.0 seconds
+- **AND** timeout MUST be in range 1.0-300.0 seconds; values outside this range SHALL return an error before network work starts
 
 #### Scenario: Max sources parameter
 - **GIVEN** a search query and max_sources parameter
@@ -136,6 +138,12 @@ The `ground.search_batch()` function SHALL execute multiple grounded searches co
 - **GIVEN** a list of queries and model parameter
 - **WHEN** `ground.search_batch(queries=queries, model="gemini-3.0-flash")` is called
 - **THEN** it SHALL use the specified model for all searches
+
+#### Scenario: Batch retry guardrails
+- **WHEN** `ground.search_batch()` is called with retry controls
+- **THEN** `retries` MUST be an integer in range 0-3
+- **AND** `retry_delay_ms` MUST be in range 0-10000
+- **AND** values outside these ranges SHALL return an error before batch work starts
 
 ### Requirement: Source Citations
 

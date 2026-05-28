@@ -88,8 +88,8 @@ Agents are excellent at writing code. OneTool tool calls can be batched, chained
 
 Write Python, not tool definitions. You see exactly what runs. No more guessing.
 
-```python
->>> brave.search(q="AI")
+```text
+__run brave.search(q="AI")
 ```
 
 </div>
@@ -172,10 +172,10 @@ Routes image analysis to a cheaper, better vision model. Zero tokens charged to 
 
 Supports PNG, JPEG, GIF, WebP, TIFF, HEIC, AVIF, SVG.
 
-```python
->>> img.load(img="invoice.png")
->>> img.ask(img="#inv_01", q="Extract all line items and prices")
->>> img.clip_ask(q="What does this screenshot show?")  # clipboard shortcut
+```text
+__run img.load(img="invoice.png")
+__run img.ask(img="#inv_01", q="Extract all line items and prices")
+__run img.clip_ask(q="What does this screenshot show?")  # clipboard shortcut
 ```
 
 [:octicons-arrow-right-24: ot_image reference](reference/tools/ot_image.md)
@@ -188,9 +188,8 @@ Supports PNG, JPEG, GIF, WebP, TIFF, HEIC, AVIF, SVG.
 
 Persistent SQLite+FTS5 store for large tool outputs. Write once, search many times. Agents build up knowledge across tool calls without burning context window.
 
-```python
->>> ctx.write(content="...", source="research")
->>> ctx.search("async error handling")
+```text
+__run h = ctx.write(content="...", source="research"); ctx.grep(handle=h["handle"], pattern="async error handling")
 ```
 
 [:octicons-arrow-right-24: ctx reference](reference/tools/ot_context.md)
@@ -210,9 +209,9 @@ LLM-powered text compaction. One dunder compacts any tool output. Code blocks, U
 | Search results | 25–31% |
 | Mixed prose + code | 15–35% |
 
-```python
->>> __compact__ = True
->>> brave.search(query='AI news', count=10)
+```text
+__run __compact__ = True
+__run brave.search(query='AI news', count=10)
 # compacted in-place; ~25–31% reduction on search snippets
 ```
 

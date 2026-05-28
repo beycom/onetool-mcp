@@ -1,12 +1,13 @@
 ---
 name: ot-ref
-description: Optional OneTool advanced reference — recovery loops, proxy handling, security, ctx traps
+description: OneTool __run/MCP run reference for direct pack calls, recovery, proxy handling, ctx handles, and run-vs-local-script decisions
 tags: [reference, cheatsheet]
 ---
 
 # OneTool Advanced Reference
 
 `ot-ref` is optional. Base run instructions are sufficient for normal OneTool use.
+Use this when a OneTool `__run`/MCP run request needs recovery, proxy, ctx, output, or run-vs-local-script guidance.
 
 ## Fast Recovery (fail-first)
 
@@ -15,6 +16,16 @@ tags: [reference, cheatsheet]
 3. If unknown/missing tool, check `ot.tools(pattern='name')` or `ot.packs(pattern='name')`.
 4. If still unclear, run `ot.help(query='topic')`.
 5. Retry once with corrected kwargs. Do not guess beyond one retry.
+
+Close-call recovery:
+- If a call is syntactically valid but may have wrong args, calling first is OK; repair from the error plus `ot.tool_info`.
+- If input is natural language or invalid Python, inspect/synthesize instead of sending code that can only fail syntax validation.
+- For readable discovery output: `__format__ = 'yml_h'; ot.help(query='topic')`.
+
+Param prefixes:
+- Exact param match wins.
+- Otherwise any signature/schema param starting with the provided key can match.
+- If multiple params match, first in signature/schema order wins; use longer keys when ambiguity matters.
 
 ## Proxy Server Recovery
 

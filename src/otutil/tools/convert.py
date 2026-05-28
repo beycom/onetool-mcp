@@ -37,6 +37,7 @@ from typing import Any
 
 from otpack import LogSpan, resolve_cwd_path
 
+from ot.utils.async_bridge import run_coro_sync
 from otutil.tools._convert import (
     convert_excel,
     convert_pdf,
@@ -331,7 +332,7 @@ def pdf(
 
         # Batch conversion
         try:
-            result = asyncio.run(_convert_batch_async(files, out_path, convert_pdf))
+            result = run_coro_sync(_convert_batch_async(files, out_path, convert_pdf))
             s.add(converted=result["converted"], failed=result["failed"])
 
             return _format_batch_result(
@@ -387,7 +388,7 @@ def word(
                 return f"Error converting {files[0].name}: {e}"
 
         try:
-            result = asyncio.run(_convert_batch_async(files, out_path, convert_word))
+            result = run_coro_sync(_convert_batch_async(files, out_path, convert_word))
             s.add(converted=result["converted"], failed=result["failed"])
 
             return _format_batch_result(
@@ -447,7 +448,7 @@ def powerpoint(
                 return f"Error converting {files[0].name}: {e}"
 
         try:
-            result = asyncio.run(
+            result = run_coro_sync(
                 _convert_batch_async(
                     files, out_path, convert_powerpoint, include_notes=include_notes
                 )
@@ -518,7 +519,7 @@ def excel(
                 return f"Error converting {files[0].name}: {e}"
 
         try:
-            result = asyncio.run(
+            result = run_coro_sync(
                 _convert_batch_async(
                     files, out_path, convert_excel,
                     include_formulas=include_formulas,
@@ -596,7 +597,7 @@ def auto(
 
         # Batch conversion with async parallel processing
         try:
-            result = asyncio.run(_convert_auto_batch_async(files, out_path, converters))
+            result = run_coro_sync(_convert_auto_batch_async(files, out_path, converters))
             s.add(converted=result["converted"], failed=result["failed"], skipped=result["skipped"])
 
             return _format_batch_result(

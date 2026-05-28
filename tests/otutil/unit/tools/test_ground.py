@@ -12,6 +12,7 @@ import pytest
 pytest.importorskip("google.genai", reason="google-genai not installed ([util] extra)")
 
 from otutil.tools.ground import (
+    Config,
     _extract_structured_data,
     _extract_sources,
     _format_error,
@@ -190,6 +191,18 @@ class TestSearch:
         assert "Search results" in result
         mock_grounded.assert_called_once()
 
+    def test_rejects_invalid_timeout_before_network(self):
+        result = search(query="Python best practices", timeout=0)
+
+        assert "timeout must be between 1.0 and 300.0 seconds" in result
+
+    def test_rejects_non_numeric_timeout_before_network(self):
+        result = search(query="Python best practices", timeout="x")  # type: ignore[arg-type]
+        assert "timeout must be between 1.0 and 300.0 seconds" in result
+
+        result = search(query="Python best practices", timeout=True)  # type: ignore[arg-type]
+        assert "timeout must be between 1.0 and 300.0 seconds" in result
+
     @patch("otutil.tools.ground._grounded_search")
     def test_includes_context(self, mock_grounded):
         mock_grounded.return_value = "results"
@@ -321,6 +334,14 @@ class TestReddit:
 class TestGroundedSearch:
     """Test _grounded_search core function."""
 
+    def test_config_accepts_timeout(self):
+        cfg = Config(timeout=180.0)
+
+        assert cfg.timeout == 180.0
+
+    def test_default_timeout_is_180(self):
+        assert Config().timeout == 180.0
+
     @patch("otutil.tools.ground._require_google_genai")
     @patch("otutil.tools.ground._get_client")
     @patch("otutil.tools.ground.get_tool_config")
@@ -345,6 +366,32 @@ class TestGroundedSearch:
             result = _grounded_search("test query", span_name="test.span")
 
         assert "Search result text" in result
+
+    @patch("otutil.tools.ground._require_google_genai")
+    @patch("otutil.tools.ground._get_client")
+    @patch("otutil.tools.ground.get_tool_config")
+    def test_grounded_search_uses_configured_timeout(self, mock_config, mock_get_client, mock_require):
+        import sys
+        from unittest.mock import MagicMock
+
+        from otutil.tools.ground import Config, _grounded_search
+
+        mock_config.return_value = Config(model="gemini-2.0-flash", timeout=180.0)
+
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+
+        mock_response = MagicMock()
+        mock_response.text = "Search result text"
+        mock_response.candidates = []
+        mock_client.models.generate_content.return_value = mock_response
+
+        mock_types = MagicMock()
+        with patch.dict(sys.modules, {"google.genai.types": mock_types, "google.genai": MagicMock(types=mock_types)}):
+            _grounded_search("test query", span_name="test.span")
+
+        config_kwargs = mock_types.GenerateContentConfig.call_args.kwargs
+        assert config_kwargs["http_options"]["timeout"] == 180_000
 
     @patch("otutil.tools.ground._require_google_genai")
     @patch("otutil.tools.ground._get_client")
@@ -586,6 +633,41 @@ class TestSearchBatchModel:
         assert result["results"][0]["query"] == "q1"
         assert result["results"][1]["query"] == "q2"
 
+    def test_search_batch_rejects_invalid_retry_controls(self):
+        result = search_batch(queries=["q1"], retries=-1)
+
+        assert "retries must be between 0 and 3" in result
+
+        result = search_batch(queries=["q1"], retries="x")  # type: ignore[arg-type]
+
+        assert "retries must be between 0 and 3" in result
+
+        result = search_batch(queries=["q1"], retries=4)
+
+        assert "retries must be between 0 and 3" in result
+
+        result = search_batch(queries=["q1"], retry_delay_ms=10_001)
+
+        assert "retry_delay_ms must be between 0 and 10000" in result
+
+        result = search_batch(queries=["q1"], retry_delay_ms="x")  # type: ignore[arg-type]
+
+        assert "retry_delay_ms must be between 0 and 10000" in result
+
+    @patch("otutil.tools.ground.search")
+    def test_search_batch_accepts_retry_control_upper_bounds(self, mock_search):
+        mock_search.return_value = "Result"
+
+        result = search_batch(
+            queries=["q1"],
+            timeout=300.0,
+            retries=3,
+            retry_delay_ms=10_000,
+        )
+
+        assert isinstance(result, dict)
+        assert result["meta"]["retries"] == 3
+
 
 @pytest.mark.unit
 @pytest.mark.tools
@@ -734,6 +816,15 @@ class TestErrorMessages:
         result = _format_error(exc)
 
         assert "timed out" in result.lower()
+
+    def test_ground_config_timeout_error_not_masked(self):
+        """Config errors mentioning timeout should not look like request timeouts."""
+        exc = Exception("Invalid tools.ground configuration: timeout must be less than or equal to 300")
+
+        result = _format_error(exc)
+
+        assert "Invalid tools.ground configuration" in result
+        assert "Request timed out" not in result
 
     def test_generic_error(self):
         """Generic errors should include original message."""

@@ -128,7 +128,7 @@ def load_secrets(
         if not private_key:
             raise SecretDecryptionError(
                 "Encrypted secrets found in secrets file but no age identity is "
-                "stored in the OS keychain. Run: >>> ot_secrets.init()"
+                "stored in the OS keychain. Run: __run ot_secrets.init()"
             )
 
         identity = pyrage.x25519.Identity.from_str(private_key)

@@ -134,7 +134,7 @@ def test_tools_pattern_filter_by_pack() -> None:
     # Should only have ot pack tools
     assert any(name == "ot.tools" for name in tool_names)
     assert any(name == "ot.packs" for name in tool_names)
-    assert any(name == "ot.health" for name in tool_names)
+    assert any(name == "ot.status" for name in tool_names)
 
     # Should NOT have other pack tools
     assert not any(name.startswith("brave.") for name in tool_names)
@@ -174,11 +174,11 @@ def test_tools_pattern_no_match_returns_empty() -> None:
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_health_counts_all_tools() -> None:
-    """Verify ot.health() counts all tools including duplicates."""
-    from ot.meta import health
+def test_status_counts_all_tools() -> None:
+    """Verify ot.status() counts all tools including duplicates."""
+    from ot.meta import status
 
-    result = health()
+    result = status()
 
     # Result is now a dict directly
     assert "registry" in result
@@ -648,8 +648,8 @@ def test_snippet_info_no_args_returns_all(override_config: Any) -> None:
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_snippet_info_dollar_prefix_hint(override_config: Any) -> None:
-    """ot.snippet_info(name='$rg') returns a hint to drop the '$' prefix."""
+def test_snippet_info_colon_prefix_hint(override_config: Any) -> None:
+    """ot.snippet_info(name=':rg') returns a hint to drop the ':' prefix."""
     from ot.config import SnippetDef
     from ot.meta import snippet_info
 
@@ -658,11 +658,11 @@ def test_snippet_info_dollar_prefix_hint(override_config: Any) -> None:
             snippets={"rg": SnippetDef(description="Ripgrep search", body="rg.search()")}
         )
     ):
-        result = snippet_info(name="$rg")
+        result = snippet_info(name=":rg")
         assert isinstance(result, dict)
         assert "error" in result
         assert "Did you mean 'rg'" in result["error"]
-        assert "$" in result["error"]
+        assert ":" in result["error"]
 
 
 @pytest.mark.unit

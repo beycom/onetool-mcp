@@ -23,6 +23,9 @@ def test_load_config_defaults() -> None:
     assert config.log_level == "INFO"
     assert config.security.validate_code is True
     assert config.tools_dir == ["tools/*.py"]
+    assert config.llm.base_url == "https://api.openai.com/v1"
+    assert config.llm.model == "gpt-5.4-nano"
+    assert config.llm.embedding_model == "text-embedding-3-small"
 
 
 @pytest.mark.unit
@@ -195,6 +198,118 @@ def test_tools_config_accepts_any_tool() -> None:
         # Tool configs are accessible as dicts
         assert config.tools.model_extra.get("brave", {}).get("timeout") == 0.5
         assert config.tools.model_extra.get("custom_tool", {}).get("my_setting") == "value"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_get_tool_config_rejects_invalid_override(tmp_path: Path) -> None:
+    """Pack config schema errors are visible instead of falling back to defaults."""
+    import ot.config.loader
+    from pydantic import BaseModel
+
+    from ot.config.loader import get_config, get_tool_config
+
+    class SampleConfig(BaseModel):
+        timeout: int = 30
+
+    config_path = tmp_path / "onetool.yaml"
+    config_path.write_text(
+        yaml.dump({"version": 2, "tools": {"sample": {"timeout": "not-an-int"}}})
+    )
+
+    ot.config.loader._config = None
+    try:
+        get_config(config_path)
+        with pytest.raises(ValueError, match="Invalid tools.sample configuration"):
+            get_tool_config("sample", SampleConfig)
+    finally:
+        ot.config.loader._config = None
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_get_tool_config_rejects_unknown_override(tmp_path: Path) -> None:
+    """Unknown typed pack config keys fail loudly instead of being ignored."""
+    import ot.config.loader
+    from pydantic import BaseModel
+
+    from ot.config.loader import get_config, get_tool_config
+
+    class SampleConfig(BaseModel):
+        timeout: int = 30
+
+    config_path = tmp_path / "onetool.yaml"
+    config_path.write_text(
+        yaml.dump({"version": 2, "tools": {"sample": {"timeout": 45, "extra": True}}})
+    )
+
+    ot.config.loader._config = None
+    try:
+        get_config(config_path)
+        with pytest.raises(ValueError, match="Invalid tools.sample configuration"):
+            get_tool_config("sample", SampleConfig)
+    finally:
+        ot.config.loader._config = None
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_get_tool_config_rejects_unknown_for_forbid_schema(tmp_path: Path) -> None:
+    """Unknown fields remain hard errors for schemas that explicitly forbid extras."""
+    import ot.config.loader
+    from pydantic import BaseModel, ConfigDict
+
+    from ot.config.loader import get_config, get_tool_config
+
+    class SampleConfig(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+
+        timeout: int = 30
+
+    config_path = tmp_path / "onetool.yaml"
+    config_path.write_text(
+        yaml.dump({"version": 2, "tools": {"sample": {"timeout": 45, "extra": True}}})
+    )
+
+    ot.config.loader._config = None
+    try:
+        get_config(config_path)
+        with pytest.raises(ValueError, match="Invalid tools.sample configuration"):
+            get_tool_config("sample", SampleConfig)
+    finally:
+        ot.config.loader._config = None
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_get_tool_config_rejects_removed_knowledge_keys(tmp_path: Path) -> None:
+    """Removed knowledge config keys must not be silently dropped."""
+    import ot.config.loader
+
+    from ot.config.loader import get_config, get_tool_config
+    from otutil.tools._knowledge.config import Config
+
+    config_path = tmp_path / "onetool.yaml"
+    config_path.write_text(
+        yaml.dump(
+            {
+                "version": 2,
+                "tools": {
+                    "knowledge": {
+                        "databases": {"docs": {"path": "mem/docs.db"}},
+                    },
+                },
+            }
+        )
+    )
+
+    ot.config.loader._config = None
+    try:
+        get_config(config_path)
+        with pytest.raises(ValueError, match="Invalid tools.knowledge configuration"):
+            get_tool_config("knowledge", Config)
+    finally:
+        ot.config.loader._config = None
 
 
 @pytest.mark.unit
@@ -929,5 +1044,3 @@ def test_get_tool_config_expands_vars_at_runtime() -> None:
         # Cleanup
         secrets_module._secrets = None
         loader_module._config = None
-
-

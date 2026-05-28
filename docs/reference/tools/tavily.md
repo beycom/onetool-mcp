@@ -39,8 +39,8 @@ Short alias: `tav`
 | `days` | int | For news topic, how many days back to search (1-30, default: 3) |
 | `include_domains` | list[str] | Restrict results to these domains |
 | `exclude_domains` | list[str] | Exclude results from these domains |
-| `retries` | int | Batch mode only. Retry count for transient failures (default: 0) |
-| `retry_delay_ms` | int | Batch mode only. Base backoff delay in milliseconds (default: 250) |
+| `retries` | int | Batch mode only. Retry count for transient failures (non-negative, default: 0) |
+| `retry_delay_ms` | int | Batch mode only. Base backoff delay in milliseconds (0-10000, default: 250) |
 | `extract_schema` | dict | Optional schema-constrained extraction mode for search/search_batch |
 | `return_provenance` | bool | Include per-field provenance (`source_url`, `snippet`, `confidence`) |
 
@@ -59,7 +59,7 @@ Short alias: `tav`
 |-----------|------|-------------|
 | `input` | str | Research question or task (required, cannot be empty) |
 | `model` | str | `"mini"` (5 credits), `"pro"` (20 credits), `"auto"` (default) |
-| `timeout_seconds` | int | Max seconds to wait for completion (default: 300) |
+| `timeout_seconds` | int | Max seconds to wait for completion (10-1800, default: 300) |
 
 ## Requires
 
@@ -75,12 +75,12 @@ Short alias: `tav`
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `tools.tavily.timeout` | float | `60.0` | Request timeout in seconds. Range: `1.0-300.0`. |
+| `tools.tavily.timeout` | float | `180.0` | Request timeout in seconds. Range: `1.0-300.0`. |
 
 ```yaml
 tools:
   tavily:
-    timeout: 60.0
+    timeout: 180.0
 ```
 
 ### Defaults

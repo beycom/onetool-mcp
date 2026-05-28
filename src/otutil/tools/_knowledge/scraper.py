@@ -19,6 +19,8 @@ from urllib.parse import urlparse
 
 import yaml
 
+from ot.utils.async_bridge import run_coro_sync
+
 # Binary file extensions to exclude from crawling
 _BINARY_EXTENSIONS = re.compile(
     r"\.(pdf|zip|gz|tar|tgz|rar|7z|exe|dmg|pkg|deb|rpm"
@@ -306,7 +308,7 @@ def run_scrape(
     Returns:
         ScrapeResult with written/failed/skipped counts and per-page records.
     """
-    return asyncio.run(_run_scrape_async(
+    return run_coro_sync(_run_scrape_async(
         url=url,
         output_dir=output_dir,
         source_name=source_name,

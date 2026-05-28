@@ -78,6 +78,13 @@ def _create_pack_proxy(pack_name: str, pack_funcs: dict[str, Any]) -> Any:
                 return self._function_cache[name]
 
             available = ", ".join(sorted(pack_funcs.keys()))
+            if pack_name == "ot":
+                raise AttributeError(
+                    f"Function '{name}' not found in pack 'ot'. "
+                    "To call a OneTool pack, use direct pack syntax such as "
+                    f"{name}.tool(...), not ot.{name}.tool(...). "
+                    f"Available ot functions: {available}"
+                )
             raise AttributeError(
                 f"Function '{name}' not found in pack '{pack_name}'. "
                 f"Available: {available}"

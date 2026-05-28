@@ -65,6 +65,11 @@ All conversions SHALL execute asynchronously.
 - **WHEN** conversion starts
 - **THEN** files SHALL be processed in parallel using async
 
+#### Scenario: Batch conversion inside a running event loop
+- **GIVEN** OneTool is already executing inside an event loop
+- **WHEN** a batch conversion path is called
+- **THEN** the async batch work SHALL complete without calling `asyncio.run()` on the running loop
+
 #### Scenario: Completion summary
 - **GIVEN** a batch conversion completes
 - **WHEN** all files are processed
@@ -374,4 +379,3 @@ The convert tool SHALL follow OneTool tool conventions.
 - **WHEN** the tool is used
 - **THEN** it SHALL follow all requirements in `tool-conventions` spec
 - **INCLUDING** keyword-only arguments, LogSpan logging, string error returns
-
