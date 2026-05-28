@@ -6,7 +6,7 @@ Uses mocked converters to test the tool interface without requiring documents.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 
 import pytest
@@ -180,6 +180,69 @@ def test_pdf_error_handling(test_pdf: Path, tmp_path: Path) -> None:
 
     assert "Error" in result
     assert "Test error" in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_pdf_single_file_does_not_use_async_bridge(test_pdf: Path, tmp_path: Path) -> None:
+    """Verify single-file conversion stays on the direct synchronous path."""
+    from otutil.tools.convert import pdf
+
+    mock_result = {
+        "output": str(tmp_path / "output" / "test.md"),
+        "pages": 5,
+        "images": 2,
+    }
+
+    with (
+        patch("otutil.tools.convert.convert_pdf", return_value=mock_result),
+        patch("otutil.tools.convert.run_coro_sync") as mock_bridge,
+    ):
+        result = pdf(pattern=str(test_pdf), output_dir="output")
+
+    assert "Converted test.pdf" in result
+    mock_bridge.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+async def test_batch_conversions_run_inside_running_loop(tmp_path: Path) -> None:
+    """Verify batch conversion wrappers work from an active event loop."""
+    from otutil.tools import convert
+
+    files_by_ext = {
+        "pdf": [tmp_path / "a.pdf", tmp_path / "b.pdf"],
+        "docx": [tmp_path / "a.docx", tmp_path / "b.docx"],
+        "pptx": [tmp_path / "a.pptx", tmp_path / "b.pptx"],
+        "xlsx": [tmp_path / "a.xlsx", tmp_path / "b.xlsx"],
+    }
+    for paths in files_by_ext.values():
+        for path in paths:
+            path.write_bytes(b"content")
+
+    def _result(input_path: Path, _output_dir: Path, _source_rel: str, **_kwargs: Any) -> dict[str, Any]:
+        data: dict[str, Any] = {"output": f"{input_path.stem}.md"}
+        if input_path.suffix == ".pdf":
+            data.update({"pages": 1, "images": 0})
+        elif input_path.suffix == ".docx":
+            data.update({"paragraphs": 1, "tables": 0, "images": 0})
+        elif input_path.suffix == ".pptx":
+            data.update({"slides": 1, "images": 0})
+        elif input_path.suffix == ".xlsx":
+            data.update({"sheets": 1, "rows": 1})
+        return data
+
+    with (
+        patch("otutil.tools.convert.convert_pdf", side_effect=_result),
+        patch("otutil.tools.convert.convert_word", side_effect=_result),
+        patch("otutil.tools.convert.convert_powerpoint", side_effect=_result),
+        patch("otutil.tools.convert.convert_excel", side_effect=_result),
+    ):
+        assert "Converted 2 files" in convert.pdf(pattern="*.pdf", output_dir="output")
+        assert "Converted 2 files" in convert.word(pattern="*.docx", output_dir="output")
+        assert "Converted 2 files" in convert.powerpoint(pattern="*.pptx", output_dir="output")
+        assert "Converted 2 files" in convert.excel(pattern="*.xlsx", output_dir="output")
+        assert "Converted 8 files" in convert.auto(pattern="*", output_dir="output")
 
 
 # =============================================================================
