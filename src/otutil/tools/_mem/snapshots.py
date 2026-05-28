@@ -1,4 +1,4 @@
-"""Memory snap and restore (directory-based snapshots)."""
+"""Memory snapshot and restore (directory-based snapshots)."""
 from __future__ import annotations
 
 import uuid
@@ -21,7 +21,7 @@ from .db import (
 from .embedding import _maybe_embed
 
 
-def snap(
+def snapshot(
     *,
     output: str,
     topic: str | None = None,
@@ -40,17 +40,17 @@ def snap(
         on_conflict: "skip" (default) or "overwrite" for existing files
 
     Returns:
-        Summary of snap results.
+        Summary of snapshot results.
 
     Example:
-        mem.snap(output="backup/consult", topic="consult/")
-        mem.snap(output="backup/all")
-        mem.snap(output="backup/config", topic="config/", ext=".yaml")
+        mem.snapshot(output="backup/consult", topic="consult/")
+        mem.snapshot(output="backup/all")
+        mem.snapshot(output="backup/config", topic="config/", ext=".yaml")
     """
     if on_conflict not in ("skip", "overwrite"):
         return f"Error: on_conflict must be 'skip' or 'overwrite', got '{on_conflict}'"
 
-    with LogSpan(span="mem.snap", output=output, topic=topic) as s:
+    with LogSpan(span="mem.snapshot", output=output, topic=topic) as s:
         try:
             conn = _get_connection()
 
@@ -71,7 +71,7 @@ def snap(
             rows = conn.execute(sql, params).fetchall()
 
             if not rows:
-                return "No memories to snap"
+                return "No memories to snapshot"
 
             # Determine topic prefix to strip
             strip_prefix = ""
@@ -135,7 +135,7 @@ def snap(
                 import yaml
             except ImportError as e:
                 raise ImportError(
-                    "pyyaml is required for YAML export. Install with: pip install pyyaml"
+                    "pyyaml is required for YAML snapshot. Install with: pip install pyyaml"
                 ) from e
 
             now_str = datetime.now(UTC).isoformat()
@@ -168,11 +168,11 @@ def snap(
             s.add("written", written)
             s.add("skipped", skipped)
             s.add("total", len(index_entries))
-            return f"Snap {len(index_entries)} memories to {validated_path} ({written} written, {skipped} skipped)"
+            return f"Snapshot {len(index_entries)} memories to {validated_path} ({written} written, {skipped} skipped)"
 
         except Exception as e:
             s.add("error", str(e))
-            return f"Error creating snap: {e}"
+            return f"Error creating snapshot: {e}"
 
 
 def restore(
@@ -181,7 +181,7 @@ def restore(
     topic: str | None = None,
     overwrite: bool = False,
 ) -> str:
-    """Restore memories from a snap directory (created by `mem.snap`).
+    """Restore memories from a snapshot directory (created by `mem.snapshot`).
 
     Reads index.yaml and content files, recreating memories with full metadata.
 
@@ -312,7 +312,7 @@ def restore(
             return f"Error: {e}"
         except Exception as e:
             s.add("error", str(e))
-            return f"Error restoring snap: {e}"
+            return f"Error restoring snapshot: {e}"
 
 
-__all__ = ["restore", "snap"]
+__all__ = ["restore", "snapshot"]
