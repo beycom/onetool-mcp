@@ -47,6 +47,7 @@ just docs-deploy      # deploy to GitHub Pages
 ```bash
 just build    # build the package (uv build)
 just clean    # clean build artefacts and caches
+just reset-env # recreate .venv from scratch
 ```
 
 ## OneTool

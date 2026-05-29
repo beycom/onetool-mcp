@@ -152,6 +152,12 @@ clean:
     find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
     uv cache clean
 
+# Recreate the local Python environment from scratch
+reset-env: clean
+    rm -rf .venv
+    uv cache clean
+    just install
+
 # ============================================================================
 # MODULES (use `just <module>::<task>`)
 # ============================================================================
