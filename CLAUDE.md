@@ -1,1 +1,0 @@
-READ AGENTS.md for full instructions
