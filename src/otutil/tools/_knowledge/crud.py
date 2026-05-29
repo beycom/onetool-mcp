@@ -7,6 +7,8 @@ from typing import Any
 from loguru import logger
 from otpack import LogSpan
 
+from ot.logging import LogEntry
+
 from .chunker import _content_hash
 from .config import VALID_CATEGORIES
 from .db import (
@@ -308,7 +310,14 @@ def _try_embed(conn: Any, chunk_id: str, content: str) -> str | None:
         )
         return None
     except Exception as e:
-        logger.warning("Embedding generation failed for chunk {}: {}", chunk_id, e)
+        logger.warning(
+            LogEntry(
+                event="knowledge.embedding.chunk_failed",
+                chunkId=chunk_id,
+                errorType=type(e).__name__,
+                error=str(e),
+            )
+        )
         return str(e)
 
 

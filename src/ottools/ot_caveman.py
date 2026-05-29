@@ -45,6 +45,8 @@ from openai import OpenAI
 from otpack import LogSpan, get_secret, get_tool_config, resolve_cwd_path
 from pydantic import BaseModel, Field
 
+from ot.logging import LogEntry
+
 # ---------------------------------------------------------------------------
 # Client cache — avoids new connection pool per call
 # ---------------------------------------------------------------------------
@@ -128,7 +130,15 @@ def _get_config() -> Config:
         if updates:
             config = config.model_copy(update=updates)
     except Exception as e:
-        logger.warning("Failed to load top-level llm config for ot_caveman fallbacks: {}", e)
+        logger.warning(
+            LogEntry(
+                event="ot_caveman.config.llm_fallback_failed",
+                tool="ot_caveman",
+                configSource="llm",
+                errorType=type(e).__name__,
+                error=str(e),
+            )
+        )
     return config
 
 
@@ -537,7 +547,17 @@ def compact(
                 try:
                     content = fpath.read_text(encoding="utf-8")
                 except OSError as e:
-                    logger.warning("ot_caveman.compact: skipping {} — read error: {}", fpath, e)
+                    logger.warning(
+                        LogEntry(
+                            event="ot_caveman.file.skipped",
+                            tool="ot_caveman",
+                            operation="compact",
+                            path=fpath,
+                            reason="read_error",
+                            errorType=type(e).__name__,
+                            error=str(e),
+                        )
+                    )
                     skipped += 1
                     continue
                 if not content or not content.strip():
@@ -548,7 +568,17 @@ def compact(
                 try:
                     compacted = _compact_text(content)
                 except RuntimeError as e:
-                    logger.warning("ot_caveman.compact: skipping {} — {}", fpath, e)
+                    logger.warning(
+                        LogEntry(
+                            event="ot_caveman.file.skipped",
+                            tool="ot_caveman",
+                            operation="compact",
+                            path=fpath,
+                            reason="llm_error",
+                            errorType=type(e).__name__,
+                            error=str(e),
+                        )
+                    )
                     skipped += 1
                     continue
                 fell_back = compacted == content
@@ -700,7 +730,17 @@ def expand(
                 try:
                     content = fpath.read_text(encoding="utf-8")
                 except OSError as e:
-                    logger.warning("ot_caveman.expand: skipping {} — read error: {}", fpath, e)
+                    logger.warning(
+                        LogEntry(
+                            event="ot_caveman.file.skipped",
+                            tool="ot_caveman",
+                            operation="expand",
+                            path=fpath,
+                            reason="read_error",
+                            errorType=type(e).__name__,
+                            error=str(e),
+                        )
+                    )
                     skipped += 1
                     continue
                 if not content or not content.strip():
@@ -719,7 +759,16 @@ def expand(
                     config.max_tokens,
                 )
                 if err:
-                    logger.warning("ot_caveman.expand: skipping {} — LLM error: {}", fpath, err)
+                    logger.warning(
+                        LogEntry(
+                            event="ot_caveman.file.skipped",
+                            tool="ot_caveman",
+                            operation="expand",
+                            path=fpath,
+                            reason="llm_error",
+                            error=err,
+                        )
+                    )
                     skipped += 1
                     continue
 

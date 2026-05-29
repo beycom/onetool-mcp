@@ -10,6 +10,7 @@ from loguru import logger
 from otpack import LogSpan, get_secret
 
 from ot.config import get_llm_config
+from ot.logging import LogEntry
 
 from .config import _get_config
 from .db import _serialize_embedding, _use_connection
@@ -156,8 +157,12 @@ def _enqueue_embedding(memory_id: str) -> None:
         _embedding_dropped += 1
         if _embedding_dropped in {1, 10, 100} or _embedding_dropped % 1000 == 0:
             logger.warning(
-                "Embedding queue full; dropped {} pending job(s)",
-                _embedding_dropped,
+                LogEntry(
+                    event="mem.embedding.queue_full",
+                    droppedCount=_embedding_dropped,
+                    queueSize=_embedding_queue.qsize(),
+                    queueMaxSize=_embedding_queue.maxsize,
+                )
             )
 
 
@@ -207,9 +212,12 @@ def _embedding_worker() -> None:
                         time.sleep(2**retries)  # 2s, 4s, 8s
                     else:
                         logger.warning(
-                            "Failed embedding for {} after {} retries",
-                            memory_id,
-                            max_retries,
+                            LogEntry(
+                                event="mem.embedding.failed",
+                                memoryId=memory_id,
+                                retries=max_retries,
+                                errorCount=_embedding_errors,
+                            )
                         )
         finally:
             _embedding_queue.task_done()

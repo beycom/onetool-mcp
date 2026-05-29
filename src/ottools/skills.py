@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING, Any
 
 from otpack import LogSpan, cache
 
+from ot.logging import LogEntry
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -29,11 +31,16 @@ def _get_skills_dir() -> Path:
     return get_global_templates_dir() / "skills"
 
 
-def _parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
+def _parse_frontmatter(
+    content: str,
+    *,
+    source_path: Path | None = None,
+) -> tuple[dict[str, Any], str]:
     """Parse YAML frontmatter from Markdown content.
 
     Args:
         content: Full file content with optional --- frontmatter ---
+        source_path: Optional source path for structured warning context.
 
     Returns:
         (frontmatter_dict, body_text) where body has leading whitespace stripped
@@ -54,7 +61,15 @@ def _parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
         fm: dict[str, Any] = yaml.safe_load(fm_text) or {}
     except Exception as e:
         from loguru import logger
-        logger.warning("Malformed YAML frontmatter in skill file: {}", e)
+
+        logger.warning(
+            LogEntry(
+                event="skills.frontmatter.malformed",
+                path=source_path,
+                errorType=type(e).__name__,
+                error=str(e),
+            )
+        )
         fm = {}
 
     return fm, body
@@ -75,7 +90,7 @@ def _load_skill_index() -> dict[str, tuple[dict[str, Any], str]]:
         if skill_file.name.startswith("_"):
             continue
         content = skill_file.read_text(encoding="utf-8")
-        fm, body = _parse_frontmatter(content)
+        fm, body = _parse_frontmatter(content, source_path=skill_file)
         result[skill_file.stem] = (fm, body)
     return result
 
