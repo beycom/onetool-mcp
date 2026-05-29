@@ -45,6 +45,28 @@ class MetricExpectations(BaseModel):
     cost_required: bool = False
 
 
+class WorkspaceMountConfig(BaseModel):
+    """Optional host workspace mounted into each Harbor task container."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    target: str = Field(default="/app", min_length=1)
+    root: Path | None = None
+
+    @field_validator("target")
+    @classmethod
+    def target_must_be_absolute_container_path(cls, value: str) -> str:
+        """Require a simple absolute container path for the workspace mount."""
+        if not value.startswith("/"):
+            raise ValueError("workspace_mount.target must be an absolute path")
+        if "?" in value or "#" in value or any(ch.isspace() for ch in value):
+            raise ValueError(
+                "workspace_mount.target must not contain whitespace, query, or fragment"
+            )
+        return value
+
+
 class VariantRef(BaseModel):
     """Reference to a variant config file from an experiment."""
 
@@ -68,6 +90,9 @@ class ExperimentConfigRaw(BaseModel):
     extra_instruction_paths: list[Path] = Field(default_factory=list)
     output_root: Path | None = None
     metrics: MetricExpectations = Field(default_factory=MetricExpectations)
+    workspace_mount: WorkspaceMountConfig = Field(
+        default_factory=WorkspaceMountConfig
+    )
 
     @field_validator("task_file")
     @classmethod
@@ -79,14 +104,23 @@ class ExperimentConfigRaw(BaseModel):
 
 
 class OneToolMcpConfig(BaseModel):
-    """Stdio MCP server config for the OneTool variant."""
+    """HTTP MCP server config for OneTool harness variants."""
 
     model_config = ConfigDict(extra="forbid")
 
     config_path: Path
     server_name: str = Field(default="onetool", min_length=1)
-    command: str = Field(default="uv", min_length=1)
-    args: list[str] = Field(default_factory=lambda: ["run", "onetool"])
+    url: str = Field(min_length=1)
+
+    @field_validator("url")
+    @classmethod
+    def url_must_be_http_mcp_endpoint(cls, value: str) -> str:
+        """Require an explicit HTTP URL for the host-running OneTool MCP server."""
+        if not value.startswith(("http://", "https://")):
+            raise ValueError("mcp.url must start with http:// or https://")
+        if "?" in value or "#" in value or any(ch.isspace() for ch in value):
+            raise ValueError("mcp.url must not contain whitespace, query, or fragment")
+        return value
 
 
 class VariantConfigRaw(BaseModel):
@@ -120,8 +154,6 @@ class VariantConfigRaw(BaseModel):
         if self.kind == VariantKind.CODEX_SKILLS:
             if self.skills_dir is None:
                 raise ValueError("codex-skills variant requires skills_dir")
-            if self.mcp is not None:
-                raise ValueError("codex-skills variant must not configure mcp")
             if not self.id.startswith("codex-skills-"):
                 raise ValueError(
                     "codex-skills variant id must start with codex-skills-"
@@ -160,6 +192,7 @@ class ExperimentConfig(BaseModel):
     extra_instruction_paths: list[Path]
     output_root: Path
     metrics: MetricExpectations
+    workspace_mount: WorkspaceMountConfig
 
 
 LEGACY_FIELDS = frozenset(
@@ -220,6 +253,12 @@ def load_experiment(path: Path) -> ExperimentConfig:
         raise ConfigError(
             f"output_root must not resolve inside packages/ot-harness: {output_root}"
         )
+    workspace_root = (
+        (config_path.parent / raw.workspace_mount.root).resolve()
+        if raw.workspace_mount.root is not None
+        else output_root / "workspaces" / raw.name
+    )
+    workspace_mount = raw.workspace_mount.model_copy(update={"root": workspace_root})
 
     return ExperimentConfig(
         name=raw.name,
@@ -233,6 +272,7 @@ def load_experiment(path: Path) -> ExperimentConfig:
         extra_instruction_paths=extra_instruction_paths,
         output_root=output_root,
         metrics=raw.metrics,
+        workspace_mount=workspace_mount,
     )
 
 

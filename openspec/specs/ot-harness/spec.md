@@ -63,7 +63,7 @@ The system SHALL define a strict experiment config that describes the benchmark 
 
 ### Requirement: Codex variants
 
-The system SHALL support initial Codex benchmark variants for base Codex, Codex with OneTool MCP, and Codex with skill directories.
+The system SHALL support initial Codex benchmark variants for base Codex, Codex with OneTool MCP over HTTP, and Codex with skill directories.
 
 #### Scenario: Base Codex variant
 
@@ -76,7 +76,7 @@ The system SHALL support initial Codex benchmark variants for base Codex, Codex 
 
 - **WHEN** an experiment includes the `codex-onetool-mcp` variant
 - **THEN** the generated Harbor configuration uses the same Codex agent and model as the base variant
-- **AND** it configures a OneTool MCP server for the Codex run
+- **AND** it configures a OneTool MCP server over HTTP for the Codex run
 - **AND** it does not require handoff tools
 
 #### Scenario: Skills variant
@@ -84,6 +84,7 @@ The system SHALL support initial Codex benchmark variants for base Codex, Codex 
 - **WHEN** an experiment includes a `codex-skills-*` variant
 - **THEN** the generated Harbor configuration uses the same Codex agent and model as the other variants
 - **AND** it points Harbor skill injection at the configured skill directory
+- **AND** it may configure OneTool MCP over HTTP so skill variations can be compared with MCP access
 - **AND** the result metadata records the skill variant id, skill path, deterministic skill text hash, and available skill metadata
 
 ### Requirement: Runtime artifact locations

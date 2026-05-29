@@ -11,6 +11,8 @@ variants:
     path: ../../variants/codex-onetool-mcp.yaml
   - id: codex-skills-smoke
     path: ../../variants/codex-skills-smoke.yaml
+  - id: codex-skills-smoke-onetool-mcp
+    path: ../../variants/codex-skills-smoke-onetool-mcp.yaml
 repetitions: 1
 timeout_seconds: 3600
 metrics:

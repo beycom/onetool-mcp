@@ -1,0 +1,8 @@
+id: codex-skills-pypi-owned-onetool-mcp
+kind: codex-skills
+description: Codex with focused pypi-server skill and a harness-owned OneTool MCP server over host HTTP.
+skills_dir: ../skills/focused
+mcp:
+  config_path: ../mcp/onetool-owned-http.toml
+  server_name: onetool
+  url: http://host.docker.internal:18768/mcp

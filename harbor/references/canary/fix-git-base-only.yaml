@@ -1,0 +1,19 @@
+name: fix-git-base-canary
+harbor:
+  dataset: terminal-bench/terminal-bench-2-1
+  agent: codex
+  model: gpt-5.3-codex
+  reasoning_effort: medium
+  run_args:
+    - --yes
+variants:
+  - id: codex-base
+    path: ../../../packages/ot-harness/variants/codex-base.yaml
+task_file: fix-git-tasks.yaml
+repetitions: 1
+timeout_seconds: 1800
+output_root: ../harbor
+metrics:
+  verifier_required: true
+  tokens_required: false
+  cost_required: false

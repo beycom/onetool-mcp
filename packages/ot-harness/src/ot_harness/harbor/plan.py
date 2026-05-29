@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,8 @@ class HarborTrial:
     command: list[str]
     config: dict[str, Any]
     metadata: dict[str, Any]
+    workspace_dir: Path | None = None
+    workspace_target: str | None = None
 
 
 def build_trials(experiment: ExperimentConfig) -> list[HarborTrial]:
@@ -44,6 +47,14 @@ def build_trials(experiment: ExperimentConfig) -> list[HarborTrial]:
                     *experiment.harbor.run_args,
                 ]
                 metadata = _variant_metadata(variant)
+                workspace_dir = _workspace_dir(
+                    experiment, task_id, variant.id, repetition
+                )
+                workspace_target = (
+                    experiment.workspace_mount.target
+                    if experiment.workspace_mount.enabled
+                    else None
+                )
                 trials.append(
                     HarborTrial(
                         task_id=task_id,
@@ -53,7 +64,13 @@ def build_trials(experiment: ExperimentConfig) -> list[HarborTrial]:
                         config_path=config_path,
                         command=command,
                         config=config,
-                        metadata=metadata,
+                        metadata=_trial_metadata(
+                            metadata,
+                            workspace_dir=workspace_dir,
+                            workspace_target=workspace_target,
+                        ),
+                        workspace_dir=workspace_dir,
+                        workspace_target=workspace_target,
                     )
                 )
     return trials
@@ -62,6 +79,10 @@ def build_trials(experiment: ExperimentConfig) -> list[HarborTrial]:
 def write_trial_config(trial: HarborTrial) -> None:
     """Write one generated Harbor config and metadata file."""
     trial.run_dir.mkdir(parents=True, exist_ok=True)
+    if trial.workspace_dir is not None:
+        if trial.workspace_dir.exists():
+            shutil.rmtree(trial.workspace_dir)
+        trial.workspace_dir.mkdir(parents=True, exist_ok=True)
     with trial.config_path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(trial.config, handle, sort_keys=False)
     metadata_path = trial.run_dir / "ot-harness-trial.json"
@@ -97,27 +118,34 @@ def _trial_config(
         agent["mcp_servers"] = [
             {
                 "name": variant.mcp.server_name,
-                "transport": "stdio",
-                "command": variant.mcp.command,
-                "args": variant.mcp.args,
+                "transport": "http",
+                "url": variant.mcp.url,
             }
         ]
     skill_paths = [str(path) for path in variant.skill_paths]
+    if variant.kind == VariantKind.CODEX_SKILLS and variant.mcp is not None:
+        agent["mcp_servers"] = [
+            {
+                "name": variant.mcp.server_name,
+                "transport": "http",
+                "url": variant.mcp.url,
+            }
+        ]
     if variant.kind == VariantKind.CODEX_SKILLS and variant.skills_dir is not None:
         skill_paths.append(str(variant.skills_dir))
     if skill_paths:
         agent["skills"] = skill_paths
 
     environment: dict[str, Any] = {"type": "docker", "delete": True}
-    if variant.kind == VariantKind.CODEX_ONETOOL_MCP:
+    workspace_dir = _workspace_dir(experiment, task_id, variant.id, _repetition(run_dir))
+    if workspace_dir is not None:
         environment["mounts"] = [
             {
                 "type": "bind",
-                "source": str(_repo_root()),
-                "target": "/opt/onetool-mcp",
+                "source": str(workspace_dir),
+                "target": experiment.workspace_mount.target,
             }
         ]
-
     config = {
         "job_name": f"{experiment.name}-{_slug(task_id)}-{variant.id}-{run_dir.name}",
         "jobs_dir": str(run_dir),
@@ -140,6 +168,21 @@ def _trial_config(
     return config
 
 
+def _trial_metadata(
+    variant_metadata: dict[str, Any],
+    *,
+    workspace_dir: Path | None,
+    workspace_target: str | None,
+) -> dict[str, Any]:
+    metadata = dict(variant_metadata)
+    if workspace_dir is not None and workspace_target is not None:
+        metadata["workspace_mount"] = {
+            "source": str(workspace_dir),
+            "target": workspace_target,
+        }
+    return metadata
+
+
 def _variant_metadata(variant: VariantConfig) -> dict[str, Any]:
     metadata: dict[str, Any] = {
         "variant_id": variant.id,
@@ -160,8 +203,8 @@ def _variant_metadata(variant: VariantConfig) -> dict[str, Any]:
     if variant.mcp is not None:
         metadata["mcp"] = {
             "server_name": variant.mcp.server_name,
-            "command": variant.mcp.command,
-            "args": variant.mcp.args,
+            "transport": "http",
+            "url": variant.mcp.url,
             "config_path": str(variant.mcp.config_path),
         }
     return metadata
@@ -196,6 +239,28 @@ def _trial_dir(
         / variant_id
         / f"rep-{repetition:03d}"
     )
+
+
+def _workspace_dir(
+    experiment: ExperimentConfig, task_id: str, variant_id: str, repetition: int
+) -> Path | None:
+    if not experiment.workspace_mount.enabled:
+        return None
+    assert experiment.workspace_mount.root is not None
+    return (
+        experiment.workspace_mount.root
+        / _slug(task_id)
+        / variant_id
+        / f"rep-{repetition:03d}"
+    )
+
+
+def _repetition(run_dir: Path) -> int:
+    name = run_dir.name
+    if not name.startswith("rep-"):
+        msg = f"Unexpected trial run directory name: {run_dir}"
+        raise ValueError(msg)
+    return int(name.removeprefix("rep-"))
 
 
 def _slug(value: str) -> str:

@@ -69,6 +69,10 @@ test-setup:
 test-coverage:
     uv run pytest --cov=onetool --cov-report=html
 
+# Run ot-harness with its own temporary OneTool HTTP MCP server
+test-harness-owned-mcp *args:
+    ./scripts/run_ot_harness_owned_mcp.sh {{ args }}
+
 # ============================================================================
 # CODE QUALITY
 # ============================================================================

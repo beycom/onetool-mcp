@@ -1,0 +1,4 @@
+Reading additional input from stdin...
+Error: thread/start: thread/start failed: failed to load configuration: url is not supported for stdio
+in `mcp_servers.onetool`
+ (code -32600)

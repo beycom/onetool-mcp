@@ -1,0 +1,20 @@
+name: terminal-bench-owned-mcp-pypi
+harbor:
+  dataset: terminal-bench
+  agent: codex
+  model: gpt-5.2
+task_file: tasks.yaml
+variants:
+  - id: codex-base
+    path: ../../variants/codex-base.yaml
+  - id: codex-skills-pypi-owned-onetool-mcp
+    path: ../../variants/codex-skills-pypi-owned-onetool-mcp.yaml
+repetitions: 1
+timeout_seconds: 3600
+workspace_mount:
+  enabled: true
+  target: /app
+metrics:
+  verifier_required: true
+  tokens_required: false
+  cost_required: false

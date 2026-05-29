@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from statistics import mean, median
 from typing import Any
@@ -38,15 +39,18 @@ class TrialResult:
 def discover_results(run_output_dir: Path) -> list[TrialResult]:
     """Discover and normalize Harbor result JSON files below a run directory."""
     results: list[TrialResult] = []
-    for path in sorted(run_output_dir.rglob("*.json")):
-        if path.name == "ot-harness-trial.json":
+    paths = sorted(path for path in run_output_dir.rglob("*.json") if path.name == "result.json")
+    for path in paths:
+        if path.name != "result.json":
             continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             continue
+        if _is_harbor_job_summary(data) and _has_descendant_result(path, paths):
+            continue
         if _looks_like_result(data):
-            results.append(normalize_result(data, path))
+            results.append(normalize_result(_with_trial_metadata(data, path), path))
     return results
 
 
@@ -58,12 +62,28 @@ def normalize_result(data: dict[str, Any], path: Path) -> TrialResult:
             data, "score", "reward", "accuracy", nested=(verifier, "score", "reward")
         )
     )
+    if score is None:
+        score = _harbor_job_score(data)
+    if score is None:
+        score = _harbor_trial_score(data)
     accuracy_status = _accuracy_status(data, verifier, score)
-    tokens = _int_or_none(_first_present(data, "tokens", "token_count", "total_tokens"))
-    cost_usd = _float_or_none(_first_present(data, "cost_usd", "cost", "total_cost"))
+    stats = data.get("stats") if isinstance(data.get("stats"), dict) else {}
+    agent_result = data.get("agent_result") if isinstance(data.get("agent_result"), dict) else {}
+    tokens = _int_or_none(
+        _first_present(data, "tokens", "token_count", "total_tokens")
+    ) or _harbor_total_tokens(stats) or _harbor_total_tokens(agent_result)
+    cost_usd = _float_or_none(
+        _first_present(data, "cost_usd", "cost", "total_cost")
+    )
+    if cost_usd is None:
+        cost_usd = _float_or_none(stats.get("cost_usd"))
+    if cost_usd is None:
+        cost_usd = _float_or_none(agent_result.get("cost_usd"))
     wall_time = _float_or_none(
         _first_present(data, "wall_time_seconds", "duration_seconds", "elapsed_seconds")
     )
+    if wall_time is None:
+        wall_time = _duration_seconds(data.get("started_at"), data.get("finished_at"))
     tool_calls = _int_or_none(_first_present(data, "tool_calls", "tool_call_count"))
     onetool_calls = _int_or_none(
         _first_present(data, "onetool_calls", "onetool_call_count")
@@ -167,11 +187,62 @@ def render_markdown_report(results: list[TrialResult]) -> str:
 
 
 def _looks_like_result(data: Any) -> bool:
-    return (
-        isinstance(data, dict)
-        and any(key in data for key in ("task_id", "task"))
-        and any(key in data for key in ("variant_id", "variant"))
-    )
+    if not isinstance(data, dict):
+        return False
+    if any(key in data for key in ("task_id", "task")) and any(
+        key in data for key in ("variant_id", "variant")
+    ):
+        return True
+    if _is_harbor_job_summary(data):
+        return True
+    if "agent_result" in data and "verifier_result" in data:
+        return True
+    return any(key in data for key in ("verifier", "verification", "verifier_output"))
+
+
+def _is_harbor_job_summary(data: Any) -> bool:
+    return isinstance(data, dict) and "stats" in data and "n_total_trials" in data
+
+
+def _has_descendant_result(path: Path, result_paths: list[Path]) -> bool:
+    return any(other != path and path.parent in other.parents for other in result_paths)
+
+
+def _with_trial_metadata(data: dict[str, Any], path: Path) -> dict[str, Any]:
+    metadata_path = _find_trial_metadata(path)
+    if metadata_path is None:
+        return data
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return data
+    merged = dict(data)
+    for source_key, target_key in (
+        ("task_id", "task_id"),
+        ("variant_id", "variant_id"),
+        ("repetition", "repetition"),
+    ):
+        current = merged.get(target_key)
+        should_use_metadata = current is None or (
+            target_key in {"task_id", "variant_id"} and not isinstance(current, str)
+        )
+        if should_use_metadata and metadata.get(source_key) is not None:
+            merged[target_key] = metadata[source_key]
+    variant_metadata = metadata.get("variant_metadata")
+    if isinstance(variant_metadata, dict):
+        if merged.get("variant_metadata") is None:
+            merged["variant_metadata"] = variant_metadata
+        if merged.get("onetool_calls") is None and variant_metadata.get("mcp") is not None:
+            merged["onetool_calls"] = _int_or_none(merged.get("onetool_call_count"))
+    return merged
+
+
+def _find_trial_metadata(path: Path) -> Path | None:
+    for directory in (path.parent, *path.parents):
+        metadata_path = directory / "ot-harness-trial.json"
+        if metadata_path.is_file():
+            return metadata_path
+    return None
 
 
 def _accuracy_status(data: dict[str, Any], verifier: Any, score: float | None) -> str:
@@ -185,6 +256,61 @@ def _accuracy_status(data: dict[str, Any], verifier: Any, score: float | None) -
     if score is None:
         return "invalid"
     return "pass" if score >= 1.0 else "fail"
+
+
+def _harbor_job_score(data: dict[str, Any]) -> float | None:
+    stats = data.get("stats")
+    if not isinstance(stats, dict):
+        return None
+    evals = stats.get("evals")
+    if not isinstance(evals, dict):
+        return None
+    means: list[float] = []
+    for evaluation in evals.values():
+        if not isinstance(evaluation, dict):
+            continue
+        metrics = evaluation.get("metrics")
+        if not isinstance(metrics, list):
+            continue
+        for metric in metrics:
+            if isinstance(metric, dict):
+                value = _float_or_none(metric.get("mean"))
+                if value is not None:
+                    means.append(value)
+    return _mean_or_none(means)
+
+
+def _harbor_trial_score(data: dict[str, Any]) -> float | None:
+    verifier_result = data.get("verifier_result")
+    if not isinstance(verifier_result, dict):
+        return None
+    rewards = verifier_result.get("rewards")
+    if not isinstance(rewards, dict):
+        return None
+    return _float_or_none(rewards.get("reward"))
+
+
+def _harbor_total_tokens(stats: dict[str, Any]) -> int | None:
+    input_tokens = _int_or_none(stats.get("n_input_tokens"))
+    output_tokens = _int_or_none(stats.get("n_output_tokens"))
+    if input_tokens is None and output_tokens is None:
+        return None
+    return (input_tokens or 0) + (output_tokens or 0)
+
+
+def _duration_seconds(started_at: Any, finished_at: Any) -> float | None:
+    if not isinstance(started_at, str) or not isinstance(finished_at, str):
+        return None
+    try:
+        started = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+        finished = datetime.fromisoformat(finished_at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if started.tzinfo is None and finished.tzinfo is not None:
+        finished = finished.replace(tzinfo=None)
+    if started.tzinfo is not None and finished.tzinfo is None:
+        started = started.replace(tzinfo=None)
+    return (finished - started).total_seconds()
 
 
 def _first_present(

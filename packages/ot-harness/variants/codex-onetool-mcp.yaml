@@ -1,22 +1,10 @@
 id: codex-onetool-mcp
 kind: codex-onetool-mcp
-description: Codex with OneTool MCP configured as a stdio server.
+description: Codex with OneTool MCP configured over host HTTP.
 mcp:
-  config_path: ../mcp/onetool-local.toml
+  config_path: ../mcp/onetool-http.toml
   server_name: onetool
-  command: bash
-  args:
-    - -lc
-    - >-
-      set -euo pipefail;
-      export PATH="$HOME/.local/bin:$PATH";
-      export UV_PROJECT_ENVIRONMENT=/tmp/onetool-venv;
-      export UV_CACHE_DIR=/tmp/uv-cache;
-      if ! command -v uv >/dev/null 2>&1; then
-        curl -LsSf https://astral.sh/uv/install.sh | sh;
-      fi;
-      cd /opt/onetool-mcp;
-      exec uv run --project /opt/onetool-mcp --no-default-groups onetool child --url http://host.docker.internal:8765 --ot-dir /opt/onetool-mcp/.onetool
+  url: http://host.docker.internal:8768/mcp
 skill_paths:
   - ../../../.codex/skills/ot-cm
   - ../../../.codex/skills/ot-ref

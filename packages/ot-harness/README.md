@@ -17,7 +17,27 @@ docker --version
 uv run onetool --help
 ```
 
-For OneTool MCP variants, inspect `mcp/onetool-local.toml` and confirm the configured command starts the intended local server. For skills variants, confirm the configured `skills_dir` contains the expected `SKILL.md` files before running the matrix.
+For ad hoc OneTool MCP variants, the benchmark container connects to a host HTTP
+MCP endpoint:
+
+```bash
+uv run onetool serve --config .onetool/onetool.yaml --transport http --host 0.0.0.0 --port 8768 --path /mcp
+```
+
+Harbor trials run in Docker, so checked-in variants use `http://host.docker.internal:8768/mcp`. Port `8768` avoids the default direct API port used by the local OneTool config. Stdio MCP is intentionally unsupported by `ot-harness` because the benchmark container should connect to the already-running host MCP server instead of starting OneTool inside the task container.
+
+For repeatable tests, prefer the owned-server recipe:
+
+```bash
+just test-harness-owned-mcp
+```
+
+That recipe starts its own OneTool HTTP MCP server on port `18768`, verifies it
+with a real FastMCP `ot.status()` call, runs the harness experiment, and stops
+only the child server it started. It does not start, stop, or reuse the shared
+interactive OneTool MCP server.
+
+For skills variants, confirm the configured `skills_dir` contains the expected `SKILL.md` files before running the matrix. Combined variants such as `codex-skills-smoke-onetool-mcp` inject the skill directory and connect to OneTool MCP over HTTP in the same trial, which allows direct skill variation comparisons with MCP access held constant.
 
 ## Smoke Workflow
 

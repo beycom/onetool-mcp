@@ -1,4 +1,0 @@
-[mcp_servers.onetool]
-transport = "stdio"
-command = "uv"
-args = ["run", "onetool"]

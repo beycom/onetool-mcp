@@ -1,0 +1,8 @@
+id: codex-skills-smoke-onetool-mcp
+kind: codex-skills
+description: Codex with the smoke skill directory and OneTool MCP over host HTTP.
+skills_dir: ../skills/smoke
+mcp:
+  config_path: ../mcp/onetool-http.toml
+  server_name: onetool
+  url: http://host.docker.internal:8768/mcp

@@ -1,0 +1,10 @@
+id: codex-owned-onetool-mcp
+kind: codex-onetool-mcp
+description: Codex with a harness-owned OneTool MCP server over host HTTP.
+mcp:
+  config_path: ../mcp/onetool-owned-http.toml
+  server_name: onetool
+  url: http://host.docker.internal:18768/mcp
+skill_paths:
+  - ../../../.codex/skills/ot-cm
+  - ../../../.codex/skills/ot-ref

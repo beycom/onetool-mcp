@@ -1,0 +1,3 @@
+[mcp_servers.onetool]
+transport = "http"
+url = "http://host.docker.internal:18768/mcp"
