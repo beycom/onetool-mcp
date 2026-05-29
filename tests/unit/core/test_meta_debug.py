@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from ot.meta import debug
@@ -59,6 +61,8 @@ def test_debug_basic():
     assert "servers_disconnected" in result["runtime"]
     assert "start_time" in result["runtime"]
     assert "uptime_seconds" in result["runtime"]
+    assert "mcpId" in result["runtime"]
+    assert "pid" in result["runtime"]
 
 
 @pytest.mark.smoke
@@ -163,6 +167,18 @@ def test_debug_runtime_timing():
     # Verify uptime is a positive number
     assert isinstance(runtime["uptime_seconds"], (int, float))
     assert runtime["uptime_seconds"] >= 0
+
+
+@pytest.mark.smoke
+@pytest.mark.unit
+@pytest.mark.core
+def test_debug_runtime_identity():
+    """Runtime info exposes MCP identity."""
+    result = debug()
+    runtime = result["runtime"]
+
+    assert re.fullmatch(r"\d{8}-[0-9a-f]{8}", runtime["mcpId"])
+    assert isinstance(runtime["pid"], int)
 
 
 @pytest.mark.smoke

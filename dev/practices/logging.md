@@ -153,6 +153,7 @@ async def execute_tool(ctx, tool_name: str, args: dict) -> str:
 |----------|-----|
 | Wrapping an external call (HTTP, subprocess) | `LogSpan` |
 | Recording a discrete event | `LogEntry` |
+| Warning about degraded behavior or skipped work | `LogEntry` with event name and actionable fields |
 | Debug output during development | `loguru.logger.debug()` |
 | User-facing output | Rich console (not logging) |
 

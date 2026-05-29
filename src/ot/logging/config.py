@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import secrets
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -20,6 +22,21 @@ from loguru import logger
 
 from ot.config.loader import get_config, get_log_dir, get_log_level
 from ot.logging.format import format_dev_value
+
+_NOISY_THIRD_PARTY_LOGGERS = (
+    "anyio",
+    "google.genai",
+    "google_genai",
+    "hpack",
+    "httpcore",
+    "httpx",
+    "mcp",
+    "openai",
+    "openai._base_client",
+    "pydoll",
+)
+_MCP_ID: str | None = None
+_PROCESS_PID = os.getpid()
 
 
 class InterceptHandler(logging.Handler):
@@ -38,6 +55,7 @@ class InterceptHandler(logging.Handler):
             _intercepted_file=record.filename,
             _intercepted_func=record.funcName,
             _intercepted_line=record.lineno,
+            _intercepted_logger=record.name,
         ).opt(exception=record.exc_info).log(level, record.getMessage())
 
 
@@ -180,8 +198,27 @@ def dev_formatter(record: dict[str, Any]) -> str:
 
 def patching(record: Any) -> None:
     """Patch record with serialized JSON and dev-friendly format."""
+    for key, value in get_runtime_log_identity().items():
+        record["extra"][key] = value
     record["extra"]["serialized"] = json_serializer(record)
     record["extra"]["dev"] = dev_formatter(record)
+
+
+def _get_mcp_id() -> str:
+    """Return this process's short MCP runtime id."""
+    global _MCP_ID
+    if _MCP_ID is None:
+        date_str = datetime.now(UTC).strftime("%Y%m%d")
+        _MCP_ID = f"{date_str}-{secrets.token_hex(4)}"
+    return _MCP_ID
+
+
+def get_runtime_log_identity() -> dict[str, str | int]:
+    """Return stable runtime identity fields used in log records."""
+    return {
+        "mcpId": _get_mcp_id(),
+        "pid": _PROCESS_PID,
+    }
 
 
 def configure_logging(log_name: str = "onetool", level: str | None = None) -> None:
@@ -231,19 +268,15 @@ def configure_logging(log_name: str = "onetool", level: str | None = None) -> No
         logging.getLogger(logger_name).handlers = [InterceptHandler()]
         logging.getLogger(logger_name).propagate = False
 
-    # Silence noisy framework/client loggers - set to WARNING to suppress request chatter.
-    for logger_name in [
-        "httpcore",
-        "httpx",
-        "mcp",
-        "anyio",
-        "hpack",
-        "openai",
-        "openai._base_client",
-    ]:
-        logging.getLogger(logger_name).setLevel(logging.WARNING)
+    _suppress_noisy_third_party_loggers()
 
     logger.debug("Logging configured", level=level, file=str(log_file))
+
+
+def _suppress_noisy_third_party_loggers() -> None:
+    """Suppress low-value third-party INFO logs intercepted into OneTool logs."""
+    for logger_name in _NOISY_THIRD_PARTY_LOGGERS:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
 
 
 def configure_test_logging(
@@ -308,14 +341,4 @@ def configure_test_logging(
     # Intercept standard logging
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
-    # Silence noisy HTTP/network/client loggers - set to WARNING to suppress DEBUG/INFO spam
-    for logger_name in [
-        "httpcore",
-        "httpx",
-        "mcp",
-        "anyio",
-        "hpack",
-        "openai",
-        "openai._base_client",
-    ]:
-        logging.getLogger(logger_name).setLevel(logging.WARNING)
+    _suppress_noisy_third_party_loggers()

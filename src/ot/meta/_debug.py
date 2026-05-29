@@ -121,6 +121,7 @@ def _get_runtime_info() -> dict[str, Any]:
 
     from ot.executor.tool_loader import load_tool_registry
     from ot.executor.worker_proxy import WorkerPackProxy
+    from ot.logging.config import get_runtime_log_identity
     from ot.proxy import get_proxy_manager
 
     registry = load_tool_registry()
@@ -145,6 +146,7 @@ def _get_runtime_info() -> dict[str, Any]:
     start_time = datetime.fromtimestamp(_MODULE_LOAD_TIME, tz=UTC)
 
     return {
+        **get_runtime_log_identity(),
         "packs_loaded": len(registry.packs),
         "tools_local": tool_count,
         "tools_proxied": proxy.tool_count,

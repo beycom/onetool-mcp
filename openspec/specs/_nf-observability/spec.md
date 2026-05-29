@@ -158,6 +158,19 @@ The system SHALL support configurable logging.
 - **WHEN** the log file grows
 - **THEN** the logging sink SHALL rotate files according to the configured runtime policy
 
+#### Scenario: Noisy third-party INFO suppression
+- **GIVEN** runtime or test logging intercepts standard library logging
+- **WHEN** browser automation or model-client dependencies emit non-actionable INFO lifecycle chatter
+- **THEN** those dependency logger roots SHALL be held at WARNING or above
+- **AND** OneTool structured LogSpan and LogEntry records SHALL remain visible according to the configured OneTool log level
+
+#### Scenario: Shared runtime log attribution
+- **GIVEN** multiple MCP server processes write to the same runtime log file
+- **WHEN** runtime or test log records are emitted
+- **THEN** every record SHALL include a stable process-wide `mcpId`
+- **AND** every record SHALL include the emitting process `pid`
+- **AND** `mcpId` SHALL remain stable for all log records emitted by the same process
+
 ### Requirement: CLI Logging Initialization
 
 The system SHALL ensure all CLIs initialize logging consistently.
@@ -211,6 +224,19 @@ The system SHALL log every MCP tool call with full context.
 - **GIVEN** a tool call completes
 - **WHEN** the result is logged
 - **THEN** it SHALL include `resultLength` (character count of output)
+
+#### Scenario: Snippet execution summary
+- **GIVEN** a snippet command is expanded into generated Python code
+- **WHEN** `runner.execute` logs the execution at INFO level
+- **THEN** the `command` field SHALL contain the original snippet invocation
+- **AND** the log SHALL include `commandType: "snippet"`, `snippet`, `preparedLines`, and `preparedLength`
+- **AND** expanded or prepared Python code SHALL be limited to DEBUG logging
+
+#### Scenario: Tool-pack warning context
+- **GIVEN** a tool pack emits a warning for degraded behavior or skipped user work
+- **WHEN** the warning is logged
+- **THEN** it SHALL use a structured `LogEntry` event name
+- **AND** it SHALL include actionable fields such as tool, operation, path, pattern, retry count, status code, chunk id, memory id, dropped count, or error type where applicable
 
 ### Requirement: FastMCP Context Integration
 
