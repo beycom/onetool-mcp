@@ -37,52 +37,49 @@ The paths module SHALL provide a function to get the effective working directory
 
 ### Requirement: Directory Structure
 
-The `.onetool/` directory SHALL use a subdirectory structure to organise files by purpose.
+The active OneTool config directory SHALL use a subdirectory structure to organise files by purpose.
 
 #### Scenario: Standard subdirectories
-- **GIVEN** a `.onetool/` directory (global or project)
+- **GIVEN** an active OneTool config directory
 - **WHEN** the directory structure is created or validated
 - **THEN** it SHALL contain these subdirectories:
-  - `config/` - YAML configuration files
-  - `logs/` - Application log files
-  - `stats/` - Statistics data (stats.jsonl)
-  - `tools/` - Reserved for installed tool packs
+  - `tools/` - Custom tool packs
+  - `runtime/` - Logs, stats, sessions, and reports
+  - `data/` - Tool-owned config-scoped data stores
+  - `templates/` - Editable template overrides
 
-#### Scenario: Config files in config subdirectory
+#### Scenario: Config files at config root
 - **GIVEN** config files like `onetool.yaml`, `secrets.yaml`, `snippets.yaml`
 - **WHEN** they are created or looked up
-- **THEN** they SHALL be in the `config/` subdirectory
-- **AND** paths like `~/.onetool/config/onetool.yaml`
+- **THEN** they SHALL be in the active config directory
 
-#### Scenario: Logs in logs subdirectory
+#### Scenario: Logs in runtime logs subdirectory
 - **GIVEN** log files are written
 - **WHEN** the log directory is resolved
-- **THEN** logs SHALL be written to the `logs/` subdirectory
-- **AND** paths like `~/.onetool/logs/onetool.log`
+- **THEN** logs SHALL be written to the `runtime/logs/` subdirectory
 
-#### Scenario: Stats in stats subdirectory
+#### Scenario: Stats in runtime stats subdirectory
 - **GIVEN** statistics are persisted
 - **WHEN** the stats file is resolved
-- **THEN** stats SHALL be written to the `stats/` subdirectory
-- **AND** paths like `~/.onetool/stats/stats.jsonl`
+- **THEN** stats SHALL be written to the `runtime/stats/` subdirectory
 
 ### Requirement: Standard Config Resolution
 
-All config loaders SHALL use a standard resolution order with subdirectory support.
+Config loaders SHALL use an explicit config-file model with flat config directories.
 
 #### Scenario: Resolution order
 - **GIVEN** a CLI needs to load its config
 - **WHEN** no explicit path is provided
 - **THEN** it SHALL resolve in order:
   1. Environment variable (e.g., `ONETOOL_CONFIG`)
-  2. `get_effective_cwd() / ".onetool" / "config" / "<cli>.yaml"`
-  3. `~/.onetool/config/<cli>.yaml`
-  4. Built-in defaults (from bundled configs)
+  2. CLI argument such as `--config`
+  3. User-selected default such as `~/.onetool/<cli>.yaml`
+  4. Built-in defaults only where the loader explicitly supports packaged defaults
 
-#### Scenario: Project config takes precedence
-- **GIVEN** config exists at both `cwd/.onetool/config/onetool.yaml` and `~/.onetool/config/onetool.yaml`
-- **WHEN** the config is resolved
-- **THEN** the project config SHALL be used
+#### Scenario: Config directory is the config file parent
+- **GIVEN** config is loaded from `/project/.onetool/onetool.yaml`
+- **WHEN** relative OT_DIR paths are resolved
+- **THEN** they SHALL resolve relative to `/project/.onetool/`
 
 #### Scenario: Bundled fallback when no config exists
 - **GIVEN** no config exists in project or global directories
@@ -182,7 +179,7 @@ The `tools_dir` configuration SHALL resolve relative paths against OT_DIR.
 
 #### Scenario: Relative tools_dir pattern
 - **GIVEN** config with `tools_dir: ["tools/*.py"]`
-- **AND** config loaded from `/project/.onetool/config/onetool.yaml`
+- **AND** config loaded from `/project/.onetool/onetool.yaml`
 - **WHEN** tool files are discovered
 - **THEN** the pattern SHALL resolve to `/project/.onetool/tools/*.py`
 
@@ -207,7 +204,7 @@ The paths module SHALL provide access to bundled default configuration files.
 - **THEN** it SHALL contain:
   - `onetool.yaml`, `bench.yaml` (minimal working configs)
   - `prompts.yaml`, `snippets.yaml`, `servers.yaml`, `diagram.yaml`
-  - `diagram-templates/` subdirectory
+  - `arch-templates/` and `diagram-templates/` packaged resource subdirectories
 - **NOTE** `secrets.yaml` is NOT in bundled defaults; it is in global templates only
 
 #### Scenario: Bundled configs in development mode
@@ -241,7 +238,7 @@ The paths module SHALL provide access to global template configuration files for
 - **GIVEN** secrets files are gitignored (`**/secrets.yaml`)
 - **WHEN** templates are packaged
 - **THEN** secrets templates SHALL be named `*-template.yaml`
-- **AND** they SHALL be copied without the `-template` suffix to `~/.onetool/config/`
+- **AND** they SHALL be copied without the `-template` suffix to the active config directory root
 
 ### Requirement: Template File Discovery
 
@@ -280,10 +277,11 @@ The `ensure_global_dir` function SHALL seed from global templates into the `conf
 - **GIVEN** `~/.onetool/` does not exist
 - **WHEN** `ensure_global_dir()` is called
 - **THEN** it SHALL create `~/.onetool/`
-- **AND** create `config/`, `logs/`, `stats/`, `tools/` subdirectories
-- **AND** copy YAML configs from global templates to `config/`
+- **AND** create the `tools/` subdirectory
+- **AND** copy YAML configs from global templates to the config directory root
 - **AND** rename `*-template.yaml` files to remove the suffix (e.g., `secrets-template.yaml` → `secrets.yaml`)
-- **AND** NOT copy subdirectories (diagram-templates stays in bundled defaults)
+- **AND** copy only explicit editable template directories to `templates/arch/` and `templates/diagram/`
+- **AND** NOT copy package-only resource directories such as `skills/`, `tool_templates/`, or `__pycache__/`
 - **AND** print creation messages to stderr
 
 #### Scenario: Subsequent runs no-op
@@ -385,14 +383,15 @@ The SDK paths module SHALL provide convenience wrappers for common resolution pa
 - **WHEN** `resolve_cwd_path("output.txt")` is called
 - **THEN** it SHALL be equivalent to `resolve_path("output.txt", base="CWD")`
 
-#### Scenario: resolve_cwd_path for project-local state
+#### Scenario: get_project_state_dir for project-local state
 - **GIVEN** project-local runtime state belongs under the effective project working directory
 - **WHEN** `otpack` resolves the default state file path
-- **THEN** it SHALL use `resolve_cwd_path(".onetool/state.yaml")`
+- **THEN** it SHALL use `get_project_state_dir(pack) / "state.yaml"`
 
-#### Scenario: Project-local state version first
-- **WHEN** `otpack` writes `.onetool/state.yaml`
-- **THEN** the YAML document SHALL place `version` before `packs`
+#### Scenario: Project-local state is pack-owned
+- **WHEN** `otpack` writes project-local state for pack `bridge`
+- **THEN** it SHALL write under `{CWD}/.onetool/state/bridge/`
+- **AND** it SHALL NOT read `{CWD}/.onetool/state.yaml` as a fallback
 
 #### Scenario: resolve_ot_path for config assets
 - **GIVEN** a path for config or logs

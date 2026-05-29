@@ -8,6 +8,7 @@ from typing import Any
 
 from loguru import logger
 
+from ot.logging import LogEntry
 from otutil.tools._content_util import HEADING_RE as _HEADING_RE
 from otutil.tools._content_util import build_toc as _build_toc
 from otutil.tools._content_util import parse_headings as _parse_headings
@@ -66,8 +67,15 @@ def _redact(content: str) -> str:
     for pattern in config.redaction_patterns:
         try:
             result = re.sub(pattern, "[REDACTED]", result)
-        except re.error:
-            logger.warning("Invalid redaction pattern: {}", pattern)
+        except re.error as e:
+            logger.warning(
+                LogEntry(
+                    event="mem.content.redaction_pattern_invalid",
+                    pattern=pattern,
+                    errorType=type(e).__name__,
+                    error=str(e),
+                )
+            )
 
     return result
 

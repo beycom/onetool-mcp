@@ -72,6 +72,28 @@ def test_parse_frontmatter_body_stripped() -> None:
     assert body.strip() == "Body with whitespace."
 
 
+@pytest.mark.unit
+@pytest.mark.tools
+def test_parse_frontmatter_warning_includes_path_context(tmp_path: Path) -> None:
+    """Malformed frontmatter warnings include stable structured fields."""
+    from ottools.skills import _parse_frontmatter
+
+    source_path = tmp_path / "bad-skill.md"
+
+    with patch("loguru.logger.warning") as mock_warning:
+        fm, body = _parse_frontmatter(
+            "---\nname: [unterminated\n---\n\nBody.",
+            source_path=source_path,
+        )
+
+    assert fm == {}
+    assert body == "Body."
+    entry = mock_warning.call_args.args[0]
+    assert entry.fields["event"] == "skills.frontmatter.malformed"
+    assert entry.fields["path"] == source_path
+    assert entry.fields["errorType"]
+
+
 # =============================================================================
 # skills() Listing Tests
 # =============================================================================

@@ -82,7 +82,10 @@ def create_app() -> Any:
 
         cfg = get_config()
         proxy = get_proxy_manager()
-        readiness = proxy.readiness(tuple(cfg.servers.keys()))
+        enabled_servers = tuple(
+            name for name, server in cfg.servers.items() if server.enabled
+        )
+        readiness = proxy.readiness(enabled_servers)
         return signed_json_response(
             _protocol_payload(
                 status="ok" if readiness["ready"] else "starting",

@@ -247,7 +247,7 @@ v2 simplifies how config is found and passed to the server:
 - **Versioned schema** — add `version: 2` to `onetool.yaml`; configs without it are rejected with a clear error rather than silently misbehaving
 
 ```bash
-onetool --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
+onetool serve --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
 ```
 
 ### Top-level `llm:` config
@@ -340,7 +340,7 @@ v1 auto-discovered config and required no arguments. v2 uses explicit `--config`
 Or via Claude Code CLI:
 
 ```bash
-claude mcp add onetool -- onetool --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
+claude mcp add onetool -- onetool serve --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
 ```
 
 Omit `--secrets` if you don't use API keys. Omit `--config` to start with sensible defaults.

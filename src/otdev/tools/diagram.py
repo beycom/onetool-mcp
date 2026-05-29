@@ -1552,11 +1552,14 @@ def get_template(*, name: str) -> str:
             # 1. Resolve relative to config directory (.onetool/)
             path = _resolve_config_path(file_path)
 
-            # 2. Fall back to bundled global templates
+            # 2. Fall back to bundled defaults for the editable override tree
             if not path.exists():
                 from ot.paths import get_global_templates_dir
 
-                path = get_global_templates_dir() / file_path
+                template_rel = Path(file_path).as_posix()
+                if template_rel.startswith("templates/diagram/"):
+                    bundled_rel = template_rel.removeprefix("templates/diagram/")
+                    path = get_global_templates_dir() / "diagram-templates" / bundled_rel
 
             if path.exists():
                 source = path.read_text()

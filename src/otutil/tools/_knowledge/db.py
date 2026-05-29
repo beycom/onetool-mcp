@@ -58,7 +58,7 @@ def _resolve_db_path(db_name: str) -> Path:
     if kb_project:
         path = resolve_ot_path(kb_project.db.path)
     else:
-        path = resolve_ot_path(f"mem/{db_name}.db")
+        path = resolve_ot_path(f"data/knowledge/{db_name}.db")
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 

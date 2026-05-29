@@ -12,7 +12,8 @@ Defines the MCP-owned direct API exposed by a running OneTool MCP process when
 ### Requirement: MCP-owned direct API startup
 
 When `direct.host.enabled: true`, MCP startup SHALL bind an authenticated local
-HTTP API inside the MCP process.
+HTTP API inside the MCP process, regardless of whether the root MCP transport is
+stdio or Streamable HTTP.
 
 Config fields:
 - `direct.host.enabled` — bind the MCP direct API when true
@@ -24,29 +25,50 @@ the configured port first, then increment until a free port is found.
 #### Scenario: Direct API disabled
 
 - **GIVEN** `direct.host.enabled: false`
-- **WHEN** MCP startup runs
+- **WHEN** stdio or HTTP root MCP startup runs
 - **THEN** no direct API listener SHALL be started
 - **AND** startup logs SHALL state that the direct API is disabled
 
-#### Scenario: Direct API enabled
+#### Scenario: Direct client unavailable when disabled
 
-- **GIVEN** `direct.host.enabled: true` and `direct.host.port: 9000`
+- **GIVEN** stdio or HTTP root MCP startup ran with `direct.host.enabled: false`
+- **WHEN** `onetool direct run` targets that process
+- **THEN** the command SHALL fail without executing user code
+- **AND** the error SHALL clearly identify that the Direct API target is
+  unavailable or unreachable
+
+#### Scenario: Direct API enabled under stdio root
+
+- **GIVEN** stdio root mode
+- **AND** `direct.host.enabled: true` and `direct.host.port: 9000`
 - **WHEN** MCP startup runs
 - **THEN** it SHALL try ports `9000, 9001, ...` until one binds
-- **AND** startup logs SHALL include the configured port, candidates tried, occupied ports skipped, and successful base URL
+- **AND** startup logs SHALL include the configured port, candidates tried,
+  occupied ports skipped, and successful base URL
+
+#### Scenario: Direct API enabled under HTTP root
+
+- **GIVEN** Streamable HTTP root mode
+- **AND** `direct.host.enabled: true` and `direct.host.port: 9000`
+- **WHEN** MCP startup runs
+- **THEN** it SHALL try ports `9000, 9001, ...` until one binds
+- **AND** startup logs SHALL include the configured port, candidates tried,
+  occupied ports skipped, and successful base URL
+- **AND** the Direct API URL SHALL be logged separately from the MCP Streamable
+  HTTP URL
 
 #### Scenario: Startup failure degrades MCP startup
 
 - **GIVEN** `direct.host.enabled: true`
 - **AND** direct API startup fails
-- **WHEN** MCP startup runs
+- **WHEN** stdio or HTTP root MCP startup runs
 - **THEN** MCP startup SHALL continue
 - **AND** logs SHALL include the direct API degradation error
 
 #### Scenario: MCP shutdown closes listener
 
 - **GIVEN** the MCP-owned direct API is running
-- **WHEN** MCP shutdown runs
+- **WHEN** stdio or HTTP root MCP shutdown runs
 - **THEN** the direct API listener SHALL be stopped with the MCP process
 
 ### Requirement: authenticated API endpoints
@@ -56,10 +78,8 @@ The API SHALL expose:
 - signed `GET /ready`
 - signed `POST /run`
 
-Requests and responses SHALL use OneTool HMAC headers with the `mcp-direct`
-auth namespace. The HMAC key SHALL be stored at
-`mcp-direct/auth.key` under the active OT_DIR using `resolve_ot_path(".")`
-as the `otpack.ensure_hmac_key("mcp-direct", base_dir=...)` base directory.
+Requests and responses SHALL use OneTool HMAC headers. The HMAC key SHALL be
+stored at `auth/mcp-direct.key` under the active OT_DIR.
 
 Every request SHALL verify method, path, body hash, timestamp, nonce, and
 signature before doing work. Replayed nonces SHALL be rejected. Every response,
@@ -113,10 +133,21 @@ limit before command execution.
 - **THEN** it SHALL return a signed HTTP `413`
 - **AND** SHALL NOT execute the command
 
-#### Scenario: Execute command via MCP process
+#### Scenario: Execute command via stdio root process
 
+- **GIVEN** the parent MCP process is running in stdio root mode
 - **WHEN** signed `POST /run` receives a valid run request
-- **THEN** the command SHALL execute in the MCP process using that process's loaded config, secrets, proxy connections, registry, state, and stats behavior
+- **THEN** the command SHALL execute in the MCP process using that process's
+  loaded config, secrets, proxy connections, registry, state, and stats behavior
+- **AND** command success SHALL return `success: true`
+- **AND** execution failure SHALL return `success: false`
+
+#### Scenario: Execute command via HTTP root process
+
+- **GIVEN** the parent MCP process is running in Streamable HTTP root mode
+- **WHEN** signed `POST /run` receives a valid run request
+- **THEN** the command SHALL execute in the MCP process using that process's
+  loaded config, secrets, proxy connections, registry, state, and stats behavior
 - **AND** command success SHALL return `success: true`
 - **AND** execution failure SHALL return `success: false`
 

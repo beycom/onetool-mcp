@@ -33,7 +33,7 @@ The optional `board=` parameter specifies the named board to operate on. If omit
 
 #### Scenario: Named board
 - **WHEN** `whiteboard.draw(input='box:A', board='myboard')` is called
-- **THEN** state SHALL be written to `~/.onetool/whiteboard/myboard.json`
+- **THEN** state SHALL be written to `{CWD}/.onetool/state/whiteboard/myboard.json`
 
 #### Scenario: Subgraph bounding rect
 - **WHEN** the DSL includes a `subgraph ... end` block naming existing shapes

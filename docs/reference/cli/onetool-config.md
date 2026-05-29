@@ -103,8 +103,8 @@ servers:
     `onetool init` writes an `onetool.yaml` that already includes all of them, so this only
     matters if you write your own config from scratch.
 
-    Skills (`.onetool/skills/`) are the exception: they are auto-discovered at runtime without
-    any `include:` entry.
+    Packaged skills are discovered from bundled resources at runtime; they are not loaded from
+    copied files under the OneTool config directory.
 
 ## Pack Configuration
 
@@ -191,7 +191,7 @@ No pack-specific `tools.excel` settings.
 
 | Field | Type | Default | Range | Description |
 |------|------|---------|-------|-------------|
-| `db_path` | string | `mem.db` | - | SQLite path for memory store |
+| `db_path` | string | `data/mem/default.db` | - | SQLite path for memory store |
 | `model` | string | `text-embedding-3-small` | - | Embedding model |
 | `base_url` | string | `https://openrouter.ai/api/v1` | - | OpenAI-compatible embedding API base |
 | `dimensions` | int | `1536` | - | Embedding dimensions |
@@ -286,7 +286,7 @@ tools:
 API keys stored separately in `secrets.yaml` (gitignored). Pass the path via `--secrets`:
 
 ```bash
-onetool --config .onetool/onetool.yaml --secrets .onetool/secrets.yaml
+onetool serve --config .onetool/onetool.yaml --secrets .onetool/secrets.yaml
 ```
 
 ```yaml

@@ -154,7 +154,7 @@ Add to `~/.claude/mcp.json` (or use `claude mcp add`):
   "mcpServers": {
     "onetool": {
       "command": "onetool",
-      "args": ["--config", "/path/to/.onetool/onetool.yaml", "--secrets", "/path/to/.onetool/secrets.yaml"]
+      "args": ["serve", "--config", "/path/to/.onetool/onetool.yaml", "--secrets", "/path/to/.onetool/secrets.yaml"]
     }
   }
 }
@@ -163,7 +163,7 @@ Add to `~/.claude/mcp.json` (or use `claude mcp add`):
 Or using the CLI:
 
 ```bash
-claude mcp add onetool -- onetool --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
+claude mcp add onetool -- onetool serve --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
 ```
 
 ## External Tools

@@ -83,6 +83,7 @@ def test_all_exports() -> None:
         "move",
         "read",
         "read_batch",
+        "resolve",
         "search",
         "slice",
         "slice_batch",
@@ -586,6 +587,435 @@ def test_search_include_hidden(tmp_path: Path) -> None:
     assert ".hidden.txt" in result
 
 
+# =============================================================================
+# File Resolve
+# =============================================================================
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_requires_exactly_one_selector() -> None:
+    """resolve requires exactly one of glob or match."""
+    from otutil.tools.file import resolve
+
+    assert "Exactly one" in resolve()
+    assert "not both" in resolve(glob="*.py", match="tf")
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_rejects_invalid_path_type_and_multi() -> None:
+    """resolve validates enum-like arguments."""
+    from otutil.tools.file import resolve
+
+    assert "path_type" in resolve(glob="*.py", path_type="full")
+    assert "multi" in resolve(glob="*.py", multi="many")
+    assert "kind" in resolve(glob="*.py", kind="folder")  # type: ignore[arg-type]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_glob_exact_file_returns_relative_path(tmp_path: Path) -> None:
+    """resolve accepts exact paths through glob mode."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / "notes.md").write_text("notes")
+
+    result = resolve(glob="notes.md")
+
+    assert result == ["notes.md"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_glob_defaults_to_all_sorted_relative_paths(tmp_path: Path) -> None:
+    """resolve glob mode returns deterministic sorted paths by default."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / "b.py").write_text("b")
+    (tmp_path / "A.py").write_text("a")
+    (tmp_path / "notes.txt").write_text("notes")
+
+    result = resolve(glob="*.py")
+
+    assert result == ["A.py", "b.py"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_defaults_to_max_ten_results(tmp_path: Path) -> None:
+    """resolve caps default result sets at ten matches."""
+    from otutil.tools.file import resolve
+
+    for idx in range(12):
+        (tmp_path / f"item-{idx:02}.py").write_text("item")
+
+    result = resolve(glob="*.py")
+
+    assert result == [f"item-{idx:02}.py" for idx in range(10)]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_kind_file_returns_files_only(tmp_path: Path) -> None:
+    """kind=file filters glob candidates to files."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "main.py").write_text("print('ok')\n")
+
+    result = resolve(glob="src*", kind="file")
+
+    assert result == []
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_kind_dir_returns_directories_only(tmp_path: Path) -> None:
+    """kind=dir filters glob candidates to directories."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src.py").write_text("not a directory")
+
+    result = resolve(glob="src*", kind="dir")
+
+    assert result == ["src"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_match_honors_dir_kind(tmp_path: Path) -> None:
+    """match mode can resolve directory candidates."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / "docs" / "reference" / "tools").mkdir(parents=True)
+    (tmp_path / "docs" / "reference.md").write_text("file")
+
+    result = resolve(match="docs tools", kind="dir")
+
+    assert result == ["docs/reference/tools"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_list_input_flattens_results_in_input_order(tmp_path: Path) -> None:
+    """list input always returns a flat list in selector order."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / "one.md").write_text("one")
+    (tmp_path / "two.md").write_text("two")
+
+    result = resolve(glob=["two.md", "one.md"])
+
+    assert result == ["two.md", "one.md"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_multi_error_reports_candidates(tmp_path: Path) -> None:
+    """multi=error reports numbered candidates and suggested alternatives."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / "alpha.py").write_text("a")
+    (tmp_path / "beta.py").write_text("b")
+
+    result = resolve(glob="*.py", multi="error")
+
+    assert isinstance(result, str)
+    assert "Multiple files matched" in result
+    assert "1. alpha.py" in result
+    assert "2. beta.py" in result
+    assert "multi='first'" in result
+    assert "multi='all'" in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_multi_first_returns_first_sorted_match(tmp_path: Path) -> None:
+    """multi=first returns the first deterministic match."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / "zeta.py").write_text("z")
+    (tmp_path / "alpha.py").write_text("a")
+
+    result = resolve(glob="*.py", multi="first")
+
+    assert result == "alpha.py"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_absolute_path_type_returns_absolute_path(tmp_path: Path) -> None:
+    """path_type=absolute returns absolute paths."""
+    from otutil.tools.file import resolve
+
+    target = tmp_path / "notes.md"
+    target.write_text("notes")
+
+    result = resolve(glob="notes.md", path_type="absolute")
+
+    assert result == [str(target)]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_glob_absolute_pattern(tmp_path: Path) -> None:
+    """absolute glob patterns resolve from filesystem root."""
+    from otutil.tools.file import resolve
+
+    target = tmp_path / "src" / "main.py"
+    target.parent.mkdir()
+    target.write_text("print('ok')\n")
+
+    result = resolve(glob=str(tmp_path / "src" / "*.py"))
+
+    assert result == ["src/main.py"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_glob_dedupes_per_selector(tmp_path: Path) -> None:
+    """duplicate glob paths are deduped by resolved absolute path."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "main.py").write_text("print('ok')\n")
+
+    result = resolve(glob=["src/main.py", "src/*.py"])
+
+    assert result == ["src/main.py", "src/main.py"]
+    assert resolve(glob=["src/main.py", "src/main.py"], multi="all") == [
+        "src/main.py",
+        "src/main.py",
+    ]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_glob_resolves_relative_to_path_root(tmp_path: Path) -> None:
+    """relative glob patterns resolve under the supplied path root."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / "dev" / "guides").mkdir(parents=True)
+    (tmp_path / "dev" / "guides" / "tool-development.md").write_text("dev")
+    (tmp_path / "docs" / "guides").mkdir(parents=True)
+    (tmp_path / "docs" / "guides" / "tool-reference.md").write_text("docs")
+
+    result = resolve(path="dev/guides", glob="tool-*.md", multi="all")
+
+    assert result == ["dev/guides/tool-development.md"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_path_root_does_not_change_absolute_glob(tmp_path: Path) -> None:
+    """absolute glob patterns still resolve from filesystem root."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / "dev").mkdir()
+    (tmp_path / "dev" / "ignored.py").write_text("ignored")
+    target = tmp_path / "src" / "main.py"
+    target.parent.mkdir()
+    target.write_text("print('ok')\n")
+
+    result = resolve(path="dev", glob=str(tmp_path / "src" / "*.py"))
+
+    assert result == ["src/main.py"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_glob_tilde_pattern_is_not_expanded(tmp_path: Path) -> None:
+    """glob patterns do not use Path.expanduser project path handling."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / "~").mkdir()
+    (tmp_path / "~" / "notes.md").write_text("literal tilde")
+
+    assert resolve(glob="~/*.md") == ["~/notes.md"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_match_uses_fuzzy_quick_open(tmp_path: Path) -> None:
+    """match mode uses fzy-style quick-open path matching."""
+    from otutil.tools.file import resolve
+
+    target = tmp_path / "tests" / "unit" / "core" / "test_log_format.py"
+    target.parent.mkdir(parents=True)
+    target.write_text("def test_log_format(): pass\n")
+    other = tmp_path / "tests" / "otutil" / "unit" / "tools" / "test_file.py"
+    other.parent.mkdir(parents=True)
+    other.write_text("def test_file(): pass\n")
+
+    result = resolve(match="tlf", multi="first")
+
+    assert result == "tests/unit/core/test_log_format.py"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_match_uses_path_root_for_candidates(tmp_path: Path) -> None:
+    """match mode only discovers candidates under the supplied path root."""
+    from otutil.tools.file import resolve
+
+    target = tmp_path / "dev" / "practices" / "cli-patterns.md"
+    target.parent.mkdir(parents=True)
+    target.write_text("cli")
+    other = tmp_path / "docs" / "cli-patterns.md"
+    other.parent.mkdir()
+    other.write_text("docs")
+
+    result = resolve(path="dev/practices", match="cli-pattern", multi="first")
+
+    assert result == "dev/practices/cli-patterns.md"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_match_path_root_excludes_outside_candidates(tmp_path: Path) -> None:
+    """match mode returns no match for files outside the supplied path root."""
+    from otutil.tools.file import resolve
+
+    target = tmp_path / "dev" / "practices" / "cli-patterns.md"
+    target.parent.mkdir(parents=True)
+    target.write_text("cli")
+    (tmp_path / "wip").mkdir()
+
+    result = resolve(path="wip", match="cli-pattern")
+
+    assert result == []
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_path_must_be_directory(tmp_path: Path) -> None:
+    """path must resolve to an existing directory."""
+    from otutil.tools.file import resolve
+
+    target = tmp_path / "notes.md"
+    target.write_text("notes")
+
+    assert "Not a directory" in resolve(path="notes.md", glob="*.md")
+    assert "Path not found" in resolve(path="missing", glob="*.md")
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_match_space_separated_query(tmp_path: Path) -> None:
+    """match mode supports space-separated quick-open queries."""
+    from otutil.tools.file import resolve
+
+    target = tmp_path / "wip" / "notes" / "onetool-mcp-2026.md"
+    target.parent.mkdir(parents=True)
+    target.write_text("notes")
+
+    result = resolve(match="wip 2026")
+
+    assert result == ["wip/notes/onetool-mcp-2026.md"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_gitignore_true_skips_ignored(tmp_path: Path) -> None:
+    """gitignore=True skips ignored files in glob and match modes."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / ".gitignore").write_text("ignored.py\n")
+    (tmp_path / "ignored.py").write_text("ignored")
+    (tmp_path / "visible.py").write_text("visible")
+
+    assert resolve(glob="*.py", gitignore=True) == ["visible.py"]
+    assert resolve(match="ignored", gitignore=True) == []
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_gitignore_false_includes_ignored(tmp_path: Path) -> None:
+    """gitignore=False includes gitignored files."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / ".gitignore").write_text("logs/\n")
+    (tmp_path / "logs").mkdir()
+    (tmp_path / "logs" / "app.log").write_text("error")
+
+    result = resolve(glob="logs/*.log", gitignore=False)
+
+    assert result == ["logs/app.log"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_include_hidden_controls_hidden_segments(tmp_path: Path) -> None:
+    """include_hidden controls hidden files and hidden path segments."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / ".hidden").mkdir()
+    (tmp_path / ".hidden" / "note.md").write_text("hidden")
+    (tmp_path / "visible.md").write_text("visible")
+
+    assert resolve(glob="**/*.md") == [
+        ".hidden/note.md",
+        "visible.md",
+    ]
+    assert resolve(glob="**/*.md", include_hidden=False) == ["visible.md"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_match_prunes_hidden_directories(tmp_path: Path) -> None:
+    """match mode avoids descending into hidden directories by default."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / ".hidden").mkdir()
+    (tmp_path / ".hidden" / "secret-target.md").write_text("hidden")
+
+    assert resolve(match="secret-target") == [".hidden/secret-target.md"]
+    assert resolve(match="secret-target", include_hidden=False) == []
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_match_prunes_gitignored_directories(tmp_path: Path) -> None:
+    """match mode avoids descending into gitignored directories."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / ".gitignore").write_text("build/\n")
+    (tmp_path / "build").mkdir()
+    (tmp_path / "build" / "generated-target.py").write_text("generated")
+
+    assert resolve(match="generated-target") == []
+    assert resolve(match="generated-target", gitignore=False) == ["build/generated-target.py"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_respects_exclude_patterns(tmp_path: Path) -> None:
+    """resolve always applies file tool exclude patterns."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / "__pycache__").mkdir()
+    (tmp_path / "__pycache__" / "cached.py").write_text("cached")
+    (tmp_path / "main.py").write_text("main")
+
+    result = resolve(glob="**/*.py", gitignore=False)
+
+    assert result == ["main.py"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_resolve_match_prunes_excluded_directories(tmp_path: Path) -> None:
+    """match mode avoids descending into configured excluded directories."""
+    from otutil.tools.file import resolve
+
+    (tmp_path / "__pycache__").mkdir()
+    (tmp_path / "__pycache__" / "package-target.py").write_text("module")
+
+    assert resolve(match="package-target", gitignore=False) == []
+
+
 @pytest.mark.unit
 @pytest.mark.tools
 def test_write_encoding(tmp_path: Path) -> None:
@@ -779,6 +1209,54 @@ def test_grep_context_lines(grep_dir: Path) -> None:
     assert "alpha.py:4: def bar():" in result
     # A context line (before or after, dash format)
     assert "alpha.py-" in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_grep_context_zero_returns_all_match_groups(tmp_path: Path) -> None:
+    """context=0 returns all matches allowed by max_matches."""
+    from otutil.tools.file import grep
+
+    lines = [f"def func_{idx}(): pass" for idx in range(12)]
+    (tmp_path / "many.py").write_text("\n".join(lines) + "\n")
+
+    result = grep(pattern="def ", path=str(tmp_path), context=0, max_matches=20)
+
+    assert result.count("many.py:") == 12
+    assert "many.py:12: def func_11(): pass" in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_grep_context_zero_has_no_blank_group_separators(tmp_path: Path) -> None:
+    """context=0 uses one match per line without blank group separators."""
+    from otutil.tools.file import grep
+
+    (tmp_path / "many.py").write_text("def one(): pass\nx = 1\ndef two(): pass\n")
+
+    result = grep(pattern="def ", path=str(tmp_path), context=0)
+
+    assert result.splitlines() == [
+        "many.py:1: def one(): pass",
+        "many.py:3: def two(): pass",
+    ]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_grep_max_matches_caps_total_output(tmp_path: Path) -> None:
+    """max_matches remains the public total result cap."""
+    from otutil.tools.file import grep
+
+    lines = [f"def func_{idx}(): pass" for idx in range(5)]
+    (tmp_path / "many.py").write_text("\n".join(lines) + "\n")
+
+    result = grep(pattern="def ", path=str(tmp_path), context=0, max_matches=3)
+
+    assert result.count("many.py:") == 3
+    assert "many.py:3: def func_2(): pass" in result
+    assert "many.py:4: def func_3(): pass" not in result
+    assert "... (stopped at 3 matches)" in result
 
 
 @pytest.mark.unit

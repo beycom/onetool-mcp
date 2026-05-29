@@ -14,6 +14,8 @@ from urllib.parse import urldefrag, urljoin
 
 from loguru import logger
 
+from ot.logging import LogEntry
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -175,9 +177,11 @@ def _build_pathspec(patterns: list[str]) -> Any:
         return pathspec.PathSpec.from_lines("gitwildmatch", patterns)
     except ImportError:
         logger.warning(
-            "pathspec not installed — {} ignore pattern(s) will not be applied "
-            "(install with: uv add pathspec)",
-            len(patterns),
+            LogEntry(
+                event="knowledge.indexer.pathspec_missing",
+                patternCount=len(patterns),
+                action="ignore_patterns_skipped",
+            )
         )
         return None
 

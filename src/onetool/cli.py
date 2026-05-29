@@ -79,7 +79,7 @@ def _setup_signal_handlers() -> None:
 
 def _write_startup_config_error(config: Path, error: Exception) -> None:
     """Write pre-handshake config failures to the serve log location."""
-    log_dir = config.parent / "logs"
+    log_dir = config.parent / "runtime" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "serve.log"
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
@@ -88,6 +88,79 @@ def _write_startup_config_error(config: Path, error: Exception) -> None:
             f"{timestamp} | ERROR  | cli | mcp.startup.config_error | "
             f"config={config} | error={error}\n"
         )
+
+
+def _validate_http_root_options(*, host: str, port: int, path: str) -> None:
+    """Validate HTTP root options without importing the server module."""
+    if not host or host.strip() != host:
+        raise ValueError("--host must be a non-empty hostname or IP address")
+    if port < 1 or port > 65535:
+        raise ValueError("--port must be between 1 and 65535")
+    if not path.startswith("/"):
+        raise ValueError("--path must start with '/'")
+    if "?" in path or "#" in path or any(ch.isspace() for ch in path):
+        raise ValueError("--path must be a URL path without whitespace, query, or fragment")
+
+
+def _load_runtime_config(config: Path, secrets: Path | None) -> None:
+    """Load root runtime configuration before starting MCP transport."""
+    from ot.config.loader import get_config
+
+    try:
+        get_config(config, reload=True, secrets_path=secrets)
+    except Exception as e:
+        _write_startup_config_error(config, e)
+        console.print(f"[red]Error loading config:[/red] {e}")
+        raise typer.Exit(1) from e
+
+
+def _ensure_runtime_config_exists(config: Path) -> None:
+    """Fail if root runtime config is missing."""
+    if not config.exists():
+        console.print(f"OneTool not initialized. Run: onetool init --config {config}")
+        raise typer.Exit(1)
+
+
+def _start_root_runtime(
+    *,
+    config: Path,
+    secrets: Path | None,
+    transport: str,
+    host: str,
+    port: int,
+    path: str,
+) -> None:
+    """Start root MCP runtime with shared config loading and banner behavior."""
+    if transport not in {"stdio", "http"}:
+        console.print("[red]Error:[/red] --transport must be 'stdio' or 'http'")
+        raise typer.Exit(2)
+    if transport == "http":
+        try:
+            _validate_http_root_options(host=host, port=port, path=path)
+        except ValueError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(2) from e
+
+    _ensure_runtime_config_exists(config)
+    _load_runtime_config(config, secrets)
+    _setup_signal_handlers()
+    _print_startup_banner()
+
+    from ot.server import run_root_server
+
+    if transport == "stdio":
+        run_root_server(transport="stdio")
+        return
+
+    if transport == "http":
+        console.print(f"[cyan]Streamable HTTP root MCP:[/cyan] http://{host}:{port}{path}")
+        run_root_server(
+            transport="streamable-http",
+            host=host,
+            port=port,
+            path=path,
+        )
+        return
 
 
 app.add_typer(direct_app, name="direct", rich_help_panel="Direct")
@@ -100,6 +173,55 @@ init_app = typer.Typer(
     invoke_without_command=True,
 )
 app.add_typer(init_app, rich_help_panel="Configuration")
+
+
+@app.command("serve", rich_help_panel="Runtime")
+def serve_command(
+    config: Path = typer.Option(
+        ...,
+        "--config",
+        "-c",
+        help="Path to onetool.yaml configuration file.",
+    ),
+    secrets: Path | None = typer.Option(
+        None,
+        "--secrets",
+        "-s",
+        help="Path to secrets file. If omitted, no secrets are loaded.",
+    ),
+    transport: str = typer.Option(
+        "stdio",
+        "--transport",
+        "-t",
+        help="Root MCP transport: stdio or http.",
+    ),
+    host: str = typer.Option(
+        "127.0.0.1",
+        "--host",
+        help="Streamable HTTP root bind host.",
+    ),
+    port: int = typer.Option(
+        8767,
+        "--port",
+        min=1,
+        max=65535,
+        help="Streamable HTTP root bind port.",
+    ),
+    path: str = typer.Option(
+        "/mcp",
+        "--path",
+        help="Streamable HTTP MCP endpoint path.",
+    ),
+) -> None:
+    """Run the OneTool root MCP server."""
+    _start_root_runtime(
+        config=config,
+        secrets=secrets,
+        transport=transport,
+        host=host,
+        port=port,
+        path=path,
+    )
 
 
 def _next_bak(path: Path) -> Path:
@@ -226,7 +348,7 @@ def _copy_file(ot_dir: Path, filename: str) -> bool:
 
 
 def _copy_diagram(ot_dir: Path) -> bool:
-    """Copy diagram.yaml and diagram-templates/ directory. Returns True if success."""
+    """Copy diagram.yaml and editable diagram templates. Returns True if success."""
     import shutil
 
     from ot.paths import get_global_templates_dir
@@ -243,15 +365,16 @@ def _copy_diagram(ot_dir: Path) -> bool:
 
     src_templates = templates_dir / "diagram-templates"
     if src_templates.exists():
-        dest_templates = ot_dir / "diagram-templates"
+        dest_templates = ot_dir / "templates" / "diagram"
         if dest_templates.exists():
             bak = _next_bak(dest_templates)
             dest_templates.rename(bak)
             console.print(
-                f"  [yellow]![/yellow] diagram-templates/ exists → backed up as {bak.name}"
+                f"  [yellow]![/yellow] templates/diagram/ exists → backed up as {bak.name}"
             )
+        dest_templates.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(src_templates, dest_templates)
-        console.print("  [green]✓[/green] diagram-templates/")
+        console.print("  [green]✓[/green] templates/diagram/")
 
     return True
 
@@ -550,7 +673,7 @@ def init_validate(
 
 
 @app.callback(invoke_without_command=True)
-def serve(
+def root_callback(
     ctx: typer.Context,
     _version: bool | None = typer.Option(
         None,
@@ -579,8 +702,8 @@ def serve(
     The server communicates via stdio and is typically invoked by MCP clients.
 
     Examples:
-        onetool --config /path/to/.onetool/onetool.yaml
-        onetool --config /path/to/.onetool/onetool.yaml --secrets /path/to/.onetool/secrets.yaml
+        onetool serve --config /path/to/.onetool/onetool.yaml
+        onetool serve --config /path/to/.onetool/onetool.yaml --secrets /path/to/.onetool/secrets.yaml
     """
     # Only run if no subcommand was invoked (handles --help automatically)
     if ctx.invoked_subcommand is not None:
@@ -588,7 +711,7 @@ def serve(
 
     if config is None:
         console.print("[red]Error: Missing option '--config' / '-c'.[/red]")
-        console.print("Usage: onetool --config /path/to/.onetool/onetool.yaml")
+        console.print("Usage: onetool serve --config /path/to/.onetool/onetool.yaml")
         raise typer.Exit(1)
     if not config.exists():
         if _stdin_is_tty():
@@ -609,29 +732,20 @@ def serve(
             )
             raise typer.Exit(1)
 
+    console.print(
+        "[yellow]Warning:[/yellow] prefer explicit runtime invocation: "
+        f"onetool serve --config {config}"
+    )
+
     # Remove loguru's default stderr handler before any logging occurs
     import ot.logging  # noqa: F401
-
-    # Load config (secrets threaded through load_config)
-    from ot.config.loader import get_config
-
-    try:
-        get_config(config, reload=True, secrets_path=secrets)
-    except Exception as e:
-        _write_startup_config_error(config, e)
-        console.print(f"[red]Error loading config:[/red] {e}")
-        raise typer.Exit(1) from e
-
-    # Set up signal handlers for clean exit (before starting server)
+    _load_runtime_config(config, secrets)
     _setup_signal_handlers()
-
-    # Print startup banner to stderr (stdout is for MCP JSON-RPC)
     _print_startup_banner()
 
-    # Import here to avoid circular imports and only load when needed
-    from ot.server import main as server_main
+    from ot.server import run_root_server
 
-    server_main()
+    run_root_server(transport="stdio")
 
 
 def cli() -> None:

@@ -19,7 +19,7 @@ existing `.py` file reads the file contents and executes them.
 
 Flags:
 - `--port`/`-p` — required target MCP direct API port
-- `--ot-dir` — absolute OneTool directory containing `mcp-direct/auth.key`; default `~/.onetool`
+- `--ot-dir` — absolute OneTool directory containing `auth/mcp-direct.key`; default `~/.onetool`
 - `--format`/`-f` — output format: `json_h` (default), `json`, `yml`, `yml_h`, `raw`
 - `--sanitize` — enable output sanitization
 - `--timeout`/`-t` — direct API request timeout in seconds
@@ -65,8 +65,8 @@ Flags:
 ### Requirement: authenticated direct API client
 
 `onetool direct run` SHALL connect only to `127.0.0.1:PORT` and use the
-`mcp-direct` HMAC key from `OT_DIR/mcp-direct/auth.key`. The client-side
-OT_DIR SHALL come from `--ot-dir`, defaulting to `~/.onetool`.
+HMAC key from `OT_DIR/auth/mcp-direct.key`. The client-side OT_DIR SHALL come
+from `--ot-dir`, defaulting to `~/.onetool`.
 
 `--ot-dir` SHALL be an explicit absolute directory selector after `~`
 expansion. It SHALL NOT load OneTool config and SHALL NOT resolve relative to

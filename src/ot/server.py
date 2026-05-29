@@ -23,6 +23,7 @@ import socket
 import threading
 import time
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -35,7 +36,7 @@ from loguru import logger
 from ot.config.loader import get_config
 from ot.executor import SimpleExecutor, execute_command
 from ot.executor.runner import prepare_command
-from ot.logging import LogSpan, configure_logging
+from ot.logging import LogEntry, LogSpan, configure_logging
 from ot.logging.mcp_logging import (
     map_mcp_logging_level,
     register_set_logging_level_handler,
@@ -61,6 +62,40 @@ _stats_writer: JsonlStatsWriter | None = None
 _direct_api_server: Any | None = None
 _direct_api_thread: threading.Thread | None = None
 _direct_api_port: int | None = None
+_root_runtime: RootRuntime | None = None
+
+
+@dataclass(frozen=True)
+class RootRuntime:
+    """Root MCP transport settings for lifecycle logs."""
+
+    transport: str
+    host: str | None = None
+    port: int | None = None
+    path: str | None = None
+
+    @property
+    def url(self) -> str | None:
+        """Return the client URL for HTTP root mode."""
+        if self.transport != "streamable-http":
+            return None
+        return f"http://{self.host}:{self.port}{self.path}"
+
+
+def _is_loopback_host(host: str) -> bool:
+    return host in {"127.0.0.1", "localhost", "::1"}
+
+
+def validate_http_root_options(*, host: str, port: int, path: str) -> None:
+    """Validate Streamable HTTP root options before server startup."""
+    if not host or host.strip() != host:
+        raise ValueError("--host must be a non-empty hostname or IP address")
+    if port < 1 or port > 65535:
+        raise ValueError("--port must be between 1 and 65535")
+    if not path.startswith("/"):
+        raise ValueError("--path must start with '/'")
+    if "?" in path or "#" in path or any(ch.isspace() for ch in path):
+        raise ValueError("--path must be a URL path without whitespace, query, or fragment")
 
 
 def _direct_health_probe_once(host: str, port: int, timeout_secs: float = 0.2) -> bool:
@@ -84,20 +119,22 @@ def _direct_health_probe_once(host: str, port: int, timeout_secs: float = 0.2) -
             )
             payload: dict[str, Any] = json.loads(body.decode("utf-8"))
             healthy = payload.get("status") == "ok"
-            logger.info("direct.api.health_probe | port={} | healthy={}", port, healthy)
+            logger.debug(LogEntry(event="direct.api.health_probe", port=port, healthy=healthy))
             return healthy
     except Exception as e:
-        logger.info("direct.api.health_probe | port={} | healthy=False | error={}", port, e)
+        logger.debug(
+            LogEntry(event="direct.api.health_probe", port=port, healthy=False).failure(e)
+        )
         return False
 
 
 def _tcp_port_bound(host: str, port: int, timeout_secs: float = 0.1) -> bool:
     try:
         with socket.create_connection((host, port), timeout=timeout_secs):
-            logger.info("direct.api.port_bound | port={} | bound=True", port)
+            logger.debug(LogEntry(event="direct.api.port_bound", port=port, bound=True))
             return True
     except (OSError, ConnectionRefusedError, TimeoutError):
-        logger.info("direct.api.port_bound | port={} | bound=False", port)
+        logger.debug(LogEntry(event="direct.api.port_bound", port=port, bound=False))
         return False
 
 
@@ -112,17 +149,19 @@ def _start_direct_api() -> tuple[Any, threading.Thread, int]:
 
     from ot.direct_api import create_app
 
-    logger.info(
-        "direct.api.start.begin | configuredPort={} | candidateCount={}",
-        _config.direct.host.port,
-        65536 - _config.direct.host.port,
+    logger.debug(
+        LogEntry(
+            event="direct.api.start.begin",
+            configuredPort=_config.direct.host.port,
+            candidateCount=65536 - _config.direct.host.port,
+        )
     )
     for port in _direct_candidate_ports():
         if _tcp_port_bound("127.0.0.1", port):
-            logger.info("direct.api.port.occupied_skipped | port={}", port)
+            logger.debug(LogEntry(event="direct.api.port.occupied_skipped", port=port))
             continue
 
-        logger.info("direct.api.candidate | port={}", port)
+        logger.debug(LogEntry(event="direct.api.candidate", port=port))
         config = uvicorn.Config(
             create_app(),
             host="127.0.0.1",
@@ -138,9 +177,11 @@ def _start_direct_api() -> tuple[Any, threading.Thread, int]:
         while time.monotonic() < deadline:
             if server.started and _direct_health_probe_once("127.0.0.1", port):
                 logger.info(
-                    "direct.api.ready | port={} | baseUrl=http://127.0.0.1:{}",
-                    port,
-                    port,
+                    LogEntry(
+                        event="direct.api.ready",
+                        port=port,
+                        baseUrl=f"http://127.0.0.1:{port}",
+                    ).success()
                 )
                 return server, thread, port
             if not thread.is_alive():
@@ -158,10 +199,10 @@ def _start_direct_api() -> tuple[Any, threading.Thread, int]:
 
 def _stop_direct_api(server: Any, thread: threading.Thread, port: int) -> None:
     """Stop the embedded direct API listener."""
-    logger.info("direct.api.stop.begin | port={}", port)
+    logger.debug(LogEntry(event="direct.api.stop.begin", port=port))
     server.should_exit = True
     thread.join(timeout=5.0)
-    logger.info("direct.api.stop.done | port={}", port)
+    logger.info(LogEntry(event="direct.api.stop.done", port=port).success())
 
 
 def _build_pack_summary() -> str:
@@ -212,22 +253,26 @@ def _log_startup_diagnostics(
     config_path = get_loaded_config_path()
     prompts_info = _get_prompts_info()
     logger.info(
-        "mcp.startup.diagnostics | transport=stdio | configDir={} | configFile={} | includeCount={} | logPath={} | statsEnabled={} | statsPath={} | registryToolCount={} | proxyConfigured={} | proxyBackground={} | directConfigured={} | directStatus={} | directPort={} | promptSource={} | promptPath={} | promptHash={} | statusTool=ot.status",
-        cfg._config_dir,
-        config_path,
-        len(cfg.include),
-        cfg.get_log_dir_path() / "serve.log",
-        cfg.stats.enabled,
-        cfg.get_stats_file_path(),
-        tool_count,
-        proxy_count,
-        bool(proxy_count),
-        cfg.direct.host.enabled,
-        direct_status,
-        direct_port,
-        prompts_info.get("source"),
-        prompts_info.get("path"),
-        prompts_info.get("sha256"),
+        LogEntry(
+            event="mcp.startup.diagnostics",
+            transport="stdio",
+            configDir=cfg._config_dir,
+            configFile=config_path,
+            includeCount=len(cfg.include),
+            logPath=cfg.get_log_dir_path() / "serve.log",
+            statsEnabled=cfg.stats.enabled,
+            statsPath=cfg.get_stats_file_path(),
+            registryToolCount=tool_count,
+            proxyConfigured=proxy_count,
+            proxyBackground=bool(proxy_count),
+            directConfigured=cfg.direct.host.enabled,
+            directStatus=direct_status,
+            directPort=direct_port,
+            promptSource=prompts_info.get("source"),
+            promptPath=prompts_info.get("path"),
+            promptHash=prompts_info.get("sha256"),
+            statusTool="ot.status",
+        )
     )
 
 
@@ -236,13 +281,34 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
     """Manage server lifecycle - startup and shutdown."""
     global _stats_writer, _direct_api_server, _direct_api_thread, _direct_api_port
 
-    with LogSpan(span="mcp.server.start") as start_span:
+    runtime = _root_runtime or RootRuntime(transport="stdio")
+
+    with LogSpan(span="mcp.server.start", transport=runtime.transport) as start_span:
+        start_time = time.monotonic()
+        if runtime.transport == "streamable-http":
+            start_span.add(
+                host=runtime.host,
+                port=runtime.port,
+                path=runtime.path,
+                url=runtime.url,
+            )
+            if runtime.host and not _is_loopback_host(runtime.host):
+                logger.warning(
+                    "mcp.http_root.non_loopback_bind | host={} | port={} | path={} | url={}",
+                    runtime.host,
+                    runtime.port,
+                    runtime.path,
+                    runtime.url,
+                )
         # Startup: connect to proxy MCP servers in the background so FastMCP
         # can begin handling MCP protocol messages immediately.
         proxy = get_proxy_manager()
-        if _config.servers:
-            proxy.connect_background(_config.servers)
-            start_span.add("proxyCount", len(_config.servers))
+        enabled_servers = {
+            name: config for name, config in _config.servers.items() if config.enabled
+        }
+        if enabled_servers:
+            proxy.connect_background(enabled_servers)
+            start_span.add("proxyCount", len(enabled_servers))
 
         # Log tool count from registry
         registry = get_registry()
@@ -263,12 +329,14 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
                 start_span.add("directApi", f"http://127.0.0.1:{api_port}")
                 direct_status = "ready"
             except Exception as e:
-                logger.error("direct.api.degraded | error={}", e)
+                logger.error(LogEntry(event="direct.api.degraded").failure(e))
                 start_span.add("directApi", "degraded")
                 start_span.add("directApiError", str(e))
                 direct_status = "degraded"
         else:
-            logger.info("direct.api.disabled")
+            logger.debug(
+                LogEntry(event="direct.api.disabled", rootTransport=runtime.transport)
+            )
 
         # Fire anonymous startup telemetry (non-blocking daemon thread)
         from ot.telemetry import ping as _telemetry_ping
@@ -291,17 +359,18 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
 
         _log_startup_diagnostics(
             tool_count=len(registry.tools),
-            proxy_count=len(_config.servers),
+            proxy_count=len(enabled_servers),
             direct_status=direct_status,
             direct_port=_direct_api_port,
         )
 
         # Log support message
-        logger.info(get_startup_message())
+        logger.info(LogEntry(event="mcp.support_message", message=get_startup_message()))
 
     yield
 
-    with LogSpan(span="mcp.server.stop") as stop_span:
+    with LogSpan(span="mcp.server.stop", transport=runtime.transport) as stop_span:
+        stop_span.add(duration=round(time.monotonic() - start_time, 3))
         if (
             _direct_api_server is not None
             and _direct_api_thread is not None
@@ -505,4 +574,48 @@ async def run(command: str, ctx: Context) -> ToolResult:  # noqa: ARG001
 
 def main() -> None:
     """Run the MCP server over stdio transport."""
-    mcp.run(show_banner=False)
+    run_root_server()
+
+
+def run_root_server(
+    *,
+    transport: str = "stdio",
+    host: str = "127.0.0.1",
+    port: int = 8767,
+    path: str = "/mcp",
+) -> None:
+    """Run the shared root MCP server over stdio or Streamable HTTP."""
+    global _root_runtime
+
+    if transport == "stdio":
+        _root_runtime = RootRuntime(transport="stdio")
+        mcp.run(transport="stdio", show_banner=False)
+        return
+
+    if transport == "streamable-http":
+        validate_http_root_options(host=host, port=port, path=path)
+        _root_runtime = RootRuntime(
+            transport="streamable-http",
+            host=host,
+            port=port,
+            path=path,
+        )
+        logger.info(
+            LogEntry(
+                event="mcp.http_root.start",
+                host=host,
+                port=port,
+                path=path,
+                url=f"http://{host}:{port}{path}",
+            )
+        )
+        mcp.run(
+            transport="streamable-http",
+            show_banner=False,
+            host=host,
+            port=port,
+            path=path,
+        )
+        return
+
+    raise ValueError(f"Unsupported root MCP transport: {transport}")

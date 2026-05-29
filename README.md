@@ -62,7 +62,7 @@ onetool init --config ~/.onetool
 Add to Claude Code:
 
 ```bash
-claude mcp add onetool -- onetool --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
+claude mcp add onetool -- onetool serve --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
 ```
 
 Or manually add to `~/.claude/mcp.json`:
@@ -72,7 +72,7 @@ Or manually add to `~/.claude/mcp.json`:
   "mcpServers": {
     "onetool": {
       "command": "onetool",
-      "args": ["--config", "/Users/yourname/.onetool/onetool.yaml", "--secrets", "/Users/yourname/.onetool/secrets.yaml"]
+      "args": ["serve", "--config", "/Users/yourname/.onetool/onetool.yaml", "--secrets", "/Users/yourname/.onetool/secrets.yaml"]
     }
   }
 }
@@ -91,6 +91,12 @@ Verify: `onetool init validate --config ~/.onetool/onetool.yaml`
 Works as an MCP server **and** as a direct CLI bridge into a running MCP process. Useful for agent harnesses, scripts, and automation:
 
 ```bash
+# Recommended local MCP root mode: stdio
+onetool serve --config .onetool/onetool.yaml
+
+# URL-based MCP root mode for containerized clients
+onetool serve --transport http --config .onetool/onetool.yaml --host 127.0.0.1 --port 8767 --path /mcp
+
 # Enable the MCP-owned direct API in onetool.yaml:
 # direct.host.enabled: true
 

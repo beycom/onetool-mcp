@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from loguru import logger
 
+from ot.logging import LogEntry
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -261,7 +263,7 @@ class StatsReader:
                             acc[1] += 1
                         acc[2] += int(record.get("duration_ms", 0))
         except Exception as e:
-            logger.warning(f"Failed to read stats: {e}")
+            logger.warning(LogEntry(event="stats.read.failed", path=self._path).failure(e))
             return AggregatedStats(
                 period=period,
                 start_time=None,
@@ -335,4 +337,3 @@ class StatsReader:
             return now - timedelta(days=30)
 
         return None
-

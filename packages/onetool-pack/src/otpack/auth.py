@@ -15,6 +15,7 @@ __all__ = [
     "HmacAuthError",
     "NonceCache",
     "ensure_hmac_key",
+    "ensure_hmac_key_file",
     "sign_http_message",
     "verify_http_message",
 ]
@@ -75,7 +76,11 @@ def ensure_hmac_key(namespace: str, *, base_dir: Path | None = None) -> bytes:
         raise ValueError("HMAC key namespace must be a simple name")
 
     root = Path.home() / ".onetool" if base_dir is None else base_dir
-    path = root / namespace / "auth.key"
+    return ensure_hmac_key_file(root / namespace / "auth.key")
+
+
+def ensure_hmac_key_file(path: Path) -> bytes:
+    """Read or create a local HMAC key at an explicit file path."""
     if path.exists():
         return _decode_key(path.read_text().strip())
 

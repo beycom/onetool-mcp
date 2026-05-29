@@ -54,7 +54,7 @@ def test_copy_file_security(tmp_path: Path) -> None:
 @pytest.mark.unit
 @pytest.mark.core
 def test_copy_diagram_copies_yaml_and_templates(tmp_path: Path) -> None:
-    """_copy_diagram copies diagram.yaml and diagram-templates/ directory."""
+    """_copy_diagram copies diagram.yaml and templates/diagram/ directory."""
     from onetool.cli import _copy_diagram
 
     ot_dir = tmp_path / ".onetool"
@@ -64,28 +64,28 @@ def test_copy_diagram_copies_yaml_and_templates(tmp_path: Path) -> None:
 
     assert result is True
     assert (ot_dir / "diagram.yaml").exists()
-    assert (ot_dir / "diagram-templates").is_dir()
+    assert (ot_dir / "templates" / "diagram").is_dir()
     # At least one template file should be present
-    templates = list((ot_dir / "diagram-templates").iterdir())
+    templates = list((ot_dir / "templates" / "diagram").iterdir())
     assert len(templates) > 0
 
 
 @pytest.mark.unit
 @pytest.mark.core
 def test_copy_diagram_backs_up_existing_templates(tmp_path: Path) -> None:
-    """_copy_diagram backs up existing diagram-templates/ before overwriting."""
+    """_copy_diagram backs up existing templates/diagram/ before overwriting."""
     from onetool.cli import _copy_diagram
 
     ot_dir = tmp_path / ".onetool"
     ot_dir.mkdir()
-    existing_templates = ot_dir / "diagram-templates"
-    existing_templates.mkdir()
+    existing_templates = ot_dir / "templates" / "diagram"
+    existing_templates.mkdir(parents=True)
     (existing_templates / "custom.mmd").write_text("# custom")
 
     _copy_diagram(ot_dir)
 
-    assert (ot_dir / "diagram-templates").is_dir()
-    bak = ot_dir / "diagram-templates.bak"
+    assert (ot_dir / "templates" / "diagram").is_dir()
+    bak = ot_dir / "templates" / "diagram.bak"
     assert bak.exists()
     assert (bak / "custom.mmd").read_text() == "# custom"
 
@@ -416,8 +416,8 @@ def test_init_config_creates_missing_directory(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_serve_missing_config_non_interactive_exits(tmp_path: Path) -> None:
-    """onetool serve with missing config and non-TTY stdin prints message and exits 1."""
+def test_root_invocation_missing_config_non_interactive_exits(tmp_path: Path) -> None:
+    """Root compatibility invocation with missing config exits 1."""
     from unittest.mock import patch
 
     from typer.testing import CliRunner
@@ -436,8 +436,10 @@ def test_serve_missing_config_non_interactive_exits(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_serve_missing_config_interactive_declined_exits(tmp_path: Path) -> None:
-    """onetool serve with missing config in TTY mode, user declines init — exits 1."""
+def test_root_invocation_missing_config_interactive_declined_exits(
+    tmp_path: Path,
+) -> None:
+    """Root compatibility invocation with missing config exits when init is declined."""
     from unittest.mock import patch
 
     from typer.testing import CliRunner
@@ -456,8 +458,10 @@ def test_serve_missing_config_interactive_declined_exits(tmp_path: Path) -> None
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_serve_missing_config_interactive_accepted_calls_ensure_ot_dir(tmp_path: Path) -> None:
-    """onetool serve with missing config in TTY mode, user accepts — ensure_ot_dir is called."""
+def test_root_invocation_missing_config_interactive_accepted_calls_ensure_ot_dir(
+    tmp_path: Path,
+) -> None:
+    """Root compatibility invocation with missing config can initialize in TTY mode."""
     from unittest.mock import MagicMock, patch
 
     from typer.testing import CliRunner
@@ -475,7 +479,7 @@ def test_serve_missing_config_interactive_accepted_calls_ensure_ot_dir(tmp_path:
     import types
 
     fake_server = types.ModuleType("ot.server")
-    fake_server.main = MagicMock()
+    fake_server.run_root_server = MagicMock()
 
     with (
         patch("onetool.cli._stdin_is_tty", return_value=True),
@@ -489,6 +493,27 @@ def test_serve_missing_config_interactive_accepted_calls_ensure_ot_dir(tmp_path:
 
     assert mock_ensure.call_count == 1
     assert "Initialized" in result.output
+    fake_server.run_root_server.assert_called_once_with(transport="stdio")
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_serve_missing_config_fails_fast(tmp_path: Path) -> None:
+    """Explicit serve command with missing config fails without interactive init."""
+    from unittest.mock import patch
+
+    from typer.testing import CliRunner
+
+    from onetool.cli import app
+
+    config_path = tmp_path / ".onetool" / "onetool.yaml"
+
+    with patch("onetool.cli._stdin_is_tty", return_value=True):
+        result = CliRunner().invoke(app, ["serve", "--config", str(config_path)])
+
+    assert result.exit_code == 1
+    assert "OneTool not initialized" in result.output
+    assert "Initialize now?" not in result.output
 
 
 @pytest.mark.unit
@@ -531,7 +556,7 @@ def test_serve_config_error_is_written_to_serve_log(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "Error loading config" in result.output
-    log_text = (ot_dir / "logs" / "serve.log").read_text()
+    log_text = (ot_dir / "runtime" / "logs" / "serve.log").read_text()
     assert "mcp.startup.config_error" in log_text
     assert str(config_path) in log_text
     assert "70000" in log_text

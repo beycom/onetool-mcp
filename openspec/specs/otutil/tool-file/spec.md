@@ -204,6 +204,92 @@ The `file.search()` function SHALL search for files by name pattern.
 - **THEN** it SHALL exclude hidden files (starting with `.`)
 - **AND** `include_hidden=True` SHALL include them
 
+### Requirement: File Reference Resolution
+
+The `file.resolve()` function SHALL resolve exact/glob references and fuzzy quick-open references to file or directory path strings.
+
+#### Scenario: Selector validation
+- **GIVEN** neither `glob` nor `match` is provided
+- **WHEN** `file.resolve()` is called
+- **THEN** it SHALL return an error string
+- **AND** providing both `glob` and `match` SHALL return an error string
+
+#### Scenario: Glob reference
+- **GIVEN** an exact path or glob pattern
+- **WHEN** `file.resolve(glob="src/**/*.py")` is called
+- **THEN** it SHALL return matching file paths sorted deterministically by case-insensitive path order
+- **AND** exact file paths SHALL be accepted by the same code path as glob patterns
+- **AND** by default it SHALL return at most 10 paths per selector
+
+#### Scenario: Scoped glob reference
+- **GIVEN** a directory path and a relative glob pattern
+- **WHEN** `file.resolve(path="dev/guides", glob="tool-*.md")` is called
+- **THEN** it SHALL resolve the relative glob from the supplied path root
+- **AND** returned relative paths SHALL remain relative to the effective cwd when possible
+- **AND** absolute glob patterns SHALL still resolve from the filesystem root
+
+#### Scenario: Directory reference
+- **GIVEN** matching directory and file candidates
+- **WHEN** `file.resolve(glob="src/**", kind="dir")` is called
+- **THEN** it SHALL return only matching directory paths
+- **AND** `kind="file"` SHALL return only matching file paths
+- **AND** invalid `kind` values SHALL return an error string
+
+#### Scenario: Fuzzy quick-open reference
+- **GIVEN** files under the effective cwd
+- **WHEN** `file.resolve(match="tlf")` is called
+- **THEN** it SHALL fuzzy-match against relative candidate paths using fzy-style path scoring
+- **AND** match results SHALL be sorted by fuzzy score descending, then case-insensitive path order
+- **AND** by default it SHALL return at most 10 paths per selector
+
+#### Scenario: Scoped fuzzy quick-open reference
+- **GIVEN** a directory path and files inside and outside that directory
+- **WHEN** `file.resolve(path="dev/practices", match="cli-pattern")` is called
+- **THEN** it SHALL build fuzzy candidates only from files under the supplied path root
+- **AND** returned relative paths SHALL remain relative to the effective cwd when possible
+
+#### Scenario: Invalid path root
+- **GIVEN** a missing path or file path
+- **WHEN** `file.resolve(path=path, match="query")` is called
+- **THEN** it SHALL return an error string
+
+#### Scenario: Result shape
+- **GIVEN** a single-string selector
+- **WHEN** `multi` is omitted or set to `"all"`
+- **THEN** `file.resolve()` SHALL return a list of path strings
+- **AND** no matches SHALL return an empty list
+- **AND** `multi="first"` SHALL return a single path string when resolution succeeds
+- **AND** `multi="error"` SHALL return a single path string only when exactly one path resolves
+- **AND** list selector input SHALL always return a flat list in input order
+
+#### Scenario: Multiple matches
+- **GIVEN** a selector with multiple matches
+- **WHEN** `file.resolve(..., multi="error")` is called
+- **THEN** it SHALL return an error string with numbered candidate paths
+- **AND** the error SHALL suggest `multi="first"` or `multi="all"`
+
+#### Scenario: Filtering
+- **GIVEN** hidden files, gitignored files, and files matching `exclude_patterns`
+- **WHEN** `file.resolve()` resolves candidates
+- **THEN** it SHALL include hidden path segments by default
+- **AND** it SHALL skip hidden path segments when `include_hidden=False`
+- **AND** it SHALL honor `.gitignore` when `gitignore=True`
+- **AND** it SHALL include gitignored files when `gitignore=False`
+- **AND** it SHALL always apply `exclude_patterns`
+
+#### Scenario: Result limit
+- **GIVEN** more matches than `max_results`
+- **WHEN** `file.resolve(max_results=10)` is called
+- **THEN** it SHALL return at most 10 matches per selector
+- **AND** invalid non-positive `max_results` values SHALL return an error string
+
+#### Scenario: Path type
+- **GIVEN** a matching file under the effective cwd
+- **WHEN** `file.resolve(path_type="relative")` is called
+- **THEN** it SHALL return cwd-relative paths when possible
+- **AND** `path_type="absolute"` SHALL return absolute paths
+- **AND** invalid `path_type` values SHALL return an error string
+
 ### Requirement: Content Grep
 
 The `file.grep()` function SHALL search file contents using pure-Python regex (no external binaries required).
@@ -249,6 +335,14 @@ The `file.grep()` function SHALL search file contents using pure-Python regex (n
 - **GIVEN** many matches across files
 - **WHEN** matches exceed `max_matches` (default: 500)
 - **THEN** it SHALL stop and append a truncation notice
+- **AND** it SHALL NOT apply any additional hidden per-file or per-group cap
+
+#### Scenario: Zero context output format
+- **GIVEN** a file with multiple non-adjacent matching lines
+- **WHEN** `file.grep(pattern="foo", context=0)` is called
+- **THEN** each match SHALL be returned as one line in `filename:lineno: line`
+  format
+- **AND** blank separator lines SHALL NOT be inserted between match lines
 
 #### Scenario: Gitignore respected by default
 - **GIVEN** a `.gitignore` at the search root listing `ignored.py`

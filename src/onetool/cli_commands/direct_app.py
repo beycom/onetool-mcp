@@ -203,7 +203,7 @@ def direct_run(
         Path | None,
         typer.Option(
             "--ot-dir",
-            help="Absolute OneTool directory containing mcp-direct/auth.key",
+            help="Absolute OneTool directory containing auth/mcp-direct.key",
         ),
     ] = None,
     fmt: Annotated[

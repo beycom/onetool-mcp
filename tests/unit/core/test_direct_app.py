@@ -12,17 +12,17 @@ import pytest
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_direct_auth_key_uses_mcp_direct_namespace() -> None:
-    """Direct API auth must use the dedicated config-scoped mcp-direct namespace."""
+def test_direct_auth_key_uses_config_scoped_auth_file() -> None:
+    """Direct API auth must use the dedicated config-scoped auth key file."""
     from ot.direct_auth import direct_auth_key
 
     with (
-        patch("ot.direct_auth.ensure_hmac_key", return_value=b"x" * 32) as mock_key,
+        patch("ot.direct_auth.ensure_hmac_key_file", return_value=b"x" * 32) as mock_key,
         patch("ot.meta.resolve_ot_path", return_value=Path("/tmp/project/.onetool")),
     ):
         assert direct_auth_key() == b"x" * 32
 
-    mock_key.assert_called_once_with("mcp-direct", base_dir=Path("/tmp/project/.onetool"))
+    mock_key.assert_called_once_with(Path("/tmp/project/.onetool/auth/mcp-direct.key"))
 
 
 @pytest.mark.unit
@@ -84,3 +84,158 @@ def test_direct_api_failure_is_degraded_in_lifespan() -> None:
         patch.object(server, "logger"),
     ):
         asyncio.run(_run_lifespan())
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_lifespan_does_not_connect_disabled_proxy_servers() -> None:
+    """MCP startup should not schedule proxy connections for disabled servers."""
+    from ot import server
+    from ot.config.models import McpServerConfig
+
+    async def _run_lifespan() -> None:
+        async with server._lifespan(SimpleNamespace()):
+            pass
+
+    cfg = SimpleNamespace(
+        _config_dir=Path("/tmp/onetool/config"),
+        servers={
+            "disabled": McpServerConfig(
+                type="stdio",
+                command="uvx",
+                args=["disabled"],
+                enabled=False,
+            )
+        },
+        include=[],
+        prompts=[],
+        direct=SimpleNamespace(host=SimpleNamespace(enabled=False)),
+        stats=SimpleNamespace(enabled=False),
+        get_log_dir_path=lambda: Path("/tmp/onetool/logs"),
+        get_stats_file_path=lambda: Path("/tmp/onetool/stats.jsonl"),
+    )
+    proxy = SimpleNamespace(
+        connect_background=MagicMock(),
+        servers={},
+        is_connecting=False,
+    )
+
+    with (
+        patch.object(server, "_config", cfg),
+        patch.object(server, "get_proxy_manager", return_value=proxy),
+        patch.object(server, "get_registry", return_value=SimpleNamespace(tools={})),
+        patch("ot.executor.tool_loader.load_tool_registry"),
+        patch("ot.telemetry.ping"),
+        patch.object(server, "logger"),
+    ):
+        asyncio.run(_run_lifespan())
+
+    proxy.connect_background.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_run_root_server_uses_streamable_http_transport() -> None:
+    """HTTP root mode should run the shared FastMCP instance over Streamable HTTP."""
+    from ot import server
+
+    with patch.object(server.mcp, "run") as mcp_run:
+        server.run_root_server(
+            transport="streamable-http",
+            host="127.0.0.1",
+            port=8767,
+            path="/mcp",
+        )
+
+    mcp_run.assert_called_once_with(
+        transport="streamable-http",
+        show_banner=False,
+        host="127.0.0.1",
+        port=8767,
+        path="/mcp",
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_http_root_option_validation_rejects_bad_path() -> None:
+    """HTTP root path must be an MCP endpoint path."""
+    from ot.server import validate_http_root_options
+
+    with pytest.raises(ValueError, match="--path must start"):
+        validate_http_root_options(host="127.0.0.1", port=8767, path="mcp")
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_http_root_lifespan_logs_transport_and_non_loopback_warning() -> None:
+    """HTTP root startup logs include transport-specific URL fields and bind warning."""
+    from ot import server
+
+    async def _run_lifespan() -> None:
+        async with server._lifespan(SimpleNamespace()):
+            pass
+
+    cfg = SimpleNamespace(
+        _config_dir=Path("/tmp/onetool/config"),
+        servers={},
+        include=[],
+        prompts=[],
+        direct=SimpleNamespace(host=SimpleNamespace(enabled=False)),
+        stats=SimpleNamespace(enabled=False),
+        get_log_dir_path=lambda: Path("/tmp/onetool/logs"),
+        get_stats_file_path=lambda: Path("/tmp/onetool/stats.jsonl"),
+    )
+    spans: list[tuple[str, dict[str, object]]] = []
+
+    class FakeSpan:
+        def __init__(self, *, span: str, **values: object) -> None:
+            self.name = span
+            self.values = dict(values)
+
+        def __enter__(self) -> FakeSpan:
+            spans.append((self.name, self.values))
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def add(self, *args: object, **values: object) -> None:
+            if args and isinstance(args[0], dict):
+                self.values.update(args[0])
+            self.values.update(values)
+
+    runtime = server.RootRuntime(
+        transport="streamable-http",
+        host="0.0.0.0",
+        port=8767,
+        path="/mcp",
+    )
+    proxy = SimpleNamespace(
+        connect_background=lambda _servers: None,
+        servers={},
+        is_connecting=False,
+    )
+
+    with (
+        patch.object(server, "_config", cfg),
+        patch.object(server, "_root_runtime", runtime),
+        patch.object(server, "LogSpan", FakeSpan),
+        patch.object(server, "get_proxy_manager", return_value=proxy),
+        patch.object(server, "get_registry", return_value=SimpleNamespace(tools={})),
+        patch("ot.executor.tool_loader.load_tool_registry"),
+        patch("ot.telemetry.ping"),
+        patch.object(server, "logger") as logger,
+    ):
+        asyncio.run(_run_lifespan())
+
+    start = next(values for name, values in spans if name == "mcp.server.start")
+    stop = next(values for name, values in spans if name == "mcp.server.stop")
+    assert start["transport"] == "streamable-http"
+    assert start["host"] == "0.0.0.0"
+    assert start["port"] == 8767
+    assert start["path"] == "/mcp"
+    assert start["url"] == "http://0.0.0.0:8767/mcp"
+    assert stop["transport"] == "streamable-http"
+    assert "duration" in stop
+    logger.warning.assert_called_once()

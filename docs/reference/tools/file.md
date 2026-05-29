@@ -23,6 +23,7 @@ Short alias: `f`
 
 | Function | Description |
 |----------|-------------|
+| `file.resolve(path, glob, match, kind, gitignore, include_hidden, path_type, multi, max_results)` | Resolve exact/glob or fuzzy quick-open file or directory references to path strings |
 | `file.grep(pattern, path, glob, context, case_sensitive, max_matches, fixed_strings, gitignore)` | Search file contents with regex (pure Python) |
 
 ## Section Navigation
@@ -62,7 +63,12 @@ Short alias: `f`
 |-----------|------|-------------|
 | `path` | str | File or directory path (relative to cwd or absolute) |
 | `pattern` | str | Filename pattern for filtering (e.g., `*.py`, `*test*`) |
-| `glob` | str | Glob pattern to filter files, always recursive (e.g., `*.py`, `*.md`, `src/**/*.py`) |
+| `glob` | str\|list[str] | Glob pattern to filter paths; `file.resolve` also accepts a list of glob selectors |
+| `match` | str\|list[str] | Fuzzy quick-open query or queries for `file.resolve` |
+| `kind` | str | Candidate kind for `file.resolve`: `file` or `dir` (default: `file`) |
+| `path_type` | str | Path output for `file.resolve`: `relative` or `absolute` (default: `relative`) |
+| `multi` | str | Match handling for `file.resolve`: `error`, `first`, or `all` (default: `all`) |
+| `max_results` | int | Maximum results per `file.resolve` selector (default: `10`) |
 | `offset` | int | Line number to start from (1-indexed, default: 1) |
 | `limit` | int | Maximum lines to return |
 | `line_numbers` | bool | Include line-number prefixes in `file.read` output (default: `False`) |
@@ -71,7 +77,7 @@ Short alias: `f`
 | `dry_run` | bool | Show what would happen without making changes |
 | `recursive` | bool | Delete non-empty directories |
 | `follow_symlinks` | bool | Follow symlinks or treat as links |
-| `include_hidden` | bool | Include hidden files (starting with `.`) |
+| `include_hidden` | bool | Include hidden files and path segments in `file.resolve` (default: `true`) and hidden files in listing/search helpers when supported |
 | `context` | int | Context lines before/after each match in grep (default: 2) |
 | `max_matches` | int | Max total grep matches before stopping (default: 500) |
 | `fixed_strings` | bool | Treat grep pattern as a literal string, not regex |
@@ -167,11 +173,39 @@ file.read_batch(glob="src/**/*.py", max_files=10)  # "*.py" also works
 file.read_batch(glob="docs/*.md")  # recurses into docs/ subdirs
 ```
 
+### Resolving File References
+
+```python
+# Resolve file paths from an exact path or glob
+file.resolve(glob="src/otutil/tools/file.py")
+
+# Resolve directory paths
+file.resolve(glob="src/otutil/**", kind="dir")
+
+# Fuzzy quick-open matching
+file.resolve(match="tlf")       # e.g. tests/unit/core/test_log_format.py
+file.resolve(match="wip 2026")  # space-separated quick-open query
+
+# Scope a file reference lookup to a known directory
+file.resolve(path="dev/practices", match="cli-pattern", multi="first")
+file.resolve(path="dev/project/guides", glob="tool-*.md")
+
+# Return absolute paths or include gitignored files
+file.resolve(glob="wip/**/*.log", path_type="absolute", gitignore=False)
+
+# Ask for one path or an ambiguity error
+file.resolve(glob="src/**/*.py", multi="first")
+file.resolve(glob="src/**/*.py", multi="error")
+```
+
 ### Searching File Contents
 
 ```python
 # Search for a regex pattern (glob always recurses — "*.py" == "**/*.py")
 file.grep(pattern="LogSpan", path="src/", glob="*.py")
+
+# One rg-style match per line with no context separators
+file.grep(pattern="def ", path="src/", glob="*.py", context=0, max_matches=5000)
 
 # Case-insensitive with context lines
 file.grep(pattern="TODO", path=".", context=3, case_sensitive=False)
@@ -188,6 +222,10 @@ file.grep(pattern="error", path=".", gitignore=False)
 # Explicitly opt in (same as default)
 file.grep(pattern="secret", path=".", gitignore=True)
 ```
+
+`file.grep` is a pure-Python search, not a native `rg` wrapper. It follows
+OneTool file safety policy, skips binary and oversized files, respects
+`.gitignore` by default, and uses `max_matches` as the public total match cap.
 
 ### Navigating Sections
 

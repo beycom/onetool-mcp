@@ -22,6 +22,8 @@ from typing import IO, Any
 
 from loguru import logger
 
+from ot.logging import LogEntry
+
 # Shared thread pool for non-blocking I/O operations
 _io_executor: ThreadPoolExecutor | None = None
 _io_executor_lock = threading.Lock()
@@ -178,7 +180,13 @@ class WorkerPool:
                 elif not worker.is_alive():
                     # Worker crashed, remove from pool
                     to_reap.append(tool_path)
-                    logger.warning(f"Worker for {tool_path.name} crashed, removing")
+                    logger.warning(
+                        LogEntry(
+                            event="worker.crashed",
+                            tool=tool_path.name,
+                            exitCode=worker.process.poll(),
+                        )
+                    )
 
             for tool_path in to_reap:
                 worker = self._workers.pop(tool_path)
@@ -280,7 +288,14 @@ class WorkerPool:
                 existing = self._workers.get(tool_path)
                 if existing is None or not existing.is_alive():
                     if existing is not None:
-                        logger.warning(f"Worker for {tool_path.name} died, respawning")
+                        logger.warning(
+                            LogEntry(
+                                event="worker.died",
+                                tool=tool_path.name,
+                                exitCode=existing.process.poll(),
+                                action="respawn",
+                            )
+                        )
                     self._workers[tool_path] = new_worker
                     worker = new_worker
                 else:

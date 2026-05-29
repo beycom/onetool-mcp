@@ -43,7 +43,7 @@ from ot.config import get_secret
 api_key = get_secret("BRAVE_API_KEY")
 ```
 
-Secrets live in `.onetool/config/secrets.yaml`.
+Secrets live in `{OT_DIR}/secrets.yaml`.
 
 ## Path Resolution
 
@@ -52,7 +52,7 @@ For paths relative to `.onetool/` (databases, logs, stats):
 ```python
 from ot.meta import resolve_ot_path
 
-db_path = resolve_ot_path("mem.db")
+db_path = resolve_ot_path("data/mem/default.db")
 ```
 
 For user-supplied file paths:
@@ -63,4 +63,4 @@ from ot.config import resolve_cwd_path
 file_path = resolve_cwd_path(user_path)
 ```
 
-Use relative defaults (e.g., `mem.db`) not absolute (e.g., `~/.onetool/mem.db`). These resolvers honour `OT_GLOBAL_DIR` and project-level `.onetool/` directories. Never use `Path.expanduser()` directly.
+Use relative defaults (e.g., `data/mem/default.db`) not absolute (e.g., `~/.onetool/mem.db`). These resolvers honour the active OneTool config directory and effective project cwd. Never use `Path.expanduser()` directly.

@@ -8,7 +8,20 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-__all__ = ["expand_path", "get_effective_cwd", "resolve_cwd_path"]
+__all__ = [
+    "expand_path",
+    "get_effective_cwd",
+    "get_project_artifact_dir",
+    "get_project_state_dir",
+    "resolve_cwd_path",
+]
+
+
+def _validate_relative_fragment(value: str, *, label: str) -> Path:
+    path = Path(value)
+    if not value or path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+        raise ValueError(f"{label} must be a non-empty relative path fragment: {value!r}")
+    return path
 
 
 def get_effective_cwd() -> Path:
@@ -58,3 +71,13 @@ def resolve_cwd_path(path: str) -> Path:
     if p.is_absolute():
         return p.resolve()
     return (get_effective_cwd() / p).resolve()
+
+
+def get_project_state_dir(pack: str) -> Path:
+    """Return a project-local pack state directory under CWD/.onetool/state/."""
+    return get_effective_cwd() / ".onetool" / "state" / _validate_relative_fragment(pack, label="pack")
+
+
+def get_project_artifact_dir(kind: str) -> Path:
+    """Return a generated artifact directory under the effective project CWD."""
+    return get_effective_cwd() / _validate_relative_fragment(kind, label="artifact kind")

@@ -540,7 +540,7 @@ Tools SHALL use the shared path resolution utilities for all path handling.
 - **GIVEN** a tool that stores data under `.onetool/`
 - **WHEN** resolving the storage path
 - **THEN** it SHALL use `resolve_ot_path()` from `ot.paths`
-- **AND** it SHALL use relative defaults (e.g. `mem.db` not `~/.onetool/mem.db`)
+- **AND** it SHALL use relative defaults (e.g. `data/mem/default.db` not `~/.onetool/mem.db`)
 
 ---
 
@@ -565,4 +565,3 @@ Packs exceeding approximately 500 lines SHALL use the facade plus private packag
 - **GIVEN** submodules within a private pack package
 - **WHEN** importing between submodules
 - **THEN** they SHALL use relative imports (e.g. `from .config import Config`)
-

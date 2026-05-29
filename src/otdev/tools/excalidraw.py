@@ -2515,7 +2515,7 @@ def hard_reset() -> str:
 def boards() -> str:
     """List all active whiteboard session boards.
 
-    Scans ``~/.onetool/whiteboard/`` and returns each board's name,
+    Scans ``.onetool/state/whiteboard/`` and returns each board's name,
     last-modified time, and shape count.
 
     Returns:

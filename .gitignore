@@ -97,6 +97,7 @@ credentials/
 docs/_wip/
 scratch/
 diagrams/
+/arch/
 .localhist/
 msg/
 plan/
@@ -106,13 +107,9 @@ openspec/consult/
 global/
 .onetool/
 !tests/.onetool/
-tests/.onetool/logs/
-tests/.onetool/sessions/
-tests/.onetool/stats/
-tests/.onetool/tmp/
-tests/.onetool/mem.db
-tests/.onetool/mem.db-shm
-tests/.onetool/mem.db-wal
+tests/.onetool/auth/
+tests/.onetool/runtime/
+tests/.onetool/data/
 
 # Demo: downloadable assets (see demo/README.md)
 demo/data/db/
@@ -139,3 +136,4 @@ tests/explore/*-results.md
 
 # Test data (downloaded via `just test::setup`)
 tests/data/
+.localhist/

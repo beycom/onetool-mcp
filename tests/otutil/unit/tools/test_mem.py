@@ -95,6 +95,12 @@ class TestTopicFilter:
 
 @pytest.mark.unit
 @pytest.mark.tools
+def test_config_default_db_path_is_data_scoped() -> None:
+    assert Config().db_path == "data/mem/default.db"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
 @patch("otutil.tools._mem.content._get_config", return_value=Config())
 class TestRedact:
     """Test _redact secret/PII redaction."""
@@ -123,6 +129,18 @@ class TestRedact:
         mock_config.return_value = Config(redaction_enabled=False)
         content = "key: sk-abc123def456ghi789jkl0123"
         assert _redact(content) == content
+
+    def test_invalid_custom_redaction_pattern_logs_context(self, mock_config):
+        mock_config.return_value = Config(redaction_patterns=["["])
+
+        with patch("otutil.tools._mem.content.logger.warning") as mock_warning:
+            result = _redact("plain content")
+
+        assert result == "plain content"
+        entry = mock_warning.call_args.args[0]
+        assert entry.fields["event"] == "mem.content.redaction_pattern_invalid"
+        assert entry.fields["pattern"] == "["
+        assert entry.fields["errorType"] in {"PatternError", "error"}
 
 
 @pytest.mark.unit
@@ -1502,6 +1520,7 @@ class TestSnapshot:
     def test_snapshot_meta_special_chars_round_trips(self, mock_conn, tmp_path):
         """meta with pipes, colons, and quotes must survive YAML round-trip."""
         import yaml
+
         from otutil.tools.mem import snapshot
 
         conn = MagicMock()
@@ -2351,6 +2370,7 @@ class TestAsk:
     @patch("otutil.tools._mem.ask._get_connection")
     def test_ot_llm_not_installed_returns_error(self, mock_conn):
         import sys
+
         from otutil.tools.mem import ask
 
         conn = MagicMock()
@@ -2367,6 +2387,7 @@ class TestAsk:
     @patch("otutil.tools._mem.ask._get_connection")
     def test_single_question_returns_answer(self, mock_conn):
         import types
+
         from otutil.tools.mem import ask
 
         conn = MagicMock()
@@ -2404,6 +2425,7 @@ class TestQuery:
     @patch("otutil.tools._mem.query._get_connection")
     def test_json_content_query(self, mock_conn):
         import json
+
         from otutil.tools.mem import query
 
         conn = MagicMock()
@@ -2434,6 +2456,7 @@ class TestQuery:
     @patch("otutil.tools._mem.query._get_connection")
     def test_no_match_returns_error(self, mock_conn):
         import json
+
         from otutil.tools.mem import query
 
         conn = MagicMock()

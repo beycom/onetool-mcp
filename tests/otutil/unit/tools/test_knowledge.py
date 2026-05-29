@@ -790,6 +790,20 @@ class TestKnowledgeConfig:
         assert "docs" in result
         assert "Project docs" in result
 
+    def test_default_db_path_is_data_scoped(self, tmp_path: Path) -> None:
+        from otutil.tools._knowledge.db import _resolve_db_path
+
+        with (
+            patch("otutil.tools._knowledge.config._get_config") as mock_cfg,
+            patch("ot.meta.resolve_ot_path", side_effect=lambda path: tmp_path / path),
+        ):
+            cfg = MagicMock()
+            cfg.kb = {}
+            mock_cfg.return_value = cfg
+            result = _resolve_db_path("docs")
+
+        assert result == tmp_path / "data" / "knowledge" / "docs.db"
+
 
 # ===========================================================================
 # 6.3 — CRUD round-trips and listing shapes
@@ -1386,12 +1400,24 @@ class TestKnowledgeBatchEmbedding:
         mock_client = MagicMock()
         mock_client.embeddings.create.side_effect = fake_create
 
-        with patch("otutil.tools._knowledge.embedding.time") as mock_time:
+        with (
+            patch("otutil.tools._knowledge.embedding.time") as mock_time,
+            patch("otutil.tools._knowledge.embedding.logger.warning") as mock_warning,
+        ):
             result = _embed_batch_with_retry(mock_client, "text-embedding-3-small", ["a", "b"])
 
         assert call_count == 3
         assert len(result) == 2
         assert mock_time.sleep.call_count == 2
+        entries = [call.args[0] for call in mock_warning.call_args_list]
+        assert [entry.fields["event"] for entry in entries] == [
+            "knowledge.embedding.retry",
+            "knowledge.embedding.retry",
+        ]
+        assert entries[0].fields["statusCode"] == 429
+        assert entries[0].fields["attempt"] == 1
+        assert entries[0].fields["maxAttempts"] == 3
+        assert entries[0].fields["waitSeconds"] == 1.0
 
     def test_valueerror_not_retried(self):
         """_embed_batch_with_retry does NOT retry ValueError — batch rejection is not transient."""

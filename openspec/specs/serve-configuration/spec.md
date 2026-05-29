@@ -12,7 +12,7 @@ The system SHALL load configuration from a YAML file using a standard resolution
 - **GIVEN** no explicit config path provided
 - **AND** no `ONETOOL_CONFIG` environment variable
 - **WHEN** the server starts
-- **THEN** it SHALL look for `~/.onetool/config/onetool.yaml`
+- **THEN** it SHALL look for `~/.onetool/onetool.yaml`
 - **AND** require initialisation if not found
 
 #### Scenario: Environment variable override
@@ -756,14 +756,14 @@ The system SHALL support a `secrets_file` field for loading secrets relative to 
 The system SHALL track the directory containing the loaded configuration file.
 
 #### Scenario: Config loaded from file
-- **GIVEN** configuration loaded from `~/.onetool/config/onetool.yaml`
+- **GIVEN** configuration loaded from `~/.onetool/onetool.yaml`
 - **WHEN** relative paths are resolved
-- **THEN** they SHALL resolve relative to `~/.onetool/config/`
+- **THEN** they SHALL resolve relative to `~/.onetool/`
 
 #### Scenario: Config loaded from defaults
 - **GIVEN** no configuration file exists
 - **WHEN** the server starts with defaults
-- **THEN** relative paths SHALL resolve relative to `get_effective_cwd() / ".onetool" / "config"`
+- **THEN** relative paths SHALL resolve relative to `get_effective_cwd() / ".onetool"`
 
 #### Scenario: Config directory available
 - **GIVEN** configuration is loaded
@@ -857,7 +857,7 @@ The system SHALL support logging settings in YAML config and environment variabl
 - **GIVEN** configuration with `log_dir: custom/logs`
 - **WHEN** the server starts
 - **THEN** logs SHALL be written to the specified directory relative to `.onetool/`
-- **DEFAULT** `logs` (logs written to `.onetool/logs/`)
+- **DEFAULT** `runtime/logs` (logs written to `.onetool/runtime/logs/`)
 
 #### Scenario: Log directory via environment variable
 - **GIVEN** `OT_LOG_DIR=/tmp/my-logs` environment variable
@@ -1207,7 +1207,7 @@ Statistics configuration SHALL be at the root level.
 - **GIVEN** no stats configuration specified
 - **WHEN** the server starts
 - **THEN** stats SHALL use defaults from Pydantic model
-- **DEFAULT** enabled: true, flush_interval_seconds: 30, persist_dir: stats
+- **DEFAULT** enabled: true, flush_interval_seconds: 30, persist_dir: runtime/stats
 
 ### Removed: Stats Directory Configuration
 
@@ -1216,7 +1216,7 @@ The system SHALL support a dedicated directory for statistics files.
 #### Scenario: Stats directory default
 - **GIVEN** no `stats.persist_dir` in configuration
 - **WHEN** the server starts
-- **THEN** stats SHALL be written to `.onetool/stats/`
+- **THEN** stats SHALL be written to `.onetool/runtime/stats/`
 
 #### Scenario: Custom stats directory
 - **GIVEN** configuration with `stats.persist_dir: metrics`

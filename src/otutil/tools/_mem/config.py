@@ -37,7 +37,7 @@ class Config(BaseModel):
     """Pack configuration - discovered by registry."""
 
     db_path: str = Field(
-        default="mem.db",
+        default="data/mem/default.db",
         description="Path to memory SQLite database (relative to .onetool/)",
     )
     model: str = Field(

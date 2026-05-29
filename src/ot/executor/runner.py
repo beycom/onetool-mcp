@@ -29,6 +29,7 @@ from ot.executor.fence_processor import strip_fences
 from ot.executor.pack_proxy import build_execution_namespace
 from ot.executor.tool_loader import load_tool_functions, load_tool_registry
 from ot.logging import LogSpan
+from ot.logging.entry import LogEntry
 from ot.utils import serialize_result
 
 if TYPE_CHECKING:
@@ -454,6 +455,10 @@ class PreparedCommand:
 
     code: str
     original: str
+    command_type: str = "python"
+    snippet: str | None = None
+    prepared_lines: int = 0
+    prepared_length: int = 0
     error: str | None = None
     warnings: list[str] = field(default_factory=list)
 
@@ -500,9 +505,12 @@ def prepare_command(command: str) -> PreparedCommand:
     if wrapped is not None:
         meta_prefix, snippet_target = wrapped
 
-    if is_snippet(snippet_target):
+    command_type = "snippet" if is_snippet(snippet_target) else "python"
+    snippet_name: str | None = None
+    if command_type == "snippet":
         try:
             parsed = parse_snippet(snippet_target)
+            snippet_name = parsed.name
             expanded = expand_snippet(parsed, config)
             stripped = f"{meta_prefix}\n{expanded}" if meta_prefix else expanded
         except ValueError as e:
@@ -536,6 +544,10 @@ def prepare_command(command: str) -> PreparedCommand:
     return PreparedCommand(
         code=stripped,
         original=command,
+        command_type=command_type,
+        snippet=snippet_name,
+        prepared_lines=len(stripped.splitlines()),
+        prepared_length=len(stripped),
         warnings=validation.warnings,
     )
 
@@ -573,6 +585,13 @@ async def execute_command(
     # If prepared_code is provided, use it directly (already preprocessed)
     if prepared_code is not None:
         stripped = prepared_code
+        prepared = PreparedCommand(
+            code=stripped,
+            original=command,
+            command_type="prepared",
+            prepared_lines=len(stripped.splitlines()),
+            prepared_length=len(stripped),
+        )
     else:
         # Use prepare_command for preprocessing
         prepared = prepare_command(command)
@@ -603,7 +622,25 @@ async def execute_command(
     # Extract tool name only for single top-level call commands.
     tool_name = _extract_single_call_name(stripped)
 
-    with LogSpan(span="runner.execute", command=stripped, tool=tool_name) as span:
+    with LogSpan(
+        span="runner.execute",
+        command=prepared.original.strip(),
+        commandType=prepared.command_type,
+        snippet=prepared.snippet,
+        preparedLines=prepared.prepared_lines,
+        preparedLength=prepared.prepared_length,
+        tool=tool_name,
+    ) as span:
+        logger.debug(
+            LogEntry(
+                event="runner.execute.prepared",
+                commandType=prepared.command_type,
+                preparedCode=stripped,
+                preparedLines=prepared.prepared_lines,
+                preparedLength=prepared.prepared_length,
+                tool=tool_name,
+            )
+        )
         try:
             if use_thread_pool:
                 # Run in thread pool so event loop can process proxy calls

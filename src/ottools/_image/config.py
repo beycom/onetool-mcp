@@ -6,6 +6,8 @@ from loguru import logger
 from otpack import get_secret, get_tool_config
 from pydantic import BaseModel, Field
 
+from ot.logging import LogEntry
+
 
 class Config(BaseModel):
     """Image pack configuration — discovered by registry."""
@@ -53,7 +55,15 @@ def get_image_config() -> Config:
         if updates:
             config = config.model_copy(update=updates)
     except Exception as e:
-        logger.warning("Failed to load top-level llm config for ot_image fallbacks: {}", e)
+        logger.warning(
+            LogEntry(
+                event="ot_image.config.llm_fallback_failed",
+                tool="ot_image",
+                configSource="llm",
+                errorType=type(e).__name__,
+                error=str(e),
+            )
+        )
 
     return config
 

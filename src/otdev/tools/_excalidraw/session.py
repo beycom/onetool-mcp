@@ -1,6 +1,6 @@
 """File-backed whiteboard session state.
 
-Board state is persisted at ~/.onetool/whiteboard/{key}.json.
+Board state is persisted at {CWD}/.onetool/state/whiteboard/{key}.json.
 The key is derived from the resolved CWD (SHA-256 prefix) unless a named board is given.
 
 Schema:
@@ -19,30 +19,34 @@ import contextlib
 import hashlib
 import json
 import re
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from otpack import get_effective_cwd, get_project_state_dir
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _BOARD_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def _whiteboard_dir() -> Path:
-    """Return ~/.onetool/whiteboard/, creating it if needed."""
-    d = Path.home() / ".onetool" / "whiteboard"
+    """Return the project-local whiteboard state directory, creating it if needed."""
+    d = get_project_state_dir("whiteboard")
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
 def cwd_key() -> str:
     """Derive session key from the resolved CWD: first 12 hex chars of SHA-256."""
-    cwd = str(Path.cwd().resolve())
+    cwd = str(get_effective_cwd())
     return hashlib.sha256(cwd.encode()).hexdigest()[:12]
 
 
 def session_path(board: str | None) -> Path:
     """Return the Path for the session file.
 
-    Named boards use ~/.onetool/whiteboard/{board}.json.
-    Default (CWD-keyed) boards use ~/.onetool/whiteboard/{cwd_key}.json.
+    Named boards use {CWD}/.onetool/state/whiteboard/{board}.json.
+    Default (CWD-keyed) boards use {CWD}/.onetool/state/whiteboard/{cwd_key}.json.
     """
     d = _whiteboard_dir()
     if board:
@@ -101,7 +105,7 @@ def save(state: dict[str, Any], board: str | None = None) -> None:
 def list_boards() -> list[dict[str, Any]]:
     """Return a list of active boards with name, mtime, and shape count.
 
-    Only files in ~/.onetool/whiteboard/*.json are listed.
+    Only files in {CWD}/.onetool/state/whiteboard/*.json are listed.
     """
     d = _whiteboard_dir()
     boards = []

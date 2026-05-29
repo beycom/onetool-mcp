@@ -12,6 +12,7 @@ from loguru import logger
 from otpack import LogSpan, get_secret
 
 from ot.config import get_llm_config
+from ot.logging import LogEntry
 
 from .config import _get_config
 
@@ -115,12 +116,15 @@ def _embed_batch_with_retry(
                 raise
             wait = 2.0 ** attempt
             logger.warning(
-                "Embedding API error ({}), retrying in {:.0f}s (attempt {}/{}): {}",
-                status or type(e).__name__,
-                wait,
-                attempt + 1,
-                max_attempts,
-                e,
+                LogEntry(
+                    event="knowledge.embedding.retry",
+                    statusCode=status,
+                    waitSeconds=wait,
+                    attempt=attempt + 1,
+                    maxAttempts=max_attempts,
+                    errorType=type(e).__name__,
+                    error=str(e),
+                )
             )
             time.sleep(wait)
     raise RuntimeError("unreachable")  # pragma: no cover

@@ -22,8 +22,9 @@ _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 def _get_db_path():
     """Get the memory database path, resolving relative to .onetool/ directory.
 
-    Uses resolve_ot_path (not expand_path) so the default "mem.db" resolves
-    against config._config_dir (config_path.parent).
+    Uses resolve_ot_path (not expand_path) so the default
+    "data/mem/default.db" resolves against config._config_dir
+    (config_path.parent).
     """
     from ot.meta import resolve_ot_path
 

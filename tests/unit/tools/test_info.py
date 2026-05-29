@@ -194,6 +194,47 @@ def test_status_counts_all_tools() -> None:
 
 @pytest.mark.unit
 @pytest.mark.serve
+def test_status_ignores_disabled_proxy_servers() -> None:
+    """Disabled proxy server definitions should not degrade runtime status."""
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    from ot.meta import status
+
+    cfg = SimpleNamespace(
+        _config_dir=Path("/tmp/onetool/config"),
+        tools_dir=[],
+        include=[],
+        servers={"disabled": SimpleNamespace(enabled=False)},
+        direct=SimpleNamespace(host=SimpleNamespace(enabled=False)),
+        stats=SimpleNamespace(enabled=False),
+        get_log_dir_path=lambda: Path("/tmp/onetool/logs"),
+        get_stats_file_path=lambda: Path("/tmp/onetool/stats.jsonl"),
+        get_result_store_path=lambda: Path("/tmp/onetool/results"),
+    )
+    proxy = SimpleNamespace(
+        get_connection=MagicMock(return_value=None),
+        get_error=MagicMock(return_value=None),
+        is_connecting=False,
+    )
+    registry = SimpleNamespace(packs={"pack": {"tool": object()}})
+
+    with (
+        patch("ot.meta._config_health.get_config", return_value=cfg),
+        patch("ot.meta._config_health.get_proxy_manager", return_value=proxy),
+        patch("ot.executor.tool_loader.load_tool_registry", return_value=registry),
+    ):
+        result = status()
+
+    assert result["proxy"]["status"] == "ok"
+    assert result["proxy"]["server_count"] == 0
+    assert "servers" not in result["proxy"]
+    assert not result["warnings"]
+    proxy.get_connection.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.serve
 def test_config_returns_configuration() -> None:
     """Verify ot.config() returns configuration information."""
     from ot.meta import config
@@ -388,6 +429,36 @@ def test_reload_resets_runtime_tool_caches() -> None:
 
     assert "OK" in result
     hook.assert_called_once_with()
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_reload_clears_tool_and_helper_modules() -> None:
+    """Verify ot.reload() clears tool modules and owned helper packages."""
+    import sys
+    from types import ModuleType
+
+    from ot.meta import reload
+
+    module_names = [
+        "ot_tool.tools.custom",
+        "ottools.ot_timer",
+        "otdev.tools._localhist.core",
+        "otutil.tools.file",
+    ]
+    unrelated = "otdev.not_tools"
+    for name in module_names:
+        sys.modules[name] = ModuleType(name)
+    sentinel = ModuleType(unrelated)
+    sys.modules[unrelated] = sentinel
+
+    result = reload()
+
+    assert "OK" in result
+    for name in module_names:
+        assert name not in sys.modules
+    assert sys.modules[unrelated] is sentinel
+    del sys.modules[unrelated]
 
 
 # ============================================================================

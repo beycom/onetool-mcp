@@ -84,7 +84,7 @@ class TestGetTemplate:
         fake_config_dir = tmp_path / "onetool"
         fake_config_dir.mkdir()
 
-        template_cfg = self._make_template_config("diagram-templates/api-flow.mmd")
+        template_cfg = self._make_template_config("templates/diagram/api-flow.mmd")
         mock_templates = {"api-flow": template_cfg}
 
         with (
@@ -102,12 +102,12 @@ class TestGetTemplate:
         """Local config dir file is used when it exists."""
         from otdev.tools.diagram import get_template
 
-        local_dir = tmp_path / "onetool" / "diagram-templates"
+        local_dir = tmp_path / "onetool" / "templates" / "diagram"
         local_dir.mkdir(parents=True)
         local_file = local_dir / "api-flow.mmd"
         local_file.write_text("sequenceDiagram\n  A->>B: local override")
 
-        template_cfg = self._make_template_config("diagram-templates/api-flow.mmd")
+        template_cfg = self._make_template_config("templates/diagram/api-flow.mmd")
         mock_templates = {"api-flow": template_cfg}
 
         with (

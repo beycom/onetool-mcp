@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the unified logging and observability infrastructure for OneTool. Covers structured JSON logging, LogSpan timing, token/cost tracking, and core logging patterns shared across all components.
+Defines the unified logging and observability infrastructure for OneTool. Covers structured runtime and test logging, LogSpan timing, token/cost tracking, and core logging patterns shared across all components.
 
 CLI-specific logging requirements are defined in their respective specs:
 - [bench-logging](../bench-logging/spec.md) - bench CLI output, verbose/trace modes
@@ -13,24 +13,25 @@ CLI-specific logging requirements are defined in their respective specs:
 
 <!-- Section: Core Infrastructure -->
 
-### Requirement: Structured JSON Logging
+### Requirement: Structured Runtime Logging
 
-The system SHALL log all operations as structured JSON for machine parsing.
+The system SHALL preserve structured fields for logged operations and render runtime logs as dev-friendly single-line records.
 
-#### Scenario: Log entry format
+#### Scenario: Runtime log entry format
 - **GIVEN** any logged operation
 - **WHEN** the log is written
-- **THEN** it SHALL be valid JSON with `span`, `duration`, and context fields
+- **THEN** the runtime log line SHALL include the span or event, duration when available, and context fields
+- **AND** embedded newlines in field values SHALL NOT create additional physical log lines
 
 #### Scenario: Log file output
-- **GIVEN** `OT_LOG_FILE` environment variable set
+- **GIVEN** the server runs with runtime logging configured
 - **WHEN** the server runs
-- **THEN** all logs SHALL be written to the specified file in JSON format
+- **THEN** logs SHALL be written to `logs/{cli_name}.log` in dev-friendly single-line format
 
-#### Scenario: Console output
-- **GIVEN** `--verbose` flag or `OT_LOG_LEVEL=DEBUG`
-- **WHEN** the server runs
-- **THEN** logs SHALL also appear on console in human-readable format
+#### Scenario: Test log entry format
+- **GIVEN** test logging is configured
+- **WHEN** test logs are written
+- **THEN** the primary test log file SHALL contain JSON structured records for machine parsing
 
 ### Requirement: Log Span Timing
 
@@ -153,9 +154,22 @@ The system SHALL support configurable logging.
 - **THEN** truncation SHALL be disabled (full values shown)
 
 #### Scenario: Log rotation
-- **GIVEN** `OT_LOG_FILE` is configured
+- **GIVEN** runtime logging is configured
 - **WHEN** the log file grows
-- **THEN** it SHALL support standard log rotation tools (logrotate compatible)
+- **THEN** the logging sink SHALL rotate files according to the configured runtime policy
+
+#### Scenario: Noisy third-party INFO suppression
+- **GIVEN** runtime or test logging intercepts standard library logging
+- **WHEN** browser automation or model-client dependencies emit non-actionable INFO lifecycle chatter
+- **THEN** those dependency logger roots SHALL be held at WARNING or above
+- **AND** OneTool structured LogSpan and LogEntry records SHALL remain visible according to the configured OneTool log level
+
+#### Scenario: Shared runtime log attribution
+- **GIVEN** multiple MCP server processes write to the same runtime log file
+- **WHEN** runtime or test log records are emitted
+- **THEN** every record SHALL include a stable process-wide `mcpId`
+- **AND** every record SHALL include the emitting process `pid`
+- **AND** `mcpId` SHALL remain stable for all log records emitted by the same process
 
 ### Requirement: CLI Logging Initialization
 
@@ -211,6 +225,19 @@ The system SHALL log every MCP tool call with full context.
 - **WHEN** the result is logged
 - **THEN** it SHALL include `resultLength` (character count of output)
 
+#### Scenario: Snippet execution summary
+- **GIVEN** a snippet command is expanded into generated Python code
+- **WHEN** `runner.execute` logs the execution at INFO level
+- **THEN** the `command` field SHALL contain the original snippet invocation
+- **AND** the log SHALL include `commandType: "snippet"`, `snippet`, `preparedLines`, and `preparedLength`
+- **AND** expanded or prepared Python code SHALL be limited to DEBUG logging
+
+#### Scenario: Tool-pack warning context
+- **GIVEN** a tool pack emits a warning for degraded behavior or skipped user work
+- **WHEN** the warning is logged
+- **THEN** it SHALL use a structured `LogEntry` event name
+- **AND** it SHALL include actionable fields such as tool, operation, path, pattern, retry count, status code, chunk id, memory id, dropped count, or error type where applicable
+
 ### Requirement: FastMCP Context Integration
 
 The logging system SHALL integrate with FastMCP Context when available.
@@ -237,15 +264,37 @@ The logging system SHALL integrate with FastMCP Context when available.
 
 ### Requirement: MCP Server Lifecycle Logging
 
-The system SHALL log MCP server lifecycle events.
+The system SHALL log MCP server lifecycle events with enough mode-specific
+context to distinguish stdio root, Streamable HTTP root, Direct API sidecar,
+proxy state, and shutdown cleanup.
 
 #### Scenario: Server start logging
 - **GIVEN** the MCP server is starting
 - **WHEN** initialization completes
 - **THEN** it SHALL log:
   - `span: "mcp.server.start"`
-  - `transport`: Transport type (stdio, sse)
+  - `transport`: Transport type (`stdio` or `streamable-http`)
   - `toolCount`: Number of registered tools
+  - config path where available
+  - whether a secrets path was supplied
+
+#### Scenario: HTTP root start logging
+- **GIVEN** Streamable HTTP root mode is starting
+- **WHEN** the HTTP server is ready to accept MCP clients
+- **THEN** startup logs SHALL include bind host, port, path, and full client URL
+- **AND** startup logs SHALL warn when the bind host is not loopback
+
+#### Scenario: Direct API sidecar logging
+- **GIVEN** Direct API startup is evaluated during root MCP startup
+- **WHEN** Direct API is disabled, ready, degraded, or stopped
+- **THEN** logs SHALL identify that state separately from root MCP transport logs
+- **AND** ready logs SHALL include the selected loopback URL
+
+#### Scenario: Proxy state logging under HTTP mode
+- **GIVEN** Streamable HTTP root mode is running
+- **WHEN** proxy servers connect, fail, enable, disable, restart, or shut down
+- **THEN** logs SHALL record server name, operation, status, transport, tool
+  count when connected, and cleanup result where applicable
 
 #### Scenario: Server stop logging
 - **GIVEN** the MCP server is running
@@ -253,6 +302,9 @@ The system SHALL log MCP server lifecycle events.
 - **THEN** it SHALL log:
   - `span: "mcp.server.stop"`
   - `duration`: Total server uptime
+  - Direct API stop result when applicable
+  - stats writer stop result when applicable
+  - proxy disconnect count and cleanup result when applicable
 
 ### Requirement: Tool Resolution Logging
 
@@ -345,7 +397,7 @@ The system SHALL format log output with truncation and sanitisation at write tim
 
 #### Scenario: Field-based truncation
 - **GIVEN** a log entry with a `path` field containing 300 characters
-- **WHEN** the entry is written to file or console
+- **WHEN** the entry is written to a configured sink
 - **THEN** the value SHALL be truncated to 200 characters with `...` suffix
 
 #### Scenario: URL truncation

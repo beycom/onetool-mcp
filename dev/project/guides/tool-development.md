@@ -454,7 +454,7 @@ def read_file(*, path: str) -> str:
     return resolved.read_text()
 ```
 
-**Never use** `Path.expanduser()` or bare `expand_path()` for project-relative paths. Use `resolve_cwd_path()` for user-supplied paths and `resolve_ot_path()` for `.onetool/`-relative paths (databases, logs, stats). Use relative defaults (e.g., `mem.db` not `~/.onetool/mem.db`).
+**Never use** `Path.expanduser()` or bare `expand_path()` for project-relative paths. Use `resolve_cwd_path()` for user-supplied paths, `resolve_ot_path()` or `get_ot_data_dir()` for `.onetool/` data, `get_ot_runtime_dir()` for runtime files, and `get_project_state_dir()` for pack state. Use relative defaults (e.g., `data/mem/default.db` not `~/.onetool/mem.db`).
 
 ---
 

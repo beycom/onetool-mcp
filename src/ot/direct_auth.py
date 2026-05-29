@@ -11,12 +11,12 @@ if TYPE_CHECKING:
 from otpack import (
     HmacAuthError,
     NonceCache,
-    ensure_hmac_key,
+    ensure_hmac_key_file,
     sign_http_message,
     verify_http_message,
 )
 
-AUTH_NAMESPACE = "mcp-direct"
+AUTH_KEY_NAME = "mcp-direct.key"
 RUN_PATH = "/run"
 HEALTH_PATH = "/health"
 READY_PATH = "/ready"
@@ -30,7 +30,7 @@ def direct_auth_key(*, base_dir: Path | None = None) -> bytes:
 
         base_dir = resolve_ot_path(".")
 
-    return ensure_hmac_key(AUTH_NAMESPACE, base_dir=base_dir)
+    return ensure_hmac_key_file(base_dir / "auth" / AUTH_KEY_NAME)
 
 
 def signed_headers(
@@ -104,7 +104,7 @@ def auth_error_response(error: Exception, *, path: str = RUN_PATH) -> Any:
 
 
 __all__ = [
-    "AUTH_NAMESPACE",
+    "AUTH_KEY_NAME",
     "HEALTH_PATH",
     "READY_PATH",
     "RUN_PATH",

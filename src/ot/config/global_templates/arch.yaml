@@ -3,13 +3,13 @@
 
 tools:
   arch:
-    output_dir: architecture-output
+    output_dir: arch
     default_profile: simple
     profiles:
       simple:
-        solution_report: arch-templates/solution/default/index.html.j2
-        system_report: arch-templates/solution/default/system.html.j2
-        system_diagram: arch-templates/d2/system.d2.j2
+        solution_report: templates/arch/solution/default/index.html.j2
+        system_report: templates/arch/solution/default/system.html.j2
+        system_diagram: templates/arch/d2/system.d2.j2
         system_engine: d2 {{ input }} {{ output }} --layout elk
         diagram_engine: d2 {{ input }} {{ output }} --layout elk
         data:

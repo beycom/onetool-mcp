@@ -59,11 +59,11 @@ Architecture workflows for Excel ingestion, validation, generation, round-trip c
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `tools.arch.output_dir` | str | `"architecture-output"` | Default generation output directory. |
+| `tools.arch.output_dir` | str | `"arch"` | Default generation output directory. |
 | `tools.arch.default_profile` | str | `"simple"` | Profile used when no profile override is provided. |
-| `tools.arch.profiles.<name>.solution_report` | str | `"arch-templates/solution/default/index.html.j2"` | Jinja template file for the solution index report (supports `base.html`, `styles.css`, `scripts.js` in same directory). |
-| `tools.arch.profiles.<name>.system_report` | str | `"arch-templates/solution/default/system.html.j2"` | Jinja template file for each system page. |
-| `tools.arch.profiles.<name>.system_diagram` | str | `"arch-templates/d2/system.d2.j2"` | Jinja template file for system D2 source. The same directory must include `styles.d2`. |
+| `tools.arch.profiles.<name>.solution_report` | str | `"templates/arch/solution/default/index.html.j2"` | Jinja template file for the solution index report (supports `base.html`, `styles.css`, `scripts.js` in same directory). |
+| `tools.arch.profiles.<name>.system_report` | str | `"templates/arch/solution/default/system.html.j2"` | Jinja template file for each system page. |
+| `tools.arch.profiles.<name>.system_diagram` | str | `"templates/arch/d2/system.d2.j2"` | Jinja template file for system D2 source. The same directory must include `styles.d2`. |
 | `tools.arch.profiles.<name>.system_engine` | str | `d2 {{ input }} {{ output }} --layout elk` | Jinja command template for system SVG rendering. |
 | `tools.arch.profiles.<name>.diagram_engine` | str | `d2 {{ input }} {{ output }} --layout elk` | Jinja command template for workbook-defined diagram SVG rendering. |
 | `tools.arch.profiles.<name>.data` | map[str, any] | `{}` | Extra values available to templates under `profile_data`. |
@@ -77,13 +77,13 @@ Architecture workflows for Excel ingestion, validation, generation, round-trip c
 ```yaml
 tools:
   arch:
-    output_dir: architecture-output
+    output_dir: arch
     default_profile: simple
     profiles:
       simple:
-        solution_report: arch-templates/solution/default/index.html.j2
-        system_report: arch-templates/solution/default/system.html.j2
-        system_diagram: arch-templates/d2/system.d2.j2
+        solution_report: templates/arch/solution/default/index.html.j2
+        system_report: templates/arch/solution/default/system.html.j2
+        system_diagram: templates/arch/d2/system.d2.j2
         system_engine: d2 {{ input }} {{ output }} --layout elk
         diagram_engine: d2 {{ input }} {{ output }} --layout elk
         data:
@@ -94,9 +94,9 @@ tools:
           arrowhead_labels: "{{ row.key }}"
           direction: up
       acme:
-        solution_report: arch-templates/solution/default/index.html.j2
-        system_report: arch-templates/solution/default/system.html.j2
-        system_diagram: arch-templates/d2/system.d2.j2
+        solution_report: templates/arch/solution/default/index.html.j2
+        system_report: templates/arch/solution/default/system.html.j2
+        system_diagram: templates/arch/d2/system.d2.j2
         system_engine: d2 {{ input }} {{ output }} --layout elk --theme 200
         diagram_engine: d2 {{ input }} {{ output }} --layout elk --theme 200
         data:
@@ -110,12 +110,12 @@ tools:
 
 ### Defaults
 
-- If `tools.arch` is omitted, generation writes to `architecture-output/` in the effective project cwd.
+- If `tools.arch` is omitted, generation writes to `arch/` in the effective project cwd.
 - Exactly one profile source is used per `arch.generate` run:
   - `profile_yaml` when provided
   - otherwise explicit `profile` when provided
   - otherwise `tools.arch.default_profile`
-- Relative template/style paths first resolve under the active config directory; missing relative paths fall back to bundled `global_templates/arch-templates` assets.
+- Relative template/style paths first resolve under the active config directory; default `templates/arch/` paths fall back to bundled `global_templates/arch-templates` assets when no editable override exists.
 - Integration table `Key` values come from the integration row `key` field.
 - Engine command templates run via argv execution (`shell=False`) after rendering.
 - Legacy placeholder aliases in engine commands (for example `${{input_file}}`) are not supported. Use Jinja placeholders only: `{{ input }}` and `{{ output }}`.
@@ -198,11 +198,11 @@ arch.import_yaml(
 )
 
 # Bundle generated solution output to a zip archive
-arch.bundle_solution(directory="architecture-output/solution")
+arch.bundle_solution(directory="arch/solution")
 
 # Bundle with extra source files (file, dir, or glob)
 arch.bundle_solution(
-    directory="architecture-output/solution",
+    directory="arch/solution",
     include="input/*.xlsx",
 )
 ```

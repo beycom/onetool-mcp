@@ -10,31 +10,74 @@ Defines the main `onetool` CLI. Provides the MCP server entry point, the `init` 
 
 ### Requirement: CLI Entry Point
 
-The system SHALL provide a `onetool` CLI command.
+The system SHALL provide a `onetool` CLI command with an explicit `serve`
+runtime command for root MCP server startup. `onetool serve` SHALL default to
+stdio transport and SHALL support Streamable HTTP root mode through
+`--transport http`.
 
-#### Scenario: CLI invocation
+#### Scenario: Explicit stdio root invocation
 - **GIVEN** the package is installed
-- **WHEN** `onetool` is executed with no arguments and no subcommand
+- **WHEN** `onetool serve --config /path/to/onetool.yaml` is executed
 - **THEN** it SHALL start the MCP server over stdio
+
+#### Scenario: Explicit HTTP root invocation
+- **GIVEN** the package is installed
+- **WHEN** `onetool serve --transport http --config /path/to/onetool.yaml` is
+  executed with optional host, port, and path options
+- **THEN** it SHALL start the same OneTool MCP server over Streamable HTTP
+- **AND** the public transport value `http` SHALL map internally to FastMCP's
+  `streamable-http` transport
+- **AND** it SHALL use the same config, secrets, lifespan, proxy startup, Direct
+  API startup, stats, telemetry, and shutdown behavior as stdio root mode
+
+#### Scenario: Transport short option
+- **WHEN** `onetool serve -t http -c /path/to/onetool.yaml` is executed
+- **THEN** it SHALL behave the same as `--transport http --config
+  /path/to/onetool.yaml`
+
+#### Scenario: HTTP root defaults
+- **WHEN** `onetool serve --transport http` is started without host, port, or
+  path overrides
+- **THEN** the bind host SHALL default to loopback
+- **AND** the bind port SHALL default to `8767`
+- **AND** the MCP endpoint path SHALL default to `/mcp`
+
+#### Scenario: HTTP root explicit broad bind
+- **WHEN** Streamable HTTP root mode is started with `--host 0.0.0.0`
+- **THEN** the server SHALL bind to `0.0.0.0`
+- **AND** startup logs SHALL include an explicit warning that the bind address is
+  not loopback
+
+#### Scenario: Root callback compatibility warning
+- **WHEN** `onetool --config /path/to/onetool.yaml` starts stdio root mode
+- **THEN** it SHALL continue to start the MCP server over stdio
+- **AND** it SHALL print a warning recommending `onetool serve --config
+  /path/to/onetool.yaml`
+
+#### Scenario: Removed serve-http command
+- **WHEN** `onetool serve-http` is executed
+- **THEN** the CLI SHALL fail through normal unknown-command handling
 
 #### Scenario: Startup config validation failure
 - **GIVEN** `onetool --config /path/to/onetool.yaml` is launched by an MCP client
 - **AND** config loading fails before the MCP handshake
 - **WHEN** the process exits
 - **THEN** stderr SHALL include a compact config error diagnostic
-- **AND** `<config-dir>/logs/serve.log` SHALL record the config path and error message
+- **AND** `<config-dir>/runtime/logs/serve.log` SHALL record the config path and error message
 
 #### Scenario: Termination signal
-- **GIVEN** the stdio MCP server process receives SIGINT or SIGTERM
+- **GIVEN** the stdio or HTTP MCP server process receives SIGINT or SIGTERM
 - **WHEN** the signal is handled
 - **THEN** the process SHALL unwind through normal server shutdown
 - **AND** FastMCP lifespan cleanup SHALL be able to close proxied transports
+- **AND** the Direct API sidecar SHALL be stopped if it is running
 
 #### Scenario: Help output
 - **GIVEN** `onetool --help` is executed
 - **WHEN** help is displayed
 - **THEN** it SHALL list available options and subcommands with descriptions
-- **AND** subcommands SHALL be grouped under labelled panels: `CLI`, `Configuration`, `Knowledge Base`
+- **AND** subcommands SHALL be grouped under labelled panels: `CLI`, `Runtime`,
+  `Direct`, `Configuration`, and `Knowledge Base` where applicable
 
 #### Scenario: Version flag
 - **GIVEN** `onetool --version` is executed
@@ -55,6 +98,33 @@ The `onetool` CLI SHALL provide a `direct` subcommand group for sending commands
 
 - **WHEN** `onetool direct --help` is run
 - **THEN** it SHALL list `run` as the only available direct subcommand
+
+### Requirement: Runtime Mode Documentation
+
+The user-facing CLI documentation SHALL describe the runtime modes consistently.
+
+#### Scenario: Runtime mode table
+- **WHEN** users read the CLI documentation
+- **THEN** they SHALL find a comparison of `stdio`, `http`, and `direct`
+- **AND** the table SHALL describe purpose, transport, auth, port or bind,
+  config, entry point, and when to use each mode
+
+#### Scenario: Stdio recommended
+- **WHEN** users read local MCP setup documentation
+- **THEN** stdio SHALL be presented as the default and recommended local MCP
+  setup
+
+#### Scenario: HTTP container configuration
+- **WHEN** users read containerized client documentation
+- **THEN** Streamable HTTP root mode SHALL be documented with a pure MCP client
+  URL config and no command or args
+
+#### Scenario: HTTP smoke coverage
+- **WHEN** automated smoke coverage starts Streamable HTTP root mode
+- **THEN** it SHALL connect with a Streamable HTTP MCP client
+- **AND** it SHALL list tools and verify the `run` tool is present
+- **AND** it SHALL call `run` successfully over Streamable HTTP
+- **AND** it SHALL verify proxy/server status through the Streamable HTTP root
 
 ---
 
@@ -85,11 +155,11 @@ Existing files in the target directory SHALL be backed up to `<filename>.bak` (o
 - **AND** write an `onetool.yaml` that includes only the materialised YAML files
 - **AND** if the user cancels (Ctrl+C) at the checkbox, exit with code 0 without writing any files
 
-#### Scenario: diagram.yaml sidecar directory
+#### Scenario: diagram.yaml editable template directory
 - **GIVEN** the user selects `diagram.yaml` during init
 - **WHEN** init materialises `diagram.yaml`
-- **THEN** it SHALL also copy the `diagram-templates/` directory from package templates into the config dir alongside `diagram.yaml`
-- **AND** if `diagram-templates/` already exists it SHALL be backed up using the standard `.bak` scheme before overwriting
+- **THEN** it SHALL also copy packaged diagram templates into `templates/diagram/` under the config dir
+- **AND** if `templates/diagram/` already exists it SHALL be backed up using the standard `.bak` scheme before overwriting
 
 #### Scenario: Conflict handling
 - **GIVEN** a file already exists in the target directory

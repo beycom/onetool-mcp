@@ -24,6 +24,7 @@ from loguru import logger
 
 from ot.executor.pep723 import ToolFileInfo, categorize_tools
 from ot.executor.worker_proxy import create_worker_proxy
+from ot.logging import LogEntry
 from ot.paths import get_effective_cwd
 
 
@@ -90,6 +91,13 @@ _module_cache: OrderedDict[Path, tuple[LoadedTools, dict[str, float], float]] = 
 
 # TTL for skipping per-file mtime checks when the cache was recently validated
 _CACHE_TTL = 1.0  # seconds
+
+_RELOADABLE_TOOL_MODULE_PREFIXES = (
+    "ot_tool.",
+    "ottools.",
+    "otdev.tools.",
+    "otutil.tools.",
+)
 
 
 def _cache_get(key: Path) -> tuple[LoadedTools, dict[str, float], float] | None:
@@ -262,7 +270,13 @@ def _load_worker_tools(
             )
 
         except Exception as e:
-            logger.warning(f"Failed to load extension tool {py_file.stem}: {e}")
+            logger.warning(
+                LogEntry(
+                    event="tool_loader.extension_load.failed",
+                    module=py_file.stem,
+                    path=py_file,
+                ).failure(e)
+            )
 
     return functions, loaded_workers
 
@@ -338,7 +352,13 @@ def _load_inprocess_tools(
                         functions[name] = obj
 
         except Exception as e:
-            logger.warning(f"Failed to load tool module {py_file.stem}: {e}")
+            logger.warning(
+                LogEntry(
+                    event="tool_loader.module_load.failed",
+                    module=py_file.stem,
+                    path=py_file,
+                ).failure(e)
+            )
 
     return functions, pack_aliases, doc_slugs
 
@@ -478,3 +498,16 @@ def reset() -> None:
 
     _module_cache.clear()
     pack_proxy.reset()
+
+
+def clear_reloadable_tool_modules() -> int:
+    """Clear loaded tool and tool-helper modules owned by the tool loader."""
+
+    module_names = [
+        name
+        for name in sys.modules
+        if name.startswith(_RELOADABLE_TOOL_MODULE_PREFIXES)
+    ]
+    for name in module_names:
+        del sys.modules[name]
+    return len(module_names)

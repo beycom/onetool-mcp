@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from loguru import logger
 
+from ot.logging import LogEntry
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
@@ -189,8 +191,11 @@ class JsonlStatsWriter:
             # Log occasionally to avoid noisy logs under sustained failure.
             if self._dropped_records in {1, 10, 100} or self._dropped_records % 1000 == 0:
                 logger.warning(
-                    f"Stats buffer overflow; dropped {self._dropped_records} oldest record(s) "
-                    f"(buffer capped at {self._max_buffer_records})"
+                    LogEntry(
+                        event="stats.buffer.overflow",
+                        droppedRecords=self._dropped_records,
+                        maxBufferRecords=self._max_buffer_records,
+                    )
                 )
 
     async def start(self) -> None:
@@ -226,7 +231,9 @@ class JsonlStatsWriter:
                 break
             except Exception as e:
                 # Log but don't crash - stats are not critical
-                logger.warning(f"JSONL stats flush error: {e}")
+                logger.warning(
+                    LogEntry(event="stats.flush.failed", path=self._path).failure(e)
+                )
 
     async def _flush(self) -> None:
         """Flush buffer to JSONL file."""
@@ -245,7 +252,13 @@ class JsonlStatsWriter:
         except Exception as e:
             # Log but don't crash - stats are not critical
             # Buffer NOT cleared; records will retry on next flush
-            logger.warning(f"Failed to write JSONL stats: {e}")
+            logger.warning(
+                LogEntry(
+                    event="stats.write.failed",
+                    path=self._path,
+                    recordCount=len(records),
+                ).failure(e)
+            )
 
     async def _write_records(self, records: Sequence[dict[str, Any]]) -> None:
         """Write records to JSONL file."""
