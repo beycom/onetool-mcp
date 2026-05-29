@@ -116,6 +116,7 @@ def test_init_info_status_save_log_and_gitignore(monkeypatch: pytest.MonkeyPatch
     exclude_lines = (tmp_path / ".localhist" / "info" / "exclude").read_text().splitlines()
     assert ".git/" in exclude_lines
     assert ".onetool/state/localhist/" in exclude_lines
+    assert ".localhist/" in exclude_lines
     assert (tmp_path / ".onetool" / "state" / "localhist" / "force-include").exists()
     assert not (tmp_path / ".localhist" / "info" / "force-include").exists()
     assert localhist.init()["already_initialized"] is True
@@ -129,7 +130,7 @@ def test_init_info_status_save_log_and_gitignore(monkeypatch: pytest.MonkeyPatch
 
     info_result = localhist.info()
     assert info_result["initialized"] is True
-    assert info_result["exclude_rules"] == [".git/", ".onetool/state/localhist/"]
+    assert info_result["exclude_rules"] == [".git/", ".onetool/state/localhist/", ".localhist/"]
     assert info_result["force_include_rules"] == []
     assert info_result["config"]["git_dir"] == ".localhist"
 
@@ -138,6 +139,40 @@ def test_init_info_status_save_log_and_gitignore(monkeypatch: pytest.MonkeyPatch
     assert save_result["commit"]["kind"] == "manual"
     assert localhist.save(message="no changes")["created"] is False
     assert len(localhist.log(limit=5)["entries"]) == 1
+
+
+def test_save_repairs_localhist_git_dir_exclude_before_staging(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    _write(tmp_path / "notes.txt", "one\n")
+
+    assert localhist.init()["ok"] is True
+    assert localhist.save(message="first")["created"] is True
+    (tmp_path / ".gitignore").write_text("")
+    exclude = tmp_path / ".localhist" / "info" / "exclude"
+    exclude.write_text(".git/\n.onetool/state/localhist/\n")
+    _write(tmp_path / "notes.txt", "two\n")
+
+    assert localhist.save(message="second")["created"] is True
+    assert ".localhist/" in exclude.read_text().splitlines()
+    tracked = subprocess.run(
+        [
+            "git",
+            f"--git-dir={tmp_path / '.localhist'}",
+            f"--work-tree={tmp_path}",
+            "ls-tree",
+            "-r",
+            "--name-only",
+            "HEAD",
+        ],
+        capture_output=True,
+        check=True,
+        text=True,
+    ).stdout.splitlines()
+    assert ".localhist/HEAD" not in tracked
+    assert not any(path.startswith(".localhist/") for path in tracked)
 
 
 def test_exclude_and_force_include_rules_are_idempotent(
@@ -161,6 +196,26 @@ def test_exclude_and_force_include_rules_are_idempotent(
     save_result = localhist.save(message="force include")
     assert save_result["created"] is True
     assert "secret" in localhist.show(ref="HEAD", path="keep.secret")["content"]
+
+
+def test_force_include_rejects_localhist_protected_paths(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    assert localhist.init()["ok"] is True
+
+    for rule in [
+        ".git/config",
+        "./.localhist/HEAD",
+        ".onetool/state/localhist/force-include",
+        ":(glob).localhist/**",
+    ]:
+        result = localhist.add_force_include(rule=rule)
+        assert result["ok"] is False
+
+    force_include = tmp_path / ".onetool" / "state" / "localhist" / "force-include"
+    assert force_include.read_text() == ""
 
 
 def test_save_accepts_free_form_kind_and_rejects_empty_message(

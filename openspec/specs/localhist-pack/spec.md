@@ -30,7 +30,7 @@ The system SHALL manage local history in an independent Git database that observ
 
 #### Scenario: Initialize local history
 - **WHEN** `localhist.init()` is called for an uninitialized project
-- **THEN** the system SHALL create the local-history Git database, configure required local-history settings, ensure `.localhist/` is ignored by the primary repository, ensure `.localhist/info/exclude` contains `.git/`, ensure `.onetool/state/localhist/force-include` exists, and return structured initialization status.
+- **THEN** the system SHALL create the local-history Git database, configure required local-history settings, ensure `.localhist/` is ignored by the primary repository, ensure `.localhist/info/exclude` contains `.git/`, `.onetool/state/localhist/`, and the configured local-history Git directory, ensure `.onetool/state/localhist/force-include` exists, and return structured initialization status.
 
 #### Scenario: Reinitialize existing local history
 - **GIVEN** a local-history Git database already exists
@@ -65,7 +65,7 @@ The system SHALL allow agents to create manual local-history snapshots without p
 
 #### Scenario: Save with changes
 - **WHEN** `localhist.save(message="before refactor", kind="manual")` is called and eligible changes exist
-- **THEN** the system SHALL stage changes with Git-native ignore behavior, force-add configured force-includes, create a commit with the provided message and `manual` kind metadata, and return structured commit details.
+- **THEN** the system SHALL ensure localhist-owned exclude rules are present, stage changes with Git-native ignore behavior, force-add configured force-includes, create a commit with the provided message and `manual` kind metadata, and return structured commit details.
 
 #### Scenario: Save without changes
 - **WHEN** `localhist.save(...)` is called and no eligible changes exist
@@ -93,6 +93,10 @@ The system SHALL use Git-native ignore behavior for local-history staging, with 
 #### Scenario: Force-include rule
 - **WHEN** `localhist.add_force_include(rule="generated/report.json")` is called
 - **THEN** the system SHALL append the rule idempotently to `.onetool/state/localhist/force-include` and return the config file path, added rules, unchanged rules, effective rules, and before/after content.
+
+#### Scenario: Protected force-include rule
+- **WHEN** `localhist.add_force_include(...)` targets the primary `.git/` directory, `.onetool/state/localhist/`, the configured local-history Git directory, or uses Git pathspec magic
+- **THEN** the system SHALL reject the rule and SHALL NOT append it to `.onetool/state/localhist/force-include`.
 
 #### Scenario: Snapshot force-adds configured includes
 - **WHEN** force-include rules exist and `localhist.save(...)` stages a snapshot

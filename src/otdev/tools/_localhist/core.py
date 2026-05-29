@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
 from otdev.tools._localhist.config import (
@@ -51,6 +52,60 @@ def _ensure_gitignore(config: Config, paths: Paths) -> bool:
     lines.append(entry)
     gitignore.write_text("\n".join(lines).rstrip() + "\n")
     return True
+
+
+def _required_info_excludes(config: Config, paths: Paths) -> list[str]:
+    # These directories hold Git metadata, localhist's own database, and
+    # localhist runtime state. They are repository machinery, not project
+    # content, so snapshots must never stage them.
+    rules = [".git/", ".onetool/state/localhist/"]
+    entry = _gitignore_entry(config, paths)
+    if entry is not None:
+        rules.append(entry)
+    return rules
+
+
+def _protected_force_include_prefixes(config: Config, paths: Paths) -> list[str]:
+    # Force-includes are applied with `git add -f`, so they can override the
+    # localhist-owned excludes above. Keep the same storage paths on a separate
+    # denylist so users cannot accidentally snapshot repository internals.
+    prefixes = _required_info_excludes(config, paths)
+    for path in (paths.git_dir, paths.project_root / ".git", paths.state_dir):
+        if path == paths.work_tree or paths.work_tree in path.parents:
+            prefixes.append(path.relative_to(paths.work_tree).as_posix().rstrip("/") + "/")
+    return list(dict.fromkeys(prefixes))
+
+
+def _normalize_force_include_rule(rule: str) -> str:
+    clean = rule.strip()
+    if not clean:
+        return ""
+    if clean.startswith(":"):
+        # Git pathspec magic can express broad matches like `:(glob).git/**`.
+        # Force-includes are intentionally plain paths so protected-prefix
+        # checks remain exact and reviewable.
+        raise ValueError("force-include rules must be literal project-relative paths")
+    normalized = PurePosixPath(clean.lstrip("/")).as_posix()
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    if normalized in {"", "."} or normalized.startswith("../"):
+        raise ValueError(f"force-include rule must stay inside the work tree: {rule}")
+    return normalized
+
+
+def _validate_force_include_rules(config: Config, paths: Paths, rules: list[str]) -> list[str]:
+    protected = _protected_force_include_prefixes(config, paths)
+    validated: list[str] = []
+    for rule in rules:
+        normalized = _normalize_force_include_rule(rule)
+        if not normalized:
+            continue
+        for prefix in protected:
+            directory = prefix.rstrip("/")
+            if normalized == directory or normalized.startswith(prefix):
+                raise ValueError(f"force-include rule targets protected localhist path: {rule}")
+        validated.append(normalized)
+    return validated
 
 
 def _append_info_exclude(paths: Path, patterns: list[str]) -> int:
@@ -258,7 +313,7 @@ def init_repository() -> dict[str, object]:
         git.run("config", "user.email", LOCALHIST_USER_EMAIL)
         git.run("config", "commit.gpgsign", "false")
         ignore_added = _ensure_gitignore(config, paths)
-        exclude_added = _append_info_exclude(paths.git_dir, [".git/", ".onetool/state/localhist/"])
+        exclude_added = _append_info_exclude(paths.git_dir, _required_info_excludes(config, paths))
         _ensure_force_include_file(paths)
         return {
             "ok": True,
@@ -368,7 +423,11 @@ def info_repository() -> dict[str, object]:
         return _error(exc)
 
 
-def _stage_snapshot(git: GitRunner, paths: Paths) -> None:
+def _stage_snapshot(git: GitRunner, config: Config, paths: Paths) -> None:
+    # Repair required excludes on every snapshot, not only init. If a project
+    # .gitignore or localhist exclude file is edited between autosaves, staging
+    # still must not recurse into Git/localhist storage.
+    _append_info_exclude(paths.git_dir, _required_info_excludes(config, paths))
     git.run("add", "-A", "--", ".")
     force_rules = _read_rules(paths.force_include_file)
     if force_rules:
@@ -392,7 +451,7 @@ def create_snapshot(
             return init_result
     git = GitRunner(paths)
     git.run("reset")
-    _stage_snapshot(git, paths)
+    _stage_snapshot(git, config, paths)
     status = git.run("diff", "--cached", "--name-only")
     if not status.strip():
         return {
@@ -674,7 +733,7 @@ def append_force_include_rules(*, rules: list[str]) -> dict[str, object]:
             if not init_result.get("ok"):
                 return init_result
         force_include = _ensure_force_include_file(paths)
-        mutation = _append_rules(force_include, rules)
+        mutation = _append_rules(force_include, _validate_force_include_rules(config, paths, rules))
         return {
             "ok": True,
             **mutation,

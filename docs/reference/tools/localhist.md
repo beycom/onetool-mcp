@@ -84,8 +84,9 @@ tools:
 - If `tools.localhist` is omitted, localhist stores its Git database in `.localhist/` and snapshots the effective project cwd.
 - Absolute `git_dir` values must include `{project_id}` so global storage paths remain project-specific.
 - Localhist uses the project `.gitignore` through Git's native ignore handling.
-- `localhist.init()` ensures the primary `.gitignore` ignores `.localhist/`, ensures `.localhist/info/exclude` includes `.git/` and `.onetool/state/localhist/`, and creates `.onetool/state/localhist/force-include`.
-- Snapshot staging runs `git add -A -- .`, then force-adds pathspecs from `.onetool/state/localhist/force-include`.
+- `localhist.init()` ensures the primary `.gitignore` ignores `.localhist/`, ensures `.localhist/info/exclude` includes `.git/`, `.onetool/state/localhist/`, and the configured local-history Git directory, and creates `.onetool/state/localhist/force-include`.
+- Snapshot staging ensures localhist-owned excludes exist, runs `git add -A -- .`, then force-adds pathspecs from `.onetool/state/localhist/force-include`.
+- Force-includes must be literal project-relative paths and cannot target `.git/`, `.onetool/state/localhist/`, or the configured local-history Git directory.
 - `status()` reports working-tree file status. Use `info()` for initialization metadata, paths, config, head, branch, and ignore-file locations.
 - `diff()` and `show()` cap returned content at 1 MB and include `truncated`, `max_bytes`, and `bytes_returned` metadata.
 - `autosave_start()` and `autosave_list()` return the effective `tools.localhist` config, including `autosave` scheduling values.
