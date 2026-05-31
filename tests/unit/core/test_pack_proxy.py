@@ -232,6 +232,7 @@ class TestPackShortNameAliases:
             "whiteboard": ("wb",),
             "webfetch": ("wf",),
             "brave": ("br",),
+            "chat_ops": ("co",),
         }
 
         mock_config = MagicMock()
@@ -263,6 +264,15 @@ class TestPackShortNameAliases:
         assert "wf" in ns
         assert ns["wf"] is ns["webfetch"]
 
+    def test_chat_ops_gets_co_short_alias(self) -> None:
+        """chat_ops pack should appear as both 'chat_ops' and 'co'."""
+        packs = {"chat_ops": {"ingest": MagicMock(), "report_excel": MagicMock()}}
+        ns = self._build_namespace_with_packs(packs)
+
+        assert "chat_ops" in ns
+        assert "co" in ns
+        assert ns["co"] is ns["chat_ops"]
+
     def test_short_alias_not_added_when_pack_absent(self) -> None:
         """Short alias is only injected when the full pack is present."""
         ns = self._build_namespace_with_packs({"brave": {"search": MagicMock()}})
@@ -288,6 +298,7 @@ class TestPackShortNameAliases:
             "whiteboard": ("wb",),
             "webfetch": ("wf",),
             "brave": ("br",),
+            "chat_ops": ("co",),
         }
         for full, pack_aliases in aliases.items():
             for alias in pack_aliases:

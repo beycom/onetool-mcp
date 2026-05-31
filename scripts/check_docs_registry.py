@@ -32,6 +32,7 @@ CFG = ROOT / "tests/.onetool/onetool.yaml"
 NAME_TO_PACK = {
     "AWS": "aws",
     "Brave": "brave",
+    "Chat Ops": "chat_ops",
     "Chrome DevTools Util": "chrome_util",
     "OT Context": "ot_context",
     "Context7": "context7",

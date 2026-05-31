@@ -25,3 +25,41 @@ direct:
   host:
     enabled: false  # true binds an authenticated loopback API from the MCP process
     port: 8765      # preferred API port; MCP startup probes upward to 65535
+
+# Tool-specific configuration
+# tools:
+#   # ot_llm - LLM calls from within OneTool (code generation, transforms, etc.)
+#   ot_llm:
+#     model: google/gemini-3-flash-preview
+#     base_url: https://openrouter.ai/api/v1
+#   # arch - architecture workbook generation (optional inline override)
+#   arch:
+#     output_dir: tmp/arch/output
+#     default_profile: simple
+#     profiles:
+#       simple:
+#         system_engine: d2 {{ input }} {{ output }} --layout elk
+#         diagram_engine: d2 {{ input }} {{ output }} --layout elk
+#         data:
+#           merge_integrations: true
+#           show_integration_labels: false
+#           integration_labels: "[{{ row.key }}] {{ row.name }}"
+#           show_arrowhead_labels: true
+#           arrowhead_labels: "{{ row.key }}"
+#           direction: up
+#   # mem - persistent memory (semantic search and recall)
+#   # mem: {}
+#   # chat_ops - telemetry ingest/reporting defaults (optional [dev] extra)
+#   chat_ops:
+#     storage:
+#       db: chat-ops/chat-ops.db
+#     providers:
+#       codex:
+#         provider_dir: "${HOME}/.codex/sessions"
+#         parser_file: "builtin:codex_parser"
+#     analysis:
+#       default_category: GENERAL
+#       categories: []
+#       signals: []
+#     reporting:
+#       output_dir: chat-ops/reports
