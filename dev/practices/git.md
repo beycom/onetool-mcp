@@ -79,7 +79,10 @@ feat(config): add compact array format; update security template
 | `main` | `main` | Main development branch |
 | `feature/{name}` | `feature/config-refactor` | Feature branches |
 | `fix/{name}` | `fix/auth-bug` | Bug fix branches |
+| `remove/{name}` | `remove/aws-pack` | Removal branches for deleting packs, tools, integrations, or other owned surfaces |
 | `release/{version}` | `release/1.0.0` | Release preparation branches |
+
+Use `remove/{name}` for intentional deletions that should be reviewed as a named change. This keeps removal work distinct from ordinary refactors and avoids ambiguous temporary names like `wip/remove-{name}`.
 
 ---
 
@@ -133,6 +136,7 @@ Annotated tags (`-a`) with `v` prefix: `v1.0.0`, `v1.0.0rc3`, `v1.0.0b1`
 ## Branch Hygiene
 
 - Delete feature branches after merging to main
+- Delete merged `remove/{name}` branches after the removal is stable, or rename them to `archive/remove-{name}` when keeping them as historical breadcrumbs
 - Keep main clean and deployable at all times
 - No force pushes to main
 - Feature branches should be short-lived (days, not weeks)
