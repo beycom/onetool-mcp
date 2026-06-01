@@ -62,7 +62,6 @@ Tool packs for developer-focused features. Installed via `pip install onetool-mc
 | Pack | Description |
 |------|-------------|
 | `tools/arch.py` | Architecture model export and validation |
-| `tools/aws_util.py` | AWS utility operations |
 | `tools/chrome_util.py` | Chrome utility operations |
 | `tools/context7.py` | Context7 documentation lookup |
 | `tools/db.py` | Database operations (SQLAlchemy) |

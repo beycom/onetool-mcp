@@ -106,10 +106,10 @@ def _create_mcp_proxy_pack(server_name: str, tool_prefix: str | None = None) -> 
 
     Args:
         server_name: Name of the MCP server.
-        tool_prefix: Optional prefix that the server's tools carry (e.g. "aws_").
+        tool_prefix: Optional prefix that the server's tools carry (e.g. "docs_").
             When provided, a second match attempt is made with the prefix prepended,
             so callers can omit it: knowledge.search_documentation() resolves to
-            aws_search_documentation.
+            docs_search_documentation.
 
     Returns:
         Object with __getattr__ that routes to proxy manager.
@@ -143,7 +143,7 @@ def _create_mcp_proxy_pack(server_name: str, tool_prefix: str | None = None) -> 
                 raise AttributeError(str(e)) from None
 
             if match_result is None and tool_prefix:
-                # Server declares a tool_prefix (e.g. "aws_"): try matching with it
+                # Server declares a tool_prefix (e.g. "docs_"): try matching with it
                 # prepended so callers can omit it.
                 match_result = find_canonical_match(
                     f"{tool_prefix}{accessor_name}", available_tools
@@ -342,7 +342,7 @@ def build_execution_namespace(
             safe_name = server_name
 
         # Register both spellings intentionally: safe_name gives Python dot
-        # access (`aws_iam.tool()`), while the original key preserves exact
+        # access (`billing_service.tool()`), while the original key preserves exact
         # server-name lookup for callers using namespace dictionaries.
         if safe_name not in namespace:
             namespace[safe_name] = _create_mcp_proxy_pack(server_name, tool_prefix)

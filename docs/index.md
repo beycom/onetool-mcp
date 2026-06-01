@@ -9,7 +9,7 @@ hide:
 <div class="hero">
 <div class="hero__logo" role="img" aria-label="OneTool logo"></div>
 <p class="hero__title">OneTool</p>
-<p class="hero__tagline">🧿 One MCP for developers - No tool tax, no context rot.<br>100+ tools including Brave, Google, Context7, Excalidraw, AWS, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more.</p>
+<p class="hero__tagline">🧿 One MCP for developers - No tool tax, no context rot.<br>100+ tools including Brave, Google, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more.</p>
 <div class="hero__buttons">
 <a href="learn/" class="btn btn--primary">Learn OneTool</a>
 <a href="reference/" class="btn btn--secondary">Reference</a>
@@ -20,7 +20,6 @@ hide:
 !!! tip "OneTool v2 is here"
     **New in v2 — highlights:**
 
-    - :material-aws: **Dynamic AWS proxy** — the only practical way to use all 57+ official AWS MCP servers; zero token tax, credentials and SSO handled automatically
     - :material-draw: **Live whiteboard** — draw diagrams and architecture with a Mermaid-compatible DSL, powered by Excalidraw
     - :material-magnify: **Three search engines** — Brave, Google (Ground), and Tavily; each with batch support, topic filters, and answer summaries
     - :material-eye: **Browser annotations** — highlight page elements and guide users through multi-step workflows via Chrome DevTools or Playwright
@@ -158,7 +157,7 @@ Meta tools for introspection. [Structured logging](learn/extension-tools.md#logg
 
 ### :material-package-variant: 100+ Tools
 
-Web Search (Brave, Google), Context7, Version Check, Chrome DevTools, Playwright, Excel, File Ops, Database, AWS, Memory and many more.
+Web Search (Brave, Google), Context7, Version Check, Chrome DevTools, Playwright, Excel, File Ops, Database, Memory and many more.
 
 [:octicons-arrow-right-24: Browse tools](reference/tools/index.md)
 

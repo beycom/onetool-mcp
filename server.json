@@ -3,7 +3,7 @@
   "name": "io.github.beycom/onetool-mcp",
   "version": "2.2.2",
   "title": "OneTool MCP",
-  "description": "One MCP for devs incl Brave,Google,Tavily,Context7,AWS,Excalidraw,DB,GitHub,DevTools,Playwright",
+  "description": "One MCP for devs incl Brave,Google,Tavily,Context7,Excalidraw,DB,GitHub,DevTools,Playwright",
   "repository": {
     "url": "https://github.com/beycom/onetool-mcp",
     "source": "github"

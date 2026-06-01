@@ -106,7 +106,7 @@ You'll also get tired of typing `query="..."`, so I added smart parameter prefix
 
 ### Batteries included: 100+ tools
 
-OneTool includes [100+ tools](../reference/tools/index.md) including Brave, Google, Context7, Excalidraw, AWS, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more.
+OneTool includes [100+ tools](../reference/tools/index.md) including Brave, Google, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more.
 
 It even has "Smart Tools" -  [LLM-powered transformation](../reference/tools/ot_llm.md). Delegate work to cheaper LLMs instead of using your expensive AI coding agent. For example: fetch a page, summarise it with Gemini-3-Flash ($0.50/M input tokens), then pass the result back to Claude Opus 4.5 ($5/M input tokens). That's a 10× saving.
 
@@ -147,7 +147,7 @@ Keep the king. Stop the tax.
 Download and install it, and give your agentic engineering the boost it needs.
 
 🧿 One MCP for developers - No tool tax, no context rot. 
-100+ tools including Brave, Google, Context7, Excalidraw, AWS, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more.
+100+ tools including Brave, Google, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more.
 
 --- 
 

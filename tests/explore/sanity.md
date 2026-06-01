@@ -17,14 +17,13 @@ ot_servers.enable(name="chrome_devtools")
 ```
 
 Test out the following packs:
-Packs: arch, aws, brave, chrome_util, context7, convert, db, diagram, excel, file, ground, knowledge, mem, ot, ot_caveman, ot_context, ot_forge, ot_image, ot_llm, ot_secrets, ot_servers, ot_timer, package, play_util, ripgrep, tavily, webfetch, whiteboard
+Packs: arch, brave, chrome_util, context7, convert, db, diagram, excel, file, ground, knowledge, mem, ot, ot_caveman, ot_context, ot_forge, ot_image, ot_llm, ot_secrets, ot_servers, ot_timer, package, play_util, ripgrep, tavily, webfetch, whiteboard
 
 Test out the following proxy servers separately:
 Proxy servers: chrome_devtools, github, playwright
 
 When testing:
 - arch: validate a workbook from tests/data/ if present, otherwise run `ot.tools(pattern="arch.", info="full")` and note missing fixture coverage.
-- aws: use read-only/config inspection first (`aws.profiles()`, `aws.profile()`, `aws.regions()`, `aws.services()`); only call login/start/stop tools if explicitly safe for the local environment.
 - chrome_util: with a known browser page if available, test scan_annotations, inject_annotations, clear_annotations; if no Chrome session is available, verify help/signatures and note as environment gap.
 - convert with files at tests/data/
 - db with db at tests/data/northwind.db (25MB, download via `just test-setup`)

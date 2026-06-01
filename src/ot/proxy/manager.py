@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 def _strip_ctx_from_schema(tool: types.Tool) -> types.Tool:
     """Remove 'ctx' from a tool's inputSchema.
 
-    Some MCP server implementations (e.g. awslabs.iam-mcp-server) include
+    Some MCP server implementations include
     a 'ctx: Context' parameter in their function signatures that the framework
     fails to strip from the exposed JSON schema.  This parameter is an internal
     MCP framework injection and must never be presented to callers.

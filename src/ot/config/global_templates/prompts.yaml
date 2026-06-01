@@ -48,7 +48,6 @@ prompts:
   packs:
     ot: "** Discover tools, packs. Get the help you need to call them correctly. The BEST PLACE to start. **"
     arch: "Architecture workflows for Excel ingest, validation, generation, round-trip, and bundling"
-    aws: "Manage AWS resources — dynamically enable any of their 50+ dedicated MCP tools"
     brave: "Search the web, news, and images — fast, private, with batch support"
     chrome_util: "Annotate and highlight page elements via Chrome DevTools"
     context7: "Pull up-to-date docs for any library — React, FastAPI, etc."

@@ -117,18 +117,18 @@ MCP servers may use naming conventions incompatible with Python identifiers (e.g
 
 The system SHALL expose MCP servers via Python-accessible namespace aliases when the server name contains hyphens.
 
-Server names with hyphens cannot be used as Python variable names (e.g., `aws-iam` is parsed as subtraction, not a namespace). The system SHALL register Python-safe aliases so users can call tools via dot notation.
+Server names with hyphens cannot be used as Python variable names (e.g., `billing-service` is parsed as subtraction, not a namespace). The system SHALL register Python-safe aliases so users can call tools via dot notation.
 
 #### Scenario: hyphenated server gets generic underscore alias
 
-- **GIVEN** a hyphenated MCP server is connected (e.g., `aws-cost-explorer`)
+- **GIVEN** a hyphenated MCP server is connected (e.g., `billing-service`)
 - **WHEN** the execution namespace is built
-- **THEN** the full name with hyphens replaced by underscores SHALL be accessible as a variable (e.g., `aws_cost_explorer`)
-- **AND** `aws-iam` → `aws_iam`, `aws-cost-explorer` → `aws_cost_explorer`, `aws-well-architected` → `aws_well_architected`
+- **THEN** the full name with hyphens replaced by underscores SHALL be accessible as a variable (e.g., `billing_service`)
+- **AND** `billing-service` -> `billing_service`, `cost-explorer` -> `cost_explorer`, `well-architected` -> `well_architected`
 
-#### Scenario: Non-aws hyphenated server gets underscore primary + warning
+#### Scenario: Hyphenated server gets underscore primary + warning
 
-- **GIVEN** a non-aws MCP server whose name contains hyphens (e.g., `my-server`)
+- **GIVEN** an MCP server whose name contains hyphens (e.g., `my-server`)
 - **WHEN** the execution namespace is built
 - **THEN** the underscore form SHALL be the primary namespace key (e.g., `my_server`)
 - **AND** the original hyphen name SHALL also be accessible as an exact server-name key for namespace-dictionary lookups
@@ -137,35 +137,35 @@ Server names with hyphens cannot be used as Python variable names (e.g., `aws-ia
 #### Scenario: Alias does not overwrite existing local pack
 
 - **GIVEN** a local pack named `iam` already exists in the namespace
-- **AND** an `aws-iam` server is connected
+- **AND** a `billing-service` server is connected
 - **WHEN** the execution namespace is built
 - **THEN** the existing `iam` local pack SHALL take precedence
-- **AND** `aws-iam` SHALL still be accessible via the full hyphenated key for exact server-name access
+- **AND** `billing-service` SHALL still be accessible via the full hyphenated key for exact server-name access
 
 ### Requirement: Tool Prefix Omission
 
-Some MCP servers expose tools whose names carry a prefix that is redundant when accessed via dot notation (e.g., the AWS Knowledge server exposes `aws_search_documentation` but callers write `knowledge.search_documentation()`). The system SHALL support a `tool_prefix` config field on `McpServerConfig` that enables prefix-omission when resolving tool names.
+Some MCP servers expose tools whose names carry a prefix that is redundant when accessed via dot notation (e.g., a docs server exposes `docs_search_documentation` but callers write `knowledge.search_documentation()`). The system SHALL support a `tool_prefix` config field on `McpServerConfig` that enables prefix-omission when resolving tool names.
 
 When `tool_prefix` is declared for a server, the proxy pack SHALL attempt a second match with the prefix prepended if the first canonical match fails. This allows callers to omit the prefix entirely.
 
 #### Scenario: Caller omits tool prefix
 
-- **GIVEN** a server with `tool_prefix: "aws_"` connected as `aws-know`
-- **AND** the server exposes a tool named `aws_search_documentation`
+- **GIVEN** a server with `tool_prefix: "docs_"` connected as `docs-knowledge`
+- **AND** the server exposes a tool named `docs_search_documentation`
 - **WHEN** code calls `knowledge.search_documentation()`
-- **THEN** the system SHALL resolve it to `aws_search_documentation` via prefix prepend
+- **THEN** the system SHALL resolve it to `docs_search_documentation` via prefix prepend
 - **AND** SHALL call the tool successfully
 
 #### Scenario: Exact prefixed name still works
 
-- **GIVEN** a server with `tool_prefix: "aws_"` configured
-- **WHEN** code calls `knowledge.aws_search_documentation()`
+- **GIVEN** a server with `tool_prefix: "docs_"` configured
+- **WHEN** code calls `knowledge.docs_search_documentation()`
 - **THEN** the exact tool name SHALL match directly (prefix not prepended again)
 
 #### Scenario: No tool_prefix — no fallback
 
 - **GIVEN** a server with no `tool_prefix` configured
-- **AND** the server exposes `aws_search_documentation`
+- **AND** the server exposes `docs_search_documentation`
 - **WHEN** code calls `server.search_documentation()`
 - **THEN** the system SHALL raise `AttributeError` (no prefix fallback attempted)
 

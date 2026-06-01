@@ -110,16 +110,6 @@ servers:
 
 Pack settings go under `tools.<pack_name>` in `onetool.yaml`.
 
-### aws
-
-| Field | Type | Default | Range | Description |
-|------|------|---------|-------|-------------|
-| `profile` | string \| null | `null` | - | Active AWS profile name |
-| `region` | string \| null | `null` | - | Active AWS region |
-| `timeout` | int | `30` | `>=1` | Boto3 API call timeout seconds |
-| `roles` | object<string, string[]> | `{}` | - | User-defined role name -> server short names |
-| `servers` | object<string, string> | `{}` | - | Additional/override AWS MCP servers |
-
 ### brave
 
 | Field | Type | Default | Range | Description |
@@ -266,9 +256,6 @@ Example:
 
 ```yaml
 tools:
-  aws:
-    profile: dev
-    timeout: 45
   diagram:
     backend:
       prefer: auto

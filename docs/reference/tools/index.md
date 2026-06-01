@@ -1,6 +1,6 @@
 # Tool Reference
 
-**29 Packs. 263 Tools.**
+**28 Packs. 246 Tools.**
 
 Complete reference of all built-in tool packs and functions.
 
@@ -15,7 +15,7 @@ Tools are split into optional install extras. Install only what you need:
 |-------|---------------|
 | *(core, always included)* | `ot_caveman` (alias `cm`), `ctx`, `ot`, `ot_forge`, `ot_llm`, `ot_secrets`, `ot_servers`, `ot_timer` |
 | `[util]` | `brave`, `convert`, `excel`, `file`, `ground`, `knowledge`, `mem`, `tavily` |
-| `[dev]` | `arch`, `aws`, `chrome_util`, `context7`, `db`, `diagram`, `localhist`, `package`, `play_util`, `ripgrep`, `whiteboard`, `webfetch` |
+| `[dev]` | `arch`, `chrome_util`, `context7`, `db`, `diagram`, `localhist`, `package`, `play_util`, `ripgrep`, `whiteboard`, `webfetch` |
 | `[all]` | All of the above |
 
 ```bash
@@ -28,7 +28,6 @@ uv tool install 'onetool-mcp[util,dev]'  # most tools
 | Pack | Extra | Description | Tool Count | Credits | Tools |
 |------|-------|-------------|---|---------|-------|
 | [**Arch**](arch.md) | `[dev]` | Architecture workflows for Excel ingest, validation, generation, round-trip, and bundling. | 5 | MIT | `bundle_solution`, `export_yaml`, `generate`, `import_yaml`, `validate` |
-| [**AWS**](aws.md) | `[dev]` | AWS services via awslabs/mcp servers, activated on demand by role. | 17 | [awslabs/mcp](https://github.com/awslabs/mcp) (Apache 2.0) | `arn`, `attributes`, `check`, `login`, `mfa`, `packs`, `profile`, `profiles`, `refresh_packs`, `regions`, `roles`, `services`, `start_packs`, `stop_packs`, `use`, `values`, `whoami` |
 | [**Brave**](brave.md) | `[util]` | Web search via Brave Search API. | 5 | [brave-search-mcp-server](https://github.com/brave/brave-search-mcp-server) (MIT) | `image`, `news`, `search`, `search_batch`, `video` |
 | [**OT Caveman**](ot_caveman.md) | core | LLM-powered text compaction and expansion. | 3 | MIT | `compact`, `expand`, `input` |
 | [**Chrome DevTools Util**](chrome-util.md) | `[dev]` | Visual element annotation for the Chrome DevTools MCP server. | 5 | MIT | `clear_annotations`, `guide_user`, `highlight_element`, `inject_annotations`, `scan_annotations` |

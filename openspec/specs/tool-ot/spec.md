@@ -378,7 +378,7 @@ The `ot.servers()` function SHALL list configured MCP proxy servers with optiona
 - **GIVEN** `info="default"` parameter (or no info parameter)
 - **WHEN** `ot.servers()` or `ot.servers(info="default")` is called
 - **THEN** each entry SHALL include: `{name, status, enabled}`
-- **AND** `call_as` SHALL be included only when the server name contains hyphens (e.g. `aws-iam` → `call_as: "aws_iam"`)
+- **AND** `call_as` SHALL be included only when the server name contains hyphens (e.g. `billing-service` -> `call_as: "billing_service"`)
 - **AND** `tool_count` SHALL be included only when the server is connected
 - **AND** `error` SHALL be included only when the server is disconnected and has an error
 - **AND** `type` SHALL NOT be included (not useful to agents)

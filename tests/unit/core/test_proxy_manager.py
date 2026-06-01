@@ -981,16 +981,16 @@ class TestProxyManagerIncrementalConnect:
         mock_client = AsyncMock()
         mock_client.transport = AsyncMock()
         mock_tool = MagicMock(spec=types.Tool)
-        manager._clients = {"aws-iam": mock_client}
-        manager._tools_by_server = {"aws-iam": [mock_tool]}
-        manager._server_timeouts = {"aws-iam": 120.0}
+        manager._clients = {"billing-service": mock_client}
+        manager._tools_by_server = {"billing-service": [mock_tool]}
+        manager._server_timeouts = {"billing-service": 120.0}
 
-        result = await manager.disconnect_server("aws-iam")
+        result = await manager.disconnect_server("billing-service")
 
         assert result == "disconnected"
-        assert "aws-iam" not in manager._clients
-        assert "aws-iam" not in manager._tools_by_server
-        assert "aws-iam" not in manager._server_timeouts
+        assert "billing-service" not in manager._clients
+        assert "billing-service" not in manager._tools_by_server
+        assert "billing-service" not in manager._server_timeouts
         mock_client.__aexit__.assert_awaited_once_with(None, None, None)
         mock_client.transport.close.assert_awaited_once_with()
 
@@ -1024,12 +1024,12 @@ class TestProxyManagerIncrementalConnect:
         """Should remove from clients dict directly when no running loop."""
         manager = ProxyManager()
         manager._loop = None
-        manager._clients = {"aws-iam": MagicMock()}
-        manager._tools_by_server = {"aws-iam": []}
+        manager._clients = {"billing-service": MagicMock()}
+        manager._tools_by_server = {"billing-service": []}
 
-        result = manager.disconnect_server_sync("aws-iam")
+        result = manager.disconnect_server_sync("billing-service")
         assert result == "disconnected"
-        assert "aws-iam" not in manager._clients
+        assert "billing-service" not in manager._clients
 
     def test_disconnect_server_sync_no_loop_not_connected(self) -> None:
         """Should return 'not connected' when no loop and server not in clients."""
