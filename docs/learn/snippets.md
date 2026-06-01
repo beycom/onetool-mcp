@@ -134,7 +134,7 @@ __run :pkg_npm packages=react,typescript,vite
 __run :mem_s q=authentication patterns
 
 # Enable a configured proxy server for this session
-__run :server_on name=github
+__run :server_on name=playwright
 ```
 
 ## Defining Your Own Snippets

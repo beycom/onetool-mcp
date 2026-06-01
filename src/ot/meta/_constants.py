@@ -13,7 +13,6 @@ ServerInfoLevel = Literal["min", "default", "full", "resources", "prompts"]
 PACK_NAME = "ot"
 
 DOC_BASE_URL = "https://onetool.beycom.online/reference/tools/"
-SERVER_DOC_BASE_URL = "https://onetool.beycom.online/reference/servers/"
 
 
 def safe_server_name(server_name: str) -> str:

@@ -6,7 +6,6 @@ from typing import Any
 
 from ot.meta._constants import (
     DOC_BASE_URL,
-    SERVER_DOC_BASE_URL,
     InfoLevel,
 )
 from ot.meta._constants import (
@@ -73,7 +72,7 @@ def _format_general_help() -> str:
   ot.status()                   - Check runtime status
   ot.help(query="task")         - Find right tool for goal
   ot.servers()                  - Check MCP proxy server status
-  ot_servers.enable(name="github") - Enable disconnected server
+  ot_servers.enable(name="playwright") - Enable disconnected server
   ot.tool_info(name="pack.tool") - Confirm signature + args
 
 ## Discovery
@@ -116,7 +115,6 @@ def _is_server_intent_query(query: str) -> bool:
         "connect",
         "connection",
         "disconnected",
-        "github",
         "playwright",
         "chrome_devtools",
     )
@@ -181,7 +179,7 @@ Snippet values are plain strings until the template renders Python.
   ot.servers()                   - check proxy server status
 
 Do not guess tool names, argument names, or allowed values. If they are unknown, inspect first.
-For a known disconnected proxy server, run `ot_servers.enable(name='github')` then retry once."""
+For a known disconnected proxy server, run `ot_servers.enable(name='playwright')` then retry once."""
 
 
 def _format_tool_help(tool_info: dict[str, Any], pack: str) -> str:
@@ -371,7 +369,6 @@ def _format_server_help(
     source = getattr(server_cfg, "source", None)
     if source:
         lines.append(f"**Source:** {source}")
-    lines.append(f"**Guide:** {SERVER_DOC_BASE_URL}{server_name}/")
     lines.append("")
 
     # Layer instructions: native MCP first, then servers.yaml additions
@@ -512,9 +509,9 @@ def _format_search_results(
         lines.append("")
         if _is_server_intent_query(query):
             lines.append("Try proxy recovery:")
-            lines.append("  ot_servers.enable(name=\"github\")  - Enable + connect known server")
+            lines.append("  ot_servers.enable(name=\"playwright\")  - Enable + connect known server")
             lines.append("  ot.servers()                       - Use only if server name/status unknown")
-            lines.append("  ot.help(query=\"github\")      - See server tools + guidance")
+            lines.append("  ot.help(query=\"playwright\")  - See server tools + guidance")
             lines.append("")
         lines.append("Try browsing with:")
         lines.append("  ot.tools()    - List all tools")

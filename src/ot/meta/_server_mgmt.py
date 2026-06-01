@@ -66,8 +66,8 @@ def server(
     Example:
         ot.server()                           # list all servers
         ot.server(status="devtools")          # show status for devtools
-        ot_servers.enable(name="github")      # enable + connect a server
-        ot_servers.disable(name="github")     # disable + disconnect
+        ot_servers.enable(name="playwright")  # enable + connect a server
+        ot_servers.disable(name="playwright") # disable + disconnect
         ot_servers.restart(name="playwright") # reconnect server
     """
     from ot.meta._server_services import server as _server

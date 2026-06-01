@@ -59,9 +59,6 @@ Edit `~/.onetool/secrets.yaml` to add your API keys:
 # Get your key at: https://console.anthropic.com/
 # ANTHROPIC_API_KEY: "sk-ant-..."
 
-# GitHub token for GitHub MCP server
-# Get your token at: https://github.com/settings/tokens
-# GITHUB_TOKEN: "ghp_xxxxxxxxxxxxxxxxxxxx"
 ```
 
 Uncomment and add keys for the tools you want to use.

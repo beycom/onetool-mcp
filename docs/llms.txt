@@ -61,7 +61,6 @@ Source of truth: `src/ot/config/global_templates/prompts.yaml` (`prompts.packs`)
 - Extending: `docs/learn/extension-tools.md`
 - Tool Reference: `docs/reference/tools/`
 - CLI Reference: `docs/reference/cli/`
-- Server Reference: `docs/reference/servers/`
 
 ## Adding Tools
 

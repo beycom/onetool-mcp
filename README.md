@@ -173,18 +173,20 @@ Wrap any existing MCP server and call it explicitly - simple yaml config without
 ```yaml
 # .onetool/onetool.yaml
 servers:
-  chrome_devtools:
+  local_tools:
     type: stdio
     command: npx
-    args: ["-y", "@anthropic-ai/chrome-devtools-mcp@latest"]
-  github:
-    type: stdio
-    command: npx
-    args: ["-y", "@anthropic-ai/github-mcp-server@latest"]
+    args: ["-y", "some-mcp-server@latest"]
+  private_api:
+    type: http
+    url: ${PRIVATE_MCP_URL}
+    auth:
+      type: bearer
+      token: ${PRIVATE_MCP_TOKEN}
 ```
 
 ```python
-__run mcp.call(server="github", tool="get_file_contents", arguments={"path": "README.md"})
+__run private_api.read_resource(path="README.md")
 ```
 
 [📖 Configuration guide](https://onetool.beycom.online/learn/configuration/#external-mcp-servers)

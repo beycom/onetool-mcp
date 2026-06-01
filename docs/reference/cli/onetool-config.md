@@ -366,26 +366,26 @@ Local MCP servers running as subprocesses:
 
 ```yaml
 servers:
-  github:
+  local_tools:
     type: stdio
     command: npx
-    args: ["-y", "@anthropic-ai/github-mcp-server@latest"]
+    args: ["-y", "some-mcp-server@latest"]
     timeout: 30
 
-  chrome_devtools:
+  browser_tools:
     type: stdio
     command: npx
-    args: ["-y", "@anthropic-ai/chrome-devtools-mcp@latest"]
+    args: ["-y", "browser-mcp-server@latest"]
 
-  aws:
+  docs_tools:
     type: stdio
     command: uvx
-    args: ["awslabs.core-mcp-server@latest"]
-    tool_prefix: "aws_"      # Strip this prefix so aws_knowledge.search() → knowledge.search()
+    args: ["docs-mcp-server"]
+    tool_prefix: "docs_"     # Strip this prefix so docs_search.query() → search.query()
     inherit_env: true
 ```
 
-**`tool_prefix`:** When set, callers may omit the prefix. For example, with `tool_prefix: "aws_"` you can call `knowledge.search_documentation()` instead of `aws_knowledge.search_documentation()`. Prefix stripping is resolved automatically at call time.
+**`tool_prefix`:** When set, callers may omit the prefix. For example, with `tool_prefix: "docs_"` you can call `search.query()` instead of `docs_search.query()`. Prefix stripping is resolved automatically at call time.
 
 ### HTTP Servers
 
@@ -400,20 +400,20 @@ servers:
     timeout: 30
 
   # HTTP server with Bearer token authentication
-  github:
+  private_api:
     type: http
-    url: https://api.githubcopilot.com/mcp/
+    url: ${PRIVATE_MCP_URL}
     auth:
       type: bearer
-      token: ${GITHUB_TOKEN}  # Expands from secrets.yaml
+      token: ${PRIVATE_MCP_TOKEN}  # Expands from secrets.yaml
     headers:
       Accept: "application/json, text/event-stream"
     timeout: 120
 
   # HTTP server with OAuth 2.1 + PKCE
-  context7:
+  docs_api:
     type: http
-    url: https://mcp.context7.com/mcp
+    url: https://docs-api.local/mcp
     auth:
       type: oauth
       scopes: [tools:read, tools:write]

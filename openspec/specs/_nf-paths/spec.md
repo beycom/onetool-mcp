@@ -229,7 +229,7 @@ The paths module SHALL provide access to global template configuration files for
 - **THEN** it SHALL contain:
   - `onetool.yaml` (commented template with all options)
   - `snippets.yaml` (example snippets as comments)
-  - `servers.yaml` (example MCP server configs as comments)
+  - `servers.yaml` (supported browser MCP integration templates)
   - `secrets-template.yaml` (API key placeholders, copied as `secrets.yaml`)
   - `bench.yaml` (bench config template)
   - `bench-secrets-template.yaml` (bench secrets, copied as `bench-secrets.yaml`)

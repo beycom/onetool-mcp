@@ -442,7 +442,7 @@ class TestFormatServerHelp:
         return t
 
     def test_basic_output(self) -> None:
-        """Heading, status, and guide are always present."""
+        """Heading and status are always present."""
         from ot.meta._help_formatting import _format_server_help
 
         cfg = _make_server_cfg()
@@ -450,7 +450,7 @@ class TestFormatServerHelp:
 
         assert "# github server" in result
         assert "**Status:** disconnected" in result
-        assert "**Guide:**" in result
+        assert "**Guide:**" not in result
 
     def test_call_as_shown_for_hyphen_name(self) -> None:
         """Call-as line appears when server name contains hyphens."""

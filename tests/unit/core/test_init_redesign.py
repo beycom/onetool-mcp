@@ -129,17 +129,20 @@ def test_copy_servers_yaml_subset(tmp_path: Path) -> None:
 @pytest.mark.unit
 @pytest.mark.core
 def test_copy_servers_yaml_all(tmp_path: Path) -> None:
-    """All servers materialised when all known names requested."""
+    """Only shipped server templates are materialised when requested."""
     from onetool.cli import _copy_servers_yaml
 
     ot_dir = tmp_path / ".onetool"
     ot_dir.mkdir()
 
-    _copy_servers_yaml(ot_dir, ["chrome_devtools", "playwright", "github"])
+    _copy_servers_yaml(ot_dir, ["chrome_devtools", "playwright", "github", "azure"])
 
     data = yaml.safe_load((ot_dir / "servers.yaml").read_text())
     servers = data.get("servers", {})
-    assert len(servers) == 3
+    assert set(servers) == {"chrome_devtools", "playwright"}
+    assert "github" not in servers
+    assert "azure" not in servers
+    assert "chunkhound" not in servers
 
 
 @pytest.mark.unit

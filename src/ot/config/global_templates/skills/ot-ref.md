@@ -29,7 +29,7 @@ Param prefixes:
 
 ## Proxy Server Recovery
 
-- Known disconnected server: `ot_servers.enable(name='github')` then retry once.
+- Known disconnected server: `ot_servers.enable(name='playwright')` then retry once.
 - Unknown server name/status: `ot.servers()` first, then enable.
 - Discovery stays read-only in `ot.*`; state changes are in `ot_servers.*`.
 

@@ -109,7 +109,7 @@ class TestHelp:
         )
 
         assert "ot.servers()" in result
-        assert "ot_servers.enable(name=\"github\")" in result
+        assert "ot_servers.enable(name=\"playwright\")" in result
 
     @pytest.mark.parametrize("query", ["__run", "__r", "__ot", "run", "direct command", "snippet"])
     def test_direct_run_queries_return_invocation_help(self, query: str) -> None:

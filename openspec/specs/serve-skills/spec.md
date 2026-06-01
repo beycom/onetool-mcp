@@ -86,8 +86,3 @@ The system SHALL bundle an initial set of skills for on-demand discovery and ser
 - **WHEN** `ot.skills()` is called
 - **THEN** `ot-playwright-mcp` SHALL be listed
 - **AND** its content SHALL cover the Playwright MCP server tools and usage patterns
-
-#### Scenario: ot-github-mcp skill bundled
-- **WHEN** `ot.skills()` is called
-- **THEN** `ot-github-mcp` SHALL be listed
-- **AND** its content SHALL cover the GitHub MCP server tools and usage patterns

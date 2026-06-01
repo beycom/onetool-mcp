@@ -15,7 +15,7 @@ prompts:
         Snippets: `__run :name key=value` (expanded server-side).
         Discovery: `ot.help(query='topic')`, `ot.tool_info(name='pack.tool')`.
         Do not guess tool names, parameter names, or allowed values. If the exact tool, parameters, or allowed values are unknown, inspect first with `ot.tool_info(name='pack.tool')` or `ot.help(query='...')`.
-        Proxy recovery: if known disconnected server, `ot_servers.enable(name='github')` then retry once. If server name/status unknown, use `ot.servers()` first.
+        Proxy recovery: if known disconnected server, `ot_servers.enable(name='playwright')` then retry once. If server name/status unknown, use `ot.servers()` first.
         Intent mapping: treat "use ot pack.tool(...)", "use ot :name ...", and "use ot name snippet ..." as explicit run requests mapped to direct `pack.tool(...)` or `:name ...` commands.
         Connected-agent preference: call this MCP tool as `run(command='<code>')`; do not use the `onetool` CLI or local Python for direct tool calls. Use local scripts only for heavy repo/file transformations, then call OneTool for high-level pack operations.
 

@@ -24,16 +24,16 @@ Short alias: `srv`
 
 ```python
 # Enable on demand for this session
-ot_servers.enable(name="github")
+ot_servers.enable(name="playwright")
 
 # Inspect one server
-ot_servers.status(name="github")
+ot_servers.status(name="playwright")
 
 # Reconnect after failure
-ot_servers.restart(name="github")
+ot_servers.restart(name="playwright")
 
 # Disable when done
-ot_servers.disable(name="github")
+ot_servers.disable(name="playwright")
 ```
 
 ## Notes

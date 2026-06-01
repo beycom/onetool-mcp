@@ -318,7 +318,7 @@ snippets:
   server_on:
     description: Enable and connect a configured MCP proxy server
     params:
-      name: { description: "Configured server name, such as github" }
+      name: { description: "Configured server name, such as playwright" }
     body: |
       __format__="yml_h";__sanitize__=False
       ot_servers.enable(name={{ name | tojson }})
@@ -326,7 +326,7 @@ snippets:
   server_off:
     description: Disable a configured MCP proxy server
     params:
-      name: { description: "Configured server name, such as github" }
+      name: { description: "Configured server name, such as playwright" }
     body: |
       __format__="yml_h";__sanitize__=False
       ot_servers.disable(name={{ name | tojson }})

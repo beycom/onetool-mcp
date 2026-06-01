@@ -67,6 +67,11 @@ When an include path is not found in the config dir, the system SHALL fall back 
 - **THEN** `global_templates/servers.yaml` SHALL be loaded as the fallback
 - **AND** an INFO log message SHALL record that the package default was used
 
+#### Scenario: Default proxy server set
+- **WHEN** the package-level `servers.yaml` fallback is loaded
+- **THEN** it SHALL include only proxy servers that work from documented default setup paths
+- **AND** it SHALL NOT include ChunkHound because it requires separate installation, indexing, and embedding configuration before use.
+
 #### Scenario: Absolute include path — no fallback
 - **GIVEN** `include: /absolute/path/to/file.yaml`
 - **AND** the file does not exist
@@ -376,12 +381,12 @@ The system SHALL support configuration for proxying external MCP servers.
 - **GIVEN** configuration with:
   ```yaml
   servers:
-    github:
+    api_server:
       type: http
-      url: https://api.githubcopilot.com/mcp/
+      url: https://mcp.internal.local/mcp
       auth:
         type: bearer
-        token: ${GITHUB_TOKEN}
+        token: ${API_SERVER_TOKEN}
   ```
 - **WHEN** the server starts
 - **THEN** it SHALL expand `${VAR}` in token using secrets.yaml values
@@ -404,12 +409,12 @@ The system SHALL support configuration for proxying external MCP servers.
 - **GIVEN** configuration with:
   ```yaml
   servers:
-    github:
+    local_docs:
       type: stdio
       command: npx
-      args: ["-y", "@modelcontextprotocol/server-github"]
+      args: ["-y", "@modelcontextprotocol/server-everything"]
       env:
-        GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_TOKEN}
+        DOCS_API_TOKEN: ${DOCS_API_TOKEN}
   ```
 - **WHEN** the server starts
 - **THEN** it SHALL spawn the subprocess and connect via stdio
@@ -878,41 +883,40 @@ The system SHALL support logging settings in YAML config and environment variabl
 - **AND** the env var SHALL take priority over `compact_max_length` in YAML
 - **AND** non-integer values SHALL be ignored (config default used instead)
 
-### Removed: Remote GitHub MCP Server Configuration
+### Removed: Curated External MCP Server Configuration
 
-The system SHALL support configuration for the Remote GitHub MCP Server as a documented example.
+The system SHALL support configuration for a specific third-party remote MCP server as a documented shipped example.
 
-#### Scenario: Remote GitHub MCP server via HTTP
+#### Scenario: Remote third-party MCP server via HTTP
 - **GIVEN** configuration with:
   ```yaml
   servers:
-    github:
+    api_server:
       type: http
-      url: https://api.githubcopilot.com/mcp/
+      url: https://mcp.internal.local/mcp
       headers:
-        Authorization: Bearer ${GITHUB_TOKEN}
-        X-GitHub-Api-Version: "2022-11-28"
+        Authorization: Bearer ${API_SERVER_TOKEN}
   ```
 - **WHEN** the server starts
-- **THEN** it SHALL connect to GitHub's hosted MCP server
-- **AND** expose GitHub tools via the `github` pack
+- **THEN** it SHALL connect to the configured MCP server
+- **AND** expose server tools via the configured server pack
 
-#### Scenario: GitHub Enterprise Cloud with data residency
+#### Scenario: Vendor-specific endpoint
 - **GIVEN** configuration with:
   ```yaml
   servers:
-    github:
+    regional_api:
       type: http
-      url: https://copilot-api.octocorp.ghe.com/mcp/
+      url: https://mcp.region.internal.local/mcp/
       headers:
-        Authorization: Bearer ${GITHUB_TOKEN}
+        Authorization: Bearer ${REGIONAL_API_TOKEN}
   ```
 - **WHEN** the server starts
-- **THEN** it SHALL connect to the enterprise-specific endpoint
+- **THEN** it SHALL connect to the configured endpoint
 
-#### Scenario: GitHub token from secrets file
-- **GIVEN** `secrets.yaml` contains `GITHUB_TOKEN: ghp_xxx`
-- **AND** server config references `${GITHUB_TOKEN}`
+#### Scenario: Server token from secrets file
+- **GIVEN** `secrets.yaml` contains `API_SERVER_TOKEN: secret-value`
+- **AND** server config references `${API_SERVER_TOKEN}`
 - **WHEN** the server starts
 - **THEN** the token SHALL be expanded from secrets
 
@@ -945,15 +949,15 @@ The system SHALL support a top-level `include:` key for merging external config 
 - **GIVEN** configuration with:
   ```yaml
   include:
-    - base.yaml  # contains servers: {github: {...}}
+    - base.yaml  # contains servers: {api_server: {...}}
   servers:
-    github:
+    api_server:
       timeout: 120  # override
     local:
       type: stdio   # addition
   ```
 - **WHEN** the config is loaded
-- **THEN** inline `servers.github` SHALL override included `servers.github`
+- **THEN** inline `servers.api_server` SHALL override included `servers.api_server`
 - **AND** inline `servers.local` SHALL be added
 
 #### Scenario: Deep merge nested dicts
@@ -1376,30 +1380,28 @@ The system SHALL support a root-level `env:` section for shared subprocess envir
 - **WHEN** a stdio server is spawned
 - **THEN** subprocess SHALL receive only `PATH` plus server-specific env
 
-### Removed: DevTools Server Template Documentation
+### Requirement: Shipped Browser Server Templates
 
-The `servers.yaml` global template SHALL include comprehensive inline documentation for the Chrome DevTools MCP server entry.
+The `servers.yaml` global template SHALL include active entries only for OneTool-supported browser integration servers used by bundled packs.
 
-#### Scenario: Connection mode comments
-- **GIVEN** a user reading the DevTools section of `servers.yaml`
-- **WHEN** they inspect the comments
-- **THEN** they find descriptions of isolated mode (default), remote mode (advanced), and autoConnect mode (experimental)
-- **AND** instructions for switching between modes
+#### Scenario: Supported browser integrations included
+- **GIVEN** the package-level `servers.yaml` fallback is loaded
+- **WHEN** the template is parsed
+- **THEN** it SHALL include `chrome_devtools`
+- **AND** it SHALL include `playwright`
 
-#### Scenario: Remote mode setup instructions
-- **GIVEN** a user wanting to use remote mode
-- **WHEN** they read the DevTools section comments
-- **THEN** they find platform-specific Chrome launch commands for macOS, Linux, and Windows
-- **AND** a verification command (`curl http://localhost:9222/json/version`)
-- **AND** a note about `--user-data-dir` being required since Chrome 136+
+#### Scenario: Generic third-party presets omitted
+- **GIVEN** the package-level `servers.yaml` fallback is loaded
+- **WHEN** the template is parsed
+- **THEN** it SHALL NOT include generic third-party presets such as `github` or `azure`
+- **AND** it SHALL NOT include commented setup blocks for those presets
 
-#### Scenario: Element highlighting reference
-- **GIVEN** a user wanting to use element annotations via Chrome DevTools
-- **WHEN** they read the DevTools section comments
-- **THEN** they find a quick reference for `chrome_util` functions (inject, highlight, scan, clear)
-- **AND** a note about Ctrl+I / Cmd+I for manual annotation
+#### Scenario: Arbitrary user servers still supported
+- **GIVEN** a user-owned `servers.yaml` includes an arbitrary MCP server
+- **WHEN** OneTool loads configuration
+- **THEN** the configured server SHALL remain available through the generic MCP proxy mechanism
 
-### Removed: Playwright Server Template
+### Removed: Commented Playwright Server Template
 
 The `servers.yaml` global template SHALL include a commented-out Playwright MCP server entry.
 

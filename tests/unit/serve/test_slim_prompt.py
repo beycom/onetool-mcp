@@ -143,6 +143,7 @@ def test_servers_yaml_has_source_field() -> None:
 
     data = yaml.safe_load(content) or {}
     servers = data.get("servers", {})
+    assert "chunkhound" not in servers
 
     for name, cfg in servers.items():
         if isinstance(cfg, dict):

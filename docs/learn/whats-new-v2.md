@@ -61,7 +61,7 @@ __run chrome_util.scan_annotations()
 
 ### skills — Bundled skill guides
 
-v1 supported user-defined skill files but they were fragile and hard to maintain. v2 replaces them with curated, bundled skill guides covering AWS, Chrome DevTools, Playwright, and more. These are structured Markdown documents that give your LLM the context it needs to use external MCP servers correctly — no manual setup required.
+v1 supported user-defined skill files but they were fragile and hard to maintain. v2 replaces them with curated, bundled skill guides. These are structured Markdown documents that give your LLM focused context on demand.
 
 ```text
 __run skills.skills()                     # list all skills
