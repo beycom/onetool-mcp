@@ -81,6 +81,13 @@ The project SHALL document all tools at `docs/reference/tools/`.
 - **GIVEN** a user at `reference/tools/index.md`
 - **WHEN** they scan the page
 - **THEN** they find a table of all packs with links to individual docs
+- **AND** they find a link to the generated Tool Index
+
+#### Scenario: Generated Tool Index
+- **GIVEN** a user at `reference/tools/tool-index.md`
+- **WHEN** they scan the page
+- **THEN** they find a generated compact list of all tool signatures
+- **AND** each listed tool includes a short inline description
 
 #### Scenario: Individual tool docs
 - **GIVEN** each tool pack
@@ -441,47 +448,6 @@ The project SHALL provide task-oriented extension documentation in `docs/learn/e
 - **THEN** they find a brief overview of extension documentation
 - **AND** links to the extension tool guide
 
-### Requirement: Chrome DevTools Guide
+### Removed: Public Server Reference Guides
 
-The project SHALL provide Chrome DevTools MCP guidance in `docs/reference/servers/chrome-devtools.md`.
-
-#### Scenario: Quick start section
-- **GIVEN** a user wanting to try Chrome DevTools MCP
-- **WHEN** they read the Quick Start section
-- **THEN** they find a 3-command example that launches a browser, takes a screenshot, and highlights an element
-- **AND** no prior configuration is required
-
-#### Scenario: Connection modes documented
-- **GIVEN** a user needing to understand connection options
-- **WHEN** they read the Connection Modes section
-- **THEN** they find isolated mode (default), remote mode (advanced), and autoConnect mode (experimental)
-- **AND** a comparison table showing setup complexity, session persistence, bot detection, and security risk
-- **AND** platform-specific setup commands for remote mode (macOS, Linux, Windows)
-
-#### Scenario: Element highlighting documented
-- **GIVEN** a user wanting to use element annotation
-- **WHEN** they read the Element Highlighting section
-- **THEN** they find how to inject the annotation tool
-- **AND** how Claude can highlight elements programmatically
-- **AND** how users can annotate elements manually (Ctrl+I / Cmd+I)
-- **AND** the API reference for `chrome_util` functions (Chrome DevTools)
-- **AND** the API reference for `play_util` functions (Playwright)
-- **AND** a note that the two packs are independent — each targets its own MCP server with no fallback between them
-
-#### Scenario: Common tasks documented
-- **GIVEN** a user wanting to accomplish a specific task
-- **WHEN** they read the Common Tasks section
-- **THEN** they find at least 5 task walkthroughs with copy-paste code examples
-- **AND** each task includes goal, prerequisites, steps, and common issues
-
-#### Scenario: Troubleshooting documented
-- **GIVEN** a user experiencing issues
-- **WHEN** they read the Troubleshooting section
-- **THEN** they find issues organised by symptom (not cause)
-- **AND** each issue includes diagnostic commands and solutions
-
-#### Scenario: FAQ documented
-- **GIVEN** a user with common questions
-- **WHEN** they read the FAQ section
-- **THEN** they find answers to at least 8 common questions
-- **AND** answers include code examples where relevant
+The project SHALL provide curated MCP server setup guides as public reference pages.

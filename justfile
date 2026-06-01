@@ -112,6 +112,7 @@ docs-serve *args:
 # Sync generated docs blocks and validate index counts against runtime registry
 docs-sync:
     uv run python scripts/sync_docs_generated.py
+    uv run python scripts/list_tool_inventory.py --tool-descriptions
     uv run python scripts/check_docs_registry.py
 
 # Stop the documentation server

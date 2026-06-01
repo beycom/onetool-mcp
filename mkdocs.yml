@@ -160,6 +160,7 @@ nav:
           - onetool direct: reference/cli/onetool-direct.md
       - Tools:
           - reference/tools/index.md
+          - Tool Index: reference/tools/tool-index.md
           - OT Tools:
               - OT Context: reference/tools/ot_context.md
               - OT Core: reference/tools/ot_core.md

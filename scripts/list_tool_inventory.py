@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Print a compact inventory of OneTool packs, tools, and arguments."""
+"""Print a compact Tool Index of OneTool packs, tools, and arguments."""
 
 from __future__ import annotations
 
@@ -54,8 +54,18 @@ def _description_by_arg(detail: dict[str, Any]) -> dict[str, str]:
     return descriptions
 
 
+def _short_description(description: Any) -> str:
+    """Return the first non-empty line of a description."""
+    for line in str(description or "").splitlines():
+        line = line.strip()
+        if line:
+            return line
+    return ""
+
+
 def _tool_inventory(
     *,
+    include_tool_descriptions: bool,
     include_descriptions: bool,
 ) -> list[dict[str, Any]]:
     from ot.meta import pack_info, packs, tool_info
@@ -68,7 +78,8 @@ def _tool_inventory(
             continue
 
         pack_name = str(pack_row["name"])
-        details = tool_info(pattern=f"{pack_name}.", info="min")
+        details_info = "default" if include_tool_descriptions else "min"
+        details = tool_info(pattern=f"{pack_name}.", info=details_info)
         detail_rows = [details] if isinstance(details, dict) else details
 
         tools: list[dict[str, Any]] = []
@@ -80,6 +91,8 @@ def _tool_inventory(
                 "short_name": name.removeprefix(f"{pack_name}."),
                 "args": args,
             }
+            if include_tool_descriptions:
+                tool_row["description"] = _short_description(detail.get("description"))
             if include_descriptions:
                 tool_row["arg_descriptions"] = _description_by_arg(detail)
             tools.append(tool_row)
@@ -99,11 +112,16 @@ def _tool_inventory(
     return inventory
 
 
-def _format_text(inventory: list[dict[str, Any]], *, include_descriptions: bool) -> str:
+def _format_text(
+    inventory: list[dict[str, Any]],
+    *,
+    include_tool_descriptions: bool,
+    include_descriptions: bool,
+) -> str:
     lines: list[str] = []
     pack_count = len(inventory)
     tool_count = sum(len(pack["tools"]) for pack in inventory)
-    lines.append("# OneTool MCP Tool Inventory")
+    lines.append("# OneTool MCP Tool Index")
     lines.append("")
     lines.append(f"packs={pack_count} tools={tool_count}")
 
@@ -115,7 +133,10 @@ def _format_text(inventory: list[dict[str, Any]], *, include_descriptions: bool)
         lines.append(f"\n## {heading}")
         lines.append("```python")
         for tool in tools:
-            lines.append(f"{tool['name']}({tool['args']})")
+            line = f"{tool['name']}({tool['args']})"
+            if include_tool_descriptions and tool.get("description"):
+                line = f"{line}  # {tool['description']}"
+            lines.append(line)
             if include_descriptions:
                 for arg, description in tool.get("arg_descriptions", {}).items():
                     lines.append(f"# {arg}: {description}")
@@ -132,7 +153,7 @@ def main() -> int:
     logger.remove()
 
     parser = argparse.ArgumentParser(
-        description="Output OneTool packs, tools, and args in a compact format."
+        description="Output OneTool packs, tools, and args as a compact Tool Index."
     )
     parser.add_argument(
         "--config",
@@ -153,6 +174,11 @@ def main() -> int:
         help="Output format.",
     )
     parser.add_argument(
+        "--tool-descriptions",
+        action="store_true",
+        help="Include one-line tool descriptions.",
+    )
+    parser.add_argument(
         "--descriptions",
         action="store_true",
         help="Include argument descriptions. More complete, less token efficient.",
@@ -160,7 +186,7 @@ def main() -> int:
     parser.add_argument(
         "--output",
         type=Path,
-        default=ROOT / "onetool-mcp.md",
+        default=ROOT / "docs" / "reference" / "tools" / "tool-index.md",
         help="Output file path. Use '-' for stdout.",
     )
     args = parser.parse_args()
@@ -168,11 +194,18 @@ def main() -> int:
     config = args.config or _default_config()
     get_config(config, reload=True, secrets_path=args.secrets)
 
-    inventory = _tool_inventory(include_descriptions=args.descriptions)
+    inventory = _tool_inventory(
+        include_tool_descriptions=args.tool_descriptions,
+        include_descriptions=args.descriptions,
+    )
     if args.format == "json":
         output = json.dumps(inventory, separators=(",", ":"), sort_keys=True)
     else:
-        output = _format_text(inventory, include_descriptions=args.descriptions)
+        output = _format_text(
+            inventory,
+            include_tool_descriptions=args.tool_descriptions,
+            include_descriptions=args.descriptions,
+        )
 
     if str(args.output) == "-":
         print(output)
