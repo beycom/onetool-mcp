@@ -122,19 +122,19 @@ class TestServersDefaultRedesign:
 
         assert "type" not in result[0]
 
-    def test_aws_server_call_as_uses_generic_underscore_alias(self) -> None:
-        """aws-iam → call_as = 'aws_iam'."""
+    def test_hyphenated_server_call_as_uses_generic_underscore_alias(self) -> None:
+        """billing-service -> call_as = 'billing_service'."""
         from ot.meta import servers
 
         proxy = _make_proxy()
         cfg = MagicMock()
-        cfg.servers = {"aws-iam": _make_server_cfg()}
+        cfg.servers = {"billing-service": _make_server_cfg()}
 
         with patch("ot.meta._discovery.get_proxy_manager", return_value=proxy):
             with patch("ot.meta._discovery.get_config", return_value=cfg):
                 result = servers(info="default")
 
-        assert result[0]["call_as"] == "aws_iam"
+        assert result[0]["call_as"] == "billing_service"
 
 
 @pytest.mark.unit
@@ -285,9 +285,9 @@ class TestPackProxyRegistrationWarning:
         user_warnings = [w for w in caught if issubclass(w.category, UserWarning)]
         assert len(user_warnings) == 0
 
-    def test_aws_server_warns_like_any_hyphenated_server(self) -> None:
-        """aws-* servers use the same generic hyphen warning."""
-        _, caught = self._build_namespace(["aws-iam"])
+    def test_hyphenated_server_warns(self) -> None:
+        """Hyphenated servers emit the generic hyphen warning."""
+        _, caught = self._build_namespace(["billing-service"])
         assert any(issubclass(w.category, UserWarning) for w in caught)
 
 

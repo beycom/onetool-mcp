@@ -1,6 +1,6 @@
 # OneTool MCP Tool Index
 
-packs=29 tools=263
+packs=28 tools=246
 
 ## arch
 ```python
@@ -9,27 +9,6 @@ arch.export_yaml(input_path: str, output_path: str)  # Export Excel entity sheet
 arch.generate(input_path: str, output_dir: str | None=None, profile: str | None=None, profile_yaml: str | None=None, title: str | None=None, include_tags: list[str] | None=None, exclude_tags: list[str] | None=None)  # Generate architecture outputs from workbook input.
 arch.import_yaml(input_path: str, template_path: str, output_path: str)  # Import YAML entities into a template workbook.
 arch.validate(input_path: str)  # Validate architecture workbook input.
-```
-
-## aws
-```python
-aws.arn(arn_string: str)  # Parse an AWS ARN string into its components.
-aws.attributes(service: str)  # Return filterable attribute names for an AWS pricing service.
-aws.check(profile: str | None=None)  # Validate active AWS credentials and return a health report.
-aws.login(profile: str | None=None)  # Initiate an AWS SSO login flow and block until complete.
-aws.mfa(profile: str, token: str)  # Obtain a temporary MFA session and write it to ~/.aws/credentials.
-aws.packs()  # List currently connected AWS MCP sub-servers with tool counts and doc links.
-aws.profile()  # Return the active profile, region, account ID, and account alias.
-aws.profiles()  # Return all configured AWS profile names.
-aws.refresh_packs()  # Restart all active AWS stdio servers with current credentials.
-aws.regions(service: str='ec2')  # Return available regions for an AWS service.
-aws.roles()  # List all available roles with their server lists.
-aws.services(filter: str | None=None, limit: int=100)  # List AWS service codes from the Pricing API.
-aws.start_packs(role: str | None=None, pack: str | list[str] | None=None)  # Connect AWS MCP sub-servers without disrupting existing connections.
-aws.stop_packs(role: str | None=None, pack: str | list[str] | None=None)  # Disconnect AWS MCP sub-servers without affecting other connections.
-aws.use(profile: str, region: str | None=None)  # Switch the active AWS profile and restart active stdio AWS sub-servers.
-aws.values(service: str, attribute: str)  # Return valid values for a pricing attribute.
-aws.whoami()  # Return the current caller identity via STS GetCallerIdentity.
 ```
 
 ## brave, br

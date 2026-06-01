@@ -6,19 +6,6 @@ This guide covers what you gain in OneTool MCP v2, followed by upgrade steps and
 
 These packs are entirely new in v2.
 
-### aws — Dynamic proxy to all 57+ official AWSlabs MCP servers `[dev]`
-
-AWS publishes 57 official MCP servers (awslabs) covering everything from S3 and Lambda to Bedrock and Cost Explorer. Without OneTool, using even one of them means paying the full tool tax on every request — and configuring credentials, profiles, SSO, and MFA manually for each. This pack gives you dynamic access to all 57 through a single interface with a fixed, minimal token footprint. Pick servers individually or activate curated role-based bundles (finops, security, compute, data, ml, and 13 more). Credential pre-flight, SSO login, MFA sessions, and profile switching are all handled automatically.
-
-```text
-__run aws_util.whoami()
-__run aws_util.login(profile="dev")
-__run aws_util.start_packs(role="finops")
-__run aws_util.profiles()
-```
-
-Also provides `check`, `use`, `mfa`, `roles`, `packs`, `stop_packs`, `refresh_packs`, `services`, `regions`, `arn`, `attributes`, and `values`.
-
 ### whiteboard (excalidraw) — Live whiteboard `[dev]`
 
 Turns Excalidraw into a tool-driven canvas. Agents can generate architecture diagrams, flowcharts, and sketches using a Mermaid-compatible DSL, then screenshot or save the result — all without manual drawing. Useful for visual planning, documentation, and sharing ideas that are easier to show than describe.
@@ -65,7 +52,7 @@ v1 supported user-defined skill files but they were fragile and hard to maintain
 
 ```text
 __run skills.skills()                     # list all skills
-__run skills.skills(name="ot-aws-mcp")   # get full skill content
+__run skills.skills(name="ot-ref")       # get full skill content
 ```
 
 ### ot_secrets — Secret encryption
@@ -282,7 +269,7 @@ In v1, all tools shipped in a single install. v2 splits heavy-dependency packs i
 | Extra    | Packs                                                                              |
 | -------- | ---------------------------------------------------------------------------------- |
 | `[util]` | brave, convert, excel, file, ground, mem                                           |
-| `[dev]`  | aws, context7, db, diagram, package, ripgrep, webfetch, whiteboard, and browser utils |
+| `[dev]`  | context7, db, diagram, package, ripgrep, webfetch, whiteboard, and browser utils |
 | `[all]`  | Everything                                                                         |
 
 ---
@@ -298,7 +285,7 @@ Or with optional tool packs:
 ```bash
 uv tool install 'onetool-mcp[all]'     # everything
 uv tool install 'onetool-mcp[util]'    # file, convert, excel, brave, ground, mem
-uv tool install 'onetool-mcp[dev]'     # ripgrep, db, webfetch, diagram, aws, ...
+uv tool install 'onetool-mcp[dev]'     # ripgrep, db, webfetch, diagram, ...
 ```
 
 ---
@@ -371,7 +358,7 @@ __ot brave.search(query="test")
 
 ### User-defined skills removed
 
-Custom skill files are no longer supported. Built-in skills (like `ot-aws-mcp`, `ot-ref`) are bundled and retrieved via `ot.skills()`.
+Custom skill files are no longer supported. Built-in skills like `ot-ref` are bundled and retrieved via `ot.skills()`.
 
 ---
 
@@ -381,7 +368,7 @@ Custom skill files are no longer supported. Built-in skills (like `ot-aws-mcp`, 
 
 **Moved to `[util]`:** `openpyxl`, `pymupdf`, `python-docx`, `python-pptx`, `google-genai`, `send2trash`, `pathspec`
 
-**Moved to `[dev]`:** `boto3`, `sqlalchemy`, `trafilatura`, `filelock`, `tabulate`
+**Moved to `[dev]`:** `sqlalchemy`, `trafilatura`, `filelock`, `tabulate`
 
 The base `onetool-mcp` install is significantly lighter. Install `[all]` to get everything back.
 

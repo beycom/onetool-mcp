@@ -1,7 +1,7 @@
 [project]
 name = "onetool-mcp"
 version = "2.2.2"
-description = "🧿 One MCP for developers - No tool tax, no context rot. 100+ tools including Brave, Google, Context7, Excalidraw, AWS, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more."
+description = "🧿 One MCP for developers - No tool tax, no context rot. 100+ tools including Brave, Google, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more."
 mcpName = "io.github.beycom/onetool"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -64,7 +64,6 @@ util = [
 ]
 dev = [
     "beautifulsoup4>=4.14.3",
-    "boto3>=1.42.97",
     "filelock>=3.29.0",
     "lxml>=5.3,<6",
     "markdown>=3.9",

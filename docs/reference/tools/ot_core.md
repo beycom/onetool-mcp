@@ -195,7 +195,7 @@ Returns server information (operational view):
 - `name` - Server name from config
 - `status` - Connection status (connected/disconnected)
 - `enabled` - Whether server is enabled
-- `call_as` - Python-safe identifier (only when name has hyphens, e.g. `aws-iam` → `aws_iam`)
+- `call_as` - Python-safe identifier (only when name has hyphens, e.g. `billing-service` -> `billing_service`)
 - `tool_count` - Number of available tools (only when connected)
 - `error` - Connection error (only when disconnected with error)
 

@@ -27,7 +27,6 @@ Source of truth: `src/ot/config/global_templates/prompts.yaml` (`prompts.packs`)
 |---|---|---|
 | `ot` | `core` | ** Discover tools, packs. Get the help you need to call them correctly. The BEST PLACE to start. ** |
 | `arch` | `[dev]` | Architecture workflows for Excel ingest, validation, generation, round-trip, and bundling |
-| `aws` | `[dev]` | Manage AWS resources — dynamically enable any of their 50+ dedicated MCP tools |
 | `brave` | `[util]` | Search the web, news, and images — fast, private, with batch support |
 | `chrome_util` | `[dev]` | Annotate and highlight page elements via Chrome DevTools |
 | `context7` | `[dev]` | Pull up-to-date docs for any library — React, FastAPI, etc. |

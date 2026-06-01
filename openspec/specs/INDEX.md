@@ -106,7 +106,6 @@ The MCP server that exposes tools for LLM code execution.
 
 | Spec | Purpose |
 |------|---------|
-| [aws-pack](aws-pack/spec.md) | AWS tool pack: credential management, identity queries, ARN utilities, AWS MCP sub-servers |
 | [tool-context7](otdev/tool-context7/spec.md) | Context7 library documentation API |
 | [tool-db](otdev/tool-db/spec.md) | SQL database queries via SQLAlchemy |
 | [tool-diagram](otdev/tool-diagram/spec.md) | Diagram generation |

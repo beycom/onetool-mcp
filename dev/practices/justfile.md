@@ -14,9 +14,12 @@ just dev            # run MCP server in dev mode
 
 ```bash
 just test              # all tests, strict (errors on missing requirements)
+just test [args]       # pass extra pytest args
 just test-lenient      # skip tests with missing requirements
 just test-unit         # unit tests only
-just test-integration  # integration tests only
+just test-int          # integration tests only
+just test-all          # all tests including integration, strict
+just test-setup        # download test data into tests/data/
 just test-coverage     # with HTML coverage report (tmp/htmlcov/)
 ```
 
@@ -35,6 +38,7 @@ just secrets-check # scan for leaked secrets (gitleaks)
 ## Documentation
 
 ```bash
+just docs-sync        # sync generated docs blocks and validate runtime counts
 just docs-serve       # serve docs locally with hot reload (port 8000)
 just docs-serve-stop  # stop docs server
 just docs-build       # build docs (strict mode)
@@ -45,21 +49,23 @@ just docs-deploy      # deploy to GitHub Pages
 ## Build & Release
 
 ```bash
-just build    # build the package (uv build)
-just clean    # clean build artefacts and caches
-just reset-env # recreate .venv from scratch
+just build        # build the package (uv build)
+just build-inject # bundle inject.js annotation script
+just clean        # clean build artefacts and caches
+just reset-env    # recreate .venv from scratch
 ```
 
 ## OneTool
 
 ```bash
-just ot [args]              # run local dev onetool
-just ot --v 1.0.0rc2 init   # run specific published version
-just ot-direct "ot.packs()" # run via repo-local direct API
-just ot-install             # install as global uv tool
-just ot-uninstall           # uninstall global tool
-just ot-list                # list global uv tools
-just ot-inspector           # launch MCP Inspector (MCPJam)
+just ot [args]                    # run local dev onetool
+just ot --v 1.0.0rc2 init         # run specific published version
+just ot-direct "ot.packs()"       # run via repo-local direct API
+just dev [args]                   # run MCP server in development mode
+just ot-install                   # install as global uv tool
+just ot-uninstall                 # uninstall global tool
+just ot-list                      # list global uv tools
+just ot-inspector                 # launch MCP Inspector (MCPJam)
 ```
 
 ## Diagram Server (Kroki)
@@ -76,6 +82,7 @@ just tool-diagram-logs     # view Kroki logs
 ```bash
 just bench::demo::<task>   # run demo tasks
 just release::<task>       # run release tasks
+just eval-caveman [args]   # run caveman skill eval
 ```
 
 ## Key Details
@@ -83,4 +90,3 @@ just release::<task>       # run release tasks
 - All test commands use `uv run pytest` for proper dependency resolution
 - Config caches stored in `tmp/` (.ruff_cache, .mypy_cache, .pytest_cache)
 - Coverage HTML output goes to `tmp/htmlcov/`
-

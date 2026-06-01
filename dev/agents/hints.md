@@ -26,7 +26,7 @@ src/
   ot/           Core framework (executor, config, logging, registry)
   ottools/     Base tool packs
   onetool/      MCP server CLI
-  otdev/        [dev] extra: arch, aws, chrome, context7, db, diagram, package, play, ripgrep, webfetch
+  otdev/        [dev] extra: arch, chrome, context7, db, diagram, package, play, ripgrep, webfetch
   otutil/       [util] extra: brave, convert, ctx, excel, file, ground, knowledge, mem, tavily
 
 packages/

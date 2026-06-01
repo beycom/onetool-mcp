@@ -30,7 +30,7 @@ One tool to rule them all
 ### External Pitch
 
 `🧿 One MCP for developers - No tool tax, no context rot.
-Configured packs can include Brave, Google grounding, Context7, Excalidraw, AWS, Version Checker, Excel, File Ops, Database, Playwright, Chrome utility tools, and more.`
+Configured packs can include Brave, Google grounding, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Playwright, Chrome utility tools, and more.`
 
 ---
 
@@ -67,7 +67,7 @@ Details and methodology: [claims.md](claims.md)
 ## Short Descriptions
 
 ```text
-🧿 One MCP for developers - No tool tax, no context rot. Configured packs can include Brave, Google grounding, Context7, Excalidraw, AWS, Version Checker, Excel, File Ops, Database, Playwright, Chrome utility tools, and more.
+🧿 One MCP for developers - No tool tax, no context rot. Configured packs can include Brave, Google grounding, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Playwright, Chrome utility tools, and more.
 ```
 
 ## GitHub Tags

@@ -507,9 +507,9 @@ class McpServerConfig(BaseModel):
     tool_prefix: str | None = Field(
         default=None,
         description=(
-            "Prefix that this server's tools carry (e.g. 'aws_'). "
+            "Prefix that this server's tools carry (e.g. 'docs_'). "
             "When set, callers may omit the prefix: knowledge.search_documentation() "
-            "resolves to the tool aws_search_documentation."
+            "resolves to the tool docs_search_documentation."
         ),
     )
 

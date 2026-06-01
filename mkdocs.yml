@@ -172,7 +172,6 @@ nav:
               - OT Timer: reference/tools/ot_timer.md
           - Tools:
               - Arch: reference/tools/arch.md
-              - AWS: reference/tools/aws.md
               - Brave: reference/tools/brave.md
               - OT Caveman: reference/tools/ot_caveman.md
               - Chrome DevTools Util: reference/tools/chrome-util.md

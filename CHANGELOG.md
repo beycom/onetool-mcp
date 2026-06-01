@@ -94,7 +94,6 @@ Agent harnesses can invoke tools via subprocess or HTTP rather than MCP. `onetoo
 ## [2.0.0] - 2026-03-01
 
 ### Highlights
-- **Dynamic AWS** — proxy all 57+ official AWSlabs MCP servers via a single interface; zero token tax, credentials and SSO handled automatically
 - **Live Whiteboard** — draw architecture diagrams and flowcharts with a Mermaid-compatible DSL, powered by Excalidraw
 - **Three Search Engines** — Brave, Google (Ground), and Tavily; each with batch support and AI-synthesised answer summaries
 - **Browser Annotations** — highlight page elements and guide users through workflows via Chrome DevTools or Playwright
@@ -103,7 +102,6 @@ Agent harnesses can invoke tools via subprocess or HTTP rather than MCP. `onetoo
 - **Leaner Install** — optional `[util]` and `[dev]` extras; install only the dependencies you need
 
 ### New Tool Packs
-- **`aws`** `[dev]` — dynamic proxy to all 57+ AWSlabs MCP servers; role-based bundles, SSO, MFA, and credential preflight
 - **`whiteboard`** `[dev]` — live Excalidraw canvas with Mermaid-compatible DSL; screenshot and save results. Short alias: `wb`
 - **`tavily`** `[util]` — AI-native search with batch queries, URL extraction, and deep research mode
 - **`chrome_util` / `play_util`** `[dev]` — visual browser annotations via Chrome DevTools or Playwright
@@ -117,7 +115,7 @@ Agent harnesses can invoke tools via subprocess or HTTP rather than MCP. `onetoo
 - **Slim prompts** — system prompt under 25 lines, freeing token budget for actual work
 - **`>>>` trigger prefix** — new recommended invocation style (replaces `__ot`)
 - **Smarter `ot.result()`** — `tail`, `search`, `context`, `progress`, and `next_query` params for navigating large outputs
-- **Bundled skills** — curated guides for AWS, Chrome DevTools, Playwright, and more via `ot.skills()`
+- **Bundled skills** — curated guides for Chrome DevTools, Playwright, and more via `ot.skills()`
 - **`ot_secrets` encryption** — transparent age/keyring decryption at load time
 - **Short pack aliases** — all verbose pack names have short aliases (e.g. `whiteboard→wb`, `webfetch→wf`, `ripgrep→rg`)
 
@@ -139,7 +137,7 @@ Agent harnesses can invoke tools via subprocess or HTTP rather than MCP. `onetoo
 | Extra    | Packs                                                                 |
 | -------- | --------------------------------------------------------------------- |
 | `[util]` | brave, convert, excel, file, ground, mem, tavily                      |
-| `[dev]`  | aws, context7, db, diagram, package, ripgrep, webfetch, worktree, whiteboard, chrome_util, play_util |
+| `[dev]`  | context7, db, diagram, package, ripgrep, webfetch, worktree, whiteboard, chrome_util, play_util |
 | `[all]`  | Everything                                                            |
 
 ---

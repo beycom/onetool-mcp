@@ -38,39 +38,39 @@ class TestBuildExecutionNamespaceAliases:
         return ns
 
     @pytest.mark.filterwarnings("ignore:Server.*uses hyphens:UserWarning")
-    def test_aws_iam_uses_generic_underscore_alias(self) -> None:
-        """aws-iam server should create generic aws_iam alias."""
-        ns = self._build_namespace(["aws-iam"])
+    def test_hyphenated_server_uses_generic_underscore_alias(self) -> None:
+        """billing-service server should create generic billing_service alias."""
+        ns = self._build_namespace(["billing-service"])
 
-        assert "aws_iam" in ns
-        assert "aws-iam" in ns
-
-    @pytest.mark.filterwarnings("ignore:Server.*uses hyphens:UserWarning")
-    def test_aws_cost_explorer_uses_generic_underscore_alias(self) -> None:
-        """aws-cost-explorer server should create aws_cost_explorer alias."""
-        ns = self._build_namespace(["aws-cost-explorer"])
-
-        assert "aws_cost_explorer" in ns
-        assert "aws-cost-explorer" in ns
+        assert "billing_service" in ns
+        assert "billing-service" in ns
 
     @pytest.mark.filterwarnings("ignore:Server.*uses hyphens:UserWarning")
-    def test_aws_well_architected_uses_generic_underscore_alias(self) -> None:
-        """aws-well-architected server should create aws_well_architected alias."""
-        ns = self._build_namespace(["aws-well-architected"])
+    def test_multi_part_server_uses_generic_underscore_alias(self) -> None:
+        """cost-explorer server should create cost_explorer alias."""
+        ns = self._build_namespace(["cost-explorer"])
 
-        assert "aws_well_architected" in ns
-
-    @pytest.mark.filterwarnings("ignore:Server.*uses hyphens:UserWarning")
-    def test_aws_single_word_server_uses_generic_underscore_alias(self) -> None:
-        """aws-billing server should create aws_billing alias."""
-        ns = self._build_namespace(["aws-billing"])
-
-        assert "aws_billing" in ns
-        assert "aws-billing" in ns
+        assert "cost_explorer" in ns
+        assert "cost-explorer" in ns
 
     @pytest.mark.filterwarnings("ignore:Server.*uses hyphens:UserWarning")
-    def test_non_aws_hyphenated_server_gets_underscore_alias(self) -> None:
-        """Non-aws hyphenated server (e.g. my-server) should get underscore alias."""
+    def test_three_part_server_uses_generic_underscore_alias(self) -> None:
+        """well-architected-review server should create well_architected_review alias."""
+        ns = self._build_namespace(["well-architected-review"])
+
+        assert "well_architected_review" in ns
+
+    @pytest.mark.filterwarnings("ignore:Server.*uses hyphens:UserWarning")
+    def test_two_word_server_uses_generic_underscore_alias(self) -> None:
+        """email-worker server should create email_worker alias."""
+        ns = self._build_namespace(["email-worker"])
+
+        assert "email_worker" in ns
+        assert "email-worker" in ns
+
+    @pytest.mark.filterwarnings("ignore:Server.*uses hyphens:UserWarning")
+    def test_hyphenated_server_gets_underscore_alias(self) -> None:
+        """Hyphenated server (e.g. my-server) should get underscore alias."""
         ns = self._build_namespace(["my-server"])
 
         assert "my_server" in ns
@@ -147,7 +147,7 @@ class TestBuildExecutionNamespaceAliases:
         reset()
 
         mock_proxy = MagicMock()
-        mock_proxy.servers = ["aws-iam"]
+        mock_proxy.servers = ["billing-service"]
         mock_proxy.list_tools.return_value = []
 
         mock_registry = MagicMock()
@@ -168,22 +168,22 @@ class TestBuildExecutionNamespaceAliases:
         assert "iam" in ns
 
     @pytest.mark.filterwarnings("ignore:Server.*uses hyphens:UserWarning")
-    def test_multiple_aws_servers_all_get_generic_aliases(self) -> None:
-        """All aws-* servers should each get generic aliases."""
-        ns = self._build_namespace(["aws-iam", "aws-cost-explorer", "aws-cloudtrail"])
+    def test_multiple_hyphenated_servers_all_get_generic_aliases(self) -> None:
+        """All hyphenated servers should each get generic aliases."""
+        ns = self._build_namespace(["billing-service", "cost-explorer", "audit-log"])
 
-        assert "aws_iam" in ns
-        assert "aws_cost_explorer" in ns
-        assert "aws_cloudtrail" in ns
+        assert "billing_service" in ns
+        assert "cost_explorer" in ns
+        assert "audit_log" in ns
 
     @pytest.mark.filterwarnings("ignore:Server.*uses hyphens:UserWarning")
     def test_alias_proxy_is_callable(self) -> None:
         """The namespace alias should be an object supporting attribute access."""
-        ns = self._build_namespace(["aws-iam"])
+        ns = self._build_namespace(["billing-service"])
 
         # Both the full server name and alias should be pack proxy objects
-        assert ns["aws_iam"] is not None
-        assert hasattr(ns["aws_iam"], "__getattr__") or callable(getattr(ns["aws_iam"], "__class__", None))
+        assert ns["billing_service"] is not None
+        assert hasattr(ns["billing_service"], "__getattr__") or callable(getattr(ns["billing_service"], "__class__", None))
 
 
 @pytest.mark.unit
@@ -311,13 +311,13 @@ class TestMcpProxyPackToolPrefixFallback:
         return mock_proxy
 
     def test_tool_prefix_allows_omitting_prefix(self) -> None:
-        """knowledge.search_documentation() resolves to aws_search_documentation via tool_prefix."""
+        """knowledge.search_documentation() resolves to docs_search_documentation via tool_prefix."""
         from ot.executor.pack_proxy import _create_mcp_proxy_pack
 
-        mock_proxy = self._make_proxy_tools("aws-knowledge", ["aws_search_documentation"])
+        mock_proxy = self._make_proxy_tools("docs-knowledge", ["docs_search_documentation"])
 
         with patch("ot.proxy.get_proxy_manager", return_value=mock_proxy):
-            pack = _create_mcp_proxy_pack("aws-knowledge", tool_prefix="aws_")
+            pack = _create_mcp_proxy_pack("docs-knowledge", tool_prefix="docs_")
             fn = pack.search_documentation  # omit prefix — should resolve
             assert callable(fn)
 
@@ -325,7 +325,7 @@ class TestMcpProxyPackToolPrefixFallback:
         """Without tool_prefix, accessing an unprefixed name that only exists prefixed raises."""
         from ot.executor.pack_proxy import _create_mcp_proxy_pack
 
-        mock_proxy = self._make_proxy_tools("github", ["aws_something"])
+        mock_proxy = self._make_proxy_tools("github", ["docs_something"])
 
         with patch("ot.proxy.get_proxy_manager", return_value=mock_proxy):
             pack = _create_mcp_proxy_pack("github")  # no tool_prefix
@@ -336,11 +336,11 @@ class TestMcpProxyPackToolPrefixFallback:
         """The full prefixed tool name is always accessible directly."""
         from ot.executor.pack_proxy import _create_mcp_proxy_pack
 
-        mock_proxy = self._make_proxy_tools("aws-knowledge", ["aws_search_documentation"])
+        mock_proxy = self._make_proxy_tools("docs-knowledge", ["docs_search_documentation"])
 
         with patch("ot.proxy.get_proxy_manager", return_value=mock_proxy):
-            pack = _create_mcp_proxy_pack("aws-knowledge", tool_prefix="aws_")
-            fn = pack.aws_search_documentation  # exact name still works
+            pack = _create_mcp_proxy_pack("docs-knowledge", tool_prefix="docs_")
+            fn = pack.docs_search_documentation  # exact name still works
             assert callable(fn)
 
     def test_tool_prefix_works_for_any_server_name(self) -> None:

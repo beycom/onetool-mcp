@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <strong>🧿 One MCP for developers - No tool tax, no context rot.<br>100+ tools including Brave, Google, Context7, Excalidraw, AWS, Version Checker, Excel, File Ops, Database, Image Vision, Playwright & Chrome DevTools Utils and many more.</strong>
+  <strong>🧿 One MCP for developers - No tool tax, no context rot.<br>100+ tools including Brave, Google, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Image Vision, Playwright & Chrome DevTools Utils and many more.</strong>
 </p>
 
 <p align="center">
@@ -114,9 +114,8 @@ onetool direct run --port 8765 "brave.search(query='latest AI news')" --format r
 | Feature                  | Description                                                   |
 | ------------------------ | ------------------------------------------------------------- |
 | **96% Token Savings**    | ~2K tokens no matter how many tools you add                   |
-| **100+ Built-in Tools**  | Web search, AWS, databases, file ops, diagrams, conversions   |
+| **100+ Built-in Tools**  | Web search, databases, file ops, diagrams, conversions        |
 | **Explicit Execution**   | See exactly what runs — `__run brave.search(q="AI")`           |
-| **Dynamic AWS**          | Proxy all 57+ AWSlabs MCP servers; SSO and credentials handled |
 | **Live Whiteboard**      | Draw diagrams with a Mermaid-compatible DSL via Excalidraw    |
 | **MCP Server Proxy**     | Wrap existing MCP servers without the tool tax                |
 | **Encrypted Secrets**    | age-encrypted `secrets.yaml` backed by your OS keychain       |
@@ -135,7 +134,6 @@ onetool direct run --port 8765 "brave.search(query='latest AI news')" --format r
 
 | Pack          | Tools                                          | Extra    | Description                    |
 | ------------- | ---------------------------------------------- | -------- | ------------------------------ |
-| `aws`         | `whoami`, `login`, `start_packs`, `roles`      | `[dev]`  | Dynamic AWS proxy (57+ servers)|
 | `brave`       | `search`, `news`                               | `[util]` | Web and news search            |
 | `chrome_util` | `highlight_element`, `guide_user`              | `[dev]`  | Browser annotations (DevTools) |
 | `context7`    | `search`, `doc`                                | `[dev]`  | Library documentation          |

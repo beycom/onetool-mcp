@@ -30,7 +30,6 @@ _RE_OT_SECRETS_LINK = re.compile(r"\[\*\*OT Secrets\*\*\]\(ot_secrets\.md\)")
 CFG = ROOT / "tests/.onetool/onetool.yaml"
 
 NAME_TO_PACK = {
-    "AWS": "aws",
     "Brave": "brave",
     "Chrome DevTools Util": "chrome_util",
     "OT Context": "ot_context",
