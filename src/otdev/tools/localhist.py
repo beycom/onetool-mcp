@@ -1,4 +1,4 @@
-"""Project-local history snapshots backed by an independent Git database."""
+"""OneTool Local History snapshots backed by Git."""
 
 from __future__ import annotations
 

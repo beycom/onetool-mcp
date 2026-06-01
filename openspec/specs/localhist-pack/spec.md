@@ -21,6 +21,10 @@ The system SHALL expose a Dev extra `localhist` pack that provides project-local
 - **WHEN** the Dev extra is installed and an agent calls an `lh` tool alias
 - **THEN** the alias SHALL resolve to the `localhist` pack.
 
+#### Scenario: Pack summary
+- **WHEN** the `localhist` pack metadata is displayed
+- **THEN** the pack summary SHALL be `OneTool Local History snapshots backed by Git.`
+
 #### Scenario: No CLI contract
 - **WHEN** local history is used in phase one
 - **THEN** the system SHALL expose the behavior through MCP tools and SHALL NOT require a OneTool CLI command.
@@ -31,6 +35,11 @@ The system SHALL manage local history in an independent Git database that observ
 #### Scenario: Initialize local history
 - **WHEN** `localhist.init()` is called for an uninitialized project
 - **THEN** the system SHALL create the local-history Git database, configure required local-history settings, ensure `.localhist/` is ignored by the primary repository, ensure `.localhist/info/exclude` contains `.git/`, `.onetool/state/localhist/`, and the configured local-history Git directory, ensure `.onetool/state/localhist/force-include` exists, and return structured initialization status.
+
+#### Scenario: Local history Git identity
+- **WHEN** `localhist.init()` initializes or reinitializes the local-history Git database
+- **THEN** the database-local Git config SHALL set `user.name` to `OneTool`
+- **AND** `user.email` to `localhist@onetool`
 
 #### Scenario: Reinitialize existing local history
 - **GIVEN** a local-history Git database already exists

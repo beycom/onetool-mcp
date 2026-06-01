@@ -22,8 +22,8 @@ if TYPE_CHECKING:
 
     from otdev.tools._localhist.config import Paths
 
-LOCALHIST_USER_NAME = "OneTool Local History"
-LOCALHIST_USER_EMAIL = "localhist@onetool.local"
+LOCALHIST_USER_NAME = "OneTool"
+LOCALHIST_USER_EMAIL = "localhist@onetool"
 MAX_DIFF_BYTES = 1_000_000
 MAX_SHOW_BYTES = 1_000_000
 

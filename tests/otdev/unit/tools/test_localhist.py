@@ -26,6 +26,7 @@ def _write(path: Path, text: str) -> None:
 
 
 def test_pack_metadata_and_public_signatures() -> None:
+    assert localhist.__doc__ == "OneTool Local History snapshots backed by Git."
     assert localhist.pack == "localhist"
     assert localhist.pack_aliases == ("lh",)
     assert localhist.__all__ == [
@@ -119,6 +120,32 @@ def test_init_info_status_save_log_and_gitignore(monkeypatch: pytest.MonkeyPatch
     assert ".localhist/" in exclude_lines
     assert (tmp_path / ".onetool" / "state" / "localhist" / "force-include").exists()
     assert not (tmp_path / ".localhist" / "info" / "force-include").exists()
+    git_config_name = subprocess.run(
+        [
+            "git",
+            f"--git-dir={tmp_path / '.localhist'}",
+            "config",
+            "--get",
+            "user.name",
+        ],
+        capture_output=True,
+        check=True,
+        text=True,
+    ).stdout.strip()
+    git_config_email = subprocess.run(
+        [
+            "git",
+            f"--git-dir={tmp_path / '.localhist'}",
+            "config",
+            "--get",
+            "user.email",
+        ],
+        capture_output=True,
+        check=True,
+        text=True,
+    ).stdout.strip()
+    assert git_config_name == "OneTool"
+    assert git_config_email == "localhist@onetool"
     assert localhist.init()["already_initialized"] is True
 
     status_result = localhist.status()
