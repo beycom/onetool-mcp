@@ -143,10 +143,6 @@ build:
 build-inject:
     cd src/ot/assets && npm run build
 
-# Build the panel React app (requires bun; outputs to src/ottools/_panel/dist/)
-build-panel:
-    cd src/ottools/_panel/app && bun install && bun run build
-
 # Clean build artifacts and caches
 clean:
     rm -rf dist/ build/ *.egg-info tmp/

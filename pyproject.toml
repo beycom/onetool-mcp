@@ -90,7 +90,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ot", "src/ottools", "src/onetool", "src/otdev", "src/otutil", "packages/onetool-pack/src/otpack"]
-artifacts = ["src/ottools/_panel/dist/**"]
 
 [dependency-groups]
 docs = [
