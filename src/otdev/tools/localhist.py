@@ -136,20 +136,28 @@ def add_force_include(*, rule: str | list[str]) -> dict[str, object]:
         return result
 
 
-def save(*, message: str, kind: SnapshotKind = "") -> dict[str, object]:
+def save(
+    *,
+    message: str,
+    kind: SnapshotKind = "",
+    paths: str | list[str] | None = None,
+) -> dict[str, object]:
     """Create a local-history snapshot.
 
     Args:
         message: Commit message for the snapshot.
         kind: Stable snapshot category metadata. Leave empty for manual saves;
             use `message` for draft names, versions, and save-specific rationale.
+        paths: Optional project-relative Git pathspec or pathspecs to snapshot.
+            When omitted, snapshots the whole configured work tree.
 
     Returns:
         Structured snapshot result with commit details or no-change status.
     """
 
-    with LogSpan(span="localhist.save", kind=kind) as span:
-        result = save_snapshot(message=message, kind=kind)
+    path_count = 0 if paths is None else len([paths] if isinstance(paths, str) else paths)
+    with LogSpan(span="localhist.save", kind=kind, pathCount=path_count) as span:
+        result = save_snapshot(message=message, kind=kind, paths=paths)
         span.add(ok=result.get("ok"), created=result.get("created"))
         return result
 

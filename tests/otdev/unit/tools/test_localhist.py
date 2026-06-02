@@ -452,6 +452,93 @@ def test_status_log_history_diff_and_show_options(
     assert shown["bytes_returned"] == len(b"two\n")
 
 
+def test_save_paths_snapshots_only_selected_pathspecs(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    _write(tmp_path / "docs" / "nested" / "a.md", "a1\n")
+    _write(tmp_path / "docs" / "b.txt", "b1\n")
+    _write(tmp_path / "src" / "c.md", "c1\n")
+    baseline = localhist.save(message="baseline")
+    assert baseline["created"] is True
+
+    _write(tmp_path / "docs" / "nested" / "a.md", "a2\n")
+    _write(tmp_path / "docs" / "b.txt", "b2\n")
+    _write(tmp_path / "src" / "c.md", "c2\n")
+
+    scoped = localhist.save(message="markdown docs", paths=["docs/**/*.md"])
+    assert scoped["created"] is True
+    assert scoped["paths"] == ["docs/**/*.md"]
+    assert scoped["changed_count"] == 1
+
+    assert localhist.show(ref="HEAD", path="docs/nested/a.md")["content"] == "a2\n"
+    assert localhist.show(ref="HEAD", path="docs/b.txt")["content"] == "b1\n"
+    assert localhist.show(ref="HEAD", path="src/c.md")["content"] == "c1\n"
+
+
+def test_save_paths_force_includes_ignored_selected_paths(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    _write(tmp_path / ".gitignore", "openspec/changes/\nignored-secret\n")
+    _write(tmp_path / "openspec" / "changes" / "display" / "proposal.md", "proposal\n")
+    _write(tmp_path / "ignored-secret", "secret\n")
+    _write(tmp_path / "other.md", "other\n")
+
+    localhist.add_force_include(rule=["openspec/changes", "ignored-secret"])
+    result = localhist.save(message="display spec", paths="openspec/changes/")
+
+    assert result["created"] is True
+    assert result["paths"] == ["openspec/changes"]
+    assert result["changed_count"] == 1
+    shown = localhist.show(ref="HEAD", path="openspec/changes/display/proposal.md")
+    assert shown["content"] == "proposal\n"
+    assert localhist.show(ref="HEAD", path="ignored-secret")["ok"] is False
+    assert localhist.show(ref="HEAD", path="other.md")["ok"] is False
+
+
+def test_save_paths_force_include_matches_scoped_glob(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    _write(tmp_path / ".gitignore", "docs/nested/generated.md\n")
+    _write(tmp_path / "docs" / "nested" / "generated.md", "generated\n")
+    _write(tmp_path / "docs" / "nested" / "ignored.txt", "ignored\n")
+
+    localhist.add_force_include(rule="docs/nested/generated.md")
+    result = localhist.save(message="generated markdown", paths=["docs/**/*.md"])
+
+    assert result["created"] is True
+    assert result["paths"] == ["docs/**/*.md"]
+    assert result["changed_count"] == 1
+    assert localhist.show(ref="HEAD", path="docs/nested/generated.md")["content"] == "generated\n"
+    assert localhist.show(ref="HEAD", path="docs/nested/ignored.txt")["ok"] is False
+
+
+def test_save_paths_reject_invalid_pathspecs(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+
+    assert localhist.save(message="bad", paths=[""]) == {
+        "ok": False,
+        "error": "paths entries must not be empty",
+    }
+    assert "project-relative" in str(localhist.save(message="bad", paths="/abs")["error"])
+    assert "inside the work tree" in str(localhist.save(message="bad", paths="../x")["error"])
+    assert "pathspec magic" in str(localhist.save(message="bad", paths=":(glob)*")["error"])
+    assert "protected localhist path" in str(
+        localhist.save(message="bad", paths=".localhist/**")["error"]
+    )
+    assert "protected localhist path" in str(
+        localhist.save(message="bad", paths=".onetool/state/localhist/**")["error"]
+    )
+
+
 def test_symlink_path_can_be_inspected_when_target_escapes_worktree(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

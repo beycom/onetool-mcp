@@ -18,7 +18,7 @@ OneTool Local History snapshots backed by Git.
 | `localhist.info()` | Inspect initialization state, paths, config, head, and ignore files |
 | `localhist.add_exclude(rule)` | Add localhist-only exclude rules to `.localhist/info/exclude` |
 | `localhist.add_force_include(rule)` | Add force-include pathspecs to `.onetool/state/localhist/force-include` |
-| `localhist.save(message, ...)` | Create a snapshot with optional category metadata |
+| `localhist.save(message, paths, ...)` | Create a full or path-scoped snapshot with optional category metadata |
 | `localhist.autosave_start(path, ...)` | Start or reuse the shared autosave watcher |
 | `localhist.autosave_list()` | Inspect shared autosave watcher state |
 | `localhist.autosave_stop(path, ...)` | Stop the shared autosave watcher, optionally scoped to a project path |
@@ -34,11 +34,11 @@ OneTool Local History snapshots backed by Git.
 |-----------|------|-------------|
 | `message` | str | Snapshot commit message |
 | `kind` | str | Stable snapshot category metadata. Empty defaults to `manual`. |
+| `paths` | str \| list[str] \| None | Optional project-relative Git pathspecs for scoped `save()` snapshots, or explicit project-relative paths for `restore()` |
 | `rule` | str \| list[str] | Localhist exclude or force-include pathspec rule |
 | `ref` | str | Local-history commit ref, such as `HEAD` or `HEAD~1` |
 | `against` | str \| None | Optional comparison ref, or `worktree` to compare a snapshot to current files |
 | `path` | str | Project-relative file path, or project directory for `autosave_start()` / `autosave_stop()` |
-| `paths` | list[str] | Explicit project-relative paths for restore |
 | `offset` | int | One-based first line for partial `show()` reads |
 | `limit` | int \| None | Maximum status entries, log/history entries, or lines returned by `show()` |
 | `tail` | int \| None | Return the last N lines from `show()` |
@@ -86,6 +86,8 @@ tools:
 - Localhist uses the project `.gitignore` through Git's native ignore handling.
 - `localhist.init()` ensures the primary `.gitignore` ignores `.localhist/`, ensures `.localhist/info/exclude` includes `.git/`, `.onetool/state/localhist/`, and the configured local-history Git directory, and creates `.onetool/state/localhist/force-include`.
 - Snapshot staging ensures localhist-owned excludes exist, runs `git add -A -- .`, then force-adds pathspecs from `.onetool/state/localhist/force-include`.
+- `save(paths=...)` stages only the selected project-relative Git pathspec or pathspecs, without shell expansion. Scoped saves reject empty paths, absolute paths, parent traversal, protected localhist storage paths, and Git pathspec magic.
+- Scoped saves still apply configured force-includes that match the requested scope.
 - Force-includes must be literal project-relative paths and cannot target `.git/`, `.onetool/state/localhist/`, or the configured local-history Git directory.
 - `status()` reports working-tree file status. Use `info()` for initialization metadata, paths, config, head, branch, and ignore-file locations.
 - `diff()` and `show()` cap returned content at 1 MB and include `truncated`, `max_bytes`, and `bytes_returned` metadata.
@@ -114,6 +116,7 @@ localhist.info()
 # Save a manual checkpoint before a risky edit
 localhist.save(message="before parser rewrite")
 localhist.save(message="generated docs before registry refresh", kind="generated")
+localhist.save(message="save markdown docs", paths=["docs/**/*.md"])
 
 # Add localhist-only ignore and force-include rules
 localhist.add_exclude(rule="tmp/")

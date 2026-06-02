@@ -76,6 +76,18 @@ The system SHALL allow agents to create manual local-history snapshots without p
 - **WHEN** `localhist.save(message="before refactor", kind="manual")` is called and eligible changes exist
 - **THEN** the system SHALL ensure localhist-owned exclude rules are present, stage changes with Git-native ignore behavior, force-add configured force-includes, create a commit with the provided message and `manual` kind metadata, and return structured commit details.
 
+#### Scenario: Save scoped paths
+- **WHEN** `localhist.save(message="save markdown docs", paths=["docs/**/*.md"])` is called and matching eligible changes exist
+- **THEN** the system SHALL stage only matching project-relative Git pathspecs without relying on shell expansion, create a commit, and return the normalized requested `paths` alongside `changed_count`.
+
+#### Scenario: Save scoped ignored force-includes
+- **WHEN** `localhist.save(...)` is called with scoped paths that match configured force-include rules
+- **THEN** the system SHALL run normal Git staging for the scoped paths and then force-add matching configured force-includes.
+
+#### Scenario: Save scoped paths reject unsafe pathspecs
+- **WHEN** `localhist.save(...)` is called with empty paths, absolute paths, parent traversal, protected localhist storage paths, or Git pathspec magic
+- **THEN** the system SHALL reject the call before committing.
+
 #### Scenario: Save without changes
 - **WHEN** `localhist.save(...)` is called and no eligible changes exist
 - **THEN** the system SHALL return `created: false` instead of failing.

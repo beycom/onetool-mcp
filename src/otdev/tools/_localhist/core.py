@@ -108,6 +108,54 @@ def _validate_force_include_rules(config: Config, paths: Paths, rules: list[str]
     return validated
 
 
+def _literal_pathspec_prefix(pathspec: str) -> str:
+    parts: list[str] = []
+    for part in PurePosixPath(pathspec).parts:
+        if any(char in part for char in "*?["):
+            break
+        parts.append(part)
+    return PurePosixPath(*parts).as_posix() if parts else ""
+
+
+def _validate_snapshot_pathspecs(
+    config: Config,
+    paths: Paths,
+    pathspecs: str | list[str] | None,
+) -> list[str]:
+    if pathspecs is None:
+        return []
+    raw_pathspecs = [pathspecs] if isinstance(pathspecs, str) else pathspecs
+    protected = _protected_force_include_prefixes(config, paths)
+    validated: list[str] = []
+    for raw in raw_pathspecs:
+        clean = raw.strip()
+        if not clean:
+            raise ValueError("paths entries must not be empty")
+        if clean.startswith(":"):
+            raise ValueError("paths entries must not use Git pathspec magic")
+        normalized = PurePosixPath(clean).as_posix()
+        if PurePosixPath(normalized).is_absolute() or clean.startswith("/"):
+            raise ValueError(f"paths entries must be project-relative: {raw}")
+        while normalized.startswith("./"):
+            normalized = normalized[2:]
+        if normalized in {"", "."}:
+            raise ValueError("paths entries must not target the whole work tree")
+        if ".." in PurePosixPath(normalized).parts:
+            raise ValueError(f"paths entries must stay inside the work tree: {raw}")
+        literal_prefix = _literal_pathspec_prefix(normalized)
+        for prefix in protected:
+            directory = prefix.rstrip("/")
+            if (
+                normalized == directory
+                or normalized.startswith(prefix)
+                or literal_prefix == directory
+                or literal_prefix.startswith(prefix)
+            ):
+                raise ValueError(f"paths entry targets protected localhist path: {raw}")
+        validated.append(normalized.rstrip("/"))
+    return list(dict.fromkeys(validated))
+
+
 def _append_info_exclude(paths: Path, patterns: list[str]) -> int:
     exclude = _info_file(paths, "exclude")
     return int(_append_rules(exclude, patterns)["added"])
@@ -423,13 +471,43 @@ def info_repository() -> dict[str, object]:
         return _error(exc)
 
 
-def _stage_snapshot(git: GitRunner, config: Config, paths: Paths) -> None:
+def _pathspec_matches_scope(rule: str, scoped_paths: list[str]) -> bool:
+    rule_clean = rule.rstrip("/")
+    for scoped in scoped_paths:
+        scoped_clean = scoped.rstrip("/")
+        scoped_has_glob = any(char in scoped_clean for char in "*?[")
+        if (
+            rule_clean == scoped_clean
+            or rule_clean.startswith(scoped_clean + "/")
+            or scoped_clean.startswith(rule_clean + "/")
+            or (scoped_has_glob and PurePosixPath(rule_clean).match(scoped_clean))
+        ):
+            return True
+    return False
+
+
+def _stage_snapshot(
+    git: GitRunner,
+    config: Config,
+    paths: Paths,
+    *,
+    scoped_paths: list[str],
+) -> None:
     # Repair required excludes on every snapshot, not only init. If a project
     # .gitignore or localhist exclude file is edited between autosaves, staging
     # still must not recurse into Git/localhist storage.
     _append_info_exclude(paths.git_dir, _required_info_excludes(config, paths))
-    git.run("add", "-A", "--", ".")
+    if scoped_paths:
+        # A scoped path can be fully ignored and later recovered by a matching
+        # force-include. Let normal staging fail quietly in that case.
+        git.run_pathspec_file(["add", "-A"], scoped_paths, check=False)
+    else:
+        git.run("add", "-A", "--", ".")
     force_rules = _read_rules(paths.force_include_file)
+    if scoped_paths:
+        force_rules = [
+            rule for rule in force_rules if _pathspec_matches_scope(rule, scoped_paths)
+        ]
     if force_rules:
         git.run_pathspec_file(["add", "-f"], force_rules)
 
@@ -438,6 +516,7 @@ def create_snapshot(
     *,
     message: str,
     kind: SnapshotKind,
+    pathspecs: str | list[str] | None = None,
 ) -> dict[str, object]:
     """Create a local-history snapshot."""
 
@@ -449,9 +528,10 @@ def create_snapshot(
         init_result = init_repository()
         if not init_result.get("ok"):
             return init_result
+    scoped_paths = _validate_snapshot_pathspecs(config, paths, pathspecs)
     git = GitRunner(paths)
     git.run("reset")
-    _stage_snapshot(git, config, paths)
+    _stage_snapshot(git, config, paths, scoped_paths=scoped_paths)
     status = git.run("diff", "--cached", "--name-only")
     if not status.strip():
         return {
@@ -459,6 +539,7 @@ def create_snapshot(
             "created": False,
             "reason": "no_changes",
             "changed_count": 0,
+            "paths": scoped_paths,
             **_repo_info(config),
         }
     commit_message = f"{message.strip()}\n\nLocalhist-Kind: {kind or 'manual'}"
@@ -469,15 +550,21 @@ def create_snapshot(
         "created": True,
         "commit": details,
         "changed_count": len(status.splitlines()),
+        "paths": scoped_paths,
         **_repo_info(config),
     }
 
 
-def save_snapshot(*, message: str, kind: SnapshotKind) -> dict[str, object]:
+def save_snapshot(
+    *,
+    message: str,
+    kind: SnapshotKind,
+    paths: str | list[str] | None = None,
+) -> dict[str, object]:
     """Save a manual or restore snapshot."""
 
     try:
-        return create_snapshot(message=message, kind=kind)
+        return create_snapshot(message=message, kind=kind, pathspecs=paths)
     except Exception as exc:
         return _error(exc)
 
