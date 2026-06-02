@@ -143,6 +143,10 @@ build:
 build-inject:
     cd src/ot/assets && npm run build
 
+# Bundle display UI TypeScript app (requires npm install in packages/onetool-display-ui/)
+build-display:
+    cd packages/onetool-display-ui && npm run build
+
 # Clean build artifacts and caches
 clean:
     rm -rf dist/ build/ *.egg-info tmp/

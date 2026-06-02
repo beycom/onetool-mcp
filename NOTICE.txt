@@ -68,5 +68,14 @@ https://github.com/kazhala/pfzy
 Used in: otutil/tools/_file_resolve_match.py (fzy-style fuzzy path matching)
 
 ================================================================================
+t3code
+================================================================================
+Copyright (c) 2026 T3 Tools Inc.
+Licensed under the MIT License
+https://github.com/pingdotgg/t3code
+
+Used in: packages/onetool-display-ui (React timeline, row stability, markdown/code, and diff rendering architecture)
+
+================================================================================
 
 Full license texts are available in the licenses/ directory.

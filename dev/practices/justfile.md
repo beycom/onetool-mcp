@@ -49,9 +49,10 @@ just docs-deploy      # deploy to GitHub Pages
 ## Build & Release
 
 ```bash
-just build        # build the package (uv build)
-just build-inject # bundle inject.js annotation script
-just clean        # clean build artefacts and caches
+just build         # build the package (uv build)
+just build-inject  # bundle inject.js annotation script
+just build-display # bundle display UI TypeScript app
+just clean         # clean build artefacts and caches
 just reset-env    # recreate .venv from scratch
 ```
 
