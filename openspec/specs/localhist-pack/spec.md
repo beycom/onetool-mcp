@@ -84,9 +84,14 @@ The system SHALL allow agents to create manual local-history snapshots without p
 - **WHEN** `localhist.save(message="")` or a whitespace-only message is called
 - **THEN** the system SHALL reject the call before initializing, staging, or committing.
 
-#### Scenario: Save with free-form snapshot kind
+#### Scenario: Save with custom snapshot kind
 - **WHEN** `localhist.save(message="generated artifact", kind="agent-custom")` is called and eligible changes exist
 - **THEN** the system SHALL create a commit and preserve `agent-custom` as snapshot kind metadata in commit details and log entries.
+
+#### Scenario: Snapshot kind usage
+- **WHEN** an agent chooses `kind` for a snapshot
+- **THEN** it SHALL treat `kind` as stable category metadata such as `manual`, `auto`, `restore`, `generated`, `refactor`, or `experiment`
+- **AND** it SHALL put draft names, versions, recommendations, and save-specific rationale in `message`.
 
 ### Requirement: Git-Native Snapshot Inclusion
 The system SHALL use Git-native ignore behavior for local-history staging, with localhist-only excludes and explicit force-includes stored in the local-history Git database.

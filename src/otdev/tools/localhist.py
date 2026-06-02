@@ -141,7 +141,8 @@ def save(*, message: str, kind: SnapshotKind = "") -> dict[str, object]:
 
     Args:
         message: Commit message for the snapshot.
-        kind: Free-form snapshot kind metadata.
+        kind: Stable snapshot category metadata. Leave empty for manual saves;
+            use `message` for draft names, versions, and save-specific rationale.
 
     Returns:
         Structured snapshot result with commit details or no-change status.

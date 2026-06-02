@@ -18,7 +18,7 @@ OneTool Local History snapshots backed by Git.
 | `localhist.info()` | Inspect initialization state, paths, config, head, and ignore files |
 | `localhist.add_exclude(rule)` | Add localhist-only exclude rules to `.localhist/info/exclude` |
 | `localhist.add_force_include(rule)` | Add force-include pathspecs to `.onetool/state/localhist/force-include` |
-| `localhist.save(message, ...)` | Create a snapshot with optional free-form kind metadata |
+| `localhist.save(message, ...)` | Create a snapshot with optional category metadata |
 | `localhist.autosave_start(path, ...)` | Start or reuse the shared autosave watcher |
 | `localhist.autosave_list()` | Inspect shared autosave watcher state |
 | `localhist.autosave_stop(path, ...)` | Stop the shared autosave watcher, optionally scoped to a project path |
@@ -33,7 +33,7 @@ OneTool Local History snapshots backed by Git.
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `message` | str | Snapshot commit message |
-| `kind` | str | Free-form snapshot kind metadata. Empty defaults to `manual`. |
+| `kind` | str | Stable snapshot category metadata. Empty defaults to `manual`. |
 | `rule` | str \| list[str] | Localhist exclude or force-include pathspec rule |
 | `ref` | str | Local-history commit ref, such as `HEAD` or `HEAD~1` |
 | `against` | str \| None | Optional comparison ref, or `worktree` to compare a snapshot to current files |
@@ -94,6 +94,16 @@ tools:
 - The short pack alias is `lh`.
 - No public `localhist.autosave(reason=...)` tool is exposed; autosave snapshots are created only by an active watcher.
 
+### Snapshot `kind`
+
+Use `kind` for stable categories that help filter or understand snapshot origin:
+
+- `manual` or omitted: ordinary user or agent checkpoints.
+- `auto`: background autosave snapshots.
+- `restore`: audit snapshots created by restore flows.
+
+If you set a custom kind, keep it broad and reusable, such as `generated`, `refactor`, or `experiment`. Put draft names, versions, recommendations, and save-specific rationale in `message`, not `kind`.
+
 ## Examples
 
 ```python
@@ -103,7 +113,7 @@ localhist.info()
 
 # Save a manual checkpoint before a risky edit
 localhist.save(message="before parser rewrite")
-localhist.save(message="before generated update", kind="generated")
+localhist.save(message="generated docs before registry refresh", kind="generated")
 
 # Add localhist-only ignore and force-include rules
 localhist.add_exclude(rule="tmp/")
