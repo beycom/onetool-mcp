@@ -89,6 +89,13 @@ The project SHALL document all tools at `docs/reference/tools/`.
 - **THEN** they find a generated compact list of all tool signatures
 - **AND** each listed tool includes a short inline description
 
+#### Scenario: Generated docs developer tooling
+- **GIVEN** a developer runs generated documentation commands
+- **WHEN** Tool Index generation, generated block synchronization, or docs registry checks execute
+- **THEN** reusable implementation SHALL live in importable developer modules
+- **AND** script entrypoints SHALL remain thin command wrappers
+- **AND** docs registry checks SHALL validate `reference/tools/index.md` against runtime registry metadata
+
 #### Scenario: Individual tool docs
 - **GIVEN** each tool pack
 - **WHEN** the user reads its doc

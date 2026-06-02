@@ -121,7 +121,7 @@ onetool-pack = { workspace = true }
 [tool.ruff]
 target-version = "py312"
 line-length = 88
-src = ["src", "tests"]
+src = ["src", "tests", "scripts"]
 cache-dir = "tmp/.ruff_cache"
 # Exclude Jinja2 templates (not valid Python)
 extend-exclude = ["src/ot/config/global_templates/tool_templates/*.py"]
