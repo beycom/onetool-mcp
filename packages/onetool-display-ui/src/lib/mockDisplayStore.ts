@@ -19,7 +19,6 @@ export function useMockDisplayStore(location: Location): DisplayStore {
   }, [location]);
   const fixtures = useMemo(() => buildMockMessages(), []);
   const [selectedId, setSelectedId] = useState<string | null>(ACTIVE_ID);
-  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [payloadById, setPayloadById] = useState<ReadonlyMap<string, PayloadView>>(() => new Map());
 
   const byId = useMemo(() => new Map(fixtures.map((entry) => [entry.metadata.id, entry.payload])), [fixtures]);
@@ -35,30 +34,14 @@ export function useMockDisplayStore(location: Location): DisplayStore {
   }, [byId]);
   const focusMessage = useCallback((id: string) => {
     setSelectedId(id);
-    setExpandedIds((current) => new Set(current).add(id));
     setPayloadById((current) => {
       if (current.has(id)) return current;
       const payload = byId.get(id);
       return payload ? new Map(current).set(id, payload) : current;
     });
   }, [byId]);
-  const toggleExpanded = useCallback((id: string) => {
-    setExpandedIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    window.setTimeout(() => {
-      setPayloadById((current) => {
-        if (current.has(id)) return current;
-        const payload = byId.get(id);
-        return payload ? new Map(current).set(id, payload) : current;
-      });
-    }, 120);
-  }, [byId]);
 
-  return { api, messages, selectedId, expandedIds, payloadById, error: null, refresh, loadPayload, toggleExpanded, focusMessage };
+  return { api, messages, selectedId, payloadById, error: null, refresh, loadPayload, focusMessage };
 }
 
 function buildMockMessages(): MockMessage[] {

@@ -1,11 +1,11 @@
 ## Purpose
 
-Provide a local, user-facing display service for rich OneTool artifacts and bounded message navigation without turning display output into durable storage or model-visible context.
+Provide a local admin dashboard foundation with display as the first feature route for rich OneTool artifacts and bounded message navigation, without turning display output into durable storage or model-visible context.
 
 ## Requirements
 
-### Requirement: Lazy Local Display Service
-The system SHALL provide a display service that starts lazily on the first `display.*` tool call, binds to `127.0.0.1`, and serves display UI/API routes for the current running OneTool MCP server process.
+### Requirement: Lazy Local Admin Service
+The system SHALL provide a Starlette-backed local admin service that starts lazily on the first `display.*` tool call, binds to `127.0.0.1`, and serves display UI/API routes for the current running OneTool MCP server process.
 
 #### Scenario: Status starts display service
 - **WHEN** an agent calls `display.status()` before the display service is running
@@ -14,6 +14,10 @@ The system SHALL provide a display service that starts lazily on the first `disp
 #### Scenario: Service uses local binding
 - **WHEN** the display service starts
 - **THEN** it binds to `127.0.0.1` and does not expose a public network listener
+
+#### Scenario: Admin health route is available
+- **WHEN** the local admin service is running
+- **THEN** `GET /api/admin/health` returns JSON health metadata
 
 ### Requirement: MCP Instance Scoping
 The system SHALL assign each running OneTool MCP server process a generated `mcp_instance_id` and SHALL scope display UI state, messages, and API routes to that instance.
@@ -36,6 +40,7 @@ The system SHALL expose `display.status()` to return current display service and
 #### Scenario: Status returns clickable instance URL
 - **WHEN** an agent calls `display.status()`
 - **THEN** the result includes `status`, `mcp_instance_id`, `url`, `message_count`, `started_at`, and `updated_at`
+- **AND** `url` uses a compact high-entropy browser instance route without exposing the API token in the URL string
 
 #### Scenario: Status is metadata-only
 - **WHEN** an agent calls `display.status()` after messages have been shown
@@ -51,6 +56,8 @@ The system SHALL expose `display.show(...)` to create one typed user-visible dis
 #### Scenario: Show creates message
 - **WHEN** an agent calls `display.show(...)` with a valid kind and payload or payload reference
 - **THEN** the system creates a display message in the current MCP instance timeline and returns its stable `id`
+- **AND** the message `id` SHALL be 12 lowercase hexadecimal characters with no prefix
+- **AND** message ID generation SHALL retry on collisions within the current display instance
 
 #### Scenario: Show starts display service
 - **WHEN** an agent calls `display.show(...)` before the display service is running
@@ -82,13 +89,50 @@ The system SHALL keep large display payloads outside model-visible tool response
 - **WHEN** the browser loads a display timeline
 - **THEN** the timeline response contains message metadata and summaries without eagerly returning every message payload
 
-#### Scenario: Expanded row fetches preview
-- **WHEN** a user expands a display row in the browser UI
-- **THEN** the browser fetches the relevant bounded preview or payload view from the display service
+#### Scenario: Timeline row fetches fixed preview
+- **WHEN** a user views the display timeline in the browser UI
+- **THEN** each row fetches the relevant bounded preview or payload view and clips it to a bounded visual preview area without nested vertical scrollbars
+
+#### Scenario: Recent messages are visible on initial browser load
+- **WHEN** a display instance has more messages than the browser's initial page size
+- **THEN** the browser timeline SHALL load the latest message page initially while preserving oldest-to-newest visual order within that page
+- **AND** recent `display.show(...)` messages SHALL become visible quickly in high-volume sessions
+
+#### Scenario: Timeline exposes scroll-to-bottom affordance
+- **WHEN** a user is not viewing the newest loaded message or unseen messages arrive
+- **THEN** the browser SHALL expose a scroll-to-bottom control that jumps to the newest loaded message without stealing scroll while the user is reading older messages
+
+#### Scenario: Message actions use overflow menu
+- **WHEN** a user opens message actions in the browser UI
+- **THEN** the browser shows an overflow menu with secondary text-labeled actions such as copy path and rich view toggle
+- **AND** copy content is exposed as a standalone row toolbar icon
+- **AND** copy path is not exposed as a standalone row toolbar icon
+- **AND** timeline rows for inline message kinds SHALL expose visible toolbar actions as copy content, then open in side panel
+- **AND** timeline rows for openable file-backed message kinds SHALL order visible toolbar actions as copy content, open in side panel, then open
+- **AND** timeline rows SHALL NOT show the overflow menu as a visible toolbar button
+- **AND** file-backed side panel rows SHALL order visible toolbar actions as overflow menu, then open file
 
 #### Scenario: File previews use content-aware renderers
-- **WHEN** a user opens or expands a file display message with known language, MIME type, or extension metadata
+- **WHEN** a user opens a file display message with known language, MIME type, or extension metadata
 - **THEN** the browser routes markdown, JSON, YAML, and code-like files through the matching rich renderer while unknown files use a raw text fallback
+- **AND** markdown files SHALL render as continuous documents without page-like vertical gaps between normal block elements
+- **AND** file-backed JSON and YAML renderers SHALL parse the fetched preview/source text when no inline structured content is present
+
+#### Scenario: Rich rendering can be disabled
+- **WHEN** a user disables rich view for a message in the browser UI
+- **THEN** the browser shows the bounded raw/source payload for that message instead of the rich renderer
+- **AND** the user can enable rich view again without reloading the display page
+
+#### Scenario: Structured payloads have tree and source views
+- **WHEN** a user views JSON or YAML display content in the browser UI
+- **THEN** the browser provides a collapsible structured tree view and a source-code view
+- **AND** the tree/source segmented control SHALL size to its content instead of stretching across the message body
+- **AND** collapsing the root node SHALL keep the collapsed root row directly below the tree/source controls without introducing blank vertical gaps
+- **AND** valid structured file previews SHALL NOT render as `root undefined` or as a single quoted source string in tree mode
+
+#### Scenario: Mermaid payloads have render and source views
+- **WHEN** a user views Mermaid display content in the browser UI
+- **THEN** the browser provides rendered diagram controls for pan, zoom, reset, and fit plus a source-code view
 
 ### Requirement: Message Metadata Shape
 The system SHALL store display messages as metadata records plus payload references rather than full eager payload records.
@@ -100,13 +144,33 @@ The system SHALL store display messages as metadata records plus payload referen
 #### Scenario: Message record supports summaries
 - **WHEN** the system returns timeline or listing rows
 - **THEN** each row can include lightweight display metadata such as title, summary, source, size, and status without full payload content
+- **AND** the browser timeline preview is not required to display title, summary, kind, byte count, or line count as row chrome
+- **AND** the browser timeline and side panel SHALL NOT display generic title or summary chrome by default
+- **AND** file-backed `file`, `image`, and `file_diff` rows SHALL display a compact filename header above the payload while keeping the full path available through message info or actions
+- **AND** file-backed rows SHALL NOT repeat the file path or filename in footer metadata
+- **AND** file-backed source renderers SHALL NOT duplicate the compact filename header inside the payload body
+- **AND** footer message IDs SHALL show the full 12-character display message ID
+- **AND** browser-rendered message timestamps SHALL use `HH:mm, dd-Mon` format, such as `23:01, 03-Jun`
+
+#### Scenario: Text payloads render as plain content
+- **WHEN** a user views a `text` display message in rich mode
+- **THEN** the browser renders the payload as plain text on the message card background
+- **AND** the browser SHALL NOT wrap the text in code-style raw block chrome unless rich rendering is disabled
 
 ### Requirement: Retention Limits
-The system SHALL enforce bounded in-memory retention for display messages and payload previews per MCP display instance.
+The system SHALL enforce bounded hot and cold retention for display messages and payload previews per MCP display instance while using project-local display state as an internal cold-message cache.
 
-#### Scenario: Long session reaches retention limit
-- **WHEN** a display instance exceeds 1,000 retained message metadata records
-- **THEN** the system evicts older in-memory message records without making persistence or archive recovery a V1 guarantee
+#### Scenario: Long session moves cold messages out of memory
+- **WHEN** a display instance exceeds the hot in-memory message window
+- **THEN** the system keeps only the hot message window in memory
+- **AND** older message records remain available within the bounded cold message window to `display.list(...)`, `display.read(id=...)`, and browser timeline API reads through project-local display cache state
+- **AND** the cache location SHALL be under the display project state directory returned by `get_project_state_dir("display")`
+- **AND** the cache SHALL NOT create a durable storage, archive, or restart-recovery guarantee
+
+#### Scenario: Long session reaches cold retention limit
+- **WHEN** a display instance exceeds the cold message retention limit
+- **THEN** the system removes the oldest message IDs and cached records from display state
+- **AND** removed messages are no longer available through `display.list(...)`, `display.read(id=...)`, or browser timeline API reads
 
 #### Scenario: Payload previews are bounded
 - **WHEN** a display payload is stored inline, generated from a file preview, or generated from a file diff
@@ -120,6 +184,11 @@ The system SHALL enforce bounded in-memory retention for display messages and pa
 - **WHEN** a generated file diff request compares two workspace files and either input is larger than 1 MiB
 - **THEN** the system returns a bounded skip preview rather than reading both files into memory for diff generation
 
+#### Scenario: Generated file diffs keep structured source paths
+- **WHEN** a generated file diff request compares two workspace files
+- **THEN** the payload reference stores the resolved old and new file paths as separate metadata fields
+- **AND** the system does not flatten the pair into one ambiguous path string
+
 #### Scenario: Browser payload cache is bounded
 - **WHEN** a browser client lazily loads many expanded payload views
 - **THEN** the browser keeps at most 100 payload views cached in client state and prunes payloads for evicted messages
@@ -127,10 +196,22 @@ The system SHALL enforce bounded in-memory retention for display messages and pa
 #### Scenario: Table grid rendering is bounded
 - **WHEN** a table message contains many rows or columns
 - **THEN** the browser renders a bounded grid preview of up to 200 rows by 80 columns
+- **AND** the browser SHALL NOT show row/column truncation status text above the grid
 
 #### Scenario: Browser side panel uses bounded layout
 - **WHEN** a user opens a long payload in the browser side panel
 - **THEN** the inspector uses the available panel height without nested vertical scroll caps causing scroll bounce
+- **AND** long code/file lines SHALL remain horizontally scrollable in the inspector
+
+#### Scenario: Browser side panel matches message layout
+- **WHEN** a user opens a message in the browser side panel
+- **THEN** the side panel uses the same message title, floating action, payload, and metadata layout as timeline message rows
+- **AND** the side panel does not render a separate inspector header band or separator above the selected message content
+
+#### Scenario: Renderer failures are isolated
+- **WHEN** one payload renderer fails while rendering a timeline row or inspector payload
+- **THEN** the browser SHALL show a recoverable preview error for that message
+- **AND** the rest of the display app SHALL remain usable
 
 ### Requirement: Display Read Tool
 The system SHALL expose `display.read(id=...)` to return one display message record by ID with metadata, payload references, and bounded preview only.
@@ -177,6 +258,10 @@ If the system exposes `display.list(...)` in V1, it SHALL return a paginated, me
 - **WHEN** an agent calls `display.list(...)` with supported filters such as kind or source
 - **THEN** the result applies those filters while still returning metadata only
 
+#### Scenario: List rejects invalid pagination
+- **WHEN** an agent calls `display.list(...)` with `limit` outside 1 through 500 or `offset` below 0
+- **THEN** the system rejects the call through normal tool validation instead of silently clamping the values
+
 ### Requirement: Display Search Deferred
 The system SHALL NOT expose `display.search(...)` in V1.
 
@@ -202,16 +287,35 @@ The system SHALL NOT expose agent-facing display message update or delete operat
 - **WHEN** an agent attempts to delete an existing display message through a display tool
 - **THEN** the call fails through the normal unavailable-tool or validation path
 
+### Requirement: Test-Only Display Fixture Tool
+The system MAY expose a temporary `display.seed_mock_messages(...)` fixture tool during display/admin UI development.
+
+#### Scenario: Fixture seeds all V1 kinds
+- **WHEN** an agent calls `display.seed_mock_messages(...)`
+- **THEN** the tool SHALL create representative messages for every V1 display kind through the normal display service path
+- **AND** the response SHALL be metadata-only, including a display URL, count, IDs by kind, and `test_only: true`
+- **AND** the tool SHALL be marked test-only in code/docs
+
 ### Requirement: Display Browser And API Routes
-The system SHALL provide local browser and API routes scoped to the MCP instance for status, timeline/message creation, message reads, optional listing, focus events, file previews, diff previews, controlled open actions, and UI events.
+The system SHALL provide local admin browser and API routes scoped to the MCP instance for status, timeline/message creation, message reads, optional listing, focus events, file previews, diff previews, controlled open actions, and UI events.
 
 #### Scenario: Instance page opens
 - **WHEN** a user opens the URL returned by `display.status()`
 - **THEN** the browser displays the message timeline for that MCP instance
 
+#### Scenario: Compact browser route preserves API authorization
+- **WHEN** a user opens `/display/{browser_id}` for the current display instance
+- **THEN** the browser page can bootstrap full instance API credentials for that page
+- **AND** API routes still reject requests without the full instance ID and valid token
+
+#### Scenario: Display APIs use admin namespace
+- **WHEN** a browser client reads or mutates display state
+- **THEN** it uses routes under `/api/display/instances/{instance_id}/...`
+
 #### Scenario: Browser UI supports message inspection actions
 - **WHEN** a user views a message in the timeline or inspector panel
 - **THEN** the browser exposes copy content, copy path, and controlled file open actions in the message header area, with visible failed-open feedback
+- **AND** the controlled file open action SHALL use a compact icon button with accessible label/tooltip text
 
 #### Scenario: Browser UI follows display theme for rendered diffs
 - **WHEN** a user views parsed diff content in light or dark display mode
@@ -220,6 +324,11 @@ The system SHALL provide local browser and API routes scoped to the MCP instance
 #### Scenario: Browser inspector width is adjustable
 - **WHEN** a user drags the separator between the timeline and inspector
 - **THEN** the browser resizes the inspector within usable minimum widths and preserves that width locally for reloads
+
+#### Scenario: Admin frontend uses adopted foundation stack
+- **WHEN** the packaged display/admin UI is built
+- **THEN** it uses Vite, React, TypeScript, TanStack Router, TanStack Query, TanStack Table, Radix-compatible UI primitives, Tailwind as the styling foundation, Recharts availability, and lucide icons
+- **AND** Python serves built static assets without requiring Node at runtime
 
 #### Scenario: Message creation route stores message
 - **WHEN** the display tool creates a message through the display service
@@ -268,7 +377,7 @@ The system SHALL NOT guarantee display message survival across MCP server proces
 
 #### Scenario: No V1 cache contract
 - **WHEN** a OneTool MCP server process restarts
-- **THEN** the system does not rely on a display cache to recover prior display messages
+- **THEN** the system does not rely on the display cold-message cache to recover prior display messages
 
 ### Requirement: User-Initiated Open Actions
 The system SHALL make editor or OS open actions explicit user-visible actions rather than automatic side effects of `display.status()` or `display.show(...)`.

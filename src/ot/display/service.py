@@ -77,12 +77,13 @@ def list_messages(
     *,
     limit: int = 100,
     offset: int = 0,
+    tail: bool = False,
     kind: str | None = None,
     source: str | None = None,
 ) -> MessageList:
     """List display message metadata only."""
     ensure_server()
-    return STATE.list_messages(limit=limit, offset=offset, kind=kind, source=source)
+    return STATE.list_messages(limit=limit, offset=offset, tail=tail, kind=kind, source=source)
 
 
 def get_payload_view(*, id: str) -> dict[str, object] | None:

@@ -1,8 +1,9 @@
-import { InfoIcon, PanelRightIcon, RefreshCwIcon, SettingsIcon } from "lucide-react";
+import { PanelRightIcon, RefreshCwIcon, SettingsIcon } from "lucide-react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { DisplayTimeline } from "./components/DisplayTimeline";
-import { MessageActions, MessageInfo } from "./components/MessageRow";
-import { PayloadRenderer } from "./components/PayloadRenderer";
+import { MessageRow } from "./components/MessageRow";
 import { Popover, PopoverPopup, PopoverTrigger } from "./components/ui/Popover";
 import { DisplaySettingsProvider } from "./lib/displaySettings";
 import type { DisplayStore } from "./lib/displayStore";
@@ -14,10 +15,51 @@ const PANEL_WIDTH_KEY = "onetool.display.sidePanelWidth";
 const DEFAULT_PANEL_WIDTH = 560;
 const MIN_PANEL_WIDTH = 380;
 const MIN_MAIN_WIDTH = 360;
+const queryClient = new QueryClient();
 
 export function App() {
-  const useMock = new URLSearchParams(window.location.search).has("mock") || !window.location.pathname.includes("/instances/");
-  return useMock ? <MockDisplayApp /> : <LiveDisplayApp />;
+  const router = useMemo(() => createAdminRouter(), []);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  );
+}
+
+function createAdminRouter() {
+  const rootRoute = createRootRoute({ component: AdminRoot });
+  const indexRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/",
+    component: MockDisplayApp,
+  });
+  const displayIndexRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/display",
+    component: MockDisplayApp,
+  });
+  const displayInstanceRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/display/$mcpInstanceId",
+    component: LiveDisplayApp,
+  });
+  const placeholderRoutes = ["config", "tools", "stats", "localhist", "servers", "security", "results"].map((path) =>
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path,
+      component: AdminPlaceholder,
+    }),
+  );
+  const routeTree = rootRoute.addChildren([indexRoute, displayIndexRoute, displayInstanceRoute, ...placeholderRoutes]);
+  return createRouter({ routeTree });
+}
+
+function AdminRoot() {
+  return <Outlet />;
+}
+
+function AdminPlaceholder() {
+  return <MockDisplayApp />;
 }
 
 function MockDisplayApp() {
@@ -37,6 +79,7 @@ function DisplayAppShell({ store, label }: { store: DisplayStore; label: string 
   const [panelWidth, setPanelWidth] = useState(() => readStoredPanelWidth());
   const [wrapDiff, setWrapDiff] = useState(false);
   const [hideWhitespace, setHideWhitespace] = useState(true);
+  const [richById, setRichById] = useState<Record<string, boolean>>({});
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
@@ -54,6 +97,14 @@ function DisplayAppShell({ store, label }: { store: DisplayStore; label: string 
     setPanelMessageId(id);
     store.loadPayload(id);
   }, [store]);
+  const selectedPanelRich = selectedPanelMessage ? richById[selectedPanelMessage.id] ?? true : true;
+  const togglePanelRich = useCallback(() => {
+    if (!selectedPanelMessage) return;
+    setRichById((values) => ({
+      ...values,
+      [selectedPanelMessage.id]: !(values[selectedPanelMessage.id] ?? true),
+    }));
+  }, [selectedPanelMessage]);
   const panelLabel = panelOpen ? "Hide message inspector" : "Show message inspector";
   const shellStyle = panelOpen ? ({ "--side-panel-width": `${panelWidth}px` } as CSSProperties) : undefined;
   const startPanelResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
@@ -76,43 +127,43 @@ function DisplayAppShell({ store, label }: { store: DisplayStore; label: string 
   return (
     <DisplaySettingsProvider value={{ wrapDiff, hideWhitespace, codeTheme }}>
       <main className={`app-shell${panelOpen ? " panel-open" : ""}${wrapDiff ? " diff-wrap" : ""}${hideWhitespace ? " hide-whitespace" : ""}`} style={shellStyle}>
+        <header className="topbar">
+          <div>
+            <h1>OneTool Display</h1>
+            <p>{label}</p>
+          </div>
+          <div className="topbar-actions">
+            <button type="button" className="icon-button" onClick={() => void store.refresh()} aria-label="Refresh">
+              <RefreshCwIcon size={16} />
+            </button>
+            <Popover>
+              <PopoverTrigger className="icon-button" aria-label="Open settings" title="Open settings">
+                <SettingsIcon size={16} />
+              </PopoverTrigger>
+              <PopoverPopup>
+                <div className="settings-popover" aria-label="Display settings">
+                  <SettingsRow title="Theme" description="Choose how Display looks across the app.">
+                    <select value={theme} onChange={(event) => setTheme(event.target.value as ThemeChoice)} aria-label="Theme">
+                      <option value="system">System</option>
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                    </select>
+                  </SettingsRow>
+                  <SettingsRow title="Diff line wrapping" description="Set the default wrap state when diff and raw code panels open.">
+                    <input type="checkbox" checked={wrapDiff} onChange={(event) => setWrapDiff(event.target.checked)} aria-label="Diff line wrapping" />
+                  </SettingsRow>
+                  <SettingsRow title="Hide whitespace changes" description="Reserved for diff renderers that expose whitespace filtering.">
+                    <input type="checkbox" checked={hideWhitespace} onChange={(event) => setHideWhitespace(event.target.checked)} aria-label="Hide whitespace changes" />
+                  </SettingsRow>
+                </div>
+              </PopoverPopup>
+            </Popover>
+            <button type="button" className="icon-button" onClick={() => setPanelOpen((open) => !open)} aria-label={panelLabel} title={panelLabel}>
+              <PanelRightIcon size={16} />
+            </button>
+          </div>
+        </header>
         <div className="main-column">
-          <header className="topbar">
-            <div>
-              <h1>OneTool Display</h1>
-              <p>{label}</p>
-            </div>
-            <div className="topbar-actions">
-              <button type="button" className="icon-button" onClick={() => void store.refresh()} aria-label="Refresh">
-                <RefreshCwIcon size={16} />
-              </button>
-              <Popover>
-                <PopoverTrigger className="icon-button" aria-label="Open settings" title="Open settings">
-                  <SettingsIcon size={16} />
-                </PopoverTrigger>
-                <PopoverPopup>
-                  <div className="settings-popover" aria-label="Display settings">
-                    <SettingsRow title="Theme" description="Choose how Display looks across the app.">
-                      <select value={theme} onChange={(event) => setTheme(event.target.value as ThemeChoice)} aria-label="Theme">
-                        <option value="system">System</option>
-                        <option value="light">Light</option>
-                        <option value="dark">Dark</option>
-                      </select>
-                    </SettingsRow>
-                    <SettingsRow title="Diff line wrapping" description="Set the default wrap state when diff and raw code panels open.">
-                      <input type="checkbox" checked={wrapDiff} onChange={(event) => setWrapDiff(event.target.checked)} aria-label="Diff line wrapping" />
-                    </SettingsRow>
-                    <SettingsRow title="Hide whitespace changes" description="Reserved for diff renderers that expose whitespace filtering.">
-                      <input type="checkbox" checked={hideWhitespace} onChange={(event) => setHideWhitespace(event.target.checked)} aria-label="Hide whitespace changes" />
-                    </SettingsRow>
-                  </div>
-                </PopoverPopup>
-              </Popover>
-              <button type="button" className="icon-button" onClick={() => setPanelOpen((open) => !open)} aria-label={panelLabel} title={panelLabel}>
-                <PanelRightIcon size={16} />
-              </button>
-            </div>
-          </header>
           {store.error ? <div className="error-banner">{store.error}</div> : null}
           <section className="timeline-shell" aria-label="Display timeline">
             <DisplayTimeline store={store} onOpenPanel={openPanelMessage} />
@@ -124,28 +175,18 @@ function DisplayAppShell({ store, label }: { store: DisplayStore; label: string 
           <aside className="right-panel" aria-label="Display message inspector">
             <section className="inspector-section" aria-label="Selected message content">
               {selectedPanelMessage ? (
-                <>
-                  <div className="inspector-header">
-                    <div className="inspector-title">
-                      <span className={`kind kind-${selectedPanelMessage.kind}`}>{selectedPanelMessage.kind}</span>
-                      <strong>{selectedPanelMessage.title || selectedPanelMessage.summary || selectedPanelMessage.id}</strong>
-                    </div>
-                    <div className="inspector-actions">
-                      <MessageActions api={store.api} message={selectedPanelMessage} payload={store.payloadById.get(selectedPanelMessage.id)} />
-                      <Popover>
-                        <PopoverTrigger className="icon-button row-action" aria-label="Show message info" title="Message info">
-                          <InfoIcon size={14} />
-                        </PopoverTrigger>
-                        <PopoverPopup>
-                          <MessageInfo message={selectedPanelMessage} />
-                        </PopoverPopup>
-                      </Popover>
-                    </div>
-                  </div>
-                  <div className="inspector-payload">
-                    <PayloadRenderer api={store.api} message={selectedPanelMessage} payload={store.payloadById.get(selectedPanelMessage.id)} />
-                  </div>
-                </>
+                <div className="inspector-payload">
+                  <MessageRow
+                    api={store.api}
+                    message={selectedPanelMessage}
+                    selected
+                    payload={store.payloadById.get(selectedPanelMessage.id)}
+                    rich={selectedPanelRich}
+                    onToggleRich={togglePanelRich}
+                    expanded
+                    actionLayout="inspector"
+                  />
+                </div>
               ) : (
                 <div className="inspector-empty">
                   <PanelRightIcon size={18} />

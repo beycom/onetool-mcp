@@ -1,4 +1,4 @@
-"""Display server compatibility helpers backed by the local admin service."""
+"""Local admin dashboard service."""
 
 from __future__ import annotations
 

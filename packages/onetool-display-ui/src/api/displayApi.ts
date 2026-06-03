@@ -1,4 +1,13 @@
-import type { DisplayEvent, MessageList, MessageRead, PayloadView } from "../types";
+import type { DisplayEvent, FilePreview, MessageList, MessageRead, PayloadView } from "../types";
+
+declare global {
+  interface Window {
+    __ONETOOL_DISPLAY_BOOTSTRAP__?: {
+      instanceId: string;
+      token: string;
+    };
+  }
+}
 
 export class DisplayApi {
   readonly instanceId: string;
@@ -6,12 +15,16 @@ export class DisplayApi {
 
   constructor(location: Location) {
     const parts = location.pathname.split("/").filter(Boolean);
-    this.instanceId = parts[1] ?? "";
-    this.token = new URLSearchParams(location.search).get("token") ?? "";
+    const bootstrap = window.__ONETOOL_DISPLAY_BOOTSTRAP__;
+    this.instanceId = bootstrap?.instanceId ?? parts[1] ?? "";
+    this.token = bootstrap?.token ?? new URLSearchParams(location.search).get("token") ?? "";
   }
 
-  async list(limit = 300): Promise<MessageList> {
-    return this.get(`/messages?limit=${limit}`);
+  async list(limit = 300, options: { tail?: boolean; offset?: number } = {}): Promise<MessageList> {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (options.offset) params.set("offset", String(options.offset));
+    if (options.tail) params.set("tail", "true");
+    return this.get(`/messages?${params.toString()}`);
   }
 
   async read(id: string): Promise<MessageRead> {
@@ -29,6 +42,10 @@ export class DisplayApi {
 
   async open(path: string): Promise<{ status: string; opened: boolean; path: string }> {
     return this.post("/open", { path });
+  }
+
+  async preview(path: string): Promise<FilePreview> {
+    return this.get(`/preview?path=${encodeURIComponent(path)}`);
   }
 
   private async get<T>(path: string): Promise<T> {
@@ -49,6 +66,6 @@ export class DisplayApi {
 
   private url(path: string): string {
     const separator = path.includes("?") ? "&" : "?";
-    return `/api/instances/${this.instanceId}${path}${separator}token=${encodeURIComponent(this.token)}`;
+    return `/api/display/instances/${this.instanceId}${path}${separator}token=${encodeURIComponent(this.token)}`;
   }
 }

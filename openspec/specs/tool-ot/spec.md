@@ -43,6 +43,7 @@ The `ot.tools()` function SHALL list all available tools with optional filtering
 - **WHEN** `ot.tools(info="full")` is called
 - **THEN** each entry SHALL include: `{name, description, source}`
 - **AND** source SHALL be "local" or "mcp:{server}"
+- **AND** signatures and arguments SHALL remain available through `ot.tool_info(...)`, not `ot.tools(...)`
 
 ---
 

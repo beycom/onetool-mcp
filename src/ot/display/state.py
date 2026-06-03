@@ -1,12 +1,14 @@
-"""In-memory state for the local display service."""
+"""Process-local state for the local display service."""
 
 from __future__ import annotations
 
 import json
 from collections import OrderedDict, deque
+from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from difflib import unified_diff
+from secrets import token_hex
 from threading import Lock
 from typing import TYPE_CHECKING
 from urllib.parse import quote
@@ -23,15 +25,18 @@ from ot.display.models import (
     PayloadReference,
     ShowRequest,
 )
-from ot.paths import get_effective_cwd
+from ot.paths import get_effective_cwd, get_project_state_dir
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-MAX_MESSAGES = 1000
+HOT_MESSAGE_WINDOW = 1000
+MAX_MESSAGE_RECORDS = 5000
+MAX_EVENT_QUEUE = 1000
 PREVIEW_LIMIT_BYTES = 64 * 1024
 MAX_INLINE_LIST_ITEMS = 500
 MAX_DIFF_INPUT_BYTES = 1 * 1024 * 1024
+MESSAGE_ID_HEX_CHARS = 12
 
 
 @dataclass
@@ -43,6 +48,9 @@ class DisplayInstance:
     started_at: datetime
     updated_at: datetime
     messages: OrderedDict[str, DisplayMessage] = field(default_factory=OrderedDict)
+    message_ids: list[str] = field(default_factory=list)
+    message_id_set: set[str] = field(default_factory=set)
+    cache_dir: Path | None = None
     focus_target: str | None = None
     event_queue: deque[dict[str, str]] = field(default_factory=deque)
     has_event_client: bool = False
@@ -60,11 +68,13 @@ class DisplayState:
         with self._lock:
             if self._instance is None:
                 now = _utcnow()
+                instance_id = f"mcp-{uuid4().hex}"
                 self._instance = DisplayInstance(
-                    id=f"mcp-{uuid4().hex}",
+                    id=instance_id,
                     token=uuid4().hex,
                     started_at=now,
                     updated_at=now,
+                    cache_dir=_cache_dir_for_instance(instance_id),
                 )
             return self._instance
 
@@ -78,31 +88,42 @@ class DisplayState:
         """Add a validated display message to the current instance."""
         instance = self.get_or_create_instance()
         now = _utcnow()
-        message_id = f"msg-{uuid4().hex}"
         payload, preview, inline_payload = _build_payload(request)
-        metadata = MessageMetadata(
-            id=message_id,
-            kind=request.kind,
-            title=request.title,
-            summary=request.summary or _default_summary(preview),
-            source=request.source,
-            expand=request.expand,
-            preview_lines=_preview_line_count(preview),
-            created_at=now,
-            updated_at=now,
-            payload=payload,
-        )
-        message = DisplayMessage(
-            metadata=metadata,
-            preview=preview,
-            inline_payload=inline_payload,
-        )
+        expired_ids: list[str] = []
         with self._lock:
+            message_id = _new_message_id(instance.message_id_set)
+            metadata = MessageMetadata(
+                id=message_id,
+                kind=request.kind,
+                title=request.title,
+                summary=request.summary or _default_summary(request=request, preview=preview),
+                source=request.source,
+                expand=request.expand,
+                preview_lines=_preview_line_count(preview),
+                created_at=now,
+                updated_at=now,
+                payload=payload,
+            )
+            message = DisplayMessage(
+                metadata=metadata,
+                preview=preview,
+                inline_payload=inline_payload,
+            )
+            _write_cached_message(instance, message)
             instance.messages[message_id] = message
-            while len(instance.messages) > MAX_MESSAGES:
+            instance.message_ids.append(message_id)
+            instance.message_id_set.add(message_id)
+            while len(instance.messages) > HOT_MESSAGE_WINDOW:
                 instance.messages.popitem(last=False)
+            while len(instance.message_ids) > MAX_MESSAGE_RECORDS:
+                expired_id = instance.message_ids.pop(0)
+                instance.messages.pop(expired_id, None)
+                instance.message_id_set.discard(expired_id)
+                expired_ids.append(expired_id)
             instance.updated_at = now
-            instance.event_queue.append({"type": "message", "id": message_id})
+            _append_event(instance, {"type": "message", "id": message_id})
+        for expired_id in expired_ids:
+            _delete_cached_message(instance, expired_id)
         return metadata
 
     def read_message(self, *, id: str) -> MessageRead | None:
@@ -110,40 +131,46 @@ class DisplayState:
         instance = self.get_or_create_instance()
         with self._lock:
             message = instance.messages.get(id)
-            if message is None:
-                return None
-            return MessageRead(metadata=message.metadata, preview=message.preview)
+            known_id = id in instance.message_id_set
+        if message is None and known_id:
+            message = _read_cached_message(instance, id)
+        if message is None:
+            return None
+        return MessageRead(metadata=message.metadata, preview=message.preview)
 
     def payload_view(self, *, id: str, base_url: str) -> dict[str, object] | None:
         """Return a browser-only payload view for lazy row expansion."""
         instance = self.get_or_create_instance()
         with self._lock:
-            message = instance.messages.get(id)
-            if message is None:
-                return None
-            metadata = message.metadata
-            payload = metadata.payload
             token = instance.token
             instance_id = instance.id
+            message = instance.messages.get(id)
+            known_id = id in instance.message_id_set
+        if message is None and known_id:
+            message = _read_cached_message(instance, id)
+        if message is None:
+            return None
+        metadata = message.metadata
+        payload = metadata.payload
         result: dict[str, object] = {
             "metadata": metadata.model_dump(mode="json"),
             "preview": message.preview.model_dump(mode="json") if message.preview else None,
         }
-        if payload.mode == "inline":
+        if payload.mode == "inline" or payload.path is None:
             result["content"] = _bounded_inline_payload(message.inline_payload)
         elif payload.path is not None:
             encoded_path = quote(payload.path)
             result["file_url"] = (
-                f"{base_url}/api/instances/{instance_id}/preview"
+                f"{base_url}/api/display/instances/{instance_id}/preview"
                 f"?token={token}&path={encoded_path}"
             )
             result["open_url"] = (
-                f"{base_url}/api/instances/{instance_id}/open"
+                f"{base_url}/api/display/instances/{instance_id}/open"
                 f"?token={token}"
             )
             if metadata.kind == "image":
                 result["image_url"] = (
-                    f"{base_url}/api/instances/{instance_id}/asset"
+                    f"{base_url}/api/display/instances/{instance_id}/asset"
                     f"?token={token}&path={encoded_path}"
                 )
         return result
@@ -153,21 +180,47 @@ class DisplayState:
         *,
         limit: int,
         offset: int,
+        tail: bool = False,
         kind: str | None = None,
         source: str | None = None,
     ) -> MessageList:
         """List message metadata with optional lightweight filters."""
         instance = self.get_or_create_instance()
         with self._lock:
-            items = [message.metadata for message in instance.messages.values()]
+            message_ids = list(instance.message_ids)
+            hot_metadata = {
+                message_id: message.metadata
+                for message_id, message in instance.messages.items()
+            }
+        if kind is None and source is None:
+            page_offset = _tail_offset(total=len(message_ids), limit=limit, offset=offset) if tail else offset
+            page_ids = message_ids[page_offset : page_offset + limit]
+            items = [
+                metadata
+                for message_id in page_ids
+                if (metadata := hot_metadata.get(message_id) or _read_cached_metadata(instance, message_id)) is not None
+            ]
+            total = len(message_ids)
+            return MessageList(
+                items=items,
+                total=total,
+                offset=page_offset,
+                limit=limit,
+            )
+        items = [
+            metadata
+            for message_id in message_ids
+            if (metadata := hot_metadata.get(message_id) or _read_cached_metadata(instance, message_id)) is not None
+        ]
         if kind is not None:
             items = [item for item in items if item.kind == kind]
         if source is not None:
             items = [item for item in items if item.source == source]
+        page_offset = _tail_offset(total=len(items), limit=limit, offset=offset) if tail else offset
         return MessageList(
-            items=items[offset : offset + limit],
+            items=items[page_offset : page_offset + limit],
             total=len(items),
-            offset=offset,
+            offset=page_offset,
             limit=limit,
         )
 
@@ -175,12 +228,12 @@ class DisplayState:
         """Queue or deliver a focus event for one message."""
         instance = self.get_or_create_instance()
         with self._lock:
-            if id not in instance.messages:
+            if id not in instance.message_id_set:
                 return None
             instance.focus_target = id
             instance.updated_at = _utcnow()
             delivered = instance.has_event_client
-            instance.event_queue.append({"type": "focus", "id": id})
+            _append_event(instance, {"type": "focus", "id": id})
             return FocusResult(id=id, delivered=delivered, queued=not delivered)
 
     def poll_events(self, *, instance_id: str, token: str) -> list[dict[str, str]] | None:
@@ -196,6 +249,14 @@ class DisplayState:
                 events.append({"type": "focus", "id": instance.focus_target})
             return events
 
+    def resolve_browser_instance(self, *, browser_instance_id: str) -> tuple[str, str] | None:
+        """Resolve a full or short browser instance ID to API credentials."""
+        instance = self.get_or_create_instance()
+        with self._lock:
+            if browser_instance_id == instance.id or browser_instance_id == short_instance_id(instance.id):
+                return instance.id, instance.token
+            return None
+
     def authorize(self, *, instance_id: str, token: str | None) -> bool:
         """Return whether an instance route token is valid."""
         instance = self.get_or_create_instance()
@@ -203,6 +264,14 @@ class DisplayState:
 
 
 STATE = DisplayState()
+
+
+def _new_message_id(existing_ids: set[str]) -> str:
+    """Return a short unique display message ID for one process instance."""
+    while True:
+        message_id = token_hex(MESSAGE_ID_HEX_CHARS // 2)
+        if message_id not in existing_ids:
+            return message_id
 
 
 def allowed_roots() -> list[Path]:
@@ -222,22 +291,78 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def _tail_offset(*, total: int, limit: int, offset: int) -> int:
+    """Return an offset from the end while preserving ascending item order."""
+    return max(0, total - limit - offset)
+
+
+def _append_event(instance: DisplayInstance, event: dict[str, str]) -> None:
+    """Append an event while bounding disconnected-client memory growth."""
+    if event["type"] == "message" and instance.event_queue and instance.event_queue[-1]["type"] == "message":
+        instance.event_queue[-1] = event
+        return
+    instance.event_queue.append(event)
+    while len(instance.event_queue) > MAX_EVENT_QUEUE:
+        instance.event_queue.popleft()
+
+
 def _instance_metadata(instance: DisplayInstance, *, base_url: str) -> InstanceMetadata:
     return InstanceMetadata(
         status="running",
         mcp_instance_id=instance.id,
-        url=f"{base_url}/instances/{instance.id}?token={instance.token}",
-        message_count=len(instance.messages),
+        url=f"{base_url}/display/{short_instance_id(instance.id)}",
+        message_count=len(instance.message_ids),
         started_at=instance.started_at,
         updated_at=instance.updated_at,
     )
+
+
+def short_instance_id(instance_id: str) -> str:
+    """Return the compact browser route ID for a display instance."""
+    return instance_id.removeprefix("mcp-")[:16]
+
+
+def _cache_dir_for_instance(instance_id: str) -> Path:
+    return get_project_state_dir("display") / "instances" / instance_id / "messages"
+
+
+def _cache_path(instance: DisplayInstance, message_id: str) -> Path:
+    cache_dir = instance.cache_dir or _cache_dir_for_instance(instance.id)
+    return cache_dir / f"{message_id}.json"
+
+
+def _write_cached_message(instance: DisplayInstance, message: DisplayMessage) -> None:
+    path = _cache_path(instance, message.metadata.id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = path.with_suffix(".json.tmp")
+    temp_path.write_text(message.model_dump_json(), encoding="utf-8")
+    temp_path.replace(path)
+
+
+def _delete_cached_message(instance: DisplayInstance, message_id: str) -> None:
+    with suppress(FileNotFoundError):
+        _cache_path(instance, message_id).unlink()
+
+
+def _read_cached_message(instance: DisplayInstance, message_id: str) -> DisplayMessage | None:
+    path = _cache_path(instance, message_id)
+    if not path.is_file():
+        return None
+    return DisplayMessage.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def _read_cached_metadata(instance: DisplayInstance, message_id: str) -> MessageMetadata | None:
+    message = _read_cached_message(instance, message_id)
+    if message is None:
+        return None
+    return message.metadata
 
 
 def _build_payload(
     request: ShowRequest,
 ) -> tuple[PayloadReference, BoundedPreview | None, object | None]:
     if request.kind in {"file", "image"}:
-        path = resolve_allowed_path(request.path or "")
+        path = _resolve_existing_payload_path(request.path or "", kind=request.kind)
         size = path.stat().st_size
         preview = _file_preview(path) if request.kind == "file" else None
         return (
@@ -253,7 +378,7 @@ def _build_payload(
         )
     if request.kind == "file_diff":
         if request.path:
-            path = resolve_allowed_path(request.path)
+            path = _resolve_existing_payload_path(request.path, kind=request.kind)
             size = path.stat().st_size
             data = _read_bounded_file(path, limit=PREVIEW_LIMIT_BYTES)
             preview = BoundedPreview(
@@ -267,14 +392,15 @@ def _build_payload(
                 preview,
                 None,
             )
-        old_path = resolve_allowed_path(request.old_path or "")
-        new_path = resolve_allowed_path(request.new_path or "")
+        old_path = _resolve_existing_payload_path(request.old_path or "", kind=request.kind)
+        new_path = _resolve_existing_payload_path(request.new_path or "", kind=request.kind)
         diff_text = _file_diff(old_path, new_path)
         encoded = diff_text.encode("utf-8")
         return (
             PayloadReference(
-                mode="inline",
-                path=f"{old_path}..{new_path}",
+                mode="file_diff",
+                old_path=str(old_path),
+                new_path=str(new_path),
                 size_bytes=len(encoded),
                 language="diff",
             ),
@@ -304,6 +430,13 @@ def _build_payload(
         preview,
         _bounded_inline_payload(request.content),
     )
+
+
+def _resolve_existing_payload_path(path: str, *, kind: str) -> Path:
+    resolved = resolve_allowed_path(path)
+    if not resolved.is_file():
+        raise ValueError(f"{kind} path not found: {path}")
+    return resolved
 
 
 def _file_preview(path: Path) -> BoundedPreview:
@@ -380,10 +513,60 @@ def _read_bounded_file(path: Path, *, limit: int) -> bytes:
         return stream.read(limit)
 
 
-def _default_summary(preview: BoundedPreview | None) -> str | None:
+def _default_summary(*, request: ShowRequest, preview: BoundedPreview | None) -> str | None:
+    structured = _structured_summary(request)
+    if structured is not None:
+        return structured
     if preview is None:
         return None
     first_line = preview.text.strip().splitlines()
     if not first_line:
         return None
     return first_line[0][:160]
+
+
+def _structured_summary(request: ShowRequest) -> str | None:
+    content = request.content
+    if request.kind in {"json", "yaml"}:
+        if isinstance(content, dict):
+            return _dict_summary(content)
+        if isinstance(content, list):
+            return _list_summary(content)
+    if request.kind == "table" and isinstance(content, list):
+        return _table_summary(content)
+    return None
+
+
+def _dict_summary(content: dict[str, object]) -> str:
+    keys = list(content)
+    if not keys:
+        return "0 keys"
+    preview = ", ".join(keys[:5])
+    suffix = "" if len(keys) <= 5 else f", +{len(keys) - 5} more"
+    return f"{len(keys)} keys: {preview}{suffix}"
+
+
+def _list_summary(content: list[object]) -> str:
+    return f"{len(content)} items"
+
+
+def _table_summary(content: list[object]) -> str:
+    columns: list[object] = []
+    seen_columns: set[object] = set()
+    for row in content:
+        if not isinstance(row, dict):
+            continue
+        for key in row:
+            if key in seen_columns:
+                continue
+            seen_columns.add(key)
+            columns.append(key)
+            if len(columns) > 5:
+                break
+        if len(columns) > 5:
+            break
+    if not columns:
+        return f"{len(content)} rows"
+    preview = ", ".join(str(column) for column in columns[:5])
+    suffix = "" if len(columns) <= 5 else ", +more"
+    return f"{len(content)} rows: {preview}{suffix}"

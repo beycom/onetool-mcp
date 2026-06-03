@@ -18,6 +18,8 @@ export interface PayloadReference {
   mode: PayloadMode;
   size_bytes: number;
   path?: string | null;
+  old_path?: string | null;
+  new_path?: string | null;
   mime_type?: string | null;
   language?: string | null;
 }
@@ -53,6 +55,14 @@ export interface PayloadView extends MessageRead {
   image_url?: string | null;
   file_url?: string | null;
   open_url?: string | null;
+}
+
+export interface FilePreview {
+  path: string;
+  text: string;
+  truncated: boolean;
+  size_bytes: number;
+  limit_bytes: number;
 }
 
 export interface MessageList {

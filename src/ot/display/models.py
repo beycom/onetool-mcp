@@ -33,14 +33,18 @@ class PayloadReference(BaseModel):
     mode: PayloadMode
     size_bytes: int = Field(ge=0)
     path: str | None = None
+    old_path: str | None = None
+    new_path: str | None = None
     mime_type: str | None = None
     language: str | None = None
 
     @model_validator(mode="after")
     def validate_path_for_file_modes(self) -> PayloadReference:
         """Require paths for file-backed payload references."""
-        if self.mode in {"file", "file_diff"} and not self.path:
-            raise ValueError(f"{self.mode} payload references require path")
+        if self.mode == "file" and not self.path:
+            raise ValueError("file payload references require path")
+        if self.mode == "file_diff" and not (self.path or (self.old_path and self.new_path)):
+            raise ValueError("file_diff payload references require path or old_path and new_path")
         return self
 
 

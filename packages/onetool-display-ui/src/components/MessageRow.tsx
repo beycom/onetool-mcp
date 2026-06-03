@@ -1,58 +1,74 @@
-import { AlertCircleIcon, CheckIcon, ClockIcon, CopyIcon, ExternalLinkIcon, FileTextIcon, PanelRightOpenIcon, ScrollTextIcon } from "lucide-react";
-import { memo, useCallback, useState } from "react";
+import { AlertCircleIcon, BracesIcon, CalendarClockIcon, CheckIcon, CopyIcon, EllipsisIcon, ExternalLinkIcon, FileTextIcon, FolderTreeIcon, PanelRightOpenIcon } from "lucide-react";
+import { memo, useCallback, type ReactNode, useState } from "react";
 import type { DisplayApi } from "../api/displayApi";
 import type { MessageMetadata, PayloadView } from "../types";
 import { PayloadRenderer } from "./PayloadRenderer";
+import { RenderErrorBoundary } from "./RenderErrorBoundary";
+import { Popover, PopoverPopup, PopoverTrigger } from "./ui/Popover";
 
 export const MessageRow = memo(function MessageRow({
   api,
   message,
-  expanded,
   selected,
   payload,
-  onToggle,
   onOpenPanel,
+  rich = true,
+  onToggleRich,
+  expanded = false,
+  actionLayout = "timeline",
+  extraActions,
 }: {
   api: DisplayApi;
   message: MessageMetadata;
-  expanded: boolean;
   selected: boolean;
   payload: PayloadView | undefined;
-  onToggle: (id: string) => void;
-  onOpenPanel: (id: string) => void;
+  onOpenPanel?: (id: string) => void;
+  rich?: boolean;
+  onToggleRich?: () => void;
+  expanded?: boolean;
+  actionLayout?: "timeline" | "inspector";
+  extraActions?: ReactNode;
 }) {
   return (
-    <article className={selected ? "message-row selected" : "message-row"} data-message-id={message.id}>
+    <article className={`${selected ? "message-row selected" : "message-row"}${expanded ? " message-row-expanded" : ""}`} data-message-id={message.id}>
       <div className="message-toolbar">
-        <div className="message-title">
-          <span className={`kind kind-${message.kind}`}>{message.kind}</span>
-          <strong>{message.title || message.summary || message.id}</strong>
-        </div>
         <div className="message-actions">
-          <MessageActions api={api} message={message} payload={payload} onOpenPanel={onOpenPanel} />
+          <MessageActions
+            api={api}
+            message={message}
+            payload={payload}
+            onOpenPanel={onOpenPanel}
+            rich={rich}
+            onToggleRich={onToggleRich}
+            layout={actionLayout}
+          />
+          {extraActions}
         </div>
       </div>
-      <div className={`preview-wrap${expanded ? "" : " is-collapsed"}${message.preview_lines && message.preview_lines > 5 ? " truncated" : ""}`}>
+      <FileMessageHeader message={message} />
+      <div className="preview-wrap">
         <div className="payload-panel">
-          {expanded || payload ? <PayloadRenderer api={api} message={message} payload={payload} /> : <CollapsedPreview message={message} />}
+          <RenderErrorBoundary label={message.id}>
+            <PayloadRenderer api={api} message={message} payload={payload} rich={rich} />
+          </RenderErrorBoundary>
         </div>
-        <button type="button" className="preview-toggle" onClick={() => onToggle(message.id)} aria-expanded={expanded}>
-          {expanded ? "collapse" : "expand"}
-        </button>
       </div>
       <footer className="message-meta">
         <MessageHeaderMeta message={message} />
-        <span className="message-id" title={message.id}>{message.id}</span>
+        <span className="message-id" title={message.id}>{compactMessageId(message.id)}</span>
       </footer>
     </article>
   );
 });
 
-function CollapsedPreview({ message }: { message: MessageMetadata }) {
+function FileMessageHeader({ message }: { message: MessageMetadata }) {
+  const label = fileHeaderLabel(message);
+  if (!label) return null;
   return (
-    <pre className="raw-block preview-placeholder">
-      {message.summary || message.title || message.id}
-    </pre>
+    <header className="file-message-header" title={payloadPathLabel(message) ?? label}>
+      <FileTextIcon size={14} />
+      <span>{label}</span>
+    </header>
   );
 }
 
@@ -61,51 +77,100 @@ export function MessageActions({
   message,
   payload,
   onOpenPanel,
+  rich,
+  onToggleRich,
+  layout,
 }: {
   api: DisplayApi;
   message: MessageMetadata;
   payload: PayloadView | undefined;
   onOpenPanel?: (id: string) => void;
+  rich: boolean;
+  onToggleRich?: () => void;
+  layout: "timeline" | "inspector";
 }) {
+  const filePath = actionPath(message);
+  const openButton = filePath ? <OpenFileButton api={api} path={filePath} /> : null;
+  const panelButton = onOpenPanel ? (
+    <button type="button" className="icon-button row-action" onClick={() => onOpenPanel(message.id)} aria-label="Open message in side panel" title="Open in side panel">
+      <PanelRightOpenIcon size={14} />
+    </button>
+  ) : null;
+  if (layout === "inspector") {
+    return (
+      <>
+        <MessageActionMenu api={api} message={message} payload={payload} rich={rich} onToggleRich={onToggleRich} />
+        {openButton}
+      </>
+    );
+  }
   return (
     <>
       <CopyMessageButton api={api} message={message} payload={payload} kind="content" />
-      {message.payload.path ? <CopyMessageButton api={api} message={message} payload={payload} kind="path" /> : null}
-      {message.payload.path ? <OpenFileButton api={api} path={message.payload.path} /> : null}
-      {onOpenPanel ? (
-          <button type="button" className="icon-button row-action" onClick={() => onOpenPanel(message.id)} aria-label="Open message in side panel" title="Open in side panel">
-            <PanelRightOpenIcon size={14} />
-          </button>
-      ) : null}
+      {panelButton}
+      {openButton}
     </>
+  );
+}
+
+function MessageActionMenu({
+  api,
+  message,
+  payload,
+  rich,
+  onToggleRich,
+}: {
+  api: DisplayApi;
+  message: MessageMetadata;
+  payload: PayloadView | undefined;
+  rich: boolean;
+  onToggleRich?: () => void;
+}) {
+  const pathLabel = payloadPathLabel(message);
+  const copyContent = useCopyMessageAction({ api, message, payload, kind: "content" });
+  const copyPath = useCopyMessageAction({ api, message, payload, kind: "path" });
+  return (
+    <Popover>
+      <PopoverTrigger className="icon-button row-action" aria-label="Open message actions" title="Message actions">
+        <EllipsisIcon size={14} />
+      </PopoverTrigger>
+      <PopoverPopup sideOffset={4}>
+        <div className="message-action-menu" aria-label="Message actions">
+          {pathLabel ? (
+            <button type="button" className="message-action-menu-item" onClick={copyPath.copy}>
+              {copyPath.copied ? <CheckIcon size={16} /> : <FolderTreeIcon size={16} />}
+              <span>{copyPath.copied ? "Copied path" : "Copy path"}</span>
+            </button>
+          ) : null}
+          <button type="button" className="message-action-menu-item" onClick={copyContent.copy}>
+            {copyContent.copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
+            <span>{copyContent.copied ? "Copied file contents" : "Copy file contents"}</span>
+          </button>
+          {onToggleRich ? (
+            <button type="button" className="message-action-menu-item" onClick={onToggleRich}>
+              <BracesIcon size={16} />
+              <span>{rich ? "Disable rich view" : "Enable rich view"}</span>
+            </button>
+          ) : null}
+        </div>
+      </PopoverPopup>
+    </Popover>
   );
 }
 
 export function MessageHeaderMeta({ message }: { message: MessageMetadata }) {
   return (
     <>
-      <span className="row-header-meta-item" title="Message size">
-        <ScrollTextIcon size={13} />
-        <span>{formatBytes(message.payload.size_bytes)}</span>
-      </span>
-      <span className="row-header-meta-item" title="Preview line count">
-        <span>{message.preview_lines ?? 0} lines</span>
-      </span>
       <span className="row-header-meta-item" title={message.created_at}>
-        <ClockIcon size={13} />
+        <CalendarClockIcon size={13} />
         <span>{formatTimestamp(message.created_at)}</span>
       </span>
-      {message.payload.path ? (
-        <span className="row-header-meta-item row-path" title={message.payload.path}>
-          <FileTextIcon size={13} />
-          <span>{message.payload.path}</span>
-        </span>
-      ) : null}
     </>
   );
 }
 
 export function MessageInfo({ message }: { message: MessageMetadata }) {
+  const pathLabel = payloadPathLabel(message);
   return (
     <dl className="message-info">
       <div>
@@ -120,10 +185,10 @@ export function MessageInfo({ message }: { message: MessageMetadata }) {
         <dt>Created</dt>
         <dd>{formatTimestamp(message.created_at)}</dd>
       </div>
-      {message.payload.path ? (
+      {pathLabel ? (
         <div>
           <dt>Path</dt>
-          <dd title={message.payload.path}>{message.payload.path}</dd>
+          <dd title={pathLabel}>{pathLabel}</dd>
         </div>
       ) : null}
       <div>
@@ -145,12 +210,32 @@ export function CopyMessageButton({
   payload: PayloadView | undefined;
   kind: "content" | "path";
 }) {
+  const { copied, copy } = useCopyMessageAction({ api, message, payload, kind });
+  const label = kind === "path" ? "Copy path" : "Copy content";
+  return (
+    <button type="button" className="icon-button row-action" onClick={copy} aria-label={copied ? `Copied ${kind}` : label} title={label}>
+      {copied ? <CheckIcon size={14} /> : kind === "path" ? <FolderTreeIcon size={14} /> : <CopyIcon size={14} />}
+    </button>
+  );
+}
+
+function useCopyMessageAction({
+  api,
+  message,
+  payload,
+  kind,
+}: {
+  api: DisplayApi;
+  message: MessageMetadata;
+  payload: PayloadView | undefined;
+  kind: "content" | "path";
+}): { copied: boolean; copy: () => void } {
   const [copied, setCopied] = useState(false);
   const [fetchedPayload, setFetchedPayload] = useState<PayloadView | undefined>(undefined);
   const copy = useCallback(() => {
     const copyFromPayload = (view: PayloadView | undefined) => view?.preview?.text ?? stringifyPayload(view?.content) ?? message.summary ?? message.title ?? message.id;
     const textPromise = kind === "path"
-      ? Promise.resolve(message.payload.path ?? "")
+      ? Promise.resolve(payloadPathLabel(message) ?? "")
       : (payload ?? fetchedPayload
         ? Promise.resolve(payload ?? fetchedPayload)
         : api.payload(message.id).then((view) => {
@@ -162,12 +247,7 @@ export function CopyMessageButton({
       window.setTimeout(() => setCopied(false), 1200);
     });
   }, [api, fetchedPayload, kind, message, payload]);
-  const label = kind === "path" ? "Copy path" : "Copy content";
-  return (
-    <button type="button" className="icon-button row-action" onClick={copy} aria-label={copied ? `Copied ${kind}` : label} title={label}>
-      {copied ? <CheckIcon size={14} /> : kind === "path" ? <FileTextIcon size={14} /> : <CopyIcon size={14} />}
-    </button>
-  );
+  return { copied, copy };
 }
 
 export function OpenFileButton({ api, path }: { api: DisplayApi; path: string }) {
@@ -184,11 +264,10 @@ export function OpenFileButton({ api, path }: { api: DisplayApi; path: string })
       setError(err instanceof Error ? err.message : String(err));
     });
   }, [api, path]);
-  const label = status === "opened" ? "Opened" : status === "failed" ? "Open failed" : "Open";
+  const label = status === "opened" ? "Opened" : status === "failed" ? "Open failed" : "Open file";
   return (
-    <button type="button" className={`text-button row-open${status === "failed" ? " failed" : ""}`} onClick={open} aria-label={error ?? "Open file"} title={error ?? "Open file"}>
+    <button type="button" className={`icon-button row-action row-open${status === "failed" ? " failed" : ""}`} onClick={open} aria-label={error ?? label} title={error ?? label}>
       {status === "failed" ? <AlertCircleIcon size={14} /> : <ExternalLinkIcon size={14} />}
-      {label}
     </button>
   );
 }
@@ -202,7 +281,49 @@ function formatBytes(bytes: number): string {
 function formatTimestamp(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const hour = date.getHours().toString().padStart(2, "0");
+  const minute = date.getMinutes().toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+  return `${hour}:${minute}, ${day}-${months[date.getMonth()]}`;
+}
+
+function fileName(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
+}
+
+function compactMessageId(id: string): string {
+  return id;
+}
+
+function actionPath(message: MessageMetadata): string | null {
+  return message.payload.path ?? null;
+}
+
+function fileHeaderLabel(message: MessageMetadata): string | null {
+  if (message.kind === "file" || message.kind === "image") {
+    return message.payload.path ? fileName(message.payload.path) : null;
+  }
+  if (message.kind === "file_diff") {
+    return payloadPathDisplay(message);
+  }
+  return null;
+}
+
+function payloadPathLabel(message: MessageMetadata): string | null {
+  if (message.payload.path) return message.payload.path;
+  if (message.payload.old_path && message.payload.new_path) {
+    return `${message.payload.old_path} -> ${message.payload.new_path}`;
+  }
+  return null;
+}
+
+function payloadPathDisplay(message: MessageMetadata): string {
+  if (message.payload.path) return fileName(message.payload.path);
+  if (message.payload.old_path && message.payload.new_path) {
+    return `${fileName(message.payload.old_path)} -> ${fileName(message.payload.new_path)}`;
+  }
+  return "";
 }
 
 function stringifyPayload(content: unknown): string | null {

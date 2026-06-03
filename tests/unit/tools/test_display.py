@@ -32,8 +32,42 @@ class TestDisplayTools:
         assert isinstance(focused, dict)
         assert focused["id"] == created["id"]
 
+    @pytest.mark.parametrize(
+        ("limit", "offset", "match"),
+        [
+            (0, 0, "limit must be between 1 and 500"),
+            (501, 0, "limit must be between 1 and 500"),
+            (1, -1, "offset must be greater than or equal to 0"),
+        ],
+    )
+    def test_list_rejects_invalid_pagination(self, limit: int, offset: int, match: str) -> None:
+        with pytest.raises(ValueError, match=match):
+            display.list(limit=limit, offset=offset)
+
     def test_unknown_read_returns_error(self) -> None:
-        result = display.read(id="msg-missing")
+        result = display.read(id="missing")
 
         assert isinstance(result, str)
         assert result.startswith("Error:")
+
+    def test_seed_mock_messages_returns_metadata_only_for_all_v1_kinds(self) -> None:
+        result = display.seed_mock_messages()
+
+        expected_kinds = {
+            "text",
+            "markdown",
+            "code",
+            "file",
+            "diff",
+            "file_diff",
+            "image",
+            "json",
+            "mermaid",
+            "yaml",
+            "table",
+        }
+        assert result["test_only"] is True
+        assert result["url"].startswith("http://127.0.0.1:")
+        assert expected_kinds <= set(result["ids_by_kind"])
+        assert result["count"] >= len(expected_kinds)
+        assert "content" not in result

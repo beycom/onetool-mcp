@@ -1,9 +1,12 @@
-import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
-import * as YAML from "yaml";
+import { memo, useEffect, useState } from "react";
+import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import type { MessageMetadata, PayloadView } from "../types";
+import { CodeView } from "./CodeView";
 import { DiffRenderer } from "./DiffRenderer";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import type { DisplayApi } from "../api/displayApi";
+import { MermaidViewer } from "./MermaidViewer";
+import { StructuredDataViewer } from "./StructuredDataViewer";
 
 const MAX_GRID_ROWS = 200;
 const MAX_GRID_COLUMNS = 80;
@@ -12,13 +15,16 @@ export const PayloadRenderer = memo(function PayloadRenderer({
   api,
   message,
   payload,
+  rich = true,
 }: {
   api: DisplayApi;
   message: MessageMetadata;
   payload: PayloadView | undefined;
+  rich?: boolean;
 }) {
   if (!payload) return <div className="loading-line">Loading preview...</div>;
   const text = payload.preview?.text ?? stringContent(payload.content);
+  if (!rich) return <pre className="raw-block">{text}</pre>;
   if (message.kind === "image" && payload.image_url) {
     return <img className="image-preview" src={payload.image_url} alt={message.title ?? message.id} loading="lazy" />;
   }
@@ -27,22 +33,27 @@ export const PayloadRenderer = memo(function PayloadRenderer({
   if (message.kind === "json" || message.kind === "yaml" || message.kind === "mermaid" || message.kind === "table") {
     return <StructuredRenderer message={message} text={text} content={payload.content} />;
   }
-  if (message.kind === "file") return <FileRenderer message={message} text={text} content={payload.content} />;
+  if (message.kind === "file") return <FileRenderer api={api} message={message} text={text} content={payload.content} />;
+  if (message.kind === "text") return <PlainTextRenderer text={text} />;
   return <CodeLikeRenderer message={message} text={text} />;
 });
 
-function FileRenderer({ message, text, content }: { message: MessageMetadata; text: string; content: unknown }) {
+function PlainTextRenderer({ text }: { text: string }) {
+  return <div className="plain-text-payload">{text}</div>;
+}
+
+function FileRenderer({ api, message, text, content }: { api: DisplayApi; message: MessageMetadata; text: string; content: unknown }) {
   const fileKind = resolveFileViewerKind(message);
-  if (fileKind === "markdown") return <MarkdownRenderer text={text} copyCode={false} />;
-  if (fileKind === "json") return <MarkdownRenderer text={`\`\`\`json\n${formatJson(content, text)}\n\`\`\``} copyCode={false} />;
-  if (fileKind === "yaml") return <MarkdownRenderer text={`\`\`\`yaml\n${formatYaml(content, text)}\n\`\`\``} copyCode={false} />;
-  if (fileKind === "code") return <MarkdownRenderer text={`\`\`\`${resolveFileLanguage(message)}\n${text}\n\`\`\``} copyCode={false} />;
-  return <pre className="raw-block">{text}</pre>;
+  const previewText = useFilePreviewText(api, message, text);
+  if (fileKind === "markdown") return <MarkdownRenderer text={previewText} copyCode={false} />;
+  if (fileKind === "json" || fileKind === "yaml") return <StructuredDataViewer kind={fileKind} text={previewText} content={content} name={fileName(message.payload.path)} showHeader={false} />;
+  if (fileKind === "code") return <CodeView text={previewText} language={resolveFileLanguage(message)} name={fileName(message.payload.path)} showHeader={false} />;
+  return <pre className="raw-block">{previewText}</pre>;
 }
 
 function CodeLikeRenderer({ message, text }: { message: MessageMetadata; text: string }) {
   if (message.kind === "code") {
-    return <MarkdownRenderer text={`\`\`\`${message.payload.language ?? ""}\n${text}\n\`\`\``} copyCode={false} />;
+    return <CodeView text={text} language={message.payload.language} name={message.title ?? fileName(message.payload.path)} showHeader={!message.payload.path} />;
   }
   return <pre className="raw-block">{text}</pre>;
 }
@@ -51,9 +62,8 @@ function StructuredRenderer({ message, text, content }: { message: MessageMetada
   if (message.kind === "table" && Array.isArray(content)) {
     return <DataGridPreview rows={content} />;
   }
-  if (message.kind === "json") return <MarkdownRenderer text={`\`\`\`json\n${formatJson(content, text)}\n\`\`\``} />;
-  if (message.kind === "yaml") return <MarkdownRenderer text={`\`\`\`yaml\n${formatYaml(content, text)}\n\`\`\``} />;
-  if (message.kind === "mermaid") return <MermaidPreview source={text} />;
+  if (message.kind === "json" || message.kind === "yaml") return <StructuredDataViewer kind={message.kind} text={text} content={content} />;
+  if (message.kind === "mermaid") return <MermaidViewer source={text} />;
   return <pre className="raw-block">{text}</pre>;
 }
 
@@ -62,64 +72,38 @@ function DataGridPreview({ rows }: { rows: unknown[] }) {
   const records = allRecords.slice(0, MAX_GRID_ROWS);
   const allColumns = [...new Set(records.flatMap((row) => Object.keys(row)))];
   const columns = allColumns.slice(0, MAX_GRID_COLUMNS);
+  const columnHelper = createColumnHelper<Record<string, unknown>>();
+  const table = useReactTable({
+    data: records,
+    columns: columns.map((column) =>
+      columnHelper.accessor((row) => row[column], {
+        id: column,
+        header: column,
+        cell: (info) => formatCell(info.getValue()),
+      }),
+    ),
+    getCoreRowModel: getCoreRowModel(),
+  });
   if (records.length === 0 || columns.length === 0) return <pre className="raw-block">{JSON.stringify(rows, null, 2)}</pre>;
   const gridTemplateColumns = `repeat(${columns.length}, minmax(140px, 1fr))`;
   return (
     <div className="data-grid-scroller">
-      {allRecords.length > records.length || allColumns.length > columns.length ? (
-        <p className="muted">Showing {records.length} of {allRecords.length} rows and {columns.length} of {allColumns.length} columns.</p>
-      ) : null}
       <div className="data-grid" role="grid" style={{ gridTemplateColumns }}>
-        {columns.map((column) => (
-          <div key={column} className="data-grid-cell data-grid-header" role="columnheader" title={column}>
-            {column}
-          </div>
-        ))}
-        {records.map((row, rowIndex) =>
-          columns.map((column) => (
-            <div key={`${rowIndex}:${column}`} className="data-grid-cell" role="gridcell" title={formatCell(row[column])}>
-              {formatCell(row[column])}
+        {table.getHeaderGroups().flatMap((headerGroup) =>
+          headerGroup.headers.map((header) => (
+            <div key={header.id} className="data-grid-cell data-grid-header" role="columnheader" title={String(header.column.columnDef.header)}>
+              {flexRender(header.column.columnDef.header, header.getContext())}
+            </div>
+          )),
+        )}
+        {table.getRowModel().rows.flatMap((row) =>
+          row.getVisibleCells().map((cell) => (
+            <div key={cell.id} className="data-grid-cell" role="gridcell" title={formatCell(cell.getValue())}>
+              {flexRender(cell.column.columnDef.cell, cell.getContext())}
             </div>
           )),
         )}
       </div>
-    </div>
-  );
-}
-
-function MermaidPreview({ source }: { source: string }) {
-  const elementId = useId().replace(/:/g, "");
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [error, setError] = useState<string | null>(null);
-  const diagramSource = useMemo(() => source.trim(), [source]);
-  useEffect(() => {
-    let cancelled = false;
-    const render = async () => {
-      try {
-        const mermaid = (await import("mermaid")).default;
-        mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: resolveMermaidTheme() });
-        const { svg } = await mermaid.render(`onetool-display-${elementId}`, diagramSource);
-        if (cancelled || !containerRef.current) return;
-        containerRef.current.innerHTML = svg;
-        setError(null);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
-      }
-    };
-    void render();
-    return () => {
-      cancelled = true;
-    };
-  }, [diagramSource, elementId]);
-  return (
-    <div className="mermaid-preview">
-      <div ref={containerRef} className="mermaid-canvas" />
-      {error ? (
-        <>
-          <p className="error-text">{error}</p>
-          <MarkdownRenderer text={`\`\`\`mermaid\n${diagramSource}\n\`\`\``} />
-        </>
-      ) : null}
     </div>
   );
 }
@@ -130,35 +114,35 @@ function stringContent(content: unknown): string {
   return JSON.stringify(content, null, 2);
 }
 
-function formatJson(content: unknown, text: string): string {
-  try {
-    return JSON.stringify(typeof content === "string" ? JSON.parse(content) : content, null, 2);
-  } catch {
-    return text;
-  }
-}
-
-function formatYaml(content: unknown, text: string): string {
-  try {
-    const value = typeof content === "string" ? YAML.parse(content) : content;
-    return YAML.stringify(value, { indent: 2, lineWidth: 110 }).trimEnd();
-  } catch {
-    return text;
-  }
-}
-
-function resolveMermaidTheme(): "default" | "dark" {
-  const theme = document.documentElement.dataset.theme;
-  if (theme === "light") return "default";
-  if (theme === "dark") return "dark";
-  return window.matchMedia("(prefers-color-scheme: light)").matches ? "default" : "dark";
-}
-
 function formatCell(value: unknown): string {
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   if (value === null || value === undefined) return "";
   return JSON.stringify(value);
+}
+
+function useFilePreviewText(api: DisplayApi, message: MessageMetadata, fallbackText: string): string {
+  const [previewText, setPreviewText] = useState<string | null>(null);
+  const path = message.payload.path;
+  useEffect(() => {
+    let cancelled = false;
+    setPreviewText(null);
+    if (!path || fallbackText) return;
+    void api.preview(path).then((preview) => {
+      if (!cancelled) setPreviewText(preview.text);
+    }).catch(() => {
+      if (!cancelled) setPreviewText("");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [api, fallbackText, path]);
+  return previewText ?? fallbackText;
+}
+
+function fileName(path: string | null | undefined): string | null {
+  if (!path) return null;
+  return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
 }
 
 function resolveFileViewerKind(message: MessageMetadata): "markdown" | "json" | "yaml" | "code" | "raw" {

@@ -91,7 +91,10 @@ def _format_general_help() -> str:
 ## Info Levels
   info="min"     - Names only
   info="default" - Name + description (default)
-  info="full"    - Everything (includes instructions)
+  info="full"    - Full list view; use detail helpers for signatures
+
+List commands stay compact. Use ot.tool_info(name="pack.tool") for signatures
+and args, and ot.pack_info(name="pack") for pack instructions.
 
 ## Quick Examples
   brave.search(query="AI news")

@@ -28,6 +28,7 @@ class TestHelp:
         assert "tool_info" in result
         assert "pack_info" in result
         assert "ot.status()" in result
+        assert "Use ot.tool_info" in result
 
     def test_tool_lookup_exact(self) -> None:
         """Exact tool name returns detailed tool help."""

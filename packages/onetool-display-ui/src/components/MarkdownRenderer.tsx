@@ -17,31 +17,33 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ text, copyCode 
   const { codeTheme } = useDisplaySettings();
   const themeName = resolveDiffThemeName(codeTheme);
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      components={{
-        pre({ children }) {
-          const code = nodeToPlainText(children);
-          const className = extractCodeClassName(children);
-          return (
-            <MarkdownCodeBlock code={code} copyCode={copyCode}>
-              <Suspense fallback={<pre className="code-block"><code>{code}</code></pre>}>
-                <HighlightedCodeBlock code={code} className={className} themeName={themeName} />
-              </Suspense>
-            </MarkdownCodeBlock>
-          );
-        },
-        a({ href, children }) {
-          return (
-            <a href={href} rel="noreferrer" target="_blank">
-              {children}
-            </a>
-          );
-        },
-      }}
-    >
-      {text}
-    </ReactMarkdown>
+    <div className="markdown-viewer">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          pre({ children }) {
+            const code = nodeToPlainText(children);
+            const className = extractCodeClassName(children);
+            return (
+              <MarkdownCodeBlock code={code} copyCode={copyCode}>
+                <Suspense fallback={<pre className="code-block"><code>{code}</code></pre>}>
+                  <HighlightedCodeBlock code={code} className={className} themeName={themeName} />
+                </Suspense>
+              </MarkdownCodeBlock>
+            );
+          },
+          a({ href, children }) {
+            return (
+              <a href={href} rel="noreferrer" target="_blank">
+                {children}
+              </a>
+            );
+          },
+        }}
+      >
+        {text}
+      </ReactMarkdown>
+    </div>
   );
 });
 

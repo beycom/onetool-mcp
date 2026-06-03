@@ -8,12 +8,10 @@ export interface DisplayStore {
   api: DisplayApi;
   messages: MessageMetadata[];
   selectedId: string | null;
-  expandedIds: ReadonlySet<string>;
   payloadById: ReadonlyMap<string, PayloadView>;
   error: string | null;
   refresh: () => Promise<void>;
   loadPayload: (id: string) => void;
-  toggleExpanded: (id: string) => void;
   focusMessage: (id: string) => void;
 }
 
@@ -21,7 +19,6 @@ export function useDisplayStore(location: Location): DisplayStore {
   const api = useMemo(() => new DisplayApi(location), [location]);
   const [messages, setMessages] = useState<MessageMetadata[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [payloadById, setPayloadById] = useState<ReadonlyMap<string, PayloadView>>(() => new Map());
   const [error, setError] = useState<string | null>(null);
   const payloadByIdRef = useRef(payloadById);
@@ -49,9 +46,8 @@ export function useDisplayStore(location: Location): DisplayStore {
 
   const refresh = useCallback(async () => {
     try {
-      const list = await api.list();
+      const list = await api.list(300, { tail: true });
       setMessages((current) => preserveMessageReferences(current, list.items));
-      setExpandedIds((current) => mergeInitialExpansion(current, list.items));
       setPayloadById((current) => prunePayloadCache(current, list.items));
       setError(null);
     } catch (err) {
@@ -61,29 +57,12 @@ export function useDisplayStore(location: Location): DisplayStore {
 
   const focusMessage = useCallback((id: string) => {
     setSelectedId(id);
-    setExpandedIds((current) => new Set(current).add(id));
-  }, []);
-
-  const toggleExpanded = useCallback(
-    (id: string) => {
-      setExpandedIds((current) => {
-        const next = new Set(current);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        return next;
-      });
-      loadPayload(id);
-    },
-    [loadPayload],
-  );
+    loadPayload(id);
+  }, [loadPayload]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
-
-  useEffect(() => {
-    for (const id of expandedIds) loadPayload(id);
-  }, [expandedIds, loadPayload]);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,7 +81,7 @@ export function useDisplayStore(location: Location): DisplayStore {
     };
   }, [api, focusMessage, refresh]);
 
-  return { api, messages, selectedId, expandedIds, payloadById, error, refresh, loadPayload, toggleExpanded, focusMessage };
+  return { api, messages, selectedId, payloadById, error, refresh, loadPayload, focusMessage };
 }
 
 function withPayloadCacheLimit(payloads: Map<string, PayloadView>): Map<string, PayloadView> {
@@ -162,28 +141,8 @@ function shallowMessageEqual(left: MessageMetadata, right: MessageMetadata): boo
     left.status === right.status &&
     left.payload.size_bytes === right.payload.size_bytes &&
     left.payload.path === right.payload.path &&
+    left.payload.old_path === right.payload.old_path &&
+    left.payload.new_path === right.payload.new_path &&
     left.payload.language === right.payload.language
   );
-}
-
-function mergeInitialExpansion(
-  current: ReadonlySet<string>,
-  messages: ReadonlyArray<MessageMetadata>,
-): ReadonlySet<string> {
-  const next = new Set(current);
-  for (const message of messages) {
-    if (next.has(message.id)) continue;
-    if (shouldStartExpanded(message)) next.add(message.id);
-  }
-  return next;
-}
-
-function shouldStartExpanded(message: MessageMetadata): boolean {
-  if (message.expand === "expanded") return true;
-  if (message.expand === "collapsed") return false;
-  if (message.kind === "image") return true;
-  const previewLines = message.preview_lines ?? 0;
-  if (previewLines <= 1) return false;
-  if (previewLines > 18) return false;
-  return ["text", "markdown", "json", "yaml", "code"].includes(message.kind);
 }

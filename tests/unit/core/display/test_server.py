@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path  # noqa: TC003 - pytest fixture annotation only.
 from urllib.error import HTTPError
 from urllib.parse import urlencode
@@ -8,8 +9,9 @@ from urllib.request import Request, urlopen
 
 import pytest
 
+from ot.admin.routes.display import _inject_display_bootstrap
 from ot.display.server import ensure_server
-from ot.display.state import STATE
+from ot.display.state import STATE, short_instance_id
 
 
 @pytest.mark.unit
@@ -22,23 +24,64 @@ class TestDisplayServer:
 
         assert base_url.startswith("http://127.0.0.1:")
 
+    def test_admin_health_route(self) -> None:
+        base_url = ensure_server()
+
+        health = _get_json(f"{base_url}/api/admin/health")
+
+        assert health == {"status": "ok", "service": "onetool-admin"}
+
     def test_scoped_status_and_message_routes(self) -> None:
         base_url = ensure_server()
         status = STATE.status(base_url=base_url)
-        token = status.url.split("token=", 1)[1]
+        token = _instance_token()
         payload = {"kind": "text", "content": "route payload", "title": "Route"}
 
         created = _post_json(
-            f"{base_url}/api/instances/{status.mcp_instance_id}/messages?{urlencode({'token': token})}",
+            f"{base_url}/api/display/instances/{status.mcp_instance_id}/messages?{urlencode({'token': token})}",
             payload,
         )
         read = _get_json(
-            f"{base_url}/api/instances/{status.mcp_instance_id}/messages/{created['id']}?{urlencode({'token': token})}"
+            f"{base_url}/api/display/instances/{status.mcp_instance_id}/messages/{created['id']}?{urlencode({'token': token})}"
         )
 
-        assert created["id"].startswith("msg-")
+        assert re.fullmatch(r"[0-9a-f]{12}", created["id"]) is not None
         assert read["metadata"]["id"] == created["id"]
         assert read["preview"]["text"] == "route payload"
+
+    def test_status_url_uses_short_browser_instance_without_token(self) -> None:
+        base_url = ensure_server()
+        status = STATE.status(base_url=base_url)
+
+        assert status.url == f"{base_url}/display/{short_instance_id(status.mcp_instance_id)}"
+        assert "token=" not in status.url
+
+    def test_short_browser_route_bootstraps_full_api_credentials(self) -> None:
+        base_url = ensure_server()
+        status = STATE.status(base_url=base_url)
+
+        with urlopen(status.url, timeout=5) as response:
+            html = response.read().decode("utf-8")
+
+        assert response.headers["content-type"].startswith("text/html")
+        assert status.mcp_instance_id in html
+        assert _instance_token() in html
+        assert '<script type="module">' in html
+
+    def test_bootstrap_injection_ignores_head_tags_inside_inline_scripts(self) -> None:
+        html = (
+            "<!doctype html><html><head>"
+            "<script>const fragment = `<html><head></head><body></body></html>`;</script>"
+            "</head><body><div id=\"onetool-display-root\"></div></body></html>"
+        )
+        bootstrap = "<script>window.__ONETOOL_DISPLAY_BOOTSTRAP__={};</script>"
+
+        result = _inject_display_bootstrap(html, bootstrap)
+
+        assert result.count(bootstrap) == 1
+        assert result.index(bootstrap) > result.index("</script>")
+        assert result.index(bootstrap) < result.rindex("</head>")
+        assert "<head><script>window.__ONETOOL_DISPLAY_BOOTSTRAP__" not in result
 
     def test_rejects_wrong_instance_token(self) -> None:
         base_url = ensure_server()
@@ -46,7 +89,7 @@ class TestDisplayServer:
 
         with pytest.raises(HTTPError) as exc:
             _get_json(
-                f"{base_url}/api/instances/{status.mcp_instance_id}/messages?token=wrong"
+                f"{base_url}/api/display/instances/{status.mcp_instance_id}/messages?token=wrong"
             )
 
         assert exc.value.code == 403
@@ -60,10 +103,10 @@ class TestDisplayServer:
         monkeypatch.setenv("OT_CWD", str(workspace))
         base_url = ensure_server()
         status = STATE.status(base_url=base_url)
-        token = status.url.split("token=", 1)[1]
+        token = _instance_token()
 
         preview = _get_json(
-            f"{base_url}/api/instances/{status.mcp_instance_id}/preview?{urlencode({'token': token, 'path': 'result.txt'})}"
+            f"{base_url}/api/display/instances/{status.mcp_instance_id}/preview?{urlencode({'token': token, 'path': 'result.txt'})}"
         )
 
         assert preview["text"] == "preview text"
@@ -76,10 +119,10 @@ class TestDisplayServer:
         monkeypatch.setenv("OT_CWD", str(tmp_path))
         base_url = ensure_server()
         status = STATE.status(base_url=base_url)
-        token = status.url.split("token=", 1)[1]
+        token = _instance_token()
 
         preview = _get_json(
-            f"{base_url}/api/instances/{status.mcp_instance_id}/preview?{urlencode({'token': token, 'path': 'result.txt', 'limit': '3'})}"
+            f"{base_url}/api/display/instances/{status.mcp_instance_id}/preview?{urlencode({'token': token, 'path': 'result.txt', 'limit': '3'})}"
         )
 
         assert preview["text"] == "abc"
@@ -97,11 +140,11 @@ class TestDisplayServer:
         monkeypatch.setenv("OT_CWD", str(workspace))
         base_url = ensure_server()
         status = STATE.status(base_url=base_url)
-        token = status.url.split("token=", 1)[1]
+        token = _instance_token()
 
         with pytest.raises(HTTPError) as exc:
             _get_json(
-                f"{base_url}/api/instances/{status.mcp_instance_id}/preview?{urlencode({'token': token, 'path': '../outside.txt'})}"
+                f"{base_url}/api/display/instances/{status.mcp_instance_id}/preview?{urlencode({'token': token, 'path': '../outside.txt'})}"
             )
 
         assert exc.value.code == 403
@@ -109,14 +152,14 @@ class TestDisplayServer:
     def test_payload_route_returns_inline_content(self) -> None:
         base_url = ensure_server()
         status = STATE.status(base_url=base_url)
-        token = status.url.split("token=", 1)[1]
+        token = _instance_token()
         created = _post_json(
-            f"{base_url}/api/instances/{status.mcp_instance_id}/messages?{urlencode({'token': token})}",
+            f"{base_url}/api/display/instances/{status.mcp_instance_id}/messages?{urlencode({'token': token})}",
             {"kind": "table", "content": [{"name": "Ada", "score": 10}]},
         )
 
         payload = _get_json(
-            f"{base_url}/api/instances/{status.mcp_instance_id}/messages/{created['id']}/payload?{urlencode({'token': token})}"
+            f"{base_url}/api/display/instances/{status.mcp_instance_id}/messages/{created['id']}/payload?{urlencode({'token': token})}"
         )
 
         assert payload["content"] == [{"name": "Ada", "score": 10}]
@@ -133,10 +176,10 @@ class TestDisplayServer:
         monkeypatch.setenv("OT_CWD", str(tmp_path))
         base_url = ensure_server()
         status = STATE.status(base_url=base_url)
-        token = status.url.split("token=", 1)[1]
+        token = _instance_token()
 
         with urlopen(
-            f"{base_url}/api/instances/{status.mcp_instance_id}/asset?{urlencode({'token': token, 'path': 'pixel.png'})}",
+            f"{base_url}/api/display/instances/{status.mcp_instance_id}/asset?{urlencode({'token': token, 'path': 'pixel.png'})}",
             timeout=5,
         ) as response:
             assert response.headers["content-type"] == "image/png"
@@ -147,13 +190,13 @@ class TestDisplayServer:
         target.write_text("ok", encoding="utf-8")
         monkeypatch.setenv("OT_CWD", str(tmp_path))
         opened_paths: list[Path] = []
-        monkeypatch.setattr("ot.display.server._open_path", lambda path: opened_paths.append(path) is None or True)
+        monkeypatch.setattr("ot.admin.routes.display._open_path", lambda path: opened_paths.append(path) is None or True)
         base_url = ensure_server()
         status = STATE.status(base_url=base_url)
-        token = status.url.split("token=", 1)[1]
+        token = _instance_token()
 
         result = _post_json(
-            f"{base_url}/api/instances/{status.mcp_instance_id}/open?{urlencode({'token': token})}",
+            f"{base_url}/api/display/instances/{status.mcp_instance_id}/open?{urlencode({'token': token})}",
             {"path": "result.txt"},
         )
 
@@ -177,3 +220,7 @@ def _post_json(url: str, payload: dict[str, object]) -> dict[str, object]:
     )
     with urlopen(request, timeout=5) as response:
         return json.loads(response.read().decode("utf-8"))
+
+
+def _instance_token() -> str:
+    return STATE.get_or_create_instance().token

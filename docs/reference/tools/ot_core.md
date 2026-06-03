@@ -131,7 +131,7 @@ ot.tools(pattern="search")
 # Names only
 ot.tools(info="min")
 
-# Full details (name, description, source)
+# Full list details (name, description, source)
 ot.tools(pattern="brave.", info="full")
 
 # Get signature + args for a specific tool
@@ -144,7 +144,7 @@ ot.tool_info(pattern="brave.")
 ot.tool_info(name="brave.search", info="min")
 ```
 
-`tools()` returns list-mode info (compact). `tool_info()` returns detail-mode info (signatures, args, returns, examples).
+`tools()` returns list-mode info (compact), including for `info="full"`. `tool_info()` returns detail-mode info with signatures, args, returns, and examples.
 
 ## ot.packs() / ot.pack_info()
 

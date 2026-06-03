@@ -1,13 +1,14 @@
 # Display
 
-Local browser display service for rich, user-visible artifacts.
+Local admin dashboard route for rich, user-visible artifacts.
 
 ## Highlights
 
-- Starts lazily on the first `display.*` call and binds to `127.0.0.1`
-- Returns a per-running-MCP-process URL from `display.status()`
-- Stores messages in memory for the current process only
-- Loads payloads lazily in a t3code-derived React timeline UI with content-aware markdown, code, diff, JSON, YAML, table, and file renderers
+- Starts a Starlette-backed local admin service lazily on the first `display.*` call and binds to `127.0.0.1`
+- Returns a compact high-entropy per-running-MCP-process browser URL from `display.status()`
+- Keeps bounded hot and cold message windows for the current process, with cold records cached under project-local display state
+- Loads payloads lazily in a t3code-derived React timeline UI with fixed row previews, a side inspector, content-aware markdown, code, diff, JSON/YAML tree/source, Mermaid render/source, table, and file renderers
+- Loads the latest timeline page on browser startup in high-volume sessions while preserving oldest-to-newest visual order within the loaded page
 - Restricts file previews and open actions to the current workspace root
 
 ## Functions
@@ -19,6 +20,7 @@ Local browser display service for rich, user-visible artifacts.
 | `display.read(id)` | Return message metadata, payload references, and bounded preview only |
 | `display.focus(id)` | Ask connected display clients to scroll to a message |
 | `display.list(...)` | Return a paginated metadata-only message list |
+| `display.seed_mock_messages(...)` | TEST ONLY: seed representative UI fixture messages for every V1 kind |
 
 ## Key Parameters
 
@@ -28,16 +30,16 @@ Local browser display service for rich, user-visible artifacts.
 | `content` | str\|dict\|list | Inline payload for text-like, structured, diff, and table messages |
 | `path` | str | Workspace-local path for file, image, or file-diff payloads |
 | `old_path` / `new_path` | str | Workspace-local paths used to generate a file diff |
-| `title` | str | Optional display title for the timeline row |
-| `summary` | str | Optional lightweight timeline summary |
+| `title` | str | Optional display title metadata |
+| `summary` | str | Optional lightweight summary metadata |
 | `source` | str | Optional producer or workflow label |
 | `expand` | str | Initial browser expansion mode: `auto`, `collapsed`, or `expanded` |
-| `id` | str | Stable display message ID returned by `display.show(...)` |
-| `limit` / `offset` | int | Pagination controls for `display.list(...)`; `limit` is bounded to 1-500 |
+| `id` | str | Stable 12-character lowercase hex display message ID returned by `display.show(...)` |
+| `limit` / `offset` | int | Pagination controls for `display.list(...)`; `limit` must be 1-500 and `offset` must be 0 or greater |
 
 ## Requires
 
-None - no secrets or external services required. The browser UI build uses the local `packages/onetool-display-ui` React/TypeScript project during development.
+None - no secrets or external services required. The browser UI build uses the local `packages/onetool-display-ui` Vite + React + TypeScript project during development.
 
 ## Configuration
 
@@ -55,21 +57,23 @@ tools: {}
 
 ### Defaults
 
-- The display server binds to `127.0.0.1` on an ephemeral local port.
-- Display state is in-memory and scoped to the current running MCP process.
+- The admin server binds to `127.0.0.1` on an ephemeral local port.
+- Display hot state is in-memory and scoped to the current running MCP process; a bounded cold message window may be cached under the project-local display state directory.
 - File access is limited to the effective OneTool cwd.
 
 ## Supported Kinds
 
 V1 accepts `text`, `markdown`, `code`, `file`, `diff`, `file_diff`, `image`, `json`, `mermaid`, `yaml`, and `table`.
 
-The browser UI uses a t3code-derived React architecture: `@legendapp/list` for the virtualized timeline, `react-markdown` with GFM for markdown, `@pierre/diffs` for diff parsing/rendering, Mermaid for in-browser diagram rendering, `yaml` for YAML formatting, and renderer-specific lazy payload expansion. File messages route through markdown, JSON, YAML, code, or raw text viewers based on metadata and extension hints. Large payloads use bounded previews and raw fallbacks.
+The browser UI uses the local admin frontend foundation: Vite, React, TypeScript, TanStack Router, TanStack Query, TanStack Table, Radix-compatible primitives, Tailwind as the styling foundation, Recharts availability, and lucide icons. Display keeps its t3code-derived architecture: `@legendapp/list` for the virtualized timeline, `react-markdown` with GFM for markdown, `@pierre/diffs` for code/diff rendering, Mermaid for in-browser diagram rendering, `yaml` for YAML parsing, and renderer-specific lazy payload loading. File messages route through markdown, JSON, YAML, code, or raw text viewers based on metadata and extension hints, with a compact filename header above file-backed payloads and full paths kept in message info/actions instead of footer metadata. File-backed source renderers do not duplicate the filename inside the payload body, and footer message IDs show the full 12-character display ID. Browser-rendered timestamps use `HH:mm, dd-Mon` format, such as `23:01, 03-Jun`. Large payloads use bounded row previews, side-panel inspection, bounded previews, and raw fallbacks; table previews render directly as a bounded grid without row/column truncation status text. Structured JSON/YAML tree/source toggles size to their content instead of stretching across the message body. Text messages render as plain content by default, not as code-style raw blocks. Inline timeline rows expose copy content and side-panel open actions; openable file-backed timeline rows add an open action after those controls. File side-panel rows expose the overflow menu followed by open-file. Secondary actions such as path copy and rich/raw view controls live behind a text-labeled overflow menu. The side panel uses the same compact message layout as timeline rows, with floating actions and no separate inspector header band. Recent messages are loaded first in the browser, a scroll-to-bottom control appears when the user is away from the latest messages, and renderer failures are isolated to the affected message card or inspector payload.
+
+Generated `file_diff` messages keep old and new source paths as separate payload metadata fields. File-backed diff payloads use `path` for the referenced diff file.
 
 ## Limits
 
 Display keeps memory bounded during long sessions:
 
-- Retains up to 1,000 message metadata records per running MCP process.
+- Keeps only the hot message window in memory while allowing a bounded cold message window to be read from project-local display cache state.
 - Returns file, inline string, and generated preview text in 64 KiB windows.
 - Keeps inline list payload views to the first 500 items.
 - Skips generated file diffs when either input file is larger than 1 MiB.
@@ -79,11 +83,11 @@ Display keeps memory bounded during long sessions:
 
 ## Security And Persistence
 
-The service is local-only and binds to `127.0.0.1`. Browser and API routes are scoped by the generated MCP instance ID plus an instance token in the returned URL.
+The service is local-only and binds to `127.0.0.1`. `display.status()` returns a compact high-entropy browser route such as `/display/0821a4b75d1e8c31`; the browser page bootstraps full API credentials for that page. Display API routes live under `/api/display/instances/{instance_id}/...` and remain scoped by the generated MCP instance ID plus an instance token. The admin service also exposes `/api/admin/health`.
 
 File and image payloads must use workspace-local paths. Remote URLs, untrusted `file://` URLs, path traversal outside the workspace, HTML kinds, and terminal/log kinds are rejected.
 
-Display state is in-session only. A OneTool MCP process restart creates fresh display state; there is no V1 persistence guarantee.
+Display state is in-session only. A OneTool MCP process restart creates fresh display state; cached cold-message records are an internal memory-pressure detail, not durable storage or a V1 recovery guarantee.
 
 ## Examples
 
@@ -104,7 +108,10 @@ display.show(kind="file", title="Test output", path="tmp/test-output.txt")
 display.show(kind="table", title="Scores", content=[{"name": "Ada", "score": 10}])
 
 # Focus an existing display message
-display.focus(id="msg_...")
+display.focus(id="a1b2c3d4e5f6")
+
+# TEST ONLY: seed UI fixture messages during display/admin development
+display.seed_mock_messages()
 ```
 
 ## V1 Exclusions
