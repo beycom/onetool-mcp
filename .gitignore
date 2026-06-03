@@ -125,6 +125,7 @@ demo/tmp/
 .localhist/
 .mcp.json
 .playwright-mcp/
+.codegraph/
 
 # Worktree state files
 .gitworktree.json
