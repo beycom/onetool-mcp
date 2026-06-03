@@ -1,4 +1,4 @@
-import { CheckIcon, ChevronDownIcon, ChevronRightIcon, ClockIcon, CopyIcon, ExternalLinkIcon, FileTextIcon, PanelRightOpenIcon, ScrollTextIcon } from "lucide-react";
+import { AlertCircleIcon, CheckIcon, ClockIcon, CopyIcon, ExternalLinkIcon, FileTextIcon, PanelRightOpenIcon, ScrollTextIcon } from "lucide-react";
 import { memo, useCallback, useState } from "react";
 import type { DisplayApi } from "../api/displayApi";
 import type { MessageMetadata, PayloadView } from "../types";
@@ -23,56 +23,118 @@ export const MessageRow = memo(function MessageRow({
 }) {
   return (
     <article className={selected ? "message-row selected" : "message-row"} data-message-id={message.id}>
-      <div className="row-header">
-        <button type="button" className="row-toggle" onClick={() => onToggle(message.id)} aria-expanded={expanded}>
-          {expanded ? <ChevronDownIcon size={16} /> : <ChevronRightIcon size={16} />}
+      <div className="message-toolbar">
+        <div className="message-title">
           <span className={`kind kind-${message.kind}`}>{message.kind}</span>
-          <span className="row-copy">
-            <strong>{message.title || message.summary || message.id}</strong>
-            {message.summary && message.summary !== message.title ? <small>{message.summary}</small> : null}
-            <MessageHeaderMeta message={message} />
-          </span>
-        </button>
-        <div className="row-actions">
-          <CopyMessageButton api={api} message={message} payload={payload} kind="content" />
-          {message.payload.path ? <CopyMessageButton api={api} message={message} payload={payload} kind="path" /> : null}
-          {message.payload.path ? <OpenFileButton api={api} path={message.payload.path} /> : null}
-          <button type="button" className="icon-button row-action" onClick={() => onOpenPanel(message.id)} aria-label="Open message in side panel" title="Open in side panel">
-            <PanelRightOpenIcon size={14} />
-          </button>
+          <strong>{message.title || message.summary || message.id}</strong>
+        </div>
+        <div className="message-actions">
+          <MessageActions api={api} message={message} payload={payload} onOpenPanel={onOpenPanel} />
         </div>
       </div>
-      {expanded ? (
+      <div className={`preview-wrap${expanded ? "" : " is-collapsed"}${message.preview_lines && message.preview_lines > 5 ? " truncated" : ""}`}>
         <div className="payload-panel">
-          <PayloadRenderer api={api} message={message} payload={payload} />
+          {expanded || payload ? <PayloadRenderer api={api} message={message} payload={payload} /> : <CollapsedPreview message={message} />}
         </div>
-      ) : null}
+        <button type="button" className="preview-toggle" onClick={() => onToggle(message.id)} aria-expanded={expanded}>
+          {expanded ? "collapse" : "expand"}
+        </button>
+      </div>
+      <footer className="message-meta">
+        <MessageHeaderMeta message={message} />
+        <span className="message-id" title={message.id}>{message.id}</span>
+      </footer>
     </article>
   );
 });
 
-function MessageHeaderMeta({ message }: { message: MessageMetadata }) {
+function CollapsedPreview({ message }: { message: MessageMetadata }) {
   return (
-    <span className="row-header-meta">
+    <pre className="raw-block preview-placeholder">
+      {message.summary || message.title || message.id}
+    </pre>
+  );
+}
+
+export function MessageActions({
+  api,
+  message,
+  payload,
+  onOpenPanel,
+}: {
+  api: DisplayApi;
+  message: MessageMetadata;
+  payload: PayloadView | undefined;
+  onOpenPanel?: (id: string) => void;
+}) {
+  return (
+    <>
+      <CopyMessageButton api={api} message={message} payload={payload} kind="content" />
+      {message.payload.path ? <CopyMessageButton api={api} message={message} payload={payload} kind="path" /> : null}
+      {message.payload.path ? <OpenFileButton api={api} path={message.payload.path} /> : null}
+      {onOpenPanel ? (
+          <button type="button" className="icon-button row-action" onClick={() => onOpenPanel(message.id)} aria-label="Open message in side panel" title="Open in side panel">
+            <PanelRightOpenIcon size={14} />
+          </button>
+      ) : null}
+    </>
+  );
+}
+
+export function MessageHeaderMeta({ message }: { message: MessageMetadata }) {
+  return (
+    <>
+      <span className="row-header-meta-item" title="Message size">
+        <ScrollTextIcon size={13} />
+        <span>{formatBytes(message.payload.size_bytes)}</span>
+      </span>
+      <span className="row-header-meta-item" title="Preview line count">
+        <span>{message.preview_lines ?? 0} lines</span>
+      </span>
+      <span className="row-header-meta-item" title={message.created_at}>
+        <ClockIcon size={13} />
+        <span>{formatTimestamp(message.created_at)}</span>
+      </span>
       {message.payload.path ? (
         <span className="row-header-meta-item row-path" title={message.payload.path}>
           <FileTextIcon size={13} />
           <span>{message.payload.path}</span>
         </span>
       ) : null}
-      <span className="row-header-meta-item" title="Message size">
-        <ScrollTextIcon size={13} />
-        <span>{formatBytes(message.payload.size_bytes)}</span>
-      </span>
-      <span className="row-header-meta-item" title={message.created_at}>
-        <ClockIcon size={13} />
-        <span>{formatTimestamp(message.created_at)}</span>
-      </span>
-    </span>
+    </>
   );
 }
 
-function CopyMessageButton({
+export function MessageInfo({ message }: { message: MessageMetadata }) {
+  return (
+    <dl className="message-info">
+      <div>
+        <dt>Kind</dt>
+        <dd>{message.kind}</dd>
+      </div>
+      <div>
+        <dt>Size</dt>
+        <dd>{formatBytes(message.payload.size_bytes)}</dd>
+      </div>
+      <div>
+        <dt>Created</dt>
+        <dd>{formatTimestamp(message.created_at)}</dd>
+      </div>
+      {message.payload.path ? (
+        <div>
+          <dt>Path</dt>
+          <dd title={message.payload.path}>{message.payload.path}</dd>
+        </div>
+      ) : null}
+      <div>
+        <dt>ID</dt>
+        <dd title={message.id}>{message.id}</dd>
+      </div>
+    </dl>
+  );
+}
+
+export function CopyMessageButton({
   api,
   message,
   payload,
@@ -103,20 +165,30 @@ function CopyMessageButton({
   const label = kind === "path" ? "Copy path" : "Copy content";
   return (
     <button type="button" className="icon-button row-action" onClick={copy} aria-label={copied ? `Copied ${kind}` : label} title={label}>
-      {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+      {copied ? <CheckIcon size={14} /> : kind === "path" ? <FileTextIcon size={14} /> : <CopyIcon size={14} />}
     </button>
   );
 }
 
-function OpenFileButton({ api, path }: { api: DisplayApi; path: string }) {
-  const [opened, setOpened] = useState(false);
+export function OpenFileButton({ api, path }: { api: DisplayApi; path: string }) {
+  const [status, setStatus] = useState<"idle" | "opened" | "failed">("idle");
+  const [error, setError] = useState<string | null>(null);
   const open = useCallback(() => {
-    void api.open(path).then((result) => setOpened(result.opened));
+    setStatus("idle");
+    setError(null);
+    void api.open(path).then((result) => {
+      setStatus(result.opened ? "opened" : "failed");
+      setError(result.opened ? null : `Open unavailable for ${result.path}`);
+    }).catch((err: unknown) => {
+      setStatus("failed");
+      setError(err instanceof Error ? err.message : String(err));
+    });
   }, [api, path]);
+  const label = status === "opened" ? "Opened" : status === "failed" ? "Open failed" : "Open";
   return (
-    <button type="button" className="text-button row-open" onClick={open} aria-label="Open file" title="Open file">
-      <ExternalLinkIcon size={14} />
-      {opened ? "Opened" : "Open"}
+    <button type="button" className={`text-button row-open${status === "failed" ? " failed" : ""}`} onClick={open} aria-label={error ?? "Open file"} title={error ?? "Open file"}>
+      {status === "failed" ? <AlertCircleIcon size={14} /> : <ExternalLinkIcon size={14} />}
+      {label}
     </button>
   );
 }

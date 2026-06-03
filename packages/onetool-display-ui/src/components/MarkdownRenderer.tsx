@@ -13,7 +13,7 @@ const MAX_HIGHLIGHTER_PROMISES = 64;
 const highlightedCodeCache = new LRUCache<string>(500, 50 * 1024 * 1024);
 const highlighterPromiseCache = new Map<string, Promise<DiffsHighlighter>>();
 
-export const MarkdownRenderer = memo(function MarkdownRenderer({ text }: { text: string }) {
+export const MarkdownRenderer = memo(function MarkdownRenderer({ text, copyCode = true }: { text: string; copyCode?: boolean }) {
   const { codeTheme } = useDisplaySettings();
   const themeName = resolveDiffThemeName(codeTheme);
   return (
@@ -24,7 +24,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ text }: { text:
           const code = nodeToPlainText(children);
           const className = extractCodeClassName(children);
           return (
-            <MarkdownCodeBlock code={code}>
+            <MarkdownCodeBlock code={code} copyCode={copyCode}>
               <Suspense fallback={<pre className="code-block"><code>{code}</code></pre>}>
                 <HighlightedCodeBlock code={code} className={className} themeName={themeName} />
               </Suspense>
@@ -45,7 +45,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ text }: { text:
   );
 });
 
-function MarkdownCodeBlock({ code, children }: { code: string; children: ReactNode }) {
+function MarkdownCodeBlock({ code, copyCode, children }: { code: string; copyCode: boolean; children: ReactNode }) {
   const [copied, setCopied] = useState(false);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copy = useCallback(() => {
@@ -63,9 +63,11 @@ function MarkdownCodeBlock({ code, children }: { code: string; children: ReactNo
   );
   return (
     <div className="code-shell">
-      <button type="button" className="icon-button code-copy" onClick={copy} aria-label={copied ? "Copied" : "Copy code"}>
-        {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
-      </button>
+      {copyCode ? (
+        <button type="button" className="icon-button code-copy" onClick={copy} aria-label={copied ? "Copied" : "Copy code"}>
+          {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+        </button>
+      ) : null}
       {children}
     </div>
   );

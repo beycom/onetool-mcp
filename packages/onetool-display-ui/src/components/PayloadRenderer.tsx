@@ -1,5 +1,4 @@
-import { CheckIcon, CopyIcon } from "lucide-react";
-import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
 import * as YAML from "yaml";
 import type { MessageMetadata, PayloadView } from "../types";
 import { DiffRenderer } from "./DiffRenderer";
@@ -28,19 +27,22 @@ export const PayloadRenderer = memo(function PayloadRenderer({
   if (message.kind === "json" || message.kind === "yaml" || message.kind === "mermaid" || message.kind === "table") {
     return <StructuredRenderer message={message} text={text} content={payload.content} />;
   }
-  if (message.kind === "file") return <FileRenderer text={text} />;
+  if (message.kind === "file") return <FileRenderer message={message} text={text} content={payload.content} />;
   return <CodeLikeRenderer message={message} text={text} />;
 });
 
-function FileRenderer({ text }: { text: string }) {
-  return (
-    <pre className="raw-block">{text}</pre>
-  );
+function FileRenderer({ message, text, content }: { message: MessageMetadata; text: string; content: unknown }) {
+  const fileKind = resolveFileViewerKind(message);
+  if (fileKind === "markdown") return <MarkdownRenderer text={text} copyCode={false} />;
+  if (fileKind === "json") return <MarkdownRenderer text={`\`\`\`json\n${formatJson(content, text)}\n\`\`\``} copyCode={false} />;
+  if (fileKind === "yaml") return <MarkdownRenderer text={`\`\`\`yaml\n${formatYaml(content, text)}\n\`\`\``} copyCode={false} />;
+  if (fileKind === "code") return <MarkdownRenderer text={`\`\`\`${resolveFileLanguage(message)}\n${text}\n\`\`\``} copyCode={false} />;
+  return <pre className="raw-block">{text}</pre>;
 }
 
 function CodeLikeRenderer({ message, text }: { message: MessageMetadata; text: string }) {
   if (message.kind === "code") {
-    return <MarkdownRenderer text={`\`\`\`${message.payload.language ?? ""}\n${text}\n\`\`\``} />;
+    return <MarkdownRenderer text={`\`\`\`${message.payload.language ?? ""}\n${text}\n\`\`\``} copyCode={false} />;
   }
   return <pre className="raw-block">{text}</pre>;
 }
@@ -122,21 +124,6 @@ function MermaidPreview({ source }: { source: string }) {
   );
 }
 
-function CopyButton({ text, label }: { text: string; label: string }) {
-  const [copied, setCopied] = useState(false);
-  const copy = useCallback(() => {
-    void navigator.clipboard?.writeText(text).then(() => {
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1200);
-    });
-  }, [text]);
-  return (
-    <button type="button" className="icon-button" onClick={copy} title={label} aria-label={label}>
-      {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
-    </button>
-  );
-}
-
 function stringContent(content: unknown): string {
   if (typeof content === "string") return content;
   if (content === undefined || content === null) return "";
@@ -173,3 +160,96 @@ function formatCell(value: unknown): string {
   if (value === null || value === undefined) return "";
   return JSON.stringify(value);
 }
+
+function resolveFileViewerKind(message: MessageMetadata): "markdown" | "json" | "yaml" | "code" | "raw" {
+  const language = resolveFileLanguage(message);
+  if (["markdown", "md", "mdx"].includes(language)) return "markdown";
+  if (language === "json") return "json";
+  if (["yaml", "yml"].includes(language)) return "yaml";
+  if (CODE_LANGUAGES.has(language)) return "code";
+  return "raw";
+}
+
+function resolveFileLanguage(message: MessageMetadata): string {
+  const explicit = normalizeLanguage(message.payload.language);
+  if (explicit) return explicit;
+  const mime = normalizeMimeLanguage(message.payload.mime_type);
+  if (mime) return mime;
+  const path = message.payload.path?.toLowerCase() ?? "";
+  for (const [extension, language] of FILE_EXTENSION_LANGUAGES) {
+    if (path.endsWith(extension)) return language;
+  }
+  return "text";
+}
+
+function normalizeLanguage(value: string | null | undefined): string | null {
+  const language = value?.trim().toLowerCase();
+  if (!language) return null;
+  return LANGUAGE_ALIASES.get(language) ?? language;
+}
+
+function normalizeMimeLanguage(value: string | null | undefined): string | null {
+  const mime = value?.split(";")[0]?.trim().toLowerCase();
+  if (!mime) return null;
+  return MIME_LANGUAGES.get(mime) ?? null;
+}
+
+const LANGUAGE_ALIASES = new Map([
+  ["javascript", "js"],
+  ["typescript", "ts"],
+  ["python", "py"],
+  ["shell", "bash"],
+  ["sh", "bash"],
+  ["text/markdown", "markdown"],
+  ["application/json", "json"],
+  ["application/yaml", "yaml"],
+  ["text/yaml", "yaml"],
+]);
+
+const MIME_LANGUAGES = new Map([
+  ["application/json", "json"],
+  ["application/x-yaml", "yaml"],
+  ["application/yaml", "yaml"],
+  ["text/yaml", "yaml"],
+  ["text/markdown", "markdown"],
+  ["text/x-python", "py"],
+  ["application/javascript", "js"],
+  ["text/javascript", "js"],
+  ["text/typescript", "ts"],
+  ["text/x-toml", "toml"],
+]);
+
+const FILE_EXTENSION_LANGUAGES: Array<[string, string]> = [
+  [".mdx", "mdx"],
+  [".md", "markdown"],
+  [".markdown", "markdown"],
+  [".json", "json"],
+  [".yaml", "yaml"],
+  [".yml", "yaml"],
+  [".py", "py"],
+  [".js", "js"],
+  [".jsx", "jsx"],
+  [".ts", "ts"],
+  [".tsx", "tsx"],
+  [".toml", "toml"],
+  [".rs", "rust"],
+  [".go", "go"],
+  [".java", "java"],
+  [".c", "c"],
+  [".h", "c"],
+  [".cpp", "cpp"],
+  [".hpp", "cpp"],
+  [".css", "css"],
+  [".scss", "scss"],
+  [".html", "html"],
+  [".xml", "xml"],
+  [".sql", "sql"],
+  [".sh", "bash"],
+  [".bash", "bash"],
+  [".zsh", "bash"],
+  [".fish", "fish"],
+  [".ini", "ini"],
+  [".dockerfile", "dockerfile"],
+];
+
+const CODE_LANGUAGES = new Set(FILE_EXTENSION_LANGUAGES.map(([, language]) => language).filter((language) => !["markdown", "mdx", "json", "yaml"].includes(language)));

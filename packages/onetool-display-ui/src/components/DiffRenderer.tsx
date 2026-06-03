@@ -5,7 +5,7 @@ import { useDisplaySettings } from "../lib/displaySettings";
 import { getRenderablePatch, resolveDiffThemeName, resolveFileDiffPath } from "../lib/diffRendering";
 
 export const DiffRenderer = memo(function DiffRenderer({ patch }: { patch: string }) {
-  const { wrapDiff } = useDisplaySettings();
+  const { codeTheme, wrapDiff } = useDisplaySettings();
   const renderable = useMemo(() => getRenderablePatch(patch), [patch]);
   if (!renderable) return <p className="muted">No diff content.</p>;
   if (renderable.kind === "raw") {
@@ -20,7 +20,7 @@ export const DiffRenderer = memo(function DiffRenderer({ patch }: { patch: strin
     <div className="diff-stack">
       {renderable.files.map((file) => (
         <div key={file.cacheKey ?? `${file.prevName}:${file.name}`} className="diff-file" data-diff-file-path={resolveFileDiffPath(file)}>
-          <FileDiff fileDiff={file} options={{ theme: resolveDiffThemeName("dark"), overflow: wrapDiff ? "wrap" : "scroll" }} />
+          <FileDiff fileDiff={file} options={{ theme: resolveDiffThemeName(codeTheme), overflow: wrapDiff ? "wrap" : "scroll" }} />
         </div>
       ))}
     </div>

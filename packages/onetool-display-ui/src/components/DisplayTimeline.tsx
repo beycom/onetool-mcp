@@ -45,8 +45,6 @@ export const DisplayTimeline = memo(function DisplayTimeline({ store, onOpenPane
         style={{ height: "100%", minHeight: 0, overflowY: "auto" }}
         contentContainerStyle={{ minHeight: "100%" }}
         recycleItems
-        alignItemsAtEnd
-        maintainScrollAtEnd
         ListHeaderComponent={<div className="timeline-pad" />}
         ListFooterComponent={<div className="timeline-pad" />}
       />
@@ -56,6 +54,12 @@ export const DisplayTimeline = memo(function DisplayTimeline({ store, onOpenPane
 
 function TimelineRow({ row }: { row: DisplayTimelineRow }) {
   const { store, onOpenPanel } = use(TimelineRowCtx);
+  const toggleExpanded = useCallback((id: string) => {
+    store.toggleExpanded(id);
+    window.requestAnimationFrame(() => {
+      document.querySelector(`[data-message-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest" });
+    });
+  }, [store]);
   if (row.kind === "empty") {
     return <div className="empty-state">No display messages yet.</div>;
   }
@@ -66,7 +70,7 @@ function TimelineRow({ row }: { row: DisplayTimelineRow }) {
       expanded={store.expandedIds.has(row.id)}
       selected={store.selectedId === row.id}
       payload={store.payloadById.get(row.id)}
-      onToggle={store.toggleExpanded}
+      onToggle={toggleExpanded}
       onOpenPanel={onOpenPanel}
     />
   );

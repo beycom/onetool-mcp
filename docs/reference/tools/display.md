@@ -7,7 +7,7 @@ Local browser display service for rich, user-visible artifacts.
 - Starts lazily on the first `display.*` call and binds to `127.0.0.1`
 - Returns a per-running-MCP-process URL from `display.status()`
 - Stores messages in memory for the current process only
-- Loads payloads lazily in a t3code-derived React timeline UI with well-maintained renderers
+- Loads payloads lazily in a t3code-derived React timeline UI with content-aware markdown, code, diff, JSON, YAML, table, and file renderers
 - Restricts file previews and open actions to the current workspace root
 
 ## Functions
@@ -63,7 +63,7 @@ tools: {}
 
 V1 accepts `text`, `markdown`, `code`, `file`, `diff`, `file_diff`, `image`, `json`, `mermaid`, `yaml`, and `table`.
 
-The browser UI uses a t3code-derived React architecture: `@legendapp/list` for the virtualized timeline, `react-markdown` with GFM for markdown, `@pierre/diffs` for diff parsing/rendering, Mermaid for in-browser diagram rendering, `yaml` for YAML formatting, and renderer-specific lazy payload expansion. Large payloads use bounded previews and raw fallbacks.
+The browser UI uses a t3code-derived React architecture: `@legendapp/list` for the virtualized timeline, `react-markdown` with GFM for markdown, `@pierre/diffs` for diff parsing/rendering, Mermaid for in-browser diagram rendering, `yaml` for YAML formatting, and renderer-specific lazy payload expansion. File messages route through markdown, JSON, YAML, code, or raw text viewers based on metadata and extension hints. Large payloads use bounded previews and raw fallbacks.
 
 ## Limits
 
@@ -75,6 +75,7 @@ Display keeps memory bounded during long sessions:
 - Skips generated file diffs when either input file is larger than 1 MiB.
 - Keeps up to 100 lazily loaded payload views in the browser cache.
 - Renders table previews as a bounded grid of up to 200 rows by 80 columns.
+- Keeps the browser inspector panel resizable locally, with long payloads using the panel height rather than nested vertical scroll caps.
 
 ## Security And Persistence
 

@@ -86,6 +86,10 @@ The system SHALL keep large display payloads outside model-visible tool response
 - **WHEN** a user expands a display row in the browser UI
 - **THEN** the browser fetches the relevant bounded preview or payload view from the display service
 
+#### Scenario: File previews use content-aware renderers
+- **WHEN** a user opens or expands a file display message with known language, MIME type, or extension metadata
+- **THEN** the browser routes markdown, JSON, YAML, and code-like files through the matching rich renderer while unknown files use a raw text fallback
+
 ### Requirement: Message Metadata Shape
 The system SHALL store display messages as metadata records plus payload references rather than full eager payload records.
 
@@ -123,6 +127,10 @@ The system SHALL enforce bounded in-memory retention for display messages and pa
 #### Scenario: Table grid rendering is bounded
 - **WHEN** a table message contains many rows or columns
 - **THEN** the browser renders a bounded grid preview of up to 200 rows by 80 columns
+
+#### Scenario: Browser side panel uses bounded layout
+- **WHEN** a user opens a long payload in the browser side panel
+- **THEN** the inspector uses the available panel height without nested vertical scroll caps causing scroll bounce
 
 ### Requirement: Display Read Tool
 The system SHALL expose `display.read(id=...)` to return one display message record by ID with metadata, payload references, and bounded preview only.
@@ -200,6 +208,18 @@ The system SHALL provide local browser and API routes scoped to the MCP instance
 #### Scenario: Instance page opens
 - **WHEN** a user opens the URL returned by `display.status()`
 - **THEN** the browser displays the message timeline for that MCP instance
+
+#### Scenario: Browser UI supports message inspection actions
+- **WHEN** a user views a message in the timeline or inspector panel
+- **THEN** the browser exposes copy content, copy path, and controlled file open actions in the message header area, with visible failed-open feedback
+
+#### Scenario: Browser UI follows display theme for rendered diffs
+- **WHEN** a user views parsed diff content in light or dark display mode
+- **THEN** the diff renderer uses the corresponding light or dark code theme
+
+#### Scenario: Browser inspector width is adjustable
+- **WHEN** a user drags the separator between the timeline and inspector
+- **THEN** the browser resizes the inspector within usable minimum widths and preserves that width locally for reloads
 
 #### Scenario: Message creation route stores message
 - **WHEN** the display tool creates a message through the display service

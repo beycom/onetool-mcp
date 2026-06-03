@@ -1,6 +1,7 @@
-import { PanelRightIcon, RefreshCwIcon, SettingsIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { InfoIcon, PanelRightIcon, RefreshCwIcon, SettingsIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { DisplayTimeline } from "./components/DisplayTimeline";
+import { MessageActions, MessageInfo } from "./components/MessageRow";
 import { PayloadRenderer } from "./components/PayloadRenderer";
 import { Popover, PopoverPopup, PopoverTrigger } from "./components/ui/Popover";
 import { DisplaySettingsProvider } from "./lib/displaySettings";
@@ -9,6 +10,10 @@ import { useDisplayStore } from "./lib/displayStore";
 import { useMockDisplayStore } from "./lib/mockDisplayStore";
 
 type ThemeChoice = "system" | "light" | "dark";
+const PANEL_WIDTH_KEY = "onetool.display.sidePanelWidth";
+const DEFAULT_PANEL_WIDTH = 560;
+const MIN_PANEL_WIDTH = 380;
+const MIN_MAIN_WIDTH = 360;
 
 export function App() {
   const useMock = new URLSearchParams(window.location.search).has("mock") || !window.location.pathname.includes("/instances/");
@@ -29,6 +34,7 @@ function DisplayAppShell({ store, label }: { store: DisplayStore; label: string 
   const [theme, setTheme] = useState<ThemeChoice>("system");
   const [panelOpen, setPanelOpen] = useState(true);
   const [panelMessageId, setPanelMessageId] = useState<string | null>(null);
+  const [panelWidth, setPanelWidth] = useState(() => readStoredPanelWidth());
   const [wrapDiff, setWrapDiff] = useState(false);
   const [hideWhitespace, setHideWhitespace] = useState(true);
   useEffect(() => {
@@ -49,9 +55,27 @@ function DisplayAppShell({ store, label }: { store: DisplayStore; label: string 
     store.loadPayload(id);
   }, [store]);
   const panelLabel = panelOpen ? "Hide message inspector" : "Show message inspector";
+  const shellStyle = panelOpen ? ({ "--side-panel-width": `${panelWidth}px` } as CSSProperties) : undefined;
+  const startPanelResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = panelWidth;
+    const maxWidth = Math.max(MIN_PANEL_WIDTH, window.innerWidth - MIN_MAIN_WIDTH);
+    const onMove = (moveEvent: PointerEvent) => {
+      const nextWidth = clamp(startWidth + startX - moveEvent.clientX, MIN_PANEL_WIDTH, maxWidth);
+      setPanelWidth(nextWidth);
+      window.localStorage.setItem(PANEL_WIDTH_KEY, String(nextWidth));
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+  }, [panelWidth]);
   return (
     <DisplaySettingsProvider value={{ wrapDiff, hideWhitespace, codeTheme }}>
-      <main className={`app-shell${panelOpen ? " panel-open" : ""}${wrapDiff ? " diff-wrap" : ""}${hideWhitespace ? " hide-whitespace" : ""}`}>
+      <main className={`app-shell${panelOpen ? " panel-open" : ""}${wrapDiff ? " diff-wrap" : ""}${hideWhitespace ? " hide-whitespace" : ""}`} style={shellStyle}>
         <div className="main-column">
           <header className="topbar">
             <div>
@@ -95,13 +119,28 @@ function DisplayAppShell({ store, label }: { store: DisplayStore; label: string 
           </section>
         </div>
         {panelOpen ? (
+          <>
+          <div className="panel-resizer" role="separator" aria-label="Resize message inspector" aria-orientation="vertical" onPointerDown={startPanelResize} />
           <aside className="right-panel" aria-label="Display message inspector">
             <section className="inspector-section" aria-label="Selected message content">
               {selectedPanelMessage ? (
                 <>
                   <div className="inspector-header">
-                    <span className={`kind kind-${selectedPanelMessage.kind}`}>{selectedPanelMessage.kind}</span>
-                    <strong>{selectedPanelMessage.title || selectedPanelMessage.summary || selectedPanelMessage.id}</strong>
+                    <div className="inspector-title">
+                      <span className={`kind kind-${selectedPanelMessage.kind}`}>{selectedPanelMessage.kind}</span>
+                      <strong>{selectedPanelMessage.title || selectedPanelMessage.summary || selectedPanelMessage.id}</strong>
+                    </div>
+                    <div className="inspector-actions">
+                      <MessageActions api={store.api} message={selectedPanelMessage} payload={store.payloadById.get(selectedPanelMessage.id)} />
+                      <Popover>
+                        <PopoverTrigger className="icon-button row-action" aria-label="Show message info" title="Message info">
+                          <InfoIcon size={14} />
+                        </PopoverTrigger>
+                        <PopoverPopup>
+                          <MessageInfo message={selectedPanelMessage} />
+                        </PopoverPopup>
+                      </Popover>
+                    </div>
                   </div>
                   <div className="inspector-payload">
                     <PayloadRenderer api={store.api} message={selectedPanelMessage} payload={store.payloadById.get(selectedPanelMessage.id)} />
@@ -115,6 +154,7 @@ function DisplayAppShell({ store, label }: { store: DisplayStore; label: string 
               )}
             </section>
           </aside>
+          </>
         ) : null}
       </main>
     </DisplaySettingsProvider>
@@ -136,4 +176,13 @@ function SettingsRow({ title, description, children }: { title: string; descript
 function resolveCodeTheme(theme: ThemeChoice): "light" | "dark" {
   if (theme === "light" || theme === "dark") return theme;
   return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
+function readStoredPanelWidth(): number {
+  const value = Number(window.localStorage.getItem(PANEL_WIDTH_KEY));
+  return Number.isFinite(value) ? clamp(value, MIN_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, window.innerWidth - MIN_MAIN_WIDTH)) : DEFAULT_PANEL_WIDTH;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }
