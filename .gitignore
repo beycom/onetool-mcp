@@ -42,7 +42,7 @@ build/
 out/
 target/
 *.pyc
-__pycache__/
+**/__pycache__/
 *.class
 *.o
 *.so
@@ -125,6 +125,7 @@ demo/tmp/
 .localhist/
 .mcp.json
 .playwright-mcp/
+.codegraph/
 
 # Worktree state files
 .gitworktree.json
