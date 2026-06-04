@@ -21,13 +21,37 @@ default:
 install:
     uv sync --group dev --all-extras
 
-# Run all quality checks (lint, typecheck, test, display UI checks)
+# Run all quality checks (lint, typecheck, test, Admin UI checks)
 check: lint typecheck test
-    just display-ui::check
+    just admin-ui::check
 
 # Run the MCP server in development mode (uses dev config)
 dev *args:
     uv run onetool --config {{ ot_config }} {{ args }}
+
+# Serve the Admin App and open it in the default browser
+admin-open port="8760" direct_start_port="8765" scan_max="10":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    url="http://127.0.0.1:{{ port }}"
+    if curl -fsS "$url/api/admin/health" >/dev/null 2>&1; then
+        uv run python -m webbrowser "$url" >/dev/null 2>&1
+        exit 0
+    fi
+    (
+        for _ in {1..40}; do
+            if curl -fsS "$url/api/admin/health" >/dev/null 2>&1; then
+                uv run python -m webbrowser "$url" >/dev/null 2>&1
+                exit 0
+            fi
+            sleep 0.25
+        done
+    ) &
+    uv run onetool admin serve \
+        --ot-dir {{ quote(ot_dir) }} \
+        --port {{ port }} \
+        --direct-start-port {{ direct_start_port }} \
+        --scan-max {{ scan_max }}
 
 # ============================================================================
 # TESTING
@@ -138,16 +162,16 @@ docs-deploy:
 
 # Build the package
 build:
-    just display-ui::build
+    just admin-ui::build
     uv build
 
 # Bundle inject.js annotation script (requires npm install in src/ot/assets/)
 build-inject:
     cd src/ot/assets && npm run build
 
-# Bundle display UI TypeScript app (requires npm install in packages/onetool-display-ui/)
+# Bundle Admin UI TypeScript app (requires npm install in packages/admin-ui/)
 build-display:
-    just display-ui::build
+    just admin-ui::build
 
 # Clean build artifacts and caches
 clean:
@@ -166,7 +190,7 @@ reset-env: clean
 # ============================================================================
 
 mod bench 'packages/onetool-bench/justfile'
-mod display-ui "packages/onetool-display-ui/justfile"
+mod admin-ui "packages/admin-ui/justfile"
 mod release "release.just"
 
 # ============================================================================

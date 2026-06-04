@@ -1,0 +1,239 @@
+import { PanelRightIcon, RefreshCwIcon, SettingsIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import type { AdminInstance } from "../../app/adminTypes";
+import { Popover, PopoverPopup, PopoverTrigger } from "../../shared/components/ui/Popover";
+import { DisplayTimeline } from "./components/DisplayTimeline";
+import { MessageRow } from "./components/MessageRow";
+import { DisplaySettingsProvider } from "./lib/displaySettings";
+import type { DisplayStore } from "./lib/displayStore";
+import { useDisplayStore } from "./lib/displayStore";
+import { useMockDisplayStore } from "./lib/mockDisplayStore";
+
+type ThemeChoice = "system" | "light" | "dark";
+
+const PANEL_WIDTH_KEY = "onetool.display.sidePanelWidth";
+const DEFAULT_PANEL_WIDTH = 560;
+const MIN_PANEL_WIDTH = 380;
+const MIN_MAIN_WIDTH = 360;
+
+export function MockDisplayApp() {
+  const store = useMockDisplayStore(window.location);
+
+  return <DisplayAppShell store={store} label="mock artifact timeline" />;
+}
+
+export function LiveDisplayApp({ instance }: { instance: AdminInstance }) {
+  const store = useDisplayStore(window.location, instance.identity);
+
+  return <DisplayAppShell store={store} label={`${instance.short_identity || instance.identity} · ${instance.status}`} />;
+}
+
+export function DisplayAppShell({ store, label }: { store: DisplayStore; label: string }) {
+  const [theme, setTheme] = useState<ThemeChoice>("system");
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [panelMessageId, setPanelMessageId] = useState<string | null>(null);
+  const [panelWidth, setPanelWidth] = useState(() => readStoredPanelWidth());
+  const [wrapText, setWrapText] = useState(false);
+  const [hideWhitespace, setHideWhitespace] = useState(true);
+  const [richById, setRichById] = useState<Record<string, boolean>>({});
+  const activePanelResizeCleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  useEffect(() => () => {
+    activePanelResizeCleanupRef.current?.();
+    activePanelResizeCleanupRef.current = null;
+  }, []);
+
+  const codeTheme = useMemo(() => resolveCodeTheme(theme), [theme]);
+  const selectedPanelMessage = useMemo(() => {
+    if (!panelMessageId) return null;
+    return store.messages.find((message) => message.id === panelMessageId) ?? null;
+  }, [panelMessageId, store.messages]);
+  const selectedPanelRich = selectedPanelMessage ? richById[selectedPanelMessage.id] ?? true : true;
+  const panelLabel = panelOpen ? "Hide message inspector" : "Show message inspector";
+  const shellStyle = panelOpen ? ({ "--side-panel-width": `${panelWidth}px` } as CSSProperties) : undefined;
+
+  useEffect(() => {
+    if (!selectedPanelMessage) return;
+    store.loadPayload(selectedPanelMessage.id);
+  }, [selectedPanelMessage, store]);
+
+  const openPanelMessage = useCallback((id: string) => {
+    setPanelOpen(true);
+    setPanelMessageId(id);
+    store.loadPayload(id);
+  }, [store]);
+
+  const togglePanelRich = useCallback(() => {
+    if (!selectedPanelMessage) return;
+    setRichById((values) => ({
+      ...values,
+      [selectedPanelMessage.id]: !(values[selectedPanelMessage.id] ?? true),
+    }));
+  }, [selectedPanelMessage]);
+
+  const startPanelResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    activePanelResizeCleanupRef.current?.();
+    const startX = event.clientX;
+    const startWidth = panelWidth;
+    const maxWidth = Math.max(MIN_PANEL_WIDTH, window.innerWidth - MIN_MAIN_WIDTH);
+    const onMove = (moveEvent: PointerEvent) => {
+      const nextWidth = clamp(startWidth + startX - moveEvent.clientX, MIN_PANEL_WIDTH, maxWidth);
+      setPanelWidth(nextWidth);
+      writeStoredPanelWidth(nextWidth);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      activePanelResizeCleanupRef.current = null;
+    };
+    activePanelResizeCleanupRef.current = onUp;
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+  }, [panelWidth]);
+
+  const resizePanelByKeyboard = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const step = event.shiftKey ? 48 : 16;
+    const maxWidth = Math.max(MIN_PANEL_WIDTH, window.innerWidth - MIN_MAIN_WIDTH);
+    let nextWidth: number | null = null;
+    if (event.key === "ArrowLeft") nextWidth = panelWidth + step;
+    if (event.key === "ArrowRight") nextWidth = panelWidth - step;
+    if (event.key === "Home") nextWidth = MIN_PANEL_WIDTH;
+    if (event.key === "End") nextWidth = maxWidth;
+    if (nextWidth === null) return;
+    event.preventDefault();
+    const clamped = clamp(nextWidth, MIN_PANEL_WIDTH, maxWidth);
+    setPanelWidth(clamped);
+    writeStoredPanelWidth(clamped);
+  }, [panelWidth]);
+
+  return (
+    <DisplaySettingsProvider value={{ wrapText, hideWhitespace, codeTheme }}>
+      <main className={`app-shell${panelOpen ? " panel-open" : ""}${wrapText ? " text-wrap" : ""}${hideWhitespace ? " hide-whitespace" : ""}`} style={shellStyle}>
+        <header className="topbar">
+          <div>
+            <h1>OneTool Display</h1>
+            <p>{label}</p>
+          </div>
+          <div className="topbar-actions">
+            <button type="button" className="icon-button" onClick={() => void store.refresh()} aria-label="Refresh">
+              <RefreshCwIcon size={16} />
+            </button>
+            <Popover>
+              <PopoverTrigger className="icon-button" aria-label="Open settings" title="Open settings">
+                <SettingsIcon size={16} />
+              </PopoverTrigger>
+              <PopoverPopup>
+                <div className="settings-popover" aria-label="Display settings">
+                  <SettingsRow title="Theme" description="Choose how Display looks across the app.">
+                    <select value={theme} onChange={(event) => setTheme(event.target.value as ThemeChoice)} aria-label="Theme">
+                      <option value="system">System</option>
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                    </select>
+                  </SettingsRow>
+                  <SettingsRow title="Line Wrapping" description="Wrap text, source, code, and diff lines instead of horizontal scrolling.">
+                    <input type="checkbox" checked={wrapText} onChange={(event) => setWrapText(event.target.checked)} aria-label="Line Wrapping" />
+                  </SettingsRow>
+                  <SettingsRow title="Hide whitespace changes" description="Reserved for diff renderers that expose whitespace filtering.">
+                    <input type="checkbox" checked={hideWhitespace} onChange={(event) => setHideWhitespace(event.target.checked)} aria-label="Hide whitespace changes" />
+                  </SettingsRow>
+                </div>
+              </PopoverPopup>
+            </Popover>
+            <button type="button" className="icon-button" onClick={() => setPanelOpen((open) => !open)} aria-label={panelLabel} title={panelLabel}>
+              <PanelRightIcon size={16} />
+            </button>
+          </div>
+        </header>
+        <div className="main-column">
+          {store.error ? <div className="error-banner">{store.error}</div> : null}
+          <section className="timeline-shell" aria-label="Display timeline">
+            <DisplayTimeline store={store} onOpenPanel={openPanelMessage} />
+          </section>
+        </div>
+        {panelOpen ? (
+          <>
+            <div
+              className="panel-resizer"
+              role="separator"
+              aria-label="Resize message inspector"
+              aria-orientation="vertical"
+              aria-valuemin={MIN_PANEL_WIDTH}
+              aria-valuemax={Math.max(MIN_PANEL_WIDTH, window.innerWidth - MIN_MAIN_WIDTH)}
+              aria-valuenow={panelWidth}
+              tabIndex={0}
+              onKeyDown={resizePanelByKeyboard}
+              onPointerDown={startPanelResize}
+            />
+            <aside className="right-panel" aria-label="Display message inspector">
+              <section className="inspector-section" aria-label="Selected message content">
+                {selectedPanelMessage ? (
+                  <div className="inspector-payload">
+                    <MessageRow
+                      api={store.api}
+                      message={selectedPanelMessage}
+                      selected
+                      payload={store.payloadById.get(selectedPanelMessage.id)}
+                      rich={selectedPanelRich}
+                      onToggleRich={togglePanelRich}
+                      expanded
+                      actionLayout="inspector"
+                    />
+                  </div>
+                ) : (
+                  <div className="inspector-empty">
+                    <PanelRightIcon size={18} />
+                    <p>Open a message in the side panel.</p>
+                  </div>
+                )}
+              </section>
+            </aside>
+          </>
+        ) : null}
+      </main>
+    </DisplaySettingsProvider>
+  );
+}
+
+function SettingsRow({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+  return (
+    <div className="settings-row">
+      <div>
+        <h3>{title}</h3>
+        <p>{description}</p>
+      </div>
+      <div className="settings-control">{children}</div>
+    </div>
+  );
+}
+
+function resolveCodeTheme(theme: ThemeChoice): "light" | "dark" {
+  if (theme === "light" || theme === "dark") return theme;
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
+function readStoredPanelWidth(): number {
+  const value = Number(safeLocalStorage()?.getItem(PANEL_WIDTH_KEY));
+  return Number.isFinite(value) ? clamp(value, MIN_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, window.innerWidth - MIN_MAIN_WIDTH)) : DEFAULT_PANEL_WIDTH;
+}
+
+function writeStoredPanelWidth(value: number): void {
+  safeLocalStorage()?.setItem(PANEL_WIDTH_KEY, String(value));
+}
+
+function safeLocalStorage(): Storage | null {
+  try {
+    return window.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}

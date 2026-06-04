@@ -38,10 +38,7 @@ pnpm-debug.log*
 
 # Build outputs
 dist/
-!packages/onetool-display-ui/src/ot_display_ui/dist/
-packages/onetool-display-ui/src/ot_display_ui/dist/*
-!packages/onetool-display-ui/src/ot_display_ui/dist/__init__.py
-!packages/onetool-display-ui/src/ot_display_ui/dist/index.html
+packages/admin-ui/src/onetool_admin_ui/dist/
 build/
 out/
 target/
@@ -80,7 +77,7 @@ htmlcov/
 
 # Package manager files
 package-lock.json
-!packages/onetool-display-ui/package-lock.json
+!packages/admin-ui/package-lock.json
 !src/ot/assets/package-lock.json
 yarn.lock
 pnpm-lock.yaml

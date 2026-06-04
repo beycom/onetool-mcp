@@ -74,7 +74,7 @@ Copyright (c) 2026 T3 Tools Inc.
 Licensed under the MIT License
 https://github.com/pingdotgg/t3code
 
-Used in: packages/onetool-display-ui (React timeline, row stability, markdown/code, and diff rendering architecture)
+Used in: packages/admin-ui (React timeline, row stability, markdown/code, and diff rendering architecture)
 
 ================================================================================
 
