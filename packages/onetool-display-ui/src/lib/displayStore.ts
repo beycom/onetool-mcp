@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DisplayApi } from "../api/displayApi";
 import type { DisplayEvent, MessageMetadata, PayloadView } from "../types";
 
 const MAX_PAYLOAD_CACHE_ENTRIES = 100;
+const DISPLAY_MESSAGES_LIMIT = 300;
+const PAYLOAD_STALE_MS = 5 * 60 * 1000;
+const PAYLOAD_GC_MS = 10 * 60 * 1000;
 
 export interface DisplayStore {
   api: DisplayApi;
@@ -16,23 +20,43 @@ export interface DisplayStore {
 }
 
 export function useDisplayStore(location: Location): DisplayStore {
+  const queryClient = useQueryClient();
   const api = useMemo(() => new DisplayApi(location), [location]);
-  const [messages, setMessages] = useState<MessageMetadata[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [payloadById, setPayloadById] = useState<ReadonlyMap<string, PayloadView>>(() => new Map());
+  const [payloadVersion, setPayloadVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const payloadByIdRef = useRef(payloadById);
   const pendingPayloadIdsRef = useRef<Set<string>>(new Set());
-  payloadByIdRef.current = payloadById;
+  const messageQuery = useQuery({
+    queryKey: displayMessagesKey(api.instanceId),
+    queryFn: () => api.list(DISPLAY_MESSAGES_LIMIT, { tail: true }),
+    refetchOnWindowFocus: false,
+  });
+  const messages = useMemo(
+    () => preserveMessageReferences([], messageQuery.data?.items ?? []),
+    [messageQuery.data?.items],
+  );
+  const payloadById = useMemo(
+    () => {
+      void payloadVersion;
+      return collectCachedPayloads(queryClient, api.instanceId, messages);
+    },
+    [api.instanceId, messages, payloadVersion, queryClient],
+  );
 
   const loadPayload = useCallback(
     (id: string) => {
-      if (payloadByIdRef.current.has(id) || pendingPayloadIdsRef.current.has(id)) return;
+      if (queryClient.getQueryData(payloadKey(api.instanceId, id)) || pendingPayloadIdsRef.current.has(id)) return;
       pendingPayloadIdsRef.current.add(id);
-      void api
-        .payload(id)
-        .then((payload) => {
-          setPayloadById((current) => withPayloadCacheLimit(new Map(current).set(id, payload)));
+      void queryClient
+        .fetchQuery({
+          queryKey: payloadKey(api.instanceId, id),
+          queryFn: () => api.payload(id),
+          staleTime: PAYLOAD_STALE_MS,
+          gcTime: PAYLOAD_GC_MS,
+        })
+        .then(() => {
+          prunePayloadQueries(queryClient, api.instanceId, messages);
+          setPayloadVersion((value) => value + 1);
         })
         .catch((err) => {
           setError(err instanceof Error ? err.message : String(err));
@@ -41,19 +65,18 @@ export function useDisplayStore(location: Location): DisplayStore {
           pendingPayloadIdsRef.current.delete(id);
         });
     },
-    [api],
+    [api, messages, queryClient],
   );
 
   const refresh = useCallback(async () => {
     try {
-      const list = await api.list(300, { tail: true });
-      setMessages((current) => preserveMessageReferences(current, list.items));
-      setPayloadById((current) => prunePayloadCache(current, list.items));
+      await queryClient.invalidateQueries({ queryKey: displayMessagesKey(api.instanceId) });
+      prunePayloadQueries(queryClient, api.instanceId, messages);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [api]);
+  }, [api.instanceId, messages, queryClient]);
 
   const focusMessage = useCallback((id: string) => {
     setSelectedId(id);
@@ -61,8 +84,12 @@ export function useDisplayStore(location: Location): DisplayStore {
   }, [loadPayload]);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    if (messageQuery.error) {
+      setError(messageQuery.error instanceof Error ? messageQuery.error.message : String(messageQuery.error));
+    } else if (messageQuery.data) {
+      setError(null);
+    }
+  }, [messageQuery.data, messageQuery.error]);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,7 +99,7 @@ export function useDisplayStore(location: Location): DisplayStore {
         const events = await api.events();
         applyEvents(events, { refresh, focusMessage });
       } finally {
-        if (!cancelled) window.setTimeout(poll, 900);
+        if (!cancelled) window.setTimeout(() => void poll(), 900);
       }
     };
     void poll();
@@ -82,27 +109,6 @@ export function useDisplayStore(location: Location): DisplayStore {
   }, [api, focusMessage, refresh]);
 
   return { api, messages, selectedId, payloadById, error, refresh, loadPayload, focusMessage };
-}
-
-function withPayloadCacheLimit(payloads: Map<string, PayloadView>): Map<string, PayloadView> {
-  while (payloads.size > MAX_PAYLOAD_CACHE_ENTRIES) {
-    const oldest = payloads.keys().next().value;
-    if (oldest === undefined) break;
-    payloads.delete(oldest);
-  }
-  return payloads;
-}
-
-function prunePayloadCache(
-  current: ReadonlyMap<string, PayloadView>,
-  messages: ReadonlyArray<MessageMetadata>,
-): ReadonlyMap<string, PayloadView> {
-  const liveIds = new Set(messages.map((message) => message.id));
-  const next = new Map<string, PayloadView>();
-  for (const [id, payload] of current) {
-    if (liveIds.has(id)) next.set(id, payload);
-  }
-  return withPayloadCacheLimit(next);
 }
 
 function applyEvents(
@@ -148,4 +154,50 @@ function shallowRecordEqual(left: Record<string, string>, right: Record<string, 
   const leftEntries = Object.entries(left);
   if (leftEntries.length !== Object.keys(right).length) return false;
   return leftEntries.every(([key, value]) => right[key] === value);
+}
+
+export function displayMessagesKey(instanceId: string): readonly ["display", string, "messages"] {
+  return ["display", instanceId, "messages"] as const;
+}
+
+export function payloadKey(instanceId: string, messageId: string): readonly ["display", string, "payload", string] {
+  return ["display", instanceId, "payload", messageId] as const;
+}
+
+function collectCachedPayloads(
+  queryClient: ReturnType<typeof useQueryClient>,
+  instanceId: string,
+  messages: ReadonlyArray<MessageMetadata>,
+): ReadonlyMap<string, PayloadView> {
+  const next = new Map<string, PayloadView>();
+  for (const message of messages) {
+    const payload = queryClient.getQueryData<PayloadView>(payloadKey(instanceId, message.id));
+    if (payload) next.set(message.id, payload);
+  }
+  return next;
+}
+
+function prunePayloadQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  instanceId: string,
+  messages: ReadonlyArray<MessageMetadata>,
+): void {
+  const liveIds = new Set(messages.map((message) => message.id));
+  const cached = queryClient
+    .getQueryCache()
+    .findAll({ queryKey: ["display", instanceId, "payload"] })
+    .filter((query) => typeof query.queryKey[3] === "string");
+  for (const query of cached) {
+    const id = query.queryKey[3] as string;
+    if (!liveIds.has(id)) {
+      queryClient.removeQueries({ queryKey: payloadKey(instanceId, id), exact: true });
+    }
+  }
+  const retained = cached.filter((query) => liveIds.has(query.queryKey[3] as string));
+  for (const query of retained.slice(0, Math.max(0, retained.length - MAX_PAYLOAD_CACHE_ENTRIES))) {
+    queryClient.removeQueries({
+      queryKey: payloadKey(instanceId, query.queryKey[3] as string),
+      exact: true,
+    });
+  }
 }

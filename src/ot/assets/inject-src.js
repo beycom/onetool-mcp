@@ -8,7 +8,6 @@
  * - Viewport-aware smart label positioning
  * - Debounced scroll/resize handlers (150ms + RAF)
  * - Ctrl+I / Cmd+I manual selection mode
- * - Backward compatible with v1.0 window.__inspector API
  */
 
 import { select } from "optimal-select";
@@ -329,7 +328,7 @@ import { select } from "optimal-select";
     disableSelectionMode();
   }
 
-  document.addEventListener("keydown", (e) => {
+  function onKeyDown(e) {
     if ((e.ctrlKey || e.metaKey) && e.key === "i") {
       e.preventDefault();
       if (selectionMode) {
@@ -338,7 +337,21 @@ import { select } from "optimal-select";
         enableSelectionMode();
       }
     }
-  });
+  }
+
+  document.addEventListener("keydown", onKeyDown);
+
+  function dispose() {
+    disableSelectionMode();
+    observer.disconnect();
+    window.removeEventListener("scroll", debouncedScrollResize);
+    window.removeEventListener("resize", debouncedScrollResize);
+    document.removeEventListener("keydown", onKeyDown);
+    clearAnnotations();
+    overlayContainer.remove();
+    delete window.__inspector;
+    return { success: true };
+  }
 
   // ── Public API ─────────────────────────────────────────────────────
 
@@ -350,6 +363,7 @@ import { select } from "optimal-select";
     isReady,
     enableSelectionMode,
     disableSelectionMode,
+    dispose,
     renderAll,
     version: "2.0.0",
   };

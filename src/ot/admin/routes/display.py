@@ -34,6 +34,20 @@ async def browser_entry(request: Request) -> Response:
     return HTMLResponse(_index_html(instance_id=instance_id, token=token))
 
 
+async def browser_asset(request: Request) -> Response:
+    """Serve packaged display UI split assets."""
+    asset_path = request.path_params.get("asset_path")
+    if not isinstance(asset_path, str) or ".." in asset_path.split("/"):
+        return JSONResponse({"error": "not found"}, status_code=HTTPStatus.NOT_FOUND)
+    try:
+        asset = resources.files("ot_display_ui.dist").joinpath("assets", asset_path)
+    except ModuleNotFoundError:
+        return JSONResponse({"error": "not found"}, status_code=HTTPStatus.NOT_FOUND)
+    if not asset.is_file():
+        return JSONResponse({"error": "not found"}, status_code=HTTPStatus.NOT_FOUND)
+    return FileResponse(str(asset), media_type=_guess_display_asset_type(asset_path))
+
+
 async def status(request: Request) -> Response:
     """Return current display instance status."""
     auth = _authorize(request)
@@ -223,6 +237,16 @@ def _guess_image_type(suffix: str) -> str:
     }.get(suffix, "application/octet-stream")
 
 
+def _guess_display_asset_type(path: str) -> str:
+    suffix = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+    return {
+        "css": "text/css",
+        "js": "text/javascript",
+        "map": "application/json",
+        "wasm": "application/wasm",
+    }.get(suffix, "application/octet-stream")
+
+
 def _read_bounded_file(path: Path, *, limit: int) -> tuple[bytes, int]:
     size = path.stat().st_size
     with path.open("rb") as stream:
@@ -272,6 +296,7 @@ def _fallback_html() -> str:
 routes = [
     Route("/", browser_entry, methods=["GET"]),
     Route("/display", browser_entry, methods=["GET"]),
+    Route("/display/assets/{asset_path:path}", browser_asset, methods=["GET"]),
     Route("/display/{browser_instance_id}", browser_entry, methods=["GET"]),
     Route("/api/display/instances/{instance_id}/status", status, methods=["GET"]),
     Route("/api/display/instances/{instance_id}/messages", messages, methods=["GET", "POST"]),

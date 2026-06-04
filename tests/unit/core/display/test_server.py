@@ -83,6 +83,14 @@ class TestDisplayServer:
         assert result.index(bootstrap) < result.rindex("</head>")
         assert "<head><script>window.__ONETOOL_DISPLAY_BOOTSTRAP__" not in result
 
+    def test_display_asset_route_rejects_traversal(self) -> None:
+        base_url = ensure_server()
+
+        with pytest.raises(HTTPError) as exc:
+            _get_json(f"{base_url}/display/assets/../index.html")
+
+        assert exc.value.code == 404
+
     def test_rejects_wrong_instance_token(self) -> None:
         base_url = ensure_server()
         status = STATE.status(base_url=base_url)

@@ -4,6 +4,8 @@
 
 Every test gets a speed tier and a component tag. CI runs smoke tests in 30 seconds.
 
+Frontend package tests are separate from Python pytest. For Vitest, Testing Library, Playwright, and frontend accessibility testing, use [TypeScript React UI](typescript-react-ui.md).
+
 ---
 
 ## Principles

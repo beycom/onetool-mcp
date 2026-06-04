@@ -82,8 +82,22 @@ just tool-diagram-logs     # view Kroki logs
 
 ```bash
 just bench::demo::<task>   # run demo tasks
+just display-ui::<task>    # run Display UI frontend tasks
 just release::<task>       # run release tasks
 just eval-caveman [args]   # run caveman skill eval
+```
+
+Display UI module tasks:
+
+```bash
+just display-ui::install
+just display-ui::typecheck
+just display-ui::lint
+just display-ui::test-unit
+just display-ui::test-e2e
+just display-ui::deps-check
+just display-ui::build
+just display-ui::check
 ```
 
 ## Key Details

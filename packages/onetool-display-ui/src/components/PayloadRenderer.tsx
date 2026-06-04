@@ -1,15 +1,15 @@
-import { memo, useEffect, useState } from "react";
+import { lazy, memo, Suspense, useEffect, useState, type ReactNode } from "react";
 import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import type { MessageMetadata, PayloadView } from "../types";
 import { CodeView } from "./CodeView";
-import { DiffRenderer } from "./DiffRenderer";
-import { MarkdownRenderer } from "./MarkdownRenderer";
 import type { DisplayApi } from "../api/displayApi";
-import { MermaidViewer } from "./MermaidViewer";
-import { StructuredDataViewer } from "./StructuredDataViewer";
 
 const MAX_GRID_ROWS = 200;
 const MAX_GRID_COLUMNS = 80;
+const LazyDiffRenderer = lazy(() => import("./DiffRenderer").then((module) => ({ default: module.DiffRenderer })));
+const LazyMarkdownRenderer = lazy(() => import("./MarkdownRenderer").then((module) => ({ default: module.MarkdownRenderer })));
+const LazyMermaidViewer = lazy(() => import("./MermaidViewer").then((module) => ({ default: module.MermaidViewer })));
+const LazyStructuredDataViewer = lazy(() => import("./StructuredDataViewer").then((module) => ({ default: module.StructuredDataViewer })));
 
 export const PayloadRenderer = memo(function PayloadRenderer({
   api,
@@ -28,8 +28,8 @@ export const PayloadRenderer = memo(function PayloadRenderer({
   if (message.kind === "image" && payload.image_url) {
     return <img className="image-preview" src={payload.image_url} alt={messageTitle(message) ?? message.id} loading="lazy" />;
   }
-  if (message.kind === "markdown") return <MarkdownRenderer text={text} />;
-  if (message.kind === "diff" || message.kind === "file_diff") return <DiffRenderer patch={text} />;
+  if (message.kind === "markdown") return <LazyRenderer><LazyMarkdownRenderer text={text} /></LazyRenderer>;
+  if (message.kind === "diff" || message.kind === "file_diff") return <LazyRenderer><LazyDiffRenderer patch={text} /></LazyRenderer>;
   if (message.kind === "json" || message.kind === "yaml" || message.kind === "mermaid" || message.kind === "table") {
     return <StructuredRenderer message={message} text={text} content={payload.content} />;
   }
@@ -45,8 +45,14 @@ function PlainTextRenderer({ text }: { text: string }) {
 function FileRenderer({ api, message, text, content }: { api: DisplayApi; message: MessageMetadata; text: string; content: unknown }) {
   const fileKind = resolveFileViewerKind(message);
   const previewText = useFilePreviewText(api, message, text);
-  if (fileKind === "markdown") return <MarkdownRenderer text={previewText} copyCode={false} />;
-  if (fileKind === "json" || fileKind === "yaml") return <StructuredDataViewer kind={fileKind} text={previewText} content={content} name={fileName(message.payload.path)} showHeader={false} />;
+  if (fileKind === "markdown") return <LazyRenderer><LazyMarkdownRenderer text={previewText} copyCode={false} /></LazyRenderer>;
+  if (fileKind === "json" || fileKind === "yaml") {
+    return (
+      <LazyRenderer>
+        <LazyStructuredDataViewer kind={fileKind} text={previewText} content={content} name={fileName(message.payload.path)} showHeader={false} />
+      </LazyRenderer>
+    );
+  }
   if (fileKind === "code") return <CodeView text={previewText} language={resolveFileLanguage(message)} name={fileName(message.payload.path)} showHeader={false} />;
   return <pre className="raw-block">{previewText}</pre>;
 }
@@ -66,9 +72,15 @@ function StructuredRenderer({ message, text, content }: { message: MessageMetada
   if (message.kind === "table" && Array.isArray(content)) {
     return <DataGridPreview rows={content} />;
   }
-  if (message.kind === "json" || message.kind === "yaml") return <StructuredDataViewer kind={message.kind} text={text} content={content} />;
-  if (message.kind === "mermaid") return <MermaidViewer source={text} />;
+  if (message.kind === "json" || message.kind === "yaml") {
+    return <LazyRenderer><LazyStructuredDataViewer kind={message.kind} text={text} content={content} /></LazyRenderer>;
+  }
+  if (message.kind === "mermaid") return <LazyRenderer><LazyMermaidViewer source={text} /></LazyRenderer>;
   return <pre className="raw-block">{text}</pre>;
+}
+
+function LazyRenderer({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<div className="loading-line">Loading renderer...</div>}>{children}</Suspense>;
 }
 
 function DataGridPreview({ rows }: { rows: unknown[] }) {

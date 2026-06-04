@@ -21,8 +21,9 @@ default:
 install:
     uv sync --group dev --all-extras
 
-# Run all quality checks (lint, typecheck, test)
+# Run all quality checks (lint, typecheck, test, display UI checks)
 check: lint typecheck test
+    just display-ui::check
 
 # Run the MCP server in development mode (uses dev config)
 dev *args:
@@ -137,7 +138,7 @@ docs-deploy:
 
 # Build the package
 build:
-    cd packages/onetool-display-ui && npm run build
+    just display-ui::build
     uv build
 
 # Bundle inject.js annotation script (requires npm install in src/ot/assets/)
@@ -146,7 +147,7 @@ build-inject:
 
 # Bundle display UI TypeScript app (requires npm install in packages/onetool-display-ui/)
 build-display:
-    cd packages/onetool-display-ui && npm run build
+    just display-ui::build
 
 # Clean build artifacts and caches
 clean:
@@ -165,6 +166,7 @@ reset-env: clean
 # ============================================================================
 
 mod bench 'packages/onetool-bench/justfile'
+mod display-ui "packages/onetool-display-ui/justfile"
 mod release "release.just"
 
 # ============================================================================

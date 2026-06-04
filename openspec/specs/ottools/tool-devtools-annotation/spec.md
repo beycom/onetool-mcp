@@ -18,6 +18,12 @@ The system SHALL provide a bundled JavaScript annotation script at `src/ot/asset
 - **WHEN** checked
 - **THEN** it SHALL be under 100KB
 
+#### Scenario: Generated asset freshness
+- **GIVEN** `src/ot/assets/inject-src.js` has been changed
+- **WHEN** release checks run
+- **THEN** `src/ot/assets/inject.js` SHALL be rebuilt
+- **AND** the check SHALL fail if the generated asset differs from the working tree
+
 ### Requirement: Annotation API
 
 The injected script SHALL expose a `window.__inspector` API for programmatic annotation management.
@@ -44,6 +50,12 @@ The injected script SHALL expose a `window.__inspector` API for programmatic ann
 - **GIVEN** the script has been injected
 - **WHEN** `isReady()` is called
 - **THEN** it returns `true`
+
+#### Scenario: Internal cleanup
+- **GIVEN** the script has been injected
+- **WHEN** the internal `dispose()` helper is called by tests or browser adapter cleanup
+- **THEN** annotation attributes, overlays, global listeners, and observers are removed
+- **AND** the script can be injected again successfully
 
 ### Requirement: Colour Coding
 
@@ -120,4 +132,3 @@ The annotation system SHALL optimise rendering for scroll and resize events.
 - **GIVEN** annotated elements on the page
 - **WHEN** the viewport is resized
 - **THEN** highlights are re-rendered after a 150ms debounce using requestAnimationFrame
-

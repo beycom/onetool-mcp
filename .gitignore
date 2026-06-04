@@ -80,6 +80,8 @@ htmlcov/
 
 # Package manager files
 package-lock.json
+!packages/onetool-display-ui/package-lock.json
+!src/ot/assets/package-lock.json
 yarn.lock
 pnpm-lock.yaml
 composer.lock

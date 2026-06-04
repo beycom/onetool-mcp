@@ -6,6 +6,8 @@ import type { DisplayStore } from "../lib/displayStore";
 import { computeStableDisplayRows, deriveDisplayRows, type DisplayTimelineRow, type StableDisplayRowsState } from "../lib/displayRows";
 import { MessageRow } from "./MessageRow";
 
+const INITIAL_PAYLOAD_PREFETCH_COUNT = 3;
+
 interface TimelineSharedState {
   store: DisplayStore;
   onOpenPanel: (id: string) => void;
@@ -30,7 +32,7 @@ export const DisplayTimeline = memo(function DisplayTimeline({ store, onOpenPane
 
   const scrollToBottom = useCallback((animated = true) => {
     if (rows.length === 0) return;
-    listRef.current?.scrollToIndex?.({ index: rows.length - 1, animated });
+    void listRef.current?.scrollToIndex?.({ index: rows.length - 1, animated });
     setAtBottom(true);
     setSeenLastId(lastMessageId);
   }, [lastMessageId, rows.length]);
@@ -39,7 +41,7 @@ export const DisplayTimeline = memo(function DisplayTimeline({ store, onOpenPane
     if (!store.selectedId) return;
     const index = rows.findIndex((row) => row.id === store.selectedId);
     if (index >= 0) {
-      listRef.current?.scrollToIndex?.({ index, animated: true });
+      void listRef.current?.scrollToIndex?.({ index, animated: true });
     }
   }, [rows, store.selectedId]);
 
@@ -50,6 +52,13 @@ export const DisplayTimeline = memo(function DisplayTimeline({ store, onOpenPane
       setSeenLastId(lastMessageId);
     }
   }, [atBottom, lastMessageId, scrollToBottom, seenLastId]);
+
+  useEffect(() => {
+    const recentMessages = rows.filter((row): row is Extract<DisplayTimelineRow, { kind: "message" }> => row.kind === "message").slice(-INITIAL_PAYLOAD_PREFETCH_COUNT);
+    for (const row of recentMessages) {
+      store.loadPayload(row.id);
+    }
+  }, [rows, store]);
 
   const onScroll = useCallback((event: { currentTarget?: EventTarget | null; nativeEvent?: { contentOffset?: { y?: number }; layoutMeasurement?: { height?: number }; contentSize?: { height?: number } } }) => {
     const native = event.nativeEvent;
@@ -108,17 +117,16 @@ function TimelineRow({ row }: { row: DisplayTimelineRow }) {
 }
 
 function MessageTimelineRow({ store, onOpenPanel, row }: { store: DisplayStore; onOpenPanel: (id: string) => void; row: Extract<DisplayTimelineRow, { kind: "message" }> }) {
-  useEffect(() => {
-    store.loadPayload(row.id);
-  }, [row.id, store]);
   return (
-    <MessageRow
-      api={store.api}
-      message={row.message}
-      selected={store.selectedId === row.id}
-      payload={store.payloadById.get(row.id)}
-      onOpenPanel={onOpenPanel}
-    />
+    <div onMouseEnter={() => store.loadPayload(row.id)} onFocus={() => store.loadPayload(row.id)}>
+      <MessageRow
+        api={store.api}
+        message={row.message}
+        selected={store.selectedId === row.id}
+        payload={store.payloadById.get(row.id)}
+        onOpenPanel={onOpenPanel}
+      />
+    </div>
   );
 }
 

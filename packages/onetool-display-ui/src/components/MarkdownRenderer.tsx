@@ -3,7 +3,7 @@ import { CheckIcon, CopyIcon } from "lucide-react";
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { getSharedHighlighter, type DiffsHighlighter, type SupportedLanguages } from "@pierre/diffs";
+import { getSharedHighlighter, type DiffsHighlighter } from "@pierre/diffs";
 import { fnv1a32, resolveDiffThemeName, type DiffThemeName } from "../lib/diffRendering";
 import { useDisplaySettings } from "../lib/displaySettings";
 import { LRUCache } from "../lib/lruCache";
@@ -122,7 +122,7 @@ function getHighlighterPromise(language: string): Promise<DiffsHighlighter> {
   if (cached) return cached;
   const promise = getSharedHighlighter({
     themes: [resolveDiffThemeName("dark"), resolveDiffThemeName("light")],
-    langs: [language as SupportedLanguages],
+    langs: [language],
     preferredHighlighter: "shiki-js",
   }).catch((err) => {
     highlighterPromiseCache.delete(language);

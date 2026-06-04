@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -31,7 +31,7 @@ for (const match of styleMatches) {
 for (const match of scriptMatches) {
   const src = match[1].replace(/^\//, "");
   const js = await readFile(resolve(outDir, src), "utf8");
-  const escaped = escapeScript(js);
+  const escaped = escapeScript(rewriteDynamicAssetImports(js));
   assertNoRawTextTerminator(escaped, "script");
   html = html.replace(match[0], () => `<script type="module">${escaped}</script>`);
 }
@@ -39,6 +39,8 @@ for (const match of scriptMatches) {
 await writeFile(resolve(outDir, "index.html"), html);
 await mkdir(packageDistDir, { recursive: true });
 await writeFile(resolve(packageDistDir, "index.html"), html);
+await rm(resolve(packageDistDir, "assets"), { recursive: true, force: true });
+await cp(resolve(outDir, "assets"), resolve(packageDistDir, "assets"), { recursive: true });
 
 function escapeScript(value) {
   return value.replace(/<\/script/gi, "<\\/script");
@@ -46,6 +48,16 @@ function escapeScript(value) {
 
 function escapeStyle(value) {
   return value.replace(/<\/style/gi, "<\\/style");
+}
+
+function rewriteDynamicAssetImports(value) {
+  return value
+    .replaceAll('from"./', 'from"/display/assets/')
+    .replaceAll("from'./", "from'/display/assets/")
+    .replaceAll('import("./', 'import("/display/assets/')
+    .replaceAll("import('./", "import('/display/assets/")
+    .replaceAll('"assets/', '"/display/assets/')
+    .replaceAll("'assets/", "'/display/assets/");
 }
 
 function assertNoRawTextTerminator(value, tagName) {

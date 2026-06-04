@@ -1,6 +1,6 @@
 # Development Practices
 
-Generic development workflows and standards that could apply to any Python project.
+Generic development workflows and standards for Python and frontend code in this repository.
 
 ---
 
@@ -22,6 +22,7 @@ Generic development workflows and standards that could apply to any Python proje
 | Guide | Topic |
 |-------|-------|
 | [Python Style](python-style.md) | Python coding standards |
+| [TypeScript React UI](typescript-react-ui.md) | TypeScript, React, Tailwind, frontend testing, and browser asset practices |
 | [Testing](testing.md) | Testing strategy, markers, fixtures |
 | [Logging](logging.md) | LogSpan patterns and best practices |
 | [CLI Patterns](cli-patterns.md) | CLI development patterns |
@@ -35,6 +36,7 @@ Generic development workflows and standards that could apply to any Python proje
 | Make a commit | [Git Workflow](git.md) → Commit Format |
 | Find commit scope | [Commit Scopes](commit-scopes.md) |
 | Write tests | [Testing](testing.md) |
+| Work on frontend UI | [TypeScript React UI](typescript-react-ui.md) |
 | Add logging | [Logging](logging.md) |
 | Follow Python style | [Python Style](python-style.md) |
 | Use just commands | [Justfile](justfile.md) |
@@ -45,7 +47,7 @@ Generic development workflows and standards that could apply to any Python proje
 
 ---
 
-**Note:** These practices use OneTool-specific tools (like LogSpan), but the patterns are generic enough to apply elsewhere.
+**Note:** These practices use OneTool-specific tools and package boundaries, but the patterns are generic enough to apply elsewhere.
 
 ---
 

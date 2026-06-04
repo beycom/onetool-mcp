@@ -30,6 +30,8 @@ just release::check
 ```
 
 - Runs lint, typecheck, and all tests
+- Runs Display UI checks and build
+- Rebuilds `inject.js` and fails if generated Display UI or annotation assets are stale
 - Scans for secrets with gitleaks
 - Builds docs (strict mode to catch broken links)
 - Runs `/p:test-explore sanity.md retest all` via `claude` CLI
@@ -70,6 +72,8 @@ just release::tag 1.0.0b2  # Commit, tag, push
 just release::mcp       # mcp-publisher publish
 just release::docs      # mkdocs gh-deploy
 ```
+
+`just release::build` builds the Display UI and annotation assets before `uv build`. The built wheel and sdist must include the packaged Display UI HTML without requiring generated `packages/onetool-display-ui/dist/` output to be committed.
 
 ---
 

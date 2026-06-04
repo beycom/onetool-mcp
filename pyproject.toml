@@ -90,10 +90,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ot", "src/ottools", "src/onetool", "src/otdev", "src/otutil", "packages/onetool-pack/src/otpack", "packages/onetool-display-ui/src/ot_display_ui"]
-artifacts = ["packages/onetool-display-ui/src/ot_display_ui/dist/index.html"]
+artifacts = ["packages/onetool-display-ui/src/ot_display_ui/dist/**"]
 
 [tool.hatch.build.targets.sdist]
-artifacts = ["packages/onetool-display-ui/src/ot_display_ui/dist/index.html"]
+artifacts = ["packages/onetool-display-ui/src/ot_display_ui/dist/**"]
 
 [dependency-groups]
 docs = [

@@ -11,7 +11,8 @@
     "isolatedModules": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "types": ["node", "vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "scripts/**/*.mjs"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "*.config.ts", "scripts/**/*.mjs", "vitest.setup.ts"]
 }

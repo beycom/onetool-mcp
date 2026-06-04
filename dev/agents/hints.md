@@ -12,6 +12,8 @@
 |------|---------|-------|
 | Run all checks | `just check` | Lint + type + test |
 | Run tests | `just test` | Full test suite |
+| Run Display UI checks | `just display-ui::check` | TS typecheck + lint + unit tests |
+| Build Display UI | `just display-ui::build` | Vite build + packaged HTML |
 | Run smoke tests | `uv run pytest -m smoke` | Fast checks only |
 | Run specific component | `uv run pytest -m serve` | By marker |
 | Dev server | `just dev` | MCP server in dev mode |
@@ -30,6 +32,7 @@ src/
   otutil/       [util] extra: brave, convert, ctx, excel, file, ground, knowledge, mem, tavily
 
 packages/
+  onetool-display-ui/ TypeScript React Display UI package
   onetool-bench/  Benchmark harness (internal, not installed)
 
 tests/          All tests (smoke, unit, integration)
@@ -48,6 +51,7 @@ openspec/       Specifications and proposals
 | **Config** | `justfile` | All dev commands |
 | **Rules** | `dev/agents/hints.md` | This file - quick reference |
 | **Tools** | `src/ottools/*.py` | Built-in tool packs |
+| **Frontend** | `packages/onetool-display-ui/` | Display UI TypeScript React package |
 | **Core** | `src/ot/executor/runner.py` | Main execution engine |
 | **Server** | `src/ot/server.py` | FastMCP server runtime |
 | **CLI** | `src/onetool/cli.py` | `onetool` command entry point |
@@ -68,6 +72,14 @@ openspec/       Specifications and proposals
 - Run with: `uv run pytest` (never bare `pytest`)
 - Fixtures: Use shared fixtures from `conftest.py`
 - Test location mirrors source package: `src/otdev/` → `tests/otdev/`, `src/ottools/` → `tests/ottools/`, `src/otutil/` → `tests/otutil/`, core → `tests/`
+
+### Frontend/UI
+- Detailed guide: `dev/practices/typescript-react-ui.md`
+- Package: `packages/onetool-display-ui`
+- Commands: `just display-ui::install`, `just display-ui::check`, `just display-ui::build`
+- Use npm with committed package lockfiles; keep TS config/deps/tests inside the frontend package
+- Use React Query for display/admin API state and local React state for view-only UI state
+- Renderer safety: sanitize generated SVG/HTML, bound JSON/YAML parsing/rendering, and prefer source fallback for oversized content
 
 ### Paths
 - `.onetool/` paths: Use `resolve_ot_path()` from `ot.meta`
@@ -109,6 +121,7 @@ openspec/       Specifications and proposals
 | OneTool architecture | `query="request pipeline"` | `dev/project/arch/index.md` |
 | Tool packs info | `query="tool packs"` | `docs/reference/tools/index.md` |
 | Testing guide | `query="test markers fixtures"` | `dev/practices/testing.md` |
+| Frontend guide | `query="typescript react ui"` | `dev/practices/typescript-react-ui.md` |
 | Git workflow | `query="git merge strategy"` | `dev/practices/git.md` |
 | Commit scope | `query="commit scope for X"` | `dev/practices/commit-scopes.md` |
 | Python style | `query="python style rules"` | `dev/practices/python-style.md` |

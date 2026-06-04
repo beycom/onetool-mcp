@@ -232,6 +232,19 @@ The system SHALL enforce bounded hot and cold retention for display messages and
 - **WHEN** a browser client lazily loads many expanded payload views
 - **THEN** the browser keeps at most 100 payload views cached in client state and prunes payloads for evicted messages
 
+#### Scenario: Browser uses query-scoped server state
+- **WHEN** the browser loads display/admin API data
+- **THEN** server state is fetched and cached through query keys scoped by display instance and resource type
+- **AND** message list queries use keys equivalent to `["display", instance_id, "messages"]`
+- **AND** payload queries use keys equivalent to `["display", instance_id, "payload", message_id]`
+- **AND** view-only UI state such as selected panel message, panel width, rich/raw toggles, theme, and scroll state remains local UI state
+
+#### Scenario: Timeline payload loading follows user intent
+- **WHEN** the browser renders a display timeline with many messages
+- **THEN** timeline rows SHALL NOT fetch every message payload as a render side effect
+- **AND** the browser MAY prefetch only a small bounded recent-message window
+- **AND** selected, focused, hovered, copied, or inspector-opened messages MAY fetch their payload lazily
+
 #### Scenario: Table grid rendering is bounded
 - **WHEN** a table message contains many rows or columns
 - **THEN** the browser renders a bounded grid preview of up to 200 rows by 80 columns
@@ -255,6 +268,27 @@ The system SHALL enforce bounded hot and cold retention for display messages and
 - **WHEN** one payload renderer fails while rendering a timeline row or inspector payload
 - **THEN** the browser SHALL show a recoverable preview error for that message
 - **AND** the rest of the display app SHALL remain usable
+
+#### Scenario: Structured renderers are bounded
+- **WHEN** the browser renders JSON or YAML payloads
+- **THEN** parsing and tree rendering SHALL be bounded by source size, depth, and sibling count
+- **AND** oversized or invalid content SHALL remain usable through a source fallback
+- **AND** collapsed tree nodes SHALL NOT render their descendants
+
+#### Scenario: Mermaid SVG is sanitized
+- **WHEN** the browser renders a Mermaid diagram
+- **THEN** generated SVG SHALL be sanitized before DOM insertion
+- **AND** unsafe tags, scriptable attributes, and executable links SHALL be removed
+
+#### Scenario: Heavy renderers are lazy loaded
+- **WHEN** the browser loads the display app shell
+- **THEN** heavyweight markdown, code/highlighting, diff, Mermaid, structured data, table, image, and file renderers SHOULD be split from the initial app shell where supported by the frontend build
+
+#### Scenario: Split display assets are served locally
+- **WHEN** the packaged Display UI build emits split frontend assets
+- **THEN** the local admin service SHALL serve those assets from a package-owned display asset route
+- **AND** Python packaging SHALL include the generated Display UI asset directory in wheel and sdist builds
+- **AND** generated package assets SHALL NOT require editable installs from a fresh checkout to have already run the frontend build
 
 ### Requirement: Display Read Tool
 The system SHALL expose `display.read(id=...)` to return one display message record by ID with metadata, payload references, and bounded preview only.

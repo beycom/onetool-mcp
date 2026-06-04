@@ -1,7 +1,7 @@
 import { PanelRightIcon, RefreshCwIcon, SettingsIcon } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { DisplayTimeline } from "./components/DisplayTimeline";
 import { MessageRow } from "./components/MessageRow";
 import { Popover, PopoverPopup, PopoverTrigger } from "./components/ui/Popover";
@@ -72,7 +72,7 @@ function LiveDisplayApp() {
   return <DisplayAppShell store={store} label={store.api.instanceId} />;
 }
 
-function DisplayAppShell({ store, label }: { store: DisplayStore; label: string }) {
+export function DisplayAppShell({ store, label }: { store: DisplayStore; label: string }) {
   const [theme, setTheme] = useState<ThemeChoice>("system");
   const [panelOpen, setPanelOpen] = useState(true);
   const [panelMessageId, setPanelMessageId] = useState<string | null>(null);
@@ -80,9 +80,14 @@ function DisplayAppShell({ store, label }: { store: DisplayStore; label: string 
   const [wrapText, setWrapText] = useState(false);
   const [hideWhitespace, setHideWhitespace] = useState(true);
   const [richById, setRichById] = useState<Record<string, boolean>>({});
+  const activePanelResizeCleanupRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+  useEffect(() => () => {
+    activePanelResizeCleanupRef.current?.();
+    activePanelResizeCleanupRef.current = null;
+  }, []);
   const codeTheme = useMemo(() => resolveCodeTheme(theme), [theme]);
   const selectedPanelMessage = useMemo(() => {
     if (!panelMessageId) return null;
@@ -109,20 +114,37 @@ function DisplayAppShell({ store, label }: { store: DisplayStore; label: string 
   const shellStyle = panelOpen ? ({ "--side-panel-width": `${panelWidth}px` } as CSSProperties) : undefined;
   const startPanelResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
+    activePanelResizeCleanupRef.current?.();
     const startX = event.clientX;
     const startWidth = panelWidth;
     const maxWidth = Math.max(MIN_PANEL_WIDTH, window.innerWidth - MIN_MAIN_WIDTH);
     const onMove = (moveEvent: PointerEvent) => {
       const nextWidth = clamp(startWidth + startX - moveEvent.clientX, MIN_PANEL_WIDTH, maxWidth);
       setPanelWidth(nextWidth);
-      window.localStorage.setItem(PANEL_WIDTH_KEY, String(nextWidth));
+      writeStoredPanelWidth(nextWidth);
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      activePanelResizeCleanupRef.current = null;
     };
+    activePanelResizeCleanupRef.current = onUp;
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp, { once: true });
+  }, [panelWidth]);
+  const resizePanelByKeyboard = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const step = event.shiftKey ? 48 : 16;
+    const maxWidth = Math.max(MIN_PANEL_WIDTH, window.innerWidth - MIN_MAIN_WIDTH);
+    let nextWidth: number | null = null;
+    if (event.key === "ArrowLeft") nextWidth = panelWidth + step;
+    if (event.key === "ArrowRight") nextWidth = panelWidth - step;
+    if (event.key === "Home") nextWidth = MIN_PANEL_WIDTH;
+    if (event.key === "End") nextWidth = maxWidth;
+    if (nextWidth === null) return;
+    event.preventDefault();
+    const clamped = clamp(nextWidth, MIN_PANEL_WIDTH, maxWidth);
+    setPanelWidth(clamped);
+    writeStoredPanelWidth(clamped);
   }, [panelWidth]);
   return (
     <DisplaySettingsProvider value={{ wrapText, hideWhitespace, codeTheme }}>
@@ -171,7 +193,18 @@ function DisplayAppShell({ store, label }: { store: DisplayStore; label: string 
         </div>
         {panelOpen ? (
           <>
-          <div className="panel-resizer" role="separator" aria-label="Resize message inspector" aria-orientation="vertical" onPointerDown={startPanelResize} />
+          <div
+            className="panel-resizer"
+            role="separator"
+            aria-label="Resize message inspector"
+            aria-orientation="vertical"
+            aria-valuemin={MIN_PANEL_WIDTH}
+            aria-valuemax={Math.max(MIN_PANEL_WIDTH, window.innerWidth - MIN_MAIN_WIDTH)}
+            aria-valuenow={panelWidth}
+            tabIndex={0}
+            onKeyDown={resizePanelByKeyboard}
+            onPointerDown={startPanelResize}
+          />
           <aside className="right-panel" aria-label="Display message inspector">
             <section className="inspector-section" aria-label="Selected message content">
               {selectedPanelMessage ? (
@@ -220,8 +253,20 @@ function resolveCodeTheme(theme: ThemeChoice): "light" | "dark" {
 }
 
 function readStoredPanelWidth(): number {
-  const value = Number(window.localStorage.getItem(PANEL_WIDTH_KEY));
+  const value = Number(safeLocalStorage()?.getItem(PANEL_WIDTH_KEY));
   return Number.isFinite(value) ? clamp(value, MIN_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, window.innerWidth - MIN_MAIN_WIDTH)) : DEFAULT_PANEL_WIDTH;
+}
+
+function writeStoredPanelWidth(value: number): void {
+  safeLocalStorage()?.setItem(PANEL_WIDTH_KEY, String(value));
+}
+
+function safeLocalStorage(): Storage | null {
+  try {
+    return window.localStorage ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function clamp(value: number, min: number, max: number): number {

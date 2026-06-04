@@ -14,8 +14,11 @@ if (tsc.status !== 0) {
 const builtHtml = await readFile(resolve(root, "dist/index.html"), "utf8");
 const sourceChecks = [
   ["@vitejs/plugin-react", "vite.config.ts"],
-  ["codeSplitting: false", "vite.config.ts"],
+  ['return "rendererMermaid"', "vite.config.ts"],
   ['"dev": "vite"', "package.json"],
+  ['"typecheck": "tsc --noEmit"', "package.json"],
+  ['"test:unit": "vitest run"', "package.json"],
+  ['"lint": "eslint . --max-warnings=0"', "package.json"],
   ["@tanstack/react-router", "src/App.tsx"],
   ["@tanstack/react-query", "src/App.tsx"],
   ["@tanstack/react-table", "src/components/PayloadRenderer.tsx"],
@@ -51,8 +54,8 @@ const sourceChecks = [
   ['className={`icon-button row-action row-open', "src/components/MessageRow.tsx"],
   ["computeStableDisplayRows", "src/lib/displayRows.ts"],
   ["MAX_PAYLOAD_CACHE_ENTRIES", "src/lib/displayStore.ts"],
-  ["prunePayloadCache", "src/lib/displayStore.ts"],
-  ["store.loadPayload(row.id);", "src/components/DisplayTimeline.tsx"],
+  ["prunePayloadQueries", "src/lib/displayStore.ts"],
+  ["INITIAL_PAYLOAD_PREFETCH_COUNT", "src/components/DisplayTimeline.tsx"],
   ['className="preview-wrap"', "src/components/MessageRow.tsx"],
   ["react-markdown", "src/components/MarkdownRenderer.tsx"],
   ['className="markdown-viewer"', "src/components/MarkdownRenderer.tsx"],
@@ -61,8 +64,10 @@ const sourceChecks = [
   ["@pierre/diffs", "src/lib/diffRendering.ts"],
   ["@pierre/diffs/react", "src/components/CodeView.tsx"],
   ['import("mermaid")', "src/components/MermaidViewer.tsx"],
+  ["sanitizeMermaidSvg", "src/components/MermaidViewer.tsx"],
   ['from "yaml"', "src/components/StructuredDataViewer.tsx"],
-  ["StructuredDataViewer", "src/components/PayloadRenderer.tsx"],
+  ["STRUCTURED_SOURCE_LIMIT_BYTES", "src/components/StructuredDataViewer.tsx"],
+  ["LazyStructuredDataViewer", "src/components/PayloadRenderer.tsx"],
   ["showHeader={false}", "src/components/PayloadRenderer.tsx"],
   ['className="plain-text-payload"', "src/components/PayloadRenderer.tsx"],
   ["api.preview(path)", "src/components/PayloadRenderer.tsx"],
@@ -193,6 +198,12 @@ if (payloadRenderer.includes("Showing {records.length} of {allRecords.length} ro
 }
 if (!payloadRenderer.includes("showHeader={false}")) {
   throw new Error("File-backed source renderers must suppress duplicate inner file headers.");
+}
+if (payloadRenderer.includes('import { MermaidViewer }') || payloadRenderer.includes('import { StructuredDataViewer }')) {
+  throw new Error("Heavy renderers must stay behind lazy component imports.");
+}
+if (!payloadRenderer.includes("lazy(() => import(\"./MermaidViewer\")")) {
+  throw new Error("Mermaid renderer must be lazy-loaded.");
 }
 
 for (const marker of ["onetool-display-root", "OneTool Display"]) {

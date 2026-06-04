@@ -25,7 +25,8 @@ Start with the smallest file that answers the question:
 | Architecture or execution flow | [project/arch/index.md](project/arch/index.md) | Entry point to request pipeline, routing, registry, proxy, security, and config architecture |
 | Creating or changing tools | [project/guides/index.md](project/guides/index.md) | Routes to creating tools, tool config, reference docs, attribution, and review guidance |
 | Deciding file locations | [project/guides/onetool-file-layout.md](project/guides/onetool-file-layout.md) | Canonical ownership rules for config, runtime, data, state, artifacts, and templates |
-| Generic development practice | [practices/index.md](practices/index.md) | Routes to testing, Python style, git, logging, CLI, docs, release, and just commands |
+| Generic development practice | [practices/index.md](practices/index.md) | Routes to testing, Python/frontend style, git, logging, CLI, docs, release, and just commands |
+| Frontend/UI practice | [practices/typescript-react-ui.md](practices/typescript-react-ui.md) | TypeScript, React, Tailwind, testing, renderer safety, and browser asset pipeline |
 | Brand, terminology, claims, links | [project/brand/index.md](project/brand/index.md) | OneTool wording, claims, taglines, and external references |
 | Tool reference content | [../docs/reference/tools/index.md](../docs/reference/tools/index.md) | User-facing pack/tool descriptions and per-tool docs |
 
@@ -149,7 +150,7 @@ Use this decision tree:
 
 **Is it a generic dev practice?** → `practices/`
 - Git, commits, releases → `practices/`
-- Python style, testing, logging → `practices/`
+- Python style, frontend style, testing, logging → `practices/`
 - CLI patterns, workflows → `practices/`
 
 **Is it a quick reference for agents?** → `agents/`

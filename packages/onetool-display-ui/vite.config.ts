@@ -1,15 +1,23 @@
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   build: {
     assetsInlineLimit: 0,
-    chunkSizeWarningLimit: 16000,
-    cssCodeSplit: false,
+    chunkSizeWarningLimit: 900,
+    cssCodeSplit: true,
     rollupOptions: {
       output: {
-        codeSplitting: false,
+        manualChunks(id) {
+          if (id.includes("react-markdown") || id.includes("remark-gfm")) return "rendererMarkdown";
+          if (id.includes("mermaid") || id.includes("dompurify")) return "rendererMermaid";
+          if (id.includes("/yaml/")) return "rendererStructured";
+          if (id.includes("@tanstack/react-table")) return "rendererTable";
+          if (id.includes("@pierre/diffs")) return "rendererDiffCode";
+          return undefined;
+        },
       },
     },
   },

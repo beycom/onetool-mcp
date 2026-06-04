@@ -1,6 +1,8 @@
 import { MaximizeIcon, MinusIcon, PlusIcon, RotateCcwIcon } from "lucide-react";
 import { memo, useEffect, useId, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import DOMPurify from "dompurify";
 import { CodeView } from "./CodeView";
+import { SegmentedControl } from "./StructuredDataViewer";
 
 export const MermaidViewer = memo(function MermaidViewer({ source }: { source: string }) {
   const elementId = useId().replace(/:/g, "");
@@ -9,7 +11,12 @@ export const MermaidViewer = memo(function MermaidViewer({ source }: { source: s
   const [view, setView] = useState<"render" | "source">("render");
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const activePanCleanupRef = useRef<(() => void) | null>(null);
   const diagramSource = useMemo(() => source.trim(), [source]);
+  useEffect(() => () => {
+    activePanCleanupRef.current?.();
+    activePanCleanupRef.current = null;
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -19,7 +26,7 @@ export const MermaidViewer = memo(function MermaidViewer({ source }: { source: s
         mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: resolveMermaidTheme() });
         const { svg } = await mermaid.render(`onetool-display-${elementId}`, diagramSource);
         if (cancelled || !containerRef.current) return;
-        containerRef.current.innerHTML = svg;
+        containerRef.current.innerHTML = sanitizeMermaidSvg(svg);
         setError(null);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -33,6 +40,7 @@ export const MermaidViewer = memo(function MermaidViewer({ source }: { source: s
 
   const startPan = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (view !== "render") return;
+    activePanCleanupRef.current?.();
     event.currentTarget.setPointerCapture(event.pointerId);
     const start = { x: event.clientX, y: event.clientY, offset };
     const onMove = (moveEvent: PointerEvent) => {
@@ -41,7 +49,9 @@ export const MermaidViewer = memo(function MermaidViewer({ source }: { source: s
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      activePanCleanupRef.current = null;
     };
+    activePanCleanupRef.current = onUp;
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp, { once: true });
   };
@@ -49,10 +59,7 @@ export const MermaidViewer = memo(function MermaidViewer({ source }: { source: s
   return (
     <div className="mermaid-preview">
       <div className="viewer-toolbar">
-        <div className="segmented-control">
-          <button type="button" className={view === "render" ? "active" : ""} onClick={() => setView("render")}>render</button>
-          <button type="button" className={view === "source" ? "active" : ""} onClick={() => setView("source")}>source</button>
-        </div>
+        <SegmentedControl value={view} options={["render", "source"]} onChange={setView} />
         <button type="button" className="icon-button row-action" onClick={() => setScale((value) => Math.max(0.25, value - 0.15))} aria-label="Zoom out" title="Zoom out">
           <MinusIcon size={14} />
         </button>
@@ -74,6 +81,14 @@ export const MermaidViewer = memo(function MermaidViewer({ source }: { source: s
     </div>
   );
 });
+
+export function sanitizeMermaidSvg(svg: string): string {
+  return DOMPurify.sanitize(svg, {
+    USE_PROFILES: { svg: true, svgFilters: true },
+    FORBID_ATTR: ["onload", "onclick", "onerror", "href", "xlink:href"],
+    FORBID_TAGS: ["script", "foreignObject", "iframe", "object", "embed"],
+  });
+}
 
 function resolveMermaidTheme(): "default" | "dark" {
   const theme = document.documentElement.dataset.theme;
