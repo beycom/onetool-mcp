@@ -1,13 +1,13 @@
 # Display
 
-Local admin dashboard route for rich, user-visible artifacts.
+In-process message store for rich, user-visible artifacts inspected through the shared Admin App.
 
 Short alias: `d`
 
 ## Highlights
 
-- Starts a Starlette-backed local admin service lazily on the first `display.*` call and binds to `127.0.0.1`
-- Returns a compact high-entropy per-running-MCP-process browser URL from `display.status()`
+- Stores display messages in the current OneTool MCP process and exposes them through signed MCP Direct API routes
+- Returns current MCP instance metadata from `display.status()`, without starting or returning a browser URL
 - Keeps bounded hot and cold message windows for the current process, with cold records cached under project-local display state
 - Loads payloads lazily in a t3code-derived React timeline UI with fixed row previews, a side inspector, content-aware markdown, code, diff, JSON/YAML tree/source, Mermaid render/source, table, and file renderers
 - Loads the latest timeline page on browser startup in high-volume sessions while preserving oldest-to-newest visual order within the loaded page
@@ -17,8 +17,8 @@ Short alias: `d`
 
 | Function | Description |
 |----------|-------------|
-| `display.status()` | Start or check the local display service and return the current instance URL and metadata |
-| `display.show(...)` | Create one typed display message and return its path, kind, stable ID, URL, and metadata |
+| `display.status()` | Return current display instance status, MCP instance ID, message count, and timestamps |
+| `display.show(...)` | Create one typed display message and return its path, kind, stable ID, and metadata |
 | `display.show_clip(...)` | Resolve a clipboard image or existing clipboard file path into a path-backed display message |
 | `display.read(id)` | Return message metadata, payload references, and bounded preview only |
 | `display.focus(id)` | Ask connected display clients to scroll to a message |
@@ -40,7 +40,7 @@ Short alias: `d`
 
 ## Requires
 
-None - no secrets or external services required. The browser UI build uses the local `packages/onetool-display-ui` Vite + React + TypeScript project during development. Use `just display-ui::install`, `just display-ui::check`, and `just display-ui::build` for frontend work.
+None for writing display messages. Browser inspection uses the shared Admin App and the local `packages/admin-ui` Vite + React + TypeScript project during development. Use `just admin-ui::install`, `just admin-ui::check`, and `just admin-ui::build` for frontend work.
 
 ## Configuration
 
@@ -58,7 +58,9 @@ tools: {}
 
 ### Defaults
 
-- The admin server binds to `127.0.0.1` on an ephemeral local port.
+- Display tool calls do not start the Admin App.
+- `onetool admin serve` binds the Admin App to `127.0.0.1:8760` by default.
+- Admin App scans start at MCP Direct API port `8765` and check up to 10 candidate ports by default.
 - Display hot state is in-memory and scoped to the current running MCP process; a bounded cold message window may be cached under the project-local display state directory.
 - File access is limited to the effective OneTool cwd.
 
@@ -84,7 +86,7 @@ Display keeps memory bounded during long sessions:
 
 ## Security And Persistence
 
-The service is local-only and binds to `127.0.0.1`. `display.status()` returns a compact high-entropy browser route such as `/display/0821a4b75d1e8c31`; the browser page bootstraps full API credentials for that page. Display API routes live under `/api/display/instances/{instance_id}/...` and remain scoped by the generated MCP instance ID plus an instance token. The admin service also exposes `/api/admin/health`.
+Display tools do not launch a browser service or return a browser URL. Start the shared UI explicitly with `onetool admin serve --ot-dir ~/.onetool`, then scan for MCP Direct API instances. MCP-side display routes live under signed Direct API paths such as `/api/admin/display/messages`, and the browser talks only to the Admin App's same-origin `/api/admin/...` routes.
 
 File payloads must use workspace-local paths. Image payloads may also reference OneTool-owned session image paths produced by clipboard image loading. Remote URLs, untrusted `file://` URLs, path traversal outside allowed roots, HTML kinds, and terminal/log kinds are rejected.
 
@@ -93,7 +95,7 @@ Display state is in-session only. A OneTool MCP process restart creates fresh di
 ## Examples
 
 ```python
-# Get the current display URL
+# Get the current display instance metadata
 display.status()
 
 # Show markdown in the display timeline

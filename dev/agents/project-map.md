@@ -55,15 +55,18 @@ Performance benchmarking CLI (internal, not distributed with `onetool-mcp`).
 | `harness/runner.py` | Scenario/task execution loop |
 | `reporter.py` | Console and summary reporting |
 
-### Display UI (`packages/onetool-display-ui/`)
+### Admin UI (`packages/admin-ui/`)
 
-Owned TypeScript React package for the local Display/admin browser UI.
+Owned TypeScript React package for the shared local Admin App browser UI.
 
 | Area | Purpose |
 |------|---------|
-| `src/` | React app, API client, renderers, styles, and tests |
+| `src/app/` | App bootstrap, routing, Admin layout, instance API, and app-level types |
+| `src/features/<domain>/` | Feature-owned API clients, types, components, stores, hooks, and tests |
+| `src/shared/` | Cross-feature UI primitives and shared frontend helpers |
+| `src/styles/` | Package-level Admin UI styles |
 | `scripts/` | Build and generated asset validation helpers |
-| `justfile` | Package-local frontend commands used as `just display-ui::<task>` |
+| `justfile` | Package-local frontend commands used as `just admin-ui::<task>` |
 | `package.json` / `package-lock.json` | npm dependencies and reproducible frontend installs |
 
 Practice guide: `dev/practices/typescript-react-ui.md`.
@@ -109,7 +112,7 @@ Tool packs for document and file utilities. Installed via `pip install onetool-m
 |------|---------|--------------|
 | `pyproject.toml` | Dependencies, scripts, tools | `[project]`, `[tool.ruff]`, `[tool.pytest]` |
 | `justfile` | Dev commands | `install`, `check`, `test`, `dev` |
-| `packages/onetool-display-ui/package.json` | Display UI frontend config | scripts, dependencies, Node engine |
+| `packages/admin-ui/package.json` | Admin UI frontend config | scripts, dependencies, Node engine |
 | `onetool.yaml` | OneTool config (optional) | Tool-specific settings |
 
 ---
@@ -125,7 +128,7 @@ Tests mirror the source package structure:
 | `src/otdev/` | `tests/otdev/` |
 | `src/otutil/` | `tests/otutil/` |
 
-Frontend tests stay inside `packages/onetool-display-ui` and run through `just display-ui::test-unit` or `just display-ui::test-e2e`.
+Frontend tests stay inside `packages/admin-ui` and run through `just admin-ui::test-unit` or `just admin-ui::test-e2e`.
 
 Each test root has the same layout:
 
@@ -182,7 +185,7 @@ A test for `src/otdev/tools/webfetch.py` → `tests/otdev/unit/tools/test_webfet
 
 **Need to modify:**
 - Base tool pack → `src/ottools/<pack>.py`
-- Display UI → `packages/onetool-display-ui/src/`
+- Admin UI → `packages/admin-ui/src/`
 - Extra tool pack → `src/otdev/tools/<pack>.py` or `src/otutil/tools/<pack>.py`
 - Core executor → `src/ot/executor/runner.py`
 - MCP server runtime → `src/ot/server.py`

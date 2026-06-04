@@ -179,6 +179,7 @@ nav:
               - Convert: reference/tools/convert.md
               - DB: reference/tools/db.md
               - Diagram: reference/tools/diagram.md
+              - Display: reference/tools/display.md
               - Excel: reference/tools/excel.md
               - File: reference/tools/file.md
               - Ground: reference/tools/ground.md

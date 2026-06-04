@@ -1,6 +1,6 @@
 # OneTool MCP Tool Index
 
-packs=28 tools=246
+packs=29 tools=254
 
 ## arch
 ```python
@@ -65,6 +65,18 @@ diagram.get_template(name: str)  # Load a diagram template by name.
 diagram.list_providers(focus_only: bool=False)  # List all available diagram providers.
 diagram.render_diagram(source: str | None=None, source_file: str | None=None, provider: str | None=None, name: str | None=None, output_format: Literal['svg', 'png', 'pdf']='svg', output_dir: str | None=None, save_source: bool | None=None, async_mode: bool=False)  # Render a diagram from source code or file via Kroki.
 diagram.render_directory(directory: str, output_format: Literal['svg', 'png', 'pdf']='svg', output_dir: str | None=None, recursive: bool=False, pattern: str='', max_concurrent: int=5)  # Discover and render all diagram source files in a directory.
+```
+
+## display, d
+```python
+display.clear()  # Clear all messages from the current display instance.
+display.focus(id: str)  # Focus one display message in connected browser clients.
+display.list(limit: int=100, offset: int=0, kind: DisplayKind | None=None, source: str | None=None)  # List display messages as paginated metadata only.
+display.read(id: str)  # Read one display message with metadata and bounded preview only.
+display.seed_mock_messages(bulk_count: int=0)  # TEST ONLY: seed representative Display messages for UI development.
+display.show(kind: DisplayKind, metadata: dict[str, str] | None=None, content: str | dict[str, Any] | list[Any] | None=None, path: str | None=None, old_path: str | None=None, new_path: str | None=None)  # Create one typed user-visible display message.
+display.show_clip(metadata: dict[str, str] | None=None)  # Display an image or file path from the system clipboard.
+display.status()  # Return display service and current instance metadata.
 ```
 
 ## excel, xls
@@ -156,7 +168,7 @@ localhist.info()  # Inspect local-history initialization, config, paths, and cur
 localhist.init()  # Initialize the project-local history repository.
 localhist.log(limit: int=20, date_format: str='%Y-%m-%d %H:%M:%S %Z')  # List local-history snapshots.
 localhist.restore(ref: str, paths: list[str], dry_run: bool=True)  # Restore selected paths from a local-history snapshot.
-localhist.save(message: str, kind: SnapshotKind='')  # Create a local-history snapshot.
+localhist.save(message: str, kind: SnapshotKind='', paths: str | list[str] | None=None)  # Create a local-history snapshot.
 localhist.show(ref: str, path: str, offset: int=1, limit: int | None=None, tail: int | None=None)  # Return file content from a local-history snapshot.
 localhist.status(path: str | None=None, status: str | None=None, limit: int | None=None)  # Inspect local-history working tree status.
 ```

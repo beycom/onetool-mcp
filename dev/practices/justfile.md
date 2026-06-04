@@ -51,7 +51,7 @@ just docs-deploy      # deploy to GitHub Pages
 ```bash
 just build         # build the package (uv build)
 just build-inject  # bundle inject.js annotation script
-just build-display # bundle display UI TypeScript app
+just build-display # bundle Admin UI TypeScript app
 just clean         # clean build artefacts and caches
 just reset-env    # recreate .venv from scratch
 ```
@@ -82,22 +82,22 @@ just tool-diagram-logs     # view Kroki logs
 
 ```bash
 just bench::demo::<task>   # run demo tasks
-just display-ui::<task>    # run Display UI frontend tasks
+just admin-ui::<task>      # run Admin UI frontend tasks
 just release::<task>       # run release tasks
 just eval-caveman [args]   # run caveman skill eval
 ```
 
-Display UI module tasks:
+Admin UI module tasks:
 
 ```bash
-just display-ui::install
-just display-ui::typecheck
-just display-ui::lint
-just display-ui::test-unit
-just display-ui::test-e2e
-just display-ui::deps-check
-just display-ui::build
-just display-ui::check
+just admin-ui::install
+just admin-ui::typecheck
+just admin-ui::lint
+just admin-ui::test-unit
+just admin-ui::test-e2e
+just admin-ui::deps-check
+just admin-ui::build
+just admin-ui::check
 ```
 
 ## Key Details

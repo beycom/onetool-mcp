@@ -4,43 +4,43 @@ Provide a local admin dashboard foundation with display as the first feature rou
 
 ## Requirements
 
-### Requirement: Lazy Local Admin Service
-The system SHALL provide a Starlette-backed local admin service that starts lazily on the first `display.*` tool call, binds to `127.0.0.1`, and serves display UI/API routes for the current running OneTool MCP server process.
+### Requirement: In-Process Display State And Direct API Routes
+The system SHALL keep display state in the current OneTool MCP server process and expose signed MCP Direct API routes for Admin App access without starting a browser-facing service from `display.*` tool calls.
 
-#### Scenario: Status starts display service
-- **WHEN** an agent calls `display.status()` before the display service is running
-- **THEN** the system starts the local display service and returns service metadata for the current MCP process
+#### Scenario: Status initializes display state
+- **WHEN** an agent calls `display.status()` before display state has been accessed in the current MCP process
+- **THEN** the system creates or reuses display state for the current MCP process and returns metadata for that process
 
-#### Scenario: Service uses local binding
-- **WHEN** the display service starts
-- **THEN** it binds to `127.0.0.1` and does not expose a public network listener
+#### Scenario: Display tools do not start Admin App
+- **WHEN** an agent calls any `display.*` tool
+- **THEN** the tool call does not start the shared Admin App or return a browser URL
 
-#### Scenario: Admin health route is available
-- **WHEN** the local admin service is running
-- **THEN** `GET /api/admin/health` returns JSON health metadata
+#### Scenario: Signed Direct API routes are available
+- **WHEN** the MCP-owned Direct API is running
+- **THEN** signed routes under `/api/admin/display/...` expose display status, messages, payloads, previews, assets, focus, open, and events for the current MCP process
 
 ### Requirement: MCP Instance Scoping
 The system SHALL assign each running OneTool MCP server process a generated `mcp_instance_id` and SHALL scope display UI state, messages, and API routes to that instance.
 
 #### Scenario: Current process receives instance ID
-- **WHEN** the first `display.*` call occurs in a running MCP process
+- **WHEN** display state is first accessed in a running MCP process
 - **THEN** the system creates or reuses a generated `mcp_instance_id` for that process
 
 #### Scenario: Concurrent processes are separated
-- **WHEN** two running MCP processes use the display service
-- **THEN** each process has a separate instance route and message timeline
+- **WHEN** two running MCP processes use display state
+- **THEN** each process has a separate `mcp_instance_id` and message timeline
 
 #### Scenario: Same process clients share timeline
-- **WHEN** multiple browser clients connect to the same MCP instance route
+- **WHEN** multiple browser clients inspect the same discovered MCP instance through the Admin App
 - **THEN** they see the same display messages for that MCP instance
 
 ### Requirement: Display Status Tool
-The system SHALL expose `display.status()` to return current display service and MCP instance metadata without creating messages or returning message payloads.
+The system SHALL expose `display.status()` to return current display and MCP instance metadata without creating messages, returning message payloads, or returning browser URLs.
 
-#### Scenario: Status returns clickable instance URL
+#### Scenario: Status returns metadata only
 - **WHEN** an agent calls `display.status()`
-- **THEN** the result includes `status`, `mcp_instance_id`, `url`, `message_count`, `started_at`, and `updated_at`
-- **AND** `url` uses a compact high-entropy browser instance route without exposing the API token in the URL string
+- **THEN** the result includes `status`, `mcp_instance_id`, `message_count`, `started_at`, and `updated_at`
+- **AND** the result does not include a browser URL
 
 #### Scenario: Status is metadata-only
 - **WHEN** an agent calls `display.status()` after messages have been shown
@@ -55,13 +55,13 @@ The system SHALL expose `display.show(...)` to create one typed user-visible dis
 
 #### Scenario: Show creates message
 - **WHEN** an agent calls `display.show(...)` with a valid kind and payload or payload reference
-- **THEN** the system creates a display message in the current MCP instance timeline and returns `path`, `kind`, stable `id`, `url`, and `metadata`
+- **THEN** the system creates a display message in the current MCP instance timeline and returns `path`, `kind`, stable `id`, and `metadata`
 - **AND** the message `id` SHALL be 12 lowercase hexadecimal characters with no prefix
 - **AND** message ID generation SHALL retry on collisions within the current display instance
 
-#### Scenario: Show starts display service
-- **WHEN** an agent calls `display.show(...)` before the display service is running
-- **THEN** the system starts the display service before creating the message
+#### Scenario: Show does not start Admin App
+- **WHEN** an agent calls `display.show(...)`
+- **THEN** the system creates the message without starting the shared Admin App or returning a browser URL
 
 #### Scenario: Show validates kind
 - **WHEN** an agent calls `display.show(...)` with an unsupported kind
@@ -83,7 +83,7 @@ The system SHALL expose `display.show_clip(...)` to resolve clipboard images or 
 - **WHEN** an agent calls `display.show_clip()` while the clipboard contains an image
 - **THEN** the system saves the image using the same session storage and hash deduplication behavior as `image.load(img="clip")`
 - **AND** the system creates an `image` display message for the stored image path
-- **AND** the response includes `path`, `kind: "image"`, `id`, `url`, and `metadata`
+- **AND** the response includes `path`, `kind: "image"`, `id`, and `metadata`
 
 #### Scenario: Clipboard contains file list
 - **WHEN** an agent calls `display.show_clip()` while the clipboard contains one or more file paths
@@ -112,7 +112,7 @@ The system SHALL support V1 display message kinds for `text`, `markdown`, `code`
 - **THEN** the system provides a table display contract with at least an initial grid prototype and bounded payload handling
 
 ### Requirement: Payload References And Lazy Loading
-The system SHALL keep large display payloads outside model-visible tool responses and SHALL load payload previews lazily through display service routes.
+The system SHALL keep large display payloads outside model-visible tool responses and SHALL load payload previews lazily through signed Direct API routes proxied by the Admin App.
 
 #### Scenario: Large file is referenced
 - **WHEN** an agent shows a file, diff, image, table, or blob-like artifact
@@ -284,10 +284,10 @@ The system SHALL enforce bounded hot and cold retention for display messages and
 - **WHEN** the browser loads the display app shell
 - **THEN** heavyweight markdown, code/highlighting, diff, Mermaid, structured data, table, image, and file renderers SHOULD be split from the initial app shell where supported by the frontend build
 
-#### Scenario: Split display assets are served locally
-- **WHEN** the packaged Display UI build emits split frontend assets
-- **THEN** the local admin service SHALL serve those assets from a package-owned display asset route
-- **AND** Python packaging SHALL include the generated Display UI asset directory in wheel and sdist builds
+#### Scenario: Split Admin UI assets are served locally
+- **WHEN** the packaged Admin UI build emits split frontend assets
+- **THEN** the shared Admin App SHALL serve those assets from `onetool_admin_ui/dist/**`
+- **AND** Python packaging SHALL include the generated Admin UI asset directory in wheel and sdist builds
 - **AND** generated package assets SHALL NOT require editable installs from a fresh checkout to have already run the frontend build
 
 ### Requirement: Display Read Tool
@@ -379,29 +379,34 @@ The system SHALL NOT expose agent-facing display message update or individual me
 - **THEN** the call fails through the normal unavailable-tool or validation path
 
 ### Requirement: Test-Only Display Fixture Tool
-The system MAY expose a temporary `display.seed_mock_messages(...)` fixture tool during display/admin UI development.
+The system SHALL expose a temporary `display.seed_mock_messages(...)` fixture tool during display/admin UI development.
 
 #### Scenario: Fixture seeds all V1 kinds
 - **WHEN** an agent calls `display.seed_mock_messages(...)`
-- **THEN** the tool SHALL create representative messages for every V1 display kind through the normal display service path
-- **AND** the response SHALL be metadata-only, including a display URL, count, IDs by kind, and `test_only: true`
+- **THEN** the tool SHALL create representative messages for every V1 display kind through the normal display state path
+- **AND** the response SHALL be metadata-only, including the MCP instance ID, count, IDs by kind, and `test_only: true`
 - **AND** the tool SHALL be marked test-only in code/docs
 
-### Requirement: Display Browser And API Routes
-The system SHALL provide local admin browser and API routes scoped to the MCP instance for status, timeline/message creation, message reads, optional listing, focus events, file previews, diff previews, controlled open actions, and UI events.
+### Requirement: Admin App Display Browser And API Routes
+The system SHALL provide shared Admin App browser and API routes for scanning MCP Direct API instances, listing discovered instances, and proxying display status, timeline/message creation, message reads, listing, focus events, file previews, diff previews, controlled open actions, and UI events through signed server-side Direct API calls.
 
-#### Scenario: Instance page opens
-- **WHEN** a user opens the URL returned by `display.status()`
-- **THEN** the browser displays the message timeline for that MCP instance
+#### Scenario: Admin App scan discovers display instances
+- **WHEN** a user starts `onetool admin serve --ot-dir <absolute path>` and requests a scan from the browser
+- **THEN** the Admin App probes the configured MCP Direct API candidate port range using signed Direct API requests
+- **AND** discovered instances are stored in the Admin App's in-memory instance list
 
-#### Scenario: Compact browser route preserves API authorization
-- **WHEN** a user opens `/display/{browser_id}` for the current display instance
-- **THEN** the browser page can bootstrap full instance API credentials for that page
-- **AND** API routes still reject requests without the full instance ID and valid token
+#### Scenario: Admin App lists discovered instances
+- **WHEN** a browser requests the Admin App instance list
+- **THEN** the Admin App returns the current in-memory discovered MCP instances with browser-safe metadata
 
 #### Scenario: Display APIs use admin namespace
 - **WHEN** a browser client reads or mutates display state
-- **THEN** it uses routes under `/api/display/instances/{instance_id}/...`
+- **THEN** it uses same-origin Admin App routes under `/api/admin/...`
+- **AND** the Admin App proxies those requests to the selected MCP instance through signed Direct API calls
+
+#### Scenario: Admin App marks failed instances disconnected
+- **WHEN** a proxied display request to a discovered MCP instance fails
+- **THEN** the Admin App marks that instance `disconnected` in its in-memory instance list
 
 #### Scenario: Browser UI supports message inspection actions
 - **WHEN** a user views a message in the timeline or inspector panel
@@ -422,7 +427,7 @@ The system SHALL provide local admin browser and API routes scoped to the MCP in
 - **AND** Python serves built static assets without requiring Node at runtime
 
 #### Scenario: Message creation route stores message
-- **WHEN** the display tool creates a message through the display service
+- **WHEN** the display tool creates a message through display state
 - **THEN** the service stores the message in the current MCP instance timeline and makes it visible to connected clients
 
 #### Scenario: Events route delivers focus
@@ -475,7 +480,7 @@ The system SHALL make editor or OS open actions explicit user-visible actions ra
 
 #### Scenario: Status does not auto-open browser
 - **WHEN** an agent calls `display.status()`
-- **THEN** the system returns a URL and does not require automatically opening a browser
+- **THEN** the system returns metadata only and does not automatically open a browser or start the Admin App
 
 #### Scenario: Show does not auto-open editor
 - **WHEN** an agent calls `display.show(...)` for a file message

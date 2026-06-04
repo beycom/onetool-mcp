@@ -1,6 +1,6 @@
 # Tool Reference
 
-**29 Packs. 251 Tools.**
+**29 Packs. 254 Tools.**
 
 Complete reference of all built-in tool packs and functions.
 
@@ -35,7 +35,7 @@ uv tool install 'onetool-mcp[util,dev]'  # most tools
 | [**Convert**](convert.md) | `[util]` | Convert PDF, Word, PowerPoint, Excel to Markdown. | 5 | MIT | `auto`, `excel`, `pdf`, `powerpoint`, `word` |
 | [**DB**](db.md) | `[dev]` | SQL database queries. | 4 | [mcp-alchemy](https://github.com/runekaagaard/mcp-alchemy) (MPL 2.0) | `query`, `sample`, `schema`, `tables` |
 | [**Diagram**](diagram.md) | `[dev]` | Generate Mermaid, PlantUML, D2 diagrams. | 11 | [Kroki](https://kroki.io/) (MIT) | `batch_render`, `generate_source`, `get_diagram_instructions`, `get_diagram_policy`, `get_output_config`, `get_playground_url`, `get_render_status`, `get_template`, `list_providers`, `render_diagram`, `render_directory` |
-| [**Display**](display.md) | core | Local browser display service for rich, user-visible artifacts. | 5 | MIT | `focus`, `list`, `read`, `show`, `status` |
+| [**Display**](display.md) | core | In-process message store for rich, user-visible artifacts inspected through the shared Admin App. | 7 | MIT | `clear`, `focus`, `list`, `read`, `seed_mock_messages`, `show`, `status` |
 | [**Excel**](excel.md) | `[util]` | Full Excel control. | 24 | [openpyxl](https://github.com/theorchard/openpyxl) (MIT) | `add_sheet`, `cell_range`, `cell_shift`, `copy_range`, `create`, `create_table`, `delete_cols`, `delete_rows`, `formula`, `formulas`, `hyperlinks`, `info`, `insert_cols`, `insert_rows`, `merged_cells`, `named_ranges`, `read`, `search`, `sheets`, `table_data`, `table_info`, `tables`, `used_range`, `write` |
 | [**File**](file.md) | `[util]` | Secure file operations with path boundary enforcement. | 16 | MIT | `copy`, `delete`, `edit`, `grep`, `info`, `list`, `move`, `read`, `read_batch`, `resolve`, `search`, `slice`, `slice_batch`, `toc`, `tree`, `write` |
 | [**Ground**](ground.md) | `[util]` | Grounded search with sources. | 5 | [Google Gemini](https://ai.google.dev/) (MIT) | `dev`, `docs`, `reddit`, `search`, `search_batch` |
