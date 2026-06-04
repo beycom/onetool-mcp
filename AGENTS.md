@@ -59,8 +59,14 @@ The goal is a simple, clean codebase. Backward compat adds hidden complexity and
 
 ## OpenSpec Workflow
 
-Use `/opsx:new` for changes that define new user-facing behaviour or modify
-existing contracts:
+When a change appears to define new user-facing behaviour or modify existing
+contracts, warn that OpenSpec may apply and check before proceeding. Do not
+unilaterally stop or reroute the work just because a spec exists: many small
+changes can still use focused workflows such as `$p-fix`, including updating
+matching specs and docs as part of the fix.
+
+Use `/opsx:new` when the user confirms OpenSpec is appropriate, or when the
+change clearly needs structured proposal work before implementation:
 
 ✅ Requires OpenSpec:
 - New tool packs or extras ([dev], [util])
