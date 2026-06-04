@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @pytest.mark.unit
@@ -165,3 +168,82 @@ def test_serve_http_command_is_removed(tmp_path: Path) -> None:
     assert "No such command" in result.output
     run_root_server.assert_not_called()
 
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_admin_help_lists_serve_command() -> None:
+    """admin group exposes the serve command."""
+    from onetool.cli import app
+
+    result = CliRunner().invoke(app, ["admin", "--help"])
+
+    assert result.exit_code == 0
+    assert "serve" in result.output
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_admin_serve_passes_default_args(tmp_path: Path) -> None:
+    """admin serve uses default Admin App and scan ports."""
+    from onetool.cli import app
+
+    ot_dir = tmp_path / ".onetool"
+    with patch("onetool.admin.server.serve_admin_app") as serve_admin_app:
+        result = CliRunner().invoke(app, ["admin", "serve", "--ot-dir", str(ot_dir)])
+
+    assert result.exit_code == 0
+    assert "http://127.0.0.1:8760" in result.output
+    serve_admin_app.assert_called_once_with(
+        ot_dir=ot_dir,
+        port=8760,
+        direct_start_port=8765,
+        scan_max=10,
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_admin_serve_passes_port_and_scan_overrides(tmp_path: Path) -> None:
+    """admin serve passes Admin App and Direct API scan overrides."""
+    from onetool.cli import app
+
+    ot_dir = tmp_path / ".onetool"
+    with patch("onetool.admin.server.serve_admin_app") as serve_admin_app:
+        result = CliRunner().invoke(
+            app,
+            [
+                "admin",
+                "serve",
+                "--ot-dir",
+                str(ot_dir),
+                "--port",
+                "8761",
+                "--direct-start-port",
+                "9000",
+                "--scan-max",
+                "20",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert "http://127.0.0.1:8761" in result.output
+    serve_admin_app.assert_called_once_with(
+        ot_dir=ot_dir,
+        port=8761,
+        direct_start_port=9000,
+        scan_max=20,
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_admin_serve_rejects_relative_ot_dir() -> None:
+    """admin serve requires an absolute ot-dir after expansion."""
+    from onetool.cli import app
+
+    with patch("onetool.admin.server.serve_admin_app") as serve_admin_app:
+        result = CliRunner().invoke(app, ["admin", "serve", "--ot-dir", ".onetool"])
+
+    assert result.exit_code == 2
+    assert "--ot-dir must be an absolute path" in result.output
+    serve_admin_app.assert_not_called()

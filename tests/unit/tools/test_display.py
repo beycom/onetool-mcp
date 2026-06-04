@@ -10,11 +10,11 @@ from ottools import display
 class TestDisplayTools:
     """Test public display tool functions."""
 
-    def test_status_returns_url_without_message_payloads(self) -> None:
+    def test_status_returns_metadata_without_url_or_payloads(self) -> None:
         result = display.status()
 
         assert result["status"] == "running"
-        assert result["url"].startswith("http://127.0.0.1:")
+        assert "url" not in result
         assert "messages" not in result
 
     def test_show_read_list_and_focus(self) -> None:
@@ -42,7 +42,7 @@ class TestDisplayTools:
 
         assert result["cleared"] >= 2
         assert result["message_count"] == 0
-        assert result["url"].startswith("http://127.0.0.1:")
+        assert "url" not in result
         assert display.list(limit=10)["total"] == 0
         assert display.read(id=first["id"]) == f"Error: display message not found: {first['id']}"
         assert display.status()["message_count"] == 0
@@ -56,15 +56,11 @@ class TestDisplayTools:
         stored.write_bytes(b"png")
 
         monkeypatch.setattr(display, "clipboard_contains_image_object", lambda: True)
-        monkeypatch.setattr(
-            display,
-            "load_image_source",
-            lambda *, img: type(
-                "Loaded",
-                (),
-                {"path": str(stored)},
-            )(),
-        )
+        def fake_load_image_source(*, img: str) -> object:
+            del img
+            return type("Loaded", (), {"path": str(stored)})()
+
+        monkeypatch.setattr(display, "load_image_source", fake_load_image_source)
         calls = []
         monkeypatch.setattr(display, "show", lambda **kwargs: calls.append(kwargs) or {"id": "1", **kwargs})
 
@@ -80,7 +76,11 @@ class TestDisplayTools:
 
         monkeypatch.setattr(display, "clipboard_contains_image_object", lambda: False)
         monkeypatch.setattr(display, "resolve_clipboard_file_path", lambda: clip_file)
-        monkeypatch.setattr(display, "_path_is_image", lambda path: False)
+        def fake_path_is_image(path: object) -> bool:
+            del path
+            return False
+
+        monkeypatch.setattr(display, "_path_is_image", fake_path_is_image)
         monkeypatch.setattr(display, "show", lambda **kwargs: {"id": "1", **kwargs})
 
         result = display.show_clip()
@@ -132,7 +132,7 @@ class TestDisplayTools:
             "table",
         }
         assert result["test_only"] is True
-        assert result["url"].startswith("http://127.0.0.1:")
+        assert "url" not in result
         assert expected_kinds <= set(result["ids_by_kind"])
         assert result["count"] >= len(expected_kinds)
         assert "content" not in result

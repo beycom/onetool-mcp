@@ -45,7 +45,7 @@ def status() -> dict[str, Any]:
     """Return display service and current instance metadata.
 
     Returns:
-        Dict with status, mcp_instance_id, URL, message count, and timestamps.
+        Dict with status, mcp_instance_id, message count, and timestamps.
     """
     with LogSpan(span="display.status"):
         return get_status().model_dump(mode="json")
@@ -55,8 +55,7 @@ def clear() -> dict[str, Any]:
     """Clear all messages from the current display instance.
 
     Returns:
-        Dict with cleared message count, display URL, current message count, and
-        updated timestamp.
+        Dict with cleared message count, current message count, and updated timestamp.
     """
     with LogSpan(span="display.clear"):
         return clear_messages()
@@ -84,7 +83,7 @@ def show(
         new_path: Workspace-local new path for file_diff payloads.
 
     Returns:
-        Dict with path, kind, stable message ID, instance URL, and metadata.
+        Dict with path, kind, stable message ID, and metadata.
     """
     with LogSpan(span="display.show", kind=kind):
         return show_message(
@@ -108,8 +107,7 @@ def show_clip(*, metadata: dict[str, str] | None = None) -> dict[str, Any] | str
         metadata: Optional user-provided key-value metadata.
 
     Returns:
-        Dict with path, kind, stable message ID, instance URL, and metadata, or
-        an error string.
+        Dict with path, kind, stable message ID, and metadata, or an error string.
     """
     with LogSpan(span="display.show_clip"):
         try:
@@ -194,7 +192,7 @@ def seed_mock_messages(*, bulk_count: int = 0) -> dict[str, Any]:
         bulk_count: Optional number of extra lightweight text messages for volume testing.
 
     Returns:
-        Metadata only: display URL, count, and created message IDs by kind.
+        Metadata only: MCP instance ID, count, and created message IDs by kind.
     """
     with LogSpan(span="display.seed_mock_messages", bulk_count=bulk_count):
         ids_by_kind: dict[str, list[str]] = {}
@@ -225,7 +223,7 @@ def seed_mock_messages(*, bulk_count: int = 0) -> dict[str, Any]:
 
         diff_pair = _first_existing_pair(
             [
-                ("packages/onetool-display-ui/src/api/displayApi.ts", "packages/onetool-display-ui/src/lib/displayStore.ts"),
+                ("packages/admin-ui/src/features/display/api.ts", "packages/admin-ui/src/features/display/lib/displayStore.ts"),
                 ("src/ottools/display.py", "src/ot/display/service.py"),
             ]
         )
@@ -239,7 +237,7 @@ def seed_mock_messages(*, bulk_count: int = 0) -> dict[str, Any]:
         status_result = status()
         return {
             "test_only": True,
-            "url": status_result["url"],
+            "mcp_instance_id": status_result["mcp_instance_id"],
             "count": sum(len(ids) for ids in ids_by_kind.values()),
             "ids_by_kind": ids_by_kind,
         }
@@ -249,10 +247,10 @@ def _fixture_file_paths() -> list[str]:
     candidates = [
         "README.md",
         "dev/agents/hints.md",
-        "packages/onetool-display-ui/package.json",
+        "packages/admin-ui/package.json",
         "mkdocs.yml",
-        "packages/onetool-display-ui/scripts/build.mjs",
-        "packages/onetool-display-ui/src/api/displayApi.ts",
+        "packages/admin-ui/scripts/build.mjs",
+        "packages/admin-ui/src/features/display/api.ts",
         "src/ottools/display.py",
         "pyproject.toml",
     ]

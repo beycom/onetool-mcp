@@ -90,7 +90,6 @@ class InstanceMetadata(BaseModel):
 
     status: Literal["running"]
     mcp_instance_id: str
-    url: str
     message_count: int = Field(ge=0)
     started_at: datetime
     updated_at: datetime

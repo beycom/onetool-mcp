@@ -27,8 +27,8 @@ class TestDisplayState:
     def test_status_does_not_create_message(self) -> None:
         state = DisplayState()
 
-        first = state.status(base_url="http://127.0.0.1:1")
-        second = state.status(base_url="http://127.0.0.1:1")
+        first = state.status()
+        second = state.status()
 
         assert first.mcp_instance_id == second.mcp_instance_id
         assert first.message_count == 0
@@ -130,7 +130,7 @@ class TestDisplayState:
         cleared = state.clear_messages()
 
         assert cleared == 2
-        assert state.status(base_url="http://127.0.0.1:1").message_count == 0
+        assert state.status().message_count == 0
         assert state.list_messages(limit=10, offset=0).total == 0
         assert state.read_message(id=first.id) is None
         assert state.focus(id=first.id) is None
@@ -157,7 +157,7 @@ class TestDisplayState:
         assert len(instance.message_ids) == HOT_MESSAGE_WINDOW + 5
         assert first_id not in instance.messages
         assert state.read_message(id=first_id) is not None
-        assert state.payload_view(id=first_id, base_url="http://127.0.0.1:1") is not None
+        assert state.payload_view(id=first_id) is not None
         assert state.focus(id=first_id) is not None
         page = state.list_messages(limit=1, offset=0)
         assert page.total == HOT_MESSAGE_WINDOW + 5
@@ -204,7 +204,7 @@ class TestDisplayState:
             request=ShowRequest(kind="text", content="x" * (PREVIEW_LIMIT_BYTES + 10)),
         )
 
-        payload = state.payload_view(id=metadata.id, base_url="http://127.0.0.1:1")
+        payload = state.payload_view(id=metadata.id)
 
         assert payload is not None
         assert payload["content"] == "x" * PREVIEW_LIMIT_BYTES
@@ -220,7 +220,7 @@ class TestDisplayState:
             ),
         )
 
-        payload = state.payload_view(id=metadata.id, base_url="http://127.0.0.1:1")
+        payload = state.payload_view(id=metadata.id)
 
         assert payload is not None
         assert payload["content"]["truncated"] is True
@@ -233,7 +233,7 @@ class TestDisplayState:
             request=ShowRequest(kind="table", content=[{"row": index} for index in range(700)]),
         )
 
-        payload = state.payload_view(id=metadata.id, base_url="http://127.0.0.1:1")
+        payload = state.payload_view(id=metadata.id)
 
         assert payload is not None
         assert len(payload["content"]) == 500
@@ -252,7 +252,7 @@ class TestDisplayState:
         metadata = state.add_message(
             request=ShowRequest(kind="file_diff", old_path="old.txt", new_path="new.txt"),
         )
-        payload = state.payload_view(id=metadata.id, base_url="http://127.0.0.1:1")
+        payload = state.payload_view(id=metadata.id)
 
         assert payload is not None
         assert payload["preview"] is not None

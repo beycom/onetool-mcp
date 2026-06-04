@@ -34,11 +34,12 @@ async def _read_limited_body(request: Any) -> bytes:
     return body
 
 
-def create_app() -> Any:
+def create_app(*, base_url: str = "http://127.0.0.1:8765") -> Any:
     """Build and return the Starlette ASGI app for the MCP direct API."""
     from starlette.applications import Starlette
     from starlette.routing import Route
 
+    from ot.admin.routes.direct_display import create_routes as create_admin_routes
     from ot.direct_auth import (
         HEALTH_PATH,
         READY_PATH,
@@ -182,6 +183,7 @@ def create_app() -> Any:
             Route(HEALTH_PATH, health_endpoint, methods=["GET"]),
             Route(READY_PATH, ready_endpoint, methods=["GET"]),
             Route(RUN_PATH, run_endpoint, methods=["POST"]),
+            *create_admin_routes(base_url=base_url),
         ]
     )
 

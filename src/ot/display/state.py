@@ -12,7 +12,6 @@ from difflib import unified_diff
 from secrets import token_hex
 from threading import Lock
 from typing import TYPE_CHECKING
-from urllib.parse import quote
 from uuid import uuid4
 
 from ot.display.models import (
@@ -80,11 +79,11 @@ class DisplayState:
                 )
             return self._instance
 
-    def status(self, *, base_url: str) -> InstanceMetadata:
+    def status(self) -> InstanceMetadata:
         """Return current instance metadata."""
         instance = self.get_or_create_instance()
         with self._lock:
-            return _instance_metadata(instance, base_url=base_url)
+            return _instance_metadata(instance)
 
     def add_message(self, *, request: ShowRequest) -> MessageMetadata:
         """Add a validated display message to the current instance."""
@@ -137,12 +136,10 @@ class DisplayState:
             return None
         return MessageRead(metadata=message.metadata, preview=message.preview)
 
-    def payload_view(self, *, id: str, base_url: str) -> dict[str, object] | None:
+    def payload_view(self, *, id: str) -> dict[str, object] | None:
         """Return a browser-only payload view for lazy row expansion."""
         instance = self.get_or_create_instance()
         with self._lock:
-            token = instance.token
-            instance_id = instance.id
             message = instance.messages.get(id)
             known_id = id in instance.message_id_set
         if message is None and known_id:
@@ -158,20 +155,10 @@ class DisplayState:
         if payload.mode == "inline" or payload.path is None:
             result["content"] = _bounded_inline_payload(message.inline_payload)
         elif payload.path is not None:
-            encoded_path = quote(payload.path)
-            result["file_url"] = (
-                f"{base_url}/api/display/instances/{instance_id}/preview"
-                f"?token={token}&path={encoded_path}"
-            )
-            result["open_url"] = (
-                f"{base_url}/api/display/instances/{instance_id}/open"
-                f"?token={token}"
-            )
+            result["file_url"] = f"/api/admin/display/preview?path={payload.path}"
+            result["open_url"] = "/api/admin/display/open"
             if metadata.kind == "image":
-                result["image_url"] = (
-                    f"{base_url}/api/display/instances/{instance_id}/asset"
-                    f"?token={token}&path={encoded_path}"
-                )
+                result["image_url"] = f"/api/admin/display/asset?path={payload.path}"
         return result
 
     def list_messages(
@@ -266,6 +253,17 @@ class DisplayState:
                 events.append({"type": "focus", "id": instance.focus_target})
             return events
 
+    def poll_current_events(self) -> list[dict[str, str]]:
+        """Return queued events for the current signed Direct API caller."""
+        instance = self.get_or_create_instance()
+        with self._lock:
+            instance.has_event_client = True
+            events = list(instance.event_queue)
+            instance.event_queue.clear()
+            if instance.focus_target is not None:
+                events.append({"type": "focus", "id": instance.focus_target})
+            return events
+
     def resolve_browser_instance(self, *, browser_instance_id: str) -> tuple[str, str] | None:
         """Resolve a full or short browser instance ID to API credentials."""
         instance = self.get_or_create_instance()
@@ -323,11 +321,10 @@ def _append_event(instance: DisplayInstance, event: dict[str, str]) -> None:
         instance.event_queue.popleft()
 
 
-def _instance_metadata(instance: DisplayInstance, *, base_url: str) -> InstanceMetadata:
+def _instance_metadata(instance: DisplayInstance) -> InstanceMetadata:
     return InstanceMetadata(
         status="running",
         mcp_instance_id=instance.id,
-        url=f"{base_url}/display/{short_instance_id(instance.id)}",
         message_count=len(instance.message_ids),
         started_at=instance.started_at,
         updated_at=instance.updated_at,

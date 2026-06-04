@@ -163,7 +163,7 @@ def _start_direct_api() -> tuple[Any, threading.Thread, int]:
 
         logger.debug(LogEntry(event="direct.api.candidate", port=port))
         config = uvicorn.Config(
-            create_app(),
+            create_app(base_url=f"http://127.0.0.1:{port}"),
             host="127.0.0.1",
             port=port,
             log_level="warning",
