@@ -14,7 +14,7 @@ export const CodeView = memo(function CodeView({
   name?: string | null;
   showHeader?: boolean;
 }) {
-  const { codeTheme, wrapDiff } = useDisplaySettings();
+  const { codeTheme, wrapText } = useDisplaySettings();
   const file = useMemo(
     () => ({
       name: name || extensionName(language),
@@ -26,7 +26,7 @@ export const CodeView = memo(function CodeView({
   );
   return (
     <div className="code-view">
-      <File file={file} options={{ theme: resolveDiffThemeName(codeTheme), overflow: wrapDiff ? "wrap" : "scroll", disableFileHeader: !showHeader }} />
+      <File file={file} options={{ theme: resolveDiffThemeName(codeTheme), overflow: wrapText ? "wrap" : "scroll", disableFileHeader: !showHeader }} />
     </div>
   );
 });

@@ -51,11 +51,11 @@ The system SHALL expose `display.status()` to return current display service and
 - **THEN** the current instance message count is not increased by that call
 
 ### Requirement: Display Show Tool
-The system SHALL expose `display.show(...)` to create one typed user-visible display message and return a stable message ID.
+The system SHALL expose `display.show(...)` to create one typed user-visible display message and return path-first message metadata.
 
 #### Scenario: Show creates message
 - **WHEN** an agent calls `display.show(...)` with a valid kind and payload or payload reference
-- **THEN** the system creates a display message in the current MCP instance timeline and returns its stable `id`
+- **THEN** the system creates a display message in the current MCP instance timeline and returns `path`, `kind`, stable `id`, `url`, and `metadata`
 - **AND** the message `id` SHALL be 12 lowercase hexadecimal characters with no prefix
 - **AND** message ID generation SHALL retry on collisions within the current display instance
 
@@ -66,6 +66,39 @@ The system SHALL expose `display.show(...)` to create one typed user-visible dis
 #### Scenario: Show validates kind
 - **WHEN** an agent calls `display.show(...)` with an unsupported kind
 - **THEN** the system rejects the call through normal tool validation
+
+#### Scenario: Show uses key-value metadata
+- **WHEN** an agent calls `display.show(...)` with `metadata={"title": "Run", "task": "audit"}`
+- **THEN** the system stores those values as message metadata only
+- **AND** user-provided metadata SHALL NOT control rendering, routing, validation, payload selection, or display behavior
+
+#### Scenario: Removed display fields are rejected
+- **WHEN** an agent calls `display.show(...)` with removed top-level fields such as `title`, `summary`, `source`, `expand`, `language`, or `mime_type`
+- **THEN** the system rejects the call through the current tool signature or request validation path
+
+### Requirement: Display Clipboard Tool
+The system SHALL expose `display.show_clip(...)` to resolve clipboard images or clipboard file paths into path-backed display messages.
+
+#### Scenario: Clipboard contains image
+- **WHEN** an agent calls `display.show_clip()` while the clipboard contains an image
+- **THEN** the system saves the image using the same session storage and hash deduplication behavior as `image.load(img="clip")`
+- **AND** the system creates an `image` display message for the stored image path
+- **AND** the response includes `path`, `kind: "image"`, `id`, `url`, and `metadata`
+
+#### Scenario: Clipboard contains file list
+- **WHEN** an agent calls `display.show_clip()` while the clipboard contains one or more file paths
+- **THEN** the system uses the first file path
+- **AND** the system creates an `image` display message when the file is a supported image
+- **AND** the system creates a `file` display message otherwise
+
+#### Scenario: Clipboard contains text path
+- **WHEN** an agent calls `display.show_clip()` while the clipboard contains text
+- **THEN** the system treats the text as a path only when it resolves to an existing file
+- **AND** the system SHALL NOT infer markdown, diff, Mermaid, JSON, YAML, table, or other non-path display kinds from clipboard text
+
+#### Scenario: Clipboard cannot resolve display path
+- **WHEN** an agent calls `display.show_clip()` with an empty clipboard, non-image clipboard, or clipboard text that is not an existing file path
+- **THEN** the system returns a clear error
 
 ### Requirement: Typed V1 Display Kinds
 The system SHALL support V1 display message kinds for `text`, `markdown`, `code`, `file`, `diff`, `file_diff`, `image`, `json`, `mermaid`, `yaml`, and `table`.
@@ -107,10 +140,15 @@ The system SHALL keep large display payloads outside model-visible tool response
 - **THEN** the browser shows an overflow menu with secondary text-labeled actions such as copy path and rich view toggle
 - **AND** copy content is exposed as a standalone row toolbar icon
 - **AND** copy path is not exposed as a standalone row toolbar icon
-- **AND** timeline rows for inline message kinds SHALL expose visible toolbar actions as copy content, then open in side panel
-- **AND** timeline rows for openable file-backed message kinds SHALL order visible toolbar actions as copy content, open in side panel, then open
+- **AND** timeline rows for inline message kinds SHALL expose visible toolbar actions as copy content, message info, then open in side panel
+- **AND** timeline rows for openable file-backed message kinds SHALL order visible toolbar actions as copy content, message info, open in side panel, then open
 - **AND** timeline rows SHALL NOT show the overflow menu as a visible toolbar button
-- **AND** file-backed side panel rows SHALL order visible toolbar actions as overflow menu, then open file
+- **AND** side panel rows SHALL expose message info as a visible toolbar action
+- **AND** file-backed side panel rows SHALL order visible toolbar actions as overflow menu, message info, then open file
+- **AND** selecting an overflow menu item SHALL close the overflow menu after invoking the item action
+- **AND** message info SHALL include core message fields, payload references, and caller-provided key-value metadata except `summary`
+- **AND** message info SHALL label preview line count as `Lines`
+- **AND** message info SHALL NOT show message status, payload mode, or raw timestamp strings next to formatted timestamps
 
 #### Scenario: File previews use content-aware renderers
 - **WHEN** a user opens a file display message with known language, MIME type, or extension metadata
@@ -139,11 +177,12 @@ The system SHALL store display messages as metadata records plus payload referen
 
 #### Scenario: Message record contains metadata
 - **WHEN** the system creates a display message
-- **THEN** the stored message record includes `id`, `kind`, timestamps, and payload reference metadata
+- **THEN** the stored message record includes `id`, `kind`, key-value metadata, timestamps, and payload reference metadata
 
 #### Scenario: Message record supports summaries
 - **WHEN** the system returns timeline or listing rows
-- **THEN** each row can include lightweight display metadata such as title, summary, source, size, and status without full payload content
+- **THEN** each row can include lightweight display metadata such as key-value user metadata, size, and status without full payload content
+- **AND** the system SHALL NOT generate default `summary` metadata
 - **AND** the browser timeline preview is not required to display title, summary, kind, byte count, or line count as row chrome
 - **AND** the browser timeline and side panel SHALL NOT display generic title or summary chrome by default
 - **AND** file-backed `file`, `image`, and `file_diff` rows SHALL display a compact filename header above the payload while keeping the full path available through message info or actions
@@ -201,7 +240,11 @@ The system SHALL enforce bounded hot and cold retention for display messages and
 #### Scenario: Browser side panel uses bounded layout
 - **WHEN** a user opens a long payload in the browser side panel
 - **THEN** the inspector uses the available panel height without nested vertical scroll caps causing scroll bounce
-- **AND** long code/file lines SHALL remain horizontally scrollable in the inspector
+- **AND** the selected message chrome and action toolbar SHALL remain fixed while the message payload area scrolls
+- **AND** long code/file lines SHALL remain horizontally scrollable through the inspector panel container
+- **AND** inspector payload renderers SHALL NOT place their own horizontal scrollbar above the bottom of the side panel
+- **AND** the browser line wrapping setting SHALL apply consistently to plain text, raw text, code/source, structured source, and diff renderers
+- **AND** disabling line wrapping SHALL expose horizontal scrolling instead of clipping long text/source lines
 
 #### Scenario: Browser side panel matches message layout
 - **WHEN** a user opens a message in the browser side panel
@@ -243,12 +286,26 @@ The system SHALL expose `display.focus(id=...)` to direct connected display UI c
 - **WHEN** an agent calls `display.focus(id=...)` with an ID that is not in the current MCP instance
 - **THEN** the system returns an error for the missing message
 
+### Requirement: Display Clear Tool
+The system SHALL expose `display.clear()` to remove all messages from the current display instance timeline without deleting individual messages by ID.
+
+#### Scenario: Clear removes current instance messages
+- **WHEN** an agent calls `display.clear()` after messages have been shown
+- **THEN** the system removes all hot and cold messages for the current MCP instance
+- **AND** subsequent `display.list(...)` calls return zero messages
+- **AND** subsequent `display.read(id=...)` calls for cleared message IDs return missing-message errors
+- **AND** `display.status()` reports `message_count` as `0`
+
+#### Scenario: Clear notifies connected clients
+- **WHEN** an agent calls `display.clear()` while display browser clients are connected
+- **THEN** the system emits a display event that causes clients to refresh their timeline to the empty state
+
 ### Requirement: Metadata-Only Display List
 If the system exposes `display.list(...)` in V1, it SHALL return a paginated, metadata-only message listing for ID recovery and lightweight navigation.
 
 #### Scenario: List returns metadata page
 - **WHEN** an agent calls `display.list(...)`
-- **THEN** the result contains a page of message metadata such as `id`, `kind`, `title`, timestamps, source, size, and summary or status
+- **THEN** the result contains a page of message metadata such as `id`, `kind`, key-value metadata, timestamps, size, and status
 
 #### Scenario: List omits full payloads
 - **WHEN** an agent calls `display.list(...)`
@@ -256,7 +313,7 @@ If the system exposes `display.list(...)` in V1, it SHALL return a paginated, me
 
 #### Scenario: List supports lightweight filters
 - **WHEN** an agent calls `display.list(...)` with supported filters such as kind or source
-- **THEN** the result applies those filters while still returning metadata only
+- **THEN** the result applies those filters against message kind and the explicit `source` metadata key while still returning metadata only
 
 #### Scenario: List rejects invalid pagination
 - **WHEN** an agent calls `display.list(...)` with `limit` outside 1 through 500 or `offset` below 0
@@ -276,14 +333,14 @@ The system SHALL use `display.show(...)` as the V1 message creation operation an
 - **WHEN** an agent attempts to call `display.create(...)`
 - **THEN** the call fails through the normal unavailable-tool or validation path
 
-### Requirement: Update And Delete Deferred
-The system SHALL NOT expose agent-facing display message update or delete operations in V1.
+### Requirement: Update And Individual Delete Deferred
+The system SHALL NOT expose agent-facing display message update or individual message delete operations in V1.
 
 #### Scenario: Update is unavailable
 - **WHEN** an agent attempts to update an existing display message through a display tool
 - **THEN** the call fails through the normal unavailable-tool or validation path
 
-#### Scenario: Delete is unavailable
+#### Scenario: Individual delete is unavailable
 - **WHEN** an agent attempts to delete an existing display message through a display tool
 - **THEN** the call fails through the normal unavailable-tool or validation path
 

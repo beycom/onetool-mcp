@@ -63,6 +63,12 @@ and image metadata.
 - **WHEN** `image.load(img="~/a.png")` is called again without a `handle=` parameter
 - **THEN** it SHALL return a dict with `handle: "#img_a3f7b2c4"` and `dedup: true` without writing new files
 
+#### Scenario: Internal image load result exposes stored path
+
+- **WHEN** internal callers load an image through the shared image storage helper
+- **THEN** the helper SHALL return the handle, stored image path, source, dimensions, hash, and deduplication status
+- **AND** public `image.load()` SHALL keep returning its documented handle-oriented response
+
 #### Scenario: Named handle bypasses content dedup
 
 - **WHEN** `image.load(img="~/a.png", handle="ref")` is called for content already stored under an auto-handle

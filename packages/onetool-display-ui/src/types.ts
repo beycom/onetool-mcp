@@ -12,7 +12,6 @@ export type DisplayKind =
   | "table";
 
 export type PayloadMode = "inline" | "file" | "file_diff";
-export type ExpandMode = "auto" | "collapsed" | "expanded";
 
 export interface PayloadReference {
   mode: PayloadMode;
@@ -27,10 +26,7 @@ export interface PayloadReference {
 export interface MessageMetadata {
   id: string;
   kind: DisplayKind;
-  title?: string | null;
-  summary?: string | null;
-  source?: string | null;
-  expand: ExpandMode;
+  metadata: Record<string, string>;
   preview_lines?: number | null;
   created_at: string;
   updated_at: string;

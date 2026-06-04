@@ -22,7 +22,6 @@ DisplayKind = Literal[
 ]
 
 PayloadMode = Literal["inline", "file", "file_diff"]
-ExpandMode = Literal["auto", "collapsed", "expanded"]
 
 
 class PayloadReference(BaseModel):
@@ -66,10 +65,7 @@ class MessageMetadata(BaseModel):
 
     id: str
     kind: DisplayKind
-    title: str | None = None
-    summary: str | None = None
-    source: str | None = None
-    expand: ExpandMode = "auto"
+    metadata: dict[str, str] = Field(default_factory=dict)
     preview_lines: int = Field(default=0, ge=0)
     created_at: datetime
     updated_at: datetime
@@ -136,16 +132,11 @@ class ShowRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: DisplayKind
-    title: str | None = None
-    summary: str | None = None
-    source: str | None = None
-    expand: ExpandMode = "auto"
+    metadata: dict[str, str] = Field(default_factory=dict)
     content: str | dict[str, Any] | list[Any] | None = None
     path: str | None = None
     old_path: str | None = None
     new_path: str | None = None
-    language: str | None = None
-    mime_type: str | None = None
 
     @field_validator("path", "old_path", "new_path")
     @classmethod

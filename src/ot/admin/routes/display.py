@@ -241,7 +241,7 @@ def _open_path(path: Path) -> bool:
 def _index_html(*, instance_id: str, token: str) -> str:
     try:
         html = (
-            resources.files("ot.display.assets")
+            resources.files("ot_display_ui.dist")
             .joinpath("index.html")
             .read_text(encoding="utf-8")
         )

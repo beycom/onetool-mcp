@@ -1,12 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-const root = resolve(scriptDir, "..");
+const root = resolve(fileURLToPath(import.meta.url), "../..");
 const outDir = resolve(root, "dist");
-const assetPath = resolve(root, "../../src/ot/display/assets/index.html");
+const packageDistDir = resolve(root, "src/ot_display_ui/dist");
 
 const vite = spawnSync("npx", ["vite", "build"], {
   cwd: root,
@@ -38,8 +37,8 @@ for (const match of scriptMatches) {
 }
 
 await writeFile(resolve(outDir, "index.html"), html);
-await mkdir(dirname(assetPath), { recursive: true });
-await writeFile(assetPath, html);
+await mkdir(packageDistDir, { recursive: true });
+await writeFile(resolve(packageDistDir, "index.html"), html);
 
 function escapeScript(value) {
   return value.replace(/<\/script/gi, "<\\/script");

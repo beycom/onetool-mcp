@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import threading
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -23,6 +24,7 @@ from .store import (
     cache_get,
     cache_put,
     find_by_hash,
+    image_path,
     load_meta,
     load_raw_bytes,
     save_image,
@@ -34,6 +36,19 @@ from .vision import ask_questions, extract_summary
 # Clipboard reads for ask/summary always refresh via load(img="clip"),
 # which deduplicates unchanged content by hash.
 _clip_handle: str | None = None
+
+
+@dataclass(frozen=True)
+class LoadedImage:
+    """Internal loaded image result shared by public image/display tools."""
+
+    handle: str
+    path: str
+    source: str
+    dims: list[int] | None
+    resized: bool
+    dedup: bool
+    sha256: str | None
 
 
 def _background_summarise(handle_name: str, model_bytes: bytes) -> None:
@@ -108,120 +123,116 @@ def load(*, img: str, handle: str | None = None, max_edge: int = 1568) -> dict[s
         image.load(img="~/screenshots/ui.png")
         image.load(img="https://example.org/diagram.png", handle="ref")
     """
-    global _clip_handle
-
     with LogSpan(span="ot_image.load", source=img) as s:
-        # Resolve source type and raw bytes
         try:
-            source_type, data = resolve_source(img)
+            loaded = load_image_source(img=img, handle=handle, max_edge=max_edge)
         except NotImplementedError as e:
             s.add(error="clipboard_unsupported")
             return {"error": str(e)}
-        except (FileNotFoundError, IsADirectoryError, ValueError, RuntimeError) as e:
+        except (FileNotFoundError, IsADirectoryError, ValueError, RuntimeError, ImportError) as e:
             s.add(error=str(e))
             return {"error": str(e)}
-
-        if source_type == "glob":
-            s.add(error="glob_in_load")
-            return {
-                "error": (
-                    "glob patterns are not supported by load() — "
-                    "use load_batch() instead"
-                )
-            }
-
-        if source_type == "handle":
-            handle_name = str(data)
-            meta = load_meta(handle_name)
-            if meta is None:
-                s.add(error="handle_not_found")
-                return {"error": f"handle #{handle_name} not found"}
-            s.add(handle=handle_name, passthrough=True)
-            return {
-                "handle": f"#{handle_name}",
-                "source": meta.get("source", ""),
-                "dims": meta.get("original_dims"),
-                "resized": meta.get("resized", False),
-                "dedup": True,
-            }
-
-        raw_bytes = bytes(data)
-
-        try:
-            validate_image_bytes(raw_bytes, img)
-        except ValueError as e:
-            s.add(error=str(e))
-            return {"error": str(e)}
-
-        sha256_hex = _sha256(raw_bytes)
-
-        # Dedup by hash (auto-handles only — named handles may differ intentionally)
-        if handle is None:
-            existing = find_by_hash(sha256_hex)
-            if existing:
-                # Re-populate cache if evicted
-                if cache_get(existing) is None:
-                    disk = load_raw_bytes(existing)
-                    if disk is not None:
-                        prep = prepare_for_model(disk, max_edge)
-                        cache_put(existing, prep.model_bytes)
-                if source_type == "clipboard":
-                    _clip_handle = existing
-                s.add(handle=existing, dedup=True)
-                existing_meta = load_meta(existing)
-                return {
-                    "handle": f"#{existing}",
-                    "source": (existing_meta or {}).get("source", img),
-                    "dims": (existing_meta or {}).get("original_dims"),
-                    "resized": (existing_meta or {}).get("resized", False),
-                    "dedup": True,
-                }
-
-        handle_name = handle if handle is not None else _auto_handle_name(sha256_hex)
-
-        # Named handle collision check
-        if handle is not None:
-            existing_meta = load_meta(handle_name)
-            if existing_meta is not None:
-                if existing_meta.get("hash") != sha256_hex:
-                    s.add(error="handle_collision")
-                    return {
-                        "error": (
-                            f"handle #{handle_name} already exists with different "
-                            "content. Use a different handle name or delete it first."
-                        )
-                    }
-                # Same content, same named handle — dedup
-                if source_type == "clipboard":
-                    _clip_handle = handle_name
-                s.add(handle=handle_name, dedup=True)
-                return {
-                    "handle": f"#{handle_name}",
-                    "source": existing_meta.get("source", img),
-                    "dims": existing_meta.get("original_dims"),
-                    "resized": existing_meta.get("resized", False),
-                    "dedup": True,
-                }
-
-        prep = prepare_for_model(raw_bytes, max_edge)
-
-        source_label = img if source_type in ("url", "file") else source_type
-        meta: dict[str, Any] = {
-            "handle": handle_name,
-            "source": source_label,
-            "hash": sha256_hex,
-            "original_dims": list(prep.original_dims),
-            "model_dims": list(prep.model_dims),
-            "resized": prep.resized,
-            "max_edge": max_edge,
-            "original_format": prep.original_format,
-            "created_at": datetime.now(UTC).isoformat(),
-            "summary": None,
+        s.add(
+            handle=loaded.handle,
+            resized=loaded.resized,
+            originalDims=loaded.dims,
+            dedup=loaded.dedup,
+        )
+        return {
+            "handle": f"#{loaded.handle}",
+            "source": loaded.source,
+            "dims": loaded.dims,
+            "resized": loaded.resized,
+            "dedup": loaded.dedup,
         }
-        save_image(raw_bytes, handle_name, meta)
-        cache_put(handle_name, prep.model_bytes)
 
-        # Spawn background summary — silently skipped if model not set
+
+def load_image_source(*, img: str, handle: str | None = None, max_edge: int = 1568) -> LoadedImage:
+    """Load image bytes into session storage and return internal path metadata."""
+    global _clip_handle
+
+    source_type, data = resolve_source(img)
+    if source_type == "glob":
+        raise ValueError("glob patterns are not supported by load() — use load_batch() instead")
+    if source_type == "handle":
+        handle_name = str(data)
+        meta = load_meta(handle_name)
+        if meta is None:
+            raise ValueError(f"handle #{handle_name} not found")
+        return LoadedImage(
+            handle=handle_name,
+            path=str(image_path(handle_name)),
+            source=str(meta.get("source", "")),
+            dims=meta.get("original_dims"),
+            resized=bool(meta.get("resized", False)),
+            dedup=True,
+            sha256=meta.get("hash"),
+        )
+
+    raw_bytes = bytes(data)
+    validate_image_bytes(raw_bytes, img)
+    sha256_hex = _sha256(raw_bytes)
+
+    if handle is None:
+        existing = find_by_hash(sha256_hex)
+        if existing:
+            if cache_get(existing) is None:
+                disk = load_raw_bytes(existing)
+                if disk is not None:
+                    prep = prepare_for_model(disk, max_edge)
+                    cache_put(existing, prep.model_bytes)
+            if source_type == "clipboard":
+                _clip_handle = existing
+            existing_meta = load_meta(existing) or {}
+            return LoadedImage(
+                handle=existing,
+                path=str(image_path(existing)),
+                source=str(existing_meta.get("source", img)),
+                dims=existing_meta.get("original_dims"),
+                resized=bool(existing_meta.get("resized", False)),
+                dedup=True,
+                sha256=sha256_hex,
+            )
+
+    handle_name = handle if handle is not None else _auto_handle_name(sha256_hex)
+    if handle is not None:
+        existing_meta = load_meta(handle_name)
+        if existing_meta is not None:
+            if existing_meta.get("hash") != sha256_hex:
+                raise ValueError(
+                    f"handle #{handle_name} already exists with different content. "
+                    "Use a different handle name or delete it first."
+                )
+            if source_type == "clipboard":
+                _clip_handle = handle_name
+            return LoadedImage(
+                handle=handle_name,
+                path=str(image_path(handle_name)),
+                source=str(existing_meta.get("source", img)),
+                dims=existing_meta.get("original_dims"),
+                resized=bool(existing_meta.get("resized", False)),
+                dedup=True,
+                sha256=sha256_hex,
+            )
+
+    prep = prepare_for_model(raw_bytes, max_edge)
+    source_label = img if source_type in ("url", "file") else source_type
+    meta: dict[str, Any] = {
+        "handle": handle_name,
+        "source": source_label,
+        "hash": sha256_hex,
+        "original_dims": list(prep.original_dims),
+        "model_dims": list(prep.model_dims),
+        "resized": prep.resized,
+        "max_edge": max_edge,
+        "original_format": prep.original_format,
+        "created_at": datetime.now(UTC).isoformat(),
+        "summary": None,
+    }
+    save_image(raw_bytes, handle_name, meta)
+    cache_put(handle_name, prep.model_bytes)
+
+    if get_image_config().model:
         thread = threading.Thread(
             target=_background_summarise,
             args=(handle_name, prep.model_bytes),
@@ -229,22 +240,18 @@ def load(*, img: str, handle: str | None = None, max_edge: int = 1568) -> dict[s
         )
         thread.start()
 
-        if source_type == "clipboard":
-            _clip_handle = handle_name
+    if source_type == "clipboard":
+        _clip_handle = handle_name
 
-        s.add(
-            handle=handle_name,
-            sourceType=source_type,
-            resized=prep.resized,
-            originalDims=list(prep.original_dims),
-        )
-        return {
-            "handle": f"#{handle_name}",
-            "source": source_label,
-            "dims": list(prep.original_dims),
-            "resized": prep.resized,
-            "dedup": False,
-        }
+    return LoadedImage(
+        handle=handle_name,
+        path=str(image_path(handle_name)),
+        source=source_label,
+        dims=list(prep.original_dims),
+        resized=prep.resized,
+        dedup=False,
+        sha256=sha256_hex,
+    )
 
 
 def load_batch(*, img: str | list[str], max_edge: int = 1568) -> list[dict[str, Any]]:

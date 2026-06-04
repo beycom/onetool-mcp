@@ -38,11 +38,16 @@ pnpm-debug.log*
 
 # Build outputs
 dist/
+!packages/onetool-display-ui/src/ot_display_ui/dist/
+packages/onetool-display-ui/src/ot_display_ui/dist/*
+!packages/onetool-display-ui/src/ot_display_ui/dist/__init__.py
+!packages/onetool-display-ui/src/ot_display_ui/dist/index.html
 build/
 out/
 target/
 *.pyc
 __pycache__/
+**/__pycache__/
 *.class
 *.o
 *.so

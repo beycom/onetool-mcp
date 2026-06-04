@@ -132,10 +132,7 @@ function shallowMessageEqual(left: MessageMetadata, right: MessageMetadata): boo
   return (
     left.id === right.id &&
     left.kind === right.kind &&
-    left.title === right.title &&
-    left.summary === right.summary &&
-    left.source === right.source &&
-    left.expand === right.expand &&
+    shallowRecordEqual(left.metadata, right.metadata) &&
     left.preview_lines === right.preview_lines &&
     left.updated_at === right.updated_at &&
     left.status === right.status &&
@@ -145,4 +142,10 @@ function shallowMessageEqual(left: MessageMetadata, right: MessageMetadata): boo
     left.payload.new_path === right.payload.new_path &&
     left.payload.language === right.payload.language
   );
+}
+
+function shallowRecordEqual(left: Record<string, string>, right: Record<string, string>): boolean {
+  const leftEntries = Object.entries(left);
+  if (leftEntries.length !== Object.keys(right).length) return false;
+  return leftEntries.every(([key, value]) => right[key] === value);
 }

@@ -77,7 +77,7 @@ function DisplayAppShell({ store, label }: { store: DisplayStore; label: string 
   const [panelOpen, setPanelOpen] = useState(true);
   const [panelMessageId, setPanelMessageId] = useState<string | null>(null);
   const [panelWidth, setPanelWidth] = useState(() => readStoredPanelWidth());
-  const [wrapDiff, setWrapDiff] = useState(false);
+  const [wrapText, setWrapText] = useState(false);
   const [hideWhitespace, setHideWhitespace] = useState(true);
   const [richById, setRichById] = useState<Record<string, boolean>>({});
   useEffect(() => {
@@ -125,8 +125,8 @@ function DisplayAppShell({ store, label }: { store: DisplayStore; label: string 
     window.addEventListener("pointerup", onUp, { once: true });
   }, [panelWidth]);
   return (
-    <DisplaySettingsProvider value={{ wrapDiff, hideWhitespace, codeTheme }}>
-      <main className={`app-shell${panelOpen ? " panel-open" : ""}${wrapDiff ? " diff-wrap" : ""}${hideWhitespace ? " hide-whitespace" : ""}`} style={shellStyle}>
+    <DisplaySettingsProvider value={{ wrapText, hideWhitespace, codeTheme }}>
+      <main className={`app-shell${panelOpen ? " panel-open" : ""}${wrapText ? " text-wrap" : ""}${hideWhitespace ? " hide-whitespace" : ""}`} style={shellStyle}>
         <header className="topbar">
           <div>
             <h1>OneTool Display</h1>
@@ -149,8 +149,8 @@ function DisplayAppShell({ store, label }: { store: DisplayStore; label: string 
                       <option value="dark">Dark</option>
                     </select>
                   </SettingsRow>
-                  <SettingsRow title="Diff line wrapping" description="Set the default wrap state when diff and raw code panels open.">
-                    <input type="checkbox" checked={wrapDiff} onChange={(event) => setWrapDiff(event.target.checked)} aria-label="Diff line wrapping" />
+                  <SettingsRow title="Line Wrapping" description="Wrap text, source, code, and diff lines instead of horizontal scrolling.">
+                    <input type="checkbox" checked={wrapText} onChange={(event) => setWrapText(event.target.checked)} aria-label="Line Wrapping" />
                   </SettingsRow>
                   <SettingsRow title="Hide whitespace changes" description="Reserved for diff renderers that expose whitespace filtering.">
                     <input type="checkbox" checked={hideWhitespace} onChange={(event) => setHideWhitespace(event.target.checked)} aria-label="Hide whitespace changes" />

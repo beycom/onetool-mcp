@@ -26,7 +26,7 @@ export const PayloadRenderer = memo(function PayloadRenderer({
   const text = payload.preview?.text ?? stringContent(payload.content);
   if (!rich) return <pre className="raw-block">{text}</pre>;
   if (message.kind === "image" && payload.image_url) {
-    return <img className="image-preview" src={payload.image_url} alt={message.title ?? message.id} loading="lazy" />;
+    return <img className="image-preview" src={payload.image_url} alt={messageTitle(message) ?? message.id} loading="lazy" />;
   }
   if (message.kind === "markdown") return <MarkdownRenderer text={text} />;
   if (message.kind === "diff" || message.kind === "file_diff") return <DiffRenderer patch={text} />;
@@ -53,9 +53,13 @@ function FileRenderer({ api, message, text, content }: { api: DisplayApi; messag
 
 function CodeLikeRenderer({ message, text }: { message: MessageMetadata; text: string }) {
   if (message.kind === "code") {
-    return <CodeView text={text} language={message.payload.language} name={message.title ?? fileName(message.payload.path)} showHeader={!message.payload.path} />;
+    return <CodeView text={text} language={message.payload.language} name={messageTitle(message) ?? fileName(message.payload.path)} showHeader={!message.payload.path} />;
   }
   return <pre className="raw-block">{text}</pre>;
+}
+
+function messageTitle(message: MessageMetadata): string | null {
+  return message.metadata.title || null;
 }
 
 function StructuredRenderer({ message, text, content }: { message: MessageMetadata; text: string; content: unknown }) {

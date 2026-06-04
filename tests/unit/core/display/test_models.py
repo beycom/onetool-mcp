@@ -12,19 +12,14 @@ class TestShowRequest:
     """Validate strict display payload contracts."""
 
     def test_accepts_supported_kind(self) -> None:
-        request = ShowRequest(kind="markdown", content="# Result")
+        request = ShowRequest(kind="markdown", content="# Result", metadata={"task": "audit"})
 
         assert request.kind == "markdown"
-        assert request.expand == "auto"
+        assert request.metadata == {"task": "audit"}
 
-    def test_accepts_expand_mode(self) -> None:
-        request = ShowRequest(kind="markdown", content="# Result", expand="expanded")
-
-        assert request.expand == "expanded"
-
-    def test_rejects_invalid_expand_mode(self) -> None:
+    def test_rejects_removed_expand_mode(self) -> None:
         with pytest.raises(ValidationError):
-            ShowRequest(kind="markdown", content="# Result", expand="open")
+            ShowRequest(kind="markdown", content="# Result", expand="expanded")
 
     def test_rejects_unsupported_kind(self) -> None:
         with pytest.raises(ValidationError):

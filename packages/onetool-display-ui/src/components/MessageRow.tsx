@@ -1,4 +1,4 @@
-import { AlertCircleIcon, BracesIcon, CalendarClockIcon, CheckIcon, CopyIcon, EllipsisIcon, ExternalLinkIcon, FileTextIcon, FolderTreeIcon, PanelRightOpenIcon } from "lucide-react";
+import { AlertCircleIcon, BracesIcon, CalendarClockIcon, CheckIcon, CopyIcon, EllipsisIcon, ExternalLinkIcon, FileTextIcon, FolderTreeIcon, InfoIcon, PanelRightOpenIcon } from "lucide-react";
 import { memo, useCallback, type ReactNode, useState } from "react";
 import type { DisplayApi } from "../api/displayApi";
 import type { MessageMetadata, PayloadView } from "../types";
@@ -91,6 +91,7 @@ export function MessageActions({
 }) {
   const filePath = actionPath(message);
   const openButton = filePath ? <OpenFileButton api={api} path={filePath} /> : null;
+  const infoButton = <MessageInfoButton message={message} />;
   const panelButton = onOpenPanel ? (
     <button type="button" className="icon-button row-action" onClick={() => onOpenPanel(message.id)} aria-label="Open message in side panel" title="Open in side panel">
       <PanelRightOpenIcon size={14} />
@@ -100,6 +101,7 @@ export function MessageActions({
     return (
       <>
         <MessageActionMenu api={api} message={message} payload={payload} rich={rich} onToggleRich={onToggleRich} />
+        {infoButton}
         {openButton}
       </>
     );
@@ -107,9 +109,23 @@ export function MessageActions({
   return (
     <>
       <CopyMessageButton api={api} message={message} payload={payload} kind="content" />
+      {infoButton}
       {panelButton}
       {openButton}
     </>
+  );
+}
+
+function MessageInfoButton({ message }: { message: MessageMetadata }) {
+  return (
+    <Popover>
+      <PopoverTrigger className="icon-button row-action" aria-label="Show message info" title="Message info">
+        <InfoIcon size={14} />
+      </PopoverTrigger>
+      <PopoverPopup sideOffset={4}>
+        <MessageInfo message={message} />
+      </PopoverPopup>
+    </Popover>
   );
 }
 
@@ -129,25 +145,30 @@ function MessageActionMenu({
   const pathLabel = payloadPathLabel(message);
   const copyContent = useCopyMessageAction({ api, message, payload, kind: "content" });
   const copyPath = useCopyMessageAction({ api, message, payload, kind: "path" });
+  const [open, setOpen] = useState(false);
+  const runMenuAction = useCallback((action: () => void) => {
+    setOpen(false);
+    action();
+  }, []);
   return (
-    <Popover>
-      <PopoverTrigger className="icon-button row-action" aria-label="Open message actions" title="Message actions">
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger className={`icon-button row-action message-action-trigger${open ? " open" : ""}`} aria-label="Open message actions" title="Message actions">
         <EllipsisIcon size={14} />
       </PopoverTrigger>
       <PopoverPopup sideOffset={4}>
         <div className="message-action-menu" aria-label="Message actions">
           {pathLabel ? (
-            <button type="button" className="message-action-menu-item" onClick={copyPath.copy}>
+            <button type="button" className="message-action-menu-item" onClick={() => runMenuAction(copyPath.copy)}>
               {copyPath.copied ? <CheckIcon size={16} /> : <FolderTreeIcon size={16} />}
               <span>{copyPath.copied ? "Copied path" : "Copy path"}</span>
             </button>
           ) : null}
-          <button type="button" className="message-action-menu-item" onClick={copyContent.copy}>
+          <button type="button" className="message-action-menu-item" onClick={() => runMenuAction(copyContent.copy)}>
             {copyContent.copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
             <span>{copyContent.copied ? "Copied file contents" : "Copy file contents"}</span>
           </button>
           {onToggleRich ? (
-            <button type="button" className="message-action-menu-item" onClick={onToggleRich}>
+            <button type="button" className="message-action-menu-item" onClick={() => runMenuAction(onToggleRich)}>
               <BracesIcon size={16} />
               <span>{rich ? "Disable rich view" : "Enable rich view"}</span>
             </button>
@@ -170,33 +191,38 @@ export function MessageHeaderMeta({ message }: { message: MessageMetadata }) {
 }
 
 export function MessageInfo({ message }: { message: MessageMetadata }) {
-  const pathLabel = payloadPathLabel(message);
+  const entries = messageInfoEntries(message);
   return (
     <dl className="message-info">
-      <div>
-        <dt>Kind</dt>
-        <dd>{message.kind}</dd>
-      </div>
-      <div>
-        <dt>Size</dt>
-        <dd>{formatBytes(message.payload.size_bytes)}</dd>
-      </div>
-      <div>
-        <dt>Created</dt>
-        <dd>{formatTimestamp(message.created_at)}</dd>
-      </div>
-      {pathLabel ? (
-        <div>
-          <dt>Path</dt>
-          <dd title={pathLabel}>{pathLabel}</dd>
+      {entries.map(([label, value]) => (
+        <div key={label}>
+          <dt>{label}</dt>
+          <dd title={value}>{value}</dd>
         </div>
-      ) : null}
-      <div>
-        <dt>ID</dt>
-        <dd title={message.id}>{message.id}</dd>
-      </div>
+      ))}
     </dl>
   );
+}
+
+function messageInfoEntries(message: MessageMetadata): [string, string][] {
+  const entries: [string, string][] = [
+    ["ID", message.id],
+    ["Kind", message.kind],
+    ["Size", formatBytes(message.payload.size_bytes)],
+    ["Lines", message.preview_lines === null || message.preview_lines === undefined ? "n/a" : String(message.preview_lines)],
+    ["Created", formatTimestamp(message.created_at)],
+    ["Updated", formatTimestamp(message.updated_at)],
+  ];
+  if (message.payload.path) entries.push(["Path", message.payload.path]);
+  if (message.payload.old_path) entries.push(["Old path", message.payload.old_path]);
+  if (message.payload.new_path) entries.push(["New path", message.payload.new_path]);
+  if (message.payload.mime_type) entries.push(["MIME type", message.payload.mime_type]);
+  if (message.payload.language) entries.push(["Language", message.payload.language]);
+  const metadataEntries = Object.entries(message.metadata).filter(([key]) => key !== "summary");
+  for (const [key, value] of metadataEntries.sort(([left], [right]) => left.localeCompare(right))) {
+    entries.push([`metadata.${key}`, value]);
+  }
+  return entries;
 }
 
 export function CopyMessageButton({
@@ -233,7 +259,7 @@ function useCopyMessageAction({
   const [copied, setCopied] = useState(false);
   const [fetchedPayload, setFetchedPayload] = useState<PayloadView | undefined>(undefined);
   const copy = useCallback(() => {
-    const copyFromPayload = (view: PayloadView | undefined) => view?.preview?.text ?? stringifyPayload(view?.content) ?? message.summary ?? message.title ?? message.id;
+    const copyFromPayload = (view: PayloadView | undefined) => view?.preview?.text ?? stringifyPayload(view?.content) ?? metadataValue(message, "summary") ?? metadataValue(message, "title") ?? message.id;
     const textPromise = kind === "path"
       ? Promise.resolve(payloadPathLabel(message) ?? "")
       : (payload ?? fetchedPayload
@@ -330,4 +356,8 @@ function stringifyPayload(content: unknown): string | null {
   if (typeof content === "string") return content;
   if (content === undefined || content === null) return null;
   return JSON.stringify(content, null, 2);
+}
+
+function metadataValue(message: MessageMetadata, key: string): string | null {
+  return message.metadata[key] || null;
 }

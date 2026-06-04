@@ -174,10 +174,11 @@ function message({
   const metadata: MessageMetadata = {
     id,
     kind,
-    title,
-    summary,
-    source: "mock.artifacts",
-    expand: "auto",
+    metadata: {
+      source: "mock.artifacts",
+      title,
+      summary,
+    },
     preview_lines: countLines(text),
     created_at: createdAt,
     updated_at: createdAt,

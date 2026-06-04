@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from ot.display.models import (
-    ExpandMode,
     FocusResult,
     InstanceMetadata,
     MessageList,
@@ -16,6 +15,19 @@ from ot.display.server import ensure_server
 from ot.display.state import STATE
 
 
+def clear_messages() -> dict[str, Any]:
+    """Clear all messages for the current display instance."""
+    base_url = ensure_server()
+    cleared = STATE.clear_messages()
+    status = STATE.status(base_url=base_url)
+    return {
+        "cleared": cleared,
+        "url": status.url,
+        "message_count": status.message_count,
+        "updated_at": status.updated_at.isoformat(),
+    }
+
+
 def get_status() -> InstanceMetadata:
     """Return display service and current instance metadata."""
     return STATE.status(base_url=ensure_server())
@@ -24,40 +36,32 @@ def get_status() -> InstanceMetadata:
 def show_message(
     *,
     kind: str,
-    title: str | None = None,
-    summary: str | None = None,
-    source: str | None = None,
-    expand: ExpandMode = "auto",
+    metadata: dict[str, str] | None = None,
     content: str | dict[str, Any] | list[Any] | None = None,
     path: str | None = None,
     old_path: str | None = None,
     new_path: str | None = None,
-    language: str | None = None,
-    mime_type: str | None = None,
 ) -> dict[str, Any]:
     """Create one display message and return its stable ID."""
     request = ShowRequest.model_validate(
         {
             "kind": kind,
-            "title": title,
-            "summary": summary,
-            "source": source,
-            "expand": expand,
+            "metadata": metadata or {},
             "content": content,
             "path": path,
             "old_path": old_path,
             "new_path": new_path,
-            "language": language,
-            "mime_type": mime_type,
         }
     )
     ensure_server()
-    metadata = STATE.add_message(request=request)
+    message = STATE.add_message(request=request)
     status = get_status()
     return {
-        "id": metadata.id,
+        "id": message.id,
+        "kind": message.kind,
+        "path": message.payload.path,
         "url": status.url,
-        "metadata": metadata.model_dump(mode="json"),
+        "metadata": message.model_dump(mode="json"),
     }
 
 

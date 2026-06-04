@@ -32,14 +32,17 @@ const sourceChecks = [
   ['actionLayout="inspector"', "src/App.tsx"],
   ['aria-label="Resize message inspector"', "src/App.tsx"],
   ['aria-label="Open message in side panel"', "src/components/MessageRow.tsx"],
+  ['aria-label="Show message info"', "src/components/MessageRow.tsx"],
   ["RenderErrorBoundary", "src/components/MessageRow.tsx"],
   ['className="message-toolbar"', "src/components/MessageRow.tsx"],
   ['className="message-action-menu"', "src/components/MessageRow.tsx"],
   ["Disable rich view", "src/components/MessageRow.tsx"],
+  ["message-action-trigger", "src/components/MessageRow.tsx"],
   ['layout: "timeline" | "inspector"', "src/components/MessageRow.tsx"],
   ['actionLayout = "timeline"', "src/components/MessageRow.tsx"],
   ['className="file-message-header"', "src/components/MessageRow.tsx"],
   ['className="message-meta"', "src/components/MessageRow.tsx"],
+  ["metadata.", "src/components/MessageRow.tsx"],
   ["compactMessageId", "src/components/MessageRow.tsx"],
   ['<CopyMessageButton api={api} message={message} payload={payload} kind="content" />', "src/components/MessageRow.tsx"],
   ["api.payload(message.id)", "src/components/MessageRow.tsx"],
@@ -69,9 +72,12 @@ const sourceChecks = [
   ["MAX_GRID_COLUMNS", "src/components/PayloadRenderer.tsx"],
   ['role="grid"', "src/components/PayloadRenderer.tsx"],
   ["resolveDiffThemeName(codeTheme)", "src/components/DiffRenderer.tsx"],
-  ['overflow: wrapDiff ? "wrap" : "scroll"', "src/components/DiffRenderer.tsx"],
+  ['overflow: wrapText ? "wrap" : "scroll"', "src/components/DiffRenderer.tsx"],
+  ['aria-label="Line Wrapping"', "src/App.tsx"],
+  [".text-wrap .plain-text-payload", "src/styles/app.css"],
   ["#onetool-display-root", "src/styles/app.css"],
   [".message-toolbar", "src/styles/app.css"],
+  [".message-action-trigger.open", "src/styles/app.css"],
   [".scroll-bottom-button", "src/styles/app.css"],
   [".renderer-error", "src/styles/app.css"],
   [".structured-viewer", "src/styles/app.css"],
@@ -97,8 +103,34 @@ const styles = await readFile(resolve(root, "src/styles/app.css"), "utf8");
 if (/\.inspector-payload\s*>\s*\*\s*\{\s*min-height:\s*100%/m.test(styles)) {
   throw new Error("Inspector payload must not force every child to min-height: 100%.");
 }
+if (!/\.inspector-payload\s*\{[^}]*width:\s*100%;[^}]*height:\s*100%;[^}]*overflow:\s*hidden;/m.test(styles)) {
+  throw new Error("Inspector payload must keep message chrome fixed outside the scroll container.");
+}
+if (!/\.inspector-payload\s+\.message-row-expanded\s*\{[^}]*min-width:\s*100%;[^}]*width:\s*100%;[^}]*height:\s*100%;[^}]*overflow:\s*hidden;/m.test(styles)) {
+  throw new Error("Inspector expanded message must fill the panel without becoming the scroll container.");
+}
+if (!/\.inspector-payload\s+\.message-row-expanded\s+\.preview-wrap\s*\{[^}]*overflow:\s*auto;[^}]*overscroll-behavior:\s*contain;/m.test(styles)) {
+  throw new Error("Inspector expanded message preview must own payload scrolling.");
+}
+if (/\.inspector-payload\s+\.(?:raw-block|code-view|diff-file|data-grid-scroller)[^{]*\{[^}]*overflow-x:\s*auto;/m.test(styles)) {
+  throw new Error("Inspector child renderers must not own horizontal scrollbars.");
+}
 if (!/\.segmented-control\s*\{[^}]*justify-self:\s*start;/m.test(styles)) {
   throw new Error("Segmented controls must not stretch across structured viewer grids.");
+}
+if (/\.popover-viewport\b/.test(styles)) {
+  throw new Error("Popover scrolling must stay on the popup; do not reintroduce a viewport wrapper.");
+}
+if (!/\.popover-popup\s*\{[^}]*max-height:\s*min\(520px,\s*calc\(100vh - 80px\)\);[^}]*overflow-x:\s*hidden;[^}]*overflow-y:\s*auto;/m.test(styles)) {
+  throw new Error("Popover popup must bound static info content and scroll vertically only.");
+}
+if (/\.popover-popup\s*\{[^}]*overflow:\s*auto;/m.test(styles)) {
+  throw new Error("Popover popup must not use two-axis overflow auto.");
+}
+
+const popover = await readFile(resolve(root, "src/components/ui/Popover.tsx"), "utf8");
+if (popover.includes("PopoverPrimitive.Viewport")) {
+  throw new Error("Popover popup must not wrap static content in PopoverPrimitive.Viewport.");
 }
 
 const messageRow = await readFile(resolve(root, "src/components/MessageRow.tsx"), "utf8");
@@ -108,12 +140,21 @@ if (!/function compactMessageId\(id: string\): string \{\s*return id;\s*\}/m.tes
 if (!messageRow.includes('return `${hour}:${minute}, ${day}-${months[date.getMonth()]}`;')) {
   throw new Error("Message timestamps must render as HH:mm, dd-Mon.");
 }
+if (!messageRow.includes('["Lines", message.preview_lines')) {
+  throw new Error("Message info must label preview line count as Lines.");
+}
+for (const marker of ['["Status", message.status]', '["Payload mode", message.payload.mode]', '"Preview lines"', "metadata.summary"]) {
+  if (messageRow.includes(marker)) {
+    throw new Error(`Message info must not include ${marker}.`);
+  }
+}
 
 const copyIndex = messageRow.indexOf('<CopyMessageButton api={api} message={message} payload={payload} kind="content" />');
-const panelIndex = messageRow.indexOf("{panelButton}", copyIndex);
+const infoIndex = messageRow.indexOf("{infoButton}", copyIndex);
+const panelIndex = messageRow.indexOf("{panelButton}", infoIndex);
 const openIndex = messageRow.indexOf("{openButton}", panelIndex);
-if (copyIndex < 0 || panelIndex < 0 || openIndex < 0 || copyIndex > panelIndex || panelIndex > openIndex) {
-  throw new Error("Timeline actions must render as copy content, side panel, then open.");
+if (copyIndex < 0 || infoIndex < 0 || panelIndex < 0 || openIndex < 0 || copyIndex > infoIndex || infoIndex > panelIndex || panelIndex > openIndex) {
+  throw new Error("Timeline actions must render as copy content, info, side panel, then open.");
 }
 if (messageRow.includes("inspectButton") || messageRow.includes("openButton ??")) {
   throw new Error("Timeline rows must not render an open fallback for non-file messages.");
@@ -123,6 +164,27 @@ const timelineReturnEnd = messageRow.indexOf("</>", timelineReturnStart);
 const timelineReturn = messageRow.slice(timelineReturnStart, timelineReturnEnd);
 if (timelineReturn.includes("<MessageActionMenu")) {
   throw new Error("Timeline message rows must not render the overflow action menu.");
+}
+if (!messageRow.includes('<Popover open={open} onOpenChange={setOpen}>')) {
+  throw new Error("Message action menu must expose controlled open state for trigger visibility.");
+}
+if (!messageRow.includes("const runMenuAction = useCallback((action: () => void) => {")) {
+  throw new Error("Message action menu must wrap item handlers to close after selection.");
+}
+if (!messageRow.includes("setOpen(false);")) {
+  throw new Error("Message action menu item selection must close the popover.");
+}
+for (const marker of ["runMenuAction(copyPath.copy)", "runMenuAction(copyContent.copy)", "runMenuAction(onToggleRich)"]) {
+  if (!messageRow.includes(marker)) {
+    throw new Error(`Message action menu item is missing close wrapper ${marker}.`);
+  }
+}
+
+if (/\.message-row\.selected\s+\.message-actions/.test(styles)) {
+  throw new Error("Selected rows must not force message actions to stay visible.");
+}
+if (!/\.message-action-trigger\.open\s*\{[^}]*opacity:\s*0;[^}]*pointer-events:\s*none;/m.test(styles)) {
+  throw new Error("Open overflow action triggers must hide while their menu is selected.");
 }
 
 const payloadRenderer = await readFile(resolve(root, "src/components/PayloadRenderer.tsx"), "utf8");

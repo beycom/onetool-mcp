@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections import deque
 from typing import TYPE_CHECKING
 
 import pytest
@@ -35,7 +36,7 @@ class TestDisplayState:
 
     def test_show_creates_stable_id_and_metadata_only_list(self) -> None:
         state = DisplayState()
-        request = ShowRequest(kind="text", content="hello world", title="Greeting")
+        request = ShowRequest(kind="text", content="hello world", metadata={"title": "Greeting"})
 
         metadata = state.add_message(request=request)
         page = state.list_messages(limit=10, offset=0)
@@ -113,6 +114,29 @@ class TestDisplayState:
 
         assert len(instance.event_queue) == 1
         assert instance.event_queue[0]["type"] == "message"
+
+    def test_clear_messages_removes_messages_cache_and_focus(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("OT_CWD", str(tmp_path))
+        state = DisplayState()
+        instance = state.get_or_create_instance()
+        first = state.add_message(request=ShowRequest(kind="text", content="one"))
+        state.add_message(request=ShowRequest(kind="text", content="two"))
+        assert state.focus(id=first.id) is not None
+        assert instance.cache_dir is not None
+        assert (instance.cache_dir / f"{first.id}.json").is_file()
+
+        cleared = state.clear_messages()
+
+        assert cleared == 2
+        assert state.status(base_url="http://127.0.0.1:1").message_count == 0
+        assert state.list_messages(limit=10, offset=0).total == 0
+        assert state.read_message(id=first.id) is None
+        assert state.focus(id=first.id) is None
+        assert instance.focus_target is None
+        assert instance.event_queue == deque([{"type": "message", "id": ""}])
+        assert not instance.cache_dir.exists()
 
     def test_hot_window_is_bounded_while_cached_messages_remain_readable(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -255,7 +279,7 @@ class TestDisplayState:
         assert metadata.payload.new_path == str(new_path)
         assert metadata.payload.language == "diff"
 
-    def test_structured_content_gets_useful_default_summaries(self) -> None:
+    def test_structured_content_does_not_generate_summary_metadata(self) -> None:
         state = DisplayState()
 
         json_metadata = state.add_message(
@@ -265,8 +289,24 @@ class TestDisplayState:
             request=ShowRequest(kind="table", content=[{"name": "alpha", "value": 1}, {"name": "beta", "value": 2}]),
         )
 
-        assert json_metadata.summary == "2 keys: ok, items"
-        assert table_metadata.summary == "2 rows: name, value"
+        assert "summary" not in json_metadata.metadata
+        assert "summary" not in table_metadata.metadata
+
+    def test_list_filters_source_against_metadata(self) -> None:
+        state = DisplayState()
+        first = state.add_message(
+            request=ShowRequest(kind="text", content="one", metadata={"source": "run-a"}),
+        )
+        state.add_message(
+            request=ShowRequest(kind="text", content="two", metadata={"source": "run-b"}),
+        )
+        state.add_message(
+            request=ShowRequest(kind="text", content="three", metadata={"title": "run-a"}),
+        )
+
+        page = state.list_messages(limit=10, offset=0, source="run-a")
+
+        assert [item.id for item in page.items] == [first.id]
 
     def test_missing_file_payload_returns_clear_validation_error(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

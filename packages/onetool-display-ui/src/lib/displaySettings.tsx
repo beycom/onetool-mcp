@@ -1,13 +1,13 @@
 import { createContext, useContext } from "react";
 
 export interface DisplaySettings {
-  wrapDiff: boolean;
+  wrapText: boolean;
   hideWhitespace: boolean;
   codeTheme: "light" | "dark";
 }
 
 const DisplaySettingsContext = createContext<DisplaySettings>({
-  wrapDiff: false,
+  wrapText: false,
   hideWhitespace: true,
   codeTheme: "dark",
 });

@@ -70,6 +70,11 @@ def load_raw_bytes(handle_name: str) -> bytes | None:
     return path.read_bytes() if path.exists() else None
 
 
+def image_path(handle_name: str) -> Path:
+    """Return the stored image path for a handle."""
+    return _images_dir() / f"{handle_name}.png"
+
+
 def load_meta(handle_name: str) -> dict[str, Any] | None:
     """Read and parse ``meta.json`` for a handle.
 

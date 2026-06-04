@@ -137,6 +137,7 @@ docs-deploy:
 
 # Build the package
 build:
+    cd packages/onetool-display-ui && npm run build
     uv build
 
 # Bundle inject.js annotation script (requires npm install in src/ot/assets/)

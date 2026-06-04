@@ -35,7 +35,7 @@ class TestDisplayServer:
         base_url = ensure_server()
         status = STATE.status(base_url=base_url)
         token = _instance_token()
-        payload = {"kind": "text", "content": "route payload", "title": "Route"}
+        payload = {"kind": "text", "content": "route payload", "metadata": {"title": "Route"}}
 
         created = _post_json(
             f"{base_url}/api/display/instances/{status.mcp_instance_id}/messages?{urlencode({'token': token})}",
@@ -66,7 +66,7 @@ class TestDisplayServer:
         assert response.headers["content-type"].startswith("text/html")
         assert status.mcp_instance_id in html
         assert _instance_token() in html
-        assert '<script type="module">' in html
+        assert "onetool-display-root" in html
 
     def test_bootstrap_injection_ignores_head_tags_inside_inline_scripts(self) -> None:
         html = (

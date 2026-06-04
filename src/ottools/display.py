@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 pack = "display"
-__all__ = ["focus", "list", "read", "seed_mock_messages", "show", "status"]
+pack_aliases = ("d",)
+__all__ = ["clear", "focus", "list", "read", "seed_mock_messages", "show", "show_clip", "status"]
 
 from pathlib import Path
 from typing import Any, Literal
@@ -11,12 +12,19 @@ from typing import Any, Literal
 from otpack import LogSpan
 
 from ot.display import (
+    clear_messages,
     focus_message,
     get_message,
     get_status,
     list_messages,
     show_message,
 )
+from ottools._image.sources import (
+    clipboard_contains_image_object,
+    resolve_clipboard_file_path,
+    validate_image_bytes,
+)
+from ottools._image.tools import load_image_source
 
 DisplayKind = Literal[
     "text",
@@ -31,7 +39,6 @@ DisplayKind = Literal[
     "yaml",
     "table",
 ]
-ExpandMode = Literal["auto", "collapsed", "expanded"]
 
 
 def status() -> dict[str, Any]:
@@ -44,53 +51,77 @@ def status() -> dict[str, Any]:
         return get_status().model_dump(mode="json")
 
 
+def clear() -> dict[str, Any]:
+    """Clear all messages from the current display instance.
+
+    Returns:
+        Dict with cleared message count, display URL, current message count, and
+        updated timestamp.
+    """
+    with LogSpan(span="display.clear"):
+        return clear_messages()
+
+
 def show(
     *,
     kind: DisplayKind,
-    title: str | None = None,
-    summary: str | None = None,
-    source: str | None = None,
-    expand: ExpandMode = "auto",
+    metadata: dict[str, str] | None = None,
     content: str | dict[str, Any] | list[Any] | None = None,
     path: str | None = None,
     old_path: str | None = None,
     new_path: str | None = None,
-    language: str | None = None,
-    mime_type: str | None = None,
 ) -> dict[str, Any]:
     """Create one typed user-visible display message.
 
     Args:
         kind: V1 kind: text, markdown, code, file, diff, file_diff, image, json,
             mermaid, yaml, or table.
-        title: Optional display title.
-        summary: Optional lightweight summary for timeline rows.
-        source: Optional producer or workflow source label.
-        expand: Initial browser expansion mode: auto, collapsed, or expanded.
+        metadata: Optional user-provided key-value metadata. Metadata is not
+            used to control rendering, validation, or routing.
         content: Inline content for text-like and structured kinds.
         path: Workspace-local path for file, image, or file_diff payloads.
         old_path: Workspace-local old path for file_diff payloads.
         new_path: Workspace-local new path for file_diff payloads.
-        language: Optional code or highlighter language.
-        mime_type: Optional MIME type.
 
     Returns:
-        Dict with stable message ID, instance URL, and metadata only.
+        Dict with path, kind, stable message ID, instance URL, and metadata.
     """
     with LogSpan(span="display.show", kind=kind):
         return show_message(
             kind=kind,
-            title=title,
-            summary=summary,
-            source=source,
-            expand=expand,
+            metadata=metadata,
             content=content,
             path=path,
             old_path=old_path,
             new_path=new_path,
-            language=language,
-            mime_type=mime_type,
         )
+
+
+def show_clip(*, metadata: dict[str, str] | None = None) -> dict[str, Any] | str:
+    """Display an image or file path from the system clipboard.
+
+    Clipboard text is treated as a path only when it resolves to an existing
+    file. Non-path text is rejected rather than inferred as another display
+    kind.
+
+    Args:
+        metadata: Optional user-provided key-value metadata.
+
+    Returns:
+        Dict with path, kind, stable message ID, instance URL, and metadata, or
+        an error string.
+    """
+    with LogSpan(span="display.show_clip"):
+        try:
+            if clipboard_contains_image_object():
+                loaded = load_image_source(img="clip")
+                return show(kind="image", path=loaded.path, metadata=metadata)
+
+            clip_path = resolve_clipboard_file_path()
+            kind: DisplayKind = "image" if _path_is_image(clip_path) else "file"
+            return show(kind=kind, path=str(clip_path), metadata=metadata)
+        except (FileNotFoundError, IsADirectoryError, ValueError, RuntimeError, NotImplementedError, ImportError) as exc:
+            return f"Error: {exc}"
 
 
 def read(*, id: str) -> dict[str, Any] | str:
@@ -169,26 +200,28 @@ def seed_mock_messages(*, bulk_count: int = 0) -> dict[str, Any]:
         ids_by_kind: dict[str, list[str]] = {}
 
         def add(kind: DisplayKind, **kwargs: Any) -> str:
-            created = show(kind=kind, source="display.seed_mock_messages", **kwargs)
+            metadata = dict(kwargs.pop("metadata", {}))
+            metadata["source"] = "display.seed_mock_messages"
+            created = show(kind=kind, metadata=metadata, **kwargs)
             message_id = str(created["id"])
             ids_by_kind.setdefault(kind, []).append(message_id)
             return message_id
 
-        add("text", title="Short text", content="A short display message.")
-        add("markdown", title="Markdown", content="# Display fixture\n\n- markdown\n- code\n- tables")
-        add("code", title="Python code", language="python", content='def fixture() -> str:\n    return "display"\n')
-        add("diff", title="Inline diff", content="--- a/example.txt\n+++ b/example.txt\n@@ -1 +1 @@\n-old\n+new\n")
-        add("json", title="JSON", content={"ok": True, "items": [{"name": "alpha"}, {"name": "beta"}]})
-        add("yaml", title="YAML", content="site_name: OneTool\nsite_description: Display fixture\nfeatures:\n  - timeline\n  - inspector\n")
-        add("mermaid", title="Mermaid", content="flowchart LR\n  A[show] --> B[display]\n")
-        add("table", title="Table", content=[{"row": index, "value": f"item-{index}"} for index in range(250)])
+        add("text", metadata={"title": "Short text"}, content="A short display message.")
+        add("markdown", metadata={"title": "Markdown"}, content="# Display fixture\n\n- markdown\n- code\n- tables")
+        add("code", metadata={"title": "Python code"}, content='def fixture() -> str:\n    return "display"\n')
+        add("diff", metadata={"title": "Inline diff"}, content="--- a/example.txt\n+++ b/example.txt\n@@ -1 +1 @@\n-old\n+new\n")
+        add("json", metadata={"title": "JSON"}, content={"ok": True, "items": [{"name": "alpha"}, {"name": "beta"}]})
+        add("yaml", metadata={"title": "YAML"}, content="site_name: OneTool\nsite_description: Display fixture\nfeatures:\n  - timeline\n  - inspector\n")
+        add("mermaid", metadata={"title": "Mermaid"}, content="flowchart LR\n  A[show] --> B[display]\n")
+        add("table", metadata={"title": "Table"}, content=[{"row": index, "value": f"item-{index}"} for index in range(250)])
 
         for path in _fixture_file_paths():
-            add("file", title=Path(path).name, path=path)
+            add("file", metadata={"title": Path(path).name}, path=path)
 
         image_path = _first_existing_path(["docs/assets/logo.png", "docs/assets/logo.svg", "tests/data/products-small.png"])
         if image_path is not None:
-            add("image", title=Path(image_path).name, path=image_path)
+            add("image", metadata={"title": Path(image_path).name}, path=image_path)
 
         diff_pair = _first_existing_pair(
             [
@@ -198,10 +231,10 @@ def seed_mock_messages(*, bulk_count: int = 0) -> dict[str, Any]:
         )
         if diff_pair is not None:
             old_path, new_path = diff_pair
-            add("file_diff", title="Fixture diff", old_path=old_path, new_path=new_path)
+            add("file_diff", metadata={"title": "Fixture diff"}, old_path=old_path, new_path=new_path)
 
         for index in range(max(0, min(2000, bulk_count))):
-            add("text", title=f"Bulk {index + 1}", content=f"Bulk fixture message {index + 1}")
+            add("text", metadata={"title": f"Bulk {index + 1}"}, content=f"Bulk fixture message {index + 1}")
 
         status_result = status()
         return {
@@ -235,3 +268,11 @@ def _first_existing_pair(candidates: list[tuple[str, str]]) -> tuple[str, str] |
         ((old_path, new_path) for old_path, new_path in candidates if Path(old_path).is_file() and Path(new_path).is_file()),
         None,
     )
+
+
+def _path_is_image(path: Path) -> bool:
+    try:
+        validate_image_bytes(path.read_bytes(), str(path))
+    except ValueError:
+        return False
+    return True

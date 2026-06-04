@@ -7,6 +7,10 @@ and loads raw image bytes from the appropriate source.
 from __future__ import annotations
 
 import sys
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # Supported format magic bytes for validation
 _MAGIC: list[tuple[bytes, str]] = [
@@ -215,3 +219,80 @@ def _grab_clipboard() -> bytes:
         img = img.convert("RGB")
     img.save(buf, format="PNG")
     return buf.getvalue()
+
+
+def resolve_clipboard_file_path() -> Path:
+    """Return the first existing file path from clipboard file-list or text."""
+    if sys.platform == "linux":
+        raise NotImplementedError(
+            "Clipboard path capture is not supported on Linux. "
+            "Use display.show(kind='file', path=...) instead."
+        )
+
+    clipboard = _grab_clipboard_object()
+    if isinstance(clipboard, list):
+        if not clipboard:
+            raise ValueError("No file path found in clipboard")
+        return _existing_file_path(str(clipboard[0]))
+
+    text = _clipboard_text()
+    if text:
+        return _existing_file_path(text.strip())
+
+    raise ValueError("Clipboard does not contain an image or existing file path")
+
+
+def clipboard_contains_image_object() -> bool:
+    """Return whether clipboard currently contains an in-memory image object."""
+    if sys.platform == "linux":
+        return False
+    try:
+        from PIL import Image
+    except ImportError:
+        return False
+    return isinstance(_grab_clipboard_object(), Image.Image)
+
+
+def _grab_clipboard_object() -> object:
+    try:
+        from PIL import ImageGrab
+    except ImportError as exc:
+        raise ImportError(
+            "Pillow is required for clipboard capture. "
+            "Install with: pip install Pillow"
+        ) from exc
+    return ImageGrab.grabclipboard()
+
+
+def _clipboard_text() -> str | None:
+    if sys.platform == "darwin":
+        import subprocess
+
+        result = subprocess.run(
+            ["pbpaste"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout if result.returncode == 0 else None
+    try:
+        import tkinter
+    except ImportError:
+        return None
+    root = tkinter.Tk()
+    root.withdraw()
+    try:
+        return str(root.clipboard_get())
+    except tkinter.TclError:
+        return None
+    finally:
+        root.destroy()
+
+
+def _existing_file_path(path_text: str) -> Path:
+    from ot.paths import expand_path
+
+    path = expand_path(path_text)
+    if not path.is_file():
+        raise ValueError(f"Clipboard text is not an existing file path: {path_text}")
+    return path

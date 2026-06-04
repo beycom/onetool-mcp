@@ -190,8 +190,7 @@ button {
 }
 
 .message-row:hover .message-actions,
-.message-row:focus-within .message-actions,
-.message-row.selected .message-actions {
+.message-row:focus-within .message-actions {
   opacity: 1;
   transform: translateY(0);
 }
@@ -213,6 +212,11 @@ button {
 .row-open.failed {
   color: var(--danger);
   border-color: var(--danger);
+}
+
+.message-action-trigger.open {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .row-header-meta-item span,
@@ -380,8 +384,8 @@ button {
 }
 
 .plain-text-payload {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  overflow-x: auto;
+  white-space: pre;
   color: var(--text);
   line-height: 1.5;
 }
@@ -392,19 +396,22 @@ button {
   margin: 0;
   padding: 12px;
   max-height: none;
-  overflow: hidden;
+  overflow: auto;
   border-radius: 6px;
   background: var(--code);
   color: var(--text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 1.55;
+  white-space: pre;
 }
 
-.diff-wrap .raw-block,
-.diff-wrap .code-block,
-.diff-wrap .shiki-block pre {
+.text-wrap .plain-text-payload,
+.text-wrap .raw-block,
+.text-wrap .code-block,
+.text-wrap .shiki-block pre {
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 
@@ -458,14 +465,16 @@ button {
 
 .diff-file {
   max-height: none;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   border-radius: 6px;
   background: var(--code);
 }
 
 .code-view {
   max-height: none;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   border-radius: 6px;
   background: var(--code);
 }
@@ -473,7 +482,7 @@ button {
 .data-grid-scroller {
   max-width: 100%;
   max-height: none;
-  overflow: hidden;
+  overflow: auto;
   border: 1px solid var(--border);
   border-radius: 6px;
 }
@@ -650,12 +659,27 @@ button {
 
 .inspector-payload {
   min-height: 0;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.inspector-payload .message-row-expanded {
+  min-width: 100%;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.inspector-payload .message-row-expanded .preview-wrap {
   overflow: auto;
   overscroll-behavior: contain;
 }
 
 .inspector-payload .payload-panel {
   max-height: none;
+  min-width: 100%;
 }
 
 .inspector-payload .raw-block,
@@ -672,15 +696,20 @@ button {
 .inspector-payload .raw-block,
 .inspector-payload .code-block,
 .inspector-payload .shiki-block pre {
-  overflow-x: auto;
+  overflow-x: visible;
   overflow-y: visible;
 }
 
 .inspector-payload .code-view,
 .inspector-payload .diff-file,
 .inspector-payload .data-grid-scroller {
-  overflow-x: auto;
+  overflow-x: visible;
   overflow-y: visible;
+}
+
+.inspector-payload .image-preview {
+  max-width: none;
+  max-height: none;
 }
 
 .scroll-bottom-button {
@@ -723,15 +752,15 @@ button {
 
 .message-info {
   display: grid;
-  gap: 10px;
-  min-width: min(340px, calc(100vw - 32px));
+  gap: 8px;
+  min-width: min(420px, calc(100vw - 32px));
   margin: 0;
   padding: 14px;
 }
 
 .message-info div {
   display: grid;
-  grid-template-columns: 74px minmax(0, 1fr);
+  grid-template-columns: 116px minmax(0, 1fr);
   gap: 10px;
 }
 
@@ -743,9 +772,8 @@ button {
 .message-info dd {
   min-width: 0;
   margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
 }
@@ -772,17 +800,15 @@ button {
 .popover-popup {
   min-width: min(360px, calc(100vw - 24px));
   max-width: min(420px, calc(100vw - 24px));
+  max-height: min(520px, calc(100vh - 80px));
+  overflow-x: hidden;
+  overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
   color: var(--text);
   box-shadow: var(--shadow);
   outline: none;
-}
-
-.popover-viewport {
-  max-height: min(520px, calc(100vh - 80px));
-  overflow: auto;
 }
 
 .message-action-menu {

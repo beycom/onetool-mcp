@@ -229,6 +229,7 @@ class TestPackShortNameAliases:
         mock_registry = MagicMock()
         mock_registry.packs = packs
         mock_registry.pack_aliases = {
+            "display": ("d",),
             "whiteboard": ("wb",),
             "webfetch": ("wf",),
             "brave": ("br",),
@@ -263,6 +264,15 @@ class TestPackShortNameAliases:
         assert "wf" in ns
         assert ns["wf"] is ns["webfetch"]
 
+    def test_display_gets_d_short_alias(self) -> None:
+        """display pack should appear as both 'display' and 'd'."""
+        packs = {"display": {"show": MagicMock(), "status": MagicMock()}}
+        ns = self._build_namespace_with_packs(packs)
+
+        assert "display" in ns
+        assert "d" in ns
+        assert ns["d"] is ns["display"]
+
     def test_short_alias_not_added_when_pack_absent(self) -> None:
         """Short alias is only injected when the full pack is present."""
         ns = self._build_namespace_with_packs({"brave": {"search": MagicMock()}})
@@ -285,6 +295,7 @@ class TestPackShortNameAliases:
     def test_all_metadata_aliases_are_valid_identifiers(self) -> None:
         """All declared aliases must be valid Python identifiers."""
         aliases = {
+            "display": ("d",),
             "whiteboard": ("wb",),
             "webfetch": ("wf",),
             "brave": ("br",),

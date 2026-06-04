@@ -784,6 +784,30 @@ class TestLoad:
         assert result["dedup"] is True
         assert result["dims"] is not None
 
+    def test_internal_load_image_source_returns_path_and_dedups(self, tmp_path: Path) -> None:
+        from ottools._image import store, tools
+
+        png = _make_png_bytes()
+        img_path = tmp_path / "shared.png"
+        img_path.write_bytes(png)
+
+        with (
+            patch.object(store, "_images_dir", return_value=tmp_path),
+            patch("ottools._image.tools.get_image_config") as mock_cfg,
+        ):
+            from ottools._image.config import Config
+
+            mock_cfg.return_value = Config(session_cache_size=10)
+            tools._clip_handle = None
+
+            first = tools.load_image_source(img=str(img_path))
+            second = tools.load_image_source(img=str(img_path))
+
+        assert first.handle == second.handle
+        assert first.path == str(tmp_path / f"{first.handle}.png")
+        assert second.dedup is True
+        assert second.sha256 is not None
+
     def test_glob_returns_error(self) -> None:
         from ottools._image import tools
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from collections import OrderedDict, deque
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -26,6 +27,7 @@ from ot.display.models import (
     ShowRequest,
 )
 from ot.paths import get_effective_cwd, get_project_state_dir
+from ot.utils.session import get_session_dir
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -95,10 +97,7 @@ class DisplayState:
             metadata = MessageMetadata(
                 id=message_id,
                 kind=request.kind,
-                title=request.title,
-                summary=request.summary or _default_summary(request=request, preview=preview),
-                source=request.source,
-                expand=request.expand,
+                metadata=_message_metadata(request=request),
                 preview_lines=_preview_line_count(preview),
                 created_at=now,
                 updated_at=now,
@@ -215,7 +214,7 @@ class DisplayState:
         if kind is not None:
             items = [item for item in items if item.kind == kind]
         if source is not None:
-            items = [item for item in items if item.source == source]
+            items = [item for item in items if item.metadata.get("source") == source]
         page_offset = _tail_offset(total=len(items), limit=limit, offset=offset) if tail else offset
         return MessageList(
             items=items[page_offset : page_offset + limit],
@@ -235,6 +234,24 @@ class DisplayState:
             delivered = instance.has_event_client
             _append_event(instance, {"type": "focus", "id": id})
             return FocusResult(id=id, delivered=delivered, queued=not delivered)
+
+    def clear_messages(self) -> int:
+        """Clear all messages for the current display instance."""
+        instance = self.get_or_create_instance()
+        cache_dir: Path | None
+        with self._lock:
+            cleared = len(instance.message_ids)
+            cache_dir = instance.cache_dir
+            instance.messages.clear()
+            instance.message_ids.clear()
+            instance.message_id_set.clear()
+            instance.focus_target = None
+            instance.event_queue.clear()
+            instance.updated_at = _utcnow()
+            _append_event(instance, {"type": "message", "id": ""})
+        if cache_dir is not None:
+            shutil.rmtree(cache_dir, ignore_errors=True)
+        return cleared
 
     def poll_events(self, *, instance_id: str, token: str) -> list[dict[str, str]] | None:
         """Return queued events for an authorized instance."""
@@ -276,7 +293,7 @@ def _new_message_id(existing_ids: set[str]) -> str:
 
 def allowed_roots() -> list[Path]:
     """Return workspace roots allowed for display file preview."""
-    return [get_effective_cwd().resolve()]
+    return [get_effective_cwd().resolve(), (get_session_dir() / "images").resolve()]
 
 
 def resolve_allowed_path(path: str) -> Path:
@@ -370,8 +387,6 @@ def _build_payload(
                 mode="file",
                 path=str(path),
                 size_bytes=size,
-                mime_type=request.mime_type,
-                language=request.language,
             ),
             preview,
             None,
@@ -424,8 +439,6 @@ def _build_payload(
         PayloadReference(
             mode="inline",
             size_bytes=len(encoded),
-            mime_type=request.mime_type,
-            language=request.language,
         ),
         preview,
         _bounded_inline_payload(request.content),
@@ -513,60 +526,5 @@ def _read_bounded_file(path: Path, *, limit: int) -> bytes:
         return stream.read(limit)
 
 
-def _default_summary(*, request: ShowRequest, preview: BoundedPreview | None) -> str | None:
-    structured = _structured_summary(request)
-    if structured is not None:
-        return structured
-    if preview is None:
-        return None
-    first_line = preview.text.strip().splitlines()
-    if not first_line:
-        return None
-    return first_line[0][:160]
-
-
-def _structured_summary(request: ShowRequest) -> str | None:
-    content = request.content
-    if request.kind in {"json", "yaml"}:
-        if isinstance(content, dict):
-            return _dict_summary(content)
-        if isinstance(content, list):
-            return _list_summary(content)
-    if request.kind == "table" and isinstance(content, list):
-        return _table_summary(content)
-    return None
-
-
-def _dict_summary(content: dict[str, object]) -> str:
-    keys = list(content)
-    if not keys:
-        return "0 keys"
-    preview = ", ".join(keys[:5])
-    suffix = "" if len(keys) <= 5 else f", +{len(keys) - 5} more"
-    return f"{len(keys)} keys: {preview}{suffix}"
-
-
-def _list_summary(content: list[object]) -> str:
-    return f"{len(content)} items"
-
-
-def _table_summary(content: list[object]) -> str:
-    columns: list[object] = []
-    seen_columns: set[object] = set()
-    for row in content:
-        if not isinstance(row, dict):
-            continue
-        for key in row:
-            if key in seen_columns:
-                continue
-            seen_columns.add(key)
-            columns.append(key)
-            if len(columns) > 5:
-                break
-        if len(columns) > 5:
-            break
-    if not columns:
-        return f"{len(content)} rows"
-    preview = ", ".join(str(column) for column in columns[:5])
-    suffix = "" if len(columns) <= 5 else ", +more"
-    return f"{len(content)} rows: {preview}{suffix}"
+def _message_metadata(*, request: ShowRequest) -> dict[str, str]:
+    return dict(request.metadata)

@@ -36,9 +36,7 @@ export function PopoverPopup({
         sideOffset={sideOffset}
       >
         <PopoverPrimitive.Popup className="popover-popup" data-slot="popover-popup" {...props}>
-          <PopoverPrimitive.Viewport className="popover-viewport" data-slot="popover-viewport">
-            {children}
-          </PopoverPrimitive.Viewport>
+          {children}
         </PopoverPrimitive.Popup>
       </PopoverPrimitive.Positioner>
     </PopoverPrimitive.Portal>
