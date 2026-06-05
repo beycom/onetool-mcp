@@ -22,7 +22,7 @@ security:
     warn: [yaml]
 
   dunders:
-    allow: [__format__, __sanitize__, __compact__, __force_context__]
+    allow: [__format__, __sanitize__, __compact__, __force_context__, __display__]
 
   sanitize:
     enabled: true

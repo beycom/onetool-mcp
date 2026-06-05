@@ -62,7 +62,7 @@ class TestCompactDunder:
                 return_value="compacted output",
             ) as mock_compact:
                 code = '__compact__ = True\n"original verbose output"'
-                text, _raw, _sanitize, _fmt, _fc = execute_python_code(code, tool_functions=tool_funcs)
+                text, _raw, _sanitize, _fmt, _fc, _display = execute_python_code(code, tool_functions=tool_funcs)
 
         mock_compact.assert_called_once()
         assert text == "compacted output"
@@ -82,7 +82,7 @@ class TestCompactDunder:
         with patch("ot.executor.runner.get_config", return_value=_make_config(compact=False)):
             with patch("ot.executor.runner._apply_compact", side_effect=_failing_compact):
                 code = '__compact__ = True\n"original output"'
-                text, _raw, _sanitize, _fmt, _fc = execute_python_code(code, tool_functions=tool_funcs)
+                text, _raw, _sanitize, _fmt, _fc, _display = execute_python_code(code, tool_functions=tool_funcs)
 
         assert "original output" in text
 
@@ -99,7 +99,7 @@ class TestCompactDunder:
         with patch("ot.executor.runner.get_config", return_value=_make_config(compact=False)):
             with patch("ot.executor.runner._apply_compact", side_effect=_apply_compact_import_error):
                 code = '__compact__ = True\n"original output"'
-                text, _raw, _sanitize, _fmt, _fc = execute_python_code(code, tool_functions=tool_funcs)
+                text, _raw, _sanitize, _fmt, _fc, _display = execute_python_code(code, tool_functions=tool_funcs)
 
         assert "original output" in text
 
@@ -141,7 +141,7 @@ class TestCompactDunder:
                 return_value="compacted via config",
             ) as mock_compact:
                 code = '"some output"'
-                text, _raw, _sanitize, _fmt, _fc = execute_python_code(code, tool_functions=tool_funcs)
+                text, _raw, _sanitize, _fmt, _fc, _display = execute_python_code(code, tool_functions=tool_funcs)
 
         mock_compact.assert_called_once()
         assert text == "compacted via config"

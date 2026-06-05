@@ -19,6 +19,10 @@ class TestDirectConfig:
         cfg = OneToolConfig()
         assert cfg.direct.host.enabled is False
         assert cfg.direct.host.port == 8765
+        assert cfg.direct.admin.enabled is True
+        assert cfg.direct.admin.port == 8760
+        assert cfg.direct.admin.heartbeat_seconds == 15.0
+        assert cfg.display.max_queue_messages == 1000
 
     def test_defaults_load_from_yaml_without_direct(self, write_config: Callable) -> None:
         from ot.config.loader import load_config
@@ -28,6 +32,7 @@ class TestDirectConfig:
 
         assert cfg.direct.host.enabled is False
         assert cfg.direct.host.port == 8765
+        assert cfg.direct.admin.heartbeat_seconds == 15.0
 
     def test_direct_section_overrides_host_port(self, write_config: Callable) -> None:
         from ot.config.loader import load_config
@@ -66,9 +71,22 @@ class TestDirectConfig:
     def test_direct_accepts_expected_shape(self) -> None:
         from ot.config.models import DirectConfig
 
-        cfg = DirectConfig(host={"enabled": True, "port": 9001})
+        cfg = DirectConfig(
+            host={"enabled": True, "port": 9001},
+            admin={"enabled": True, "port": 8761, "heartbeat_seconds": 5},
+        )
         assert cfg.host.enabled is True
         assert cfg.host.port == 9001
+        assert cfg.admin.port == 8761
+        assert cfg.admin.heartbeat_seconds == 5
+
+    def test_direct_admin_heartbeat_must_be_positive(self) -> None:
+        from pydantic import ValidationError
+
+        from ot.config.models import DirectConfig
+
+        with pytest.raises(ValidationError):
+            DirectConfig(admin={"heartbeat_seconds": 0})
 
     def test_load_config_ignores_direct_host_timeout_with_warning(
         self, write_config: Callable

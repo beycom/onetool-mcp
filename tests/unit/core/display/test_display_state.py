@@ -138,7 +138,7 @@ class TestDisplayState:
         assert instance.event_queue == deque([{"type": "message", "id": ""}])
         assert not instance.cache_dir.exists()
 
-    def test_hot_window_is_bounded_while_cached_messages_remain_readable(
+    def test_default_producer_queue_is_bounded(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("OT_CWD", str(tmp_path))
@@ -154,14 +154,14 @@ class TestDisplayState:
                 first_id = metadata.id
 
         assert len(instance.messages) == HOT_MESSAGE_WINDOW
-        assert len(instance.message_ids) == HOT_MESSAGE_WINDOW + 5
+        assert len(instance.message_ids) == HOT_MESSAGE_WINDOW
         assert first_id not in instance.messages
-        assert state.read_message(id=first_id) is not None
-        assert state.payload_view(id=first_id) is not None
-        assert state.focus(id=first_id) is not None
+        assert state.read_message(id=first_id) is None
+        assert state.payload_view(id=first_id) is None
+        assert state.focus(id=first_id) is None
         page = state.list_messages(limit=1, offset=0)
-        assert page.total == HOT_MESSAGE_WINDOW + 5
-        assert page.items[0].id == first_id
+        assert page.total == HOT_MESSAGE_WINDOW
+        assert page.items[0].id != first_id
         assert (tmp_path / ".onetool" / "state" / "display").is_dir()
 
     def test_tail_list_returns_latest_messages_in_oldest_to_newest_order(self) -> None:
@@ -177,7 +177,7 @@ class TestDisplayState:
         assert page.offset == 3
         assert [item.id for item in page.items] == ids[-2:]
 
-    def test_cold_message_cache_is_bounded(
+    def test_configured_message_queue_is_bounded(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("OT_CWD", str(tmp_path))
@@ -192,7 +192,7 @@ class TestDisplayState:
             if index == 0:
                 first_id = metadata.id
 
-        assert len(instance.message_ids) == MAX_MESSAGE_RECORDS
+        assert len(instance.message_ids) == HOT_MESSAGE_WINDOW
         assert first_id not in instance.message_ids
         assert state.read_message(id=first_id) is None
         assert instance.cache_dir is not None

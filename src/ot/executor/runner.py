@@ -281,7 +281,7 @@ def wrap_code_for_exec(code: str, has_explicit_return: bool) -> tuple[str, int]:
     indented_code = "\n".join(indented_lines)
 
     # Add global declarations for magic variables so they can be read from outer namespace
-    global_decl = "    global __format__, __sanitize__, __compact__, __force_context__"
+    global_decl = "    global __format__, __sanitize__, __compact__, __force_context__, __display__"
 
     # Use sentinel if no explicit return to distinguish from explicit None
     if has_explicit_return:
@@ -335,7 +335,7 @@ def execute_python_code(
     tools_dir: Path | None = None,
     validate: bool = True,
     default_format: FormatMode = "json",
-) -> tuple[str, Any, bool, str, bool]:
+) -> tuple[str, Any, bool, str, bool, bool]:
     """Execute Python code with tool functions available.
 
     Args:
@@ -346,7 +346,8 @@ def execute_python_code(
         default_format: Format used when code does not set __format__
 
     Returns:
-        Tuple of (serialized string, raw Python object, sanitize flag, format mode, force_context flag)
+        Tuple of serialized string, raw Python object, sanitize flag, format mode,
+        force_context flag, and display flag.
 
     Raises:
         ValueError: If validation fails or execution fails
@@ -420,6 +421,7 @@ def execute_python_code(
         should_sanitize: bool = namespace.get("__sanitize__", config.security.sanitize.enabled)
         should_compact: bool = namespace.get("__compact__", config.output.compact)
         should_force_context: bool = namespace.get("__force_context__", False)
+        should_display: bool = namespace.get("__display__", False)
 
         # Determine output and raw_result
         raw_result = None
@@ -438,7 +440,7 @@ def execute_python_code(
         if should_compact:
             output = _apply_compact(output)
 
-        return output, raw_result, should_sanitize, fmt, should_force_context
+        return output, raw_result, should_sanitize, fmt, should_force_context, should_display
 
     except Exception as e:
         error_msg, line_num = _map_error_line(e, line_offset)
@@ -552,6 +554,65 @@ def prepare_command(command: str) -> PreparedCommand:
     )
 
 
+def _command_requests_display(code: str) -> bool:
+    """Return whether top-level code explicitly sets __display__ truthy."""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return False
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(target, ast.Name) and target.id == "__display__" for target in node.targets):
+            continue
+        return isinstance(node.value, ast.Constant) and node.value.value is True
+    return False
+
+
+def _display_run_result(
+    *,
+    command: str,
+    prepared_code: str,
+    tool_name: str | None,
+    text_result: str,
+    raw_result: Any,
+    result_fmt: str,
+    success: bool,
+    error_type: str | None = None,
+) -> None:
+    """Send the final run result to Display without changing the MCP response."""
+    try:
+        from ot.display.service import show_message
+
+        kind, content = _display_payload(text_result=text_result, raw_result=raw_result)
+        metadata = {
+            "source": "run",
+            "tool": tool_name or "",
+            "command": command[:500],
+            "prepared": prepared_code[:500],
+            "format": result_fmt,
+            "success": str(success).lower(),
+            "serialized": str(raw_result is None).lower(),
+        }
+        if error_type:
+            metadata["error_type"] = error_type
+        show_message(kind=kind, content=content, metadata=metadata)
+    except Exception as e:
+        logger.warning("__display__ failed: {} — returning original output", e)
+
+
+def _display_payload(*, text_result: str, raw_result: Any) -> tuple[str, Any]:
+    """Choose a Display kind for a final run result."""
+    if isinstance(raw_result, list) and all(isinstance(item, dict) for item in raw_result):
+        return "table", raw_result
+    if isinstance(raw_result, dict | list):
+        return "json", raw_result
+    stripped = text_result.lstrip()
+    if stripped.startswith(("# ", "## ", "### ", "- ", "* ", "```")):
+        return "markdown", text_result
+    return "text", text_result
+
+
 # -----------------------------------------------------------------------------
 # Unified Command Execution
 # -----------------------------------------------------------------------------
@@ -644,7 +705,14 @@ async def execute_command(
         try:
             if use_thread_pool:
                 # Run in thread pool so event loop can process proxy calls
-                text_result, raw_result, sanitize, result_fmt, force_context = await asyncio.to_thread(
+                (
+                    text_result,
+                    raw_result,
+                    sanitize,
+                    result_fmt,
+                    force_context,
+                    should_display,
+                ) = await asyncio.to_thread(
                     execute_python_code,
                     stripped,
                     tool_functions=tool_namespace,
@@ -653,7 +721,7 @@ async def execute_command(
                 )
             else:
                 # Direct execution for non-proxy calls (no overhead)
-                text_result, raw_result, sanitize, result_fmt, force_context = execute_python_code(
+                text_result, raw_result, sanitize, result_fmt, force_context, should_display = execute_python_code(
                     stripped,
                     tool_functions=tool_namespace,
                     validate=should_validate,
@@ -667,6 +735,16 @@ async def execute_command(
             from ot.services import get_services
 
             output_policy = get_services().output_policy_for(tool_name)
+            if should_display:
+                _display_run_result(
+                    command=command,
+                    prepared_code=stripped,
+                    tool_name=tool_name,
+                    text_result=text_result,
+                    raw_result=raw_result,
+                    result_fmt=result_fmt,
+                    success=True,
+                )
             if output_policy.allow_deflect:
                 result_size = len(text_result.encode("utf-8"))
                 if force_context or (max_size > 0 and result_size > max_size):
@@ -696,6 +774,17 @@ async def execute_command(
                 format=result_fmt,
             )
         except Exception as e:
+            if _command_requests_display(stripped):
+                _display_run_result(
+                    command=command,
+                    prepared_code=stripped,
+                    tool_name=tool_name,
+                    text_result=str(e),
+                    raw_result=None,
+                    result_fmt="raw",
+                    success=False,
+                    error_type=type(e).__name__,
+                )
             return CommandResult(
                 command=command,
                 result=str(e),

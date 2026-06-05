@@ -450,6 +450,7 @@ def test_allowed_dunders_pass() -> None:
     allowed = [
         "__format__ = 'json'",
         "__sanitize__ = False",
+        "__display__ = True",
     ]
     for code in allowed:
         result = validate_python_code(code)

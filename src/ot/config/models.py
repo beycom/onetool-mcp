@@ -192,7 +192,13 @@ class DundersConfig(BaseModel):
     """Magic variable (dunder) configuration."""
 
     allow: list[str] = Field(
-        default_factory=lambda: ["__format__", "__sanitize__", "__compact__", "__force_context__"],
+        default_factory=lambda: [
+            "__format__",
+            "__sanitize__",
+            "__compact__",
+            "__force_context__",
+            "__display__",
+        ],
         description="Allowed magic variables (e.g., '__format__')",
     )
 
@@ -538,6 +544,29 @@ class DirectHostConfig(BaseModel):
     )
 
 
+class DirectAdminConfig(BaseModel):
+    """Admin App registration settings for MCP-owned Direct API instances."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = Field(
+        default=True,
+        strict=True,
+        description="Register this MCP process with the local Admin App when Direct API is bound.",
+    )
+    port: int = Field(
+        default=8760,
+        ge=1,
+        le=65535,
+        description="Local Admin App port used for registration heartbeats.",
+    )
+    heartbeat_seconds: float = Field(
+        default=15.0,
+        gt=0,
+        description="Seconds between best-effort Admin App registration heartbeats.",
+    )
+
+
 class DirectConfig(BaseModel):
     """Direct API configuration for MCP-owned direct execution."""
 
@@ -546,6 +575,22 @@ class DirectConfig(BaseModel):
     host: DirectHostConfig = Field(
         default_factory=DirectHostConfig,
         description="MCP-owned direct API settings.",
+    )
+    admin: DirectAdminConfig = Field(
+        default_factory=DirectAdminConfig,
+        description="Admin App registration settings.",
+    )
+
+
+class DisplayConfig(BaseModel):
+    """MCP-side display producer queue settings."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    max_queue_messages: int = Field(
+        default=1000,
+        ge=1,
+        description="Maximum display messages retained by the MCP producer queue.",
     )
 
 
@@ -615,6 +660,11 @@ class OneToolConfig(BaseModel):
     direct: DirectConfig = Field(
         default_factory=DirectConfig,
         description="MCP-owned direct API configuration",
+    )
+
+    display: DisplayConfig = Field(
+        default_factory=DisplayConfig,
+        description="MCP-side display producer queue configuration",
     )
 
     tools: ToolsConfig = Field(

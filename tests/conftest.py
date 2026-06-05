@@ -132,7 +132,7 @@ def executor() -> Callable[[str], str]:
     tool_funcs: dict[str, Any] = load_tool_functions(tools_dir)
 
     def run(code: str) -> str:
-        text, _raw, _sanitize, _fmt, _fc = execute_python_code(code, tool_functions=tool_funcs)
+        text, _raw, _sanitize, _fmt, _fc, _display = execute_python_code(code, tool_functions=tool_funcs)
         return text
 
     return run

@@ -113,7 +113,8 @@ class DisplayState:
             instance.message_id_set.add(message_id)
             while len(instance.messages) > HOT_MESSAGE_WINDOW:
                 instance.messages.popitem(last=False)
-            while len(instance.message_ids) > MAX_MESSAGE_RECORDS:
+            max_message_records = _max_message_records()
+            while len(instance.message_ids) > max_message_records:
                 expired_id = instance.message_ids.pop(0)
                 instance.messages.pop(expired_id, None)
                 instance.message_id_set.discard(expired_id)
@@ -319,6 +320,16 @@ def _append_event(instance: DisplayInstance, event: dict[str, str]) -> None:
     instance.event_queue.append(event)
     while len(instance.event_queue) > MAX_EVENT_QUEUE:
         instance.event_queue.popleft()
+
+
+def _max_message_records() -> int:
+    """Return configured MCP-side display queue retention."""
+    try:
+        from ot.config import get_config
+
+        return max(1, min(MAX_MESSAGE_RECORDS, get_config().display.max_queue_messages))
+    except Exception:
+        return MAX_MESSAGE_RECORDS
 
 
 def _instance_metadata(instance: DisplayInstance) -> InstanceMetadata:

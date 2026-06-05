@@ -141,7 +141,7 @@ class TestForceContextDunder:
             patch("ot.ctx.write.ctx_write") as mock_write,
             patch(
                 "ot.executor.runner.execute_python_code",
-                return_value=('{"content": "ctx result"}', None, False, "json", True),
+                return_value=('{"content": "ctx result"}', None, False, "json", True, False),
             ),
         ):
             mock_pm.return_value.servers = {}
@@ -165,7 +165,7 @@ class TestForceContextDunder:
             patch("ot.ctx.write.ctx_write") as mock_write,
             patch(
                 "ot.executor.runner.execute_python_code",
-                return_value=('{"help":"value"}', None, False, "json", True),
+                return_value=('{"help":"value"}', None, False, "json", True, False),
             ),
         ):
             mock_pm.return_value.servers = {}
@@ -240,7 +240,7 @@ class TestForceContextDunder:
             patch("ot.proxy.get_proxy_manager") as mock_pm,
             patch(
                 "ot.executor.runner.execute_python_code",
-                return_value=('{"name":"ot.help"}', None, False, "json", False),
+                return_value=('{"name":"ot.help"}', None, False, "json", False, False),
             ) as mock_exec,
         ):
             mock_pm.return_value.servers = {}
@@ -263,7 +263,7 @@ class TestForceContextDunder:
             patch("ot.proxy.get_proxy_manager") as mock_pm,
             patch(
                 "ot.executor.runner.execute_python_code",
-                return_value=('{"ok":true}', None, False, "json", False),
+                return_value=('{"ok":true}', None, False, "json", False, False),
             ) as mock_exec,
         ):
             mock_pm.return_value.servers = {}

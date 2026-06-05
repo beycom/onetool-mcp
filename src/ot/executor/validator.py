@@ -94,7 +94,7 @@ FALLBACK_WARNED_IMPORTS = frozenset({
 })
 
 FALLBACK_ALLOWED_DUNDERS = frozenset({
-    "__format__", "__sanitize__", "__compact__", "__force_context__",
+    "__format__", "__sanitize__", "__compact__", "__force_context__", "__display__",
 })
 
 # Cache stdlib module names for performance (checked per qualified call)

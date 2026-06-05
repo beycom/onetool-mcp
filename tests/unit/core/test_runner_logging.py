@@ -86,7 +86,7 @@ async def test_execute_command_logs_original_snippet_command_not_expanded_code()
         ),
         patch(
             "ot.executor.runner.execute_python_code",
-            return_value=("ok", "ok", True, "json", False),
+            return_value=("ok", "ok", True, "json", False, False),
         ),
         patch("ot.executor.runner.LogSpan", FakeSpan),
     ):
