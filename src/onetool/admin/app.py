@@ -38,6 +38,7 @@ def create_app(*, settings: AdminSettings) -> Starlette:
             Route("/", _index, methods=["GET"]),
             Route("/assets/{asset_path:path}", _asset, methods=["GET"]),
             Route("/api/admin/health", _health, methods=["GET"]),
+            Route("/api/admin/register", _register(service), methods=["POST"]),
             Route("/api/admin/scan", _scan(service), methods=["POST"]),
             Route("/api/admin/instances", _instances(service), methods=["GET"]),
             Route("/api/admin/display/refresh", _refresh(service), methods=["POST"]),
@@ -63,7 +64,7 @@ def create_app(*, settings: AdminSettings) -> Starlette:
             ),
             Route(
                 "/api/admin/instances/{identity}/display/events",
-                _proxy_get(service, f"{DISPLAY_PREFIX}/events"),
+                _events(service),
                 methods=["GET"],
             ),
             Route(
@@ -125,6 +126,20 @@ def _scan(service: AdminService) -> Endpoint:
     return endpoint
 
 
+def _register(service: AdminService) -> Endpoint:
+    async def endpoint(request: Request) -> Response:
+        try:
+            payload = await request.json()
+            if not isinstance(payload, dict):
+                raise ValueError("registration payload must be an object")
+            instances = await service.register(payload=payload)
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, status_code=HTTPStatus.BAD_REQUEST)
+        return JSONResponse({"instances": instances})
+
+    return endpoint
+
+
 def _instances(service: AdminService) -> Endpoint:
     async def endpoint(request: Request) -> Response:
         del request
@@ -162,11 +177,27 @@ def _messages(service: AdminService) -> Endpoint:
             if request.method == "POST":
                 payload = await request.json()
                 result = await service.proxy_post(identity=identity, path=DISPLAY_PREFIX + "/messages", payload=payload)
+                await service.display_message_list(
+                    identity=identity,
+                    path=f"{DISPLAY_PREFIX}/messages?tail=true&limit=500",
+                )
             else:
-                result = await service.proxy_get(identity=identity, path=direct_path)
+                result = await service.display_message_list(identity=identity, path=direct_path)
         except Exception as e:
             return JSONResponse({"error": str(e)}, status_code=HTTPStatus.BAD_GATEWAY)
         return JSONResponse(result)
+
+    return endpoint
+
+
+def _events(service: AdminService) -> Endpoint:
+    async def endpoint(request: Request) -> Response:
+        identity = str(request.path_params["identity"])
+        try:
+            payload = await service.display_events(identity=identity)
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=HTTPStatus.BAD_GATEWAY)
+        return JSONResponse(payload)
 
     return endpoint
 

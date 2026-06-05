@@ -1,8 +1,7 @@
-"""Services for scanning and proxying MCP Direct API instances."""
+"""Services for registered MCP Direct API instances."""
 
 from __future__ import annotations
 
-import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -66,6 +65,16 @@ class AdminInstanceStore:
             key=lambda item: (item[1].status == "connected", item[1].updated_at),
         )[:overflow]:
             del self._instances[identity]
+
+    def mark_stale_connected(self, *, missed_heartbeats: int = 4) -> None:
+        """Mark connected instances disconnected after missed registration heartbeats."""
+        now = datetime.now(UTC)
+        for identity, instance in list(self._instances.items()):
+            if instance.status != "connected":
+                continue
+            ttl = timedelta(seconds=instance.heartbeat_seconds * missed_heartbeats)
+            if now - instance.updated_at > ttl:
+                self.mark_disconnected(identity)
 
 
 class DirectApiClient:
@@ -162,19 +171,28 @@ class AdminService:
         self.settings = settings
         self.store = AdminInstanceStore()
         self.direct = DirectApiClient(settings=settings)
+        self.display_messages: dict[str, dict[str, Any]] = {}
 
     async def scan(self) -> list[dict[str, Any]]:
-        """Scan configured Direct API candidate ports and update the snapshot."""
-        ports = range(
-            self.settings.direct_start_port,
-            self.settings.direct_start_port + self.settings.scan_max,
-        )
-        instances = await asyncio.gather(
-            *(self._probe(base_url=f"http://127.0.0.1:{port}") for port in ports)
-        )
-        for instance in instances:
-            if instance is not None:
-                self.store.upsert(instance, max_instances=self.settings.max_instances)
+        """Reconcile registered instances and expire missed heartbeats."""
+        self.store.mark_stale_connected()
+        self.store.prune(max_instances=self.settings.max_instances)
+        return self.store.list_instances()
+
+    async def register(self, *, payload: dict[str, Any]) -> list[dict[str, Any]]:
+        """Verify and store one MCP Direct API registration."""
+        base_url = payload.get("base_url")
+        heartbeat_seconds = payload.get("heartbeat_seconds", 15.0)
+        if not isinstance(base_url, str) or not _is_loopback_url(base_url):
+            raise ValueError("base_url must be a loopback HTTP URL")
+        if not isinstance(heartbeat_seconds, (int, float)) or heartbeat_seconds <= 0:
+            raise ValueError("heartbeat_seconds must be positive")
+
+        instance = await self._probe(base_url=base_url, heartbeat_seconds=float(heartbeat_seconds))
+        if instance is None:
+            raise ValueError("registered Direct API did not verify")
+        self.store.upsert(instance, max_instances=self.settings.max_instances)
+        self.store.mark_stale_connected()
         self.store.prune(max_instances=self.settings.max_instances)
         return self.store.list_instances()
 
@@ -205,6 +223,31 @@ class AdminService:
             self.store.mark_disconnected(identity)
             raise
 
+    async def display_message_list(self, *, identity: str, path: str) -> dict[str, Any]:
+        """Return Admin-owned display message metadata after Direct API backfill."""
+        try:
+            payload = await self.proxy_get(identity=identity, path=path)
+        except Exception:
+            cached = self.display_messages.get(identity)
+            if cached is not None:
+                return cached
+            raise
+        self.display_messages[identity] = payload
+        return payload
+
+    async def display_events(self, *, identity: str) -> dict[str, Any]:
+        """Fetch Direct API events and ingest message metadata into Admin state."""
+        payload = await self.proxy_get(identity=identity, path=f"{DISPLAY_PREFIX}/events")
+        events = payload.get("events", [])
+        if isinstance(events, list) and any(
+            isinstance(event, dict) and event.get("type") == "message" for event in events
+        ):
+            await self.display_message_list(
+                identity=identity,
+                path=f"{DISPLAY_PREFIX}/messages?tail=true&limit=500",
+            )
+        return payload
+
     async def proxy_post(
         self, *, identity: str, path: str, payload: dict[str, Any]
     ) -> dict[str, Any]:
@@ -233,7 +276,7 @@ class AdminService:
         """Close service-owned network resources."""
         await self.direct.aclose()
 
-    async def _probe(self, *, base_url: str) -> DiscoveredInstance | None:
+    async def _probe(self, *, base_url: str, heartbeat_seconds: float = 15.0) -> DiscoveredInstance | None:
         try:
             health = await self.direct.get(base_url=base_url, path=HEALTH_PATH)
             if health.get("protocol_version") != PROTOCOL_VERSION:
@@ -248,12 +291,14 @@ class AdminService:
         return DiscoveredInstance(
             identity=identity,
             short_identity=str(bootstrap.get("short_identity", "")),
-            base_url=str(bootstrap.get("base_url", base_url)),
+            base_url=base_url,
             cwd=str(bootstrap.get("cwd", "")),
             started_at=str(bootstrap.get("started_at", "")),
             api_version=int(bootstrap.get("api_version", 0)),
             status="connected",
             display=dict(bootstrap.get("display", {})),
+            meta=dict(bootstrap.get("meta", {})),
+            heartbeat_seconds=heartbeat_seconds,
         )
 
     def _connected_instance(self, identity: str) -> DiscoveredInstance:
@@ -268,3 +313,9 @@ class AdminService:
 def _sign_path(path: str) -> str:
     """Return the URL path component used by Direct API signatures."""
     return urlsplit(path).path
+
+
+def _is_loopback_url(base_url: str) -> bool:
+    """Return whether a registration URL is constrained to loopback HTTP."""
+    parsed = urlsplit(base_url)
+    return parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost", "::1"}

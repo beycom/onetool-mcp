@@ -17,8 +17,6 @@ class AdminSettings:
     ot_dir: Path
     host: str = "127.0.0.1"
     port: int = 8760
-    direct_start_port: int = 8765
-    scan_max: int = 10
     max_instances: int = 100
 
 
@@ -34,6 +32,8 @@ class DiscoveredInstance:
     api_version: int
     status: InstanceStatus
     display: dict[str, Any]
+    meta: dict[str, Any] = field(default_factory=dict)
+    heartbeat_seconds: float = 15.0
     discovered_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -48,6 +48,8 @@ class DiscoveredInstance:
             "api_version": self.api_version,
             "status": self.status,
             "display": self.display,
+            "meta": self.meta,
+            "heartbeat_seconds": self.heartbeat_seconds,
             "discovered_at": self.discovered_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }

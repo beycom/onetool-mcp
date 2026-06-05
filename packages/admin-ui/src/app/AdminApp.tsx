@@ -9,7 +9,8 @@ export function AdminApp() {
   const [selectedIdentity, setSelectedIdentity] = useState<string | null>(null);
   const instancesQuery = useQuery({
     queryKey: ["admin", api.adminOrigin, "instances"],
-    queryFn: () => api.instances(),
+    queryFn: () => api.scan(),
+    refetchInterval: 5_000,
     refetchOnWindowFocus: false,
   });
   const instances = instancesQuery.data ?? [];
@@ -25,18 +26,12 @@ export function AdminApp() {
     if (!selectedIdentity && next[0]) setSelectedIdentity(next[0].identity);
   }, [api, queryClient, selectedIdentity]);
 
-  const refresh = useCallback(async () => {
-    const next = await api.refreshDisplays();
-    queryClient.setQueryData(["admin", api.adminOrigin, "instances"], next);
-  }, [api, queryClient]);
-
   return (
     <AdminFrame
       instances={instances}
       selected={selected}
       error={instancesQuery.error instanceof Error ? instancesQuery.error.message : null}
       onScan={scan}
-      onRefresh={refresh}
       onSelect={setSelectedIdentity}
     />
   );

@@ -1,4 +1,4 @@
-import { RefreshCwIcon, SearchIcon, ServerIcon } from "lucide-react";
+import { SearchIcon, ServerIcon } from "lucide-react";
 import { LiveDisplayApp, MockDisplayApp } from "../features/display/DisplayApp";
 import type { AdminInstance } from "./adminTypes";
 
@@ -7,14 +7,12 @@ export function AdminFrame({
   selected,
   error,
   onScan,
-  onRefresh,
   onSelect,
 }: {
   instances: AdminInstance[];
   selected: AdminInstance | null;
   error: string | null;
   onScan: () => Promise<void>;
-  onRefresh: () => Promise<void>;
   onSelect: (identity: string) => void;
 }) {
   return (
@@ -25,9 +23,6 @@ export function AdminFrame({
           <div className="instance-actions">
             <button type="button" className="icon-button" onClick={() => void onScan()} aria-label="Scan MCP instances" title="Scan MCP instances">
               <SearchIcon size={16} />
-            </button>
-            <button type="button" className="icon-button" onClick={() => void onRefresh()} aria-label="Refresh displays" title="Refresh displays">
-              <RefreshCwIcon size={16} />
             </button>
           </div>
         </div>
@@ -41,7 +36,7 @@ export function AdminFrame({
               onClick={() => onSelect(instance.identity)}
             >
               <ServerIcon size={15} />
-              <span>{instance.short_identity || instance.identity}</span>
+              <span>{instanceLabel(instance)}</span>
               <small>{instance.status}</small>
             </button>
           ))}
@@ -52,4 +47,12 @@ export function AdminFrame({
       </section>
     </div>
   );
+}
+
+function instanceLabel(instance: AdminInstance): string {
+  const name = instance.meta?.name?.trim();
+  if (name) return name;
+  const cwdParts = instance.cwd.split("/").filter(Boolean);
+  const cwdName = cwdParts[cwdParts.length - 1];
+  return cwdName || instance.short_identity || instance.identity;
 }

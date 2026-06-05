@@ -5,9 +5,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-from datetime import UTC, datetime
 from http import HTTPStatus
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from starlette.responses import Response
@@ -16,11 +14,13 @@ from starlette.routing import Route
 from ot.direct_api import PROTOCOL_VERSION
 from ot.display.models import ShowRequest
 from ot.display.state import STATE, resolve_allowed_path
+from ot.runtime_meta import STARTED_AT, get_runtime_meta
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from starlette.requests import Request
 
-STARTED_AT = datetime.now(UTC)
 API_VERSION = 1
 MAX_ASSET_BYTES = 16 * 1024 * 1024
 
@@ -115,7 +115,7 @@ async def _bootstrap(
 ) -> tuple[dict[str, Any], int]:
     del request, body
     status = STATE.status()
-    cwd = Path.cwd()
+    runtime = get_runtime_meta()
     return (
         {
             "protocol_version": PROTOCOL_VERSION,
@@ -123,8 +123,11 @@ async def _bootstrap(
             "identity": status.mcp_instance_id,
             "short_identity": status.mcp_instance_id.removeprefix("mcp-")[:16],
             "base_url": base_url,
-            "cwd": str(cwd),
+            "cwd": runtime["cwd"],
+            "config_path": runtime["config_path"],
+            "config_dir": runtime["config_dir"],
             "started_at": STARTED_AT.isoformat(),
+            "meta": runtime,
             "display": status.model_dump(mode="json"),
         },
         HTTPStatus.OK,

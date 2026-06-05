@@ -9,6 +9,10 @@ default:
 install:
     npm ci
 
+# Start the Vite dev server for Admin UI development
+dev port="5173":
+    npm run dev -- --host 127.0.0.1 --port {{ port }}
+
 # Type check TypeScript without emitting files
 typecheck:
     npm run typecheck

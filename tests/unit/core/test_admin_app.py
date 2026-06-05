@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
@@ -12,6 +11,7 @@ import pytest
 from onetool.admin.app import create_app
 from onetool.admin.models import AdminSettings, DiscoveredInstance
 from onetool.admin.services import AdminInstanceStore, AdminService
+from ot.direct_api import PROTOCOL_VERSION
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -36,9 +36,9 @@ async def test_admin_app_serves_static_fallback(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 @pytest.mark.core
-async def test_admin_scan_stores_successful_instances(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Scan stores successful signed probes in memory."""
-    service = AdminService(settings=AdminSettings(ot_dir=tmp_path, direct_start_port=9000, scan_max=2))
+async def test_admin_register_stores_verified_instance(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Registration stores one successfully verified Direct API instance."""
+    service = AdminService(settings=AdminSettings(ot_dir=tmp_path))
     discovered = DiscoveredInstance(
         identity="mcp-alpha",
         short_identity="alpha",
@@ -48,14 +48,17 @@ async def test_admin_scan_stores_successful_instances(tmp_path: Path, monkeypatc
         api_version=1,
         status="connected",
         display={"mcp_instance_id": "mcp-alpha", "message_count": 0},
+        heartbeat_seconds=2.0,
     )
 
-    async def fake_probe(*, base_url: str) -> DiscoveredInstance | None:
-        return discovered if base_url.endswith(":9000") else None
+    async def fake_probe(*, base_url: str, heartbeat_seconds: float = 15.0) -> DiscoveredInstance | None:
+        assert base_url == "http://127.0.0.1:9000"
+        assert heartbeat_seconds == 2.0
+        return discovered
 
     monkeypatch.setattr(service, "_probe", fake_probe)
 
-    result = await service.scan()
+    result = await service.register(payload={"base_url": "http://127.0.0.1:9000", "heartbeat_seconds": 2.0})
     await service.aclose()
 
     assert [item["identity"] for item in result] == ["mcp-alpha"]
@@ -64,30 +67,66 @@ async def test_admin_scan_stores_successful_instances(tmp_path: Path, monkeypatc
 
 @pytest.mark.unit
 @pytest.mark.core
-async def test_admin_scan_probes_candidate_ports_concurrently(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Scan starts candidate port probes concurrently."""
-    service = AdminService(settings=AdminSettings(ot_dir=tmp_path, direct_start_port=9000, scan_max=3))
-    release = asyncio.Event()
-    started: list[str] = []
+async def test_admin_probe_pins_verified_registration_base_url(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Admin proxying stays pinned to the verified registration URL."""
+    service = AdminService(settings=AdminSettings(ot_dir=tmp_path))
 
-    async def fake_probe(*, base_url: str) -> DiscoveredInstance | None:
-        started.append(base_url)
-        if len(started) == service.settings.scan_max:
-            release.set()
-        await release.wait()
-        return None
+    async def fake_get(*, base_url: str, path: str, timeout: float = 1.0) -> dict[str, object]:
+        del timeout
+        assert base_url == "http://127.0.0.1:9000"
+        if path.endswith("/health"):
+            return {"protocol_version": PROTOCOL_VERSION}
+        if path.endswith("/ready"):
+            return {"ready": True}
+        return {
+            "identity": "mcp-alpha",
+            "short_identity": "alpha",
+            "base_url": "http://192.0.2.10:9000",
+            "cwd": str(tmp_path),
+            "started_at": "2026-06-04T00:00:00+00:00",
+            "api_version": 1,
+            "display": {"message_count": 0},
+        }
 
-    monkeypatch.setattr(service, "_probe", fake_probe)
+    monkeypatch.setattr(service.direct, "get", fake_get)
+
+    instance = await service._probe(base_url="http://127.0.0.1:9000", heartbeat_seconds=2.0)
+    await service.aclose()
+
+    assert instance is not None
+    assert instance.base_url == "http://127.0.0.1:9000"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+async def test_admin_scan_marks_missed_heartbeats_disconnected(tmp_path: Path) -> None:
+    """Manual scan reconciles registered instances without probing port ranges."""
+    service = AdminService(settings=AdminSettings(ot_dir=tmp_path))
+    service.store.upsert(
+        DiscoveredInstance(
+            identity="mcp-stale",
+            short_identity="stale",
+            base_url="http://127.0.0.1:9000",
+            cwd=str(tmp_path),
+            started_at="2026-06-04T00:00:00+00:00",
+            api_version=1,
+            status="connected",
+            display={"message_count": 0},
+            heartbeat_seconds=1.0,
+        ),
+        max_instances=service.settings.max_instances,
+    )
+    stored = service.store.get("mcp-stale")
+    assert stored is not None
+    stored.updated_at = datetime.now(UTC) - timedelta(seconds=5)
 
     result = await service.scan()
     await service.aclose()
 
-    assert result == []
-    assert started == [
-        "http://127.0.0.1:9000",
-        "http://127.0.0.1:9001",
-        "http://127.0.0.1:9002",
-    ]
+    assert result[0]["identity"] == "mcp-stale"
+    assert result[0]["status"] == "disconnected"
 
 
 @pytest.mark.unit
@@ -168,6 +207,50 @@ async def test_admin_proxy_failure_marks_disconnected(tmp_path: Path, monkeypatc
     await service.aclose()
 
     assert service.store.get("mcp-gone").status == "disconnected"  # type: ignore[union-attr]
+
+
+@pytest.mark.unit
+@pytest.mark.core
+async def test_admin_display_messages_return_cached_after_disconnect(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Admin owns the latest ingested message list when Direct API later fails."""
+    service = AdminService(settings=AdminSettings(ot_dir=tmp_path))
+    service.store.upsert(
+        DiscoveredInstance(
+            identity="mcp-alpha",
+            short_identity="alpha",
+            base_url="http://127.0.0.1:9000",
+            cwd=str(tmp_path),
+            started_at="2026-06-04T00:00:00+00:00",
+            api_version=1,
+            status="connected",
+            display={"message_count": 1},
+        ),
+        max_instances=service.settings.max_instances,
+    )
+    calls = 0
+
+    async def fake_get(*, base_url: str, path: str, timeout: float = 1.0) -> dict[str, object]:
+        nonlocal calls
+        del base_url, path, timeout
+        calls += 1
+        if calls > 1:
+            raise RuntimeError("gone")
+        return {"items": [{"id": "abc123"}], "total": 1, "offset": 0, "limit": 100}
+
+    monkeypatch.setattr(service.direct, "get", fake_get)
+
+    first = await service.display_message_list(
+        identity="mcp-alpha", path="/api/admin/display/messages"
+    )
+    second = await service.display_message_list(
+        identity="mcp-alpha", path="/api/admin/display/messages"
+    )
+    await service.aclose()
+
+    assert first == second
+    assert second["items"][0]["id"] == "abc123"
 
 
 @pytest.mark.unit

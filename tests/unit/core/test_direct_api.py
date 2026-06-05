@@ -138,6 +138,8 @@ async def test_signed_admin_bootstrap_returns_mcp_metadata() -> None:
     assert payload["identity"].startswith("mcp-")
     assert payload["base_url"] == "http://127.0.0.1:9999"
     assert payload["display"]["mcp_instance_id"] == payload["identity"]
+    assert payload["meta"]["identity"] == payload["identity"]
+    assert "cwd" in payload["meta"]
     assert "url" not in payload["display"]
 
 

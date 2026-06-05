@@ -184,7 +184,7 @@ def test_admin_help_lists_serve_command() -> None:
 @pytest.mark.unit
 @pytest.mark.serve
 def test_admin_serve_passes_default_args(tmp_path: Path) -> None:
-    """admin serve uses default Admin App and scan ports."""
+    """admin serve uses default Admin App args."""
     from onetool.cli import app
 
     ot_dir = tmp_path / ".onetool"
@@ -196,15 +196,13 @@ def test_admin_serve_passes_default_args(tmp_path: Path) -> None:
     serve_admin_app.assert_called_once_with(
         ot_dir=ot_dir,
         port=8760,
-        direct_start_port=8765,
-        scan_max=10,
     )
 
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_admin_serve_passes_port_and_scan_overrides(tmp_path: Path) -> None:
-    """admin serve passes Admin App and Direct API scan overrides."""
+def test_admin_serve_passes_port_override(tmp_path: Path) -> None:
+    """admin serve passes the Admin App port override."""
     from onetool.cli import app
 
     ot_dir = tmp_path / ".onetool"
@@ -218,10 +216,6 @@ def test_admin_serve_passes_port_and_scan_overrides(tmp_path: Path) -> None:
                 str(ot_dir),
                 "--port",
                 "8761",
-                "--direct-start-port",
-                "9000",
-                "--scan-max",
-                "20",
             ],
         )
 
@@ -230,9 +224,31 @@ def test_admin_serve_passes_port_and_scan_overrides(tmp_path: Path) -> None:
     serve_admin_app.assert_called_once_with(
         ot_dir=ot_dir,
         port=8761,
-        direct_start_port=9000,
-        scan_max=20,
     )
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_admin_serve_rejects_removed_scan_flags(tmp_path: Path) -> None:
+    """Removed scan flags fail through Typer's normal validation path."""
+    from onetool.cli import app
+
+    ot_dir = tmp_path / ".onetool"
+    with patch("onetool.admin.server.serve_admin_app") as serve_admin_app:
+        result = CliRunner().invoke(
+            app,
+            [
+                "admin",
+                "serve",
+                "--ot-dir",
+                str(ot_dir),
+                "--direct-start-port",
+                "9000",
+            ],
+        )
+
+    assert result.exit_code == 2
+    serve_admin_app.assert_not_called()
 
 
 @pytest.mark.unit

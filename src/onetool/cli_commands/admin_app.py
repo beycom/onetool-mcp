@@ -41,19 +41,6 @@ def admin_serve(
         int,
         typer.Option("--port", help="Admin App browser server port.", min=1, max=65535),
     ] = 8760,
-    direct_start_port: Annotated[
-        int,
-        typer.Option(
-            "--direct-start-port",
-            help="First MCP Direct API candidate port scanned by the Admin App.",
-            min=1,
-            max=65535,
-        ),
-    ] = 8765,
-    scan_max: Annotated[
-        int,
-        typer.Option("--scan-max", help="Maximum Direct API candidate ports per scan.", min=1),
-    ] = 10,
 ) -> None:
     """Serve the shared local Admin App."""
     resolved_ot_dir = _resolve_admin_ot_dir(ot_dir)
@@ -64,8 +51,6 @@ def admin_serve(
     serve_admin_app(
         ot_dir=resolved_ot_dir,
         port=port,
-        direct_start_port=direct_start_port,
-        scan_max=scan_max,
     )
 
 

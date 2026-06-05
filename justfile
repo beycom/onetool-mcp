@@ -30,7 +30,7 @@ dev *args:
     uv run onetool --config {{ ot_config }} {{ args }}
 
 # Serve the Admin App and open it in the default browser
-admin-open port="8760" direct_start_port="8765" scan_max="10":
+admin-open port="8760":
     #!/usr/bin/env bash
     set -euo pipefail
     url="http://127.0.0.1:{{ port }}"
@@ -49,9 +49,11 @@ admin-open port="8760" direct_start_port="8765" scan_max="10":
     ) &
     uv run onetool admin serve \
         --ot-dir {{ quote(ot_dir) }} \
-        --port {{ port }} \
-        --direct-start-port {{ direct_start_port }} \
-        --scan-max {{ scan_max }}
+        --port {{ port }}
+
+# Start the Admin UI Vite dev server
+admin-vite port="5173":
+    just admin-ui::dev {{ port }}
 
 # ============================================================================
 # TESTING

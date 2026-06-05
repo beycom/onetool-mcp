@@ -20,11 +20,4 @@ export class AdminApi {
     const payload = (await response.json()) as { instances: AdminInstance[] };
     return payload.instances;
   }
-
-  async refreshDisplays(): Promise<AdminInstance[]> {
-    const response = await fetch("/api/admin/display/refresh", { method: "POST" });
-    if (!response.ok) throw new Error(`Admin API ${response.status}`);
-    const payload = (await response.json()) as { instances: AdminInstance[] };
-    return payload.instances;
-  }
 }
