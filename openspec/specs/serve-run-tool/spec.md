@@ -437,6 +437,29 @@ The system SHALL support a `__compact__` magic variable to transparently compact
 - **WHEN** compaction reduces output below the threshold
 - **THEN** the compacted output SHALL be returned inline (no ctx-store handle)
 
+### Requirement: Display Magic Variable
+
+The system SHALL support a `__display__` magic variable that mirrors the final run result to Display without changing the normal MCP run response.
+
+#### Scenario: Explicit display
+- **GIVEN** code that sets `__display__ = True`
+- **WHEN** the final result is produced
+- **THEN** the result SHALL be returned through the normal MCP run path
+- **AND** the same final result SHALL be written to Display before ctx deflection replaces the model-visible response with a handle summary
+- **AND** the Display message SHALL include metadata for source, command, prepared code, result format, success state, and serialization state
+
+#### Scenario: Structured display kinds
+- **GIVEN** code that sets `__display__ = True`
+- **WHEN** the final result is a list of dicts
+- **THEN** Display SHALL receive a `table` message
+- **AND** dict/list results that are not tables SHALL be sent as `json`
+- **AND** text results SHALL be sent as `text` or `markdown`
+
+#### Scenario: Default display behavior
+- **GIVEN** code that does not set `__display__` or sets it false
+- **WHEN** the result is returned
+- **THEN** no automatic Display message SHALL be created
+
 ### Requirement: Large Output Handling
 
 The system SHALL intercept tool outputs exceeding a configurable size threshold and store them to disk. The system SHALL also store outputs unconditionally when `__force_context__` is set to `True`.

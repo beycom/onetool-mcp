@@ -1,14 +1,14 @@
 # Display
 
-In-process message store for rich, user-visible artifacts inspected through the shared Admin App.
+Bounded display producer for rich, user-visible artifacts inspected through the shared Admin App.
 
 Short alias: `d`
 
 ## Highlights
 
-- Stores display messages in the current OneTool MCP process and exposes them through signed MCP Direct API routes
+- Queues display messages in the current OneTool MCP process and exposes them through signed MCP Direct API routes for Admin ingestion
 - Returns current MCP instance metadata from `display.status()`, without starting or returning a browser URL
-- Keeps bounded hot and cold message windows for the current process, with cold records cached under project-local display state
+- Keeps a bounded MCP-side producer queue controlled by `display.max_queue_messages`
 - Loads payloads lazily in a t3code-derived React timeline UI with fixed row previews, a side inspector, content-aware markdown, code, diff, JSON/YAML tree/source, Mermaid render/source, table, and file renderers
 - Loads the latest timeline page on browser startup in high-volume sessions while preserving oldest-to-newest visual order within the loaded page
 - Restricts file previews and open actions to the current workspace root
@@ -50,18 +50,19 @@ None - no secrets required.
 
 ### Optional
 
-No `tools.display` configuration keys are supported in V1.
+No `tools.display` configuration keys are supported in V1. The MCP-side producer queue is configured at the root `display` section.
 
 ```yaml
-tools: {}
+display:
+  max_queue_messages: 1000
 ```
 
 ### Defaults
 
 - Display tool calls do not start the Admin App.
 - `onetool admin serve` binds the Admin App to `127.0.0.1:8760` by default.
-- Admin App scans start at MCP Direct API port `8765` and check up to 10 candidate ports by default.
-- Display hot state is in-memory and scoped to the current running MCP process; a bounded cold message window may be cached under the project-local display state directory.
+- MCP processes register with the Admin App after their Direct API binds. The Scan button reconciles registered instances and marks missed heartbeats disconnected.
+- Display producer state is in-memory and scoped to the current running MCP process; messages are FIFO-evicted when `display.max_queue_messages` is exceeded.
 - File access is limited to the effective OneTool cwd.
 
 ## Supported Kinds
@@ -76,7 +77,7 @@ Generated `file_diff` messages keep old and new source paths as separate payload
 
 Display keeps memory bounded during long sessions:
 
-- Keeps only the hot message window in memory while allowing a bounded cold message window to be read from project-local display cache state.
+- Keeps only a bounded MCP-side producer queue before Admin ingestion.
 - Returns file, inline string, and generated preview text in 64 KiB windows.
 - Keeps inline list payload views to the first 500 items.
 - Skips generated file diffs when either input file is larger than 1 MiB.
@@ -86,11 +87,11 @@ Display keeps memory bounded during long sessions:
 
 ## Security And Persistence
 
-Display tools do not launch a browser service or return a browser URL. Start the shared UI explicitly with `onetool admin serve --ot-dir ~/.onetool`, then scan for MCP Direct API instances. MCP-side display routes live under signed Direct API paths such as `/api/admin/display/messages`, and the browser talks only to the Admin App's same-origin `/api/admin/...` routes.
+Display tools do not launch a browser service or return a browser URL. Start the shared UI explicitly with `onetool admin serve --ot-dir ~/.onetool`; MCP processes with `direct.host.enabled: true` register with that Admin App after binding their Direct API. MCP-side display routes live under signed Direct API paths such as `/api/admin/display/messages`, and the browser talks only to the Admin App's same-origin `/api/admin/...` routes.
 
 File payloads must use workspace-local paths. Image payloads may also reference OneTool-owned session image paths produced by clipboard image loading. Remote URLs, untrusted `file://` URLs, path traversal outside allowed roots, HTML kinds, and terminal/log kinds are rejected.
 
-Display state is in-session only. A OneTool MCP process restart creates fresh display state; cached cold-message records are an internal memory-pressure detail, not durable storage or a V1 recovery guarantee.
+Display producer state is in-session only. A OneTool MCP process restart creates fresh display state; Admin App memory is the browser-facing owner for registered runtime state.
 
 ## Examples
 

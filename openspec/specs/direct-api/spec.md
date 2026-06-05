@@ -18,6 +18,9 @@ stdio or Streamable HTTP.
 Config fields:
 - `direct.host.enabled` — bind the MCP direct API when true
 - `direct.host.port` — preferred port, default `8765`
+- `direct.admin.enabled` — send Admin App registrations when true
+- `direct.admin.port` — local Admin App port, default `8760`
+- `direct.admin.heartbeat_seconds` — registration interval, default `15`
 
 The API SHALL bind only to loopback (`127.0.0.1`) by default. Startup SHALL try
 the configured port first, then increment until a free port is found.
@@ -70,6 +73,23 @@ the configured port first, then increment until a free port is found.
 - **GIVEN** the MCP-owned direct API is running
 - **WHEN** stdio or HTTP root MCP shutdown runs
 - **THEN** the direct API listener SHALL be stopped with the MCP process
+
+### Requirement: Admin App Registration
+
+When Direct API binds successfully and `direct.admin.enabled: true`, MCP startup SHALL register the actual bound Direct API base URL with the local Admin App and repeat registration at the configured heartbeat interval.
+
+#### Scenario: Registration starts after bind
+- **GIVEN** `direct.host.enabled: true`
+- **AND** `direct.admin.enabled: true`
+- **WHEN** Direct API binds to `http://127.0.0.1:9001`
+- **THEN** MCP SHALL register that exact base URL with `http://127.0.0.1:{direct.admin.port}/api/admin/register`
+- **AND** registration SHALL be best-effort and SHALL NOT block MCP startup
+
+#### Scenario: Registration heartbeat
+- **GIVEN** Direct API registration is enabled
+- **WHEN** the MCP process remains running
+- **THEN** it SHALL repeat registration every `direct.admin.heartbeat_seconds`
+- **AND** the heartbeat interval SHALL be validated as positive
 
 ### Requirement: authenticated API endpoints
 

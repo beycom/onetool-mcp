@@ -50,7 +50,7 @@ security:
   calls:
     block: [pickle.*, yaml.load]
   dunders:
-    allow: [__format__, __sanitize__]
+    allow: [__format__, __sanitize__, __compact__, __force_context__, __display__]
 ```
 
 Tool namespaces (`ot.*`, `brave.*`, `file.*`, etc.) are auto-allowed.

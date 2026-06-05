@@ -197,19 +197,17 @@ The system SHALL store display messages as metadata records plus payload referen
 - **AND** the browser SHALL NOT wrap the text in code-style raw block chrome unless rich rendering is disabled
 
 ### Requirement: Retention Limits
-The system SHALL enforce bounded hot and cold retention for display messages and payload previews per MCP display instance while using project-local display state as an internal cold-message cache.
+The system SHALL enforce bounded retention for MCP-side display producer messages and payload previews per MCP display instance.
 
-#### Scenario: Long session moves cold messages out of memory
-- **WHEN** a display instance exceeds the hot in-memory message window
-- **THEN** the system keeps only the hot message window in memory
-- **AND** older message records remain available within the bounded cold message window to `display.list(...)`, `display.read(id=...)`, and browser timeline API reads through project-local display cache state
-- **AND** the cache location SHALL be under the display project state directory returned by `get_project_state_dir("display")`
-- **AND** the cache SHALL NOT create a durable storage, archive, or restart-recovery guarantee
+#### Scenario: Long session reaches producer queue limit
+- **WHEN** a display instance exceeds `display.max_queue_messages`
+- **THEN** the MCP process removes the oldest message IDs and cached records FIFO
+- **AND** removed messages are no longer available through MCP-side `display.list(...)`, `display.read(id=...)`, or signed display routes
+- **AND** Admin App state is the browser-facing owner for messages already ingested from MCP events
 
-#### Scenario: Long session reaches cold retention limit
-- **WHEN** a display instance exceeds the cold message retention limit
-- **THEN** the system removes the oldest message IDs and cached records from display state
-- **AND** removed messages are no longer available through `display.list(...)`, `display.read(id=...)`, or browser timeline API reads
+#### Scenario: Queue limit is configurable
+- **WHEN** configuration sets `display.max_queue_messages`
+- **THEN** the MCP-side producer queue SHALL enforce that positive limit capped by the implementation maximum of `5000`
 
 #### Scenario: Payload previews are bounded
 - **WHEN** a display payload is stored inline, generated from a file preview, or generated from a file diff
@@ -388,12 +386,17 @@ The system SHALL expose a temporary `display.seed_mock_messages(...)` fixture to
 - **AND** the tool SHALL be marked test-only in code/docs
 
 ### Requirement: Admin App Display Browser And API Routes
-The system SHALL provide shared Admin App browser and API routes for scanning MCP Direct API instances, listing discovered instances, and proxying display status, timeline/message creation, message reads, listing, focus events, file previews, diff previews, controlled open actions, and UI events through signed server-side Direct API calls.
+The system SHALL provide shared Admin App browser and API routes for accepting MCP Direct API registrations, listing registered instances, reconciling heartbeat state, and proxying display status, timeline/message creation, message reads, listing, focus events, file previews, diff previews, controlled open actions, and UI events through signed server-side Direct API calls.
 
-#### Scenario: Admin App scan discovers display instances
-- **WHEN** a user starts `onetool admin serve --ot-dir <absolute path>` and requests a scan from the browser
-- **THEN** the Admin App probes the configured MCP Direct API candidate port range using signed Direct API requests
-- **AND** discovered instances are stored in the Admin App's in-memory instance list
+#### Scenario: MCP registration discovers display instances
+- **WHEN** an MCP process posts a Direct API `base_url` to `/api/admin/register`
+- **THEN** the Admin App verifies the registered Direct API using signed `/health`, `/ready`, and `/api/admin/bootstrap` requests
+- **AND** verified instances are stored in the Admin App's in-memory instance list
+
+#### Scenario: Scan reconciles registered instances
+- **WHEN** a user requests Scan from the browser
+- **THEN** the Admin App marks connected instances disconnected after missed heartbeats derived from each instance heartbeat interval
+- **AND** Scan SHALL NOT probe a Direct API port range
 
 #### Scenario: Admin App lists discovered instances
 - **WHEN** a browser requests the Admin App instance list

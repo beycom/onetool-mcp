@@ -139,6 +139,30 @@ warnings: []
 - **THEN** server status SHALL show "disconnected"
 - **AND** proxy status SHALL show "degraded"
 
+### Requirement: Runtime Metadata
+
+The `ot.meta()`, `ot.set_meta(...)`, and `ot.connect_admin(...)` functions SHALL expose and update runtime metadata used by the Admin App to identify MCP runtimes.
+
+#### Scenario: Read runtime metadata
+- **WHEN** `ot.meta()` is called
+- **THEN** it SHALL return immutable runtime identity, mutable `name`, mutable `description`, effective CWD, config path, config dir, Direct API base URL/port when available, `started_at`, and metadata `updated_at`
+
+#### Scenario: Set runtime metadata
+- **WHEN** `ot.set_meta(name="Planning", description="Scope")` is called
+- **THEN** the current runtime metadata SHALL be updated in place
+- **AND** repeated calls SHALL NOT create a new runtime identity
+
+#### Scenario: Partial metadata update
+- **GIVEN** a runtime has both name and description set
+- **WHEN** `ot.set_meta(name="Implementation")` is called
+- **THEN** the description SHALL be preserved
+- **AND** explicit empty strings SHALL clear name or description
+
+#### Scenario: Manual Admin registration
+- **WHEN** `ot.connect_admin(port=8760)` is called
+- **THEN** OneTool SHALL send one registration attempt for the current Direct API runtime to the local Admin App
+- **AND** it SHALL return status details useful for debugging
+
 ---
 
 ### Requirement: Reload Configuration

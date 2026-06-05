@@ -56,7 +56,7 @@ The validator checks four categories:
 | **builtins** | Allowed builtin functions | `str`, `len`, `print`, `range` |
 | **imports** | Allowed module imports | `json`, `re`, `math`, `datetime` |
 | **calls** | Blocked/warned qualified calls | `pickle.*`, `yaml.load` |
-| **dunders** | Allowed magic variables | `__format__`, `__sanitize__` |
+| **dunders** | Allowed magic variables | `__format__`, `__sanitize__`, `__compact__`, `__force_context__`, `__display__` |
 
 **Tool namespaces are auto-allowed:** `ot.*`, `brave.*`, `file.*`, etc. are automatically permitted since they're the whole point of OneTool.
 
@@ -80,7 +80,7 @@ security:
     block: [pickle.*, yaml.load]
     warn: [random.seed]
   dunders:
-    allow: [__format__, __sanitize__]
+    allow: [__format__, __sanitize__, __compact__, __force_context__, __display__]
 ```
 
 **Compact array format:** Group related items for readability:
@@ -230,7 +230,7 @@ OneTool ships with a secure default `security.yaml`:
 
 **Warned imports:** `yaml` (generates warning but allowed).
 
-**Allowed dunders:** `__format__` and `__sanitize__` for OneTool control variables.
+**Allowed dunders:** `__format__`, `__sanitize__`, `__compact__`, `__force_context__`, and `__display__` for OneTool control variables.
 
 ## Customising Security
 

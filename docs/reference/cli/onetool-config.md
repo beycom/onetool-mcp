@@ -463,12 +463,23 @@ direct:
   host:
     enabled: false  # true binds the authenticated loopback API from the MCP process
     port: 8765      # Preferred API port; MCP startup probes upward if occupied
+  admin:
+    enabled: true
+    port: 8760
+    heartbeat_seconds: 15
+
+display:
+  max_queue_messages: 1000
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `direct.host.enabled` | bool | `false` | Bind the MCP-owned authenticated loopback direct API when the MCP process starts. |
 | `direct.host.port` | int (1-65535) | `8765` | Preferred direct API port. MCP startup tries this port first, then increments until one binds. |
+| `direct.admin.enabled` | bool | `true` | Register the bound Direct API with the local Admin App. Registration is best-effort and only starts after Direct API binds. |
+| `direct.admin.port` | int (1-65535) | `8760` | Local Admin App port for registration heartbeats. |
+| `direct.admin.heartbeat_seconds` | number > 0 | `15` | Registration heartbeat interval. Admin marks missed heartbeats disconnected using this interval. |
+| `display.max_queue_messages` | int >= 1 | `1000` | Maximum MCP-side display producer messages retained before FIFO eviction. |
 
 Unrecognised config attributes are ignored with warnings that identify the dotted
 path. Recognised attributes with invalid values still fail validation.
@@ -555,7 +566,7 @@ security:
     warn: [random.seed]           # Warned qualified calls
 
   dunders:
-    allow: [__format__, __sanitize__]  # Allowed magic variables
+    allow: [__format__, __sanitize__, __compact__, __force_context__, __display__]  # Allowed magic variables
 
   sanitize:
     enabled: true              # Output sanitization (prompt injection protection)
