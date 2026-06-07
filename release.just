@@ -41,9 +41,6 @@ check:
     just lint
     just typecheck
     just test-all
-    just admin-ui::check
-    just admin-ui::build
-    git diff --exit-code -- packages/admin-ui/src/onetool_admin_ui/dist
     just build-inject
     git diff --exit-code -- src/ot/assets/inject.js
     just secrets-check
@@ -75,7 +72,6 @@ set-version version:
 # Build package
 build:
     rm -rf dist/ build/ *.egg-info
-    just admin-ui::build
     just build-inject
     uv build
 

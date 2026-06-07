@@ -30,9 +30,8 @@ Core tools for OneTool introspection and management.
 | `ot.skills(name, pattern, info)` | List bundled skills or retrieve a skill body |
 | `ot.config()` | Show aliases, snippets, and server names |
 | `ot.debug(verbose, env_vars, dependencies, prompts)` | Show debug diagnostics |
-| `ot.meta()` | Show runtime identity, mutable Admin label metadata, cwd, config paths, Direct API URL, and timestamps |
+| `ot.meta()` | Show runtime identity, mutable label metadata, cwd, config paths, Direct API URL, and timestamps |
 | `ot.set_meta(name, description)` | Set a human-readable name or description for the current runtime |
-| `ot.connect_admin(port)` | Send one Admin App registration attempt for the current Direct API runtime |
 | `ot.status()` | Check runtime status |
 | `ot.version()` | Show OneTool version information |
 | `ot.stats(period, tool, output, info)` | Get runtime usage statistics |
@@ -75,15 +74,14 @@ Set `__format__` explicitly to override (for example `json_h`, `yml`, or `yml_h`
 
 ## Runtime Metadata
 
-Use runtime metadata to make Admin App entries recognizable when several MCP processes are running.
+Use runtime metadata to make local inspection entries recognizable when several MCP processes are running.
 
 ```python
-ot.set_meta(name="Planning", description="Scope Admin runtime metadata")
+ot.set_meta(name="Planning", description="Scope runtime metadata")
 ot.meta()
-ot.connect_admin(port=8760)
 ```
 
-Partial `ot.set_meta(...)` updates preserve existing fields. Empty strings clear `name` or `description`. The Admin App labels runtimes by `meta.name`, then CWD basename, then the short technical identity.
+Partial `ot.set_meta(...)` updates preserve existing fields. Empty strings clear `name` or `description`.
 
 ## ot.help()
 

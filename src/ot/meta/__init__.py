@@ -39,7 +39,7 @@ from ot.meta._help_formatting import (
     _get_doc_url,
 )
 from ot.meta._introspection import aliases, snippet_info, snippets
-from ot.meta._runtime import connect_admin, meta, set_meta
+from ot.meta._runtime import meta, set_meta
 from ot.meta._server_mgmt import security, server, skills
 from ot.meta._stats import result, stats
 from ot.meta._tool_discovery import (
@@ -68,7 +68,6 @@ __all__ = [
     "_truncate",
     "aliases",
     "config",
-    "connect_admin",
     "debug",
     "get_ot_pack_functions",
     "help",
@@ -123,7 +122,6 @@ def get_ot_pack_functions() -> dict[str, Any]:
         "snippet_info": snippet_info,
         "skills": skills,
         "config": config,
-        "connect_admin": connect_admin,
         "debug": debug,
         "help": help,
         "meta": meta,

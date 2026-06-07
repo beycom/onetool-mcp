@@ -12,8 +12,6 @@
 |------|---------|-------|
 | Run all checks | `just check` | Lint + type + test |
 | Run tests | `just test` | Full test suite |
-| Run Admin UI checks | `just admin-ui::check` | Full Admin UI quality gate |
-| Build Admin UI | `just admin-ui::build` | Vite build + packaged assets |
 | Run smoke tests | `uv run pytest -m smoke` | Fast checks only |
 | Run specific component | `uv run pytest -m serve` | By marker |
 | Dev server | `just dev` | MCP server in dev mode |
@@ -32,7 +30,6 @@ src/
   otutil/       [util] extra: brave, convert, ctx, excel, file, ground, knowledge, mem, tavily
 
 packages/
-  admin-ui/ TypeScript React Admin UI package
   onetool-bench/  Benchmark harness (internal, not installed)
 
 tests/          All tests (smoke, unit, integration)
@@ -51,7 +48,6 @@ openspec/       Specifications and proposals
 | **Config** | `justfile` | All dev commands |
 | **Rules** | `dev/agents/hints.md` | This file - quick reference |
 | **Tools** | `src/ottools/*.py` | Built-in tool packs |
-| **Frontend** | `packages/admin-ui/` | Admin UI TypeScript React package |
 | **Core** | `src/ot/executor/runner.py` | Main execution engine |
 | **Server** | `src/ot/server.py` | FastMCP server runtime |
 | **CLI** | `src/onetool/cli.py` | `onetool` command entry point |
@@ -73,14 +69,10 @@ openspec/       Specifications and proposals
 - Fixtures: Use shared fixtures from `conftest.py`
 - Test location mirrors source package: `src/otdev/` → `tests/otdev/`, `src/ottools/` → `tests/ottools/`, `src/otutil/` → `tests/otutil/`, core → `tests/`
 
-### Frontend/UI
-- Detailed guide: `dev/practices/typescript-react-ui.md`
-- Package: `packages/admin-ui`
-- Commands: `just admin-ui::install`, `just admin-ui::check`, `just admin-ui::build`
-- Use npm with committed package lockfiles; keep TS config/deps/tests inside the frontend package
-- Use React Query for display/admin API state and local React state for view-only UI state
-- Use feature/domain-first source folders: app shell in `src/app/`, feature code in `src/features/<domain>/`, reusable primitives in `src/shared/`
-- Renderer safety: sanitize generated SVG/HTML, bound JSON/YAML parsing/rendering, and prefer source fallback for oversized content
+### Console/UI
+- Browser-facing display lives in the separate `onetool-console` TypeScript project.
+- `onetool-mcp` owns only MCP execution, Direct API `/run`, and signed Console outbox endpoints.
+- Launch Console separately with `onetool-console serve --ot-dir ~/.onetool`.
 
 ### Paths
 - `.onetool/` paths: Use `resolve_ot_path()` from `ot.meta`
@@ -122,7 +114,7 @@ openspec/       Specifications and proposals
 | OneTool architecture | `query="request pipeline"` | `dev/project/arch/index.md` |
 | Tool packs info | `query="tool packs"` | `docs/reference/tools/index.md` |
 | Testing guide | `query="test markers fixtures"` | `dev/practices/testing.md` |
-| Frontend guide | `query="typescript react ui"` | `dev/practices/typescript-react-ui.md` |
+| Console frontend guide | `query="typescript react ui"` | `dev/practices/typescript-react-ui.md` |
 | Git workflow | `query="git merge strategy"` | `dev/practices/git.md` |
 | Commit scope | `query="commit scope for X"` | `dev/practices/commit-scopes.md` |
 | Python style | `query="python style rules"` | `dev/practices/python-style.md` |

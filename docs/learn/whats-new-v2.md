@@ -346,6 +346,16 @@ version: 2
 
 The config directory changed from `~/.onetool/config/` to `~/.onetool/` (flat layout). Move your files up one level, or re-run `onetool init`.
 
+### Admin App moved to OneTool Console App
+
+The in-repo browser Admin App and `onetool admin serve` launch command were removed. Browser-facing display inspection now lives in the separate OneTool Console App:
+
+```bash
+onetool-console serve --ot-dir ~/.onetool
+```
+
+Enable `direct.host.enabled: true` in the MCP config so Console can consume `/api/console/outbox` with `auth/console-outbox.key`. Console is read-only: it consumes events and reads local files under published roots, but it does not run MCP commands or mutate MCP config.
+
 ### Trigger prefix change
 
 `__run` is the canonical explicit invocation prefix. `__r` and `__ot` are also supported aliases:

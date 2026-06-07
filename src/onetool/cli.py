@@ -13,7 +13,6 @@ from pathlib import Path
 
 import typer
 
-from onetool.cli_commands.admin_app import admin_app
 from onetool.cli_commands.direct_app import direct_app
 from onetool.kb import kb_app
 
@@ -164,7 +163,6 @@ def _start_root_runtime(
         return
 
 
-app.add_typer(admin_app, name="admin", rich_help_panel="Admin")
 app.add_typer(direct_app, name="direct", rich_help_panel="Direct")
 app.add_typer(kb_app, name="kb", rich_help_panel="Knowledge Base")
 

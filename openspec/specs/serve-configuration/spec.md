@@ -172,22 +172,6 @@ The system SHALL use direct (host) execution.
 - **WHEN** execution starts
 - **THEN** it SHALL use default timeout (120s)
 
-### Requirement: Direct Admin Registration Configuration
-
-The system SHALL support `direct.admin` settings for MCP-to-Admin App registration.
-
-#### Scenario: Direct admin defaults
-- **GIVEN** no `direct.admin` section
-- **WHEN** configuration is loaded
-- **THEN** `direct.admin.enabled` SHALL default to `true`
-- **AND** `direct.admin.port` SHALL default to `8760`
-- **AND** `direct.admin.heartbeat_seconds` SHALL default to `15`
-
-#### Scenario: Direct admin heartbeat validation
-- **GIVEN** `direct.admin.heartbeat_seconds` is not positive
-- **WHEN** configuration is loaded
-- **THEN** validation SHALL fail
-
 ### Requirement: Display Queue Configuration
 
 The system SHALL support a root `display.max_queue_messages` setting for MCP-side display producer retention.

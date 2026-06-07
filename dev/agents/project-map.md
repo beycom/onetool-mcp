@@ -55,21 +55,11 @@ Performance benchmarking CLI (internal, not distributed with `onetool-mcp`).
 | `harness/runner.py` | Scenario/task execution loop |
 | `reporter.py` | Console and summary reporting |
 
-### Admin UI (`packages/admin-ui/`)
+### Console App
 
-Owned TypeScript React package for the shared local Admin App browser UI.
-
-| Area | Purpose |
-|------|---------|
-| `src/app/` | App bootstrap, routing, Admin layout, instance API, and app-level types |
-| `src/features/<domain>/` | Feature-owned API clients, types, components, stores, hooks, and tests |
-| `src/shared/` | Cross-feature UI primitives and shared frontend helpers |
-| `src/styles/` | Package-level Admin UI styles |
-| `scripts/` | Build and generated asset validation helpers |
-| `justfile` | Package-local frontend commands used as `just admin-ui::<task>` |
-| `package.json` / `package-lock.json` | npm dependencies and reproducible frontend installs |
-
-Practice guide: `dev/practices/typescript-react-ui.md`.
+The browser-facing OneTool Console App lives in the separate sibling project
+`/Users/gavin/01-work-thor/projects/group-hobby/onetool-console`.
+This repo only produces signed Console outbox events from the MCP Direct API.
 
 ### Dev Extras (`src/otdev/`) — optional `[dev]`
 
@@ -112,7 +102,6 @@ Tool packs for document and file utilities. Installed via `pip install onetool-m
 |------|---------|--------------|
 | `pyproject.toml` | Dependencies, scripts, tools | `[project]`, `[tool.ruff]`, `[tool.pytest]` |
 | `justfile` | Dev commands | `install`, `check`, `test`, `dev` |
-| `packages/admin-ui/package.json` | Admin UI frontend config | scripts, dependencies, Node engine |
 | `onetool.yaml` | OneTool config (optional) | Tool-specific settings |
 
 ---
@@ -128,7 +117,7 @@ Tests mirror the source package structure:
 | `src/otdev/` | `tests/otdev/` |
 | `src/otutil/` | `tests/otutil/` |
 
-Frontend tests stay inside `packages/admin-ui` and run through `just admin-ui::test-unit` or `just admin-ui::test-e2e`.
+Console frontend tests stay in the separate `onetool-console` project.
 
 Each test root has the same layout:
 
@@ -164,7 +153,7 @@ A test for `src/otdev/tools/webfetch.py` → `tests/otdev/unit/tools/test_webfet
 | `dev/agents/project-map.md` | This file - project structure |
 | `dev/practices/commit-scopes.md` | Conventional commit scopes |
 | `dev/practices/git.md` | Git workflow, branches, tags |
-| `dev/practices/typescript-react-ui.md` | TypeScript React UI standards |
+| `dev/practices/typescript-react-ui.md` | TypeScript React UI standards for the separate Console project |
 | `CLAUDE.md` | Instructions for Claude Code |
 | `README.md` | Project overview |
 
@@ -185,7 +174,7 @@ A test for `src/otdev/tools/webfetch.py` → `tests/otdev/unit/tools/test_webfet
 
 **Need to modify:**
 - Base tool pack → `src/ottools/<pack>.py`
-- Admin UI → `packages/admin-ui/src/`
+- Console UI → `/Users/gavin/01-work-thor/projects/group-hobby/onetool-console/packages/ui/src/`
 - Extra tool pack → `src/otdev/tools/<pack>.py` or `src/otutil/tools/<pack>.py`
 - Core executor → `src/ot/executor/runner.py`
 - MCP server runtime → `src/ot/server.py`

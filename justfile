@@ -21,39 +21,12 @@ default:
 install:
     uv sync --group dev --all-extras
 
-# Run all quality checks (lint, typecheck, test, Admin UI checks)
+# Run all quality checks (lint, typecheck, test)
 check: lint typecheck test
-    just admin-ui::check
 
 # Run the MCP server in development mode (uses dev config)
 dev *args:
     uv run onetool --config {{ ot_config }} {{ args }}
-
-# Serve the Admin App and open it in the default browser
-admin-open port="8760":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    url="http://127.0.0.1:{{ port }}"
-    if curl -fsS "$url/api/admin/health" >/dev/null 2>&1; then
-        uv run python -m webbrowser "$url" >/dev/null 2>&1
-        exit 0
-    fi
-    (
-        for _ in {1..40}; do
-            if curl -fsS "$url/api/admin/health" >/dev/null 2>&1; then
-                uv run python -m webbrowser "$url" >/dev/null 2>&1
-                exit 0
-            fi
-            sleep 0.25
-        done
-    ) &
-    uv run onetool admin serve \
-        --ot-dir {{ quote(ot_dir) }} \
-        --port {{ port }}
-
-# Start the Admin UI Vite dev server
-admin-vite port="5173":
-    just admin-ui::dev {{ port }}
 
 # ============================================================================
 # TESTING
@@ -164,16 +137,11 @@ docs-deploy:
 
 # Build the package
 build:
-    just admin-ui::build
     uv build
 
 # Bundle inject.js annotation script (requires npm install in src/ot/assets/)
 build-inject:
     cd src/ot/assets && npm run build
-
-# Bundle Admin UI TypeScript app (requires npm install in packages/admin-ui/)
-build-display:
-    just admin-ui::build
 
 # Clean build artifacts and caches
 clean:
@@ -192,7 +160,6 @@ reset-env: clean
 # ============================================================================
 
 mod bench 'packages/onetool-bench/justfile'
-mod admin-ui "packages/admin-ui/justfile"
 mod release "release.just"
 
 # ============================================================================

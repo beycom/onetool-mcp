@@ -51,7 +51,6 @@ just docs-deploy      # deploy to GitHub Pages
 ```bash
 just build         # build the package (uv build)
 just build-inject  # bundle inject.js annotation script
-just build-display # bundle Admin UI TypeScript app
 just clean         # clean build artefacts and caches
 just reset-env    # recreate .venv from scratch
 ```
@@ -82,22 +81,8 @@ just tool-diagram-logs     # view Kroki logs
 
 ```bash
 just bench::demo::<task>   # run demo tasks
-just admin-ui::<task>      # run Admin UI frontend tasks
 just release::<task>       # run release tasks
 just eval-caveman [args]   # run caveman skill eval
-```
-
-Admin UI module tasks:
-
-```bash
-just admin-ui::install
-just admin-ui::typecheck
-just admin-ui::lint
-just admin-ui::test-unit
-just admin-ui::test-e2e
-just admin-ui::deps-check
-just admin-ui::build
-just admin-ui::check
 ```
 
 ## Key Details

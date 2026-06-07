@@ -30,8 +30,7 @@ just release::check
 ```
 
 - Runs lint, typecheck, and all tests
-- Runs Admin UI checks and build
-- Rebuilds `inject.js` and fails if generated Admin UI or annotation assets are stale
+- Rebuilds `inject.js` and fails if generated annotation assets are stale
 - Scans for secrets with gitleaks
 - Builds docs (strict mode to catch broken links)
 - Runs `/p:test-explore sanity.md retest all` via `claude` CLI
@@ -73,7 +72,7 @@ just release::mcp       # mcp-publisher publish
 just release::docs      # mkdocs gh-deploy
 ```
 
-`just release::build` builds the Admin UI and annotation assets before `uv build`. The built wheel and sdist must include the packaged Admin UI asset tree without requiring generated `packages/admin-ui/dist/` output to be committed.
+`just release::build` builds package artifacts with `uv build`. The browser-facing OneTool Console App is released from the separate `onetool-console` project.
 
 ---
 

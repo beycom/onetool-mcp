@@ -17,7 +17,7 @@ STARTED_AT = datetime.now(UTC)
 
 @dataclass
 class RuntimeMetaState:
-    """Mutable process metadata shown by the Admin App."""
+    """Mutable process metadata shown by local inspection surfaces."""
 
     name: str = ""
     description: str = ""
@@ -42,7 +42,7 @@ def set_runtime_meta(*, name: str | None = None, description: str | None = None)
 
 
 def set_direct_api(*, base_url: str, port: int) -> None:
-    """Record the bound Direct API URL for Admin registration and diagnostics."""
+    """Record the bound Direct API URL for diagnostics."""
     with _LOCK:
         _STATE.direct_base_url = base_url
         _STATE.direct_port = port

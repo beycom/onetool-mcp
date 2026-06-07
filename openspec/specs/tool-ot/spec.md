@@ -141,7 +141,7 @@ warnings: []
 
 ### Requirement: Runtime Metadata
 
-The `ot.meta()`, `ot.set_meta(...)`, and `ot.connect_admin(...)` functions SHALL expose and update runtime metadata used by the Admin App to identify MCP runtimes.
+The `ot.meta()` and `ot.set_meta(...)` functions SHALL expose and update runtime metadata used to identify MCP runtimes.
 
 #### Scenario: Read runtime metadata
 - **WHEN** `ot.meta()` is called
@@ -157,11 +157,6 @@ The `ot.meta()`, `ot.set_meta(...)`, and `ot.connect_admin(...)` functions SHALL
 - **WHEN** `ot.set_meta(name="Implementation")` is called
 - **THEN** the description SHALL be preserved
 - **AND** explicit empty strings SHALL clear name or description
-
-#### Scenario: Manual Admin registration
-- **WHEN** `ot.connect_admin(port=8760)` is called
-- **THEN** OneTool SHALL send one registration attempt for the current Direct API runtime to the local Admin App
-- **AND** it SHALL return status details useful for debugging
 
 ---
 

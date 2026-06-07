@@ -544,29 +544,6 @@ class DirectHostConfig(BaseModel):
     )
 
 
-class DirectAdminConfig(BaseModel):
-    """Admin App registration settings for MCP-owned Direct API instances."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    enabled: bool = Field(
-        default=True,
-        strict=True,
-        description="Register this MCP process with the local Admin App when Direct API is bound.",
-    )
-    port: int = Field(
-        default=8760,
-        ge=1,
-        le=65535,
-        description="Local Admin App port used for registration heartbeats.",
-    )
-    heartbeat_seconds: float = Field(
-        default=15.0,
-        gt=0,
-        description="Seconds between best-effort Admin App registration heartbeats.",
-    )
-
-
 class DirectConfig(BaseModel):
     """Direct API configuration for MCP-owned direct execution."""
 
@@ -575,10 +552,6 @@ class DirectConfig(BaseModel):
     host: DirectHostConfig = Field(
         default_factory=DirectHostConfig,
         description="MCP-owned direct API settings.",
-    )
-    admin: DirectAdminConfig = Field(
-        default_factory=DirectAdminConfig,
-        description="Admin App registration settings.",
     )
 
 

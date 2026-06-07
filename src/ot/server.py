@@ -19,7 +19,6 @@ Supported explicit prefixes stripped from command text: __run, __r, __ot.
 from __future__ import annotations
 
 import json
-import random
 import socket
 import threading
 import time
@@ -63,8 +62,6 @@ _stats_writer: JsonlStatsWriter | None = None
 _direct_api_server: Any | None = None
 _direct_api_thread: threading.Thread | None = None
 _direct_api_port: int | None = None
-_direct_admin_thread: threading.Thread | None = None
-_direct_admin_stop = threading.Event()
 _root_runtime: RootRuntime | None = None
 
 
@@ -166,7 +163,7 @@ def _start_direct_api() -> tuple[Any, threading.Thread, int]:
 
         logger.debug(LogEntry(event="direct.api.candidate", port=port))
         config = uvicorn.Config(
-            create_app(base_url=f"http://127.0.0.1:{port}"),
+            create_app(),
             host="127.0.0.1",
             port=port,
             log_level="warning",
@@ -204,48 +201,8 @@ def _start_direct_api() -> tuple[Any, threading.Thread, int]:
     raise RuntimeError(f"Could not start MCP direct API in configured ports {start_port}..65535")
 
 
-def _start_direct_admin_registration(*, base_url: str) -> threading.Thread | None:
-    """Start best-effort Admin App registration heartbeats."""
-    if not _config.direct.admin.enabled:
-        return None
-
-    from ot.admin_registration import register_with_admin
-
-    heartbeat = _config.direct.admin.heartbeat_seconds
-    admin_port = _config.direct.admin.port
-    _direct_admin_stop.clear()
-
-    def worker() -> None:
-        delay = min(heartbeat, random.uniform(0.0, max(0.1, heartbeat * 0.2)))
-        if _direct_admin_stop.wait(delay):
-            return
-        while not _direct_admin_stop.is_set():
-            result = register_with_admin(admin_port=admin_port, base_url=base_url, timeout=2.0)
-            if result.get("ok"):
-                logger.debug(
-                    LogEntry(event="direct.admin.register", adminPort=admin_port, baseUrl=base_url).success()
-                )
-            else:
-                logger.debug(
-                    LogEntry(
-                        event="direct.admin.register",
-                        adminPort=admin_port,
-                        baseUrl=base_url,
-                        error=result.get("error"),
-                    ).failure()
-                )
-            _direct_admin_stop.wait(heartbeat)
-
-    thread = threading.Thread(target=worker, name="onetool-admin-registration", daemon=True)
-    thread.start()
-    return thread
-
-
 def _stop_direct_api(server: Any, thread: threading.Thread, port: int) -> None:
     """Stop the embedded direct API listener."""
-    _direct_admin_stop.set()
-    if _direct_admin_thread is not None:
-        _direct_admin_thread.join(timeout=2.0)
     logger.debug(LogEntry(event="direct.api.stop.begin", port=port))
     server.should_exit = True
     thread.join(timeout=5.0)
@@ -326,7 +283,7 @@ def _log_startup_diagnostics(
 @asynccontextmanager
 async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
     """Manage server lifecycle - startup and shutdown."""
-    global _stats_writer, _direct_api_server, _direct_api_thread, _direct_api_port, _direct_admin_thread
+    global _stats_writer, _direct_api_server, _direct_api_thread, _direct_api_port
 
     runtime = _root_runtime or RootRuntime(transport="stdio")
 
@@ -373,9 +330,6 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
                 _direct_api_server = api_server
                 _direct_api_thread = api_thread
                 _direct_api_port = api_port
-                _direct_admin_thread = _start_direct_admin_registration(
-                    base_url=f"http://127.0.0.1:{api_port}"
-                )
                 start_span.add("directApi", f"http://127.0.0.1:{api_port}")
                 direct_status = "ready"
             except Exception as e:
@@ -431,7 +385,6 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
         _direct_api_server = None
         _direct_api_thread = None
         _direct_api_port = None
-        _direct_admin_thread = None
 
         # Shutdown: stop stats writer
         if _stats_writer is not None:
