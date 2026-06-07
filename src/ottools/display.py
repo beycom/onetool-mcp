@@ -223,8 +223,8 @@ def seed_mock_messages(*, bulk_count: int = 0) -> dict[str, Any]:
 
         diff_pair = _first_existing_pair(
             [
-                ("packages/admin-ui/src/features/display/api.ts", "packages/admin-ui/src/features/display/lib/displayStore.ts"),
                 ("src/ottools/display.py", "src/ot/display/service.py"),
+                ("src/ot/direct_api.py", "src/ot/console_outbox.py"),
             ]
         )
         if diff_pair is not None:
@@ -247,10 +247,8 @@ def _fixture_file_paths() -> list[str]:
     candidates = [
         "README.md",
         "dev/agents/hints.md",
-        "packages/admin-ui/package.json",
         "mkdocs.yml",
-        "packages/admin-ui/scripts/build.mjs",
-        "packages/admin-ui/src/features/display/api.ts",
+        "src/ot/console_outbox.py",
         "src/ottools/display.py",
         "pyproject.toml",
     ]

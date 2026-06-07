@@ -83,7 +83,9 @@ class DisplayState:
         """Return current instance metadata."""
         instance = self.get_or_create_instance()
         with self._lock:
-            return _instance_metadata(instance)
+            metadata = _instance_metadata(instance)
+        _ensure_console_snapshot(message_count=metadata.message_count)
+        return metadata
 
     def add_message(self, *, request: ShowRequest) -> MessageMetadata:
         """Add a validated display message to the current instance."""
@@ -121,8 +123,10 @@ class DisplayState:
                 expired_ids.append(expired_id)
             instance.updated_at = now
             _append_event(instance, {"type": "message", "id": message_id})
+        _publish_console_message(metadata=metadata, preview=preview, inline_payload=inline_payload)
         for expired_id in expired_ids:
             _delete_cached_message(instance, expired_id)
+            _drop_console_message(message_id=expired_id)
         return metadata
 
     def read_message(self, *, id: str) -> MessageRead | None:
@@ -156,10 +160,7 @@ class DisplayState:
         if payload.mode == "inline" or payload.path is None:
             result["content"] = _bounded_inline_payload(message.inline_payload)
         elif payload.path is not None:
-            result["file_url"] = f"/api/admin/display/preview?path={payload.path}"
-            result["open_url"] = "/api/admin/display/open"
-            if metadata.kind == "image":
-                result["image_url"] = f"/api/admin/display/asset?path={payload.path}"
+            result["path"] = payload.path
         return result
 
     def list_messages(
@@ -237,6 +238,7 @@ class DisplayState:
             instance.event_queue.clear()
             instance.updated_at = _utcnow()
             _append_event(instance, {"type": "message", "id": ""})
+            _clear_console_outbox()
         if cache_dir is not None:
             shutil.rmtree(cache_dir, ignore_errors=True)
         return cleared
@@ -536,3 +538,44 @@ def _read_bounded_file(path: Path, *, limit: int) -> bytes:
 
 def _message_metadata(*, request: ShowRequest) -> dict[str, str]:
     return dict(request.metadata)
+
+
+def _ensure_console_snapshot(*, message_count: int) -> None:
+    try:
+        from ot.console_outbox import ensure_instance_snapshot
+
+        ensure_instance_snapshot(message_count=message_count)
+    except Exception:
+        return
+
+
+def _publish_console_message(
+    *,
+    metadata: MessageMetadata,
+    preview: BoundedPreview | None,
+    inline_payload: object | None,
+) -> None:
+    try:
+        from ot.console_outbox import publish_display_message
+
+        publish_display_message(metadata=metadata, preview=preview, inline_payload=inline_payload)
+    except Exception:
+        return
+
+
+def _drop_console_message(*, message_id: str) -> None:
+    try:
+        from ot.console_outbox import STATE as console_outbox
+
+        console_outbox.drop_message(message_id=message_id)
+    except Exception:
+        return
+
+
+def _clear_console_outbox() -> None:
+    try:
+        from ot.console_outbox import STATE as console_outbox
+
+        console_outbox.clear()
+    except Exception:
+        return

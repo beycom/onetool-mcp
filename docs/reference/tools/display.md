@@ -1,17 +1,16 @@
 # Display
 
-Bounded display producer for rich, user-visible artifacts inspected through the shared Admin App.
+Bounded MCP-side producer for rich, user-visible artifacts consumed by the separate OneTool Console App.
 
 Short alias: `d`
 
 ## Highlights
 
-- Queues display messages in the current OneTool MCP process and exposes them through signed MCP Direct API routes for Admin ingestion
-- Returns current MCP instance metadata from `display.status()`, without starting or returning a browser URL
-- Keeps a bounded MCP-side producer queue controlled by `display.max_queue_messages`
-- Loads payloads lazily in a t3code-derived React timeline UI with fixed row previews, a side inspector, content-aware markdown, code, diff, JSON/YAML tree/source, Mermaid render/source, table, and file renderers
-- Loads the latest timeline page on browser startup in high-volume sessions while preserving oldest-to-newest visual order within the loaded page
-- Restricts file previews and open actions to the current workspace root
+- Creates display messages in the current OneTool MCP process without starting a browser service or returning a browser URL.
+- Publishes `display.message.created` events to the signed Console outbox when `display.show(...)` creates a message.
+- Keeps a bounded MCP-side producer queue controlled by `display.max_queue_messages`.
+- Keeps MCP-local introspection through `display.status`, `display.list`, `display.read`, `display.focus`, and `display.clear`.
+- Leaves browser read models, file previews, rich rendering, and disposable UI cache ownership to `onetool-console`.
 
 ## Functions
 
@@ -20,114 +19,70 @@ Short alias: `d`
 | `display.status()` | Return current display instance status, MCP instance ID, message count, and timestamps |
 | `display.show(...)` | Create one typed display message and return its path, kind, stable ID, and metadata |
 | `display.show_clip(...)` | Resolve a clipboard image or existing clipboard file path into a path-backed display message |
-| `display.read(id)` | Return message metadata, payload references, and bounded preview only |
-| `display.focus(id)` | Ask connected display clients to scroll to a message |
-| `display.clear()` | Clear all messages from the current display instance timeline |
+| `display.read(id)` | Return message metadata and bounded preview only |
+| `display.focus(id)` | Queue a local focus request for MCP-local display clients |
+| `display.clear()` | Clear messages from the current MCP display instance |
 | `display.list(...)` | Return a paginated metadata-only message list |
-| `display.seed_mock_messages(...)` | TEST ONLY: seed representative UI fixture messages for every V1 kind |
+| `display.seed_mock_messages(...)` | TEST ONLY: seed representative fixture messages |
 
-## Key Parameters
+## Console App
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `kind` | str | One of `text`, `markdown`, `code`, `file`, `diff`, `file_diff`, `image`, `json`, `mermaid`, `yaml`, or `table` |
-| `content` | str\|dict\|list | Inline payload for text-like, structured, diff, and table messages |
-| `path` | str | Workspace-local path for file, image, or file-diff payloads |
-| `old_path` / `new_path` | str | Workspace-local paths used to generate a file diff |
-| `metadata` | dict[str, str] | Optional key-value metadata; it does not control rendering, validation, or routing |
-| `id` | str | Stable 12-character lowercase hex display message ID returned by `display.show(...)` |
-| `limit` / `offset` | int | Pagination controls for `display.list(...)`; `limit` must be 1-500 and `offset` must be 0 or greater |
+Launch the browser-facing OneTool Console App from the separate TypeScript project:
 
-## Requires
+```bash
+onetool-console serve --ot-dir ~/.onetool
+```
 
-None for writing display messages. Browser inspection uses the shared Admin App and the local `packages/admin-ui` Vite + React + TypeScript project during development. Use `just admin-ui::install`, `just admin-ui::check`, and `just admin-ui::build` for frontend work.
+`onetool-mcp` must have `direct.host.enabled: true` for Console ingestion. Console reads `~/.onetool/auth/console-outbox.key` by default and consumes:
+
+- `GET /api/console/outbox`
+- `POST /api/console/outbox/ack`
+
+The Console outbox key is scoped only to those endpoints. It does not authorize `/run`.
 
 ## Configuration
 
-### Required
-
-None - no secrets required.
-
-### Optional
-
-No `tools.display` configuration keys are supported in V1. The MCP-side producer queue is configured at the root `display` section.
-
 ```yaml
+direct:
+  host:
+    enabled: true
+    port: 8765
+
 display:
   max_queue_messages: 1000
 ```
 
-### Defaults
+## Payload Modes
 
-- Display tool calls do not start the Admin App.
-- `onetool admin serve` binds the Admin App to `127.0.0.1:8760` by default.
-- MCP processes register with the Admin App after their Direct API binds. The Scan button reconciles registered instances and marks missed heartbeats disconnected.
-- Display producer state is in-memory and scoped to the current running MCP process; messages are FIFO-evicted when `display.max_queue_messages` is exceeded.
-- File access is limited to the effective OneTool cwd.
+Display events use Console protocol payload modes:
 
-## Supported Kinds
-
-V1 accepts `text`, `markdown`, `code`, `file`, `diff`, `file_diff`, `image`, `json`, `mermaid`, `yaml`, and `table`.
-
-The browser UI uses the local admin frontend foundation: Vite, React, TypeScript, TanStack Router, TanStack Query, TanStack Table, Radix-compatible primitives, Tailwind as the styling foundation, Recharts availability, and lucide icons. Display keeps its t3code-derived architecture: `@legendapp/list` for the virtualized timeline, `react-markdown` with GFM for markdown, `@pierre/diffs` for code/diff rendering, Mermaid for in-browser diagram rendering, `yaml` for YAML parsing, and renderer-specific lazy payload loading. File messages route through markdown, JSON, YAML, code, or raw text viewers based on metadata and extension hints, with a compact filename header above file-backed payloads and full paths kept in message info/actions instead of footer metadata. Message info actions are available from timeline rows and the side panel, and show core message fields, payload references, and caller-provided key-value metadata except `summary`. File-backed source renderers do not duplicate the filename inside the payload body, and footer message IDs show the full 12-character display ID. Browser-rendered timestamps use `HH:mm, dd-Mon` format, such as `23:01, 03-Jun`. Large payloads use bounded row previews, side-panel inspection, bounded previews, and raw fallbacks; table previews render directly as a bounded grid without row/column truncation status text. Structured JSON/YAML parsing and tree rendering are bounded by source size, depth, and sibling count. Mermaid SVG is sanitized before DOM insertion. Structured JSON/YAML tree/source toggles size to their content instead of stretching across the message body. Text messages render as plain content by default, not as code-style raw blocks. Display does not generate default `summary` metadata. The Line Wrapping setting applies to plain text, raw text, code/source, structured source, and diff renderers; when disabled, long text/source lines remain horizontally scrollable instead of clipping. Inline timeline rows expose copy content, message info, and side-panel open actions; openable file-backed timeline rows add an open action after those controls. File side-panel rows expose the overflow menu, message info, and open-file. Secondary actions such as path copy and rich/raw view controls live behind a text-labeled overflow menu. The side panel uses the same compact message layout as timeline rows, with floating actions and no separate inspector header band. Recent messages are loaded first in the browser, a scroll-to-bottom control appears when the user is away from the latest messages, and renderer failures are isolated to the affected message card or inspector payload.
-
-Generated `file_diff` messages keep old and new source paths as separate payload metadata fields. File-backed diff payloads use `path` for the referenced diff file.
+- `inline` for text, markdown, code, diff, JSON, YAML, Mermaid, and table content.
+- `file_ref` for local file and image references.
+- `file_diff_ref` for local diff files or generated diffs with structured old/new paths.
 
 ## Limits
 
-Display keeps memory bounded during long sessions:
-
-- Keeps only a bounded MCP-side producer queue before Admin ingestion.
-- Returns file, inline string, and generated preview text in 64 KiB windows.
-- Keeps inline list payload views to the first 500 items.
-- Skips generated file diffs when either input file is larger than 1 MiB.
-- Keeps up to 100 lazily loaded payload views in the browser cache.
-- Renders table previews as a bounded grid of up to 200 rows by 80 columns.
-- Keeps the browser inspector panel resizable locally, with long payloads using the panel height rather than nested vertical scroll caps.
+- Message IDs are stable 12-character lowercase hex strings.
+- Preview text is bounded to 64 KiB windows.
+- Inline list payload views are bounded to the first 500 items.
+- Generated file diffs are skipped when either input is larger than 1 MiB.
+- MCP producer retention is FIFO bounded by `display.max_queue_messages`, capped by the implementation maximum.
 
 ## Security And Persistence
 
-Display tools do not launch a browser service or return a browser URL. Start the shared UI explicitly with `onetool admin serve --ot-dir ~/.onetool`; MCP processes with `direct.host.enabled: true` register with that Admin App after binding their Direct API. MCP-side display routes live under signed Direct API paths such as `/api/admin/display/messages`, and the browser talks only to the Admin App's same-origin `/api/admin/...` routes.
-
 File payloads must use workspace-local paths. Image payloads may also reference OneTool-owned session image paths produced by clipboard image loading. Remote URLs, untrusted `file://` URLs, path traversal outside allowed roots, HTML kinds, and terminal/log kinds are rejected.
 
-Display producer state is in-session only. A OneTool MCP process restart creates fresh display state; Admin App memory is the browser-facing owner for registered runtime state.
+Display producer state is in-session only. A OneTool MCP process restart creates fresh display state. Console owns browser-facing state after it ingests outbox events.
 
 ## Examples
 
 ```python
-# Get the current display instance metadata
 display.status()
-
-# Show markdown in the display timeline
 display.show(kind="markdown", metadata={"title": "Run summary"}, content="# Result\n\n- passed")
-
-# Add arbitrary metadata without affecting rendering
 display.show(kind="json", metadata={"title": "Result", "task": "smoke"}, content={"ok": True})
-
-# Show a workspace file by reference
 display.show(kind="file", metadata={"title": "Test output"}, path="tmp/test-output.txt")
-
-# Show a table with bounded browser rendering
 display.show(kind="table", metadata={"title": "Scores"}, content=[{"name": "Ada", "score": 10}])
-
-# Show a clipboard image or existing clipboard file path
 display.show_clip()
-
-# Focus an existing display message
 display.focus(id="a1b2c3d4e5f6")
-
-# Clear the current display timeline
 display.clear()
-
-# TEST ONLY: seed UI fixture messages during display/admin development
-display.seed_mock_messages()
 ```
-
-## V1 Exclusions
-
-`display.search(...)`, `display.create(...)`, update tools, and individual message delete tools are not exposed in V1. HTML, remote URL, terminal, and log renderers are also excluded.
-
-## Based on
-
-The display browser UI is based on [t3code](https://github.com/pingdotgg/t3code) by T3 Tools Inc., licensed under MIT.

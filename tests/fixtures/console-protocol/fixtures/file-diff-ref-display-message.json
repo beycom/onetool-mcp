@@ -1,0 +1,25 @@
+{
+  "id": "789abc012def",
+  "kind": "file_diff",
+  "metadata": {
+    "title": "Patch"
+  },
+  "created_at": "2026-06-07T00:00:00Z",
+  "updated_at": "2026-06-07T00:00:00Z",
+  "payload": {
+    "mode": "file_diff_ref",
+    "path": null,
+    "old_path": "/Users/gavin/project/a.txt",
+    "new_path": "/Users/gavin/project/b.txt",
+    "mime_type": "text/x-diff",
+    "size_bytes": 64,
+    "language": "diff"
+  },
+  "preview": {
+    "text": "--- a.txt\n+++ b.txt",
+    "truncated": false,
+    "size_bytes": 64,
+    "limit_bytes": 65536
+  }
+}
+

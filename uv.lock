@@ -2316,6 +2316,7 @@ all = [
     { name = "filelock" },
     { name = "formulas" },
     { name = "google-genai" },
+    { name = "jsonschema" },
     { name = "lxml" },
     { name = "markdown" },
     { name = "openpyxl" },
@@ -2333,6 +2334,7 @@ all = [
 dev = [
     { name = "beautifulsoup4" },
     { name = "filelock" },
+    { name = "jsonschema" },
     { name = "lxml" },
     { name = "markdown" },
     { name = "openpyxl" },
@@ -2390,6 +2392,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "jmespath", specifier = ">=1.1.0" },
+    { name = "jsonschema", marker = "extra == 'dev'", specifier = ">=4.26.0" },
     { name = "keyring", specifier = ">=25.7.0" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "lxml", marker = "extra == 'dev'", specifier = ">=5.3,<6" },

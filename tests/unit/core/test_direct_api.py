@@ -14,18 +14,19 @@ from ot.direct_auth import (
     HEALTH_PATH,
     READY_PATH,
     RUN_PATH,
+    signed_console_headers,
     signed_headers,
+    verify_console_response,
     verify_response,
 )
+from ot.console_outbox import OUTBOX_ACK_PATH, OUTBOX_PATH, STATE
+from ot.display.models import ShowRequest
+from ot.display.state import DisplayState
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from starlette.types import ASGIApp
-
-ADMIN_BOOTSTRAP_PATH = "/api/admin/bootstrap"
-ADMIN_DISPLAY_STATUS_PATH = "/api/admin/display/status"
-ADMIN_DISPLAY_MESSAGES_PATH = "/api/admin/display/messages"
 
 
 def _direct_client(app: ASGIApp | None = None) -> httpx.AsyncClient:
@@ -103,13 +104,13 @@ async def test_unsigned_endpoints_return_signed_401() -> None:
 
 @pytest.mark.unit
 @pytest.mark.core
-async def test_unsigned_admin_display_endpoint_returns_signed_401() -> None:
-    """MCP-side admin/display routes require HMAC auth."""
+async def test_unsigned_console_outbox_endpoint_returns_signed_401() -> None:
+    """Console outbox routes require the Console HMAC key."""
     async with _direct_client() as client:
-        response = await client.get(ADMIN_DISPLAY_STATUS_PATH)
+        response = await client.get(OUTBOX_PATH)
 
-    verify_response(
-        path=ADMIN_DISPLAY_STATUS_PATH,
+    verify_console_response(
+        path=OUTBOX_PATH,
         body=response.content,
         headers=dict(response.headers),
         status_code=response.status_code,
@@ -119,97 +120,115 @@ async def test_unsigned_admin_display_endpoint_returns_signed_401() -> None:
 
 @pytest.mark.unit
 @pytest.mark.core
-async def test_signed_admin_bootstrap_returns_mcp_metadata() -> None:
-    """Bootstrap returns MCP identity and display summary over signed Direct API."""
-    async with _direct_client(create_app(base_url="http://127.0.0.1:9999")) as client:
+async def test_signed_console_outbox_poll_returns_batch() -> None:
+    """Signed Console outbox poll returns retained events without mutating them."""
+    STATE.instance_id = "mcp-test"
+    STATE.sequence = 0
+    STATE.acked_through = 0
+    STATE.entries.clear()
+    STATE.append(event_type="instance.snapshot", payload={"id": "mcp-test", "status": "running"})
+
+    async with _direct_client() as client:
         response = await client.get(
-            ADMIN_BOOTSTRAP_PATH,
-            headers=signed_headers(method="GET", path=ADMIN_BOOTSTRAP_PATH, body=b""),
+            f"{OUTBOX_PATH}?limit=1",
+            headers=signed_console_headers(method="GET", path=OUTBOX_PATH, body=b""),
         )
 
-    verify_response(
-        path=ADMIN_BOOTSTRAP_PATH,
+    verify_console_response(
+        path=OUTBOX_PATH,
         body=response.content,
         headers=dict(response.headers),
         status_code=response.status_code,
     )
     payload = response.json()
     assert response.status_code == 200
-    assert payload["identity"].startswith("mcp-")
-    assert payload["base_url"] == "http://127.0.0.1:9999"
-    assert payload["display"]["mcp_instance_id"] == payload["identity"]
-    assert payload["meta"]["identity"] == payload["identity"]
-    assert "cwd" in payload["meta"]
-    assert "url" not in payload["display"]
+    assert payload["protocol"] == "onetool.console"
+    assert payload["instance_id"] == "mcp-test"
+    assert payload["events"][0]["type"] == "instance.snapshot"
+    assert len(STATE.entries) == 1
 
 
 @pytest.mark.unit
 @pytest.mark.core
-async def test_signed_admin_display_messages_round_trip() -> None:
-    """Signed Direct API display routes create and read current MCP messages."""
-    body = b'{"kind":"text","content":"direct route","metadata":{"source":"unit"}}'
+async def test_signed_console_outbox_ack_drops_consumed_entries() -> None:
+    """Signed ack records consumption and can drop retained entries early."""
+    STATE.instance_id = "mcp-test"
+    STATE.sequence = 0
+    STATE.acked_through = 0
+    STATE.entries.clear()
+    STATE.append(event_type="instance.snapshot", payload={"id": "mcp-test", "status": "running"})
+    batch = STATE.poll(limit=10)
+    body = (
+        f'{{"protocol":"onetool.console","protocol_version":1,'
+        f'"instance_id":"mcp-test","batch_id":"{batch["batch_id"]}",'
+        f'"acked_through":{batch["next_cursor"]}}}'
+    ).encode("utf-8")
 
     async with _direct_client() as client:
-        created = await client.post(
-            ADMIN_DISPLAY_MESSAGES_PATH,
+        response = await client.post(
+            OUTBOX_ACK_PATH,
             content=body,
             headers={
                 "content-type": "application/json",
-                **signed_headers(method="POST", path=ADMIN_DISPLAY_MESSAGES_PATH, body=body),
+                **signed_console_headers(method="POST", path=OUTBOX_ACK_PATH, body=body),
             },
         )
-        created_payload = created.json()
-        read_path = f"{ADMIN_DISPLAY_MESSAGES_PATH}/{created_payload['id']}"
-        read = await client.get(
-            read_path,
-            headers=signed_headers(method="GET", path=read_path, body=b""),
-        )
 
-    verify_response(
-        path=ADMIN_DISPLAY_MESSAGES_PATH,
-        body=created.content,
-        headers=dict(created.headers),
-        status_code=created.status_code,
-    )
-    verify_response(
-        path=read_path,
-        body=read.content,
-        headers=dict(read.headers),
-        status_code=read.status_code,
-    )
-    assert created.status_code == 200
-    assert read.json()["preview"]["text"] == "direct route"
-
-
-@pytest.mark.unit
-@pytest.mark.core
-async def test_signed_admin_display_asset_rejects_oversized_file(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Signed Direct API asset route rejects files above the memory cap."""
-    from ot.admin.routes import direct_display
-
-    monkeypatch.setenv("OT_CWD", str(tmp_path))
-    monkeypatch.setattr(direct_display, "MAX_ASSET_BYTES", 4)
-    asset = tmp_path / "large.png"
-    asset.write_bytes(b"abcde")
-    path = "/api/admin/display/asset"
-
-    async with _direct_client() as client:
-        response = await client.get(
-            f"{path}?path={asset}",
-            headers=signed_headers(method="GET", path=path, body=b""),
-        )
-
-    verify_response(
-        path=path,
+    verify_console_response(
+        path=OUTBOX_ACK_PATH,
         body=response.content,
         headers=dict(response.headers),
         status_code=response.status_code,
     )
-    assert response.status_code == 413
-    assert response.json()["error"] == "asset too large"
+    assert response.status_code == 200
+    assert response.json()["acked_through"] == batch["next_cursor"]
+    assert len(STATE.entries) == 0
+
+
+@pytest.mark.unit
+@pytest.mark.core
+async def test_console_outbox_key_does_not_authorize_run() -> None:
+    """The narrow Console key must not authorize direct execution."""
+    body = b'{"protocol_version":1,"operation":"run","command":"ot.version()"}'
+
+    async with _direct_client() as client:
+        response = await client.post(
+            RUN_PATH,
+            content=body,
+            headers={
+                "content-type": "application/json",
+                **signed_console_headers(method="POST", path=RUN_PATH, body=body),
+            },
+        )
+
+    verify_response(
+        path=RUN_PATH,
+        body=response.content,
+        headers=dict(response.headers),
+        status_code=response.status_code,
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.unit
+@pytest.mark.core
+async def test_display_message_is_available_in_console_outbox() -> None:
+    """Display writes append Console protocol events for offline consumers."""
+    STATE.instance_id = None
+    STATE.sequence = 0
+    STATE.acked_through = 0
+    STATE.entries.clear()
+    display_state = DisplayState()
+
+    metadata = display_state.add_message(
+        request=ShowRequest(kind="text", content="direct route", metadata={"source": "unit"})
+    )
+
+    batch = STATE.poll(limit=10)
+    assert metadata.id
+    assert batch["events"][-1]["type"] == "display.message.created"
+    assert batch["events"][-1]["payload"]["id"] == metadata.id
+    assert batch["events"][-1]["payload"]["payload"]["mode"] == "inline"
 
 
 @pytest.mark.unit
