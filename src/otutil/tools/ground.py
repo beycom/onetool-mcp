@@ -436,7 +436,7 @@ def _grounded_search(
 
         except Exception as e:
             s.add("error", str(e))
-            return _format_error(e)
+            raise
 
 
 def search(
@@ -598,8 +598,8 @@ def search_batch(
         return "Error: queries list cannot be empty"
     try:
         request_timeout = _get_config().timeout if timeout is None else timeout
-    except Exception as e:
-        return _format_error(e)
+    except Exception:
+        raise
     if error := _validate_request_timeout(request_timeout):
         return error
     if error := _validate_batch_retry_controls(retries, retry_delay_ms):

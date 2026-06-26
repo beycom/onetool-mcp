@@ -565,11 +565,14 @@ async def run(command: str, ctx: Context) -> ToolResult:  # noqa: ARG001
         )
 
     # Return ToolResult with content only — prevents FastMCP from auto-generating
-    # structuredContent (which Claude Code prefers over content text)
+    # structuredContent (which Claude Code prefers over content text).
+    # Propagate is_error from CommandResult so MCP clients see the failure flag
+    # on the wire and the LLM treats it as a tool error rather than success
+    # content.
     text = sanitize_output(
         result.result, enabled=result.should_sanitize, fmt=result.format
     )
-    return ToolResult(content=text)
+    return ToolResult(content=text, is_error=not result.success)
 
 
 def main() -> None:
