@@ -614,7 +614,7 @@ The `file.move()` function SHALL move or rename files.
 
 ### Requirement: Logging
 
-All file operations SHALL log using LogSpan.
+All file operations SHALL emit structured runtime logs.
 
 #### Scenario: Read logging
 - **GIVEN** a file read operation

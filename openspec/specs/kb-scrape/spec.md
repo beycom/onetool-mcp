@@ -2,7 +2,8 @@
 
 ## Purpose
 
-<!-- TBD: Define purpose of the kb-scrape component -->
+Defines the `onetool kb scrape` pipeline that crawls documentation sites into
+Markdown pages and sidecar metadata suitable for later `kb index` ingestion.
 
 ---
 
@@ -21,8 +22,9 @@ The package SHALL provide a `[scrape]` optional dependency group that includes `
 
 ---
 
-### Requirement: Crawl4AI BFS pipeline
-The scraping pipeline SHALL use Crawl4AI's `AsyncWebCrawler` with `BFSDeepCrawlStrategy` to crawl a site breadth-first up to a configurable depth and page limit.
+### Requirement: Crawl Pipeline
+The scraping pipeline SHALL crawl a site breadth-first up to a configurable
+depth and page limit.
 
 #### Scenario: Pages are crawled and written
 - **WHEN** a crawl completes successfully
@@ -30,14 +32,14 @@ The scraping pipeline SHALL use Crawl4AI's `AsyncWebCrawler` with `BFSDeepCrawlS
   - `<slug>.md` — `fit_markdown` content (fallback to `raw_markdown` if `fit_markdown` is empty)
   - `<slug>.meta.yaml` — sidecar with exactly `url`, `source`, and `crawled_at`
 
-#### Scenario: Scrape called inside a running event loop
+#### Scenario: Scrape called inside an active runtime
 - **GIVEN** OneTool is already executing inside an event loop
-- **WHEN** `run_scrape()` is called
-- **THEN** the async crawl work SHALL complete without calling `asyncio.run()` on the running loop
+- **WHEN** `onetool kb scrape` runs
+- **THEN** crawl work SHALL complete without failing due to the existing event loop
 
 #### Scenario: Crawler cleanup on page-processing failure
-- **WHEN** page processing raises after `AsyncWebCrawler` has entered its async context
-- **THEN** the crawler context manager SHALL still exit
+- **WHEN** page processing fails after browser crawl resources have been opened
+- **THEN** those resources SHALL still be closed before the command exits
 
 #### Scenario: URL slug generation
 - **WHEN** a page URL is converted to a filename

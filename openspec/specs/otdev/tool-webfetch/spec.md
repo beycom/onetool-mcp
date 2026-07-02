@@ -239,7 +239,7 @@ The `webfetch.fetch()` function SHALL detect content type and return non-HTML co
 #### Scenario: Missing content type
 - **GIVEN** a URL with no Content-Type header
 - **WHEN** `webfetch.fetch(url=url)` is called
-- **THEN** it SHALL assume HTML and proceed with extraction (legacy behavior)
+- **THEN** it SHALL assume HTML and proceed with extraction
 
 #### Scenario: Non-HTML content truncation
 - **GIVEN** a non-HTML URL with content exceeding max_length
@@ -273,7 +273,7 @@ The functions SHALL use trafilatura library for extraction.
 
 ### Requirement: Web Fetch Logging
 
-The tool SHALL log all fetch operations using LogSpan.
+The tool SHALL emit structured runtime logs for all fetch operations.
 
 #### Scenario: URL download logging
 - **GIVEN** a URL download is requested

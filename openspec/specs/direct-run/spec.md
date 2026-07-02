@@ -113,3 +113,9 @@ The `/run` response body SHALL be small JSON:
 ```json
 {"protocol_version":1,"result":"...","success":true,"duration_ms":12}
 ```
+
+#### Scenario: Compact direct run envelope
+
+- **WHEN** `onetool direct run --port 8765 "ot.version()"` sends a request
+- **THEN** the request body SHALL include `protocol_version`, `operation`, `command`, `format`, and `sanitize`
+- **AND** a successful response SHALL include `protocol_version`, `result`, `success`, and `duration_ms`

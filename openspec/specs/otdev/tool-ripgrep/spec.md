@@ -207,7 +207,7 @@ The ripgrep tool SHALL handle errors gracefully.
 
 ### Requirement: Ripgrep Tool Logging
 
-The tool SHALL log all operations using LogSpan.
+The tool SHALL emit structured runtime logs for all operations.
 
 #### Scenario: Search logging
 - **GIVEN** a search is requested

@@ -1,7 +1,10 @@
 # field-level-provenance Specification
 
 ## Purpose
-TBD - created by archiving change search-structured-extraction-and-field-provenance. Update Purpose after archive.
+
+Defines field-level provenance metadata for structured extraction results so
+callers can trace extracted values back to source URLs, snippets, and provider
+confidence when available.
 ## Requirements
 ### Requirement: Field-level provenance metadata
 Extraction results SHALL include provenance metadata per extracted field.
@@ -21,4 +24,3 @@ Field-level provenance SHALL use a stable, machine-readable structure.
 #### Scenario: Stable key set
 - **WHEN** extraction results are returned
 - **THEN** all field provenance entries SHALL use the same key structure across result items
-

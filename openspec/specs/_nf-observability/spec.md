@@ -1,483 +1,133 @@
-# observability Specification
+# _nf-observability Specification
 
 ## Purpose
 
-Defines the unified logging and observability infrastructure for OneTool. Covers structured runtime and test logging, LogSpan timing, token/cost tracking, and core logging patterns shared across all components.
-
-CLI-specific logging requirements are defined in their respective specs:
-- [bench-logging](../bench-logging/spec.md) - bench CLI output, verbose/trace modes
-
----
+Defines product-level observability requirements for operating and debugging
+OneTool. These requirements describe the runtime information users and operators
+can observe, not the internal logging APIs used to produce it.
 
 ## Requirements
 
-<!-- Section: Core Infrastructure -->
+### Requirement: Structured Runtime Events
+
+OneTool SHALL emit structured runtime events for significant operations so users
+can diagnose behavior from logs without parsing free-form prose.
 
-### Requirement: Structured Runtime Logging
+#### Scenario: Operation event shape
+- **GIVEN** a OneTool runtime operation is logged
+- **WHEN** the log record is written
+- **THEN** it SHALL include an event or span name
+- **AND** operation status where available
+- **AND** contextual fields relevant to the operation
 
-The system SHALL preserve structured fields for logged operations and render runtime logs as dev-friendly single-line records.
+#### Scenario: Single-line runtime logs
+- **GIVEN** a structured runtime event contains multiline values
+- **WHEN** it is written to a text log file
+- **THEN** one logical event SHALL occupy one physical log line
 
-#### Scenario: Runtime log entry format
-- **GIVEN** any logged operation
-- **WHEN** the log is written
-- **THEN** the runtime log line SHALL include the span or event, duration when available, and context fields
-- **AND** embedded newlines in field values SHALL NOT create additional physical log lines
-
-#### Scenario: Log file output
-- **GIVEN** the server runs with runtime logging configured
-- **WHEN** the server runs
-- **THEN** logs SHALL be written to `logs/{cli_name}.log` in dev-friendly single-line format
-
-#### Scenario: Test log entry format
-- **GIVEN** test logging is configured
-- **WHEN** test logs are written
-- **THEN** the primary test log file SHALL contain JSON structured records for machine parsing
-
-### Requirement: Log Span Timing
-
-The system SHALL automatically time operations via LogSpan.
-
-#### Scenario: Automatic duration
-- **GIVEN** a LogSpan context manager
-- **WHEN** the span exits
-- **THEN** `duration` SHALL be calculated from entry to exit
-
-#### Scenario: Nested spans
-- **GIVEN** a span contains nested operations
-- **WHEN** each completes
-- **THEN** each SHALL have independent duration tracking
-
-#### Scenario: Status tracking
-- **GIVEN** a span completes
-- **WHEN** it logs
-- **THEN** it SHALL include `status: "SUCCESS"` or `status: "FAILED"`
-
-#### Scenario: Sync and async support
-- **GIVEN** LogSpan is used
-- **WHEN** in sync context (with statement) or async context (async with)
-- **THEN** timing and status tracking SHALL work identically
-
-### Requirement: Async LogSpan Context Manager
-
-The system SHALL provide an async context manager for span-based logging.
-
-#### Scenario: Async span usage
-- **GIVEN** an async tool function
-- **WHEN** `async with LogSpan.async_span("operation", ctx=ctx) as s:` is used
-- **THEN** it SHALL log start and completion with timing automatically
-
-#### Scenario: Async span error handling
-- **GIVEN** an exception occurs within async_span
-- **WHEN** the context exits
-- **THEN** it SHALL log the error with duration and status="FAILED"
-
-#### Scenario: Span metadata in logs
-- **GIVEN** an async span with additional fields
-- **WHEN** logs are emitted
-- **THEN** they SHALL include the span name and all fields in the extra dict
-
-### Requirement: Token and Cost Tracking
-
-The system SHALL track and log token usage and costs.
-
-#### Scenario: Token count logging
-- **GIVEN** an LLM call is made (smart tool or harness)
-- **WHEN** the call completes
-- **THEN** it SHALL log:
-  - `input_tokens`: Prompt tokens
-  - `output_tokens`: Completion tokens
-  - `total_tokens`: Sum of both
-
-#### Scenario: Cost logging
-- **GIVEN** an LLM call completes
-- **WHEN** the result is logged
-- **THEN** it SHALL include `cost_usd`: Estimated cost based on model pricing
-
-#### Scenario: Cumulative tracking
-- **GIVEN** multiple LLM calls in a session
-- **WHEN** logs are written
-- **THEN** each log SHALL include running totals available via log aggregation
-
-### Requirement: Dynamic Model Pricing
-
-The system SHALL fetch model pricing from OpenRouter API for cost calculations.
-
-#### Scenario: Pricing fetched from API
-- **GIVEN** the OpenRouter API is reachable
-- **WHEN** `calculate_cost()` is called
-- **THEN** it SHALL use pricing from `https://openrouter.ai/api/v1/models`
-
-#### Scenario: Unknown model warning
-- **GIVEN** a model is not found in API response
-- **WHEN** `calculate_cost()` is called for that model
-- **THEN** it SHALL log a warning and return 0
-
-### Requirement: Error Logging
-
-The system SHALL log errors with full context for debugging.
-
-#### Scenario: Tool execution error
-- **GIVEN** a tool raises an exception
-- **WHEN** the error is logged
-- **THEN** it SHALL include:
-  - `span: "mcp.error"`
-  - `tool`: Function that failed
-  - `errorType`: Exception class name
-  - `error`: Error message (truncated)
-  - `duration`: Time before failure
-
-### Requirement: Debug Mode
-
-The system SHALL support detailed debug logging for development.
-
-#### Scenario: Debug log level
-- **GIVEN** `OT_LOG_LEVEL=DEBUG`
-- **WHEN** the server runs
-- **THEN** it SHALL log:
-  - Registry scanning details
-  - Config loading steps
-  - Container lifecycle events
-  - Full request/response bodies
-
-### Requirement: Log Configuration
-
-The system SHALL support configurable logging.
-
-#### Scenario: Log level configuration
-- **GIVEN** `OT_LOG_LEVEL=WARNING`
-- **WHEN** the server runs
-- **THEN** only WARNING and above SHALL be logged
-
-#### Scenario: Verbose logging configuration
-- **GIVEN** `OT_LOG_VERBOSE=true` or `log_verbose: true` in config
-- **WHEN** a long value is logged
-- **THEN** truncation SHALL be disabled (full values shown)
-
-#### Scenario: Log rotation
-- **GIVEN** runtime logging is configured
-- **WHEN** the log file grows
-- **THEN** the logging sink SHALL rotate files according to the configured runtime policy
-
-#### Scenario: Noisy third-party INFO suppression
-- **GIVEN** runtime or test logging intercepts standard library logging
-- **WHEN** browser automation or model-client dependencies emit non-actionable INFO lifecycle chatter
-- **THEN** those dependency logger roots SHALL be held at WARNING or above
-- **AND** OneTool structured LogSpan and LogEntry records SHALL remain visible according to the configured OneTool log level
-
-#### Scenario: Shared runtime log attribution
-- **GIVEN** multiple MCP server processes write to the same runtime log file
-- **WHEN** runtime or test log records are emitted
-- **THEN** every record SHALL include a stable process-wide `mcpId`
-- **AND** every record SHALL include the emitting process `pid`
-- **AND** `mcpId` SHALL remain stable for all log records emitted by the same process
-
-### Requirement: CLI Logging Initialization
-
-The system SHALL ensure all CLIs initialize logging consistently.
-
-#### Scenario: CLI startup logging
-- **GIVEN** any OneTool CLI is started
-- **WHEN** the CLI initializes
-- **THEN** it SHALL call `configure_logging(cli_name)`
-
-#### Scenario: Separate log files
-- **GIVEN** logging is configured for a CLI
-- **WHEN** log files are created
-- **THEN** each CLI SHALL write to `logs/{cli_name}.log`
-
-### Requirement: Logging Documentation
-
-The system SHALL provide centralized logging documentation for developers.
-
-#### Scenario: Developer guide exists
-- **GIVEN** a developer needs to add logging to new code
-- **WHEN** they consult `dev/practices/logging.md`
-- **THEN** it SHALL contain:
-  - LogSpan usage patterns
-  - Span naming conventions
-  - Code examples
-  - Links to this spec
-
----
-
-<!-- Section: MCP Server Logging -->
-
-### Requirement: MCP Request Logging
-
-The system SHALL log every MCP tool call with full context.
-
-#### Scenario: Tool call logging
-- **GIVEN** an MCP `run()` call is received
-- **WHEN** the call is processed
-- **THEN** it SHALL log with `span: "runner.execute"` including:
-  - `tool`: Function name being called (e.g., `brave.search`)
-  - `command`: Full command syntax (truncated via central FIELD_LIMITS)
-  - `duration`: Time to complete
-  - `status`: SUCCESS or FAILED
-
-#### Scenario: Tool call arguments
-- **GIVEN** a tool call with arguments
-- **WHEN** the call is logged
-- **THEN** the `command` field SHALL be truncated according to `FIELD_LIMITS["command"]`
-
-#### Scenario: Tool call result
-- **GIVEN** a tool call completes
-- **WHEN** the result is logged
-- **THEN** it SHALL include `resultLength` (character count of output)
-
-#### Scenario: Snippet execution summary
-- **GIVEN** a snippet command is expanded into generated Python code
-- **WHEN** `runner.execute` logs the execution at INFO level
-- **THEN** the `command` field SHALL contain the original snippet invocation
-- **AND** the log SHALL include `commandType: "snippet"`, `snippet`, `preparedLines`, and `preparedLength`
-- **AND** expanded or prepared Python code SHALL be limited to DEBUG logging
-
-#### Scenario: Tool-pack warning context
-- **GIVEN** a tool pack emits a warning for degraded behavior or skipped user work
-- **WHEN** the warning is logged
-- **THEN** it SHALL use a structured `LogEntry` event name
-- **AND** it SHALL include actionable fields such as tool, operation, path, pattern, retry count, status code, chunk id, memory id, dropped count, or error type where applicable
-
-### Requirement: FastMCP Context Integration
-
-The logging system SHALL integrate with FastMCP Context when available.
-
-#### Scenario: Context logging in MCP tools
-- **GIVEN** a tool function with a FastMCP Context parameter
-- **WHEN** LogSpan.async_span() is used with ctx parameter
-- **THEN** log messages SHALL be sent to the MCP client via Context
-
-#### Scenario: Fallback to loguru
-- **GIVEN** no FastMCP Context available (CLI mode)
-- **WHEN** LogSpan is used
-- **THEN** log messages SHALL be written to loguru as before
-
-#### Scenario: Async logging methods
-- **GIVEN** a LogSpan instance with Context
-- **WHEN** log_info(), log_debug(), log_warning(), or log_error() is called
-- **THEN** the message SHALL be sent via the appropriate Context method
-
-#### Scenario: Progress reporting
-- **GIVEN** a LogSpan instance with Context
-- **WHEN** report_progress(progress, total) is called
-- **THEN** it SHALL call ctx.report_progress() if Context is available
-
-### Requirement: MCP Server Lifecycle Logging
-
-The system SHALL log MCP server lifecycle events with enough mode-specific
-context to distinguish stdio root, Streamable HTTP root, Direct API sidecar,
-proxy state, and shutdown cleanup.
-
-#### Scenario: Server start logging
-- **GIVEN** the MCP server is starting
-- **WHEN** initialization completes
-- **THEN** it SHALL log:
-  - `span: "mcp.server.start"`
-  - `transport`: Transport type (`stdio` or `streamable-http`)
-  - `toolCount`: Number of registered tools
-  - config path where available
-  - whether a secrets path was supplied
-
-#### Scenario: HTTP root start logging
-- **GIVEN** Streamable HTTP root mode is starting
-- **WHEN** the HTTP server is ready to accept MCP clients
-- **THEN** startup logs SHALL include bind host, port, path, and full client URL
-- **AND** startup logs SHALL warn when the bind host is not loopback
-
-#### Scenario: Direct API sidecar logging
-- **GIVEN** Direct API startup is evaluated during root MCP startup
-- **WHEN** Direct API is disabled, ready, degraded, or stopped
-- **THEN** logs SHALL identify that state separately from root MCP transport logs
-- **AND** ready logs SHALL include the selected loopback URL
-
-#### Scenario: Proxy state logging under HTTP mode
-- **GIVEN** Streamable HTTP root mode is running
-- **WHEN** proxy servers connect, fail, enable, disable, restart, or shut down
-- **THEN** logs SHALL record server name, operation, status, transport, tool
-  count when connected, and cleanup result where applicable
-
-#### Scenario: Server stop logging
-- **GIVEN** the MCP server is running
-- **WHEN** shutdown is initiated
-- **THEN** it SHALL log:
-  - `span: "mcp.server.stop"`
-  - `duration`: Total server uptime
-  - Direct API stop result when applicable
-  - stats writer stop result when applicable
-  - proxy disconnect count and cleanup result when applicable
-
-### Requirement: Tool Resolution Logging
-
-The system SHALL log tool lookup in the registry.
-
-#### Scenario: Tool lookup
-- **GIVEN** a tool call is received
-- **WHEN** the tool is resolved from the registry
-- **THEN** it SHALL log:
-  - `span: "tool.lookup"`
-  - `function`: Requested function name
-  - `found`: Boolean indicating success
-
----
-
-<!-- Section: Tool Function Logging -->
-
-### Requirement: Tool Function LogSpan
-
-All public tool functions SHALL use LogSpan for structured operation logging.
-
-#### Scenario: Public function uses LogSpan
-- **GIVEN** a public tool function (non-underscore prefixed)
-- **WHEN** the function is executed
-- **THEN** it SHALL wrap execution in a `LogSpan` context manager with:
-  - `span`: Named using dot-notation `{pack}.{function}`
-  - Key parameters logged as span fields
-  - Result metrics added before exit
-
-#### Scenario: Consistent span naming
-- **GIVEN** a tool in pack `pack` with function `fn`
-- **WHEN** LogSpan is created
-- **THEN** the span name SHALL be `{pack}.{fn}` (e.g., `brave.search`, `db.query`)
-
-#### Scenario: Use log() helper
-- **GIVEN** a tool function needs to create a LogSpan
-- **WHEN** the span is created
-- **THEN** it SHALL use the `log()` context manager helper, not `LogSpan` directly
-
-### Requirement: Span Field Guidelines
-
-LogSpan fields SHALL follow consistent naming conventions.
-
-#### Scenario: Input parameters logged
-- **GIVEN** a tool function with significant input parameters
-- **WHEN** LogSpan is created
-- **THEN** key inputs SHALL be logged as span fields (e.g., `query`, `path`, `pattern`)
-
-#### Scenario: Result metrics logged
-- **GIVEN** a tool function that returns results
-- **WHEN** the function completes successfully
-- **THEN** result metrics SHALL be added (e.g., `resultCount`, `resultLen`, `found`)
-
-#### Scenario: Error state captured
-- **GIVEN** a tool function encounters an error
-- **WHEN** the error occurs within LogSpan
-- **THEN** the span SHALL automatically log `status=FAILED` with error details
-
-### Requirement: Shared HTTP Client
-
-Tools SHALL use a shared HTTP client utility for external API requests.
-
-#### Scenario: GET request with success
-- **GIVEN** a tool needs to make an HTTP GET request
-- **WHEN** `http_get(url, params, headers, timeout)` is called
-- **THEN** it SHALL return `(True, response_data)` on success
-
-#### Scenario: GET request with HTTP error
-- **GIVEN** a tool makes an HTTP GET request
-- **WHEN** the server returns an error status code
-- **THEN** it SHALL return `(False, error_message)` with status code
-
-#### Scenario: GET request with network error
-- **GIVEN** a tool makes an HTTP GET request
-- **WHEN** a network error occurs (timeout, connection refused)
-- **THEN** it SHALL return `(False, error_message)` describing the failure
-
-#### Scenario: Optional LogSpan integration
-- **GIVEN** a tool makes an HTTP GET request with `span_name` parameter
-- **WHEN** the request completes
-- **THEN** it SHALL log the request via LogSpan with endpoint and status
-
----
-
-<!-- Section: Output Formatting -->
-
-### Requirement: Log Output Formatting
-
-The system SHALL format log output with truncation and sanitisation at write time.
-
-#### Scenario: Field-based truncation
-- **GIVEN** a log entry with a `path` field containing 300 characters
-- **WHEN** the entry is written to a configured sink
-- **THEN** the value SHALL be truncated to 200 characters with `...` suffix
-
-#### Scenario: URL truncation
-- **GIVEN** a log entry with a `url` field exceeding 120 characters
-- **WHEN** the entry is written
-- **THEN** the value SHALL be truncated to 120 characters with `...` suffix
-
-#### Scenario: Query truncation
-- **GIVEN** a log entry with a `query` field exceeding 100 characters
-- **WHEN** the entry is written
-- **THEN** the value SHALL be truncated to 100 characters with `...` suffix
-
-#### Scenario: Credential sanitisation
-- **GIVEN** a log entry with a URL containing credentials (`://user:pass@`)
-- **WHEN** the entry is written
-- **THEN** credentials SHALL be masked as `://***:***@`
-
-#### Scenario: Full values preserved
-- **GIVEN** a LogEntry with a long path value
-- **WHEN** `entry.to_dict()` is called directly
-- **THEN** the full untruncated value SHALL be returned
-
-### Requirement: Verbose Logging Mode
-
-The system SHALL support a verbose mode that disables output truncation.
-
-#### Scenario: Verbose config option
-- **GIVEN** `log_verbose: true` in serve config
-- **WHEN** log entries are written
-- **THEN** truncation SHALL be skipped and full values SHALL appear
-
-#### Scenario: Verbose environment variable
-- **GIVEN** `OT_LOG_VERBOSE=true` environment variable
-- **WHEN** the server runs
-- **THEN** truncation SHALL be skipped
-
-#### Scenario: Default behaviour
-- **GIVEN** no verbose option set
-- **WHEN** log entries are written
-- **THEN** truncation SHALL be applied based on field type
-
-### Requirement: Helper Function Logging
-
-Internal helper functions making external calls SHALL use LogSpan for observability.
-
-#### Scenario: HTTP request helpers
-- **GIVEN** a helper function making HTTP requests (e.g., `_fetch()`, `_make_request()`)
-- **WHEN** the request completes
-- **THEN** it SHALL log with a span including `url`, `status`, and `duration`
-
-#### Scenario: Subprocess execution
-- **GIVEN** a helper function executing subprocesses (e.g., `_run_rg()`)
-- **WHEN** execution completes
-- **THEN** it SHALL log with a span including `returnCode` and `outputLen`
-
-#### Scenario: Database connection
-- **GIVEN** a helper function creating database connections
-- **WHEN** the connection is established
-- **THEN** it SHALL log with a span including `dbUrl` (sanitised at output)
-
-#### Scenario: Embedding API calls
-- **GIVEN** a helper function calling embedding APIs
-- **WHEN** the API call completes
-- **THEN** it SHALL log with a span including `model` and `dimensions`
-
-### Requirement: Span Attribute Naming
-
-LogSpan attributes SHALL use camelCase naming consistently.
-
-#### Scenario: Count attributes
-- **GIVEN** a span logs a count metric
-- **WHEN** the attribute is named
-- **THEN** it SHALL use camelCase (e.g., `resultCount`, `fileCount`, `outputLen`)
-
-#### Scenario: Boolean attributes
-- **GIVEN** a span logs a boolean outcome
-- **WHEN** the attribute is named
-- **THEN** it SHALL use camelCase (e.g., `success`, `found`, `cached`)
-
-#### Scenario: Invalid naming detected
-- **GIVEN** an attribute uses snake_case (e.g., `output_len`)
-- **WHEN** the code is reviewed
-- **THEN** it SHALL be corrected to camelCase (`outputLen`)
+### Requirement: Runtime Attribution
+
+Logs SHALL distinguish processes and runtime modes when multiple OneTool
+processes or transports may be active.
+
+#### Scenario: Process attribution
+- **GIVEN** a OneTool process emits runtime logs
+- **WHEN** records are written
+- **THEN** each record SHALL include the process id
+- **AND** a stable process-scoped MCP identifier where available
+
+#### Scenario: Runtime mode attribution
+- **GIVEN** OneTool starts in stdio, HTTP, Direct API, or proxy-related runtime paths
+- **WHEN** lifecycle events are logged
+- **THEN** records SHALL identify the runtime mode and relevant bind or target details
+
+### Requirement: Lifecycle Visibility
+
+OneTool SHALL log lifecycle transitions for root MCP runtime, Direct API sidecar,
+stats persistence, and external MCP proxy connections.
+
+#### Scenario: Startup visibility
+- **GIVEN** OneTool runtime startup completes
+- **WHEN** startup logs are written
+- **THEN** records SHALL include runtime transport, config path where available, and registered tool count
+
+#### Scenario: Shutdown visibility
+- **GIVEN** OneTool runtime shutdown starts
+- **WHEN** shutdown logs are written
+- **THEN** records SHALL include cleanup results for active runtime components
+
+#### Scenario: Proxy visibility
+- **GIVEN** an external MCP proxy server connects, fails, restarts, disables, or shuts down
+- **WHEN** the event is logged
+- **THEN** the record SHALL identify the server name, operation, status, and connected tool count when known
+
+### Requirement: Execution Diagnostics
+
+OneTool SHALL log execution diagnostics for MCP `run` calls and direct tool
+execution without exposing unbounded payloads by default.
+
+#### Scenario: Run execution record
+- **GIVEN** an MCP `run(command=...)` call is processed
+- **WHEN** execution completes or fails
+- **THEN** logs SHALL include command type, duration, status, and result size where available
+
+#### Scenario: Snippet execution record
+- **GIVEN** a snippet invocation expands to generated Python
+- **WHEN** execution is logged at normal verbosity
+- **THEN** logs SHALL identify the original snippet invocation and summary metadata
+- **AND** expanded generated code SHALL not be included at normal verbosity
+
+#### Scenario: Error diagnostics
+- **GIVEN** an operation fails
+- **WHEN** the failure is logged
+- **THEN** records SHALL include error type, error message, operation context, and elapsed duration where available
+
+### Requirement: Sensitive Data Protection
+
+Observability output SHALL avoid exposing secrets or unbounded user data by
+default.
+
+#### Scenario: Credential masking
+- **GIVEN** a logged value contains URL credentials or secret-like values known to OneTool
+- **WHEN** the log record is rendered
+- **THEN** credentials SHALL be masked or omitted
+
+#### Scenario: Bounded default logging
+- **GIVEN** a log field contains a large command, response, path, URL, or query
+- **WHEN** default logging renders the field
+- **THEN** the value SHALL be truncated or summarized
+
+#### Scenario: Verbose opt-in
+- **GIVEN** a user explicitly enables verbose logging
+- **WHEN** log records are rendered
+- **THEN** truncation MAY be disabled for diagnostic fields
+- **AND** secret masking SHALL still apply
+
+### Requirement: Configurable Log Level
+
+Users SHALL be able to control runtime log verbosity.
+
+#### Scenario: Log level override
+- **GIVEN** the user configures a supported log level
+- **WHEN** OneTool emits logs
+- **THEN** records below that level SHALL be suppressed
+
+#### Scenario: Debug diagnostics
+- **GIVEN** debug logging is enabled
+- **WHEN** OneTool performs configuration, discovery, proxy, or execution work
+- **THEN** additional diagnostic records MAY be emitted for troubleshooting
+
+### Requirement: Usage And Cost Visibility
+
+When OneTool performs LLM-backed work, observability records SHALL expose usage
+and cost metadata when providers return enough information to do so.
+
+#### Scenario: Token usage
+- **GIVEN** an LLM-backed operation completes with token usage metadata
+- **WHEN** the operation is logged or reported
+- **THEN** input, output, and total token counts SHALL be available
+
+#### Scenario: Cost estimate
+- **GIVEN** model pricing is known for an LLM-backed operation
+- **WHEN** cost metadata is reported
+- **THEN** the estimate SHALL identify the model and estimated cost

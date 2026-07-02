@@ -305,7 +305,7 @@ Use this decision tree:
 
 - `pyproject.toml` - Dependencies, ruff/mypy/pytest config
 - `justfile` - All dev commands
-- `openspec/AGENTS.md` - OpenSpec workflow (linked, not duplicated)
+- `dev/practices/spec-writing.md` - OpenSpec quality, scope, and bloat control
 
 ---
 

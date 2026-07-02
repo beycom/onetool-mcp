@@ -93,7 +93,7 @@ The `version()` function SHALL check latest versions for packages from any suppo
 
 ### Requirement: Package Tool Logging
 
-The package tools SHALL log all operations using LogSpan.
+The package tools SHALL emit structured runtime logs for all operations.
 
 #### Scenario: version logging
 - **GIVEN** a version check via `npm()`, `pypi()`, or `version()`

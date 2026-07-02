@@ -1,4 +1,10 @@
-## ADDED Requirements
+# tool-arch-model-centric-rendering Specification
+
+## Purpose
+
+Defines the model-centric architecture rendering contract for the `arch` tool.
+
+## Requirements
 
 ### Requirement: Model-centric pipeline boundary
 The `arch` tool SHALL execute architecture workflows using a strict two-stage boundary: `data -> model` and `model -> report`.
@@ -34,25 +40,25 @@ The `arch` tool SHALL resolve render target/profile/engine/template configuratio
 - **THEN** the tool SHALL resolve `tools.arch.profiles.<name>.sequence_engine` settings and run the configured command template for sequence output
 
 ### Requirement: Strict argument and config validation
-The `arch` tool SHALL enforce fail-fast validation for invalid values, removed values, and invalid configuration structure.
+The `arch` tool SHALL enforce fail-fast validation for invalid values, unsupported values, and invalid configuration structure.
 
 #### Scenario: Unsupported format rejected
-- **WHEN** `arch.generate(..., format="legacy")` is called
+- **WHEN** `arch.generate(...)` is called with an unsupported `format` value
 - **THEN** the tool SHALL fail with an explicit invalid-format error
 
-#### Scenario: Removed orchestration shape rejected
-- **WHEN** removed orchestration-style config keys (for example `tools.arch.orchestration`) are supplied
+#### Scenario: Unsupported orchestration shape rejected
+- **WHEN** unsupported orchestration-style config keys are supplied
 - **THEN** the tool SHALL fail with an explicit configuration error
 
 #### Scenario: Missing required template variable rejected
 - **WHEN** a command template references a required variable that is absent from render context
 - **THEN** the tool SHALL fail with an explicit template-variable error
 
-### Requirement: No backward compatibility aliases
-The `arch` tool SHALL NOT accept removed parameters, removed enum values, or legacy aliases.
+### Requirement: Current API only
+The `arch` tool SHALL NOT accept unsupported parameters, unsupported enum values, or alias parameters outside the current public API.
 
-#### Scenario: Removed key rejected
-- **WHEN** a removed config key or removed parameter is supplied
+#### Scenario: Unsupported key rejected
+- **WHEN** an unsupported config key or parameter is supplied
 - **THEN** the tool SHALL fail explicitly and SHALL NOT remap it silently
 
 ### Requirement: No-loss YAML and Excel round-trip semantics

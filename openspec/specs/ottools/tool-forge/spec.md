@@ -53,10 +53,10 @@ The ot_forge pack SHALL provide a `validate_ext()` function for pre-reload valid
 - **AND** the file is missing `pack` or `__all__`
 - **THEN** it returns "Validation FAILED" with errors
 
-#### Scenario: Warn about deprecated ot_sdk imports
+#### Scenario: Warn about ot_sdk imports
 - **WHEN** `ot_forge.validate_ext(path="/path/to/tool.py")` is called
 - **AND** the file imports from `ot_sdk`
-- **THEN** it includes a DEPRECATED warning in the result
+- **THEN** it includes a warning that extension tools should use current `ot.*` imports
 
 #### Scenario: Best practices warnings
 - **WHEN** `ot_forge.validate_ext(path="/path/to/extension.py")` is called
@@ -73,8 +73,7 @@ The extension template SHALL include all required components for in-process exec
 
 #### Scenario: Extension template includes logging
 - **WHEN** the extension template is used
-- **THEN** the generated function uses `with LogSpan(...) as s:` pattern
-- **AND** imports `LogSpan` from `ot.logging`
+- **THEN** the generated function emits structured runtime logs for the generated operation
 
 ### Requirement: Template Location
 

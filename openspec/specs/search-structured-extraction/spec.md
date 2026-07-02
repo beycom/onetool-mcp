@@ -1,7 +1,10 @@
 # search-structured-extraction Specification
 
 ## Purpose
-TBD - created by archiving change search-structured-extraction-and-field-provenance. Update Purpose after archive.
+
+Defines schema-constrained extraction behavior for search workflows, including
+validation of caller-provided schemas and required versus optional field
+outcomes in structured results.
 ## Requirements
 ### Requirement: Schema-constrained extraction mode
 Search workflows SHALL support an explicit schema-constrained extraction mode.
@@ -24,4 +27,3 @@ Extraction mode SHALL enforce required/optional field semantics.
 #### Scenario: Optional field missing
 - **WHEN** an optional field cannot be extracted
 - **THEN** the workflow SHALL return a null or empty value per contract without failing the full extraction
-

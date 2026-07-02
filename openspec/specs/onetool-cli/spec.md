@@ -119,13 +119,6 @@ The user-facing CLI documentation SHALL describe the runtime modes consistently.
 - **THEN** Streamable HTTP root mode SHALL be documented with a pure MCP client
   URL config and no command or args
 
-#### Scenario: HTTP smoke coverage
-- **WHEN** automated smoke coverage starts Streamable HTTP root mode
-- **THEN** it SHALL connect with a Streamable HTTP MCP client
-- **AND** it SHALL list tools and verify the `run` tool is present
-- **AND** it SHALL call `run` successfully over Streamable HTTP
-- **AND** it SHALL verify proxy/server status through the Streamable HTTP root
-
 ---
 
 > **Terminology:** The **config dir** is the directory that contains `onetool.yaml`. All materialised files are written to this directory.

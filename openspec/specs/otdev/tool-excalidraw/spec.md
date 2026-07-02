@@ -9,7 +9,6 @@ be installed on the host.
 
 Pack name: `whiteboard` (used as `whiteboard.draw(...)`, `whiteboard.note(...)`, etc.)
 Short alias: `wb` — `wb.draw(...)` is equivalent to `whiteboard.draw(...)`.
-Source: `src/otdev/tools/excalidraw.py`
 
 ---
 
@@ -83,11 +82,11 @@ The optional `board=` parameter specifies the named board to operate on. If omit
 
 #### Scenario: State not committed on JS failure
 - **WHEN** the browser call raises an exception
-- **THEN** `_dsl_state` and `_edge_keys` SHALL remain unchanged
+- **THEN** persisted board state SHALL remain unchanged
 
-#### Scenario: Single batch call per draw
+#### Scenario: Multi-element draw returns one summary
 - **WHEN** `whiteboard.draw()` is called with multiple shapes and edges
-- **THEN** exactly one `_js_batch_draw` call SHALL be issued
+- **THEN** the call SHALL return one summary covering all added or updated elements
 
 #### Scenario: Inline x/y positions new shapes
 - **WHEN** `draw()` is called with `a["Foo"] x:100,y:200` (inline position props)
@@ -113,7 +112,7 @@ The optional `board=` parameter specifies the named board to operate on. If omit
 
 `whiteboard.note(input=, background=)` SHALL parse tagged blocks and render each as a
 code-font rectangle placed below any existing diagram content (100px below the
-canvas max-y, as returned by `_get_canvas_max_y()`). The background colour
+current canvas content). The background colour
 defaults to beige (`#f5f5dc`).
 
 #### Scenario: Table note
@@ -158,20 +157,20 @@ defaults to beige (`#f5f5dc`).
 - **AND** no shape SHALL be inserted for that block
 
 #### Scenario: Note placed below existing content
-- **WHEN** `_get_canvas_max_y()` returns 300.0 and `note()` is called
-- **THEN** the note shape `y` SHALL be at least 400.0 (canvas max-y + 100)
+- **WHEN** `note()` is called on a board with existing content
+- **THEN** the note SHALL be placed below the existing canvas content
 
 #### Scenario: Multi-block note renders all blocks
 - **WHEN** `note()` is called with multiple `id[type:\ncontent\n]` blocks in one call
-- **THEN** each block SHALL be drawn via a separate `_js_batch_draw` call (one per block)
+- **THEN** each block SHALL render as a separate note on the canvas
 - **AND** the return value SHALL reflect the total count, e.g. `"inserted 4 note(s)"`
 
 #### Scenario: Indented triple-quoted input
 - **WHEN** `note()` is called with a triple-quoted string that has common leading indentation
-- **THEN** `_parse_note_blocks` SHALL strip common indentation (via `textwrap.dedent`) before parsing
+- **THEN** common indentation SHALL be ignored before parsing
 - **AND** trailing whitespace on each line (including the closing `]`) SHALL be stripped
 - **AND** blocks SHALL be parsed correctly regardless of surrounding whitespace
-- **AND** all blocks SHALL be found even when block IDs have leading whitespace (the regex anchor allows optional `\s*` before each block ID)
+- **AND** all blocks SHALL be found even when block IDs have leading whitespace
 
 ### Requirement: Embed DSL as canvas element
 
@@ -180,13 +179,16 @@ rectangle with id `"dsl"` placed below existing canvas content (100px below canv
 the previous embed (idempotent). The element is excluded from `save()`
 snapshots. Returns `"nothing to embed — canvas is empty"` when state is empty.
 
+#### Scenario: Embed current DSL text
+- **WHEN** `whiteboard.embed_dsl()` is called with non-empty board state
+- **THEN** the canvas SHALL contain one grey code-font element with id `"dsl"`
+- **AND** repeated calls SHALL replace the previous embedded DSL element
+
 ### Requirement: Erase elements
 
 `whiteboard.erase(ids=)` SHALL remove the specified element IDs from the canvas and
 Python state. Edges that become dangling (src or dst in the erased set) SHALL
-be removed automatically. Silently ignores IDs not currently rendered. Updates
-`_edge_keys` by matching against the actual edges being removed (not a
-reconstructed base ID string), covering both shape erasure and labeled-edge erasure.
+be removed automatically. Silently ignores IDs not currently rendered.
 
 #### Scenario: Erase shape removes dangling edges
 - **WHEN** `whiteboard.erase(ids=["b"])` is called and edges `a-->b` and `b-->c` exist
@@ -248,7 +250,12 @@ a warning is included in the return value.
 ### Requirement: Clear diagram
 
 `whiteboard.clear()` SHALL remove all elements from the canvas and reset
-`_dsl_state`, `_edge_keys`, and `_rendered_ids` to empty.
+stored board state to empty.
+
+#### Scenario: Clear resets canvas and state
+- **WHEN** `whiteboard.clear()` is called
+- **THEN** all canvas elements SHALL be removed
+- **AND** stored board state SHALL be empty
 
 ### Requirement: Open whiteboard
 
@@ -256,6 +263,12 @@ a warning is included in the return value.
 start fresh — reset Python state and clear canvas — regardless of existing
 canvas content. Untracked content warnings from `_ensure_ready()` are non-fatal.
 Returns `"whiteboard ready"` on success.
+
+#### Scenario: Open starts a fresh board
+- **WHEN** `whiteboard.open()` is called
+- **THEN** excalidraw.com SHALL be available and bootstrapped
+- **AND** Python state and canvas content SHALL be cleared
+- **AND** the return value SHALL be `"whiteboard ready"`
 
 ### Requirement: Close whiteboard
 
@@ -267,17 +280,32 @@ the Chrome process is closed automatically on interpreter exit even if
 `whiteboard.close()` is not called explicitly. The handler SHALL tolerate
 already-closed state (no-op if browser was already shut down).
 
+#### Scenario: Close resets state
+- **WHEN** `whiteboard.close()` is called
+- **THEN** Python state SHALL be reset
+- **AND** the browser process SHALL be closed when it is running
+
 ### Requirement: Hard reset
 
 `whiteboard.hard_reset()` SHALL reset Python state unconditionally and attempt canvas
 clear if the browser is available. Returns `"hard reset: state cleared, canvas
 cleared"` or `"hard reset: state cleared (browser unavailable)"`.
 
+#### Scenario: Hard reset without browser
+- **WHEN** `whiteboard.hard_reset()` is called and the browser is unavailable
+- **THEN** Python state SHALL be cleared
+- **AND** the return value SHALL be `"hard reset: state cleared (browser unavailable)"`
+
 ### Requirement: Screenshot
 
 `whiteboard.screenshot(file=)` SHALL capture the current canvas as a PNG image.
 Without `file`, returns the raw image content for inline display.
 With `file`, saves the image to the given path on disk.
+
+#### Scenario: Screenshot saved to file
+- **WHEN** `whiteboard.screenshot(file="board.png")` is called
+- **THEN** the current canvas SHALL be captured as PNG
+- **AND** the image SHALL be written to `board.png`
 
 ### Requirement: Scroll and zoom
 
@@ -286,16 +314,22 @@ With `file`, saves the image to the given path on disk.
 in view. Negative levels SHALL return an error string without calling the browser.
 `whiteboard.fit()` SHALL delegate to `whiteboard.zoom(level=0)`.
 
-When `zoom(0)` is called, the fit implementation SHALL compute bounds from
-`window.__drawElements` (the authoritative element cache) rather than relying on
-`api.scrollToContent()`, so that elements placed with explicit x/y coordinates
+When `zoom(0)` is called, the fit behavior SHALL compute bounds from
+the current canvas scene so that elements placed with explicit x/y coordinates
 are correctly included in the viewport.
+
+#### Scenario: Fit zoom includes explicit coordinates
+- **WHEN** `whiteboard.zoom(level=0)` is called
+- **THEN** the viewport SHALL fit the bounds of all current canvas elements
+
+#### Scenario: Negative zoom rejected
+- **WHEN** `whiteboard.zoom(level=-1)` is called
+- **THEN** an error string SHALL be returned without calling the browser
 
 ### Requirement: Automatic browser lifecycle management
 
-Every public tool SHALL call `_ensure_ready()` before executing (except
-`screenshot` and `hard_reset` which call `_check_browser()` instead).
-If excalidraw.com is not open or the API is missing, the tool SHALL
+Every public tool that needs the live canvas SHALL ensure the browser and canvas
+are ready before executing. If excalidraw.com is not open or the API is missing, the tool SHALL
 transparently navigate, bootstrap, and re-render from the current Python state.
 
 #### Scenario: First call opens browser
@@ -316,8 +350,8 @@ transparently navigate, bootstrap, and re-render from the current Python state.
 - **THEN** the tool SHALL return an error indicating the browser is not available
 
 #### Scenario: Untracked canvas content warning
-- **WHEN** the canvas is ready but `_rendered_ids` is empty and the canvas has untracked elements
-- **THEN** `_ensure_ready()` SHALL return a warning string (non-fatal for `open()`)
+- **WHEN** the canvas is ready but tracked board state is empty and the canvas has untracked elements
+- **THEN** mutating tools SHALL return a non-fatal warning where applicable
 
 ### Requirement: DSL syntax
 
@@ -411,12 +445,15 @@ When `algorithm != "layered"`, `node_placement`, `crossing_min`, and
 When `algorithm == "stress"`, `elk.stress.desiredEdgeLength` SHALL be set to
 `gap_node * 3` to reduce node overlap.
 
+#### Scenario: Layout applies to selected nodes
+- **WHEN** `whiteboard.layout(...)` is called with selected elements
+- **THEN** only selected eligible nodes SHALL be laid out
+- **AND** the return string SHALL include `(selection)`
+
 #### Edge repositioning
 
-ELK returns no waypoints for edges. The implementation SHALL recompute each
-edge's start and end coordinates from the newly computed node positions and the
-layout direction, then include these as `points` patches alongside the node
-patches:
+After layout, arrows SHALL connect to the appropriate side of each repositioned
+node based on layout direction:
 
 | `direction` | Start point | End point |
 |---|---|---|
@@ -425,13 +462,8 @@ patches:
 | `DOWN` | `(src.x + src.w/2, src.y + src.h)` | `(dst.x + dst.w/2, dst.y)` |
 | `UP` | `(src.x + src.w/2, src.y)` | `(dst.x + dst.w/2, dst.y + dst.h)` |
 
-This ensures arrow lines connect the correct node edges after layout repositions
-nodes — without this step, arrows remain at stale absolute canvas coordinates
-and cross diagonally through the repositioned node boxes.
-
-Arrow patches SHALL NOT set `startBinding: null` or `endBinding: null`. The
-existing bindings from `window.__drawElements` SHALL be preserved so that
-Excalidraw can re-route arrows reactively after subsequent node moves.
+This ensures arrow lines remain connected to repositioned node boxes after
+layout.
 
 #### Layout offset
 
@@ -448,11 +480,6 @@ than jumping to the canvas origin.
 `whiteboard.align(ids=, axis=)` SHALL apply Excalidraw's built-in alignment or
 distribution actions to the specified element IDs.
 
-The implementation MUST call `action.perform(elements, appState, null, api.actionManager)`
-directly with a synthetic `appState` that includes `selectedElementIds` — it MUST NOT
-use `api.setAppState()` followed by `executeAction()`, because `setAppState()` schedules
-an async React update and the action would run against stale (empty) selection state.
-
 | `axis` | Action |
 |---|---|
 | `"left"` | `alignLeft` |
@@ -466,11 +493,19 @@ an async React update and the action would run against stale (empty) selection s
 
 Invalid `axis` values SHALL return an `"Error: ..."` string without calling the browser.
 
+#### Scenario: Align selected IDs on an axis
+- **WHEN** `whiteboard.align(ids=["a", "b"], axis="left")` is called
+- **THEN** Excalidraw's left-alignment action SHALL be applied to those element IDs
+
+#### Scenario: Invalid alignment axis
+- **WHEN** `whiteboard.align(ids=["a"], axis="diagonal")` is called
+- **THEN** an error string SHALL be returned without calling the browser
+
 ### Requirement: Style resolution
 
-`_parse_style_props(s)` SHALL parse a comma-separated `key:value` style string
-and return an Excalidraw-compatible property dict. Shorthand keys are expanded
-to Excalidraw property names. Unknown keys SHALL be passed through as-is.
+Style strings SHALL use comma-separated `key:value` pairs. Shorthand keys are
+expanded to Excalidraw style property names. Unknown keys SHALL be passed
+through as-is.
 
 The following new shorthands are supported:
 
@@ -482,6 +517,14 @@ The following new shorthands are supported:
 
 Invalid values for `fi`, `cr`, and `at` SHALL raise `ValueError` (unlike other
 properties which are passed through).
+
+#### Scenario: Style shorthand expands
+- **WHEN** style string `fi:solid,cr:round,at:elbow` is parsed
+- **THEN** it SHALL resolve to Excalidraw `fillStyle`, `corners`, and `arrowType` properties
+
+#### Scenario: Invalid style value rejected
+- **WHEN** `fi:not-a-style` is parsed
+- **THEN** a `ValueError` SHALL be raised
 
 ### Requirement: Note DSL
 
@@ -497,12 +540,21 @@ The `note()` input uses `id[type:\ncontent\n]` blocks. Supported types:
 
 All renderers accept `;` as a line separator in addition to newlines.
 
+#### Scenario: Table note block
+- **WHEN** `whiteboard.note(input="t1[table:\nA,B;1,2\n]")` is called
+- **THEN** a table note SHALL be rendered on the canvas
+
+#### Scenario: Semicolon line separator
+- **WHEN** a note block uses `;` between logical lines
+- **THEN** the renderer SHALL treat those separators as newlines
+
 ### Requirement: Apply visual styles
 
 `whiteboard.style(ids=, style=)` SHALL apply Excalidraw style properties to existing
-canvas elements in bulk. It SHALL never modify `_dsl_state` — styling is a
-purely visual operation. The `style` string uses the same shorthand key:value
-format as `whiteboard.draw` inline styles. All keys and values are case-insensitive.
+canvas elements in bulk. Styling is a visual operation and SHALL NOT rewrite the
+diagram DSL persisted for save/load/sync. The `style` string uses the same
+shorthand key:value format as `whiteboard.draw` inline styles. All keys and
+values are case-insensitive.
 
 Shape changes (`shape:d`, `shape:c`) SHALL use delete+recreate with the same ID
 so arrow connections survive.
@@ -591,7 +643,7 @@ success. If no `__otDSL` element is found, returns an explanatory message.
 
 #### Scenario: Sync restores state
 - **WHEN** `whiteboard.sync()` is called and a `__otDSL` element is present
-- **THEN** `_dsl_state` SHALL be restored from the embedded DSL text
+- **THEN** stored board state SHALL be restored from the embedded DSL text
 
 #### Scenario: No __otDSL element
 - **WHEN** `whiteboard.sync()` is called and no `__otDSL` element is on canvas

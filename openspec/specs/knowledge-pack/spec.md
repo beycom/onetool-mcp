@@ -316,8 +316,13 @@ The `onetool.yaml` `tools.knowledge` block SHALL support: `kb` (map of project n
 
 Each `KBProjectConfig` SHALL contain:
 - `db`: `DBConfig` with `path`, `description`, `embeddings_enabled`
-- `scrape` (optional): `ScrapeProjectConfig` — same fields as before except `url_base_path` is removed from `ScrapeSourceConfig`
+- `scrape` (optional): `ScrapeProjectConfig` with `output_base_dir`, crawl defaults, extraction options, default category/tags, and named `sources`
 - `index` (optional): `IndexProjectConfig` with `ignore_patterns` (default `[]`) and `topic_roots` (default `[]`)
+
+Each `ScrapeSourceConfig` source SHALL include `url` and MAY override project
+defaults with `url_prefix`, `depth`, `max_pages`, `check_robots_txt`, delay,
+user-agent, wait, timeout, iframe, filter, crawl strategy, score, selector,
+JavaScript, image, flat-file, category, and tag settings.
 
 `topic_roots` entries accept a full URL or bare path prefix. During indexing, the first matching root is stripped from each chunk's canonical topic to derive the stored topic.
 

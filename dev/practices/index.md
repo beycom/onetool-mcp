@@ -12,6 +12,7 @@ Generic development workflows and standards that could apply to any Python proje
 | [Commit Scopes](commit-scopes.md) | Comprehensive conventional commit scope reference |
 | [Release](release.md) | Release and publishing workflow |
 | [Justfile](justfile.md) | Just command reference |
+| [Spec Writing](spec-writing.md) | OpenSpec quality, scope, and bloat control |
 | [Documentation Writing](docs-writing.md) | MkDocs Material features and best practices |
 | [Documentation Visual Design](docs-visual-design.md) | Design system for documentation site |
 
@@ -38,6 +39,7 @@ Generic development workflows and standards that could apply to any Python proje
 | Add logging | [Logging](logging.md) |
 | Follow Python style | [Python Style](python-style.md) |
 | Use just commands | [Justfile](justfile.md) |
+| Write or review specs | [Spec Writing](spec-writing.md) |
 | Release a version | [Release](release.md) |
 | Build a CLI | [CLI Patterns](cli-patterns.md) |
 | Write documentation | [Documentation Writing](docs-writing.md) |

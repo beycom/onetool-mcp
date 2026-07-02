@@ -1,8 +1,8 @@
-# serve-prompts Specification v2
+# serve-prompts Specification
 
 ## Purpose
 
-Defines the YAML-based prompts configuration system for the MCP server. Covers server instructions, tool descriptions, prompt templates, and the invocation contract for the `run` tool. Version 3 keeps server instructions concise, makes the `run` tool description authoritative, and uses colon-prefixed snippet invocations.
+Defines the YAML-based prompts configuration system for the MCP server. Covers server instructions, tool descriptions, prompt templates, and the invocation contract for the `run` tool.
 
 ## Requirements
 
@@ -187,42 +187,43 @@ The system SHALL support reusable prompt templates.
 - **WHEN** the MCP server starts
 - **THEN** templates SHALL be registered as MCP prompts
 
-### Requirement: Prompts Configuration Model
+### Requirement: Prompts Configuration Schema
 
-The system SHALL use a Pydantic model for prompts configuration.
+The system SHALL validate prompt configuration using a typed schema before
+server instructions, tool prompts, or MCP prompts are exposed.
 
-#### Scenario: PromptsConfig structure
+#### Scenario: Top-level prompt configuration
 - **GIVEN** prompts.yaml is loaded
 - **WHEN** parsed
-- **THEN** it SHALL validate against PromptsConfig model with: instructions (str), tools (dict), templates (dict)
+- **THEN** it SHALL accept `instructions` as a string, `tools` as a mapping, and `templates` as a mapping
 
-#### Scenario: ToolPrompt structure
+#### Scenario: Tool prompt entries
 - **GIVEN** a tool prompt entry
 - **WHEN** parsed
-- **THEN** it SHALL validate: description (str), examples (list[str])
+- **THEN** it SHALL require a string description and a list of string examples
 
-#### Scenario: PromptTemplate structure
+#### Scenario: Prompt template entries
 - **GIVEN** a template entry
 - **WHEN** parsed
-- **THEN** it SHALL validate: description (str), template (str)
+- **THEN** it SHALL require a string description and string template body
 
-### Requirement: Get Instructions Helper
+### Requirement: Instruction Resolution
 
-The system SHALL provide a helper function for getting instructions.
+The system SHALL resolve server instructions from configured prompt content before using default instructions.
 
 #### Scenario: Get from file
 - **GIVEN** prompts.yaml exists with instructions
-- **WHEN** get_instructions() is called
+- **WHEN** server instructions are requested
 - **THEN** it SHALL return the file-based instructions
 
 #### Scenario: Get fallback
 - **GIVEN** no prompts file or no instructions key
-- **WHEN** get_instructions() is called
+- **WHEN** server instructions are requested
 - **THEN** it SHALL return default instructions
 
 #### Scenario: Caching
 - **GIVEN** prompts.yaml has been loaded once
-- **WHEN** get_instructions() is called again
+- **WHEN** server instructions are requested again
 - **THEN** it MAY use cached result for performance
 
 ### Requirement: Tool-Specific Prompts
@@ -261,16 +262,3 @@ The system SHALL support tool-specific descriptions and examples with minimal re
 - **WHEN** tool description and instructions are generated
 - **THEN** critical invocation modes and repair rules SHALL appear in the run tool description
 - **AND** broad unscoped pass-through rules such as "JUST pass the exact command" SHALL NOT be required
-
-## Change Notes
-
-### Removed: Canonical Format Documentation
-**Reason:** Superseded by the direct `run(command=...)` MCP calling convention and the authoritative run tool description.
-
-### Removed: Explicit Trigger Documentation (v1)
-**Reason:** Replaced by the invocation contract requirement, which documents `__run`, `__r`, `__ot`, and colon-prefixed snippets.
-
-### Removed: Discovery functions documented
-**Reason:** Discovery reference material is too detailed for the always-on prompt. Core guidance remains in always-on instructions; advanced edge cases live in `ot-ref`.
-
-**Migration:** Agents can run `ot.help(query="topic")` through `run(command=...)` directly for discovery. `ot-ref` remains optional.

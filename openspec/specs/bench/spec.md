@@ -60,18 +60,6 @@ The harness SHALL support tool-specific benchmarks using the `tool_<name>.yaml` 
 
 ---
 
-### Requirement: OneTool Features Testing
-
-OneTool-specific capabilities (aliases, snippets, proxy, invocation styles) SHALL be tested via exploratory tests or unit tests, not benchmarks.
-
-#### Scenario: Features excluded from benchmarks
-- **GIVEN** the benchmark suite
-- **WHEN** defining benchmark files
-- **THEN** it SHALL NOT include a dedicated features benchmark
-- **REASON** Feature testing is better served by exploratory tests (see `tests/explore/`) and unit tests
-
----
-
 ### Requirement: All MCPs Context Demonstration
 
 The harness SHALL support registering multiple MCP servers to demonstrate context rot and token bloat.
@@ -114,25 +102,6 @@ Benchmark files SHALL follow consistent conventions for maintainability and clar
   - Tool: `brave`, `context7`, `web-fetch`, `package`, `code-search`, `transform`
   - Feature: `invoke`, `proxy`, `snippet`, `direct`, `harness`
   - Execution: `parse`, `var`, `loop`, `if`, `comp`, `import`, `return`
-
-### Requirement: Python Execution Testing
-
-The execution engine SHALL be tested via unit tests, not benchmarks.
-
-#### Scenario: Unit test coverage
-- **GIVEN** the Python execution engine
-- **WHEN** testing parsing, execution, return values, imports, and errors
-- **THEN** tests SHALL be in `tests/unit/core/test_python_exec.py`
-- **AND** tests SHALL use the `executor` fixture for direct execution
-- **NOT** require LLM involvement
-
-#### Scenario: No python_exec benchmark
-- **GIVEN** the benchmark suite
-- **WHEN** looking for execution engine tests
-- **THEN** there SHALL NOT be a `python_exec.yaml` benchmark file
-- **REASON** Execution tests are deterministic and don't need LLM
-
----
 
 ### Requirement: Enhanced Reporter Output
 

@@ -1,3 +1,5 @@
+# serve-telemetry Specification
+
 ## Purpose
 
 Anonymous usage telemetry fired at server start via PostHog.
