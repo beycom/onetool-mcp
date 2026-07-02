@@ -1,7 +1,10 @@
 # search-batch-structured-contract Specification
 
 ## Purpose
-TBD - created by archiving change search-batch-structured-output-contract-ground-brave-tavily. Update Purpose after archive.
+
+Defines the shared structured response shape for batch search tools, including
+ordered per-item results, explicit status and error fields, and aggregate batch
+metadata.
 ## Requirements
 ### Requirement: Structured batch response shape
 Batch search tools SHALL return a JSON-serializable object instead of delimiter text.
@@ -41,4 +44,3 @@ Batch response metadata SHALL summarize aggregate outcomes.
 - **WHEN** batch processing completes
 - **THEN** `meta` SHALL include totals for query count, success count, and error count
 - **AND** `meta` SHALL indicate whether the outcome is partial success
-

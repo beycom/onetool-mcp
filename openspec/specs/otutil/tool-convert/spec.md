@@ -68,7 +68,7 @@ All conversions SHALL execute asynchronously.
 #### Scenario: Batch conversion inside a running event loop
 - **GIVEN** OneTool is already executing inside an event loop
 - **WHEN** a batch conversion path is called
-- **THEN** the async batch work SHALL complete without calling `asyncio.run()` on the running loop
+- **THEN** the async batch work SHALL complete without failing due to the existing event loop
 
 #### Scenario: Completion summary
 - **GIVEN** a batch conversion completes
@@ -367,15 +367,3 @@ All converters SHALL write consistent output structure.
 - **GIVEN** an output_dir that does not exist
 - **WHEN** conversion runs
 - **THEN** the directory SHALL be created automatically
-
----
-
-### Requirement: Tool Conventions
-
-The convert tool SHALL follow OneTool tool conventions.
-
-#### Scenario: Follows tool-conventions
-- **GIVEN** implementation in `src/otutil/tools/convert.py`
-- **WHEN** the tool is used
-- **THEN** it SHALL follow all requirements in `tool-conventions` spec
-- **INCLUDING** keyword-only arguments, LogSpan logging, string error returns

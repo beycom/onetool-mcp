@@ -194,7 +194,7 @@ All grounding search functions SHALL require API key configuration.
 
 ### Requirement: Grounding Search Logging
 
-The tool SHALL log all API operations using LogSpan.
+The tool SHALL emit structured runtime logs for all API operations.
 
 #### Scenario: Search logging
 - **GIVEN** a search is requested

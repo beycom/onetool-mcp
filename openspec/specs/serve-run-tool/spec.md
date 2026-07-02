@@ -242,31 +242,6 @@ The `proj` pack SHALL use a special proxy supporting dynamic project attributes.
   - Available functions (path, list)
   - Available projects (onetool)
 
-### Requirement: Runner Module Organization
-
-The runner implementation SHALL be organized into focused modules.
-
-#### Scenario: Fence processing isolation
-- **GIVEN** the runner receives a fenced command
-- **WHEN** fence stripping is needed
-- **THEN** it SHALL use the dedicated `fence_processor` module
-
-#### Scenario: Tool loading isolation
-- **GIVEN** the runner needs to load tool functions
-- **WHEN** tools are discovered and cached
-- **THEN** it SHALL use the dedicated `tool_loader` module
-
-#### Scenario: Pack proxy isolation
-- **GIVEN** the runner builds execution namespace
-- **WHEN** proxy objects are created for dot notation
-- **THEN** it SHALL use the dedicated `pack_proxy` module
-
-#### Scenario: Runner focused on orchestration
-- **GIVEN** the runner module
-- **WHEN** examining its responsibilities
-- **THEN** it SHALL focus on code execution and command routing
-- **AND** it SHALL import fence, loader, and proxy functionality from dedicated modules
-
 ### Requirement: Parameter Prefix Matching
 
 The system SHALL resolve abbreviated parameter names to full parameter names using prefix matching.
@@ -307,7 +282,7 @@ The system SHALL resolve abbreviated parameter names to full parameter names usi
 Parameter prefix matching SHALL apply to all tool execution paths.
 
 #### Scenario: Internal tool prefix matching
-- **GIVEN** an internal tool (in-process, from `src/ottools/`)
+- **GIVEN** a bundled in-process tool
 - **WHEN** called with abbreviated parameter names
 - **THEN** prefix matching SHALL be applied
 

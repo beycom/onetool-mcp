@@ -30,18 +30,18 @@ Extension tools (user-created tools with PEP 723 headers) SHALL execute in persi
 
 ### Requirement: PEP 723 Dependency Declaration
 
-Extension tools SHALL declare dependencies using PEP 723 inline script metadata. The metadata parser SHALL use Python's `tomllib` standard library for full TOML spec compliance.
+Extension tools SHALL declare dependencies using PEP 723 inline script metadata.
 
 #### Scenario: Tool with dependencies
 - **WHEN** a tool file contains `# /// script` metadata with dependencies
-- **THEN** the system parses the TOML content using `tomllib`
+- **THEN** the system parses the metadata as TOML
 - **AND** the system uses `uv run` to execute in an isolated environment
 - **AND** dependencies are installed automatically
 
 #### Scenario: TOML parsing compliance
 - **WHEN** PEP 723 metadata is extracted from a tool file
 - **THEN** the comment prefixes (`# `) are stripped from each line
-- **AND** the content is parsed as valid TOML using `tomllib.loads()`
+- **AND** the content is parsed as valid TOML
 - **AND** malformed TOML is gracefully handled (returns None)
 
 ### Requirement: Internal Tool In-Process Execution
@@ -49,18 +49,17 @@ Extension tools SHALL declare dependencies using PEP 723 inline script metadata.
 Internal tools (shipped with onetool, without PEP 723 headers) SHALL execute in-process within onetool with direct access to bundled dependencies.
 
 #### Scenario: Internal tool detection
-- **WHEN** a tool file in `src/ottools/` does NOT contain PEP 723 metadata
+- **WHEN** a bundled tool has no PEP 723 metadata
 - **THEN** the system loads and executes it in-process
 - **AND** it has direct access to onetool state
 
-#### Scenario: Internal tool has onetool access
+#### Scenario: Internal tool has runtime access
 - **WHEN** an internal tool executes
 - **THEN** it can access registry, config, and LLM capabilities directly
-- **AND** uses `ot.*` imports (not `ot_sdk`)
 
 #### Scenario: Internal tool dependencies
 - **WHEN** an internal tool requires a dependency
-- **THEN** the dependency is bundled in `pyproject.toml`
+- **THEN** the dependency is available from the installed OneTool runtime
 - **AND** no PEP 723 header is required
 
 ### Requirement: Extension Tool Location
@@ -82,8 +81,7 @@ Extension tools SHALL be discovered from the `.onetool/tools/` directory structu
 The system SHALL distinguish between internal and extension tools based on file location and PEP 723 headers.
 
 #### Scenario: Internal tool identification
-- **WHEN** a tool file is in `src/ottools/`
-- **AND** has no PEP 723 header
+- **WHEN** a bundled tool has no PEP 723 header
 - **THEN** it is loaded as an internal tool (in-process)
 
 #### Scenario: Extension tool identification
@@ -95,4 +93,3 @@ The system SHALL distinguish between internal and extension tools based on file 
 - **WHEN** a tool file is in `.onetool/tools/`
 - **AND** has no PEP 723 header
 - **THEN** it is still loaded but may fail if it has unmet dependencies
-

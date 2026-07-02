@@ -290,7 +290,7 @@ The diagram tool SHALL support remote and self-hosted Kroki backends.
 
 ### Requirement: Diagram Logging
 
-The diagram tool SHALL log all operations using LogSpan.
+The diagram tool SHALL emit structured runtime logs for all operations.
 
 #### Scenario: Generate logging
 - **GIVEN** a generate operation

@@ -145,4 +145,3 @@ Annotated tags (`-a`) with `v` prefix: `v1.0.0`, `v1.0.0rc3`, `v1.0.0b1`
 
 **Related:**
 - [Commit Scopes](commit-scopes.md) - Comprehensive scope reference
-- OpenSpec: `openspec/AGENTS.md` - For extending commit standards

@@ -161,7 +161,7 @@ The tool SHALL use connection pooling optimized for long-running servers.
 
 ### Requirement: Database Tool Logging
 
-The tool SHALL log all operations using LogSpan.
+The tool SHALL emit structured runtime logs for all operations.
 
 #### Scenario: Query logging
 - **GIVEN** a query is executed

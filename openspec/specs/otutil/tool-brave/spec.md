@@ -199,7 +199,7 @@ All Brave Search functions SHALL require API key configuration.
 
 ### Requirement: Brave Search Logging
 
-The tool SHALL log all API operations using LogSpan.
+The tool SHALL emit structured runtime logs for all API operations.
 
 #### Scenario: Web search logging
 - **GIVEN** a web search is requested

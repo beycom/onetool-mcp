@@ -1,16 +1,19 @@
-# tool-devtools-util Specification
+# tool-chrome-util Specification
 
 ## Purpose
-Defines the `chrome_util` extension tool pack, which exposes programmatic Chrome DevTools automation via the Chrome DevTools MCP server. Covers annotation injection, element highlighting, screenshot capture, page navigation, and JavaScript evaluation.
+Defines the `chrome_util` (`chrome`) tool pack, which exposes programmatic
+annotation utilities through the Chrome DevTools MCP server.
+
 ## Requirements
 ### Requirement: chrome_util Pack Declaration
 
-The system SHALL provide a `chrome_util` extension tool pack at `.onetool/tools/chrome_util.py`.
+The system SHALL provide a `chrome_util` tool pack with `chrome` as a short alias.
 
 #### Scenario: Pack discovery
-- **GIVEN** the `chrome_util.py` file exists in `.onetool/tools/`
-- **WHEN** `ot.tools(pattern="chrome_devtools")` is called
-- **THEN** it lists `chrome_util` with its 5 functions
+- **GIVEN** the `otdev` extra is installed
+- **WHEN** tools are discovered
+- **THEN** the `chrome_util` pack SHALL expose `inject_annotations`, `highlight_element`, `scan_annotations`, `clear_annotations`, and `guide_user`
+- **AND** callers MAY use the `chrome` alias
 
 ### Requirement: Annotation Injection
 
@@ -97,4 +100,3 @@ The `chrome_util` pack SHALL only work with the `chrome_devtools` MCP server.
 - **WHEN** any chrome_util function is called
 - **THEN** it does NOT fall back to Playwright automatically
 - **AND** users must use `play_util` pack for Playwright servers
-

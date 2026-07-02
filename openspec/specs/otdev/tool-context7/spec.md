@@ -186,7 +186,7 @@ Context7 functions SHALL handle errors gracefully.
 
 ### Requirement: Context7 Logging
 
-The tool SHALL log all documentation operations using LogSpan.
+The tool SHALL emit structured runtime logs for documentation operations.
 
 #### Scenario: Library search logging
 - **GIVEN** a library search is requested

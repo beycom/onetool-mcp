@@ -1,28 +1,29 @@
-# tool-devtools-annotation Specification
+# tool-play-util Specification
 
 ## Purpose
-Defines the bundled `inject.js` annotation script asset and the `window.__inspector` JavaScript API it exposes. Covers script loading, annotation add/remove/clear operations, and the attribute-based visual highlighting system used by `chrome_util` and `play_util`.
+Defines the `play_util` (`play`) tool pack and the shared `inject.js` browser
+annotation behavior it exposes through the Playwright MCP server.
+
 ## Requirements
+### Requirement: play_util Pack Declaration
+
+The system SHALL provide a `play_util` tool pack with `play` as a short alias.
+
+#### Scenario: Pack discovery
+- **GIVEN** the `otdev` extra is installed
+- **WHEN** tools are discovered
+- **THEN** the `play_util` pack SHALL expose `inject_annotations`, `enable_auto_inject`, `highlight_element`, `scan_annotations`, `clear_annotations`, and `guide_user`
+- **AND** callers MAY use the `play` alias
+
 ### Requirement: Annotation Script Asset
 
-The system SHALL provide a bundled JavaScript annotation script at `src/ot/assets/inject.js`.
+The system SHALL provide a bundled JavaScript annotation script through
+`ot.assets`.
 
 #### Scenario: Script loading
 - **GIVEN** the annotation script asset
-- **WHEN** loaded via `get_inject_script("inject.js")`
-- **THEN** it returns the minified JavaScript as a string
-- **AND** the string is suitable for injection via `evaluate_script()`
-
-#### Scenario: Script size
-- **GIVEN** the bundled annotation script
-- **WHEN** checked
-- **THEN** it SHALL be under 100KB
-
-#### Scenario: Generated asset freshness
-- **GIVEN** `src/ot/assets/inject-src.js` has been changed
-- **WHEN** release checks run
-- **THEN** `src/ot/assets/inject.js` SHALL be rebuilt
-- **AND** the check SHALL fail if the generated asset differs from the working tree
+- **WHEN** `play_util.inject_annotations()` is called
+- **THEN** it SHALL inject the bundled script through the Playwright MCP server
 
 ### Requirement: Annotation API
 
@@ -53,7 +54,7 @@ The injected script SHALL expose a `window.__inspector` API for programmatic ann
 
 #### Scenario: Internal cleanup
 - **GIVEN** the script has been injected
-- **WHEN** the internal `dispose()` helper is called by tests or browser adapter cleanup
+- **WHEN** the browser-side `dispose()` API is called
 - **THEN** annotation attributes, overlays, global listeners, and observers are removed
 - **AND** the script can be injected again successfully
 
@@ -132,3 +133,19 @@ The annotation system SHALL optimise rendering for scroll and resize events.
 - **GIVEN** annotated elements on the page
 - **WHEN** the viewport is resized
 - **THEN** highlights are re-rendered after a 150ms debounce using requestAnimationFrame
+
+### Requirement: Playwright Server Boundary
+
+The `play_util` pack SHALL use the configured `playwright` MCP server.
+
+#### Scenario: Playwright server required
+- **GIVEN** the `playwright` MCP server is not connected
+- **WHEN** any `play_util` function is called
+- **THEN** it SHALL return an error indicating the `playwright` server is unavailable
+- **AND** include the available server names in the error message
+
+#### Scenario: Auto-inject registration
+- **GIVEN** the `playwright` MCP server is connected
+- **WHEN** `play_util.enable_auto_inject()` is called
+- **THEN** it SHALL register the annotation script for future pages in the browser session
+- **AND** return `success` and `auto_inject` fields

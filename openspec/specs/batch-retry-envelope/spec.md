@@ -1,7 +1,10 @@
 # batch-retry-envelope Specification
 
 ## Purpose
-TBD - created by archiving change search-batch-error-envelope-and-retry-policy-ground-brave-tavily. Update Purpose after archive.
+
+Defines the shared batch retry and per-query error envelope contract for search
+providers. Batch search operations return explicit item-level success or error
+state while preserving successful results when other items fail.
 ## Requirements
 ### Requirement: Per-query batch error envelope
 Batch search operations SHALL return a per-query envelope with explicit success/error state.
@@ -46,4 +49,3 @@ Batch search operations SHALL return successful items even when other items fail
 - **WHEN** some queries succeed and some fail
 - **THEN** successful items SHALL remain present in results
 - **AND** failed items SHALL include their error envelopes
-

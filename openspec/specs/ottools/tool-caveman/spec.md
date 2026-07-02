@@ -82,22 +82,6 @@ The `compact()` tool SHALL return a distinct error string for each missing confi
 - **WHEN** API key and base_url are present but no model is set
 - **THEN** returns error string mentioning `llm.model or tools.ot_caveman.model`
 
-### Requirement: _compact_text() is an importable private helper
-
-The `_compact_text(text: str) -> str` function SHALL be importable from `ottools.ot_caveman` as a private helper for internal consumers (e.g. runner.py). It SHALL raise `RuntimeError` on any failure (config error or LLM error) and never return an error string.
-
-#### Scenario: Returns compacted text
-- **WHEN** `_compact_text(text)` is called with a configured client and working LLM
-- **THEN** it returns the compacted string
-
-#### Scenario: Raises RuntimeError on config error
-- **WHEN** `_get_client` returns an error (no API key, missing model, etc.)
-- **THEN** `_compact_text` raises `RuntimeError` with a descriptive message
-
-#### Scenario: Raises RuntimeError on LLM error
-- **WHEN** the LLM API call fails
-- **THEN** `_compact_text` raises `RuntimeError` with the error message
-
 ### Requirement: expand() reconstructs readable prose
 
 The `expand()` tool SHALL accept either `text` or `src` and reconstruct readable prose from packed text using an LLM. It SHALL return a dict with keys `text`, `tokens_in`, `tokens_out`, `expansion_pct`. Reconstruction is lossy. If `dest` is provided, the expanded text SHALL be written to that path. Supports glob batch mode.
@@ -153,6 +137,11 @@ The `ot_caveman` pack SHALL read `tools.ot_caveman.model` and `tools.ot_caveman.
 ### Requirement: ot_caveman pack declares required dependencies
 
 The `ot_caveman` pack SHALL declare `openai` and `tiktoken` in `__ot_requires__["lib"]` and `OPENAI_API_KEY` in `__ot_requires__["secrets"]`, so the registry can surface missing deps before the first call.
+
+#### Scenario: Dependency metadata exposed
+- **WHEN** tool metadata for `ot_caveman` is discovered
+- **THEN** it SHALL include library requirements for `openai` and `tiktoken`
+- **AND** it SHALL include the `OPENAI_API_KEY` secret requirement
 
 ### Requirement: ot_caveman pack is registered with short alias cm
 

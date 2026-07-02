@@ -177,11 +177,11 @@ The `ot.reload()` function SHALL force reload of all configuration.
 - **THEN** `ot.reload()` SHALL clear those runtime caches
 - **AND** subsequent tool calls SHALL use current config/secrets values
 
-#### Scenario: Reload clears reloadable internal helper modules
-- **GIVEN** a reloadable internal pack uses helper modules with process-global runtime state
+#### Scenario: Reload clears reloadable pack runtime state
+- **GIVEN** a reloadable pack has process-global runtime state
 - **WHEN** `ot.reload()` is called
-- **THEN** `ot.reload()` SHALL remove those helper modules from the import cache after running registered reload hooks
-- **AND** subsequent tool calls SHALL import the current helper module source
+- **THEN** `ot.reload()` SHALL clear that runtime state after running registered reload hooks
+- **AND** subsequent tool calls SHALL use current configuration, secrets, and pack code
 
 #### Scenario: Reload does not block MCP run event loop
 - **GIVEN** `ot.reload()` is executed through the MCP `run()` tool
@@ -280,12 +280,12 @@ All `ot.*` functions SHALL format output using YAML flow style.
 
 ### Requirement: Logging
 
-The tool SHALL follow [_nf-conventions](../_nf-conventions/spec.md) for logging.
+The `ot.*` runtime helper pack SHALL emit observable logs for helper operations.
 
 #### Scenario: Span naming
 - **GIVEN** an ot function is called
-- **WHEN** LogSpan is created
-- **THEN** span name SHALL be `ot.{function_name}` (e.g., `ot.tools`, `ot.status`)
+- **WHEN** the operation is logged
+- **THEN** the log event or span SHALL identify the `ot.*` operation (e.g., `ot.tools`, `ot.status`)
 
 ---
 
@@ -809,13 +809,13 @@ When large output is stored, the returned summary SHALL include navigation hints
 
 ### Requirement: Result Query Logging
 
-The `ot.result()` function SHALL follow logging conventions.
+The `ot.result()` function SHALL emit structured runtime logs.
 
-#### Scenario: Span naming
+#### Scenario: Result query logging
 - **GIVEN** `ot.result()` is called
-- **WHEN** LogSpan is created
-- **THEN** span name SHALL be `ot.result`
-- **AND** span SHALL include: `handle`, `offset`, `limit`, `search` (if provided), `tail` (if > 0), `context` (if > 0)
+- **WHEN** the operation is logged
+- **THEN** the log event SHALL identify the operation as `ot.result`
+- **AND** include: `handle`, `offset`, `limit`, `search` (if provided), `tail` (if > 0), `context` (if > 0)
 
 ---
 
@@ -945,6 +945,6 @@ The `ot.debug()` function SHALL provide comprehensive debug information about th
 
 #### Scenario: Logging
 - **GIVEN** `ot.debug()` is called
-- **WHEN** LogSpan is created
-- **THEN** span name SHALL be `ot.debug`
-- **AND** span SHALL include `version` attribute from result
+- **WHEN** the operation is logged
+- **THEN** the log event SHALL identify the operation as `ot.debug`
+- **AND** include the `version` attribute from result

@@ -207,8 +207,8 @@ The `tavily.research()` function SHALL perform comprehensive multi-source resear
 
 ## Logging
 
-HTTP requests SHALL be logged with `LogSpan(span="tavily.request", ...)`.
-Search operations SHALL be logged with `LogSpan(span="tavily.search", query, depth, resultCount, credits)`.
-Batch search/extract operations SHALL be logged with `LogSpan(span="tavily.batch", ...)`.
-URL extractions SHALL be logged with `LogSpan(span="tavily.extract", ...)`.
-Research tasks SHALL be logged with `LogSpan(span="tavily.research", model, elapsed)`.
+HTTP requests SHALL be logged as structured runtime events.
+Search operations SHALL log query, depth, result count, and credits where available.
+Batch search and extract operations SHALL log batch size and result counts where available.
+URL extractions SHALL log the target URL count and extraction result count.
+Research tasks SHALL log model and elapsed time where available.

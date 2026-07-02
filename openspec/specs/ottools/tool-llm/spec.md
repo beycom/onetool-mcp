@@ -152,7 +152,7 @@ The transform() function SHALL compose with other tools.
 
 ### Requirement: Transform Logging
 
-The tool SHALL log LLM operations using LogSpan.
+The tool SHALL emit structured runtime logs for LLM operations.
 
 #### Scenario: Transform logging
 - **GIVEN** a transform is requested
@@ -237,7 +237,7 @@ The transform_file() function SHALL transform file contents using an LLM.
 
 ### Requirement: File Transform Logging
 
-The transform_file() function SHALL log file operations using LogSpan.
+The `transform_file()` function SHALL emit structured runtime logs for file operations.
 
 #### Scenario: File transform logging
 - **GIVEN** a file transform is requested

@@ -187,12 +187,12 @@ The system SHALL prioritize local tools over proxied tools when names conflict.
 
 ### Requirement: Proxy Tool Observability
 
-The system SHALL log proxy operations with LogSpan.
+The system SHALL emit structured runtime log events for proxy operations.
 
 #### Scenario: Proxy initialization logging
 - **GIVEN** servers configured
 - **WHEN** the server starts
-- **THEN** it SHALL log `proxy.init` span with:
+- **THEN** it SHALL log a `proxy.init` event with:
   - `serverCount`: Number of enabled servers to connect
   - `connected`: Number of successfully connected servers
   - `failed`: Number of servers that failed to connect
@@ -201,26 +201,26 @@ The system SHALL log proxy operations with LogSpan.
 #### Scenario: Connection logging
 - **GIVEN** an MCP server connection
 - **WHEN** connection is established
-- **THEN** it SHALL log `proxy.connect` span with:
+- **THEN** it SHALL log a `proxy.connect` event with:
   - `server`: Server name
   - `type`: http or stdio
   - `toolCount`: Number of tools discovered
-  - `status`: SUCCESS or FAILED (auto-added by LogSpan)
+  - `status`: SUCCESS or FAILED
 
 #### Scenario: Tool call logging
 - **GIVEN** a proxied tool is called
 - **WHEN** the call completes
-- **THEN** it SHALL log `proxy.tool.call` span with:
+- **THEN** it SHALL log a `proxy.tool.call` event with:
   - `server`: Server name
   - `tool`: Tool name
   - `resultLength`: Length of result string
-  - `duration`: Call duration (auto-added by LogSpan)
-  - `status`: SUCCESS or FAILED (auto-added by LogSpan)
+  - `duration`: Call duration
+  - `status`: SUCCESS or FAILED
 
 #### Scenario: Error logging
 - **GIVEN** a proxied tool call fails
 - **WHEN** the error occurs
-- **THEN** LogSpan SHALL automatically log with:
+- **THEN** the runtime log event SHALL include:
   - `status`: FAILED
   - `errorType`: Exception type
   - `errorMessage`: Error message

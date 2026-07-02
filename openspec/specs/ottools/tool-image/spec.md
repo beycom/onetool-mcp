@@ -14,6 +14,14 @@ Defines the `ot_image` pack providing image loading, querying, and lifecycle man
 - HEIC, HEIF, and AVIF require `pillow-heif` to be installed; if it is missing, `load()` SHALL surface a clear `ImportError` message directing the user to `pip install pillow-heif`.
 - SVG is supported via rasterisation with `cairosvg`; if it is missing, `load()` SHALL surface a clear `ImportError` message directing the user to `pip install cairosvg`.
 
+#### Scenario: Supported raster format loads
+- **WHEN** `image.load(img="photo.png")` is called for a supported raster image
+- **THEN** the image SHALL be accepted and stored
+
+#### Scenario: Missing optional decoder
+- **WHEN** `image.load(...)` is called for a HEIC, HEIF, AVIF, or SVG source and the required optional decoder is missing
+- **THEN** the error SHALL name the missing install requirement
+
 ---
 
 ### Requirement: Load a single image into session storage
