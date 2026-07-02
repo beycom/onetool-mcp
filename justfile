@@ -21,6 +21,10 @@ default:
 install:
     uv sync --group dev --all-extras
 
+# Reproducible install from the locked resolution (fails if uv.lock is stale)
+install-locked:
+    uv sync --locked --group dev --all-extras
+
 # Run all quality checks (lint, typecheck, test)
 check: lint typecheck test
 
@@ -96,6 +100,10 @@ typecheck:
 # Check for unused dependencies
 deps-check:
     uvx deptry . 2>&1 | grep -v "^Assuming"
+
+# Audit installed dependencies for known vulnerabilities (requires: pip-audit)
+audit:
+    uv run --with pip-audit pip-audit --skip-editable
 
 # Scan for secrets with gitleaks
 secrets-check:
