@@ -105,6 +105,19 @@ including errors, SHALL be signed.
 - **THEN** it SHALL be accepted only for `/api/console/outbox` and `/api/console/outbox/ack`
 - **AND** it SHALL NOT authorize `/run`
 
+#### Scenario: Console endpoints available when Direct API enabled
+
+- **GIVEN** `direct.host.enabled: true`
+- **WHEN** the MCP-owned Direct API starts successfully
+- **THEN** signed Console outbox poll and ack endpoints SHALL be available on the bound Direct API listener
+- **AND** signed `/health`, `/ready`, and `/run` behavior SHALL remain available
+
+#### Scenario: Console endpoints unavailable when Direct API disabled
+
+- **GIVEN** `direct.host.enabled: false`
+- **WHEN** MCP startup runs
+- **THEN** Console outbox endpoints SHALL NOT be reachable because no Direct API listener is started
+
 ### Requirement: health, readiness, and run contracts
 
 `GET /health` SHALL return authenticated protocol and identity information.

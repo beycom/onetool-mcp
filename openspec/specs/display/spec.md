@@ -1,3 +1,5 @@
+# display Specification
+
 ## Purpose
 
 Provide an MCP-local display producer for rich artifacts and publish those artifacts to the separate OneTool Console App through the signed Console outbox protocol.
@@ -36,6 +38,19 @@ The system SHALL expose `display.show(...)` to create one typed user-visible dis
 - **THEN** the system SHALL append a `display.message.created` event to the current MCP instance Console outbox
 - **AND** the event SHALL use Console protocol payload modes `inline`, `file_ref`, or `file_diff_ref`
 
+#### Scenario: Show does not start Console
+- **WHEN** an agent calls `display.show(...)`
+- **THEN** the system creates the message and outbox event without starting the OneTool Console App or returning a browser URL
+
+#### Scenario: Show validates kind
+- **WHEN** an agent calls `display.show(...)` with an unsupported kind
+- **THEN** the system rejects the call through normal tool validation
+
+#### Scenario: Show uses key-value metadata
+- **WHEN** an agent calls `display.show(...)` with `metadata={"title": "Run", "task": "audit"}`
+- **THEN** the system stores those values as message metadata only
+- **AND** user-provided metadata SHALL NOT control rendering, routing, validation, payload selection, or display behavior
+
 #### Scenario: Removed display fields are rejected
 - **WHEN** an agent calls `display.show(...)` with removed top-level fields such as `title`, `summary`, `source`, `expand`, `language`, or `mime_type`
 - **THEN** the system rejects the call through the current tool signature or request validation path
@@ -71,6 +86,10 @@ The system SHALL enforce bounded retention for MCP-side display producer message
 - **THEN** the MCP process removes the oldest message IDs and cached records FIFO
 - **AND** removed messages are no longer available through MCP-side `display.list(...)`, `display.read(id=...)`, or retained Console outbox events
 - **AND** Console state is the browser-facing owner for messages already ingested from MCP events
+
+#### Scenario: Queue limit is configurable
+- **WHEN** configuration sets `display.max_queue_messages`
+- **THEN** the MCP-side producer queue SHALL enforce that positive limit capped by the implementation maximum of `5000`
 
 #### Scenario: Payload previews are bounded
 - **WHEN** a display payload is stored inline, generated from a file preview, or generated from a file diff

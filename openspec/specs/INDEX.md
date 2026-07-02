@@ -29,6 +29,7 @@ details belong under `openspec/changes/`, not in this index.
 | [onetool-cli](onetool-cli/spec.md) | `onetool` CLI runtime, init, and knowledge-base commands |
 | [direct-api](direct-api/spec.md) | Authenticated loopback Direct API |
 | [direct-run](direct-run/spec.md) | `onetool direct run` client behavior |
+| [console-outbox](console-outbox/spec.md) | Signed MCP-to-Console outbox protocol |
 
 ## MCP Server Runtime
 
@@ -54,10 +55,11 @@ details belong under `openspec/changes/`, not in this index.
 | [search-structured-extraction](search-structured-extraction/spec.md) | Structured extraction for search tools |
 | [search-batch-structured-contract](search-batch-structured-contract/spec.md) | Batch structured search contract |
 
-## Browser Utilities
+## Display And Browser Utilities
 
 | Spec | Purpose |
 |------|---------|
+| [display](display/spec.md) | MCP-local display producer and Console outbox publishing |
 | [tool-chrome-util](otdev/tool-chrome-util/spec.md) | Chrome DevTools annotation utilities |
 | [tool-play-util](otdev/tool-play-util/spec.md) | Playwright annotation utilities |
 
@@ -126,12 +128,12 @@ details belong under `openspec/changes/`, not in this index.
 | Category | Count |
 |----------|-------|
 | Non-Functional | 3 |
-| CLI And Direct APIs | 3 |
+| CLI And Direct APIs | 4 |
 | MCP Server Runtime | 19 |
-| Browser Utilities | 2 |
+| Display And Browser Utilities | 3 |
 | Knowledge, Context, And Memory | 6 |
 | Core Built-In Tool Packs | 6 |
 | Domain Tools `[util]` | 6 |
 | Domain Tools `[dev]` | 9 |
 | Bench | 8 |
-| **Total** | **62** |
+| **Total** | **64** |
