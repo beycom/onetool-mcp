@@ -192,7 +192,7 @@ class DundersConfig(BaseModel):
     """Magic variable (dunder) configuration."""
 
     allow: list[str] = Field(
-        default_factory=lambda: ["__format__", "__sanitize__", "__compact__", "__force_context__"],
+        default_factory=lambda: ["__format__", "__sanitize__", "__force_context__"],
         description="Allowed magic variables (e.g., '__format__')",
     )
 
@@ -204,7 +204,7 @@ class OutputSanitizationConfig(BaseModel):
     that may contain malicious payloads from external content.
 
     Three-layer defense:
-    1. Trigger sanitization: Replace __ot, __run, mcp__onetool patterns
+    1. Trigger sanitization: Replace __onetool, __ot, mcp__onetool patterns
     2. Tag sanitization: Remove <external-content-*> patterns
     3. GUID-tagged boundaries: Wrap content in unpredictable tags
     """
@@ -337,11 +337,6 @@ class OutputConfig(BaseModel):
     and a summary with a query handle is returned instead.
     """
 
-    compact: bool = Field(
-        default=False,
-        description="Apply ot_caveman compaction to all tool outputs by default. "
-        "Per-call __compact__ dunder overrides this setting.",
-    )
     max_inline_size: int = Field(
         default=5000,
         ge=0,

@@ -22,7 +22,6 @@ PACK_DOCS: tuple[PackDocs, ...] = (
     PackDocs("ot_forge", "OT Forge", "core", "ot_forge.md"),
     PackDocs("ot_image", "OT Image", "core", "ot_image.md"),
     PackDocs("ot_llm", "OT LLM", "core", "ot_llm.md"),
-    PackDocs("ot_caveman", "OT Caveman", "core", "ot_caveman.md"),
     PackDocs("ot_secrets", "OT Secrets", "core", "ot_secrets.md"),
     PackDocs("ot_servers", "OT Servers", "core", "ot_servers.md"),
     PackDocs("ot_timer", "OT Timer", "core", "ot_timer.md"),
@@ -49,4 +48,3 @@ PACK_DOCS: tuple[PackDocs, ...] = (
 DOC_PATH_BY_PACK = {item.pack: item.doc_path for item in PACK_DOCS if item.doc_path}
 EXTRA_BY_PACK = {item.pack: item.extra for item in PACK_DOCS}
 PACK_BY_DISPLAY_NAME = {item.display_name: item.pack for item in PACK_DOCS}
-

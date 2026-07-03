@@ -46,7 +46,6 @@ class OutputPolicy:
 
 
 OutputPolicyHook = Callable[[str], OutputPolicy | None]
-CompactionService = Callable[[str], str]
 LlmService = Callable[..., str]
 ReloadHook = Callable[[], None]
 
@@ -57,7 +56,6 @@ class ServiceRegistry:
 
     output_policy_hooks: list[OutputPolicyHook] = field(default_factory=list)
     result_store_backend: ResultStoreBackend | None = None
-    compaction_service: CompactionService | None = None
     llm_service: LlmService | None = None
     reload_hooks: list[ReloadHook] = field(default_factory=list)
 
@@ -78,16 +76,6 @@ class ServiceRegistry:
     def register_result_store(self, backend: ResultStoreBackend) -> None:
         """Register the active large-output result store backend."""
         self.result_store_backend = backend
-
-    def register_compaction(self, service: CompactionService) -> None:
-        """Register the active text compaction service."""
-        self.compaction_service = service
-
-    def compact(self, text: str) -> str:
-        """Compact text using the registered service."""
-        if self.compaction_service is None:
-            raise RuntimeError("No compaction service registered")
-        return self.compaction_service(text)
 
     def register_llm(self, service: LlmService) -> None:
         """Register the active LLM transform service."""
@@ -112,7 +100,6 @@ class ServiceRegistry:
         """Clear all registered runtime hooks."""
         self.output_policy_hooks.clear()
         self.result_store_backend = None
-        self.compaction_service = None
         self.llm_service = None
         self.reload_hooks.clear()
 

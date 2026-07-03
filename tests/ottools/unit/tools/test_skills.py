@@ -236,7 +236,7 @@ def test_bundled_skills_exist() -> None:
     skills_dir = get_global_templates_dir() / "skills"
     assert skills_dir.exists(), "skills/ directory must exist in global_templates"
 
-    expected = {"ot-cm", "ot-ref"}
+    expected = {"ot-ref"}
     found = {f.stem for f in skills_dir.glob("*.md")}
     assert expected.issubset(found), f"Missing bundled skills: {expected - found}"
 
@@ -268,8 +268,8 @@ def test_ot_ref_frontmatter_triggers_direct_run_requests() -> None:
     fm, body = _parse_frontmatter(content)
     description = fm["description"]
 
-    assert "__run" in description
+    assert "__onetool" in description
     assert "MCP run" in description
     assert "direct pack calls" in description
     assert "run-vs-local-script" in description
-    assert "OneTool `__run`/MCP run request" in body
+    assert "OneTool `__onetool`/MCP run request" in body

@@ -17,11 +17,10 @@ import pytest
 # ---------------------------------------------------------------------------
 
 
-def _make_config(max_inline_size: int = 5000, compact: bool = False) -> MagicMock:
+def _make_config(max_inline_size: int = 5000) -> MagicMock:
     """Build a minimal mock config for runner tests."""
     cfg = MagicMock()
     cfg.output.max_inline_size = max_inline_size
-    cfg.output.compact = compact
     cfg.security.sanitize.enabled = False
     return cfg
 
@@ -199,35 +198,6 @@ class TestForceContextDunder:
         assert parsed["next_commands"][0].startswith("ctx.toc(handle='")
         assert "ctx.ask(handle='" in parsed["next_commands"][1]
         assert "ctx.read(handle='" in parsed["next_commands"][2]
-
-    def test_force_context_and_compact_compacts_then_stores(self):
-        """4.5 — __compact__ = True + __force_context__ = True → compacted output stored."""
-        cfg = _make_config(max_inline_size=5000, compact=False)
-
-        _capture_write, ctx_write_calls = _make_capture_writer()
-
-        with (
-            patch("ot.executor.runner.get_config", return_value=cfg),
-            patch("ot.executor.runner.load_tool_registry"),
-            patch("ot.executor.runner.build_execution_namespace", return_value={}),
-            patch("ot.proxy.get_proxy_manager") as mock_pm,
-            patch("ot.executor.runner._apply_compact", return_value="compacted text"),
-            patch("ot.ctx.write.ctx_write", side_effect=_capture_write),
-        ):
-            mock_pm.return_value.servers = {}
-            from ot.executor.runner import execute_command
-
-            result = asyncio.run(
-                execute_command('__compact__ = True\n__force_context__ = True\n"verbose output"')
-            )
-
-        assert result.success, f"Command failed: {result.result}"
-        assert len(ctx_write_calls) == 1, "ctx_write should have been called once"
-        assert ctx_write_calls[0] == "compacted text", (
-            f"Expected compacted text to be stored, got: {ctx_write_calls[0]}"
-        )
-        parsed = json.loads(result.result)
-        assert "handle" in parsed
 
     def test_discovery_calls_keep_json_default(self):
         """Discovery calls keep compact JSON as default format."""

@@ -86,20 +86,6 @@ def _split_meta_wrapped_snippet(code: str) -> tuple[str, str] | None:
     return prefix, snippet_code
 
 
-def _apply_compact(text: str) -> str:
-    """Apply registered compaction to text. Returns original on any failure."""
-    try:
-        from ot.services import get_services
-
-        return get_services().compact(text)
-    except RuntimeError as e:
-        logger.warning("__compact__ failed: {} — returning original output", e)
-        return text
-    except Exception as e:
-        logger.warning("__compact__ failed: {} — returning original output", e)
-        return text
-
-
 # -----------------------------------------------------------------------------
 # Code Execution
 # -----------------------------------------------------------------------------
@@ -281,7 +267,7 @@ def wrap_code_for_exec(code: str, has_explicit_return: bool) -> tuple[str, int]:
     indented_code = "\n".join(indented_lines)
 
     # Add global declarations for magic variables so they can be read from outer namespace
-    global_decl = "    global __format__, __sanitize__, __compact__, __force_context__"
+    global_decl = "    global __format__, __sanitize__, __force_context__"
 
     # Use sentinel if no explicit return to distinguish from explicit None
     if has_explicit_return:
@@ -382,7 +368,7 @@ def execute_python_code(
     def _nested_run(command: str) -> Any:
         """Execute a nested OneTool command string from Python workflows."""
         if not isinstance(command, str) or not command.strip():
-            raise ValueError("__run(command) requires a non-empty command string")
+            raise ValueError("__onetool(command) requires a non-empty command string")
 
         prepared = prepare_command(command)
         if prepared.error:
@@ -394,7 +380,7 @@ def execute_python_code(
         nested_result = namespace.get("__result__", _NO_RETURN)
         return None if nested_result is _NO_RETURN else nested_result
 
-    namespace["__run"] = _nested_run
+    namespace["__onetool"] = _nested_run
 
     # Step 4: Prepare code for result capture (reuse AST if available)
     prepared_code, has_return = prepare_code_for_exec(code, tree=ast_tree)
@@ -415,10 +401,9 @@ def execute_python_code(
         if fmt not in ("json", "json_h", "yml", "yml_h", "raw"):
             fmt = default_format if default_format in ("json", "json_h", "yml", "yml_h", "raw") else "json"
 
-        # Read __sanitize__, __compact__, and __force_context__ from namespace, defaulting to config settings
+        # Read __sanitize__ and __force_context__ from namespace, defaulting to config settings
         config = get_config()
         should_sanitize: bool = namespace.get("__sanitize__", config.security.sanitize.enabled)
-        should_compact: bool = namespace.get("__compact__", config.output.compact)
         should_force_context: bool = namespace.get("__force_context__", False)
 
         # Determine output and raw_result
@@ -433,10 +418,6 @@ def execute_python_code(
                 output = f"{stdout_output}\n{serialize_result(result, fmt)}"
             else:
                 output = serialize_result(result, fmt)
-
-        # Apply compaction if requested (after serialize, before ctx-store threshold check)
-        if should_compact:
-            output = _apply_compact(output)
 
         return output, raw_result, should_sanitize, fmt, should_force_context
 
