@@ -2,7 +2,7 @@
 name = "onetool-mcp"
 version = "2.2.2"
 description = "🧿 One MCP for developers - No tool tax, no context rot. 100+ tools including Brave, Google, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more."
-mcpName = "io.github.beycom/onetool"
+mcpName = "io.github.beycom/onetool-mcp"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "GPL-3.0" }
@@ -45,10 +45,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/beycom/onetool"
-Repository = "https://github.com/beycom/onetool"
+Homepage = "https://github.com/beycom/onetool-mcp"
+Repository = "https://github.com/beycom/onetool-mcp"
 Documentation = "https://onetool.beycom.online"
-Issues = "https://github.com/beycom/onetool/issues"
+Issues = "https://github.com/beycom/onetool-mcp/issues"
 
 [project.optional-dependencies]
 util = [

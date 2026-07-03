@@ -179,7 +179,7 @@ def main():
         print("Verify at:")
         print("  - https://pypi.org/project/onetool-mcp/")
         print("  - https://registry.modelcontextprotocol.io")
-        print("  - https://github.com/beycom/onetool/releases")
+        print("  - https://github.com/beycom/onetool-mcp/releases")
         print("  - https://onetool.beycom.online")
     print("=" * 60)
 

@@ -80,5 +80,5 @@ just release::docs      # mkdocs gh-deploy
 After release, verify at:
 - PyPI: https://pypi.org/project/onetool-mcp/
 - MCP Registry: https://registry.modelcontextprotocol.io
-- GitHub: https://github.com/beycom/onetool/releases
+- GitHub: https://github.com/beycom/onetool-mcp/releases
 - Docs: https://onetool.beycom.online
