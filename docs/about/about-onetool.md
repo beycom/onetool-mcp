@@ -94,7 +94,7 @@ And yes — like any engineer — I couldn't help engineering a few party tricks
 
 #### No more guessing
 
-Write Python like: `__run brave.search(query="latest react docs 2025")`
+Write Python like: `__onetool brave.search(query="latest react docs 2025")`
 
 You can see exactly what runs. No tool-selection guessing. No non-deterministic behaviour. No more guessing what the agent actually searched for.
 

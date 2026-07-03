@@ -305,16 +305,16 @@ Values in `secrets.yaml` can be encrypted using [age](https://age-encryption.org
 
 ```python
 # 1. Generate an age X25519 identity and store it in the OS keychain
-__run ot_secrets.init(label="my-machine")
+__onetool ot_secrets.init(label="my-machine")
 
 # 2. Encrypt all plain values in your secrets file
-__run ot_secrets.encrypt(file="~/.onetool/secrets.yaml")
+__onetool ot_secrets.encrypt(file="~/.onetool/secrets.yaml")
 ```
 
 After encryption, `secrets.yaml` looks like:
 
 ```yaml
-# Encrypt values with: __run ot_secrets.encrypt(file=<this file>)
+# Encrypt values with: __onetool ot_secrets.encrypt(file=<this file>)
 BRAVE_API_KEY: "age1enc:YWdlLWVuY3J5cHRpb24ub3JnL3Yx..."
 OPENAI_API_KEY: "age1enc:YWdlLWVuY3J5cHRpb24ub3JnL3Yy..."
 ```
@@ -332,13 +332,13 @@ The file is safe to inspect — values cannot be recovered without the private k
 
 ```python
 # Check identity status and count encrypted/plain values
-__run ot_secrets.status(file="~/.onetool/secrets.yaml")
+__onetool ot_secrets.status(file="~/.onetool/secrets.yaml")
 
 # Scan for any unencrypted values (safe to run before committing)
-__run ot_secrets.audit(file="~/.onetool/secrets.yaml")
+__onetool ot_secrets.audit(file="~/.onetool/secrets.yaml")
 
 # Rotate to a new key (re-encrypts all values)
-__run ot_secrets.rotate(file="~/.onetool/secrets.yaml")
+__onetool ot_secrets.rotate(file="~/.onetool/secrets.yaml")
 ```
 
 **Headless / CI environments:** This is a local-dev security feature. CI/CD should continue using environment variables (existing behavior). Plain `secrets.yaml` files are completely unaffected — encryption only triggers when `age1enc:` values are present.
@@ -583,7 +583,7 @@ ot.security(check="pickle.load") # Check qualified call
 
 The `security.sanitize` subsection protects against indirect prompt injection by sanitizing tool outputs:
 
-1. **Trigger sanitization:** Replace `__run`, `__r`, `__ot`, and `mcp__onetool` patterns
+1. **Trigger sanitization:** Replace `__onetool`, `__ot`, and `mcp__onetool` patterns
 2. **Tag sanitization:** Remove `<external-content-*>` patterns
 3. **GUID-tagged boundaries:** Wrap content in unpredictable tags
 

@@ -4,7 +4,7 @@ OneTool gives you explicit control over tool invocation. You write code, invoke 
 
 ## Invocation Modes
 
-OneTool has three modes, selected by the shape after `__run`, `__r`, or `__ot`.
+OneTool has three modes, selected by the shape after `__onetool` or `__ot`.
 
 | Shape | Mode | Meaning |
 |-------|------|---------|
@@ -17,9 +17,9 @@ OneTool has three modes, selected by the shape after `__run`, `__r`, or `__ot`.
 Jinja2 templates are invoked with `:name`. Values are plain strings; Python syntax does not apply.
 
 ```
-__run :g q=latest AI tools
-__run :pkg_npm packages=react lodash
-__run :g q="AI news"
+__onetool :g q=latest AI tools
+__onetool :pkg_npm packages=react lodash
+__onetool :g q="AI news"
 ```
 
 - Quotes are optional and stripped (`q=abc` is equivalent to `q="abc"`)
@@ -31,9 +31,9 @@ __run :g q="AI news"
 Python executes directly against the tool namespace.
 
 ```
-__run brave.search(q="AI news")
-__run `ground.search(q='price of gold')`
-__run x = foo(text="hello"); x
+__onetool brave.search(q="AI news")
+__onetool `ground.search(q='price of gold')`
+__onetool x = foo(text="hello"); x
 ```
 
 - Python syntax applies: strings must be quoted
@@ -46,8 +46,8 @@ __run x = foo(text="hello"); x
 You can ask the agent to use OneTool without writing the final Python yourself:
 
 ```
-__run ground.search for the price of gold
-Use __run ground.search to find the price of gold.
+__onetool ground.search for the price of gold
+Use __onetool ground.search to find the price of gold.
 ```
 
 The agent should synthesize the command, using `ot.tool_info(name="pack.tool")` or `ot.help(query="pack.tool")` first if it does not know the tool arguments. If a syntactically valid close call fails, the agent can repair it from the error and retry once.
@@ -56,25 +56,24 @@ The agent should synthesize the command, using `ot.tool_info(name="pack.tool")` 
 
 | Prefix | Role |
 |--------|------|
-| `__run` | Canonical explicit invocation |
-| `__r` | Concise alias |
-| `__ot` | OneTool alias |
+| `__onetool` | Canonical explicit invocation |
+| `__ot` | Short alias |
 
-Removed forms such as `>>>`, `mcp__onetool__run`, `__onetool`, and `__ot__run` are not runtime prefixes.
+Removed forms such as `>>>`, `__run`, `__r`, `mcp__onetool__run`, and `__ot__run` are not runtime prefixes.
 
 ## Invocation Styles
 
 Direct call after the prefix:
 
 ```
-__run foo(text="hello")
-__run multiply(a=8472, b=9384)
+__onetool foo(text="hello")
+__onetool multiply(a=8472, b=9384)
 ```
 
 Multi-line code in a fenced block:
 
 ````
-__run
+__onetool
 ```python
 metals = ["Gold", "Silver"]
 results = {}
@@ -87,11 +86,11 @@ results
 ## Complete Examples
 
 ```
-__run foo(text="hello world")
+__onetool foo(text="hello world")
 ```
 
 ````
-__run
+__onetool
 ```python
 msg = "Hello World"
 foo(text=msg)
@@ -99,7 +98,7 @@ foo(text=msg)
 ````
 
 ````
-__run
+__onetool
 ```python
 primes = [is_prime(n=i) for i in range(11, 21)]
 primes

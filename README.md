@@ -35,7 +35,7 @@ And then there's **context rot** - your AI literally gets dumber as you add more
 OneTool is **one MCP server** that exposes tools as a Python API. Instead of reading tool definitions, your agent writes code:
 
 ```python
-__run brave.search(query="react docs 2026")
+__onetool brave.search(query="react docs 2026")
 ```
 
 Configure one MCP server. Use unlimited tools.
@@ -115,14 +115,13 @@ onetool direct run --port 8765 "brave.search(query='latest AI news')" --format r
 | ------------------------ | ------------------------------------------------------------- |
 | **96% Token Savings**    | ~2K tokens no matter how many tools you add                   |
 | **100+ Built-in Tools**  | Web search, databases, file ops, diagrams, conversions        |
-| **Explicit Execution**   | See exactly what runs — `__run brave.search(q="AI")`           |
+| **Explicit Execution**   | See exactly what runs — `__onetool brave.search(q="AI")`           |
 | **Live Whiteboard**      | Draw diagrams with a Mermaid-compatible DSL via Excalidraw    |
 | **MCP Server Proxy**     | Wrap existing MCP servers without the tool tax                |
 | **Encrypted Secrets**    | age-encrypted `secrets.yaml` backed by your OS keychain       |
 | **Forge Tools**          | Build new tools as part of the conversation                   |
 | **Image Vision**         | Routes to a cheaper, better vision model via `ot_image` (`img`). Zero host tokens. Supports local files, URLs, clipboard; PNG, JPEG, GIF, WebP, TIFF, HEIC, AVIF, SVG. |
 | **Smart Context**        | `ot_context` (`ctx`) — SQLite+FTS5 store. Search and navigate large outputs without filling the context window. |
-| **Caveman Compact**      | `ot_caveman` (`cm`) — LLM-powered text compaction. 55–65% on tech prose, 25–31% on search results, 45–55% on conversational prose. `__compact__ = True` applies it to any tool call. Code blocks, URLs, and security warnings are never modified. |
 | **Smart Tools**          | Delegate to cheaper LLMs (10× savings)                        |
 | **Security Layers**      | AST validation, path boundaries, output sanitisation          |
 
@@ -147,7 +146,6 @@ onetool direct run --port 8765 "brave.search(query='latest AI news')" --format r
 | `mem`         | `write`, `read`, `search`, `grep`, `ask`, `inspect`, `query` | `[util]` | Persistent memory              |
 | `ot_forge`    | `create_ext`, `validate_ext`, `install_skills` |          | Scaffold new tool packs        |
 | `ot_context` (`ctx`) | `write`, `read`, `search`, `grep`, `slice`, `toc`                 |          | Smart context store (SQLite+FTS5)   |
-| `ot_caveman` (`cm`)  | `compact`, `expand`, `input`                                      |          | LLM-powered text compaction and expansion |
 | `ot_image` (`img`)   | `load`, `load_batch`, `ask`, `summary`, `list`, `delete`, `purge` | `[util]` | Image vision via dedicated model    |
 | `ot_llm`      | `transform`, `transform_file`                  |          | LLM-powered transforms         |
 | `ot_secrets`  | `init`, `encrypt`, `audit`, `rotate`           |          | Secrets encryption             |
@@ -184,7 +182,7 @@ servers:
 ```
 
 ```python
-__run private_api.read_resource(path="README.md")
+__onetool private_api.read_resource(path="README.md")
 ```
 
 [📖 Configuration guide](https://onetool.beycom.online/learn/configuration/#external-mcp-servers)
@@ -207,7 +205,7 @@ def summary(*, title: str) -> str:
 ```
 
 ```python
-__run wiki.summary(title="Python_(programming_language)")
+__onetool wiki.summary(title="Python_(programming_language)")
 ```
 
 [📖 Creating tools guide](https://onetool.beycom.online/learn/extension-tools/)

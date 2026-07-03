@@ -84,10 +84,11 @@ tools:
 - If `tools.localhist` is omitted, localhist stores its Git database in `.localhist/` and snapshots the effective project cwd.
 - Absolute `git_dir` values must include `{project_id}` so global storage paths remain project-specific.
 - Localhist uses the project `.gitignore` through Git's native ignore handling.
-- `localhist.init()` ensures the primary `.gitignore` ignores `.localhist/`, ensures `.localhist/info/exclude` includes `.git/`, `.onetool/state/localhist/`, and the configured local-history Git directory, and creates `.onetool/state/localhist/force-include`.
+- `localhist.init()` writes `<git_dir>/.gitignore` with `*` and `!.gitignore`; it does not edit the project root `.gitignore`.
+- `localhist.init()` ensures `.localhist/info/exclude` includes `.git/`, `.onetool/state/localhist/`, and the configured local-history Git directory, and creates `.onetool/state/localhist/force-include`.
 - Snapshot staging ensures localhist-owned excludes exist, runs `git add -A -- .`, then force-adds pathspecs from `.onetool/state/localhist/force-include`.
 - `save(paths=...)` stages only the selected project-relative Git pathspec or pathspecs, without shell expansion. Scoped saves reject empty paths, absolute paths, parent traversal, protected localhist storage paths, and Git pathspec magic.
-- Scoped saves still apply configured force-includes that match the requested scope.
+- Scoped saves still apply configured force-includes that match the requested scope, including directory globs such as `wip/**` for `paths="wip/requirements"`.
 - Force-includes must be literal project-relative paths and cannot target `.git/`, `.onetool/state/localhist/`, or the configured local-history Git directory.
 - `status()` reports working-tree file status. Use `info()` for initialization metadata, paths, config, head, branch, and ignore-file locations.
 - `diff()` and `show()` cap returned content at 1 MB and include `truncated`, `max_bytes`, and `bytes_returned` metadata.

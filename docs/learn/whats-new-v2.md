@@ -11,11 +11,11 @@ These packs are entirely new in v2.
 Turns Excalidraw into a tool-driven canvas. Agents can generate architecture diagrams, flowcharts, and sketches using a Mermaid-compatible DSL, then screenshot or save the result — all without manual drawing. Useful for visual planning, documentation, and sharing ideas that are easier to show than describe.
 
 ```text
-__run whiteboard.open()
-__run whiteboard.draw(input="A --> B --> C")
-__run whiteboard.screenshot()
-__run whiteboard.save(path="arch.json")
-__run whiteboard.close()
+__onetool whiteboard.open()
+__onetool whiteboard.draw(input="A --> B --> C")
+__onetool whiteboard.screenshot()
+__onetool whiteboard.save(path="arch.json")
+__onetool whiteboard.close()
 ```
 
 Also provides `load`, `clear`, `erase`, `note`, `scroll`, `zoom`, `fit`, `layout`, `align`, `read_scene`, and `hard_reset`. Short alias: `wb`.
@@ -25,12 +25,12 @@ Also provides `load`, `clear`, `erase`, `note`, `scroll`, `zoom`, `fit`, `layout
 Tavily is an AI-native search API optimised for LLM pipelines. Results come back clean — titles, URLs, content snippets, and an AI-synthesised answer — all in one call. `output_format` controls the response structure (`"full"`, `"text_only"`, `"sources_only"`), matching the convention used by the `ground` pack. `search_batch()` runs multiple queries in parallel with section labels. `extract_batch()` fetches multiple URL sets concurrently. `research()` submits a deep research task and polls until complete.
 
 ```text
-__run tavily.search(query="LLM context window research", output_format="text_only")
-__run tavily.search(query="AI news", topic="news", time_range="week", min_score=0.7)
-__run tavily.search_batch(queries=["React 19 features", "Vue 4 roadmap"])
-__run tavily.extract(urls=["https://docs.python.org/3/"])
-__run tavily.extract_batch(url_sets=[(["https://docs.a.com"], "A"), (["https://docs.b.com"], "B")])
-__run tavily.research(input="How does Rust's ownership model work?", model="mini")
+__onetool tavily.search(query="LLM context window research", output_format="text_only")
+__onetool tavily.search(query="AI news", topic="news", time_range="week", min_score=0.7)
+__onetool tavily.search_batch(queries=["React 19 features", "Vue 4 roadmap"])
+__onetool tavily.extract(urls=["https://docs.python.org/3/"])
+__onetool tavily.extract_batch(url_sets=[(["https://docs.a.com"], "A"), (["https://docs.b.com"], "B")])
+__onetool tavily.research(input="How does Rust's ownership model work?", model="mini")
 ```
 
 Requires a `TAVILY_API_KEY` in `secrets.yaml`. Supports topic filters (`general`, `news`, `finance`), domain allow/block lists, time range filtering, relevance score threshold (`min_score`), and configurable result depth.
@@ -40,10 +40,10 @@ Requires a `TAVILY_API_KEY` in `secrets.yaml`. Supports topic filters (`general`
 Two packs that bring visual annotation to browser automation. Inject overlays onto any page, highlight elements with labels and colours, and display step-by-step guidance panels — one driven by Chrome DevTools Protocol, the other by Playwright. The benefit is the same: agents can visually mark up a page to show users exactly what they're looking at or guide them through a multi-step UI workflow.
 
 ```text
-__run chrome_util.inject_annotations()
-__run chrome_util.highlight_element(selector="h1", label="Title")
-__run chrome_util.guide_user(instructions="Click the login button")
-__run chrome_util.scan_annotations()
+__onetool chrome_util.inject_annotations()
+__onetool chrome_util.highlight_element(selector="h1", label="Title")
+__onetool chrome_util.guide_user(task="Login", steps=[{"selector": "button.login", "label": "Click login"}])
+__onetool chrome_util.scan_annotations()
 ```
 
 ### skills — Bundled skill guides
@@ -51,8 +51,8 @@ __run chrome_util.scan_annotations()
 v1 supported user-defined skill files but they were fragile and hard to maintain. v2 replaces them with curated, bundled skill guides. These are structured Markdown documents that give your LLM focused context on demand.
 
 ```text
-__run skills.skills()                     # list all skills
-__run skills.skills(name="ot-ref")       # get full skill content
+__onetool skills.skills()                     # list all skills
+__onetool skills.skills(name="ot-ref")       # get full skill content
 ```
 
 ### ot_secrets — Secret encryption
@@ -60,11 +60,11 @@ __run skills.skills(name="ot-ref")       # get full skill content
 In v1, API keys sat in plain text in `secrets.yaml`. If that file was accidentally committed or shared, every key was exposed. v2 adds transparent age encryption backed by your OS keychain. You generate an identity once, encrypt your secrets file in-place, and from that point on OneTool decrypts values automatically at load time. You can audit which values are still plain, rotate keys, and check keychain status — all without leaving the tool.
 
 ```text
-__run ot_secrets.init()                          # generate key, store in keychain
-__run ot_secrets.encrypt(file="secrets.yaml")    # encrypt plain values in-place
-__run ot_secrets.audit(file="secrets.yaml")      # check which values are encrypted
-__run ot_secrets.rotate(file="secrets.yaml")     # rotate to a new key
-__run ot_secrets.status()                        # keychain status
+__onetool ot_secrets.init()                          # generate key, store in keychain
+__onetool ot_secrets.encrypt(file="secrets.yaml")    # encrypt plain values in-place
+__onetool ot_secrets.audit(file="secrets.yaml")      # check which values are encrypted
+__onetool ot_secrets.rotate(file="secrets.yaml")     # rotate to a new key
+__onetool ot_secrets.status()                        # keychain status
 ```
 
 ### ot_forge — Extension scaffolding
@@ -72,8 +72,8 @@ __run ot_secrets.status()                        # keychain status
 Generates the boilerplate for new tool packs — file structure, type hints, keyword-only args, docstrings — so you can focus on the logic. Also validates extensions before reload, catching issues early.
 
 ```text
-__run ot_forge.create_ext(name="my_pack", pack_name="mypack", function="hello")
-__run ot_forge.validate_ext(path="src/mypack.py")
+__onetool ot_forge.create_ext(name="my_pack", pack_name="mypack", function="hello")
+__onetool ot_forge.validate_ext(path="src/mypack.py")
 ```
 
 ### ot_timer — Named timers
@@ -81,9 +81,9 @@ __run ot_forge.validate_ext(path="src/mypack.py")
 Simple named timers that persist across tool calls. Start a timer before a long operation, check elapsed time after, and compare results. Useful for profiling builds, API calls, or any workflow where you want to measure duration without leaving the conversation.
 
 ```text
-__run ot_timer.start(name="build")
-__run ot_timer.elapsed(name="build")
-__run ot_timer.list()
+__onetool ot_timer.start(name="build")
+__onetool ot_timer.elapsed(name="build")
+__onetool ot_timer.list()
 ```
 
 ### knowledge — RAG knowledge base `[util]`
@@ -91,10 +91,10 @@ __run ot_timer.list()
 Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis. Index documentation from scraped sites or write personal annotations, then search with keyword, semantic, or combined (hybrid) modes. `knowledge.ask()` retrieves relevant chunks and synthesises a concise answer with source citations. Link-graph traversal via `knowledge.related()` follows markdown hyperlinks between topics.
 
 ```text
-__run knowledge.search(q='context managers', db='docs')
-__run knowledge.ask(q='How do I configure authentication?', db='docs')
-__run knowledge.write(topic='python/tips/loops', content='Use enumerate()', db='docs', category='rule')
-__run knowledge.dbs()
+__onetool knowledge.search(q='context managers', db='docs')
+__onetool knowledge.ask(q='How do I configure authentication?', db='docs')
+__onetool knowledge.write(topic='python/tips/loops', content='Use enumerate()', db='docs', category='rule')
+__onetool knowledge.dbs()
 ```
 
 Also provides `read`, `update`, `append`, `delete`, `grep`, `related`, `list`, `toc`, `slice`, `stats`, `info`. Short alias: `kb`.
@@ -104,9 +104,9 @@ Also provides `read`, `update`, `append`, `delete`, `grep`, `related`, `list`, `
 Persistent SQLite + FTS5 store for large tool outputs. TTL-expiring, BM25-indexed. Write, search, grep, and navigate results across tool calls without burning your context window.
 
 ```text
-__run h = ctx.write(content="...", source="research"); ctx.grep(handle=h["handle"], pattern="async error handling")
-__run ctx.grep(handle="abc123", pattern="def.*handler")
-__run ctx.read(handle="abc123", offset=50)
+__onetool h = ctx.write(content="...", source="research"); ctx.grep(handle=h["handle"], pattern="async error handling")
+__onetool ctx.grep(handle="abc123", pattern="def.*handler")
+__onetool ctx.read(handle="abc123", offset=50)
 ```
 
 Short alias: `ctx`.
@@ -126,9 +126,9 @@ Benchmark (4-column product price grid, 20 cells):
 | Speed                 | 41s       | 34s               |
 
 ```text
-__run img.load(img="diagram.png")
-__run img.ask(img="#diag_01", q="What services are in this architecture?")
-__run img.summary(img="#diag_01")
+__onetool img.load(img="diagram.png")
+__onetool img.ask(img="#diag_01", q="What services are in this architecture?")
+__onetool img.summary(img="#diag_01")
 ```
 
 Supports PNG, JPG, SVG, HEIC, AVIF, TIFF. Short alias: `img`.
@@ -182,11 +182,11 @@ Adds `get_playground_url(source)` which generates a shareable Kroki playground l
 Runs ELK.js in the browser to automatically position all nodes, then calls `fit()`. Works on the full canvas or a selection.
 
 ```text
-__run wb.layout()                                    # layered, top-to-bottom
-__run wb.layout(direction="RIGHT", gap_layer=120)    # left-to-right pipeline
-__run wb.layout(algorithm="stress")                  # spring-based, undirected
-__run wb.layout(algorithm="mrtree", direction="DOWN")
-__run wb.layout(direction="RIGHT", arrow_type="elbow")
+__onetool wb.layout()                                    # layered, top-to-bottom
+__onetool wb.layout(direction="RIGHT", gap_layer=120)    # left-to-right pipeline
+__onetool wb.layout(algorithm="stress")                  # spring-based, undirected
+__onetool wb.layout(algorithm="mrtree", direction="DOWN")
+__onetool wb.layout(direction="RIGHT", arrow_type="elbow")
 ```
 
 | Parameter        | Default            | Options                                                                  |
@@ -348,11 +348,10 @@ The config directory changed from `~/.onetool/config/` to `~/.onetool/` (flat la
 
 ### Trigger prefix change
 
-`__run` is the canonical explicit invocation prefix. `__r` and `__ot` are also supported aliases:
+`__onetool` is the canonical explicit invocation prefix. `__ot` is also supported as a short alias:
 
 ```text
-__run brave.search(query="test")
-__r brave.search(query="test")
+__onetool brave.search(query="test")
 __ot brave.search(query="test")
 ```
 
@@ -380,4 +379,4 @@ The base `onetool-mcp` install is significantly lighter. Install `[all]` to get 
 2. Add `version: 2` to `onetool.yaml`
 3. Move config from `~/.onetool/config/` to `~/.onetool/` (or re-run `onetool init`)
 4. Update MCP client config to pass `--config` and `--secrets` flags
-5. Replace `__ot` with `__run` in any saved prompts or documentation
+5. Replace `__ot` with `__onetool` in any saved prompts or documentation

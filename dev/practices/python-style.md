@@ -49,7 +49,7 @@ See [Justfile & Dev Commands](justfile.md) for how to run these.
 
 - `__init__.py` required in all `src/` packages
 - `__init__.py` required in all `tests/` subdirs (empty, avoids name collisions)
-- First-party packages: `ot`, `ottools`, `onetool`
+- First-party packages: `ot`, `ottools`, `onetool`, `otdev`, `otutil`, `otpack`
 
 ## CLI Code
 

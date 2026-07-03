@@ -17,7 +17,7 @@ ot_servers.enable(name="chrome_devtools")
 ```
 
 Test out the following packs:
-Packs: arch, brave, chrome_util, context7, convert, db, diagram, excel, file, ground, knowledge, mem, ot, ot_caveman, ot_context, ot_forge, ot_image, ot_llm, ot_secrets, ot_servers, ot_timer, package, play_util, ripgrep, tavily, webfetch, whiteboard
+Packs: arch, brave, chrome_util, context7, convert, db, diagram, excel, file, ground, knowledge, mem, ot, ot_context, ot_forge, ot_image, ot_llm, ot_secrets, ot_servers, ot_timer, package, play_util, ripgrep, tavily, webfetch, whiteboard
 
 Test out the following proxy servers separately:
 Proxy servers: chrome_devtools, github, playwright
@@ -30,7 +30,6 @@ When testing:
 - excel with files at tests/data/
 - mem: use `tmp/test/` topic prefix for all writes. Test write, read, list, search, toc, slice, snapshot/restore, stale/refresh, write_batch, read_batch, slice_batch, stats, dump/load, update, delete, decay, context, flush. Clean up with `mem.delete(topic="tmp/", confirm=True)` when done.
 - diagram: list_providers, get_template, generate_source, render_diagram, get_playground_url
-- ot_caveman: compact and expand short inline text; do not use protected content as the primary assertion.
 - ot_forge: create_ext, validate_ext, install_skills
 - ot_secrets: test status and audit; avoid rotate/encrypt/init on real secrets unless using a temporary file.
 - ot_servers: status/list a configured server; enable/restart/disable only for explicit proxy-server test cases.
@@ -122,12 +121,11 @@ Parameter Prefixes
 - Short prefixes work: ot.tools(p="brave", i="full") equivalent to ot.tools(pattern="brave", info="full")
 
 Trigger Prefixes (invocation styles)
-- __run - canonical trigger
-- __r - short alias
-- __ot - named alias
+- __onetool - canonical trigger
+- __ot - short alias
 
 Invocation Styles
-- Simple call: __run func(arg=val)
+- Simple call: __onetool func(arg=val)
 - Code fence: multi-line Python blocks
 
 Snippet Expansion

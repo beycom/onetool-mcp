@@ -34,9 +34,9 @@ ot.snippet_info(name="help")
 Prefix with `:name` and pass `key=value` params:
 
 ```
-__run :br q=react hooks
-__run :help q=web search
-__run :wf url=https://news.ycombinator.com
+__onetool :br q=react hooks
+__onetool :help q=web search
+__onetool :wf url=https://news.ycombinator.com
 ```
 
 - **Quotes are optional:** `q=react hooks` ≡ `q="react hooks"`
@@ -46,11 +46,11 @@ __run :wf url=https://news.ycombinator.com
 
 ### Snippets Inside Python Workflows
 
-Inside code mode, execute snippet commands with the nested `__run(...)` helper:
+Inside code mode, execute snippet commands with the nested `__onetool(...)` helper:
 
 ```python
-__run(":help q=web search")
-__run(":wf url=https://docs.python.org")
+__onetool(":help q=web search")
+__onetool(":wf url=https://docs.python.org")
 ```
 
 ## Standard Snippets
@@ -119,22 +119,22 @@ All snippets included in `config/snippets.yaml`:
 
 ```
 # Search multiple topics at once
-__run :br q=react hooks|vue composition api|svelte
+__onetool :br q=react hooks|vue composition api|svelte
 
 # Discover a tool signature
-__run :tool name=brave.search info=full
+__onetool :tool name=brave.search info=full
 
 # Fetch and summarize a page, focused on a specific area
-__run :wf_s url=https://news.ycombinator.com focus=pricing
+__onetool :wf_s url=https://news.ycombinator.com focus=pricing
 
 # Check latest npm package versions
-__run :pkg_npm packages=react,typescript,vite
+__onetool :pkg_npm packages=react,typescript,vite
 
 # Semantic search across memories
-__run :mem_s q=authentication patterns
+__onetool :mem_s q=authentication patterns
 
 # Enable a configured proxy server for this session
-__run :server_on name=playwright
+__onetool :server_on name=playwright
 ```
 
 ## Defining Your Own Snippets

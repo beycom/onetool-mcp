@@ -1,6 +1,6 @@
 # Chrome Util
 
-Visual element annotation for the Chrome DevTools MCP server — highlight elements, guide users through workflows, and read user selections.
+Visual element annotation for a Chrome DevTools MCP server - highlight elements, guide users through workflows, and read user selections.
 
 Short alias: `chrome`
 
@@ -31,10 +31,11 @@ Short alias: `chrome`
 | `element_id` | str | Optional ID for the annotation |
 | `task` | str | Description of the guided workflow |
 | `steps` | list[dict] | List of `{selector, label, color}` dicts for `guide_user` |
+| `server` | str | Chrome DevTools-compatible MCP server name. Defaults to `chrome_devtools`. |
 
 ## Requires
 
-- The `chrome_devtools` MCP server must be enabled in `servers.yaml` or via `ot_servers.enable(name="chrome_devtools")`
+- A Chrome DevTools-compatible MCP server must be enabled. By default this pack uses `chrome_devtools`; pass `server="..."` to target a compatible server configured under another name.
 
 ## Configuration
 
@@ -64,6 +65,9 @@ Or enable for the current session only: `ot_servers.enable(name="chrome_devtools
 # Inject annotations and highlight an element
 chrome_util.inject_annotations()
 chrome_util.highlight_element(selector="button.submit", label="Click here")
+
+# Target a compatible non-default server name
+chrome_util.inject_annotations(server="chrome_devtool_connect")
 
 # Guide a user through a multi-step form
 chrome_util.guide_user(

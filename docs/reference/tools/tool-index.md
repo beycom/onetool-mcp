@@ -217,13 +217,6 @@ ot.tools(pattern: str='', info: InfoLevel='default')  # List all available tools
 ot.version()  # Return OneTool version string.
 ```
 
-## ot_caveman, cm
-```python
-ot_caveman.compact(text: str | None=None, src: str | None=None, dest: str | None=None, overwrite: bool=False)  # Compact text or a file to terse caveman-speak.
-ot_caveman.expand(text: str | None=None, src: str | None=None, dest: str | None=None, overwrite: bool=False)  # Expand packed (compressed) text back to readable prose.
-ot_caveman.input(file: str='command.md', command: str | None=None, compact: bool=True)  # Read the next pending command from a command.md task file.
-```
-
 ## ot_context, ctx
 ```python
 ot_context.append(handle: str, content: str, store: HandleStore | None=None)  # Append content to an existing handle.

@@ -3,7 +3,7 @@
 OneTool is a single MCP server that exposes configured tool packs through one `run` endpoint. Instead of LLMs reading verbose tool schemas (~3K-30K tokens per server), agents write Python code:
 
 ```python
-__run brave.search(query="react docs")
+__onetool brave.search(query="react docs")
 ```
 
 This delivers ~96% token savings and eliminates context rot.
@@ -12,7 +12,7 @@ This delivers ~96% token savings and eliminates context rot.
 
 ```mermaid
 graph TD
-    C[Client - LLM] -->|"__run brave.search(...)"| M[MCP Protocol]
+    C[Client - LLM] -->|"__onetool brave.search(...)"| M[MCP Protocol]
     M -->|"single run tool"| S[server.py - FastMCP]
 
     S --> R[runner.py]

@@ -1,6 +1,6 @@
 # Play Util
 
-Visual element annotation for the Playwright MCP server — highlight elements, guide users through workflows, and read user selections.
+Visual element annotation for a Playwright MCP server - highlight elements, guide users through workflows, and read user selections.
 
 Short alias: `play`
 
@@ -32,10 +32,11 @@ Short alias: `play`
 | `element_id` | str | Optional ID for the annotation |
 | `task` | str | Description of the guided workflow |
 | `steps` | list[dict] | List of `{selector, label, color}` dicts for `guide_user` |
+| `server` | str | Playwright-compatible MCP server name. Defaults to `playwright`. |
 
 ## Requires
 
-- The `playwright` MCP server must be enabled in `servers.yaml` or via `ot_servers.enable(name="playwright")`
+- A Playwright-compatible MCP server must be enabled. By default this pack uses `playwright`; pass `server="..."` to target a compatible server configured under another name.
 
 ## Configuration
 
@@ -65,6 +66,9 @@ Or enable for the current session only: `ot_servers.enable(name="playwright")`
 # Inject annotations and highlight an element
 play_util.inject_annotations()
 play_util.highlight_element(selector="button.submit", label="Click here")
+
+# Target a compatible non-default server name
+play_util.inject_annotations(server="playwright_proxy")
 
 # Enable auto-inject for multi-page sessions
 play_util.enable_auto_inject()

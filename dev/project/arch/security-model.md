@@ -6,7 +6,7 @@ Four layers of defence protect against arbitrary code execution and prompt injec
 
 `fence_processor.py` normalises input before any execution:
 
-- Strips execution prefixes: `__run`, `__r`, and `__ot`
+- Strips execution prefixes: `__onetool` and `__ot`
 - Removes markdown code fences and backticks for code-mode commands
 - Ensures expanded snippet/code-mode Python reaches the validator
 
@@ -37,7 +37,7 @@ The `exec()` call receives a carefully constructed namespace containing only:
 
 - Tool pack proxies (`brave`, `file`, `db`, ...)
 - Allowlisted builtins
-- Magic variables (`__format__`, `__sanitize__`)
+- Magic variables (`__format__`, `__sanitize__`, `__force_context__`)
 
 Excluded: `__import__`, `exec`, `eval`, direct filesystem access, network access, subprocess.
 
@@ -45,7 +45,7 @@ Excluded: `__import__`, `exec`, `eval`, direct filesystem access, network access
 
 `sanitize.py` protects against prompt injection in tool results:
 
-- **Trigger sanitisation**: Replaces OneTool trigger-like output (`__run`, `__r`, `__ot`, `mcp__onetool*`) with `[REDACTED:trigger]`
+- **Trigger sanitisation**: Replaces OneTool trigger-like output (`__onetool`, `__ot`, `mcp__onetool*`) with `[REDACTED:trigger]`
 - **Tag sanitisation**: Removes boundary tag patterns
 - **GUID wrapping**: External content wrapped in unpredictable UUID-tagged boundaries
 

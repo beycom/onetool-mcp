@@ -5,7 +5,8 @@ Use `just` (not `make`) for all project commands. Run `just` with no args to see
 ## Quick Start
 
 ```bash
-just install        # install all dependencies (uv sync --group dev)
+just install        # install all dependencies for day-to-day development
+just install-locked # install from the lockfile for release/repro checks
 just check          # run lint + typecheck + test (use before every commit)
 just dev            # run MCP server in dev mode
 ```
@@ -81,7 +82,6 @@ just tool-diagram-logs     # view Kroki logs
 
 ```bash
 just release::<task>       # run release tasks
-just eval-caveman [args]   # run caveman skill eval
 ```
 
 ## Key Details

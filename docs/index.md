@@ -29,7 +29,6 @@ hide:
     - :material-package-variant: **Leaner install** — optional `[util]` and `[dev]` extras; install only the dependencies you need
     - :material-database: **Smart context store** — `ot_context` (`ctx`); SQLite+FTS5 store; search and navigate large tool outputs without filling context
     - :material-image-search: **Image vision** — `ot_image` (`img`); routes to a cheaper, better vision model; zero host tokens; supports local files, URLs, clipboard, and 8 formats (PNG, JPEG, GIF, WebP, TIFF, HEIC, AVIF, SVG)
-    - :material-text-box-minus: **Caveman compact** — `ot_caveman` (`cm`); LLM-powered text compaction; 55–65% on tech prose, 25–31% on search results; `__compact__ = True` applies it to any tool call; code blocks, URLs, and security warnings are never modified
     - :material-console: **CLI-first execution** — `onetool direct run --port` bridges shell commands into a running MCP process for agent harnesses
 
     [:octicons-arrow-right-24: See everything that's new in v2](learn/whats-new-v2.md)
@@ -88,7 +87,7 @@ Agents are excellent at writing code. OneTool tool calls can be batched, chained
 Write Python, not tool definitions. You see exactly what runs. No more guessing.
 
 ```text
-__run brave.search(q="AI")
+__onetool brave.search(q="AI")
 ```
 
 </div>
@@ -172,9 +171,9 @@ Routes image analysis to a cheaper, better vision model. Zero tokens charged to 
 Supports PNG, JPEG, GIF, WebP, TIFF, HEIC, AVIF, SVG.
 
 ```text
-__run img.load(img="invoice.png")
-__run img.ask(img="#inv_01", q="Extract all line items and prices")
-__run img.clip_ask(q="What does this screenshot show?")  # clipboard shortcut
+__onetool img.load(img="invoice.png")
+__onetool img.ask(img="#inv_01", q="Extract all line items and prices")
+__onetool img.clip_ask(q="What does this screenshot show?")  # clipboard shortcut
 ```
 
 [:octicons-arrow-right-24: ot_image reference](reference/tools/ot_image.md)
@@ -188,33 +187,10 @@ __run img.clip_ask(q="What does this screenshot show?")  # clipboard shortcut
 Persistent SQLite+FTS5 store for large tool outputs. Write once, search many times. Agents build up knowledge across tool calls without burning context window.
 
 ```text
-__run h = ctx.write(content="...", source="research"); ctx.grep(handle=h["handle"], pattern="async error handling")
+__onetool h = ctx.write(content="...", source="research"); ctx.grep(handle=h["handle"], pattern="async error handling")
 ```
 
 [:octicons-arrow-right-24: ctx reference](reference/tools/ot_context.md)
-
-</div>
-
-<div class="card span-2" markdown>
-
-### :material-text-box-minus: Caveman Compact
-
-LLM-powered text compaction. One dunder compacts any tool output. Code blocks, URLs, paths, and security warnings are never modified.
-
-| Content | Reduction |
-|---|---|
-| Tech prose | 55–65% |
-| Conversational prose | 45–55% |
-| Search results | 25–31% |
-| Mixed prose + code | 15–35% |
-
-```text
-__run __compact__ = True
-__run brave.search(query='AI news', count=10)
-# compacted in-place; ~25–31% reduction on search snippets
-```
-
-[:octicons-arrow-right-24: ot_caveman reference](reference/tools/ot_caveman.md)
 
 </div>
 

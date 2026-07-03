@@ -4,7 +4,7 @@ Every call flows through an eight-stage pipeline from client to response.
 
 ## Stages
 
-1. **Input normalisation** - Remove trigger prefix (`__run`, `__r`, `__ot`), markdown fences, and backticks
+1. **Input normalisation** - Remove trigger prefix (`__onetool`, `__ot`), markdown fences, and backticks
 2. **Snippet expansion** - Expand `:name key=value` snippets into Python when the normalised command starts with `:`
 3. **Validation** - AST-based security checks against allowlists
 4. **Code preparation** - Parse Python, auto-wrap last expression as return
@@ -28,7 +28,7 @@ sequenceDiagram
     participant E as Executor
     participant T as Tool Function
 
-    C->>M: run(command="__run brave.search(query='test')")
+    C->>M: run(command="__onetool brave.search(query='test')")
     M->>S: Handle tool call
 
     rect rgb(240, 248, 255)
