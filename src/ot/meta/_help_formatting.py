@@ -125,8 +125,7 @@ def _is_direct_run_query(query: str) -> bool:
     """Return True when query asks about direct OneTool run invocation."""
     q = query.lower().strip()
     exact_terms = {
-        "__run",
-        "__r",
+        "__onetool",
         "__ot",
         "run",
         "mcp run",
@@ -141,8 +140,7 @@ def _is_direct_run_query(query: str) -> bool:
     if q in exact_terms:
         return True
     keywords = (
-        "__run",
-        "__r",
+        "__onetool",
         "__ot",
         "mcp run",
         "direct onetool",
@@ -162,15 +160,15 @@ Use MCP `run(command='...')` for direct OneTool pack calls from a connected agen
 Use the `onetool direct` CLI only when you explicitly want the CLI workflow.
 
 ## Triggers
-  __run <code>       - canonical user-facing trigger
-  __r <code>         - short alias
-  __ot <code>        - OneTool alias
+  __onetool <code>   - canonical user-facing trigger
+  __ot <code>        - short alias
 
 ## Call Shapes
   pack.tool(arg=value)     - direct tool call
   :snippet key=value       - snippet invocation
 
 Use direct pack syntax such as `ground.search(q='price of gold')`, not `ot.ground.search(...)`.
+Use `:` only for snippets such as `__onetool :snippet key=value`; never add `:` to `pack.tool(...)` calls.
 Snippet values are plain strings until the template renders Python.
 
 ## Discovery

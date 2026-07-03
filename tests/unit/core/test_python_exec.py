@@ -71,6 +71,18 @@ class TestParseNested:
         result = executor("sorted([5, 2, 8, 1, 9, 3])[:3]")
         assert result == "[1,2,3]"
 
+    def test_nested_onetool_helper_is_current_name(self) -> None:
+        """Nested command helper is exposed as __onetool, not legacy __run."""
+        from ot.executor.runner import execute_python_code
+
+        result, _raw, _sanitize, _fmt, _fc = execute_python_code(
+            '{"new": "__onetool" in globals(), "old": "__run" in globals()}',
+            tool_functions={},
+            validate=False,
+        )
+        assert '"new":true' in result
+        assert '"old":false' in result
+
 
 @pytest.mark.unit
 @pytest.mark.core

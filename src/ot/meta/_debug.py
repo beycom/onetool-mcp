@@ -178,7 +178,7 @@ def _get_prompts_info() -> dict[str, Any]:
     digest = hashlib.sha256(combined.encode("utf-8")).hexdigest()
     checks = {
         "has_run_contract": "Mode by shape:" in (run_desc or ""),
-        "has_canonical_trigger": "__run" in combined,
+        "has_canonical_trigger": "__onetool" in combined,
         "has_snippet_colon": ":name" in combined or ":snippet" in combined,
         "has_direct_tool_intent": "use ot pack.tool" in combined,
         "has_mcp_preference": "run(command=" in combined,

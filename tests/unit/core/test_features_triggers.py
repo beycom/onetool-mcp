@@ -10,7 +10,7 @@ import pytest
 class TestPrefixStripping:
     """Test supported explicit invocation prefixes."""
 
-    @pytest.mark.parametrize("prefix", ["__run", "__r", "__ot"])
+    @pytest.mark.parametrize("prefix", ["__onetool", "__ot"])
     def test_supported_prefixes_are_stripped(self, prefix: str) -> None:
         """Supported prefixes are stripped before execution."""
         from ot.executor.fence_processor import strip_fences
@@ -22,7 +22,7 @@ class TestPrefixStripping:
 
     @pytest.mark.parametrize(
         "prefix",
-        [">>>", "__ot__run", "__onetool", "__onetool__run", "mcp__onetool__run"],
+        [">>>", "__run", "__r", "__ot__run", "__onetool__run", "mcp__onetool__run"],
     )
     def test_removed_prefixes_are_not_stripped(self, prefix: str) -> None:
         """Removed prefixes are not accepted as runtime trigger syntax."""
@@ -43,7 +43,7 @@ class TestInvocationStyles:
         """Code wrapped in inline backticks is stripped."""
         from ot.executor.fence_processor import strip_fences
 
-        stripped, changed = strip_fences("__run `demo.foo()`")
+        stripped, changed = strip_fences("__onetool `demo.foo()`")
 
         assert stripped == "demo.foo()"
         assert changed is True
@@ -52,7 +52,7 @@ class TestInvocationStyles:
         """Multi-line code in fenced block is stripped."""
         from ot.executor.fence_processor import strip_fences
 
-        code = """__run
+        code = """__onetool
 ```python
 msg = "hello"
 demo.foo(text=msg)

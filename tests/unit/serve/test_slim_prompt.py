@@ -41,10 +41,12 @@ def test_run_description_has_invocation_contract() -> None:
     prompts = load_prompts()
     desc = prompts.tools["run"].description or ""
 
-    assert "__run" in desc
-    assert "__r" in desc
+    assert "__onetool" in desc
     assert "__ot" in desc
+    assert "__run" not in desc
+    assert "__r" not in desc
     assert ":name" in desc
+    assert "never add `:` to `pack.tool(...)` calls" in desc
     assert "Call shape: `pack.tool(arg=value)`, not `ot.pack.tool(...)`." in desc
     assert "Do not guess tool names, parameter names, or allowed values." in desc
     assert "Mode by shape:" in desc
@@ -67,6 +69,7 @@ def test_run_description_documents_shape_based_modes() -> None:
     assert ":name key=value" in desc
     assert "not Python" in desc
     assert "plain strings" in desc
+    assert "Do not convert `pack.tool(...)` calls into colon syntax." in desc
     assert "natural-language intent" in desc
     assert "OneTool resolves param prefixes" in desc
     assert "keyword-only tools" in desc
@@ -115,7 +118,7 @@ def test_ot_ref_contains_advanced_recovery_not_core_contract() -> None:
     assert "Param prefixes" in text
     assert "first in signature/schema order wins" in text
     assert "__format__ = 'yml_h'; ot.help(query='topic')" in text
-    assert "OneTool `__run`/MCP run request" in text
+    assert "OneTool `__onetool`/MCP run request" in text
     assert "Natural language to code" not in text
 
 

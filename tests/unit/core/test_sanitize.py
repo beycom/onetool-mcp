@@ -26,13 +26,12 @@ class TestSanitizeTriggers:
         assert "__ot" not in result
         assert "[REDACTED:trigger]" in result
 
-    def test_sanitizes_run_triggers(self):
-        """__run and __r triggers are replaced."""
-        content = "__run file.list(path='.') and __r ot.status()"
+    def test_sanitizes_onetool_trigger(self):
+        """__onetool trigger is replaced."""
+        content = "__onetool file.list(path='.')"
         result = sanitize_triggers(content)
-        assert "__run" not in result
-        assert "__r" not in result
-        assert result.count("[REDACTED:trigger]") == 2
+        assert "__onetool" not in result
+        assert result.count("[REDACTED:trigger]") == 1
 
     def test_sanitizes_mcp_onetool_trigger(self):
         """mcp__onetool trigger is replaced."""
@@ -43,9 +42,9 @@ class TestSanitizeTriggers:
 
     def test_case_insensitive(self):
         """Trigger matching is case-insensitive."""
-        content = "Try __OT or MCP__ONETOOL__RUN"
+        content = "Try __ONETOOL or MCP__ONETOOL__RUN"
         result = sanitize_triggers(content)
-        assert "__OT" not in result
+        assert "__ONETOOL" not in result
         assert "MCP__ONETOOL" not in result
         assert result.count("[REDACTED:trigger]") == 2
 

@@ -1,7 +1,7 @@
 """Fence processing for command execution.
 
 Handles stripping of:
-- Execution trigger prefixes (__run, __r, __ot)
+- Execution trigger prefixes (__onetool, __ot)
 - Markdown code fences (triple backticks with/without language)
 - Inline backticks (single and double)
 
@@ -17,9 +17,8 @@ def strip_fences(command: str) -> tuple[str, bool]:
     """Strip execution prefixes, markdown code fences, and inline backticks.
 
     Execution trigger prefixes (stripped first):
-        __run                - canonical explicit invocation form
-        __r                  - concise alias
-        __ot                 - OneTool alias
+        __onetool            - canonical explicit invocation form
+        __ot                 - short alias
 
     Each prefix supports two invocation styles:
         <prefix> func(arg="value")     - simple call
@@ -45,7 +44,7 @@ def strip_fences(command: str) -> tuple[str, bool]:
     anything_stripped = False
 
     # Strip only the supported explicit invocation prefixes.
-    prefix_pattern = r"^(?:__run|__r|__ot)(?=\s|`|$)\s*"
+    prefix_pattern = r"^(?:__onetool|__ot)(?=\s|`|$)\s*"
     match = re.match(prefix_pattern, stripped)
     if match:
         stripped = stripped[match.end() :].strip()

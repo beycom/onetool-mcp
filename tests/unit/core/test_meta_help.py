@@ -111,7 +111,7 @@ class TestHelp:
         assert "ot.servers()" in result
         assert "ot_servers.enable(name=\"playwright\")" in result
 
-    @pytest.mark.parametrize("query", ["__run", "__r", "__ot", "run", "direct command", "snippet"])
+    @pytest.mark.parametrize("query", ["__onetool", "__ot", "run", "direct command", "snippet"])
     def test_direct_run_queries_return_invocation_help(self, query: str) -> None:
         """Direct run trigger queries surface deterministic invocation guidance."""
         from ot.meta import help
@@ -119,10 +119,10 @@ class TestHelp:
         result = help(query=query)
 
         assert "# Direct OneTool Invocation" in result
-        assert "__run <code>" in result
-        assert "__r <code>" in result
+        assert "__onetool <code>" in result
         assert "__ot <code>" in result
         assert ":snippet key=value" in result
+        assert "never add `:` to `pack.tool(...)` calls" in result
         assert "ot.tool_info(name='pack.tool')" in result
         assert "onetool direct" in result
 

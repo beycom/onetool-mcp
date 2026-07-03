@@ -13,7 +13,7 @@ Or Python code blocks:
   return results
   ```
 
-Supported explicit prefixes stripped from command text: __run, __r, __ot.
+Supported explicit prefixes stripped from command text: __onetool, __ot.
 """
 
 from __future__ import annotations

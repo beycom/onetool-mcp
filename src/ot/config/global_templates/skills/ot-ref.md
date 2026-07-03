@@ -1,13 +1,13 @@
 ---
 name: ot-ref
-description: OneTool __run/MCP run reference for direct pack calls, recovery, proxy handling, ctx handles, and run-vs-local-script decisions
+description: OneTool __onetool/MCP run reference for direct pack calls, recovery, proxy handling, ctx handles, and run-vs-local-script decisions
 tags: [reference, cheatsheet]
 ---
 
 # OneTool Advanced Reference
 
 `ot-ref` is optional. Base run instructions are sufficient for normal OneTool use.
-Use this when a OneTool `__run`/MCP run request needs recovery, proxy, ctx, output, or run-vs-local-script guidance.
+Use this when a OneTool `__onetool`/MCP run request needs recovery, proxy, ctx, output, or run-vs-local-script guidance.
 
 ## Fast Recovery (fail-first)
 
@@ -66,7 +66,6 @@ Supported `__format__` values: `json`, `json_h`, `yml`, `yml_h`, `raw`.
 Runtime dunders:
 - `__format__`: controls result serialization format (`json`, `json_h`, `yml`, `yml_h`, `raw`).
 - `__sanitize__`: toggles output sanitization (default from config). IMPORTANT use `False` only when you explicitly need raw output and trust the source.
-- `__compact__`: compacts final serialized output (default from config).
 - `__force_context__`: forces result to be stored in ctx and returned as a handle.
 
 ## ctx Handle Trap + Navigation Hints
