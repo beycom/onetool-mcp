@@ -132,19 +132,20 @@ def load(*, img: str, handle: str | None = None, max_edge: int = 1568) -> dict[s
 
         if source_type == "handle":
             handle_name = str(data)
-            meta = load_meta(handle_name)
-            if meta is None:
+            handle_meta = load_meta(handle_name)
+            if handle_meta is None:
                 s.add(error="handle_not_found")
                 return {"error": f"handle #{handle_name} not found"}
             s.add(handle=handle_name, passthrough=True)
             return {
                 "handle": f"#{handle_name}",
-                "source": meta.get("source", ""),
-                "dims": meta.get("original_dims"),
-                "resized": meta.get("resized", False),
+                "source": handle_meta.get("source", ""),
+                "dims": handle_meta.get("original_dims"),
+                "resized": handle_meta.get("resized", False),
                 "dedup": True,
             }
 
+        assert isinstance(data, bytes)
         raw_bytes = bytes(data)
 
         try:
@@ -206,7 +207,7 @@ def load(*, img: str, handle: str | None = None, max_edge: int = 1568) -> dict[s
         prep = prepare_for_model(raw_bytes, max_edge)
 
         source_label = img if source_type in ("url", "file") else source_type
-        meta: dict[str, Any] = {
+        image_meta: dict[str, Any] = {
             "handle": handle_name,
             "source": source_label,
             "hash": sha256_hex,
@@ -218,7 +219,7 @@ def load(*, img: str, handle: str | None = None, max_edge: int = 1568) -> dict[s
             "created_at": datetime.now(UTC).isoformat(),
             "summary": None,
         }
-        save_image(raw_bytes, handle_name, meta)
+        save_image(raw_bytes, handle_name, image_meta)
         cache_put(handle_name, prep.model_bytes)
 
         # Spawn background summary — silently skipped if model not set

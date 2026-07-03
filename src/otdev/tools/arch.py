@@ -473,7 +473,7 @@ def _execute_render_jobs(
     *,
     jobs: list[tuple[int, RenderTargetConfig, dict[str, Any]]],
     max_workers: int,
-) -> tuple[bool, dict[int, dict[str, Any]]]:
+) -> tuple[bool, Any]:
     """Run render jobs concurrently and return results indexed by input order."""
     if not jobs:
         return True, {}

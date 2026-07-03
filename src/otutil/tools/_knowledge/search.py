@@ -30,7 +30,7 @@ def _exec_fts(
     fts_q: str,
     limit: int,
     category: str | None,
-) -> list:
+) -> list[Any]:
     """Execute a single FTS5 MATCH query and return raw rows."""
     sql = """
         SELECT c.id, c.topic, c.content, c.category, c.tags, c.meta, c.hit_count,
@@ -179,7 +179,7 @@ def apply_metadata_filters(
     return filtered
 
 
-def _row_to_result(row: tuple, score: float) -> dict[str, Any]:
+def _row_to_result(row: tuple[Any, ...], score: float) -> dict[str, Any]:
     """Convert a DB row tuple to a result dict."""
     meta = deserialize_meta(row[5])
     tags = deserialize_tags(row[4])

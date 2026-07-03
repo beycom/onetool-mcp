@@ -325,7 +325,7 @@ def _resolve_library_id(library_id: str) -> tuple[str, bool, bool]:
     return normalized, True, False
 
 
-def search(*, query: str, library_name: str, output_format: str = "str") -> str:
+def search(*, query: str, library_name: str, output_format: str = "str") -> str | dict[str, Any]:
     """Search for libraries by name in Context7.
 
     Args:
@@ -458,7 +458,7 @@ def doc(
             note = f"[Resolved '{library_id}' → '{resolved_id}']\n\n"
 
         # Fetch context
-        params: dict[str, str] = {"libraryId": resolved_id, "type": "txt"}
+        params: dict[str, str | int] = {"libraryId": resolved_id, "type": "txt"}
         if query:
             params["query"] = query
 

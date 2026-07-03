@@ -30,6 +30,7 @@ import httpx
 from pydantic import BaseModel, Field
 
 from otpack import (
+    BatchEnvelope,
     LogSpan,
     _format_http_error,
     batch_execute_enveloped,
@@ -168,15 +169,15 @@ def _format_web_results(
         return _format_sources(results, max_sources=max_sources) or "No sources found."
 
     if output_format == "text_only":
-        lines: list[str] = []
+        text_lines: list[str] = []
         for result in results:
             title = result.get("title", "No title")
             description = result.get("description", "")
-            lines.append(title)
+            text_lines.append(title)
             if description:
-                lines.append(description)
-            lines.append("")
-        return "\n".join(lines).strip()
+                text_lines.append(description)
+            text_lines.append("")
+        return "\n".join(text_lines).strip()
 
     lines: list[str] = []
     for i, result in enumerate(results, 1):
@@ -226,17 +227,17 @@ def _format_news_results(
         return _format_sources(results, max_sources=max_sources) or "No sources found."
 
     if output_format == "text_only":
-        lines: list[str] = []
+        text_lines: list[str] = []
         for result in results:
             title = result.get("title", "No title")
             source = result.get("meta_url", {}).get("hostname", "")
             age = result.get("age", "")
-            lines.append(title)
+            text_lines.append(title)
             details = ", ".join(part for part in [source, age] if part)
             if details:
-                lines.append(details)
-            lines.append("")
-        return "\n".join(lines).strip()
+                text_lines.append(details)
+            text_lines.append("")
+        return "\n".join(text_lines).strip()
 
     lines: list[str] = []
     for i, result in enumerate(results, 1):
@@ -277,15 +278,15 @@ def _format_image_results(
         return _format_sources(results, max_sources=max_sources) or "No sources found."
 
     if output_format == "text_only":
-        lines: list[str] = []
+        text_lines: list[str] = []
         for result in results:
             title = result.get("title", "") or "No title"
             source = result.get("source", "")
-            lines.append(title)
+            text_lines.append(title)
             if source:
-                lines.append(f"Source: {source}")
-            lines.append("")
-        return "\n".join(lines).strip()
+                text_lines.append(f"Source: {source}")
+            text_lines.append("")
+        return "\n".join(text_lines).strip()
 
     lines: list[str] = []
     for i, result in enumerate(results, 1):
@@ -328,15 +329,15 @@ def _format_video_results(
         return _format_sources(results, max_sources=max_sources) or "No sources found."
 
     if output_format == "text_only":
-        lines: list[str] = []
+        text_lines: list[str] = []
         for result in results:
             title = result.get("title", "No title")
             description = result.get("description", "")
-            lines.append(title)
+            text_lines.append(title)
             if description:
-                lines.append(truncate(description, VIDEO_DESC_MAX_LENGTH))
-            lines.append("")
-        return "\n".join(lines).strip()
+                text_lines.append(truncate(description, VIDEO_DESC_MAX_LENGTH))
+            text_lines.append("")
+        return "\n".join(text_lines).strip()
 
     lines: list[str] = []
     for i, result in enumerate(results, 1):
@@ -753,7 +754,7 @@ def search_batch(
     max_sources: int | None = None,
     retries: int = 0,
     retry_delay_ms: int = 250,
-) -> dict[str, Any] | str:
+) -> BatchEnvelope | str:
     """Execute multiple web searches concurrently and return combined results.
 
     Queries are executed in parallel using threads for better performance.

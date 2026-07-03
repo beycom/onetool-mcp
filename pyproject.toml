@@ -107,7 +107,10 @@ dev = [
     "ruff>=0.15.12",
     "types-aiofiles>=25.1.0.20260409",
     "types-jmespath>=1.1.0.20260408",
+    "types-openpyxl>=3.1.5.20260518",
     "types-pyyaml>=6.0.12.20260408",
+    "types-send2trash>=2.1.0.20260408",
+    "types-tabulate>=0.10.0.20260508",
 ]
 
 [tool.uv]
@@ -162,6 +165,8 @@ known-first-party = ["ot", "ottools", "onetool", "otdev", "otutil", "otpack"]
 # Path used at runtime for function signatures (not just type hints)
 "src/otutil/tools/_convert/*.py" = ["TC003"]
 "src/otutil/tools/_knowledge/scraper.py" = ["TC003"]
+"src/otutil/tools/_mem/listing.py" = ["UP006"]
+"src/otutil/tools/file.py" = ["UP006"]
 "src/ot/executor/*.py" = ["TC003"]
 
 [tool.mypy]

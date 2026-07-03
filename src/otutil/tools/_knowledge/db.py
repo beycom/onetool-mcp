@@ -5,7 +5,7 @@ import builtins
 import json
 import struct
 import threading
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from ot.utils.sqlite_pool import SqlitePool
 
@@ -13,6 +13,7 @@ from .config import _get_config, _get_kb_project
 
 if TYPE_CHECKING:
     import sqlite3
+    from contextlib import AbstractContextManager
     from pathlib import Path
 
 _builtins_list = builtins.list
@@ -31,7 +32,7 @@ def _check_vec_available() -> bool:
     global _VEC_AVAILABLE
     if _VEC_AVAILABLE is None:
         try:
-            import sqlite_vec  # noqa: F401
+            import sqlite_vec  # type: ignore[import-untyped]  # noqa: F401
             _VEC_AVAILABLE = True
         except ImportError:
             _VEC_AVAILABLE = False
@@ -195,7 +196,7 @@ def get_connection(db_name: str) -> sqlite3.Connection:
     return _get_pool(db_name).get()
 
 
-def use_connection(db_name: str):
+def use_connection(db_name: str) -> AbstractContextManager[sqlite3.Connection]:
     """Context manager that holds the pool lock for the named database."""
     return _get_pool(db_name).use()
 
@@ -238,7 +239,7 @@ def serialize_tags(tags: list[str] | None) -> str:
 def deserialize_tags(raw: str | None) -> list[str]:
     if not raw:
         return []
-    return json.loads(raw)
+    return cast("list[str]", json.loads(raw))
 
 
 def serialize_meta(meta: dict[str, Any] | None) -> str:
@@ -248,7 +249,7 @@ def serialize_meta(meta: dict[str, Any] | None) -> str:
 def deserialize_meta(raw: str | None) -> dict[str, Any]:
     if not raw:
         return {}
-    return json.loads(raw)
+    return cast("dict[str, Any]", json.loads(raw))
 
 
 __all__ = [

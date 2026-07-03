@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, List  # noqa: UP035
 
 from otpack import LogSpan
 
@@ -42,7 +42,7 @@ def list(
             conn = _get_connection()
 
             sql = "SELECT id, topic, category, tags, relevance, access_count, created_at, length(content) as content_len, meta FROM memories WHERE 1=1"
-            params: list[Any] = []
+            params: List[Any] = []
 
             topic_sql, topic_params = _topic_filter(topic)
             sql += topic_sql
@@ -110,7 +110,7 @@ def count(
             conn = _get_connection()
 
             sql = "SELECT COUNT(*) FROM memories WHERE 1=1"
-            params: list[Any] = []
+            params: List[Any] = []
 
             topic_sql, topic_params = _topic_filter(topic)
             sql += topic_sql

@@ -9,6 +9,7 @@ import ast
 import fnmatch
 import re
 from pathlib import Path
+from typing import Any, cast
 
 from ot.paths import get_config_dir
 from otpack import LogSpan, cache, get_effective_cwd
@@ -369,7 +370,7 @@ def validate_ext(*, path: str) -> str:
 
 
 @cache.memoize(ttl=3600)
-def _get_tools_config() -> dict:
+def _get_tools_config() -> dict[str, Any]:
     """Load tool path configuration from global_templates/skills.md."""
     import yaml
 
@@ -379,7 +380,7 @@ def _get_tools_config() -> dict:
     if not tools_yaml.exists():
         return {}
     raw = yaml.safe_load(tools_yaml.read_text()) or {}
-    return raw.get("tools", {})
+    return cast("dict[str, Any]", raw.get("tools", {}))
 
 
 @cache.memoize(ttl=3600)
@@ -424,7 +425,7 @@ def _get_skill_description(skill_name: str) -> str:
         if end != -1:
             try:
                 fm = yaml.safe_load(content[3:end]) or {}
-                return fm.get("description", skill_name)
+                return str(fm.get("description", skill_name))
             except yaml.YAMLError:
                 pass
     return skill_name

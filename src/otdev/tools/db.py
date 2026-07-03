@@ -32,7 +32,7 @@ import contextlib
 import threading
 from collections import OrderedDict
 from datetime import date, datetime
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, Field
 
@@ -235,7 +235,7 @@ def tables(
 
                 if not include_row_count:
                     s.add(resultCount=len(all_tables))
-                    return all_tables
+                    return cast("list[str]", all_tables)
 
                 from sqlalchemy import MetaData, Table, func, select
 

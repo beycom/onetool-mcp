@@ -6,12 +6,14 @@ import json
 import math
 import re
 import struct
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from .config import _get_config
 
 if TYPE_CHECKING:
     import sqlite3
+    from contextlib import AbstractContextManager
+    from pathlib import Path
 
 from ot.utils.sqlite_pool import SqlitePool
 
@@ -19,7 +21,7 @@ _builtins_list = builtins.list
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
-def _get_db_path():
+def _get_db_path() -> Path:
     """Get the memory database path, resolving relative to .onetool/ directory.
 
     Uses resolve_ot_path (not expand_path) so the default
@@ -49,7 +51,7 @@ def _cosine_similarity(a_blob: bytes | None, b_blob: bytes | None) -> float | No
     norm_b = math.sqrt(sum(x * x for x in b))
     if norm_a == 0.0 or norm_b == 0.0:
         return 0.0
-    return dot / (norm_a * norm_b)
+    return float(dot / (norm_a * norm_b))
 
 
 def _mem_setup(conn: sqlite3.Connection) -> None:
@@ -66,7 +68,7 @@ def _get_connection() -> sqlite3.Connection:
     return _pool.get()
 
 
-def _use_connection():
+def _use_connection() -> AbstractContextManager[sqlite3.Connection]:
     """Context manager that holds the connection lock for the entire operation."""
     return _pool.use()
 
@@ -163,7 +165,7 @@ def _deserialize_tags(raw: str | None) -> list[str]:
     """Deserialize JSON string back to tag list."""
     if not raw:
         return []
-    return json.loads(raw)
+    return cast("list[str]", json.loads(raw))
 
 
 def _serialize_meta(meta: dict[str, str] | None) -> str:
@@ -175,7 +177,7 @@ def _deserialize_meta(raw: str | None) -> dict[str, str]:
     """Deserialize JSON string back to meta dict."""
     if not raw:
         return {}
-    return json.loads(raw)
+    return cast("dict[str, str]", json.loads(raw))
 
 
 __all__ = [

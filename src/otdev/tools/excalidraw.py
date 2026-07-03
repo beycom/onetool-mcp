@@ -123,7 +123,7 @@ def _open_browser() -> None:
             except NoValidTabFound as exc:
                 last_exc = exc
                 with contextlib.suppress(Exception):
-                    await b.stop()
+                    await b.stop()  # type: ignore[no-untyped-call]
         raise last_exc
 
     b, t = _run(_start())
@@ -2155,6 +2155,8 @@ def layout(
             src_in = src_elk is not None and src_elk in elk_node_set
             dst_in = dst_elk is not None and dst_elk in elk_node_set
             if src_in and dst_in:
+                assert src_elk is not None
+                assert dst_elk is not None
                 seen_edge_ids.add(eid)
                 elk_edges.append({"id": eid, "sources": [src_elk], "targets": [dst_elk]})
                 scene_edge_map[eid] = {"src": src_elk, "dst": dst_elk}
@@ -2275,9 +2277,9 @@ async () => {{
         # use the entry side), which is the *opposite* side from the layout direction.
         for bedge in boundary_edges:
             eid = bedge["id"]
-            src_in: bool = bedge["src_in"]
-            anchored_elk = bedge["src_elk"] if src_in else bedge["dst_elk"]
-            free_id = bedge["dst"] if src_in else bedge["src"]
+            src_inside: bool = bedge["src_in"]
+            anchored_elk = bedge["src_elk"] if src_inside else bedge["dst_elk"]
+            free_id = bedge["dst"] if src_inside else bedge["src"]
             if anchored_elk not in pos_map:
                 continue
             anc_x, anc_y = pos_map[anchored_elk]

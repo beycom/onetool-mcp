@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import zipfile
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from bs4 import BeautifulSoup
 
@@ -40,7 +40,7 @@ def _inline_html_svgs(*, html_path: Path) -> int:
     replaced = 0
 
     for container in soup.find_all(attrs={"data-svg-src": True}):
-        svg_rel_path = container.get("data-svg-src")
+        svg_rel_path = cast("str | None", container.get("data-svg-src"))
         if not svg_rel_path:
             continue
         svg_path = (html_path.parent / svg_rel_path).resolve()
@@ -108,8 +108,8 @@ def bundle_solution_directory(
         if include:
             include_files = _discover_additional_files(include)
             for include_file in include_files:
-                arcname = f"data/{include_file.name}"
-                zf.write(include_file, arcname)
+                include_arcname = f"data/{include_file.name}"
+                zf.write(include_file, include_arcname)
                 included_files.append(str(include_file))
 
     return {

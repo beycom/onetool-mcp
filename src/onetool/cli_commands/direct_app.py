@@ -7,7 +7,7 @@ import socket
 import sys
 import time
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 import typer
 from rich.console import Console
@@ -56,7 +56,7 @@ def _signed_get(host: str, port: int, *, path: str, timeout: float, ot_dir: Path
                 status_code=resp.status,
                 base_dir=ot_dir,
             )
-            return json.loads(response_body.decode("utf-8"))
+            return cast("dict[str, Any]", json.loads(response_body.decode("utf-8")))
     except urllib.error.HTTPError as e:
         response_body = e.read()
         verify_response(

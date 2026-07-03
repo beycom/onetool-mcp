@@ -123,8 +123,7 @@ def slice(
                 row_meta = _deserialize_meta(row[9])
                 sections = _decode_sections(row_meta.get("sections", ""))
 
-                # Normalise select to a sequence
-                selectors: _builtins_list[int | str] = select if type(select) is _builtins_list else [select]  # type: ignore[assignment]
+                selectors = select if isinstance(select, _builtins_list) else [select]
 
                 extracted_parts: list[str] = []
                 for sel in selectors:
@@ -261,7 +260,7 @@ def slice_batch(
                 key = f"topic:{topic}" if topic else f"id:{mid}"
                 row = row_map.get(key)
                 if not row:
-                    label = topic or mid
+                    label = topic or mid or str(item)
                     result_parts.append(f"# {label} [{_selector_label(sel)}]\n\nError: No memory found for {'topic' if topic else 'id'} '{label}'")
                     continue
 
@@ -271,7 +270,7 @@ def slice_batch(
                 row_meta = _deserialize_meta(row[9])
                 sections = _decode_sections(row_meta.get("sections", ""))
 
-                selectors: _builtins_list[int | str] = sel if type(sel) is _builtins_list else [sel]  # type: ignore[assignment]
+                selectors = sel if isinstance(sel, _builtins_list) else [sel]
                 extracted: _builtins_list[str] = []
                 for sel_item in selectors:
                     part = _resolve_slice(sel_item, lines, sections)

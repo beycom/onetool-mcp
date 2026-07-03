@@ -274,7 +274,7 @@ def fetch(
                     trafilatura_format = "txt"
 
                 # Extract content from HTML
-                result = trafilatura.extract(
+                extracted = trafilatura.extract(
                     downloaded,
                     url=url,
                     output_format=trafilatura_format,
@@ -291,9 +291,10 @@ def fetch(
                     config=config,
                 )
 
-                if result is None:
+                if extracted is None:
                     s.add(error="no_content")
                     return f"Error: No content could be extracted from: {url}"
+                result = extracted
 
             # Wrap with metadata if requested (JSON only)
             if include_metadata and output_format == "json":

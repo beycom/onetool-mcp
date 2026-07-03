@@ -59,7 +59,7 @@ def prepare_for_model(raw_bytes: bytes, max_edge: int) -> PreparedImage:
     # Register pillow-heif opener lazily for HEIC/HEIF/AVIF (ISOBMFF containers)
     if len(raw_bytes) >= 12 and raw_bytes[4:8] == b"ftyp":
         try:
-            import pillow_heif
+            import pillow_heif  # type: ignore[import-untyped]
 
             pillow_heif.register_heif_opener()
         except ImportError as exc:
@@ -68,7 +68,7 @@ def prepare_for_model(raw_bytes: bytes, max_edge: int) -> PreparedImage:
                 "Install with: pip install pillow-heif"
             ) from exc
 
-    img = Image.open(io.BytesIO(raw_bytes))
+    img: Image.Image = Image.open(io.BytesIO(raw_bytes))
     original_format = img.format or "PNG"
     original_dims = (img.width, img.height)
 
@@ -77,7 +77,7 @@ def prepare_for_model(raw_bytes: bytes, max_edge: int) -> PreparedImage:
         scale = max_edge / long_edge
         new_w = max(1, int(img.width * scale))
         new_h = max(1, int(img.height * scale))
-        img = img.resize((new_w, new_h), Image.LANCZOS)
+        img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
         model_dims: tuple[int, int] = (new_w, new_h)
         resized = True
     else:

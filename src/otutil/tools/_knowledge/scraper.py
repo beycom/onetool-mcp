@@ -15,6 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 import yaml
@@ -120,7 +121,7 @@ def _write_page(
     page_url: str,
     content: str,
     source_name: str,
-    page_metadata: dict | None = None,  # type: ignore[type-arg]
+    page_metadata: dict[str, Any] | None = None,
     category: str | None = None,
     tags: list[str] | None = None,
     flat_files: bool = False,
@@ -137,7 +138,7 @@ def _write_page(
         meta_path = output_dir / f"{slug}.meta.yaml"
         md_path.parent.mkdir(parents=True, exist_ok=True)
     _write_atomic(md_path, content)
-    meta: dict = {
+    meta: dict[str, Any] = {
         "url": page_url,
         "source": source_name,
         "crawled_at": datetime.now(UTC).isoformat(),
@@ -233,7 +234,7 @@ def _extract_markdown(page: object, include_images: bool) -> str:
 
 def _build_deep_filter_chain(url: str, url_prefix: str) -> object:
     """Build domain + URL-prefix + binary-exclusion filter chain for deep crawl strategies."""
-    from crawl4ai.deep_crawling.filters import (  # type: ignore[import-not-found]
+    from crawl4ai.deep_crawling.filters import (  # type: ignore[import-untyped]
         DomainFilter,
         FilterChain,
         URLPatternFilter,
@@ -267,7 +268,7 @@ def run_scrape(
     min_word_threshold: int = 50,
     crawl_strategy: str = "bfs",
     seed_urls: list[str] | None = None,
-    score: dict | None = None,
+    score: dict[str, Any] | None = None,
     css_selector: str = "",
     js_code: str = "",
     include_images: bool = False,
@@ -360,7 +361,7 @@ async def _run_scrape_async(
     min_word_threshold: int,
     crawl_strategy: str,
     seed_urls: list[str],
-    score: dict,
+    score: dict[str, Any],
     css_selector: str,
     js_code: str,
     include_images: bool,
@@ -371,16 +372,16 @@ async def _run_scrape_async(
     tags: list[str],
     debug: bool,
 ) -> ScrapeResult:
-    from crawl4ai import (  # type: ignore[import-not-found]
+    from crawl4ai import (  # type: ignore[import-untyped]
         AsyncWebCrawler,
         BrowserConfig,
         CacheMode,
         CrawlerRunConfig,
     )
-    from crawl4ai.content_filter_strategy import (  # type: ignore[import-not-found]
+    from crawl4ai.content_filter_strategy import (  # type: ignore[import-untyped]
         PruningContentFilter,
     )
-    from crawl4ai.markdown_generation_strategy import (  # type: ignore[import-not-found]
+    from crawl4ai.markdown_generation_strategy import (  # type: ignore[import-untyped]
         DefaultMarkdownGenerator,
     )
     logging.getLogger("crawl4ai").setLevel(logging.WARNING)
@@ -506,7 +507,7 @@ async def _run_scrape_async(
                 if on_page:
                     on_page(result.written, page_url)
     else:
-        from crawl4ai.deep_crawling import (  # type: ignore[import-not-found]
+        from crawl4ai.deep_crawling import (  # type: ignore[import-untyped]
             BFSDeepCrawlStrategy,
             DFSDeepCrawlStrategy,
         )
@@ -520,10 +521,10 @@ async def _run_scrape_async(
                 filter_chain=filter_chain,
             )
         elif crawl_strategy == "best_first":
-            from crawl4ai.deep_crawling import (  # type: ignore[import-not-found]
+            from crawl4ai.deep_crawling import (
                 BestFirstCrawlingStrategy,
             )
-            from crawl4ai.deep_crawling.scorers import (  # type: ignore[import-not-found]
+            from crawl4ai.deep_crawling.scorers import (  # type: ignore[import-untyped]
                 KeywordRelevanceScorer,
             )
             kw_entries = score.get("keyword_relevance", [])

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import builtins
-from typing import Any
+from typing import Any, cast
 
 from otpack import LogSpan
 
@@ -101,7 +101,7 @@ def _format_read_row(row: Any, *, meta: bool) -> str:
     """
     content = row[2]
     if not meta:
-        return content
+        return cast("str", content)
 
     tags = _deserialize_tags(row[4])
     header = (

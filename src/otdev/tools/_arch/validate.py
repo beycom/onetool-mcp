@@ -40,7 +40,7 @@ def _missing_required(
 
 
 def _duplicate_ids(*, sheet: str, rows: list[dict[str, Any]]) -> list[Issue]:
-    counter = Counter()
+    counter: Counter[str] = Counter()
     for row in rows:
         row_id = row.get("id")
         if row_id is None:

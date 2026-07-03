@@ -64,6 +64,7 @@ def configure_standalone(config_path: str | Path, secrets_path: str | Path | Non
     with _standalone_lock:
         _standalone_config = data
         # Determine secrets file path
+        resolved_secrets: Path | None
         if secrets_path is not None:
             resolved_secrets = Path(secrets_path).expanduser().resolve()
             if not resolved_secrets.exists():
@@ -71,7 +72,7 @@ def configure_standalone(config_path: str | Path, secrets_path: str | Path | Non
         else:
             resolved_secrets = path.parent / "secrets.yaml"
             if not resolved_secrets.exists():
-                resolved_secrets = None  # type: ignore[assignment]
+                resolved_secrets = None
 
         if resolved_secrets is not None:
             with resolved_secrets.open() as f:

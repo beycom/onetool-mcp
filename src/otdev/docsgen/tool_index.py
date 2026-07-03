@@ -6,7 +6,7 @@ import argparse
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_OUTPUT = ROOT / "docs" / "reference" / "tools" / "tool-index.md"
@@ -78,7 +78,7 @@ def tool_inventory(
             continue
 
         pack_name = str(pack_row["name"])
-        details_info = "default" if include_tool_descriptions else "min"
+        details_info: Literal["default", "min"] = "default" if include_tool_descriptions else "min"
         details = tool_info(pattern=f"{pack_name}.", info=details_info)
         detail_rows = [details] if isinstance(details, dict) else details
 
@@ -219,4 +219,3 @@ def main(argv: list[str] | None = None) -> int:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(output + "\n", encoding="utf-8")
     return 0
-

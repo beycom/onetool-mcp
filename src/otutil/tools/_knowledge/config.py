@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -31,7 +31,7 @@ class ScrapeSourceConfig(BaseModel):
     min_word_threshold: int | None = Field(default=None, description="Minimum words per block for PruningContentFilter (None = inherit from project)")
     crawl_strategy: Literal["bfs", "dfs", "best_first", "seed_urls"] | None = Field(default=None, description="Crawl strategy override (None = inherit from project)")
     seed_urls: list[str] = Field(default_factory=list, description="Explicit URL list — only used when crawl_strategy=seed_urls")
-    score: dict = Field(default_factory=dict, description="Scorer config for best_first strategy (e.g. {keyword_relevance: ['term:1.0']})")
+    score: dict[str, Any] = Field(default_factory=dict, description="Scorer config for best_first strategy (e.g. {keyword_relevance: ['term:1.0']})")
     css_selector: str = Field(default="", description="CSS selector to restrict content extraction to a specific element (e.g. '#mc-main-content')")
     js_code: str = Field(default="", description="JavaScript to run on each page before extraction (crawl4ai js_code)")
     include_images: bool | None = Field(default=None, description="Append image URLs to page content (None = inherit from project)")
@@ -55,7 +55,7 @@ class ScrapeProjectConfig(BaseModel):
     wait_for: str = Field(default="", description="CSS/JS selector to wait for before extracting (empty = no wait)")
     page_timeout: int = Field(default=30000, description="Page load timeout in ms")
     crawl_strategy: Literal["bfs", "dfs", "best_first", "seed_urls"] = Field(default="bfs", description="Default crawl strategy for all sources in this project")
-    score: dict = Field(default_factory=dict, description="Default scorer config for best_first strategy")
+    score: dict[str, Any] = Field(default_factory=dict, description="Default scorer config for best_first strategy")
     cache: bool = Field(default=False, description="Enable crawl4ai disk cache")
     process_iframes: bool = Field(default=False, description="Extract text from embedded iframes")
     content_filter_threshold: float = Field(default=0.48, description="PruningContentFilter threshold 0-1")
@@ -94,7 +94,7 @@ class ResolvedSourceConfig(BaseModel):
     min_word_threshold: int
     crawl_strategy: str
     seed_urls: list[str]
-    score: dict
+    score: dict[str, Any]
     css_selector: str
     js_code: str
     include_images: bool

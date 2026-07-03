@@ -4,7 +4,7 @@ from __future__ import annotations
 import queue
 import threading
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
@@ -94,8 +94,8 @@ def _chunk_text_by_tokens(text: str, max_tokens: int, model: str) -> list[str]:
 def _get_embedding_model(config: Any) -> str:
     """Resolve the embedding model, falling back to top-level llm config."""
     if config.model:
-        return config.model
-    return get_llm_config().embedding_model or config.model
+        return cast("str", config.model)
+    return cast("str", get_llm_config().embedding_model or config.model)
 
 
 def _generate_embedding(text: str) -> list[float]:

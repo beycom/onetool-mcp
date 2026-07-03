@@ -10,7 +10,7 @@ from __future__ import annotations
 import atexit
 import base64
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -81,7 +81,7 @@ def load_meta(handle_name: str) -> dict[str, Any] | None:
     path = _images_dir() / f"{handle_name}.meta.json"
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))  # type: ignore[return-value]
+    return cast("dict[str, Any]", json.loads(path.read_text(encoding="utf-8")))
 
 
 def save_summary(handle_name: str, summary_dict: dict[str, Any]) -> None:

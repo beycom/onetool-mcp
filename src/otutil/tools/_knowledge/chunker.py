@@ -313,6 +313,8 @@ def _split_by_headings(body: str, base_topic: str, source_path_val: str, meta: d
                 )
             # No predecessor → skip
             continue
+        if heading is None:
+            continue
         slug = _slug(heading)
         topic = f"{base_topic}#{slug}"
         chunk_meta = dict(meta)

@@ -49,7 +49,7 @@ def _require_keyring() -> Any:
 
 def _require_pyrage() -> Any:
     try:
-        import pyrage  # type: ignore[import-not-found]
+        import pyrage  # type: ignore[import-untyped]
 
         return pyrage
     except ImportError as e:

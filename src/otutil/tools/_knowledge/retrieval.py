@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from ot.utils.factory import lazy_client
 from otpack import LogSpan
@@ -42,7 +42,7 @@ def reset_runtime_cache() -> None:
     Called by ot.reload() so rotated credentials/base URLs are picked up
     without requiring a process restart.
     """
-    _get_llm_client.reset()
+    cast("Any", _get_llm_client).reset()
 
 
 def search(

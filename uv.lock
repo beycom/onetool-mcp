@@ -2353,7 +2353,10 @@ dev = [
     { name = "ruff" },
     { name = "types-aiofiles" },
     { name = "types-jmespath" },
+    { name = "types-openpyxl" },
     { name = "types-pyyaml" },
+    { name = "types-send2trash" },
+    { name = "types-tabulate" },
 ]
 docs = [
     { name = "mkdocs" },
@@ -2419,7 +2422,10 @@ dev = [
     { name = "ruff", specifier = ">=0.15.12" },
     { name = "types-aiofiles", specifier = ">=25.1.0.20260409" },
     { name = "types-jmespath", specifier = ">=1.1.0.20260408" },
+    { name = "types-openpyxl", specifier = ">=3.1.5.20260518" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20260408" },
+    { name = "types-send2trash", specifier = ">=2.1.0.20260408" },
+    { name = "types-tabulate", specifier = ">=0.10.0.20260508" },
 ]
 docs = [
     { name = "mkdocs", specifier = ">=1,<2" },
@@ -4181,12 +4187,39 @@ wheels = [
 ]
 
 [[package]]
+name = "types-openpyxl"
+version = "3.1.5.20260518"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f5/d1/a1e23040a758746ad5bb6b8849a011c3c901775618bc7e1fec3a1a8b7142/types_openpyxl-3.1.5.20260518.tar.gz", hash = "sha256:da9cd644e4e80215a3f60a8c2c2c8e980e941a9b581cffa3876285aa791ca5af", size = 101550, upload-time = "2026-05-18T06:03:57.59Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/96/0e/d745ce95fc74e34df802010fd0387e33db468179e6ff42b708280ab268c7/types_openpyxl-3.1.5.20260518-py3-none-any.whl", hash = "sha256:e6ca4b116c8b979ed57f3045edcd3d49c25917d6dae99e90358f41322a19d375", size = 165744, upload-time = "2026-05-18T06:03:56.036Z" },
+]
+
+[[package]]
 name = "types-pyyaml"
 version = "6.0.12.20260518"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b8/83/4a1afc3fbfcf5b8d46fc390cd95ed6b0dc9010a265f4e9f46314efffa37a/types_pyyaml-6.0.12.20260518.tar.gz", hash = "sha256:d917f83fb38462550338c1297faedd860b3ec83912b96b1e3d73255f7473e466", size = 17850, upload-time = "2026-05-18T06:01:58.675Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/06/a2/c01db32be2ae7d6a1689972f3c492b149ee4e164b12fdfd9f64b50888215/types_pyyaml-6.0.12.20260518-py3-none-any.whl", hash = "sha256:d2150f75a231c9fe9c7463bd29487d93e60bac90400287351384bc2284eba7cd", size = 20312, upload-time = "2026-05-18T06:01:57.368Z" },
+]
+
+[[package]]
+name = "types-send2trash"
+version = "2.1.0.20260408"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/dd/6f/b9d32edd71063a3eb516aeb5090a42119ddaa6c8371c5ed20e24b2cc8894/types_send2trash-2.1.0.20260408.tar.gz", hash = "sha256:caeea92ff46e6a5a5333f2558a773d8962c04d9b7a8fc5b4cb3d34f2962aba08", size = 7673, upload-time = "2026-04-08T04:32:33.673Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c8/6e/a5b49858cd85a4f207255b7f3482ea6e061c289b230e2e2401c0e558651e/types_send2trash-2.1.0.20260408-py3-none-any.whl", hash = "sha256:b118d896ec324436a554c2ae1b1dfda9487fd1a51b9049e209c2d42b9644ad61", size = 8277, upload-time = "2026-04-08T04:32:32.943Z" },
+]
+
+[[package]]
+name = "types-tabulate"
+version = "0.10.0.20260508"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/11/af/c100d86897d3fdb010d8f813569fa80355b5cb553f51080e37d4f3c451bb/types_tabulate-0.10.0.20260508.tar.gz", hash = "sha256:8e51f159e8b24976849706ae2ed1dc9adba8ebbd080b17e494ebb66a8cc92c74", size = 8395, upload-time = "2026-05-08T04:47:58.921Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a0/36/443b700f54a585cf8ed4e76d8ad08b12df6914f8782a2788ecd0d8491519/types_tabulate-0.10.0.20260508-py3-none-any.whl", hash = "sha256:b1e1a2d0456fbd655a71690b09a7aaeffdf2978d32049184ea436492aa51d20a", size = 8137, upload-time = "2026-05-08T04:47:57.872Z" },
 ]
 
 [[package]]

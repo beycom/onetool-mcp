@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import struct
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -47,8 +47,8 @@ def _get_openai_client() -> OpenAI:
 def _get_embedding_model(config: Any) -> str:
     """Resolve the embedding model, falling back to top-level llm config."""
     if config.model:
-        return config.model
-    return get_llm_config().embedding_model or config.model
+        return cast("str", config.model)
+    return cast("str", get_llm_config().embedding_model or config.model)
 
 
 def _get_tiktoken_encoding(model: str) -> Any:

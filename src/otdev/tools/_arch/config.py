@@ -103,14 +103,14 @@ def get_active_profile(
 ) -> tuple[str, ArchProfileConfig]:
     """Resolve active profile from config with optional override."""
     profile_name = profile or config.default_profile
-    profile = config.profiles.get(profile_name)
-    if profile is None:
+    active_profile = config.profiles.get(profile_name)
+    if active_profile is None:
         key = "profile" if profile_name != config.default_profile else "default_profile"
         raise ConfigResolutionError(
             f"Unknown tools.arch.{key} '{profile_name}'. "
             f"Available: {sorted(config.profiles)}"
         )
-    return profile_name, profile
+    return profile_name, active_profile
 
 
 def resolve_output_dir(*, output_dir: str | None, config: ArchConfig) -> Path:
@@ -126,11 +126,11 @@ def resolve_render_target(
     profile: str | None = None,
 ) -> RenderTargetConfig:
     """Resolve render target command from active profile."""
-    profile_name, profile = get_active_profile(config=config, profile=profile)
+    profile_name, active_profile = get_active_profile(config=config, profile=profile)
     return resolve_render_target_for_profile(
         target=target,
         profile_name=profile_name,
-        profile=profile,
+        profile=active_profile,
     )
 
 

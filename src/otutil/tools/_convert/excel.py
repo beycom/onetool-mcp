@@ -43,7 +43,7 @@ def convert_excel(
         Dict with 'output', 'sheets', 'rows' keys
     """
     try:
-        from openpyxl import load_workbook  # type: ignore[import-untyped]
+        from openpyxl import load_workbook
     except ImportError as e:
         raise ImportError(
             "openpyxl is required for convert. Install with: pip install openpyxl"

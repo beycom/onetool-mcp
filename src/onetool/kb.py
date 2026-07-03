@@ -11,6 +11,7 @@ from rich.progress import (
     MofNCompleteColumn,
     Progress,
     SpinnerColumn,
+    TaskID,
     TextColumn,
     TimeElapsedColumn,
 )
@@ -202,7 +203,7 @@ def cmd_scrape(
 
     # Lazy import crawl4ai — not installed unless [scrape] extra is present
     try:
-        import crawl4ai  # type: ignore[import-not-found]  # noqa: F401
+        import crawl4ai  # type: ignore[import-untyped]  # noqa: F401
     except ImportError as exc:
         console.print(
             "[red]crawl4ai is required. Install with:[/red] pip install 'onetool\\[scrape]'"
@@ -212,7 +213,7 @@ def cmd_scrape(
     # Detect missing Playwright browser (crawl4ai uses Playwright internally)
     try:
         from playwright.sync_api import (
-            sync_playwright,  # type: ignore[import-not-found]
+            sync_playwright,
         )
         with sync_playwright() as pw:
             browser = None
@@ -290,7 +291,7 @@ def cmd_scrape(
                 total=None,
             )
 
-            def on_page(written: int, current_url: str, _name: str = source_name, _max: int = _scrape_total, _task: object = crawl_task) -> None:
+            def on_page(written: int, current_url: str, _name: str = source_name, _max: int = _scrape_total, _task: TaskID = crawl_task) -> None:
                 short_url = current_url[:80] + "…" if len(current_url) > 80 else current_url
                 progress.update(
                     _task,

@@ -82,7 +82,7 @@ def dump(
             return f"Error dumping memories: {e}"
 
 
-def _export_yaml(rows: list[tuple]) -> str:
+def _export_yaml(rows: list[tuple[Any, ...]]) -> str:
     """Export memories to YAML format."""
     lines = ["memories:"]
     for r in rows:

@@ -575,10 +575,11 @@ def version(
         package.version(registry="pypi", packages={"requests": "2.31.0", "flask": "3.0.0"})
     """
     # Normalize input: convert dict to list of tuples (name, current_version)
+    pkg_list: list[tuple[str, str | None]]
     if isinstance(packages, dict):
         pkg_list = [(name, ver) for name, ver in packages.items()]
     else:
-        pkg_list: list[tuple[str, str | None]] = [(name, None) for name in packages]
+        pkg_list = [(name, None) for name in packages]
 
     with LogSpan(span="package.version", registry=registry, count=len(pkg_list)):
         results: list[dict[str, Any]] = []

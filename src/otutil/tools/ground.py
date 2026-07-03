@@ -15,7 +15,7 @@ doc_slug = "grounding-search"
 __all__ = ["dev", "docs", "reddit", "search", "search_batch"]
 
 import re
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 # Type alias for output format
 OutputFormat = Literal["full", "text_only", "sources_only"]
@@ -23,6 +23,7 @@ OutputFormat = Literal["full", "text_only", "sources_only"]
 from pydantic import BaseModel, Field
 
 from otpack import (
+    BatchEnvelope,
     LogSpan,
     batch_execute_enveloped,
     get_tool_config,
@@ -404,9 +405,10 @@ def _grounded_search(
             # Build config with timeout
             config = types.GenerateContentConfig(
                 tools=[google_search_tool],
-                http_options={"timeout": timeout * 1000},  # Convert to milliseconds
+                http_options=cast("Any", {"timeout": int(timeout * 1000)}),
             )
 
+            assert client is not None
             response = client.models.generate_content(
                 model=model,
                 contents=prompt,
@@ -426,14 +428,14 @@ def _grounded_search(
                 s.add("resultLen", len(str(result)))
                 return result
 
-            result = _format_response(
+            formatted_result = _format_response(
                 response,
                 output_format=output_format,
                 max_sources=max_sources,
             )
-            s.add("hasResults", bool(result and result not in ("No results found.", "No sources found.")))
-            s.add("resultLen", len(result))
-            return result
+            s.add("hasResults", bool(formatted_result and formatted_result not in ("No results found.", "No sources found.")))
+            s.add("resultLen", len(formatted_result))
+            return formatted_result
 
         except Exception as e:
             s.add("error", str(e))
@@ -545,7 +547,7 @@ def search_batch(
     return_provenance: bool = False,
     retries: int = 0,
     retry_delay_ms: int = 250,
-) -> dict[str, Any] | str:
+) -> BatchEnvelope | str:
     """Execute multiple grounded searches concurrently and return combined results.
 
     Queries are executed in parallel using threads for better performance.
@@ -610,7 +612,7 @@ def search_batch(
 
     with LogSpan(span="ground.batch", queryCount=len(normalized), focus=focus) as s:
 
-        def _search_one(query: str, _label: str) -> str:
+        def _search_one(query: str, _label: str) -> dict[str, Any] | str:
             """Execute a single search and return raw result payload."""
             return search(
                 query=query,
@@ -689,7 +691,7 @@ def dev(
 
     prompt = "".join(prompt_parts)
 
-    return _grounded_search(
+    return cast("str", _grounded_search(
         prompt,
         span_name="ground.dev",
         timeout=timeout,
@@ -698,7 +700,7 @@ def dev(
         query=query,
         language=language or None,
         framework=framework or None,
-    )
+    ))
 
 
 def docs(
@@ -750,7 +752,7 @@ def docs(
 
     prompt = "".join(prompt_parts)
 
-    return _grounded_search(
+    return cast("str", _grounded_search(
         prompt,
         span_name="ground.docs",
         timeout=timeout,
@@ -758,7 +760,7 @@ def docs(
         max_sources=max_sources,
         query=query,
         technology=technology or None,
-    )
+    ))
 
 
 def reddit(
@@ -813,7 +815,7 @@ def reddit(
 
     prompt = "".join(prompt_parts)
 
-    return _grounded_search(
+    return cast("str", _grounded_search(
         prompt,
         span_name="ground.reddit",
         timeout=timeout,
@@ -821,4 +823,4 @@ def reddit(
         max_sources=max_sources,
         query=query,
         subreddit=subreddit or None,
-    )
+    ))

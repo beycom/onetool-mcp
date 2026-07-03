@@ -79,11 +79,11 @@ ResolveKind = Literal["file", "dir"]
 class Config(BaseModel):
     """Pack configuration - discovered by registry."""
 
-    allowed_dirs: list[str] = Field(
+    allowed_dirs: List[str] = Field(
         default_factory=list,
         description="Allowed directories for file operations (empty = cwd only)",
     )
-    exclude_patterns: list[str] = Field(
+    exclude_patterns: List[str] = Field(
         default_factory=lambda: [".git", "node_modules", "__pycache__", ".venv", "venv"],
         description="Path patterns to exclude from operations",
     )
@@ -132,7 +132,7 @@ _TEXT_CHARS = frozenset({7, 8, 9, 10, 12, 13, 27} | set(range(0x20, 0x100)))
 # ============================================================================
 
 
-def _load_gitignore(root: Path) -> pathspec.PathSpec | None:
+def _load_gitignore(root: Path) -> pathspec.PathSpec[Any] | None:
     """Load a PathSpec from .gitignore at root, or None if not present."""
     gitignore = root / ".gitignore"
     if not gitignore.is_file():
@@ -325,7 +325,7 @@ def _gitignore_matches(
     path: Path,
     *,
     cwd: Path,
-    gi_spec: pathspec.PathSpec | None,
+    gi_spec: pathspec.PathSpec[Any] | None,
 ) -> bool:
     """Return whether a path is matched by the loaded cwd .gitignore."""
     if gi_spec is None:
@@ -343,7 +343,7 @@ def _should_skip_resolve_dir(
     cwd: Path,
     cfg: Config,
     include_hidden: bool,
-    gi_spec: pathspec.PathSpec | None,
+    gi_spec: pathspec.PathSpec[Any] | None,
 ) -> bool:
     """Return whether traversal should avoid a candidate directory."""
     try:
@@ -369,7 +369,7 @@ def _validated_resolve_candidate(
     cwd: Path,
     cfg: Config,
     include_hidden: bool,
-    gi_spec: pathspec.PathSpec | None,
+    gi_spec: pathspec.PathSpec[Any] | None,
 ) -> Path | None:
     """Validate and filter one file or directory reference candidate."""
     if kind == "file" and not entry.is_file():
@@ -397,10 +397,10 @@ def _validated_resolve_candidate(
     return validated
 
 
-def _dedupe_paths(paths: list[Path]) -> list[Path]:
+def _dedupe_paths(paths: List[Path]) -> List[Path]:
     """Deduplicate paths by resolved absolute path while preserving order."""
     seen: set[Path] = set()
-    deduped: list[Path] = []
+    deduped: List[Path] = []
     for path in paths:
         try:
             key = path.resolve()
@@ -421,9 +421,9 @@ def _glob_resolve_candidates(
     cwd: Path,
     cfg: Config,
     include_hidden: bool,
-    gi_spec: pathspec.PathSpec | None,
+    gi_spec: pathspec.PathSpec[Any] | None,
     max_results: int,
-) -> list[Path]:
+) -> List[Path]:
     """Resolve one exact or glob pattern to validated file or dir candidates."""
     raw_pattern = Path(pattern)
     if raw_pattern.is_absolute():
@@ -433,7 +433,7 @@ def _glob_resolve_candidates(
         glob_root = root
         glob_pattern = pattern
 
-    matches: list[Path] = []
+    matches: List[Path] = []
     try:
         entries = glob_root.glob(glob_pattern)
         for entry in entries:
@@ -462,14 +462,14 @@ def _all_resolve_candidates(
     cwd: Path,
     cfg: Config,
     include_hidden: bool,
-    gi_spec: pathspec.PathSpec | None,
-) -> list[Path]:
+    gi_spec: pathspec.PathSpec[Any] | None,
+) -> List[Path]:
     """Build the validated candidate set for fuzzy path reference matching."""
-    candidates: list[Path] = []
+    candidates: List[Path] = []
     try:
         for current_root, dir_names, file_names in os.walk(root):
             current_path = Path(current_root)
-            validated_dirs: list[str] = []
+            validated_dirs: List[str] = []
             for dir_name in dir_names:
                 dir_path = current_path / dir_name
                 if _should_skip_resolve_dir(
@@ -514,10 +514,10 @@ def _all_resolve_candidates(
 def _match_resolve_candidates(
     query: str,
     *,
-    candidates: list[Path],
+    candidates: List[Path],
     cwd: Path,
     max_results: int,
-) -> list[Path]:
+) -> List[Path]:
     """Resolve one fuzzy quick-open query to ranked file candidates."""
     haystack_to_path = {
         _display_path(path, cwd=cwd, path_type="relative"): path for path in candidates
@@ -526,7 +526,7 @@ def _match_resolve_candidates(
     return [haystack_to_path[match.value] for match in matches]
 
 
-def _format_resolve_error(selector: str, candidates: list[str]) -> str:
+def _format_resolve_error(selector: str, candidates: List[str]) -> str:
     """Format a multi-match error with numbered candidate paths."""
     lines = [f"Error: Multiple files matched '{selector}':"]
     lines.extend(f"{idx}. {candidate}" for idx, candidate in enumerate(candidates, start=1))
@@ -536,12 +536,12 @@ def _format_resolve_error(selector: str, candidates: list[str]) -> str:
 
 def _select_resolve_result(
     selector: str,
-    paths: list[Path],
+    paths: List[Path],
     *,
     cwd: Path,
     path_type: str,
     multi: str,
-) -> str | list[str]:
+) -> str | List[str]:
     """Apply multi behavior to one selector's resolved paths."""
     display_paths = [_display_path(path, cwd=cwd, path_type=path_type) for path in paths]
     if multi == "all":
@@ -558,15 +558,15 @@ def _select_resolve_result(
 def resolve(
     *,
     path: str = ".",
-    glob: str | list[str] | None = None,
-    match: str | list[str] | None = None,
+    glob: str | List[str] | None = None,
+    match: str | List[str] | None = None,
     kind: ResolveKind = "file",
     gitignore: bool = True,
     include_hidden: bool = True,
     path_type: str = "relative",
     multi: str = "all",
     max_results: int = 10,
-) -> str | list[str]:
+) -> str | List[str]:
     """Resolve file or directory references to path strings.
 
     Accepts exact/glob path references or fuzzy quick-open style matches and
@@ -635,14 +635,21 @@ def resolve(
         gi_spec = _load_gitignore(cwd) if gitignore else None
         selector_input = glob if glob is not None else match
         is_list_input = isinstance(selector_input, builtins.list)
-        selectors = selector_input if is_list_input else [selector_input]
+        selectors: List[str]
+        if isinstance(selector_input, builtins.list):
+            selectors = selector_input
+        elif isinstance(selector_input, str):
+            selectors = [selector_input]
+        else:
+            s.add(error="missing_selector")
+            return "Error: Exactly one of 'glob' or 'match' is required"
 
         if any(not isinstance(item, str) or not item for item in selectors):
             s.add(error="invalid_selector")
             return "Error: selectors must be non-empty strings"
 
-        results: list[str] = []
-        fuzzy_candidates: list[Path] | None = None
+        results: List[str] = []
+        fuzzy_candidates: List[Path] | None = None
         for selector in selectors:
             assert isinstance(selector, str)
             if glob is not None:
@@ -953,7 +960,7 @@ def list(
 
         try:
             # Collect entries with metadata: (type, rel_path, size, mtime, entry)
-            entries: List[tuple[str, str, int, float]] = []  # noqa: UP006
+            entries: List[tuple[str, str, int, float]] = []
 
             if pattern:
                 matches = (
@@ -1075,7 +1082,7 @@ def tree(
         node_count = 0
         max_nodes = cfg.max_list_entries
 
-        def build_tree(dir_path: Path, prefix: str, depth: int) -> List[str]:  # noqa: UP006
+        def build_tree(dir_path: Path, prefix: str, depth: int) -> List[str]:
             nonlocal node_count
 
             if depth > max_depth or node_count >= max_nodes:
@@ -1172,7 +1179,7 @@ def search(
             return f"Error: Not a directory: {path}"
 
         cfg = _get_file_config()
-        results: List[tuple[str, int]] = []  # noqa: UP006
+        results: List[tuple[str, int]] = []
 
         try:
             if glob:
@@ -1331,7 +1338,7 @@ def grep(
         cwd = resolved
         gi_spec = _load_gitignore(cwd) if gitignore else None
 
-        output_parts: list[str] = []
+        output_parts: List[str] = []
         total_matches = 0
 
         # Always recurse; strip leading "**/" so "**/*.md" and "*.md" behave identically
@@ -1384,7 +1391,7 @@ def grep(
             for group in groups:
                 if total_matches >= max_matches:
                     break
-                block_lines: list[str] = []
+                block_lines: List[str] = []
                 for lineno, line, is_match in group:
                     if is_match and total_matches >= max_matches:
                         break
@@ -1414,7 +1421,7 @@ def grep(
 
 def read_batch(
     *,
-    paths: list[str] | None = None,
+    paths: List[str] | None = None,
     glob: str | None = None,
     encoding: str = "utf-8",
     max_files: int = 20,
@@ -1450,7 +1457,7 @@ def read_batch(
         cwd = _expand_path(".")
 
         # Collect candidate paths
-        candidates: list[Path] = []
+        candidates: List[Path] = []
         if paths:
             for p in paths:
                 resolved, error = _validate_path(p, must_exist=True)
@@ -1480,7 +1487,7 @@ def read_batch(
         if len(candidates) > max_files:
             candidates = candidates[:max_files]
 
-        parts: list[str] = []
+        parts: List[str] = []
         read_count = 0
 
         for entry in candidates:
@@ -1582,7 +1589,7 @@ def toc(
 def slice(
     *,
     path: str,
-    select: int | str | list[int | str],
+    select: int | str | List[int | str],
     encoding: str = "utf-8",
 ) -> str:
     """Extract content from a file by line range, heading, or section number.
@@ -1641,8 +1648,8 @@ def slice(
         lines = content.split("\n")
         sections = parse_headings("", lines=lines)
 
-        selectors: list[int | str] = select if not isinstance(select, (int, str)) else [select]  # type: ignore[assignment]
-        extracted: list[str] = []
+        selectors = select if isinstance(select, builtins.list) else [select]
+        extracted: List[str] = []
         for sel in selectors:
             part = resolve_slice(sel, lines, sections)
             if part is not None:
@@ -1658,7 +1665,7 @@ def slice(
 
 def slice_batch(
     *,
-    items: list[dict],
+    items: List[dict[str, Any]],
 ) -> str:
     """Extract sections from multiple files in a single call.
 
@@ -1688,7 +1695,7 @@ def slice_batch(
         if len(items) > 20:
             return f"Error: Maximum 20 items allowed, got {len(items)}"
 
-        result_parts: list[str] = []
+        result_parts: List[str] = []
         sliced_count = 0
 
         for item in items:
@@ -1739,8 +1746,8 @@ def slice_batch(
             lines = content.split("\n")
             sections = parse_headings("", lines=lines)
 
-            selectors: list[int | str] = sel if not isinstance(sel, (int, str)) else [sel]  # type: ignore[assignment]
-            extracted: list[str] = []
+            selectors = sel if isinstance(sel, builtins.list) else [sel]
+            extracted: List[str] = []
             for sel_item in selectors:
                 part = resolve_slice(sel_item, lines, sections)
                 if part is not None:

@@ -887,12 +887,18 @@ def render_diagram(
                 # Infer provider from extension
                 if provider is None:
                     ext = _match_source_extension(file_path)
-                    provider = EXTENSION_TO_PROVIDER.get(ext)
-                    if provider is None:
+                    if ext is None:
                         raise ValueError(
                             f"Cannot infer provider from extension '{file_path.suffix.lower()}'. "
                             "Please specify provider explicitly."
                         )
+                    inferred_provider = EXTENSION_TO_PROVIDER.get(ext)
+                    if inferred_provider is None:
+                        raise ValueError(
+                            f"Cannot infer provider from extension '{file_path.suffix.lower()}'. "
+                            "Please specify provider explicitly."
+                        )
+                    provider = inferred_provider
 
                 # Use filename as name if not provided
                 if name is None:

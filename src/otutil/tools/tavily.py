@@ -35,6 +35,7 @@ import httpx
 from pydantic import BaseModel, Field
 
 from otpack import (
+    BatchEnvelope,
     LogSpan,
     _format_http_error,
     batch_execute_enveloped,
@@ -619,6 +620,7 @@ def search(
 
         if not success:
             return str(result)
+        assert isinstance(result, dict)
 
         output = _format_search_results(result, output_format, min_score, max_sources=max_sources)
 
@@ -698,6 +700,7 @@ def extract(
 
         if not success:
             return str(result)
+        assert isinstance(result, dict)
 
         output = _format_extract_results(result)
         span.add(outputLen=len(output))
@@ -803,7 +806,7 @@ def search_batch(
     return_provenance: bool = False,
     retries: int = 0,
     retry_delay_ms: int = 250,
-) -> dict[str, Any] | str:
+) -> BatchEnvelope | str:
     """Execute multiple Tavily searches concurrently and return combined results.
 
     Queries are executed in parallel using threads for better performance.
@@ -870,7 +873,7 @@ def search_batch(
         span="tavily.batch", query_count=len(normalized), max_results=max_results
     ) as s:
 
-        def _search_one(query: str, _label: str) -> str:
+        def _search_one(query: str, _label: str) -> dict[str, Any] | str:
             return search(
                 query=query,
                 max_results=max_results,
@@ -954,6 +957,7 @@ def research(
 
         if not success:
             return str(result)
+        assert isinstance(result, dict)
 
         status = result.get("status", "")
 
@@ -997,6 +1001,7 @@ def research(
 
             if not poll_success:
                 continue
+            assert isinstance(poll_result, dict)
 
             poll_status = poll_result.get("status", "")
 

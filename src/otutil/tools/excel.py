@@ -165,6 +165,7 @@ def create(
             _ensure_parent_dir(filepath)
             wb = Workbook()
             ws = wb.active
+            assert ws is not None
             if sheet_names:
                 ws.title = sheet_names[0]
                 for name in sheet_names[1:]:
@@ -321,6 +322,7 @@ def write(
                 _ensure_parent_dir(filepath)
                 wb = Workbook()
                 if sheet_name:
+                    assert wb.active is not None
                     wb.active.title = sheet_name
             else:
                 wb = load_workbook(path)

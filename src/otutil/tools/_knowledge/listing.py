@@ -5,7 +5,7 @@ import contextlib
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from otpack import LogSpan
 from otutil.tools._content_util import grep_lines, parse_headings
@@ -221,7 +221,7 @@ def slice_entry(
                 e = end if end is not None else len(lines)
                 return "\n".join(lines[s:e])
 
-            return content
+            return cast("str", content)
         except Exception as e:
             return f"Error slicing '{topic}': {e}"
 
@@ -449,7 +449,7 @@ def export_db(
             return f"Error exporting '{db}': {e}"
 
 
-def _apply_topic_filter(sql: str, params: list, topic: str | None) -> tuple[str, list]:
+def _apply_topic_filter(sql: str, params: list[Any], topic: str | None) -> tuple[str, list[Any]]:
     if not topic:
         return sql, params
     if topic.endswith("/"):
