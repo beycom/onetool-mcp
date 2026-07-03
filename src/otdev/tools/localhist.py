@@ -24,8 +24,6 @@ __all__ = [
 
 __ot_requires__: dict[str, list[tuple[str, str]]] = {}
 
-from otpack import LogSpan
-
 from otdev.tools._localhist.autosave import (
     autosave_list_project,
     autosave_start_project,
@@ -45,6 +43,7 @@ from otdev.tools._localhist.core import (
     show_file,
     status_repository,
 )
+from otpack import LogSpan
 
 SnapshotKind = str
 
@@ -221,7 +220,8 @@ def log(*, limit: int = 20, date_format: str = "%Y-%m-%d %H:%M:%S %Z") -> dict[s
 
     with LogSpan(span="localhist.log", limit=limit) as span:
         result = list_log(limit=limit, date_format=date_format)
-        span.add(ok=result.get("ok"), count=len(result.get("entries", [])))
+        entries = result.get("entries", [])
+        span.add(ok=result.get("ok"), count=len(entries) if isinstance(entries, list) else 0)
         return result
 
 
@@ -246,7 +246,8 @@ def history(
 
     with LogSpan(span="localhist.history", path=path, limit=limit, follow=follow) as span:
         result = list_history(path=path, limit=limit, follow=follow, date_format=date_format)
-        span.add(ok=result.get("ok"), count=len(result.get("entries", [])))
+        entries = result.get("entries", [])
+        span.add(ok=result.get("ok"), count=len(entries) if isinstance(entries, list) else 0)
         return result
 
 

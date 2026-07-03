@@ -63,7 +63,8 @@ def _lock_path(paths: Paths) -> Path:
 def _read_json(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
-    return json.loads(path.read_text())
+    data = json.loads(path.read_text())
+    return data if isinstance(data, dict) else {}
 
 
 def _write_json(path: Path, data: dict[str, Any]) -> None:

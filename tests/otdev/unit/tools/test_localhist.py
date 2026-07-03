@@ -113,7 +113,8 @@ def test_init_info_status_save_log_and_gitignore(monkeypatch: pytest.MonkeyPatch
     assert init_result["ok"] is True
     assert init_result["created"] is True
     gitignore_lines = (tmp_path / ".gitignore").read_text().splitlines()
-    assert ".localhist/" in gitignore_lines
+    assert ".localhist/" not in gitignore_lines
+    assert (tmp_path / ".localhist" / ".gitignore").read_text() == "*\n!.gitignore\n"
     exclude_lines = (tmp_path / ".localhist" / "info" / "exclude").read_text().splitlines()
     assert ".git/" in exclude_lines
     assert ".onetool/state/localhist/" in exclude_lines
@@ -166,6 +167,23 @@ def test_init_info_status_save_log_and_gitignore(monkeypatch: pytest.MonkeyPatch
     assert save_result["commit"]["kind"] == "manual"
     assert localhist.save(message="no changes")["created"] is False
     assert len(localhist.log(limit=5)["entries"]) == 1
+
+
+def test_init_creates_nested_gitignore_for_custom_git_dir(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    monkeypatch.setattr(
+        "otdev.tools._localhist.core.load_config",
+        lambda: Config(git_dir="history/local"),
+    )
+
+    result = localhist.init()
+
+    assert result["ok"] is True
+    assert (tmp_path / "history" / "local" / ".gitignore").read_text() == "*\n!.gitignore\n"
+    assert not (tmp_path / ".gitignore").exists()
 
 
 def test_save_repairs_localhist_git_dir_exclude_before_staging(
@@ -516,6 +534,23 @@ def test_save_paths_force_include_matches_scoped_glob(
     assert result["changed_count"] == 1
     assert localhist.show(ref="HEAD", path="docs/nested/generated.md")["content"] == "generated\n"
     assert localhist.show(ref="HEAD", path="docs/nested/ignored.txt")["ok"] is False
+
+
+def test_save_paths_force_include_glob_matches_literal_subdirectory_scope(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    _write(tmp_path / ".gitignore", "wip/\n")
+    _write(tmp_path / "wip" / "requirements" / "feature.md", "requirements\n")
+
+    localhist.add_force_include(rule="wip/**")
+    result = localhist.save(message="scoped wip", paths="wip/requirements")
+
+    assert result["created"] is True
+    assert result["paths"] == ["wip/requirements"]
+    assert result["changed_count"] == 1
+    assert localhist.show(ref="HEAD", path="wip/requirements/feature.md")["content"] == "requirements\n"
 
 
 def test_save_paths_reject_invalid_pathspecs(

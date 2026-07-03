@@ -9,8 +9,9 @@ from hashlib import sha256
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from otpack import get_project_state_dir, get_tool_config, resolve_cwd_path
 from pydantic import BaseModel, ConfigDict, Field
+
+from otpack import get_project_state_dir, get_tool_config, resolve_cwd_path
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

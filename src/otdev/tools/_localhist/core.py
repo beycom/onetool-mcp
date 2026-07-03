@@ -41,16 +41,14 @@ def _gitignore_entry(config: Config, paths: Paths) -> str | None:
         return config.git_dir.rstrip("/") + "/"
 
 
-def _ensure_gitignore(config: Config, paths: Paths) -> bool:
-    entry = _gitignore_entry(config, paths)
-    if entry is None:
+def _ensure_nested_gitignore(paths: Paths) -> bool:
+    gitignore = paths.git_dir / ".gitignore"
+    before = gitignore.read_text() if gitignore.exists() else ""
+    after = "*\n!.gitignore\n"
+    if before == after:
         return False
-    gitignore = paths.project_root / ".gitignore"
-    lines = gitignore.read_text().splitlines() if gitignore.exists() else []
-    if entry in lines:
-        return False
-    lines.append(entry)
-    gitignore.write_text("\n".join(lines).rstrip() + "\n")
+    gitignore.parent.mkdir(parents=True, exist_ok=True)
+    gitignore.write_text(after)
     return True
 
 
@@ -158,10 +156,11 @@ def _validate_snapshot_pathspecs(
 
 def _append_info_exclude(paths: Path, patterns: list[str]) -> int:
     exclude = _info_file(paths, "exclude")
-    return int(_append_rules(exclude, patterns)["added"])
+    added = _append_rules(exclude, patterns)["added"]
+    return added if isinstance(added, int) else 0
 
 
-def _ensure_force_include_file(paths: Path) -> Path:
+def _ensure_force_include_file(paths: Paths) -> Path:
     paths.state_dir.mkdir(parents=True, exist_ok=True)
     if not paths.force_include_file.exists():
         paths.force_include_file.write_text("")
@@ -360,7 +359,7 @@ def init_repository() -> dict[str, object]:
         git.run("config", "user.name", LOCALHIST_USER_NAME)
         git.run("config", "user.email", LOCALHIST_USER_EMAIL)
         git.run("config", "commit.gpgsign", "false")
-        ignore_added = _ensure_gitignore(config, paths)
+        ignore_added = _ensure_nested_gitignore(paths)
         exclude_added = _append_info_exclude(paths.git_dir, _required_info_excludes(config, paths))
         _ensure_force_include_file(paths)
         return {
@@ -476,11 +475,22 @@ def _pathspec_matches_scope(rule: str, scoped_paths: list[str]) -> bool:
     for scoped in scoped_paths:
         scoped_clean = scoped.rstrip("/")
         scoped_has_glob = any(char in scoped_clean for char in "*?[")
+        rule_has_glob = any(char in rule_clean for char in "*?[")
+        rule_literal_prefix = _literal_pathspec_prefix(rule_clean)
         if (
             rule_clean == scoped_clean
             or rule_clean.startswith(scoped_clean + "/")
             or scoped_clean.startswith(rule_clean + "/")
             or (scoped_has_glob and PurePosixPath(rule_clean).match(scoped_clean))
+            or (rule_has_glob and PurePosixPath(scoped_clean).match(rule_clean))
+            or (
+                rule_has_glob
+                and rule_literal_prefix
+                and (
+                    scoped_clean == rule_literal_prefix
+                    or scoped_clean.startswith(rule_literal_prefix + "/")
+                )
+            )
         ):
             return True
     return False
