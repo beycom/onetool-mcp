@@ -4,9 +4,8 @@ from __future__ import annotations
 from collections import deque
 from typing import TYPE_CHECKING, Any
 
-from otpack import LogSpan
-
 from ot.utils.factory import lazy_client
+from otpack import LogSpan
 
 from .config import _get_config
 from .db import deserialize_meta, deserialize_tags, get_connection, use_connection
@@ -20,9 +19,9 @@ def _create_llm_client() -> OpenAI | None:
     """Create OpenAI client for LLM reranking and synthesis."""
     try:
         from openai import OpenAI
-        from otpack import get_secret
 
         from ot.config import get_llm_config
+        from otpack import get_secret
 
         api_key = get_secret("OPENAI_API_KEY") or ""
         if not api_key:

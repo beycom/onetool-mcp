@@ -55,6 +55,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 import pathspec
+from pydantic import BaseModel, Field
+
 from otpack import (
     LogSpan,
     get_tool_config,
@@ -62,8 +64,6 @@ from otpack import (
     resolve_cwd_path,
     validate_path,
 )
-from pydantic import BaseModel, Field
-
 from otutil.tools._content_util import (
     build_toc,
     grep_lines,

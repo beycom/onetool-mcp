@@ -35,9 +35,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
-from otpack import LogSpan, resolve_cwd_path
-
 from ot.utils.async_bridge import run_coro_sync
+from otpack import LogSpan, resolve_cwd_path
 from otutil.tools._convert import (
     convert_excel,
     convert_pdf,

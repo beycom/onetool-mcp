@@ -24,6 +24,8 @@ import re
 from typing import Any
 
 import httpx
+from pydantic import BaseModel, Field
+
 from otpack import (
     LogSpan,
     _format_http_error,
@@ -32,7 +34,6 @@ from otpack import (
     lazy_client,
     require_api_key,
 )
-from pydantic import BaseModel, Field
 
 
 class Config(BaseModel):

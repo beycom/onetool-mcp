@@ -21,10 +21,10 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC
 from typing import TYPE_CHECKING, Any
 
-from otpack import LogSpan, get_tool_config, resolve_cwd_path
 from pydantic import BaseModel, Field
 
 from ot.http_client import http_get
+from otpack import LogSpan, get_tool_config, resolve_cwd_path
 
 if TYPE_CHECKING:
     from pathlib import Path

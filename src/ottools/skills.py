@@ -13,9 +13,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from otpack import LogSpan, cache
-
 from ot.logging import LogEntry
+from otpack import LogSpan, cache
 
 if TYPE_CHECKING:
     from pathlib import Path

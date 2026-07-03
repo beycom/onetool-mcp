@@ -19,7 +19,6 @@ from typing import Any
 
 import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, TemplateError
-from otpack import LogSpan, resolve_cwd_path
 
 from otdev.tools._arch.bundle import BundleError, bundle_solution_directory
 from otdev.tools._arch.config import (
@@ -79,6 +78,7 @@ from otdev.tools._arch.system_model import (
     system_page_name as _system_page_name,
 )
 from otdev.tools._arch.validate import validate_entities
+from otpack import LogSpan, resolve_cwd_path
 
 _SAFE_ID_FRAGMENT_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 _UNSAFE_PATH_CHARS_RE = re.compile(r"[;\|&`$<>\r\n]")

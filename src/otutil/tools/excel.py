@@ -60,8 +60,9 @@ except ImportError as _openpyxl_err:
         "Excel tools require the [util] extra. "
         "Install with: pip install onetool-mcp[util]"
     ) from _openpyxl_err
-from otpack import LogSpan, get_tool_config, resolve_cwd_path
 from pydantic import BaseModel
+
+from otpack import LogSpan, get_tool_config, resolve_cwd_path
 
 if TYPE_CHECKING:
     from pathlib import Path

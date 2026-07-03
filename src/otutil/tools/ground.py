@@ -20,6 +20,8 @@ from typing import Any, Literal
 # Type alias for output format
 OutputFormat = Literal["full", "text_only", "sources_only"]
 
+from pydantic import BaseModel, Field
+
 from otpack import (
     LogSpan,
     batch_execute_enveloped,
@@ -28,7 +30,6 @@ from otpack import (
     normalize_items,
     require_api_key,
 )
-from pydantic import BaseModel, Field
 
 # Dependency declarations for CLI validation
 __ot_requires__ = {

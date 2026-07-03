@@ -27,6 +27,8 @@ from typing import Any, Literal
 OutputFormat = Literal["full", "text_only", "sources_only"]
 
 import httpx
+from pydantic import BaseModel, Field
+
 from otpack import (
     LogSpan,
     _format_http_error,
@@ -37,7 +39,6 @@ from otpack import (
     require_api_key,
     truncate,
 )
-from pydantic import BaseModel, Field
 
 
 class Config(BaseModel):

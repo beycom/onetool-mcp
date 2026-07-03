@@ -4,8 +4,9 @@ from __future__ import annotations
 import builtins
 from typing import TYPE_CHECKING
 
-from otpack import DEFAULT_EXCLUDE_PATTERNS, get_tool_config, validate_path
 from pydantic import BaseModel, Field
+
+from otpack import DEFAULT_EXCLUDE_PATTERNS, get_tool_config, validate_path
 
 if TYPE_CHECKING:
     from pathlib import Path

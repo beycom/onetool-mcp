@@ -10,9 +10,8 @@ import fnmatch
 import re
 from pathlib import Path
 
-from otpack import LogSpan, cache, get_effective_cwd
-
 from ot.paths import get_config_dir
+from otpack import LogSpan, cache, get_effective_cwd
 
 # Pack for dot notation: ot_forge.create_ext(), ot_forge.validate_ext(), ot_forge.install_skills()
 pack = "ot_forge"
@@ -392,7 +391,7 @@ def _get_skill_stub_template() -> str:
     if not tmpl.exists():
         return (
             "---\nname: {{ name }}\ndescription: {{ description }}\n---\n\n"
-            "To load this skill: `__run ot.skills(name=\"{{ name }}\")`\n"
+            "To load this skill: `__onetool ot.skills(name=\"{{ name }}\")`\n"
         )
     return tmpl.read_text(encoding="utf-8")
 

@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 from otpack import LogSpan
-
 from otutil.tools._content_util import grep_lines, parse_headings
 
 from .config import _get_config

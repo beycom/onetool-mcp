@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from otpack import get_effective_cwd, get_tool_config, resolve_cwd_path
 from pydantic import BaseModel, ConfigDict, Field
 
 from ot.paths import get_config_dir, get_global_templates_dir
+from otpack import get_effective_cwd, get_tool_config, resolve_cwd_path
 
 
 class _ArchBaseModel(BaseModel):

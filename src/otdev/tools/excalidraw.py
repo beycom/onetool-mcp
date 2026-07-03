@@ -54,9 +54,8 @@ import threading
 from importlib import resources
 from typing import Any
 
-from otpack import LogSpan, resolve_cwd_path
-
 from otdev.tools._excalidraw import session as _session
+from otpack import LogSpan, resolve_cwd_path
 
 
 def _edge_key(e: dict[str, Any]) -> tuple[str, str, str, str | None, str | None]:

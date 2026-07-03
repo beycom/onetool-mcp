@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
 from otpack import LogSpan
 
 # Pack for dot notation: ot_secrets.init(), ot_secrets.encrypt(), etc.

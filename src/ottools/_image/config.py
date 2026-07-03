@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from loguru import logger
-from otpack import get_secret, get_tool_config
 from pydantic import BaseModel, Field
 
 from ot.logging import LogEntry
+from otpack import get_secret, get_tool_config
 
 
 class Config(BaseModel):

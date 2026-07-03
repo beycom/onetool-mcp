@@ -5,9 +5,9 @@ import uuid
 from typing import Any
 
 from loguru import logger
-from otpack import LogSpan
 
 from ot.logging import LogEntry
+from otpack import LogSpan
 
 from .chunker import _content_hash
 from .config import VALID_CATEGORIES

@@ -9,10 +9,10 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 from loguru import logger
-from otpack import LogSpan, get_secret
 
 from ot.config import get_llm_config
 from ot.logging import LogEntry
+from otpack import LogSpan, get_secret
 
 from .config import _get_config
 

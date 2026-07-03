@@ -49,8 +49,9 @@ from pathlib import Path
 from typing import Any, Literal
 
 import httpx
-from otpack import LogSpan, get_effective_cwd, get_tool_config, truncate
 from pydantic import BaseModel, Field
+
+from otpack import LogSpan, get_effective_cwd, get_tool_config, truncate
 
 # ==================== Configuration Classes ====================
 

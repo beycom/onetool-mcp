@@ -4,8 +4,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from otpack import get_tool_config
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from otpack import get_tool_config
 
 VALID_CATEGORIES = {"reference", "rule", "note", "mistake"}
 

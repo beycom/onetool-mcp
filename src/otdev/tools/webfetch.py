@@ -19,6 +19,8 @@ import json
 from typing import Any, Literal
 from urllib.parse import urlparse
 
+from pydantic import BaseModel, Field
+
 from otpack import (
     LogSpan,
     batch_execute,
@@ -28,7 +30,6 @@ from otpack import (
     normalize_items,
     truncate,
 )
-from pydantic import BaseModel, Field
 
 
 def _require_trafilatura() -> None:

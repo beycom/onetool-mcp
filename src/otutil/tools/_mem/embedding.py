@@ -7,10 +7,10 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
-from otpack import LogSpan, get_secret
 
 from ot.config import get_llm_config
 from ot.logging import LogEntry
+from otpack import LogSpan, get_secret
 
 from .config import _get_config
 from .db import _serialize_embedding, _use_connection
