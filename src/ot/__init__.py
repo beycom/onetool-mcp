@@ -13,8 +13,6 @@ Usage:
     # With config and secrets
     onetool serve --config config/onetool.yaml --secrets config/secrets.yaml
 
-    # Run benchmarks
-    bench run harness.yaml
 """
 
 from importlib.metadata import PackageNotFoundError, version

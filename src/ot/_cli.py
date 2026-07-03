@@ -1,7 +1,4 @@
-"""Shared CLI utilities for OneTool CLIs.
-
-Provides common patterns used across onetool and bench CLIs.
-"""
+"""Shared CLI utilities for OneTool CLIs."""
 
 from __future__ import annotations
 
@@ -23,7 +20,7 @@ def version_callback(name: str, version: str) -> Callable[[bool], None]:
     """Create a version callback for Typer CLI.
 
     Args:
-        name: CLI name to display (e.g., "ot", "bench")
+        name: CLI name to display (e.g., "onetool")
         version: Version string to display
 
     Returns:
@@ -68,11 +65,7 @@ def create_cli(
         Configured Typer app
 
     Example:
-        app = create_cli(
-            "bench",
-            "OneTool benchmark harness.",
-            no_args_is_help=True,
-        )
+        app = create_cli("onetool", "OneTool MCP server.")
     """
     return typer.Typer(
         name=name,

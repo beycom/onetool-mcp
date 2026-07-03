@@ -8,8 +8,8 @@ details belong under `openspec/changes/`, not in this index.
 
 | Pattern | Example | Description |
 |---------|---------|-------------|
-| `{cli}` | `bench` | Main spec for a CLI or package area |
-| `{cli}-{feature}` | `bench-config` | CLI feature spec |
+| `{cli}` | `onetool-cli` | Main spec for a CLI or package area |
+| `{api}-{feature}` | `direct-run` | Direct API feature spec |
 | `serve-{feature}` | `serve-configuration` | OneTool MCP server feature spec |
 | `tool-{name}` | `otutil/tool-brave` | Tool pack spec grouped by source package |
 | `_nf-{name}` | `_nf-observability` | Cross-cutting non-functional spec |
@@ -108,19 +108,6 @@ details belong under `openspec/changes/`, not in this index.
 | [tool-ripgrep](otdev/tool-ripgrep/spec.md) | Ripgrep-backed search tools |
 | [tool-webfetch](otdev/tool-webfetch/spec.md) | Web content extraction |
 
-## Bench
-
-| Spec | Purpose |
-|------|---------|
-| [bench](bench/spec.md) | Benchmark harness overview |
-| [bench-config](bench-config/spec.md) | Benchmark YAML config and server connections |
-| [bench-csv](bench-csv/spec.md) | CSV export |
-| [bench-evaluators](bench-evaluators/spec.md) | Deterministic and LLM evaluators |
-| [bench-logging](bench-logging/spec.md) | CLI output and reporter behavior |
-| [bench-metrics](bench-metrics/spec.md) | Metrics and context growth analysis |
-| [bench-tasks](bench-tasks/spec.md) | Scenario and task definitions |
-| [bench-tui](bench-tui/spec.md) | TUI favorites mode |
-
 ## Spec Count Summary
 
 | Category | Count |
@@ -133,5 +120,4 @@ details belong under `openspec/changes/`, not in this index.
 | Core Built-In Tool Packs | 6 |
 | Domain Tools `[util]` | 6 |
 | Domain Tools `[dev]` | 9 |
-| Bench | 8 |
-| **Total** | **62** |
+| **Total** | **54** |

@@ -100,8 +100,6 @@ src/
     mem.py                   #   Persistent memory tools
 
   onetool/                   # MCP server CLI (onetool.cli:cli)
-
-packages/onetool-bench/src/bench/  # Benchmark harness (internal)
 ```
 
 ## Deep Dives

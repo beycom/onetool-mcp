@@ -8,7 +8,6 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "onetool-bench",
     "onetool-mcp",
     "onetool-pack",
 ]
@@ -2268,21 +2267,6 @@ wheels = [
 ]
 
 [[package]]
-name = "onetool-bench"
-version = "2.2.2"
-source = { editable = "packages/onetool-bench" }
-dependencies = [
-    { name = "onetool-mcp" },
-    { name = "questionary" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "onetool-mcp", editable = "." },
-    { name = "questionary", specifier = ">=2.1.1" },
-]
-
-[[package]]
 name = "onetool-mcp"
 version = "2.2.2"
 source = { editable = "." }
@@ -2302,6 +2286,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pyrage" },
     { name = "pyyaml" },
+    { name = "questionary" },
     { name = "resvg-py" },
     { name = "rich" },
     { name = "tiktoken" },
@@ -2410,6 +2395,7 @@ requires-dist = [
     { name = "python-frontmatter", marker = "extra == 'util'", specifier = ">=1.1.0" },
     { name = "python-pptx", marker = "extra == 'util'", specifier = ">=1.0.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "questionary", specifier = ">=2.1.1" },
     { name = "resvg-py", specifier = ">=0.3.1" },
     { name = "rich", specifier = ">=14.3.3" },
     { name = "send2trash", marker = "extra == 'util'", specifier = ">=2.1.0" },
@@ -4395,11 +4381,11 @@ wheels = [
 
 [[package]]
 name = "wcwidth"
-version = "0.7.0"
+version = "0.8.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/2c/ee/afaf0f85a9a18fe47a67f1e4422ed6cf1fe642f0ae0a2f81166231303c52/wcwidth-0.7.0.tar.gz", hash = "sha256:90e3a7ea092341c44b99562e75d09e4d5160fe7a3974c6fb842a101a95e7eed0", size = 182132, upload-time = "2026-05-02T16:04:12.653Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/34/74/c6428f875774288bec1396f5bfcbc2d925700a4dad61727fd5f2b12f249d/wcwidth-0.8.2.tar.gz", hash = "sha256:91fbef97204b96a3d4d421609b80340b760cf33e26da123ff243d76b1fda8dda", size = 1466253, upload-time = "2026-06-29T18:11:11.601Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/41/52/e465037f5375f43533d1a80b6923955201596a99142ed524d77b571a1418/wcwidth-0.7.0-py3-none-any.whl", hash = "sha256:5d69154c429a82910e241c738cd0e2976fac8a2dd47a1a805f4afed1c0f136f2", size = 110825, upload-time = "2026-05-02T16:04:11.033Z" },
+    { url = "https://files.pythonhosted.org/packages/96/42/3e5985a0a7e57de470b320c6d6a1a67c844f6737a587f3d44dd13d1819e7/wcwidth-0.8.2-py3-none-any.whl", hash = "sha256:d63947694a0539a1d51e01eda7caf800c291020e6cdd7e28ad7b14dd33ad4f85", size = 323166, upload-time = "2026-06-29T18:11:09.888Z" },
 ]
 
 [[package]]

@@ -64,7 +64,6 @@ set-version version:
     sed -i '' 's/^version = ".*"/version = "{{ version }}"/' pyproject.toml
     sed -i '' 's/"version": ".*"/"version": "{{ version }}"/g' server.json
     sed -i '' 's/^version = ".*"/version = "{{ version }}"/' packages/onetool-pack/pyproject.toml
-    sed -i '' 's/^version = ".*"/version = "{{ version }}"/' packages/onetool-bench/pyproject.toml
     @echo "Updated pyproject.toml, server.json, and package pyprojects."
 
 # Build package

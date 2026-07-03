@@ -5,9 +5,9 @@ useful for profiling workflows, benchmarking API responses, or capturing
 lap times during multi-step operations.
 
 Example:
-    ot_timer.start(name="api_bench")
+    ot_timer.start(name="api_call")
     # ... do work across multiple tool calls ...
-    ot_timer.elapsed(name="api_bench", store_as="api_total")
+    ot_timer.elapsed(name="api_call", store_as="api_total")
     ot_timer.list()
 """
 

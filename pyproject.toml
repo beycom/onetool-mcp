@@ -28,6 +28,7 @@ dependencies = [
     "pydantic-settings>=2.14.0",
     "jmespath>=1.1.0",
     "pyyaml>=6.0.3",
+    "questionary>=2.1.1",
     "rich>=14.3.3",
     "typer>=0.25.0",
     "jinja2>=3.1.6",              # Snippets template engine
@@ -113,7 +114,7 @@ dev = [
 default-groups = ["dev", "docs"]
 
 [tool.uv.workspace]
-members = ["packages/onetool-pack", "packages/onetool-bench"]
+members = ["packages/onetool-pack"]
 
 [tool.uv.sources]
 onetool-pack = { workspace = true }
@@ -186,8 +187,8 @@ module = "questionary"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "packages/onetool-pack/tests", "packages/onetool-bench/tests"]
-pythonpath = ["src", "packages/onetool-pack/src", "packages/onetool-bench/src"]
+testpaths = ["tests", "packages/onetool-pack/tests"]
+pythonpath = ["src", "packages/onetool-pack/src"]
 addopts = "-v"
 asyncio_mode = "auto"
 cache_dir = "tmp/.pytest_cache"
@@ -203,7 +204,6 @@ markers = [
 
     # Component tags (required - pick one)
     "serve: MCP server tests",
-    "bench: Benchmark harness tests",
     "core: Core library tests",
     "tools: Tool implementation tests",
     "pkg: Package tests",

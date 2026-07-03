@@ -44,17 +44,6 @@ FastMCP server runtime lives in `src/ot/`; the installed `onetool` command lives
 | `src/onetool/cli.py` | `onetool` CLI entry point and commands |
 | `src/onetool/cli_commands/` | CLI command implementations |
 
-### Benchmark Harness (`packages/onetool-bench/src/bench/`)
-
-Performance benchmarking CLI (internal, not distributed with `onetool-mcp`).
-
-| File | Purpose |
-|------|---------|
-| `cli.py` | Benchmark CLI |
-| `run.py` | Benchmark execution entry |
-| `harness/runner.py` | Scenario/task execution loop |
-| `reporter.py` | Console and summary reporting |
-
 ### Dev Extras (`src/otdev/`) — optional `[dev]`
 
 Tool packs for developer-focused features. Installed via `pip install onetool-mcp[dev]`.
@@ -120,7 +109,7 @@ Each test root has the same layout:
 | `integration/` | Integration tests | `@pytest.mark.integration` |
 | `slow/` | Long-running tests | `@pytest.mark.slow` |
 
-**Component markers:** `core`, `bench`, `serve`, `tools`
+**Component markers:** `core`, `serve`, `tools`, `pkg`, `spec`
 
 **Rule:** Always place tests under the root that matches the source package.
 A test for `src/otdev/tools/webfetch.py` → `tests/otdev/unit/tools/test_webfetch.py`.
@@ -157,7 +146,6 @@ A test for `src/otdev/tools/webfetch.py` → `tests/otdev/unit/tools/test_webfet
 | `wip/test-results/` | Sanity test outputs |
 | `wip/issues/` | Issues found during testing |
 | `wip/consult/` | Consultation findings |
-| `wip/bench/` | Benchmark results |
 
 ---
 

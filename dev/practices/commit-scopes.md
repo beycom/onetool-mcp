@@ -49,14 +49,6 @@ Ref: #123
 | `tool:scaffold` | scaffold | Tool scaffolding |
 | `tool:webfetch` | webfetch | Web fetch |
 
-## Benchmark System
-
-| Scope | Description |
-|-------|-------------|
-| `bench` | Benchmark changes (use for most) |
-| `bench:harness` | Major harness refactors only |
-| `bench:tui` | TUI-specific changes |
-
 ## Other Scopes
 
 | Scope | When to Use |
@@ -80,7 +72,7 @@ Ref: #123
 | `docs` | Documentation | `docs(readme): update installation instructions` |
 | `test` | Tests | `test(config): add compact array format test` |
 | `build` | Build system | `build: update uv to 0.5.0` |
-| `ci` | CI/CD | `ci: add benchmark workflow` |
+| `ci` | CI/CD | `ci: update release workflow` |
 | `chore` | Maintenance | `chore(deps): update pydantic to 2.12` |
 | `style` | Code style | `style: fix ruff formatting issues` |
 

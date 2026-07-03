@@ -374,7 +374,7 @@ pytestmark = [pytest.mark.integration, pytest.mark.skip(reason="disabled")]
 ### Checklist
 
 - [ ] Add speed marker (`smoke`, `unit`, `integration`, or `slow`)
-- [ ] Add component marker (`tools`, `core`, `bench`, `serve`, `pkg`, `spec`)
+- [ ] Add component marker (`tools`, `core`, `serve`, `pkg`, `spec`)
 - [ ] Add dependency markers if needed (`network`, `api`, `playwright`, `docker`)
 - [ ] Write descriptive docstring explaining what is tested
 - [ ] Use class grouping for related tests

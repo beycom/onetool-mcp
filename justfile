@@ -167,7 +167,6 @@ reset-env: clean
 # MODULES (use `just <module>::<task>`)
 # ============================================================================
 
-mod bench 'packages/onetool-bench/justfile'
 mod release "release.just"
 
 # ============================================================================

@@ -57,7 +57,6 @@ target/
 .env.production.local
 .env.*.local
 **/secrets.yaml
-**/bench-secrets.yaml
 
 # Temporary files
 tmp/

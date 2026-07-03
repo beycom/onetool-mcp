@@ -29,9 +29,6 @@ src/
   otdev/        [dev] extra: arch, chrome, context7, db, diagram, package, play, ripgrep, webfetch
   otutil/       [util] extra: brave, convert, ctx, excel, file, ground, knowledge, mem, tavily
 
-packages/
-  onetool-bench/  Benchmark harness (internal, not installed)
-
 tests/          All tests (smoke, unit, integration)
 dev/            Developer documentation (THIS folder)
 docs/           User-facing documentation
@@ -64,7 +61,7 @@ openspec/       Specifications and proposals
 - Docstrings: Google-style for all public functions
 
 ### Testing
-- Two markers required: speed (`smoke`|`unit`|`integration`|`slow`) + component (`core`|`bench`|`serve`|`tools`)
+- Two markers required: speed (`smoke`|`unit`|`integration`|`slow`) + component (`core`|`serve`|`tools`|`pkg`|`spec`)
 - Run with: `uv run pytest` (never bare `pytest`)
 - Fixtures: Use shared fixtures from `conftest.py`
 - Test location mirrors source package: `src/otdev/` → `tests/otdev/`, `src/ottools/` → `tests/ottools/`, `src/otutil/` → `tests/otutil/`, core → `tests/`

@@ -464,11 +464,7 @@ class AuthConfig(BaseModel):
 
 
 class McpServerConfig(BaseModel):
-    """Configuration for an MCP server connection.
-
-    Compatible with bench ServerConfig format, with additional
-    `enabled` field for toggling servers without removing config.
-    """
+    """Configuration for an MCP server connection."""
 
     type: Literal["http", "stdio"] = Field(description="Server connection type")
     enabled: bool = Field(default=True, description="Whether this server is enabled")

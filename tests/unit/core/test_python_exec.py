@@ -9,7 +9,7 @@ Tests the executor without LLM involvement:
 - Exception handling
 - Infinite loop/recursion detection
 
-Migrated from demo/bench/python_exec.yaml to provide:
+Converted from earlier scenario coverage to provide:
 - Faster feedback (seconds vs minutes)
 - Deterministic results (no LLM variance)
 - No API costs

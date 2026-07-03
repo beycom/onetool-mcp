@@ -80,7 +80,6 @@ just tool-diagram-logs     # view Kroki logs
 ## Module Commands
 
 ```bash
-just bench::demo::<task>   # run demo tasks
 just release::<task>       # run release tasks
 just eval-caveman [args]   # run caveman skill eval
 ```

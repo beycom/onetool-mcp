@@ -1,6 +1,6 @@
-# OneTool vs MCPs Benchmark
+# OneTool vs MCPs Historical Performance Comparison
 
-*Benchmarks run: February 2026 · [raw data](../results/result-20260223-0334.csv)*
+*Measurements captured: February 2026 · [raw data](../results/result-20260223-0334.csv)*
 
 ## Scenario: Impact of tool usage - one-shot
 

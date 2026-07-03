@@ -8,8 +8,6 @@ Patterns used in the `onetool` CLI.
 |-----|---------|---------|
 | `onetool` | `src/onetool/` | MCP server, setup, configuration |
 
-`bench` is an internal tool in `packages/onetool-bench/` and is not user-facing.
-
 ## Shared Utilities
 
 CLIs use shared utilities from `ot._cli`:

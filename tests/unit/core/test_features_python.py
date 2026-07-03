@@ -8,7 +8,6 @@ Tests complex Python constructs with the execution engine:
 
 These tests complement test_python_exec.py by focusing on constructs
 commonly used in OneTool code that combines tool calls with Python logic.
-Migrated from demo/bench/features.yaml Python construct tests.
 """
 
 from __future__ import annotations

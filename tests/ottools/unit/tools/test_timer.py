@@ -94,14 +94,14 @@ def test_elapsed_unknown_name():
 @pytest.mark.unit
 @pytest.mark.tools
 def test_store_as():
-    timer.start(name="bench")
+    timer.start(name="profile")
     sleep(0.01)
-    timer.elapsed(name="bench", store_as="bench_result")
+    timer.elapsed(name="profile", store_as="profile_result")
 
     stored = timer.list()
-    assert "bench_result" in stored["stored"]
-    assert stored["stored"]["bench_result"]["name"] == "bench"
-    assert stored["stored"]["bench_result"]["elapsed_seconds"] >= 0.005
+    assert "profile_result" in stored["stored"]
+    assert stored["stored"]["profile_result"]["name"] == "profile"
+    assert stored["stored"]["profile_result"]["elapsed_seconds"] >= 0.005
 
 
 # =============================================================================
