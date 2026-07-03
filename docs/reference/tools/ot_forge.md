@@ -1,6 +1,6 @@
 # OT Forge
 
-Create, validate, and install extension tools and skill stubs.
+Create and validate extension tools.
 
 Short alias: `forge`
 
@@ -9,7 +9,6 @@ Short alias: `forge`
 - Single in-process extension template with full `ot.*` access
 - Validation before reload catches errors early
 - Best practices checking and warnings
-- Skill stub installation for Claude, Codex, and OpenCode
 
 ## Functions
 
@@ -17,7 +16,6 @@ Short alias: `forge`
 |----------|-------------|
 | `ot_forge.create_ext(name, ...)` | Create a new in-process extension tool |
 | `ot_forge.validate_ext(path)` | Validate an extension before reload |
-| `ot_forge.install_skills(install, ...)` | Install a skill stub for an AI tool |
 
 ## Key Parameters
 
@@ -37,14 +35,6 @@ Short alias: `forge`
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `path` | str | Full path to the extension file |
-
-### install_skills
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `install` | str | Skill name to install, or `"all"` for all skills (default: `"all"`) |
-| `exclude` | list[str] | Skill names to skip when `install="all"` |
-| `tool` | str | Target AI tool: `"claude"` (default), `"codex"`, `"opencode"`, `"pi"` |
 
 ## Requires
 
@@ -81,19 +71,4 @@ ot_forge.create_ext(name="my_tool", function="search")
 
 # Validate before reload
 ot_forge.validate_ext(path=".onetool/tools/my_tool.py")
-
-# List available skills (use ot.skills, not ot_forge)
-ot.skills()
-
-# Install a skill stub for Claude Code
-ot_forge.install_skills(install="ot-ref")
-
-# Install for a different AI tool
-ot_forge.install_skills(install="ot-ref", tool="codex")
-
-# Install all skills at once (default)
-ot_forge.install_skills()
-
-# Install all skills except specific ones
-ot_forge.install_skills(exclude=["ot-ref"])
 ```

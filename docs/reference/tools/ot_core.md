@@ -27,7 +27,6 @@ Core tools for OneTool introspection and management.
 | `ot.aliases(pattern, info)` | List aliases, filter by pattern |
 | `ot.snippets(pattern, info)` | List snippets, filter by pattern |
 | `ot.snippet_info(name, pattern, info)` | Get full definition for a specific snippet |
-| `ot.skills(name, pattern, info)` | List bundled skills or retrieve a skill body |
 | `ot.config()` | Show aliases, snippets, and server names |
 | `ot.debug(verbose, env_vars, dependencies, prompts)` | Show debug diagnostics |
 | `ot.status()` | Check runtime status |
@@ -54,7 +53,7 @@ Core tools for OneTool introspection and management.
 
 ## Info Levels
 
-All discovery functions (`help`, `tools`, `tool_info`, `packs`, `pack_info`, `aliases`, `snippets`, `snippet_info`, `skills`) support an `info` parameter:
+All discovery functions (`help`, `tools`, `tool_info`, `packs`, `pack_info`, `aliases`, `snippets`, `snippet_info`) support an `info` parameter:
 
 | Level | Description |
 |-------|-------------|
@@ -299,33 +298,6 @@ snippets:
           results.append(brave.search(query=q))
       "\n---\n".join(results)
 ```
-
-## ot.skills()
-
-List available bundled skill stubs or retrieve a skill's body content.
-
-```python
-# List all skills
-ot.skills()
-
-# Names only
-ot.skills(info="min")
-
-# Default listing (name + description)
-ot.skills(info="default")
-
-# Filter by pattern
-ot.skills(pattern="ot-")
-
-# Full info for each skill
-ot.skills(info="full")
-
-# Retrieve the body of a specific skill
-ot.skills(name="ot-chrome-devtools-mcp")
-ot.skills(name="ot-ref")
-```
-
-Skills are bundled `.md` files that can be installed as context prompts for AI tools. Use `ot_forge.install_skills()` to write them to disk.
 
 ## ot.config()
 

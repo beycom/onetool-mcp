@@ -175,7 +175,6 @@ def reload() -> str:
     - Secrets (secrets.yaml)
     - Tool registry (tool files from tools_dir)
     - Prompts
-    - Skills index (bundled skill content)
     - Execution namespace cache (pack proxies)
     - MCP proxy connections
     - Parameter resolution caches
@@ -213,7 +212,7 @@ def reload() -> str:
 
         ot.config.reset()  # Clears both config and secrets
         ot.prompts.reset()
-        _ot_cache.clear()  # Clears skills index and other TTL-cached data
+        _ot_cache.clear()  # Clears TTL-cached data
         ot.registry.reset()
         ot.executor.tool_loader.reset()
         ot.executor.validator.reset()

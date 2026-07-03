@@ -166,6 +166,19 @@ Or using the CLI:
 claude mcp add onetool -- onetool serve --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
 ```
 
+## Install the OneTool Skills
+
+OneTool ships the `ot-ref` skill in the standard Agent Skills layout at `skills/ot-ref/SKILL.md`.
+Install it into your agent with [vercel-labs/skills](https://github.com/vercel-labs/skills):
+
+```bash
+npx skills add https://github.com/beycom/onetool-mcp --skill ot-ref --agent claude
+```
+
+`--agent` also accepts `codex`, `opencode`, and others. Run `npx skills add https://github.com/beycom/onetool-mcp --list`
+to discover every installable skill. If you don't use vercel-labs/skills, APM or a manual copy of
+`skills/ot-ref/SKILL.md` into your agent's skills directory are supported alternatives.
+
 ## External Tools
 
 ### Ripgrep Search

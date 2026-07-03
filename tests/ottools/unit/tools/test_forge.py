@@ -46,7 +46,7 @@ def test_all_exports() -> None:
     """Verify __all__ contains the expected public functions."""
     from ottools.ot_forge import __all__
 
-    expected = {"create_ext", "install_skills", "validate_ext"}
+    expected = {"create_ext", "validate_ext"}
     assert set(__all__) == expected
 
 

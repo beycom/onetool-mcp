@@ -25,7 +25,6 @@ def test_instructions_has_required_elements() -> None:
     text = prompts.instructions
 
     assert "run(command=" in text, "Missing MCP run preference in instructions"
-    assert "ot.skills(name='ot-ref')" in text, "Missing optional ot-ref pointer"
     assert "ot.security()" in text, "Missing security check pointer"
     assert "external-content" in text or "boundary" in text.lower(), (
         "Missing external content boundary warning in instructions"
@@ -110,9 +109,9 @@ def test_instructions_stay_concise_and_defer_contract() -> None:
 @pytest.mark.serve
 def test_ot_ref_contains_advanced_recovery_not_core_contract() -> None:
     """ot-ref carries advanced reference details without owning normal invocation."""
-    from ot.paths import get_global_templates_dir
+    from pathlib import Path
 
-    text = (get_global_templates_dir() / "skills" / "ot-ref.md").read_text()
+    text = (Path(__file__).resolve().parents[3] / "skills" / "ot-ref" / "SKILL.md").read_text()
 
     assert "Close-call recovery" in text
     assert "Param prefixes" in text

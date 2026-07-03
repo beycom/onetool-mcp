@@ -94,7 +94,7 @@ The system SHALL capture results from any valid Python expression or statement a
 - **AND** the result SHALL NOT contain double-escaped JSON
 
 #### Scenario: Discovery calls keep JSON default format
-- **GIVEN** a discovery/introspection call (`ot.help`, `ot.tool_info`, `ot.tools`, `ot.packs`, `ot.pack_info`, `ot.servers`, `ot.aliases`, `ot.snippets`, `ot.snippet_info`, `ot.skills`)
+- **GIVEN** a discovery/introspection call (`ot.help`, `ot.tool_info`, `ot.tools`, `ot.packs`, `ot.pack_info`, `ot.servers`, `ot.aliases`, `ot.snippets`, `ot.snippet_info`)
 - **AND** no explicit `__format__` is set in the executed code
 - **WHEN** the result is captured by the runner
 - **THEN** the runner SHALL default to compact JSON (`json`)

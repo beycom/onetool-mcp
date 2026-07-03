@@ -39,7 +39,7 @@ from ot.meta._help_formatting import (
     _get_doc_url,
 )
 from ot.meta._introspection import aliases, snippet_info, snippets
-from ot.meta._server_mgmt import security, server, skills
+from ot.meta._server_mgmt import security, server
 from ot.meta._stats import result, stats
 from ot.meta._tool_discovery import (
     _build_proxy_tool_info,
@@ -78,7 +78,6 @@ __all__ = [
     "security",
     "server",
     "servers",
-    "skills",
     "snippet_info",
     "snippets",
     "stats",
@@ -117,7 +116,6 @@ def get_ot_pack_functions() -> dict[str, Any]:
         "aliases": aliases,
         "snippets": snippets,
         "snippet_info": snippet_info,
-        "skills": skills,
         "config": config,
         "debug": debug,
         "help": help,

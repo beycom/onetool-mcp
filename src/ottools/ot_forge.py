@@ -9,16 +9,15 @@ import ast
 import fnmatch
 import re
 from pathlib import Path
-from typing import Any, cast
 
 from ot.paths import get_config_dir
-from otpack import LogSpan, cache, get_effective_cwd
+from otpack import LogSpan
 
-# Pack for dot notation: ot_forge.create_ext(), ot_forge.validate_ext(), ot_forge.install_skills()
+# Pack for dot notation: ot_forge.create_ext(), ot_forge.validate_ext()
 pack = "ot_forge"
 pack_aliases = ("forge",)
 
-__all__ = ["create_ext", "install_skills", "validate_ext"]
+__all__ = ["create_ext", "validate_ext"]
 
 
 def _get_templates_dir() -> Path:
@@ -362,179 +361,3 @@ def validate_ext(*, path: str) -> str:
         result.append("")
         result.append("Ready to reload: ot.reload()")
         return "\n".join(result)
-
-
-# =============================================================================
-# Skill Installation
-# =============================================================================
-
-
-@cache.memoize(ttl=3600)
-def _get_tools_config() -> dict[str, Any]:
-    """Load tool path configuration from global_templates/skills.md."""
-    import yaml
-
-    from ot.paths import get_global_templates_dir
-
-    tools_yaml = get_global_templates_dir() / "skills.md"
-    if not tools_yaml.exists():
-        return {}
-    raw = yaml.safe_load(tools_yaml.read_text()) or {}
-    return cast("dict[str, Any]", raw.get("tools", {}))
-
-
-@cache.memoize(ttl=3600)
-def _get_skill_stub_template() -> str:
-    """Load the Jinja2 skill stub template."""
-    from ot.paths import get_global_templates_dir
-
-    tmpl = get_global_templates_dir() / "skill_stub.md.j2"
-    if not tmpl.exists():
-        return (
-            "---\nname: {{ name }}\ndescription: {{ description }}\n---\n\n"
-            "To load this skill: `__onetool ot.skills(name=\"{{ name }}\")`\n"
-        )
-    return tmpl.read_text(encoding="utf-8")
-
-
-@cache.memoize(ttl=3600)
-def _list_bundled_skills() -> list[str]:
-    """Return sorted list of bundled skill names."""
-    from ot.paths import get_global_templates_dir
-
-    skills_dir = get_global_templates_dir() / "skills"
-    if not skills_dir.exists():
-        return []
-    return sorted(f.stem for f in skills_dir.glob("*.md") if not f.name.startswith("_"))
-
-
-@cache.memoize(ttl=3600)
-def _get_skill_description(skill_name: str) -> str:
-    """Get the description from a bundled skill's frontmatter."""
-    import yaml
-
-    from ot.paths import get_global_templates_dir
-
-    skill_file = get_global_templates_dir() / "skills" / f"{skill_name}.md"
-    if not skill_file.exists():
-        return skill_name
-
-    content = skill_file.read_text(encoding="utf-8")
-    if content.startswith("---"):
-        end = content.find("\n---", 3)
-        if end != -1:
-            try:
-                fm = yaml.safe_load(content[3:end]) or {}
-                return str(fm.get("description", skill_name))
-            except yaml.YAMLError:
-                pass
-    return skill_name
-
-
-@cache.memoize(ttl=3600)
-def _get_skill_body(skill_name: str) -> str:
-    """Get the body content from a bundled skill."""
-    from ot.paths import get_global_templates_dir
-
-    skill_file = get_global_templates_dir() / "skills" / f"{skill_name}.md"
-    if not skill_file.exists():
-        return ""
-
-    content = skill_file.read_text(encoding="utf-8")
-    if content.startswith("---"):
-        end = content.find("\n---", 3)
-        if end != -1:
-            return content[end + 4:].strip()
-    return content.strip()
-
-
-def install_skills(
-    *,
-    install: str = "all",
-    exclude: list[str] | None = None,
-    tool: str = "claude",
-) -> str:
-    """Install a skill stub for an AI tool.
-
-    Writes a stub file to the appropriate location for the specified AI tool.
-    Use ot.skills() to list available skills.
-
-    Args:
-        install: Skill name to install, or "all" to install all skills (default)
-        exclude: Skill names to skip when install="all"
-        tool: Target AI tool — "claude" (default), "codex", or "opencode"
-
-    Returns:
-        Status message describing what was done
-
-    Example:
-        ot_forge.install_skills()
-        ot_forge.install_skills(install="ot-ref")
-        ot_forge.install_skills(install="ot-ref", tool="codex")
-        ot_forge.install_skills(install="all", tool="opencode")
-        ot_forge.install_skills(install="ot-ref", tool="pi")
-    """
-    exclude = exclude or []
-    with LogSpan(span="ot_forge.install_skills", install=install, tool=tool) as s:
-        tools_config = _get_tools_config()
-        bundled = _list_bundled_skills()
-
-        # Validate tool
-        if tool not in tools_config:
-            supported = ", ".join(sorted(tools_config.keys())) or "none"
-            s.add(error="unsupported_tool", tool=tool)
-            return f"Error: Unsupported tool '{tool}'. Supported: {supported}"
-
-        tool_cfg = tools_config[tool]
-        stub_path_template = tool_cfg.get("stub_path", "")
-
-        # Resolve list of skills to install
-        if install == "all":
-            to_install = [skill for skill in bundled if skill not in exclude]
-        else:
-            if install not in bundled:
-                s.add(error="unknown_skill", install=install)
-                return (
-                    f"Error: Unknown skill '{install}'. "
-                    f"Available: {', '.join(bundled) or '(none)'}"
-                )
-            to_install = [install]
-
-        # Render and write stubs
-        try:
-            from jinja2 import Template
-
-            template_src = _get_skill_stub_template()
-            tmpl = Template(template_src)
-        except ImportError:
-            return "Error: jinja2 is required for ot_forge.install_skills(). Install it: pip install jinja2"
-
-        from ot.paths import expand_path
-
-        cwd = get_effective_cwd()
-
-        results: list[str] = []
-        for skill_name in to_install:
-            description = _get_skill_description(skill_name)
-            body = _get_skill_body(skill_name)
-            rendered = tmpl.render(name=skill_name, description=description, body=body, tool=tool)
-
-            # Resolve stub path
-            raw_path = stub_path_template.format(name=skill_name)
-            if raw_path.startswith("~"):
-                stub_file = expand_path(raw_path)
-            elif Path(raw_path).is_absolute():
-                stub_file = Path(raw_path)
-            else:
-                stub_file = cwd / raw_path
-
-            # Write the stub
-            stub_file.parent.mkdir(parents=True, exist_ok=True)
-            existed = stub_file.exists()
-            stub_file.write_text(rendered, encoding="utf-8")
-            action = "updated" if existed else "installed"
-            results.append(f"  {action}: {stub_file}")
-
-        s.add(installed=len(to_install), tool=tool)
-        summary = f"Skill stubs for '{tool}' ({len(to_install)} skills):\n" + "\n".join(results)
-        return summary

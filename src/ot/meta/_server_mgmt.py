@@ -73,30 +73,3 @@ def server(
     from ot.meta._server_services import server as _server
 
     return _server(status=status)
-
-
-def skills(
-    *,
-    name: str | None = None,
-    pattern: str | None = None,
-    info: str = "default",
-) -> str:
-    """List available bundled skills or retrieve a skill's body content.
-
-    Args:
-        name: Skill name to retrieve body for (e.g., "ot-guide")
-        pattern: Filter skills by substring match on name
-        info: Detail level — "min" (names only), "default" (+ description), "full" (everything)
-
-    Returns:
-        Skill body if name= provided; formatted list of skills otherwise
-
-    Example:
-        ot.skills()                                  # list all
-        ot.skills(pattern="ot-")                     # filter by pattern
-        ot.skills(name="ot-chrome-devtools-mcp")     # retrieve body
-        ot.skills(info="full")                       # full info for each skill
-    """
-    from ot.meta._skills_services import skills as _skills
-
-    return _skills(name=name, pattern=pattern, info=info)

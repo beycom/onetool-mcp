@@ -61,12 +61,11 @@ The system SHALL support externalised server instructions with a minimal footpri
 - **AND** SHALL orient agents to use `run(command=...)` for available `pack.tool(...)` calls and light orchestration
 - **AND** SHALL reserve local scripts for heavy repo/file transformations or reusable generation logic
 - **AND** SHALL state that the `run` tool description is authoritative for invocation syntax, no-guessing, and pass-through behavior
-- **AND** SHALL include an optional `ot.skills(name="ot-ref")` pointer and an external content boundary warning
+- **AND** SHALL include an external content boundary warning
 
 #### Scenario: Discovery hint present
 - **WHEN** an agent is lost or encountering errors
 - **THEN** the prompt SHALL direct the agent to run `ot.help(query="topic")` for discovery
-- **AND** MAY include `ot.skills(name="ot-ref")` as an optional extended reference path
 
 ### Requirement: Three-Mode Execution Model
 
@@ -241,7 +240,6 @@ The system SHALL support tool-specific descriptions and examples with minimal re
 - **WHEN** run tool description is generated
 - **THEN** it SHALL include discovery references to `ot.help(...)` and `ot.tool_info(...)`
 - **AND** it SHALL include proxy enable guidance (`ot_servers.enable(name="...")` → retry once)
-- **AND** it MAY include `ot.skills(name="ot-ref")` as an optional advanced reference
 
 #### Scenario: Tool examples
 - **GIVEN** prompts.yaml with `tools.run.examples: ["example1", "example2"]`

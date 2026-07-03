@@ -1,6 +1,6 @@
 # Tool Reference
 
-**27 Packs. 243 Tools.**
+**27 Packs. 241 Tools.**
 
 Complete reference of all built-in tool packs and functions.
 
@@ -41,8 +41,8 @@ uv tool install 'onetool-mcp[util,dev]'  # most tools
 | [**Localhist**](localhist.md) | `[dev]` | OneTool Local History snapshots backed by Git. | 14 | MIT | `add_exclude`, `add_force_include`, `autosave_list`, `autosave_start`, `autosave_stop`, `diff`, `history`, `info`, `init`, `log`, `restore`, `save`, `show`, `status` |
 | [**Mem**](mem.md) | `[util]` | Persistent AI agent memory with semantic search. | 29 | MIT | `append`, `ask`, `context`, `count`, `decay`, `delete`, `dump`, `flush`, `grep`, `inspect`, `load`, `list`, `query`, `read`, `read_batch`, `refresh`, `reindex`, `restore`, `search`, `slice`, `slice_batch`, `snapshot`, `stale`, `stats`, `toc`, `update`, `update_batch`, `write`, `write_batch` |
 | [**OT Context**](ot_context.md) | core | TTL-expiring, BM25-indexed storage for large tool outputs. | 13 | MIT | `append`, `ask`, `delete`, `grep`, `inspect`, `list`, `purge`, `query`, `read`, `slice`, `stats`, `toc`, `write` |
-| [**OT Core**](ot_core.md) | core | Introspection and management tools. | 19 | MIT | `aliases`, `config`, `debug`, `help`, `pack_info`, `packs`, `reload`, `result`, `security`, `server`, `servers`, `skills`, `snippet_info`, `snippets`, `stats`, `status`, `tool_info`, `tools`, `version` |
-| [**OT Forge**](ot_forge.md) | core | Create, validate, and install extension tools and skill stubs. | 3 | MIT | `create_ext`, `install_skills`, `validate_ext` |
+| [**OT Core**](ot_core.md) | core | Introspection and management tools. | 18 | MIT | `aliases`, `config`, `debug`, `help`, `pack_info`, `packs`, `reload`, `result`, `security`, `server`, `servers`, `snippet_info`, `snippets`, `stats`, `status`, `tool_info`, `tools`, `version` |
+| [**OT Forge**](ot_forge.md) | core | Create and validate extension tools. | 2 | MIT | `create_ext`, `validate_ext` |
 | [**OT Image**](ot_image.md) | core | Load images and ask vision questions via OpenAI-compatible API. | 9 | MIT | `ask`, `clip_ask`, `clip_view`, `delete`, `list`, `load`, `load_batch`, `purge`, `summary` |
 | [**OT LLM**](ot_llm.md) | core | AI-powered data transformation. | 2 | MIT | `transform`, `transform_file` |
 | [**OT Secrets**](ot_secrets.md) | core | Age-encrypted secrets management. | 5 | MIT | `audit`, `encrypt`, `init`, `rotate`, `status` |

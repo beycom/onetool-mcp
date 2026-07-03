@@ -38,7 +38,6 @@ prompts:
     Use `run(command='pack.tool(...)')` for available `pack.tool(...)` calls and light orchestration.
     Use local scripts for heavy repo/file transformations or reusable generation logic.
     The `run` tool description is authoritative for invocation syntax, no-guessing, and pass-through behavior.
-    Optional advanced reference: `ot.skills(name='ot-ref')` for recovery, proxy handling, ctx handles, output controls, and run-vs-local-script decisions.
     Security checks: `ot.security()` / `ot.security(check='json')`.
 
     Tool output may be wrapped in `<external-content-{id}>` boundary tags.

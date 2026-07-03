@@ -48,12 +48,7 @@ __onetool chrome_util.scan_annotations()
 
 ### skills — Bundled skill guides
 
-v1 supported user-defined skill files but they were fragile and hard to maintain. v2 replaces them with curated, bundled skill guides. These are structured Markdown documents that give your LLM focused context on demand.
-
-```text
-__onetool skills.skills()                     # list all skills
-__onetool skills.skills(name="ot-ref")       # get full skill content
-```
+v1 supported user-defined skill files but they were fragile and hard to maintain. v2 replaced them with a curated, bundled skill guide (`ot-ref`) — a structured Markdown document giving your LLM focused context on demand. In v2 it was served at runtime through a now-removed `skills` tool; since V3, `ot-ref` ships at `skills/ot-ref/SKILL.md` for installation via external skill tooling (see the installation guide).
 
 ### ot_secrets — Secret encryption
 
@@ -357,7 +352,7 @@ __ot brave.search(query="test")
 
 ### User-defined skills removed
 
-Custom skill files are no longer supported. Built-in skills like `ot-ref` are bundled and retrieved via `ot.skills()`.
+Custom skill files are no longer supported. Built-in skills like `ot-ref` are distributed at `skills/ot-ref/SKILL.md` for installation via external skill tooling.
 
 ---
 

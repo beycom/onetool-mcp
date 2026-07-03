@@ -1,6 +1,6 @@
 # OneTool MCP Tool Index
 
-packs=28 tools=246
+packs=27 tools=241
 
 ## arch
 ```python
@@ -22,11 +22,11 @@ brave.video(query: str, count: int=10, country: str='US', search_lang: str='en',
 
 ## chrome_util, chrome
 ```python
-chrome_util.clear_annotations()  # Remove all annotations and visual highlights from the page.
-chrome_util.guide_user(task: str, steps: list[dict[str, str]])  # Highlight a sequence of elements to guide the user through a task.
-chrome_util.highlight_element(selector: str, label: str, color: str='orange', element_id: str | None=None)  # Highlight elements matching a CSS selector with an annotation overlay.
-chrome_util.inject_annotations()  # Inject the annotation script into the current browser page.
-chrome_util.scan_annotations()  # Read all current annotations from the page.
+chrome_util.clear_annotations(server: str='chrome_devtools')  # Remove all annotations and visual highlights from the page.
+chrome_util.guide_user(task: str, steps: list[dict[str, str]], server: str='chrome_devtools')  # Highlight a sequence of elements to guide the user through a task.
+chrome_util.highlight_element(selector: str, label: str, color: str='orange', element_id: str | None=None, server: str='chrome_devtools')  # Highlight elements matching a CSS selector with an annotation overlay.
+chrome_util.inject_annotations(server: str='chrome_devtools')  # Inject the annotation script into the current browser page.
+chrome_util.scan_annotations(server: str='chrome_devtools')  # Read all current annotations from the page.
 ```
 
 ## context7, c7
@@ -105,11 +105,11 @@ file.info(path: str, follow_symlinks: bool=True)  # Get file or directory metada
 file.list(path: str='.', pattern: str | None=None, recursive: bool=False, include_hidden: bool=False, sort_by: str='name', reverse: bool=False, follow_symlinks: bool=False)  # List directory contents.
 file.move(source: str, dest: str)  # Move or rename a file or directory.
 file.read(path: str, offset: int=1, limit: int | None=None, encoding: str='utf-8', line_numbers: bool=False)  # Read file content with optional offset and limit.
-file.read_batch(paths: list[str] | None=None, glob: str | None=None, encoding: str='utf-8', max_files: int=20)  # Read multiple files in a single call.
-file.resolve(path: str='.', glob: str | list[str] | None=None, match: str | list[str] | None=None, kind: ResolveKind='file', gitignore: bool=True, include_hidden: bool=True, path_type: str='relative', multi: str='all', max_results: int=10)  # Resolve file or directory references to path strings.
+file.read_batch(paths: List[str] | None=None, glob: str | None=None, encoding: str='utf-8', max_files: int=20)  # Read multiple files in a single call.
+file.resolve(path: str='.', glob: str | List[str] | None=None, match: str | List[str] | None=None, kind: ResolveKind='file', gitignore: bool=True, include_hidden: bool=True, path_type: str='relative', multi: str='all', max_results: int=10)  # Resolve file or directory references to path strings.
 file.search(path: str='.', pattern: str | None=None, glob: str | None=None, file_pattern: str | None=None, case_sensitive: bool=False, include_hidden: bool=False, max_results: int=100)  # Search for files by name pattern or glob.
-file.slice(path: str, select: int | str | list[int | str], encoding: str='utf-8')  # Extract content from a file by line range, heading, or section number.
-file.slice_batch(items: list[dict])  # Extract sections from multiple files in a single call.
+file.slice(path: str, select: int | str | List[int | str], encoding: str='utf-8')  # Extract content from a file by line range, heading, or section number.
+file.slice_batch(items: List[dict[str, Any]])  # Extract sections from multiple files in a single call.
 file.toc(path: str, encoding: str='utf-8')  # Display a numbered section index for a file (table of contents).
 file.tree(path: str='.', max_depth: int=3, include_hidden: bool=False)  # Display directory tree structure.
 file.write(path: str, content: str, append: bool=False, create_dirs: bool=False, encoding: str='utf-8', dry_run: bool=False)  # Write content to a file.
@@ -156,7 +156,7 @@ localhist.info()  # Inspect local-history initialization, config, paths, and cur
 localhist.init()  # Initialize the project-local history repository.
 localhist.log(limit: int=20, date_format: str='%Y-%m-%d %H:%M:%S %Z')  # List local-history snapshots.
 localhist.restore(ref: str, paths: list[str], dry_run: bool=True)  # Restore selected paths from a local-history snapshot.
-localhist.save(message: str, kind: SnapshotKind='')  # Create a local-history snapshot.
+localhist.save(message: str, kind: SnapshotKind='', paths: str | list[str] | None=None)  # Create a local-history snapshot.
 localhist.show(ref: str, path: str, offset: int=1, limit: int | None=None, tail: int | None=None)  # Return file content from a local-history snapshot.
 localhist.status(path: str | None=None, status: str | None=None, limit: int | None=None)  # Inspect local-history working tree status.
 ```
@@ -207,7 +207,6 @@ ot.result(handle: str, offset: int=1, limit: int=100, search: str='', fuzzy: boo
 ot.security(check: str='')  # Check security rules for code validation.
 ot.server(status: str | None=None)  # List or inspect runtime proxy server state.
 ot.servers(pattern: str='', info: ServerInfoLevel='default')  # List configured MCP proxy servers with optional filtering.
-ot.skills(name: str | None=None, pattern: str | None=None, info: str='default')  # List available bundled skills or retrieve a skill's body content.
 ot.snippet_info(name: str='', pattern: str='', info: InfoLevel='default')  # Get detailed info for one or more snippets.
 ot.snippets(pattern: str='', info: InfoLevel='default')  # List snippets with optional filtering.
 ot.stats(period: str='all', tool: str='', info: InfoLevel='default', output: str='')  # Get runtime statistics for OneTool usage.
@@ -237,7 +236,6 @@ ot_context.write(content: str | dict[str, Any], source: str='', verbose: bool=Fa
 ## ot_forge, forge
 ```python
 ot_forge.create_ext(name: str, pack_name: str | None=None, function: str='run', description: str='My extension tool', function_description: str='Execute the tool function', api_key: str='MY_API_KEY')  # Create a new extension tool.
-ot_forge.install_skills(install: str='all', exclude: list[str] | None=None, tool: str='claude')  # Install a skill stub for an AI tool.
 ot_forge.validate_ext(path: str)  # Validate an extension before reload.
 ```
 
@@ -296,12 +294,12 @@ package.version(registry: str, packages: list[str] | dict[str, str])  # Check la
 
 ## play_util, play
 ```python
-play_util.clear_annotations()  # Remove all annotations and visual highlights from the page.
-play_util.enable_auto_inject()  # Register inject.js as a Playwright init script for automatic injection.
-play_util.guide_user(task: str, steps: list[dict[str, str]])  # Highlight a sequence of elements to guide the user through a task.
-play_util.highlight_element(selector: str, label: str, color: str='orange', element_id: str | None=None)  # Highlight elements matching a CSS selector with an annotation overlay.
-play_util.inject_annotations()  # Inject the annotation script into the current browser page.
-play_util.scan_annotations()  # Read all current annotations from the page.
+play_util.clear_annotations(server: str='playwright')  # Remove all annotations and visual highlights from the page.
+play_util.enable_auto_inject(server: str='playwright')  # Register inject.js as a Playwright init script for automatic injection.
+play_util.guide_user(task: str, steps: list[dict[str, str]], server: str='playwright')  # Highlight a sequence of elements to guide the user through a task.
+play_util.highlight_element(selector: str, label: str, color: str='orange', element_id: str | None=None, server: str='playwright')  # Highlight elements matching a CSS selector with an annotation overlay.
+play_util.inject_annotations(server: str='playwright')  # Inject the annotation script into the current browser page.
+play_util.scan_annotations(server: str='playwright')  # Read all current annotations from the page.
 ```
 
 ## ripgrep, rg

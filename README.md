@@ -82,6 +82,12 @@ That's it. All 100+ tools work out of the box.
 
 Verify: `onetool init validate --config ~/.onetool/onetool.yaml`
 
+Install the `ot-ref` skill into your agent with [vercel-labs/skills](https://github.com/vercel-labs/skills):
+
+```bash
+npx skills add https://github.com/beycom/onetool-mcp --skill ot-ref --agent claude
+```
+
 [📖 Full installation guide](https://onetool.beycom.online/learn/installation/)
 
 ---
@@ -144,13 +150,13 @@ onetool direct run --port 8765 "brave.search(query='latest AI news')" --format r
 | `ground`      | `search`                                       | `[util]` | Google Grounding search        |
 | `knowledge`   | `search`, `ask`, `write`, `read`, `grep`       | `[util]` | RAG knowledge base (FTS5+vector) |
 | `mem`         | `write`, `read`, `search`, `grep`, `ask`, `inspect`, `query` | `[util]` | Persistent memory              |
-| `ot_forge`    | `create_ext`, `validate_ext`, `install_skills` |          | Scaffold new tool packs        |
+| `ot_forge`    | `create_ext`, `validate_ext`                   |          | Scaffold new tool packs        |
 | `ot_context` (`ctx`) | `write`, `read`, `search`, `grep`, `slice`, `toc`                 |          | Smart context store (SQLite+FTS5)   |
 | `ot_image` (`img`)   | `load`, `load_batch`, `ask`, `summary`, `list`, `delete`, `purge` | `[util]` | Image vision via dedicated model    |
 | `ot_llm`      | `transform`, `transform_file`                  |          | LLM-powered transforms         |
 | `ot_secrets`  | `init`, `encrypt`, `audit`, `rotate`           |          | Secrets encryption             |
 | `ot_timer`    | `start`, `elapsed`, `list`                     |          | Named timers                   |
-| `ot`          | `help`, `tools`, `stats`, `skills`             |          | Introspection                  |
+| `ot`          | `help`, `tools`, `stats`                       |          | Introspection                  |
 | `package`     | `npm`, `pypi`, `cargo`                         | `[dev]`  | Package versions               |
 | `play_util`   | `highlight_element`, `guide_user`              | `[dev]`  | Browser annotations (Playwright)|
 | `ripgrep`     | `search`, `count`                              | `[dev]`  | Fast code search               |
