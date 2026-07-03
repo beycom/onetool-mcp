@@ -9,12 +9,11 @@ Uses inject.js v2.0 (bundled in ``ot.assets``).
 from __future__ import annotations
 
 import json
-from typing import Any
-
-from otpack import LogSpan
+from typing import Any, cast
 
 from ot.assets import get_inject_script
 from ot.proxy import get_proxy_manager
+from otpack import LogSpan
 
 
 def _check_server(server: str) -> str | None:
@@ -75,6 +74,12 @@ def _extract_result(raw: str) -> str:
     return raw
 
 
+def _raw_to_text(raw: str | dict[str, Any] | list[Any]) -> str:
+    if isinstance(raw, str):
+        return raw
+    return json.dumps(raw)
+
+
 def _eval_js(server: str, tool: str, expression: str) -> str:
     """Evaluate a JavaScript expression in the browser and return its result as JSON.
 
@@ -97,7 +102,7 @@ def _eval_js(server: str, tool: str, expression: str) -> str:
     proxy = get_proxy_manager()
     fn = f"() => {{ return JSON.stringify({expression}); }}"
     raw = proxy.call_tool_sync(server, tool, {"function": fn})
-    value = _extract_result(raw)
+    value = _extract_result(_raw_to_text(raw))
     # Chrome DevTools MCP JSON-encodes the returned string a second time.
     # Detect this by checking if the parsed result is itself a string.
     try:
@@ -125,7 +130,7 @@ def _exec_js(server: str, tool: str, script: str) -> str:
     proxy = get_proxy_manager()
     fn = f"() => {{ {script} }}"
     raw = proxy.call_tool_sync(server, tool, {"function": fn})
-    return _extract_result(raw)
+    return _extract_result(_raw_to_text(raw))
 
 
 _CHECK_JS = (
@@ -174,7 +179,7 @@ def enable_auto_inject(server: str, pack_name: str) -> dict[str, Any]:
     of the browser session — no per-page re-injection needed.
 
     Uses ``browser_run_code`` (not ``browser_evaluate``) to access the raw
-    Playwright ``page`` object. Only works with the Playwright MCP server;
+    Playwright ``page`` object. Only works with Playwright-compatible MCP servers;
     ``chrome_util`` has no equivalent capability.
 
     Args:
@@ -202,7 +207,7 @@ def enable_auto_inject(server: str, pack_name: str) -> dict[str, Any]:
             )
             proxy = get_proxy_manager()
             raw = proxy.call_tool_sync(server, "browser_run_code", {"code": code})
-            result_str = _extract_result(raw)
+            result_str = _extract_result(_raw_to_text(raw))
             try:
                 result = json.loads(result_str)
                 success = bool(result.get("success"))
@@ -324,7 +329,7 @@ def highlight_element(
                 result = {"success": False, "count": 0, "ids": [], "error": raw}
 
             s.add(success=result.get("success"), count=result.get("count", 0))
-            return result
+            return cast("dict[str, Any]", result)
         except Exception as e:
             s.add(error=str(e))
             return {"success": False, "count": 0, "ids": [], "error": str(e)}
@@ -359,12 +364,13 @@ def scan_annotations(
                 server, tool, "window.__inspector.scanAnnotations()"
             )
             try:
-                annotations = json.loads(raw)
+                loaded = json.loads(raw)
+                annotations = loaded if isinstance(loaded, list) else []
             except (json.JSONDecodeError, TypeError):
                 annotations = []
 
             s.add(count=len(annotations))
-            return annotations
+            return cast("list[dict[str, Any]]", annotations)
         except Exception as e:
             s.add(error=str(e))
             return []
@@ -399,7 +405,7 @@ def clear_annotations(
                 result = {"success": False, "cleared": 0}
 
             s.add(success=result.get("success"), cleared=result.get("cleared", 0))
-            return result
+            return cast("dict[str, Any]", result)
         except Exception as e:
             s.add(error=str(e))
             return {"success": False, "cleared": 0, "error": str(e)}

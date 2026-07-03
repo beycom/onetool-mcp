@@ -93,3 +93,31 @@ class TestPlayUtil:
         guide = play_util.guide_user(task="T", steps=[{"selector": ".a", "label": "A"}])
         assert guide["highlighted"] == 0
         assert "error" in guide
+
+    def test_custom_server_name(self, mock_proxy_manager) -> None:
+        """Annotation calls can target a compatible non-default server."""
+        from otdev.tools import play_util
+
+        mock_proxy_manager.servers = ["playwright_proxy"]
+        mock_proxy_manager.call_tool_sync.return_value = _pw_wrap(_READY)
+
+        result = play_util.inject_annotations(server="playwright_proxy")
+
+        assert result["success"] is True
+        call_args = mock_proxy_manager.call_tool_sync.call_args
+        assert call_args[0][0] == "playwright_proxy"
+        assert call_args[0][1] == "browser_evaluate"
+
+    def test_enable_auto_inject_custom_server_name(self, mock_proxy_manager) -> None:
+        """Auto-inject uses browser_run_code on the selected server."""
+        from otdev.tools import play_util
+
+        mock_proxy_manager.servers = ["playwright_proxy"]
+        mock_proxy_manager.call_tool_sync.return_value = _pw_wrap('{"success": true}')
+
+        result = play_util.enable_auto_inject(server="playwright_proxy")
+
+        assert result["success"] is True
+        call_args = mock_proxy_manager.call_tool_sync.call_args
+        assert call_args[0][0] == "playwright_proxy"
+        assert call_args[0][1] == "browser_run_code"

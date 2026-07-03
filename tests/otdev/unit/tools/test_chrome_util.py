@@ -78,3 +78,17 @@ class TestChromeUtil:
         guide = chrome_util.guide_user(task="T", steps=[{"selector": ".a", "label": "A"}])
         assert guide["highlighted"] == 0
         assert "error" in guide
+
+    def test_custom_server_name(self, mock_proxy_manager) -> None:
+        """Annotation calls can target a compatible non-default server."""
+        from otdev.tools import chrome_util
+
+        mock_proxy_manager.servers = ["chrome_devtool_connect"]
+        mock_proxy_manager.call_tool_sync.return_value = _READY
+
+        result = chrome_util.inject_annotations(server="chrome_devtool_connect")
+
+        assert result["success"] is True
+        call_args = mock_proxy_manager.call_tool_sync.call_args
+        assert call_args[0][0] == "chrome_devtool_connect"
+        assert call_args[0][1] == "evaluate_script"
