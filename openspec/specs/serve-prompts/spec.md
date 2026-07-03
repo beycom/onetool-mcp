@@ -53,7 +53,7 @@ The system SHALL support externalised server instructions with a minimal footpri
 - **GIVEN** no prompts.yaml or no instructions key
 - **WHEN** default instructions are used
 - **THEN** they SHALL direct agents to follow the `run` tool description first
-- **AND** the `run` tool description SHALL include the supported prefixes `__run`, `__r`, and `__ot`
+- **AND** the `run` tool description SHALL include the supported prefixes `__onetool` and `__ot`
 
 #### Scenario: Instructions are concise
 - **WHEN** the server builds the handshake instructions
@@ -110,9 +110,10 @@ The run tool description SHALL document the complete invocation contract.
 #### Scenario: Supported prefixes documented
 - **GIVEN** prompts.yaml instructions
 - **WHEN** loaded
-- **THEN** the run tool description SHALL identify `__run` as the canonical trigger
-- **AND** SHALL identify `__r` and `__ot` as supported aliases
+- **THEN** the run tool description SHALL identify `__onetool` as the canonical trigger
+- **AND** SHALL identify `__ot` as the supported short alias
 - **AND** SHALL document `:name key=value` as snippet syntax
+- **AND** SHALL state that colon syntax applies only to snippets and must not be added to direct `pack.tool(...)` calls
 - **AND** SHALL state that connected agents should call MCP `run(command=...)`
 - **AND** SHALL state that direct pack calls use `pack.tool(arg=value)`, not `ot.pack.tool(...)`
 - **AND** SHALL state that agents must not guess tool names, parameter names, or allowed values when they are unknown
@@ -127,7 +128,7 @@ The run tool description SHALL document the complete invocation contract.
 #### Scenario: Removed triggers not advertised
 - **GIVEN** the default prompts template
 - **WHEN** instructions are generated
-- **THEN** `>>>`, `__onetool`, `__ot__run`, `__onetool__run`, and `mcp__onetool__run` SHALL NOT appear as supported runtime prefixes
+- **THEN** `>>>`, `__run`, `__r`, `__ot__run`, `__onetool__run`, and `mcp__onetool__run` SHALL NOT appear as supported runtime prefixes
 
 ### Requirement: Snippet Param Prefix Resolution
 
@@ -135,7 +136,7 @@ The system SHALL resolve abbreviated snippet param names using prefix matching.
 
 #### Scenario: Abbreviated param resolved
 - **GIVEN** a snippet with param `query` defined in snippets.yaml
-- **WHEN** the user invokes `__run :snip q=test`
+- **WHEN** the user invokes `__onetool :snip q=test`
 - **THEN** `q` SHALL be resolved to `query` (prefix match, single candidate)
 
 #### Scenario: Exact match wins

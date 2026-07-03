@@ -34,9 +34,3 @@ The system SHALL support a `__force_context__` magic variable that forces the cu
 - **AND** the tool being executed is a `ctx.*` call or `ot.result`
 - **THEN** the output SHALL be returned inline
 - **AND** the `__force_context__` flag SHALL be ignored for that call
-
-#### Scenario: Compaction runs before force-context check
-- **WHEN** code sets both `__compact__ = True` and `__force_context__ = True`
-- **THEN** the output SHALL be compacted first
-- **AND** the compacted output SHALL be stored to the ctx backend
-- **AND** a handle summary SHALL be returned

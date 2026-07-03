@@ -2,7 +2,7 @@
 
 ## Purpose
 Defines the `play_util` (`play`) tool pack and the shared `inject.js` browser
-annotation behavior it exposes through the Playwright MCP server.
+annotation behavior it exposes through a Playwright-compatible MCP server.
 
 ## Requirements
 ### Requirement: play_util Pack Declaration
@@ -23,7 +23,7 @@ The system SHALL provide a bundled JavaScript annotation script through
 #### Scenario: Script loading
 - **GIVEN** the annotation script asset
 - **WHEN** `play_util.inject_annotations()` is called
-- **THEN** it SHALL inject the bundled script through the Playwright MCP server
+- **THEN** it SHALL inject the bundled script through the selected Playwright-compatible MCP server
 
 ### Requirement: Annotation API
 
@@ -136,16 +136,21 @@ The annotation system SHALL optimise rendering for scroll and resize events.
 
 ### Requirement: Playwright Server Boundary
 
-The `play_util` pack SHALL use the configured `playwright` MCP server.
+The `play_util` pack SHALL use a Playwright-compatible MCP server selected by an optional keyword-only `server` argument. When omitted, `server` SHALL default to `playwright`.
 
-#### Scenario: Playwright server required
-- **GIVEN** the `playwright` MCP server is not connected
+#### Scenario: Selected server required
+- **GIVEN** the selected server is not connected
 - **WHEN** any `play_util` function is called
-- **THEN** it SHALL return an error indicating the `playwright` server is unavailable
+- **THEN** it SHALL return an error indicating the selected server name is unavailable
 - **AND** include the available server names in the error message
 
+#### Scenario: Compatible server override
+- **GIVEN** a Playwright-compatible server is connected under a non-default name
+- **WHEN** `play_util.inject_annotations(server="playwright_proxy")` is called
+- **THEN** it SHALL call that server's `browser_evaluate` tool.
+
 #### Scenario: Auto-inject registration
-- **GIVEN** the `playwright` MCP server is connected
+- **GIVEN** the selected Playwright-compatible MCP server is connected
 - **WHEN** `play_util.enable_auto_inject()` is called
 - **THEN** it SHALL register the annotation script for future pages in the browser session
 - **AND** return `success` and `auto_inject` fields

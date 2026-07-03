@@ -67,12 +67,12 @@ The system SHALL bundle an initial set of skills for on-demand discovery and ser
 
 #### Scenario: ot-ref direct run discoverability
 - **WHEN** bundled `ot-ref` frontmatter is parsed
-- **THEN** its description SHALL include trigger terms for `__run`, MCP `run`, direct pack calls, and run-vs-local-script decisions
+- **THEN** its description SHALL include trigger terms for `__onetool`, MCP `run`, direct pack calls, and run-vs-local-script decisions
 
 #### Scenario: ot-ref advanced reference scope
 - **WHEN** `ot.skills(name="ot-ref")` is called
 - **THEN** the returned body SHALL include advanced recovery, proxy handling, security, output, and ctx guidance
-- **AND** it SHALL open with guidance that it applies when a OneTool `__run`/MCP run request needs advanced recovery or decision-boundary help
+- **AND** it SHALL open with guidance that it applies when a OneTool `__onetool`/MCP run request needs advanced recovery or decision-boundary help
 - **AND** it SHALL include parameter prefix matching and readable discovery hints
 - **AND** it SHALL NOT be the only place where normal invocation modes are documented
 - **AND** its content SHALL include error recovery patterns, security allowlist guidance, output format/sanitisation controls, multi-step patterns, pack extras, and parameter traps
@@ -80,9 +80,9 @@ The system SHALL bundle an initial set of skills for on-demand discovery and ser
 #### Scenario: ot-chrome-devtools-mcp skill bundled
 - **WHEN** `ot.skills()` is called
 - **THEN** `ot-chrome-devtools-mcp` SHALL be listed
-- **AND** its content SHALL cover the Chrome DevTools MCP server tools, connection modes, and usage patterns
+- **AND** its content SHALL cover Chrome DevTools-compatible MCP server tools, connection modes, and usage patterns
 
 #### Scenario: ot-playwright-mcp skill bundled
 - **WHEN** `ot.skills()` is called
 - **THEN** `ot-playwright-mcp` SHALL be listed
-- **AND** its content SHALL cover the Playwright MCP server tools and usage patterns
+- **AND** its content SHALL cover Playwright-compatible MCP server tools and usage patterns

@@ -76,7 +76,6 @@ details belong under `openspec/changes/`, not in this index.
 
 | Spec | Purpose |
 |------|---------|
-| [tool-caveman](ottools/tool-caveman/spec.md) | Text compaction, expansion, and command-queue input |
 | [tool-forge](ottools/tool-forge/spec.md) | Extension scaffolding and validation |
 | [tool-image](ottools/tool-image/spec.md) | Image loading, querying, and lifecycle management |
 | [tool-llm](ottools/tool-llm/spec.md) | LLM-powered data transformation |
@@ -117,7 +116,7 @@ details belong under `openspec/changes/`, not in this index.
 | MCP Server Runtime | 19 |
 | Browser Utilities | 2 |
 | Knowledge, Context, And Memory | 6 |
-| Core Built-In Tool Packs | 6 |
+| Core Built-In Tool Packs | 5 |
 | Domain Tools `[util]` | 6 |
 | Domain Tools `[dev]` | 9 |
-| **Total** | **54** |
+| **Total** | **53** |

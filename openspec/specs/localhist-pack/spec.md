@@ -34,7 +34,8 @@ The system SHALL manage local history in an independent Git database that observ
 
 #### Scenario: Initialize local history
 - **WHEN** `localhist.init()` is called for an uninitialized project
-- **THEN** the system SHALL create the local-history Git database, configure required local-history settings, ensure `.localhist/` is ignored by the primary repository, ensure `.localhist/info/exclude` contains `.git/`, `.onetool/state/localhist/`, and the configured local-history Git directory, ensure `.onetool/state/localhist/force-include` exists, and return structured initialization status.
+- **THEN** the system SHALL create the local-history Git database, configure required local-history settings, write `<git_dir>/.gitignore` to ignore generated localhist contents while allowing that ignore file, ensure `.localhist/info/exclude` contains `.git/`, `.onetool/state/localhist/`, and the configured local-history Git directory, ensure `.onetool/state/localhist/force-include` exists, and return structured initialization status.
+- **AND** it SHALL NOT edit the project root `.gitignore`.
 
 #### Scenario: Local history Git identity
 - **WHEN** `localhist.init()` initializes or reinitializes the local-history Git database
@@ -83,6 +84,10 @@ The system SHALL allow agents to create manual local-history snapshots without p
 #### Scenario: Save scoped ignored force-includes
 - **WHEN** `localhist.save(...)` is called with scoped paths that match configured force-include rules
 - **THEN** the system SHALL run normal Git staging for the scoped paths and then force-add matching configured force-includes.
+
+#### Scenario: Scoped directory matches force-include glob
+- **WHEN** `localhist.save(message="save", paths="wip/requirements")` is called with force-include rule `wip/**`
+- **THEN** the system SHALL treat that force-include rule as matching the scoped path and force-add ignored files under the requested subtree.
 
 #### Scenario: Save scoped paths reject unsafe pathspecs
 - **WHEN** `localhist.save(...)` is called with empty paths, absolute paths, parent traversal, protected localhist storage paths, or Git pathspec magic

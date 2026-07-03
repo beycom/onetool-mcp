@@ -639,10 +639,11 @@ The `ot.help()` function SHALL provide unified help across tools, packs, snippet
 - **AND** matching SHALL consider both names and descriptions for tools/packs/snippets/aliases
 
 #### Scenario: Direct run invocation help
-- **GIVEN** a query for direct invocation syntax such as `__run`, `__r`, `__ot`, `run`, `direct command`, or `snippet`
+- **GIVEN** a query for direct invocation syntax such as `__onetool`, `__ot`, `run`, `direct command`, or `snippet`
 - **WHEN** `ot.help(query=...)` is called
 - **THEN** it SHALL return deterministic direct OneTool invocation guidance
-- **AND** the guidance SHALL include `__run <code>`, `__r <code>`, `__ot <code>`, `:snippet key=value`, direct `pack.tool(arg=value)` call shape, and `ot.tool_info(name="pack.tool")` discovery
+- **AND** the guidance SHALL include `__onetool <code>`, `__ot <code>`, `:snippet key=value`, direct `pack.tool(arg=value)` call shape, and `ot.tool_info(name="pack.tool")` discovery
+- **AND** the guidance SHALL state that colon syntax applies only to snippets and must not be added to direct `pack.tool(...)` calls
 - **AND** the guidance SHALL distinguish connected-agent MCP `run(command=...)` usage from the explicit `onetool direct` CLI workflow
 
 #### Scenario: Fuzzy matching with typos

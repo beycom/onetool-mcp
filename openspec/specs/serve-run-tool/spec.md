@@ -212,9 +212,9 @@ The system SHALL expand snippet templates using Jinja2.
 - **THEN** it SHALL expand the snippet template and execute the result
 
 #### Scenario: Snippet expansion inside multiline python workflow
-- **GIVEN** a multiline run() command with normal python statements and `result = __run(":wsq q1=AI q2=ML p=Compare")`
+- **GIVEN** a multiline run() command with normal python statements and `result = __onetool(":wsq q1=AI q2=ML p=Compare")`
 - **WHEN** run() executes the command
-- **THEN** `__run(...)` SHALL expand and execute the snippet command and return its tool result to the caller
+- **THEN** `__onetool(...)` SHALL expand and execute the snippet command and return its tool result to the caller
 
 ### Requirement: Project Pack Proxy
 
@@ -364,53 +364,6 @@ The system SHALL support a `__sanitize__` magic variable to control output sanit
 - **GIVEN** code that does not set `__sanitize__`
 - **WHEN** the result is returned
 - **THEN** sanitisation SHALL NOT be applied (opt-in)
-
-### Requirement: Compaction Magic Variable
-
-The system SHALL support a `__compact__` magic variable to transparently compact serialized output via ot_caveman's core text-compaction logic.
-
-#### Scenario: Explicit enable
-- **GIVEN** code that sets `__compact__ = True`
-- **WHEN** the result is returned
-- **THEN** the serialized output SHALL be passed through ot_caveman text compaction before being returned
-
-#### Scenario: Explicit disable
-- **GIVEN** code that sets `__compact__ = False`
-- **WHEN** the result is returned
-- **THEN** no compaction SHALL be applied, regardless of `output.compact` config
-
-#### Scenario: Default behaviour (config off)
-- **GIVEN** code that does not set `__compact__`
-- **AND** `output.compact` is `false` (or absent)
-- **WHEN** the result is returned
-- **THEN** no compaction SHALL be applied
-
-#### Scenario: Default behaviour (config on)
-- **GIVEN** code that does not set `__compact__`
-- **AND** `output.compact` is `true`
-- **WHEN** the result is returned
-- **THEN** the serialized output SHALL be passed through ot_caveman text compaction
-
-#### Scenario: Compaction unavailable — warn and return original
-- **GIVEN** code that sets `__compact__ = True`
-- **AND** ot_caveman is not installed or is misconfigured (e.g. no API key)
-- **WHEN** compaction is attempted
-- **THEN** a warning SHALL be logged
-- **AND** the original uncompacted output SHALL be returned unchanged
-- **AND** no error string SHALL be injected into the output
-
-#### Scenario: Compaction runs after serialization
-- **GIVEN** code that sets both `__format__ = "json"` and `__compact__ = True`
-- **WHEN** the result is returned
-- **THEN** the result SHALL be serialized to JSON first
-- **AND** THEN the JSON string SHALL be passed through compaction
-- **AND** the compacted output SHALL NOT be expected to parse as valid JSON
-
-#### Scenario: Compaction runs before large-output threshold check
-- **GIVEN** code that sets `__compact__ = True`
-- **AND** the pre-compaction output exceeds `output.max_inline_size`
-- **WHEN** compaction reduces output below the threshold
-- **THEN** the compacted output SHALL be returned inline (no ctx-store handle)
 
 ### Requirement: Large Output Handling
 

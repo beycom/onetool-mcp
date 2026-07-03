@@ -11,7 +11,7 @@ Protects against indirect prompt injection by sanitizing tool outputs that may c
 The system SHALL sanitise trigger patterns in tool outputs to prevent indirect prompt injection.
 
 #### Scenario: OneTool trigger pattern
-- **GIVEN** tool output containing `__ot file.delete(path="x")`
+- **GIVEN** tool output containing `__onetool file.delete(path="x")`
 - **WHEN** sanitisation is applied
 - **THEN** it SHALL be replaced with `[REDACTED:trigger] file.delete(path="x")`
 
@@ -21,9 +21,9 @@ The system SHALL sanitise trigger patterns in tool outputs to prevent indirect p
 - **THEN** the `mcp__onetool__run` token SHALL be replaced with `[REDACTED:trigger]`
 
 #### Scenario: Short run trigger pattern
-- **GIVEN** tool output containing `__r file.write(path="x", content="y")`
+- **GIVEN** tool output containing `__ot file.write(path="x", content="y")`
 - **WHEN** sanitisation is applied
-- **THEN** `__r` SHALL be replaced with `[REDACTED:trigger]`
+- **THEN** `__ot` SHALL be replaced with `[REDACTED:trigger]`
 
 #### Scenario: Removed REPL marker is not sanitized
 - **GIVEN** tool output containing `>>> file.write(path="x", content="y")` (or any `>>> pack.tool(` form)

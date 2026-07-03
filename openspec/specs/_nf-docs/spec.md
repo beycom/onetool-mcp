@@ -19,7 +19,7 @@ user to install OneTool, configure a client, and make a first tool call.
 - **WHEN** they follow the quick start
 - **THEN** they SHALL find installation instructions
 - **AND** a minimal MCP client configuration
-- **AND** a first successful `run(command=...)` or `__run` invocation example
+- **AND** a first successful `run(command=...)` or `__onetool` invocation example
 
 #### Scenario: Configuration entry point
 - **GIVEN** a user configuring OneTool
