@@ -24,8 +24,10 @@ from mcp import types
 
 from ot.config import expand_vars
 from ot.logging import LogEntry, LogSpan
+from ot.logging.redact import redact_secrets
 
 if TYPE_CHECKING:
+    from collections.abc import Coroutine
     from concurrent.futures import Future
 
     from ot.config.models import McpServerConfig
@@ -45,7 +47,17 @@ def _sanitize_connect_error(msg: str) -> str:
     A decrypted secret can end up in a bearer/authorization header; if a connection
     failure echoes it, this keeps it out of ot.servers()/status output and logs while
     preserving enough context (exception type, non-credential text) to diagnose.
+
+    Two layers, applied in order:
+    1. ``redact_secrets()`` — the canonical, shape-based redactor (single source of
+       truth, shared with logging/mem redaction) that catches raw secret literals
+       (``sk-...``, ``ghp_...``, ``AKIA...``, connection strings, ...) regardless of
+       whether a credential keyword precedes them.
+    2. ``_CONNECT_SECRET_RE`` — a keyword-gated pass that truncates anything trailing
+       a credential keyword (authorization/bearer/basic/token/api-key) to end-of-line,
+       catching keyword-prefixed opaque tokens whose shape the first pass can't know.
     """
+    msg = redact_secrets(msg)
     return _CONNECT_SECRET_RE.sub(r"\1 [redacted]", msg)
 
 
@@ -758,15 +770,18 @@ class ProxyManager:
         D14: both the pack-proxy namespace cache (accessor -> tool closures) and the
         MCP param-name cache key on server identity but are not otherwise invalidated
         on a disconnect/restart. ``name=None`` clears everything (full reconnect).
+
+        The namespace-cache eviction below is deliberately global regardless of
+        ``name``: the namespace cache is a single composite dict shared by packs for
+        all servers, so a full rebuild is the only correct option and is cheap (D14,
+        p12). Per-server eviction was considered and rejected for this cache; contrast
+        with ``evict_mcp_param_cache`` above, which does real per-server eviction.
         """
-        from ot.executor.pack_proxy import evict_server_cache, reset
+        from ot.executor.pack_proxy import reset
         from ot.executor.param_resolver import evict_mcp_param_cache
 
         evict_mcp_param_cache(name)
-        if name is None:
-            reset()
-        else:
-            evict_server_cache(name)
+        reset()
 
     async def reconnect(self, configs: dict[str, McpServerConfig]) -> None:
         """Reconnect to all MCP servers.
@@ -812,6 +827,23 @@ class ProxyManager:
             logger.warning(LogEntry(event="proxy.connect.failed", server=name).failure(e))
             return f"failed: {e}"
 
+    def _schedule_or_wait(self, coro: Coroutine[Any, Any, str], timeout: float) -> str:
+        """Run ``coro`` on the manager's loop, guarding against a same-loop deadlock.
+
+        D3: if called from code already running on the manager's own loop, a blocking
+        ``future.result()`` onto that same loop can never complete (the scheduled
+        coroutine cannot run until this call returns) — a multi-second freeze. In that
+        case, schedule fire-and-continue instead. Otherwise (called from another
+        thread), hop onto the manager's loop via ``run_coroutine_threadsafe`` and
+        block up to ``timeout`` seconds for the result.
+        """
+        with contextlib.suppress(RuntimeError):
+            if asyncio.get_running_loop() is self._loop:
+                self._loop.create_task(coro)
+                return "scheduled"
+        future = asyncio.run_coroutine_threadsafe(coro, self._loop)  # type: ignore[arg-type]
+        return future.result(timeout=timeout)
+
     def connect_additional_sync(self, name: str, config: McpServerConfig) -> str:
         """Synchronously connect a single new server without disrupting existing connections.
 
@@ -826,19 +858,9 @@ class ProxyManager:
         """
         if self._loop is None or not self._loop.is_running():
             return "failed: no running event loop"
-        # D3: if called from code already running on the manager's own loop, a
-        # blocking future.result() onto that same loop can never complete (the
-        # scheduled coroutine cannot run until this call returns) — a ~120s freeze.
-        # Schedule fire-and-continue instead, matching reconnect_sync's pattern.
-        with contextlib.suppress(RuntimeError):
-            if asyncio.get_running_loop() is self._loop:
-                self._loop.create_task(self.connect_additional(name, config))
-                return "scheduled"
-        future = asyncio.run_coroutine_threadsafe(
-            self.connect_additional(name, config),
-            self._loop,
+        return self._schedule_or_wait(
+            self.connect_additional(name, config), timeout=120
         )
-        return future.result(timeout=120)
 
     async def disconnect_server(self, name: str) -> str:
         """Disconnect a single server without affecting other connections.
@@ -893,17 +915,7 @@ class ProxyManager:
                     "no running event loop; underlying transport may not be closed."
                 )
                 return "disconnected"
-        # D3: same-loop guard — blocking on our own loop from our own loop can never
-        # complete. Schedule fire-and-continue instead of a ~30s deadlock.
-        with contextlib.suppress(RuntimeError):
-            if asyncio.get_running_loop() is self._loop:
-                self._loop.create_task(self.disconnect_server(name))
-                return "scheduled"
-        future = asyncio.run_coroutine_threadsafe(
-            self.disconnect_server(name),
-            self._loop,
-        )
-        return future.result(timeout=30)
+        return self._schedule_or_wait(self.disconnect_server(name), timeout=30)
 
     def reconnect_sync(self, configs: dict[str, McpServerConfig]) -> None:
         """Synchronously reconnect to all MCP servers.

@@ -152,3 +152,23 @@ class TestConnectErrorSanitization:
         out = _sanitize_connect_error(msg)
         assert "sk-secret123" not in out
         assert "connection failed" in out
+
+    def test_raw_shape_token_redacted_without_keyword(self) -> None:
+        """A bare secret-shaped literal (no authorization/bearer/token keyword nearby)
+        must still be caught by the redact_secrets() shape-based first pass."""
+        from ot.proxy.manager import _sanitize_connect_error
+
+        msg = "connection failed: upstream rejected sk-abc123def456ghi789jklmno"
+        out = _sanitize_connect_error(msg)
+        assert "sk-abc123def456ghi789jklmno" not in out
+        assert "connection failed" in out
+
+    def test_keyword_form_still_redacted(self) -> None:
+        """Keyword-gated second pass still catches keyword-prefixed opaque tokens
+        that the shape-based patterns don't recognize."""
+        from ot.proxy.manager import _sanitize_connect_error
+
+        msg = "connection failed: authorization: Bearer xyz rejected"
+        out = _sanitize_connect_error(msg)
+        assert "xyz" not in out
+        assert "connection failed" in out
