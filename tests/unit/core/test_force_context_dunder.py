@@ -195,9 +195,8 @@ class TestForceContextDunder:
         assert result.success, f"Command failed: {result.result}"
         parsed = json.loads(result.result)
         assert "next_commands" in parsed
-        assert parsed["next_commands"][0].startswith("ctx.toc(handle='")
-        assert "ctx.ask(handle='" in parsed["next_commands"][1]
-        assert "ctx.read(handle='" in parsed["next_commands"][2]
+        # Seam 4: a single universal ot.result hint, no [util]-only ctx.* commands.
+        assert parsed["next_commands"] == [f"ot.result(handle='{parsed['handle']}')"]
 
     def test_discovery_calls_keep_json_default(self):
         """Discovery calls keep compact JSON as default format."""

@@ -367,6 +367,10 @@ def _format_server_help(
     source = getattr(server_cfg, "source", None)
     if source:
         lines.append(f"**Source:** {source}")
+    if status != "connected":
+        lines.append(
+            f"**Recovery:** Run `ot_servers.enable(name='{server_name}')` to connect."
+        )
     lines.append("")
 
     # Layer instructions: native MCP first, then servers.yaml additions

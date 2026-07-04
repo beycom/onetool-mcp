@@ -150,6 +150,16 @@ def _create_mcp_proxy_pack(server_name: str, tool_prefix: str | None = None) -> 
                 )
 
             if match_result is None:
+                # A configured-but-not-yet-connected server has an empty tool list,
+                # which is indistinguishable from "tool genuinely missing". Name the
+                # real problem and the one-line recovery command instead.
+                if proxy.get_connection(server_name) is None:
+                    raise AttributeError(
+                        f"Server '{server_name}' is configured but not connected. "
+                        f"Tool '{accessor_name}' is unavailable until it connects. "
+                        f"Run ot_servers.enable(name='{server_name}') to connect it, then retry."
+                    )
+
                 # No match found - provide suggestions
                 suggestions = suggest_similar_names(accessor_name, available_tools)
                 if suggestions:

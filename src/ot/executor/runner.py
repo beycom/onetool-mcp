@@ -504,6 +504,9 @@ def execute_python_code(
         else:
             wrapped = ValueError(f"❗️Execution error: {orig_type}: {error_msg}")
         wrapped.ot_original_error_type = orig_type  # type: ignore[attr-defined]
+        # Preserve the unresolved identifier of a NameError so execute_command can
+        # offer a fuzzy pack-name suggestion (the wrapper drops the original .name).
+        wrapped.ot_original_error_name = getattr(e, "name", None)  # type: ignore[attr-defined]
         raise wrapped from e
 
 
@@ -803,11 +806,34 @@ async def execute_command(
             # D-b2: first-party error text is not untrusted external content, so it
             # is not boundary-wrapped or trigger-redacted. D6: report the real
             # exception type threaded through from execute_python_code.
+            orig_type = getattr(e, "ot_original_error_type", type(e).__name__)
+            result_text = str(e)
+            # Seam 2: a typo'd pack name surfaces as a NameError. Enrich it with a
+            # fuzzy did-you-mean drawn from the same namespace the command ran
+            # against, plus a pointer to ot.packs(). Other error types are unchanged.
+            if orig_type == "NameError":
+                failed_name = getattr(e, "ot_original_error_name", None) or getattr(
+                    e, "name", None
+                )
+                if failed_name:
+                    from ot.meta._help_formatting import _fuzzy_match
+
+                    suggestions = _fuzzy_match(failed_name, sorted(tool_namespace.keys()))
+                    if suggestions:
+                        suggestion_list = ", ".join(f"'{s}'" for s in suggestions[:3])
+                        result_text = (
+                            f"{result_text}. Did you mean: {suggestion_list}? "
+                            "Use ot.packs() to list all available packs."
+                        )
+                    else:
+                        result_text = (
+                            f"{result_text}. Use ot.packs() to list all available packs."
+                        )
             return CommandResult(
                 command=command,
-                result=str(e),
+                result=result_text,
                 executor="python",
                 success=False,
-                error_type=getattr(e, "ot_original_error_type", type(e).__name__),
+                error_type=orig_type,
                 should_sanitize=False,
             )

@@ -62,11 +62,11 @@ class CtxResultStoreBackend:
             if fuzzy:
                 raise ValueError(
                     "fuzzy=True is no longer supported; "
-                    "use ctx.ask() for natural-language queries or ctx.grep() for regex."
+                    "use ot.result(handle=..., search='pattern') for regex search."
                 )
-            from ot.ctx.grep import ctx_grep
+            from ot.ctx import grep
 
-            result = ctx_grep(handle, search, context=context)
+            result = grep.ctx_grep(handle, search, context=context)
             if "error" in result:
                 raise ValueError(result["error"])
             all_lines = result["content"].splitlines() if result["content"] else []
@@ -97,9 +97,9 @@ class CtxResultStoreBackend:
                 next_query=next_query,
             )
 
-        from ot.ctx.read import ctx_read
+        from ot.ctx import read
 
-        result = ctx_read(handle, offset=offset, limit=limit, tail=tail)
+        result = read.ctx_read(handle, offset=offset, limit=limit, tail=tail)
         if "error" in result:
             raise ValueError(result["error"])
 
@@ -128,15 +128,15 @@ class CtxResultStoreBackend:
         return int(result.get("deleted", 0))
 
     def format_store_response(self, stored: Any) -> dict[str, Any]:
-        """Format runner response with ctx-owned follow-up commands."""
+        """Format runner response with the universal ot.result follow-up hint.
+
+        Uses ot.result(handle=...) — always present in the base install — rather than
+        ctx.* commands, which only exist when the optional [util] extra is installed.
+        """
         if not isinstance(stored, StoredResult):
             raise TypeError("ctx result store expected StoredResult")
         response = stored.to_dict()
-        response["next_commands"] = [
-            f"ctx.toc(handle='{stored.handle}')",
-            f"ctx.ask(handle='{stored.handle}', q='What matters most here?')",
-            f"ctx.read(handle='{stored.handle}', limit=80)",
-        ]
+        response["next_commands"] = [f"ot.result(handle='{stored.handle}')"]
         return response
 
 

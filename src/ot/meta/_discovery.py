@@ -162,6 +162,9 @@ def tool_info(
         filter_lower = filter_pattern.lower() if filter_pattern else ""
 
         results: list[dict[str, Any]] = []
+        # Unfiltered set of every tool full name — needed for did-you-mean on an
+        # exact-name miss, since `results` is empty by construction in that case.
+        all_full_names: list[str] = []
 
         # Local tools
         from ot.executor.worker_proxy import WorkerPackProxy
@@ -175,6 +178,7 @@ def tool_info(
 
             for func_name, func in func_items:
                 full_name = f"{pack_name}.{func_name}"
+                all_full_names.append(full_name)
 
                 if filter_lower and filter_lower not in full_name.lower():
                     continue
@@ -187,6 +191,7 @@ def tool_info(
         for proxy_tool in proxy.list_tools():
             safe_server = _safe_server_name(proxy_tool.server)
             tool_name = f"{safe_server}.{proxy_tool.name}"
+            all_full_names.append(tool_name)
 
             if filter_lower and filter_lower not in tool_name.lower():
                 continue
@@ -210,7 +215,13 @@ def tool_info(
             for result in results:
                 if result["name"] == filter_pattern:
                     return result
-            return {}
+            # Miss: return an actionable error with fuzzy suggestions instead of {}.
+            from ot.meta._help_formatting import _fuzzy_match
+
+            return {
+                "error": f"Tool '{filter_pattern}' not found.",
+                "did_you_mean": _fuzzy_match(filter_pattern, all_full_names)[:5],
+            }
 
         return results
 

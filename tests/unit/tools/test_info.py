@@ -1337,3 +1337,31 @@ class TestInfoLevelValidation:
 
         with pytest.raises(ValueError, match="is not valid"):
             pack_info(name="brave", info="core")  # type: ignore[arg-type]
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_tool_info_miss_returns_did_you_mean() -> None:
+    """Seam 3: an exact-name miss returns {error, did_you_mean}, not {}."""
+    from ot.meta import tool_info
+
+    result = tool_info(name="brave.serch")
+
+    assert isinstance(result, dict)
+    assert set(result.keys()) == {"error", "did_you_mean"}
+    assert result["error"]
+    assert result["did_you_mean"]
+    assert "brave.search" in result["did_you_mean"]
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_tool_info_miss_no_match_returns_empty_list() -> None:
+    """Seam 3: a wildly-wrong name still returns did_you_mean=[], never a bare {}."""
+    from ot.meta import tool_info
+
+    result = tool_info(name="zzzzz.nonexistent")
+
+    assert isinstance(result, dict)
+    assert result["error"]
+    assert result["did_you_mean"] == []

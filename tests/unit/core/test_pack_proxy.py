@@ -353,3 +353,26 @@ class TestMcpProxyPackToolPrefixFallback:
             pack = _create_mcp_proxy_pack("my-custom-server", tool_prefix="myco_")
             fn = pack.list_things  # prefix stripped
             assert callable(fn)
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestMcpProxyPackDisconnectedServer:
+    """Seam 1a: a configured-but-disconnected server names the enable command."""
+
+    def test_disconnected_server_error_names_enable_command(self) -> None:
+        from ot.executor.pack_proxy import _create_mcp_proxy_pack
+
+        mock_proxy = MagicMock()
+        mock_proxy.list_tools.return_value = []  # never connected -> empty tool list
+        mock_proxy.get_connection.return_value = None  # not connected
+
+        with patch("ot.proxy.get_proxy_manager", return_value=mock_proxy):
+            pack = _create_mcp_proxy_pack("playwright")
+            with pytest.raises(AttributeError) as exc_info:
+                _ = pack.click
+
+        message = str(exc_info.value)
+        assert "playwright" in message
+        assert "not connected" in message.lower()
+        assert "ot_servers.enable(name='playwright')" in message
