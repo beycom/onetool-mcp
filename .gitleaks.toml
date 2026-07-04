@@ -8,8 +8,13 @@ useDefault = true
 [allowlist]
 description = "Allowed patterns and paths"
 
-# PostHog project API keys are public client-side tokens (write-only)
-regexes = ['''phc_[a-zA-Z0-9]+''']
+# PostHog project API keys are public client-side tokens (write-only).
+# sk-abc123... is the canonical fake key used by the redaction tests
+# (test_mem.py, test_llm.py, test_log_format.py) and their specs.
+regexes = [
+    '''phc_[a-zA-Z0-9]+''',
+    '''sk-abc123[a-z0-9]*''',
+]
 
 # Paths containing example/captured content
 paths = [

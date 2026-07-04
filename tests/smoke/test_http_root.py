@@ -12,6 +12,8 @@ from pathlib import Path
 import pytest
 from fastmcp import Client
 
+from ot import __version__ as OT_VERSION
+
 
 def _free_port() -> int:
     with socket.socket() as sock:
@@ -90,7 +92,7 @@ def test_streamable_http_root_lists_and_calls_run(tmp_path: Path) -> None:
                 assert any(tool.name == "run" for tool in tools)
 
                 version = await client.call_tool("run", {"command": "ot.version()"})
-                assert "2.2.2" in str(version.content[0].text)
+                assert OT_VERSION in str(version.content[0].text)
 
                 servers = await client.call_tool("run", {"command": "ot.servers()"})
                 assert "broken_proxy" in str(servers.content[0].text)
@@ -109,7 +111,7 @@ def test_streamable_http_root_lists_and_calls_run(tmp_path: Path) -> None:
                 after_failure = await client.call_tool(
                     "run", {"command": "ot.version()"}
                 )
-                assert "2.2.2" in str(after_failure.content[0].text)
+                assert OT_VERSION in str(after_failure.content[0].text)
 
         asyncio.run(_exercise_http_root())
 

@@ -1,5 +1,58 @@
 # Changelog
 
+## [3.0.0] - 2026-07-04
+
+### Breaking Changes
+- **Explicit invocation trigger renamed** — the canonical trigger is now `__onetool` (short form `__ot`). The old `__run` / `__r` forms are removed with no shims. Migration: replace `__run` with `__onetool` in prompts, agent instructions, and snippets. Snippet calls keep their colon syntax; explicit `pack.tool(...)` calls never use a colon.
+- **`mem` operations renamed** — `mem.export` → `mem.dump`, `mem.snap` → `mem.snapshot`. Update any callers.
+- **Direct settings restructured** — `direct.*` config now lives under `direct.host.*` (`DirectHostConfig`). Migration: nest existing direct keys under `host:`.
+- **`file.read` defaults to raw lines** — line numbers are now opt-in rather than emitted by default.
+- **Removed surfaces** (verified gone, no stale references in `src/`, `docs/`, or `openspec/`):
+  - `onetool-bench` benchmark package, its specs, and justfile targets.
+  - AWS pack.
+  - Handoff — the entire pack is removed, not just the child runtime (`src/ot/handoff/*`, `src/ottools/handoff.py`), along with its docs and spec.
+  - Public proxy server reference pages and obsolete agent config files.
+  - `output.compact` config and the `__compact__` dunder (removed along with compaction support).
+- **This release cycle's own removals**:
+  - `ot.skills` runtime tool and the `install_skills` installer surface — skills now ship as a standard top-level `skills/` layout owned by external installers.
+  - The `[whiteboard]` install extra — folded into `[util]`.
+  - Pack API parameter renames — `kb` `q` → `query`, `mem` `pattern` → `keyword`, `brave` `count` → `max_results`.
+
+### New tools and improvements
+
+#### Direct API lifecycle
+- **MCP-managed Direct API** — authenticated direct execution against an already-running, MCP-owned runtime: direct host lifecycle management, bound-port routing, host context sync, secrets path resolution, and scoped auth with project state paths. Endpoints are `/run`, `/health`, and `/ready`.
+- **HTTP root runtime mode** and a `direct` OneTool just recipe; snippet commands now carry direct-run metadata; direct CLI usage documented.
+
+#### Local history pack (`localhist`)
+- **New project-local snapshot pack** — keep project-local history without capturing the history store itself. Hardened through git identity setup, storage protection from snapshots, scoped save paths, nested ignore behavior, and scoped force-include handling.
+
+#### Server management and diagnostics
+- **New `ot_servers` pack** with a read-only `ot.server` (enable/disable/restart/status for proxied MCP servers from inside the agent loop).
+- **`ot.help` ask mode** and richer status diagnostics; improved help discovery and run output guidance.
+- Disabled servers are skipped in runtime readiness checks; proxy transports close more reliably and servers connect concurrently; configured server packs are now exposed; Chrome/Playwright annotation utilities accept any compatible MCP server name instead of one fixed name.
+
+#### Tool improvements
+- **`file`** — directory resolution with a safer default list output, a file reference resolver, and grep match limits aligned with ripgrep.
+- **`ripgrep`** — `follow_symlinks`, `smart_case`, and `filenames_only`.
+- **`db`** — table sampling and optional row counts; hardened identifier handling and connection usage.
+- **`arch`** — new model-centric architecture pack with generation, round-trip, and parallel render flows.
+- **`ground`** — structured search extraction, provenance, and batch envelopes.
+- Search timeout and retry guardrails; `knowledge` scrape event-loop and browser lifecycle cleanup; `convert` batch loops run inside active event loops; `web` loopback error and metadata improvements; `diagram` compound-extension and batch-status handling; `package` fixes for empty versions and dotted dependencies; `ot_image` clipboard read/summary fixes.
+
+#### Configuration and runtime
+- **Guided encrypted-secrets flow** — `set`/`get` with keyring validation and atomic `0600` writes; install bootstrap, `init` mcp-config generation, idempotent `init`, and secrets-startup guards.
+- Azure MCP server template; config rejects invalid typed pack configuration; unknown root/nested keys warn-and-ignore on load.
+- Rewritten `run` invocation contract with a three-layer command index (via the `ot-ref` skill); hardened run-tool pipeline (isError contract, non-blocking exec, resilient serialization) and recovery seams that name the fix.
+- Runtime cache reload tightened for tool helper modules; tool output/result services; runtime attribution and snippet metadata in structured logs; prompt templates prefer single-quoted literals.
+- **fastmcp v3 runtime** — MCP server wiring upgraded to fastmcp v3, with security floor pins raised across the dependency set (`fastmcp` 3.4.1, `mcp`, `openai`, `uvicorn`) and a full lockfile refresh.
+
+#### Documentation, specs, and quality gates
+- Specs normalized and synced to implemented contracts; spec-writing guidance added; dev docs reorganized; generated tool references refreshed; direct usage docs rewritten.
+- Shipped-surface lint/typecheck now covers `ot`, `ottools`, `onetool`, `otdev`, `otutil`, and `otpack`.
+
+---
+
 ## [2.2.2] - 2026-04-03
 
 ### Fix

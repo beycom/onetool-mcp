@@ -38,6 +38,41 @@ just release::check
 
 ---
 
+## Step 2.5: Direct-run sanity gate
+
+Confirm the Direct API actually executes tool calls inside a live root process before
+publishing. **This gate must pass before `just release::publish` is invoked.**
+
+Start a root process — either `onetool serve` or a running direct host with
+`direct.host.enabled: true` — then run the seven probe commands from
+`tests/explore/test-cli.md:122-128` against it (with `$OT_DIR` set to the parent Direct
+API auth-key directory and `--port` matching the running host):
+
+```bash
+onetool direct run --ot-dir "$OT_DIR" --port 8765 "ot.version()"
+onetool direct run --ot-dir "$OT_DIR" --port 8765 "ot.debug()"
+onetool direct run --ot-dir "$OT_DIR" --port 8765 "ripgrep.search(pattern='TODO', path='.')"
+onetool direct run --ot-dir "$OT_DIR" --port 8765 "mem.write(topic='tmp/test/cli-runtime', content='direct probe', category='note'); mem.read(topic='tmp/test/cli-runtime'); mem.delete(topic='tmp/test/', confirm=True)"
+onetool direct run --ot-dir "$OT_DIR" --port 8765 --format json "ot.version()"
+onetool direct run --ot-dir "$OT_DIR" --port 8765 --format yml "ot.version()"
+echo 'ot.version()' | onetool direct run --ot-dir "$OT_DIR" --port 8765 -
+```
+
+The probes are: `ot.version()`; `ot.debug()`; a `ripgrep.search(...)` call; a
+`mem.write` / `mem.read` / `mem.delete` sequence; `--format json` and `--format yml`
+variants of `ot.version()`; and the stdin-dash form.
+
+Verify (per `tests/explore/test-cli.md`'s "Verify" list):
+
+- calls execute in the running root process
+- real pack calls route through the root registry, not only `ot.*` introspection
+- output formats are honored
+- stdin command input works
+
+If any probe fails, do not publish — resolve it first.
+
+---
+
 ## Step 3: Publish
 
 ```bash

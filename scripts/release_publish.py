@@ -36,13 +36,14 @@ def extract_release_notes(version: str) -> str | None:
     return None
 
 
-def run(cmd: str, check: bool = True) -> subprocess.CompletedProcess | None:
-    """Run a shell command."""
+def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess | None:
+    """Run a command from an argv list (never a shell string)."""
+    display = " ".join(cmd)
     if DRY_RUN:
-        print(f"  $ {cmd}")
+        print(f"  $ {display}")
         return None
-    print(f"  $ {cmd}")
-    return subprocess.run(cmd, shell=True, cwd=PROJECT_ROOT, check=check)
+    print(f"  $ {display}")
+    return subprocess.run(cmd, cwd=PROJECT_ROOT, check=check)
 
 
 def confirm(prompt: str) -> bool:
@@ -75,7 +76,10 @@ def main():
     parser = argparse.ArgumentParser(description="Publish a release")
     parser.add_argument("version", help="Version to release (e.g., 1.0.0rc1)")
     parser.add_argument(
-        "--force", "-f", action="store_true", help="Actually publish (default is dry-run)"
+        "--force",
+        "-f",
+        action="store_true",
+        help="Actually publish (default is dry-run)",
     )
     args = parser.parse_args()
 
@@ -103,7 +107,7 @@ def main():
     removed = clean_build_dirs()
     if removed:
         print(f"  Removing: {', '.join(removed)}")
-    run("uv build")
+    run(["uv", "build"])
     print()
 
     # Step 2: Git
@@ -111,11 +115,11 @@ def main():
         print("─" * 40)
         print("Step 2: Git commit, tag, push")
         print("─" * 40)
-        run("git add -A")
-        run(f'git commit -m "Release {version}"', check=False)
-        run(f'git tag -a "v{version}" -m "Release {version}"')
-        run("git push origin main")
-        run(f'git push origin "v{version}"')
+        run(["git", "add", "-A"])
+        run(["git", "commit", "-m", f"Release {version}"], check=False)
+        run(["git", "tag", "-a", f"v{version}", "-m", f"Release {version}"])
+        run(["git", "push", "origin", "main"])
+        run(["git", "push", "origin", f"v{version}"])
         print()
 
     # Step 3: GitHub Release
@@ -134,13 +138,42 @@ def main():
                 notes_file = PROJECT_ROOT / "tmp" / "release-notes.md"
                 notes_file.parent.mkdir(exist_ok=True)
                 notes_file.write_text(notes)
+            dist_files = [
+                str(p)
+                for pattern in ("*.whl", "*.tar.gz")
+                for p in sorted((PROJECT_ROOT / "dist").glob(pattern))
+            ]
             run(
-                f'gh release create "v{version}" dist/* --title "v{version}" --notes-file tmp/release-notes.md'
+                [
+                    "gh",
+                    "release",
+                    "create",
+                    f"v{version}",
+                    *dist_files,
+                    "--title",
+                    f"v{version}",
+                    "--notes-file",
+                    "tmp/release-notes.md",
+                ]
             )
         else:
             print(f"  Warning: Version {version} not found in CHANGELOG.md")
+            dist_files = [
+                str(p)
+                for pattern in ("*.whl", "*.tar.gz")
+                for p in sorted((PROJECT_ROOT / "dist").glob(pattern))
+            ]
             run(
-                f'gh release create "v{version}" dist/* --title "v{version}" --generate-notes'
+                [
+                    "gh",
+                    "release",
+                    "create",
+                    f"v{version}",
+                    *dist_files,
+                    "--title",
+                    f"v{version}",
+                    "--generate-notes",
+                ]
             )
         print()
 
@@ -149,7 +182,7 @@ def main():
         print("─" * 40)
         print("Step 4: Publish to PyPI")
         print("─" * 40)
-        run("uv publish")
+        run(["uv", "publish"])
         print()
 
     # Step 5: MCP Registry (requires PyPI package to exist)
@@ -157,8 +190,8 @@ def main():
         print("─" * 40)
         print("Step 5: Publish to MCP Registry")
         print("─" * 40)
-        run("mcp-publisher login github")
-        run("mcp-publisher publish")
+        run(["mcp-publisher", "login", "github"])
+        run(["mcp-publisher", "publish"])
         print()
 
     # Step 6: Docs
@@ -166,7 +199,7 @@ def main():
         print("─" * 40)
         print("Step 6: Deploy docs")
         print("─" * 40)
-        run("uv run mkdocs gh-deploy --force")
+        run(["uv", "run", "mkdocs", "gh-deploy", "--force"])
         print()
 
     print("=" * 60)

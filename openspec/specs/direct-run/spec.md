@@ -73,7 +73,7 @@ expansion. It SHALL NOT load OneTool config and SHALL NOT resolve relative to
 cwd or `.onetool`. Relative `--ot-dir` values SHALL fail with a clear argument
 error.
 
-Before `/run`, the client SHALL perform signed `/status` and `/ready` checks.
+Before `/run`, the client SHALL perform signed `/health` and `/ready` checks.
 The client SHALL verify signed responses before printing or trusting response
 content.
 
@@ -84,13 +84,13 @@ content.
 
 #### Scenario: Non-OneTool or unauthenticated service
 
-- **WHEN** a service is listening but signed status/readiness fails
+- **WHEN** a service is listening but signed health/readiness fails
 - **THEN** the command SHALL fail clearly as an authentication or protocol error
 - **AND** no command SHALL be sent without valid authentication
 
 #### Scenario: Protocol mismatch
 
-- **WHEN** `/status` or `/run` returns a different direct protocol version
+- **WHEN** `/health` or `/run` returns a different direct protocol version
 - **THEN** the command SHALL fail clearly with a protocol mismatch
 - **AND** `/ready` SHALL still be signed and parseable before it is trusted
 
