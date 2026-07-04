@@ -3,14 +3,21 @@
 Provides list/status (read-only) plus enable/disable/restart helpers used by
 other surfaces.
 
-All changes are in-memory only — state resets on server restart.
+Enable/disable are in-memory only — state resets on server restart. Restart
+re-reads the named server's entry from config on disk so "edit servers.yaml,
+then restart" applies the new settings.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from ot.config.loader import get_config
+from ot.config.loader import (
+    get_config,
+    get_loaded_config_path,
+    get_loaded_secrets_path,
+    load_config,
+)
 from ot.logging import LogSpan
 from ot.proxy import get_proxy_manager
 
@@ -50,6 +57,24 @@ def _get_env() -> tuple[dict[str, Any], Any]:
     if not cfg.servers:
         raise ValueError("No servers configured. Add servers to servers.yaml.")
     return cfg.servers, get_proxy_manager()
+
+
+def _read_server_from_disk(name: str) -> tuple[bool, Any]:
+    """Re-read the named server's entry from config on disk.
+
+    Returns (reloaded, entry): reloaded is False when no config path is known
+    (fall back to the cached entry); entry is None when the server no longer
+    exists on disk. The global config singleton is not replaced — the caller
+    swaps the single entry into the shared servers dict.
+
+    Raises:
+        FileNotFoundError, ValueError: If the config file is missing or invalid.
+    """
+    config_path = get_loaded_config_path()
+    if config_path is None:
+        return False, None
+    fresh = load_config(config_path, secrets_path=get_loaded_secrets_path())
+    return True, (fresh.servers or {}).get(name)
 
 
 def server(*, status: str | None = None) -> str:
@@ -159,7 +184,7 @@ def disable(*, name: str) -> str:
 
 
 def restart(*, name: str) -> str:
-    """Disconnect and reconnect a server."""
+    """Disconnect and reconnect a server with its current on-disk config."""
     with LogSpan(span="server.restart", name=name) as s:
         try:
             configured, proxy = _get_env()
@@ -169,7 +194,24 @@ def restart(*, name: str) -> str:
         if name not in configured:
             return _unknown_error(name, configured)
 
-        srv_cfg = configured[name]
+        try:
+            reloaded, fresh_cfg = _read_server_from_disk(name)
+        except (FileNotFoundError, ValueError) as e:
+            return f"Error: could not re-read config for restart: {e}"
+
+        if reloaded:
+            if fresh_cfg is None:
+                return (
+                    f"Error: server '{name}' no longer exists in config on disk. "
+                    "Run ot.reload() to sync runtime state."
+                )
+            # Swap into the shared config dict so downstream consumers (e.g.
+            # the execution-namespace fingerprint) see the fresh tool_prefix.
+            configured[name] = fresh_cfg
+            srv_cfg = fresh_cfg
+        else:
+            srv_cfg = configured[name]
+
         if not srv_cfg.enabled:
             srv_cfg.enabled = True
 

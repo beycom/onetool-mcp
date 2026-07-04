@@ -45,7 +45,10 @@ def disable(*, name: str) -> str:
 
 
 def restart(*, name: str) -> str:
-    """Reconnect a proxy server.
+    """Reconnect a proxy server with its current on-disk config.
+
+    Re-reads the server's entry from servers.yaml before reconnecting, so
+    config edits (command, args, env, timeout, tool_prefix) take effect.
 
     Args:
         name: Configured server name

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines read-only `ot.server()` status views plus mutable `ot_servers.*` actions for named proxy servers at runtime. All state changes are in-memory only; no YAML configuration files are modified.
+Defines read-only `ot.server()` status views plus mutable `ot_servers.*` actions for named proxy servers at runtime. Enable/disable state changes are in-memory only; restart re-reads the named server's entry from config on disk before reconnecting. No YAML configuration files are ever modified.
 ## Requirements
 ### Requirement: Server Listing
 
@@ -99,7 +99,9 @@ root requests.
 ### Requirement: Server Restart
 
 The system SHALL support restarting a named proxy server under both stdio root
-mode and Streamable HTTP root mode. A restart SHALL invalidate any cached
+mode and Streamable HTTP root mode. A restart SHALL re-read the named server's
+configuration entry from disk before reconnecting, so "edit servers.yaml, then
+restart" applies the new settings. A restart SHALL invalidate any cached
 tool-name or parameter-name resolutions for that server so that calls after a
 restart resolve against the server's current tool list, not a stale one.
 
@@ -107,6 +109,30 @@ restart resolve against the server's current tool list, not a stale one.
 - **WHEN** `ot_servers.restart(name="devtools-isolated")` is called
 - **THEN** it SHALL disconnect and reconnect the server
 - **AND** return a confirmation message with tool count after reconnection
+
+#### Scenario: Restart applies config edits from disk
+- **GIVEN** a server's entry in `servers.yaml` has been edited since serve
+  startup (e.g. `tool_prefix`, `command`, `args`, `env`, or `timeout` changed)
+- **WHEN** `ot_servers.restart(name=...)` is called
+- **THEN** it SHALL reconnect using the fresh on-disk configuration for that
+  server
+- **AND** the shared in-memory config entry for that server SHALL be replaced
+  with the fresh one, so downstream consumers (e.g. the execution-namespace
+  fingerprint keyed on `(name, tool_prefix)`) observe the change
+- **AND** other servers' in-memory state (including runtime enable/disable
+  toggles) SHALL NOT be affected
+
+#### Scenario: Restart refuses a server removed from disk
+- **GIVEN** the named server's entry has been removed from config on disk
+- **WHEN** `ot_servers.restart(name=...)` is called
+- **THEN** it SHALL return an error rather than reconnecting with the stale
+  cached entry
+
+#### Scenario: Restart surfaces an unreadable config
+- **GIVEN** the config on disk fails to load (missing file or invalid YAML)
+- **WHEN** `ot_servers.restart(name=...)` is called
+- **THEN** it SHALL return an error message and SHALL NOT silently restart the
+  server with the stale cached configuration
 
 #### Scenario: Restart a disconnected server
 - **WHEN** `ot_servers.restart(name="devtools-isolated")` is called

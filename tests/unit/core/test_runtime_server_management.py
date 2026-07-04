@@ -54,6 +54,7 @@ def test_enable_disable_restart_runtime_operations() -> None:
     with (
         patch("ottools.server.get_config", return_value=cfg),
         patch("ottools.server.get_proxy_manager", return_value=proxy),
+        patch("ottools.server.get_loaded_config_path", return_value=None),
     ):
         assert "enabled" in enable(name="worker")
         assert cfg.servers["worker"].enabled is True
@@ -67,6 +68,102 @@ def test_enable_disable_restart_runtime_operations() -> None:
         assert cfg.servers["worker"].enabled is True
         assert proxy.disconnect_server_sync.call_count == 2
         assert proxy.connect_additional_sync.call_count == 2
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_restart_applies_fresh_config_from_disk() -> None:
+    """restart() re-reads the server's entry from disk and swaps it into the shared dict."""
+    from pathlib import Path
+
+    from ottools.server import restart
+
+    stale = SimpleNamespace(enabled=True, tool_prefix="")
+    fresh = SimpleNamespace(enabled=True, tool_prefix="codegraph_")
+    cfg = SimpleNamespace(servers={"codegraph": stale})
+    fresh_full = SimpleNamespace(servers={"codegraph": fresh})
+    proxy = _proxy(connected=True)
+
+    with (
+        patch("ottools.server.get_config", return_value=cfg),
+        patch("ottools.server.get_proxy_manager", return_value=proxy),
+        patch(
+            "ottools.server.get_loaded_config_path",
+            return_value=Path("/tmp/onetool.yaml"),
+        ),
+        patch("ottools.server.get_loaded_secrets_path", return_value=None),
+        patch("ottools.server.load_config", return_value=fresh_full) as mock_load,
+    ):
+        result = restart(name="codegraph")
+
+    assert "restarted" in result
+    mock_load.assert_called_once()
+    # Shared config dict updated in place — the execution-namespace
+    # fingerprint (name, tool_prefix) must see the new prefix.
+    assert cfg.servers["codegraph"] is fresh
+    proxy.connect_additional_sync.assert_called_once_with("codegraph", fresh)
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_restart_errors_when_server_removed_from_disk() -> None:
+    """restart() refuses to reconnect a server that no longer exists on disk."""
+    from pathlib import Path
+
+    from ottools.server import restart
+
+    cfg = SimpleNamespace(servers={"codegraph": _server_cfg(enabled=True)})
+    proxy = _proxy()
+
+    with (
+        patch("ottools.server.get_config", return_value=cfg),
+        patch("ottools.server.get_proxy_manager", return_value=proxy),
+        patch(
+            "ottools.server.get_loaded_config_path",
+            return_value=Path("/tmp/onetool.yaml"),
+        ),
+        patch("ottools.server.get_loaded_secrets_path", return_value=None),
+        patch(
+            "ottools.server.load_config",
+            return_value=SimpleNamespace(servers={}),
+        ),
+    ):
+        result = restart(name="codegraph")
+
+    assert "no longer exists" in result
+    proxy.disconnect_server_sync.assert_not_called()
+    proxy.connect_additional_sync.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_restart_errors_when_disk_config_invalid() -> None:
+    """restart() reports a config error instead of silently reusing stale config."""
+    from pathlib import Path
+
+    from ottools.server import restart
+
+    cfg = SimpleNamespace(servers={"codegraph": _server_cfg(enabled=True)})
+    proxy = _proxy()
+
+    with (
+        patch("ottools.server.get_config", return_value=cfg),
+        patch("ottools.server.get_proxy_manager", return_value=proxy),
+        patch(
+            "ottools.server.get_loaded_config_path",
+            return_value=Path("/tmp/onetool.yaml"),
+        ),
+        patch("ottools.server.get_loaded_secrets_path", return_value=None),
+        patch(
+            "ottools.server.load_config",
+            side_effect=ValueError("Invalid YAML"),
+        ),
+    ):
+        result = restart(name="codegraph")
+
+    assert "could not re-read config" in result
+    proxy.disconnect_server_sync.assert_not_called()
+    proxy.connect_additional_sync.assert_not_called()
 
 
 @pytest.mark.unit
@@ -93,6 +190,7 @@ def test_concurrent_runtime_mutations_are_serialized() -> None:
     with (
         patch("ottools.server.get_config", return_value=cfg),
         patch("ottools.server.get_proxy_manager", return_value=proxy),
+        patch("ottools.server.get_loaded_config_path", return_value=None),
     ):
         with ThreadPoolExecutor(max_workers=3) as pool:
             results = list(
