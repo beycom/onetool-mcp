@@ -7,6 +7,7 @@ Uses mocked keyring and pyrage to avoid external dependencies.
 from __future__ import annotations
 
 import base64
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, call, patch
@@ -23,13 +24,36 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
-def _make_keyring_mock(store: dict | None = None) -> MagicMock:
-    """Return a keyring mock backed by an in-memory store."""
+class _FakeSecureBackend:
+    """Stand-in whose type resolves to an allow-listed secure keyring backend."""
+
+
+_FakeSecureBackend.__module__ = "keyring.backends.macOS"
+_FakeSecureBackend.__qualname__ = "Keyring"
+
+
+class _FakeInsecureBackend:
+    """Stand-in whose type resolves to a rejected (plaintext-fallback) backend."""
+
+
+_FakeInsecureBackend.__module__ = "keyring.backends.fail"
+_FakeInsecureBackend.__qualname__ = "Keyring"
+
+
+def _make_keyring_mock(store: dict | None = None, *, secure: bool = True) -> MagicMock:
+    """Return a keyring mock backed by an in-memory store.
+
+    By default resolves to a secure backend so backend validation passes; set
+    ``secure=False`` to exercise the insecure-backend rejection path.
+    """
     if store is None:
         store = {}
     kr = MagicMock()
     kr.get_password.side_effect = lambda s, k: store.get((s, k))
     kr.set_password.side_effect = lambda s, k, v: store.update({(s, k): v})
+    kr.get_keyring.return_value = (
+        _FakeSecureBackend() if secure else _FakeInsecureBackend()
+    )
     return kr
 
 
@@ -83,7 +107,7 @@ def test_pack_name() -> None:
 def test_all_exports() -> None:
     from ottools.ot_secrets import __all__
 
-    assert set(__all__) == {"init", "encrypt", "status", "rotate", "audit"}
+    assert set(__all__) == {"init", "encrypt", "status", "rotate", "audit", "set", "get"}
 
 
 @pytest.mark.unit
@@ -323,15 +347,21 @@ def test_encrypt_idempotent_on_all_encrypted(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 @pytest.mark.tools
-def test_status_identity_found_no_file() -> None:
-    """Identity found, no file: returns found identity with no values."""
+def test_status_identity_found_no_file(tmp_path: Path) -> None:
+    """Identity found, no resolvable secrets file: returns identity with no values."""
     store = {
         ("onetool", "age_pubkey"): "age1longpubkey1234567890abcdefgh",
         ("onetool", "age_label"): "my-machine",
     }
     kr = _make_keyring_mock(store)
 
-    with patch("ottools.ot_secrets._require_keyring", return_value=kr):
+    # status() now resolves a default secrets file; point that default at a path
+    # that does not exist so this test still exercises the identity-only branch.
+    missing = tmp_path / "no-secrets.yaml"
+    with (
+        patch("ottools.ot_secrets._require_keyring", return_value=kr),
+        patch("ottools.ot_secrets._resolve_secrets_file", return_value=missing),
+    ):
         from ottools.ot_secrets import status
 
         result = status()
@@ -903,3 +933,341 @@ def test_rotate_preserves_key_order(tmp_path: Path) -> None:
     apple_pos = content.index("APPLE")
     middle_pos = content.index("MIDDLE")
     assert zebra_pos < apple_pos < middle_pos, "Key order not preserved after rotate()"
+
+
+# ---------------------------------------------------------------------------
+# p14: keyring backend validation
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_insecure_backend_rejected_by_init_encrypt_rotate(tmp_path: Path) -> None:
+    """init/encrypt/rotate all reject an insecure backend before touching the keychain."""
+    from ottools import ot_secrets
+
+    secrets_file = tmp_path / "secrets.yaml"
+    secrets_file.write_text("A: plain\n")
+
+    for fn, kwargs in (
+        (ot_secrets.init, {}),
+        (ot_secrets.encrypt, {"file": str(secrets_file)}),
+        (ot_secrets.rotate, {"file": str(secrets_file)}),
+    ):
+        kr = _make_keyring_mock(
+            {("onetool", "age_pubkey"): "age1pub", ("onetool", "age_identity"): "id"},
+            secure=False,
+        )
+        with patch("ottools.ot_secrets._require_keyring", return_value=kr):
+            with pytest.raises(RuntimeError, match="keyring.backends.fail"):
+                fn(**kwargs)
+        # No keychain read/write happened after rejection.
+        kr.set_password.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_secure_backend_allows_init() -> None:
+    """A secure backend does not trip the allow-list (happy-path regression guard)."""
+    from ottools.ot_secrets import init
+
+    kr = _make_keyring_mock(secure=True)
+    pr = _make_pyrage_mock()
+    with (
+        patch("ottools.ot_secrets._require_keyring", return_value=kr),
+        patch("ottools.ot_secrets._require_pyrage", return_value=pr),
+    ):
+        result = init()
+    assert result["status"] == "stored"
+
+
+# ---------------------------------------------------------------------------
+# p14: atomic write + 0600
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_atomic_write_failure_leaves_original(tmp_path: Path) -> None:
+    """A mid-write failure leaves the original file intact and no temp behind."""
+    from ottools.ot_secrets import _atomic_write_yaml
+
+    target = tmp_path / "secrets.yaml"
+    target.write_text("ORIGINAL: value\n")
+
+    with patch("ottools.ot_secrets.yaml.dump", side_effect=RuntimeError("boom")):
+        with pytest.raises(RuntimeError):
+            _atomic_write_yaml(target, {"NEW": "data"})
+
+    assert target.read_text() == "ORIGINAL: value\n"
+    assert not list(tmp_path.glob(".tmp_*"))
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_atomic_write_is_0600_under_permissive_umask(tmp_path: Path) -> None:
+    """The written file is 0600 even with a permissive umask."""
+    from ottools.ot_secrets import _atomic_write_yaml
+
+    target = tmp_path / "secrets.yaml"
+    old = os.umask(0o022)
+    try:
+        _atomic_write_yaml(target, {"K": "v"})
+    finally:
+        os.umask(old)
+    assert (target.stat().st_mode & 0o777) == 0o600
+
+
+# ---------------------------------------------------------------------------
+# p14: encrypt/rotate backup default flip + 0600
+# ---------------------------------------------------------------------------
+
+
+def _encrypt_ready(tmp_path: Path) -> tuple[Path, MagicMock, MagicMock]:
+    secrets_file = tmp_path / "secrets.yaml"
+    secrets_file.write_text("API: sk-plain\n")
+    kr = _make_keyring_mock({("onetool", "age_pubkey"): "age1pub"})
+    pr = _make_pyrage_mock()
+    return secrets_file, kr, pr
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_encrypt_no_backup_by_default(tmp_path: Path) -> None:
+    secrets_file, kr, pr = _encrypt_ready(tmp_path)
+    with (
+        patch("ottools.ot_secrets._require_keyring", return_value=kr),
+        patch("ottools.ot_secrets._require_pyrage", return_value=pr),
+    ):
+        from ottools.ot_secrets import encrypt
+
+        result = encrypt(file=str(secrets_file))
+    assert result["backup"] is None
+    assert not Path(str(secrets_file) + ".bak").exists()
+    assert (secrets_file.stat().st_mode & 0o777) == 0o600
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_encrypt_backup_true_is_0600(tmp_path: Path) -> None:
+    secrets_file, kr, pr = _encrypt_ready(tmp_path)
+    with (
+        patch("ottools.ot_secrets._require_keyring", return_value=kr),
+        patch("ottools.ot_secrets._require_pyrage", return_value=pr),
+    ):
+        from ottools.ot_secrets import encrypt
+
+        encrypt(file=str(secrets_file), backup=True)
+    bak = Path(str(secrets_file) + ".bak")
+    assert bak.exists()
+    assert (bak.stat().st_mode & 0o777) == 0o600
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_rotate_no_backup_by_default(tmp_path: Path) -> None:
+    secrets_file = tmp_path / "secrets.yaml"
+    secrets_file.write_text("A: 'age1enc:" + base64.b64encode(b"ct").decode() + "'\n")
+    store = {("onetool", "age_identity"): "old", ("onetool", "age_pubkey"): "oldpub"}
+    kr = _make_keyring_mock(store)
+    pr = _make_pyrage_mock(plaintext=b"secret")
+    with (
+        patch("ottools.ot_secrets._require_keyring", return_value=kr),
+        patch("ottools.ot_secrets._require_pyrage", return_value=pr),
+    ):
+        from ottools.ot_secrets import rotate
+
+        result = rotate(file=str(secrets_file))
+    assert result["status"] == "rotated"
+    assert result["backup"] is None
+    assert not Path(str(secrets_file) + ".bak").exists()
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_rotate_verify_mismatch_aborts(tmp_path: Path) -> None:
+    """A round-trip verification mismatch aborts before any write or keychain update."""
+    secrets_file = tmp_path / "secrets.yaml"
+    secrets_file.write_text("A: 'age1enc:" + base64.b64encode(b"ct").decode() + "'\n")
+    before = secrets_file.read_text()
+    store = {("onetool", "age_identity"): "old", ("onetool", "age_pubkey"): "oldpub"}
+    kr = _make_keyring_mock(store)
+    pr = _make_pyrage_mock()
+    # decrypt with old identity -> b"orig"; verify decrypt with new -> b"different"
+    pr.decrypt.side_effect = [b"orig", b"different"]
+    with (
+        patch("ottools.ot_secrets._require_keyring", return_value=kr),
+        patch("ottools.ot_secrets._require_pyrage", return_value=pr),
+    ):
+        from ottools.ot_secrets import rotate
+
+        result = rotate(file=str(secrets_file))
+    assert result["status"] == "verify_failed"
+    assert secrets_file.read_text() == before  # nothing written
+    kr.set_password.assert_not_called()  # keychain untouched
+
+
+# ---------------------------------------------------------------------------
+# p14: file= default resolution
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_encrypt_defaults_to_loaded_secrets_path(tmp_path: Path) -> None:
+    secrets_file = tmp_path / "secrets.yaml"
+    secrets_file.write_text("API: plain\n")
+    kr = _make_keyring_mock({("onetool", "age_pubkey"): "age1pub"})
+    pr = _make_pyrage_mock()
+    with (
+        patch("ottools.ot_secrets._require_keyring", return_value=kr),
+        patch("ottools.ot_secrets._require_pyrage", return_value=pr),
+        patch("ot.config.loader.get_loaded_secrets_path", return_value=str(secrets_file)),
+    ):
+        from ottools.ot_secrets import encrypt
+
+        result = encrypt()
+    assert result["file"] == str(secrets_file)
+
+
+# ---------------------------------------------------------------------------
+# p14: set()
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_set_encrypts_and_never_leaks_value(tmp_path: Path) -> None:
+    import json
+
+    secrets_file = tmp_path / "secrets.yaml"
+    kr = _make_keyring_mock({("onetool", "age_pubkey"): "age1pub", ("onetool", "age_identity"): "id"})
+    pr = _make_pyrage_mock(plaintext=b"secret123")
+    with (
+        patch("ottools.ot_secrets._require_keyring", return_value=kr),
+        patch("ottools.ot_secrets._require_pyrage", return_value=pr),
+    ):
+        from ottools.ot_secrets import set as set_secret
+
+        result = set_secret(key="X", value="secret123", file=str(secrets_file))
+
+    assert result["encrypted"] is True
+    assert "secret123" not in json.dumps(result)
+    written = yaml.safe_load(secrets_file.read_text())
+    assert written["X"].startswith("age1enc:")
+    assert "secret123" not in secrets_file.read_text()
+    assert (secrets_file.stat().st_mode & 0o777) == 0o600
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_set_preserves_other_keys(tmp_path: Path) -> None:
+    secrets_file = tmp_path / "secrets.yaml"
+    secrets_file.write_text("KEEP: keep_val\nX: old\n")
+    kr = _make_keyring_mock({("onetool", "age_pubkey"): "age1pub", ("onetool", "age_identity"): "id"})
+    pr = _make_pyrage_mock(plaintext=b"newval")
+    with (
+        patch("ottools.ot_secrets._require_keyring", return_value=kr),
+        patch("ottools.ot_secrets._require_pyrage", return_value=pr),
+    ):
+        from ottools.ot_secrets import set as set_secret
+
+        set_secret(key="X", value="newval", file=str(secrets_file))
+    written = yaml.safe_load(secrets_file.read_text())
+    assert written["KEEP"] == "keep_val"
+    assert list(written.keys()) == ["KEEP", "X"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_set_no_identity_stores_plain_with_warning(tmp_path: Path) -> None:
+    secrets_file = tmp_path / "secrets.yaml"
+    kr = _make_keyring_mock({})  # no pubkey
+    with patch("ottools.ot_secrets._require_keyring", return_value=kr):
+        from ottools.ot_secrets import set as set_secret
+
+        result = set_secret(key="X", value="plainval", file=str(secrets_file))
+    assert result["encrypted"] is False
+    assert "warning" in result
+    assert yaml.safe_load(secrets_file.read_text())["X"] == "plainval"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_set_insecure_backend_rejected_before_write(tmp_path: Path) -> None:
+    secrets_file = tmp_path / "secrets.yaml"
+    kr = _make_keyring_mock(
+        {("onetool", "age_pubkey"): "age1pub", ("onetool", "age_identity"): "id"},
+        secure=False,
+    )
+    with patch("ottools.ot_secrets._require_keyring", return_value=kr):
+        from ottools.ot_secrets import set as set_secret
+
+        with pytest.raises(RuntimeError, match="keyring.backends.fail"):
+            set_secret(key="X", value="v", file=str(secrets_file))
+    assert not secrets_file.exists()
+
+
+# ---------------------------------------------------------------------------
+# p14: get()
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_get_metadata_only_no_value(tmp_path: Path) -> None:
+    secrets_file = tmp_path / "secrets.yaml"
+    secrets_file.write_text("X: 'age1enc:" + base64.b64encode(b"ct").decode() + "'\n")
+    from ottools.ot_secrets import get as get_secret
+
+    result = get_secret(key="X", file=str(secrets_file))
+    assert result == {"found": True, "encrypted": True}
+    assert "value" not in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_get_out_file_writes_0600_no_value_in_result(tmp_path: Path) -> None:
+    import json
+
+    secrets_file = tmp_path / "secrets.yaml"
+    secrets_file.write_text("X: 'age1enc:" + base64.b64encode(b"ct").decode() + "'\n")
+    out = tmp_path / "out.txt"
+    kr = _make_keyring_mock({("onetool", "age_identity"): "id"})
+    pr = _make_pyrage_mock(plaintext=b"the_secret")
+    with (
+        patch("ottools.ot_secrets._require_keyring", return_value=kr),
+        patch("ottools.ot_secrets._require_pyrage", return_value=pr),
+    ):
+        from ottools.ot_secrets import get as get_secret
+
+        result = get_secret(key="X", file=str(secrets_file), out_file=str(out))
+    assert out.read_text() == "the_secret"
+    assert (out.stat().st_mode & 0o777) == 0o600
+    assert result["written_to"] == str(out)
+    assert "the_secret" not in json.dumps(result)
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_get_missing_key(tmp_path: Path) -> None:
+    secrets_file = tmp_path / "secrets.yaml"
+    secrets_file.write_text("X: v\n")
+    from ottools.ot_secrets import get as get_secret
+
+    assert get_secret(key="MISSING", file=str(secrets_file)) == {
+        "found": False,
+        "encrypted": None,
+    }
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_get_has_no_value_escape_hatch() -> None:
+    import inspect
+
+    from ottools.ot_secrets import get as get_secret
+
+    params = inspect.signature(get_secret).parameters
+    assert "include_value" not in params
+    assert "reveal" not in params

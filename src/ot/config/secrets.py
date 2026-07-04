@@ -124,17 +124,23 @@ def load_secrets(
                 "Run: pip install onetool-mcp"
             ) from e
 
+        # Fail-closed on an insecure/plaintext keyring backend before reading the
+        # identity (reuses the ot_secrets allow-list — single source of truth).
+        from ottools.ot_secrets import (
+            _NO_IDENTITY_MSG,
+            _assert_secure_keyring_backend,
+        )
+
+        _assert_secure_keyring_backend(keyring)
+
         private_key = keyring.get_password("onetool", "age_identity")
         if not private_key:
-            raise SecretDecryptionError(
-                "Encrypted secrets found in secrets file but no age identity is "
-                "stored in the OS keychain. Run: __onetool ot_secrets.init()"
-            )
+            raise SecretDecryptionError(_NO_IDENTITY_MSG)
 
         identity = pyrage.x25519.Identity.from_str(private_key)
         for key in encrypted_keys:
             encoded = secrets[key][len(_AGE_PREFIX):]
-            ciphertext = base64.b64decode(encoded)
+            ciphertext = base64.b64decode(encoded, validate=True)
             # Decrypt — plaintext never logged
             plaintext_bytes = pyrage.decrypt(ciphertext, [identity])
             secrets[key] = plaintext_bytes.decode()

@@ -16,23 +16,28 @@ Short alias: `sec`
 | Function | Description |
 |----------|-------------|
 | `ot_secrets.init(label, force)` | Create/store keypair in OS keychain |
+| `ot_secrets.set(key, value, file)` | Encrypt and store a single value in place (round-trip verified) |
+| `ot_secrets.get(key, file, out_file)` | Report a key's existence/encryption; write the value to a `0600` `out_file` only (never returned) |
 | `ot_secrets.encrypt(file, backup)` | Encrypt plaintext values in a secrets YAML file |
 | `ot_secrets.status(file)` | Show identity status and encrypted/plain counts |
 | `ot_secrets.rotate(file, backup)` | Generate new keypair and re-encrypt encrypted values |
 | `ot_secrets.audit(file)` | Report plaintext vs encrypted keys in a secrets file |
 
+`file` defaults to the configured secrets path (the loaded `--secrets` file, else `<config dir>/secrets.yaml`) for `set`, `get`, `encrypt`, `status`, `rotate`, and `audit`.
+
 ## Key Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `file` | str | Path to secrets YAML file |
+| `file` | str | Path to secrets YAML file (defaults to the configured secrets path) |
 | `label` | str | Human-readable key label for keychain identity |
-| `backup` | bool | Create `.bak` backup before modifying file (default: `True`) |
+| `backup` | bool | Create a plaintext `.bak` backup (mode `0600`) before modifying file (default: `False`) |
 | `force` | bool | Overwrite existing keychain identity when initializing |
 
 ## Requires
 
 - OS keychain support (macOS Keychain, Windows Credential Locker, or compatible Linux keyring)
+- Python packages: `pyrage` (age encryption) and `keyring` (OS keychain access) — both are core dependencies, no extra required
 
 ## Configuration
 

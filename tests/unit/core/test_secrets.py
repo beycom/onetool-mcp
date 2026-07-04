@@ -365,11 +365,23 @@ API_SECRET: "secret456"
 # ---------------------------------------------------------------------------
 
 
-def _make_mock_keyring(identity: str | None = "AGE-SECRET-KEY-fake") -> MagicMock:
+class _FakeSecureBackend:
+    """Type resolves to an allow-listed secure keyring backend."""
+
+
+_FakeSecureBackend.__module__ = "keyring.backends.macOS"
+_FakeSecureBackend.__qualname__ = "Keyring"
+
+
+def _make_mock_keyring(
+    identity: str | None = "AGE-SECRET-KEY-fake", *, secure: bool = True
+) -> MagicMock:
     kr = MagicMock()
     kr.get_password.side_effect = lambda s, k: (
         identity if k == "age_identity" else None
     )
+    if secure:
+        kr.get_keyring.return_value = _FakeSecureBackend()
     return kr
 
 
@@ -499,3 +511,53 @@ class TestLoadSecretsAgeDecryption:
                 load_secrets(secrets_file)
 
         assert "ultra_secret_value_xyz" not in caplog.text
+
+    def test_insecure_backend_rejected_before_reading_identity(
+        self, tmp_path: Path
+    ) -> None:
+        """load_secrets refuses an insecure keyring backend before reading the key."""
+        encoded = _age_encoded()
+        secrets_file = tmp_path / "secrets.yaml"
+        secrets_file.write_text(f"KEY: '{encoded}'\n")
+
+        mock_kr = _make_mock_keyring(secure=False)
+        mock_pr = _make_mock_pyrage()
+
+        with patch.dict("sys.modules", {"keyring": mock_kr, "pyrage": mock_pr}):
+            with pytest.raises(
+                RuntimeError, match="Insecure or unavailable OS keyring backend"
+            ):
+                load_secrets(secrets_file)
+        mock_kr.get_password.assert_not_called()
+
+    def test_missing_identity_uses_canonical_message(self, tmp_path: Path) -> None:
+        """The 'no identity' message matches the canonical ot_secrets wording."""
+        from ot.config.secrets import SecretDecryptionError
+
+        encoded = _age_encoded()
+        secrets_file = tmp_path / "secrets.yaml"
+        secrets_file.write_text(f"KEY: '{encoded}'\n")
+
+        mock_kr = _make_mock_keyring(identity=None)
+        mock_pr = _make_mock_pyrage()
+
+        with patch.dict("sys.modules", {"keyring": mock_kr, "pyrage": mock_pr}):
+            with pytest.raises(
+                SecretDecryptionError,
+                match="No age identity found in the OS keychain",
+            ):
+                load_secrets(secrets_file)
+
+    def test_malformed_base64_rejected(self, tmp_path: Path) -> None:
+        """A non-canonical base64 age1enc value raises a clear decode error."""
+        import binascii
+
+        secrets_file = tmp_path / "secrets.yaml"
+        secrets_file.write_text("KEY: 'age1enc:not*valid*base64'\n")
+
+        mock_kr = _make_mock_keyring()
+        mock_pr = _make_mock_pyrage()
+
+        with patch.dict("sys.modules", {"keyring": mock_kr, "pyrage": mock_pr}):
+            with pytest.raises(binascii.Error):
+                load_secrets(secrets_file)

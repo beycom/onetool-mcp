@@ -138,3 +138,17 @@ class TestCallToolSyncCancel:
                 manager.call_tool_sync("srv", "tool", {}, timeout=1.0)
 
         mock_future.cancel.assert_called_once()
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestConnectErrorSanitization:
+    """p14: connect-error strings are scrubbed of credential material before storage."""
+
+    def test_bearer_token_redacted(self) -> None:
+        from ot.proxy.manager import _sanitize_connect_error
+
+        msg = "connection failed: Authorization: Bearer sk-secret123 rejected"
+        out = _sanitize_connect_error(msg)
+        assert "sk-secret123" not in out
+        assert "connection failed" in out

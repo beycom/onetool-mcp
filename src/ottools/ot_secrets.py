@@ -8,7 +8,10 @@ in the OS keychain.
 from __future__ import annotations
 
 import base64
+import contextlib
+import os
 import shutil
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +23,7 @@ from otpack import LogSpan
 pack = "ot_secrets"
 pack_aliases = ("sec",)
 
-__all__ = ["audit", "encrypt", "init", "rotate", "status"]
+__all__ = ["audit", "encrypt", "get", "init", "rotate", "set", "status"]
 
 __ot_requires__ = {
     "lib": [
@@ -34,6 +37,87 @@ _KEY_IDENTITY = "age_identity"
 _KEY_PUBKEY = "age_pubkey"
 _KEY_LABEL = "age_label"
 _PREFIX = "age1enc:"
+
+# Canonical "no identity" guidance, shared with src/ot/config/secrets.py.
+_NO_IDENTITY_MSG = (
+    "No age identity found in the OS keychain. Run ot_secrets.init() to generate one."
+)
+
+# Allow-list of secure OS keyring backends. Anything not listed here (fail/null/
+# chainer/third-party keyrings.alt plaintext backends) is refused — third-party
+# plaintext backends cannot be enumerated, so this must be an allow-list, not a
+# deny-list.
+_SECURE_BACKENDS = {
+    "keyring.backends.macOS.Keyring",
+    "keyring.backends.Windows.WinVaultKeyring",
+    "keyring.backends.SecretService.Keyring",
+    "keyring.backends.libsecret.Keyring",
+    "keyring.backends.kwallet.DBusKeyring",
+    "keyring.backends.kwallet.DBusKeyringKWallet4",
+}
+
+
+class _InsecureKeyringError(RuntimeError):
+    """Raised when the resolved OS keyring backend is not allow-listed as secure."""
+
+
+def _assert_secure_keyring_backend(kr: Any) -> None:
+    """Refuse to touch the keychain unless a secure backend is active.
+
+    Fail-closed: a headless host can silently resolve a plaintext ``keyrings.alt``
+    backend and store the private age identity in cleartext. Verify the backend
+    before every keychain read or write, not just after init() — the backend can
+    differ between the process that ran init() and a later reader.
+    """
+    backend = kr.get_keyring()
+    qualname = f"{type(backend).__module__}.{type(backend).__qualname__}"
+    if qualname not in _SECURE_BACKENDS:
+        raise _InsecureKeyringError(
+            f"Insecure or unavailable OS keyring backend detected: {qualname}. "
+            "OneTool refuses to store the age private key in this backend "
+            "(it may be a plaintext fallback). Configure a secure OS keychain "
+            "(macOS Keychain, Windows Credential Locker, or a Secret "
+            "Service/KWallet/libsecret provider on Linux) and retry."
+        )
+
+
+def _resolve_secrets_file(file: str | None) -> Path:
+    """Resolve the secrets-file path, defaulting to the configured location.
+
+    Explicit ``file`` wins; else the loaded ``--secrets`` path; else
+    ``<config dir>/secrets.yaml``.
+    """
+    if file is not None:
+        return Path(file).expanduser()
+    from ot.config.loader import get_loaded_secrets_path
+
+    loaded = get_loaded_secrets_path()
+    if loaded is not None:
+        return Path(loaded).expanduser()
+    from ot.paths import get_config_dir
+
+    return get_config_dir() / "secrets.yaml"
+
+
+def _atomic_write_yaml(path: Path, data: dict[str, Any]) -> None:
+    """Write ``data`` to ``path`` atomically at mode 0600 (temp file + rename).
+
+    A crash mid-write leaves the original file untouched — no truncation window.
+    """
+    fd, temp_path = tempfile.mkstemp(dir=str(path.parent), prefix=".tmp_", suffix=".yaml")
+    try:
+        with os.fdopen(fd, "w") as f:
+            yaml.dump(
+                data, f, default_flow_style=False, allow_unicode=True, sort_keys=False
+            )
+        Path(temp_path).chmod(0o600)
+        Path(temp_path).replace(path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            Path(temp_path).unlink()
+        raise
+    # Re-assert 0600 after replace (covers platforms where mkstemp perms differ).
+    path.chmod(0o600)
 
 
 def _require_keyring() -> Any:
@@ -79,6 +163,8 @@ def init(*, label: str = "", force: bool = False) -> dict[str, Any]:
         keyring = _require_keyring()
         pyrage = _require_pyrage()
 
+        _assert_secure_keyring_backend(keyring)
+
         existing = keyring.get_password(_SERVICE, _KEY_IDENTITY)
         if existing and not force:
             s.add(status="exists")
@@ -103,34 +189,37 @@ def init(*, label: str = "", force: bool = False) -> dict[str, Any]:
         }
 
 
-def encrypt(*, file: str, backup: bool = True) -> dict[str, Any]:
+def encrypt(*, file: str | None = None, backup: bool = False) -> dict[str, Any]:
     """Encrypt plain values in a secrets YAML file in-place.
 
-    Skips values already prefixed with `age1enc:`. Creates a .bak copy by default.
+    Skips values already prefixed with `age1enc:`. Writes atomically at mode 0600.
 
     Args:
-        file: Path to secrets YAML file.
-        backup: If True (default), create a .bak copy before modifying.
+        file: Path to secrets YAML file. Defaults to the configured secrets path.
+        backup: If True, create a plaintext .bak copy (mode 0600) before modifying.
+            Defaults to False — an unencrypted backup on disk defeats "safe to commit".
 
     Returns:
         Dict with encryption summary including encrypted, skipped, and plain key lists.
     """
-    with LogSpan(span="ot_secrets.encrypt", file=file) as s:
+    path = _resolve_secrets_file(file)
+    with LogSpan(span="ot_secrets.encrypt", file=str(path)) as s:
         keyring = _require_keyring()
         pyrage = _require_pyrage()
+
+        _assert_secure_keyring_backend(keyring)
 
         pubkey_str = keyring.get_password(_SERVICE, _KEY_PUBKEY)
         if not pubkey_str:
             s.add(status="no_identity")
             return {
-                "error": "No identity found in keychain. Run ot_secrets.init() first.",
+                "error": _NO_IDENTITY_MSG,
                 "status": "no_identity",
             }
 
-        path = Path(file).expanduser()
         if not path.exists():
             s.add(status="file_not_found")
-            return {"error": f"File not found: {file}", "status": "file_not_found"}
+            return {"error": f"File not found: {path}", "status": "file_not_found"}
 
         try:
             with path.open() as f:
@@ -149,6 +238,7 @@ def encrypt(*, file: str, backup: bool = True) -> dict[str, Any]:
         if backup:
             backup_path = str(path) + ".bak"
             shutil.copy2(path, backup_path)
+            Path(backup_path).chmod(0o600)
 
         encrypted_keys: list[str] = []
         skipped_keys: list[str] = []
@@ -168,8 +258,7 @@ def encrypt(*, file: str, backup: bool = True) -> dict[str, Any]:
                 updated[key] = _PREFIX + encoded
                 encrypted_keys.append(key)
 
-        with path.open("w") as f:
-            yaml.dump(updated, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        _atomic_write_yaml(path, updated)
 
         s.add(encryptedCount=len(encrypted_keys), skippedCount=len(skipped_keys))
         return {
@@ -216,10 +305,19 @@ def status(*, file: str | None = None) -> dict[str, Any]:
             "values": None,
         }
 
+        # Resolve the secrets file to inspect: explicit file, else the configured
+        # default (best-effort — an identity-only status() still works with no file).
+        resolved: Path | None = None
         if file is not None:
-            path = Path(file).expanduser()
+            resolved = Path(file).expanduser()
+        else:
+            with contextlib.suppress(Exception):
+                resolved = _resolve_secrets_file(None)
+
+        if resolved is not None and (file is not None or resolved.exists()):
+            path = resolved
             if not path.exists():
-                result["file_error"] = f"File not found: {file}"
+                result["file_error"] = f"File not found: {path}"
             else:
                 try:
                     with path.open() as f:
@@ -250,21 +348,25 @@ def status(*, file: str | None = None) -> dict[str, Any]:
         return result
 
 
-def rotate(*, file: str, backup: bool = True) -> dict[str, Any]:
+def rotate(*, file: str | None = None, backup: bool = False) -> dict[str, Any]:
     """Generate a new identity and re-encrypt all encrypted values in-place.
 
     Plain (non-`age1enc:`) values are left unchanged.
 
     Args:
-        file: Path to secrets YAML file.
-        backup: If True (default), create a .bak copy before modifying.
+        file: Path to secrets YAML file. Defaults to the configured secrets path.
+        backup: If True, create a plaintext .bak copy (mode 0600) before modifying.
+            Defaults to False.
 
     Returns:
         Dict with rotation summary.
     """
-    with LogSpan(span="ot_secrets.rotate", file=file) as s:
+    path = _resolve_secrets_file(file)
+    with LogSpan(span="ot_secrets.rotate", file=str(path)) as s:
         keyring = _require_keyring()
         pyrage = _require_pyrage()
+
+        _assert_secure_keyring_backend(keyring)
 
         old_private = keyring.get_password(_SERVICE, _KEY_IDENTITY)
         old_pubkey = keyring.get_password(_SERVICE, _KEY_PUBKEY)
@@ -273,14 +375,13 @@ def rotate(*, file: str, backup: bool = True) -> dict[str, Any]:
         if not old_private:
             s.add(status="no_identity")
             return {
-                "error": "No identity found in keychain. Run ot_secrets.init() first.",
+                "error": _NO_IDENTITY_MSG,
                 "status": "no_identity",
             }
 
-        path = Path(file).expanduser()
         if not path.exists():
             s.add(status="file_not_found")
-            return {"error": f"File not found: {file}", "status": "file_not_found"}
+            return {"error": f"File not found: {path}", "status": "file_not_found"}
 
         try:
             with path.open() as f:
@@ -297,6 +398,7 @@ def rotate(*, file: str, backup: bool = True) -> dict[str, Any]:
         if backup:
             backup_path = str(path) + ".bak"
             shutil.copy2(path, backup_path)
+            Path(backup_path).chmod(0o600)
 
         old_identity = pyrage.x25519.Identity.from_str(old_private)
 
@@ -315,17 +417,35 @@ def rotate(*, file: str, backup: bool = True) -> dict[str, Any]:
             str_val = str(value)
             if str_val.startswith(_PREFIX):
                 encoded = str_val[len(_PREFIX):]
-                ciphertext = base64.b64decode(encoded)
+                ciphertext = base64.b64decode(encoded, validate=True)
                 plaintext = pyrage.decrypt(ciphertext, [old_identity])
                 new_ciphertext = pyrage.encrypt(plaintext, [new_recipient])
+                # Round-trip verify with the NEW identity before committing anything
+                # to disk or the keychain (Decision 7) — abort loudly on mismatch.
+                verify = pyrage.decrypt(new_ciphertext, [new_identity])
+                if verify != plaintext:
+                    s.add(status="verify_failed", key=key)
+                    return {
+                        "error": (
+                            f"Rotation aborted: re-encrypted value for '{key}' failed "
+                            "round-trip verification with the new identity. No changes "
+                            "were written."
+                        ),
+                        "status": "verify_failed",
+                    }
                 new_encoded = base64.b64encode(new_ciphertext).decode()
                 updated[key] = _PREFIX + new_encoded
                 rotated_keys.append(key)
             else:
                 skipped_keys.append(key)
 
-        with path.open("w") as f:
-            yaml.dump(updated, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        # Crash-safety invariant (Decision 7): write the new-key file atomically
+        # FIRST, and only update the keychain to the new identity AFTER the write
+        # succeeds. A crash before the write leaves the old file + old identity
+        # intact; a crash after the write but before the keychain update is
+        # recoverable by re-running rotate() (which fails to decrypt with the
+        # mismatched identity — a clear error, not silent data loss).
+        _atomic_write_yaml(path, updated)
 
         keyring.set_password(_SERVICE, _KEY_IDENTITY, new_private)
         keyring.set_password(_SERVICE, _KEY_PUBKEY, new_pubkey)
@@ -343,22 +463,22 @@ def rotate(*, file: str, backup: bool = True) -> dict[str, Any]:
         }
 
 
-def audit(*, file: str) -> dict[str, Any]:
+def audit(*, file: str | None = None) -> dict[str, Any]:
     """Scan a secrets YAML file for unencrypted values.
 
     Returns key names only — never exposes actual values.
 
     Args:
-        file: Path to secrets YAML file.
+        file: Path to secrets YAML file. Defaults to the configured secrets path.
 
     Returns:
         Dict with safe status, plain_keys, and encrypted_keys.
     """
-    with LogSpan(span="ot_secrets.audit", file=file) as s:
-        path = Path(file).expanduser()
+    path = _resolve_secrets_file(file)
+    with LogSpan(span="ot_secrets.audit", file=str(path)) as s:
         if not path.exists():
             s.add(status="file_not_found")
-            return {"error": f"File not found: {file}", "status": "file_not_found"}
+            return {"error": f"File not found: {path}", "status": "file_not_found"}
 
         try:
             with path.open() as f:
@@ -396,4 +516,145 @@ def audit(*, file: str) -> dict[str, Any]:
             result["message"] = (
                 "Run ot_secrets.encrypt() to secure these values before committing."
             )
+        return result
+
+
+def set(*, key: str, value: str, file: str | None = None) -> dict[str, Any]:
+    """Set a single secret, encrypting it in place if an identity exists.
+
+    Encrypts ``value`` in memory (never touching disk in plaintext) and round-trip
+    verifies before the atomic 0600 write. If no identity is present, the value is
+    stored in plaintext and a ``warning`` is returned.
+
+    Args:
+        key: Secret name.
+        value: Secret value (encrypted in place when an identity exists).
+        file: Path to secrets YAML file. Defaults to the configured secrets path.
+
+    Returns:
+        Dict summarising the write. Never contains the plaintext value.
+    """
+    path = _resolve_secrets_file(file)
+    with LogSpan(span="ot_secrets.set", file=str(path), key=key) as s:
+        keyring = _require_keyring()
+
+        data: dict[str, Any] = {}
+        if path.exists():
+            try:
+                with path.open() as f:
+                    loaded = yaml.safe_load(f)
+            except yaml.YAMLError as exc:
+                s.add(status="invalid_yaml")
+                return {"error": str(exc), "status": "invalid_yaml"}
+            if loaded is not None:
+                if not isinstance(loaded, dict):
+                    s.add(status="invalid_yaml")
+                    return {"error": "File must be a YAML mapping", "status": "invalid_yaml"}
+                data = loaded
+
+        pubkey_str = keyring.get_password(_SERVICE, _KEY_PUBKEY)
+        encrypted = False
+        warning: str | None = None
+
+        if pubkey_str:
+            _assert_secure_keyring_backend(keyring)
+            private_key = keyring.get_password(_SERVICE, _KEY_IDENTITY)
+            pyrage = _require_pyrage()
+            recipient = pyrage.x25519.Recipient.from_str(pubkey_str)
+            ciphertext = pyrage.encrypt(value.encode(), [recipient])
+            encoded = base64.b64encode(ciphertext).decode()
+            # Round-trip verify before writing anything.
+            identity = pyrage.x25519.Identity.from_str(private_key)
+            if pyrage.decrypt(ciphertext, [identity]).decode() != value:
+                s.add(status="verify_failed")
+                return {
+                    "error": (
+                        f"Round-trip verification failed for '{key}'. Nothing written."
+                    ),
+                    "status": "verify_failed",
+                }
+            data[key] = _PREFIX + encoded
+            encrypted = True
+        else:
+            data[key] = value
+            warning = (
+                "No age identity found — value stored in plaintext. Run "
+                "ot_secrets.init() then ot_secrets.encrypt() to secure it."
+            )
+
+        _atomic_write_yaml(path, data)
+        s.add(encrypted=encrypted)
+        result: dict[str, Any] = {
+            "file": str(path),
+            "key": key,
+            "encrypted": encrypted,
+            "status": "set",
+        }
+        if warning:
+            result["warning"] = warning
+        return result
+
+
+def get(
+    *, key: str, file: str | None = None, out_file: str | None = None
+) -> dict[str, Any]:
+    """Look up a secret's existence/metadata, never returning its plaintext value.
+
+    The plaintext value is *never* placed in the returned dict, a log line, or the
+    LogSpan — there is intentionally no escape hatch. To obtain the value, pass
+    ``out_file`` and the decrypted value is written to that 0600 file.
+
+    Args:
+        key: Secret name.
+        file: Path to secrets YAML file. Defaults to the configured secrets path.
+        out_file: If given, decrypt/pass-through the value into this 0600 file.
+
+    Returns:
+        Dict with ``found``/``encrypted`` (and ``written_to`` when ``out_file`` is
+        used). Never contains the value itself.
+    """
+    path = _resolve_secrets_file(file)
+    with LogSpan(span="ot_secrets.get", file=str(path), key=key) as s:
+        if not path.exists():
+            s.add(found=False)
+            return {"found": False, "encrypted": None}
+
+        try:
+            with path.open() as f:
+                data = yaml.safe_load(f)
+        except yaml.YAMLError as exc:
+            s.add(status="invalid_yaml")
+            return {"error": str(exc), "status": "invalid_yaml"}
+
+        if not isinstance(data, dict) or key not in data:
+            s.add(found=False)
+            return {"found": False, "encrypted": None}
+
+        raw = data[key]
+        raw_str = "" if raw is None else str(raw)
+        is_encrypted = raw_str.startswith(_PREFIX)
+        result: dict[str, Any] = {"found": True, "encrypted": is_encrypted}
+
+        if out_file is not None:
+            if is_encrypted:
+                keyring = _require_keyring()
+                _assert_secure_keyring_backend(keyring)
+                private_key = keyring.get_password(_SERVICE, _KEY_IDENTITY)
+                if not private_key:
+                    s.add(status="no_identity")
+                    return {"error": _NO_IDENTITY_MSG, "status": "no_identity"}
+                pyrage = _require_pyrage()
+                identity = pyrage.x25519.Identity.from_str(private_key)
+                ciphertext = base64.b64decode(raw_str[len(_PREFIX):], validate=True)
+                plaintext = pyrage.decrypt(ciphertext, [identity]).decode()
+            else:
+                plaintext = raw_str
+            out_path = Path(out_file).expanduser()
+            fd = os.open(str(out_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w") as f:
+                f.write(plaintext)
+            out_path.chmod(0o600)
+            result["written_to"] = str(out_path)
+
+        s.add(found=True, encrypted=is_encrypted)
         return result

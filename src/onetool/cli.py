@@ -347,6 +347,83 @@ def _copy_file(ot_dir: Path, filename: str) -> bool:
     return True
 
 
+def _guided_secrets_setup(secrets_path: Path) -> None:
+    """Guided "Set up encrypted secrets?" flow — never leaves plaintext on disk.
+
+    Prompts for key/value pairs, writes them, then runs init()+encrypt() in-process
+    so the values only ever hit disk as age1enc: ciphertext.
+    """
+    import questionary
+    import yaml
+
+    from ot._tui import ask_password_sync, ask_text_sync
+
+    if not questionary.confirm("Set up encrypted secrets?", default=False).ask():
+        return
+
+    pairs: dict[str, str] = {}
+    cancelled = False
+    while True:
+        key = ask_text_sync("Secret name (blank to finish)")
+        if key is None:
+            cancelled = True
+            break
+        key = key.strip()
+        if not key:
+            break
+        value = ask_password_sync(f"Value for {key}")
+        if value is None:
+            cancelled = True
+            break
+        pairs[key] = value
+
+    if not pairs:
+        if cancelled:
+            console.print("[dim]Encrypted-secrets setup cancelled.[/dim]")
+        return
+
+    # Merge the entered pairs into the materialised secrets.yaml (plaintext for now).
+    existing: dict[str, object] = {}
+    if secrets_path.exists():
+        loaded = yaml.safe_load(secrets_path.read_text()) or {}
+        if isinstance(loaded, dict):
+            existing = loaded
+    existing.update(pairs)
+    secrets_path.write_text(
+        yaml.dump(existing, default_flow_style=False, allow_unicode=True, sort_keys=False)
+    )
+
+    if cancelled:
+        console.print(
+            f"[yellow]![/yellow] {secrets_path.name} has unencrypted values pending "
+            "ot_secrets.encrypt()."
+        )
+        return
+
+    from ottools import ot_secrets
+
+    init_result = ot_secrets.init()
+    if init_result.get("status") == "exists":
+        reuse = questionary.confirm(
+            "An age identity already exists. Reuse it? (No overwrites it)", default=True
+        ).ask()
+        if reuse is False:
+            ot_secrets.init(force=True)
+
+    ot_secrets.encrypt(file=str(secrets_path), backup=False)
+    audit = ot_secrets.audit(file=str(secrets_path))
+    if audit.get("safe") is True:
+        console.print(
+            f"[green]✓[/green] {secrets_path.name} encrypted "
+            f"({len(pairs)} value(s)) — safe to commit."
+        )
+    else:
+        console.print(
+            f"[red]✗[/red] Encryption did not secure all values in {secrets_path.name}: "
+            f"{audit.get('plain_keys')}. Run ot_secrets.encrypt() manually."
+        )
+
+
 def _copy_diagram(ot_dir: Path) -> bool:
     """Copy diagram.yaml and editable diagram templates. Returns True if success."""
     import shutil
@@ -443,6 +520,7 @@ def init_callback(
             ("security.yaml", "custom security rules"),
             ("diagram.yaml", "diagram tool config"),
             ("snippets.yaml", "code snippets"),
+            ("secrets.yaml", "API keys / credentials (optionally encrypted)"),
         ]
         choices = [
             questionary.Choice("None           (no extensions)", value=None),
@@ -462,11 +540,19 @@ def init_callback(
         if selected_ext:
             console.print(f"\nCopying files into {ot_dir}/")
             for ext in selected_ext:
-                if ext == "diagram.yaml":
+                if ext == "secrets.yaml":
+                    # secrets.yaml is materialised but MUST NOT go in include: — it is
+                    # loaded via --secrets, never merged into config.
+                    if _copy_file(ot_dir, ext):
+                        (ot_dir / ext).chmod(0o600)
+                elif ext == "diagram.yaml":
                     if _copy_diagram(ot_dir):
                         includes.append(ext)
                 elif _copy_file(ot_dir, ext):
                     includes.append(ext)
+
+        if "secrets.yaml" in selected_ext:
+            _guided_secrets_setup(ot_dir / "secrets.yaml")
 
         _write_onetool_yaml(config_path, includes)
         console.print(f"\n[green]✓[/green] {config_path.name} written")

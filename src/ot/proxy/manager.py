@@ -11,6 +11,7 @@ import concurrent.futures
 import contextlib
 import json
 import os
+import re
 import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -28,6 +29,24 @@ if TYPE_CHECKING:
     from concurrent.futures import Future
 
     from ot.config.models import McpServerConfig
+
+
+_CONNECT_SECRET_RE = re.compile(
+    # Redact everything after a credential keyword to end-of-line — the value may be
+    # a scheme + token ("Bearer sk-…"), so a single-token capture would leak the rest.
+    r"(authorization|bearer|basic|token|api[-_ ]?key)\b[:=]?\s*\S[^\n]*",
+    re.IGNORECASE,
+)
+
+
+def _sanitize_connect_error(msg: str) -> str:
+    """Redact credential-bearing substrings from a connect-error string.
+
+    A decrypted secret can end up in a bearer/authorization header; if a connection
+    failure echoes it, this keeps it out of ot.servers()/status output and logs while
+    preserving enough context (exception type, non-credential text) to diagnose.
+    """
+    return _CONNECT_SECRET_RE.sub(r"\1 [redacted]", msg)
 
 
 def _strip_ctx_from_schema(tool: types.Tool) -> types.Tool:
@@ -523,7 +542,7 @@ class ProxyManager:
                         self._errors[name] = "cancelled"
                         raise
                     except Exception as e:
-                        self._errors[name] = str(e)
+                        self._errors[name] = _sanitize_connect_error(str(e))
                         logger.warning(
                             LogEntry(event="proxy.connect.failed", server=name).failure(e)
                         )
@@ -789,7 +808,7 @@ class ProxyManager:
             return f"ok ({tool_count} tools)"
         except Exception as e:
             with self._mutation_lock:
-                self._errors[name] = str(e)
+                self._errors[name] = _sanitize_connect_error(str(e))
             logger.warning(LogEntry(event="proxy.connect.failed", server=name).failure(e))
             return f"failed: {e}"
 

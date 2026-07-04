@@ -76,3 +76,12 @@ def ask_text_sync(prompt: str, default: str = "") -> str | None:
         return str(result) if result is not None else None
     except KeyboardInterrupt:
         return None
+
+
+def ask_password_sync(prompt: str) -> str | None:
+    """Synchronous masked-input prompt for secret values. Returns None on Ctrl+C."""
+    try:
+        result = questionary.password(prompt, style=APP_STYLE).ask()
+        return str(result) if result is not None else None
+    except KeyboardInterrupt:
+        return None

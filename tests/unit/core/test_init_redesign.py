@@ -563,3 +563,98 @@ def test_serve_config_error_is_written_to_serve_log(tmp_path: Path) -> None:
     assert "mcp.startup.config_error" in log_text
     assert str(config_path) in log_text
     assert "70000" in log_text
+
+
+# ---------------------------------------------------------------------------
+# p14: guided encrypted-secrets init step
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_ask_password_sync() -> None:
+    """ask_password_sync returns the value, or None on Ctrl+C."""
+    from unittest.mock import patch
+
+    with patch("ot._tui.questionary") as q:
+        q.password.return_value.ask.return_value = "secret"
+        from ot._tui import ask_password_sync
+
+        assert ask_password_sync("Value") == "secret"
+        q.password.return_value.ask.side_effect = KeyboardInterrupt
+        assert ask_password_sync("Value") is None
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_init_secrets_yaml_not_in_include_and_0600(tmp_path: Path) -> None:
+    """Selecting secrets.yaml materialises it at 0600 and keeps it out of include:."""
+    from unittest.mock import MagicMock, patch
+
+    from typer.testing import CliRunner
+
+    from onetool.cli import app
+
+    ot_dir = tmp_path / ".onetool"
+    config_path = ot_dir / "onetool.yaml"
+
+    mock_tui = MagicMock()
+    mock_tui.ask_text_sync.return_value = str(config_path)
+    mock_tui.ask_checkbox.return_value = ["secrets.yaml"]
+    q = MagicMock()
+    q.confirm.return_value.ask.return_value = False  # decline "Set up encrypted secrets?"
+
+    runner = CliRunner()
+    with patch.dict("sys.modules", {"ot._tui": mock_tui, "questionary": q}):
+        with patch("onetool.cli._stdin_is_tty", return_value=True):
+            result = runner.invoke(app, ["init", "-c", str(config_path)])
+
+    assert result.exit_code == 0, result.output
+    secrets = ot_dir / "secrets.yaml"
+    assert secrets.exists()
+    assert (secrets.stat().st_mode & 0o777) == 0o600
+    data = yaml.safe_load(config_path.read_text())
+    assert "secrets.yaml" not in (data.get("include") or [])
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_init_secrets_yaml_encrypted_step(tmp_path: Path) -> None:
+    """Confirming the encrypted step runs init()+encrypt(backup=False)+audit()."""
+    from unittest.mock import MagicMock, patch
+
+    from typer.testing import CliRunner
+
+    from onetool.cli import app
+
+    ot_dir = tmp_path / ".onetool"
+    config_path = ot_dir / "onetool.yaml"
+    secrets_path = ot_dir / "secrets.yaml"
+
+    mock_tui = MagicMock()
+    # config path, then one secret name, then blank to finish
+    mock_tui.ask_text_sync.side_effect = [str(config_path), "BRAVE_API_KEY", ""]
+    mock_tui.ask_password_sync.return_value = "sk-secret"
+    mock_tui.ask_checkbox.return_value = ["secrets.yaml"]
+    q = MagicMock()
+    q.confirm.return_value.ask.return_value = True  # accept "Set up encrypted secrets?"
+
+    ot_secrets = MagicMock()
+    ot_secrets.init.return_value = {"status": "stored"}
+    ot_secrets.encrypt.return_value = {"file": str(secrets_path)}
+    ot_secrets.audit.return_value = {"safe": True}
+    ottools_mod = MagicMock()
+    ottools_mod.ot_secrets = ot_secrets
+
+    runner = CliRunner()
+    with patch.dict(
+        "sys.modules",
+        {"ot._tui": mock_tui, "questionary": q, "ottools": ottools_mod},
+    ):
+        with patch("onetool.cli._stdin_is_tty", return_value=True):
+            result = runner.invoke(app, ["init", "-c", str(config_path)])
+
+    assert result.exit_code == 0, result.output
+    ot_secrets.init.assert_called_once()
+    ot_secrets.encrypt.assert_called_once_with(file=str(secrets_path), backup=False)
+    ot_secrets.audit.assert_called_once()

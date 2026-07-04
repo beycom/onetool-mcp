@@ -34,6 +34,15 @@ __all__ = ["_format_http_error", "api_headers", "check_api_key", "require_api_ke
 T = TypeVar("T")
 
 
+def _missing_secret_message(secret_name: str) -> str:
+    """Missing-secret error naming both the secret AND where/how to set it."""
+    return (
+        f"{secret_name} secret not configured. Set it in secrets.yaml — e.g. "
+        f"ot_secrets.set(key='{secret_name}', value='...'), or via the guided "
+        "'onetool init' secrets step."
+    )
+
+
 def api_headers(
     secret_name: str,
     *,
@@ -59,7 +68,7 @@ def api_headers(
     """
     api_key = get_secret(secret_name)
     if not api_key:
-        raise ValueError(f"{secret_name} secret not configured")
+        raise ValueError(_missing_secret_message(secret_name))
 
     headers: dict[str, str] = {}
 
@@ -145,7 +154,7 @@ def require_api_key(secret_name: str) -> tuple[str, str | None]:
     """
     key = get_secret(secret_name) or ""
     if not key:
-        return "", f"Error: {secret_name} secret not configured"
+        return "", f"Error: {_missing_secret_message(secret_name)}"
     return key, None
 
 
@@ -160,5 +169,5 @@ def check_api_key(secret_name: str) -> str | None:
     """
     api_key = get_secret(secret_name)
     if not api_key:
-        return f"Error: {secret_name} secret not configured"
+        return f"Error: {_missing_secret_message(secret_name)}"
     return None
