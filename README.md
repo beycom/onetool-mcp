@@ -157,7 +157,7 @@ onetool direct run --port 8765 "brave.search(query='latest AI news')" --format r
 | `ripgrep`     | `search`, `count`                              | `[dev]`  | Fast code search               |
 | `tavily`      | `search`, `search_batch`, `research`           | `[util]` | AI-native search               |
 | `webfetch`    | `fetch`, `fetch_batch`                         | `[dev]`  | Web fetching                   |
-| `whiteboard`  | `open`, `draw`, `screenshot`, `save`           | `[dev]`  | Live Excalidraw canvas         |
+| `whiteboard`  | `open`, `draw`, `screenshot`, `save`           | `[util]` | Live Excalidraw canvas         |
 
 [📖 Complete tools reference](https://onetool.beycom.online/reference/tools/) — full summary table with all 230+ tools
 

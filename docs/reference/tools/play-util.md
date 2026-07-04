@@ -37,6 +37,7 @@ Short alias: `play`
 ## Requires
 
 - A Playwright-compatible MCP server must be enabled. By default this pack uses `playwright`; pass `server="..."` to target a compatible server configured under another name.
+- When you configure your own external `playwright` MCP server that drives a real Chrome, launch it with `--disable-features=OptimizationGuideOnDeviceModel,OnDeviceModelBackgroundDownload`, `--disable-component-update`, and `--disable-background-networking` — this avoids an unexpected ~4GB on-device Gemini Nano model download and background networking the first time Chrome is driven over CDP.
 
 ## Configuration
 

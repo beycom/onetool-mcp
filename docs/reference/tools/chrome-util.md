@@ -36,6 +36,7 @@ Short alias: `chrome`
 ## Requires
 
 - A Chrome DevTools-compatible MCP server must be enabled. By default this pack uses `chrome_devtools`; pass `server="..."` to target a compatible server configured under another name.
+- When you configure your own external `chrome-devtools` MCP server that drives a real Chrome, launch Chrome with `--disable-features=OptimizationGuideOnDeviceModel,OnDeviceModelBackgroundDownload`, `--disable-component-update`, and `--disable-background-networking` — this avoids an unexpected ~4GB on-device Gemini Nano model download and background networking the first time Chrome is driven over CDP.
 
 ## Configuration
 

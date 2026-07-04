@@ -3153,3 +3153,48 @@ class TestReadScene:
 
         with pytest.raises(ValueError, match="info='bad'"):
             excalidraw.read_scene(info="bad")
+
+
+_CHROME_SUPPRESSION_FLAGS = [
+    "--disable-features=OptimizationGuideOnDeviceModel,OnDeviceModelBackgroundDownload",
+    "--disable-component-update",
+    "--disable-background-networking",
+]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_chrome_options_has_suppression_flags() -> None:
+    """_chrome_options() adds exactly the three Chrome suppression flags."""
+    from otdev.tools.excalidraw import _chrome_options
+
+    opts = _chrome_options()
+    assert opts.arguments == _CHROME_SUPPRESSION_FLAGS
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_open_browser_launches_chrome_with_suppression_flags() -> None:
+    """_open_browser() passes options= with the suppression flags to Chrome(...)."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    import otdev.tools.excalidraw as exc
+
+    _reset_exc_state()
+
+    mock_tab = MagicMock()
+    mock_tab.go_to = AsyncMock()
+    mock_chrome_instance = MagicMock()
+    mock_chrome_instance.start = AsyncMock(return_value=mock_tab)
+    mock_chrome_cls = MagicMock(return_value=mock_chrome_instance)
+
+    with patch("pydoll.browser.Chrome", mock_chrome_cls):
+        exc._open_browser()
+
+    _args, kwargs = mock_chrome_cls.call_args
+    assert "options" in kwargs
+    launched_flags = kwargs["options"].arguments
+    for flag in _CHROME_SUPPRESSION_FLAGS:
+        assert flag in launched_flags
+
+    _reset_exc_state()

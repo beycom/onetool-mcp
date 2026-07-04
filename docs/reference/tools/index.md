@@ -1,6 +1,6 @@
 # Tool Reference
 
-**27 Packs. 241 Tools.**
+**27 Packs. 243 Tools.**
 
 Complete reference of all built-in tool packs and functions.
 
@@ -14,8 +14,8 @@ Tools are split into optional install extras. Install only what you need:
 | Extra | Tools included |
 |-------|---------------|
 | *(core, always included)* | `ctx`, `ot`, `ot_forge`, `ot_llm`, `ot_secrets`, `ot_servers`, `ot_timer` |
-| `[util]` | `brave`, `convert`, `excel`, `file`, `ground`, `knowledge`, `mem`, `tavily` |
-| `[dev]` | `arch`, `chrome_util`, `context7`, `db`, `diagram`, `localhist`, `package`, `play_util`, `ripgrep`, `whiteboard`, `webfetch` |
+| `[util]` | `brave`, `convert`, `excel`, `file`, `ground`, `knowledge`, `mem`, `tavily`, `whiteboard` |
+| `[dev]` | `arch`, `chrome_util`, `context7`, `db`, `diagram`, `localhist`, `package`, `play_util`, `ripgrep`, `webfetch` |
 | `[all]` | All of the above |
 
 ```bash
@@ -45,12 +45,12 @@ uv tool install 'onetool-mcp[util,dev]'  # most tools
 | [**OT Forge**](ot_forge.md) | core | Create and validate extension tools. | 2 | MIT | `create_ext`, `validate_ext` |
 | [**OT Image**](ot_image.md) | core | Load images and ask vision questions via OpenAI-compatible API. | 9 | MIT | `ask`, `clip_ask`, `clip_view`, `delete`, `list`, `load`, `load_batch`, `purge`, `summary` |
 | [**OT LLM**](ot_llm.md) | core | AI-powered data transformation. | 2 | MIT | `transform`, `transform_file` |
-| [**OT Secrets**](ot_secrets.md) | core | Age-encrypted secrets management. | 5 | MIT | `audit`, `encrypt`, `init`, `rotate`, `status` |
+| [**OT Secrets**](ot_secrets.md) | core | Age-encrypted secrets management. | 7 | MIT | `audit`, `encrypt`, `get`, `init`, `rotate`, `set`, `status` |
 | [**OT Servers**](ot_servers.md) | core | Runtime proxy server state changes (enable, disable, restart, status). | 4 | MIT | `disable`, `enable`, `restart`, `status` |
 | [**Package**](package.md) | `[dev]` | Package version lookup and security audits. | 5 | MIT | `audit`, `models`, `npm`, `pypi`, `version` |
 | [**Playwright Util**](play-util.md) | `[dev]` | Visual element annotation for a Playwright-compatible MCP server. | 6 | MIT | `clear_annotations`, `enable_auto_inject`, `guide_user`, `highlight_element`, `inject_annotations`, `scan_annotations` |
 | [**Ripgrep**](ripgrep.md) | `[dev]` | Fast regex file search. | 4 | [ripgrep](https://github.com/BurntSushi/ripgrep) (MIT) | `count`, `files`, `search`, `types` |
 | [**Tavily**](tavily.md) | `[util]` | AI-powered web search and URL content extraction. | 5 | [Tavily](https://tavily.com/) (MIT) | `extract`, `extract_batch`, `research`, `search`, `search_batch` |
 | [**OT Timer**](ot_timer.md) | core | Named stopwatch timers for performance measurement. | 4 | MIT | `clear`, `elapsed`, `list`, `start` |
-| [**WB (Whiteboard)**](whiteboard.md) | `[dev]` | Live diagram drawing on excalidraw.com via Playwright. | 22 | MIT | `align`, `boards`, `clear`, `close`, `draw`, `embed_dsl`, `erase`, `fit`, `hard_reset`, `help`, `layout`, `load`, `note`, `open`, `read_scene`, `save`, `screenshot`, `scroll`, `share`, `style`, `sync`, `zoom` |
+| [**WB (Whiteboard)**](whiteboard.md) | `[util]` | Live diagram drawing on excalidraw.com via Playwright. | 22 | MIT | `align`, `boards`, `clear`, `close`, `draw`, `embed_dsl`, `erase`, `fit`, `hard_reset`, `help`, `layout`, `load`, `note`, `open`, `read_scene`, `save`, `screenshot`, `scroll`, `share`, `style`, `sync`, `zoom` |
 | [**Webfetch**](webfetch.md) | `[dev]` | Fetch and extract web content. | 2 | [trafilatura](https://github.com/adbar/trafilatura) (Apache 2.0) | `fetch`, `fetch_batch` |

@@ -55,7 +55,7 @@ Source of truth: `src/otdev/tools/excalidraw.py` (`__all__` + function docstring
 ## Requires
 
 - Chrome or Chromium installed on the host
-- `onetool-mcp[whiteboard]` extra (provides `pydoll-python`; not included in `[all]`)
+- `onetool-mcp[util]` extra (provides `pydoll-python`; included in `[all]`)
 
 ## Configuration
 

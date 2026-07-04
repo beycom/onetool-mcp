@@ -96,6 +96,25 @@ def _run(coro: Any) -> Any:
     return future.result(timeout=60)
 
 
+def _chrome_options() -> Any:
+    """Build ChromiumOptions that suppress Chrome's on-device model download.
+
+    Once whiteboard rides every util/all install, its Chrome launch path is reachable
+    from a plain recommended install. Without these flags a single whiteboard.open()
+    can silently trigger a ~4GB on-device Gemini Nano model download plus unrelated
+    background networking on the user's real Chrome.
+    """
+    from pydoll.browser.options import ChromiumOptions
+
+    options = ChromiumOptions()  # type: ignore[no-untyped-call]
+    options.add_argument(
+        "--disable-features=OptimizationGuideOnDeviceModel,OnDeviceModelBackgroundDownload"
+    )
+    options.add_argument("--disable-component-update")
+    options.add_argument("--disable-background-networking")
+    return options
+
+
 def _open_browser() -> None:
     """Launch pydoll browser, open tab, navigate to excalidraw.com."""
     global _browser, _tab
@@ -105,7 +124,7 @@ def _open_browser() -> None:
     except ImportError:
         raise ImportError(
             "pydoll-python is required for whiteboard. "
-            "Install with: pip install 'onetool-mcp[whiteboard]'"
+            "Install with: pip install 'onetool-mcp[util]'"
         ) from None
 
     async def _start() -> tuple[Any, Any]:
@@ -116,7 +135,7 @@ def _open_browser() -> None:
         for attempt in range(3):
             if attempt > 0:
                 await asyncio.sleep(1)
-            b = Chrome()
+            b = Chrome(options=_chrome_options())
             try:
                 t = await b.start()
                 return b, t

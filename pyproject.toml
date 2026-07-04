@@ -55,6 +55,7 @@ util = [
     "formulas>=1.3.4",             # Excel formula computation for convert pack
     "openpyxl>=3.1.5",
     "pathspec>=1.1.1",
+    "pydoll-python>=2.22.1",       # Chrome CDP driver for the wb (excalidraw) pack
     "pymupdf>=1.27.2.3",
     "python-docx>=1.2.0",
     "python-frontmatter>=1.1.0",   # YAML frontmatter parsing for knowledge pack
@@ -75,9 +76,6 @@ dev = [
 ]
 scrape = [
     "crawl4ai>=0.8.6",
-]
-whiteboard = [
-    "pydoll-python>=2.22.1",
 ]
 all = ["onetool-mcp[util,dev]"]
 
