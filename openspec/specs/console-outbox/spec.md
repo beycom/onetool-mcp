@@ -123,3 +123,13 @@ Message payload modes SHALL be:
 - **WHEN** MCP publishes a display message that points to a local diff
 - **THEN** the event SHALL include payload mode `file_diff_ref`, a canonical absolute diff path, optional canonical old and new paths, MIME type, and size metadata
 - **AND** Console SHALL own diff rendering from the referenced local file data
+
+### Requirement: Console Outbox Protocol Fixtures Stay Schema-Valid
+
+The vendored Console protocol JSON Schemas and example fixtures under `tests/fixtures/console-protocol/` SHALL remain mutually consistent and SHALL be validated in CI.
+
+#### Scenario: Vendored fixtures validate against vendored schemas
+
+- **WHEN** the CI test suite runs `tests/unit/core/test_console_protocol_fixtures.py`
+- **THEN** every fixture in `tests/fixtures/console-protocol/fixtures/*.json` SHALL validate against its corresponding JSON Schema in `tests/fixtures/console-protocol/schemas/*.json` using Draft 2020-12 validation
+- **AND** a schema or fixture change that breaks validation SHALL fail CI

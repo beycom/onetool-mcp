@@ -5,9 +5,7 @@
 Defines the `knowledge` pack (`kb` short alias), a retrieval-augmented knowledge base tool for querying, annotating, and managing offline knowledge bases backed by SQLite with FTS5 and vector search (sqlite-vec). Supports scraping sources, indexing markdown, hybrid search, AI-powered synthesis, and personal annotations.
 
 ---
-
 ## Requirements
-
 ### Requirement: Pack registration and short alias
 The `knowledge` pack SHALL be registered in the tool loader and available under the metadata-declared short alias `kb`.
 
@@ -52,18 +50,18 @@ The `knowledge` pack SHALL read named database configurations from `onetool.yaml
 ---
 
 ### Requirement: kb.search — Hybrid retrieval
-`kb.search()` SHALL retrieve chunks using a hybrid FTS5 BM25 + sqlite-vec KNN pipeline fused with RRF (k=60). The `mode` parameter SHALL select `hybrid` (default), `semantic` (vector-only), or `keyword` (FTS5-only).
+`kb.search()` SHALL retrieve chunks using a hybrid FTS5 BM25 + sqlite-vec KNN pipeline fused with RRF (k=60). The `mode` parameter SHALL select `hybrid` (default), `semantic` (vector-only), or `keyword` (FTS5-only). The search text parameter SHALL be named `query` (not `q`).
 
 #### Scenario: Hybrid mode returns fused results
-- **WHEN** `kb.search(q='nudge keys', db='docs', mode='hybrid', k=5)` is called
+- **WHEN** `kb.search(query='nudge keys', db='docs', mode='hybrid', k=5)` is called
 - **THEN** up to 5 chunks are returned ranked by RRF-fused BM25 and cosine scores
 
 #### Scenario: Metadata filters narrow results
-- **WHEN** `kb.search(q='...', db='docs', source='docs.example.test', k=10)` is called
+- **WHEN** `kb.search(query='...', db='docs', source='docs.example.test', k=10)` is called
 - **THEN** only chunks whose `meta.source` starts with `'docs.example.test'` are returned
 
 #### Scenario: category filter applies
-- **WHEN** `kb.search(q='...', db='docs', category='rule')` is called
+- **WHEN** `kb.search(query='...', db='docs', category='rule')` is called
 - **THEN** only chunks with `category='rule'` are returned
 
 #### Scenario: Interaction boost applied
@@ -82,24 +80,26 @@ The `knowledge` pack SHALL read named database configurations from `onetool.yaml
 - **WHEN** the `chunks_fts` virtual table is created
 - **THEN** it uses `tokenize = 'porter unicode61'` so inflected word forms match their stems
 
+#### Scenario: query parameter accepts the query= prefix match
+- **WHEN** `kb.search(q='nudge keys', db='docs')` is called (using the short `q=` keyword instead of the full `query=`)
+- **THEN** it SHALL succeed identically to `kb.search(query='nudge keys', db='docs')`, because `q` is a prefix of the `query` parameter name and is resolved by the run-tool's keyword-argument prefix matching
+
 ---
 
 ### Requirement: kb.ask — Retrieval-augmented synthesis
-`kb.ask()` SHALL retrieve relevant chunks via `kb.search`, optionally re-rank them, optionally expand context with 1-hop graph neighbours, then synthesise an answer via `ot_llm` with source citations.
+`kb.ask()` SHALL retrieve relevant chunks via `kb.search`, optionally re-rank them, optionally expand context with 1-hop graph neighbours, then synthesise an answer via `ot_llm` with source citations. The question-text parameter SHALL be named `query` (not `q`).
 
 #### Scenario: Answer is returned with citations
-- **WHEN** `kb.ask(q='How do I nudge objects?', db='docs')` is called
+- **WHEN** `kb.ask(query='How do I nudge objects?', db='docs')` is called
 - **THEN** a text answer is returned alongside a list of source citations (topic + url)
 
 #### Scenario: Re-ranking is applied by default
-- **WHEN** `kb.ask(q='...', db='docs', rerank=True)` is called
+- **WHEN** `kb.ask(query='...', db='docs', rerank=True)` is called
 - **THEN** candidate chunks are re-ordered by relevance via a single batched LLM scoring call before synthesis
 
 #### Scenario: Graph expansion adds neighbours
-- **WHEN** `kb.ask(q='...', db='docs', expand=True)` is called
+- **WHEN** `kb.ask(query='...', db='docs', expand=True)` is called
 - **THEN** 1-hop outbound neighbours of top-k chunks are included as supplementary context (deduplicated)
-
----
 
 ### Requirement: kb.grep — Regex content search
 `kb.grep()` SHALL search entry content with a regex pattern, returning matching chunks with matched lines.
@@ -590,3 +590,72 @@ All scrape runs (real and probe) SHALL use `DefaultMarkdownGenerator` with `Prun
 #### Scenario: Content filter applied during probe
 - **WHEN** `--dry-run` probes a source
 - **THEN** the `content_preview` in probe report samples SHALL reflect filtered content, not raw markdown
+
+### Requirement: kb.search — Missing or disabled embeddings guidance
+
+`kb.search()` SHALL return a clear, actionable guidance message, instead of a raw internal error, when `mode` is `hybrid`/`semantic` and the target database's embeddings are disabled or were never generated.
+
+This mirrors the existing guidance pattern in `mem.search()`
+(`src/otutil/tools/_mem/search.py`), applied to the `knowledge` pack's
+per-database config and `sqlite-vec`-backed vector index.
+
+This requirement is distinct from "Error handling — missing sqlite-vec"
+(which covers the `sqlite-vec` **package** not being installed at all): this
+requirement covers the case where `sqlite-vec` **is** available but the
+target database's embeddings are disabled by configuration or have not been
+generated yet.
+
+#### Scenario: Embeddings disabled for the target database
+- **WHEN** `kb.search(q='...', db='rhino', mode='hybrid')` is called
+- **AND** `tools.knowledge.kb.rhino.db.embeddings_enabled` is `false`
+- **THEN** the call SHALL return "Semantic search requires embeddings. Enable with: tools.knowledge.kb.rhino.db.embeddings_enabled: true"
+- **AND** SHALL NOT open a database connection or attempt a vector query
+
+#### Scenario: Embeddings enabled but never generated
+- **WHEN** `kb.search(q='...', db='rhino', mode='semantic')` is called
+- **AND** `tools.knowledge.kb.rhino.db.embeddings_enabled` is `true` (or unset, which defaults to `true`)
+- **AND** the database's `chunks_vec` table has no rows (no chunk has ever been embedded)
+- **THEN** the call SHALL return "No embeddings found for 'rhino'. Run kb.reindex(db='rhino') to generate them."
+- **AND** SHALL NOT surface a raw SQL or `sqlite-vec` exception message
+
+#### Scenario: Keyword mode is unaffected
+- **WHEN** `kb.search(q='...', db='rhino', mode='keyword')` is called
+- **AND** the database has no embeddings
+- **THEN** the call SHALL proceed with FTS5-only search and SHALL NOT check embeddings state
+
+### Requirement: Untrusted-context boundary in kb.ask synthesis and re-ranking
+
+The LLM calls backing `kb.ask()` SHALL send a system message that frames retrieved context as
+untrusted, non-instructional reference material before sending the user's question and the retrieved
+chunks. This applies to `_llm_rerank()` (candidate re-ranking) and `_synthesise()` (answer synthesis)
+in `src/otutil/tools/_knowledge/retrieval.py`. This is independent of and in addition to the
+`ottools/tool-llm` `transform()` boundary: `kb.ask()`'s re-ranking and synthesis calls build their own
+prompts directly against an LLM client rather than going through `transform()`, so they need their own
+system-message boundary.
+
+Retrieved context can contain prompt-injection text (e.g. indexed documentation that itself contains
+directive-like phrasing). Without a system-level boundary, the request sends the user question and
+retrieved context in a single `user` message with no instruction to disregard embedded directives.
+
+#### Scenario: Synthesis sends a system message
+- **GIVEN** `kb.ask(q='...', db='docs')` triggers `_synthesise()`
+- **WHEN** the LLM request is built
+- **THEN** the request's `messages` list SHALL include a `system` role message
+- **AND** that system message SHALL instruct the model to treat the retrieved context as untrusted
+  data, not instructions
+- **AND** that system message SHALL instruct the model to ignore any instructions embedded within the
+  retrieved context that attempt to change its behavior, reveal secrets, call tools, fetch URLs,
+  execute code, or disregard these rules
+
+#### Scenario: Re-ranking sends a system message
+- **GIVEN** `kb.ask(q='...', db='docs', rerank=True)` triggers `_llm_rerank()`
+- **WHEN** the LLM scoring request is built
+- **THEN** the request's `messages` list SHALL include a `system` role message with the same
+  untrusted-context framing as synthesis
+
+#### Scenario: Existing citation behavior is unchanged
+- **GIVEN** `kb.ask(q='How do I nudge objects?', db='docs')` is called
+- **WHEN** the answer is returned
+- **THEN** a text answer is still returned alongside a list of source citations (topic + url), exactly
+  as before this change — the system message is additive and does not alter the response contract
+

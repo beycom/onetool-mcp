@@ -21,6 +21,8 @@ details belong under `openspec/changes/`, not in this index.
 | [_nf-docs](_nf-docs/spec.md) | Public documentation availability, accuracy, and disclosure |
 | [_nf-observability](_nf-observability/spec.md) | Runtime observability, attribution, redaction, and usage visibility |
 | [_nf-paths](_nf-paths/spec.md) | Path resolution, storage ownership, and workspace boundaries |
+| [dependency-baseline](dependency-baseline/spec.md) | Dependency freshness and security floor pins |
+| [security-model-docs](security-model-docs/spec.md) | Security-model documentation honesty (exec is not a sandbox) |
 
 ## CLI And Direct APIs
 
@@ -29,6 +31,7 @@ details belong under `openspec/changes/`, not in this index.
 | [onetool-cli](onetool-cli/spec.md) | `onetool` CLI runtime, init, and knowledge-base commands |
 | [direct-api](direct-api/spec.md) | Authenticated loopback Direct API |
 | [direct-run](direct-run/spec.md) | `onetool direct run` client behavior |
+| [onetool-install-flow](onetool-install-flow/spec.md) | Bootstrap install scripts and documented install contract |
 
 ## MCP Server Runtime
 
@@ -44,8 +47,10 @@ details belong under `openspec/changes/`, not in this index.
 | [serve-output-sanitization](serve-output-sanitization/spec.md) | Output sanitization boundaries |
 | [serve-server-management](serve-server-management/spec.md) | Runtime server enable/disable/restart APIs |
 | [serve-skills](serve-skills/spec.md) | Runtime skill listing and content retrieval |
+| [skill-ot-ref](skill-ot-ref/spec.md) | The ot-ref skill: trigger, layout, and command-index delivery |
 | [serve-stats](serve-stats/spec.md) | Runtime statistics reporting |
 | [serve-telemetry](serve-telemetry/spec.md) | Anonymous startup telemetry |
+| [console-outbox](console-outbox/spec.md) | Console outbox protocol contract (v1, server implementation post-V3) |
 | [tool-execution](tool-execution/spec.md) | Extension tool execution worker behavior |
 | [tool-ot](tool-ot/spec.md) | Internal `ot.*` runtime helper pack |
 | [batch-retry-envelope](batch-retry-envelope/spec.md) | Structured batch retry envelopes |
@@ -111,12 +116,12 @@ details belong under `openspec/changes/`, not in this index.
 
 | Category | Count |
 |----------|-------|
-| Non-Functional | 3 |
-| CLI And Direct APIs | 3 |
-| MCP Server Runtime | 19 |
+| Non-Functional | 5 |
+| CLI And Direct APIs | 4 |
+| MCP Server Runtime | 21 |
 | Browser Utilities | 2 |
 | Knowledge, Context, And Memory | 6 |
 | Core Built-In Tool Packs | 5 |
 | Domain Tools `[util]` | 6 |
 | Domain Tools `[dev]` | 9 |
-| **Total** | **53** |
+| **Total** | **58** |

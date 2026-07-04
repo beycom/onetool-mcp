@@ -5,9 +5,7 @@
 Defines the main `onetool` CLI. Provides the MCP server entry point, the `init` subcommand group for configuration management, the `kb` subcommand group for knowledge base management, and the `direct` subcommand group for direct tool execution.
 
 ---
-
 ## Requirements
-
 ### Requirement: CLI Entry Point
 
 The system SHALL provide a `onetool` CLI command with an explicit `serve`
@@ -64,6 +62,15 @@ stdio transport and SHALL support Streamable HTTP root mode through
 - **WHEN** the process exits
 - **THEN** stderr SHALL include a compact config error diagnostic
 - **AND** `<config-dir>/runtime/logs/serve.log` SHALL record the config path and error message
+
+#### Scenario: Startup failure when --secrets file does not exist
+- **GIVEN** `onetool serve --config /path/to/onetool.yaml --secrets /path/to/missing-secrets.yaml` is executed (or the equivalent root `onetool --config ... --secrets ...` invocation)
+- **AND** `/path/to/missing-secrets.yaml` does not exist on disk
+- **WHEN** the process starts
+- **THEN** it SHALL exit with a non-zero status before the MCP handshake
+- **AND** stderr SHALL print an actionable message that names the missing secrets path and points at `onetool init` (e.g. `Secrets file not found: /path/to/missing-secrets.yaml`)
+- **AND** `<config-dir>/runtime/logs/serve.log` SHALL record the same error
+- **AND** this is distinct from omitting `--secrets` entirely, which SHALL continue to start the server with no secrets loaded and no error (secrets remain optional when the flag is not passed at all)
 
 #### Scenario: Termination signal
 - **GIVEN** the stdio or HTTP MCP server process receives SIGINT or SIGTERM
@@ -133,7 +140,9 @@ The primary interface is `onetool init` (uses current directory) or `onetool ini
 - Path ending in `.yaml` or `.yml` → treated as the config file path; parent directory is the config dir
 - Any other path → treated as the config directory; `onetool.yaml` is written inside it
 
-Existing files in the target directory SHALL be backed up to `<filename>.bak` (or `<filename>.bak1`, `<filename>.bak2`, etc. to avoid collisions) before being overwritten, and a warning SHALL be printed.
+A `--force` flag SHALL be available. In non-interactive (non-TTY) mode it SHALL be required to overwrite an existing `onetool.yaml`; without it, a second `onetool init` run against an already-initialized config path SHALL be a no-op. In interactive (TTY) mode `--force` SHALL skip the existing overwrite-confirmation prompt and proceed directly to overwriting.
+
+Existing files that ARE overwritten (via TTY confirmation or `--force`) SHALL be backed up to `<filename>.bak` (or `<filename>.bak1`, `<filename>.bak2`, etc. to avoid collisions) before being overwritten, and a warning SHALL be printed.
 
 #### Scenario: Init with no flags (interactive)
 - **GIVEN** `onetool init` or `onetool init -c <path>` is run
@@ -162,9 +171,37 @@ Existing files in the target directory SHALL be backed up to `<filename>.bak` (o
 - **AND** the new file SHALL be written to the original path
 
 #### Scenario: Minimal output config
-- **GIVEN** the user does not select any extensions during init (or stdin is not a TTY)
+- **GIVEN** the user does not select any extensions during init (or stdin is not a TTY and the target does not already exist)
 - **WHEN** init completes
 - **THEN** the generated `onetool.yaml` SHALL contain only `version: 2` with no `include:` section
+
+#### Scenario: Non-interactive re-run is a no-op by default
+- **GIVEN** `onetool init --config <path>` was already run and `<path>` exists
+- **AND** stdin is not a TTY
+- **AND** `--force` is not passed
+- **WHEN** `onetool init --config <path>` is run again
+- **THEN** it SHALL exit with status 0
+- **AND** it SHALL NOT modify, back up, or overwrite `<path>` or any other file
+- **AND** it SHALL print a message stating the config already exists and that `--force` overwrites it
+
+#### Scenario: Non-interactive re-run with --force overwrites
+- **GIVEN** `onetool init --config <path>` was already run and `<path>` exists
+- **AND** stdin is not a TTY
+- **WHEN** `onetool init --config <path> --force` is run
+- **THEN** the existing `<path>` SHALL be backed up per the standard `.bak` scheme
+- **AND** a new minimal `onetool.yaml` SHALL be written to `<path>`
+
+#### Scenario: Interactive re-run with --force skips the confirmation prompt
+- **GIVEN** `onetool init --config <path>` was already run and `<path>` exists
+- **AND** stdin is a TTY
+- **WHEN** `onetool init --config <path> --force` is run
+- **THEN** it SHALL NOT prompt "onetool.yaml already exists. Overwrite?"
+- **AND** it SHALL proceed directly to the extension checkbox TUI and overwrite `<path>` (with the standard `.bak` backup) once confirmed
+
+#### Scenario: Successful init prints the validate hint
+- **GIVEN** `onetool init` completes successfully (interactive or non-interactive) and writes or would have written `onetool.yaml` to `<path>`
+- **WHEN** the command finishes
+- **THEN** it SHALL print a hint recommending `onetool init validate --config <path>` as the next step
 
 ### Requirement: Init Validate Source Reporting
 
@@ -186,8 +223,6 @@ The `onetool init validate` command SHALL report the source of each resolved inc
 - **GIVEN** an include using a package default (`[default]` source)
 - **WHEN** validation output is shown
 - **THEN** it SHALL include a hint suggesting how to materialise the file locally to customise it
-
----
 
 ### Requirement: KB Subcommand Group
 
@@ -318,3 +353,67 @@ The `onetool kb` subcommand group SHALL include a `scrape` command that crawls a
 #### Scenario: Summary printed on completion
 - **WHEN** a crawl completes
 - **THEN** the command SHALL print the count of pages written, failed, and skipped
+
+### Requirement: Init MCP Config
+
+The `onetool init mcp-config` command SHALL print ready-to-paste MCP client configuration with fully resolved, absolute paths — never placeholder paths.
+
+`onetool init mcp-config [--client claude-code|claude-desktop|cursor|vscode] [--config PATH] [--secrets PATH]`:
+- `--config` / `-c` uses the same suffix-detection resolution as `onetool init` (`.yaml`/`.yml` → file path; otherwise → directory containing `onetool.yaml`); defaults to `onetool.yaml` in the current directory. The resolved path SHALL always be printed as an absolute path.
+- `--secrets` / `-s` defaults to `secrets.yaml` in the resolved config directory.
+- `--client` selects one client's output. If omitted, output for all four supported clients SHALL be printed in sequence, each under its own heading.
+- The `command` field in every printed config SHALL be the absolute path to the `onetool` executable as resolved via `PATH` lookup at the time the command runs, not the bare string `"onetool"`, unless `onetool` cannot be found on `PATH` — in which case the bare string SHALL be used and a warning printed to stderr.
+- If the resolved secrets path does not exist on disk, `--secrets <path>` SHALL be omitted from the printed `args` array (an absent secrets file must not be baked into a config that will fail at server startup), and a stderr note SHALL point at `onetool init` to create it.
+- If the resolved `onetool.yaml` config path does not exist on disk, the command SHALL still print the resolved (future) path, and SHALL print a stderr warning that `onetool init --config <path>` has not been run yet.
+- All JSON output SHALL be written to stdout; warnings and headings SHALL be written so that a single `--client` invocation's JSON block can be copy-pasted directly.
+
+#### Scenario: Claude Code output format
+- **WHEN** `onetool init mcp-config --client claude-code --config ~/.onetool/onetool.yaml` is run
+- **THEN** it SHALL print a JSON object with a top-level `mcpServers` key containing an `onetool` entry
+- **AND** the entry's `command` SHALL be the resolved absolute path to the `onetool` executable
+- **AND** the entry's `args` SHALL be `["serve", "--config", "<absolute path to ~/.onetool/onetool.yaml>", "--secrets", "<absolute path to ~/.onetool/secrets.yaml>"]` when `secrets.yaml` exists at that location
+- **AND** it SHALL also print the equivalent `claude mcp add onetool -- <resolved onetool path> serve --config <resolved config path> --secrets <resolved secrets path>` one-liner
+- **AND** it SHALL name the target file (`~/.claude/mcp.json`, or project `.mcp.json`) the JSON block should be merged into
+
+#### Scenario: Claude Desktop output format
+- **WHEN** `onetool init mcp-config --client claude-desktop --config ~/.onetool/onetool.yaml` is run
+- **THEN** it SHALL print the same `mcpServers`-keyed JSON shape as Claude Code
+- **AND** it SHALL name the OS-specific target file path for the platform the command is run on (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows, `~/.config/claude-desktop/claude_desktop_config.json` on Linux)
+- **AND** it SHALL note that the printed block must be merged into that file's existing `mcpServers` key, not used to replace the whole file
+
+#### Scenario: Cursor output format
+- **WHEN** `onetool init mcp-config --client cursor --config ~/.onetool/onetool.yaml` is run
+- **THEN** it SHALL print the same `mcpServers`-keyed JSON shape as Claude Code
+- **AND** it SHALL name `.cursor/mcp.json` (project-scoped, relative to the current working directory) as the primary target, and mention `~/.cursor/mcp.json` as the global alternative
+
+#### Scenario: VS Code output format
+- **WHEN** `onetool init mcp-config --client vscode --config ~/.onetool/onetool.yaml` is run
+- **THEN** it SHALL print a JSON object with a top-level `servers` key (not `mcpServers`) containing an `onetool` entry
+- **AND** the entry SHALL include `"type": "stdio"` in addition to `command` and `args`
+- **AND** it SHALL name `.vscode/mcp.json` (workspace-scoped) as the primary target, and mention the user profile `mcp.json` as the global alternative
+
+#### Scenario: No --client prints all four
+- **WHEN** `onetool init mcp-config --config ~/.onetool/onetool.yaml` is run without `--client`
+- **THEN** output SHALL include one heading + JSON block per supported client (`claude-code`, `claude-desktop`, `cursor`, `vscode`) in that order
+
+#### Scenario: Resolved onetool command path
+- **GIVEN** `onetool` resolves via `PATH` lookup to `/Users/example/.local/bin/onetool`
+- **WHEN** any `onetool init mcp-config` invocation runs
+- **THEN** every printed `command` field SHALL be `/Users/example/.local/bin/onetool`, not the bare string `onetool`
+
+#### Scenario: Missing secrets file is omitted, not guessed
+- **GIVEN** the resolved secrets path `~/.onetool/secrets.yaml` does not exist on disk
+- **WHEN** `onetool init mcp-config --config ~/.onetool/onetool.yaml` is run
+- **THEN** the printed `args` array SHALL NOT include `--secrets`
+- **AND** stderr SHALL print a note that `secrets.yaml` was not found and that `onetool init` creates it
+
+#### Scenario: Missing config path still resolves, with a warning
+- **GIVEN** `~/.onetool/onetool.yaml` does not exist on disk
+- **WHEN** `onetool init mcp-config --config ~/.onetool/onetool.yaml` is run
+- **THEN** the printed JSON SHALL still use the resolved absolute path `~/.onetool/onetool.yaml` (expanded to the user's home directory)
+- **AND** stderr SHALL print a warning that `onetool init --config ~/.onetool/onetool.yaml` has not been run yet
+
+#### Scenario: mcp-config appears in init help
+- **WHEN** `onetool init --help` is run
+- **THEN** `mcp-config` SHALL be listed as an available `init` subcommand alongside `validate`
+
