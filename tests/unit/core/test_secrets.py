@@ -549,8 +549,9 @@ class TestLoadSecretsAgeDecryption:
                 load_secrets(secrets_file)
 
     def test_malformed_base64_rejected(self, tmp_path: Path) -> None:
-        """A non-canonical base64 age1enc value raises a clear decode error."""
-        import binascii
+        """A non-canonical base64 age1enc value raises a SecretDecryptionError
+        naming the offending key, not a raw binascii error."""
+        from ot.config.secrets import SecretDecryptionError
 
         secrets_file = tmp_path / "secrets.yaml"
         secrets_file.write_text("KEY: 'age1enc:not*valid*base64'\n")
@@ -559,5 +560,23 @@ class TestLoadSecretsAgeDecryption:
         mock_pr = _make_mock_pyrage()
 
         with patch.dict("sys.modules", {"keyring": mock_kr, "pyrage": mock_pr}):
-            with pytest.raises(binascii.Error):
+            with pytest.raises(SecretDecryptionError, match="Failed to decrypt secret 'KEY'"):
+                load_secrets(secrets_file)
+
+    def test_decrypt_error_names_offending_key(self, tmp_path: Path) -> None:
+        """A corrupted age1enc: value in a multi-key file names the failing key,
+        without aborting before naming it (FIX-F)."""
+        from ot.config.secrets import SecretDecryptionError
+
+        good_encoded = _age_encoded(b"good_cipher")
+        secrets_file = tmp_path / "secrets.yaml"
+        secrets_file.write_text(
+            f"GOOD: '{good_encoded}'\nBAD: 'age1enc:not*valid*base64'\n"
+        )
+
+        mock_kr = _make_mock_keyring()
+        mock_pr = _make_mock_pyrage(plaintext=b"decrypted")
+
+        with patch.dict("sys.modules", {"keyring": mock_kr, "pyrage": mock_pr}):
+            with pytest.raises(SecretDecryptionError, match="Failed to decrypt secret 'BAD'"):
                 load_secrets(secrets_file)

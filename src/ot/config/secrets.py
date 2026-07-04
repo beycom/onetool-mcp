@@ -125,11 +125,9 @@ def load_secrets(
             ) from e
 
         # Fail-closed on an insecure/plaintext keyring backend before reading the
-        # identity (reuses the ot_secrets allow-list — single source of truth).
-        from ottools.ot_secrets import (
-            _NO_IDENTITY_MSG,
-            _assert_secure_keyring_backend,
-        )
+        # identity (shared with ottools.ot_secrets — single source of truth,
+        # hoisted to ot.config.keyring so core doesn't import a leaf pack).
+        from ot.config.keyring import _NO_IDENTITY_MSG, _assert_secure_keyring_backend
 
         _assert_secure_keyring_backend(keyring)
 
@@ -139,11 +137,18 @@ def load_secrets(
 
         identity = pyrage.x25519.Identity.from_str(private_key)
         for key in encrypted_keys:
-            encoded = secrets[key][len(_AGE_PREFIX):]
-            ciphertext = base64.b64decode(encoded, validate=True)
-            # Decrypt — plaintext never logged
-            plaintext_bytes = pyrage.decrypt(ciphertext, [identity])
-            secrets[key] = plaintext_bytes.decode()
+            try:
+                encoded = secrets[key][len(_AGE_PREFIX) :]
+                ciphertext = base64.b64decode(encoded, validate=True)
+                # Decrypt — plaintext never logged
+                plaintext_bytes = pyrage.decrypt(ciphertext, [identity])
+                secrets[key] = plaintext_bytes.decode()
+            except SecretDecryptionError:
+                raise
+            except Exception as e:
+                raise SecretDecryptionError(
+                    f"Failed to decrypt secret '{key}': {e}"
+                ) from e
 
         logger.debug(f"Decrypted {len(encrypted_keys)} encrypted secret(s)")
 

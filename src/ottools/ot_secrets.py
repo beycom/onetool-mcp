@@ -17,6 +17,18 @@ from typing import Any
 
 import yaml
 
+from ot.config.keyring import (
+    _NO_IDENTITY_MSG as _NO_IDENTITY_MSG,
+)
+from ot.config.keyring import (
+    _SECURE_BACKENDS as _SECURE_BACKENDS,
+)
+from ot.config.keyring import (
+    _assert_secure_keyring_backend as _assert_secure_keyring_backend,
+)
+from ot.config.keyring import (
+    _InsecureKeyringError as _InsecureKeyringError,
+)
 from otpack import LogSpan
 
 # Pack for dot notation: ot_secrets.init(), ot_secrets.encrypt(), etc.
@@ -38,47 +50,11 @@ _KEY_PUBKEY = "age_pubkey"
 _KEY_LABEL = "age_label"
 _PREFIX = "age1enc:"
 
-# Canonical "no identity" guidance, shared with src/ot/config/secrets.py.
-_NO_IDENTITY_MSG = (
-    "No age identity found in the OS keychain. Run ot_secrets.init() to generate one."
-)
-
-# Allow-list of secure OS keyring backends. Anything not listed here (fail/null/
-# chainer/third-party keyrings.alt plaintext backends) is refused — third-party
-# plaintext backends cannot be enumerated, so this must be an allow-list, not a
-# deny-list.
-_SECURE_BACKENDS = {
-    "keyring.backends.macOS.Keyring",
-    "keyring.backends.Windows.WinVaultKeyring",
-    "keyring.backends.SecretService.Keyring",
-    "keyring.backends.libsecret.Keyring",
-    "keyring.backends.kwallet.DBusKeyring",
-    "keyring.backends.kwallet.DBusKeyringKWallet4",
-}
-
-
-class _InsecureKeyringError(RuntimeError):
-    """Raised when the resolved OS keyring backend is not allow-listed as secure."""
-
-
-def _assert_secure_keyring_backend(kr: Any) -> None:
-    """Refuse to touch the keychain unless a secure backend is active.
-
-    Fail-closed: a headless host can silently resolve a plaintext ``keyrings.alt``
-    backend and store the private age identity in cleartext. Verify the backend
-    before every keychain read or write, not just after init() — the backend can
-    differ between the process that ran init() and a later reader.
-    """
-    backend = kr.get_keyring()
-    qualname = f"{type(backend).__module__}.{type(backend).__qualname__}"
-    if qualname not in _SECURE_BACKENDS:
-        raise _InsecureKeyringError(
-            f"Insecure or unavailable OS keyring backend detected: {qualname}. "
-            "OneTool refuses to store the age private key in this backend "
-            "(it may be a plaintext fallback). Configure a secure OS keychain "
-            "(macOS Keychain, Windows Credential Locker, or a Secret "
-            "Service/KWallet/libsecret provider on Linux) and retry."
-        )
+# _NO_IDENTITY_MSG, _SECURE_BACKENDS, _InsecureKeyringError, and
+# _assert_secure_keyring_backend() now live in ot.config.keyring (hoisted so
+# core's ot.config.secrets doesn't import a leaf pack's private symbols).
+# Re-imported above as module-level aliases for backwards compatibility —
+# existing call sites and tests in this module keep working unchanged.
 
 
 def _resolve_secrets_file(file: str | None) -> Path:
@@ -104,7 +80,9 @@ def _atomic_write_yaml(path: Path, data: dict[str, Any]) -> None:
 
     A crash mid-write leaves the original file untouched — no truncation window.
     """
-    fd, temp_path = tempfile.mkstemp(dir=str(path.parent), prefix=".tmp_", suffix=".yaml")
+    fd, temp_path = tempfile.mkstemp(
+        dir=str(path.parent), prefix=".tmp_", suffix=".yaml"
+    )
     try:
         with os.fdopen(fd, "w") as f:
             yaml.dump(
@@ -126,9 +104,7 @@ def _require_keyring() -> Any:
 
         return keyring
     except ImportError as e:
-        raise ImportError(
-            "keyring is not installed. Run: pip install keyring"
-        ) from e
+        raise ImportError("keyring is not installed. Run: pip install keyring") from e
 
 
 def _require_pyrage() -> Any:
@@ -137,9 +113,7 @@ def _require_pyrage() -> Any:
 
         return pyrage
     except ImportError as e:
-        raise ImportError(
-            "pyrage is not installed. Run: pip install pyrage"
-        ) from e
+        raise ImportError("pyrage is not installed. Run: pip install pyrage") from e
 
 
 def _pubkey_hint(pubkey: str) -> str:
@@ -342,7 +316,11 @@ def status(*, file: str | None = None) -> dict[str, Any]:
                         else:
                             plain.append(k)
                     result["file"] = str(path)
-                    result["values"] = {"encrypted": encrypted, "plain": plain, "null_keys": nulls}
+                    result["values"] = {
+                        "encrypted": encrypted,
+                        "plain": plain,
+                        "null_keys": nulls,
+                    }
 
         s.add(identity="found")
         return result
@@ -416,7 +394,7 @@ def rotate(*, file: str | None = None, backup: bool = False) -> dict[str, Any]:
                 continue
             str_val = str(value)
             if str_val.startswith(_PREFIX):
-                encoded = str_val[len(_PREFIX):]
+                encoded = str_val[len(_PREFIX) :]
                 ciphertext = base64.b64decode(encoded, validate=True)
                 plaintext = pyrage.decrypt(ciphertext, [old_identity])
                 new_ciphertext = pyrage.encrypt(plaintext, [new_recipient])
@@ -504,7 +482,9 @@ def audit(*, file: str | None = None) -> dict[str, Any]:
                 plain_keys.append(key)
 
         safe = len(plain_keys) == 0
-        s.add(safe=safe, plain_count=len(plain_keys), encrypted_count=len(encrypted_keys))
+        s.add(
+            safe=safe, plain_count=len(plain_keys), encrypted_count=len(encrypted_keys)
+        )
         result: dict[str, Any] = {
             "file": str(path),
             "safe": safe,
@@ -549,7 +529,10 @@ def set(*, key: str, value: str, file: str | None = None) -> dict[str, Any]:
             if loaded is not None:
                 if not isinstance(loaded, dict):
                     s.add(status="invalid_yaml")
-                    return {"error": "File must be a YAML mapping", "status": "invalid_yaml"}
+                    return {
+                        "error": "File must be a YAML mapping",
+                        "status": "invalid_yaml",
+                    }
                 data = loaded
 
         pubkey_str = keyring.get_password(_SERVICE, _KEY_PUBKEY)
@@ -559,6 +542,12 @@ def set(*, key: str, value: str, file: str | None = None) -> dict[str, Any]:
         if pubkey_str:
             _assert_secure_keyring_backend(keyring)
             private_key = keyring.get_password(_SERVICE, _KEY_IDENTITY)
+            if not private_key:
+                # Keychain has the pubkey but lost the identity (e.g. keychain
+                # entry deleted out-of-band) — fail with the canonical guidance
+                # instead of an unhandled TypeError from Identity.from_str(None).
+                s.add(status="no_identity")
+                return {"error": _NO_IDENTITY_MSG, "status": "no_identity"}
             pyrage = _require_pyrage()
             recipient = pyrage.x25519.Recipient.from_str(pubkey_str)
             ciphertext = pyrage.encrypt(value.encode(), [recipient])
@@ -645,7 +634,7 @@ def get(
                     return {"error": _NO_IDENTITY_MSG, "status": "no_identity"}
                 pyrage = _require_pyrage()
                 identity = pyrage.x25519.Identity.from_str(private_key)
-                ciphertext = base64.b64decode(raw_str[len(_PREFIX):], validate=True)
+                ciphertext = base64.b64decode(raw_str[len(_PREFIX) :], validate=True)
                 plaintext = pyrage.decrypt(ciphertext, [identity]).decode()
             else:
                 plaintext = raw_str

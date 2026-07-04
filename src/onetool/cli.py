@@ -392,15 +392,27 @@ def _guided_secrets_setup(secrets_path: Path) -> None:
         return
 
     # Merge the entered pairs into the materialised secrets.yaml (plaintext for now).
+    # Snapshot whether the file pre-existed with content already fully encrypted
+    # (all age1enc: values, or empty) — this decides the safest scrub below if
+    # init()/encrypt() fails after this plaintext write.
     existing: dict[str, object] = {}
-    if secrets_path.exists():
-        loaded = yaml.safe_load(secrets_path.read_text()) or {}
+    file_pre_existed = secrets_path.exists()
+    pre_merge_text: str | None = None
+    pre_merge_all_encrypted = True
+    if file_pre_existed:
+        pre_merge_text = secrets_path.read_text()
+        loaded = yaml.safe_load(pre_merge_text) or {}
         if isinstance(loaded, dict):
             existing = loaded
+            pre_merge_all_encrypted = all(
+                v is None or str(v).startswith("age1enc:") for v in existing.values()
+            )
+
     existing.update(pairs)
     secrets_path.write_text(
         yaml.dump(existing, default_flow_style=False, allow_unicode=True, sort_keys=False)
     )
+    secrets_path.chmod(0o600)
 
     if cancelled:
         console.print(
@@ -411,16 +423,35 @@ def _guided_secrets_setup(secrets_path: Path) -> None:
 
     from ottools import ot_secrets
 
-    init_result = ot_secrets.init()
-    if init_result.get("status") == "exists":
-        reuse = questionary.confirm(
-            "An age identity already exists. Reuse it? (No overwrites it)", default=True
-        ).ask()
-        if reuse is False:
-            ot_secrets.init(force=True)
+    try:
+        init_result = ot_secrets.init()
+        if init_result.get("status") == "exists":
+            reuse = questionary.confirm(
+                "An age identity already exists. Reuse it? (No overwrites it)",
+                default=True,
+            ).ask()
+            if reuse is False:
+                ot_secrets.init(force=True)
 
-    ot_secrets.encrypt(file=str(secrets_path), backup=False)
-    audit = ot_secrets.audit(file=str(secrets_path))
+        ot_secrets.encrypt(file=str(secrets_path), backup=False)
+        audit = ot_secrets.audit(file=str(secrets_path))
+    except Exception:
+        # Never leave plaintext on disk (docstring guarantee): scrub back to the
+        # safest known state before re-raising. If the pre-existing file content
+        # was already fully encrypted, restore exactly that; otherwise (file
+        # didn't exist, or had plaintext of its own) delete it outright rather
+        # than risk restoring plaintext.
+        if file_pre_existed and pre_merge_all_encrypted and pre_merge_text is not None:
+            secrets_path.write_text(pre_merge_text)
+            secrets_path.chmod(0o600)
+        else:
+            secrets_path.unlink(missing_ok=True)
+        console.print(
+            f"[red]✗[/red] Encrypted-secrets setup failed — {secrets_path.name} "
+            "scrubbed of plaintext values."
+        )
+        raise
+
     if audit.get("safe") is True:
         console.print(
             f"[green]✓[/green] {secrets_path.name} encrypted "

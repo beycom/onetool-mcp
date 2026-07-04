@@ -1194,6 +1194,29 @@ def test_set_no_identity_stores_plain_with_warning(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 @pytest.mark.tools
+def test_set_pubkey_present_identity_missing_clean_error(tmp_path: Path) -> None:
+    """FIX-E: pubkey present but identity lost from keychain -> clean no-identity
+    error, not an unhandled TypeError from Identity.from_str(None)."""
+    secrets_file = tmp_path / "secrets.yaml"
+    kr = _make_keyring_mock({("onetool", "age_pubkey"): "age1pub"})  # no identity
+    pr = _make_pyrage_mock()
+
+    with (
+        patch("ottools.ot_secrets._require_keyring", return_value=kr),
+        patch("ottools.ot_secrets._require_pyrage", return_value=pr),
+    ):
+        from ottools.ot_secrets import set as set_secret
+
+        result = set_secret(key="X", value="v", file=str(secrets_file))
+
+    assert result["status"] == "no_identity"
+    assert "ot_secrets.init()" in result["error"]
+    pr.x25519.Identity.from_str.assert_not_called()
+    assert not secrets_file.exists()
+
+
+@pytest.mark.unit
+@pytest.mark.tools
 def test_set_insecure_backend_rejected_before_write(tmp_path: Path) -> None:
     secrets_file = tmp_path / "secrets.yaml"
     kr = _make_keyring_mock(
