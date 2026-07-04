@@ -1,0 +1,23 @@
+{
+  "id": "123abc456def",
+  "kind": "file",
+  "metadata": {
+    "title": "Log"
+  },
+  "created_at": "2026-06-07T00:00:00Z",
+  "updated_at": "2026-06-07T00:00:00Z",
+  "payload": {
+    "mode": "file_ref",
+    "path": "/Users/gavin/project/tmp/run.log",
+    "mime_type": "text/plain",
+    "size_bytes": 128,
+    "language": null
+  },
+  "preview": {
+    "text": "first line",
+    "truncated": false,
+    "size_bytes": 128,
+    "limit_bytes": 65536
+  }
+}
+

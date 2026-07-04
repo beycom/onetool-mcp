@@ -158,6 +158,7 @@ nav:
           - onetool: reference/cli/onetool.md
           - onetool Configuration: reference/cli/onetool-config.md
           - onetool direct: reference/cli/onetool-direct.md
+      - Console Outbox Protocol: reference/console-outbox-protocol.md
       - Tools:
           - reference/tools/index.md
           - Tool Index: reference/tools/tool-index.md

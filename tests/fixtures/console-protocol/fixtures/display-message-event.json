@@ -1,0 +1,32 @@
+{
+  "protocol": "onetool.console",
+  "protocol_version": 1,
+  "id": "evt-display",
+  "instance_id": "mcp-alpha",
+  "sequence": 2,
+  "type": "display.message.created",
+  "created_at": "2026-06-07T00:00:02Z",
+  "payload": {
+    "id": "abc123def456",
+    "kind": "markdown",
+    "metadata": {
+      "title": "Run summary"
+    },
+    "created_at": "2026-06-07T00:00:00Z",
+    "updated_at": "2026-06-07T00:00:00Z",
+    "payload": {
+      "mode": "inline",
+      "mime_type": "text/markdown",
+      "size_bytes": 18,
+      "language": "markdown",
+      "content": "# Result\n\n- passed"
+    },
+    "preview": {
+      "text": "# Result\n\n- passed",
+      "truncated": false,
+      "size_bytes": 18,
+      "limit_bytes": 65536
+    }
+  }
+}
+

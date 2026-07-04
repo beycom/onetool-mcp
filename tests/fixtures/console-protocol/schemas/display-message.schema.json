@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onetool.beycom.online/schemas/console/display-message.schema.json",
+  "type": "object",
+  "required": ["id", "kind", "metadata", "created_at", "updated_at", "payload", "preview"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[0-9a-f]{12}$" },
+    "kind": { "type": "string", "minLength": 1 },
+    "metadata": { "type": "object", "additionalProperties": { "type": "string" } },
+    "created_at": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}" },
+    "updated_at": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}" },
+    "payload": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["mode", "size_bytes", "content"],
+          "properties": {
+            "mode": { "const": "inline" },
+            "mime_type": { "type": ["string", "null"] },
+            "size_bytes": { "type": "integer", "minimum": 0 },
+            "language": { "type": ["string", "null"] },
+            "content": {}
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["mode", "path", "size_bytes"],
+          "properties": {
+            "mode": { "const": "file_ref" },
+            "path": { "type": "string", "minLength": 1 },
+            "mime_type": { "type": ["string", "null"] },
+            "size_bytes": { "type": "integer", "minimum": 0 },
+            "language": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["mode", "size_bytes"],
+          "properties": {
+            "mode": { "const": "file_diff_ref" },
+            "path": { "type": ["string", "null"] },
+            "old_path": { "type": ["string", "null"] },
+            "new_path": { "type": ["string", "null"] },
+            "mime_type": { "type": ["string", "null"] },
+            "size_bytes": { "type": "integer", "minimum": 0 },
+            "language": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "preview": {
+      "type": ["object", "null"],
+      "required": ["text", "truncated", "size_bytes", "limit_bytes"],
+      "properties": {
+        "text": { "type": "string" },
+        "truncated": { "type": "boolean" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "limit_bytes": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
+

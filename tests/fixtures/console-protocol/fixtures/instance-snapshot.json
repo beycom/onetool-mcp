@@ -1,0 +1,17 @@
+{
+  "id": "mcp-alpha",
+  "cwd": "/Users/gavin/project",
+  "repo_root": "/Users/gavin/project",
+  "config_path": "/Users/gavin/.onetool/onetool.yaml",
+  "config_dir": "/Users/gavin/.onetool",
+  "allowed_roots": ["/Users/gavin/project", "/Users/gavin/.onetool/runtime/sessions/images"],
+  "status": "running",
+  "message_count": 2,
+  "started_at": "2026-06-07T00:00:00Z",
+  "updated_at": "2026-06-07T00:00:01Z",
+  "runtime": {
+    "name": "onetool-mcp",
+    "version": "2.2.2"
+  }
+}
+

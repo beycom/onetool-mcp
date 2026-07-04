@@ -1,0 +1,8 @@
+{
+  "protocol": "onetool.console",
+  "protocol_version": 1,
+  "instance_id": "mcp-alpha",
+  "batch_id": "batch-alpha",
+  "acked_through": 3
+}
+
