@@ -405,7 +405,25 @@ def sample(
 
 
 
-def query(*, sql: str, db_url: str, params: dict[str, Any] | None = None) -> dict[str, Any] | list[dict[str, Any]] | str:
+_READ_ONLY_KEYWORDS = ("SELECT", "EXPLAIN", "PRAGMA")
+
+
+def _is_read_only_sql(sql: str) -> bool:
+    """Return True if sql's first keyword is SELECT, EXPLAIN, or PRAGMA."""
+    stripped = sql.strip()
+    if not stripped:
+        return False
+    first_word = stripped.split(None, 1)[0].upper()
+    return first_word in _READ_ONLY_KEYWORDS
+
+
+def query(
+    *,
+    sql: str,
+    db_url: str,
+    params: dict[str, Any] | None = None,
+    read_only: bool = False,
+) -> dict[str, Any] | list[dict[str, Any]] | str:
     """Execute a SQL query and return results.
 
     IMPORTANT: Always use the params parameter for variable substitution
@@ -415,6 +433,8 @@ def query(*, sql: str, db_url: str, params: dict[str, Any] | None = None) -> dic
         sql: SQL query to execute
         db_url: Database URL (required)
         params: Query parameters for safe substitution
+        read_only: If True, reject any statement whose first keyword is not
+            SELECT, EXPLAIN, or PRAGMA (default: False)
 
     Returns:
         List of dicts for SELECT, success dict for INSERT/UPDATE/DELETE, or error string
@@ -446,6 +466,10 @@ def query(*, sql: str, db_url: str, params: dict[str, Any] | None = None) -> dic
         if not sql or not sql.strip():
             s.add(error="empty_query")
             return "Error: sql parameter is required"
+
+        if read_only and not _is_read_only_sql(sql):
+            s.add(error="read_only_violation")
+            return "Error: read_only=True but statement is not SELECT/EXPLAIN/PRAGMA"
 
         try:
             engine = _get_engine(db_url)

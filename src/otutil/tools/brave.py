@@ -396,11 +396,11 @@ def _validate_safesearch(safesearch: str, valid_values: frozenset[str]) -> str |
     return f"Error: Invalid safesearch '{safesearch}'. Use {sorted(valid_values)}"
 
 
-def _validate_count(count: int) -> str | None:
-    """Validate count is in range 1-20. Returns error string or None if valid."""
-    if 1 <= count <= 20:
+def _validate_max_results(max_results: int) -> str | None:
+    """Validate max_results is in range 1-20. Returns error string or None if valid."""
+    if 1 <= max_results <= 20:
         return None
-    return f"Error: count must be between 1 and 20 (got {count})"
+    return f"Error: max_results must be between 1 and 20 (got {max_results})"
 
 
 def _validate_batch_retry_controls(retries: int, retry_delay_ms: int) -> str | None:
@@ -467,7 +467,7 @@ def _validate_query(query: str) -> str | None:
 def search(
     *,
     query: str,
-    count: int = 10,
+    max_results: int = 10,
     offset: int = 0,
     country: str = "US",
     search_lang: str = "en",
@@ -480,7 +480,7 @@ def search(
 
     Args:
         query: Search query (max 400 chars, 50 words)
-        count: Number of results to return (1-20, default: 10)
+        max_results: Number of results to return (1-20, default: 10)
         offset: Pagination offset (0-9, default: 0)
         country: 2-letter country code for results (default: "US")
         search_lang: Language code for results (default: "en")
@@ -503,14 +503,14 @@ def search(
         brave.search(query="Python async best practices")
 
         # Recent results only
-        brave.search(query="AI news", freshness="pw", count=5)
+        brave.search(query="AI news", freshness="pw", max_results=5)
 
         # Sources only for piping or extraction
         brave.search(query="Python tutorials", output_format="sources_only")
     """
     if error := _validate_query(query):
         return error
-    if error := _validate_count(count):
+    if error := _validate_max_results(max_results):
         return error
     if error := _validate_offset(offset):
         return error
@@ -525,7 +525,7 @@ def search(
 
     params: dict[str, Any] = {
         "q": query,
-        "count": count,
+        "count": max_results,
         "offset": offset,
         "country": country,
         "search_lang": search_lang,
@@ -546,7 +546,7 @@ def search(
 def news(
     *,
     query: str,
-    count: int = 10,
+    max_results: int = 10,
     offset: int = 0,
     country: str = "US",
     search_lang: str = "en",
@@ -561,7 +561,7 @@ def news(
 
     Args:
         query: Search query for news
-        count: Number of results (1-20, default: 10)
+        max_results: Number of results (1-20, default: 10)
         offset: Pagination offset (0-9, default: 0)
         country: 2-letter country code (default: "US")
         search_lang: Language code (default: "en")
@@ -582,14 +582,14 @@ def news(
         brave.news(query="artificial intelligence", freshness="pd")
 
         # UK news
-        brave.news(query="technology", country="GB", count=5)
+        brave.news(query="technology", country="GB", max_results=5)
 
         # Sources only
         brave.news(query="AI funding", output_format="sources_only")
     """
     if error := _validate_query(query):
         return error
-    if error := _validate_count(count):
+    if error := _validate_max_results(max_results):
         return error
     if error := _validate_offset(offset):
         return error
@@ -602,7 +602,7 @@ def news(
 
     params: dict[str, Any] = {
         "q": query,
-        "count": count,
+        "count": max_results,
         "offset": offset,
         "country": country,
         "search_lang": search_lang,
@@ -622,7 +622,7 @@ def news(
 def image(
     *,
     query: str,
-    count: int = 10,
+    max_results: int = 10,
     country: str = "US",
     search_lang: str = "en",
     safesearch: str = "strict",
@@ -635,7 +635,7 @@ def image(
 
     Args:
         query: Search query for images
-        count: Number of results (1-20, default: 10)
+        max_results: Number of results (1-20, default: 10)
         country: 2-letter country code (default: "US")
         search_lang: Language code (default: "en")
         safesearch: Content filter - "off" or "strict" (default: "strict")
@@ -650,12 +650,12 @@ def image(
 
     Example:
         brave.image(query="Python programming logo")
-        brave.image(query="architecture diagrams", count=5)
+        brave.image(query="architecture diagrams", max_results=5)
         brave.image(query="infographics", output_format="sources_only")
     """
     if error := _validate_query(query):
         return error
-    if error := _validate_count(count):
+    if error := _validate_max_results(max_results):
         return error
     if error := _validate_country(country):
         return error
@@ -666,7 +666,7 @@ def image(
 
     params: dict[str, Any] = {
         "q": query,
-        "count": count,
+        "count": max_results,
         "country": country,
         "search_lang": search_lang,
         "safesearch": safesearch,
@@ -682,7 +682,7 @@ def image(
 def video(
     *,
     query: str,
-    count: int = 10,
+    max_results: int = 10,
     country: str = "US",
     search_lang: str = "en",
     freshness: str | None = None,
@@ -695,7 +695,7 @@ def video(
 
     Args:
         query: Search query for videos
-        count: Number of results (1-20, default: 10)
+        max_results: Number of results (1-20, default: 10)
         country: 2-letter country code (default: "US")
         search_lang: Language code (default: "en")
         freshness: Time filter - "pd" (day), "pw" (week), "pm" (month), "py" (year),
@@ -711,12 +711,12 @@ def video(
 
     Example:
         brave.video(query="Python tutorial for beginners")
-        brave.video(query="tech conference keynote", freshness="pm", count=5)
+        brave.video(query="tech conference keynote", freshness="pm", max_results=5)
         brave.video(query="machine learning lectures", output_format="sources_only")
     """
     if error := _validate_query(query):
         return error
-    if error := _validate_count(count):
+    if error := _validate_max_results(max_results):
         return error
     if error := _validate_country(country):
         return error
@@ -727,7 +727,7 @@ def video(
 
     params: dict[str, Any] = {
         "q": query,
-        "count": count,
+        "count": max_results,
         "country": country,
         "search_lang": search_lang,
     }
@@ -745,7 +745,7 @@ def video(
 def search_batch(
     *,
     queries: list[tuple[str, str] | str],
-    count: int = 2,
+    max_results: int = 2,
     country: str = "US",
     search_lang: str = "en",
     safesearch: str = "moderate",
@@ -763,7 +763,7 @@ def search_batch(
         queries: List of queries. Each item can be:
                  - A string (query text, used as both query and label)
                  - A tuple of (query, label) for custom labeling
-        count: Number of results per query (1-20, default: 2)
+        max_results: Number of results per query (1-20, default: 2)
         country: 2-letter country code for results (default: "US")
         search_lang: Language code for results (default: "en")
         safesearch: Content filter - "off", "moderate", "strict" (default: "moderate")
@@ -790,7 +790,7 @@ def search_batch(
         # Sources only across multiple queries
         brave.search_batch(queries=["fastapi", "django"], output_format="sources_only")
     """
-    if error := _validate_count(count):
+    if error := _validate_max_results(max_results):
         return error
     if error := _validate_safesearch(safesearch, _SAFESEARCH_WEB_VALUES):
         return error
@@ -809,13 +809,13 @@ def search_batch(
     # Fall back empty labels to query text
     normalized = [(q, label or q) for q, label in normalized]
 
-    with LogSpan(span="brave.batch", queryCount=len(normalized), count=count) as s:
+    with LogSpan(span="brave.batch", queryCount=len(normalized), count=max_results) as s:
 
         def _search_one(query: str, _label: str) -> str:
             """Execute a single search and return raw result payload."""
             return search(
                 query=query,
-                count=count,
+                max_results=max_results,
                 country=country,
                 search_lang=search_lang,
                 safesearch=safesearch,

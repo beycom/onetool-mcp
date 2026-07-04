@@ -4,7 +4,7 @@ Takes data and a prompt, uses an LLM to transform/process it.
 
 Example:
     ot_llm.transform(
-        data=brave.search(query="metal prices", count=10),
+        data=brave.search(query="metal prices", max_results=10),
         prompt="Extract prices as YAML with fields: metal, price, unit, url",
     )
 
@@ -116,13 +116,13 @@ def transform(
     Examples:
         # Extract structured data from search results
         ot_llm.transform(
-            data=brave.search(query="gold price today", count=5),
+            data=brave.search(query="gold price today", max_results=5),
             prompt="Extract the current gold price in USD/oz as a single number",
         )
 
         # Convert to YAML format
         ot_llm.transform(
-            data=brave.search(query="metal prices", count=10),
+            data=brave.search(query="metal prices", max_results=10),
             prompt="Return ONLY valid YAML with fields: metal, price, unit, url",
         )
 

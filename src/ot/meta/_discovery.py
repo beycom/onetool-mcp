@@ -295,7 +295,9 @@ def packs(
                 description = _get_pack_module_description(runner_registry, pack_name)
 
             aliases = getattr(runner_registry, "pack_aliases", {}).get(pack_name, ())
-            short = aliases[0] if aliases else None
+            # Join all aliases (most packs have one) so multi-alias packs like
+            # whiteboard (wb, excalidraw) surface every short name they answer to.
+            short = ", ".join(aliases) if aliases else None
 
             if info == "default":
                 entry: dict[str, Any] = {"name": pack_name, "description": description or "(no description)"}

@@ -18,8 +18,8 @@ Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis.
 | `knowledge.update(topic, db, ...)` | Update an existing entry |
 | `knowledge.append(topic, db, ...)` | Append content to an existing entry |
 | `knowledge.delete(topic, db, ...)` | Delete an entry by topic |
-| `knowledge.search(q, db, ...)` | Hybrid FTS5+vector search (mode: hybrid/semantic/keyword) |
-| `knowledge.ask(q, db, ...)` | Retrieve relevant chunks and synthesise an AI answer |
+| `knowledge.search(query, db, ...)` | Hybrid FTS5+vector search (mode: hybrid/semantic/keyword) |
+| `knowledge.ask(query, db, ...)` | Retrieve relevant chunks and synthesise an AI answer |
 | `knowledge.grep(pattern, db, ...)` | Regex/text search across all content |
 | `knowledge.related(topic, db, ...)` | Find entries linked from or to a given topic |
 | `knowledge.list(db, ...)` | List entries (returns meta only, no content) |
@@ -33,7 +33,7 @@ Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `q` | str | Search or question text |
+| `query` | str | Search or question text |
 | `db` | str | Database name (as configured under `tools.knowledge.kb`) |
 | `topic` | str | Entry topic path (e.g. `python/tips/generators`) |
 | `mode` | str | Search mode: `"hybrid"` (default), `"semantic"` (vector-only), `"keyword"` (FTS5-only) |
@@ -104,13 +104,13 @@ tools:
 
 ```python
 # Search a knowledge base (hybrid FTS5+vector)
-knowledge.search(q='context managers', db='docs')
+knowledge.search(query='context managers', db='docs')
 
 # Keyword-only search with more results
-knowledge.search(q='yield generator', db='docs', mode='keyword', k=20)
+knowledge.search(query='yield generator', db='docs', mode='keyword', k=20)
 
 # AI synthesis — retrieves relevant chunks then answers
-knowledge.ask(q='How do I configure authentication?', db='docs')
+knowledge.ask(query='How do I configure authentication?', db='docs')
 
 # Write a personal annotation
 knowledge.write(topic='python/tips/loops', content='Use enumerate() for index access', db='docs', category='rule')

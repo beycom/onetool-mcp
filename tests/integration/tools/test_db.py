@@ -180,6 +180,41 @@ class TestQuery:
         assert len(result["rows"]) == 3
         assert result["truncated"] is False
 
+    def test_read_only_rejects_insert(self, db_url: str) -> None:
+        from otdev.tools import db
+
+        result = db.query(
+            sql="INSERT INTO users (name, active) VALUES ('X', 1)",
+            db_url=db_url,
+            read_only=True,
+        )
+        assert isinstance(result, str)
+        assert result.startswith("Error:")
+        assert "SELECT/EXPLAIN/PRAGMA" in result
+        # The row must NOT have been inserted.
+        check = db.query(sql="SELECT COUNT(*) AS n FROM users", db_url=db_url)
+        assert check["rows"][0]["n"] == 3
+
+    def test_read_only_allows_select(self, db_url: str) -> None:
+        from otdev.tools import db
+
+        result = db.query(sql="SELECT * FROM users", db_url=db_url, read_only=True)
+        assert result["row_count"] == 3
+
+    def test_read_only_allows_pragma(self, db_url: str) -> None:
+        from otdev.tools import db
+
+        result = db.query(
+            sql="PRAGMA table_info(users)", db_url=db_url, read_only=True
+        )
+        assert not (isinstance(result, str) and result.startswith("Error:"))
+
+    def test_read_only_defaults_to_false(self, db_url: str) -> None:
+        from otdev.tools import db
+
+        result = db.query(sql="SELECT 1 AS one", db_url=db_url)
+        assert result["rows"][0]["one"] == 1
+
     def test_select_with_where(self, db_url: str) -> None:
         from otdev.tools import db
 

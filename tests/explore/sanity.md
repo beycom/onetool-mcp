@@ -291,7 +291,7 @@ OneTool is setup correctly with all dependencies and secrets needed.
 - **webfetch.fetch**: Use `max_length=` not `max_chars=` to limit output
   - Example: `webfetch.fetch(url="...", max_length=500)`
 - **brave tools**: Use `brave.news()` not `brave.search_news()`. Available: search, news, image, search_batch, video
-  - Example: `brave.news(query="AI", count=3)` not `brave.search_news(query="AI")`
+  - Example: `brave.news(query="AI", max_results=3)` not `brave.search_news(query="AI")`
 - **tavily.search**: Use `max_results=` not `count=` to limit results
   - Example: `tavily.search(query="Python", max_results=2)` not `tavily.search(query="Python", count=2)`
 - **ot_image tools**: All tools use `img=` as the image reference parameter (not `path=` or `handle=`)
@@ -384,7 +384,7 @@ Changes are in-memory only (reset on server restart). Use `ot_servers.disable(na
 Test these first for fast coverage (one tool from each category):
 
 0. Enable proxy servers: `ot_servers.enable(name="github"); ot_servers.enable(name="playwright"); ot_servers.enable(name="chrome_devtools")`
-1. `brave.search(query="test", count=2)` - web search
+1. `brave.search(query="test", max_results=2)` - web search
 2. `ripgrep.search(pattern="TODO", path=".", limit=3)` - file search
 3. `ot.status()` - introspection
 4. `:pkg_py packages="requests"` - snippets

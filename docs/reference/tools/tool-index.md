@@ -1,6 +1,6 @@
 # OneTool MCP Tool Index
 
-packs=27 tools=241
+packs=27 tools=243
 
 ## arch
 ```python
@@ -13,11 +13,11 @@ arch.validate(input_path: str)  # Validate architecture workbook input.
 
 ## brave, br
 ```python
-brave.image(query: str, count: int=10, country: str='US', search_lang: str='en', safesearch: str='strict', output_format: OutputFormat='full', max_sources: int | None=None)  # Search for images using Brave Search API.
-brave.news(query: str, count: int=10, offset: int=0, country: str='US', search_lang: str='en', freshness: str | None=None, output_format: OutputFormat='full', max_sources: int | None=None)  # Search news articles using Brave Search API.
-brave.search(query: str, count: int=10, offset: int=0, country: str='US', search_lang: str='en', safesearch: str='moderate', freshness: str | None=None, output_format: OutputFormat='full', max_sources: int | None=None)  # Search the web using Brave Search API.
-brave.search_batch(queries: list[tuple[str, str] | str], count: int=2, country: str='US', search_lang: str='en', safesearch: str='moderate', freshness: str | None=None, output_format: OutputFormat='full', max_sources: int | None=None, retries: int=0, retry_delay_ms: int=250)  # Execute multiple web searches concurrently and return combined results.
-brave.video(query: str, count: int=10, country: str='US', search_lang: str='en', freshness: str | None=None, output_format: OutputFormat='full', max_sources: int | None=None)  # Search for videos using Brave Search API.
+brave.image(query: str, max_results: int=10, country: str='US', search_lang: str='en', safesearch: str='strict', output_format: OutputFormat='full', max_sources: int | None=None)  # Search for images using Brave Search API.
+brave.news(query: str, max_results: int=10, offset: int=0, country: str='US', search_lang: str='en', freshness: str | None=None, output_format: OutputFormat='full', max_sources: int | None=None)  # Search news articles using Brave Search API.
+brave.search(query: str, max_results: int=10, offset: int=0, country: str='US', search_lang: str='en', safesearch: str='moderate', freshness: str | None=None, output_format: OutputFormat='full', max_sources: int | None=None)  # Search the web using Brave Search API.
+brave.search_batch(queries: list[tuple[str, str] | str], max_results: int=2, country: str='US', search_lang: str='en', safesearch: str='moderate', freshness: str | None=None, output_format: OutputFormat='full', max_sources: int | None=None, retries: int=0, retry_delay_ms: int=250)  # Execute multiple web searches concurrently and return combined results.
+brave.video(query: str, max_results: int=10, country: str='US', search_lang: str='en', freshness: str | None=None, output_format: OutputFormat='full', max_sources: int | None=None)  # Search for videos using Brave Search API.
 ```
 
 ## chrome_util, chrome
@@ -46,7 +46,7 @@ convert.word(pattern: str, output_dir: str)  # Convert Word documents to Markdow
 
 ## db
 ```python
-db.query(sql: str, db_url: str, params: dict[str, Any] | None=None)  # Execute a SQL query and return results.
+db.query(sql: str, db_url: str, params: dict[str, Any] | None=None, read_only: bool=False)  # Execute a SQL query and return results.
 db.sample(table: str, db_url: str, limit: int=10)  # Fetch a quick sample of rows from a table.
 db.schema(table_names: list[str], db_url: str)  # Get schema definitions for specified tables.
 db.tables(db_url: str, filter: str | None=None, ignore_case: bool=False, include_row_count: bool=False)  # List table names in the database.
@@ -127,7 +127,7 @@ ground.search_batch(queries: list[tuple[str, str] | str], context: str='', focus
 ## knowledge, kb
 ```python
 knowledge.append(topic: str, content: str, db: str, id: str | None=None)  # Append content to an existing entry.
-knowledge.ask(q: str, db: str, k: int=10, rerank: bool=True, expand: bool=False)  # Retrieve relevant chunks and synthesise an answer with citations.
+knowledge.ask(query: str, db: str, k: int=10, rerank: bool=True, expand: bool=False)  # Retrieve relevant chunks and synthesise an answer with citations.
 knowledge.dbs()  # List all configured knowledge databases.
 knowledge.delete(topic: str | None=None, source_path: str | None=None, id: str | None=None, db: str)  # Remove an entry by topic, id, or all chunks for a source file.
 knowledge.grep(pattern: str, db: str, topic: str | None=None, category: str | None=None, context: int=2, limit: int=50, case_sensitive: bool=True, fixed_strings: bool=False)  # Regex search across knowledge base entries.
@@ -135,7 +135,7 @@ knowledge.info(db: str)  # Return database metadata and connection info.
 knowledge.list(db: str, topic: str | None=None, category: str | None=None, tags: list[str] | None=None, limit: int=50, offset: int=0)  # List knowledge base entries with optional filters.
 knowledge.read(topic: str | None=None, source_path: str | None=None, id: str | None=None, db: str)  # Read a single entry by topic or id, or all chunks for a source file.
 knowledge.related(topic: str, db: str, direction: str='out', depth: int=1)  # Return chunks connected by link edges to the given topic.
-knowledge.search(q: str, db: str, mode: str='hybrid', k: int | None=None, source: str | None=None, tag: str | None=None, category: str | None=None, after: str | None=None)  # Search the knowledge base using hybrid FTS5 + vector retrieval.
+knowledge.search(query: str, db: str, mode: str='hybrid', k: int | None=None, source: str | None=None, tag: str | None=None, category: str | None=None, after: str | None=None)  # Search the knowledge base using hybrid FTS5 + vector retrieval.
 knowledge.slice(topic: str, db: str, heading: str | None=None, start: int | None=None, end: int | None=None)  # Extract a section from an entry by heading or line range.
 knowledge.stats(db: str, top: int=5)  # Return entry statistics broken down by category, with links, AI enrichments, and most-accessed pages.
 knowledge.toc(topic: str, db: str)  # Return the heading structure (table of contents) of an entry.
@@ -181,7 +181,7 @@ mem.read_batch(topic: str | None=None, ids: list[str] | None=None, category: str
 mem.refresh(topic: str | None=None, dry_run: bool=True)  # Re-read source files for stale file-backed memories.
 mem.reindex(topic: str | None=None, limit: int=100, dry_run: bool=True)  # Backfill or update vector embeddings for memories missing them.
 mem.restore(input: str, topic: str | None=None, overwrite: bool=False)  # Restore memories from a snapshot directory (created by `mem.snapshot`).
-mem.search(query: str, mode: str='semantic', topic: str | None=None, category: str | None=None, limit: int | None=None, tags: list[str] | None=None, extract: int | None=None)  # Search memories by semantic similarity, pattern matching, or hybrid.
+mem.search(query: str, mode: str='semantic', topic: str | None=None, category: str | None=None, limit: int | None=None, tags: list[str] | None=None, extract: int | None=None)  # Search memories by semantic similarity, keyword matching, or hybrid.
 mem.slice(topic: str, select: int | str | list[int | str], id: str | None=None)  # Extract content by section number, heading path, line range, or mixed list.
 mem.slice_batch(items: list[dict[str, Any]])  # Extract sections from multiple memories in a single call.
 mem.snapshot(output: str, topic: str | None=None, ext: str='', on_conflict: str='skip')  # Write memories to a directory as individual files with an index.yaml.
@@ -260,10 +260,12 @@ ot_llm.transform_file(prompt: str, in_file: str, out_file: str, model: str | Non
 
 ## ot_secrets, sec
 ```python
-ot_secrets.audit(file: str)  # Scan a secrets YAML file for unencrypted values.
-ot_secrets.encrypt(file: str, backup: bool=True)  # Encrypt plain values in a secrets YAML file in-place.
+ot_secrets.audit(file: str | None=None)  # Scan a secrets YAML file for unencrypted values.
+ot_secrets.encrypt(file: str | None=None, backup: bool=False)  # Encrypt plain values in a secrets YAML file in-place.
+ot_secrets.get(key: str, file: str | None=None, out_file: str | None=None)  # Look up a secret's existence/metadata, never returning its plaintext value.
 ot_secrets.init(label: str='', force: bool=False)  # Generate an age X25519 identity and store it in the OS keychain.
-ot_secrets.rotate(file: str, backup: bool=True)  # Generate a new identity and re-encrypt all encrypted values in-place.
+ot_secrets.rotate(file: str | None=None, backup: bool=False)  # Generate a new identity and re-encrypt all encrypted values in-place.
+ot_secrets.set(key: str, value: str, file: str | None=None)  # Set a single secret, encrypting it in place if an identity exists.
 ot_secrets.status(file: str | None=None)  # Check secrets identity status and optionally inspect a secrets file.
 ```
 
@@ -325,7 +327,7 @@ webfetch.fetch(url: str, output_format: Literal['text', 'markdown', 'json', 'htm
 webfetch.fetch_batch(urls: list[str] | list[tuple[str, str]], output_format: Literal['text', 'markdown', 'json', 'html']='markdown', include_links: bool=False, include_images: bool=False, include_tables: bool=True, include_comments: bool=False, include_formatting: bool=True, favor_precision: bool=False, favor_recall: bool=False, fast: bool=False, target_language: str | None=None, max_length: int | None=None, timeout: float | None=None, use_cache: bool=True, max_workers: int=5)  # Fetch multiple URLs concurrently and return concatenated results.
 ```
 
-## whiteboard, wb
+## whiteboard, wb, excalidraw
 ```python
 whiteboard.align(ids: list[str], axis: str)  # Align or distribute a set of shapes using Excalidraw's built-in actions.
 whiteboard.boards()  # List all active whiteboard session boards.

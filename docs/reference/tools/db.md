@@ -30,6 +30,7 @@ Database introspection and query execution via SQLAlchemy. Supports any SQLAlche
 | `table` | str | Table to preview (sample only) |
 | `limit` | int | Max rows to return for `db.sample()` (default: 10) |
 | `params` | dict | Query parameters for safe substitution (query only) |
+| `read_only` | bool | Reject non-SELECT/EXPLAIN/PRAGMA statements when True (query only, default: False) |
 
 ## Project Configuration
 

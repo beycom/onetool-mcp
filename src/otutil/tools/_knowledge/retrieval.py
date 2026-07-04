@@ -47,7 +47,7 @@ def reset_runtime_cache() -> None:
 
 def search(
     *,
-    q: str,
+    query: str,
     db: str,
     mode: str = "hybrid",
     k: int | None = None,
@@ -59,7 +59,7 @@ def search(
     """Search the knowledge base using hybrid FTS5 + vector retrieval.
 
     Args:
-        q: Search query text
+        query: Search query text
         db: Database name
         mode: Search mode — 'hybrid' (default), 'semantic' (vector-only), 'keyword' (FTS5-only)
         k: Maximum results (default: config search_limit)
@@ -72,8 +72,8 @@ def search(
         Formatted search results.
 
     Example:
-        kb.search(q='list comprehension', db='docs')
-        kb.search(q='async await', db='docs', mode='keyword', k=5)
+        kb.search(query='list comprehension', db='docs')
+        kb.search(query='async await', db='docs', mode='keyword', k=5)
     """
     if mode not in ("hybrid", "semantic", "keyword"):
         return f"Error: Invalid mode '{mode}'. Must be 'hybrid', 'semantic', or 'keyword'"
@@ -81,16 +81,16 @@ def search(
     config = _get_config()
     limit = k if k is not None else config.search_limit
 
-    with LogSpan(span="kb.search", q=q, db=db, mode=mode, k=limit) as s:
+    with LogSpan(span="kb.search", query=query, db=db, mode=mode, k=limit) as s:
         try:
             conn = get_connection(db)
 
             if mode == "hybrid":
-                results = search_hybrid(conn, q, limit * 3, category=category)
+                results = search_hybrid(conn, query, limit * 3, category=category)
             elif mode == "semantic":
-                results = search_vec(conn, q, limit * 3, category=category)
+                results = search_vec(conn, query, limit * 3, category=category)
             else:
-                results = search_fts(conn, q, limit * 3, category=category)
+                results = search_fts(conn, query, limit * 3, category=category)
 
             # Python-side metadata filters
             if source or tag or after:
@@ -105,10 +105,10 @@ def search(
 
             s.add("resultCount", len(results))
             if not results:
-                return f"No results found for: {q}"
+                return f"No results found for: {query}"
 
             extract = config.search_extract
-            lines = [f"Found {len(results)} results for: {q}\n"]
+            lines = [f"Found {len(results)} results for: {query}\n"]
             for i, r in enumerate(results, 1):
                 content = r["content"]
                 if extract > 0 and len(content) > extract:
@@ -132,7 +132,7 @@ def search(
 
 def ask(
     *,
-    q: str,
+    query: str,
     db: str,
     k: int = 10,
     rerank: bool = True,
@@ -143,7 +143,7 @@ def ask(
     Retrieve → (optional rerank via LLM) → (optional graph expand) → synthesise.
 
     Args:
-        q: Question to answer
+        query: Question to answer
         db: Database name
         k: Number of candidate chunks to retrieve (default 10)
         rerank: Re-rank candidates via batched LLM scoring (default True)
@@ -153,21 +153,21 @@ def ask(
         Synthesised answer with source citations.
 
     Example:
-        kb.ask(q='How do I use list comprehensions?', db='docs')
+        kb.ask(query='How do I use list comprehensions?', db='docs')
     """
-    with LogSpan(span="kb.ask", q=q, db=db, k=k) as s:
+    with LogSpan(span="kb.ask", query=query, db=db, k=k) as s:
         try:
             conn = get_connection(db)
 
             # 1. Retrieve
             try:
-                results = search_hybrid(conn, q, k * 2)
+                results = search_hybrid(conn, query, k * 2)
             except Exception:
-                results = search_fts(conn, q, k * 2)
+                results = search_fts(conn, query, k * 2)
             results = results[:k]
 
             if not results:
-                return f"No relevant entries found for: {q}"
+                return f"No relevant entries found for: {query}"
 
             # 2. Optional: graph expand (add 1-hop neighbours)
             if expand and results:
@@ -175,7 +175,7 @@ def ask(
 
             # 3. Optional: rerank
             if rerank and results:
-                results = _llm_rerank(q, results)
+                results = _llm_rerank(query, results)
 
             # 4. Synthesise
             context_parts = []
@@ -187,7 +187,7 @@ def ask(
                 citations.append({"num": i, "topic": r["topic"], "url": url})
 
             context = "\n\n---\n\n".join(context_parts)
-            answer = _synthesise(q, context)
+            answer = _synthesise(query, context)
 
             s.add("chunkCount", len(results))
 

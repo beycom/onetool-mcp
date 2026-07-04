@@ -41,7 +41,7 @@ PACK_DOCS: tuple[PackDocs, ...] = (
     PackDocs("package", "Package", "[dev]", "package.md"),
     PackDocs("play_util", "Playwright Util", "[dev]", "play-util.md"),
     PackDocs("ripgrep", "Ripgrep", "[dev]", "ripgrep.md"),
-    PackDocs("whiteboard", "WB (Whiteboard)", "[dev]", "whiteboard.md"),
+    PackDocs("whiteboard", "WB (Whiteboard)", "[util]", "whiteboard.md"),
     PackDocs("webfetch", "Webfetch", "[dev]", "webfetch.md"),
 )
 

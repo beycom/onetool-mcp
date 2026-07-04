@@ -577,7 +577,7 @@ class TestSearch:
             ("id-1", "topic/one", "matching content", "note", '[]', 5, 1),
         ]
 
-        result = search(query="matching", mode="pattern")
+        result = search(query="matching", mode="keyword")
 
         assert "Found 1 memories" in result
 
@@ -714,7 +714,7 @@ class TestSearchEmbeddingsDisabled:
             ("id-1", "topic/one", "matching content", "note", '[]', 5, 1),
         ]
 
-        result = search(query="matching", mode="pattern")
+        result = search(query="matching", mode="keyword")
         assert "Found 1 memories" in result
 
 

@@ -5,7 +5,7 @@ Persistent memory for AI agents with SQLite storage and optional semantic search
 ## Highlights
 
 - Topic-based memory with path hierarchy (`projects/onetool/rules`)
-- Semantic, pattern, and hybrid (RRF) search modes
+- Semantic, keyword, and hybrid (RRF) search modes
 - SHA-256 content dedup prevents duplicate storage
 - Automatic secret/PII redaction on write
 - History tracking on updates for rollback
@@ -96,7 +96,7 @@ The retrieval functions return different levels of detail:
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `query` | str | Search query text |
-| `mode` | str | "semantic" (default), "pattern", or "hybrid" |
+| `mode` | str | "semantic" (default), "keyword", or "hybrid" |
 | `topic` | str | Topic prefix filter |
 | `category` | str | Category filter |
 | `limit` | int | Max results (default: config search_limit) |
@@ -298,8 +298,8 @@ mem.write_batch(topic="docs", glob_pattern="docs/**/*.md", category="context")
 # Search semantically
 mem.search(query="authentication patterns")
 
-# Pattern search with topic filter
-mem.search(query="database", mode="pattern", topic="projects/")
+# Keyword search with topic filter
+mem.search(query="database", mode="keyword", topic="projects/")
 
 # Search with longer extract
 mem.search(query="rules", extract=500)
@@ -400,7 +400,7 @@ The `toc()` function checks if the source file has changed since storage and war
 
 ## Embedding Large Content
 
-When content exceeds the embedding model's token limit, it is automatically split into chunks, each chunk is embedded, and the vectors are averaged. This preserves semantic coverage of the full document — pattern search (`mode="pattern"`) always searches the complete stored text regardless.
+When content exceeds the embedding model's token limit, it is automatically split into chunks, each chunk is embedded, and the vectors are averaged. This preserves semantic coverage of the full document — keyword search (`mode="keyword"`) always searches the complete stored text regardless.
 
 A safety margin of 100 tokens is subtracted from the limit to avoid edge-case overflows.
 

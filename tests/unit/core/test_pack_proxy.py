@@ -229,7 +229,7 @@ class TestPackShortNameAliases:
         mock_registry = MagicMock()
         mock_registry.packs = packs
         mock_registry.pack_aliases = {
-            "whiteboard": ("wb",),
+            "whiteboard": ("wb", "excalidraw"),
             "webfetch": ("wf",),
             "brave": ("br",),
         }
@@ -253,6 +253,14 @@ class TestPackShortNameAliases:
         assert "whiteboard" in ns
         assert "wb" in ns
         assert ns["wb"] is ns["whiteboard"]
+
+    def test_whiteboard_gets_excalidraw_alias(self) -> None:
+        """whiteboard pack should appear as both 'whiteboard' and 'excalidraw'."""
+        packs = {"whiteboard": {"draw": MagicMock(), "open": MagicMock()}}
+        ns = self._build_namespace_with_packs(packs)
+
+        assert "excalidraw" in ns
+        assert ns["excalidraw"] is ns["whiteboard"]
 
     def test_webfetch_gets_wf_short_alias(self) -> None:
         """webfetch pack should appear as both 'webfetch' and 'wf'."""
@@ -285,7 +293,7 @@ class TestPackShortNameAliases:
     def test_all_metadata_aliases_are_valid_identifiers(self) -> None:
         """All declared aliases must be valid Python identifiers."""
         aliases = {
-            "whiteboard": ("wb",),
+            "whiteboard": ("wb", "excalidraw"),
             "webfetch": ("wf",),
             "brave": ("br",),
         }

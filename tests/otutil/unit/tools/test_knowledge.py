@@ -1228,7 +1228,7 @@ class TestKnowledgeRetrieval:
         from otutil.tools._knowledge.retrieval import search
         conn = self._conn_with_graph()
         with patch("otutil.tools._knowledge.retrieval.get_connection", return_value=conn):
-            result = search(q="test", db="test", mode="invalid")
+            result = search(query="test", db="test", mode="invalid")
         assert "Error" in result
 
     def test_reset_runtime_cache_resets_lazy_llm_client(self):

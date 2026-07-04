@@ -1,4 +1,4 @@
-"""Memory search: grep, semantic, pattern, and hybrid."""
+"""Memory search: grep, semantic, keyword, and hybrid."""
 from __future__ import annotations
 
 import builtins
@@ -142,11 +142,11 @@ def search(
     tags: list[str] | None = None,
     extract: int | None = None,
 ) -> str:
-    """Search memories by semantic similarity, pattern matching, or hybrid.
+    """Search memories by semantic similarity, keyword matching, or hybrid.
 
     Args:
         query: Search query text
-        mode: Search mode - "semantic" (vector cosine), "pattern" (LIKE), or "hybrid" (RRF)
+        mode: Search mode - "semantic" (vector cosine), "keyword" (LIKE), or "hybrid" (RRF)
         topic: Optional topic prefix filter (e.g., "projects/" matches all under projects)
         category: Optional category filter
         limit: Maximum results (default: config search_limit)
@@ -158,7 +158,7 @@ def search(
 
     Example:
         mem.search(query="authentication patterns")
-        mem.search(query="database", mode="pattern", topic="projects/")
+        mem.search(query="database", mode="keyword", topic="projects/")
         mem.search(query="error handling", mode="hybrid", category="mistake")
         mem.search(query="rules", extract=500)
     """
@@ -168,8 +168,8 @@ def search(
     if extract is None:
         extract = config.search_extract
 
-    if mode not in ("semantic", "pattern", "hybrid"):
-        return f"Error: Invalid mode '{mode}'. Must be 'semantic', 'pattern', or 'hybrid'"
+    if mode not in ("semantic", "keyword", "hybrid"):
+        return f"Error: Invalid mode '{mode}'. Must be 'semantic', 'keyword', or 'hybrid'"
 
     with LogSpan(span="mem.search", query=query, mode=mode, topic=topic, limit=limit) as s:
         try:
@@ -187,8 +187,8 @@ def search(
 
             if mode == "semantic":
                 results = _search_semantic(conn, query, topic, category, tags, limit)
-            elif mode == "pattern":
-                results = _search_pattern(conn, query, topic, category, tags, limit)
+            elif mode == "keyword":
+                results = _search_keyword(conn, query, topic, category, tags, limit)
             else:
                 results = _search_hybrid(conn, query, topic, category, tags, limit)
 
@@ -251,7 +251,7 @@ def _search_semantic(
     ]
 
 
-def _search_pattern(
+def _search_keyword(
     conn: Any,
     query: str,
     topic: str | None,
@@ -313,7 +313,7 @@ def _search_hybrid(
     # Get both result sets (fetch more than limit for better fusion)
     fetch_limit = limit * 3
     semantic_results = _search_semantic(conn, query, topic, category, tags, fetch_limit)
-    pattern_results = _search_pattern(conn, query, topic, category, tags, fetch_limit)
+    pattern_results = _search_keyword(conn, query, topic, category, tags, fetch_limit)
 
     # Build RRF scores
     rrf_scores: dict[str, float] = {}
@@ -364,7 +364,7 @@ def _format_search_results(results: list[dict[str, Any]], query: str, extract: i
 __all__ = [
     "_format_search_results",
     "_search_hybrid",
-    "_search_pattern",
+    "_search_keyword",
     "_search_semantic",
     "grep",
     "search",

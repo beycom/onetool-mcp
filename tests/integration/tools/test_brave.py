@@ -27,6 +27,6 @@ class TestBraveSearchLive:
         """Verify Brave web search works."""
         from otutil.tools.brave import search
 
-        result = search(query="python programming", count=3)
+        result = search(query="python programming", max_results=3)
 
         assert "Error" not in result or "BRAVE_API_KEY" not in result

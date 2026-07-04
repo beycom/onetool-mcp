@@ -110,7 +110,7 @@ primes
 If you ask an agent to use OneTool, direct it to call the MCP tool:
 
 ```
-Use OneTool run(command="brave.search(query='latest AI news', count=5)")
+Use OneTool run(command="brave.search(query='latest AI news', max_results=5)")
 ```
 
 If you ask for `use ot brave.search(...)`, the agent should execute `brave.search(...)` through `run` directly, not write Python code locally or call the `onetool` CLI.

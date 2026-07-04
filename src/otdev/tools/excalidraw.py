@@ -17,7 +17,7 @@ from __future__ import annotations
 
 # Pack declaration MUST be before other imports
 pack = "whiteboard"
-pack_aliases = ("wb",)
+pack_aliases = ("wb", "excalidraw")
 
 __all__ = [
     "align",

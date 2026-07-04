@@ -1,4 +1,4 @@
-"""Unit tests for the whiteboard tool pack (pack name: whiteboard, short alias: wb).
+"""Unit tests for the whiteboard tool pack (pack name: whiteboard, short aliases: wb, excalidraw).
 
 Tests cover: parse_dsl, _build_dsl, auto_layout, _auto_size, _shape_payload,
 _parse_style_props, and smoke tests for public tools with mocked pydoll tab.

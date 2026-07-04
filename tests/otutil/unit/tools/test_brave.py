@@ -19,7 +19,7 @@ from otutil.tools.brave import (
     _format_news_results,
     _format_video_results,
     _format_web_results,
-    _validate_count,
+    _validate_max_results,
     _validate_country,
     _validate_freshness,
     _validate_offset,
@@ -151,32 +151,32 @@ class TestValidateSafesearch:
 
 @pytest.mark.unit
 @pytest.mark.tools
-class TestValidateCount:
-    """Test _validate_count validation function."""
+class TestValidateMaxResults:
+    """Test _validate_max_results validation function."""
 
     def test_valid_count(self):
-        assert _validate_count(10) is None
+        assert _validate_max_results(10) is None
 
     def test_min_count(self):
-        assert _validate_count(1) is None
+        assert _validate_max_results(1) is None
 
     def test_max_count(self):
-        assert _validate_count(20) is None
+        assert _validate_max_results(20) is None
 
     def test_zero_returns_error(self):
-        result = _validate_count(0)
+        result = _validate_max_results(0)
         assert result is not None
-        assert "count" in result
+        assert "max_results" in result
 
     def test_negative_returns_error(self):
-        result = _validate_count(-5)
+        result = _validate_max_results(-5)
         assert result is not None
-        assert "count" in result
+        assert "max_results" in result
 
     def test_over_max_returns_error(self):
-        result = _validate_count(21)
+        result = _validate_max_results(21)
         assert result is not None
-        assert "count" in result
+        assert "max_results" in result
 
 
 @pytest.mark.unit
@@ -533,16 +533,16 @@ class TestSearch:
         assert "400 character" in result
 
     def test_rejects_count_too_high(self):
-        result = search(query="test", count=21)
-        assert "count" in result
+        result = search(query="test", max_results=21)
+        assert "max_results" in result
 
     def test_rejects_count_zero(self):
-        result = search(query="test", count=0)
-        assert "count" in result
+        result = search(query="test", max_results=0)
+        assert "max_results" in result
 
     def test_rejects_count_negative(self):
-        result = search(query="test", count=-1)
-        assert "count" in result
+        result = search(query="test", max_results=-1)
+        assert "max_results" in result
 
     def test_rejects_invalid_safesearch(self):
         result = search(query="test", safesearch="invalid")
@@ -792,8 +792,8 @@ class TestSearchBatch:
         assert result["results"][0]["label"] == "rust programming"
 
     def test_rejects_invalid_count(self):
-        result = search_batch(queries=["test"], count=0)
-        assert "count" in result
+        result = search_batch(queries=["test"], max_results=0)
+        assert "max_results" in result
 
     def test_rejects_invalid_safesearch(self):
         result = search_batch(queries=["test"], safesearch="invalid")

@@ -26,7 +26,7 @@ Short alias: `br`
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `query` | str | Search query (max 400 chars, 50 words) |
-| `count` | int | Results per query (1-20) |
+| `max_results` | int | Results per query (1-20; all functions; default 10, 2 for search_batch) |
 | `freshness` | str | "pd" (day), "pw" (week), "pm" (month), "py" (year), or "YYYY-MM-DDtoYYYY-MM-DD" date range |
 | `safesearch` | str | "off", "moderate", "strict" |
 | `output_format` | str | "full" (default), "text_only", or "sources_only" |
@@ -63,7 +63,7 @@ tools:
 
 ```python
 # Web search
-brave.search(query="python async tutorial", count=10)
+brave.search(query="python async tutorial", max_results=10)
 
 # News with freshness filter
 brave.news(query="AI announcements", freshness="pw")

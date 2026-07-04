@@ -102,7 +102,7 @@ class TestMemSearch:
         mem_db.write(topic="search/py", content="Python is great for scripting")
         mem_db.write(topic="search/js", content="JavaScript runs in browsers")
 
-        result = mem_db.search(query="Python", mode="pattern")
+        result = mem_db.search(query="Python", mode="keyword")
 
         assert "search/py" in result
         assert "search/js" not in result
