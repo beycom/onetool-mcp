@@ -81,9 +81,35 @@ def search(
     config = _get_config()
     limit = k if k is not None else config.search_limit
 
+    if mode in ("hybrid", "semantic"):
+        from .indexer import _db_embeddings_enabled
+
+        if not _db_embeddings_enabled(db):
+            return (
+                "Semantic search requires embeddings. Enable with: "
+                f"tools.knowledge.kb.{db}.db.embeddings_enabled: true"
+            )
+
     with LogSpan(span="kb.search", query=query, db=db, mode=mode, k=limit) as s:
         try:
             conn = get_connection(db)
+
+            if mode in ("hybrid", "semantic"):
+                from .db import _check_vec_available
+
+                if not _check_vec_available():
+                    return (
+                        "Semantic search requires the sqlite-vec package. "
+                        "Install with: pip install onetool-mcp[util]"
+                    )
+                has_embeddings = conn.execute(
+                    "SELECT 1 FROM chunks_vec LIMIT 1"
+                ).fetchone()
+                if not has_embeddings:
+                    return (
+                        f"No embeddings found for '{db}'. "
+                        f"Run kb.reindex(db='{db}') to generate them."
+                    )
 
             if mode == "hybrid":
                 results = search_hybrid(conn, query, limit * 3, category=category)

@@ -2104,7 +2104,7 @@ class TestScrapeProjectCLI:
             result = self._invoke(["scrape", "myproject"])
         assert result.exit_code != 0
         assert "crawl4ai" in result.output
-        assert "onetool[scrape]" in result.output
+        assert "onetool-mcp[scrape]" in result.output
 
     def test_missing_playwright_browser_shows_error(self):
         import sys
@@ -3236,3 +3236,44 @@ class TestScraperFlatFiles:
         source = ScrapeSourceConfig(url="https://docs.example.test/", flat_files=False)
         resolved = resolve_source(project, "src", source)
         assert resolved.flat_files is False
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestSearchEmbeddingsGuard:
+    """kb.search() returns actionable guidance instead of raw errors
+    when embeddings are disabled or missing."""
+
+    def test_embeddings_disabled_returns_friendly_message_without_opening_db(self):
+        from otutil.tools._knowledge import retrieval
+
+        with patch(
+            "otutil.tools._knowledge.indexer._db_embeddings_enabled",
+            return_value=False,
+        ), patch.object(retrieval, "get_connection") as mock_get_conn:
+            result = retrieval.search(query="x", db="testdb", mode="hybrid")
+
+        assert result == (
+            "Semantic search requires embeddings. Enable with: "
+            "tools.knowledge.kb.testdb.db.embeddings_enabled: true"
+        )
+        mock_get_conn.assert_not_called()
+
+    def test_no_embeddings_generated_returns_friendly_message(self):
+        from otutil.tools._knowledge import retrieval
+
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchone.return_value = None
+
+        with patch(
+            "otutil.tools._knowledge.indexer._db_embeddings_enabled",
+            return_value=True,
+        ), patch(
+            "otutil.tools._knowledge.db._check_vec_available", return_value=True
+        ), patch.object(retrieval, "get_connection", return_value=mock_conn):
+            result = retrieval.search(query="x", db="testdb", mode="semantic")
+
+        assert (
+            result
+            == "No embeddings found for 'testdb'. Run kb.reindex(db='testdb') to generate them."
+        )

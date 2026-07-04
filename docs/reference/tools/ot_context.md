@@ -12,6 +12,7 @@ TTL-expiring, BM25-indexed storage for large tool outputs. Replace context-windo
 - Regex and fuzzy grep with context lines
 - Section slicing by number, heading, or line range
 - Optional semantic embeddings via ot_llm (when configured)
+- `ctx.ask()` sends one or more questions about stored content to an LLM in a single batched call
 - Pure stdlib — no external dependencies
 
 ## Functions

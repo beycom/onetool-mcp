@@ -10,7 +10,7 @@ OneTool fires a single anonymous event via the [PostHog](https://posthog.com) SD
 | `version` | OneTool version (e.g. `1.2.3`) |
 | `os` | Operating system (e.g. `macOS`, `Linux`, `Windows`) |
 | `arch` | CPU architecture (e.g. `arm64`, `x86_64`) |
-| `python_version` | Python major.minor version (e.g. `3.11`) |
+| `python_version` | Python major.minor version (e.g. `3.12`) |
 | `version_from` | Previous version — only on `server-upgraded` events |
 | `version_to` | New version — only on `server-upgraded` events |
 | machine UUID | Anonymous stable identifier stored as `telemetry` in your OT_DIR (alongside `onetool.yaml`) |

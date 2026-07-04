@@ -39,6 +39,19 @@ Short alias: `play`
 - A Playwright-compatible MCP server must be enabled. By default this pack uses `playwright`; pass `server="..."` to target a compatible server configured under another name.
 - When you configure your own external `playwright` MCP server that drives a real Chrome, launch it with `--disable-features=OptimizationGuideOnDeviceModel,OnDeviceModelBackgroundDownload`, `--disable-component-update`, and `--disable-background-networking` — this avoids an unexpected ~4GB on-device Gemini Nano model download and background networking the first time Chrome is driven over CDP.
 
+## Relationship to the Proxied Server
+
+`play_util` is a thin annotation/highlight layer over the Playwright MCP
+server it proxies to — it does not replace that server's own tools.
+Calls like `play_util.highlight_element()` and `play_util.guide_user()`
+forward to the proxied server via `call_tool_sync(server, tool, ...)`
+(see `src/otdev/_inject_base.py`), using the browser eval tool that
+server exposes. For anything outside annotation/highlighting
+(navigation, screenshots, waiting, network inspection, etc.), call the
+underlying server's own tools directly under its proxy name — by default
+`playwright`, or whatever name you configure under `servers:` in
+`onetool.yaml` and pass as `server=` to `play_util` functions.
+
 ## Configuration
 
 ### Required

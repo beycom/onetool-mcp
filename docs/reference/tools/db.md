@@ -110,7 +110,8 @@ db.query(
 
 ## Security
 
-- Queries are read-only by default
+- Queries run under AUTOCOMMIT with no read-only restriction by default — any valid SQL (SELECT, INSERT, UPDATE, DELETE, DDL) executes
+- Pass `read_only=True` to reject non-SELECT/EXPLAIN/PRAGMA statements
 - Use parameterized queries for user input
 - Configure `max_chars` to prevent excessive output
 

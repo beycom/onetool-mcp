@@ -1,6 +1,6 @@
 ## 1. db.md / db.query docs accuracy
 
-- [ ] 1.1 In `docs/reference/tools/db.md`, replace the "Security" section
+- [x] 1.1 In `docs/reference/tools/db.md`, replace the "Security" section
   (currently at line ~110-114):
   ```
   ## Security
@@ -29,7 +29,7 @@
     - Use parameterized queries for user input
     - Configure `max_chars` to prevent excessive output
     ```
-- [ ] 1.2 In `src/otdev/tools/db.py`, in `query()`'s docstring (around line
+- [x] 1.2 In `src/otdev/tools/db.py`, in `query()`'s docstring (around line
   420), change:
   ```
       Returns:
@@ -44,7 +44,7 @@
 
 ## 2. package.md docs accuracy
 
-- [ ] 2.1 In `docs/reference/tools/package.md`, in the Functions table
+- [x] 2.1 In `docs/reference/tools/package.md`, in the Functions table
   (line ~18), change:
   ```
   | `package.audit(packages, registry)` | Security audit for npm or PyPI packages |
@@ -54,7 +54,7 @@
   | `package.audit(path, registry)` | Version-staleness audit for npm or PyPI packages against a manifest file (no CVE/vulnerability lookup) |
   ```
   This matches the real signature `audit(*, path: str = ".", registry: str | None = None)` at `src/otdev/tools/package.py:224-227`.
-- [ ] 2.2 In the same file's "Key Parameters" table, add a row for `path`
+- [x] 2.2 In the same file's "Key Parameters" table, add a row for `path`
   (it is currently undocumented):
   ```
   | `path` | str | Project directory to audit for `package.audit()` (default: `"."`) |
@@ -62,7 +62,7 @@
 
 ## 3. webfetch.py docstring examples
 
-- [ ] 3.1 In `src/otdev/tools/webfetch.py`, `fetch()`'s docstring
+- [x] 3.1 In `src/otdev/tools/webfetch.py`, `fetch()`'s docstring
   (`Example:` block, lines 207-217), `fetch()` is keyword-only
   (`def fetch(*, url: str, ...)` at line 158-160). Fix each example line
   that passes `url` positionally:
@@ -70,7 +70,7 @@
   - Line 211: `content = webfetch.fetch(url, output_format="text", fast=True)` → `content = webfetch.fetch(url=url, output_format="text", fast=True)`
   - Line 214: `content = webfetch.fetch(url, include_links=True)` → `content = webfetch.fetch(url=url, include_links=True)`
   - Line 217: `content = webfetch.fetch(url, output_format="json", include_metadata=True)` → `content = webfetch.fetch(url=url, output_format="json", include_metadata=True)`
-- [ ] 3.2 In the same file, `fetch_batch()`'s docstring (`Example:` block,
+- [x] 3.2 In the same file, `fetch_batch()`'s docstring (`Example:` block,
   lines 393-403), `fetch_batch()` is keyword-only
   (`def fetch_batch(*, urls: ..., ...)` at line 347-349). Fix both example
   calls that pass the URL list positionally:
@@ -79,19 +79,19 @@
 
 ## 4. doc_slug 404 fixes
 
-- [ ] 4.1 In `src/otdev/tools/db.py` (line 27), change
+- [x] 4.1 In `src/otdev/tools/db.py` (line 27), change
   `doc_slug = "database"` to `doc_slug = "db"`. The published page is
   `docs/reference/tools/db.md`, listed in `mkdocs.yml` nav (line ~65) as
   `DB: reference/tools/db.md` — the slug must equal `db` for
   `https://onetool.beycom.online/reference/tools/db/` to resolve.
-- [ ] 4.2 In `src/otdev/tools/webfetch.py` (line 14), change
+- [x] 4.2 In `src/otdev/tools/webfetch.py` (line 14), change
   `doc_slug = "web-fetch"` to `doc_slug = "webfetch"`. The published page
   is `docs/reference/tools/webfetch.md`, listed in `mkdocs.yml` nav
   (line ~191) as `Webfetch: reference/tools/webfetch.md`.
 
 ## 5. whiteboard draw() docstring self-contradiction
 
-- [ ] 5.1 In `src/otdev/tools/excalidraw.py`, `draw()`'s docstring (line
+- [x] 5.1 In `src/otdev/tools/excalidraw.py`, `draw()`'s docstring (line
   987), change:
   ```
           id["Label"]                           rectangle (only supported shape)
@@ -112,12 +112,12 @@
 
 ## 6. Surface undersold capabilities in doc Highlights
 
-- [ ] 6.1 In `docs/reference/tools/ot_core.md`'s Highlights section (after
+- [x] 6.1 In `docs/reference/tools/ot_core.md`'s Highlights section (after
   the existing "Unified `ot.help()` entry point..." bullet), add:
   ```
   - `ot.help(ask="...")` answers a natural-language question using only the deterministic help text narrowed by `query`
   ```
-- [ ] 6.2 In `docs/reference/tools/ot_context.md`'s Highlights section
+- [x] 6.2 In `docs/reference/tools/ot_context.md`'s Highlights section
   (after the existing bullets, before "Pure stdlib..."), add:
   ```
   - `ctx.ask()` sends one or more questions about stored content to an LLM in a single batched call
@@ -125,7 +125,7 @@
 
 ## 7. Fix: ground.py ImportError escapes the error formatter (code + test)
 
-- [ ] 7.1 In `src/otutil/tools/ground.py`, `_grounded_search()` (starts at
+- [x] 7.1 In `src/otutil/tools/ground.py`, `_grounded_search()` (starts at
   line 358). Currently:
   ```python
       _require_google_genai()
@@ -149,7 +149,7 @@
               cfg: Config | None = None
   ```
   No other lines in the function change.
-- [ ] 7.2 Add a new test to
+- [x] 7.2 Add a new test to
   `tests/otutil/unit/tools/test_ground.py`'s `TestGroundedSearch` class,
   modeled on the existing `test_handles_api_error` test in the same class:
   ```python
@@ -172,7 +172,7 @@
 
 ## 8. Fix: kb.search() surfaces raw errors instead of guidance (code + test)
 
-- [ ] 8.1 In `src/otutil/tools/_knowledge/retrieval.py`, `search()` (starts
+- [x] 8.1 In `src/otutil/tools/_knowledge/retrieval.py`, `search()` (starts
   at line 48). Add the missing-embeddings guard. Current body (lines
   78-93):
   ```python
@@ -240,7 +240,7 @@
   ```
   Everything after this point in the function is unchanged. `keyword` mode
   is unaffected (the guard only applies to `hybrid`/`semantic`).
-- [ ] 8.2 Add two new tests to `tests/otutil/unit/tools/test_knowledge.py`
+- [x] 8.2 Add two new tests to `tests/otutil/unit/tools/test_knowledge.py`
   (a new class, e.g. `TestSearchEmbeddingsGuard`, marked
   `@pytest.mark.unit @pytest.mark.tools`):
   ```python
@@ -298,7 +298,7 @@ on matching the section's exact current text, and check first whether a
 "Relationship to the Proxied Server" (or equivalently-titled) section
 already exists in the file before adding a second one.
 
-- [ ] 9.1 In `docs/reference/tools/chrome-util.md`, check whether a section
+- [x] 9.1 In `docs/reference/tools/chrome-util.md`, check whether a section
   describing the pack's relationship to the proxied `chrome_devtools`
   server already exists (it may not, or `p16`'s Chrome-launch-flags
   addition to `## Requires` may have landed first — that's a different
@@ -320,7 +320,7 @@ already exists in the file before adding a second one.
   under `servers:` in `onetool.yaml` and pass as `server=` to
   `chrome_util` functions.
   ```
-- [ ] 9.2 In `docs/reference/tools/play-util.md`, apply the same
+- [x] 9.2 In `docs/reference/tools/play-util.md`, apply the same
   already-exists check, then insert the equivalent section immediately
   before `## Configuration`:
   ```
@@ -340,20 +340,20 @@ already exists in the file before adding a second one.
 
 ## 10. Install prerequisites: Python 3.12 + uv
 
-- [ ] 10.1 In `docs/learn/installation.md`, replace line 3
+- [x] 10.1 In `docs/learn/installation.md`, replace line 3
   (`**Python 3.11+ required.**`) with:
   ```
   **Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).**
   ```
-- [ ] 10.2 In the same file, in the "System Requirements" table (line ~11),
+- [x] 10.2 In the same file, in the "System Requirements" table (line ~11),
   change `| **Python** | >= 3.11 | Runtime environment |` to
   `| **Python** | >= 3.12 | Runtime environment |`.
-- [ ] 10.3 In the same file's "Installing System Requirements" code blocks,
+- [x] 10.3 In the same file's "Installing System Requirements" code blocks,
   change:
   - Line 19: `brew install python@3.11` → `brew install python@3.12`
   - Line 26: `apt install python3.11` → `apt install python3.12`
   - Line 33: `winget install Python.Python.3.11` → `winget install Python.Python.3.12`
-- [ ] 10.4 **Do NOT restructure `installation.md`'s `## Install` section to
+- [x] 10.4 **Do NOT restructure `installation.md`'s `## Install` section to
   reorder it ahead of `## System Requirements`.** `p15-install-flow-and-mcp-config`
   already owns and is rewriting `installation.md:37-73` (the Install
   section) with bootstrap-installer content per its own task 5.3, and its
@@ -362,13 +362,13 @@ already exists in the file before adding a second one.
   p15's larger rewrite of the same lines. This change's contribution to
   "lead with the recommended install" is limited to the version-number
   fixes above; the actual reordering/rewrite is p15's.
-- [ ] 10.5 In `README.md`, line 15, change
+- [x] 10.5 In `README.md`, line 15, change
   `python-3.11%2B-blue` to `python-3.12%2B-blue` (the Python version
   badge).
 
 ## 11. kb.py wrong package name in install hints
 
-- [ ] 11.1 In `src/onetool/kb.py`, line 209, change:
+- [x] 11.1 In `src/onetool/kb.py`, line 209, change:
   ```python
               "[red]crawl4ai is required. Install with:[/red] pip install 'onetool\\[scrape]'"
   ```
@@ -376,7 +376,7 @@ already exists in the file before adding a second one.
   ```python
               "[red]crawl4ai is required. Install with:[/red] pip install 'onetool-mcp\\[scrape]'"
   ```
-- [ ] 11.2 In the same file, line 234, change:
+- [x] 11.2 In the same file, line 234, change:
   ```python
               "[red]Playwright is required. Install with:[/red] pip install 'onetool\\[scrape]'"
   ```
@@ -389,7 +389,7 @@ already exists in the file before adding a second one.
 
 ## 12. README canonical tool count
 
-- [ ] 12.1 In `README.md`, standardize every tool-count mention on
+- [x] 12.1 In `README.md`, standardize every tool-count mention on
   `240+`. Change:
   - Line 9: `100+ tools including Brave, ...` → `240+ tools including Brave, ...`
   - Line 81: `That's it. All 100+ tools work out of the box.` → `That's it. All 240+ tools work out of the box.`
@@ -403,7 +403,7 @@ already exists in the file before adding a second one.
 
 ## 13. README ot.status row
 
-- [ ] 13.1 In `README.md`'s Tools table (line ~153), change:
+- [x] 13.1 In `README.md`'s Tools table (line ~153), change:
   ```
   | `ot`          | `help`, `tools`, `stats`, `skills`             |          | Introspection                  |
   ```
@@ -425,7 +425,7 @@ different lines: `:129-132`, the "no age identity in keychain" message,
 and `:137`, `b64decode(validate=True)` — not the `:116,124`
 missing-package `ImportError` strings this task group fixes).
 
-- [ ] 14.1 Fix guidance drift in `src/ot/config/secrets.py`. Two
+- [x] 14.1 Fix guidance drift in `src/ot/config/secrets.py`. Two
   `ImportError` messages there currently tell the user to run a bare
   reinstall (`pip install onetool-mcp`) instead of naming the actually
   missing package, unlike the pack's own equivalent checks in
@@ -435,7 +435,7 @@ missing-package `ImportError` strings this task group fixes).
     `"Run: pip install onetool-mcp"` → `"Run: pip install keyring"`
   - Line 124 (inside the `pyrage` `ImportError` block, ~line 119-125):
     `"Run: pip install onetool-mcp"` → `"Run: pip install pyrage"`
-- [ ] 14.2 Update the two existing tests in
+- [x] 14.2 Update the two existing tests in
   `tests/unit/core/test_secrets.py` that pin the old message text (they
   will otherwise fail after 14.1):
   - `test_missing_keyring_raises_import_error` (line ~467):
@@ -449,7 +449,7 @@ missing-package `ImportError` strings this task group fixes).
 
 ## 15. Marketing claims reconciliation
 
-- [ ] 15.1 In `dev/project/brand/claims.md`, replace the "96% reduction in
+- [x] 15.1 In `dev/project/brand/claims.md`, replace the "96% reduction in
   token usage (25x)" section (lines 27-45) with corrected numbers sourced
   from `docs/learn/comparison.md` (one-shot: `47,660 → 1,131` at
   `comparison.md:7`; 3-shot: `119,258 → 2,947` at `comparison.md:19`).
@@ -498,19 +498,19 @@ missing-package `ImportError` strings this task group fixes).
   | Tool Search Tool          | 85%             |
   | Programmatic Tool Calling | 37%             |
   ```
-- [ ] 15.2 Do **not** edit `claims.md:14-23` (the "$30 per MCP server per
+- [x] 15.2 Do **not** edit `claims.md:14-23` (the "$30 per MCP server per
   month" section, which cites a `$485/month` figure). Its provenance could
   not be verified against `comparison.md`'s current numbers (`$395/month`
   total, `$385/month` waste) within this change's scope
   (`claims.md:33-34` vs `comparison.md:7,19`). Leave it as-is and note it
   in your final report to the user as an unresolved finding, not a task to
   complete here.
-- [ ] 15.3 Verify: `grep -n "46,130\|146,387\|1,999\|5,152" dev/project/brand/claims.md`
+- [x] 15.3 Verify: `grep -n "46,130\|146,387\|1,999\|5,152" dev/project/brand/claims.md`
   returns nothing (the stale numbers are gone).
 
 ## 16. R8 S4/S5 — proxy env broadcast + Direct API trust boundary docs
 
-- [ ] 16.1 In `docs/reference/cli/onetool-config.md`, in the "### Stdio
+- [x] 16.1 In `docs/reference/cli/onetool-config.md`, in the "### Stdio
   Servers" section (after the existing `tool_prefix` paragraph, currently
   ending around line 375), add:
   ```
@@ -521,7 +521,7 @@ missing-package `ImportError` strings this task group fixes).
   above) for secrets or values that should not be shared across servers.
   Reserve root-level `env:` for genuinely global settings (e.g. `LANG`).
   ```
-- [ ] 16.2 In the same file's "## YAML Schema" code block (line 55),
+- [x] 16.2 In the same file's "## YAML Schema" code block (line 55),
   change the inline comment on `env:` from:
   ```
   env:                          # Default subprocess environment variables
@@ -530,7 +530,7 @@ missing-package `ImportError` strings this task group fixes).
   ```
   env:                          # Default subprocess env vars — broadcast to every proxied stdio server, see External MCP Servers
   ```
-- [ ] 16.3 (optional) In the same file's "## Direct API Configuration"
+- [x] 16.3 (optional) In the same file's "## Direct API Configuration"
   section (after the existing field table, ~line 471), add a short trust-
   boundary note:
   ```
@@ -543,28 +543,28 @@ missing-package `ImportError` strings this task group fixes).
 
 ## 17. Verification
 
-- [ ] 17.1 `rg -n "3\.11" docs README.md` returns empty (no stale Python
+- [x] 17.1 `rg -n "3\.11" docs README.md` returns empty (no stale Python
   version references remain in touched docs).
-- [ ] 17.2 `rg -n "onetool\\\[" src/` returns empty (no more bare
+- [x] 17.2 `rg -n "onetool\\\[" src/` returns empty (no more bare
   `onetool[...]` package-name references; all say `onetool-mcp[...]`).
-- [ ] 17.3 `grep -n "database\"" src/otdev/tools/db.py` and
+- [x] 17.3 `grep -n "database\"" src/otdev/tools/db.py` and
   `grep -n "web-fetch\"" src/otdev/tools/webfetch.py` both return empty
   (doc_slug values fixed).
-- [ ] 17.4 `grep -n "100+\|230+" README.md` returns empty; `grep -c "240+"
+- [x] 17.4 `grep -n "100+\|230+" README.md` returns empty; `grep -c "240+"
   README.md` returns `6`.
-- [ ] 17.5 `grep -n "46,130\|146,387" dev/project/brand/claims.md` returns
+- [x] 17.5 `grep -n "46,130\|146,387" dev/project/brand/claims.md` returns
   empty; every number in the "97% reduction" section of `claims.md` is
   present verbatim in `docs/learn/comparison.md`.
-- [ ] 17.6 `uv run python scripts/check_docs_registry.py` passes (still
+- [x] 17.6 `uv run python scripts/check_docs_registry.py` passes (still
   passes — this change does not touch `docs/reference/tools/index.md`, but
   confirms nothing was broken).
-- [ ] 17.7 `uv run pytest tests/otutil/unit/tools/test_ground.py tests/otutil/unit/tools/test_knowledge.py tests/unit/core/test_secrets.py -v`
+- [x] 17.7 `uv run pytest tests/otutil/unit/tools/test_ground.py tests/otutil/unit/tools/test_knowledge.py tests/unit/core/test_secrets.py -v`
   passes, including the 3 new/updated tests from tasks 7.2, 8.2, 14.2. (No
   `-m` filter needed — pointing pytest at these three files already scopes
   the run; each test's own markers, `unit`+`tools` or `unit`+`core`, are
   unchanged from the surrounding file's convention.)
-- [ ] 17.8 `just check` passes (full lint + type + test gate).
-- [ ] 17.9 Spot-check that generated help doc URLs resolve: with the server
+- [x] 17.8 `just check` passes (full lint + type + test gate).
+- [x] 17.9 Spot-check that generated help doc URLs resolve: with the server
   running (or by inspecting `_get_doc_url("db")` / `_get_doc_url("webfetch")`
   return values directly, e.g. via a quick Python REPL import), confirm
   they produce `https://onetool.beycom.online/reference/tools/db/` and

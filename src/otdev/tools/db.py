@@ -24,7 +24,7 @@ from __future__ import annotations
 
 # Pack for dot notation: db.tables(), db.schema(), db.query()
 pack = "db"
-doc_slug = "database"
+doc_slug = "db"
 
 __all__ = ["query", "sample", "schema", "tables"]
 
@@ -437,7 +437,7 @@ def query(
             SELECT, EXPLAIN, or PRAGMA (default: False)
 
     Returns:
-        List of dicts for SELECT, success dict for INSERT/UPDATE/DELETE, or error string
+        Dict with rows/row_count/truncated for SELECT, success dict for INSERT/UPDATE/DELETE, or error string
 
     Example:
         # Basic query

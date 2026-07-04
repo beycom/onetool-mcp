@@ -8,6 +8,7 @@ Core tools for OneTool introspection and management.
 - Check runtime status, API connectivity, and security rules
 - Query stored large outputs with pagination and search
 - Unified `ot.help()` entry point for discovery across all resource types
+- `ot.help(ask="...")` answers a natural-language question using only the deterministic help text narrowed by `query`
 
 ## Functions
 

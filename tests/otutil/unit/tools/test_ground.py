@@ -334,6 +334,21 @@ class TestReddit:
 class TestGroundedSearch:
     """Test _grounded_search core function."""
 
+    @patch("otutil.tools.ground._require_google_genai")
+    def test_missing_google_genai_returns_formatted_error(self, mock_require):
+        from otutil.tools.ground import _grounded_search
+
+        mock_require.side_effect = ImportError(
+            "google-genai is required for grounding_search. "
+            "Install with: pip install onetool-mcp[util]"
+        )
+
+        result = _grounded_search("test", span_name="test.span")
+
+        assert isinstance(result, str)
+        assert "google-genai" in result
+        assert "pip install onetool-mcp[util]" in result
+
     def test_config_accepts_timeout(self):
         cfg = Config(timeout=180.0)
 

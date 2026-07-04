@@ -6,13 +6,13 @@
 </p>
 
 <p align="center">
-  <strong>🧿 One MCP for developers - No tool tax, no context rot.<br>100+ tools including Brave, Google, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Image Vision, Playwright & Chrome DevTools Utils and many more.</strong>
+  <strong>🧿 One MCP for developers - No tool tax, no context rot.<br>240+ tools including Brave, Google, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Image Vision, Playwright & Chrome DevTools Utils and many more.</strong>
 </p>
 
 <p align="center">
   <a href="https://pypi.org/project/onetool-mcp/"><img alt="PyPI" src="https://img.shields.io/pypi/v/onetool-mcp"></a>
   <a href="https://github.com/beycom/onetool-mcp/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPLv3-blue"></a>
-  <a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-blue"></a>
+  <a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/python-3.12%2B-blue"></a>
   <a href="https://github.com/beycom/onetool-mcp/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/beycom/onetool-mcp"></a>
 </p>
 
@@ -73,7 +73,7 @@ to your client (`claude-code`, `claude-desktop`, `cursor`, or `vscode`):
 onetool init mcp-config --client claude-code   # or omit --client for all four
 ```
 
-That's it. All 100+ tools work out of the box.
+That's it. All 240+ tools work out of the box.
 
 Verify: `onetool init validate --config ~/.onetool/onetool.yaml`
 
@@ -115,7 +115,7 @@ onetool direct run --port 8765 "brave.search(query='latest AI news')" --format r
 | Feature                  | Description                                                   |
 | ------------------------ | ------------------------------------------------------------- |
 | **96% Token Savings**    | ~2K tokens no matter how many tools you add                   |
-| **100+ Built-in Tools**  | Web search, databases, file ops, diagrams, conversions        |
+| **240+ Built-in Tools**  | Web search, databases, file ops, diagrams, conversions        |
 | **Explicit Execution**   | See exactly what runs — `__onetool brave.search(q="AI")`           |
 | **Live Whiteboard**      | Draw diagrams with a Mermaid-compatible DSL via Excalidraw    |
 | **MCP Server Proxy**     | Wrap existing MCP servers without the tool tax                |
@@ -130,7 +130,7 @@ onetool direct run --port 8765 "brave.search(query='latest AI news')" --format r
 
 ## Tools
 
-27+ packs, 230+ tools ready to use:
+27+ packs, 240+ tools ready to use:
 
 | Pack          | Tools                                          | Extra    | Description                    |
 | ------------- | ---------------------------------------------- | -------- | ------------------------------ |
@@ -151,7 +151,7 @@ onetool direct run --port 8765 "brave.search(query='latest AI news')" --format r
 | `ot_llm`      | `transform`, `transform_file`                  |          | LLM-powered transforms         |
 | `ot_secrets`  | `init`, `encrypt`, `audit`, `rotate`           |          | Secrets encryption             |
 | `ot_timer`    | `start`, `elapsed`, `list`                     |          | Named timers                   |
-| `ot`          | `help`, `tools`, `stats`                       |          | Introspection                  |
+| `ot`          | `help`, `tools`, `stats`, `status`             |          | Introspection                  |
 | `package`     | `npm`, `pypi`, `cargo`                         | `[dev]`  | Package versions               |
 | `play_util`   | `highlight_element`, `guide_user`              | `[dev]`  | Browser annotations (Playwright)|
 | `ripgrep`     | `search`, `count`                              | `[dev]`  | Fast code search               |
@@ -159,7 +159,7 @@ onetool direct run --port 8765 "brave.search(query='latest AI news')" --format r
 | `webfetch`    | `fetch`, `fetch_batch`                         | `[dev]`  | Web fetching                   |
 | `whiteboard`  | `open`, `draw`, `screenshot`, `save`           | `[util]` | Live Excalidraw canvas         |
 
-[📖 Complete tools reference](https://onetool.beycom.online/reference/tools/) — full summary table with all 230+ tools
+[📖 Complete tools reference](https://onetool.beycom.online/reference/tools/) — full summary table with all 240+ tools
 
 ---
 
@@ -218,7 +218,7 @@ __onetool wiki.summary(title="Python_(programming_language)")
 - [Quickstart](https://onetool.beycom.online/learn/quickstart/) - 30 seconds to first tool call
 - [Installation](https://onetool.beycom.online/learn/installation/) - All platforms
 - [Configuration](https://onetool.beycom.online/learn/configuration/) - YAML schema
-- [Tools Reference](https://onetool.beycom.online/reference/tools/) - All 100+ tools
+- [Tools Reference](https://onetool.beycom.online/reference/tools/) - All 240+ tools
 - [Security](https://onetool.beycom.online/learn/security/) - Security layers
 - [Extending](https://onetool.beycom.online/learn/extension-tools/) - Build your own
 - [Dev Docs](https://github.com/beycom/onetool-mcp/blob/main/dev/index.md) - Internal developer documentation

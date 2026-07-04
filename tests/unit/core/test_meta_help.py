@@ -178,10 +178,10 @@ class TestGetDocUrl:
         from ot.meta import _get_doc_url
 
         assert _get_doc_url("brave") == "https://onetool.beycom.online/reference/tools/brave-search/"
-        assert _get_doc_url("db") == "https://onetool.beycom.online/reference/tools/database/"
+        assert _get_doc_url("db") == "https://onetool.beycom.online/reference/tools/db/"
         assert _get_doc_url("ground") == "https://onetool.beycom.online/reference/tools/grounding-search/"
         assert _get_doc_url("ot_llm") == "https://onetool.beycom.online/reference/tools/ot_llm/"
-        assert _get_doc_url("webfetch") == "https://onetool.beycom.online/reference/tools/web-fetch/"
+        assert _get_doc_url("webfetch") == "https://onetool.beycom.online/reference/tools/webfetch/"
 
 
 @pytest.mark.unit

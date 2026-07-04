@@ -15,7 +15,7 @@ Short alias: `pkg`
 
 | Function | Description |
 |----------|-------------|
-| `package.audit(packages, registry)` | Security audit for npm or PyPI packages |
+| `package.audit(path, registry)` | Version-staleness audit for npm or PyPI packages against a manifest file (no CVE/vulnerability lookup) |
 | `package.npm(packages)` | Check latest npm package versions |
 | `package.pypi(packages)` | Check latest PyPI package versions |
 | `package.models(query, provider, limit)` | Search OpenRouter AI models |
@@ -26,6 +26,7 @@ Short alias: `pkg`
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `packages` | list or dict | Package names, or dict mapping names to current versions |
+| `path` | str | Project directory to audit for `package.audit()` (default: `"."`) |
 | `registry` | str | "npm", "pypi", or "openrouter" |
 | `query` | str | Search query for model name/id (case-insensitive) |
 | `provider` | str | Filter models by provider (e.g., "anthropic", "openai") |

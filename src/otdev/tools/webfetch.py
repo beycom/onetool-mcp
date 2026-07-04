@@ -11,7 +11,7 @@ from __future__ import annotations
 # Pack for dot notation: webfetch.fetch(), webfetch.fetch_batch()
 pack = "webfetch"
 pack_aliases = ("wf",)
-doc_slug = "web-fetch"
+doc_slug = "webfetch"
 
 __all__ = ["fetch", "fetch_batch"]
 
@@ -205,16 +205,16 @@ def fetch(
 
     Example:
         # Basic usage with defaults
-        content = webfetch.fetch("https://docs.python.org/3/library/asyncio.html")
+        content = webfetch.fetch(url="https://docs.python.org/3/library/asyncio.html")
 
         # Get plain text with faster extraction
-        content = webfetch.fetch(url, output_format="text", fast=True)
+        content = webfetch.fetch(url=url, output_format="text", fast=True)
 
         # Include links for research
-        content = webfetch.fetch(url, include_links=True)
+        content = webfetch.fetch(url=url, include_links=True)
 
         # Get content with metadata
-        content = webfetch.fetch(url, output_format="json", include_metadata=True)
+        content = webfetch.fetch(url=url, output_format="json", include_metadata=True)
     """
     # Validate inputs before starting the span
     _require_trafilatura()
@@ -391,13 +391,13 @@ def fetch_batch(
 
     Example:
         # Simple list of URLs
-        content = webfetch.fetch_batch([
+        content = webfetch.fetch_batch(urls=[
             "https://docs.python.org/3/library/asyncio.html",
             "https://docs.python.org/3/library/threading.html",
         ])
 
         # With custom labels
-        content = webfetch.fetch_batch([
+        content = webfetch.fetch_batch(urls=[
             ("https://fastapi.tiangolo.com/tutorial/", "FastAPI Tutorial"),
             ("https://docs.pydantic.dev/latest/", "Pydantic Docs"),
         ])

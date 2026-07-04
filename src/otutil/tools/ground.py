@@ -381,11 +381,11 @@ def _grounded_search(
     Returns:
         Formatted search results with sources or structured extraction payload
     """
-    _require_google_genai()
-    from google.genai import types
-
     with LogSpan(span=span_name, **log_extras) as s:
         try:
+            _require_google_genai()
+            from google.genai import types
+
             cfg: Config | None = None
             if model is None or timeout is None:
                 cfg = _get_config()

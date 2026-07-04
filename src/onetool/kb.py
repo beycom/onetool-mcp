@@ -206,7 +206,7 @@ def cmd_scrape(
         import crawl4ai  # type: ignore[import-untyped]  # noqa: F401
     except ImportError as exc:
         console.print(
-            "[red]crawl4ai is required. Install with:[/red] pip install 'onetool\\[scrape]'"
+            "[red]crawl4ai is required. Install with:[/red] pip install 'onetool-mcp\\[scrape]'"
         )
         raise typer.Exit(1) from exc
 
@@ -231,7 +231,7 @@ def cmd_scrape(
                     browser.close()
     except ImportError as exc:
         console.print(
-            "[red]Playwright is required. Install with:[/red] pip install 'onetool\\[scrape]'"
+            "[red]Playwright is required. Install with:[/red] pip install 'onetool-mcp\\[scrape]'"
         )
         raise typer.Exit(1) from exc
 

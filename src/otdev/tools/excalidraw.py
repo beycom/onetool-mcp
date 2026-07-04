@@ -1003,7 +1003,7 @@ def draw(*, input: str, board: str | None = None) -> str:
     no multi-line strings needed). Newlines are also accepted.
 
     Shapes:
-        id["Label"]                           rectangle (only supported shape)
+        id["Label"]                           rectangle (default; override with shape: prop, see below)
         id["Label"] bc:green,sw:2            rectangle with inline style props
         id bc:green                           style-only update (label unchanged)
 

@@ -52,7 +52,7 @@ include:                      # External config files to merge
 tools_dir:                    # Tool discovery patterns
   - src/ottools/*.py
 
-env:                          # Default subprocess environment variables
+env:                          # Default subprocess env vars — broadcast to every proxied stdio server, see External MCP Servers
   LANG: en_US.UTF-8
 
 log_level: INFO               # DEBUG, INFO, WARNING, ERROR
@@ -374,6 +374,8 @@ servers:
 
 **`tool_prefix`:** When set, callers may omit the prefix. For example, with `tool_prefix: "docs_"` you can call `search.query()` instead of `docs_search.query()`. Prefix stripping is resolved automatically at call time.
 
+**Environment variables:** the root-level `env:` block (see [YAML Schema](#yaml-schema)) is merged into **every** stdio server's environment, including third-party proxied servers — a value meant for one server is visible to all of them. Prefer per-server `env:` (shown above) for secrets or values that should not be shared across servers. Reserve root-level `env:` for genuinely global settings (e.g. `LANG`).
+
 ### HTTP Servers
 
 Remote MCP servers accessed via HTTP/HTTPS:
@@ -469,6 +471,8 @@ direct:
 |-------|------|---------|-------------|
 | `direct.host.enabled` | bool | `false` | Bind the MCP-owned authenticated loopback direct API when the MCP process starts. |
 | `direct.host.port` | int (1-65535) | `8765` | Preferred direct API port. MCP startup tries this port first, then increments until one binds. |
+
+The Direct API key grants full command execution to any process running as the same OS user that started the OneTool server — this is inherent to the same-user trust boundary (a malicious process running as that user already has equivalent access), not a vulnerability of the API itself. Treat the key file (`0600`) like any other local secret.
 
 Unrecognised config attributes are ignored with warnings that identify the dotted
 path. Recognised attributes with invalid values still fail validation.

@@ -1,6 +1,6 @@
 # Installation
 
-**Python 3.11+ required.**
+**Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).**
 
 For the quickest path, see [Quickstart](quickstart.md). This page covers all platforms and optional features.
 
@@ -8,7 +8,7 @@ For the quickest path, see [Quickstart](quickstart.md). This page covers all pla
 
 | Requirement | Version | Purpose |
 |-------------|---------|---------|
-| **Python** | >= 3.11 | Runtime environment |
+| **Python** | >= 3.12 | Runtime environment |
 | **uv** | Latest | Package management |
 
 ### Installing System Requirements
@@ -16,21 +16,21 @@ For the quickest path, see [Quickstart](quickstart.md). This page covers all pla
 **macOS:**
 
 ```bash
-brew install python@3.11
+brew install python@3.12
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 **Linux (Debian/Ubuntu):**
 
 ```bash
-apt install python3.11
+apt install python3.12
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 **Windows:**
 
 ```powershell
-winget install Python.Python.3.11
+winget install Python.Python.3.12
 irm https://astral.sh/uv/install.ps1 | iex
 ```
 
