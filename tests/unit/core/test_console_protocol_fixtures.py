@@ -35,6 +35,7 @@ def test_vendored_console_fixtures_validate_against_schemas() -> None:
         ("inline-console-message.json", "console-message.schema.json"),
         ("file-ref-console-message.json", "console-message.schema.json"),
         ("file-diff-ref-console-message.json", "console-message.schema.json"),
+        ("image-file-ref-console-message.json", "console-message.schema.json"),
         ("console-message-event.json", "event-envelope.schema.json"),
     ]
     for fixture_name, schema_name in cases:

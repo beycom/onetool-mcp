@@ -33,10 +33,14 @@ class TestShowRequest:
         with pytest.raises(ValidationError):
             ShowRequest(kind="text")  # type: ignore[call-arg]
 
-    def test_rejects_file_kind(self) -> None:
-        """File-backed kinds are out of scope until the full display pack ships (3.1)."""
+    def test_accepts_file_and_image_kinds(self) -> None:
+        """File-backed kinds shipped with console.display and are accepted."""
+        assert ShowRequest(kind="file", content="report.txt").kind == "file"
+        assert ShowRequest(kind="image", content="diagram.svg").kind == "image"
+
+    def test_rejects_unknown_kind(self) -> None:
         with pytest.raises(ValidationError):
-            ShowRequest(kind="file", content="report.txt")  # type: ignore[arg-type]
+            ShowRequest(kind="hologram", content="x")  # type: ignore[arg-type]
 
     def test_accepts_structured_content(self) -> None:
         request = ShowRequest(kind="json", content={"ok": True, "items": [1, 2]})

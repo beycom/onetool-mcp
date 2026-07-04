@@ -1,0 +1,17 @@
+{
+  "id": "789abc012def",
+  "kind": "image",
+  "metadata": {
+    "title": "Architecture diagram"
+  },
+  "created_at": "2026-07-05T00:00:00Z",
+  "updated_at": "2026-07-05T00:00:00Z",
+  "payload": {
+    "mode": "file_ref",
+    "path": "/Users/gavin/project/diagrams/architecture.svg",
+    "mime_type": "image/svg+xml",
+    "size_bytes": 20480,
+    "language": null
+  },
+  "preview": null
+}

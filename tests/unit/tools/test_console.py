@@ -162,3 +162,163 @@ class TestConsolePackDiscovery:
         )
 
         assert result.success is True
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestConsoleDisplay:
+    """Test console.display: inference, receipts, path refs, fallbacks."""
+
+    @pytest.fixture(autouse=True)
+    def _transport_enabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Treat the direct host as enabled so receipts are returned.
+
+        `direct.host.enabled` defaults to false, in which case `display`
+        degrades to returning the bounded preview (covered explicitly by
+        `test_direct_host_disabled_returns_bounded_preview`).
+        """
+        monkeypatch.setattr(console, "_transport_disabled", lambda: False)
+
+    def test_uniform_records_infer_table_with_digest_receipt(self) -> None:
+        rows = [
+            {"title": f"Result {i}", "url": f"https://x/{i}", "snippet": "s"}
+            for i in range(20)
+        ]
+
+        receipt = console.display(rows)
+
+        assert receipt.startswith("console[")
+        assert " table: 20 items (title, url, snippet)" in receipt
+        assert '"Result 0"' in receipt
+        assert len(receipt) <= console.RECEIPT_MAX_CHARS
+        assert "\n" not in receipt
+
+    def test_receipt_id_round_trips_through_read(self) -> None:
+        receipt = console.display({"alpha": 1, "beta": 2})
+
+        message_id = receipt.split("]")[0].removeprefix("console[")
+        read = console.read(id=message_id)
+
+        assert isinstance(read, dict)
+        assert read["metadata"]["kind"] == "json"
+        assert read["content"] == {"alpha": 1, "beta": 2}
+
+    def test_string_inference_markdown_versus_text(self) -> None:
+        markdown_receipt = console.display("# Title\n\nBody text")
+        text_receipt = console.display("plain line of output")
+
+        assert " markdown: " in markdown_receipt
+        assert " text: " in text_receipt
+
+    def test_explicit_kind_overrides_inference(self) -> None:
+        receipt = console.display({"a": 1}, kind="yaml")
+
+        assert " yaml: " in receipt
+
+    def test_rejects_multiple_or_missing_input_forms(self) -> None:
+        with pytest.raises(ValueError, match="exactly one input form"):
+            console.display("value", path="/tmp/x")
+        with pytest.raises(ValueError, match="exactly one input form"):
+            console.display()
+        with pytest.raises(ValueError, match="old_path and new_path"):
+            console.display(old_path="/tmp/only-old")
+
+    def test_in_root_path_publishes_file_ref(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        target = tmp_path / "example.py"
+        target.write_text("x = 1\n")
+        monkeypatch.setattr(
+            "ot.console.outbox.current_allowed_roots", lambda: [tmp_path.resolve()]
+        )
+
+        receipt = console.display(path=str(target))
+
+        message_id = receipt.split("]")[0].removeprefix("console[")
+        read = console.read(id=message_id)
+        assert isinstance(read, dict)
+        assert read["metadata"]["payload"]["mode"] == "file_ref"
+        assert read["metadata"]["payload"]["language"] == "python"
+        assert read["metadata"]["kind"] == "code"
+        assert read["preview"]["text"] == "x = 1\n"
+        assert " code: " in receipt
+        assert "example.py" in receipt
+
+    def test_image_extension_infers_image_kind(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        target = tmp_path / "diagram.svg"
+        target.write_text("<svg xmlns='http://www.w3.org/2000/svg'/>")
+        monkeypatch.setattr(
+            "ot.console.outbox.current_allowed_roots", lambda: [tmp_path.resolve()]
+        )
+
+        receipt = console.display(path=str(target))
+
+        message_id = receipt.split("]")[0].removeprefix("console[")
+        read = console.read(id=message_id)
+        assert isinstance(read, dict)
+        assert read["metadata"]["kind"] == "image"
+        assert read["metadata"]["payload"]["mode"] == "file_ref"
+        assert read["metadata"]["payload"]["mime_type"] == "image/svg+xml"
+
+    def test_outside_root_textual_path_falls_back_inline(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        target = tmp_path / "notes.txt"
+        target.write_text("outside the roots\n")
+        other_root = tmp_path / "roots-elsewhere"
+        other_root.mkdir()
+        monkeypatch.setattr(
+            "ot.console.outbox.current_allowed_roots",
+            lambda: [other_root.resolve()],
+        )
+
+        receipt = console.display(path=str(target))
+
+        message_id = receipt.split("]")[0].removeprefix("console[")
+        read = console.read(id=message_id)
+        assert isinstance(read, dict)
+        assert read["metadata"]["payload"]["mode"] == "inline"
+        assert read["metadata"]["metadata"]["fallback"] == "outside-allowed-roots"
+        assert read["content"] == "outside the roots\n"
+        assert "outside allowed roots" in receipt
+
+    def test_missing_file_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="file not found"):
+            console.display(path="/nonexistent/never/file.py")
+
+    def test_relative_path_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="must be absolute"):
+            console.display(path="relative/file.py")
+
+    def test_in_root_diff_paths_publish_file_diff_ref(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        old = tmp_path / "old.py"
+        new = tmp_path / "new.py"
+        old.write_text("x = 1\n")
+        new.write_text("x = 2\n")
+        monkeypatch.setattr(
+            "ot.console.outbox.current_allowed_roots", lambda: [tmp_path.resolve()]
+        )
+
+        receipt = console.display(old_path=str(old), new_path=str(new))
+
+        message_id = receipt.split("]")[0].removeprefix("console[")
+        read = console.read(id=message_id)
+        assert isinstance(read, dict)
+        assert read["metadata"]["payload"]["mode"] == "file_diff_ref"
+        assert read["metadata"]["kind"] == "diff"
+        assert read["metadata"]["payload"]["old_path"].endswith("old.py")
+        assert read["metadata"]["payload"]["new_path"].endswith("new.py")
+
+    def test_direct_host_disabled_returns_bounded_preview(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(console, "_transport_disabled", lambda: True)
+
+        result = console.display("content the human should still get")
+
+        assert result.startswith("console disabled")
+        assert "content the human should still get" in result

@@ -224,3 +224,53 @@ class TestConsoleState:
         page = state.list_messages(limit=10, offset=0, source="run-a")
 
         assert [item.id for item in page.items] == [first.id]
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestConsoleFileMessages:
+    """Test file-reference message construction."""
+
+    def test_textual_file_ref_carries_head_preview(self, tmp_path) -> None:
+        state = ConsoleState()
+        target = tmp_path / "sample.py"
+        target.write_text("a = 1\nb = 2\n")
+
+        metadata = state.add_file_message(kind="code", path=str(target))
+
+        assert metadata.payload.mode == "file_ref"
+        assert metadata.payload.path == str(target)
+        assert metadata.payload.language == "python"
+        assert metadata.payload.size_bytes == len("a = 1\nb = 2\n")
+        read = state.read_message(id=metadata.id)
+        assert read is not None
+        assert read.preview is not None
+        assert read.preview.text == "a = 1\nb = 2\n"
+        assert read.preview.truncated is False
+
+    def test_binary_file_ref_has_no_preview(self, tmp_path) -> None:
+        state = ConsoleState()
+        target = tmp_path / "blob.bin"
+        target.write_bytes(b"\x00\x01\x02binary")
+
+        metadata = state.add_file_message(kind="file", path=str(target))
+
+        assert metadata.payload.mode == "file_ref"
+        read = state.read_message(id=metadata.id)
+        assert read is not None
+        assert read.preview is None
+
+    def test_diff_ref_records_both_paths(self, tmp_path) -> None:
+        state = ConsoleState()
+        old = tmp_path / "old.txt"
+        new = tmp_path / "new.txt"
+        old.write_text("before\n")
+        new.write_text("after\n")
+
+        metadata = state.add_file_message(
+            kind="diff", old_path=str(old), new_path=str(new)
+        )
+
+        assert metadata.payload.mode == "file_diff_ref"
+        assert metadata.payload.old_path == str(old)
+        assert metadata.payload.new_path == str(new)

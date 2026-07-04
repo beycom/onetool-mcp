@@ -1,10 +1,10 @@
 # tool-console Specification
 
 ## Purpose
-Provide the agent-facing `console` pack for publishing inline messages to a connected
-onetool-console consumer via the Console outbox, with bounded in-memory retention and
-list/read/clear introspection. Inline payloads only in 3.0; file-backed payload modes ship
-with the full display experience (3.1).
+Provide the agent-facing `console` pack for publishing messages to a connected
+onetool-console consumer via the Console outbox: inline messages via `console.show`,
+context-saving display of tool output and file references via `console.display`, and
+bounded in-memory retention with list/read/clear introspection.
 
 ## Requirements
 ### Requirement: Console Pack Inline Messages
@@ -12,8 +12,7 @@ with the full display experience (3.1).
 The `console` pack SHALL let an agent publish inline messages to a connected onetool-console.
 `console.show` SHALL accept inline content (string, mapping, or list), bound it to the
 configured inline payload limit, retain a message record in memory, and append a
-`console.message.created` event (wire name fixed by protocol v1) to the Console outbox. In this release the pack SHALL NOT
-accept file path parameters; file-backed payload modes ship with the full display pack.
+`console.message.created` event (wire name fixed by protocol v1) to the Console outbox.
 
 #### Scenario: Show an inline message
 
@@ -26,6 +25,75 @@ accept file path parameters; file-backed payload modes ship with the full displa
 - **WHEN** `console.show` is called with content exceeding the inline payload bound
 - **THEN** the stored payload SHALL be truncated to the bound with truncation indicated
 - **AND** the call SHALL succeed rather than error
+
+### Requirement: Console Display With Digest Receipts
+
+`console.display` SHALL accept exactly one input form — a positional value, `path`, or
+`old_path` with `new_path` — publish it as one Console message, and return a single-line
+string receipt of at most 240 characters beginning with the message id in the form
+`console[<id>]`. Receipts SHALL summarize the payload structurally (row count and column
+names for tables, top-level keys or item count for JSON, first line for text and markdown,
+path with size and language for file references) and SHALL NOT embed more than 80
+characters of payload content. Any other combination of input forms SHALL raise an error
+without publishing.
+
+When `kind` is not provided it SHALL be inferred: a list of dicts sharing at least 80% of
+their keys infers `table`; other dicts and lists infer `json`; strings infer `markdown`
+when markdown syntax signals are present, otherwise `text`; paths infer from extension
+(`image`, `markdown`, `diff`, `code`, `json`, `yaml`, else `file`). An explicit `kind`
+argument SHALL override inference.
+
+#### Scenario: Composed tool result returns a receipt, not the value
+
+- **WHEN** an agent executes `console.display(<tool call returning 20 uniform result dicts>)`
+- **THEN** one `console.message.created` event with `payload.mode: "inline"` and kind `table` SHALL be appended to the outbox
+- **AND** the tool SHALL return a one-line receipt containing the message id, kind, row count, and column names
+
+#### Scenario: Receipt id resolves via console.read
+
+- **WHEN** an agent calls `console.read(id=<id from a receipt>)`
+- **THEN** the retained message for that receipt SHALL be returned
+
+#### Scenario: Explicit kind overrides inference
+
+- **WHEN** `console.display` receives a dict with `kind="yaml"`
+- **THEN** the published message SHALL have kind `yaml`
+
+### Requirement: Console Display File References
+
+Given `path` pointing to an existing readable file whose realpath is contained in the
+published `allowed_roots`, `console.display` SHALL publish a `file_ref` payload carrying
+the absolute path, size, and detected MIME type and language — without the file content.
+Textual files SHALL include a bounded head preview; binary files SHALL carry no preview
+text. `old_path` with `new_path` SHALL publish a `file_diff_ref` payload with kind
+defaulting to `diff`. A nonexistent or unreadable path SHALL raise an error without
+publishing.
+
+When a path's realpath falls outside `allowed_roots`, the tool SHALL NOT publish a file
+reference and SHALL NOT widen the roots; it SHALL fall back to bounded inline publication
+with `metadata.fallback = "outside-allowed-roots"` and state the fallback in the receipt.
+
+#### Scenario: In-root file publishes a file_ref
+
+- **WHEN** `console.display(path="/repo/src/app.py")` is called and `/repo/src` is under an allowed root
+- **THEN** the published payload SHALL have mode `file_ref`, the absolute path, size, and detected language, with no file content in the event
+
+#### Scenario: Outside-root path falls back to inline
+
+- **WHEN** `console.display(path=...)` references a textual file outside every allowed root
+- **THEN** the published message SHALL have `payload.mode: "inline"` with bounded content and `metadata.fallback` equal to `outside-allowed-roots`
+
+### Requirement: Console Display Degrades Without Transport
+
+Publishing SHALL NOT require a connected Console. With the direct host enabled, messages
+SHALL be retained in the outbox within its retention bound regardless of consumers. With
+the direct host disabled, `console.display` SHALL return the bounded preview text prefixed
+with a note instead of a receipt, so content is never silently dropped.
+
+#### Scenario: Direct host disabled
+
+- **WHEN** `console.display` is called while the direct host is disabled
+- **THEN** the tool SHALL return the bounded preview text prefixed with a note that the console is disabled
 
 ### Requirement: Console Message Retention And Introspection
 

@@ -377,3 +377,78 @@ def test_emitted_events_validate_against_shipped_schemas() -> None:
             Draft202012Validator(snapshot_schema).validate(event["payload"])
         elif event["type"] == "console.message.created":
             Draft202012Validator(display_schema).validate(event["payload"])
+
+
+def _utcnow():
+    from datetime import UTC, datetime
+
+    return datetime.now(UTC)
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestFileRefWirePayload:
+    """File-reference wire payloads follow the protocol payload variants."""
+
+    def test_file_ref_payload_has_path_and_no_content(self) -> None:
+        metadata = MessageMetadata(
+            id="a" * 12,
+            kind="code",
+            metadata={},
+            created_at=_utcnow(),
+            updated_at=_utcnow(),
+            payload=PayloadReference(
+                mode="file_ref",
+                size_bytes=10,
+                language="python",
+                path="/repo/src/app.py",
+            ),
+        )
+
+        payload = build_console_message_payload(
+            metadata=metadata, preview=None, inline_payload=None
+        )
+
+        assert payload["payload"]["mode"] == "file_ref"
+        assert payload["payload"]["path"] == "/repo/src/app.py"
+        assert "content" not in payload["payload"]
+
+    def test_file_diff_ref_payload_has_old_and_new_paths(self) -> None:
+        metadata = MessageMetadata(
+            id="b" * 12,
+            kind="diff",
+            metadata={},
+            created_at=_utcnow(),
+            updated_at=_utcnow(),
+            payload=PayloadReference(
+                mode="file_diff_ref",
+                size_bytes=10,
+                old_path="/repo/a.py",
+                new_path="/repo/b.py",
+            ),
+        )
+
+        payload = build_console_message_payload(
+            metadata=metadata, preview=None, inline_payload=None
+        )
+
+        assert payload["payload"]["mode"] == "file_diff_ref"
+        assert payload["payload"]["old_path"] == "/repo/a.py"
+        assert payload["payload"]["new_path"] == "/repo/b.py"
+        assert "content" not in payload["payload"]
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestSnapshotRoots:
+    """Instance snapshots publish real, resolved allowed roots."""
+
+    def test_snapshot_roots_include_cwd_and_are_resolved(self) -> None:
+        snapshot = build_instance_snapshot(message_count=0, status="running")
+
+        from ot.paths import get_effective_cwd
+
+        roots = snapshot["allowed_roots"]
+        assert str(get_effective_cwd().resolve()) in roots
+        assert all(root.startswith("/") for root in roots)
+        assert len(roots) == len(set(roots))

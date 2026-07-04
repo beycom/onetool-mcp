@@ -1,11 +1,9 @@
-"""Models for the in-memory, inline-only Console message store.
+"""Models for the in-memory Console message store.
 
-This is a deliberately slim subset of the `feature/display` branch's model set:
-only the shapes needed to produce inline `console.message.created` Console
-outbox events survive here. File-backed payload modes (`file`, `image`,
-`file_diff`) and their supporting fields (`path`, `old_path`, `new_path`) are
-out of scope until the full display pack ships (3.1) and are intentionally
-omitted.
+Inline payloads carry bounded content on the wire; file-backed payload modes
+(`file_ref`, `file_diff_ref`) carry only paths plus size/mime/language so the
+Console fetches content on demand through its own file APIs (protocol v1
+reserved these modes from the start).
 
 Note: the wire event type `console.message.created` and its payload field
 names are frozen by protocol v1 (`openspec/specs/console-outbox/spec.md`).
@@ -27,13 +25,15 @@ ConsoleKind = Literal[
     "mermaid",
     "yaml",
     "table",
+    "file",
+    "image",
 ]
 
-PayloadMode = Literal["inline"]
+PayloadMode = Literal["inline", "file_ref", "file_diff_ref"]
 
 
 class PayloadReference(BaseModel):
-    """Reference to Console message payload content (inline-only in 3.0)."""
+    """Reference to Console message payload content."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -41,6 +41,9 @@ class PayloadReference(BaseModel):
     size_bytes: int = Field(ge=0)
     mime_type: str | None = None
     language: str | None = None
+    path: str | None = None
+    old_path: str | None = None
+    new_path: str | None = None
 
 
 class BoundedPreview(BaseModel):

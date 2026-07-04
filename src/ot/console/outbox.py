@@ -1,11 +1,8 @@
 """MCP-owned Console outbox state and protocol helpers.
 
-Decoupled from the display service's process state: the branch version's only
-runtime display dependency was a workspace-roots helper used for `file_ref`
-path validation, which is out of scope until file payload modes ship (3.1).
-This module reports workspace roots for the informational instance snapshot
-without any filesystem path validation, and sources instance identity from
-`ot.runtime_meta` rather than the display service.
+Instance snapshots publish `allowed_roots` (file pack allowed dirs plus cwd);
+Console consumers validate `file_ref`/`file_diff_ref` paths against them.
+Instance identity comes from `ot.runtime_meta`.
 
 Note: the wire event type `console.message.created` and its envelope/payload
 field names are frozen by protocol v1 (`openspec/specs/console-outbox/spec.md`).
@@ -260,21 +257,32 @@ def build_console_message_payload(
     preview: BoundedPreview | None,
     inline_payload: object | None,
 ) -> dict[str, Any]:
-    """Return the public Console `console.message.created` payload (inline-only in 3.0)."""
+    """Return the public Console `console.message.created` payload."""
     payload = metadata.payload
+    wire_payload: dict[str, Any] = {
+        "mode": payload.mode,
+        "mime_type": payload.mime_type,
+        "size_bytes": payload.size_bytes,
+        "language": payload.language,
+    }
+    if payload.mode == "inline":
+        wire_payload["content"] = _json_compatible(inline_payload)
+    elif payload.mode == "file_ref":
+        wire_payload["path"] = payload.path
+    else:
+        if payload.path is not None:
+            wire_payload["path"] = payload.path
+        if payload.old_path is not None:
+            wire_payload["old_path"] = payload.old_path
+        if payload.new_path is not None:
+            wire_payload["new_path"] = payload.new_path
     result: dict[str, Any] = {
         "id": metadata.id,
         "kind": metadata.kind,
         "metadata": dict(metadata.metadata),
         "created_at": metadata.created_at.isoformat(),
         "updated_at": metadata.updated_at.isoformat(),
-        "payload": {
-            "mode": "inline",
-            "mime_type": payload.mime_type,
-            "size_bytes": payload.size_bytes,
-            "language": payload.language,
-            "content": _json_compatible(inline_payload),
-        },
+        "payload": wire_payload,
         "preview": preview.model_dump(mode="json") if preview else None,
     }
     return result
@@ -315,8 +323,55 @@ def _runtime_instance_id() -> str:
 
 
 def _snapshot_roots(cwd: Path) -> list[Path]:
-    """Return workspace roots reported in instance snapshots (informational only)."""
-    return [cwd]
+    """Return workspace roots reported in instance snapshots.
+
+    Publishes the file pack's configured `allowed_dirs` (realpath-resolved,
+    relative entries resolved against the effective cwd) plus the cwd itself.
+    Console consumers validate file-reference paths against these roots, so
+    they must reflect the real file-access boundary. Falls back to `[cwd]`
+    when the file pack has no configuration or config access fails.
+    """
+    roots: list[Path] = []
+    seen: set[str] = set()
+    for candidate in (*_file_pack_allowed_dirs(cwd), cwd.resolve()):
+        try:
+            resolved = candidate.resolve()
+        except OSError:
+            continue
+        key = str(resolved)
+        if key not in seen:
+            seen.add(key)
+            roots.append(resolved)
+    return roots or [cwd]
+
+
+def _file_pack_allowed_dirs(cwd: Path) -> list[Path]:
+    """Return the file pack's configured allowed directories, defensively."""
+    try:
+        from pathlib import Path as _Path
+
+        from ot.config import get_tool_config
+
+        raw = get_tool_config("file")
+        allowed_dirs = raw.get("allowed_dirs") if isinstance(raw, dict) else None
+        if not isinstance(allowed_dirs, list):
+            return []
+        result: list[Path] = []
+        for entry in allowed_dirs:
+            if not isinstance(entry, str) or not entry:
+                continue
+            candidate = _Path(entry).expanduser()
+            if not candidate.is_absolute():
+                candidate = cwd / candidate
+            result.append(candidate)
+        return result
+    except Exception:
+        return []
+
+
+def current_allowed_roots() -> list[Path]:
+    """Return the allowed roots currently published in instance snapshots."""
+    return _snapshot_roots(get_effective_cwd().resolve())
 
 
 def _repo_root(cwd: Path) -> Path:
@@ -358,6 +413,7 @@ __all__ = [
     "ack_outbox",
     "build_console_message_payload",
     "build_instance_snapshot",
+    "current_allowed_roots",
     "ensure_instance_snapshot",
     "poll_outbox",
     "publish_console_message",

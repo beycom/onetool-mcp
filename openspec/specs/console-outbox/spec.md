@@ -5,11 +5,10 @@
 Defines the signed MCP-owned Console outbox protocol used by the separate OneTool Console App to
 consume read-only MCP instance and display events.
 
-**Status: protocol v1 — served from 3.0.0, inline payloads only; file modes ship with the full
-display experience in 3.1.** The `/api/console/outbox` and `/api/console/outbox/ack` HTTP routes
-and the MCP-owned outbox state (`src/ot/console/outbox.py`) ship in 3.0.0 emitting `inline`
-payloads only. The `file_ref` and `file_diff_ref` payload modes remain part of protocol v1 but
-are not emitted until the full display experience ships in 3.1.
+**Status: protocol v1.** The `/api/console/outbox` and `/api/console/outbox/ack` HTTP routes
+and the MCP-owned outbox state emit all three protocol payload modes: `inline`, `file_ref`,
+and `file_diff_ref`. File-reference payloads carry paths only; consumers fetch file content
+locally, validated against the `allowed_roots` published in instance snapshots.
 ## Requirements
 ### Requirement: Console Outbox Protocol
 
@@ -160,24 +159,23 @@ The vendored Console protocol JSON Schemas and example fixtures under `tests/fix
 - **THEN** every fixture in `tests/fixtures/console-protocol/fixtures/*.json` SHALL validate against its corresponding JSON Schema in `tests/fixtures/console-protocol/schemas/*.json` using Draft 2020-12 validation
 - **AND** a schema or fixture change that breaks validation SHALL fail CI
 
-### Requirement: Inline-Only Payload Emission In 3.0
+### Requirement: Published Allowed Roots
 
-Until the full display pack ships (3.1), the server SHALL emit `console.message.created`
-events with `payload.mode: "inline"` only. The `file_ref` and `file_diff_ref` payload modes
-defined by protocol v1 SHALL NOT be emitted by a 3.0 server, and no server code SHALL depend
-on filesystem path validation (`allowed_roots`) for outbox payloads.
+Instance snapshot events SHALL publish `allowed_roots` as the realpath-resolved set of the
+file pack's configured allowed directories plus the instance working directory. Consumers
+validate file-reference paths against these roots, so they SHALL reflect the real
+file-access boundary; the producer SHALL NOT widen the roots to accommodate an individual
+message.
 
-#### Scenario: Only inline payloads emitted
+#### Scenario: Snapshot carries real roots
 
-- **WHEN** any display message event is appended to the Console outbox on a 3.0 server
-- **THEN** its payload mode SHALL be `inline`
-- **AND** the payload SHALL validate against the shipped `console-message.schema.json`
+- **WHEN** an `instance.snapshot` event is published by an instance whose file pack allows `/repo` and `/data`
+- **THEN** `allowed_roots` SHALL contain the realpaths of `/repo`, `/data`, and the instance working directory
 
-#### Scenario: Protocol consumers unaffected
+#### Scenario: File references stay within published roots
 
-- **WHEN** a protocol-v1 Console consumer connects to a 3.0 server
-- **THEN** it SHALL receive only payload modes it is already required to support
-- **AND** later servers MAY add `file_ref`/`file_diff_ref` emission without a protocol version bump
+- **WHEN** a `console.message.created` event with mode `file_ref` or `file_diff_ref` is appended
+- **THEN** every path it carries SHALL resolve within the published `allowed_roots`
 
 ### Requirement: Instance Snapshot On Startup
 
