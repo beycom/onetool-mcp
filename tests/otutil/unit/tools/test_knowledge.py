@@ -3251,13 +3251,52 @@ class TestSearchEmbeddingsGuard:
             "otutil.tools._knowledge.indexer._db_embeddings_enabled",
             return_value=False,
         ), patch.object(retrieval, "get_connection") as mock_get_conn:
-            result = retrieval.search(query="x", db="testdb", mode="hybrid")
+            result = retrieval.search(query="x", db="testdb", mode="semantic")
 
         assert result == (
             "Semantic search requires embeddings. Enable with: "
             "tools.knowledge.kb.testdb.db.embeddings_enabled: true"
         )
         mock_get_conn.assert_not_called()
+
+    def test_embeddings_disabled_hybrid_degrades_to_keyword_search(self):
+        """hybrid mode has a legitimate keyword/FTS-only lane, so a db with
+        embeddings disabled should degrade to keyword search (with a notice)
+        instead of hard-erroring like semantic mode does."""
+        from otutil.tools._knowledge import retrieval
+
+        mock_conn = MagicMock()
+        with patch(
+            "otutil.tools._knowledge.indexer._db_embeddings_enabled",
+            return_value=False,
+        ), patch.object(retrieval, "get_connection", return_value=mock_conn), patch.object(
+            retrieval, "search_fts", return_value=[]
+        ) as mock_search_fts, patch.object(retrieval, "search_hybrid") as mock_search_hybrid:
+            result = retrieval.search(query="x", db="testdb", mode="hybrid")
+
+        mock_search_hybrid.assert_not_called()
+        mock_search_fts.assert_called_once()
+        assert result == (
+            "(embeddings disabled for 'testdb' — keyword-only results)\n"
+            "No results found for: x"
+        )
+
+    def test_keyword_mode_unaffected_by_disabled_embeddings(self):
+        """keyword mode never consults the embeddings gate at all."""
+        from otutil.tools._knowledge import retrieval
+
+        mock_conn = MagicMock()
+        with patch(
+            "otutil.tools._knowledge.indexer._db_embeddings_enabled",
+            return_value=False,
+        ) as mock_embeddings_enabled, patch.object(
+            retrieval, "get_connection", return_value=mock_conn
+        ), patch.object(retrieval, "search_fts", return_value=[]) as mock_search_fts:
+            result = retrieval.search(query="x", db="testdb", mode="keyword")
+
+        mock_embeddings_enabled.assert_not_called()
+        mock_search_fts.assert_called_once()
+        assert result == "No results found for: x"
 
     def test_no_embeddings_generated_returns_friendly_message(self):
         from otutil.tools._knowledge import retrieval

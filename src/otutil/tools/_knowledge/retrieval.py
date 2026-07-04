@@ -89,7 +89,8 @@ def search(
     config = _get_config()
     limit = k if k is not None else config.search_limit
 
-    if mode in ("hybrid", "semantic"):
+    notice = ""
+    if mode == "semantic":
         from .indexer import _db_embeddings_enabled
 
         if not _db_embeddings_enabled(db):
@@ -97,6 +98,14 @@ def search(
                 "Semantic search requires embeddings. Enable with: "
                 f"tools.knowledge.kb.{db}.db.embeddings_enabled: true"
             )
+    elif mode == "hybrid":
+        from .indexer import _db_embeddings_enabled
+
+        if not _db_embeddings_enabled(db):
+            # No embeddings for this db — degrade to the keyword/FTS-only path
+            # instead of hard-erroring, since hybrid has a legitimate FTS lane.
+            mode = "keyword"
+            notice = f"(embeddings disabled for '{db}' — keyword-only results)\n"
 
     with LogSpan(span="kb.search", query=query, db=db, mode=mode, k=limit) as s:
         try:
@@ -139,7 +148,7 @@ def search(
 
             s.add("resultCount", len(results))
             if not results:
-                return f"No results found for: {query}"
+                return notice + f"No results found for: {query}"
 
             extract = config.search_extract
             lines = [f"Found {len(results)} results for: {query}\n"]
@@ -157,11 +166,11 @@ def search(
                     f"   {content}\n"
                     f"   ID: {r['id']}"
                 )
-            return "\n".join(lines)
+            return notice + "\n".join(lines)
 
         except Exception as e:
             s.add("error", str(e))
-            return f"Error searching '{db}': {e}"
+            return notice + f"Error searching '{db}': {e}"
 
 
 def ask(
