@@ -77,18 +77,15 @@ This checks your configuration is correct.
 claude mcp add onetool -- onetool serve --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
 ```
 
-Or manually add to `~/.claude/mcp.json`:
+Or generate ready-to-paste config (with resolved absolute paths — no placeholders)
+and add it to your client:
 
-```json
-{
-  "mcpServers": {
-    "onetool": {
-      "command": "onetool",
-      "args": ["serve", "--config", "/Users/yourname/.onetool/onetool.yaml", "--secrets", "/Users/yourname/.onetool/secrets.yaml"]
-    }
-  }
-}
+```bash
+onetool init mcp-config --client claude-code   # or claude-desktop / cursor / vscode
 ```
+
+Paste the printed block into the target file the command names for your client
+(e.g. `~/.claude/mcp.json` for Claude Code).
 
 ## 7. Verify Connection
 

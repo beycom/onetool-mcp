@@ -36,6 +36,29 @@ irm https://astral.sh/uv/install.ps1 | iex
 
 ## Install
 
+### Bootstrap (recommended)
+
+The bootstrap script installs `uv` if missing, installs OneTool, runs `onetool init`,
+and prints ready-to-paste MCP client config:
+
+```bash
+curl -LsSf https://onetool.beycom.online/install.sh | sh          # macOS / Linux
+irm https://onetool.beycom.online/install.ps1 | iex               # Windows (PowerShell)
+```
+
+To inspect the script and verify its checksum before running:
+
+```bash
+curl -LsSf https://onetool.beycom.online/install.sh -o install.sh
+curl -LsSf https://onetool.beycom.online/install.sh.sha256 -o install.sh.sha256
+shasum -a 256 -c install.sh.sha256
+sh install.sh
+```
+
+Override extras or config dir with `ONETOOL_EXTRAS` / `ONETOOL_CONFIG_DIR`.
+
+### Manual (uv)
+
 ```bash
 uv tool install onetool-mcp
 ```
@@ -145,26 +168,51 @@ The transform tool is not available until `base_url` and `model` are configured 
 
 ## MCP Configuration
 
-### Claude Code
-
-Add to `~/.claude/mcp.json` (or use `claude mcp add`):
-
-```json
-{
-  "mcpServers": {
-    "onetool": {
-      "command": "onetool",
-      "args": ["serve", "--config", "/path/to/.onetool/onetool.yaml", "--secrets", "/path/to/.onetool/secrets.yaml"]
-    }
-  }
-}
-```
-
-Or using the CLI:
+OneTool works with any MCP client. Generate ready-to-paste config with **resolved
+absolute paths** (config, secrets, and the `onetool` executable) — no hand-editing:
 
 ```bash
-claude mcp add onetool -- onetool serve --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
+onetool init mcp-config --client <client>   # omit --client to print all four
 ```
+
+The command prints, for each client, the JSON block and the exact file to merge it
+into. Supported `--client` values and their targets:
+
+### Claude Code
+
+```bash
+onetool init mcp-config --client claude-code
+```
+
+Merge the printed `mcpServers` block into `~/.claude/mcp.json` (or project `.mcp.json`),
+or run the printed `claude mcp add …` one-liner.
+
+### Claude Desktop
+
+```bash
+onetool init mcp-config --client claude-desktop
+```
+
+Merge into `claude_desktop_config.json` (the command names the correct per-OS path:
+`~/Library/Application Support/Claude/` on macOS, `%APPDATA%\Claude\` on Windows,
+`~/.config/claude-desktop/` on Linux).
+
+### Cursor
+
+```bash
+onetool init mcp-config --client cursor
+```
+
+Merge into `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (global).
+
+### VS Code
+
+```bash
+onetool init mcp-config --client vscode
+```
+
+VS Code uses a top-level `servers` key with `"type": "stdio"` per entry. Merge into
+`.vscode/mcp.json` (project) or the user-profile `mcp.json` (global).
 
 ## Install the OneTool Skills
 

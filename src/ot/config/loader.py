@@ -452,7 +452,7 @@ def load_config(
     config._config_dir = config_path.parent
 
     # Load secrets if --secrets path provided
-    get_secrets(secrets_path, reload=True)
+    get_secrets(secrets_path, reload=True, explicit=secrets_path is not None)
 
     logger.debug(f"Config loaded: version {config.version}")
 

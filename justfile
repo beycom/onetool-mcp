@@ -123,8 +123,16 @@ docs-sync:
 docs-serve-stop:
     @lsof -ti :8000 | xargs kill 2>/dev/null && echo "Docs server stopped" || echo "No server running on port 8000"
 
+# Mirror bootstrap installer scripts into docs/ with sha256 checksums so the
+# docs-domain copies never drift from the versioned source in scripts/.
+docs-install-scripts:
+    cp scripts/install.sh docs/install.sh
+    cp scripts/install.ps1 docs/install.ps1
+    cd docs && shasum -a 256 install.sh > install.sh.sha256
+    cd docs && shasum -a 256 install.ps1 > install.ps1.sha256
+
 # Build documentation site (strict mode)
-docs-build:
+docs-build: docs-install-scripts
     uv run mkdocs build --strict
 
 # Clean and rebuild docs (strict mode)
@@ -132,7 +140,7 @@ docs-clean:
     rm -rf dist/site && uv run mkdocs build --strict
 
 # Deploy documentation to GitHub Pages
-docs-deploy:
+docs-deploy: docs-install-scripts
     uv run mkdocs gh-deploy --force
 
 # ============================================================================

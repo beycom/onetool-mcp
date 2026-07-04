@@ -152,7 +152,9 @@ def load_secrets(
 
 
 def get_secrets(
-    secrets_path: Path | str | None = None, reload: bool = False
+    secrets_path: Path | str | None = None,
+    reload: bool = False,
+    explicit: bool = False,
 ) -> dict[str, str]:
     """Get or load the cached secrets.
 
@@ -173,7 +175,7 @@ def get_secrets(
 
     with _secrets_lock:
         if _secrets is None or reload:
-            _secrets = load_secrets(secrets_path)
+            _secrets = load_secrets(secrets_path, explicit=explicit)
     return _secrets
 
 

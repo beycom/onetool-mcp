@@ -108,6 +108,15 @@ def _load_runtime_config(config: Path, secrets: Path | None) -> None:
 
     try:
         get_config(config, reload=True, secrets_path=secrets)
+    except FileNotFoundError as e:
+        # An explicit --secrets path that doesn't exist: name it and point at init.
+        _write_startup_config_error(config, e)
+        console.print(f"[red]Error:[/red] {e}")
+        console.print(
+            "[dim]Create it with `onetool init` (choose secrets.yaml) or omit "
+            "--secrets to start without secrets.[/dim]"
+        )
+        raise typer.Exit(1) from e
     except Exception as e:
         _write_startup_config_error(config, e)
         console.print(f"[red]Error loading config:[/red] {e}")
@@ -465,16 +474,26 @@ def init_callback(
         "-c",
         help="Config directory or onetool.yaml path (auto-detected by suffix).",
     ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Overwrite an existing onetool.yaml (skips the idempotent no-op / confirm).",
+    ),
 ) -> None:
     """Initialize OneTool configuration directory.
 
     Runs an interactive TUI to select which extensions to configure.
     Existing files are backed up to .bak before overwriting.
 
+    Idempotent by default: a non-interactive re-run against an existing
+    onetool.yaml is a no-op (exit 0) unless --force is passed. In interactive
+    mode, --force skips the "overwrite?" confirmation.
+
     Examples:
       onetool init                     (uses current directory)
       onetool init -c .onetool         (directory: writes .onetool/onetool.yaml)
       onetool init -c .onetool/ot.yaml (explicit file path)
+      onetool init --force             (overwrite an existing config)
     """
     if ctx.invoked_subcommand is not None:
         return
@@ -505,13 +524,15 @@ def init_callback(
         config_path = Path(confirmed)
         ot_dir = config_path.parent
 
-        if config_path.exists():
+        if config_path.exists() and not force:
             overwrite = questionary.confirm(
                 "onetool.yaml already exists. Overwrite?", default=False
             ).ask()
             if not overwrite:
                 console.print("[dim]Cancelled.[/dim]")
                 raise typer.Exit(0)
+        elif config_path.exists() and force:
+            console.print("[dim]--force: overwriting existing onetool.yaml.[/dim]")
 
         console.print(f"\nSetting up OneTool config at [bold]{ot_dir}/[/bold]\n")
         _exts = [
@@ -558,12 +579,26 @@ def init_callback(
         console.print(f"\n[green]✓[/green] {config_path.name} written")
         if includes:
             console.print(f"  Includes: {', '.join(includes)}")
+        console.print(
+            f"\n[dim]Next: verify with `onetool init validate --config {config_path}`[/dim]"
+        )
         return
 
-    # Non-interactive: write minimal onetool.yaml
+    # Non-interactive: idempotent by default — a re-run against an existing config
+    # is a no-op unless --force is passed (avoids silently discarding extensions).
+    if config_path.exists() and not force:
+        console.print(
+            f"[dim]{config_path} already exists — no changes. "
+            "Pass --force to overwrite.[/dim]"
+        )
+        raise typer.Exit(0)
+
     ot_dir.mkdir(parents=True, exist_ok=True)
     _write_onetool_yaml(config_path, includes)
     console.print(f"\n[green]✓[/green] {config_path} written")
+    console.print(
+        f"[dim]Next: verify with `onetool init validate --config {config_path}`[/dim]"
+    )
 
 
 @init_app.command("validate")
@@ -716,7 +751,7 @@ def init_validate(
 
     # Secrets (names only) - use explicit --secrets path only
     try:
-        secrets_data = load_secrets(secrets)
+        secrets_data = load_secrets(secrets, explicit=secrets is not None)
         if secrets_data:
             sorted_keys = sorted(secrets_data.keys())
             console.print(f"\nSecrets ({len(sorted_keys)}):")
@@ -756,6 +791,106 @@ def init_validate(
     else:
         console.print("\nMCP Servers:")
         console.print("  (none)")
+
+
+_MCP_CLIENTS = ("claude-code", "claude-desktop", "cursor", "vscode")
+
+
+def _resolve_mcp_paths(config: Path | None, secrets: Path | None) -> tuple[str, str, str | None]:
+    """Resolve absolute onetool/config/secrets paths for mcp-config output."""
+    import shutil
+
+    onetool_path = shutil.which("onetool")
+    if onetool_path is None:
+        console.print(
+            "[yellow]![/yellow] 'onetool' not found on PATH — using the bare name; "
+            "the client may not resolve it. Ensure the uv tool shim dir is on PATH."
+        )
+        onetool_path = "onetool"
+
+    config_path = (config or Path("onetool.yaml")).resolve()
+    if not config_path.exists():
+        console.print(
+            f"[yellow]![/yellow] {config_path} does not exist yet — "
+            f"run `onetool init --config {config_path}` first."
+        )
+
+    secrets_path = (secrets or (config_path.parent / "secrets.yaml")).resolve()
+    secrets_arg: str | None = str(secrets_path)
+    if not secrets_path.exists():
+        console.print(
+            f"[dim]Note: {secrets_path} not found — omitting --secrets. "
+            "`onetool init` creates it.[/dim]"
+        )
+        secrets_arg = None
+
+    return onetool_path, str(config_path), secrets_arg
+
+
+def _print_mcp_block(client: str, onetool_path: str, config_abs: str, secrets_arg: str | None) -> None:
+    """Print the ready-to-paste config block for one MCP client."""
+    import json
+    import platform
+
+    args = ["serve", "--config", config_abs]
+    if secrets_arg is not None:
+        args += ["--secrets", secrets_arg]
+
+    console.print(f"\n[bold]# {client}[/bold]")
+
+    if client == "vscode":
+        # VS Code uses `servers` (not `mcpServers`) and requires "type": "stdio".
+        block = {"servers": {"onetool": {"type": "stdio", "command": onetool_path, "args": args}}}
+        console.print("Target: `.vscode/mcp.json` (project) or the user-profile `mcp.json` (global)")
+    else:
+        block = {"mcpServers": {"onetool": {"command": onetool_path, "args": args}}}
+        if client == "claude-code":
+            console.print("Target: `~/.claude/mcp.json` (or project `.mcp.json`) — merge into mcpServers")
+            secrets_cli = f" --secrets {secrets_arg}" if secrets_arg else ""
+            console.print(
+                f"Or run: `claude mcp add onetool -- {onetool_path} serve "
+                f"--config {config_abs}{secrets_cli}`"
+            )
+        elif client == "claude-desktop":
+            system = platform.system()
+            target = {
+                "Darwin": "~/Library/Application Support/Claude/claude_desktop_config.json",
+                "Windows": r"%APPDATA%\Claude\claude_desktop_config.json",
+            }.get(system, "~/.config/claude-desktop/claude_desktop_config.json")
+            console.print(f"Target: `{target}` — merge into its existing mcpServers")
+        elif client == "cursor":
+            console.print("Target: `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (global)")
+
+    # Plain print (not Rich) so the JSON is emitted verbatim/pasteable — Rich would
+    # soft-wrap long resolved paths mid-string and corrupt the block.
+    print(json.dumps(block, indent=2))
+
+
+@init_app.command("mcp-config")
+def init_mcp_config(
+    client: str | None = typer.Option(
+        None,
+        "--client",
+        help="MCP client: claude-code, claude-desktop, cursor, or vscode. Omit for all.",
+    ),
+    config: Path | None = typer.Option(
+        None, "--config", "-c", help="onetool.yaml path (default: ./onetool.yaml)."
+    ),
+    secrets: Path | None = typer.Option(
+        None, "--secrets", "-s", help="Secrets file path (default: <config-dir>/secrets.yaml)."
+    ),
+) -> None:
+    """Print ready-to-paste MCP client config with resolved absolute paths."""
+    if client is not None and client not in _MCP_CLIENTS:
+        console.print(
+            f"[red]Error:[/red] --client must be one of {', '.join(_MCP_CLIENTS)}"
+        )
+        raise typer.Exit(2)
+
+    onetool_path, config_abs, secrets_arg = _resolve_mcp_paths(config, secrets)
+    clients = (client,) if client is not None else _MCP_CLIENTS
+    for c in clients:
+        _print_mcp_block(c, onetool_path, config_abs, secrets_arg)
 
 
 @app.callback(invoke_without_command=True)

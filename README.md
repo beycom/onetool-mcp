@@ -52,30 +52,25 @@ Configure one MCP server. Use unlimited tools.
 
 ## Install
 
-Requires [uv](https://docs.astral.sh/uv/):
+Bootstrap (installs `uv` if missing, installs OneTool, initialises config, prints MCP config):
+
+```bash
+curl -LsSf https://onetool.beycom.online/install.sh | sh          # macOS / Linux
+irm https://onetool.beycom.online/install.ps1 | iex               # Windows (PowerShell)
+```
+
+Or install manually with [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv tool install 'onetool-mcp[all]'   # everything
 onetool init --config ~/.onetool
 ```
 
-Add to Claude Code:
+Then print ready-to-paste MCP client config with resolved absolute paths and add it
+to your client (`claude-code`, `claude-desktop`, `cursor`, or `vscode`):
 
 ```bash
-claude mcp add onetool -- onetool serve --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
-```
-
-Or manually add to `~/.claude/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "onetool": {
-      "command": "onetool",
-      "args": ["serve", "--config", "/Users/yourname/.onetool/onetool.yaml", "--secrets", "/Users/yourname/.onetool/secrets.yaml"]
-    }
-  }
-}
+onetool init mcp-config --client claude-code   # or omit --client for all four
 ```
 
 That's it. All 100+ tools work out of the box.

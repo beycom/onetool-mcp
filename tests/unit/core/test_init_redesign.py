@@ -658,3 +658,128 @@ def test_init_secrets_yaml_encrypted_step(tmp_path: Path) -> None:
     ot_secrets.init.assert_called_once()
     ot_secrets.encrypt.assert_called_once_with(file=str(secrets_path), backup=False)
     ot_secrets.audit.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# p15: init idempotency + --force + validate hint
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_init_noninteractive_rerun_is_noop(tmp_path: Path) -> None:
+    """A non-interactive re-run against an existing config is a no-op (no .bak)."""
+    from unittest.mock import patch
+
+    from typer.testing import CliRunner
+
+    from onetool.cli import app
+
+    config_path = tmp_path / ".onetool" / "onetool.yaml"
+    runner = CliRunner()
+    with patch("onetool.cli._stdin_is_tty", return_value=False):
+        r1 = runner.invoke(app, ["init", "-c", str(config_path)])
+        assert r1.exit_code == 0, r1.output
+        before = config_path.read_text()
+        r2 = runner.invoke(app, ["init", "-c", str(config_path)])
+
+    assert r2.exit_code == 0, r2.output
+    assert config_path.read_text() == before  # unchanged
+    assert not list((tmp_path / ".onetool").glob("*.bak"))
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_init_noninteractive_force_overwrites_with_bak(tmp_path: Path) -> None:
+    """--force overwrites an existing config and backs the old one up as .bak."""
+    from unittest.mock import patch
+
+    from typer.testing import CliRunner
+
+    from onetool.cli import app
+
+    config_path = tmp_path / ".onetool" / "onetool.yaml"
+    runner = CliRunner()
+    with patch("onetool.cli._stdin_is_tty", return_value=False):
+        runner.invoke(app, ["init", "-c", str(config_path)])
+        r = runner.invoke(app, ["init", "-c", str(config_path), "--force"])
+
+    assert r.exit_code == 0, r.output
+    assert list((tmp_path / ".onetool").glob("*.bak"))
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_init_prints_validate_hint(tmp_path: Path) -> None:
+    """After writing, init prints the `onetool init validate` next-step hint."""
+    from unittest.mock import patch
+
+    from typer.testing import CliRunner
+
+    from onetool.cli import app
+
+    config_path = tmp_path / ".onetool" / "onetool.yaml"
+    runner = CliRunner()
+    with patch("onetool.cli._stdin_is_tty", return_value=False):
+        r = runner.invoke(app, ["init", "-c", str(config_path)])
+
+    assert "onetool init validate" in r.output
+
+
+# ---------------------------------------------------------------------------
+# p15: --secrets missing-file startup failure
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_serve_missing_secrets_fails_clearly(tmp_path: Path) -> None:
+    """serve with a nonexistent --secrets exits non-zero with an actionable message."""
+    from typer.testing import CliRunner
+
+    from onetool.cli import app
+
+    config_path = tmp_path / "onetool.yaml"
+    config_path.write_text("version: 2\n")
+    missing = tmp_path / "nope-secrets.yaml"
+
+    runner = CliRunner()
+    r = runner.invoke(
+        app, ["serve", "--config", str(config_path), "--secrets", str(missing)]
+    )
+    assert r.exit_code != 0
+    # Rich soft-wraps long paths, so de-wrap before matching the path.
+    dewrapped = r.output.replace("\n", "")
+    assert "Secrets file not found" in dewrapped
+    assert str(missing) in dewrapped
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_load_runtime_config_without_secrets_ok(tmp_path: Path) -> None:
+    """Omitting --secrets loads config without error (secrets stay optional)."""
+    from onetool.cli import _load_runtime_config
+
+    config_path = tmp_path / "onetool.yaml"
+    config_path.write_text("version: 2\n")
+    _load_runtime_config(config_path, None)  # must not raise
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_init_validate_missing_secrets_reports_error(tmp_path: Path) -> None:
+    """init validate with a nonexistent --secrets names the missing path."""
+    from typer.testing import CliRunner
+
+    from onetool.cli import app
+
+    config_path = tmp_path / "onetool.yaml"
+    config_path.write_text("version: 2\n")
+    missing = tmp_path / "nope-secrets.yaml"
+
+    runner = CliRunner()
+    r = runner.invoke(
+        app,
+        ["init", "validate", "--config", str(config_path), "--secrets", str(missing)],
+    )
+    assert "Secrets file not found" in r.output or str(missing) in r.output

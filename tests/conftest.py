@@ -89,6 +89,7 @@ def reset_config_cache():
     # Reset caches
     loader._config = None
     loader._config_path = None
+    loader._secrets_path = None
     tool_loader._module_cache.clear()
 
     # Pre-load test config so get_config() works without an explicit path
