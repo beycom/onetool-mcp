@@ -104,6 +104,7 @@ markdown_extensions:
 
 not_in_nav: |
   _wip/**
+  learn/demos/**
 
 exclude_docs: |
   _wip/**
@@ -146,6 +147,8 @@ nav:
       - Installation: learn/installation.md
       - Configuration: learn/configuration.md
       - Direct Usage: learn/direct-usage.md
+      - MCP Proxy: learn/mcp-proxy.md
+      - Demos: learn/demos/index.md
       - Security: learn/security.md
       - Explicit Calls: learn/explicit-calls.md
       - Snippets: learn/snippets.md

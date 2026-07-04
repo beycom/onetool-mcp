@@ -2,6 +2,13 @@
 
 *Measurements captured: February 2026 · [raw data](../results/result-20260223-0334.csv)*
 
+> **Framework feature vs. installed product.** FastMCP is a toolkit for *building* MCP servers;
+> Code Mode, ProxyProvider, and the Monty sandbox are ingredients a developer must adopt when
+> authoring their own server — none reach an end user unless someone ships a server around them.
+> OneTool *is* that shipped server: **a framework capability you'd have to build vs. a product you install.**
+> See [Why not just use FastMCP Code Mode?](https://github.com/beycom/onetool-mcp#why-not-just-use-fastmcp-code-mode)
+> in the README for the full contrast.
+
 ## Scenario: Impact of tool usage - one-shot
 
 With 18 MCP servers loaded, `multiple-mcp` consumes **42x more input tokens** (47,660 vs 1,131) than OneTool for the same task. This translates to **28x higher cost** (2.42¢ vs 0.09¢) and **1.5x slower** execution (7s vs 5s). The token overhead comes from sending all tool definitions with every request — a cost that scales with the number of configured servers regardless of which tools are actually used.

@@ -50,6 +50,23 @@ Configure one MCP server. Use unlimited tools.
 
 ---
 
+## Why not just use FastMCP Code Mode?
+
+**Framework feature vs. installed product.** FastMCP is a toolkit for *building* MCP servers;
+Code Mode, ProxyProvider, and the Monty sandbox are ingredients a *developer* must adopt and
+expose when authoring their own MCP server. None of them reach an end user (a Claude Code /
+Cursor / Codex user) unless someone builds and ships a server around them. OneTool *is* that
+shipped server: it turns those framework capabilities into something a user installs and uses
+immediately, wrapped with 200+ curated tools, the param/alias/snippet forgiveness layer, ctx
+handles, the prompt + skill that teach an LLM to drive it, rich config, and a security model.
+**A framework capability you'd have to build vs. a product you install.**
+
+Corollary: adopting a FastMCP internal (Code Mode, ProxyProvider, Monty) is an *implementation*
+choice OneTool makes internally — never a *positioning* risk, because the story is the product,
+not the plumbing.
+
+---
+
 ## Install
 
 Bootstrap (installs `uv` if missing, installs OneTool, initialises config, prints MCP config):
