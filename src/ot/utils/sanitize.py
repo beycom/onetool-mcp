@@ -24,8 +24,15 @@ __all__ = [
 # Regex patterns for trigger detection (case-insensitive)
 # Matches supported trigger text and direct MCP tool-call text that may appear
 # in untrusted output.
+#
+# D11: the short ``__ot`` token requires an invocation *shape* to follow — optional
+# whitespace, an optional dotted identifier, then an opening ``(`` — so ordinary prose
+# ("see ``__ot`` for details", "the __OT flag") is no longer corrupted, while genuine
+# call shapes ("__ot file.delete(", "__ot foo()", "__ot.file.delete(") still match.
+# ``__onetool`` and ``mcp__onetool`` keep their broader matching: they are long enough
+# that false-positive prose collisions are not a realistic concern.
 TRIGGER_PATTERN = re.compile(
-    r"(__onetool\b|__ot\b|mcp__onetool\w*)",
+    r"(__onetool\b|__ot\b\s*[\w.]*\(|mcp__onetool\w*)",
     re.IGNORECASE,
 )
 

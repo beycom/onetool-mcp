@@ -7,6 +7,7 @@ through OneTool's single `run` tool interface.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import contextlib
 import json
 import os
@@ -156,11 +157,16 @@ class ProxyManager:
         Returns:
             List of ProxyToolInfo for available tools.
         """
-        items = (
-            [(server, t) for t in self._tools_by_server.get(server, [])]
-            if server
-            else [(srv, t) for srv, ts in self._tools_by_server.items() for t in ts]
-        )
+        # D15: snapshot _tools_by_server under the mutation lock before iterating so
+        # a background connect adding a server mid-scan cannot raise
+        # "RuntimeError: dictionary changed size during iteration".
+        if server:
+            with self._mutation_lock:
+                items = [(server, t) for t in self._tools_by_server.get(server, [])]
+        else:
+            with self._mutation_lock:
+                snapshot = list(self._tools_by_server.items())
+            items = [(srv, t) for srv, ts in snapshot for t in ts]
         return [
             ProxyToolInfo(server=srv, name=t.name, description=t.description or "", input_schema=t.inputSchema)
             for srv, t in items
@@ -224,17 +230,42 @@ class ProxyManager:
             for content in result.content:
                 if isinstance(content, types.TextContent):
                     text_parts.append(content.text)
+                elif isinstance(content, types.EmbeddedResource):
+                    # D12: surface embedded-resource payloads (common for
+                    # document/file-oriented servers) instead of silently dropping
+                    # them and reporting an empty response.
+                    resource = content.resource
+                    resource_text = getattr(resource, "text", None)
+                    if resource_text is not None:
+                        text_parts.append(resource_text)
+                    else:
+                        marker = getattr(resource, "uri", None) or type(resource).__name__
+                        text_parts.append(f"[Binary resource: {marker}]")
                 elif hasattr(content, "data"):
                     text_parts.append(f"[Binary content: {type(content).__name__}]")
 
+            result_value: str | dict[str, Any] | list[Any]
             if not text_parts:
-                result_value: str | dict[str, Any] | list[Any] = "Tool returned empty response."
+                # D12: fall back to a structured payload before declaring the
+                # response empty.
+                structured = getattr(result, "structured_content", None)
+                if structured is None:
+                    structured = getattr(result, "data", None)
+                result_value = (
+                    structured if structured is not None else "Tool returned empty response."
+                )
             elif len(text_parts) == 1:
-                # Single text part: try to parse as JSON for structured return
-                try:
-                    result_value = json.loads(text_parts[0])
-                except (json.JSONDecodeError, ValueError):
-                    result_value = text_parts[0]
+                # D13: only coerce text that structurally looks like JSON (an object
+                # or array). A plain-string answer such as "007" or "true" must pass
+                # through unchanged rather than being force-parsed to a different type.
+                single = text_parts[0]
+                if single.strip()[:1] in ("{", "["):
+                    try:
+                        result_value = json.loads(single)
+                    except (json.JSONDecodeError, ValueError):
+                        result_value = single
+                else:
+                    result_value = single
             else:
                 # Multi-part: concatenate as string
                 result_value = "\n".join(text_parts)
@@ -300,7 +331,13 @@ class ProxyManager:
             self.call_tool(server, tool, arguments, timeout),
             self._loop,
         )
-        return future.result(timeout=timeout + 5)
+        try:
+            return future.result(timeout=timeout + 5)
+        except concurrent.futures.TimeoutError:
+            # D-c1: cancel the scheduled coroutine so it does not keep running on the
+            # event loop after the caller has already received a timeout (leaked work).
+            future.cancel()
+            raise
 
     def list_resources_sync(self, server: str, timeout: float = 5.0) -> list[dict[str, Any]]:
         """Synchronously list resources from a proxied MCP server.
@@ -696,6 +733,22 @@ class ProxyManager:
                 self._server_instructions.clear()
                 self._initialized = False
 
+    def _evict_proxy_caches(self, name: str | None) -> None:
+        """Evict per-server proxy resolution caches so a restart binds to the new schema.
+
+        D14: both the pack-proxy namespace cache (accessor -> tool closures) and the
+        MCP param-name cache key on server identity but are not otherwise invalidated
+        on a disconnect/restart. ``name=None`` clears everything (full reconnect).
+        """
+        from ot.executor.pack_proxy import evict_server_cache, reset
+        from ot.executor.param_resolver import evict_mcp_param_cache
+
+        evict_mcp_param_cache(name)
+        if name is None:
+            reset()
+        else:
+            evict_server_cache(name)
+
     async def reconnect(self, configs: dict[str, McpServerConfig]) -> None:
         """Reconnect to all MCP servers.
 
@@ -706,6 +759,9 @@ class ProxyManager:
         """
         await self.shutdown()
         await self.connect(configs)
+        # D14: schemas may have changed across the restart — drop all cached proxy
+        # resolutions so subsequent calls bind against the fresh tool lists.
+        self._evict_proxy_caches(None)
 
     async def connect_additional(self, name: str, config: McpServerConfig) -> str:
         """Connect a single new server without disrupting existing connections.
@@ -727,6 +783,9 @@ class ProxyManager:
             with self._mutation_lock:
                 self._errors.pop(name, None)
                 tool_count = len(self._tools_by_server.get(name, []))
+            # D14: drop any stale cached resolutions for this server name (e.g. from a
+            # prior connection whose schema differed) so calls bind to the new tools.
+            self._evict_proxy_caches(name)
             return f"ok ({tool_count} tools)"
         except Exception as e:
             with self._mutation_lock:
@@ -748,6 +807,14 @@ class ProxyManager:
         """
         if self._loop is None or not self._loop.is_running():
             return "failed: no running event loop"
+        # D3: if called from code already running on the manager's own loop, a
+        # blocking future.result() onto that same loop can never complete (the
+        # scheduled coroutine cannot run until this call returns) — a ~120s freeze.
+        # Schedule fire-and-continue instead, matching reconnect_sync's pattern.
+        with contextlib.suppress(RuntimeError):
+            if asyncio.get_running_loop() is self._loop:
+                self._loop.create_task(self.connect_additional(name, config))
+                return "scheduled"
         future = asyncio.run_coroutine_threadsafe(
             self.connect_additional(name, config),
             self._loop,
@@ -771,6 +838,9 @@ class ProxyManager:
             self._errors.pop(name, None)
             self._server_instructions.pop(name, None)
             self._server_timeouts.pop(name, None)
+        # D14: drop cached proxy/param resolutions for this server so a later reconnect
+        # of the same name cannot serve stale pre-disconnect tool/param bindings.
+        self._evict_proxy_caches(name)
         try:
             await client.__aexit__(None, None, None)  # type: ignore[no-untyped-call]
             await self._close_client_transport(client)
@@ -804,6 +874,12 @@ class ProxyManager:
                     "no running event loop; underlying transport may not be closed."
                 )
                 return "disconnected"
+        # D3: same-loop guard — blocking on our own loop from our own loop can never
+        # complete. Schedule fire-and-continue instead of a ~30s deadlock.
+        with contextlib.suppress(RuntimeError):
+            if asyncio.get_running_loop() is self._loop:
+                self._loop.create_task(self.disconnect_server(name))
+                return "scheduled"
         future = asyncio.run_coroutine_threadsafe(
             self.disconnect_server(name),
             self._loop,

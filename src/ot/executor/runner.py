@@ -16,7 +16,6 @@ from __future__ import annotations
 import ast
 import asyncio
 import io
-import json
 import re
 from contextlib import redirect_stdout
 from dataclasses import dataclass, field
@@ -55,6 +54,16 @@ class CommandResult:
 
 # Sentinel value to distinguish explicit None return from no return
 _NO_RETURN = object()
+
+# D-a2: maximum nested __onetool(...) recursion depth. A small bound turns runaway
+# recursion into a clear error well before the Python call stack is exhausted.
+_MAX_NESTED_DEPTH = 5
+
+# D3: bounded per-run execution timeout (seconds). A `run` command may chain several
+# tool calls (each up to ~30s for webfetch/proxy) or loop, so this is a generous
+# backstop against an indefinite hang — not a tight per-call SLA. On timeout the
+# command surfaces as a clean isError:true rather than freezing the caller.
+_TOOL_EXECUTION_TIMEOUT_SECS = 300.0
 
 
 _DIRECT_META_PREFIX_RE = re.compile(
@@ -109,6 +118,14 @@ def _force_single_quotes(code: str) -> str:
             ):
                 val = ast.literal_eval(tok.string)
                 if isinstance(val, str):
+                    # D1: never re-quote a string containing control characters.
+                    # Re-quoting to a single-line single-quoted literal would drop a
+                    # real newline/tab inside the literal, producing an unterminated
+                    # string (crash). Re-quoting is purely cosmetic, so skipping it
+                    # for control-char strings is a no-op on correctness.
+                    if "\n" in val or "\r" in val or any(ord(c) < 0x20 for c in val):
+                        result.append(tok)
+                        continue
                     escaped = val.replace("\\", "\\\\").replace("'", "\\'")
                     result.append(tok._replace(string=f"'{escaped}'"))
                     continue
@@ -321,7 +338,7 @@ def execute_python_code(
     tools_dir: Path | None = None,
     validate: bool = True,
     default_format: FormatMode = "json",
-) -> tuple[str, Any, bool, str, bool]:
+) -> tuple[str, Any, bool, FormatMode, bool]:
     """Execute Python code with tool functions available.
 
     Args:
@@ -365,19 +382,68 @@ def execute_python_code(
         "__NO_RETURN__": _NO_RETURN,
     }
 
+    _nested_depth = 0
+    _magic_keys = ("__format__", "__sanitize__", "__force_context__")
+
     def _nested_run(command: str) -> Any:
         """Execute a nested OneTool command string from Python workflows."""
+        nonlocal _nested_depth
         if not isinstance(command, str) or not command.strip():
             raise ValueError("__onetool(command) requires a non-empty command string")
+
+        # D-a2: bound nested recursion so a self-referential __onetool(...) call
+        # raises a clear error instead of exhausting the Python stack (RecursionError).
+        if _nested_depth >= _MAX_NESTED_DEPTH:
+            raise ValueError(
+                f"nested __onetool call depth exceeded (limit {_MAX_NESTED_DEPTH})"
+            )
 
         prepared = prepare_command(command)
         if prepared.error:
             raise ValueError(prepared.error)
 
         nested_code, nested_has_return = prepare_code_for_exec(prepared.code)
-        nested_wrapped_code, _ = wrap_code_for_exec(nested_code, nested_has_return)
-        exec(nested_wrapped_code, namespace)
-        nested_result = namespace.get("__result__", _NO_RETURN)
+        nested_wrapped_code, nested_offset = wrap_code_for_exec(
+            nested_code, nested_has_return
+        )
+
+        # D5: exec into a child namespace (shallow copy) so nested variables and
+        # magic settings cannot leak into the outer command's namespace. Snapshot
+        # the three magics from the outer namespace and restore them afterward as
+        # belt-and-suspenders in case a nested command writes them back.
+        child_ns = dict(namespace)
+        magic_snapshot = {k: namespace[k] for k in _magic_keys if k in namespace}
+        _nested_depth += 1
+        try:
+            exec(nested_wrapped_code, child_ns)
+        except Exception as e:
+            # An error from a deeper nested level is already mapped/formatted — let it
+            # propagate unchanged rather than wrapping it again at each level.
+            if getattr(e, "ot_mapped", False):
+                raise
+            # D-a4: map the error line against the *nested* code's offset, not the
+            # outer command's, and mark it so the outer handler does not re-map it.
+            error_msg, line_num = _map_error_line(e, nested_offset)
+            if line_num is not None:
+                wrapped = ValueError(
+                    f"❗️Execution error at line {line_num}: {type(e).__name__}: {error_msg}"
+                )
+            else:
+                wrapped = ValueError(
+                    f"❗️Execution error: {type(e).__name__}: {error_msg}"
+                )
+            wrapped.ot_original_error_type = type(e).__name__  # type: ignore[attr-defined]
+            wrapped.ot_mapped = True  # type: ignore[attr-defined]
+            raise wrapped from e
+        finally:
+            _nested_depth -= 1
+            for k in _magic_keys:
+                if k in magic_snapshot:
+                    namespace[k] = magic_snapshot[k]
+                else:
+                    namespace.pop(k, None)
+
+        nested_result = child_ns.get("__result__", _NO_RETURN)
         return None if nested_result is _NO_RETURN else nested_result
 
     namespace["__onetool"] = _nested_run
@@ -422,12 +488,23 @@ def execute_python_code(
         return output, raw_result, should_sanitize, fmt, should_force_context
 
     except Exception as e:
+        # A nested __onetool(...) error is already mapped against its own source
+        # offset and formatted (D-a4); re-raise it unchanged rather than re-mapping
+        # against the outer command's line offset.
+        if getattr(e, "ot_mapped", False):
+            raise
         error_msg, line_num = _map_error_line(e, line_offset)
+        # D6: preserve the real exception type in the message and thread it through
+        # to CommandResult.error_type via an attribute the outer handler reads.
+        orig_type = type(e).__name__
         if line_num is not None:
-            raise ValueError(
-                f"❗️Execution error at line {line_num}: {error_msg}"
-            ) from e
-        raise ValueError(f"❗️Execution error: {error_msg}") from e
+            wrapped = ValueError(
+                f"❗️Execution error at line {line_num}: {orig_type}: {error_msg}"
+            )
+        else:
+            wrapped = ValueError(f"❗️Execution error: {orig_type}: {error_msg}")
+        wrapped.ot_original_error_type = orig_type  # type: ignore[attr-defined]
+        raise wrapped from e
 
 
 @dataclass
@@ -463,6 +540,15 @@ def prepare_command(command: str) -> PreparedCommand:
 
     # Step 1: Check for legacy !onetool prefix (rejected)
     stripped_cmd = command.strip()
+    # D-a1: an empty/whitespace-only command has no discoverable intent — refuse it
+    # explicitly rather than executing an empty function body and reporting success.
+    if not stripped_cmd:
+        return PreparedCommand(
+            code="",
+            original=command,
+            error="Command is empty. Provide a Python expression or tool call, "
+            "e.g. pack.tool(arg=value).",
+        )
     if stripped_cmd.startswith("!onetool"):
         return PreparedCommand(
             code="",
@@ -519,8 +605,13 @@ def prepare_command(command: str) -> PreparedCommand:
         logger.warning(f"Code validation warning: {warning}")
 
     # Step 7: Normalize (reuse AST from validation — no extra parse)
+    # D1: normalization is cosmetic. If it ever raises (e.g. a re-quoting edge case),
+    # fall back to the already-validated, executable code rather than crashing `run`.
     if validation.ast_tree is not None:
-        stripped, _ = _normalize_code(stripped, validation.ast_tree)
+        try:
+            stripped, _ = _normalize_code(stripped, validation.ast_tree)
+        except Exception as e:
+            logger.warning(f"Code normalization failed, using unnormalized code: {e}")
 
     return PreparedCommand(
         code=stripped,
@@ -583,6 +674,7 @@ async def execute_command(
                 executor="python",
                 success=False,
                 error_type="ValueError",
+                should_sanitize=False,  # D-b2: first-party error text
             )
         stripped = prepared.code
 
@@ -590,12 +682,10 @@ async def execute_command(
     tool_registry = load_tool_registry(tools_dir)
     tool_namespace = build_execution_namespace(tool_registry)
 
-    # Step 7: Execute as Python code
-    # Use thread pool only when proxy servers are connected (to avoid deadlock)
-    from ot.proxy import get_proxy_manager
-
-    proxy = get_proxy_manager()
-    use_thread_pool = bool(proxy.servers)
+    # Step 7: Execute as Python code.
+    # Always offload user code to a worker thread (D3) so the event loop stays free
+    # to service concurrent run/ping/cancellation and any proxy calls the user code
+    # issues — a blocking tool call can no longer freeze the whole server.
 
     # Determine validation behavior
     should_validate = not skip_validation and prepared_code is None
@@ -623,23 +713,29 @@ async def execute_command(
             )
         )
         try:
-            if use_thread_pool:
-                # Run in thread pool so event loop can process proxy calls
-                text_result, raw_result, sanitize, result_fmt, force_context = await asyncio.to_thread(
+            # Always run user code on a worker thread with a bounded timeout so the
+            # event loop is never blocked and a runaway call cannot hang forever.
+            (
+                text_result,
+                raw_result,
+                sanitize,
+                result_fmt,
+                force_context,
+            ) = await asyncio.wait_for(
+                asyncio.to_thread(
                     execute_python_code,
                     stripped,
                     tool_functions=tool_namespace,
                     validate=should_validate,
                     default_format="json",
-                )
-            else:
-                # Direct execution for non-proxy calls (no overhead)
-                text_result, raw_result, sanitize, result_fmt, force_context = execute_python_code(
-                    stripped,
-                    tool_functions=tool_namespace,
-                    validate=should_validate,
-                    default_format="json",
-                )
+                ),
+                timeout=_TOOL_EXECUTION_TIMEOUT_SECS,
+            )
+
+            # D7: scrub lone UTF-16 surrogates (e.g. from surrogateescape-decoded
+            # filesystem names) so the size measurement below and any downstream
+            # encode cannot raise UnicodeEncodeError on otherwise-correct output.
+            text_result = text_result.encode("utf-8", "replace").decode()
 
             # Check for large output and store if needed
             config = get_config()
@@ -648,16 +744,29 @@ async def execute_command(
             from ot.services import get_services
 
             output_policy = get_services().output_policy_for(tool_name)
+            effective_sanitize = sanitize and output_policy.allow_sanitize
             if output_policy.allow_deflect:
                 result_size = len(text_result.encode("utf-8"))
                 if force_context or (max_size > 0 and result_size > max_size):
                     from ot.executor.result_store import get_result_store
+                    from ot.utils.sanitize import (
+                        sanitize_tag_closes,
+                        sanitize_triggers,
+                    )
 
+                    # D-b3: serialize the stored body in the caller's requested
+                    # format (not always JSON) so a later ctx.read matches what the
+                    # inline response would have shown.
                     ctx_content = (
-                        json.dumps(raw_result, indent=2, ensure_ascii=False)
-                        if raw_result is not None and isinstance(raw_result, (dict, list))
+                        serialize_result(raw_result, result_fmt)
+                        if raw_result is not None
                         else text_result
                     )
+                    # D-b3: sanitize before storing so trigger patterns cannot
+                    # survive to the model via a ctx.read that bypasses the run()
+                    # sanitization boundary.
+                    if effective_sanitize:
+                        ctx_content = sanitize_tag_closes(sanitize_triggers(ctx_content))
                     result_store = get_result_store()
                     stored = result_store.store(ctx_content, tool=stripped[:50])
                     summary_dict = result_store.format_store_response(stored)
@@ -673,14 +782,32 @@ async def execute_command(
                 raw=raw_result,
                 executor="python",
                 success=True,
-                should_sanitize=sanitize and output_policy.allow_sanitize,
+                should_sanitize=effective_sanitize,
                 format=result_fmt,
             )
+        except TimeoutError:
+            # D3: the worker thread keeps running but the caller gets a clean
+            # failure that flows through the D2 ToolError path instead of hanging.
+            return CommandResult(
+                command=command,
+                result=(
+                    f"Execution timed out after {_TOOL_EXECUTION_TIMEOUT_SECS:.0f}s. "
+                    "The command took too long to complete."
+                ),
+                executor="python",
+                success=False,
+                error_type="TimeoutError",
+                should_sanitize=False,
+            )
         except Exception as e:
+            # D-b2: first-party error text is not untrusted external content, so it
+            # is not boundary-wrapped or trigger-redacted. D6: report the real
+            # exception type threaded through from execute_python_code.
             return CommandResult(
                 command=command,
                 result=str(e),
                 executor="python",
                 success=False,
-                error_type=type(e).__name__,
+                error_type=getattr(e, "ot_original_error_type", type(e).__name__),
+                should_sanitize=False,
             )

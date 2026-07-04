@@ -66,11 +66,17 @@ class TestSerializeResult:
         assert serialize_result({}) == "{}"
         assert serialize_result([]) == "[]"
 
-    def test_non_json_types_use_str(self):
-        """Non-JSON types use str() fallback."""
+    def test_top_level_scalars_serialize_as_json(self):
+        """Top-level scalars serialize via JSON, consistent with nested values (D10).
+
+        Previously top-level scalars fell through to str() (e.g. bool -> "True"),
+        which was inconsistent with the same value nested in a dict ("true"). They
+        now degrade through the same JSON path, so behavior no longer depends on
+        nesting depth.
+        """
         assert serialize_result(42) == "42"
-        assert serialize_result(True) == "True"
-        assert serialize_result(None) == "None"
+        assert serialize_result(True) == "true"
+        assert serialize_result(None) == "null"
 
 
 @pytest.mark.unit
@@ -202,3 +208,49 @@ data'''
         result = executor(code)
         assert "\n" in result
         assert json.loads(result) == {"name": "test", "value": 123}
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestSerializeResilience:
+    """Serialization degrades instead of crashing (D7-D10, D-b1)."""
+
+    def test_datetime_and_decimal_degrade(self):
+        """D8: non-JSON-native values degrade via default=str, not TypeError."""
+        from datetime import datetime
+        from decimal import Decimal
+
+        data = {"generated_at": datetime(2026, 7, 4, 12, 0), "score": Decimal("1.5")}
+        result = serialize_result(data)
+        parsed = json.loads(result)
+        assert parsed["score"] == "1.5"
+        assert "2026-07-04" in parsed["generated_at"]
+
+    def test_nan_and_infinity_are_valid_json(self):
+        """D9: NaN/Infinity serialize to valid, parseable JSON (no bare tokens)."""
+        for value in (float("nan"), float("inf"), float("-inf")):
+            result = serialize_result({"v": value})
+            assert "NaN" not in result or json.loads(result)  # parseable
+            parsed = json.loads(result)  # must not raise
+            assert isinstance(parsed["v"], str)  # string sentinel
+
+    def test_top_level_set_matches_nested_set(self):
+        """D10: a top-level set degrades the same way as a nested set."""
+        top = serialize_result({1, 2, 3})
+        nested = serialize_result({"s": {1, 2, 3}})
+        # both go through default=str -> the set becomes its str() form, no raise
+        assert json.loads(top) == json.loads(nested)["s"]
+
+    def test_yaml_set_is_tag_free(self):
+        """D-b1: a set under yml produces tag-free YAML and does not raise."""
+        result = serialize_result({"items": {1, 2, 3}}, fmt="yml")
+        assert "!!python/object" not in result
+        assert "!!set" not in result
+
+    def test_yaml_datetime_degrades(self):
+        """D-b1: yml handles values the JSON path would degrade, without raising."""
+        from decimal import Decimal
+
+        result = serialize_result({"score": Decimal("2.5")}, fmt="yml_h")
+        assert "!!python" not in result
+        assert "2.5" in result

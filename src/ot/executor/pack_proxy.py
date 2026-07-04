@@ -367,3 +367,22 @@ def reset() -> None:
     Called by ot.reload() to release stale proxy/registry references.
     """
     _namespace_cache.clear()
+
+
+def evict_server_cache(server_name: str) -> None:  # noqa: ARG001
+    """Evict cached proxy namespaces after a server connect/disconnect/restart (D14).
+
+    Each cached namespace embeds per-server ``McpProxyPack`` objects whose
+    ``_function_cache`` maps accessor names to tool closures resolved at first access.
+    On a *restart* (disconnect immediately followed by reconnect of the same server
+    name) the outer namespace-cache key — ``frozenset(proxy_mgr.servers)`` — is
+    unchanged, so without eviction the stale ``McpProxyPack`` (and its stale
+    ``_function_cache``) would be reused and resolve against the pre-restart tool list.
+    Clearing the namespace cache forces a fresh ``McpProxyPack`` with an empty
+    ``_function_cache`` on the next build, so calls bind against the current schema.
+
+    Args:
+        server_name: The server that changed (advisory — the whole cache is dropped
+            because packs for all servers share one cached namespace dict).
+    """
+    _namespace_cache.clear()

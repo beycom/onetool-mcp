@@ -163,5 +163,10 @@ class Cache:
         return decorator
 
 
-# Singleton instance — unlimited size, TTL controlled per-call via memoize()
-cache = Cache(max_size=0)
+# Singleton instance shared across packs (webfetch, context7, ot_forge, skills).
+# Bounded so LRU eviction actually engages (R8 P2): the previous max_size=0 meant
+# per-URL page-body memoization (webfetch) and every other memoized entry stayed
+# resident for the whole process lifetime — a monotonic RSS leak, since distinct URLs
+# are rarely re-requested. 2048 entries is generous enough not to thrash normal
+# single-session usage while capping worst-case retention. TTL is still per-call.
+cache = Cache(max_size=2048)

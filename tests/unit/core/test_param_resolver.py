@@ -35,6 +35,23 @@ class TestResolveKwargs:
         result = resolve_kwargs({"xyz": "test"}, ["query", "count"])
         assert result == {"xyz": "test"}
 
+    def test_collision_exact_and_prefix_raises(self):
+        """D4: exact + prefix both targeting one param raises, not silent overwrite."""
+        with pytest.raises(ValueError, match="query"):
+            resolve_kwargs({"query": "real", "q": "typo"}, ["query", "count"])
+
+    def test_collision_is_order_independent(self):
+        """D4: the ambiguity is refused regardless of provided-key order."""
+        with pytest.raises(ValueError):
+            resolve_kwargs({"c": "A", "count": "B"}, ["count"])
+        with pytest.raises(ValueError):
+            resolve_kwargs({"count": "B", "c": "A"}, ["count"])
+
+    def test_single_key_multi_prefix_first_wins_unchanged(self):
+        """D4: a single provided key ambiguously prefixing many params is unchanged."""
+        result = resolve_kwargs({"q": "test"}, ["query_info", "query", "quality"])
+        assert result == {"query_info": "test"}
+
     def test_empty_kwargs(self):
         """Empty kwargs returns empty dict."""
         result = resolve_kwargs({}, ["query", "count"])

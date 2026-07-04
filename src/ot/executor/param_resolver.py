@@ -67,6 +67,23 @@ def get_mcp_tool_param_names(server_name: str, tool_name: str) -> tuple[str, ...
     return result
 
 
+def evict_mcp_param_cache(server_name: str | None = None) -> None:
+    """Evict cached MCP tool param names (D14).
+
+    Called on server disconnect/restart so a subsequent call resolves parameters
+    against the server's *current* schema rather than a stale pre-restart one.
+
+    Args:
+        server_name: Server whose entries to drop. ``None`` clears every entry
+            (used on a full reconnect where any server's schema may have changed).
+    """
+    if server_name is None:
+        _mcp_param_cache.clear()
+        return
+    for key in [k for k in _mcp_param_cache if k[0] == server_name]:
+        _mcp_param_cache.pop(key, None)
+
+
 def resolve_kwargs(
     kwargs: dict[str, object], param_names: Sequence[str]
 ) -> dict[str, object]:
@@ -75,7 +92,11 @@ def resolve_kwargs(
     Matching rules:
     1. Exact match wins - if param name matches exactly, use it
     2. Prefix match - find all params that start with the abbreviated name
-    3. First match wins - if multiple params match, use first in param_names order
+    3. First match wins - if a *single* provided key prefix-matches multiple
+       different params, use the first in param_names order
+    4. Collision refusal (D4) - if two *different* provided keys would resolve to
+       the *same* target parameter, raise ValueError instead of silently letting
+       dict-iteration order pick a winner and discard the other value.
 
     Args:
         kwargs: Dictionary of parameter names to values.
@@ -83,6 +104,9 @@ def resolve_kwargs(
 
     Returns:
         New dictionary with resolved parameter names.
+
+    Raises:
+        ValueError: If two provided keys collide on one target parameter.
 
     Examples:
         >>> resolve_kwargs({"q": "test"}, ["query", "count"])
@@ -96,28 +120,42 @@ def resolve_kwargs(
 
         >>> resolve_kwargs({"xyz": "test"}, ["query"])
         {"xyz": "test"}  # no match, passthrough
+
+        >>> resolve_kwargs({"query": "real", "q": "typo"}, ["query", "count"])
+        Traceback (most recent call last):
+        ValueError: ...  # 'query' and 'q' both target 'query'
     """
     if not kwargs or not param_names:
         return kwargs
 
     param_set = set(param_names)
     resolved: dict[str, object] = {}
+    # target parameter name -> the provided key that first claimed it
+    claimed_by: dict[str, str] = {}
+
+    def _claim(target: str, key: str, value: object) -> None:
+        prev = claimed_by.get(target)
+        if prev is not None and prev != key:
+            raise ValueError(
+                f"Ambiguous parameters: both '{prev}' and '{key}' resolve to "
+                f"parameter '{target}'. Provide only one."
+            )
+        claimed_by[target] = key
+        resolved[target] = value
 
     for key, value in kwargs.items():
         # Exact match - use as-is
         if key in param_set:
-            resolved[key] = value
+            _claim(key, key, value)
             continue
 
         # Find prefix matches (preserve signature order)
         matches = [p for p in param_names if p.startswith(key)]
 
-        if len(matches) == 1:
-            # Single match - use it
-            resolved[matches[0]] = value
-        elif len(matches) > 1:
-            # Multiple matches - use first in signature order
-            resolved[matches[0]] = value
+        if matches:
+            # Single or multiple matches: first in signature order wins. A collision
+            # with a *different* provided key on that target is refused by _claim.
+            _claim(matches[0], key, value)
         else:
             # No match - passthrough (let function raise its own error)
             resolved[key] = value

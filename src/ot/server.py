@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
 from fastmcp import Context, FastMCP
+from fastmcp.exceptions import ToolError
 from fastmcp.tools import ToolResult
 from loguru import logger
 
@@ -168,6 +169,12 @@ def _start_direct_api() -> tuple[Any, threading.Thread, int]:
             port=port,
             log_level="warning",
             lifespan="off",
+            # F4: suppress uvicorn's default dictConfig, which installs a
+            # StreamHandler(stdout) on uvicorn.access. This process shares fd 1 with
+            # the stdio JSON-RPC stream; if the log level were ever lowered, access
+            # lines on stdout would corrupt it. loguru's InterceptHandler already
+            # covers uvicorn's loggers, so no records are lost.
+            log_config=None,
         )
         server = uvicorn.Server(config)
         thread = threading.Thread(target=server.run, name=f"onetool-direct-{port}", daemon=True)
@@ -530,7 +537,10 @@ def _get_run_description() -> str:
     annotations={
         "title": "🧿",
         "readOnlyHint": False,
-        "destructiveHint": False,
+        # A single meta-tool surface that can call file.delete (and anything else in
+        # the catalog) is, conservatively, destructive-capable. A client gating a
+        # confirmation on this hint must not skip it.
+        "destructiveHint": True,
         "idempotentHint": False,
         "openWorldHint": True,
     },
@@ -539,11 +549,18 @@ async def run(command: str, ctx: Context) -> ToolResult:  # noqa: ARG001
     # Record start time for stats
     start_time = time.monotonic()
 
-    # Step 1: Prepare and validate command
-    prepared = prepare_command(command)
+    # Step 1: Prepare and validate command. D1: any unanticipated exception during
+    # preparation becomes a clean ToolError instead of escaping the tool handler
+    # uncaught; D2: a validation error surfaces as isError:true.
+    try:
+        prepared = prepare_command(command)
+    except Exception as e:
+        raise ToolError(
+            f"Error: command preparation failed: {type(e).__name__}: {e}"
+        ) from e
 
     if prepared.error:
-        return ToolResult(content=f"Error: {prepared.error}")
+        raise ToolError(f"Error: {prepared.error}")
 
     # Step 2: Execute through unified runner (skip validation since already done)
     result = await execute_command(
@@ -569,6 +586,12 @@ async def run(command: str, ctx: Context) -> ToolResult:  # noqa: ARG001
     text = sanitize_output(
         result.result, enabled=result.should_sanitize, fmt=result.format
     )
+    # D2: a tool-execution failure must surface as isError:true. FastMCP sets isError
+    # only when the handler raises — a *returned* ToolResult is always isError:false.
+    # Raise ToolError (error text preserved) so a client branching on isError can tell
+    # success from failure.
+    if not result.success:
+        raise ToolError(text)
     return ToolResult(content=text)
 
 
