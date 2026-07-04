@@ -253,3 +253,99 @@ def test_registry_no_bare_name_collisions() -> None:
     # Should NOT have bare names for functions in packs
     # (only tools without a pack would have bare names)
     assert "search" not in registry.functions
+
+
+# =============================================================================
+# R8 P4 — single AST parse per tool file at scan time
+# =============================================================================
+
+_FIXTURE_TOOL_SOURCE = '''\
+"""Fixture tool module for registry AST-reuse tests."""
+
+pack = "fixture_pack"
+pack_aliases = ("fx",)
+doc_slug = "fixture-pack"
+
+__all__ = ["do_thing"]
+
+
+def do_thing(name: str) -> str:
+    """Do the fixture thing.
+
+    Args:
+        name: Name to greet.
+    """
+    return f"hello {name}"
+
+
+def _private_helper() -> None:
+    """Not exported — should not become a tool."""
+    return None
+'''
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_scan_files_extracts_expected_pack_and_tool_metadata(tmp_path) -> None:
+    """scan_files threading the parsed AST through to both parse_file and
+    _extract_pack_metadata must not change what gets extracted: the pack name,
+    its aliases/doc_slug, and the tool's name/signature/docstring must match
+    what a from-scratch (un-optimized) parse of the same source would produce.
+    """
+    from ot.registry.registry import ToolRegistry
+
+    tool_file = tmp_path / "fixture_tool.py"
+    tool_file.write_text(_FIXTURE_TOOL_SOURCE, encoding="utf-8")
+
+    registry = ToolRegistry(tmp_path)
+    registry.scan_files([tool_file])
+
+    # Pack metadata (previously extracted via a second read_text+ast.parse pass)
+    assert "fixture_pack" in registry.pack_metadata
+    metadata = registry.pack_metadata["fixture_pack"]
+    assert metadata["pack"] == "fixture_pack"
+    assert metadata["aliases"] == ("fx",)
+    assert metadata["doc_slug"] == "fixture-pack"
+
+    # Tool metadata (from the first parse pass). Tool keys are pack-qualified
+    # since `pack` is set on this fixture module.
+    assert "fixture_pack.do_thing" in registry.tools
+    tool = registry.tools["fixture_pack.do_thing"]
+    assert tool.pack == "fixture_pack"
+    assert tool.module == "tools.fixture_tool"
+    assert "name: str" in tool.signature
+    assert "Do the fixture thing" in tool.description
+
+    # __all__ excludes the private helper and any non-exported function.
+    assert not any(name.endswith("_private_helper") for name in registry.tools)
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_scan_files_parses_each_tool_file_ast_exactly_once(
+    tmp_path, monkeypatch
+) -> None:
+    """R8 P4: scan_files must call ast.parse exactly once per file — the tree is
+    threaded through to both parse_file and _extract_pack_metadata instead of
+    each independently read_text + ast.parse-ing the same file."""
+    import ast
+
+    from ot.registry.registry import ToolRegistry
+
+    tool_file = tmp_path / "fixture_tool.py"
+    tool_file.write_text(_FIXTURE_TOOL_SOURCE, encoding="utf-8")
+
+    real_parse = ast.parse
+    call_count = 0
+
+    def _counting_parse(*args: object, **kwargs: object) -> ast.Module:
+        nonlocal call_count
+        call_count += 1
+        return real_parse(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(ast, "parse", _counting_parse)
+
+    registry = ToolRegistry(tmp_path)
+    registry.scan_files([tool_file])
+
+    assert call_count == 1

@@ -153,9 +153,18 @@ def resolve_kwargs(
         matches = [p for p in param_names if p.startswith(key)]
 
         if matches:
-            # Single or multiple matches: first in signature order wins. A collision
-            # with a *different* provided key on that target is refused by _claim.
-            _claim(matches[0], key, value)
+            # Single match: only option, first (and only) in signature order wins.
+            # Multiple matches: prefer a target that isn't already claimed by
+            # another key and isn't itself an exact key elsewhere in kwargs
+            # (that key will claim it exactly), so we don't fabricate an
+            # ambiguity collision with an unrelated provided key. Fall back to
+            # the first match in signature order if every candidate is taken —
+            # that case is a genuine ambiguity and _claim will raise.
+            target = next(
+                (m for m in matches if m not in claimed_by and m not in kwargs),
+                matches[0],
+            )
+            _claim(target, key, value)
         else:
             # No match - passthrough (let function raise its own error)
             resolved[key] = value

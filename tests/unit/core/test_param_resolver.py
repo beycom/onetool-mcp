@@ -80,6 +80,19 @@ class TestResolveKwargs:
         result = resolve_kwargs({"count": 5}, ["cache", "count"])
         assert result == {"count": 5}
 
+    def test_multi_prefix_skips_target_claimed_by_another_key(self):
+        """Multiple prefix matches must not fabricate ambiguity with another
+        provided key: 'p' prefix-matches both 'path' and 'pattern', but 'path'
+        is itself an exact key in kwargs, so 'p' should resolve to 'pattern'."""
+        result = resolve_kwargs({"p": "x", "path": "y"}, ["path", "pattern"])
+        assert result == {"pattern": "x", "path": "y"}
+
+    def test_multi_prefix_ambiguity_still_raises_when_targets_are_taken(self):
+        """D4 must still hold: query='x', q='y' both target 'query' (the only
+        candidate), so this remains a genuine ambiguity."""
+        with pytest.raises(ValueError, match="query"):
+            resolve_kwargs({"query": "x", "q": "y"}, ["query", "count"])
+
     def test_preserves_value_types(self):
         """Value types are preserved during resolution."""
         result = resolve_kwargs(

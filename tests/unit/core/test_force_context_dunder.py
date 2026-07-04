@@ -25,7 +25,9 @@ def _make_config(max_inline_size: int = 5000) -> MagicMock:
     return cfg
 
 
-def _fake_ctx_write(content: str, *, source: str = "", verbose: bool = False, **_) -> dict:
+def _fake_ctx_write(
+    content: str, *, source: str = "", verbose: bool = False, **_
+) -> dict:
     del source, verbose
     return {
         "handle": "abcd1234",
@@ -74,7 +76,9 @@ class TestForceContextDunder:
             with patch("ot.ctx.write.ctx_write", side_effect=_capture_write):
                 from ot.executor.runner import execute_command
 
-                result = asyncio.run(execute_command('__force_context__ = True\n"tiny output"'))
+                result = asyncio.run(
+                    execute_command('__force_context__ = True\n"tiny output"')
+                )
 
         assert result.success, f"Command failed: {result.result}"
         assert len(ctx_write_calls) == 1, "ctx_write should have been called once"
@@ -95,7 +99,9 @@ class TestForceContextDunder:
             mock_pm.return_value.servers = {}
             from ot.executor.runner import execute_command
 
-            result = asyncio.run(execute_command('__force_context__ = False\n"tiny output"'))
+            result = asyncio.run(
+                execute_command('__force_context__ = False\n"tiny output"')
+            )
 
         assert result.success, f"Command failed: {result.result}"
         mock_write.assert_not_called()
@@ -140,7 +146,14 @@ class TestForceContextDunder:
             patch("ot.ctx.write.ctx_write") as mock_write,
             patch(
                 "ot.executor.runner.execute_python_code",
-                return_value=('{"content": "ctx result"}', None, False, "json", True),
+                return_value=(
+                    '{"content": "ctx result"}',
+                    None,
+                    False,
+                    "json",
+                    True,
+                    None,
+                ),
             ),
         ):
             mock_pm.return_value.servers = {}
@@ -164,7 +177,7 @@ class TestForceContextDunder:
             patch("ot.ctx.write.ctx_write") as mock_write,
             patch(
                 "ot.executor.runner.execute_python_code",
-                return_value=('{"help":"value"}', None, False, "json", True),
+                return_value=('{"help":"value"}', None, False, "json", True, None),
             ),
         ):
             mock_pm.return_value.servers = {}
@@ -190,7 +203,11 @@ class TestForceContextDunder:
             mock_pm.return_value.servers = {}
             from ot.executor.runner import execute_command
 
-            result = asyncio.run(execute_command("'this output will be deflected because threshold is tiny'"))
+            result = asyncio.run(
+                execute_command(
+                    "'this output will be deflected because threshold is tiny'"
+                )
+            )
 
         assert result.success, f"Command failed: {result.result}"
         parsed = json.loads(result.result)
@@ -209,7 +226,7 @@ class TestForceContextDunder:
             patch("ot.proxy.get_proxy_manager") as mock_pm,
             patch(
                 "ot.executor.runner.execute_python_code",
-                return_value=('{"name":"ot.help"}', None, False, "json", False),
+                return_value=('{"name":"ot.help"}', None, False, "json", False, None),
             ) as mock_exec,
         ):
             mock_pm.return_value.servers = {}
@@ -232,7 +249,7 @@ class TestForceContextDunder:
             patch("ot.proxy.get_proxy_manager") as mock_pm,
             patch(
                 "ot.executor.runner.execute_python_code",
-                return_value=('{"ok":true}', None, False, "json", False),
+                return_value=('{"ok":true}', None, False, "json", False, None),
             ) as mock_exec,
         ):
             mock_pm.return_value.servers = {}

@@ -20,6 +20,26 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+# Eagerly import ot.meta (and everything it pulls in, e.g. ot.meta._debug) before any
+# test module runs. Several core modules do a MODULE-LEVEL `from ot.config import
+# get_config` (e.g. ot/meta/_debug.py). That import statement only executes once, the
+# first time the module is imported, and it binds a name in that module's own
+# namespace to whatever object `ot.config.get_config` currently is.
+#
+# Some tests do `patch("ot.config.get_config", return_value=<mock>)` around code that
+# lazily imports ot.meta for the first time (e.g. via `ot.direct_auth.direct_auth_key`
+# -> `ot.meta.resolve_ot_path`). If that first import happens to land inside the
+# `patch(...)` context, the importing module permanently captures the mock function
+# object -- it keeps returning the stale mocked config forever after, even once the
+# patch context has exited, because the module is never re-imported (see
+# ot.meta._debug.get_config). This previously caused test_direct_app.py to fail only
+# when run after test_direct_api.py in the same session.
+#
+# Forcing the import here, before collection/patching of any test module can occur,
+# guarantees these modules bind the real `ot.config.get_config` and never observe a
+# mocked one.
+import ot.meta  # noqa: F401
+
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     """Add custom CLI options."""
@@ -133,15 +153,15 @@ def executor() -> Callable[[str], str]:
     tool_funcs: dict[str, Any] = load_tool_functions(tools_dir)
 
     def run(code: str) -> str:
-        text, _raw, _sanitize, _fmt, _fc = execute_python_code(code, tool_functions=tool_funcs)
+        text, _raw, _sanitize, _fmt, _fc, _raw_ser = execute_python_code(
+            code, tool_functions=tool_funcs
+        )
         return text
 
     return run
 
 
-def pytest_collection_modifyitems(
-    config: pytest.Config, items: list[Item]
-) -> None:
+def pytest_collection_modifyitems(config: pytest.Config, items: list[Item]) -> None:
     """Enforce required markers.
 
     By default a test missing a speed or component marker FAILS collection (so a
@@ -264,4 +284,3 @@ def mock_proxy_manager():
         proxy.servers = []
         mock.return_value = proxy
         yield proxy
-

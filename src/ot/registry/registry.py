@@ -70,8 +70,13 @@ class ToolRegistry:
                 )
                 continue
             try:
-                tools = self.parse_file(py_file)
-                metadata = self._extract_pack_metadata(py_file)
+                # R8 P4: parse the file's AST once and thread it through to both
+                # parse_file and _extract_pack_metadata, instead of each of them
+                # independently read_text + ast.parse-ing the same file.
+                source = py_file.read_text(encoding="utf-8")
+                tree = ast.parse(source, filename=str(py_file))
+                tools = self.parse_file(py_file, tree=tree)
+                metadata = self._extract_pack_metadata(py_file, tree=tree)
                 if metadata is not None:
                     self._pack_metadata[metadata["pack"]] = metadata
                 for tool in tools:
@@ -170,17 +175,24 @@ class ToolRegistry:
         py_files = list(scan_path.glob("*.py"))
         return self.scan_files(py_files)
 
-    def parse_file(self, path: Path) -> list[ToolInfo]:
+    def parse_file(
+        self, path: Path, *, tree: ast.Module | None = None
+    ) -> list[ToolInfo]:
         """Parse a Python file and extract public function information.
 
         Args:
             path: Path to Python file.
+            tree: Pre-parsed AST for `path`, if the caller already has one (e.g.
+                `scan_files`, which parses each file once and threads the tree
+                through to both this method and `_extract_pack_metadata` — R8 P4).
+                When omitted, this method reads and parses `path` itself.
 
         Returns:
             List of ToolInfo for exported functions (respects __all__ and pack).
         """
-        source = path.read_text(encoding="utf-8")
-        tree = ast.parse(source, filename=str(path))
+        if tree is None:
+            source = path.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=str(path))
 
         # Module name: tools/gold_prices.py -> tools.gold_prices
         module_name = f"tools.{path.stem}"
@@ -292,10 +304,20 @@ class ToolRegistry:
                             return None
         return None
 
-    def _extract_pack_metadata(self, path: Path) -> dict[str, Any] | None:
-        """Extract pack aliases and doc slug from a module."""
-        source = path.read_text(encoding="utf-8")
-        tree = ast.parse(source, filename=str(path))
+    def _extract_pack_metadata(
+        self, path: Path, *, tree: ast.Module | None = None
+    ) -> dict[str, Any] | None:
+        """Extract pack aliases and doc slug from a module.
+
+        Args:
+            path: Path to Python file (used for the AST filename when `tree` is
+                not provided).
+            tree: Pre-parsed AST for `path`, if the caller already has one
+                (R8 P4 — avoids a second read_text + ast.parse of the same file).
+        """
+        if tree is None:
+            source = path.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=str(path))
         pack = self._extract_pack(tree)
         if not pack:
             return None

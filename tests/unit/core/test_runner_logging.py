@@ -39,7 +39,9 @@ def test_prepare_command_records_snippet_metadata() -> None:
 @pytest.mark.unit
 @pytest.mark.core
 @pytest.mark.asyncio
-async def test_execute_command_logs_original_snippet_command_not_expanded_code() -> None:
+async def test_execute_command_logs_original_snippet_command_not_expanded_code() -> (
+    None
+):
     """runner.execute INFO metadata uses request command, not expanded snippet code."""
     from ot.config import OneToolConfig, SnippetDef
     from ot.executor.runner import execute_command
@@ -86,7 +88,7 @@ async def test_execute_command_logs_original_snippet_command_not_expanded_code()
         ),
         patch(
             "ot.executor.runner.execute_python_code",
-            return_value=("ok", "ok", True, "json", False),
+            return_value=("ok", "ok", True, "json", False, "ok"),
         ),
         patch("ot.executor.runner.LogSpan", FakeSpan),
     ):

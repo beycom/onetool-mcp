@@ -76,6 +76,17 @@ class TestSanitizeTriggers:
         assert "__ot" not in result
         assert "[REDACTED:trigger]" in result
 
+    def test_snippet_colon_call_still_redacted(self):
+        """D11: fence-snippet colon shape ('__ot :deploy key=1') still redacts.
+
+        The executor's fence_processor strips the leading ``__ot `` prefix and runs
+        ``:deploy key=1`` as a snippet, so this shape is a genuine invocation trigger
+        even though it has no trailing ``(``.
+        """
+        result = sanitize_triggers("__ot :deploy key=1")
+        assert "__ot" not in result
+        assert "[REDACTED:trigger]" in result
+
     def test_preserves_safe_content(self):
         """Content without triggers passes through unchanged."""
         content = "This is safe content with no triggers"
@@ -285,16 +296,14 @@ class TestSanitizeMagicVariable:
 
         # Create config with sanitization enabled
         mock_config = OneToolConfig(
-            security=SecurityConfig(
-                sanitize=OutputSanitizationConfig(enabled=True)
-            )
+            security=SecurityConfig(sanitize=OutputSanitizationConfig(enabled=True))
         )
 
         tools_dir = Path(__file__).parent.parent.parent.parent / "src" / "ottools"
         tool_funcs = load_tool_functions(tools_dir)
 
         with patch("ot.executor.runner.get_config", return_value=mock_config):
-            result, _raw, should_sanitize, _fmt, _fc = execute_python_code(
+            result, _raw, should_sanitize, _fmt, _fc, _raw_ser = execute_python_code(
                 '{"key": "value with __ot trigger"}',
                 tool_functions=tool_funcs,
             )
@@ -319,9 +328,9 @@ class TestSanitizeMagicVariable:
         tools_dir = Path(__file__).parent.parent.parent.parent / "src" / "ottools"
         tool_funcs = load_tool_functions(tools_dir)
 
-        code = f'''__sanitize__ = {sanitize_val}
-{{"key": "value"}}'''
-        _text, _raw, should_sanitize, _fmt, _fc = execute_python_code(
+        code = f"""__sanitize__ = {sanitize_val}
+{{"key": "value"}}"""
+        _text, _raw, should_sanitize, _fmt, _fc, _raw_ser = execute_python_code(
             code, tool_functions=tool_funcs
         )
         assert should_sanitize is expected

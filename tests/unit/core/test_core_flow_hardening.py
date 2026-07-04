@@ -161,11 +161,7 @@ class TestNestedExecution:
     def test_nested_sanitize_magic_does_not_leak(
         self, executor: Callable[[str], str]
     ) -> None:
-        outer = (
-            "__sanitize__ = False\n"
-            "__onetool('__sanitize__ = True')\n"
-            "'done'\n"
-        )
+        outer = "__sanitize__ = False\n__onetool('__sanitize__ = True')\n'done'\n"
         # Executes without error and the nested magic change is isolated.
         assert executor(outer) == "done"
 
@@ -193,6 +189,24 @@ class TestNestedExecution:
         outer = f"__onetool({nested!r})"
         with pytest.raises(ValueError, match="line 3"):
             executor(outer)
+
+    def test_nested_name_error_preserves_original_name(
+        self, executor: Callable[[str], str]
+    ) -> None:
+        """A NameError inside a nested __onetool(...) call sets ot_original_error_name.
+
+        execute_command's NameError handler reads this attribute to drive the
+        fuzzy "Did you mean <pack>?" suggestion. The nested and outer
+        error-wrapping blocks used to be duplicated by hand, and the nested one
+        omitted this attribute (only the outer block set it), so NameErrors
+        raised inside nested __onetool() calls never got the suggestion. Both
+        blocks now share `_wrap_execution_error`, which always sets it.
+        """
+        outer = "__onetool('undefined_pack_zzz.thing()')"
+        with pytest.raises(ValueError) as exc_info:
+            executor(outer)
+        assert exc_info.value.ot_original_error_type == "NameError"  # type: ignore[attr-defined]
+        assert exc_info.value.ot_original_error_name == "undefined_pack_zzz"  # type: ignore[attr-defined]
 
 
 # =============================================================================
@@ -270,6 +284,99 @@ class TestDeflectionSanitizeAndFormat:
 
 
 # =============================================================================
+# R8 P3 — Deflection avoids a redundant serialization pass
+# =============================================================================
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestDeflectionSingleSerializePass:
+    """R8 P3: deflection reuses the already-computed serialization/size instead
+    of re-`json.dumps`-ing `raw_result` and re-encoding `text_result` again."""
+
+    async def test_deflected_content_matches_expected_serialization(self) -> None:
+        """Stored content round-trips to the same data as raw_result — the ctx
+        backend re-normalizes JSON (pretty-prints it) independently of this
+        change, so compare parsed content rather than the raw stored bytes."""
+        import json
+
+        from ot.executor.result_store import get_result_store
+
+        raw = {"items": list(range(50)), "note": "x" * 50}
+        cmd = f"__force_context__ = True\n{raw!r}\n"
+        result = await execute_command(cmd)
+        assert result.success
+        handle = result.raw["handle"]
+        content = get_result_store().query(handle).content
+        assert json.loads(content) == raw
+
+    async def test_size_accounting_matches_the_reused_encode(self) -> None:
+        """`storedSize` (the deflection-threshold byte count) must equal the true
+        UTF-8 byte length of the exact string that gets stored — proving the
+        reused D7 encode wasn't swapped for a cheaper-but-wrong measurement
+        (e.g. `len(text_result)` character count instead of byte count)."""
+        from ot.utils import serialize_result
+
+        captured: dict[str, object] = {}
+
+        class FakeSpan:
+            def __init__(self, **kwargs: object) -> None:
+                captured.update(kwargs)
+
+            def __enter__(self) -> FakeSpan:
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+            def add(self, key: str, value: object = None, **kwargs: object) -> None:
+                captured[key] = value
+                captured.update(kwargs)
+
+        raw = {"items": list(range(50)), "note": "é" * 50}  # multibyte chars
+        cmd = f"__force_context__ = True\n{raw!r}\n"
+
+        from unittest.mock import patch
+
+        with patch("ot.executor.runner.LogSpan", FakeSpan):
+            result = await execute_command(cmd)
+
+        assert result.success
+        expected_size = len(serialize_result(raw, "json").encode("utf-8"))
+        assert captured["storedSize"] == expected_size
+        # A char-count (not byte-count) regression would under-count multibyte
+        # content — guard that the two diverge for this fixture, so the
+        # assertion above is actually exercising byte semantics.
+        assert expected_size != len(serialize_result(raw, "json"))
+
+    async def test_serialize_result_not_called_twice_for_raw_result(
+        self, monkeypatch
+    ) -> None:
+        """Before this fix, the deflect block called `serialize_result(raw_result,
+        result_fmt)` a second time even though `execute_python_code` already
+        computed that exact string. Assert the total call count drops to the two
+        genuinely-distinct serializations left in the deflect path: the raw
+        result itself (inside `execute_python_code`) and the outer summary_dict
+        response wrapper — not a third pass re-deriving the same raw content."""
+        import ot.executor.runner as runner
+
+        call_count = 0
+        real_serialize = runner.serialize_result
+
+        def _counting_serialize(value: object, fmt: str) -> str:
+            nonlocal call_count
+            call_count += 1
+            return real_serialize(value, fmt)
+
+        monkeypatch.setattr(runner, "serialize_result", _counting_serialize)
+
+        cmd = "__force_context__ = True\n{'a': list(range(50))}\n"
+        result = await execute_command(cmd)
+        assert result.success
+        assert call_count == 2
+
+
+# =============================================================================
 # D3 — Execution timeout
 # =============================================================================
 
@@ -288,7 +395,7 @@ class TestExecutionTimeout:
 
         def _slow(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
             time.sleep(5)
-            return ("x", None, True, "json", False)
+            return ("x", None, True, "json", False, None)
 
         # execute_command dispatches this on a worker thread; the wait_for timeout
         # must return a clean failure instead of blocking for the full sleep.

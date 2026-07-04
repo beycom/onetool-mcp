@@ -24,3 +24,15 @@ class TestTypoPackSuggestion:
         assert not result.success
         assert "ot.packs()" in result.result
         assert "Did you mean" not in result.result
+
+    async def test_nested_near_miss_pack_suggests_real_pack(self) -> None:
+        """A NameError raised inside a nested __onetool(...) call also gets the
+        fuzzy suggestion (the nested error-wrapping path used to omit
+        ot_original_error_name, so this suggestion never fired for nested code).
+        """
+        command = "__onetool(\"brvae.search(query='test')\")"
+        result = await execute_command(command)
+        assert not result.success
+        assert result.error_type == "NameError"
+        assert "brave" in result.result
+        assert "ot.packs()" in result.result

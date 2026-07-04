@@ -36,7 +36,7 @@ class TestNonBlockingExecution:
 
         def _slow(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
             time.sleep(0.8)
-            return ("ok", None, True, "json", False)
+            return ("ok", None, True, "json", False, None)
 
         # No proxy servers connected: the old code ran this synchronously on the loop.
         monkeypatch.setattr(runner, "execute_python_code", _slow)

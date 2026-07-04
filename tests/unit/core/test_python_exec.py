@@ -75,7 +75,7 @@ class TestParseNested:
         """Nested command helper is exposed as __onetool, not legacy __run."""
         from ot.executor.runner import execute_python_code
 
-        result, _raw, _sanitize, _fmt, _fc = execute_python_code(
+        result, _raw, _sanitize, _fmt, _fc, _raw_ser = execute_python_code(
             '{"new": "__onetool" in globals(), "old": "__run" in globals()}',
             tool_functions={},
             validate=False,

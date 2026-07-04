@@ -332,13 +332,49 @@ def _map_error_line(error: Exception, line_offset: int) -> tuple[str, int | None
     return str(error), None
 
 
+def _wrap_execution_error(e: Exception, offset: int) -> ValueError:
+    """Map an exec'd-code exception into the standard wrapped ValueError.
+
+    Shared by both the nested `__onetool(...)` error handler and the outer
+    execute_python_code error handler so the two paths cannot drift: both must
+    stamp the same attributes, notably `ot_original_error_name` (from the
+    original exception's `.name`, present on NameError), which execute_command
+    reads to drive the NameError "Did you mean <pack>?" fuzzy suggestion.
+
+    Args:
+        e: The exception raised during exec() of the (possibly nested) code.
+        offset: Line offset to subtract when mapping the error back to source.
+
+    Returns:
+        A ValueError with the formatted message and `ot_original_error_type`,
+        `ot_original_error_name`, and `ot_mapped` attributes set. Callers must
+        `raise wrapped from e`.
+    """
+    error_msg, line_num = _map_error_line(e, offset)
+    # D6: preserve the real exception type in the message and thread it through
+    # to CommandResult.error_type via an attribute the outer handler reads.
+    orig_type = type(e).__name__
+    if line_num is not None:
+        wrapped = ValueError(
+            f"❗️Execution error at line {line_num}: {orig_type}: {error_msg}"
+        )
+    else:
+        wrapped = ValueError(f"❗️Execution error: {orig_type}: {error_msg}")
+    wrapped.ot_original_error_type = orig_type  # type: ignore[attr-defined]
+    # Preserve the unresolved identifier of a NameError so execute_command can
+    # offer a fuzzy pack-name suggestion (the wrapper drops the original .name).
+    wrapped.ot_original_error_name = getattr(e, "name", None)  # type: ignore[attr-defined]
+    wrapped.ot_mapped = True  # type: ignore[attr-defined]
+    return wrapped
+
+
 def execute_python_code(
     code: str,
     tool_functions: dict[str, Any] | None = None,
     tools_dir: Path | None = None,
     validate: bool = True,
     default_format: FormatMode = "json",
-) -> tuple[str, Any, bool, FormatMode, bool]:
+) -> tuple[str, Any, bool, FormatMode, bool, str | None]:
     """Execute Python code with tool functions available.
 
     Args:
@@ -349,7 +385,12 @@ def execute_python_code(
         default_format: Format used when code does not set __format__
 
     Returns:
-        Tuple of (serialized string, raw Python object, sanitize flag, format mode, force_context flag)
+        Tuple of (serialized string, raw Python object, sanitize flag, format mode,
+        force_context flag, raw-only serialized string). The last element is
+        `serialize_result(raw_result, fmt)` with no stdout prefix — the exact
+        string a caller would otherwise recompute for deflection storage — or
+        `None` when there is no return value to serialize (R8 P3: lets callers
+        reuse it instead of re-serializing raw_result a second time).
 
     Raises:
         ValueError: If validation fails or execution fails
@@ -423,18 +464,7 @@ def execute_python_code(
                 raise
             # D-a4: map the error line against the *nested* code's offset, not the
             # outer command's, and mark it so the outer handler does not re-map it.
-            error_msg, line_num = _map_error_line(e, nested_offset)
-            if line_num is not None:
-                wrapped = ValueError(
-                    f"❗️Execution error at line {line_num}: {type(e).__name__}: {error_msg}"
-                )
-            else:
-                wrapped = ValueError(
-                    f"❗️Execution error: {type(e).__name__}: {error_msg}"
-                )
-            wrapped.ot_original_error_type = type(e).__name__  # type: ignore[attr-defined]
-            wrapped.ot_mapped = True  # type: ignore[attr-defined]
-            raise wrapped from e
+            raise _wrap_execution_error(e, nested_offset) from e
         finally:
             _nested_depth -= 1
             for k in _magic_keys:
@@ -465,27 +495,45 @@ def execute_python_code(
         # Read __format__ from namespace.
         fmt: FormatMode = namespace.get("__format__", default_format)
         if fmt not in ("json", "json_h", "yml", "yml_h", "raw"):
-            fmt = default_format if default_format in ("json", "json_h", "yml", "yml_h", "raw") else "json"
+            fmt = (
+                default_format
+                if default_format in ("json", "json_h", "yml", "yml_h", "raw")
+                else "json"
+            )
 
         # Read __sanitize__ and __force_context__ from namespace, defaulting to config settings
         config = get_config()
-        should_sanitize: bool = namespace.get("__sanitize__", config.security.sanitize.enabled)
+        should_sanitize: bool = namespace.get(
+            "__sanitize__", config.security.sanitize.enabled
+        )
         should_force_context: bool = namespace.get("__force_context__", False)
 
         # Determine output and raw_result
         raw_result = None
+        # R8 P3: compute the raw-only serialization once here so callers (e.g. the
+        # deflection block in execute_command) can reuse it instead of calling
+        # serialize_result(raw_result, fmt) a second time.
+        raw_serialized: str | None = None
         if result is _NO_RETURN:
             output = stdout_output or "Code executed successfully (no return value)"
         elif result is None:
             output = stdout_output or "None"
         else:
             raw_result = result
+            raw_serialized = serialize_result(result, fmt)
             if stdout_output:
-                output = f"{stdout_output}\n{serialize_result(result, fmt)}"
+                output = f"{stdout_output}\n{raw_serialized}"
             else:
-                output = serialize_result(result, fmt)
+                output = raw_serialized
 
-        return output, raw_result, should_sanitize, fmt, should_force_context
+        return (
+            output,
+            raw_result,
+            should_sanitize,
+            fmt,
+            should_force_context,
+            raw_serialized,
+        )
 
     except Exception as e:
         # A nested __onetool(...) error is already mapped against its own source
@@ -493,21 +541,7 @@ def execute_python_code(
         # against the outer command's line offset.
         if getattr(e, "ot_mapped", False):
             raise
-        error_msg, line_num = _map_error_line(e, line_offset)
-        # D6: preserve the real exception type in the message and thread it through
-        # to CommandResult.error_type via an attribute the outer handler reads.
-        orig_type = type(e).__name__
-        if line_num is not None:
-            wrapped = ValueError(
-                f"❗️Execution error at line {line_num}: {orig_type}: {error_msg}"
-            )
-        else:
-            wrapped = ValueError(f"❗️Execution error: {orig_type}: {error_msg}")
-        wrapped.ot_original_error_type = orig_type  # type: ignore[attr-defined]
-        # Preserve the unresolved identifier of a NameError so execute_command can
-        # offer a fuzzy pack-name suggestion (the wrapper drops the original .name).
-        wrapped.ot_original_error_name = getattr(e, "name", None)  # type: ignore[attr-defined]
-        raise wrapped from e
+        raise _wrap_execution_error(e, line_offset) from e
 
 
 @dataclass
@@ -724,6 +758,7 @@ async def execute_command(
                 sanitize,
                 result_fmt,
                 force_context,
+                raw_serialized,
             ) = await asyncio.wait_for(
                 asyncio.to_thread(
                     execute_python_code,
@@ -738,7 +773,10 @@ async def execute_command(
             # D7: scrub lone UTF-16 surrogates (e.g. from surrogateescape-decoded
             # filesystem names) so the size measurement below and any downstream
             # encode cannot raise UnicodeEncodeError on otherwise-correct output.
-            text_result = text_result.encode("utf-8", "replace").decode()
+            # R8 P3: keep the encoded bytes from this pass so the size check below
+            # can reuse them instead of re-encoding text_result a second time.
+            encoded_text_result = text_result.encode("utf-8", "replace")
+            text_result = encoded_text_result.decode()
 
             # Check for large output and store if needed
             config = get_config()
@@ -749,7 +787,7 @@ async def execute_command(
             output_policy = get_services().output_policy_for(tool_name)
             effective_sanitize = sanitize and output_policy.allow_sanitize
             if output_policy.allow_deflect:
-                result_size = len(text_result.encode("utf-8"))
+                result_size = len(encoded_text_result)
                 if force_context or (max_size > 0 and result_size > max_size):
                     from ot.executor.result_store import get_result_store
                     from ot.utils.sanitize import (
@@ -760,16 +798,19 @@ async def execute_command(
                     # D-b3: serialize the stored body in the caller's requested
                     # format (not always JSON) so a later ctx.read matches what the
                     # inline response would have shown.
+                    # R8 P3: raw_serialized is exactly serialize_result(raw_result,
+                    # result_fmt) — already computed inside execute_python_code —
+                    # so reuse it instead of re-serializing raw_result here.
                     ctx_content = (
-                        serialize_result(raw_result, result_fmt)
-                        if raw_result is not None
-                        else text_result
+                        raw_serialized if raw_serialized is not None else text_result
                     )
                     # D-b3: sanitize before storing so trigger patterns cannot
                     # survive to the model via a ctx.read that bypasses the run()
                     # sanitization boundary.
                     if effective_sanitize:
-                        ctx_content = sanitize_tag_closes(sanitize_triggers(ctx_content))
+                        ctx_content = sanitize_tag_closes(
+                            sanitize_triggers(ctx_content)
+                        )
                     result_store = get_result_store()
                     stored = result_store.store(ctx_content, tool=stripped[:50])
                     summary_dict = result_store.format_store_response(stored)
@@ -818,7 +859,9 @@ async def execute_command(
                 if failed_name:
                     from ot.meta._help_formatting import _fuzzy_match
 
-                    suggestions = _fuzzy_match(failed_name, sorted(tool_namespace.keys()))
+                    suggestions = _fuzzy_match(
+                        failed_name, sorted(tool_namespace.keys())
+                    )
                     if suggestions:
                         suggestion_list = ", ".join(f"'{s}'" for s in suggestions[:3])
                         result_text = (
@@ -826,9 +869,7 @@ async def execute_command(
                             "Use ot.packs() to list all available packs."
                         )
                     else:
-                        result_text = (
-                            f"{result_text}. Use ot.packs() to list all available packs."
-                        )
+                        result_text = f"{result_text}. Use ot.packs() to list all available packs."
             return CommandResult(
                 command=command,
                 result=result_text,
