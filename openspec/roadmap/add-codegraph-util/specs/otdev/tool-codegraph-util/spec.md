@@ -50,6 +50,12 @@ The `status()` function SHALL summarize the resolved CodeGraph index.
 - **THEN** it SHALL return counts for files, nodes, edges, unresolved references, languages, node kinds, and edge kinds
 - **AND** it SHALL include the resolved project path and database path
 
+#### Scenario: Staleness and parse-error reporting
+- **GIVEN** a valid CodeGraph database where some indexed files have changed on disk since `files.indexed_at` or carry entries in `files.errors`
+- **WHEN** `codegraph_util.status(project_path=...)` is called
+- **THEN** it SHALL report the count of stale files and the count of files with parse errors
+- **AND** when stale files exist it SHALL mention that the user can run `codegraph sync`
+
 ### Requirement: Symbol Search
 
 The `symbols()` function SHALL return compact structured symbol matches from the CodeGraph index.
@@ -133,8 +139,33 @@ The system SHALL provide a disabled shared MCP server template for upstream Code
 - **THEN** a disabled `codegraph` stdio server template SHALL be available
 - **AND** it SHALL run the `codegraph` command with `serve --mcp`
 - **AND** it SHALL configure `tool_prefix: "codegraph_"`
+- **AND** it SHALL set `env.CODEGRAPH_MCP_TOOLS` so all eight upstream tools (`explore`, `search`, `node`, `status`, `files`, `callers`, `callees`, `impact`) are exposed
+- **AND** it SHALL include an `instructions` block stating that `node` defaults `includeCode` to false and that symbol-name queries outperform natural-language phrasing
 
 #### Scenario: Proxied explore naming
 - **GIVEN** the shared `codegraph` server is enabled and connected
 - **WHEN** callers access the proxied CodeGraph MCP server through OneTool
 - **THEN** upstream `codegraph_explore` SHALL be callable as `codegraph.explore(...)`
+
+### Requirement: Agent Guidance Surfaces
+
+The `codegraph_util` pack SHALL be usable by agents with no prior CodeGraph knowledge, relying only on tool signatures, docstrings, snippets, and error messages.
+
+#### Scenario: Docstring examples
+- **WHEN** any public `codegraph_util` function docstring is inspected
+- **THEN** it SHALL contain an `Example:` section demonstrating a call with symbol-name arguments
+
+#### Scenario: Teaching error strings
+- **GIVEN** a call fails due to a missing index, ambiguous symbol, or unsupported schema
+- **WHEN** the error string is returned
+- **THEN** it SHALL name the concrete next action (e.g. run `codegraph init`, pass `file=` to disambiguate with a candidate list, or upgrade CodeGraph)
+
+#### Scenario: Workflow snippets
+- **WHEN** snippets are listed
+- **THEN** `:cg_impact`, `:cg_find`, and `:cg_health` SHALL be available
+- **AND** each SHALL expand to a bounded sequence of `codegraph_util` calls without requiring Python fluency from the caller
+
+#### Scenario: Query cookbook documentation
+- **WHEN** `docs/reference/tools/codegraph-util.md` is rendered
+- **THEN** it SHALL lead with guidance to prefer bags of symbol/file names over natural-language phrasing
+- **AND** it SHALL include a task-to-call table covering source reading (proxied `codegraph.node(file=..., includeCode=True)`), structured analytics (`cg.*`), and pre-edit impact (`cg.diff_impact`)

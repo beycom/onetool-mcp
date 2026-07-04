@@ -12,6 +12,29 @@ formatting. Vendoring those responsibilities would add a large second runtime an
 make OneTool responsible for upstream schema, parser, and freshness behavior. The
 companion pack should therefore consume CodeGraph outputs rather than replace them.
 
+### Validated behaviors (live testing, 2026-07-04)
+
+Tested against upstream `@colbymchenry/codegraph` proxied through OneTool with
+`tool_prefix: "codegraph_"` (verified working) and
+`env.CODEGRAPH_MCP_TOOLS: "explore,search,node,status,files,callers,callees,impact"`
+(all eight tools connect; upstream hides seven by default to save raw-client
+context, which is irrelevant behind OneTool's lazy tool discovery):
+
+- `projectPath` can be omitted when the server runs from the project root —
+  guidance for agents should say "omit it" rather than teach path resolution.
+- Query matching is lexical (FTS over symbol names). Bags of symbol/file names
+  work well; natural-language phrasing with generic verbs ("how is X resolved")
+  matches the wrong symbols.
+- `node()` defaults `includeCode=false` (locations only); agents forget this.
+  Ambiguous names return a candidate list plus a re-query hint — good behavior
+  worth mirroring in `cg.*` ambiguity results.
+- Unknown symbols return clean error strings; `impact()` reliably surfaces the
+  test functions covering a symbol.
+- Live schema confirmed: `nodes`, `edges`, `files`, `unresolved_refs`, plus
+  `schema_versions` (use for version validation) and `project_metadata`.
+  `files` carries `content_hash`, `modified_at`, `indexed_at`, and `errors`
+  (JSON) — staleness and parse-error reporting are simple column reads.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -66,6 +89,11 @@ companion pack should therefore consume CodeGraph outputs rather than replace th
    The shared server template will define a disabled `codegraph` stdio server
    using `codegraph serve --mcp` and `tool_prefix: "codegraph_"`, so
    `codegraph_explore` can be called as `codegraph.explore(...)`.
+   The template SHALL also set
+   `env.CODEGRAPH_MCP_TOOLS: "explore,search,node,status,files,callers,callees,impact"`
+   — upstream hides seven of its eight tools by default to conserve raw-client
+   context, a cost OneTool's lazy tool discovery does not pay — and an
+   `instructions` block teaching the verified gotchas (see Decision 6).
    The companion pack may provide guidance/status around this, but it should not
    depend on the upstream MCP server being connected for database-only helpers.
 
@@ -92,8 +120,38 @@ companion pack should therefore consume CodeGraph outputs rather than replace th
    Missing `codegraph` CLI should not break database-only helpers. Missing
    `.codegraph/codegraph.db` should return an error string telling the caller that
    the project is not indexed and that the user can run `codegraph init`.
-   Unknown or incomplete schemas should return an error naming the missing required
-   tables or columns.
+   Schema validation should check the `schema_versions` table first and report
+   the found version; unknown or incomplete schemas should return an error naming
+   the missing required tables or columns.
+
+6. **Design every surface for agents that have never seen CodeGraph.**
+
+   Weaker models will use this pack knowing nothing beyond what OneTool shows
+   them at call time. Four concrete measures:
+
+   - **Teaching errors.** Every error string names the next call to make, not
+     just the failure: "project is not indexed — run `codegraph init` from the
+     project root", "3 symbols match 'run' — pass file= to pin one, e.g.
+     cg.neighborhood(symbol='run', file='src/ot/executor/runner.py')". This
+     mirrors upstream's ambiguity hint, which tested well.
+   - **Docstring examples.** Every `cg.*` function docstring carries an
+     `Example:` section (the existing pack convention), because
+     `ot.tools(info='signatures')` and `ot.help()` are the only documentation a
+     mid-task agent sees. Examples use symbol-name queries, never
+     natural-language phrasing.
+   - **Snippets for canned workflows.** Server-side snippets so weak models can
+     invoke whole workflows with one short line: `:cg_impact symbol=X` (impact +
+     covering tests), `:cg_find q=X` (symbols + top neighborhood), `:cg_health`
+     (status + staleness). Snippet mode needs no Python fluency.
+   - **Query cookbook in docs.** The docs page leads with "prefer bags of
+     symbol/file names; generic natural-language verbs match the wrong symbols"
+     and a table of task → right call (read a file body → proxied
+     `codegraph.node(file=..., includeCode=True)`; structured fan-in →
+     `cg.hotspots`; blast radius before an edit → `cg.diff_impact`).
+
+   The proxied `instructions` block carries the same two highest-value rules
+   (includeCode default, symbol-name queries) so raw-proxy users get them even
+   without the pack installed.
 
 ## Risks / Trade-offs
 

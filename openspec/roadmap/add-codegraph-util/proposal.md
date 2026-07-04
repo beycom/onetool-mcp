@@ -7,7 +7,8 @@ CodeGraph can provide high-value codebase structure, but OneTool users currently
 - Add a new `[dev]` `codegraph_util` tool pack, similar in role to `chrome_util` and `play_util`, that complements a configured CodeGraph MCP server.
 - Provide structured, read-only helpers for CodeGraph-backed developer workflows such as index health, symbol search, graph neighborhoods, flow paths, hotspots, and git-diff impact.
 - Use existing CodeGraph artifacts only: the upstream MCP server for source-oriented exploration and `.codegraph/codegraph.db` for local read-only graph analytics.
-- Add an optional shared CodeGraph MCP server template so users can proxy `codegraph serve --mcp` through OneTool.
+- Add an optional shared CodeGraph MCP server template so users can proxy `codegraph serve --mcp` through OneTool, exposing all eight upstream tools (not just `explore`) with `tool_prefix` and an `instructions` block.
+- Design every surface for agents that have never seen CodeGraph: teaching error strings, docstring examples on each `cg.*` function, snippets for the common workflows, and a query cookbook in the docs page. Less capable models must be able to use the pack correctly from tool signatures and error messages alone.
 - Do not vendor CodeGraph, reimplement indexing, or mutate `.codegraph/` data.
 
 ## Capabilities
