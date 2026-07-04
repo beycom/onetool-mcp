@@ -34,7 +34,7 @@ just release::check
 - Runs lint, typecheck, and all tests
 - Scans for secrets with gitleaks
 - Builds docs (strict mode to catch broken links)
-- Runs `/p:test-explore sanity.md retest all` via `claude` CLI
+- Runs `/p-test-explore sanity.md retest all` via the Codex TUI
 
 ---
 

@@ -44,7 +44,7 @@ check:
     just secrets-check
     just docs-sync
     uv run mkdocs build --strict
-    claude --dangerously-skip-permissions "/p:test-explore sanity.md retest all"
+    codex "/p-test-explore sanity.md retest all"
     @echo "=== All checks passed. Next: just release::publish VERSION ==="
 
 # --------------------------------------------------------------------------
