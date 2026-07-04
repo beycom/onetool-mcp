@@ -32,6 +32,9 @@
 - **`ot.help` ask mode** and richer status diagnostics; improved help discovery and run output guidance.
 - Disabled servers are skipped in runtime readiness checks; proxy transports close more reliably and servers connect concurrently; configured server packs are now exposed; Chrome/Playwright annotation utilities accept any compatible MCP server name instead of one fixed name.
 
+#### Console
+- **onetool-console support** — signed Console outbox endpoints (`/api/console/outbox` + ack) on the direct API with a dedicated consumer key, plus the new `console` pack (`show`/`list`/`read`/`clear`) for inline messages; file payload modes ship with the full display experience in 3.1.
+
 #### Tool improvements
 - **`file`** — directory resolution with a safer default list output, a file reference resolver, and grep match limits aligned with ripgrep.
 - **`ripgrep`** — `follow_symlinks`, `smart_case`, and `filenames_only`.

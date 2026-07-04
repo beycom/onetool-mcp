@@ -34,6 +34,7 @@ PACK_DOCS: tuple[PackDocs, ...] = (
     PackDocs("mem", "Mem", "[util]", "mem.md"),
     PackDocs("tavily", "Tavily", "[util]", "tavily.md"),
     PackDocs("chrome_util", "Chrome DevTools Util", "[dev]", "chrome-util.md"),
+    PackDocs("console", "Console", "core", "console.md"),
     PackDocs("context7", "Context7", "[dev]", "context7.md"),
     PackDocs("db", "DB", "[dev]", "db.md"),
     PackDocs("diagram", "Diagram", "[dev]", "diagram.md"),

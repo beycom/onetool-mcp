@@ -1,6 +1,6 @@
 # Tool Reference
 
-**27 Packs. 243 Tools.**
+**28 Packs. 247 Tools.**
 
 Complete reference of all built-in tool packs and functions.
 
@@ -13,7 +13,7 @@ Tools are split into optional install extras. Install only what you need:
 
 | Extra | Tools included |
 |-------|---------------|
-| *(core, always included)* | `ctx`, `ot`, `ot_forge`, `ot_llm`, `ot_secrets`, `ot_servers`, `ot_timer` |
+| *(core, always included)* | `console`, `ctx`, `ot`, `ot_forge`, `ot_llm`, `ot_secrets`, `ot_servers`, `ot_timer` |
 | `[util]` | `brave`, `convert`, `excel`, `file`, `ground`, `knowledge`, `mem`, `tavily`, `whiteboard` |
 | `[dev]` | `arch`, `chrome_util`, `context7`, `db`, `diagram`, `localhist`, `package`, `play_util`, `ripgrep`, `webfetch` |
 | `[all]` | All of the above |
@@ -30,6 +30,7 @@ uv tool install 'onetool-mcp[util,dev]'  # most tools
 | [**Arch**](arch.md) | `[dev]` | Architecture workflows for Excel ingest, validation, generation, round-trip, and bundling. | 5 | MIT | `bundle_solution`, `export_yaml`, `generate`, `import_yaml`, `validate` |
 | [**Brave**](brave.md) | `[util]` | Web search via Brave Search API. | 5 | [brave-search-mcp-server](https://github.com/brave/brave-search-mcp-server) (MIT) | `image`, `news`, `search`, `search_batch`, `video` |
 | [**Chrome DevTools Util**](chrome-util.md) | `[dev]` | Visual element annotation for a Chrome DevTools-compatible MCP server. | 5 | MIT | `clear_annotations`, `guide_user`, `highlight_element`, `inject_annotations`, `scan_annotations` |
+| [**Console**](console.md) | core | Publish inline messages to a connected onetool-console app via the signed Console outbox. | 4 | MIT | `clear`, `list`, `read`, `show` |
 | [**Context7**](context7.md) | `[dev]` | Library documentation lookup. | 2 | [context7](https://github.com/upstash/context7) (MIT) | `doc`, `search` |
 | [**Convert**](convert.md) | `[util]` | Convert PDF, Word, PowerPoint, Excel to Markdown. | 5 | MIT | `auto`, `excel`, `pdf`, `powerpoint`, `word` |
 | [**DB**](db.md) | `[dev]` | SQL database queries. | 4 | [mcp-alchemy](https://github.com/runekaagaard/mcp-alchemy) (MPL 2.0) | `query`, `sample`, `schema`, `tables` |

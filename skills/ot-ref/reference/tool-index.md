@@ -1,6 +1,6 @@
 # OneTool MCP Tool Index
 
-packs=27 tools=243
+packs=28 tools=247
 
 ## arch
 ```python
@@ -27,6 +27,14 @@ chrome_util.guide_user(task: str, steps: list[dict[str, str]], server: str='chro
 chrome_util.highlight_element(selector: str, label: str, color: str='orange', element_id: str | None=None, server: str='chrome_devtools')  # Highlight elements matching a CSS selector with an annotation overlay.
 chrome_util.inject_annotations(server: str='chrome_devtools')  # Inject the annotation script into the current browser page.
 chrome_util.scan_annotations(server: str='chrome_devtools')  # Read all current annotations from the page.
+```
+
+## console
+```python
+console.clear()  # Clear all retained Console messages for the current instance.
+console.list(limit: int=100, offset: int=0, kind: ConsoleKind | None=None, source: str | None=None)  # List retained Console message metadata, oldest-first, paginated.
+console.read(id: str)  # Read one retained Console message's full payload by ID.
+console.show(kind: ConsoleKind, content: str | dict[str, Any] | List[Any], metadata: dict[str, str] | None=None)  # Create one inline Console message and publish it to the outbox.
 ```
 
 ## context7, c7

@@ -5,13 +5,12 @@
 Defines the signed MCP-owned Console outbox protocol used by the separate OneTool Console App to
 consume read-only MCP instance and display events.
 
-**Status: protocol v1 — server implementation ships with display (3.1).** This capability defines
-the wire contract only. No `main` code implements these endpoints yet; `src/ot/console_outbox.py`
-and the `/api/console/outbox` / `/api/console/outbox/ack` HTTP routes ship with the display pack in
-release 3.1.
-
+**Status: protocol v1 — served from 3.0.0, inline payloads only; file modes ship with the full
+display experience in 3.1.** The `/api/console/outbox` and `/api/console/outbox/ack` HTTP routes
+and the MCP-owned outbox state (`src/ot/console/outbox.py`) ship in 3.0.0 emitting `inline`
+payloads only. The `file_ref` and `file_diff_ref` payload modes remain part of protocol v1 but
+are not emitted until the full display experience ships in 3.1.
 ## Requirements
-
 ### Requirement: Console Outbox Protocol
 
 The MCP Direct API SHALL expose a local Console outbox protocol for read-only Console consumption.
@@ -26,20 +25,35 @@ The protocol SHALL use JSON-compatible payloads with:
 #### Scenario: Poll outbox batch
 
 - **WHEN** a signed Console consumer requests `GET /api/console/outbox?limit=100&after=<cursor>`
-- **THEN** the MCP Direct API SHALL return a signed outbox batch containing protocol identity, MCP instance identity, batch identity, cursors, `has_more`, and zero or more events
+- **THEN** the MCP Direct API SHALL return a signed outbox batch containing protocol identity, MCP instance identity, batch identity, cursors, `oldest_retained`, `has_more`, and zero or more events
 - **AND** the request SHALL NOT remove events from the MCP outbox
+
+> The `batch_id` remains in the poll batch for logging and diagnostics only; it is not part of the acknowledgement contract.
 
 #### Scenario: Acknowledge consumed events
 
-- **WHEN** a signed Console consumer posts `POST /api/console/outbox/ack` with matching protocol identity, MCP instance identity, batch identity, and `acked_through`
+- **WHEN** a signed Console consumer posts `POST /api/console/outbox/ack` with matching protocol identity, MCP instance identity, and `acked_through`
 - **THEN** the MCP Direct API SHALL record the acknowledgement
 - **AND** acknowledged outbox entries MAY be dropped earlier than natural queue expiry
+- **AND** the ack SHALL NOT require a batch identity; a `batch_id` field, if present, SHALL be ignored
 
 #### Scenario: At-least-once delivery
 
 - **WHEN** Console polls the outbox without acknowledging delivered events
 - **THEN** MCP SHALL keep retained events eligible for later poll responses until they are acknowledged or removed by bounded retention
 - **AND** Console SHALL be able to de-duplicate events by event `id` or by `(instance_id, sequence)`
+
+### Requirement: Consumers Tolerate Additive Fields
+
+Console consumers SHALL ignore unknown fields anywhere in the protocol so that servers can add fields without a protocol version bump.
+
+Within `protocol_version: 1`, servers MAY add new fields to outbox batches, event envelopes, and payloads. Consumers MUST ignore fields they do not recognize rather than rejecting the batch, envelope, or payload. The vendored JSON Schemas keep `additionalProperties: false` as a strict PRODUCER conformance check for the shipped server; they are not a consumer validation contract.
+
+#### Scenario: Consumer receives an additive field
+
+- **WHEN** a Console consumer receives an outbox batch, event envelope, or payload that contains a field it does not recognize
+- **THEN** the consumer SHALL ignore the unknown field and process the known fields normally
+- **AND** the consumer SHALL NOT reject or fail the batch because of the unknown field
 
 ### Requirement: Console Outbox Authentication
 
@@ -79,6 +93,12 @@ MCP SHALL keep Console outbox state bounded so tool execution and MCP startup do
 - **THEN** MCP SHALL remove the oldest unacknowledged events according to bounded retention
 - **AND** newer events SHALL remain eligible for Console polling
 
+#### Scenario: Gap signaled when retention evicts unacknowledged events
+
+- **WHEN** a poll batch is returned
+- **THEN** it SHALL include an `oldest_retained` integer equal to the sequence of the oldest retained entry, or (when no entries are retained) equal to `acked_through`
+- **AND** a consumer whose cursor is `c` SHALL treat events `c+1 .. oldest_retained-1` as lost whenever `oldest_retained > c + 1`, because bounded retention evicted them before acknowledgement
+
 ### Requirement: Console Event Types
 
 MCP SHALL publish small, stable Console events for instance metadata and display messages.
@@ -88,10 +108,16 @@ MCP SHALL publish small, stable Console events for instance metadata and display
 - **WHEN** MCP startup initializes Console outbox state
 - **THEN** MCP SHALL append an `instance.snapshot` event with instance identity, start time, current workspace paths, allowed roots, status, message count, update timestamp, and runtime metadata
 
-#### Scenario: Display message event
+#### Scenario: Snapshot emitted only on relevant state change
+
+- **WHEN** MCP evaluates whether to append an `instance.snapshot` event
+- **THEN** MCP SHALL append one at startup, on instance change, and when snapshot-relevant state (status or message count) changes
+- **AND** MCP SHALL NOT append a redundant `instance.snapshot` on every poll or status call whose status and message count are unchanged
+
+#### Scenario: Console message event
 
 - **WHEN** `display.show(...)` creates a display message
-- **THEN** MCP SHALL append a `display.message.created` event containing the display message metadata, payload mode, bounded preview metadata, and stable message ID
+- **THEN** MCP SHALL append a `console.message.created` event containing the display message metadata, payload mode, bounded preview metadata, and stable message ID
 
 #### Scenario: Unknown future event type
 
@@ -133,3 +159,49 @@ The vendored Console protocol JSON Schemas and example fixtures under `tests/fix
 - **WHEN** the CI test suite runs `tests/unit/core/test_console_protocol_fixtures.py`
 - **THEN** every fixture in `tests/fixtures/console-protocol/fixtures/*.json` SHALL validate against its corresponding JSON Schema in `tests/fixtures/console-protocol/schemas/*.json` using Draft 2020-12 validation
 - **AND** a schema or fixture change that breaks validation SHALL fail CI
+
+### Requirement: Inline-Only Payload Emission In 3.0
+
+Until the full display pack ships (3.1), the server SHALL emit `console.message.created`
+events with `payload.mode: "inline"` only. The `file_ref` and `file_diff_ref` payload modes
+defined by protocol v1 SHALL NOT be emitted by a 3.0 server, and no server code SHALL depend
+on filesystem path validation (`allowed_roots`) for outbox payloads.
+
+#### Scenario: Only inline payloads emitted
+
+- **WHEN** any display message event is appended to the Console outbox on a 3.0 server
+- **THEN** its payload mode SHALL be `inline`
+- **AND** the payload SHALL validate against the shipped `console-message.schema.json`
+
+#### Scenario: Protocol consumers unaffected
+
+- **WHEN** a protocol-v1 Console consumer connects to a 3.0 server
+- **THEN** it SHALL receive only payload modes it is already required to support
+- **AND** later servers MAY add `file_ref`/`file_diff_ref` emission without a protocol version bump
+
+### Requirement: Instance Snapshot On Startup
+
+The server SHALL bind the Console outbox to the current runtime instance at Direct API
+startup and SHALL append an `instance.snapshot` event so a connecting Console can identify
+the instance before any display messages exist.
+
+The server SHALL emit an `instance.snapshot` event at startup, on instance change, and when
+snapshot-relevant state (status or message count) changes. The server SHALL NOT emit an
+`instance.snapshot` on every poll or status call whose snapshot-relevant state is unchanged.
+
+#### Scenario: Snapshot available to first poll
+
+- **WHEN** the Direct API app has started with the Console outbox enabled
+- **AND** a signed Console consumer polls `GET /api/console/outbox` before any display activity
+- **THEN** the batch SHALL contain an `instance.snapshot` event carrying the instance identity
+
+#### Scenario: Snapshot suppressed when state is unchanged
+
+- **WHEN** a status or poll call occurs and neither status nor message count has changed since the last emitted snapshot
+- **THEN** the server SHALL NOT append another `instance.snapshot` event
+
+#### Scenario: Instance change resets outbox
+
+- **WHEN** the outbox is configured with a different instance id than it is currently bound to
+- **THEN** sequence, ack cursor, and retained entries SHALL reset for the new instance
+

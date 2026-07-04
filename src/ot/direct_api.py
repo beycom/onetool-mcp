@@ -39,15 +39,33 @@ def create_app() -> Any:
     from starlette.applications import Starlette
     from starlette.routing import Route
 
+    from ot.console.outbox import (
+        OUTBOX_ACK_PATH,
+        OUTBOX_PATH,
+        ack_outbox,
+        ensure_instance_snapshot,
+        poll_outbox,
+    )
     from ot.direct_auth import (
         HEALTH_PATH,
         READY_PATH,
         RUN_PATH,
         HmacAuthError,
         auth_error_response,
+        console_auth_error_response,
+        signed_console_json_response,
         signed_json_response,
+        verify_console_request,
         verify_request,
     )
+
+    # Bind the Console outbox to this runtime instance and append the
+    # initial `instance.snapshot` event before the app can serve any
+    # requests, so a Console polling immediately after startup always sees
+    # instance identity even before any display activity occurs (the app is
+    # served with uvicorn `lifespan="off"`, so this happens here rather than
+    # in an ASGI lifespan handler).
+    ensure_instance_snapshot(message_count=0)
 
     async def health_endpoint(request: Any) -> Any:
         body = await request.body()
@@ -177,11 +195,74 @@ def create_app() -> Any:
             path=RUN_PATH,
         )
 
+    async def console_outbox_endpoint(request: Any) -> Any:
+        body = await request.body()
+        try:
+            verify_console_request(
+                method=request.method,
+                path=OUTBOX_PATH,
+                body=body,
+                headers=dict(request.headers),
+            )
+        except HmacAuthError as e:
+            return console_auth_error_response(e, path=OUTBOX_PATH)
+        try:
+            limit = int(request.query_params.get("limit", "100"))
+            after_param = request.query_params.get("after")
+            after = int(after_param) if after_param not in {None, ""} else None
+        except ValueError:
+            return signed_console_json_response(
+                {
+                    "protocol": "onetool.console",
+                    "protocol_version": 1,
+                    "error": "invalid outbox cursor",
+                },
+                path=OUTBOX_PATH,
+                status_code=400,
+            )
+        return signed_console_json_response(
+            poll_outbox(limit=limit, after=after),
+            path=OUTBOX_PATH,
+        )
+
+    async def console_outbox_ack_endpoint(request: Any) -> Any:
+        try:
+            raw_body = await _read_limited_body(request)
+        except ValueError as e:
+            return signed_console_json_response(
+                {"protocol": "onetool.console", "protocol_version": 1, "error": str(e)},
+                path=OUTBOX_ACK_PATH,
+                status_code=413,
+            )
+        try:
+            verify_console_request(
+                method=request.method,
+                path=OUTBOX_ACK_PATH,
+                body=raw_body,
+                headers=dict(request.headers),
+            )
+        except HmacAuthError as e:
+            return console_auth_error_response(e, path=OUTBOX_ACK_PATH)
+        try:
+            payload = json.loads(raw_body.decode("utf-8"))
+            if not isinstance(payload, dict):
+                raise ValueError("invalid outbox ack payload")
+            result = ack_outbox(payload=payload)
+        except Exception as e:
+            return signed_console_json_response(
+                {"protocol": "onetool.console", "protocol_version": 1, "error": str(e)},
+                path=OUTBOX_ACK_PATH,
+                status_code=400,
+            )
+        return signed_console_json_response(result, path=OUTBOX_ACK_PATH)
+
     return Starlette(
         routes=[
             Route(HEALTH_PATH, health_endpoint, methods=["GET"]),
             Route(READY_PATH, ready_endpoint, methods=["GET"]),
             Route(RUN_PATH, run_endpoint, methods=["POST"]),
+            Route(OUTBOX_PATH, console_outbox_endpoint, methods=["GET"]),
+            Route(OUTBOX_ACK_PATH, console_outbox_ack_endpoint, methods=["POST"]),
         ]
     )
 

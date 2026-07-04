@@ -2,12 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://onetool.beycom.online/schemas/console/outbox-ack.schema.json",
   "type": "object",
-  "required": ["protocol", "protocol_version", "instance_id", "batch_id", "acked_through"],
+  "required": ["protocol", "protocol_version", "instance_id", "acked_through"],
   "properties": {
     "protocol": { "const": "onetool.console" },
     "protocol_version": { "const": 1 },
     "instance_id": { "type": "string", "minLength": 1 },
-    "batch_id": { "type": "string", "minLength": 1 },
     "acked_through": { "type": "integer", "minimum": 0 }
   },
   "additionalProperties": false

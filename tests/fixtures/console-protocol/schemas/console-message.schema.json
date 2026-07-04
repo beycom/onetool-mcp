@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://onetool.beycom.online/schemas/console/display-message.schema.json",
+  "$id": "https://onetool.beycom.online/schemas/console/console-message.schema.json",
   "type": "object",
   "required": ["id", "kind", "metadata", "created_at", "updated_at", "payload", "preview"],
   "properties": {

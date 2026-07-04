@@ -153,6 +153,7 @@ onetool direct run --port 8765 "brave.search(query='latest AI news')" --format r
 | ------------- | ---------------------------------------------- | -------- | ------------------------------ |
 | `brave`       | `search`, `news`                               | `[util]` | Web and news search            |
 | `chrome_util` | `highlight_element`, `guide_user`              | `[dev]`  | Browser annotations (DevTools) |
+| `console`     | `show`, `list`, `read`, `clear`                |          | onetool-console outbox messages |
 | `context7`    | `search`, `doc`                                | `[dev]`  | Library documentation          |
 | `convert`     | `pdf_to_md`, `docx_to_md`, `pptx_to_md`        | `[util]` | Document conversion            |
 | `db`          | `query`, `schema`, `tables`, `sample`          | `[dev]`  | Database operations            |

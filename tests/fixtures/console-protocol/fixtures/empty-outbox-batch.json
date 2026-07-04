@@ -5,6 +5,7 @@
   "batch_id": "batch-empty",
   "cursor": 0,
   "next_cursor": 0,
+  "oldest_retained": 0,
   "has_more": false,
   "events": [],
   "created_at": "2026-06-07T00:00:00Z"

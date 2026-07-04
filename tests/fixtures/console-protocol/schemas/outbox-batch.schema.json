@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://onetool.beycom.online/schemas/console/outbox-batch.schema.json",
   "type": "object",
-  "required": ["protocol", "protocol_version", "instance_id", "batch_id", "cursor", "next_cursor", "has_more", "events", "created_at"],
+  "required": ["protocol", "protocol_version", "instance_id", "batch_id", "cursor", "next_cursor", "oldest_retained", "has_more", "events", "created_at"],
   "properties": {
     "protocol": { "const": "onetool.console" },
     "protocol_version": { "const": 1 },
@@ -10,6 +10,7 @@
     "batch_id": { "type": "string", "minLength": 1 },
     "cursor": { "type": "integer", "minimum": 0 },
     "next_cursor": { "type": "integer", "minimum": 0 },
+    "oldest_retained": { "type": "integer", "minimum": 0 },
     "has_more": { "type": "boolean" },
     "events": {
       "type": "array",

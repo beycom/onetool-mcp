@@ -540,6 +540,18 @@ class DirectConfig(BaseModel):
     )
 
 
+class ConsoleConfig(BaseModel):
+    """MCP-side Console outbox producer queue settings."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    max_queue_messages: int = Field(
+        default=1000,
+        ge=1,
+        description="Maximum Console messages retained by the MCP producer queue.",
+    )
+
+
 # ==================== Tools Configuration ====================
 
 
@@ -606,6 +618,11 @@ class OneToolConfig(BaseModel):
     direct: DirectConfig = Field(
         default_factory=DirectConfig,
         description="MCP-owned direct API configuration",
+    )
+
+    console: ConsoleConfig = Field(
+        default_factory=ConsoleConfig,
+        description="MCP-side Console outbox producer queue configuration",
     )
 
     tools: ToolsConfig = Field(

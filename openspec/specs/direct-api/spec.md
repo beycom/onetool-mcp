@@ -6,9 +6,7 @@ Defines the MCP-owned direct API exposed by a running OneTool MCP process when
 `direct.host.enabled: true`.
 
 ---
-
 ## Requirements
-
 ### Requirement: MCP-owned direct API startup
 
 When `direct.host.enabled: true`, MCP startup SHALL bind an authenticated local
@@ -77,17 +75,21 @@ The API SHALL expose:
 - signed `GET /health`
 - signed `GET /ready`
 - signed `POST /run`
+- signed `GET /api/console/outbox`
+- signed `POST /api/console/outbox/ack`
 
-Requests and responses SHALL use OneTool HMAC headers. The HMAC key SHALL be
-stored at `auth/mcp-direct.key` under the active OT_DIR.
+Requests and responses SHALL use OneTool HMAC headers. Two keys SHALL exist under the active
+OT_DIR, both created `0600`:
+- `auth/mcp-direct.key` — authorizes `/health`, `/ready`, and `/run` only
+- `auth/console-outbox.key` — authorizes the Console outbox endpoints only
 
 Every request SHALL verify method, path, body hash, timestamp, nonce, and
-signature before doing work. Replayed nonces SHALL be rejected. Every response,
-including errors, SHALL be signed.
+signature before doing work, against the key scoped to that endpoint. Replayed nonces SHALL
+be rejected. Every response, including errors, SHALL be signed.
 
 #### Scenario: Unsigned request rejected
 
-- **WHEN** `/health`, `/ready`, or `/run` is requested without valid auth headers
+- **WHEN** `/health`, `/ready`, `/run`, or a Console outbox endpoint is requested without valid auth headers
 - **THEN** the API SHALL return signed HTTP `401`
 - **AND** `/run` SHALL NOT execute the command
 
@@ -96,6 +98,18 @@ including errors, SHALL be signed.
 - **WHEN** request authentication fails
 - **THEN** the API SHALL return signed HTTP `401`
 - **AND** `/run` SHALL NOT execute the command
+
+#### Scenario: Console key does not authorize run
+
+- **WHEN** a `/run`, `/health`, or `/ready` request is signed with `auth/console-outbox.key`
+- **THEN** the API SHALL return signed HTTP `401`
+- **AND** the command SHALL NOT execute
+
+#### Scenario: Direct key does not authorize Console outbox
+
+- **WHEN** a Console outbox request is signed with `auth/mcp-direct.key`
+- **THEN** the API SHALL return signed HTTP `401`
+- **AND** outbox state SHALL NOT be read or mutated
 
 ### Requirement: health, readiness, and run contracts
 
@@ -153,3 +167,4 @@ limit before command execution.
 
 Multiple MCP processes SHALL be supported by binding distinct ports; users
 select the target process with `onetool direct run --port PORT`.
+

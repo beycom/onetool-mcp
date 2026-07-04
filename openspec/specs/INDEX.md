@@ -85,6 +85,7 @@ details belong under `openspec/changes/`, not in this index.
 | [tool-image](ottools/tool-image/spec.md) | Image loading, querying, and lifecycle management |
 | [tool-llm](ottools/tool-llm/spec.md) | LLM-powered data transformation |
 | [tool-secrets](ottools/tool-secrets/spec.md) | Age-encrypted secrets management |
+| [tool-console](ottools/tool-console/spec.md) | Inline console messages to onetool-console (show/list/read/clear) |
 | [tool-timer](ottools/tool-timer/spec.md) | Named stopwatch timers |
 
 ## Domain Tools (`[util]` Extra)
@@ -121,7 +122,7 @@ details belong under `openspec/changes/`, not in this index.
 | MCP Server Runtime | 21 |
 | Browser Utilities | 2 |
 | Knowledge, Context, And Memory | 6 |
-| Core Built-In Tool Packs | 5 |
+| Core Built-In Tool Packs | 6 |
 | Domain Tools `[util]` | 6 |
 | Domain Tools `[dev]` | 9 |
-| **Total** | **58** |
+| **Total** | **59** |

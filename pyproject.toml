@@ -165,6 +165,7 @@ known-first-party = ["ot", "ottools", "onetool", "otdev", "otutil", "otpack"]
 "src/otutil/tools/_knowledge/scraper.py" = ["TC003"]
 "src/otutil/tools/_mem/listing.py" = ["UP006"]
 "src/otutil/tools/file.py" = ["UP006"]
+"src/ottools/console.py" = ["UP006"]
 "src/ot/executor/*.py" = ["TC003"]
 
 [tool.mypy]

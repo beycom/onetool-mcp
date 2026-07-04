@@ -35,6 +35,7 @@ Rules:
 - **arch** — Architecture workflows for Excel ingest, validation, generation, round-trip, and bundling
 - **brave** (br) — Search the web, news, and images — fast, private, with batch support
 - **chrome_util** (chrome) — Annotate and highlight page elements via Chrome DevTools
+- **console** — Publish inline text, markdown, code, diffs, and more to a connected onetool-console app
 - **context7** (c7) — Pull up-to-date docs for any library — React, FastAPI, etc.
 - **convert** (cv) — Turn PDF, Word, Excel, and PowerPoint files into clean markdown
 - **db** — Explore and query databases — list tables, inspect schema, run SQL
