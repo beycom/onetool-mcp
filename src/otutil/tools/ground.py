@@ -14,7 +14,6 @@ doc_slug = "grounding-search"
 
 __all__ = ["dev", "docs", "reddit", "search", "search_batch"]
 
-import re
 from typing import Any, Literal, cast
 
 # Type alias for output format
@@ -26,10 +25,13 @@ from otpack import (
     BatchEnvelope,
     LogSpan,
     batch_execute_enveloped,
+    extract_structured_data,
+    format_sources,
     get_tool_config,
     lazy_client,
     normalize_items,
     require_api_key,
+    validate_batch_retry_controls,
 )
 
 # Dependency declarations for CLI validation
@@ -55,8 +57,6 @@ class Config(BaseModel):
 
 
 _SUPPORTED_EXTRACT_TYPES = frozenset({"string", "number", "boolean"})
-_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
-_NUMBER_RE = re.compile(r"-?\d+(?:\.\d+)?")
 
 
 def _validate_request_timeout(timeout: float) -> str | None:
@@ -72,25 +72,6 @@ def _get_config() -> Config:
     """Return validated ground pack configuration."""
     return get_tool_config("ground", Config)
 
-
-def _validate_batch_retry_controls(retries: int, retry_delay_ms: int) -> str | None:
-    """Validate batch retry guardrails."""
-    if (
-        not isinstance(retries, int)
-        or isinstance(retries, bool)
-        or not 0 <= retries <= 3
-    ):
-        return f"Error: retries must be between 0 and 3 (got {retries})"
-    if (
-        not isinstance(retry_delay_ms, int)
-        or isinstance(retry_delay_ms, bool)
-        or not 0 <= retry_delay_ms <= 10_000
-    ):
-        return (
-            "Error: retry_delay_ms must be between 0 and 10000 "
-            f"(got {retry_delay_ms})"
-        )
-    return None
 
 
 def _validate_extract_schema(extract_schema: dict[str, Any] | None) -> str | None:
@@ -114,81 +95,6 @@ def _validate_extract_schema(extract_schema: dict[str, Any] | None) -> str | Non
             )
     return None
 
-
-def _extract_structured_data(
-    *,
-    text: str,
-    sources: list[dict[str, str]],
-    extract_schema: dict[str, Any],
-    return_provenance: bool,
-) -> dict[str, Any]:
-    """Extract structured fields from grounded text using a constrained schema."""
-    data: dict[str, Any] = {}
-    errors: list[dict[str, str]] = []
-    provenance: dict[str, dict[str, Any]] = {}
-    source_url = sources[0]["url"] if sources else None
-
-    for field in extract_schema.get("fields", []):
-        name = str(field.get("name", "")).strip()
-        field_type = str(field.get("type", "string"))
-        required = bool(field.get("required", False))
-        lowered_name = name.lower()
-        value: Any = None
-        snippet: str = ""
-
-        if field_type == "boolean":
-            for token in ("true", "false"):
-                idx = text.lower().find(token)
-                if idx >= 0:
-                    value = token == "true"
-                    snippet = text[max(0, idx - 20):idx + len(token) + 20].strip()
-                    break
-        elif field_type == "number":
-            match = _NUMBER_RE.search(text)
-            if match:
-                snippet = match.group(0)
-                value = float(snippet) if "." in snippet else int(snippet)
-        else:
-            if "email" in lowered_name:
-                match = _EMAIL_RE.search(text)
-                if match:
-                    value = match.group(0)
-                    snippet = value
-            if value is None:
-                key_match = re.search(
-                    rf"{re.escape(name)}\s*[:=-]\s*(.+)",
-                    text,
-                    flags=re.IGNORECASE,
-                )
-                if key_match:
-                    value = key_match.group(1).strip().splitlines()[0]
-                    snippet = value
-
-        data[name] = value
-        if required and value in (None, ""):
-            errors.append(
-                {
-                    "field": name,
-                    "error_code": "required_field_missing",
-                    "error_message": f"Required field '{name}' could not be extracted",
-                }
-            )
-
-        if return_provenance:
-            provenance[name] = {
-                "source_url": source_url,
-                "snippet": snippet,
-                "confidence": None,
-            }
-
-    result: dict[str, Any] = {
-        "mode": "structured_extraction",
-        "data": data,
-        "errors": errors,
-    }
-    if return_provenance:
-        result["provenance"] = provenance
-    return result
 
 def _require_google_genai() -> None:
     """Raise ImportError if google-genai is not installed."""
@@ -285,7 +191,7 @@ def _format_response(
     if output_format == "sources_only":
         if not sources:
             return "No sources found."
-        return _format_sources(sources, max_sources=max_sources)
+        return format_sources(sources, max_sources=max_sources)
 
     if not text:
         return "No results found."
@@ -296,39 +202,9 @@ def _format_response(
     # Full format: text + sources
     if sources:
         text += "\n\n## Sources\n"
-        text += _format_sources(sources, max_sources=max_sources)
+        text += format_sources(sources, max_sources=max_sources)
 
     return text
-
-
-def _format_sources(sources: list[dict[str, str]], *, max_sources: int | None = None) -> str:
-    """Format source citations with deduplication and optional limit.
-
-    Args:
-        sources: List of source dicts with 'title' and 'url' keys
-        max_sources: Maximum number of sources to include (None for unlimited)
-
-    Returns:
-        Formatted source list with numbered markdown links
-    """
-    result = ""
-    seen_urls: set[str] = set()
-    display_num = 0
-
-    for source in sources:
-        url = source["url"]
-        if url in seen_urls:
-            continue
-        seen_urls.add(url)
-        display_num += 1
-
-        if max_sources is not None and display_num > max_sources:
-            break
-
-        title = source["title"] or url
-        result += f"{display_num}. [{title}]({url})\n"
-
-    return result
 
 
 def _format_error(e: Exception) -> str:
@@ -418,7 +294,7 @@ def _grounded_search(
             if extract_schema is not None:
                 text = response.text or ""
                 sources = _extract_sources(response)
-                result = _extract_structured_data(
+                result = extract_structured_data(
                     text=text,
                     sources=sources,
                     extract_schema=extract_schema,
@@ -605,7 +481,7 @@ def search_batch(
         return _format_error(e)
     if error := _validate_request_timeout(request_timeout):
         return error
-    if error := _validate_batch_retry_controls(retries, retry_delay_ms):
+    if error := validate_batch_retry_controls(retries, retry_delay_ms):
         return error
     if error := _validate_extract_schema(extract_schema):
         return error

@@ -27,6 +27,7 @@ from otpack.batch import (
     batch_execute_enveloped,
     format_batch_results,
     normalize_items,
+    validate_batch_retry_controls,
 )
 from otpack.cache import Cache, cache
 from otpack.config import (
@@ -51,6 +52,7 @@ from otpack.http import (
     _format_http_error,
     api_headers,
     check_api_key,
+    create_json_http_client,
     require_api_key,
     safe_request,
 )
@@ -65,9 +67,21 @@ from otpack.paths import (
 from otpack.pathsec import DEFAULT_EXCLUDE_PATTERNS, is_path_excluded, validate_path
 from otpack.platform import get_install_hint
 from otpack.state import get_state, set_state
-from otpack.text import format_error, run_command, truncate
+from otpack.text import (
+    extract_structured_data,
+    format_error,
+    format_sources,
+    parse_frontmatter,
+    run_command,
+    truncate,
+)
 
 __all__ = [
+    "create_json_http_client",
+    "extract_structured_data",
+    "format_sources",
+    "parse_frontmatter",
+    "validate_batch_retry_controls",
     "DEFAULT_EXCLUDE_PATTERNS",
     "BatchEnvelope",
     "BatchError",

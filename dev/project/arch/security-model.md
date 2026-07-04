@@ -19,7 +19,9 @@ Four layers of defence protect against arbitrary code execution and prompt injec
 - **Calls**: Wildcard pattern matching blocks dangerous calls (`pickle.*`, `subprocess.*`)
 - Tool namespaces are auto-allowed (all registered pack names)
 
-Configured in `security.yaml`:
+Configured in `security.yaml` (keys illustrative of the schema; see the shipped
+`src/ot/config/global_templates/security.yaml` for the actual defaults, which use
+`builtins`, `imports`, `dunders`, and `sanitize`):
 
 ```yaml
 security:
@@ -27,19 +29,37 @@ security:
     allow: [str, int, list, dict, print, len, range, ...]
   imports:
     allow: [json, re, math, datetime, ...]
-  calls:
-    block: [pickle.*, subprocess.*]
+  dunders:
+    allow: [__format__, __sanitize__, __force_context__]
 ```
 
-## Layer 3: Namespace Restriction
+## Layer 3: Namespace and the exec() boundary
 
-The `exec()` call receives a carefully constructed namespace containing only:
+**`exec()` is not a sandbox.** The executor passes the full, unfiltered builtins
+mapping into the exec namespace (`src/ot/executor/runner.py`,
+`"__builtins__": __builtins__`) — `__import__`, `eval`, filesystem, network, and
+subprocess are all reachable from executed code. Do not treat `exec()` itself as a
+containment layer.
 
-- Tool pack proxies (`brave`, `file`, `db`, ...)
-- Allowlisted builtins
-- Magic variables (`__format__`, `__sanitize__`, `__force_context__`)
+AST validation (`src/ot/executor/validator.py`) blocks casual mistakes and
+known-dangerous imports/calls, but it does **not** contain a determined escape. Two
+concrete bypasses illustrate the limit:
 
-Excluded: `__import__`, `exec`, `eval`, direct filesystem access, network access, subprocess.
+- `().__class__.__base__.__subclasses__()` walks the class hierarchy to reach
+  arbitrary classes without ever naming a blocked import.
+- Aliasing: `x = __builtins__; x['eval'](...)` — the validator's `visit_Subscript`
+  check only matches `node.value.id == "__builtins__"` literally, so an aliased name
+  slips past it.
+
+**The security boundary is process / user / environment isolation** for a *trusted
+local user running a trusted agent session* — not `exec()`. Users must not feed
+untrusted content to an agent with OneTool access and expect the validator to hold as
+a security control.
+
+**Deferred hardening (V4, contingent on the threat model changing):** narrowing the
+exposed builtins or adopting an alternative sandbox (e.g. Monty) is deliberately not
+implemented — sandboxing was dropped pre-V1 as complexity, and is revisited only if
+OneTool's trust model shifts to running untrusted sessions.
 
 ## Layer 4: Output Sanitisation
 

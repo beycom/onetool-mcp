@@ -89,9 +89,16 @@ class TestSanitizeForOutput:
     """Test output sanitisation."""
 
     def test_url_field_sanitized(self):
-        """Fields with 'url' in name are sanitized."""
+        """DB connection strings are fully redacted (p22 S3 extends URL masking)."""
         result = sanitize_for_output("postgres://user:pass@host/db", "db_url")
+        assert "user:pass" not in result
+        assert "[REDACTED:connection_string]" in result
+
+    def test_http_url_creds_masked(self):
+        """Plain http URLs still get the ***:*** credential mask (not full redaction)."""
+        result = sanitize_for_output("https://user:pass@example.com/x", "api_url")
         assert "***:***@" in result
+        assert "user:pass" not in result
 
     def test_http_value_sanitized(self):
         """HTTP URLs are sanitized even without url in field name."""
@@ -126,7 +133,8 @@ class TestFormatLogEntry:
         """Credentials are sanitized even in verbose mode."""
         entry = {"db_url": "postgres://user:secret@localhost/db"}
         result = format_log_entry(entry, verbose=True)
-        assert "***:***@" in result["db_url"]
+        assert "secret" not in result["db_url"]
+        assert "[REDACTED:connection_string]" in result["db_url"]
         assert "secret" not in result["db_url"]
 
     def test_original_entry_unchanged(self):
@@ -180,3 +188,41 @@ class TestFormatDevValue:
         assert "***:***@" in result
         assert "secret" not in result
         assert len(result) <= 120
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestSecretLiteralRedaction:
+    """Secret-shaped literals are redacted in any field, in both log paths (p22 S3)."""
+
+    def test_format_log_entry_redacts_api_key_in_command(self):
+        from ot.logging.format import format_log_entry
+
+        entry = {
+            "command": 'brave.search(query="x", token="sk-abc123def456ghi789jkl")'
+        }
+        out = format_log_entry(entry, verbose=True)
+        assert "sk-abc123def456ghi789jkl" not in out["command"]
+        assert "[REDACTED:api_key]" in out["command"]
+
+    def test_logentry_str_redacts_api_key(self):
+        from ot.logging.entry import LogEntry
+
+        rendered = str(
+            LogEntry(command='x(token="sk-abc123def456ghi789jkl")')
+        )
+        assert "sk-abc123def456ghi789jkl" not in rendered
+        assert "[REDACTED:api_key]" in rendered
+
+    def test_redaction_is_field_name_agnostic(self):
+        from ot.logging.format import format_log_entry
+
+        secret = "sk-abc123def456ghi789jkl"
+        out = format_log_entry(
+            {"preparedCode": f'k="{secret}"', "error": f"failed with {secret}"},
+            verbose=True,
+        )
+        assert secret not in out["preparedCode"]
+        assert secret not in out["error"]
+        assert "[REDACTED:api_key]" in out["preparedCode"]
+        assert "[REDACTED:api_key]" in out["error"]

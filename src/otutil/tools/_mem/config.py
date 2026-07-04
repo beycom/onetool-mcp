@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
+from ot.logging.redact import SECRET_PATTERNS as _BUILTIN_REDACTION_PATTERNS
 from otpack import DEFAULT_EXCLUDE_PATTERNS, get_tool_config, validate_path
 
 if TYPE_CHECKING:
@@ -14,19 +15,6 @@ if TYPE_CHECKING:
 _builtins_list = builtins.list
 
 VALID_CATEGORIES = {"rule", "context", "decision", "mistake", "discovery", "note"}
-
-_BUILTIN_REDACTION_PATTERNS = [
-    (r"sk-[a-zA-Z0-9]{20,}", "[REDACTED:api_key]"),
-    (r"ghp_[a-zA-Z0-9]{36,}", "[REDACTED:github_token]"),
-    (r"gho_[a-zA-Z0-9]{36,}", "[REDACTED:github_token]"),
-    (r"github_pat_[a-zA-Z0-9_]{22,}", "[REDACTED:github_token]"),
-    (r"xoxb-[a-zA-Z0-9\-]+", "[REDACTED:slack_token]"),
-    (r"xoxp-[a-zA-Z0-9\-]+", "[REDACTED:slack_token]"),
-    (r"AKIA[0-9A-Z]{16}", "[REDACTED:aws_key]"),
-    (r"(?i)password\s*[=:]\s*\S+", "[REDACTED:password]"),
-    (r"(?i)(?:api[_-]?key|token|secret)\s*[=:]\s*['\"]?[a-zA-Z0-9_\-]{16,}['\"]?", "[REDACTED:secret]"),
-    (r"(?i)(?:postgres|mysql|mongodb|redis)://\S+:\S+@\S+", "[REDACTED:connection_string]"),
-]
 
 
 # ---------------------------------------------------------------------------

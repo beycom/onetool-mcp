@@ -13,11 +13,12 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from otpack import parse_frontmatter
+
 if TYPE_CHECKING:
     from pathlib import Path
 
 _HEADING_RE = re.compile(r"^(#{1,2})\s+(.+)$")
-_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 _EMPTY_IMG_ALT_RE = re.compile(r"!\[\]\(([^)]+)\)")
 
 
@@ -37,29 +38,6 @@ class Chunk:
 
 def _content_hash(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
-
-
-def _parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
-    """Parse YAML frontmatter from content. Returns (meta, body)."""
-    try:
-        import frontmatter
-        post = frontmatter.loads(content)
-        meta = dict(post.metadata)
-        body = post.content
-        return meta, body
-    except ImportError:
-        pass
-    # Fallback: try regex-based strip without python-frontmatter
-    m = _FRONTMATTER_RE.match(content)
-    if m:
-        try:
-            import yaml
-            meta = yaml.safe_load(m.group(1)) or {}
-        except Exception:
-            meta = {}
-        body = content[m.end():]
-        return meta, body
-    return {}, content
 
 
 def _load_sidecar(md_path: Path) -> dict[str, Any]:
@@ -181,7 +159,7 @@ def chunk_file(path: Path, rel_path: Path, *, min_chunk_chars: int = 200) -> lis
     except OSError:
         return []
 
-    fm_meta, body = _parse_frontmatter(raw)
+    fm_meta, body = parse_frontmatter(raw)
     body = _fill_img_alt(body)
     sidecar_meta = _load_sidecar(path)
 

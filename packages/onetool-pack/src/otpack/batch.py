@@ -34,10 +34,31 @@ __all__ = [
     "batch_execute_enveloped",
     "format_batch_results",
     "normalize_items",
+    "validate_batch_retry_controls",
 ]
 
 T = TypeVar("T")
 R = TypeVar("R")
+
+
+def validate_batch_retry_controls(retries: int, retry_delay_ms: int) -> str | None:
+    """Validate batch retry guardrails. Returns an error string or None if valid."""
+    if (
+        not isinstance(retries, int)
+        or isinstance(retries, bool)
+        or not 0 <= retries <= 3
+    ):
+        return f"Error: retries must be between 0 and 3 (got {retries})"
+    if (
+        not isinstance(retry_delay_ms, int)
+        or isinstance(retry_delay_ms, bool)
+        or not 0 <= retry_delay_ms <= 10_000
+    ):
+        return (
+            "Error: retry_delay_ms must be between 0 and 10000 "
+            f"(got {retry_delay_ms})"
+        )
+    return None
 
 
 class BatchError(TypedDict):

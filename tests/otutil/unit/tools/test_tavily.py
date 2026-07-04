@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from otpack import format_sources as _format_sources
 from otutil.tools.tavily import (
     Config,
     _EXTRACT_DEPTH_VALUES,
@@ -20,7 +21,6 @@ from otutil.tools.tavily import (
     _TOPIC_VALUES,
     _format_extract_results,
     _format_search_results,
-    _format_sources,
     _validate_days,
     _validate_extract_depth,
     _validate_extract_format,

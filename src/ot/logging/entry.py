@@ -190,19 +190,14 @@ class LogEntry:
         Returns:
             JSON string with fields and duration
         """
-        output = dict(self._fields)
-        output["duration"] = round(time.perf_counter() - self._start_time, 3)
+        # Route through format_log_entry so this direct logger.debug(LogEntry(...))
+        # path gets the same truncation + credential/secret redaction as LogSpan.
+        # Lazy imports avoid the circular import span.py already works around.
+        from ot.config import is_log_verbose
+        from ot.logging.format import format_log_entry
 
-        if self._status is not None:
-            output["status"] = self._status
-        if self._status_code is not None:
-            output["statusCode"] = self._status_code
-        if self._error_type is not None:
-            output["errorType"] = self._error_type
-        if self._error_message is not None:
-            output["errorMessage"] = self._error_message
-
-        return json.dumps(output, separators=(",", ":"), default=str)
+        formatted = format_log_entry(self.to_dict(), verbose=is_log_verbose())
+        return json.dumps(formatted, separators=(",", ":"), default=str)
 
     def __repr__(self) -> str:
         """Return a debug representation.

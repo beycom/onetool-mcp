@@ -26,7 +26,6 @@ from typing import Any, Literal
 
 OutputFormat = Literal["full", "text_only", "sources_only"]
 
-import httpx
 from pydantic import BaseModel, Field
 
 from otpack import (
@@ -34,11 +33,14 @@ from otpack import (
     LogSpan,
     _format_http_error,
     batch_execute_enveloped,
+    create_json_http_client,
+    format_sources,
     get_tool_config,
     lazy_client,
     normalize_items,
     require_api_key,
     truncate,
+    validate_batch_retry_controls,
 )
 
 
@@ -57,17 +59,10 @@ BRAVE_API_BASE = "https://api.search.brave.com/res/v1"
 # Truncation length for video descriptions (147 chars + "..." = 150 total)
 VIDEO_DESC_MAX_LENGTH = 150
 
-def _create_http_client() -> httpx.Client:
-    """Create HTTP client for Brave API requests."""
-    return httpx.Client(
-        base_url=BRAVE_API_BASE,
-        timeout=180.0,
-        headers={"Accept": "application/json", "Accept-Encoding": "gzip"},
-    )
-
-
 # Thread-safe lazy client using SDK utility
-_get_http_client = lazy_client(_create_http_client)
+_get_http_client = lazy_client(
+    lambda: create_json_http_client(BRAVE_API_BASE, timeout=180.0)
+)
 
 
 def _get_config() -> Config:
@@ -133,25 +128,6 @@ def _make_request(
             return False, _format_http_error(e)
 
 
-def _format_sources(
-    results: list[dict[str, Any]], *, max_sources: int | None = None
-) -> str:
-    """Format source URLs as a numbered deduplicated markdown link list."""
-    seen_urls: set[str] = set()
-    lines: list[str] = []
-    num = 0
-    for result in results:
-        url = result.get("url", "")
-        if not url or url in seen_urls:
-            continue
-        seen_urls.add(url)
-        num += 1
-        if max_sources is not None and num > max_sources:
-            break
-        title = result.get("title", "") or url
-        lines.append(f"{num}. [{title}]({url})")
-    return "\n".join(lines)
-
 
 def _format_web_results(
     data: dict[str, Any],
@@ -166,7 +142,7 @@ def _format_web_results(
         return "No results found."
 
     if output_format == "sources_only":
-        return _format_sources(results, max_sources=max_sources) or "No sources found."
+        return format_sources(results, max_sources=max_sources) or "No sources found."
 
     if output_format == "text_only":
         text_lines: list[str] = []
@@ -196,7 +172,7 @@ def _format_web_results(
             lines.append(f"   {description}")
         lines.append("")
 
-    sources_text = _format_sources(results, max_sources=max_sources)
+    sources_text = format_sources(results, max_sources=max_sources)
     if sources_text:
         lines.append("## Sources")
         lines.append(sources_text)
@@ -224,7 +200,7 @@ def _format_news_results(
     )
 
     if output_format == "sources_only":
-        return _format_sources(results, max_sources=max_sources) or "No sources found."
+        return format_sources(results, max_sources=max_sources) or "No sources found."
 
     if output_format == "text_only":
         text_lines: list[str] = []
@@ -275,7 +251,7 @@ def _format_image_results(
         return "No image results found."
 
     if output_format == "sources_only":
-        return _format_sources(results, max_sources=max_sources) or "No sources found."
+        return format_sources(results, max_sources=max_sources) or "No sources found."
 
     if output_format == "text_only":
         text_lines: list[str] = []
@@ -326,7 +302,7 @@ def _format_video_results(
         return "No video results found."
 
     if output_format == "sources_only":
-        return _format_sources(results, max_sources=max_sources) or "No sources found."
+        return format_sources(results, max_sources=max_sources) or "No sources found."
 
     if output_format == "text_only":
         text_lines: list[str] = []
@@ -402,25 +378,6 @@ def _validate_max_results(max_results: int) -> str | None:
         return None
     return f"Error: max_results must be between 1 and 20 (got {max_results})"
 
-
-def _validate_batch_retry_controls(retries: int, retry_delay_ms: int) -> str | None:
-    """Validate batch retry guardrails."""
-    if (
-        not isinstance(retries, int)
-        or isinstance(retries, bool)
-        or not 0 <= retries <= 3
-    ):
-        return f"Error: retries must be between 0 and 3 (got {retries})"
-    if (
-        not isinstance(retry_delay_ms, int)
-        or isinstance(retry_delay_ms, bool)
-        or not 0 <= retry_delay_ms <= 10_000
-    ):
-        return (
-            "Error: retry_delay_ms must be between 0 and 10000 "
-            f"(got {retry_delay_ms})"
-        )
-    return None
 
 
 def _validate_offset(offset: int) -> str | None:
@@ -798,7 +755,7 @@ def search_batch(
         return error
     if error := _validate_output_format(output_format):
         return error
-    if error := _validate_batch_retry_controls(retries, retry_delay_ms):
+    if error := validate_batch_retry_controls(retries, retry_delay_ms):
         return error
 
     normalized = normalize_items(queries)

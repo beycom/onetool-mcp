@@ -23,15 +23,37 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, TypeVar
 
+import httpx
+
 from otpack.config import get_secret
 from otpack.text import truncate
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-__all__ = ["_format_http_error", "api_headers", "check_api_key", "require_api_key", "safe_request"]
+__all__ = [
+    "_format_http_error",
+    "api_headers",
+    "check_api_key",
+    "create_json_http_client",
+    "require_api_key",
+    "safe_request",
+]
 
 T = TypeVar("T")
+
+
+def create_json_http_client(
+    base_url: str,
+    *,
+    timeout: float | Any = 30.0,
+    headers: dict[str, str] | None = None,
+) -> httpx.Client:
+    """Create an httpx.Client for a JSON API with gzip Accept-Encoding defaults."""
+    default_headers = {"Accept": "application/json", "Accept-Encoding": "gzip"}
+    if headers:
+        default_headers.update(headers)
+    return httpx.Client(base_url=base_url, timeout=timeout, headers=default_headers)
 
 
 def _missing_secret_message(secret_name: str) -> str:

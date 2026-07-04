@@ -156,14 +156,17 @@ def sanitize_for_output(value: Any, field_name: str = "") -> Any:
     if not isinstance(value, str):
         return value
 
+    from ot.logging.redact import redact_secrets
+
     lower_name = field_name.lower()
     lower_value = value.lower()
 
     # Apply URL sanitisation if field name contains 'url' or value is a URL
     if "url" in lower_name or lower_value.startswith(("http://", "https://")):
-        return sanitize_url(value)
+        value = sanitize_url(value)
 
-    return value
+    # Redact secret-shaped literals in ANY field (not just url-named fields).
+    return redact_secrets(value)
 
 
 def format_log_entry(

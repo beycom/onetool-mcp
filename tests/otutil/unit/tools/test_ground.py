@@ -11,13 +11,13 @@ import pytest
 
 pytest.importorskip("google.genai", reason="google-genai not installed ([util] extra)")
 
+from otpack import extract_structured_data as _extract_structured_data
+from otpack import format_sources as _format_sources
 from otutil.tools.ground import (
     Config,
-    _extract_structured_data,
     _extract_sources,
     _format_error,
     _format_response,
-    _format_sources,
     dev,
     docs,
     reddit,

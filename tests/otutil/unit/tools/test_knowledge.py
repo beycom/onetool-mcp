@@ -3277,3 +3277,44 @@ class TestSearchEmbeddingsGuard:
             result
             == "No embeddings found for 'testdb'. Run kb.reindex(db='testdb') to generate them."
         )
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestRetrievalUntrustedContextBoundary:
+    """kb.ask's LLM calls send an untrusted-context system message (p22 S2)."""
+
+    def _mock_client(self, content: str = "3"):
+        client = MagicMock()
+        client.chat.completions.create.return_value.choices = [
+            MagicMock(message=MagicMock(content=content))
+        ]
+        return client
+
+    def test_synthesise_includes_untrusted_system_message(self):
+        from otutil.tools._knowledge import retrieval
+
+        client = self._mock_client("answer")
+        with patch.object(retrieval, "_get_llm_client", return_value=client), patch(
+            "ot.config.get_llm_config"
+        ):
+            retrieval._synthesise("q", "some context")
+
+        _a, kwargs = client.chat.completions.create.call_args
+        roles = [m["role"] for m in kwargs["messages"]]
+        assert "system" in roles
+        system = next(m for m in kwargs["messages"] if m["role"] == "system")
+        assert "untrusted" in system["content"].lower()
+
+    def test_llm_rerank_includes_untrusted_system_message(self):
+        from otutil.tools._knowledge import retrieval
+
+        client = self._mock_client("5")
+        with patch.object(retrieval, "_get_llm_client", return_value=client), patch(
+            "ot.config.get_llm_config"
+        ):
+            retrieval._llm_rerank("q", [{"topic": "t", "content": "passage", "id": 1}])
+
+        _a, kwargs = client.chat.completions.create.call_args
+        system = next(m for m in kwargs["messages"] if m["role"] == "system")
+        assert "untrusted" in system["content"].lower()

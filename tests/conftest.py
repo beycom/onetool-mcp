@@ -4,10 +4,10 @@ Every test must have:
 1. A speed tier marker (smoke, unit, integration, slow)
 2. A component marker (serve, pkg, core, spec, tools)
 
-Tests missing required markers are automatically skipped.
+By default, tests missing a required marker FAIL collection (fail fast) — for both
+the `require()`-based checks and the speed/component marker gate.
 
-Use `--allow-skips` to gracefully skip tests with missing requirements.
-By default, tests with missing requirements will error (fail fast).
+Use `--allow-skips` to gracefully skip tests with missing requirements instead.
 """
 
 from __future__ import annotations
@@ -139,9 +139,19 @@ def executor() -> Callable[[str], str]:
     return run
 
 
-def pytest_collection_modifyitems(items: list[Item]) -> None:
-    """Skip tests that are missing required markers."""
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[Item]
+) -> None:
+    """Enforce required markers.
+
+    By default a test missing a speed or component marker FAILS collection (so a
+    mislabelled test can't silently vanish while CI stays green). Pass
+    ``--allow-skips`` to skip such tests (with a warning) instead.
+    """
     in_vscode = "VSCODE_PID" in os.environ
+    allow_skips = config.getoption("--allow-skips", default=False)
+    missing: list[str] = []
+
     for item in items:
         markers = {m.name for m in item.iter_markers()}
 
@@ -151,21 +161,30 @@ def pytest_collection_modifyitems(items: list[Item]) -> None:
             )
             continue
 
+        reasons: list[str] = []
         if not markers & SPEED_MARKERS:
-            warnings.warn(
-                f"Test {item.nodeid} is missing a speed marker "
-                f"(one of: {', '.join(sorted(SPEED_MARKERS))})",
-                stacklevel=1,
-            )
-            item.add_marker(pytest.mark.skip(reason="Missing speed marker"))
-
+            reasons.append(f"speed (one of: {', '.join(sorted(SPEED_MARKERS))})")
         if not markers & COMPONENT_MARKERS:
-            warnings.warn(
-                f"Test {item.nodeid} is missing a component marker "
-                f"(one of: {', '.join(sorted(COMPONENT_MARKERS))})",
-                stacklevel=1,
+            reasons.append(
+                f"component (one of: {', '.join(sorted(COMPONENT_MARKERS))})"
             )
-            item.add_marker(pytest.mark.skip(reason="Missing component marker"))
+
+        if not reasons:
+            continue
+
+        detail = f"{item.nodeid} is missing {' and '.join(reasons)}"
+        if allow_skips:
+            warnings.warn(detail, stacklevel=1)
+            item.add_marker(pytest.mark.skip(reason="Missing required marker"))
+        else:
+            missing.append(detail)
+
+    if missing:
+        pytest.exit(
+            "Tests missing required markers (use --allow-skips to skip):\n  "
+            + "\n  ".join(missing),
+            returncode=1,
+        )
 
 
 # -----------------------------------------------------------------------------
