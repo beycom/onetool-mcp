@@ -221,6 +221,13 @@ class TestValidateCountry:
         result = _validate_country("")
         assert result is not None
 
+    def test_non_str_returns_clean_error_not_typeerror(self):
+        """Reachable via legacy count=5 prefix-binding to country. Must return
+        the standard error string, not raise TypeError."""
+        result = _validate_country(5)
+        assert result is not None
+        assert "Invalid country" in result
+
 
 @pytest.mark.unit
 @pytest.mark.tools

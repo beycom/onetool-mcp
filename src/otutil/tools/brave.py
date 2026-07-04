@@ -396,7 +396,7 @@ def _validate_output_format(output_format: str) -> str | None:
 
 def _validate_country(country: str) -> str | None:
     """Validate country is a 2-letter uppercase code. Returns error string or None if valid."""
-    if _COUNTRY_RE.match(country):
+    if isinstance(country, str) and _COUNTRY_RE.match(country):
         return None
     return f"Error: Invalid country '{country}'. Use a 2-letter uppercase country code (e.g. 'US', 'GB')"
 

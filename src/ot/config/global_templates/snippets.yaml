@@ -11,11 +11,11 @@ snippets:
     description: Batch search using Brave (pipe-separated queries)
     params:
       q: { description: "Pipe-separated search queries" }
-      count: { default: 10, description: "Results per query" }
+      max_results: { default: 10, description: "Results per query" }
     body: |
       __format__="yml_h";__sanitize__=False
       _queries = [item.strip() for item in {{ q | tojson }}.split("|") if item.strip()]
-      br.search_batch(queries=_queries, count=int({{ count | tojson }}))
+      br.search_batch(queries=_queries, max_results=int({{ max_results | tojson }}))
 
 
   # ============================================================================
@@ -174,10 +174,10 @@ snippets:
   # ============================================================================
 
   mem_s:
-    description: Semantic or hybrid search across memories (finds related content)
+    description: Semantic, keyword, or hybrid search across memories (finds related content)
     params:
       q: { description: "Search query" }
-      mode: { default: "semantic", description: "Search mode: semantic, pattern, hybrid" }
+      mode: { default: "semantic", description: "Search mode: semantic, keyword, hybrid" }
       topic: { default: "", description: "Topic prefix filter (e.g., 'projects/')" }
     body: |
       __format__="yml_h";__sanitize__=False

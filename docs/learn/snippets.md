@@ -1,6 +1,6 @@
 # Snippets
 
-Snippets are reusable code templates — short names that expand into full tool calls. Instead of writing `br.search_batch(queries=["react","vue"], count=10)` every time, you write `:br q=react|vue`.
+Snippets are reusable code templates — short names that expand into full tool calls. Instead of writing `br.search_batch(queries=["react","vue"], max_results=10)` every time, you write `:br q=react|vue`.
 
 ## Loading the Bundled Library
 
@@ -148,7 +148,7 @@ snippets:
     params:
       q: { description: "Search query" }
     body: |
-      br.search(query="{{ q }}", count=5)
+      br.search(query="{{ q }}", max_results=5)
 ```
 
 Inline snippets override any snippet with the same name from included files.
