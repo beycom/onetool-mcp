@@ -39,7 +39,7 @@ def _inline_html_svgs(*, html_path: Path) -> int:
     soup = BeautifulSoup(content, "html.parser")
     replaced = 0
 
-    for container in soup.find_all(attrs={"data-svg-src": True}):
+    for container in soup.find_all(None, attrs={"data-svg-src": True}):
         svg_rel_path = cast("str | None", container.get("data-svg-src"))
         if not svg_rel_path:
             continue
