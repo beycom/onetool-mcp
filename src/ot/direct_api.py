@@ -53,11 +53,20 @@ def create_app() -> Any:
         HmacAuthError,
         auth_error_response,
         console_auth_error_response,
+        console_outbox_auth_key,
         signed_console_json_response,
         signed_json_response,
         verify_console_request,
         verify_request,
     )
+
+    # Eagerly ensure the Console outbox HMAC key file exists as soon as the
+    # Console outbox routes are mounted, instead of lazily on the first
+    # request. This lets a Console started right after MCP is up authenticate
+    # from the moment MCP is ready. `ensure_hmac_key_file` is idempotent: a
+    # pre-existing key is read, not regenerated, so the lazy call path on the
+    # first request still works unchanged.
+    console_outbox_auth_key()
 
     # Bind the Console outbox to this runtime instance and append the
     # initial `instance.snapshot` event before the app can serve any

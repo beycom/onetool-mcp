@@ -27,6 +27,7 @@ from otpack import sign_http_message
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from pathlib import Path
 
 
 def _reset_console_state(instance_id: str = "mcp-test") -> None:
@@ -49,6 +50,24 @@ def _isolate_console_outbox_state() -> Iterator[None]:
     _reset_console_state()
     yield
     _reset_console_state()
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_create_app_eagerly_ensures_console_outbox_key(tmp_path: Path) -> None:
+    """The Console outbox HMAC key file exists immediately after `create_app()`.
+
+    A Console started right after MCP is up must be able to authenticate
+    without first waiting for an outbox request to lazily create the key.
+    """
+    key_path = tmp_path / "auth" / "console-outbox.key"
+    assert not key_path.exists()
+
+    with patch("ot.meta.resolve_ot_path", return_value=tmp_path):
+        create_app()
+
+    assert key_path.exists()
+    assert oct(key_path.stat().st_mode)[-3:] == "600"
 
 
 @pytest.mark.unit

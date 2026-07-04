@@ -11,7 +11,43 @@ OneTool MCP exposes a narrow signed outbox for the separate OneTool Console App 
 | `/api/console/outbox` | `GET` | Poll retained Console events without mutating queue state |
 | `/api/console/outbox/ack` | `POST` | Acknowledge consumed events so MCP can drop them early |
 
-Console requests use `auth/console-outbox.key`. This key is separate from `auth/mcp-direct.key` and does not authorize `/run`.
+Console requests use `auth/console-outbox.key`. This key is separate from `auth/mcp-direct.key` and does not authorize `/run`. The key file is ensured **eagerly** when the direct API app is created (as soon as the Console outbox routes are mounted at startup), not lazily on the first request, so a Console started right after MCP is up can authenticate immediately.
+
+## Discovery
+
+The direct API auto-increments past `direct.host.port` when the preferred port is taken, so a fixed configured port cannot be relied on to find a running instance. To let consumers discover the actual bound port — and enumerate multiple concurrently running MCP instances — MCP writes a discovery file per instance under `<ot-dir>/runtime/direct-api/`.
+
+| Property | Value |
+|----------|-------|
+| Path | `<ot-dir>/runtime/direct-api/<instance_id>.json` |
+| Written | When the direct API successfully binds (the final auto-incremented port is known) |
+| Removed | On clean MCP shutdown |
+| Mode | `0600` |
+| Write method | Atomic: temp file in the same directory, then `os.replace` |
+
+Body shape:
+
+```json
+{
+  "instance_id": "mcp-<uuid4hex>",
+  "port": 8766,
+  "pid": 12345,
+  "started_at": "2026-07-05T00:00:00+00:00"
+}
+```
+
+- `instance_id` — the process's stable runtime instance identity (matches the id used elsewhere, e.g. Console outbox `instance_id`)
+- `port` — the actual port the direct API bound, after auto-increment
+- `pid` — the MCP process id
+- `started_at` — ISO-8601 UTC timestamp of when the direct API bound
+
+One file exists per live instance, so multiple concurrently running MCP processes each get their own discovery file in the same directory.
+
+**Staleness rule for consumers:** a discovery file is stale if its recorded `pid` is not a live process. Consumers MUST check process liveness (for example `os.kill(pid, 0)` semantics — no exception or a `PermissionError` means alive; `ProcessLookupError` means dead) before trusting a file's `port`, and MUST ignore stale files rather than connecting to them. MCP does not read a discovery file back to double check it is unmodified before removing it on shutdown, and consumers must never assume the file's absence means anything other than "no live discovery record from this MCP" — it is not itself an auth or readiness signal.
+
+MCP also opportunistically sweeps stale sibling files (dead `pid`) from `<ot-dir>/runtime/direct-api/` at its own direct API startup, but consumers SHALL NOT depend on that sweep for correctness — always apply the staleness rule when reading the directory directly.
+
+No discovery file is written when `direct.host.enabled: false` (no direct API listener is started in that case either).
 
 ## Protocol Identity
 

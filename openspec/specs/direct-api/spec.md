@@ -69,6 +69,76 @@ the configured port first, then increment until a free port is found.
 - **WHEN** stdio or HTTP root MCP shutdown runs
 - **THEN** the direct API listener SHALL be stopped with the MCP process
 
+### Requirement: Direct API discovery file
+
+When the MCP-owned direct API successfully binds, MCP SHALL write a
+discovery file so external consumers (for example the OneTool Console) can
+find the actual bound port and identify live MCP instances without polling a
+fixed, possibly stale, port.
+
+The discovery file SHALL be written at
+`<ot-dir>/runtime/direct-api/<instance_id>.json`, one file per live instance,
+with JSON body:
+
+```json
+{
+  "instance_id": "mcp-<uuid4hex>",
+  "port": 8766,
+  "pid": 12345,
+  "started_at": "2026-07-05T00:00:00+00:00"
+}
+```
+
+`instance_id` SHALL match the process's stable runtime instance identity.
+`port` SHALL be the final auto-incremented port the direct API actually
+bound. `started_at` SHALL be an ISO-8601 UTC timestamp. The file SHALL be
+written atomically (temp file in the same directory, then `os.replace`) and
+SHALL be created with file mode `0600`. The parent directory SHALL be
+created with parents as needed.
+
+#### Scenario: Discovery file written on successful bind
+
+- **GIVEN** `direct.host.enabled: true`
+- **WHEN** the direct API successfully binds a port
+- **THEN** MCP SHALL write the discovery file for the current instance at
+  `<ot-dir>/runtime/direct-api/<instance_id>.json` containing the bound port,
+  process pid, and start timestamp
+- **AND** the file SHALL be written atomically and created with mode `0600`
+
+#### Scenario: No discovery file when disabled
+
+- **GIVEN** `direct.host.enabled: false`
+- **WHEN** MCP startup runs
+- **THEN** no direct API listener SHALL be started
+- **AND** no discovery file SHALL be written
+
+#### Scenario: Discovery file removed on clean shutdown
+
+- **GIVEN** the MCP-owned direct API is running and its discovery file exists
+- **WHEN** stdio or HTTP root MCP shutdown runs and the direct API listener is
+  stopped
+- **THEN** MCP SHALL remove that instance's discovery file
+
+#### Scenario: Stale sibling discovery files swept on startup
+
+- **GIVEN** `<ot-dir>/runtime/direct-api/` contains discovery files left
+  behind by processes that are no longer running
+- **WHEN** MCP startup binds the direct API
+- **THEN** MCP SHALL remove sibling discovery files whose recorded `pid` is
+  not a live process (`os.kill(pid, 0)` semantics), before or as part of
+  writing its own discovery file
+- **AND** discovery files whose `pid` is still alive SHALL be left untouched
+
+#### Scenario: Consumers treat a dead-pid file as stale
+
+- **WHEN** a consumer reads a discovery file under
+  `<ot-dir>/runtime/direct-api/`
+- **THEN** the consumer SHALL treat the file as stale and ignore it if the
+  recorded `pid` does not correspond to a live process
+- **AND** the consumer MAY rely on MCP's own startup sweep to remove stale
+  sibling files opportunistically, but SHALL NOT depend on it for
+  correctness
+
 ### Requirement: authenticated API endpoints
 
 The API SHALL expose:
@@ -110,6 +180,17 @@ be rejected. Every response, including errors, SHALL be signed.
 - **WHEN** a Console outbox request is signed with `auth/mcp-direct.key`
 - **THEN** the API SHALL return signed HTTP `401`
 - **AND** outbox state SHALL NOT be read or mutated
+
+#### Scenario: Console outbox key is ensured eagerly at startup
+
+- **GIVEN** `direct.host.enabled: true`
+- **WHEN** the direct API app is created and the Console outbox routes are
+  mounted
+- **THEN** `auth/console-outbox.key` SHALL exist on disk immediately, before
+  any Console outbox request is served
+- **AND** a Console started as soon as MCP is up SHALL be able to
+  authenticate without waiting for a first outbox request to lazily create
+  the key
 
 ### Requirement: health, readiness, and run contracts
 

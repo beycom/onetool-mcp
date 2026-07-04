@@ -306,6 +306,13 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
         # Direct API mode: bind one local HTTP listener owned by this MCP process.
         direct_status = "disabled"
         if _config.direct.host.enabled:
+            from ot.direct_discovery import (
+                sweep_stale_discovery_files,
+                write_discovery_file,
+            )
+            from ot.runtime_meta import get_or_create_instance_id, set_direct_api
+
+            sweep_stale_discovery_files()
             try:
                 api_server, api_thread, api_port = _start_direct_api()
                 _direct_api_server = api_server
@@ -313,6 +320,10 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
                 _direct_api_port = api_port
                 start_span.add("directApi", f"http://127.0.0.1:{api_port}")
                 direct_status = "ready"
+
+                base_url = f"http://127.0.0.1:{api_port}"
+                set_direct_api(base_url=base_url, port=api_port)
+                write_discovery_file(instance_id=get_or_create_instance_id(), port=api_port)
             except Exception as e:
                 logger.error(LogEntry(event="direct.api.degraded").failure(e))
                 start_span.add("directApi", "degraded")
@@ -363,6 +374,11 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
         ):
             _stop_direct_api(_direct_api_server, _direct_api_thread, _direct_api_port)
             stop_span.add("directApiStopped", f"127.0.0.1:{_direct_api_port}")
+
+            from ot.direct_discovery import remove_discovery_file
+            from ot.runtime_meta import get_or_create_instance_id
+
+            remove_discovery_file(instance_id=get_or_create_instance_id())
         _direct_api_server = None
         _direct_api_thread = None
         _direct_api_port = None

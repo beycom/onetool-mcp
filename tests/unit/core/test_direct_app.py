@@ -133,6 +133,135 @@ def test_lifespan_does_not_connect_disabled_proxy_servers() -> None:
     proxy.connect_background.assert_not_called()
 
 
+def _direct_enabled_cfg() -> SimpleNamespace:
+    return SimpleNamespace(
+        _config_dir=Path("/tmp/onetool/config"),
+        servers={},
+        include=[],
+        prompts=[],
+        direct=SimpleNamespace(host=SimpleNamespace(enabled=True, port=8765)),
+        stats=SimpleNamespace(enabled=False),
+        get_log_dir_path=lambda: Path("/tmp/onetool/logs"),
+        get_stats_file_path=lambda: Path("/tmp/onetool/stats.jsonl"),
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_lifespan_writes_discovery_file_on_direct_api_start() -> None:
+    """Direct API startup writes the discovery file with the bound port and instance id."""
+    from ot import server
+
+    async def _run_lifespan() -> None:
+        async with server._lifespan(SimpleNamespace()):
+            pass
+
+    fake_server = MagicMock()
+    fake_thread = MagicMock()
+
+    with (
+        patch.object(server, "_config", _direct_enabled_cfg()),
+        patch.object(server, "get_proxy_manager", return_value=SimpleNamespace(
+            connect_background=lambda _servers: None,
+            servers={},
+            is_connecting=False,
+        )),
+        patch.object(server, "get_registry", return_value=SimpleNamespace(tools={})),
+        patch("ot.executor.tool_loader.load_tool_registry"),
+        patch.object(server, "_start_direct_api", return_value=(fake_server, fake_thread, 8766)),
+        patch.object(server, "_stop_direct_api"),
+        patch("ot.telemetry.ping"),
+        patch("ot.direct_discovery.sweep_stale_discovery_files") as sweep_mock,
+        patch("ot.direct_discovery.write_discovery_file") as write_mock,
+        patch("ot.runtime_meta.get_or_create_instance_id", return_value="mcp-fixedid"),
+        patch("ot.runtime_meta.set_direct_api") as set_direct_api_mock,
+    ):
+        asyncio.run(_run_lifespan())
+
+    sweep_mock.assert_called_once_with()
+    write_mock.assert_called_once_with(instance_id="mcp-fixedid", port=8766)
+    set_direct_api_mock.assert_called_once_with(base_url="http://127.0.0.1:8766", port=8766)
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_lifespan_removes_discovery_file_on_clean_shutdown() -> None:
+    """Direct API shutdown removes the discovery file for the current instance."""
+    from ot import server
+
+    async def _run_lifespan() -> None:
+        async with server._lifespan(SimpleNamespace()):
+            pass
+
+    fake_server = MagicMock()
+    fake_thread = MagicMock()
+
+    with (
+        patch.object(server, "_config", _direct_enabled_cfg()),
+        patch.object(server, "get_proxy_manager", return_value=SimpleNamespace(
+            connect_background=lambda _servers: None,
+            servers={},
+            is_connecting=False,
+        )),
+        patch.object(server, "get_registry", return_value=SimpleNamespace(tools={})),
+        patch("ot.executor.tool_loader.load_tool_registry"),
+        patch.object(server, "_start_direct_api", return_value=(fake_server, fake_thread, 8766)),
+        patch.object(server, "_stop_direct_api") as stop_mock,
+        patch("ot.telemetry.ping"),
+        patch("ot.direct_discovery.sweep_stale_discovery_files"),
+        patch("ot.direct_discovery.write_discovery_file"),
+        patch("ot.runtime_meta.get_or_create_instance_id", return_value="mcp-fixedid"),
+        patch("ot.runtime_meta.set_direct_api"),
+        patch("ot.direct_discovery.remove_discovery_file") as remove_mock,
+    ):
+        asyncio.run(_run_lifespan())
+
+    stop_mock.assert_called_once_with(fake_server, fake_thread, 8766)
+    remove_mock.assert_called_once_with(instance_id="mcp-fixedid")
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_lifespan_disabled_direct_api_never_touches_discovery_files() -> None:
+    """No discovery file write/sweep/remove happens when the Direct API is disabled."""
+    from ot import server
+
+    async def _run_lifespan() -> None:
+        async with server._lifespan(SimpleNamespace()):
+            pass
+
+    cfg = SimpleNamespace(
+        _config_dir=Path("/tmp/onetool/config"),
+        servers={},
+        include=[],
+        prompts=[],
+        direct=SimpleNamespace(host=SimpleNamespace(enabled=False)),
+        stats=SimpleNamespace(enabled=False),
+        get_log_dir_path=lambda: Path("/tmp/onetool/logs"),
+        get_stats_file_path=lambda: Path("/tmp/onetool/stats.jsonl"),
+    )
+
+    with (
+        patch.object(server, "_config", cfg),
+        patch.object(server, "get_proxy_manager", return_value=SimpleNamespace(
+            connect_background=lambda _servers: None,
+            servers={},
+            is_connecting=False,
+        )),
+        patch.object(server, "get_registry", return_value=SimpleNamespace(tools={})),
+        patch("ot.executor.tool_loader.load_tool_registry"),
+        patch("ot.telemetry.ping"),
+        patch("ot.direct_discovery.sweep_stale_discovery_files") as sweep_mock,
+        patch("ot.direct_discovery.write_discovery_file") as write_mock,
+        patch("ot.direct_discovery.remove_discovery_file") as remove_mock,
+    ):
+        asyncio.run(_run_lifespan())
+
+    sweep_mock.assert_not_called()
+    write_mock.assert_not_called()
+    remove_mock.assert_not_called()
+
+
 @pytest.mark.unit
 @pytest.mark.core
 def test_run_root_server_uses_streamable_http_transport() -> None:
