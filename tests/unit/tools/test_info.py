@@ -1365,3 +1365,56 @@ def test_tool_info_miss_no_match_returns_empty_list() -> None:
     assert isinstance(result, dict)
     assert result["error"]
     assert result["did_you_mean"] == []
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_tools_signatures_returns_oneliner_strings() -> None:
+    """ot.tools(info='signatures') returns pack.tool(args) # desc one-liner strings."""
+    from ot.meta import tools
+
+    result = tools(pattern="brave.", info="signatures")
+
+    assert isinstance(result, list)
+    assert result
+    assert all(isinstance(line, str) for line in result)
+    line = next(x for x in result if x.startswith("brave.search("))
+    assert "query" in line
+    assert "  # " in line  # description separator
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_tools_signatures_single_pack_only() -> None:
+    """A single-pack pattern in signatures mode returns only that pack."""
+    from ot.meta import tools
+
+    result = tools(pattern="brave.", info="signatures")
+    assert all(line.startswith("brave.") for line in result)
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_tools_invalid_info_names_signatures() -> None:
+    """The invalid-info error message names the signatures level."""
+    from ot.meta import tools
+
+    with pytest.raises(ValueError, match="signatures"):
+        tools(info="bogus")
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_tools_signatures_matches_index_format() -> None:
+    """A sampled tool renders identically to the tool-index generator's line."""
+    from ot.meta import tool_info, tools
+    from ot.meta._signatures import short_description, signature_args
+
+    detail = tool_info(name="brave.search", info="full")
+    assert isinstance(detail, dict)
+    expected = f"{detail['name']}({signature_args(detail['signature'])})"
+    desc = short_description(detail["description"])
+    if desc:
+        expected = f"{expected}  # {desc}"
+    sig_line = next(iter(tools(pattern="brave.search", info="signatures")))
+    assert sig_line == expected

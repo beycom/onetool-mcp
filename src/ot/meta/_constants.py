@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Literal
 
 # Info level type for discovery functions
-InfoLevel = Literal["list", "min", "default", "full"]
+InfoLevel = Literal["list", "min", "default", "full", "signatures"]
 ServerInfoLevel = Literal["min", "default", "full", "resources", "prompts"]
 
 # Pack name for dot notation: ot.tools(), ot.packs(), etc.

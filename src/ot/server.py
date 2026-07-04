@@ -212,37 +212,15 @@ def _stop_direct_api(server: Any, thread: threading.Thread, port: int) -> None:
     logger.info(LogEntry(event="direct.api.stop.done", port=port).success())
 
 
-def _build_pack_summary() -> str:
-    """Build a pack summary string from installed packs for injection into instructions."""
-    try:
-        from ot.meta._discovery import packs as _packs
-        pack_list = _packs(info="default")
-        lines = []
-        for pack in pack_list:
-            if isinstance(pack, dict):
-                name = pack.get("name", "")
-                desc = pack.get("description", "")
-                if desc and desc != "(no description)":
-                    lines.append(f"- **{name}**: {desc}")
-                else:
-                    lines.append(f"- **{name}**")
-        return "\n".join(lines)
-    except Exception:
-        return "(pack list unavailable)"
-
-
 def _get_instructions() -> str:
-    """Generate MCP server instructions with dynamic pack summary.
+    """Return the connection-time MCP server instructions.
 
     Note: Tool descriptions are NOT included here - they come through
     the MCP tool definitions which the client converts to function calling format.
+    The pack list is delivered by the ot-ref skill, not inlined here.
     """
     prompts = get_prompts(inline_prompts=_config.prompts)
-    instructions = prompts.instructions
-    if "{pack_summary}" in instructions:
-        pack_summary = _build_pack_summary()
-        instructions = instructions.replace("{pack_summary}", pack_summary)
-    return instructions.strip()
+    return prompts.instructions.strip()
 
 
 def _log_startup_diagnostics(

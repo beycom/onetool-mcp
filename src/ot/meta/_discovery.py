@@ -17,7 +17,21 @@ if TYPE_CHECKING:
 log = LogSpan
 
 
-_VALID_INFO_LEVELS = {"min", "default", "full"}
+_VALID_INFO_LEVELS = {"min", "default", "full", "signatures"}
+
+
+def _signature_line(detail: dict[str, Any]) -> str:
+    """Render a tool detail dict as a `pack.tool(args)  # description` one-liner.
+
+    Same rendering as the generated tool-index file.
+    """
+    from ot.meta._signatures import short_description, signature_args
+
+    name = str(detail.get("name", ""))
+    compact = signature_args(str(detail.get("signature", "")))
+    desc = short_description(detail.get("description", ""))
+    line = f"{name}({compact})"
+    return f"{line}  # {desc}" if desc else line
 _VALID_SERVER_INFO_LEVELS = {"min", "default", "full", "resources", "prompts"}
 
 
@@ -54,21 +68,27 @@ def tools(
     Args:
         pattern: Filter tools by name pattern (case-insensitive substring match)
         info: Output verbosity level - "min" (names only), "default" (name +
-              description truncated to 200 chars, default), or "full" (name +
-              full description + source)
+              description truncated to 200 chars, default), "full" (name +
+              full description + source), or "signatures"
+              (`pack.tool(args)  # description` one-liner strings, the same
+              format as the generated tool-index file — ideal for one pack)
 
     Returns:
-        List of tool names (info="min") or tool dicts (info="default"/"full")
+        List of tool names (info="min"), one-liner strings (info="signatures"),
+        or tool dicts (info="default"/"full")
 
     Example:
         ot.tools()
         ot.tools(pattern="search")
         ot.tools(pattern="brave.")
         ot.tools(info="min")
+        ot.tools(pattern="brave.", info="signatures")
         ot.tools(pattern="brave.search", info="full")
     """
     if info not in _VALID_INFO_LEVELS:
-        raise ValueError(f"info={info!r} is not valid. Use 'min', 'default', or 'full'.")
+        raise ValueError(
+            f"info={info!r} is not valid. Use 'min', 'default', 'full', or 'signatures'."
+        )
 
     from ot.executor.tool_loader import load_tool_registry
 
@@ -79,6 +99,11 @@ def tools(
         resolved_lower = resolved_pattern.lower() if resolved_pattern else ""
 
         tools_list: list[dict[str, Any] | str] = []
+
+        # For the signatures level, build detail dicts (which carry the signature)
+        # and render each as a one-liner string.
+        want_signatures = info == "signatures"
+        detail_info: InfoLevel = "full" if want_signatures else info
 
         # Local tools from registry
         from ot.executor.worker_proxy import WorkerPackProxy
@@ -97,7 +122,14 @@ def tools(
                 if resolved_lower and resolved_lower not in full_name.lower():
                     continue
 
-                tools_list.append(_build_tool_info(full_name, func, "local", info))
+                entry = _build_tool_info(
+                    full_name, func, "local", detail_info, detail=want_signatures
+                )
+                tools_list.append(
+                    _signature_line(entry)  # type: ignore[arg-type]
+                    if want_signatures
+                    else entry
+                )
 
         # Proxied tools
         for proxy_tool in proxy.list_tools():
@@ -107,14 +139,18 @@ def tools(
             if resolved_lower and resolved_lower not in tool_name.lower():
                 continue
 
+            entry = _build_proxy_tool_info(
+                tool_name,
+                proxy_tool.description or "",
+                proxy_tool.input_schema,
+                f"mcp:{proxy_tool.server}",
+                detail_info,
+                detail=want_signatures,
+            )
             tools_list.append(
-                _build_proxy_tool_info(
-                    tool_name,
-                    proxy_tool.description or "",
-                    proxy_tool.input_schema,
-                    f"mcp:{proxy_tool.server}",
-                    info,
-                )
+                _signature_line(entry)  # type: ignore[arg-type]
+                if want_signatures
+                else entry
             )
 
         # Sort by name (handle both str and dict)

@@ -43,13 +43,16 @@ def test_run_description_has_invocation_contract() -> None:
     assert "__onetool" in desc
     assert "__ot" in desc
     assert "__run" not in desc
-    assert "__r" not in desc
-    assert ":name" in desc
-    assert "never add `:` to `pack.tool(...)` calls" in desc
+    assert ":name key=value" in desc
+    # Colon rule is stated exactly once, with a right/wrong pair (p21 §A).
+    assert "The `:` prefix belongs to snippets only" in desc
     assert "Call shape: `pack.tool(arg=value)`, not `ot.pack.tool(...)`." in desc
     assert "Do not guess tool names, parameter names, or allowed values." in desc
     assert "Mode by shape:" in desc
+    assert "Two request forms" in desc
     assert "run(command=" in desc
+    # No reference to the removed ot.skills surface (p11/p21).
+    assert "ot.skills" not in desc
 
 
 @pytest.mark.unit
@@ -68,10 +71,11 @@ def test_run_description_documents_shape_based_modes() -> None:
     assert ":name key=value" in desc
     assert "not Python" in desc
     assert "plain strings" in desc
-    assert "Do not convert `pack.tool(...)` calls into colon syntax." in desc
     assert "natural-language intent" in desc
-    assert "OneTool resolves param prefixes" in desc
-    assert "keyword-only tools" in desc
+    # Forgiveness line covers kwarg prefixes + pack aliases + proxy-name case (p21 §A).
+    assert "short kwarg prefixes resolve" in desc
+    assert "Packs have short aliases" in desc
+    assert "keyword args for keyword-only tools" in desc
     assert "Do not send obvious syntax failures" in desc
 
 
@@ -107,18 +111,25 @@ def test_instructions_stay_concise_and_defer_contract() -> None:
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_ot_ref_contains_advanced_recovery_not_core_contract() -> None:
-    """ot-ref carries advanced reference details without owning normal invocation."""
+def test_ot_ref_skill_carries_pack_map_and_index_pointer() -> None:
+    """ot-ref SKILL.md (p21 §B) carries the pack map, forgiveness, and index pointer."""
     from pathlib import Path
 
-    text = (Path(__file__).resolve().parents[3] / "skills" / "ot-ref" / "SKILL.md").read_text()
+    root = Path(__file__).resolve().parents[3]
+    text = (root / "skills" / "ot-ref" / "SKILL.md").read_text()
 
-    assert "Close-call recovery" in text
-    assert "Param prefixes" in text
-    assert "first in signature/schema order wins" in text
-    assert "__format__ = 'yml_h'; ot.help(query='topic')" in text
-    assert "OneTool `__onetool`/MCP run request" in text
-    assert "Natural language to code" not in text
+    assert "## Pack map" in text
+    assert "<!-- packmap:begin" in text and "<!-- packmap:end -->" in text
+    assert "reference/tool-index.md" in text
+    assert "The engine is forgiving" in text
+    assert "info='signatures'" in text
+    assert "ot.skills" not in text
+
+    # Deep-dive recovery content lives in reference/recovery.md, not the body.
+    recovery = (root / "skills" / "ot-ref" / "reference" / "recovery.md").read_text()
+    assert "Fast recovery" in recovery
+    assert "Param prefixes" in recovery
+    assert "__format__ = 'yml_h'; ot.help(query='search')" in recovery
 
 
 @pytest.mark.unit
@@ -152,3 +163,41 @@ def test_servers_yaml_has_source_field() -> None:
             assert "source" in cfg, (
                 f"Server '{name}' is missing source: field in servers.yaml"
             )
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_run_examples_are_zero_config() -> None:
+    """run examples avoid key-gated calls (p21 §A): status/help/ripgrep/snippet."""
+    from ot.prompts import load_prompts
+
+    prompts = load_prompts()
+    examples = prompts.tools["run"].examples or []
+
+    assert "ot.status()" in examples
+    assert "ot.help(query='search')" in examples
+    assert ":pkg_npm packages=react" in examples
+    # No key-gated example (e.g. brave.search) in the runnable examples list.
+    assert not any("brave.search" in ex for ex in examples)
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_packs_include_localhist() -> None:
+    """prompts.yaml pack descriptions include localhist (p21 §A)."""
+    from ot.prompts import load_prompts
+
+    prompts = load_prompts()
+    assert "localhist" in prompts.packs
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_instructions_point_at_ot_ref_skill() -> None:
+    """Connection instructions point at the ot-ref skill, not ot.skills (p21 §A)."""
+    from ot.prompts import load_prompts
+
+    prompts = load_prompts()
+    assert "ot-ref" in prompts.instructions
+    assert "ot.skills" not in prompts.instructions
+    assert "{pack_summary}" not in prompts.instructions

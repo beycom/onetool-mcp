@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 from pathlib import Path
 from typing import Any, Literal
 
+from ot.meta._signatures import short_description, signature_args
+
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_OUTPUT = ROOT / "docs" / "reference" / "tools" / "tool-index.md"
+# Layer 3: the skill ships a byte-identical copy of the index so agents can grep it.
+SKILL_OUTPUT = ROOT / "skills" / "ot-ref" / "reference" / "tool-index.md"
+
+__all__ = ["short_description", "signature_args"]
 
 
 def default_config() -> Path:
@@ -25,23 +30,6 @@ def default_config() -> Path:
     raise FileNotFoundError("No OneTool config found. Pass --config <path>.")
 
 
-def signature_args(signature: str) -> str:
-    """Return compact argument text from a Python function signature string."""
-    start = signature.find("(")
-    end = signature.rfind(")")
-    if start == -1 or end == -1 or end < start:
-        return ""
-
-    args = signature[start + 1 : end]
-    args = args.replace("*, ", "").replace("*", "")
-    args = re.sub(r"\s+", " ", args)
-    args = re.sub(r": '([^']+)'", r": \1", args)
-    args = re.sub(r': "([^"]+)"', r": \1", args)
-    args = re.sub(r"\s*=\s*", "=", args)
-    args = re.sub(r"\s*,\s*", ", ", args)
-    return args.strip()
-
-
 def description_by_arg(detail: dict[str, Any]) -> dict[str, str]:
     """Return argument descriptions keyed by argument name."""
     descriptions: dict[str, str] = {}
@@ -51,15 +39,6 @@ def description_by_arg(detail: dict[str, Any]) -> dict[str, str]:
         name, _, description = raw.partition(":")
         descriptions[name.strip()] = description.strip()
     return descriptions
-
-
-def short_description(description: Any) -> str:
-    """Return the first non-empty line of a description."""
-    for line in str(description or "").splitlines():
-        line = line.strip()
-        if line:
-            return line
-    return ""
 
 
 def tool_inventory(
@@ -218,4 +197,8 @@ def main(argv: list[str] | None = None) -> int:
     else:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(output + "\n", encoding="utf-8")
+        # Also mirror the text index into the ot-ref skill (single source of truth).
+        if args.format != "json":
+            SKILL_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+            SKILL_OUTPUT.write_text(output + "\n", encoding="utf-8")
     return 0

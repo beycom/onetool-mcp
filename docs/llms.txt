@@ -37,6 +37,7 @@ Source of truth: `src/ot/config/global_templates/prompts.yaml` (`prompts.packs`)
 | `file` | `[util]` | Read, write, edit, copy, move, and delete files; browse directory trees |
 | `ground` | `[util]` | Research any topic with Google AI-grounded search and source citations |
 | `knowledge` | `[util]` | Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis |
+| `localhist` | `[dev]` | Project-local snapshot history — save, list, diff, and restore file versions |
 | `mem` | `[util]` | Persistent topic-based memory — write, search, grep, slice, and organise |
 | `ot_context` | `core` | Smart context store — ask, read, search, grep large tool responses without filling context window; format-aware toc/slice/query for json, yaml, and markdown |
 | `ot_forge` | `core` | Scaffold and generate code from templates |

@@ -117,6 +117,7 @@ docs-serve *args:
 docs-sync:
     uv run python scripts/sync_docs_generated.py
     uv run python scripts/list_tool_inventory.py --tool-descriptions
+    uv run python scripts/sync_skill_pack_map.py
     uv run python scripts/check_docs_registry.py
 
 # Stop the documentation server

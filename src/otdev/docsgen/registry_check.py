@@ -97,9 +97,25 @@ def validate_registry_doc(path: Path = DOC) -> list[str]:
     return validate_registry_text(path.read_text(encoding="utf-8"), runtime_tool_counts())
 
 
+def _check_skill_index_in_sync() -> list[str]:
+    """The ot-ref skill's tool-index copy must be byte-identical to the docs copy."""
+    docs_index = ROOT / "docs" / "reference" / "tools" / "tool-index.md"
+    skill_index = ROOT / "skills" / "ot-ref" / "reference" / "tool-index.md"
+    if not skill_index.exists():
+        return [f"missing {skill_index} — run `just docs-sync`"]
+    if not docs_index.exists():
+        return [f"missing {docs_index} — run `just docs-sync`"]
+    if docs_index.read_text(encoding="utf-8") != skill_index.read_text(encoding="utf-8"):
+        return [
+            f"{skill_index} differs from {docs_index} — run `just docs-sync` and commit"
+        ]
+    return []
+
+
 def main() -> int:
     """Run the docs registry check."""
     failures = validate_registry_doc()
+    failures += _check_skill_index_in_sync()
     if failures:
         print("docs registry check failed:")
         for failure in failures:
