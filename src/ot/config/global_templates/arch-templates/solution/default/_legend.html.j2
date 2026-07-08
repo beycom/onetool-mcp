@@ -1,0 +1,47 @@
+{# Diagram legend (D6): node classes, edge direction colors, interaction-type
+   stroke patterns, and (project pages only) change-type swatches. All colors
+   and labels come from the `legend` context built off render_styles.py in
+   system_model.py — never hardcoded here. Included by system.html.j2
+   (show_change_types=False) and project.html.j2 (show_change_types=True)
+   directly above the first diagram section. #}
+<div class="mb-6">
+    <h2 class="text-lg font-semibold mb-2 cursor-pointer select-none" data-collapse="legend-content"><span class="collapse-icon mr-1">&#9654;</span>Legend</h2>
+    <div id="legend-content" style="display: none;" data-collapsed="true">
+        <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <div>
+                <h3 class="font-semibold text-sm mb-2">Node Classes</h3>
+                <ul class="text-sm space-y-1">
+                {% for item in legend.node_classes %}
+                    <li><span class="font-medium">{{ item.label }}</span> &mdash; {{ item.description }}</li>
+                {% endfor %}
+                </ul>
+            </div>
+            <div>
+                <h3 class="font-semibold text-sm mb-2">Edge Direction</h3>
+                <ul class="text-sm space-y-1">
+                {% for item in legend.direction_colors %}
+                    <li><span class="legend-swatch" style="background:{{ item.color }}"></span>{{ item.label }}</li>
+                {% endfor %}
+                </ul>
+            </div>
+            <div>
+                <h3 class="font-semibold text-sm mb-2">Interaction Type</h3>
+                <ul class="text-sm space-y-1">
+                {% for item in legend.interaction_types %}
+                    <li><span class="legend-line" style="border-top-width:{{ item.stroke_width }}px; border-top-style:{{ 'solid' if item.stroke_dash == '0' else 'dashed' }};"></span>{{ item.label }}</li>
+                {% endfor %}
+                </ul>
+            </div>
+            {% if show_change_types %}
+            <div>
+                <h3 class="font-semibold text-sm mb-2">Change Type</h3>
+                <ul class="text-sm space-y-1">
+                {% for item in legend.change_types %}
+                    <li><span class="legend-swatch" style="background:{{ item.color }}"></span>{{ item.label }}</li>
+                {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>

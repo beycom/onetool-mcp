@@ -1,0 +1,35 @@
+{# Shared diagram tabs + panels block used by system.html.j2 (system
+   diagrams, additional diagrams) and project.html.j2 (project stages).
+   Parameters:
+   - diagrams: list of entries with level (unique within the group), label,
+     svg (inline markup), optional description / export_name / svg_path
+   - group_name: data-tab-group / radio name wiring (see initDiagramTabs in
+     scripts.js: tabs are matched by data-tab-group + data-tab-target, panels
+     by .diagram-tab-content[data-tab-group] and getElementById)
+   - id_prefix: panel id prefix; ids are "<id_prefix>-<level>" #}
+{% macro diagram_tabs(diagrams, group_name, id_prefix) %}
+<div role="tablist" class="tabs tabs-bordered mb-4" data-tab-group="{{ group_name }}">
+    {% for diagram in diagrams %}
+    <input type="radio" name="{{ group_name }}" role="tab" class="tab" aria-label="{{ diagram.label }}" {% if loop.first %}checked{% endif %} data-tab-group="{{ group_name }}" data-tab-target="{{ id_prefix }}-{{ diagram.level }}">
+    {% endfor %}
+</div>
+{% for diagram in diagrams %}
+<div id="{{ id_prefix }}-{{ diagram.level }}" class="diagram-tab-content" data-tab-group="{{ group_name }}" {% if not loop.first %}style="display: none;"{% endif %}>
+    <div class="diagram-panel border border-base-300 rounded-lg p-4">
+        <div class="flex justify-end gap-1 mb-2">
+            <button type="button" class="btn btn-xs btn-ghost" onclick="zoomIn(this)">+ Zoom</button>
+            <button type="button" class="btn btn-xs btn-ghost" onclick="zoomOut(this)">- Zoom</button>
+            <button type="button" class="btn btn-xs btn-ghost" onclick="resetZoom(this)">Reset</button>
+            <button type="button" class="btn btn-xs btn-outline" onclick="printDiagram(this)">Print</button>
+            {% if diagram.export_name %}
+            <a href="{{ diagram.svg_path }}" download="{{ diagram.export_name }}" class="btn btn-xs btn-outline">Export to draw.io</a>
+            {% endif %}
+        </div>
+        {% if diagram.description %}
+        <div class="text-sm text-base-content/80 mb-3">{{ diagram.description|safe }}</div>
+        {% endif %}
+        <div class="diagram-container min-h-[400px] overflow-hidden border border-base-200 rounded" tabindex="0">{{ diagram.svg|safe }}</div>
+    </div>
+</div>
+{% endfor %}
+{% endmacro %}

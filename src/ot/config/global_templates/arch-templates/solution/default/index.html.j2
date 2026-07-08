@@ -5,11 +5,64 @@
 {% block content %}
 <h1 class="text-2xl font-bold mb-6">{{ title }}</h1>
 
+{% if summary_cards and summary_cards.totals %}
+<div class="stats stats-vertical lg:stats-horizontal shadow mb-6 w-full">
+{% for card in summary_cards.totals %}
+    <div class="stat">
+        <div class="stat-title">{{ card.label }}</div>
+        <div class="stat-value">{{ card.count }}</div>
+    </div>
+{% endfor %}
+</div>
+{% endif %}
+
+{% if summary_cards %}
+{% set badge_groups = [
+    ("Systems by Type", summary_cards.systems_by_type),
+    ("Projects by Status", summary_cards.projects_by_status),
+    ("Interfaces by Type", summary_cards.interfaces_by_type),
+] %}
+{% for heading, items in badge_groups %}
+{% if items %}
+<div class="{{ 'mb-6' if loop.last else 'mb-4' }}">
+    <h3 class="text-sm font-semibold mb-2">{{ heading }}</h3>
+    <div class="flex flex-wrap gap-2">
+    {% for item in items %}
+        <span class="badge badge-outline">{{ item.label }}: {{ item.count }}</span>
+    {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if projects %}
+<h2 class="text-lg font-semibold mb-3">Projects</h2>
+<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
+{% for project in projects %}
+    <a href="{{ project.href }}" class="card bg-base-200 hover:bg-base-300 transition-colors">
+        <div class="card-body">
+            <h3 class="card-title">{{ project.name }}</h3>
+            {% if project.description %}
+            <p class="text-sm text-base-content/70">{{ project.description }}</p>
+            {% endif %}
+            {% if project.tag %}
+            <div class="card-actions justify-end">
+                <span class="badge badge-outline">{{ project.tag }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </a>
+{% endfor %}
+</div>
+{% endif %}
+
+<h2 class="text-lg font-semibold mb-3">Systems</h2>
 <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 {% for sys in systems %}
     <a href="{{ sys.id }}.html" class="card bg-base-200 hover:bg-base-300 transition-colors">
         <div class="card-body">
-            <h2 class="card-title">{{ sys.name }}</h2>
+            <h3 class="card-title">{{ sys.name }}</h3>
             {% if sys.description %}
             <p class="text-sm text-base-content/70">{{ sys.description }}</p>
             {% endif %}
@@ -22,6 +75,35 @@
     </a>
 {% endfor %}
 </div>
+
+{% if entity_tables %}
+<div class="mt-8">
+{% for key, table in entity_tables.items() %}
+<div class="mb-6">
+    <h2 class="text-lg font-semibold mb-2 cursor-pointer select-none" data-collapse="{{ key }}-index-content"><span class="collapse-icon mr-1">&#9654;</span>{{ table.title }}</h2>
+    <div id="{{ key }}-index-content" style="display: none;" data-collapsed="true">
+        <div class="flex justify-between items-center mb-2 gap-2">
+            <input type="text" class="input input-bordered input-sm w-full max-w-xs" placeholder="Search {{ table.title|lower }}..." data-quick-filter="{{ key }}-index-table">
+            <button type="button" class="btn btn-xs btn-outline" onclick="downloadTableXLSX('{{ key }}-index-table', '{{ key }}.xlsx')">Export XLSX</button>
+        </div>
+        <div id="{{ key }}-index-table" class="ag-theme-alpine"></div>
+    </div>
+</div>
+{% endfor %}
+</div>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    {% if entity_tables %}
+    {% for key, table in entity_tables.items() %}
+    initAgGridTable('{{ key }}-index-table', {{ table.data|tojson }}, {{ table.columns|tojson }});
+    {% endfor %}
+    initTableQuickFilters();
+    {% endif %}
+    initCollapse();
+});
+</script>
 
 <footer class="mt-8 pt-4 border-t border-base-300 text-sm text-base-content/50">
     Generated: {{ generated_at }}

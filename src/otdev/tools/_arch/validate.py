@@ -5,21 +5,36 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
-from .models import CORE_SHEETS, Issue, first_value
+from .models import (
+    APP_REF_KEYS,
+    ARROW_DIRECTIONS,
+    CORE_SHEETS,
+    PROJECT_SCOPE_ITEM_TYPES,
+    SHEET_APP,
+    SHEET_CMP,
+    SHEET_INTERFACE,
+    SHEET_PROJECT,
+    SHEET_PROJECT_SCOPE,
+    SHEET_SYS,
+    SHEET_USR,
+    SYS_REF_KEYS,
+    Issue,
+    first_value,
+)
 
 _REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
-    "sys": ("id", "name"),
-    "app": ("id", "name"),
-    "cmp": ("id", "name"),
-    "int": ("id", "src", "dst"),
-    "usr": ("id", "name"),
+    SHEET_SYS: ("id", "name"),
+    SHEET_APP: ("id", "name"),
+    SHEET_CMP: ("id", "name"),
+    SHEET_INTERFACE: ("id", "provider", "consumer"),
+    SHEET_USR: ("id", "name"),
+    SHEET_PROJECT: ("id", "name"),
+    SHEET_PROJECT_SCOPE: ("project", "stage", "item_type", "item_id", "change_type"),
 }
 
-_APP_SYSTEM_KEYS = ("sys", "system", "system_id", "sys_id")
-_CMP_APP_KEYS = ("app", "application", "app_id", "application_id")
-_INT_SRC_KEYS = ("src", "source", "from", "from_id", "src_id")
-_INT_DST_KEYS = ("dst", "target", "to", "to_id", "dst_id")
-_USR_APP_KEYS = ("app", "application", "app_id", "application_id")
+_DETAIL_LEVELS = {"sys", "app", "cmp"}
+_CONNECT_LEVELS = {"sys", "app", "cmp", "lowest_visible"}
+_PROJECT_SCOPE_CHANGE_TYPES = {"existing", "new", "changed", "removed", "impacted", "dependency"}
 
 
 def _missing_required(
@@ -69,15 +84,15 @@ def _check_refs(
 ) -> list[Issue]:
     issues: list[Issue] = []
 
-    for row in entities["app"]:
+    for row in entities[SHEET_APP]:
         row_num = int(row.get("_sheet_row", 0))
-        sys_id = first_value(row, _APP_SYSTEM_KEYS)
+        sys_id = first_value(row, SYS_REF_KEYS)
         if sys_id is None:
             issues.append(
                 Issue(
                     code="missing_reference",
                     message="Application row must reference a system",
-                    details={"sheet": "app", "row": row_num, "field": "sys"},
+                    details={"sheet": SHEET_APP, "row": row_num, "field": "sys"},
                 )
             )
             continue
@@ -86,78 +101,232 @@ def _check_refs(
                 Issue(
                     code="invalid_reference",
                     message=f"Application references unknown system '{sys_id}'",
-                    details={"sheet": "app", "row": row_num, "field": "sys", "value": str(sys_id)},
+                    details={"sheet": SHEET_APP, "row": row_num, "field": "sys", "value": str(sys_id)},
                 )
             )
 
-    for row in entities["cmp"]:
+    for row in entities[SHEET_CMP]:
         row_num = int(row.get("_sheet_row", 0))
-        app_id = first_value(row, _CMP_APP_KEYS)
-        if app_id is None:
+        app_id = first_value(row, APP_REF_KEYS)
+        sys_id = first_value(row, SYS_REF_KEYS)
+        if app_id is None and sys_id is None:
             issues.append(
                 Issue(
                     code="missing_reference",
-                    message="Component row must reference an application",
-                    details={"sheet": "cmp", "row": row_num, "field": "app"},
+                    message="Component row must reference an application or a system",
+                    details={"sheet": SHEET_CMP, "row": row_num, "field": "app"},
                 )
             )
             continue
-        if str(app_id).strip() not in app_ids:
+        if app_id is not None:
+            if str(app_id).strip() not in app_ids:
+                issues.append(
+                    Issue(
+                        code="invalid_reference",
+                        message=f"Component references unknown application '{app_id}'",
+                        details={"sheet": SHEET_CMP, "row": row_num, "field": "app", "value": str(app_id)},
+                    )
+                )
+        elif str(sys_id).strip() not in system_ids:
             issues.append(
                 Issue(
                     code="invalid_reference",
-                    message=f"Component references unknown application '{app_id}'",
-                    details={"sheet": "cmp", "row": row_num, "field": "app", "value": str(app_id)},
+                    message=f"Component references unknown system '{sys_id}'",
+                    details={"sheet": SHEET_CMP, "row": row_num, "field": "sys", "value": str(sys_id)},
                 )
             )
 
-    for row in entities["int"]:
+    for row in entities[SHEET_INTERFACE]:
         row_num = int(row.get("_sheet_row", 0))
-        src_id = first_value(row, _INT_SRC_KEYS)
-        dst_id = first_value(row, _INT_DST_KEYS)
-        if src_id is None:
+        provider_id = first_value(row, ("provider",))
+        consumer_id = first_value(row, ("consumer",))
+        if provider_id is None:
             issues.append(
                 Issue(
                     code="missing_reference",
-                    message="Integration row must reference src",
-                    details={"sheet": "int", "row": row_num, "field": "src"},
+                    message="Interface row must reference provider",
+                    details={"sheet": SHEET_INTERFACE, "row": row_num, "field": "provider"},
                 )
             )
-        elif str(src_id).strip() not in node_ids:
+        elif str(provider_id).strip() not in node_ids:
             issues.append(
                 Issue(
                     code="invalid_reference",
-                    message=f"Integration source '{src_id}' not found",
-                    details={"sheet": "int", "row": row_num, "field": "src", "value": str(src_id)},
+                    message=f"Interface provider '{provider_id}' not found",
+                    details={"sheet": SHEET_INTERFACE, "row": row_num, "field": "provider", "value": str(provider_id)},
                 )
             )
 
-        if dst_id is None:
+        if consumer_id is None:
             issues.append(
                 Issue(
                     code="missing_reference",
-                    message="Integration row must reference dst",
-                    details={"sheet": "int", "row": row_num, "field": "dst"},
+                    message="Interface row must reference consumer",
+                    details={"sheet": SHEET_INTERFACE, "row": row_num, "field": "consumer"},
                 )
             )
-        elif str(dst_id).strip() not in node_ids:
+        elif str(consumer_id).strip() not in node_ids:
             issues.append(
                 Issue(
                     code="invalid_reference",
-                    message=f"Integration destination '{dst_id}' not found",
-                    details={"sheet": "int", "row": row_num, "field": "dst", "value": str(dst_id)},
+                    message=f"Interface consumer '{consumer_id}' not found",
+                    details={"sheet": SHEET_INTERFACE, "row": row_num, "field": "consumer", "value": str(consumer_id)},
                 )
             )
 
-    for row in entities["usr"]:
+        interaction_type = row.get("interaction_type")
+        if interaction_type is not None and not str(interaction_type).strip():
+            issues.append(
+                Issue(
+                    code="invalid_value",
+                    message="Interface interaction_type must be non-empty when provided",
+                    details={"sheet": SHEET_INTERFACE, "row": row_num, "field": "interaction_type"},
+                )
+            )
+
+        arrow_direction = row.get("arrow_direction")
+        if arrow_direction is not None:
+            normalized_arrow = str(arrow_direction).strip().lower()
+            if normalized_arrow not in ARROW_DIRECTIONS:
+                issues.append(
+                    Issue(
+                        code="invalid_value",
+                        message=(
+                            "Interface arrow_direction must be one of "
+                            f"{sorted(ARROW_DIRECTIONS)}"
+                        ),
+                        details={
+                            "sheet": SHEET_INTERFACE,
+                            "row": row_num,
+                            "field": "arrow_direction",
+                            "value": str(arrow_direction),
+                        },
+                    )
+                )
+
+    project_ids = {str(row.get("id", "")).strip() for row in entities.get(SHEET_PROJECT, []) if row.get("id")}
+    item_ids_by_type = {
+        "sys": system_ids,
+        "app": app_ids,
+        "cmp": {
+            str(row["id"]).strip()
+            for row in entities.get(SHEET_CMP, [])
+            if row.get("id")
+        },
+        "interface": {
+            str(row["id"]).strip()
+            for row in entities.get(SHEET_INTERFACE, [])
+            if row.get("id")
+        },
+    }
+
+    for row in entities.get(SHEET_PROJECT, []):
         row_num = int(row.get("_sheet_row", 0))
-        app_id = first_value(row, _USR_APP_KEYS)
+        detail_level = row.get("detail_level")
+        if detail_level is not None and str(detail_level).strip().lower() not in _DETAIL_LEVELS:
+            issues.append(
+                Issue(
+                    code="invalid_value",
+                    message=f"Project detail_level must be one of {sorted(_DETAIL_LEVELS)}",
+                    details={
+                        "sheet": SHEET_PROJECT,
+                        "row": row_num,
+                        "field": "detail_level",
+                        "value": str(detail_level),
+                    },
+                )
+            )
+        connect_level = row.get("connect_level")
+        if connect_level is not None and str(connect_level).strip().lower() not in _CONNECT_LEVELS:
+            issues.append(
+                Issue(
+                    code="invalid_value",
+                    message=f"Project connect_level must be one of {sorted(_CONNECT_LEVELS)}",
+                    details={
+                        "sheet": SHEET_PROJECT,
+                        "row": row_num,
+                        "field": "connect_level",
+                        "value": str(connect_level),
+                    },
+                )
+            )
+
+    for row in entities.get(SHEET_PROJECT_SCOPE, []):
+        row_num = int(row.get("_sheet_row", 0))
+        project_id = first_value(row, ("project", "project_id"))
+        if project_id is not None and str(project_id).strip() not in project_ids:
+            issues.append(
+                Issue(
+                    code="invalid_reference",
+                    message=f"Project scope references unknown project '{project_id}'",
+                    details={
+                        "sheet": SHEET_PROJECT_SCOPE,
+                        "row": row_num,
+                        "field": "project",
+                        "value": str(project_id),
+                    },
+                )
+            )
+
+        raw_item_type = row.get("item_type")
+        item_type = (
+            PROJECT_SCOPE_ITEM_TYPES.get(str(raw_item_type).strip().lower())
+            if raw_item_type is not None
+            else None
+        )
+        if raw_item_type is not None and item_type is None:
+            issues.append(
+                Issue(
+                    code="invalid_value",
+                    message=f"Project scope item_type must be one of {sorted(PROJECT_SCOPE_ITEM_TYPES)}",
+                    details={
+                        "sheet": SHEET_PROJECT_SCOPE,
+                        "row": row_num,
+                        "field": "item_type",
+                        "value": str(raw_item_type),
+                    },
+                )
+            )
+        item_id = row.get("item_id")
+        if item_type is not None and item_id is not None and str(item_id).strip() not in item_ids_by_type[item_type]:
+            issues.append(
+                Issue(
+                    code="invalid_reference",
+                    message=f"Project scope references unknown {item_type} '{item_id}'",
+                    details={
+                        "sheet": SHEET_PROJECT_SCOPE,
+                        "row": row_num,
+                        "field": "item_id",
+                        "value": str(item_id),
+                        "item_type": item_type,
+                    },
+                )
+            )
+
+        change_type = row.get("change_type")
+        if change_type is not None and str(change_type).strip().lower() not in _PROJECT_SCOPE_CHANGE_TYPES:
+            issues.append(
+                Issue(
+                    code="invalid_value",
+                    message=f"Project scope change_type must be one of {sorted(_PROJECT_SCOPE_CHANGE_TYPES)}",
+                    details={
+                        "sheet": SHEET_PROJECT_SCOPE,
+                        "row": row_num,
+                        "field": "change_type",
+                        "value": str(change_type),
+                    },
+                )
+            )
+
+    for row in entities[SHEET_USR]:
+        row_num = int(row.get("_sheet_row", 0))
+        app_id = first_value(row, APP_REF_KEYS)
         if app_id is not None and str(app_id).strip() not in app_ids:
             issues.append(
                 Issue(
                     code="invalid_reference",
                     message=f"User references unknown application '{app_id}'",
-                    details={"sheet": "usr", "row": row_num, "field": "app", "value": str(app_id)},
+                    details={"sheet": SHEET_USR, "row": row_num, "field": "app", "value": str(app_id)},
                 )
             )
 
@@ -167,7 +336,6 @@ def _check_refs(
 def validate_entities(*, entities: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     """Validate required fields, duplicates, and reference integrity."""
     errors: list[Issue] = []
-    warnings: list[Issue] = []
 
     for sheet in CORE_SHEETS:
         rows = entities.get(sheet, [])
@@ -176,10 +344,30 @@ def validate_entities(*, entities: dict[str, list[dict[str, Any]]]) -> dict[str,
             errors.extend(_missing_required(sheet=sheet, row=row, row_index=row_num))
         errors.extend(_duplicate_ids(sheet=sheet, rows=rows))
 
-    system_ids = {str(row["id"]).strip() for row in entities.get("sys", []) if row.get("id")}
-    app_ids = {str(row["id"]).strip() for row in entities.get("app", []) if row.get("id")}
-    component_ids = {str(row["id"]).strip() for row in entities.get("cmp", []) if row.get("id")}
-    user_ids = {str(row["id"]).strip() for row in entities.get("usr", []) if row.get("id")}
+    system_ids = {str(row["id"]).strip() for row in entities.get(SHEET_SYS, []) if row.get("id")}
+    app_ids = {str(row["id"]).strip() for row in entities.get(SHEET_APP, []) if row.get("id")}
+    component_ids = {str(row["id"]).strip() for row in entities.get(SHEET_CMP, []) if row.get("id")}
+    user_ids = {str(row["id"]).strip() for row in entities.get(SHEET_USR, []) if row.get("id")}
+
+    # IDs shared across node sheets resolve ambiguously in diagrams; reject them.
+    sheets_by_id: dict[str, list[str]] = {}
+    for sheet, ids in (
+        (SHEET_SYS, system_ids),
+        (SHEET_APP, app_ids),
+        (SHEET_CMP, component_ids),
+        (SHEET_USR, user_ids),
+    ):
+        for row_id in ids:
+            sheets_by_id.setdefault(row_id, []).append(sheet)
+    for row_id, sheets in sorted(sheets_by_id.items()):
+        if len(sheets) > 1:
+            errors.append(
+                Issue(
+                    code="duplicate_id",
+                    message=f"Duplicate id '{row_id}' across sheets: {sheets}",
+                    details={"sheets": sheets, "id": row_id},
+                )
+            )
 
     node_ids = system_ids | app_ids | component_ids | user_ids
     errors.extend(
@@ -194,14 +382,14 @@ def validate_entities(*, entities: dict[str, list[dict[str, Any]]]) -> dict[str,
     summary = {
         "counts": {sheet: len(rows) for sheet, rows in entities.items()},
         "errors": len(errors),
-        "warnings": len(warnings),
+        "warnings": 0,
     }
 
     return {
         "valid": len(errors) == 0,
         "issues": {
             "errors": [item.to_dict() for item in errors],
-            "warnings": [item.to_dict() for item in warnings],
+            "warnings": [],
         },
         "summary": summary,
     }

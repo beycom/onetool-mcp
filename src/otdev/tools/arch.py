@@ -28,16 +28,31 @@ from otdev.tools._arch.config import (
     get_active_profile,
     get_arch_config,
     resolve_output_dir,
+    resolve_project_diagram_template_path_for_profile,
     resolve_render_target_for_profile,
     resolve_report_template_paths_for_profile,
     resolve_system_diagram_template_path_for_profile,
+)
+from otdev.tools._arch.drawio import (
+    build_mxfile as _build_mxfile,
+)
+from otdev.tools._arch.drawio import (
+    extract_geometry as _extract_geometry,
+)
+from otdev.tools._arch.drawio import (
+    inject_content as _inject_content,
 )
 from otdev.tools._arch.exporters import (
     apply_tag_filters,
     serializable_entities,
 )
 from otdev.tools._arch.ingest import IngestError, ingest_input
-from otdev.tools._arch.models import MODEL_VERSION, first_value
+from otdev.tools._arch.models import (
+    DEFAULT_LIST_CELL_SEPARATOR,
+    MODEL_VERSION,
+    MissingDependencyError,
+    first_value,
+)
 from otdev.tools._arch.roundtrip import (
     RoundtripError,
     export_entities_to_yaml,
@@ -57,10 +72,25 @@ from otdev.tools._arch.system_model import (
     build_entity_graph as _build_entity_graph,
 )
 from otdev.tools._arch.system_model import (
+    build_project_d2 as _build_project_d2,
+)
+from otdev.tools._arch.system_model import (
+    build_project_view as _build_project_view,
+)
+from otdev.tools._arch.system_model import (
+    build_solution_index_context as _build_solution_index_context,
+)
+from otdev.tools._arch.system_model import (
+    build_solution_project_context as _build_solution_project_context,
+)
+from otdev.tools._arch.system_model import (
     build_solution_system_context as _build_solution_system_context,
 )
 from otdev.tools._arch.system_model import (
     build_system_d2 as _build_system_d2,
+)
+from otdev.tools._arch.system_model import (
+    build_system_view as _build_system_view,
 )
 from otdev.tools._arch.system_model import (
     first_tag_value as _first_tag_value,
@@ -69,7 +99,16 @@ from otdev.tools._arch.system_model import (
     is_external_system as _is_external_system,
 )
 from otdev.tools._arch.system_model import (
+    project_page_name as _project_page_name,
+)
+from otdev.tools._arch.system_model import (
+    project_stage_ids as _project_stage_ids,
+)
+from otdev.tools._arch.system_model import (
     render_markdown as _render_markdown,
+)
+from otdev.tools._arch.system_model import (
+    safe_output_fragment as _safe_output_fragment,
 )
 from otdev.tools._arch.system_model import (
     svg_markup as _svg_markup,
@@ -109,6 +148,21 @@ def _error_payload(
     }
 
 
+def _resolve_drawio_export_toggle(profile_data: dict[str, Any]) -> bool:
+    """Read the `drawio_export` profile `data` toggle (design D10): `data`
+    is a free-form mapping (`ArchProfileConfig.data`, `extra="forbid"` does
+    not apply to its contents), so the flag is read with an explicit type
+    check here rather than a typed config field. Defaults to enabled; a
+    non-boolean value fails generation fast with `ConfigResolutionError`
+    rather than being silently coerced (spec 'Invalid value rejected')."""
+    value = profile_data.get("drawio_export", True)
+    if not isinstance(value, bool):
+        raise ConfigResolutionError(
+            f"tools.arch.profiles.<name>.data.drawio_export must be a boolean, got {value!r}"
+        )
+    return value
+
+
 def _resolve_generation_profile(
     *,
     config: Any,
@@ -138,6 +192,18 @@ def _resolve_generation_profile(
 
 def _now_timestamp() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _resolve_list_cell_separator() -> str:
+    """Resolve the configured list-cell separator, falling back to the default.
+
+    Kept resilient (never raises) so validate/round-trip do not fail on unrelated
+    profile-config errors that generate() would otherwise surface.
+    """
+    try:
+        return get_arch_config().list_cell_separator
+    except ConfigResolutionError:
+        return DEFAULT_LIST_CELL_SEPARATOR
 
 
 def _validate_system_id_fragment(*, value: str, field: str, sheet: str, row: int) -> dict[str, Any] | None:
@@ -186,7 +252,6 @@ def _collect_workbook_diagram_specs(
     entities: dict[str, list[dict[str, Any]]],
 ) -> tuple[list[_WorkbookDiagramSpec], dict[str, list[dict[str, Any]]]]:
     errors: list[dict[str, Any]] = []
-    warnings: list[dict[str, Any]] = []
     specs: list[_WorkbookDiagramSpec] = []
 
     allowed_system_ids = {
@@ -196,6 +261,7 @@ def _collect_workbook_diagram_specs(
     }
 
     for idx, row in enumerate(entities.get("diagram", []), start=1):
+        row_errors_before = len(errors)
         row_number = int(row.get("_sheet_row", idx + 1))
         sys_id = str(first_value(row, ("sys", "system", "system_id", "sys_id")) or "").strip()
         source_value = str(first_value(row, ("file", "source", "path")) or "").strip()
@@ -257,7 +323,23 @@ def _collect_workbook_diagram_specs(
             continue
 
         workbook_path = Path(workbook_value).resolve()
-        source_path = (workbook_path.parent / source_value).resolve()
+        workbook_dir = workbook_path.parent
+        source_path = (workbook_dir / source_value).resolve()
+        if not source_path.is_relative_to(workbook_dir):
+            errors.append(
+                {
+                    "code": "invalid_reference",
+                    "message": f"Diagram file must be inside the workbook directory: {source_value}",
+                    "details": {
+                        "sheet": "diagram",
+                        "row": row_number,
+                        "field": "file",
+                        "value": source_value,
+                        "resolved_path": str(source_path),
+                    },
+                }
+            )
+            continue
         if not source_path.is_file():
             errors.append(
                 {
@@ -274,6 +356,11 @@ def _collect_workbook_diagram_specs(
             )
             continue
 
+        # A row with any recorded error (e.g. an invalid system reference
+        # above) must not produce a spec.
+        if len(errors) > row_errors_before:
+            continue
+
         name = str(first_value(row, ("name", "title")) or source_path.stem).strip() or source_path.stem
         description = str(first_value(row, ("description", "desc", "summary")) or "").strip()
         specs.append(
@@ -287,7 +374,7 @@ def _collect_workbook_diagram_specs(
             )
         )
 
-    return specs, {"errors": errors, "warnings": warnings}
+    return specs, {"errors": errors, "warnings": []}
 
 
 def _build_model_payload(
@@ -313,32 +400,19 @@ def _build_model_payload(
 
 def _build_render_context(
     *,
-    model_payload: dict[str, Any],
     target_config: RenderTargetConfig,
     input_path: str,
     output_path: str,
     work_dir: str,
-    template_dir: str,
 ) -> dict[str, Any]:
-    profile_data = dict(target_config.profile.data)
+    """Build the context `_execute_render_engine` consumes: the render paths
+    plus `profile_data` for the command template."""
     return {
-        "model": model_payload,
-        "target": target_config.target,
-        "profile": target_config.profile_name,
-        "view": {"profile": target_config.profile_name},
-        "profile_data": profile_data,
+        "profile_data": dict(target_config.profile.data),
         "paths": {
             "input": input_path,
             "output": output_path,
             "work_dir": work_dir,
-            "template_dir": template_dir,
-        },
-        "engine": {
-            "name": target_config.engine_name,
-        },
-        "report": {
-            "id": f"{target_config.target}-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-            "timestamp": _now_timestamp(),
         },
     }
 
@@ -377,9 +451,12 @@ def _execute_render_engine(
 
     try:
         env = Environment(undefined=StrictUndefined, autoescape=False)
+        # shlex-quote the paths so spaces (and quotes) survive the
+        # shlex.split below; the default `d2 {{ input }} {{ output }}`
+        # template interpolates them bare.
         render_vars: dict[str, Any] = {
-            "input": input_path,
-            "output": output_path,
+            "input": shlex.quote(input_path),
+            "output": shlex.quote(output_path),
             "profile_data": dict(render_context.get("profile_data", {})),
         }
         cmd = env.from_string(target_config.cmd_template).render(
@@ -503,6 +580,81 @@ def _execute_render_jobs(
     return True, results
 
 
+def _unsafe_id_error(
+    *,
+    entities: dict[str, list[dict[str, Any]]],
+    issue: dict[str, Any],
+    message: str,
+) -> dict[str, Any]:
+    """Full validation-failed payload for an id that is unsafe as an output-path fragment."""
+    return {
+        **_error_payload(
+            operation="generate",
+            code="validation_failed",
+            message=message,
+            details={"error_count": 1},
+        ),
+        "valid": False,
+        "issues": {"errors": [issue], "warnings": []},
+        "summary": {
+            "counts": {sheet: len(rows) for sheet, rows in entities.items()},
+            "errors": 1,
+            "warnings": 0,
+        },
+    }
+
+
+def _render_view_diagrams(
+    *,
+    outputs: list[tuple[str, Path, Path, dict[str, Any]]],
+    jobs: list[tuple[int, RenderTargetConfig, dict[str, Any]]],
+    drawio_export: bool,
+    kind_label: str,
+    kind_key: str,
+    owner_key: str,
+    owner_id: str,
+    generated_files: list[str],
+) -> tuple[dict[str, str] | None, dict[str, Any] | None]:
+    """Render one page's diagram jobs, embed the draw.io model (D1/D2), and
+    collect SVG markup per output key. Shared by the system (per-level) and
+    project (per-stage) loops. Returns (svg_by_key, None) on success or
+    (None, error_payload) on failure."""
+    ok, render_result = _execute_render_jobs(jobs=jobs, max_workers=_MAX_RENDER_WORKERS)
+    if not ok:
+        return None, _error_payload(
+            operation="generate",
+            code=render_result["code"],
+            message=render_result["message"],
+            details=render_result["details"],
+        )
+
+    svg_by_key: dict[str, str] = {}
+    for key, d2_path, svg_path, view in outputs:
+        generated_files.append(str(d2_path))
+        generated_files.append(str(svg_path))
+        svg_text = svg_path.read_text(encoding="utf-8")
+        if drawio_export:
+            geometry = _extract_geometry(svg_text)
+            mxfile_xml = _build_mxfile(
+                user_nodes=view["user_nodes"],
+                external_nodes=view["external_nodes"],
+                system_blocks=view["system_blocks"],
+                interface_edges=view["interface_edges"],
+                geometry=geometry,
+            )
+            svg_text = _inject_content(svg_text, mxfile_xml)
+            svg_path.write_text(svg_text, encoding="utf-8")
+        svg_by_key[key] = _svg_markup(svg_text)
+        if not svg_by_key[key]:
+            return None, _error_payload(
+                operation="generate",
+                code="render_output_error",
+                message=f"Rendered SVG for {kind_label} '{key}' is empty.",
+                details={owner_key: owner_id, kind_key: key},
+            )
+    return svg_by_key, None
+
+
 def _generate_solution(
     *,
     output_root: Path,
@@ -512,10 +664,12 @@ def _generate_solution(
     profile: Any,
     model_payload: dict[str, Any],
     title: str | None,
+    drawio_export: bool = True,
 ) -> dict[str, Any]:
     try:
         report_templates = resolve_report_template_paths_for_profile(profile=profile)
         system_diagram_template = resolve_system_diagram_template_path_for_profile(profile=profile)
+        project_diagram_template = resolve_project_diagram_template_path_for_profile(profile=profile)
     except ConfigResolutionError as exc:
         return _error_payload(
             operation="generate",
@@ -526,6 +680,7 @@ def _generate_solution(
     template_dirs = [
         str(report_templates.solution_report_path.parent),
         str(report_templates.system_report_path.parent),
+        str(report_templates.project_report_path.parent),
     ]
     template_dirs = list(dict.fromkeys(template_dirs))
     template_dir = report_templates.solution_report_path.parent
@@ -539,12 +694,12 @@ def _generate_solution(
     env = Environment(loader=FileSystemLoader(template_dirs), autoescape=True)
 
     solution_dir = output_root / "solution"
+    # The solution directory is fully regenerated; clear stale outputs from prior runs.
+    if solution_dir.is_dir():
+        shutil.rmtree(solution_dir)
     solution_dir.mkdir(parents=True, exist_ok=True)
     images_dir = solution_dir / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
-    legacy_d2_assets_dir = images_dir / "d2"
-    if legacy_d2_assets_dir.is_dir():
-        shutil.rmtree(legacy_d2_assets_dir)
 
     try:
         render_target = resolve_render_target_for_profile(
@@ -573,7 +728,6 @@ def _generate_solution(
         output_root=output_root,
         profile_name=profile_name,
         profile=profile,
-        model_payload=model_payload,
         diagram_specs=diagram_specs,
     )
     if not diagram_result["ok"]:
@@ -581,6 +735,7 @@ def _generate_solution(
     extra_diagrams_by_system = diagram_result["by_system"]
 
     systems_list: list[dict[str, str]] = []
+    projects_list: list[dict[str, str]] = []
     generated_files: list[str] = [*diagram_result["files"]]
 
     for sys_row in entities["sys"]:
@@ -596,21 +751,11 @@ def _generate_solution(
             row=int(sys_row.get("_sheet_row", 0)),
         )
         if system_id_issue:
-            return {
-                **_error_payload(
-                    operation="generate",
-                    code="validation_failed",
-                    message="System id contains unsafe output-path characters",
-                    details={"error_count": 1},
-                ),
-                "valid": False,
-                "issues": {"errors": [system_id_issue], "warnings": []},
-                "summary": {
-                    "counts": {sheet: len(rows) for sheet, rows in entities.items()},
-                    "errors": 1,
-                    "warnings": 0,
-                },
-            }
+            return _unsafe_id_error(
+                entities=entities,
+                issue=system_id_issue,
+                message="System id contains unsafe output-path characters",
+            )
 
         systems_list.append(
             {
@@ -621,10 +766,19 @@ def _generate_solution(
             }
         )
 
-        svg_by_level: dict[str, str] = {}
         level_jobs: list[tuple[int, RenderTargetConfig, dict[str, Any]]] = []
-        level_outputs: list[tuple[str, Path, Path]] = []
+        level_outputs: list[tuple[str, Path, Path, dict[str, Any]]] = []
         for idx, level in enumerate((_LEVEL_SYS, _LEVEL_APP, _LEVEL_CMP)):
+            # Built once and reused for both the D2 source (below) and the
+            # draw.io embedded model (after rendering, D1/D2): same render
+            # context, so the two representations never drift apart.
+            system_view = _build_system_view(
+                system_id=system_id,
+                level=level,
+                entities=entities,
+                graph=graph,
+                profile_data=profile.data,
+            )
             d2_text = _build_system_d2(
                 system_id=system_id,
                 level=level,
@@ -632,45 +786,37 @@ def _generate_solution(
                 graph=graph,
                 template_path=system_diagram_template,
                 profile_data=profile.data,
+                system_view=system_view,
             )
             d2_path = images_dir / f"{system_id}-{level}.d2"
             svg_path = images_dir / f"{system_id}-{level}.svg"
             d2_path.write_text(d2_text, encoding="utf-8")
             render_context = _build_render_context(
-                model_payload=model_payload,
                 target_config=render_target,
                 input_path=str(d2_path),
                 output_path=str(svg_path),
                 work_dir=str(output_root),
-                template_dir=str(template_dir),
             )
-            level_outputs.append((level, d2_path, svg_path))
+            level_outputs.append((level, d2_path, svg_path, system_view))
             level_jobs.append((idx, render_target, render_context))
 
-        ok, render_result = _execute_render_jobs(
+        rendered_svgs, render_error = _render_view_diagrams(
+            outputs=level_outputs,
             jobs=level_jobs,
-            max_workers=3,
+            drawio_export=drawio_export,
+            kind_label="level",
+            kind_key="level",
+            owner_key="system_id",
+            owner_id=system_id,
+            generated_files=generated_files,
         )
-        if not ok:
-            return _error_payload(
+        if render_error is not None or rendered_svgs is None:
+            return render_error or _error_payload(
                 operation="generate",
-                code=render_result["code"],
-                message=render_result["message"],
-                details=render_result["details"],
+                code="render_output_error",
+                message="Rendering produced no output.",
             )
-
-        for level, d2_path, svg_path in level_outputs:
-            generated_files.append(str(d2_path))
-            generated_files.append(str(svg_path))
-            svg_by_level[level] = _svg_markup(svg_path.read_text(encoding="utf-8"))
-
-            if not svg_by_level[level]:
-                return _error_payload(
-                    operation="generate",
-                    code="render_output_error",
-                    message=f"Rendered SVG for level '{level}' is empty.",
-                    details={"system_id": system_id, "level": level},
-                )
+        svg_by_level = rendered_svgs
 
         base_context = _build_solution_system_context(
             system_id=system_id,
@@ -678,12 +824,13 @@ def _generate_solution(
             graph=graph,
             svg_by_level=svg_by_level,
             workbook_diagrams=extra_diagrams_by_system.get(system_id, []),
+            drawio_export=drawio_export,
         )
         base_context.update(
             {
                 "styles": styles_css,
                 "scripts": scripts_js,
-                "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "generated_at": _now_timestamp(),
             }
         )
         context = _template_context(
@@ -700,14 +847,129 @@ def _generate_solution(
 
     systems_list.sort(key=lambda item: item["name"].lower())
 
+    for project_row in entities.get("project", []):
+        project_id = str(project_row.get("id", "")).strip()
+        if not project_id:
+            continue
+        project_id_issue = _validate_system_id_fragment(
+            value=project_id,
+            field="id",
+            sheet="project",
+            row=int(project_row.get("_sheet_row", 0)),
+        )
+        if project_id_issue:
+            return _unsafe_id_error(
+                entities=entities,
+                issue=project_id_issue,
+                message="Project id contains unsafe output-path characters",
+            )
+
+        project_name = str(project_row.get("name") or project_id)
+        projects_list.append(
+            {
+                "id": project_id,
+                "name": project_name,
+                "description": str(first_value(project_row, ("description",)) or ""),
+                "tag": _first_tag_value(project_row),
+                "href": _project_page_name(project_id),
+            }
+        )
+
+        stage_jobs: list[tuple[int, RenderTargetConfig, dict[str, Any]]] = []
+        stage_outputs: list[tuple[str, Path, Path, dict[str, Any]]] = []
+        for idx, stage in enumerate(_project_stage_ids(project_id=project_id, entities=entities)):
+            safe_stage = _safe_output_fragment(stage)
+            # Built once and reused for both the D2 source (below) and the
+            # draw.io embedded model (after rendering, D1/D2): same render
+            # context, so the two representations never drift apart.
+            project_view = _build_project_view(
+                project_id=project_id,
+                stage=stage,
+                entities=entities,
+                graph=graph,
+                profile_data=profile.data,
+            )
+            d2_text = _build_project_d2(
+                project_id=project_id,
+                stage=stage,
+                entities=entities,
+                graph=graph,
+                template_path=project_diagram_template,
+                profile_data=profile.data,
+                project_view=project_view,
+            )
+            d2_path = images_dir / f"project-{project_id}-{safe_stage}.d2"
+            svg_path = images_dir / f"project-{project_id}-{safe_stage}.svg"
+            d2_path.write_text(d2_text, encoding="utf-8")
+            render_context = _build_render_context(
+                target_config=render_target,
+                input_path=str(d2_path),
+                output_path=str(svg_path),
+                work_dir=str(output_root),
+            )
+            stage_outputs.append((stage, d2_path, svg_path, project_view))
+            stage_jobs.append((idx, render_target, render_context))
+
+        rendered_svgs, render_error = _render_view_diagrams(
+            outputs=stage_outputs,
+            jobs=stage_jobs,
+            drawio_export=drawio_export,
+            kind_label="project stage",
+            kind_key="stage",
+            owner_key="project_id",
+            owner_id=project_id,
+            generated_files=generated_files,
+        )
+        if render_error is not None or rendered_svgs is None:
+            return render_error or _error_payload(
+                operation="generate",
+                code="render_output_error",
+                message="Rendering produced no output.",
+            )
+        svg_by_stage = rendered_svgs
+
+        base_context = _build_solution_project_context(
+            project_id=project_id,
+            entities=entities,
+            graph=graph,
+            svg_by_stage=svg_by_stage,
+            drawio_export=drawio_export,
+        )
+        base_context.update(
+            {
+                "styles": styles_css,
+                "scripts": scripts_js,
+                "generated_at": _now_timestamp(),
+            }
+        )
+        context = _template_context(
+            base_context=base_context,
+            model_payload=model_payload,
+            profile_data=profile.data,
+        )
+
+        project_template = env.get_template(report_templates.project_report_path.name)
+        project_html = project_template.render(**context)
+        project_html_path = solution_dir / _project_page_name(project_id)
+        project_html_path.write_text(project_html, encoding="utf-8")
+        generated_files.append(str(project_html_path))
+
+    projects_list.sort(key=lambda item: item["name"].lower())
+
     index_template = env.get_template(report_templates.solution_report_path.name)
     solution_title = title.strip() if title and title.strip() else "Architecture Solution"
+    # Card-grid behavior (systems_list/projects_list above) is unchanged; the
+    # index summary cards and global entity tables (D7) are additive.
+    index_extra_context = _build_solution_index_context(entities=entities, graph=graph)
     index_base_context: dict[str, Any] = {
         "title": solution_title,
         "systems": systems_list,
+        "projects": projects_list,
         "styles": styles_css,
         "scripts": scripts_js,
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "generated_at": _now_timestamp(),
+        "is_index": True,
+        **index_extra_context,
     }
     index_context = _template_context(
         base_context=index_base_context,
@@ -730,7 +992,6 @@ def _render_workbook_diagrams(
     output_root: Path,
     profile_name: str,
     profile: ArchProfileConfig,
-    model_payload: dict[str, Any],
     diagram_specs: list[_WorkbookDiagramSpec],
 ) -> dict[str, Any]:
     if not diagram_specs:
@@ -754,26 +1015,11 @@ def _render_workbook_diagrams(
     generated_files: list[str] = []
     by_system: dict[str, list[dict[str, str]]] = {}
 
+    # spec.system_id was already fragment-validated by
+    # _collect_workbook_diagram_specs; generation aborts before this point
+    # when any diagram row carries an error.
     prepared: list[tuple[_WorkbookDiagramSpec, int, str, Path]] = []
     for idx, spec in enumerate(diagram_specs, start=1):
-        system_id_issue = _validate_system_id_fragment(
-            value=spec.system_id,
-            field="sys",
-            sheet="diagram",
-            row=spec.row_number,
-        )
-        if system_id_issue:
-            return {
-                "ok": False,
-                "operation": "generate",
-                "error": {
-                    "code": "validation_failed",
-                    "message": "Diagram row has invalid system id for output-path generation",
-                    "details": {"error_count": 1},
-                },
-                "valid": False,
-                "issues": {"errors": [system_id_issue], "warnings": []},
-            }
         safe_name = re.sub(r"[^a-zA-Z0-9._-]+", "-", Path(spec.source_value).stem).strip("-")
         if not safe_name:
             safe_name = f"diagram-{idx}"
@@ -784,12 +1030,10 @@ def _render_workbook_diagrams(
     jobs: list[tuple[int, RenderTargetConfig, dict[str, Any]]] = []
     for job_idx, (spec, _, _, output_path) in enumerate(prepared):
         render_context = _build_render_context(
-            model_payload=model_payload,
             target_config=target_config,
             input_path=str(spec.source_path),
             output_path=str(output_path),
             work_dir=str(output_root),
-            template_dir=str(spec.source_path.parent),
         )
         jobs.append((job_idx, target_config, render_context))
 
@@ -840,7 +1084,10 @@ def validate(*, input_path: str) -> dict[str, Any]:
     """
     with LogSpan(span="arch.validate", inputPath=input_path) as span:
         try:
-            workbooks, entities = ingest_input(input_path=input_path)
+            workbooks, entities, _passthrough = ingest_input(
+                input_path=input_path,
+                list_cell_separator=_resolve_list_cell_separator(),
+            )
             validation = validate_entities(entities=entities)
             payload: dict[str, Any] = {
                 "ok": validation["valid"],
@@ -863,7 +1110,7 @@ def validate(*, input_path: str) -> dict[str, Any]:
                 }
             span.add(valid=validation["valid"], errorCount=validation["summary"]["errors"])
             return payload
-        except (IngestError, ImportError) as exc:
+        except (IngestError, MissingDependencyError, RoundtripError) as exc:
             span.add(error=str(exc))
             return _error_payload(
                 operation="validate",
@@ -923,16 +1170,21 @@ def generate(
 
         try:
             output_root = resolve_output_dir(output_dir=output_dir, config=config)
-            workbooks, entities = ingest_input(input_path=input_path)
+            workbooks, entities, _passthrough = ingest_input(
+                input_path=input_path,
+                list_cell_separator=config.list_cell_separator,
+            )
             profile_name, active_profile = _resolve_generation_profile(
                 config=config,
                 profile=profile,
                 profile_yaml=profile_yaml,
             )
-            effective_include_tags = include_tags
+            # Fail-fast (design D10): validate the drawio_export toggle at
+            # generation start, before any output is written.
+            drawio_export_enabled = _resolve_drawio_export_toggle(active_profile.data)
             filtered = apply_tag_filters(
                 entities=entities,
-                include_tags=effective_include_tags,
+                include_tags=include_tags,
                 exclude_tags=exclude_tags,
             )
             validation = validate_entities(entities=filtered)
@@ -973,7 +1225,7 @@ def generate(
             model_payload = _build_model_payload(
                 entities=filtered,
                 diagrams=_clean_diagram_rows(entities=filtered),
-                include_tags=effective_include_tags,
+                include_tags=include_tags,
                 exclude_tags=exclude_tags,
             )
             solution_result = _generate_solution(
@@ -984,6 +1236,7 @@ def generate(
                 profile=active_profile,
                 model_payload=model_payload,
                 title=title,
+                drawio_export=drawio_export_enabled,
             )
             if not solution_result["ok"]:
                 return solution_result
@@ -1007,14 +1260,14 @@ def generate(
                 "output_dir": str(output_root),
                 "profile": profile_name,
                 "filters": {
-                    "include_tags": effective_include_tags or [],
+                    "include_tags": include_tags or [],
                     "exclude_tags": exclude_tags or [],
                 },
                 "files": files,
                 "model": {"version": MODEL_VERSION},
                 "summary": summary,
             }
-        except (IngestError, ImportError) as exc:
+        except (IngestError, MissingDependencyError, RoundtripError) as exc:
             span.add(error=str(exc))
             return _error_payload(
                 operation="generate",
@@ -1022,6 +1275,11 @@ def generate(
                 message=str(exc),
                 details={"input_path": input_path},
             )
+        # Error-code scheme: "invalid_config" = tools.arch config itself is
+        # invalid (get_arch_config, render-target resolution);
+        # "template_not_found" = a report/diagram template is missing;
+        # "config_error" = profile resolution/validation at generate() level
+        # (profile/profile_yaml args, profile data toggles).
         except ConfigResolutionError as exc:
             span.add(error=str(exc))
             return _error_payload(
@@ -1051,9 +1309,16 @@ def export_yaml(*, input_path: str, output_path: str) -> dict[str, Any]:
     """
     with LogSpan(span="arch.export_yaml", inputPath=input_path, outputPath=output_path) as span:
         try:
-            _, entities = ingest_input(input_path=input_path)
+            _, entities, passthrough = ingest_input(
+                input_path=input_path,
+                list_cell_separator=_resolve_list_cell_separator(),
+            )
             destination = resolve_cwd_path(output_path)
-            exported = export_entities_to_yaml(entities=entities, output_path=destination)
+            exported = export_entities_to_yaml(
+                entities=entities,
+                output_path=destination,
+                passthrough=passthrough,
+            )
             span.add(ok=True)
             return {
                 "ok": True,
@@ -1061,7 +1326,7 @@ def export_yaml(*, input_path: str, output_path: str) -> dict[str, Any]:
                 "output_path": exported,
                 "summary": {"counts": {sheet: len(rows) for sheet, rows in entities.items()}},
             }
-        except (IngestError, ImportError, RoundtripError) as exc:
+        except (IngestError, MissingDependencyError, RoundtripError) as exc:
             span.add(error=str(exc))
             return _error_payload(
                 operation="export_yaml",
@@ -1089,11 +1354,13 @@ def import_yaml(*, input_path: str, template_path: str, output_path: str) -> dic
         outputPath=output_path,
     ) as span:
         try:
-            entities = load_yaml_entities(input_path=resolve_cwd_path(input_path))
+            entities, passthrough = load_yaml_entities(input_path=resolve_cwd_path(input_path))
             imported_path = import_yaml_into_template(
                 entities=entities,
                 template_path=resolve_cwd_path(template_path),
                 output_path=resolve_cwd_path(output_path),
+                list_cell_separator=_resolve_list_cell_separator(),
+                passthrough=passthrough,
             )
             validation_result = validate(input_path=imported_path)
             response: dict[str, Any] = {
@@ -1112,7 +1379,7 @@ def import_yaml(*, input_path: str, template_path: str, output_path: str) -> dic
                 }
             span.add(ok=response["ok"])
             return response
-        except (RoundtripError, ImportError, IngestError) as exc:
+        except (RoundtripError, MissingDependencyError, IngestError) as exc:
             span.add(error=str(exc))
             return _error_payload(
                 operation="import_yaml",

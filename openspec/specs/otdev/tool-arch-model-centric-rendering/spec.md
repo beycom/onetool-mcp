@@ -10,11 +10,19 @@ Defines the model-centric architecture rendering contract for the `arch` tool.
 The `arch` tool SHALL execute architecture workflows using a strict two-stage boundary: `data -> model` and `model -> report`.
 
 #### Scenario: Data normalized before reporting
-- **WHEN** `arch.generate(...)` is called with workbook (`.xlsx` / `.xlsm`) sources
+- **WHEN** `arch.generate(...)` is called with workbook (`.xlsx` / `.xlsm`) or YAML (`.yaml` / `.yml`) sources
 - **THEN** the tool SHALL normalize inputs into a canonical model before any report or render artifact is produced
 
+### Requirement: Input format parity
+The `arch` tool SHALL accept either an Excel workbook or a YAML model file as input to its `validate` and `generate` operations, normalized through the same canonical model path.
+
+#### Scenario: YAML input to validate and generate
+- **WHEN** `arch.validate(...)` or `arch.generate(...)` receives a `.yaml`/`.yml` model file as `input_path`
+- **THEN** the tool SHALL ingest it through the canonical model path used for workbooks
+- **AND** validation errors SHALL be reported the same way as for workbook input
+
 #### Scenario: Renderers consume model context only
-- **WHEN** rendering is executed for `solution` or `seq` targets
+- **WHEN** rendering is executed for solution, system diagram, project diagram, or workbook-defined diagram targets
 - **THEN** renderer/template execution SHALL use model-derived render context and SHALL NOT parse source YAML/Excel directly
 
 ### Requirement: Canonical model metadata contract
@@ -35,16 +43,12 @@ The `arch` tool SHALL resolve render target/profile/engine/template configuratio
 - **WHEN** generation is requested for `solution`
 - **THEN** the tool SHALL resolve `tools.arch.profiles.<name>.system_engine` settings and run the configured command template with resolved render context paths
 
-#### Scenario: Sequence target orchestration
-- **WHEN** generation is requested for `seq`
-- **THEN** the tool SHALL resolve `tools.arch.profiles.<name>.sequence_engine` settings and run the configured command template for sequence output
+#### Scenario: Workbook-defined diagram target orchestration
+- **WHEN** workbook-defined diagrams are provided through the `diagram` sheet
+- **THEN** the tool SHALL resolve `tools.arch.profiles.<name>.diagram_engine` settings and run the configured command template for each diagram source
 
 ### Requirement: Strict argument and config validation
 The `arch` tool SHALL enforce fail-fast validation for invalid values, unsupported values, and invalid configuration structure.
-
-#### Scenario: Unsupported format rejected
-- **WHEN** `arch.generate(...)` is called with an unsupported `format` value
-- **THEN** the tool SHALL fail with an explicit invalid-format error
 
 #### Scenario: Unsupported orchestration shape rejected
 - **WHEN** unsupported orchestration-style config keys are supplied
@@ -62,7 +66,7 @@ The `arch` tool SHALL NOT accept unsupported parameters, unsupported enum values
 - **THEN** the tool SHALL fail explicitly and SHALL NOT remap it silently
 
 ### Requirement: No-loss YAML and Excel round-trip semantics
-The `arch` tool SHALL maintain semantic equivalence across canonical round-trip paths.
+The `arch` tool SHALL maintain semantic equivalence across canonical round-trip paths and SHALL fail explicitly instead of silently dropping data.
 
 #### Scenario: YAML to Excel to model equivalence
 - **WHEN** data is processed through `YAML -> model -> Excel -> model`
@@ -72,20 +76,176 @@ The `arch` tool SHALL maintain semantic equivalence across canonical round-trip 
 - **WHEN** data is processed through `Excel -> model -> YAML -> model`
 - **THEN** the resulting model semantics SHALL remain equivalent without meaning-changing coercions
 
-### Requirement: Sequence integration at model boundary
-Sequence entities from separate files/workbooks SHALL be joined and validated at the model boundary before sequence rendering.
+#### Scenario: Unknown YAML section rejected
+- **WHEN** YAML input contains a top-level section that is not a known sheet name or alias
+- **THEN** loading SHALL fail with an explicit error naming the unknown section
 
-#### Scenario: Separate sequence source join
-- **WHEN** sequence entities are provided separately from core entity sources
-- **THEN** `arch` SHALL resolve and validate cross-references during model assembly before `seq` rendering
+#### Scenario: Template import without matching columns rejected
+- **WHEN** `arch.import_yaml(...)` receives row fields for which the template workbook sheet has no column (directly or via field aliases)
+- **THEN** the import SHALL fail with an explicit error listing the unmapped fields
 
-### Requirement: Integration key field in solution context
-Solution output context SHALL expose integration row identifiers through a `key` field.
+#### Scenario: Template import without matching sheet rejected
+- **WHEN** `arch.import_yaml(...)` receives rows for an entity sheet that the template workbook does not contain
+- **THEN** the import SHALL fail with an explicit error naming the missing sheet instead of silently dropping the rows
 
-#### Scenario: Integrations table key column
-- **WHEN** solution context is generated for integrations
-- **THEN** each integration entry SHALL expose the row key as `key`
-- **AND** the integrations table column SHALL use field `key`
+#### Scenario: Colliding workbook headers rejected
+- **WHEN** a workbook sheet has two columns that normalize to the same header key
+- **THEN** ingestion SHALL fail with an explicit error naming the colliding headers
+
+#### Scenario: List-valued fields round-trip
+- **WHEN** a field holds a list of values
+- **THEN** the canonical model SHALL store it as a real list
+- **AND** YAML SHALL represent it as a native list
+- **AND** an Excel cell SHALL encode it as bracketed text using the configured `tools.arch.list_cell_separator` (default `;`), e.g. `[core;internal]`
+- **AND** an Excel cell whose trimmed text is bracketed SHALL parse back into a list on ingest, while an unbracketed cell SHALL remain a scalar string
+
+#### Scenario: Non-canonical sheets round-trip
+- **WHEN** a workbook contains a sheet whose name is not a canonical entity or alias
+- **THEN** it SHALL be preserved verbatim (headers and rows) through `Excel -> YAML -> Excel`
+- **AND** it SHALL be carried in YAML under the reserved `_passthrough` key rather than as an unknown top-level section
+- **AND** it SHALL NOT be validated or added to the canonical model
+
+### Requirement: Entity reference integrity
+Entity rows SHALL reference resolvable parents, and node identifiers SHALL be unique across node sheets.
+
+#### Scenario: Component parent reference
+- **WHEN** a component row is validated
+- **THEN** it SHALL reference an existing application or, when no application is referenced, an existing system directly
+- **AND** a component referencing neither SHALL fail validation
+
+#### Scenario: Direct system components render
+- **WHEN** a component references a system directly and Component View is rendered
+- **THEN** the component SHALL render inside the owning system block
+- **AND** interface endpoints resolving to that component SHALL connect to its rendered node
+
+#### Scenario: Cross-sheet unique node ids
+- **WHEN** the same id appears in more than one of the `sys`, `app`, `cmp`, or `usr` sheets
+- **THEN** validation SHALL fail with a duplicate-id error naming the sheets
+
+### Requirement: Workbook-defined diagrams at model boundary
+Workbook-defined diagram rows from separate files/workbooks SHALL be joined and validated at the model boundary before rendering.
+
+#### Scenario: Separate diagram source join
+- **WHEN** diagram rows are provided separately from core entity sources
+- **THEN** `arch` SHALL resolve and validate cross-references during model assembly before diagram rendering
+
+### Requirement: Interface key field in solution context
+Solution output context SHALL expose interface row identifiers through a `key` field.
+
+#### Scenario: Interfaces table key column
+- **WHEN** solution context is generated for interfaces
+- **THEN** each interface entry SHALL expose the row key as `key`
+- **AND** the interfaces table column SHALL use field `key`
+
+### Requirement: Interface contract
+Interface rows SHALL model interface contracts using provider and consumer endpoints.
+
+#### Scenario: Provider and consumer are required
+- **WHEN** an interface row is validated
+- **THEN** it SHALL require `provider` and `consumer` endpoint fields
+- **AND** unsupported endpoint aliases SHALL NOT be remapped silently
+
+#### Scenario: Interaction type is extensible
+- **WHEN** an interface row defines `interaction_type`
+- **THEN** the value SHALL be preserved in model, diagram label, and solution table contexts
+- **AND** user-defined non-empty values SHALL be valid
+
+#### Scenario: Arrow direction is explicit
+- **WHEN** `arrow_direction` is omitted
+- **THEN** the diagram edge SHALL point from consumer to provider
+- **WHEN** `arrow_direction` is `provider_to_consumer`
+- **THEN** the diagram edge SHALL point from provider to consumer
+- **WHEN** `arrow_direction` is `none`
+- **THEN** the diagram edge SHALL have no arrowhead
+- **WHEN** `arrow_direction` is `bidirectional`
+- **THEN** the diagram edge SHALL be bidirectional
+- **AND** `none` and `bidirectional` edges SHALL use neutral edge styling rather than focus-direction styling
+- **AND** invalid arrow direction values SHALL fail validation
+
+### Requirement: Interface canonical entity names and aliases
+The canonical model entity for interface contracts SHALL be `interface`, with explicit short-form aliases for authoring.
+
+#### Scenario: Workbook sheet aliases
+- **WHEN** a workbook contains `interface` or `int` sheet names
+- **THEN** the rows SHALL load into canonical `interface` model entities
+- **AND** a workbook containing both aliases for the same canonical sheet SHALL fail explicitly
+
+#### Scenario: YAML section aliases
+- **WHEN** YAML contains `interface` or `int` sections
+- **THEN** the rows SHALL load into canonical `interface` model entities
+- **AND** YAML containing both aliases for the same canonical section SHALL fail explicitly
+
+#### Scenario: Core entity long aliases
+- **WHEN** workbook sheets or YAML sections use `system`, `application`, `component`, or `components`
+- **THEN** the rows SHALL load into canonical `sys`, `app`, and `cmp` model entities
+
+### Requirement: Project cross-system views
+The solution output SHALL support project pages generated from `project` and `project_scope` model entities.
+
+#### Scenario: Project entity validation
+- **WHEN** project rows are validated
+- **THEN** `id` and `name` SHALL be required
+- **AND** `detail_level` SHALL allow `sys`, `app`, or `cmp`
+- **AND** `connect_level` SHALL allow `sys`, `app`, `cmp`, or `lowest_visible`
+
+#### Scenario: Project scope validation
+- **WHEN** project scope rows are validated
+- **THEN** `project`, `stage`, `item_type`, `item_id`, and `change_type` SHALL be required
+- **AND** `project` SHALL reference an existing project
+- **AND** `item_id` SHALL reference an existing entity compatible with `item_type`
+- **AND** `change_type` SHALL allow `existing`, `new`, `changed`, `removed`, `impacted`, or `dependency`
+
+#### Scenario: Project index navigation
+- **WHEN** solution output is generated with project rows
+- **THEN** the solution index SHALL include project navigation entries
+- **AND** each project SHALL have its own HTML page
+
+#### Scenario: Project stage diagrams
+- **WHEN** a project has scoped rows across stages
+- **THEN** its page SHALL show one diagram per first-seen `project_scope.stage`
+- **AND** project diagrams SHALL have no primary system
+- **AND** `project.detail_level` and `project.connect_level` SHALL apply to all included systems and interface endpoints
+
+#### Scenario: Project extension fields
+- **WHEN** project or project scope rows contain extension columns
+- **THEN** those fields SHALL be preserved in YAML/model output
+- **AND** generated project pages SHALL expose those fields in metadata or scope table contexts
+
+### Requirement: Secondary system diagram detail
+System diagrams SHALL allow profiles to control how secondary systems are rendered without changing the focused primary system detail level.
+
+#### Scenario: Secondary system detail option
+- **WHEN** `tools.arch.profiles.<name>.data.secondary_system_detail` is omitted
+- **THEN** secondary systems SHALL render at `sys` detail
+- **AND** the focused primary system SHALL continue to render at the current diagram detail (`sys`, `app`, or `cmp`)
+
+#### Scenario: Secondary systems match primary detail
+- **WHEN** `tools.arch.profiles.<name>.data.secondary_system_detail` is `match_primary`
+- **THEN** secondary systems SHALL render at the current diagram detail (`sys` in System View, `app` in Application View, `cmp` in Component View)
+
+#### Scenario: Secondary system endpoint connection level
+- **WHEN** `tools.arch.profiles.<name>.data.secondary_system_connect_level` is omitted
+- **THEN** secondary-system interface endpoints SHALL connect at `app` level when the interface endpoint resolves to an app or component and the app node is visible
+- **AND** endpoints SHALL fall back to system level when the interface row does not contain enough detail or the referenced node is not visible
+
+#### Scenario: Secondary connect level does not affect primary endpoints
+- **WHEN** `secondary_system_connect_level` is configured
+- **THEN** the option SHALL apply only to secondary-system interface endpoints
+- **AND** primary-system endpoints SHALL continue to resolve from the current primary diagram detail and the interface endpoint IDs
+
+### Requirement: Profile data default alignment
+Code fallback defaults for profile data options SHALL equal the bundled `arch.yaml` profile values, so custom profiles behave like the shipped one when options are omitted.
+
+#### Scenario: Custom profile inherits documented defaults
+- **WHEN** a custom profile omits a documented `tools.arch.profiles.<name>.data` option
+- **THEN** generation SHALL use the same value the bundled default profile ships with
+
+### Requirement: Regenerated solution output
+`arch.generate` SHALL fully own the solution output directory.
+
+#### Scenario: Stale outputs removed
+- **WHEN** generation runs into a solution directory containing files from a previous run
+- **THEN** stale files SHALL be removed so the directory reflects only the current model
 
 ### Requirement: Structured operation results and errors
 The `arch` tool SHALL return stable structured payloads for success and failure across validate, generate, round-trip, and bundling operations.

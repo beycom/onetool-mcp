@@ -1,0 +1,71 @@
+{# Shared D2 diagram body used by system.d2.j2 and project.d2.j2.
+   Context contract:
+   - view: user_nodes, external_nodes, system_blocks, interface_edges
+     (set by the including template to model.system_view or model.project_view)
+   Node/edge dicts may carry optional style-class keys (change_class on
+   nodes/edges, interaction_class on edges). The `class_attr(...)` global
+   (registered in system_model.py) renders a scalar `class: X` when exactly
+   one class applies and an array `class: [A; B]` only when 2+ classes
+   apply, so models without these features emit byte-identical D2 to before
+   this capability existed. -#}
+{% for user in view.user_nodes -%}
+"{{ user.id }}": {{ user.label }} {
+  class: Person
+}
+
+{% endfor -%}
+{% for ext in view.external_nodes -%}
+"{{ ext.id }}": {{ ext.label }} {
+  class: External
+}
+
+{% endfor -%}
+{% for block in view.system_blocks -%}
+"{{ block.id }}": {{ block.label }} {
+  class: {{ class_attr(['System', block.change_class | default(None)]) }}
+{% if block.link -%}
+  link: "{{ block.link }}"
+{% endif -%}
+{% if block.placeholder -%}
+  "_placeholder_{{ block.id }}": " " {
+    class: AppPlaceholder
+  }
+{% endif -%}
+{% for direct in block.direct_components -%}
+  "{{ direct.id }}": {{ direct.label }} {
+    class: {{ class_attr([direct.class, direct.change_class | default(None)]) }}
+{% if direct.link -%}
+    link: "{{ direct.link }}"
+{% endif -%}
+  }
+{% endfor -%}
+{% for app in block.apps -%}
+  "{{ app.id }}": {{ app.label }} {
+    class: {{ class_attr(['App', app.change_class | default(None)]) }}
+{% if app.link -%}
+    link: "{{ app.link }}"
+{% endif -%}
+{% for cmp in app.components -%}
+    "{{ cmp.id }}": {{ cmp.label }} {
+      class: {{ class_attr([cmp.class, cmp.change_class | default(None)]) }}
+{% if cmp.link -%}
+      link: "{{ cmp.link }}"
+{% endif -%}
+    }
+{% endfor -%}
+  }
+{% endfor -%}
+}
+
+{% endfor -%}
+{% for edge in view.interface_edges -%}
+{{ edge.start_path }} {{ edge.operator }} {{ edge.end_path }}: "{{ edge.label }}" {
+  class: {{ class_attr([edge.direction_class, edge.interaction_class | default(None), edge.change_class | default(None)]) }}
+{% if edge.source_arrowhead_id -%}
+  source-arrowhead.label: "{{ edge.source_arrowhead_id }}"
+{% endif -%}
+{% if edge.target_arrowhead_id -%}
+  target-arrowhead.label: "{{ edge.target_arrowhead_id }}"
+{% endif -%}
+}
+{% endfor -%}

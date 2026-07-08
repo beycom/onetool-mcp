@@ -1,7 +1,7 @@
-{# System-level D2 source template.
-   Naming convention: system.d2.j2
+{# Project-level D2 source template.
+   Naming convention: project.d2.j2
    Context contract:
-   - model.system_view: title_name, level_name, user_nodes, external_nodes, system_blocks, interface_edges
+   - model.project_view: title_name, stage_name, detail_level, connect_level, user_nodes, external_nodes, system_blocks, interface_edges
    - profile_data: tools.arch.profiles.<name>.data mapping
    The shared diagram body lives in _diagram.d2.j2; this wrapper only
    contributes the title line and selects the view. The `quote_d2(...)`
@@ -9,7 +9,7 @@
    D2-significant characters in names cannot corrupt the source. #}
 {% include "styles.d2" %}
 
-title: {{ quote_d2(model.system_view.title_name ~ " - " ~ model.system_view.level_name ~ " View") }} {
+title: {{ quote_d2(model.project_view.title_name ~ " - " ~ model.project_view.stage_name) }} {
   near: top-center
   shape: text
   style.font-size: 24
@@ -18,5 +18,5 @@ title: {{ quote_d2(model.system_view.title_name ~ " - " ~ model.system_view.leve
 
 direction: {{ profile_data.direction | default("up") }}
 
-{% set view = model.system_view -%}
+{% set view = model.project_view -%}
 {% include "_diagram.d2.j2" -%}

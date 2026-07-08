@@ -36,10 +36,6 @@
     color: #ffffff;
 }
 
-.ag-theme-alpine .ag-row-selected {
-    background-color: #dbeafe !important;
-}
-
 .ag-theme-alpine .ag-row:hover {
     background-color: #f1f5f9;
 }
@@ -47,4 +43,20 @@
 .diagram-container svg {
     max-width: 100%;
     height: auto;
+}
+
+.legend-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+.legend-line {
+    display: inline-block;
+    width: 24px;
+    margin-right: 6px;
+    vertical-align: middle;
 }

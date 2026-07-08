@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import zipfile
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from bs4 import BeautifulSoup
+
+from otpack import resolve_cwd_path
 
 
 class BundleError(ValueError):
@@ -14,18 +16,23 @@ class BundleError(ValueError):
 
 
 def _discover_additional_files(path_expr: str) -> list[Path]:
-    """Discover files from a file, directory, or glob pattern."""
+    """Discover files from a file, directory, or glob pattern.
+
+    Relative paths resolve against the effective project cwd (like the caller's
+    ``directory``/``output_path``), not the process cwd, which differs under an
+    MCP server.
+    """
     if "*" in path_expr or "?" in path_expr or "[" in path_expr:
         raw = Path(path_expr)
         if raw.is_absolute():
             root = Path("/")
             pattern = raw.as_posix().lstrip("/")
         else:
-            root = Path()
+            root = resolve_cwd_path(".")
             pattern = path_expr
         return sorted(path.resolve() for path in root.glob(pattern) if path.is_file())
 
-    path = Path(path_expr)
+    path = resolve_cwd_path(path_expr)
     if path.is_file():
         return [path]
     if path.is_dir():
@@ -33,38 +40,36 @@ def _discover_additional_files(path_expr: str) -> list[Path]:
     return []
 
 
+def _load_svg_element(*, html_path: Path, rel_src: str) -> Any | None:
+    """Load a referenced SVG element ready for inlining, or None if unusable.
+
+    Strips the draw.io embedded model (design D9): inlined SVG markup never
+    carries `content`, so it exists only in the standalone file.
+    """
+    svg_path = (html_path.parent / rel_src).resolve()
+    if not svg_path.exists():
+        return None
+    svg_soup = BeautifulSoup(svg_path.read_text(encoding="utf-8"), "lxml-xml")
+    svg_elem = svg_soup.find("svg")
+    if not svg_elem:
+        return None
+    if svg_elem.has_attr("content"):
+        del svg_elem["content"]
+    return svg_elem
+
+
 def _inline_html_svgs(*, html_path: Path) -> int:
-    """Inline local SVG references into HTML from `data-svg-src` and `<img src=...svg>`."""
+    """Inline local `<img src=...svg>` references into HTML."""
     content = html_path.read_text(encoding="utf-8")
     soup = BeautifulSoup(content, "html.parser")
     replaced = 0
-
-    for container in soup.find_all(None, attrs={"data-svg-src": True}):
-        svg_rel_path = cast("str | None", container.get("data-svg-src"))
-        if not svg_rel_path:
-            continue
-        svg_path = (html_path.parent / svg_rel_path).resolve()
-        if not svg_path.exists():
-            continue
-        svg_soup = BeautifulSoup(svg_path.read_text(encoding="utf-8"), "lxml-xml")
-        svg_elem = svg_soup.find("svg")
-        if not svg_elem:
-            continue
-        container.clear()
-        container.append(svg_elem)
-        del container["data-svg-src"]
-        replaced += 1
 
     for img in soup.find_all("img", src=True):
         src = str(img.get("src", ""))
         if not src.lower().endswith(".svg"):
             continue
-        svg_path = (html_path.parent / src).resolve()
-        if not svg_path.exists():
-            continue
-        svg_soup = BeautifulSoup(svg_path.read_text(encoding="utf-8"), "lxml-xml")
-        svg_elem = svg_soup.find("svg")
-        if not svg_elem:
+        svg_elem = _load_svg_element(html_path=html_path, rel_src=src)
+        if svg_elem is None:
             continue
         wrapper = soup.new_tag("div")
         wrapper["data-inlined-svg"] = src
@@ -100,15 +105,24 @@ def bundle_solution_directory(
     included_files: list[str] = []
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for file_path in sorted(directory.rglob("*")):
-            if not file_path.is_file():
+            # Skip the partially written archive itself when output_path
+            # points inside the solution directory.
+            if not file_path.is_file() or file_path == zip_path:
                 continue
             arcname = file_path.relative_to(directory)
             zf.write(file_path, arcname)
             archived_files.append(str(arcname))
         if include:
             include_files = _discover_additional_files(include)
+            used_arcnames: set[str] = set()
             for include_file in include_files:
                 include_arcname = f"data/{include_file.name}"
+                # Qualify colliding basenames so no include silently shadows another.
+                counter = 2
+                while include_arcname in used_arcnames:
+                    include_arcname = f"data/{include_file.stem}_{counter}{include_file.suffix}"
+                    counter += 1
+                used_arcnames.add(include_arcname)
                 zf.write(include_file, include_arcname)
                 included_files.append(str(include_file))
 

@@ -29,9 +29,17 @@ class ArchProfileConfig(_ArchBaseModel):
         default="templates/arch/solution/default/system.html.j2",
         description="System report page template file",
     )
+    project_report: str = Field(
+        default="templates/arch/solution/default/project.html.j2",
+        description="Project report page template file",
+    )
     system_diagram: str = Field(
         default="templates/arch/d2/system.d2.j2",
         description="System D2 template file path",
+    )
+    project_diagram: str = Field(
+        default="templates/arch/d2/project.d2.j2",
+        description="Project D2 template file path",
     )
     system_engine: str = Field(
         default="d2 {{ input }} {{ output }} --layout elk",
@@ -57,6 +65,14 @@ class ArchConfig(_ArchBaseModel):
     default_profile: str = Field(
         default="simple",
         description="Profile name used when generate() omits profile",
+    )
+    list_cell_separator: str = Field(
+        default=";",
+        description=(
+            "Separator between items when a list-valued field is encoded into a single "
+            "Excel cell as bracketed text (e.g. [core;internal]). Applies only to the Excel "
+            "cell encoding; YAML uses native lists. List items must not contain this character."
+        ),
     )
     profiles: dict[str, ArchProfileConfig] = Field(
         default_factory=lambda: {"simple": ArchProfileConfig()},
@@ -84,6 +100,7 @@ class ReportTemplateConfig:
 
     solution_report_path: Path
     system_report_path: Path
+    project_report_path: Path
 
 
 def get_arch_config() -> ArchConfig:
@@ -119,21 +136,6 @@ def resolve_output_dir(*, output_dir: str | None, config: ArchConfig) -> Path:
     return resolve_cwd_path(target)
 
 
-def resolve_render_target(
-    *,
-    config: ArchConfig,
-    target: Literal["solution", "diagram"],
-    profile: str | None = None,
-) -> RenderTargetConfig:
-    """Resolve render target command from active profile."""
-    profile_name, active_profile = get_active_profile(config=config, profile=profile)
-    return resolve_render_target_for_profile(
-        target=target,
-        profile_name=profile_name,
-        profile=active_profile,
-    )
-
-
 def resolve_render_target_for_profile(
     *,
     target: Literal["solution", "diagram"],
@@ -153,11 +155,7 @@ def resolve_render_target_for_profile(
             f"tools.arch.profiles.{profile_name}.{target_key}_engine must not be empty"
         )
 
-    engine_name = engine_template.split(maxsplit=1)[0] if engine_template else ""
-    if not engine_name:
-        raise ConfigResolutionError(
-            f"tools.arch.profiles.{profile_name}.{target_key}_engine must start with an engine command"
-        )
+    engine_name = engine_template.split(maxsplit=1)[0]
 
     return RenderTargetConfig(
         target=target,
@@ -213,12 +211,6 @@ def _resolve_required_file(*, configured_path: str, fallback_relative: str, labe
     return path
 
 
-def resolve_report_template_paths(*, config: ArchConfig, profile: str | None = None) -> ReportTemplateConfig:
-    """Resolve active profile report template files."""
-    _, selected_profile = get_active_profile(config=config, profile=profile)
-    return resolve_report_template_paths_for_profile(profile=selected_profile)
-
-
 def resolve_report_template_paths_for_profile(*, profile: ArchProfileConfig) -> ReportTemplateConfig:
     """Resolve report template files for an explicit profile object."""
     solution_report = _resolve_required_file(
@@ -231,33 +223,49 @@ def resolve_report_template_paths_for_profile(*, profile: ArchProfileConfig) -> 
         fallback_relative="arch-templates/solution/default/system.html.j2",
         label="system_report",
     )
+    project_report = _resolve_required_file(
+        configured_path=profile.project_report,
+        fallback_relative="arch-templates/solution/default/project.html.j2",
+        label="project_report",
+    )
     return ReportTemplateConfig(
         solution_report_path=solution_report,
         system_report_path=system_report,
+        project_report_path=project_report,
     )
 
 
-def resolve_system_diagram_template_path(*, config: ArchConfig, profile: str | None = None) -> Path:
-    """Resolve active profile system diagram template path."""
-    _, selected_profile = get_active_profile(config=config, profile=profile)
-    return resolve_system_diagram_template_path_for_profile(profile=selected_profile)
+def _resolve_diagram_template(*, configured_path: str, fallback_relative: str, label: str) -> Path:
+    """Resolve a D2 diagram template path (requires a sibling styles.d2)."""
+    template_path = resolve_path_with_fallback(
+        configured_path=configured_path,
+        fallback_relative=fallback_relative,
+    )
+    if not template_path.is_file():
+        raise ConfigResolutionError(f"{label} must be a file: {template_path}")
+
+    style_path = template_path.parent / "styles.d2"
+    if not style_path.exists():
+        raise ConfigResolutionError(f"{label} missing required file: {style_path}")
+    return template_path
 
 
 def resolve_system_diagram_template_path_for_profile(*, profile: ArchProfileConfig) -> Path:
     """Resolve system diagram template path for an explicit profile object."""
-    template_path = resolve_path_with_fallback(
+    return _resolve_diagram_template(
         configured_path=profile.system_diagram,
         fallback_relative="arch-templates/d2/system.d2.j2",
+        label="system_diagram",
     )
-    if not template_path.is_file():
-        raise ConfigResolutionError(f"system_diagram must be a file: {template_path}")
 
-    style_path = template_path.parent / "styles.d2"
-    if not style_path.exists():
-        raise ConfigResolutionError(
-            f"system_diagram missing required file: {style_path}"
-        )
-    return template_path
+
+def resolve_project_diagram_template_path_for_profile(*, profile: ArchProfileConfig) -> Path:
+    """Resolve project diagram template path for an explicit profile object."""
+    return _resolve_diagram_template(
+        configured_path=profile.project_diagram,
+        fallback_relative="arch-templates/d2/project.d2.j2",
+        label="project_diagram",
+    )
 
 
 __all__ = [
@@ -270,10 +278,8 @@ __all__ = [
     "get_arch_config",
     "resolve_output_dir",
     "resolve_path_with_fallback",
-    "resolve_render_target",
+    "resolve_project_diagram_template_path_for_profile",
     "resolve_render_target_for_profile",
-    "resolve_report_template_paths",
     "resolve_report_template_paths_for_profile",
-    "resolve_system_diagram_template_path",
     "resolve_system_diagram_template_path_for_profile",
 ]

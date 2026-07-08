@@ -3,6 +3,10 @@
 const panzoomInstances = {};
 
 function initDiagramPanZoom() {
+    // Panzoom loads from a CDN; when the bundle is opened offline the
+    // diagrams stay readable, just without zoom/pan.
+    if (typeof Panzoom === 'undefined') return;
+
     const containers = document.querySelectorAll('.diagram-container');
 
     containers.forEach((container, i) => {
@@ -25,39 +29,81 @@ function initDiagramPanZoom() {
             instance.zoomWithWheel(e);
         }, { passive: false });
     });
+
+    initDiagramLinkGuard(containers);
+}
+
+// D2 nodes render as SVG <a> links (see D4 in openspec/changes/arch-render-nav).
+// Panzoom drags end with a mouseup/click on whatever is under the pointer, which
+// would otherwise trigger navigation on every drag that happens to end over a
+// linked node. Track pointerdown position per container and, in the click
+// capture phase, cancel navigation only when the pointer moved more than the
+// drag threshold before the click fired; clean (non-drag) clicks still navigate.
+function initDiagramLinkGuard(containers) {
+    const DRAG_THRESHOLD_PX = 5;
+
+    containers.forEach((container) => {
+        let pointerDownX = 0;
+        let pointerDownY = 0;
+
+        container.addEventListener('pointerdown', function(e) {
+            pointerDownX = e.clientX;
+            pointerDownY = e.clientY;
+        }, true);
+
+        container.addEventListener('click', function(e) {
+            const link = e.target.closest && e.target.closest('a');
+            if (!link) return;
+
+            const dx = e.clientX - pointerDownX;
+            const dy = e.clientY - pointerDownY;
+            const moved = Math.sqrt(dx * dx + dy * dy);
+            if (moved > DRAG_THRESHOLD_PX) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }, true);
+    });
+}
+
+// Resolve the .diagram-container that belongs to the toolbar button's panel.
+function getDiagramContainer(btn) {
+    const panel = btn.closest('.diagram-panel');
+    return panel ? panel.querySelector('.diagram-container') : null;
+}
+
+// Resolve the Panzoom instance for the toolbar button's diagram, if any.
+function getPanzoom(btn) {
+    const container = getDiagramContainer(btn);
+    return container ? panzoomInstances[container.dataset.panzoomId] : null;
 }
 
 function zoomIn(btn) {
-    const panel = btn.closest('.diagram-panel');
-    if (!panel) return;
-    const container = panel.querySelector('.diagram-container');
-    if (!container) return;
-    const pz = panzoomInstances[container.dataset.panzoomId];
+    const pz = getPanzoom(btn);
     if (pz) pz.zoomIn();
 }
 
 function zoomOut(btn) {
-    const panel = btn.closest('.diagram-panel');
-    if (!panel) return;
-    const container = panel.querySelector('.diagram-container');
-    if (!container) return;
-    const pz = panzoomInstances[container.dataset.panzoomId];
+    const pz = getPanzoom(btn);
     if (pz) pz.zoomOut();
 }
 
 function resetZoom(btn) {
-    const panel = btn.closest('.diagram-panel');
-    if (!panel) return;
-    const container = panel.querySelector('.diagram-container');
-    if (!container) return;
-    const pz = panzoomInstances[container.dataset.panzoomId];
+    const pz = getPanzoom(btn);
     if (pz) pz.reset();
 }
 
+function escapeHtml(text) {
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function printDiagram(btn) {
-    const panel = btn.closest('.diagram-panel');
-    if (!panel) return;
-    const container = panel.querySelector('.diagram-container');
+    const container = getDiagramContainer(btn);
     if (!container) return;
     const svg = container.querySelector('svg');
     if (!svg) return;
@@ -70,7 +116,9 @@ function printDiagram(btn) {
     const tabContent = btn.closest('.diagram-tab-content');
     const tabId = tabContent ? tabContent.id : '';
     const activeTab = document.querySelector(`input[data-tab-target="${tabId}"]`);
-    const title = activeTab ? activeTab.getAttribute('aria-label') + ' Diagram' : 'Diagram';
+    // The aria-label carries workbook-supplied names; escape before writing
+    // it into the popup markup.
+    const title = escapeHtml(activeTab ? activeTab.getAttribute('aria-label') + ' Diagram' : 'Diagram');
 
     const printWindow = window.open('', '_blank', 'width=800,height=600');
     if (!printWindow) return;
@@ -183,6 +231,10 @@ function initDiagramTabs() {
 const gridInstances = {};
 
 function initAgGridTable(containerId, data, columns, options = {}) {
+    // AG Grid loads from a CDN; when the bundle is opened offline the page
+    // stays readable, just without interactive tables.
+    if (typeof agGrid === 'undefined') return null;
+
     const container = document.getElementById(containerId);
     if (!container) return null;
 
@@ -218,17 +270,34 @@ function initAgGridTable(containerId, data, columns, options = {}) {
     const gridOptions = Object.assign({}, defaultOptions, options);
 
     const gridApi = agGrid.createGrid(container, gridOptions);
-    gridInstances[containerId] = { api: gridApi, data: data, columns: columns };
+    gridInstances[containerId] = gridApi;
 
     return gridApi;
 }
 
+// Wires each `[data-quick-filter]` search input (index entity tables, D7) to
+// its AG Grid instance's quickFilterText, filtering rows client-side as the
+// user types.
+function initTableQuickFilters() {
+    document.querySelectorAll('[data-quick-filter]').forEach(function(input) {
+        const containerId = input.dataset.quickFilter;
+        input.addEventListener('input', function() {
+            const gridApi = gridInstances[containerId];
+            if (!gridApi) return;
+            gridApi.setGridOption('quickFilterText', input.value);
+        });
+    });
+}
+
 function downloadTableXLSX(containerId, filename) {
-    const grid = gridInstances[containerId];
-    if (!grid) return;
+    // SheetJS loads from a CDN; no-op when the bundle is opened offline.
+    if (typeof XLSX === 'undefined') return;
+
+    const gridApi = gridInstances[containerId];
+    if (!gridApi) return;
 
     const rowData = [];
-    grid.api.forEachNode(node => rowData.push(node.data));
+    gridApi.forEachNode(node => rowData.push(node.data));
 
     const ws = XLSX.utils.json_to_sheet(rowData);
     const wb = XLSX.utils.book_new();

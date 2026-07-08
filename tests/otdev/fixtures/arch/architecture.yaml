@@ -31,19 +31,125 @@ cmp:
   name: Old Worker
   app: app_old
   tags: deprecated
-int:
-- id: int_auth_ui
+interface:
+- id: interface_auth_ui
   name: Auth to UI
-  src: cmp_auth
-  dst: cmp_ui
+  provider: cmp_ui
+  consumer: cmp_auth
+  interaction_type: event
   tags: core
-- id: int_user_api
+- id: interface_user_api
   name: User to API
-  src: usr_ops
-  dst: app_api
+  provider: app_api
+  consumer: usr_ops
+  interaction_type: REST
+  tags: core
+- id: interface_core_legacy
+  name: Core to Legacy Batch
+  provider: sys_core
+  consumer: sys_legacy
+  interaction_type: batch
+  tags: core
+- id: interface_ui_worker
+  name: UI to Worker Queue
+  provider: cmp_ui
+  consumer: cmp_old
+  interaction_type: queue
+  tags: core
+- id: interface_api_worker
+  name: API to Worker File
+  provider: app_api
+  consumer: cmp_old
+  interaction_type: file
+  tags: core
+- id: interface_admin_worker
+  name: Admin to Worker Pubsub
+  provider: app_admin
+  consumer: app_old
+  interaction_type: pubsub
+  tags: core
+- id: interface_auth_worker
+  name: Auth to Worker API
+  provider: cmp_auth
+  consumer: cmp_old
+  interaction_type: api
   tags: core
 usr:
 - id: usr_ops
   name: Operations User
   app: app_admin
   tags: core
+project:
+- id: wallet
+  name: Wallet Project
+  status: wip
+  owner: platform
+  detail_level: app
+  connect_level: app
+  tags: core
+project_scope:
+- project: wallet
+  stage: current
+  item_type: system
+  item_id: sys_core
+  change_type: existing
+  owner: platform
+  status: current
+  tags: core
+- project: wallet
+  stage: current
+  item_type: application
+  item_id: app_api
+  change_type: new
+  owner: platform
+  status: current
+  tags: core
+- project: wallet
+  stage: current
+  item_type: component
+  item_id: cmp_old
+  change_type: removed
+  owner: platform
+  status: current
+  tags: core
+- project: wallet
+  stage: current
+  item_type: interface
+  item_id: interface_core_legacy
+  change_type: dependency
+  owner: platform
+  status: current
+  tags: core
+- project: wallet
+  stage: target
+  item_type: interface
+  item_id: interface_user_api
+  change_type: changed
+  owner: platform
+  status: target
+  tags: core
+- project: wallet
+  stage: target
+  item_type: application
+  item_id: app_admin
+  change_type: impacted
+  owner: platform
+  status: target
+  tags: core
+- project: wallet
+  stage: target
+  item_type: system
+  item_id: sys_core
+  change_type: impacted
+  owner: platform
+  status: target
+  tags: core
+- project: wallet
+  stage: target
+  item_type: component
+  item_id: cmp_auth
+  change_type: new
+  owner: platform
+  status: target
+  tags: core
+diagram: []

@@ -147,7 +147,7 @@ classes: {
     }
   }
 
-  Integration: {
+  Interface: {
     style: {
       stroke: "#000000"
       font-color: "#404040"
@@ -156,7 +156,7 @@ classes: {
     target-arrowhead.style.font-color: "#404040"
   }
 
-  IntegrationFromFocus: {
+  InterfaceFromFocus: {
     style: {
       stroke: "#84A1EB"
       font-color: "#5A7BC5"
@@ -165,12 +165,95 @@ classes: {
     target-arrowhead.style.font-color: "#5A7BC5"
   }
 
-  IntegrationToFocus: {
+  InterfaceToFocus: {
     style: {
       stroke: "#C1A2F3"
       font-color: "#9A7DD0"
     }
     source-arrowhead.style.font-color: "#9A7DD0"
     target-arrowhead.style.font-color: "#9A7DD0"
+  }
+
+  ChangeNew: {
+    style: {
+      stroke: "#2E7D32"
+      stroke-width: 3
+      fill: "#E0ECE0"
+    }
+  }
+
+  ChangeChanged: {
+    style: {
+      stroke: "#F9A825"
+      stroke-width: 3
+      fill: "#FEF2DE"
+    }
+  }
+
+  ChangeRemoved: {
+    style: {
+      stroke: "#C62828"
+      stroke-width: 3
+      stroke-dash: 3
+      fill: "#F6DFDF"
+    }
+  }
+
+  ChangeImpacted: {
+    style: {
+      stroke: "#6A1B9A"
+      stroke-width: 3
+      fill: "#E9DDF0"
+    }
+  }
+
+  ChangeDependency: {
+    style: {
+      stroke: "#546E7A"
+      stroke-width: 3
+      fill: "#E5E9EB"
+    }
+  }
+
+  IntApi: {
+    style: {
+      stroke-dash: 0
+      stroke-width: 3
+    }
+  }
+
+  IntEvent: {
+    style: {
+      stroke-dash: 3
+      stroke-width: 2
+    }
+  }
+
+  IntQueue: {
+    style: {
+      stroke-dash: 5
+      stroke-width: 2
+    }
+  }
+
+  IntBatch: {
+    style: {
+      stroke-dash: 8
+      stroke-width: 2
+    }
+  }
+
+  IntFile: {
+    style: {
+      stroke-dash: 1
+      stroke-width: 2
+    }
+  }
+
+  IntPubsub: {
+    style: {
+      stroke-dash: 4
+      stroke-width: 3
+    }
   }
 }

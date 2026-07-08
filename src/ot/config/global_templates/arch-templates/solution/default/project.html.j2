@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "_diagram_tabs.html.j2" import diagram_tabs %}
+
+{% block title %}{{ project.name }}{% endblock %}
+
+{% block content %}
+<h1 class="text-3xl font-bold mb-6">{{ project.name }}</h1>
+
+{% if metadata_data %}
+<div class="mb-6">
+    <div id="metadata-table" class="ag-theme-alpine"></div>
+</div>
+{% endif %}
+
+{% include "_legend.html.j2" %}
+
+{% if diagrams %}
+<div class="mb-4">
+    <h2 class="text-lg font-semibold mb-2 cursor-pointer select-none" data-collapse="diagrams-content"><span class="collapse-icon mr-1">&#9660;</span>Stages</h2>
+    <div id="diagrams-content">
+        {{ diagram_tabs(diagrams, 'diagram-tabs', 'diagram') }}
+    </div>
+</div>
+{% endif %}
+
+{% if scope_data %}
+<div class="mb-6">
+    <h2 class="text-lg font-semibold mb-2 cursor-pointer select-none" data-collapse="scope-content"><span class="collapse-icon mr-1">&#9660;</span>Scope</h2>
+    <div id="scope-content">
+        <div class="flex justify-end mb-2">
+            <button type="button" class="btn btn-xs btn-outline" onclick="downloadTableXLSX('scope-table', 'project-scope.xlsx')">Export XLSX</button>
+        </div>
+        <div id="scope-table" class="ag-theme-alpine"></div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    {% if metadata_data %}
+    initAgGridTable('metadata-table', {{ metadata_data|tojson }}, {{ metadata_columns|tojson }}, {pagination: false});
+    {% endif %}
+
+    {% if scope_data %}
+    initAgGridTable('scope-table', {{ scope_data|tojson }}, {{ scope_columns|tojson }});
+    {% endif %}
+
+    initDiagramPanZoom();
+    initCollapse();
+    initDiagramTabs();
+});
+</script>
+
+<footer class="mt-8 pt-4 border-t border-base-300 text-sm text-base-content/50">
+    Generated: {{ generated_at }}
+</footer>
+{% endblock %}
