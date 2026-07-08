@@ -1,8 +1,10 @@
 # Testing
 
-**Fast feedback. Lean tests. Two markers per test.**
+Reusable testing practice for Python projects using pytest.
 
-Every test gets a speed tier and a component tag. CI runs smoke tests in 30 seconds.
+**Fast feedback. Lean tests. Explicit test metadata.**
+
+Each project should define a small test profile: speed tiers, component tags, dependency tags, directory layout, and command shortcuts. In this repository, every test gets a speed tier and a component tag.
 
 ---
 
@@ -18,7 +20,7 @@ Every test gets a speed tier and a component tag. CI runs smoke tests in 30 seco
 
 ## Running Tests
 
-Always use `uv run pytest` (never bare `pytest`). Shortcuts via justfile:
+Run pytest through the project environment manager so imports and optional extras match local development. This repository uses `uv run pytest` and `just` shortcuts:
 
 ```bash
 just test              # all tests (strict - errors on missing requirements)
@@ -53,7 +55,7 @@ uv run pytest -m "not network"
 
 ## Required Markers
 
-Every test must have **two markers** - a speed tier and a component:
+Every test should carry enough metadata for fast, targeted runs. This repository requires **two markers**: a speed tier and a component tag.
 
 ### Speed Tier (pick one)
 
@@ -65,6 +67,8 @@ Every test must have **two markers** - a speed tier and a component:
 | `slow` | >10s | Long-running tests (benchmarks, large data) |
 
 ### Component Tag (pick one)
+
+Define component tags that match the project architecture. For this repository:
 
 | Marker | Component |
 |--------|-----------|
@@ -88,6 +92,8 @@ Every test must have **two markers** - a speed tier and a component:
 ---
 
 ## Test Organization
+
+Mirror test layout to source ownership so maintainers can find the right tests quickly. For this repository:
 
 ```
 tests/
@@ -163,13 +169,13 @@ class TestCleanVersion:
 class TestNpm:
     """Test npm function with mocked HTTP."""
 
-    @patch("ottools.package._fetch")
+    @patch("otdev.tools.package._fetch")
     def test_fetches_single_package(self, mock_fetch):
         mock_fetch.return_value = (True, {"dist-tags": {"latest": "18.2.0"}})
         result = npm(packages=["react"])
         assert "18.2.0" in result
 
-    @patch("ottools.package._fetch")
+    @patch("otdev.tools.package._fetch")
     def test_handles_unknown_package(self, mock_fetch):
         mock_fetch.return_value = (False, "Not found")
         result = npm(packages=["nonexistent-package-xyz"])
@@ -198,7 +204,7 @@ class TestPackageLive:
     """Live integration tests for package version tool."""
 
     def test_npm_live(self):
-        from ottools.package import npm
+        from otdev.tools.package import npm
         result = npm(packages=["lodash"])
         assert "lodash" in result
         assert "unknown" not in result.lower()
@@ -235,9 +241,7 @@ Aim for 3–5 tests per tool: one happy path, one lifecycle check (create/delete
 
 ### Prerequisites — all deps must be installed
 
-Integration tests require their full environment to be present. A missing dependency
-is a **failure**, not a skip. This keeps CI honest: a red test means "fix your
-environment", not "silently skipped".
+Integration tests require their full environment to be present. Decide which dependency tier applies before writing the test. For strict release or full integration suites, a missing dependency is a **failure**, not a skip. This keeps CI honest: a red test means "fix your environment", not "silently skipped".
 
 - **API keys** — configure them in `secrets.yaml` before running integration tests
 - **Libraries** — install the relevant extras (`pip install onetool-mcp[dev,util]`)
@@ -425,7 +429,7 @@ def test_two():
 
 ## Config Isolation
 
-Tests use the flat `tests/.onetool/onetool.yaml` fixture to ensure isolation from user configs.
+Tests must not read from or write to a developer's real local state. This repository uses the flat `tests/.onetool/onetool.yaml` fixture to isolate config from user configs.
 
 ---
 

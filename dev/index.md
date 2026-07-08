@@ -12,7 +12,7 @@ just check      # Lint + typecheck + test
 just dev        # Run MCP server in dev mode
 ```
 
-For the full command reference, use [practices/justfile.md](practices/justfile.md).
+For the full command reference, use [project/guides/dev-commands.md](project/guides/dev-commands.md).
 
 ## Which File To Use
 
@@ -25,7 +25,7 @@ Start with the smallest file that answers the question:
 | Architecture or execution flow | [project/arch/index.md](project/arch/index.md) | Entry point to request pipeline, routing, registry, proxy, security, and config architecture |
 | Creating or changing tools | [project/guides/index.md](project/guides/index.md) | Routes to creating tools, tool config, reference docs, attribution, and review guidance |
 | Deciding file locations | [project/guides/onetool-file-layout.md](project/guides/onetool-file-layout.md) | Canonical ownership rules for config, runtime, data, state, artifacts, and templates |
-| Generic development practice | [practices/index.md](practices/index.md) | Routes to testing, Python style, git, logging, CLI, docs, release, and just commands |
+| Generic development practice | [practices/index.md](practices/index.md) | Routes to reusable testing, Python style, git, logging, CLI, docs, and spec practices |
 | Brand, terminology, claims, links | [project/brand/index.md](project/brand/index.md) | OneTool wording, claims, taglines, and external references |
 | Tool reference content | [../docs/reference/tools/index.md](../docs/reference/tools/index.md) | User-facing pack/tool descriptions and per-tool docs |
 
@@ -62,7 +62,7 @@ rg "your new content" dev/ -l
 ### 2. Single Source of Truth
 
 Each topic has ONE authoritative doc:
-- Just commands → `practices/justfile.md`
+- Project command reference → `project/guides/dev-commands.md`
 - Tool creation → `project/guides/tool-development.md`
 - Testing patterns → `practices/testing.md`
 - Git workflow → `practices/git.md`
@@ -84,7 +84,7 @@ just install    # Install dependencies
 just check      # Run all checks
 \`\`\`
 
-For all commands, see [justfile.md](practices/justfile.md).
+For all commands, see [dev-commands.md](project/guides/dev-commands.md).
 ```
 
 ### 4. Clear Cross-References
@@ -229,6 +229,8 @@ Use this decision tree:
 | [tool-reference-docs.md](project/guides/tool-reference-docs.md) | Tool reference documentation | Writing `docs/reference/tools/` pages |
 | [upstream-tool-review.md](project/guides/upstream-tool-review.md) | Upstream tool API review tracker | Checking source projects for changes |
 | [attribution.md](project/guides/attribution.md) | License handling for derived tools | Attributing third-party code |
+| [dev-commands.md](project/guides/dev-commands.md) | OneTool command reference | Running project commands |
+| [release.md](project/guides/release.md) | OneTool release workflow | Releasing versions |
 
 **What belongs here:**
 - How to build OneTool-specific features
@@ -265,9 +267,9 @@ Use this decision tree:
 
 ---
 
-### practices/ - Generic Development Practices
+### practices/ - Reusable Development Practices
 
-**Purpose:** Development workflows and standards that could apply to any Python project
+**Purpose:** Reusable workflows and standards for Python projects using pytest, structured logging, OpenSpec-style specs, and MkDocs-style docs
 
 | File | What's Inside | When to Read |
 |------|--------------|--------------|
@@ -278,14 +280,12 @@ Use this decision tree:
 | [testing.md](practices/testing.md) | Testing strategy, markers, fixtures | Writing tests |
 | [logging.md](practices/logging.md) | LogSpan patterns, best practices | Adding logging |
 | [cli-patterns.md](practices/cli-patterns.md) | CLI development patterns | Building CLIs |
-| [justfile.md](practices/justfile.md) | Just command reference | Using just |
-| [release.md](practices/release.md) | Release and publishing workflow | Releasing versions |
 | [docs-writing.md](practices/docs-writing.md) | Documentation writing practice | Writing docs |
 | [docs-visual-design.md](practices/docs-visual-design.md) | Documentation visual design tokens | Styling docs |
 
 **What belongs here:**
-- Generic development workflows (git, testing, Python style)
-- Standards that apply beyond OneTool
+- Reusable development workflows (git, testing, Python style)
+- Standards that apply beyond one repository
 - Common patterns for Python projects
 
 **Examples:**
@@ -297,7 +297,7 @@ Use this decision tree:
 - ❌ "Creating tool packs" (use project/guides/)
 - ❌ "Tool pack descriptions" (use project/brand/)
 
-**Note:** Some practices use OneTool-specific tools (like LogSpan), but the *patterns* are generic enough to apply elsewhere.
+**Note:** Project-specific command references, release runbooks, paths, and product defaults belong in `project/`. Practices can link to them, but should not duplicate them.
 
 ---
 
@@ -306,6 +306,7 @@ Use this decision tree:
 - `pyproject.toml` - Dependencies, ruff/mypy/pytest config
 - `justfile` - All dev commands
 - `dev/practices/spec-writing.md` - OpenSpec quality, scope, and bloat control
+- `dev/project/guides/dev-commands.md` - OneTool command reference
 
 ---
 

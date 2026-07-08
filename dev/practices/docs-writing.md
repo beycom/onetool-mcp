@@ -1,6 +1,6 @@
 # Documentation Writing
 
-Best practices for writing and maintaining OneTool documentation with MkDocs Material.
+Reusable documentation-writing practices for Python projects using MkDocs Material.
 
 ## Configuration Strategy
 
@@ -24,7 +24,7 @@ When customizing Material for MkDocs, prefer this order (minimal maintenance):
 
 ## Pack Naming Convention
 
-Always use the full pack name as the primary identifier. If you want to show the short alias, append it in parentheses:
+Project-specific naming conventions belong in a short section like this, close to other writing rules. For OneTool pack names, always use the full pack name as the primary identifier. If you want to show the short alias, append it in parentheses:
 
 ```
 `ot_context` (`ctx`)

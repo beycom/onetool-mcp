@@ -1,6 +1,8 @@
 # Logging
 
-OneTool's structured logging infrastructure built on Loguru.
+Reusable structured logging practice for Python projects using Loguru plus operation spans.
+
+`LogSpan` and `LogEntry` are project-provided primitives, but the approach is generic: wrap meaningful operations in timed spans, record discrete events as structured entries, and keep user-facing output separate from logs.
 
 ---
 

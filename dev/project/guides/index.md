@@ -30,6 +30,17 @@ OneTool configuration system.
 
 ---
 
+## Operations
+
+Project-specific commands and release workflows.
+
+| Guide | Topic |
+|-------|-------|
+| [Dev Commands](dev-commands.md) | OneTool `just` command reference |
+| [Release](release.md) | OneTool release and publishing workflow |
+
+---
+
 ## Quick Reference
 
 | I want to... | See |
@@ -40,6 +51,8 @@ OneTool configuration system.
 | Write a reference doc for my tool | [Tool Reference Documentation](tool-reference-docs.md) |
 | Handle third-party code licenses | [Attribution](attribution.md) |
 | Configure OneTool | [Configuration](onetool-configuration.md) |
+| Run project commands | [Dev Commands](dev-commands.md) |
+| Release OneTool | [Release](release.md) |
 
 ---
 

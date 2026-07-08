@@ -1,6 +1,6 @@
 # Documentation Visual Design
 
-Visual design tokens for OneTool documentation.
+Reusable visual design token checklist for documentation sites, with this repository's current token values filled in as the project profile.
 
 ## Colors
 

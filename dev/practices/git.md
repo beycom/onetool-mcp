@@ -1,6 +1,6 @@
 # Git Workflow
 
-Commit format, branch naming, and merge strategy for OneTool.
+Reusable git workflow for short-lived branches, conventional commits, explicit merge commits, and annotated release tags.
 
 ---
 
@@ -37,6 +37,8 @@ Ref: #123
 ---
 
 ## Scopes
+
+Scopes are project-specific. This repository uses:
 
 **Core**: `config`, `cli`, `serve`, `executor`, `security`, `stats`, `logging`, `prompts`, `registry`, `paths`, `openspec`
 
@@ -120,6 +122,8 @@ Annotated tags (`-a`) with `v` prefix: `v1.0.0`, `v1.0.0rc3`, `v1.0.0b1`
 ---
 
 ## Release Workflow
+
+This is the generic git portion of a release. Project packaging, publishing, and validation steps belong in the project release runbook. For this repository, see [OneTool Release & Publish Guide](../project/guides/release.md).
 
 1. Ensure feature branch is clean (no uncommitted changes)
 2. Merge feature branch to main with `--no-ff`

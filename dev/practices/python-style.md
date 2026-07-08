@@ -1,5 +1,7 @@
 # Python Style
 
+Reusable Python style defaults for this repository family. Treat package names, language preferences, and command links as the local project profile; the type-hinting, docstring, formatting, and deletion rules are intended to transfer across Python projects.
+
 ## Language & Version
 
 - Python 3.12+ required
@@ -43,7 +45,7 @@ def search(*, query: str, count: int = 10) -> dict:
 - **Linter**: Ruff (rules: E, W, F, I, B, C4, UP, ARG, SIM, TCH, PTH, RUF)
 - **Type checker**: mypy (strict mode)
 
-See [Justfile & Dev Commands](justfile.md) for how to run these.
+See the project command reference for how to run these in this repository: [OneTool Dev Commands](../project/guides/dev-commands.md).
 
 ## Package Structure
 

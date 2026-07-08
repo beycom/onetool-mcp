@@ -1,4 +1,4 @@
-# Release & Publish Guide
+# OneTool Release & Publish Guide
 
 Internal guide for publishing new versions of OneTool.
 

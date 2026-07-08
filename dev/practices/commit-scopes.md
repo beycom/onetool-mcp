@@ -1,6 +1,6 @@
 # Conventional Commit Scopes
 
-Quick reference for commit messages in this project.
+Reusable conventional commit pattern plus this repository's current scope profile.
 
 **Format:**
 ```
@@ -14,6 +14,8 @@ Ref: #123
 - NO message body
 
 ## Core Systems
+
+The scope list is project-specific. For another project, keep the message format and decision rules but replace these scopes with that project's architecture.
 
 | Scope | Description | Examples |
 |-------|-------------|----------|

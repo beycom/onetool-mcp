@@ -1,6 +1,6 @@
 # Development Practices
 
-Generic development workflows and standards that could apply to any Python project.
+Reusable development workflows and standards for Python projects using pytest, structured logging, OpenSpec-style specs, and MkDocs-style documentation. Project-specific command and release runbooks live under [OneTool Guides](../project/guides/index.md).
 
 ---
 
@@ -10,8 +10,6 @@ Generic development workflows and standards that could apply to any Python proje
 |-------|-------|
 | [Git Workflow](git.md) | Git branching, commits, merge strategy |
 | [Commit Scopes](commit-scopes.md) | Comprehensive conventional commit scope reference |
-| [Release](release.md) | Release and publishing workflow |
-| [Justfile](justfile.md) | Just command reference |
 | [Spec Writing](spec-writing.md) | OpenSpec quality, scope, and bloat control |
 | [Documentation Writing](docs-writing.md) | MkDocs Material features and best practices |
 | [Documentation Visual Design](docs-visual-design.md) | Design system for documentation site |
@@ -38,16 +36,23 @@ Generic development workflows and standards that could apply to any Python proje
 | Write tests | [Testing](testing.md) |
 | Add logging | [Logging](logging.md) |
 | Follow Python style | [Python Style](python-style.md) |
-| Use just commands | [Justfile](justfile.md) |
 | Write or review specs | [Spec Writing](spec-writing.md) |
-| Release a version | [Release](release.md) |
 | Build a CLI | [CLI Patterns](cli-patterns.md) |
 | Write documentation | [Documentation Writing](docs-writing.md) |
 | Apply docs design system | [Documentation Visual Design](docs-visual-design.md) |
 
 ---
 
-**Note:** These practices use OneTool-specific tools (like LogSpan), but the patterns are generic enough to apply elsewhere.
+## Project Runbooks
+
+| I want to... | See |
+|--------------|-----|
+| Use this repo's `just` commands | [OneTool Dev Commands](../project/guides/dev-commands.md) |
+| Release OneTool | [OneTool Release & Publish Guide](../project/guides/release.md) |
+
+---
+
+**Note:** `LogSpan` and `LogEntry` are treated as reusable structured logging patterns for Python projects. OneTool-specific paths, commands, and product runbooks should live in `dev/project/`.
 
 ---
 

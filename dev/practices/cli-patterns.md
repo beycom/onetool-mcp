@@ -1,6 +1,6 @@
 # CLI Patterns
 
-Patterns used in the `onetool` CLI.
+Reusable CLI patterns for Python projects using Typer and Rich.
 
 ## CLI Overview
 
@@ -8,9 +8,11 @@ Patterns used in the `onetool` CLI.
 |-----|---------|---------|
 | `onetool` | `src/onetool/` | MCP server, setup, configuration |
 
+Treat the table above as the project profile. The patterns below should be reusable across Python CLIs by swapping in the local command name, package path, and shared utility module.
+
 ## Shared Utilities
 
-CLIs use shared utilities from `ot._cli`:
+Use shared CLI utilities for common console setup, app creation, and version handling. In this repository those utilities live in `ot._cli`:
 
 ```python
 from ot._cli import console, create_cli, version_callback
@@ -107,7 +109,7 @@ console.print(table)
 
 ### Documentation Examples
 
-All documentation examples use **long flags** by default (`--config`, `--format`, `--port`).
+Use **long flags** by default in documentation examples (`--config`, `--format`, `--port`).
 Short flags (`-c`, `-f`, `-p`) are only used when an example is specifically demonstrating the
 short form — for instance, in a "Flags" reference table that lists both forms side-by-side.
 

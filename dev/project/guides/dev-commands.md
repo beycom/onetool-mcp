@@ -1,6 +1,6 @@
-# Justfile & Dev Commands
+# OneTool Dev Commands
 
-Use `just` (not `make`) for all project commands. Run `just` with no args to see available commands.
+OneTool uses `just` (not `make`) for project commands. Run `just` with no args to see available commands.
 
 ## Quick Start
 

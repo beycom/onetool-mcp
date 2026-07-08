@@ -87,6 +87,6 @@ Default state directory resolution should use `get_project_state_dir(pack)` beca
 |------|------|
 | `src/ot/config/loader.py` | YAML loading, includes, variable expansion |
 | `src/ot/config/models.py` | OneToolConfig Pydantic model |
-| `src/ot/meta.py` | resolve_ot_path() |
+| `src/ot/meta/_constants.py` | `resolve_ot_path()` |
 | `packages/onetool-pack/src/otpack/state.py` | Project-local pack state helpers |
 | `src/ot/utils/format.py` | Result serialisation |
