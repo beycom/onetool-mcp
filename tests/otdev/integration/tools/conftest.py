@@ -99,26 +99,4 @@ def _connect_proxy_servers():
     thread.join(timeout=5)
 
 
-@pytest.fixture(scope="session", autouse=True)
-def _browser_session():
-    """Close the whiteboard browser after the entire test session."""
-    yield
-    from otdev.tools import excalidraw
-    with contextlib.suppress(Exception):
-        excalidraw.close()
-
-
-@pytest.fixture(autouse=True)
-def _clean_canvas():
-    """Open a fresh whiteboard before each test; clear canvas after."""
-    from otdev.tools import excalidraw
-
-    result = excalidraw.open()
-    if "Error" in result:
-        pytest.fail(f"whiteboard open() failed (playwright not available?): {result}")
-    yield
-    with contextlib.suppress(Exception):
-        excalidraw.clear()
-
-
 __all__ = ["get_test_secret", "require_server"]
