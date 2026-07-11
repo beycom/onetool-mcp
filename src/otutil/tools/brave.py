@@ -41,6 +41,8 @@ from otpack import (
     require_api_key,
     truncate,
     validate_batch_retry_controls,
+    validate_choice,
+    validate_int_range,
 )
 
 
@@ -367,31 +369,22 @@ def _validate_freshness(freshness: str | None) -> str | None:
 
 def _validate_safesearch(safesearch: str, valid_values: frozenset[str]) -> str | None:
     """Validate safesearch value. Returns error string or None if valid."""
-    if safesearch in valid_values:
-        return None
-    return f"Error: Invalid safesearch '{safesearch}'. Use {sorted(valid_values)}"
+    return validate_choice("safesearch", safesearch, valid_values)
 
 
 def _validate_max_results(max_results: int) -> str | None:
     """Validate max_results is in range 1-20. Returns error string or None if valid."""
-    if 1 <= max_results <= 20:
-        return None
-    return f"Error: max_results must be between 1 and 20 (got {max_results})"
-
+    return validate_int_range("max_results", max_results, 1, 20)
 
 
 def _validate_offset(offset: int) -> str | None:
     """Validate offset is in range 0-9. Returns error string or None if valid."""
-    if 0 <= offset <= 9:
-        return None
-    return f"Error: offset must be between 0 and 9 (got {offset})"
+    return validate_int_range("offset", offset, 0, 9)
 
 
 def _validate_output_format(output_format: str) -> str | None:
     """Validate output_format value. Returns error string or None if valid."""
-    if output_format in _OUTPUT_FORMAT_VALUES:
-        return None
-    return f"Error: Invalid output_format '{output_format}'. Use {sorted(_OUTPUT_FORMAT_VALUES)}"
+    return validate_choice("output_format", output_format, _OUTPUT_FORMAT_VALUES)
 
 
 def _validate_country(country: str) -> str | None:

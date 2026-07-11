@@ -44,6 +44,8 @@ from otpack import (
     normalize_items,
     require_api_key,
     validate_batch_retry_controls,
+    validate_choice,
+    validate_int_range,
 )
 
 # Type alias matching ground.py convention
@@ -71,15 +73,6 @@ _EXTRACT_FORMAT_VALUES = frozenset(["markdown", "text"])
 _EXTRACT_DEPTH_VALUES = frozenset(["basic", "advanced"])
 _RESEARCH_MODEL_VALUES = frozenset(["mini", "pro", "auto"])
 _SUPPORTED_EXTRACT_TYPES = frozenset(["string", "number", "boolean"])
-
-# Pre-sorted for error messages
-_SEARCH_DEPTH_LIST = sorted(_SEARCH_DEPTH_VALUES)
-_TOPIC_LIST = sorted(_TOPIC_VALUES)
-_TIME_RANGE_LIST = sorted(_TIME_RANGE_VALUES)
-_OUTPUT_FORMAT_LIST = sorted(_OUTPUT_FORMAT_VALUES)
-_EXTRACT_FORMAT_LIST = sorted(_EXTRACT_FORMAT_VALUES)
-_EXTRACT_DEPTH_LIST = sorted(_EXTRACT_DEPTH_VALUES)
-_RESEARCH_MODEL_LIST = sorted(_RESEARCH_MODEL_VALUES)
 
 
 _get_http_client = lazy_client(
@@ -282,55 +275,32 @@ def _validate_query(query: str) -> str | None:
 
 def _validate_max_results(max_results: int) -> str | None:
     """Validate max_results is in range 1-20. Returns error string or None if valid."""
-    if 1 <= max_results <= 20:
-        return None
-    return f"Error: max_results must be between 1 and 20 (got {max_results})"
+    return validate_int_range("max_results", max_results, 1, 20)
 
 
 def _validate_search_depth(search_depth: str) -> str | None:
     """Validate search_depth value. Returns error string or None if valid."""
-    if search_depth in _SEARCH_DEPTH_VALUES:
-        return None
-    return f"Error: Invalid search_depth '{search_depth}'. Use {_SEARCH_DEPTH_LIST}"
+    return validate_choice("search_depth", search_depth, _SEARCH_DEPTH_VALUES)
 
 
 def _validate_topic(topic: str) -> str | None:
     """Validate topic value. Returns error string or None if valid."""
-    if topic in _TOPIC_VALUES:
-        return None
-    return f"Error: Invalid topic '{topic}'. Use {_TOPIC_LIST}"
+    return validate_choice("topic", topic, _TOPIC_VALUES)
 
 
 def _validate_time_range(time_range: str | None) -> str | None:
     """Validate time_range value. Returns error string or None if valid."""
-    if time_range is None:
-        return None
-    if time_range in _TIME_RANGE_VALUES:
-        return None
-    return f"Error: Invalid time_range '{time_range}'. Use {_TIME_RANGE_LIST}"
+    return validate_choice("time_range", time_range, _TIME_RANGE_VALUES, optional=True)
 
 
 def _validate_days(days: int) -> str | None:
     """Validate days is in range 1-30. Returns error string or None if valid."""
-    if 1 <= days <= 30:
-        return None
-    return f"Error: days must be between 1 and 30 (got {days})"
-
+    return validate_int_range("days", days, 1, 30)
 
 
 def _validate_research_timeout(timeout_seconds: int) -> str | None:
     """Validate Tavily research total timeout guardrail."""
-    if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool):
-        return (
-            "Error: timeout_seconds must be between 10 and 1800 "
-            f"(got {timeout_seconds})"
-        )
-    if 10 <= timeout_seconds <= 1_800:
-        return None
-    return (
-        "Error: timeout_seconds must be between 10 and 1800 "
-        f"(got {timeout_seconds})"
-    )
+    return validate_int_range("timeout_seconds", timeout_seconds, 10, 1800)
 
 
 def _validate_urls(urls: list[str]) -> str | None:
@@ -342,30 +312,22 @@ def _validate_urls(urls: list[str]) -> str | None:
 
 def _validate_output_format(output_format: str) -> str | None:
     """Validate output_format value. Returns error string or None if valid."""
-    if output_format in _OUTPUT_FORMAT_VALUES:
-        return None
-    return f"Error: Invalid output_format '{output_format}'. Use {_OUTPUT_FORMAT_LIST}"
+    return validate_choice("output_format", output_format, _OUTPUT_FORMAT_VALUES)
 
 
 def _validate_extract_format(fmt: str) -> str | None:
     """Validate extract format value. Returns error string or None if valid."""
-    if fmt in _EXTRACT_FORMAT_VALUES:
-        return None
-    return f"Error: Invalid format '{fmt}'. Use {_EXTRACT_FORMAT_LIST}"
+    return validate_choice("format", fmt, _EXTRACT_FORMAT_VALUES)
 
 
 def _validate_extract_depth(extract_depth: str) -> str | None:
     """Validate extract_depth value. Returns error string or None if valid."""
-    if extract_depth in _EXTRACT_DEPTH_VALUES:
-        return None
-    return f"Error: Invalid extract_depth '{extract_depth}'. Use {_EXTRACT_DEPTH_LIST}"
+    return validate_choice("extract_depth", extract_depth, _EXTRACT_DEPTH_VALUES)
 
 
 def _validate_research_model(model: str) -> str | None:
     """Validate research model value. Returns error string or None if valid."""
-    if model in _RESEARCH_MODEL_VALUES:
-        return None
-    return f"Error: Invalid model '{model}'. Use {_RESEARCH_MODEL_LIST}"
+    return validate_choice("model", model, _RESEARCH_MODEL_VALUES)
 
 
 # ---------------------------------------------------------------------------
