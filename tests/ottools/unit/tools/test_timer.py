@@ -36,7 +36,7 @@ def test_pack_name():
 @pytest.mark.unit
 @pytest.mark.tools
 def test_all_exports():
-    assert set(timer.__all__) == {"start", "elapsed", "list", "clear"}
+    assert set(timer.__all__) == {"start", "stop", "elapsed", "list", "clear"}
 
 
 # =============================================================================
@@ -82,8 +82,8 @@ def test_default_name():
 @pytest.mark.tools
 def test_elapsed_unknown_name():
     result = timer.elapsed(name="nonexistent")
-    assert isinstance(result, str)
-    assert "nonexistent" in result
+    assert result["status"] == "not_found"
+    assert "nonexistent" in result["error"]
 
 
 # =============================================================================
@@ -155,7 +155,7 @@ def test_clear_preserves_stored():
 
     # Timer is gone
     result = timer.elapsed(name="a")
-    assert isinstance(result, str)
+    assert result["status"] == "not_found"
 
     # But stored result survives
     stored = timer.list()

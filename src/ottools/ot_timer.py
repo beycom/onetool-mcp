@@ -22,7 +22,7 @@ from otpack import LogSpan
 pack = "ot_timer"
 pack_aliases = ("tmr",)
 
-__all__ = ["clear", "elapsed", "list", "start"]
+__all__ = ["clear", "elapsed", "list", "start", "stop"]
 
 # Module-level state: active timers and stored results
 _timers: dict[str, tuple[float, datetime]] = {}
@@ -50,12 +50,14 @@ def start(*, name: str = "_default") -> dict[str, Any]:
     with LogSpan(span="ot_timer.start", name=name):
         now_perf = perf_counter()
         now_wall = datetime.now(UTC)
+        # Re-insert so a restarted timer takes the newest eviction position
+        _timers.pop(name, None)
         _timers[name] = (now_perf, now_wall)
         _evict_oldest(_timers, _MAX_TIMERS)
         return {"status": "started", "name": name, "started_at": now_wall.isoformat()}
 
 
-def elapsed(*, name: str = "_default", store_as: str | None = None) -> dict[str, Any] | str:
+def elapsed(*, name: str = "_default", store_as: str | None = None) -> dict[str, Any]:
     """Get elapsed time for a named timer.
 
     The timer keeps running after this call (lap behaviour).
@@ -65,11 +67,14 @@ def elapsed(*, name: str = "_default", store_as: str | None = None) -> dict[str,
         store_as: If provided, store the result under this key for later retrieval via list().
 
     Returns:
-        Dict with elapsed seconds and formatted duration, or error string if timer not found.
+        Dict with elapsed seconds and formatted duration, or an error dict if timer not found.
     """
     with LogSpan(span="ot_timer.elapsed", name=name):
         if name not in _timers:
-            return f"No timer named '{name}' is running. Call ot_timer.start(name='{name}') first."
+            return {
+                "error": f"No timer named '{name}' is running. Call ot_timer.start(name='{name}') first.",
+                "status": "not_found",
+            }
 
         start_perf, start_wall = _timers[name]
         elapsed_secs = perf_counter() - start_perf
@@ -84,6 +89,24 @@ def elapsed(*, name: str = "_default", store_as: str | None = None) -> dict[str,
             _results[store_as] = result
             _evict_oldest(_results, _MAX_RESULTS)
 
+        return result
+
+
+def stop(*, name: str = "_default", store_as: str | None = None) -> dict[str, Any]:
+    """Stop and remove a named timer, returning its final elapsed time.
+
+    Args:
+        name: Timer name to stop. Defaults to "_default".
+        store_as: If provided, store the result under this key for later retrieval via list().
+
+    Returns:
+        Dict with final elapsed seconds, or an error dict if timer not found.
+    """
+    with LogSpan(span="ot_timer.stop", name=name):
+        result = elapsed(name=name, store_as=store_as)
+        if "error" not in result:
+            del _timers[name]
+            result = {**result, "status": "stopped"}
         return result
 
 
