@@ -21,6 +21,7 @@ __ot_requires__ = {
 }
 
 import contextlib
+import re
 import shutil
 import subprocess
 from typing import TYPE_CHECKING
@@ -275,7 +276,7 @@ def search(
         if context > 0 and before_context == 0 and after_context == 0:
             args.extend(["--context", str(context)])
 
-        if max_per_file:
+        if max_per_file is not None:
             args.extend(["--max-count", str(max_per_file)])
 
         if word_match:
@@ -320,15 +321,28 @@ def search(
         # Convert to relative paths if configured
         result = _to_relative_output(output.strip(), search_path)
 
-        # Apply total limit if specified (post-process)
+        # Apply total limit if specified (post-process). Only match lines
+        # count toward the limit — context lines and "--" separators do not.
         lines = result.split("\n")
-        if limit and len(lines) > limit:
-            result = "\n".join(lines[:limit])
-            result += f"\n... ({len(lines) - limit} more matches truncated)"
+        if filenames_only:
+            is_match = [bool(ln) for ln in lines]
+        else:
+            match_re = re.compile(r".*?:\d+:")
+            is_match = [bool(match_re.match(ln)) for ln in lines]
+        total_matches = sum(is_match)
+        if limit and total_matches > limit:
+            kept: list[str] = []
+            seen = 0
+            for ln, m in zip(lines, is_match, strict=True):
+                if m:
+                    if seen == limit:
+                        break
+                    seen += 1
+                kept.append(ln)
+            result = "\n".join(kept)
+            result += f"\n... ({total_matches - limit} more matches truncated)"
 
-        # Count matches
-        match_count = min(len(lines), limit) if limit else len(lines)
-        s.add("matchCount", match_count)
+        s.add("matchCount", min(total_matches, limit) if limit else total_matches)
 
         return result
 
