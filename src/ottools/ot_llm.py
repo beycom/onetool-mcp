@@ -12,8 +12,8 @@ Supports OpenAI API and OpenRouter (OpenAI-compatible).
 
 **Requires configuration:**
 - OPENAI_API_KEY in secrets.yaml
-- ot_llm.base_url in onetool.yaml (e.g., https://openrouter.ai/api/v1)
-- ot_llm.model in onetool.yaml (e.g., openai/gpt-5-mini)
+- tools.ot_llm.base_url in onetool.yaml (e.g., https://openrouter.ai/api/v1)
+- tools.ot_llm.model in onetool.yaml (e.g., openai/gpt-5-mini)
 
 Tool is not available until all three are configured.
 """
@@ -26,11 +26,6 @@ pack_aliases = ("llm",)
 
 __all__ = ["transform", "transform_file"]
 
-
-def register_services(registry: object) -> None:
-    """Register ot_llm as the default LLM transform service."""
-    registry.register_llm(transform)  # type: ignore[attr-defined]
-
 # Dependency declarations for CLI validation
 __ot_requires__ = {
     "lib": [("openai", "pip install openai")],
@@ -42,11 +37,17 @@ from typing import Any
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
+from otpack import LogSpan, get_secret, get_tool_config, resolve_cwd_path
+
 # Cache clients by (api_key, base_url, timeout) to avoid creating a new
-# connection pool on every transform() call.
+# connection pool on every transform() call. Bounded: oldest entry evicted.
+_CLIENT_CACHE_MAX = 8
 _client_cache: dict[tuple[str, str, int], OpenAI] = {}
 
-from otpack import LogSpan, get_secret, get_tool_config, resolve_cwd_path
+
+def register_services(registry: object) -> None:
+    """Register ot_llm as the default LLM transform service."""
+    registry.register_llm(transform)  # type: ignore[attr-defined]
 
 
 class Config(BaseModel):
@@ -139,16 +140,28 @@ def transform(
             json_mode=True
         )
     """
+    _ok, text = _transform_impl(data=data, prompt=prompt, model=model, json_mode=json_mode)
+    return text
+
+
+def _transform_impl(
+    *,
+    data: Any,
+    prompt: str,
+    model: str | None = None,
+    json_mode: bool = False,
+) -> tuple[bool, str]:
+    """Core transform returning (ok, text) so callers can detect errors structurally."""
     with LogSpan(span="ot_llm.transform", promptLen=len(prompt)) as s:
         # Validate inputs
         if not prompt or not prompt.strip():
             s.add(error="empty_prompt")
-            return "Error: prompt is required and cannot be empty"
+            return False, "Error: prompt is required and cannot be empty"
 
         data_str = str(data)
         if not data_str.strip():
             s.add(error="empty_data")
-            return "Error: data is required and cannot be empty"
+            return False, "Error: data is required and cannot be empty"
 
         s.add(dataLen=len(data_str))
 
@@ -158,7 +171,7 @@ def transform(
         # Check if transform tool is configured
         if not api_key:
             s.add(error="not_configured")
-            return (
+            return False, (
                 "Error: Transform tool not available. "
                 "Set OPENAI_API_KEY in secrets.yaml. "
                 "See: https://onetool.beycom.online/reference/tools/ot_llm/"
@@ -166,18 +179,31 @@ def transform(
 
         if not base_url:
             s.add(error="no_base_url")
-            return (
+            return False, (
                 "Error: Transform tool not available. "
                 "Set tools.ot_llm.base_url in onetool.yaml "
                 "(e.g. https://openrouter.ai/api/v1). "
                 "See: https://onetool.beycom.online/reference/tools/ot_llm/"
             )
 
+        used_model = model or default_model
+        if not used_model:
+            s.add(error="no_model")
+            return False, (
+                "Error: Transform tool not available. "
+                "Set tools.ot_llm.model in onetool.yaml "
+                "(e.g. openai/gpt-4o-mini). "
+                "See: https://onetool.beycom.online/reference/tools/ot_llm/"
+            )
+
         # Get or create cached client (avoids new connection pool per call)
         cache_key = (api_key, base_url, config.timeout)
-        if cache_key not in _client_cache:
-            _client_cache[cache_key] = OpenAI(api_key=api_key, base_url=base_url, timeout=config.timeout)
-        client = _client_cache[cache_key]
+        client = _client_cache.get(cache_key)
+        if client is None:
+            if len(_client_cache) >= _CLIENT_CACHE_MAX:
+                _client_cache.pop(next(iter(_client_cache)))
+            client = OpenAI(api_key=api_key, base_url=base_url, timeout=config.timeout)
+            _client_cache[cache_key] = client
 
         # Build the message
         user_message = f"""Data:
@@ -185,16 +211,6 @@ def transform(
 
 Instructions:
 {prompt}"""
-
-        used_model = model or default_model
-        if not used_model:
-            s.add(error="no_model")
-            return (
-                "Error: Transform tool not available. "
-                "Set tools.ot_llm.model in onetool.yaml "
-                "(e.g. openai/gpt-4o-mini). "
-                "See: https://onetool.beycom.online/reference/tools/ot_llm/"
-            )
 
         s.add(model=used_model, jsonMode=json_mode)
 
@@ -238,14 +254,14 @@ Instructions:
                     totalTokens=response.usage.total_tokens,
                 )
 
-            return result
+            return True, result
         except Exception as e:
             error_msg = str(e)
             # Sanitize sensitive info from error messages
             if "api_key" in error_msg.lower() or "sk-" in error_msg:
                 error_msg = "Authentication error - check OPENAI_API_KEY in secrets.yaml"
             s.add(error=error_msg)
-            return f"Error: {error_msg}"
+            return False, f"Error: {error_msg}"
 
 
 def transform_file(
@@ -326,15 +342,15 @@ def transform_file(
         s.add(inLen=len(in_content))
 
         # Transform the content
-        result = transform(
+        ok, result = _transform_impl(
             data=in_content,
             prompt=prompt,
             model=model,
             json_mode=json_mode,
         )
 
-        # Check if transform returned an error
-        if result.startswith("Error:"):
+        # Structural error check — legitimate output starting "Error:" passes through
+        if not ok:
             s.add(error="transform_failed")
             return result
 

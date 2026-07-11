@@ -664,7 +664,7 @@ class TestTransformFileValidation:
 class TestTransformFile:
     """Test transform_file function with mocked transform."""
 
-    @patch("ottools.ot_llm.transform")
+    @patch("ottools.ot_llm._transform_impl")
     def test_successful_transform_file(self, mock_transform, mock_cwd_path):
         from ottools.ot_llm import transform_file
 
@@ -672,7 +672,7 @@ class TestTransformFile:
         input_file.write_text("original content")
         output_file = mock_cwd_path / "output.txt"
 
-        mock_transform.return_value = "transformed content"
+        mock_transform.return_value = (True, "transformed content")
 
         result = transform_file(
             prompt="transform this", in_file="input.txt", out_file="output.txt"
@@ -690,14 +690,14 @@ class TestTransformFile:
             json_mode=False,
         )
 
-    @patch("ottools.ot_llm.transform")
+    @patch("ottools.ot_llm._transform_impl")
     def test_passes_model_parameter(self, mock_transform, mock_cwd_path):
         from ottools.ot_llm import transform_file
 
         input_file = mock_cwd_path / "input.txt"
         input_file.write_text("content")
 
-        mock_transform.return_value = "result"
+        mock_transform.return_value = (True, "result")
 
         transform_file(
             prompt="transform",
@@ -713,14 +713,14 @@ class TestTransformFile:
             json_mode=False,
         )
 
-    @patch("ottools.ot_llm.transform")
+    @patch("ottools.ot_llm._transform_impl")
     def test_passes_json_mode(self, mock_transform, mock_cwd_path):
         from ottools.ot_llm import transform_file
 
         input_file = mock_cwd_path / "input.txt"
         input_file.write_text("content")
 
-        mock_transform.return_value = '{"key": "value"}'
+        mock_transform.return_value = (True, '{"key": "value"}')
 
         transform_file(
             prompt="to json",
@@ -736,7 +736,7 @@ class TestTransformFile:
             json_mode=True,
         )
 
-    @patch("ottools.ot_llm.transform")
+    @patch("ottools.ot_llm._transform_impl")
     def test_transform_error_propagates(self, mock_transform, mock_cwd_path):
         from ottools.ot_llm import transform_file
 
@@ -744,7 +744,7 @@ class TestTransformFile:
         input_file.write_text("content")
         output_file = mock_cwd_path / "output.txt"
 
-        mock_transform.return_value = "Error: API rate limit exceeded"
+        mock_transform.return_value = (False, "Error: API rate limit exceeded")
 
         result = transform_file(
             prompt="transform", in_file="input.txt", out_file="output.txt"
@@ -754,7 +754,7 @@ class TestTransformFile:
         assert "rate limit" in result
         assert not output_file.exists()
 
-    @patch("ottools.ot_llm.transform")
+    @patch("ottools.ot_llm._transform_impl")
     def test_creates_parent_directories(self, mock_transform, mock_cwd_path):
         from ottools.ot_llm import transform_file
 
@@ -762,7 +762,7 @@ class TestTransformFile:
         input_file.write_text("content")
         output_file = mock_cwd_path / "subdir" / "nested" / "output.txt"
 
-        mock_transform.return_value = "result"
+        mock_transform.return_value = (True, "result")
 
         result = transform_file(
             prompt="transform",
@@ -774,14 +774,14 @@ class TestTransformFile:
         assert output_file.exists()
         assert output_file.read_text() == "result"
 
-    @patch("ottools.ot_llm.transform")
+    @patch("ottools.ot_llm._transform_impl")
     def test_reports_bytes_written(self, mock_transform, mock_cwd_path):
         from ottools.ot_llm import transform_file
 
         input_file = mock_cwd_path / "input.txt"
         input_file.write_text("content")
 
-        mock_transform.return_value = "result data"  # 11 bytes
+        mock_transform.return_value = (True, "result data")  # 11 bytes
 
         result = transform_file(
             prompt="transform", in_file="input.txt", out_file="output.txt"
