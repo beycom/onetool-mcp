@@ -96,7 +96,7 @@ def _get_embedding_model(config: Any) -> str:
     """Resolve the embedding model, falling back to top-level llm config."""
     if config.model:
         return cast("str", config.model)
-    return cast("str", get_llm_config().embedding_model or config.model)
+    return cast("str", get_llm_config().embedding_model or "text-embedding-3-small")
 
 
 def _generate_embedding(text: str) -> list[float]:
