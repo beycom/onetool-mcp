@@ -122,6 +122,9 @@ from otpack import LogSpan, resolve_cwd_path
 _SAFE_ID_FRAGMENT_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 _UNSAFE_PATH_CHARS_RE = re.compile(r"[;\|&`$<>\r\n]")
 _MAX_RENDER_WORKERS = 6
+# Per-render subprocess timeout: a hung engine must not block the tool call
+# (or the render ThreadPool) indefinitely.
+_RENDER_TIMEOUT_SECONDS = 60
 
 
 @dataclass(slots=True)
@@ -503,7 +506,22 @@ def _execute_render_engine(
             capture_output=True,
             text=True,
             cwd=render_context["paths"]["work_dir"],
+            timeout=_RENDER_TIMEOUT_SECONDS,
         )
+    except subprocess.TimeoutExpired:
+        return False, {
+            "code": "engine_command_timeout",
+            "message": (
+                f"Render engine command timed out after {_RENDER_TIMEOUT_SECONDS}s "
+                f"for target '{target_config.target}'."
+            ),
+            "details": {
+                "target": target_config.target,
+                "engine": target_config.engine_name,
+                "command": " ".join(shlex.quote(part) for part in argv),
+                "timeout_seconds": _RENDER_TIMEOUT_SECONDS,
+            },
+        }
     except FileNotFoundError as exc:
         command_name = argv[0]
         if command_name == "d2":
@@ -1240,11 +1258,11 @@ def generate(
             )
             if not solution_result["ok"]:
                 return solution_result
-            files: dict[str, list[str]] = {"solution": solution_result["files"]}
+            solution_files: list[str] = solution_result["files"]
 
             summary = {
                 "formats": ["solution"],
-                "generated_files": sum(len(paths) for paths in files.values()),
+                "generated_files": len(solution_files),
                 "counts": validation["summary"]["counts"],
                 "diagram_rows": len(filtered.get("diagram", [])),
                 "model_version": MODEL_VERSION,
@@ -1263,7 +1281,7 @@ def generate(
                     "include_tags": include_tags or [],
                     "exclude_tags": exclude_tags or [],
                 },
-                "files": files,
+                "files": {"solution": solution_files},
                 "model": {"version": MODEL_VERSION},
                 "summary": summary,
             }
@@ -1334,6 +1352,14 @@ def export_yaml(*, input_path: str, output_path: str) -> dict[str, Any]:
                 message=str(exc),
                 details={"input_path": input_path, "output_path": output_path},
             )
+        except Exception as exc:  # pragma: no cover - defensive
+            span.add(error=str(exc))
+            return _error_payload(
+                operation="export_yaml",
+                code="unexpected_error",
+                message=str(exc),
+                details={"traceback": traceback.format_exc(limit=5)},
+            )
 
 
 def import_yaml(*, input_path: str, template_path: str, output_path: str) -> dict[str, Any]:
@@ -1391,6 +1417,14 @@ def import_yaml(*, input_path: str, template_path: str, output_path: str) -> dic
                     "output_path": output_path,
                 },
             )
+        except Exception as exc:  # pragma: no cover - defensive
+            span.add(error=str(exc))
+            return _error_payload(
+                operation="import_yaml",
+                code="unexpected_error",
+                message=str(exc),
+                details={"traceback": traceback.format_exc(limit=5)},
+            )
 
 
 def bundle_solution(
@@ -1422,11 +1456,19 @@ def bundle_solution(
                 "operation": "bundle_solution",
                 **result,
             }
-        except BundleError as exc:
+        except (BundleError, MissingDependencyError) as exc:
             span.add(error=str(exc))
             return _error_payload(
                 operation="bundle_solution",
                 code="bundle_error",
                 message=str(exc),
                 details={"directory": directory, "output_path": output_path, "include": include},
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            span.add(error=str(exc))
+            return _error_payload(
+                operation="bundle_solution",
+                code="unexpected_error",
+                message=str(exc),
+                details={"traceback": traceback.format_exc(limit=5)},
             )

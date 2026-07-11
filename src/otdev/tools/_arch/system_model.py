@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import markdown as md  # type: ignore[import-untyped]
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, TemplateError
 from markupsafe import escape
 
@@ -25,6 +24,7 @@ from .models import (
     STD_PROJECT_SCOPE_KEYS,
     STD_SYS_KEYS,
     SYS_REF_KEYS,
+    MissingDependencyError,
     first_value,
     option_as_bool,
     tags_for_row,
@@ -82,7 +82,22 @@ COMPONENT_CLASS_MAP = {
 }
 _COMPONENT_CLASSES = set(COMPONENT_CLASS_MAP.values())
 
-_md_converter = md.Markdown(extensions=["nl2br"])
+_md_converter: Any | None = None
+
+
+def _get_md_converter() -> Any:
+    """Import markdown lazily and return a shared converter, raising
+    MissingDependencyError when the optional dependency is absent."""
+    global _md_converter
+    if _md_converter is None:
+        try:
+            import markdown as md  # type: ignore[import-untyped]
+        except ImportError as exc:  # pragma: no cover - import guard
+            raise MissingDependencyError(
+                "markdown is required for arch pack. Install with: pip install onetool-mcp[dev]"
+            ) from exc
+        _md_converter = md.Markdown(extensions=["nl2br"])
+    return _md_converter
 
 
 @dataclass(slots=True)
@@ -112,10 +127,11 @@ def render_markdown(value: Any) -> str:
     text = str(value)
     if not text.strip():
         return ""
-    _md_converter.reset()
+    converter = _get_md_converter()
+    converter.reset()
     # Escape first: python-markdown passes raw inline HTML through, and the
     # output lands in formatter:'html' table cells (XSS via workbook cells).
-    rendered: str = _md_converter.convert(str(escape(text)))
+    rendered: str = converter.convert(str(escape(text)))
     return rendered
 
 

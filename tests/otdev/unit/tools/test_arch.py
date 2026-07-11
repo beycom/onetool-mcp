@@ -553,6 +553,38 @@ class TestGenerate:
         assert result["error"]["code"] == "engine_command_not_found"
         assert "Install D2 CLI: https://github.com/terrastruct/d2" in result["error"]["message"]
 
+    def test_generate_returns_timeout_error_when_engine_hangs(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import subprocess
+
+        from otdev.tools import arch
+
+        seen_timeouts: list[object] = []
+
+        def _raise_timeout(*args: object, **kwargs: object) -> object:
+            _ = args
+            seen_timeouts.append(kwargs.get("timeout"))
+            raise subprocess.TimeoutExpired(cmd="d2", timeout=kwargs.get("timeout") or 0)
+
+        monkeypatch.setattr(arch.subprocess, "run", _raise_timeout)
+
+        result = arch.generate(
+            input_path=str(_FIXTURES / "architecture.xlsx"),
+            output_dir=str(tmp_path),
+        )
+
+        assert result["ok"] is False
+        assert result["operation"] == "generate"
+        assert result["error"]["code"] == "engine_command_timeout"
+        assert f"timed out after {arch._RENDER_TIMEOUT_SECONDS}s" in result["error"]["message"]
+        assert result["error"]["details"]["timeout_seconds"] == arch._RENDER_TIMEOUT_SECONDS
+        assert seen_timeouts and all(
+            value == arch._RENDER_TIMEOUT_SECONDS for value in seen_timeouts
+        )
+
     def test_generate_uses_profile_yaml_as_the_run_profile(
         self,
         tmp_path: Path,
@@ -2223,6 +2255,106 @@ class TestStructuredErrors:
         assert result["ok"] is False
         assert result["operation"] == "bundle_solution"
         assert set(result["error"]) == {"code", "message", "details"}
+
+    def test_export_yaml_wraps_unexpected_exception(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from otdev.tools import arch
+
+        def _boom(**kwargs: object) -> object:
+            _ = kwargs
+            raise RuntimeError("export boom")
+
+        monkeypatch.setattr(arch, "ingest_input", _boom)
+
+        result = arch.export_yaml(
+            input_path=str(_FIXTURES / "architecture.xlsx"),
+            output_path=str(tmp_path / "out.yaml"),
+        )
+
+        assert result["ok"] is False
+        assert result["operation"] == "export_yaml"
+        assert result["error"]["code"] == "unexpected_error"
+        assert "export boom" in result["error"]["message"]
+        assert "traceback" in result["error"]["details"]
+
+    def test_import_yaml_wraps_unexpected_exception(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from otdev.tools import arch
+
+        def _boom(**kwargs: object) -> object:
+            _ = kwargs
+            raise RuntimeError("import boom")
+
+        monkeypatch.setattr(arch, "load_yaml_entities", _boom)
+
+        result = arch.import_yaml(
+            input_path=str(tmp_path / "in.yaml"),
+            template_path=str(tmp_path / "template.xlsx"),
+            output_path=str(tmp_path / "out.xlsx"),
+        )
+
+        assert result["ok"] is False
+        assert result["operation"] == "import_yaml"
+        assert result["error"]["code"] == "unexpected_error"
+        assert "import boom" in result["error"]["message"]
+        assert "traceback" in result["error"]["details"]
+
+    def test_bundle_solution_wraps_unexpected_exception(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from otdev.tools import arch
+
+        def _boom(**kwargs: object) -> object:
+            _ = kwargs
+            raise RuntimeError("bundle boom")
+
+        monkeypatch.setattr(arch, "bundle_solution_directory", _boom)
+
+        result = arch.bundle_solution(directory=str(tmp_path))
+
+        assert result["ok"] is False
+        assert result["operation"] == "bundle_solution"
+        assert result["error"]["code"] == "unexpected_error"
+        assert "bundle boom" in result["error"]["message"]
+        assert "traceback" in result["error"]["details"]
+
+    def test_bundle_solution_reports_missing_beautifulsoup(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import sys
+
+        from otdev.tools import arch
+
+        solution_dir = tmp_path / "solution"
+        solution_dir.mkdir()
+        (solution_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+        # None in sys.modules makes `from bs4 import ...` raise ImportError.
+        monkeypatch.setitem(sys.modules, "bs4", None)
+
+        result = arch.bundle_solution(directory=str(solution_dir))
+
+        assert result["ok"] is False
+        assert result["operation"] == "bundle_solution"
+        assert result["error"]["code"] == "bundle_error"
+        assert "beautifulsoup4 is required" in result["error"]["message"]
+        assert "onetool-mcp[dev]" in result["error"]["message"]
+
+    def test_render_markdown_reports_missing_markdown(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import sys
+
+        from otdev.tools._arch import system_model
+        from otdev.tools._arch.models import MissingDependencyError
+
+        monkeypatch.setattr(system_model, "_md_converter", None)
+        # None in sys.modules makes `import markdown` raise ImportError.
+        monkeypatch.setitem(sys.modules, "markdown", None)
+
+        with pytest.raises(MissingDependencyError, match="onetool-mcp\\[dev\\]"):
+            system_model.render_markdown("**bold**")
 
 
 class TestRenderingPolish:

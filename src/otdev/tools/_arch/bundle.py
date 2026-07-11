@@ -6,13 +6,25 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
-from bs4 import BeautifulSoup
-
 from otpack import resolve_cwd_path
+
+from .models import MissingDependencyError
 
 
 class BundleError(ValueError):
     """Raised for bundle workflow errors."""
+
+
+def _ensure_beautifulsoup() -> Any:
+    """Import and return BeautifulSoup, raising MissingDependencyError when absent."""
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError as exc:  # pragma: no cover - import guard
+        raise MissingDependencyError(
+            "beautifulsoup4 is required for arch bundling. "
+            "Install with: pip install onetool-mcp[dev]"
+        ) from exc
+    return BeautifulSoup
 
 
 def _discover_additional_files(path_expr: str) -> list[Path]:
@@ -49,7 +61,8 @@ def _load_svg_element(*, html_path: Path, rel_src: str) -> Any | None:
     svg_path = (html_path.parent / rel_src).resolve()
     if not svg_path.exists():
         return None
-    svg_soup = BeautifulSoup(svg_path.read_text(encoding="utf-8"), "lxml-xml")
+    soup_cls = _ensure_beautifulsoup()
+    svg_soup = soup_cls(svg_path.read_text(encoding="utf-8"), "lxml-xml")
     svg_elem = svg_soup.find("svg")
     if not svg_elem:
         return None
@@ -61,7 +74,8 @@ def _load_svg_element(*, html_path: Path, rel_src: str) -> Any | None:
 def _inline_html_svgs(*, html_path: Path) -> int:
     """Inline local `<img src=...svg>` references into HTML."""
     content = html_path.read_text(encoding="utf-8")
-    soup = BeautifulSoup(content, "html.parser")
+    soup_cls = _ensure_beautifulsoup()
+    soup = soup_cls(content, "html.parser")
     replaced = 0
 
     for img in soup.find_all("img", src=True):

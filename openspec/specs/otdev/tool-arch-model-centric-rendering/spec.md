@@ -264,3 +264,8 @@ The `arch` tool SHALL return explicit execution diagnostics when delegated engin
 #### Scenario: Engine command failure
 - **WHEN** engine command execution exits non-zero
 - **THEN** the result SHALL include exit diagnostics with stderr/stdout context in structured error details
+
+#### Scenario: Engine command timeout
+- **WHEN** engine command execution exceeds the render timeout
+- **THEN** the command SHALL be terminated instead of blocking the tool call indefinitely
+- **AND** the result SHALL include a timeout error code with the timeout duration in structured error details
