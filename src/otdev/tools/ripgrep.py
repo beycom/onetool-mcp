@@ -31,7 +31,14 @@ from pydantic import BaseModel, Field
 if TYPE_CHECKING:
     from pathlib import Path
 
-from otpack import LogSpan, get_install_hint, get_tool_config, resolve_cwd_path
+from otpack import (
+    LogSpan,
+    get_install_hint,
+    get_tool_config,
+    resolve_cwd_path,
+    truncate,
+    validate_choice,
+)
 
 
 class Config(BaseModel):
@@ -46,6 +53,11 @@ class Config(BaseModel):
     relative_paths: bool = Field(
         default=True,
         description="Output relative paths instead of absolute paths",
+    )
+    max_output_chars: int = Field(
+        default=100_000,
+        ge=1_000,
+        description="Truncate search output beyond this many characters",
     )
 
 
@@ -84,15 +96,14 @@ def _to_relative_output(output: str, base_path: Path) -> str:
         return output
 
     base_str = str(base_path)
-    lines = []
-    for line in output.split("\n"):
-        if line.startswith(base_str):
-            # Convert absolute path to relative
-            rel_line = line[len(base_str) :].lstrip("/\\")
-            lines.append(rel_line)
-        else:
-            lines.append(line)
-    return "\n".join(lines)
+    # Only rewrite lines that are structurally rg path lines: an absolute path
+    # under base followed by :NN: / -NN- (match/context lines), or a bare file
+    # path (files mode). Content lines that merely start with the base path
+    # are left alone.
+    line_re = re.compile(
+        rf"^{re.escape(base_str)}[/\\](?=(?:[^:\n]*[:-]\d+[:-])|[^:\n]*$)"
+    )
+    return "\n".join(line_re.sub("", line) for line in output.split("\n"))
 
 
 def _check_rg_installed() -> str | None:
@@ -344,6 +355,12 @@ def search(
 
         s.add("matchCount", min(total_matches, limit) if limit else total_matches)
 
+        # Default output cap so broad patterns don't flood an LLM context
+        max_chars = get_tool_config("ripgrep", Config).max_output_chars
+        if len(result) > max_chars:
+            result = truncate(result, max_chars, indicator="\n... (output truncated; narrow the pattern or set tools.ripgrep.max_output_chars)")
+            s.add("truncated", True)
+
         return result
 
 
@@ -515,6 +532,9 @@ def files(
             args.append("--no-ignore")
 
         if sort:
+            if error := validate_choice("sort", sort, ("path", "modified", "accessed", "created")):
+                s.add("error", "invalid_sort")
+                return error
             args.extend(["--sort", sort])
 
         args.append(str(search_path))
