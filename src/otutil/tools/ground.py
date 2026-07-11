@@ -527,6 +527,7 @@ def dev(
     timeout: float | None = None,
     max_sources: int | None = None,
     output_format: OutputFormat = "full",
+    model: str | None = None,
 ) -> str:
     """Search for developer resources and documentation.
 
@@ -576,6 +577,7 @@ def dev(
     return cast("str", _grounded_search(
         prompt,
         span_name="ground.dev",
+        model=model,
         timeout=timeout,
         output_format=output_format,
         max_sources=max_sources,
@@ -592,6 +594,7 @@ def docs(
     timeout: float | None = None,
     max_sources: int | None = None,
     output_format: OutputFormat = "full",
+    model: str | None = None,
 ) -> str:
     """Search for official documentation.
 
@@ -637,6 +640,7 @@ def docs(
     return cast("str", _grounded_search(
         prompt,
         span_name="ground.docs",
+        model=model,
         timeout=timeout,
         output_format=output_format,
         max_sources=max_sources,
@@ -652,6 +656,7 @@ def reddit(
     timeout: float | None = None,
     max_sources: int | None = None,
     output_format: OutputFormat = "full",
+    model: str | None = None,
 ) -> str:
     """Search Reddit discussions.
 
@@ -700,6 +705,7 @@ def reddit(
     return cast("str", _grounded_search(
         prompt,
         span_name="ground.reddit",
+        model=model,
         timeout=timeout,
         output_format=output_format,
         max_sources=max_sources,
