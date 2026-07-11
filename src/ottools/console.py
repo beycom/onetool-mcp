@@ -420,7 +420,7 @@ def _infer_path_kind(target: Path) -> ConsoleKind:
 
 
 def _value_digest(content: Any, *, kind: str) -> str:
-    if kind == "table" and isinstance(content, List):
+    if kind == "table" and isinstance(content, List) and content and isinstance(content[0], dict):
         columns = [str(key) for key in content[0]][:5]
         top = ", ".join(
             f'"{_clip(_title_value(item), 40)}"' for item in content[:2]
@@ -438,6 +438,8 @@ def _value_digest(content: Any, *, kind: str) -> str:
 
 
 def _title_value(item: dict[str, Any]) -> str:
+    if not isinstance(item, dict):
+        return str(item)
     for key in ("title", "name", "id"):
         value = item.get(key)
         if isinstance(value, str) and value:
