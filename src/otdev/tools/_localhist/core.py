@@ -626,6 +626,85 @@ def list_history(
         return _error(exc)
 
 
+def prune_history(*, older_than_days: int = 30, gc: bool = True, dry_run: bool = True) -> dict[str, object]:
+    """Drop snapshots older than the cutoff by rewriting the linear history.
+
+    Pre-cutoff snapshots are squashed into a single baseline commit holding the
+    newest pre-cutoff tree; newer snapshots are replayed on top with their
+    original messages and dates. Finishes with reflog expiry (and ``git gc``
+    unless ``gc=False``) so pruned objects are actually reclaimed.
+    """
+
+    try:
+        if older_than_days < 1:
+            return {"ok": False, "error": "older_than_days must be >= 1"}
+        config = load_config()
+        paths = resolve_paths(config)
+        if not (paths.git_dir / "HEAD").exists():
+            return {"ok": True, "initialized": False, "dropped": 0}
+        git = GitRunner(paths)
+        if not git.has_commits():
+            return {"ok": True, "initialized": True, "dropped": 0}
+
+        import time as _time
+
+        cutoff = int(_time.time()) - older_than_days * 86400
+        output = git.run("log", "--reverse", "--format=%H %ct")
+        commits = [
+            (parts[0], int(parts[1]))
+            for line in output.splitlines()
+            if line.strip() and (parts := line.split())
+        ]
+        old = [c for c in commits if c[1] < cutoff]
+        keep = [c for c in commits if c[1] >= cutoff]
+
+        # The newest pre-cutoff snapshot survives as the squashed baseline, so
+        # only the commits strictly before it are actually dropped.
+        dropped = max(0, len(old) - 1)
+        if dropped == 0:
+            return {"ok": True, "dropped": 0, "kept": len(commits)}
+        if dry_run:
+            return {"ok": True, "dry_run": True, "would_drop": dropped, "kept": len(keep) + 1}
+
+        boundary_sha = old[-1][0]
+        branch_ref = git.run("rev-parse", "--symbolic-full-name", "HEAD").strip()
+        boundary_tree = git.run("rev-parse", f"{boundary_sha}^{{tree}}").strip()
+        boundary_date = git.run("log", "-1", "--format=%cI", boundary_sha).strip()
+        new_tip = git.run(
+            "commit-tree",
+            boundary_tree,
+            "-m",
+            f"localhist baseline (pruned {dropped} snapshot(s) older than {older_than_days}d)",
+            extra_env={"GIT_AUTHOR_DATE": boundary_date, "GIT_COMMITTER_DATE": boundary_date},
+        ).strip()
+        for sha, _ts in keep:
+            tree = git.run("rev-parse", f"{sha}^{{tree}}").strip()
+            message = git.run("log", "-1", "--format=%B", sha)
+            author_date = git.run("log", "-1", "--format=%aI", sha).strip()
+            committer_date = git.run("log", "-1", "--format=%cI", sha).strip()
+            new_tip = git.run(
+                "commit-tree",
+                tree,
+                "-p",
+                new_tip,
+                "-m",
+                message,
+                extra_env={
+                    "GIT_AUTHOR_DATE": author_date,
+                    "GIT_COMMITTER_DATE": committer_date,
+                },
+            ).strip()
+
+        git.run("update-ref", branch_ref, new_tip)
+        git.run("reflog", "expire", "--expire=now", "--all")
+        if gc:
+            git.run("gc", "--prune=now", "--quiet")
+
+        return {"ok": True, "dropped": dropped, "kept": len(keep) + 1, "gc": gc}
+    except Exception as exc:
+        return _error(exc)
+
+
 def _validate_ref(git: GitRunner, ref: str) -> str | None:
     if not git.ref_exists(ref):
         return f"ref not found: {ref}"

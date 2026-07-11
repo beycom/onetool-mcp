@@ -16,6 +16,7 @@ __all__ = [
     "info",
     "init",
     "log",
+    "prune",
     "restore",
     "save",
     "show",
@@ -40,6 +41,7 @@ from otdev.tools._localhist.core import (
     init_repository,
     list_history,
     list_log,
+    prune_history,
     restore_paths,
     save_snapshot,
     show_file,
@@ -300,6 +302,32 @@ def show(
     with LogSpan(span="localhist.show", ref=ref, path=path) as span:
         result = show_file(ref=ref, path=path, offset=offset, limit=limit, tail=tail)
         span.add(ok=result.get("ok"))
+        return result
+
+
+def prune(*, older_than_days: int = 30, gc: bool = True, dry_run: bool = True) -> dict[str, object]:
+    """Drop local-history snapshots older than the cutoff and reclaim disk.
+
+    Squashes pre-cutoff snapshots into a single baseline commit (the newest
+    pre-cutoff state is preserved as that baseline), replays newer snapshots
+    on top, then expires reflogs and runs ``git gc``.
+
+    Args:
+        older_than_days: Snapshots older than this many days are pruned (default: 30).
+        gc: Run ``git gc --prune=now`` after rewriting (default: True).
+        dry_run: Report what would be dropped without changing anything (default: True).
+
+    Returns:
+        Structured result with dropped/kept counts, or an error.
+
+    Example:
+        localhist.prune()                                   # preview 30-day retention
+        localhist.prune(older_than_days=90, dry_run=False)  # apply 90-day retention
+    """
+
+    with LogSpan(span="localhist.prune", olderThanDays=older_than_days, dryRun=dry_run) as span:
+        result = prune_history(older_than_days=older_than_days, gc=gc, dry_run=dry_run)
+        span.add(ok=result.get("ok"), dropped=result.get("dropped", result.get("would_drop")))
         return result
 
 

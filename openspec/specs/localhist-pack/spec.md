@@ -272,3 +272,21 @@ The system SHALL defer retention cleanup and whole-project restore.
 #### Scenario: Deferred whole-project restore
 - **WHEN** users need whole-project restore in phase one
 - **THEN** the system SHALL require path-scoped restore instead.
+
+### Requirement: History Retention (Prune)
+
+`localhist.prune()` SHALL bound repository growth by dropping snapshots older than a cutoff.
+
+#### Scenario: Prune preview (default)
+- **WHEN** `localhist.prune(older_than_days=30)` is called
+- **THEN** it SHALL report `would_drop`/`kept` counts without modifying history (`dry_run` defaults to true)
+
+#### Scenario: Apply retention
+- **WHEN** `localhist.prune(older_than_days=30, dry_run=False)` is called and snapshots older than the cutoff exist
+- **THEN** pre-cutoff snapshots SHALL be squashed into a single baseline commit preserving the newest pre-cutoff tree
+- **AND** newer snapshots SHALL be replayed on top with their original messages and dates
+- **AND** reflogs SHALL be expired and `git gc --prune=now` run (unless `gc=False`) so pruned objects are reclaimed
+
+#### Scenario: Nothing to prune
+- **WHEN** all snapshots are newer than the cutoff
+- **THEN** it SHALL return `{"ok": true, "dropped": 0, ...}` without rewriting history

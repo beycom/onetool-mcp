@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import io
 import json
+import os
 import subprocess
 import threading
 import time
@@ -43,6 +44,7 @@ def test_pack_metadata_and_public_signatures() -> None:
         "info",
         "init",
         "log",
+        "prune",
         "restore",
         "save",
         "show",
@@ -739,3 +741,56 @@ def test_restore_relative_ref_is_resolved_before_safety_snapshot(
     assert applied["requested_ref"] == "HEAD~1"
     assert (tmp_path / "a.txt").read_text() == "one\n"
     assert applied["pre_restore_snapshot"]["created"] is True
+
+
+def test_prune_drops_old_snapshots(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    _write(tmp_path / "a.txt", "v1\n")
+    assert localhist.init()["ok"] is True
+    assert localhist.save(message="old-1")["ok"] is True
+
+    def _backdate(date: str) -> None:
+        subprocess.run(
+            ["git", "commit", "--amend", "--no-edit"],
+            env={
+                **os.environ,
+                "GIT_DIR": str(tmp_path / ".localhist"),
+                "GIT_WORK_TREE": str(tmp_path),
+                "GIT_COMMITTER_DATE": date,
+                "GIT_AUTHOR_DATE": date,
+            },
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+        )
+
+    _backdate("2020-01-01T00:00:00Z")
+    _write(tmp_path / "a.txt", "v2\n")
+    assert localhist.save(message="old-2")["ok"] is True
+    _backdate("2020-02-01T00:00:00Z")
+    _write(tmp_path / "a.txt", "v3\n")
+    assert localhist.save(message="recent")["ok"] is True
+
+    preview = localhist.prune(older_than_days=30)
+    assert preview["ok"] is True
+    assert preview["dry_run"] is True
+    assert preview["would_drop"] == 1
+    assert len(localhist.log(limit=10)["entries"]) == 3  # dry run changed nothing
+
+    result = localhist.prune(older_than_days=30, dry_run=False)
+    assert result["ok"] is True
+    assert result["dropped"] == 1
+    assert result["kept"] == 2
+
+    entries = localhist.log(limit=10)["entries"]
+    assert [e["subject"] for e in entries][:1] == ["recent"]
+    assert len(entries) == 2
+    assert "baseline" in entries[-1]["subject"]
+
+    shown = localhist.show(ref="HEAD", path="a.txt")
+    assert shown["ok"] is True
+
+    # Idempotent: nothing further to drop
+    again = localhist.prune(older_than_days=30, dry_run=False)
+    assert again["ok"] is True
+    assert again["dropped"] == 0

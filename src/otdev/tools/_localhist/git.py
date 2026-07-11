@@ -27,7 +27,7 @@ class GitRunner:
     def __init__(self, paths: Paths) -> None:
         self.paths = paths
 
-    def run(self, *args: str, check: bool = True) -> str:
+    def run(self, *args: str, check: bool = True, extra_env: dict[str, str] | None = None) -> str:
         """Run git with explicit GIT_DIR and GIT_WORK_TREE."""
 
         try:
@@ -38,6 +38,7 @@ class GitRunner:
                     **os.environ,
                     "GIT_DIR": str(self.paths.git_dir),
                     "GIT_WORK_TREE": str(self.paths.work_tree),
+                    **(extra_env or {}),
                 },
                 check=check,
                 capture_output=True,
