@@ -71,6 +71,24 @@ def ttl_remaining(meta: dict[str, Any]) -> float:
     return max(0.0, float(exp) - now_ts())
 
 
+def load_live_meta(store: HandleStore, handle: str) -> tuple[dict[str, Any] | None, str | None]:
+    """Load a handle's metadata, rejecting missing or expired handles.
+
+    Returns:
+        (meta, None) on success, or (None, error_message) when the handle is
+        missing, unreadable, or past its TTL.
+    """
+    if not store.exists(handle):
+        return None, f"Handle not found: {handle}"
+    try:
+        meta = store.read_meta(handle)
+    except (OSError, ValueError):
+        return None, f"Handle not found: {handle}"
+    if is_expired(meta):
+        return None, f"Handle has expired: {handle}"
+    return meta, None
+
+
 # ---------------------------------------------------------------------------
 # HandleStore
 # ---------------------------------------------------------------------------

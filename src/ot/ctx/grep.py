@@ -8,7 +8,7 @@ from ot.logging import LogSpan
 
 from .config import Config, _get_config
 from .read import _truncate_line
-from .store import HandleStore, _get_store, _resolve_handle, is_expired
+from .store import HandleStore, _get_store, _resolve_handle, load_live_meta
 
 log = LogSpan
 
@@ -18,6 +18,8 @@ def ctx_grep(
     pattern: str,
     *,
     context: int = 0,
+    ignore_case: bool = True,
+    limit: int = 500,
     store: HandleStore | None = None,
     config: Config | None = None,
 ) -> dict[str, Any]:
@@ -27,6 +29,8 @@ def ctx_grep(
         handle: Context store handle
         pattern: Regex pattern to search for
         context: Lines before/after each match (groups separated by '---')
+        ignore_case: Case-insensitive matching (default: True)
+        limit: Maximum result lines returned (default: 500)
         store: HandleStore instance (uses session default if not provided)
         config: Pack config (uses module default if not provided)
     """
@@ -44,16 +48,9 @@ def ctx_grep(
         if not pattern:
             return {"error": "Pattern must not be empty. Use ctx.read() to retrieve all content."}
 
-        if not store.exists(handle):
-            return {"error": f"Handle not found: {handle}"}
-
-        try:
-            meta = store.read_meta(handle)
-        except (OSError, ValueError):
-            return {"error": f"Handle not found: {handle}"}
-
-        if is_expired(meta):
-            return {"error": f"Handle has expired: {handle}"}
+        meta, err = load_live_meta(store, handle)
+        if meta is None:
+            return {"error": err}
 
         try:
             content = store.read_content(handle)
@@ -61,7 +58,7 @@ def ctx_grep(
             return {"error": f"Content not found for handle: {handle}"}
 
         try:
-            compiled = re.compile(pattern, re.IGNORECASE)
+            compiled = re.compile(pattern, re.IGNORECASE if ignore_case else 0)
         except re.error as e:
             return {"error": f"Invalid regex pattern: {e}"}
 
@@ -77,11 +74,16 @@ def ctx_grep(
                 if compiled.search(ln)
             ]
 
+        truncated = len(result_lines) > max(1, limit)
+        if truncated:
+            result_lines = result_lines[: max(1, limit)]
+
         s.add("returned", len(result_lines))
         return {
             "handle": handle,
             "content": "\n".join(result_lines),
             "returned": len(result_lines),
+            "truncated": truncated,
         }
 
 

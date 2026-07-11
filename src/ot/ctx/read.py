@@ -6,7 +6,7 @@ from typing import Any
 from ot.logging import LogSpan
 
 from .config import Config, _get_config
-from .store import HandleStore, _get_store, _resolve_handle, is_expired
+from .store import HandleStore, _get_store, _resolve_handle, load_live_meta
 from .toc import ctx_toc
 
 log = LogSpan
@@ -58,16 +58,9 @@ def ctx_read(
         if limit < 1:
             return {"error": f"limit must be >= 1, got {limit}"}
 
-        if not store.exists(handle):
-            return {"error": f"Handle not found: {handle}"}
-
-        try:
-            meta = store.read_meta(handle)
-        except (OSError, ValueError):
-            return {"error": f"Handle not found: {handle}"}
-
-        if is_expired(meta):
-            return {"error": f"Handle has expired: {handle}"}
+        meta, err = load_live_meta(store, handle)
+        if meta is None:
+            return {"error": err}
 
         # Unknown mode
         if mode and mode not in ("toc", "meta"):

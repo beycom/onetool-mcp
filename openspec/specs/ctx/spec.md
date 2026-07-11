@@ -138,6 +138,11 @@ and long-line truncation.
 - **THEN** it SHALL return matching lines plus 2 lines before and after each match
 - **AND** non-contiguous groups SHALL be separated by `---`
 
+#### Scenario: Result cap and case sensitivity
+- **WHEN** `ctx.grep(h, pattern=...)` matches more than `limit` lines (default 500)
+- **THEN** it SHALL return only the first `limit` lines and set `"truncated": true`
+- **AND** matching SHALL be case-insensitive by default, with `ignore_case=False` enabling case-sensitive search
+
 ---
 
 ### Requirement: Section Slicing

@@ -60,6 +60,8 @@ def ctx_write(
         size_bytes = len(normalised.encode("utf-8"))
         total_lines = len(normalised.splitlines())
         handle = secrets.token_hex(4)  # 8 hex chars
+        while store.exists(handle):  # collision is vanishingly rare — never clobber
+            handle = secrets.token_hex(4)
         created = now_ts()
         exp = expires_at_ts(config.ttl)
 

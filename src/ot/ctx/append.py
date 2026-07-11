@@ -6,7 +6,7 @@ from typing import Any
 from ot.logging import LogSpan
 
 from .format import build_toc, detect_format, normalize_content
-from .store import HandleStore, _get_store, _resolve_handle, is_expired
+from .store import HandleStore, _get_store, _resolve_handle, load_live_meta
 
 log = LogSpan
 
@@ -36,16 +36,9 @@ def ctx_append(
         except TypeError as e:
             return {"error": str(e)}
 
-        if not store.exists(handle):
-            return {"error": f"Handle not found: {handle}"}
-
-        try:
-            meta = store.read_meta(handle)
-        except (OSError, ValueError):
-            return {"error": f"Handle not found: {handle}"}
-
-        if is_expired(meta):
-            return {"error": f"Handle has expired: {handle}"}
+        meta, err = load_live_meta(store, handle)
+        if meta is None:
+            return {"error": err}
 
         try:
             existing = store.read_content(handle)
