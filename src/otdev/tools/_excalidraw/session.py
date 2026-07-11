@@ -5,12 +5,19 @@ The key is derived from the resolved CWD (SHA-256 prefix) unless a named board i
 
 Schema:
     {
-        "shapes": {id: {"label": ..., "classes": [...]}},
+        "shapes": {id: {"label": ..., "classes": [...],
+                        "x": float?, "y": float?,     # stored canvas position
+                        "style": {prop: value, ...}?  # persisted Excalidraw props
+                       }},
         "edges":  [{"id":..., "src":..., "dst":..., "label":..., ...}],
         "groups": {gid: {"label":..., "members":[...]}},
         "edge_keys": [[src, dst, label, startArrow, endArrow], ...],
         "canvas_max_y": float
     }
+
+Per-shape ``x``/``y`` are written by draw() auto-placement, inline ``x:``/``y:``
+props, and layout(); rerenders restore them instead of re-gridding. ``style``
+holds parsed inline style props (and, for notes, exact width/height).
 """
 
 from __future__ import annotations

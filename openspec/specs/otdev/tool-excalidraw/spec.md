@@ -16,7 +16,13 @@ Short alias: `wb` — `wb.draw(...)` is equivalent to `whiteboard.draw(...)`.
 
 ### Requirement: Draw diagram elements
 
-`whiteboard.draw(input=, board=)` SHALL add shapes, edges, and subgraphs to the board state. State SHALL be persisted to a session file; no Playwright browser SHALL be launched by this call. It SHALL be additive — elements already in state are never removed or repositioned. New shapes receive column-based stacking positions: each subgraph's nodes are placed in a separate x column (300px apart); ungrouped nodes share one column. Edges are deduplicated by `(src, dst, label, startArrowhead, endArrowhead)`. Unknown edge endpoints are auto-created as shapes with their ID as label. New shapes are placed below existing canvas content. Call `whiteboard.layout()` to apply graph layout (topological layering via ELK).
+`whiteboard.draw(input=, board=)` SHALL add shapes, edges, and subgraphs to the board state. State SHALL be persisted to a session file; no Playwright browser SHALL be launched by this call. It SHALL be additive — elements already in state are never removed or repositioned. New shapes receive column-based stacking positions: each subgraph's nodes are placed in a separate x column (300px apart); ungrouped nodes share one column. The computed position SHALL be persisted per shape (`x`/`y` in the session file) so subsequent rerenders keep the layout. Edges are deduplicated by `(src, dst, label, startArrowhead, endArrowhead)`. Unknown edge endpoints are auto-created as shapes with their ID as label. New shapes are placed below existing canvas content. Call `whiteboard.layout()` to apply graph layout (topological layering via ELK).
+
+Inline style props SHALL be persisted per shape (`style` in the session file) and applied to the canvas: new shapes carry them in the batch-draw payload; existing shapes are updated through the element patch path (`_patch_elements`), which preserves the live canvas position.
+
+The `M updated` component of the return string SHALL be computed against a snapshot of the state taken before this call mutated it: an existing shape counts as updated when its label changed or inline style props were supplied for it; re-drawing a shape with an unchanged label does not count.
+
+When a browser is connected, a failed canvas push SHALL NOT be silently swallowed: the tool return string SHALL include a `[warning: canvas update failed — ...]` (or `canvas clear failed`) suffix while the session-state change remains committed. This applies to `draw()`, `erase()`, `clear()`, and `open()`.
 
 The optional `board=` parameter specifies the named board to operate on. If omitted, the CWD-keyed default board is used.
 
@@ -80,18 +86,34 @@ The optional `board=` parameter specifies the named board to operate on. If omit
 - **WHEN** `whiteboard.draw()` creates one or more new subgraphs
 - **THEN** the return value SHALL include `, +N group(s)` at the end
 
-#### Scenario: State not committed on JS failure
-- **WHEN** the browser call raises an exception
+#### Scenario: State not committed on parse failure
+- **WHEN** `draw()` raises on invalid DSL (e.g. ellipse/diamond syntax)
 - **THEN** persisted board state SHALL remain unchanged
+
+#### Scenario: Canvas push failure reported
+- **WHEN** a browser is connected and the canvas push raises an exception
+- **THEN** the session-state change SHALL remain committed
+- **AND** the return string SHALL include `[warning: canvas update failed — ...]`
 
 #### Scenario: Multi-element draw returns one summary
 - **WHEN** `whiteboard.draw()` is called with multiple shapes and edges
 - **THEN** the call SHALL return one summary covering all added or updated elements
 
+#### Scenario: Label change counted as updated
+- **WHEN** `draw(input='a["B"]')` is called and shape `a` exists with label `"A"`
+- **THEN** the return value SHALL be `"+0 shapes, 1 updated"`
+- **AND** re-drawing `a["A"]` with an unchanged label SHALL NOT include `updated`
+
+#### Scenario: Inline styles applied and persisted
+- **WHEN** `draw(input='a["A"] bc:green,sw:2')` is called
+- **THEN** the resolved props (`backgroundColor: "#bbf7d0"`, `strokeWidth: 2`) SHALL be stored in the shape's `style` in the session file
+- **AND** when a browser is connected, new shapes SHALL carry the props in the batch-draw payload and existing shapes SHALL be patched via `_patch_elements`
+- **AND** subsequent rerenders SHALL re-apply the stored style
+
 #### Scenario: Inline x/y positions new shapes
 - **WHEN** `draw()` is called with `a["Foo"] x:100,y:200` (inline position props)
 - **THEN** shape `a` SHALL be placed at `x=100, y=200` instead of auto-layout coordinates
-- **AND** `x`/`y` SHALL be consumed from the style dict and NOT forwarded into `styleProps`
+- **AND** `x`/`y` SHALL be stored as the shape's persisted position and NOT forwarded into `styleProps`
 
 ### Requirement: share requires browser
 
@@ -139,8 +161,9 @@ defaults to beige (`#f5f5dc`).
 
 #### Scenario: Note persists in session state
 - **WHEN** `whiteboard.note(input="n1[note:\nhello\n]")` is called
-- **THEN** element `n1` SHALL be stored in the session state
+- **THEN** element `n1` SHALL be stored in the session state, including its position (`x`/`y`) and its exact width/height inside `style`
 - **AND** `whiteboard.erase(ids=["n1"])` SHALL remove it by ID
+- **AND** rerenders SHALL restore the note at its stored position and size
 
 #### Scenario: Unknown block type
 - **WHEN** a block type not in `{table, tree, seq, timeline, note}` is used
@@ -332,6 +355,22 @@ Every public tool that needs the live canvas SHALL ensure the browser and canvas
 are ready before executing. If excalidraw.com is not open or the API is missing, the tool SHALL
 transparently navigate, bootstrap, and re-render from the current Python state.
 
+**Rerender preserves stored layout:** Any rerender from session state
+(fresh navigation, `screenshot()`, `share()`) SHALL restore shapes at their
+stored `x`/`y` and re-apply their stored `style` props. Only shapes with no
+stored position fall back to a flat 4-column grid. When an element already
+exists on the live canvas, its live position wins (a rerender never snaps a
+user-moved or layout-positioned element back).
+
+#### Scenario: Rerender restores stored positions
+- **WHEN** the canvas is rerendered from a session state whose shapes have stored `x`/`y`
+- **THEN** each such shape SHALL be placed at its stored coordinates
+- **AND** shapes without stored coordinates SHALL be grid-placed
+
+#### Scenario: screenshot/share preserve layout
+- **WHEN** `whiteboard.layout()` is followed by `whiteboard.screenshot()` or `whiteboard.share()`
+- **THEN** the rerender SHALL NOT reset shapes to the 4-column grid
+
 #### Scenario: First call opens browser
 - **WHEN** no browser session is active and any excalidraw tool is called
 - **THEN** excalidraw.com SHALL be opened and bootstrapped automatically
@@ -400,6 +439,11 @@ build the ELK graph, inject `elkjs@0.11.0` from CDN if not already loaded,
 await `elk.layout()`, patch node and text-child positions, recompute subgraph
 bounding boxes, and call `fit()` to zoom to content.
 
+**Position write-back:** After patching the canvas, layout() SHALL write the
+computed `x`/`y` back into the session-state shapes (and update
+`canvas_max_y`) so subsequent rerenders (screenshot/share/reload) preserve
+the layout instead of re-gridding.
+
 **Selection scope:** If elements are selected (`appState.selectedElementIds`
 is non-empty), only selected nodes are laid out; edges between selected nodes
 are included. Edges with one endpoint inside the selection and one outside
@@ -414,7 +458,9 @@ scene nodes are laid out.
 `endBinding.elementId` are present and both endpoints are in the node set.
 
 **Groups:** Elements sharing a `groupIds[0]` are treated as a single atomic ELK
-node sized to their combined bounding box; all members translate as a unit.
+node sized to their combined bounding box computed from member **positions and
+sizes** (`min(x)..max(x+w)` / `min(y)..max(y+h)`), not sizes alone; all members
+translate as a unit.
 
 The return string reflects scope: `"layout applied to N nodes"` (all) or
 `"layout applied to N nodes (selection)"` (selection-scoped).
@@ -449,6 +495,15 @@ When `algorithm == "stress"`, `elk.stress.desiredEdgeLength` SHALL be set to
 - **WHEN** `whiteboard.layout(...)` is called with selected elements
 - **THEN** only selected eligible nodes SHALL be laid out
 - **AND** the return string SHALL include `(selection)`
+
+#### Scenario: Boundary arrows use per-edge containment
+- **WHEN** a selection layout has multiple boundary arrows with different containment (one arrow's source inside the selection, another arrow's destination inside)
+- **THEN** each arrow's connection sides and endpoint ordering SHALL be derived from that arrow's own containment value, never from another edge's
+
+#### Scenario: Layout positions persisted
+- **WHEN** `whiteboard.layout()` completes and a laid-out node exists in session state
+- **THEN** the node's new `x`/`y` SHALL be written to the session file
+- **AND** a subsequent `screenshot()` or `share()` rerender SHALL restore the node at that position
 
 #### Edge repositioning
 

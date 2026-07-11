@@ -17,6 +17,13 @@
     // Phase 1: shapes
     for (const s of shapes) {
       const { id, label, x, y, w, h, shape, styleProps } = s;
+      // Prefer the live position when the element already exists on canvas
+      // (moved by the user or by layout()) so redraws don't snap it back.
+      const live = liveMap[id];
+      const useLive = live && !live.isDeleted
+        && typeof live.x === 'number' && typeof live.y === 'number';
+      const px = useLive ? live.x : x;
+      const py = useLive ? live.y : y;
       const textId   = id + '-text';
       const fontSize = styleProps.fontSize || 16;
       const lineCount = label.split('\n').length;
@@ -26,7 +33,7 @@
                            : 'roundness' in styleProps ? styleProps.roundness
                            : { type: 3 };
       window.__drawElements[id] = {
-        id, type: shape, x, y, width: w, height: h,
+        id, type: shape, x: px, y: py, width: w, height: h,
         strokeColor:     styleProps.strokeColor     || '#1e1e1e',
         backgroundColor: styleProps.backgroundColor || '#ffffff',
         strokeWidth:     styleProps.strokeWidth     || 2,
@@ -42,7 +49,7 @@
       };
       window.__drawElements[textId] = {
         id: textId, type: 'text',
-        x: x + 8, y: y + (h - textH) / 2, width: w - 16, height: textH,
+        x: px + 8, y: py + (h - textH) / 2, width: w - 16, height: textH,
         text: label,
         fontSize,
         fontFamily:    styleProps.fontFamily    || 1,

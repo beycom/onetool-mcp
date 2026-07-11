@@ -54,6 +54,41 @@ Render operations (share, export, screenshot) SHALL load state from the session 
 - **THEN** Playwright SHALL launch, load the board state, and return a shareable URL or export
 - **AND** the session file SHALL not be modified by the share operation
 
+### Requirement: Per-shape position and style persistence
+
+Each shape entry in the session file MAY carry a stored position (`x`/`y`
+floats) and a `style` dict of resolved Excalidraw props, in addition to
+`label`/`classes`:
+
+- `draw()` SHALL persist the auto-computed column-stacking position for new
+  shapes, and inline `x:`/`y:` props as the stored position.
+- `draw()` SHALL persist resolved inline style props into the shape's `style`
+  (merged over any previously stored style).
+- `note()` SHALL persist each note's position and its exact width/height
+  (inside `style`).
+- `layout()` SHALL write its computed positions back into the session file.
+
+Rerenders from session state (fresh navigation, `screenshot()`, `share()`)
+SHALL restore shapes at their stored positions with their stored styles;
+only shapes with no stored position are grid-placed. Rerendering is therefore
+layout-preserving: `layout()` followed by `screenshot()` keeps the layout.
+
+#### Scenario: draw persists positions
+
+- **WHEN** `wb.draw(input='a["A"]')` is called
+- **THEN** the session file entry for `a` SHALL contain numeric `x` and `y`
+
+#### Scenario: inline style persisted and restored
+
+- **WHEN** `wb.draw(input='a["A"] bc:green')` is called and the board is later rerendered
+- **THEN** the session file entry for `a` SHALL contain `style.backgroundColor = "#bbf7d0"`
+- **AND** the rerendered shape SHALL carry that background colour
+
+#### Scenario: layout positions survive rerender
+
+- **WHEN** `wb.layout()` runs and then `wb.screenshot()` rerenders the board
+- **THEN** shapes SHALL appear at the layout-computed positions, not a flat grid
+
 ### Requirement: Whiteboard board management tools
 
 The whiteboard pack SHALL provide `wb.boards()` and `wb.clear()` tools for session management.

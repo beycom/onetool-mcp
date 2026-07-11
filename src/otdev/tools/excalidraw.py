@@ -3,12 +3,13 @@
 Opens excalidraw.com via pydoll (Chrome CDP) and exposes tools to draw, save,
 load, clear, scroll, and zoom diagrams using a Mermaid-compatible DSL.
 
-Supports two usage modes:
+Tools are documented under the ``whiteboard.`` pack name; ``wb`` and
+``excalidraw`` are accepted aliases (``wb.draw(...)`` == ``whiteboard.draw(...)``).
 
-- **Headed** (default): user interacts directly with the visible canvas while
-  the agent assists — drawing, annotating, running layout, saving files.
-- **Headless**: agent-controlled only — user cannot see the canvas, but all
-  programmatic tools (draw, save, load, screenshot, layout, etc.) work fully.
+The browser runs headed: the user interacts directly with the visible canvas
+while the agent assists — drawing, annotating, running layout, saving files.
+State-only tools (draw, erase, clear, boards) work without a browser; render
+tools (screenshot, share, layout, ...) launch one.
 
 Requires Chrome/Chromium to be installed on the host.
 """
@@ -398,27 +399,34 @@ def _ensure_ready() -> str | None:
 
 
 def _rerender_from_state(state: dict[str, Any]) -> None:
-    """Re-render all content from session state.
+    """Re-render all content from session state, preserving stored layout.
 
-    Shapes are placed in a flat grid (4 cols x N rows, 160x60, gap 40/20).
-    Call ``wb.layout()`` afterwards to apply proper graph layout.
+    Shapes with a stored ``x``/``y`` (from draw() auto-placement, inline
+    ``x:``/``y:`` props, or a previous ``whiteboard.layout()`` run) are
+    restored at those positions; stored ``style`` props are re-applied.
+    Only shapes with no stored position fall back to a flat grid
+    (4 cols x N rows, 160x60, gap 40/20).
     """
-    # Flat grid: 4 columns, fixed 160x60 nodes, 40px h-gap, 20px v-gap
-    shape_ids = list(state["shapes"].keys())
     cols, node_w, node_h, gap_x, gap_y = 4, 160, 60, 40, 20
     shape_payloads = []
-    for i, id_ in enumerate(shape_ids):
-        shape = state["shapes"][id_]
-        col = i % cols
-        row = i // cols
-        x = 100.0 + col * (node_w + gap_x)
-        y = 100.0 + row * (node_h + gap_y)
-        shape_payloads.append(_shape_payload(id_, shape, x, y))
+    grid_i = 0  # grid slot counter for shapes without a stored position
+    for id_, shape in state["shapes"].items():
+        sx, sy = shape.get("x"), shape.get("y")
+        if sx is None or sy is None:
+            col = grid_i % cols
+            row = grid_i // cols
+            sx = 100.0 + col * (node_w + gap_x)
+            sy = 100.0 + row * (node_h + gap_y)
+            grid_i += 1
+        shape_payloads.append(
+            _shape_payload(id_, shape, float(sx), float(sy), shape.get("style"))
+        )
 
     edge_payloads = [
         {"id": e["id"], "srcId": e["src"], "dstId": e["dst"],
          "label": e["label"], "startArrowhead": e.get("startArrowhead"),
          "endArrowhead": e.get("endArrowhead", "arrow"),
+         "strokeStyle": e.get("strokeStyle"),
          "styleProps": e.get("styleProps", {})}
         for e in state["edges"]
     ]
@@ -997,7 +1005,9 @@ def draw(*, input: str, board: str | None = None) -> str:
 
     **New nodes** get auto-layout positions. **Existing nodes** are upserted:
     only the properties explicitly passed are changed; position, size, and
-    other styles on the live canvas are preserved.
+    other styles on the live canvas are preserved. Positions and inline
+    styles are persisted in the board state, so later rerenders
+    (screenshot/share/reload) keep the layout and styling.
 
     Semicolons are preferred as statement separators for agent calls (compact,
     no multi-line strings needed). Newlines are also accepted.
@@ -1080,12 +1090,42 @@ def draw(*, input: str, board: str | None = None) -> str:
             if key not in edge_keys:
                 new_edges_to_commit.append((key, e))
 
-        # Update state: shapes (upsert)
+        # Snapshot pre-mutation labels so the "M updated" count compares against
+        # the state as it was BEFORE this call (not the freshly mutated dict).
+        prev_labels = {id_: shapes[id_].get("label") for id_ in existing_shape_updates}
+
+        # Count updated shapes for summary (one per shape, not per attribute)
+        patch_count = sum(
+            1
+            for id_, shape in existing_shape_updates.items()
+            if (
+                shape.get("label") is not None
+                and shape["label"] != prev_labels.get(id_)
+            ) or inline_styles.get(id_)
+        )
+
+        # Update state: shapes (upsert in place, preserving stored x/y/style)
         for id_, shape in parsed["shapes"].items():
-            if shape.get("label") is not None:
-                shapes[id_] = shape
-            elif id_ not in shapes:
-                shapes[id_] = {"label": id_, "classes": []}
+            entry = shapes.get(id_)
+            if entry is None:
+                label = shape["label"] if shape.get("label") is not None else id_
+                entry = {"label": label, "classes": shape.get("classes", [])}
+                shapes[id_] = entry
+            elif shape.get("label") is not None:
+                entry["label"] = shape["label"]
+            # Persist inline styles; x/y become the stored position
+            props = dict(inline_styles.get(id_) or {})
+            if props:
+                x_val = props.pop("x", None)
+                y_val = props.pop("y", None)
+                if x_val is not None:
+                    entry["x"] = float(x_val)
+                if y_val is not None:
+                    entry["y"] = float(y_val)
+                if props:
+                    merged = dict(entry.get("style") or {})
+                    merged.update(props)
+                    entry["style"] = merged
 
         # Update state: groups
         groups.update(parsed["groups"])
@@ -1095,7 +1135,8 @@ def draw(*, input: str, board: str | None = None) -> str:
             edges.append(e)
             edge_keys.add(key)
 
-        # Track canvas_max_y for additive positioning (used by next draw call)
+        # Position new shapes column-stacked below existing content and persist
+        # x/y so rerenders keep this layout (explicit inline x/y wins).
         base_y = state.get("canvas_max_y", 60.0) + 40 if new_shapes else state.get("canvas_max_y", 60.0)
         col_y: dict[str | None, float] = {}
         if new_shapes:
@@ -1114,19 +1155,12 @@ def draw(*, input: str, board: str | None = None) -> str:
                     next_x += 300.0
             for id_ in new_shapes:
                 sg = subgraph_of[id_]
+                entry = shapes[id_]
+                entry.setdefault("x", col_x[sg])
+                entry.setdefault("y", col_y[sg])
                 col_y[sg] += 100.0
 
         new_canvas_max_y = max(col_y.values()) if col_y else state.get("canvas_max_y", 60.0)
-
-        # Count updated shapes for summary (one per shape, not per attribute)
-        patch_count = sum(
-            1
-            for id_, shape in existing_shape_updates.items()
-            if (
-                shape.get("label") is not None
-                and shape["label"] != shapes.get(id_, {}).get("label", "")
-            ) or inline_styles.get(id_)
-        )
 
         # Save updated state to session file
         _session.save({
@@ -1137,10 +1171,50 @@ def draw(*, input: str, board: str | None = None) -> str:
             "canvas_max_y": new_canvas_max_y,
         }, board)
 
-        # Push incremental update to browser if connected
+        # Push incremental update to browser if connected: patch existing
+        # elements in place (live position preserved), batch-draw new ones.
+        browser_warning = ""
         if _tab is not None:
-            with contextlib.suppress(Exception):
-                _rerender_from_state({"shapes": shapes, "edges": edges, "groups": groups})
+            try:
+                patches: list[dict[str, Any]] = []
+                for id_, shape in existing_shape_updates.items():
+                    patch: dict[str, Any] = {"id": id_}
+                    if shape.get("label") is not None and shape["label"] != prev_labels.get(id_):
+                        patch["text"] = shape["label"]
+                    patch.update(inline_styles.get(id_) or {})
+                    if len(patch) > 1:
+                        patches.append(patch)
+                if patches:
+                    _js_patch_elements(patches)
+
+                shape_payloads = []
+                for id_ in new_shapes:
+                    entry = shapes[id_]
+                    shape_payloads.append(_shape_payload(
+                        id_, entry,
+                        float(entry.get("x", 100.0)), float(entry.get("y", base_y)),
+                        entry.get("style"),
+                    ))
+                edge_payloads = [
+                    {"id": e["id"], "srcId": e["src"], "dstId": e["dst"],
+                     "label": e["label"], "startArrowhead": e.get("startArrowhead"),
+                     "endArrowhead": e.get("endArrowhead", "arrow"),
+                     "strokeStyle": e.get("strokeStyle"),
+                     "styleProps": e.get("styleProps", {})}
+                    for _, e in new_edges_to_commit
+                ]
+                # Subgraphs are redrawn every call so bounds track member positions
+                subgraph_payloads = [
+                    {"id": gid, "label": group["label"],
+                     "memberIds": group["members"], "savedBounds": None}
+                    for gid, group in groups.items()
+                ]
+                if shape_payloads or edge_payloads or subgraph_payloads:
+                    _js_batch_draw(
+                        shapes=shape_payloads, edges=edge_payloads, subgraphs=subgraph_payloads
+                    )
+            except Exception as exc:
+                browser_warning = f" [warning: canvas update failed — {exc}]"
 
         new_edge_ids = [e["id"] for _, e in new_edges_to_commit]
         edge_msg = f", +{len(new_edge_ids)} edge(s): {', '.join(new_edge_ids)}" if new_edge_ids else ""
@@ -1149,7 +1223,7 @@ def draw(*, input: str, board: str | None = None) -> str:
 
         s.add("newShapes", len(new_shapes))
         s.add("board", board or "cwd")
-        return f"+{len(new_shapes)} shapes{updated_msg}{edge_msg}{group_msg}"
+        return f"+{len(new_shapes)} shapes{updated_msg}{edge_msg}{group_msg}{browser_warning}"
 
 
 # ---------------------------------------------------------------------------
@@ -1328,7 +1402,11 @@ def note(*, input: str, background: str = _NOTE_DEFAULT_BG) -> str:
                     "label": payload["label"],
                     "classes": [],
                     "shape": payload["shape"],
-                    "style": payload["styleProps"],
+                    # Persist size inside style so rerenders restore exact dims
+                    "style": {**payload["styleProps"],
+                              "width": payload["w"], "height": payload["h"]},
+                    "x": payload["x"],
+                    "y": payload["y"],
                 }
                 max_y = max(max_y, float(payload["y"]) + float(payload["h"]))
             _session.save({
@@ -1357,7 +1435,7 @@ def embed_dsl() -> str:
         Summary such as "embedded DSL (12 lines)".
 
     Example:
-        excalidraw.embed_dsl()
+        whiteboard.embed_dsl()
     """
     with LogSpan(span="excalidraw.embed_dsl") as s:
         err = _ensure_ready()
@@ -1424,7 +1502,7 @@ def erase(*, ids: list[str], board: str | None = None) -> str:
         Summary such as "erased 2 element(s)".
 
     Example:
-        excalidraw.erase(ids=["a", "edge-a-b"])
+        whiteboard.erase(ids=["a", "edge-a-b"])
     """
     with LogSpan(span="excalidraw.erase", ids=ids) as s:
         # Load session state — no browser needed for erase
@@ -1475,19 +1553,22 @@ def erase(*, ids: list[str], board: str | None = None) -> str:
         }, board)
 
         # Delete erased elements from browser canvas if connected
+        browser_warning = ""
         if _tab is not None:
             all_erase_ids = to_erase + [eid for eid in orphaned_edge_ids if eid not in to_erase]
             if all_erase_ids:
-                with contextlib.suppress(Exception):
+                try:
                     _browser_evaluate(f"() => window._batch_erase({json.dumps(all_erase_ids)})")
+                except Exception as exc:
+                    browser_warning = f" [warning: canvas update failed — {exc}]"
 
         n = len(to_erase)
         dangling = len(orphaned_edge_ids)
         s.add("erased", n)
         s.add("danglingEdges", dangling)
         if dangling:
-            return f"erased {n} element(s), {dangling} dangling edge(s) removed"
-        return f"erased {n} element(s)"
+            return f"erased {n} element(s), {dangling} dangling edge(s) removed{browser_warning}"
+        return f"erased {n} element(s){browser_warning}"
 
 
 def save(*, file: str) -> str:
@@ -1507,7 +1588,7 @@ def save(*, file: str) -> str:
         Summary of elements saved.
 
     Example:
-        excalidraw.save(file="diagrams/arch.excalidraw")
+        whiteboard.save(file="diagrams/arch.excalidraw")
     """
     with LogSpan(span="excalidraw.save", file=file) as s:
         err = _ensure_ready()
@@ -1559,7 +1640,7 @@ def load(*, file: str) -> str:
         Summary of elements loaded.
 
     Example:
-        excalidraw.load(file="diagrams/arch.excalidraw")
+        whiteboard.load(file="diagrams/arch.excalidraw")
     """
     with LogSpan(span="excalidraw.load", file=file) as s:
         err = _ensure_ready()
@@ -1631,7 +1712,7 @@ def sync() -> str:
         Summary like ``"synced: 4 shapes, 3 edges"``.
 
     Example:
-        excalidraw.sync()
+        whiteboard.sync()
     """
     with LogSpan(span="excalidraw.sync") as s:
         err = _ensure_ready()
@@ -1666,7 +1747,7 @@ def help() -> str:
         Full DSL and style reference as a plain-text string.
 
     Example:
-        excalidraw.help()
+        whiteboard.help()
     """
     return _load_js("dsl-reference.md")
 
@@ -1675,7 +1756,9 @@ def style(*, ids: list[str], style: str) -> str:
     """Apply visual style properties to existing canvas elements in bulk.
 
     Applies Excalidraw style properties to the named elements. Never touches
-    ``_dsl_state`` — styling is a purely visual operation.
+    the persisted board state — styling via this tool is a purely visual
+    operation on the live canvas (use ``whiteboard.draw`` inline styles to
+    persist styling across rerenders).
 
     Style string is comma-separated ``key:value`` pairs using the shorthand
     table shared with ``whiteboard.draw`` inline styles:
@@ -1712,8 +1795,8 @@ def style(*, ids: list[str], style: str) -> str:
         Summary like ``"styled 3 element(s)"``.
 
     Example:
-        excalidraw.style(ids=["a", "b"], style="bc:green,sc:#16a34a")
-        excalidraw.style(ids=["c"], style="shape:d")
+        whiteboard.style(ids=["a", "b"], style="bc:green,sc:#16a34a")
+        whiteboard.style(ids=["c"], style="shape:d")
     """
     with LogSpan(span="excalidraw.style", ids=ids, style=style) as s:
         err = _ensure_ready()
@@ -1802,7 +1885,7 @@ def share(*, board: str | None = None) -> str:
         Shareable URL like ``https://excalidraw.com/#json={id},{key}``.
 
     Example:
-        excalidraw.share()
+        whiteboard.share()
     """
     with LogSpan(span="excalidraw.share") as s:
         # Load session state and render to browser
@@ -1896,8 +1979,8 @@ def clear(*, board: str | None = None) -> str:
         Confirmation message.
 
     Example:
-        excalidraw.clear()
-        excalidraw.clear(board='arch')
+        whiteboard.clear()
+        whiteboard.clear(board='arch')
     """
     with LogSpan(span="excalidraw.clear") as s:
         _session.clear_board(board)
@@ -1905,8 +1988,10 @@ def clear(*, board: str | None = None) -> str:
 
         # Also clear the live canvas when using the default CWD board and browser is open
         if board is None and _tab is not None:
-            with contextlib.suppress(Exception):
+            try:
                 _browser_evaluate("() => window.__drawApi.clear()")
+            except Exception as exc:
+                return f"board state cleared [warning: canvas clear failed — {exc}]"
 
         return "canvas cleared"
 
@@ -1922,7 +2007,7 @@ def scroll(*, dx: int = 0, dy: int = 0) -> str:
         Confirmation message.
 
     Example:
-        excalidraw.scroll(dx=200, dy=0)
+        whiteboard.scroll(dx=200, dy=0)
     """
     with LogSpan(span="excalidraw.scroll", dx=dx, dy=dy) as s:
         err = _ensure_ready()
@@ -1944,8 +2029,8 @@ def zoom(*, level: float) -> str:
         Confirmation message.
 
     Example:
-        excalidraw.zoom(level=0.5)
-        excalidraw.zoom(level=0)   # fit all
+        whiteboard.zoom(level=0.5)
+        whiteboard.zoom(level=0)   # fit all
     """
     if level < 0:
         return "Error: zoom level must be >= 0 (use 0 to fit all)"
@@ -1969,7 +2054,7 @@ def fit() -> str:
         Confirmation message.
 
     Example:
-        excalidraw.fit()
+        whiteboard.fit()
     """
     return zoom(level=0)
 
@@ -1999,7 +2084,9 @@ def layout(
 
     Loads ELK.js from CDN (once), runs the chosen layout algorithm in the
     browser, patches every shape's position, recomputes subgraph bounding
-    boxes, and calls ``wb.fit()`` to zoom-to-fit.
+    boxes, writes the computed positions back into the board session state
+    (so later rerenders keep the layout), and calls ``whiteboard.fit()``
+    to zoom-to-fit.
 
     Args:
         direction:      Layout direction — ``RIGHT``, ``LEFT``, ``DOWN`` (default), ``UP``.
@@ -2035,9 +2122,9 @@ def layout(
         Summary string, e.g. ``"layout applied to 12 nodes"``.
 
     Example:
-        wb.layout()
-        wb.layout(direction="RIGHT", gap_layer=120, gap_node=60)
-        wb.layout(algorithm="stress")
+        whiteboard.layout()
+        whiteboard.layout(direction="RIGHT", gap_layer=120, gap_node=60)
+        whiteboard.layout(algorithm="stress")
     """
     direction = direction.upper()
     algorithm = algorithm.lower()
@@ -2148,10 +2235,11 @@ def layout(
             min_x = min_y = float("inf")
             max_x = max_y = float("-inf")
             for m in members:
-                min_x = min(min_x, 0.0)  # positions unknown here, use sizes
-                max_x = max(max_x, float(m["w"]))
-                min_y = min(min_y, 0.0)
-                max_y = max(max_y, float(m["h"]))
+                mx, my = float(m.get("x", 0)), float(m.get("y", 0))
+                min_x = min(min_x, mx)
+                max_x = max(max_x, mx + float(m["w"]))
+                min_y = min(min_y, my)
+                max_y = max(max_y, my + float(m["h"]))
                 elem_to_elk[m["id"]] = gid
             w, h = int(max_x - min_x) or 160, int(max_y - min_y) or 60
             elk_nodes.append({"id": gid, "width": w, "height": h})
@@ -2312,35 +2400,37 @@ async () => {{
             # Determine connection points: the anchored node uses the side
             # appropriate for its role (source=exit side, dest=entry side).
             # For RIGHT layout: source exits right, dest enters left.
+            # Uses this edge's own containment (src_inside) — never the loop
+            # variable from the classification pass above.
             if direction == "RIGHT":
-                if src_in:
+                if src_inside:
                     anc_pt: list[float] = [anc_x + anc_w, anc_y + anc_h / 2]
                     free_pt: list[float] = [free_x, free_y + free_h / 2]
                 else:
                     anc_pt = [anc_x, anc_y + anc_h / 2]
                     free_pt = [free_x + free_w, free_y + free_h / 2]
             elif direction == "LEFT":
-                if src_in:
+                if src_inside:
                     anc_pt = [anc_x, anc_y + anc_h / 2]
                     free_pt = [free_x + free_w, free_y + free_h / 2]
                 else:
                     anc_pt = [anc_x + anc_w, anc_y + anc_h / 2]
                     free_pt = [free_x, free_y + free_h / 2]
             elif direction == "DOWN":
-                if src_in:
+                if src_inside:
                     anc_pt = [anc_x + anc_w / 2, anc_y + anc_h]
                     free_pt = [free_x + free_w / 2, free_y]
                 else:
                     anc_pt = [anc_x + anc_w / 2, anc_y]
                     free_pt = [free_x + free_w / 2, free_y + free_h]
             else:  # UP
-                if src_in:
+                if src_inside:
                     anc_pt = [anc_x + anc_w / 2, anc_y]
                     free_pt = [free_x + free_w / 2, free_y + free_h]
                 else:
                     anc_pt = [anc_x + anc_w / 2, anc_y + anc_h]
                     free_pt = [free_x + free_w / 2, free_y]
-            start_pt, end_pt = (anc_pt, free_pt) if src_in else (free_pt, anc_pt)
+            start_pt, end_pt = (anc_pt, free_pt) if src_inside else (free_pt, anc_pt)
             patches.append({"id": eid, "points": [start_pt, end_pt]})
 
         patches_json = json.dumps(patches)
@@ -2400,6 +2490,26 @@ async () => {{
             sg_json = json.dumps(subgraph_payloads)
             _browser_evaluate(f"() => window._batch_draw([], [], {sg_json})")
 
+        # Persist computed positions in session state so subsequent rerenders
+        # (screenshot/share/reload) keep this layout instead of re-gridding.
+        moved = 0
+        for pos in positions_list:
+            shape = layout_state["shapes"].get(pos["id"])
+            if shape is None:
+                continue
+            shape["x"] = float(pos["x"])
+            shape["y"] = float(pos["y"])
+            moved += 1
+        if moved:
+            new_max = max(
+                float(pos["y"]) + float(node_dims.get(pos["id"], (160, 60))[1])
+                for pos in positions_list
+            )
+            if use_selection:
+                new_max = max(new_max, float(layout_state.get("canvas_max_y", 60.0)))
+            layout_state["canvas_max_y"] = new_max
+            _session.save(layout_state, board)
+
         fit()
 
         n_nodes = len(positions_list)
@@ -2434,8 +2544,8 @@ def align(*, ids: list[str], axis: str) -> str:
         Summary like ``"aligned 3 element(s) (left)"``.
 
     Example:
-        wb.align(ids=["a", "b", "c"], axis="top")
-        wb.align(ids=["a", "b", "c"], axis="hdistribute")
+        whiteboard.align(ids=["a", "b", "c"], axis="top")
+        whiteboard.align(ids=["a", "b", "c"], axis="hdistribute")
     """
     axis = axis.lower()
     if axis not in _ALIGN_ACTIONS:
@@ -2482,8 +2592,8 @@ def screenshot(*, file: str | None = None, board: str | None = None) -> Any:
         Screenshot image content, or confirmation message when file is given.
 
     Example:
-        excalidraw.screenshot()
-        excalidraw.screenshot(file="diagrams/canvas.png")
+        whiteboard.screenshot()
+        whiteboard.screenshot(file="diagrams/canvas.png")
     """
     with LogSpan(span="excalidraw.screenshot") as s:
         # Load session state and render to browser
@@ -2515,7 +2625,7 @@ def hard_reset() -> str:
         "hard reset: state cleared (browser unavailable)"
 
     Example:
-        excalidraw.hard_reset()
+        whiteboard.hard_reset()
     """
     _session.clear_board(None)
 
@@ -2571,7 +2681,7 @@ def open() -> str:
         "whiteboard ready" on success, or an error string.
 
     Example:
-        excalidraw.open()
+        whiteboard.open()
     """
     with LogSpan(span="excalidraw.open") as s:
         err = _ensure_ready()
@@ -2581,8 +2691,10 @@ def open() -> str:
             return err
         # Always start fresh: clear session file and canvas
         _session.clear_board(None)
-        with contextlib.suppress(Exception):
+        try:
             _browser_evaluate("() => window.__drawApi.clear()")
+        except Exception as exc:
+            return f"whiteboard ready [warning: canvas clear failed — {exc}]"
         return "whiteboard ready"
 
 
@@ -2597,7 +2709,7 @@ def close() -> str:
         Confirmation message.
 
     Example:
-        excalidraw.close()
+        whiteboard.close()
     """
     global _browser, _tab
     _session.clear_board(None)

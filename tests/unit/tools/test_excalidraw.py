@@ -7,6 +7,7 @@ _parse_style_props, and smoke tests for public tools with mocked pydoll tab.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -3196,5 +3197,442 @@ def test_open_browser_launches_chrome_with_suppression_flags() -> None:
     launched_flags = kwargs["options"].arguments
     for flag in _CHROME_SUPPRESSION_FLAGS:
         assert flag in launched_flags
+
+
+# ===========================================================================
+# Bug-fix pass (whiteboard-pack-fixes): B1-B5 + browser push error reporting
+# ===========================================================================
+
+
+def _extract_layout_patches(js_calls: list[str]) -> list[dict[str, Any]]:
+    """Extract the patches array from the captured layout() patch JS."""
+    for js in js_calls:
+        m = re.search(r"const patches = (\[.*?\]);", js, re.DOTALL)
+        if m:
+            return json.loads(m[1])
+    return []
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestLayoutBoundaryArrowContainment:
+    """B1: each boundary arrow must use its own containment value, not the
+    stale ``src_in`` left over from the edge-classification loop."""
+
+    def _run(self) -> list[dict[str, Any]]:
+        # Only b is selected. edge-a-b enters the selection (src outside),
+        # edge-b-d leaves it (src inside). The classification loop processes
+        # edge-b-d last, leaving src_in=True — the buggy code applied that to
+        # edge-a-b as well.
+        good_scene = {
+            "nodes": [
+                {"id": "a", "w": 160, "h": 60, "groupIds": [], "x": 0, "y": 100},
+                {"id": "b", "w": 160, "h": 60, "groupIds": [], "x": 300, "y": 100},
+                {"id": "d", "w": 160, "h": 60, "groupIds": [], "x": 600, "y": 100},
+            ],
+            "edges": [
+                {"id": "edge-a-b", "src": "a", "dst": "b"},
+                {"id": "edge-b-d", "src": "b", "dst": "d"},
+            ],
+            "selectedIds": ["b"],
+        }
+        # Selection offset anchors to b's current position (300, 100).
+        elk_response = {"nodes": [{"id": "b", "x": 300, "y": 100}], "edges": []}
+        captured: list[str] = []
+
+        def _json_side_effect(js: str) -> Any:
+            if "selectedIds" in js:
+                return good_scene
+            if "ELK" in js:
+                return elk_response
+            return None
+
+        def _eval_side_effect(fn: str) -> str:
+            captured.append(fn)
+            return ""
+
+        from otdev.tools import excalidraw
+
+        _reset_exc_state()
+        with (
+            patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+            patch("otdev.tools.excalidraw._browser_evaluate_json", side_effect=_json_side_effect),
+            patch("otdev.tools.excalidraw._browser_evaluate", side_effect=_eval_side_effect),
+        ):
+            result = excalidraw.layout(direction="RIGHT")
+
+        assert "layout applied" in result, f"unexpected result: {result!r}"
+        return _extract_layout_patches(captured)
+
+    def test_dst_inside_edge_uses_entry_side(self) -> None:
+        """a→b (a outside): arrow must run from a's right edge to b's left edge."""
+        patches = self._run()
+        p = next(p for p in patches if p["id"] == "edge-a-b")
+        assert p["points"] == [[160.0, 130.0], [300.0, 130.0]], (
+            "edge-a-b must use its own containment (dst inside): "
+            f"start at a's right edge, end at b's left edge — got {p['points']}"
+        )
+
+    def test_src_inside_edge_uses_exit_side(self) -> None:
+        """b→d (b inside): arrow must run from b's right edge to d's left edge."""
+        patches = self._run()
+        p = next(p for p in patches if p["id"] == "edge-b-d")
+        assert p["points"] == [[460.0, 130.0], [600.0, 130.0]], (
+            f"edge-b-d must exit b's right edge and end at d's left edge — got {p['points']}"
+        )
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestLayoutGroupBbox:
+    """B5: grouped clusters must be sized from member positions, not sizes."""
+
+    def test_group_elk_node_sized_from_positions(self) -> None:
+        good_scene = {
+            "nodes": [
+                {"id": "m1", "w": 160, "h": 60, "groupIds": ["g1"], "x": 0, "y": 0},
+                {"id": "m2", "w": 160, "h": 60, "groupIds": ["g1"], "x": 200, "y": 150},
+            ],
+            "edges": [],
+            "selectedIds": [],
+        }
+        elk_response = {"nodes": [{"id": "g1", "x": 60, "y": 60}], "edges": []}
+        captured_elk: list[str] = []
+
+        def _json_side_effect(js: str) -> Any:
+            if "selectedIds" in js:
+                return good_scene
+            if "ELK" in js:
+                captured_elk.append(js)
+                return elk_response
+            return None
+
+        from otdev.tools import excalidraw
+
+        _reset_exc_state()
+        with (
+            patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+            patch("otdev.tools.excalidraw._browser_evaluate_json", side_effect=_json_side_effect),
+            patch("otdev.tools.excalidraw._browser_evaluate"),
+        ):
+            excalidraw.layout()
+
+        assert captured_elk, "ELK layout JS was not invoked"
+        m = re.search(r"const graph = (\{.*\});", captured_elk[0])
+        assert m, "could not find ELK graph in JS"
+        graph = json.loads(m[1])
+        g1 = next(c for c in graph["children"] if c["id"] == "g1")
+        # bbox spans (0,0)-(360,210) — not max member size (160x60)
+        assert g1["width"] == 360
+        assert g1["height"] == 210
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestDrawUpdatedCount:
+    """B4: 'M updated' must compare against the pre-draw state snapshot."""
+
+    def test_label_change_counts_as_updated(self, tmp_path: Any) -> None:
+        from unittest.mock import patch as _patch
+
+        from otdev.tools import excalidraw
+        from otdev.tools._excalidraw import session as _sess
+
+        _reset_exc_state()
+        with _patch.object(_sess, "_whiteboard_dir", return_value=tmp_path):
+            excalidraw.draw(input='a["A"]')
+            result = excalidraw.draw(input='a["B"]')
+            state = _sess.load(None)
+
+        assert "+0 shapes, 1 updated" in result, f"unexpected result: {result!r}"
+        assert state["shapes"]["a"]["label"] == "B"
+
+    def test_unchanged_label_not_counted(self, tmp_path: Any) -> None:
+        from unittest.mock import patch as _patch
+
+        from otdev.tools import excalidraw
+        from otdev.tools._excalidraw import session as _sess
+
+        _reset_exc_state()
+        with _patch.object(_sess, "_whiteboard_dir", return_value=tmp_path):
+            excalidraw.draw(input='a["A"]')
+            result = excalidraw.draw(input='a["A"]')
+
+        assert "updated" not in result, f"unexpected result: {result!r}"
+
+    def test_style_only_update_counted(self, tmp_path: Any) -> None:
+        from unittest.mock import patch as _patch
+
+        from otdev.tools import excalidraw
+        from otdev.tools._excalidraw import session as _sess
+
+        _reset_exc_state()
+        with _patch.object(_sess, "_whiteboard_dir", return_value=tmp_path):
+            excalidraw.draw(input='a["A"]')
+            result = excalidraw.draw(input="a bc:green")
+
+        assert "1 updated" in result, f"unexpected result: {result!r}"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestDrawInlineStyles:
+    """B2: inline DSL styles must be persisted in state and applied via the
+    patch path for existing shapes."""
+
+    def test_new_shape_inline_style_persisted(self, tmp_path: Any) -> None:
+        from unittest.mock import patch as _patch
+
+        from otdev.tools import excalidraw
+        from otdev.tools._excalidraw import session as _sess
+
+        _reset_exc_state()
+        with _patch.object(_sess, "_whiteboard_dir", return_value=tmp_path):
+            excalidraw.draw(input='a["A"] bc:green,sw:2')
+            state = _sess.load(None)
+
+        style = state["shapes"]["a"].get("style")
+        assert style is not None, "inline style must be persisted in session state"
+        assert style["backgroundColor"] == "#bbf7d0"
+        assert style["strokeWidth"] == 2
+
+    def test_inline_xy_stored_as_position_not_style(self, tmp_path: Any) -> None:
+        from unittest.mock import patch as _patch
+
+        from otdev.tools import excalidraw
+        from otdev.tools._excalidraw import session as _sess
+
+        _reset_exc_state()
+        with _patch.object(_sess, "_whiteboard_dir", return_value=tmp_path):
+            excalidraw.draw(input='a["A"] x:111,y:222')
+            state = _sess.load(None)
+
+        shape = state["shapes"]["a"]
+        assert shape["x"] == 111.0
+        assert shape["y"] == 222.0
+        assert "x" not in (shape.get("style") or {})
+        assert "y" not in (shape.get("style") or {})
+
+    def test_existing_shape_style_applied_via_patch_path(self, tmp_path: Any) -> None:
+        from unittest.mock import patch as _patch
+
+        from otdev.tools import excalidraw
+        from otdev.tools._excalidraw import session as _sess
+
+        _reset_exc_state()
+        captured: list[str] = []
+
+        def capture_eval(fn: str) -> str:
+            captured.append(fn)
+            return "null"
+
+        with _patch.object(_sess, "_whiteboard_dir", return_value=tmp_path):
+            excalidraw.draw(input='a["A"]')  # browser-free
+            with (
+                patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+                patch("otdev.tools.excalidraw._browser_evaluate", side_effect=capture_eval),
+            ):
+                result = excalidraw.draw(input="a bc:green")
+            state = _sess.load(None)
+
+        patch_calls = [c for c in captured if "_patch_elements" in c]
+        assert patch_calls, "existing-shape style update must go through _patch_elements"
+        assert "#bbf7d0" in patch_calls[0], "resolved colour must be in the patch payload"
+        assert "1 updated" in result
+        assert state["shapes"]["a"]["style"]["backgroundColor"] == "#bbf7d0"
+
+    def test_new_shape_style_sent_in_batch_draw(self, tmp_path: Any) -> None:
+        from unittest.mock import patch as _patch
+
+        from otdev.tools import excalidraw
+        from otdev.tools._excalidraw import session as _sess
+
+        _reset_exc_state()
+        captured: list[dict[str, Any]] = []
+
+        def capture_batch(**kwargs: Any) -> None:
+            captured.append(kwargs)
+
+        with (
+            _patch.object(_sess, "_whiteboard_dir", return_value=tmp_path),
+            patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+            patch("otdev.tools.excalidraw._js_batch_draw", side_effect=capture_batch),
+        ):
+            excalidraw.draw(input='a["A"] bc:green')
+
+        assert captured, "_js_batch_draw must be called for new shapes"
+        payload = next(p for p in captured[0]["shapes"] if p["id"] == "a")
+        assert payload["styleProps"]["backgroundColor"] == "#bbf7d0"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestRerenderPreservesLayout:
+    """B3: rerenders must restore stored positions/styles; grid only for
+    shapes with no stored position."""
+
+    def test_rerender_uses_stored_positions(self) -> None:
+        from otdev.tools import excalidraw
+
+        state = {
+            "shapes": {
+                "a": {"label": "A", "classes": [], "x": 555.0, "y": 666.0},
+                "b": {"label": "B", "classes": []},
+            },
+            "edges": [],
+            "groups": {},
+        }
+        captured: list[dict[str, Any]] = []
+        with patch(
+            "otdev.tools.excalidraw._js_batch_draw",
+            side_effect=lambda **kw: captured.append(kw),
+        ):
+            excalidraw._rerender_from_state(state)
+
+        payloads = {p["id"]: p for p in captured[0]["shapes"]}
+        assert payloads["a"]["x"] == 555.0
+        assert payloads["a"]["y"] == 666.0
+        # b has no stored position → first grid slot
+        assert payloads["b"]["x"] == 100.0
+        assert payloads["b"]["y"] == 100.0
+
+    def test_rerender_applies_stored_style(self) -> None:
+        from otdev.tools import excalidraw
+
+        state = {
+            "shapes": {
+                "a": {"label": "A", "classes": [], "x": 10.0, "y": 20.0,
+                      "style": {"backgroundColor": "#bbf7d0"}},
+            },
+            "edges": [],
+            "groups": {},
+        }
+        captured: list[dict[str, Any]] = []
+        with patch(
+            "otdev.tools.excalidraw._js_batch_draw",
+            side_effect=lambda **kw: captured.append(kw),
+        ):
+            excalidraw._rerender_from_state(state)
+
+        payload = captured[0]["shapes"][0]
+        assert payload["styleProps"]["backgroundColor"] == "#bbf7d0"
+
+    def test_draw_persists_auto_positions(self, tmp_path: Any) -> None:
+        from unittest.mock import patch as _patch
+
+        from otdev.tools import excalidraw
+        from otdev.tools._excalidraw import session as _sess
+
+        _reset_exc_state()
+        with _patch.object(_sess, "_whiteboard_dir", return_value=tmp_path):
+            excalidraw.draw(input='a["A"]\nb["B"]')
+            state = _sess.load(None)
+
+        for nid in ("a", "b"):
+            assert state["shapes"][nid].get("x") is not None
+            assert state["shapes"][nid].get("y") is not None
+
+    def test_layout_writes_positions_to_session(self, tmp_path: Any) -> None:
+        from unittest.mock import patch as _patch
+
+        from otdev.tools import excalidraw
+        from otdev.tools._excalidraw import session as _sess
+
+        _reset_exc_state()
+
+        good_scene = {
+            "nodes": [{"id": "a", "w": 160, "h": 60, "groupIds": [], "x": 100, "y": 100}],
+            "edges": [],
+            "selectedIds": [],
+        }
+        elk_response = {"nodes": [{"id": "a", "x": 40.0, "y": 15.0}], "edges": []}
+
+        def _json_side_effect(js: str) -> Any:
+            if "selectedIds" in js:
+                return good_scene
+            if "ELK" in js:
+                return elk_response
+            return None
+
+        with _patch.object(_sess, "_whiteboard_dir", return_value=tmp_path):
+            excalidraw.draw(input='a["A"]')
+            with (
+                patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+                patch("otdev.tools.excalidraw._browser_evaluate_json", side_effect=_json_side_effect),
+                patch("otdev.tools.excalidraw._browser_evaluate"),
+            ):
+                result = excalidraw.layout()
+            state = _sess.load(None)
+
+        assert "layout applied" in result, f"unexpected result: {result!r}"
+        assert state["shapes"]["a"]["x"] == 40.0
+        assert state["shapes"]["a"]["y"] == 15.0
+        assert state["canvas_max_y"] == 75.0  # y + node height
+
+    def test_note_persists_position_and_size(self, tmp_path: Any) -> None:
+        from unittest.mock import patch as _patch
+
+        from otdev.tools import excalidraw
+        from otdev.tools._excalidraw import session as _sess
+
+        _reset_exc_state()
+        with (
+            _patch.object(_sess, "_whiteboard_dir", return_value=tmp_path),
+            patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+        ):
+            excalidraw.note(input="n1[note:\nhello\n]")
+            state = _sess.load(None)
+
+        n1 = state["shapes"]["n1"]
+        assert n1["x"] == 500.0
+        assert n1["y"] is not None
+        assert n1["style"]["width"] > 0
+        assert n1["style"]["height"] > 0
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestBrowserPushFailureReported:
+    """A failed canvas push must be reported in the returned string, not
+    silently swallowed. State is still committed."""
+
+    def test_draw_reports_canvas_failure(self, tmp_path: Any) -> None:
+        from unittest.mock import patch as _patch
+
+        from otdev.tools import excalidraw
+        from otdev.tools._excalidraw import session as _sess
+
+        _reset_exc_state()
+        with (
+            _patch.object(_sess, "_whiteboard_dir", return_value=tmp_path),
+            patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+            patch("otdev.tools.excalidraw._js_batch_draw", side_effect=RuntimeError("boom")),
+        ):
+            result = excalidraw.draw(input='a["A"]')
+            state = _sess.load(None)
+
+        assert "+1 shapes" in result
+        assert "warning" in result and "boom" in result
+        assert "a" in state["shapes"], "state must be committed even when push fails"
+
+    def test_erase_reports_canvas_failure(self, tmp_path: Any) -> None:
+        from unittest.mock import patch as _patch
+
+        from otdev.tools import excalidraw
+        from otdev.tools._excalidraw import session as _sess
+
+        _reset_exc_state()
+        with _patch.object(_sess, "_whiteboard_dir", return_value=tmp_path):
+            excalidraw.draw(input='a["A"]')
+            with (
+                patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+                patch("otdev.tools.excalidraw._browser_evaluate", side_effect=RuntimeError("boom")),
+            ):
+                result = excalidraw.erase(ids=["a"])
+            state = _sess.load(None)
+
+        assert "erased 1 element(s)" in result
+        assert "warning" in result and "boom" in result
+        assert "a" not in state["shapes"]
 
     _reset_exc_state()
