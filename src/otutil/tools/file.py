@@ -1003,10 +1003,6 @@ def list(
 
                 entries.append((type_ind, str(rel_path), size, mtime))
 
-                # Enforce limit before sorting (will re-limit after sort)
-                if len(entries) >= cfg.max_list_entries * 2:
-                    break
-
             # Sort based on sort_by parameter
             if sort_by == "type":
                 entries.sort(key=lambda x: (x[0], x[1].lower()), reverse=reverse)
@@ -1235,11 +1231,12 @@ def search(
 
                     # Match against search pattern (glob or substring)
                     name_to_match = entry.name if case_sensitive else entry.name.lower()
-                    pattern_core = search_pattern.replace("*", "")
-                    if (
-                        not fnmatch.fnmatch(name_to_match, search_pattern)
-                        and pattern_core not in name_to_match
-                    ):
+                    if any(ch in search_pattern for ch in "*?["):
+                        # Glob pattern: fnmatch decides — no substring fallback,
+                        # so "*.py" does not match "x.pyc".
+                        if not fnmatch.fnmatch(name_to_match, search_pattern):
+                            continue
+                    elif search_pattern not in name_to_match:
                         continue
 
                     # Get relative path and size
@@ -1883,21 +1880,22 @@ def edit(
     path: str,
     old_text: str,
     new_text: str,
-    occurrence: int = 1,
+    occurrence: int | None = None,
     encoding: str = "utf-8",
     dry_run: bool = False,
 ) -> str:
     """Edit a file by replacing text.
 
-    Performs exact string replacement. By default replaces the first
-    occurrence. Errors if old_text appears multiple times and occurrence
-    is not specified.
+    Performs exact string replacement. Errors if old_text appears multiple
+    times and occurrence is not specified; occurrence=1 explicitly targets
+    the first match.
 
     Args:
         path: Path to file
         old_text: Exact text to find and replace
         new_text: Text to replace with
-        occurrence: Which occurrence to replace (1=first, 0=all, default: 1)
+        occurrence: Which occurrence to replace (1=first, 0=all). Defaults to
+            the sole occurrence; required when old_text matches more than once.
         encoding: Character encoding (default: utf-8)
         dry_run: If True, show what would happen without editing (default: False)
 
@@ -1939,9 +1937,12 @@ def edit(
             s.add(error="not_found")
             return "Error: Text not found in file"
 
-        if count > 1 and occurrence == 1:
+        if count > 1 and occurrence is None:
             s.add(error="ambiguous")
             return f"Error: Found {count} occurrences. Use occurrence=0 to replace all, or specify which (1-{count})."
+
+        if occurrence is None:
+            occurrence = 1
 
         if occurrence > count:
             s.add(error="occurrence_out_of_range")
@@ -2074,6 +2075,9 @@ def delete(
 
             # Use send2trash if configured
             if cfg.use_trash:
+                if resolved.is_dir() and not recursive and any(resolved.iterdir()):
+                    s.add(error="directory_not_empty")
+                    return f"Error: Directory not empty: {path}. Use recursive=True to delete contents."
                 send2trash.send2trash(str(resolved))
                 s.add(deleted=True, method="trash")
                 return f"OK: Moved to trash: {path}"

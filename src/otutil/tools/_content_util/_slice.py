@@ -6,7 +6,8 @@ import re
 from typing import Any
 
 # Line range regex: matches patterns like ":50", "400:", "151:200", "-50:"
-LINE_RANGE_RE = re.compile(r"^-?\d*:\d*$")
+# A leading "-" requires digits after it so "-:" is not treated as a range.
+LINE_RANGE_RE = re.compile(r"^(-?\d+)?:\d*$")
 
 
 def resolve_line_range(spec: str, lines: list[str], total: int) -> str | None:
