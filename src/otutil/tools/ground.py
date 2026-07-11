@@ -221,7 +221,13 @@ def _format_error(e: Exception) -> str:
 
     if "invalid tools.ground configuration" in error_str:
         return f"Search failed: {original}"
-    elif "quota" in error_str or "rate" in error_str:
+    elif (
+        "quota" in error_str
+        or "429" in error_str
+        or "rate limit" in error_str
+        or "rate-limit" in error_str
+        or "ratelimit" in error_str
+    ):
         return "Error: API quota exceeded. Try again later."
     elif "authentication" in error_str or "api key" in error_str or "unauthorized" in error_str:
         return "Error: Invalid GEMINI_API_KEY. Check secrets.yaml."
