@@ -295,3 +295,17 @@ The tool SHALL emit structured runtime logs for all fetch operations.
   - `output_format`: Requested output format
   - `contentLen`: Extracted content length (if successful)
   - `cached`: Whether cache was used
+
+### Requirement: Private URL Blocking (Opt-in)
+
+When `tools.webfetch.block_private_urls` is enabled, `webfetch.fetch()` SHALL refuse URLs whose host is or resolves to a private, loopback, link-local, or reserved address. The guard is best-effort (DNS-resolution based), not a hard security boundary.
+
+#### Scenario: Private URL refused when enabled
+- **GIVEN** `tools.webfetch.block_private_urls: true`
+- **WHEN** `webfetch.fetch(url="http://192.168.1.1/admin")` is called
+- **THEN** it SHALL return an error mentioning the config key without fetching
+
+#### Scenario: Default allows private URLs
+- **GIVEN** default configuration
+- **WHEN** a loopback fixture URL is fetched
+- **THEN** the fetch SHALL proceed (existing behavior preserved)
