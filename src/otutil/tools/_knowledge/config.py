@@ -235,6 +235,26 @@ class Config(BaseModel):
         default="",
         description="LLM model for enrichment (falls back to ot_llm default if empty)",
     )
+    enrich_prompt: str = Field(
+        default="",
+        description="Custom summarisation instruction for kb enrich (empty = built-in default)",
+    )
+    enrich_batch_size: int = Field(
+        default=20,
+        ge=1,
+        le=500,
+        description="Number of summaries written per database commit during kb enrich",
+    )
+    enrich_min_chars: int = Field(
+        default=400,
+        ge=0,
+        description="Chunks with content shorter than this are skipped by kb enrich (summary=''); 0 disables skipping",
+    )
+    enrich_max_chars: int = Field(
+        default=6000,
+        ge=200,
+        description="Chunk content is truncated to this many characters in the enrichment prompt",
+    )
     min_chunk_chars: int = Field(
         default=200,
         ge=0,

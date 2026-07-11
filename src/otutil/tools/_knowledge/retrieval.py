@@ -159,8 +159,10 @@ def search(
             extract = config.search_extract
             lines = [f"Found {len(results)} results for: {query}\n"]
             for i, r in enumerate(results, 1):
-                content = r["content"]
-                if extract > 0 and len(content) > extract:
+                # Show the LLM summary when present; fall back to the content
+                # extract. Full content remains available via kb.read.
+                content = r.get("summary") or r["content"]
+                if not r.get("summary") and extract > 0 and len(content) > extract:
                     content = content[:extract] + "..."
                 tags_str = ", ".join(r["tags_list"]) if r["tags_list"] else "none"
                 meta = r["meta_dict"]
@@ -365,7 +367,7 @@ def _graph_expand(conn: Any, results: list[dict[str, Any]], limit: int) -> list[
     extra = []
     for r in results:
         rows = conn.execute(
-            "SELECT c.id, c.topic, c.content, c.category, c.tags, c.meta, c.hit_count "
+            "SELECT c.id, c.topic, c.content, c.category, c.tags, c.meta, c.hit_count, c.summary "
             "FROM edges e JOIN chunks c ON c.id = e.dst_id WHERE e.src_id = ?",
             [r["id"]],
         ).fetchall()
@@ -377,7 +379,7 @@ def _graph_expand(conn: Any, results: list[dict[str, Any]], limit: int) -> list[
                 extra.append({
                     "id": row[0], "topic": row[1], "content": row[2],
                     "category": row[3], "tags": row[4], "meta": row[5],
-                    "hit_count": row[6], "score": 0.0,
+                    "hit_count": row[6], "summary": row[7] or "", "score": 0.0,
                     "tags_list": tags, "meta_dict": meta,
                 })
     combined = results + extra

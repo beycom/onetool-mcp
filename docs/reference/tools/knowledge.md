@@ -65,7 +65,11 @@ Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis.
 | `tools.knowledge.embedding_batch_size` | int | `200` | Texts per embeddings API call. Range: `1-2048`. |
 | `tools.knowledge.search_limit` | int | `10` | Default max search results. Range: `1-100`. |
 | `tools.knowledge.search_extract` | int | `300` | Character limit for content extract in search results (`0` = full). |
-| `tools.knowledge.enrich_model` | string | `""` | LLM model for `knowledge.ask()` synthesis. Empty = falls back to top-level `llm.model`. |
+| `tools.knowledge.enrich_model` | string | `""` | LLM model for `knowledge.ask()` synthesis and `kb enrich` summaries. Empty = falls back to top-level `llm.model`. |
+| `tools.knowledge.enrich_prompt` | string | `""` | Custom summarisation instruction for `kb enrich`. Empty = built-in default. |
+| `tools.knowledge.enrich_batch_size` | int | `20` | Summaries written per database commit during `kb enrich`. Range: `1-500`. |
+| `tools.knowledge.enrich_min_chars` | int | `400` | Chunks with content shorter than this are skipped by `kb enrich` (`summary=''`). `0` disables skipping. |
+| `tools.knowledge.enrich_max_chars` | int | `6000` | Chunk content is truncated to this many characters in the enrichment prompt. Min: `200`. |
 | `tools.knowledge.min_chunk_chars` | int | `200` | Minimum body characters per chunk. Chunks below threshold are merged. `0` disables. |
 
 Project registry (under `tools.knowledge.kb`):
@@ -176,11 +180,32 @@ onetool kb index <project> [OPTIONS]
 |--------|-------------|
 | `--path PATH` | Directory to index (overrides project's `output_base_dir`) |
 | `--overwrite TEXT` | `skip` (default) or `update` |
+| `--enrich` | Generate LLM summaries for the chunks indexed this run |
 
 ```bash
 onetool kb index docs
 onetool kb index docs --overwrite update
 onetool kb index docs --path /tmp/scraped
+onetool kb index docs --overwrite update --enrich
+```
+
+### onetool kb enrich
+
+Generate short LLM summaries for chunks missing them (backfill). Summaries are shown in `knowledge.search()` results and matched by keyword search. Requires `OPENAI_API_KEY`. Content changes (re-index, `kb.update`, `kb.append`) clear the affected summaries so the next run regenerates them.
+
+```bash
+onetool kb enrich <db> [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--limit INT` | Max chunks to enrich this run (incremental backfill) |
+| `--force` | Re-summarise all chunks, not just those missing summaries |
+
+```bash
+onetool kb enrich docs
+onetool kb enrich docs --limit 100
+onetool kb enrich docs --force
 ```
 
 ### onetool kb reindex

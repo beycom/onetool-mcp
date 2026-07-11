@@ -191,7 +191,7 @@ def append(*, topic: str, content: str, db: str, id: str | None = None) -> str:
                 new_content = old_content + content
                 new_hash = _content_hash(new_content)
                 conn.execute(
-                    "UPDATE chunks SET content = ?, content_hash = ?, updated_at = datetime('now') WHERE id = ?",
+                    "UPDATE chunks SET content = ?, content_hash = ?, summary = NULL, updated_at = datetime('now') WHERE id = ?",
                     [new_content, new_hash, chunk_id],
                 )
                 embed_err = _try_embed(conn, chunk_id, new_content)
@@ -247,7 +247,7 @@ def update(*, topic: str, content: str, db: str, id: str | None = None, source_p
                 embed_err: str | None = None
                 for (chunk_id,) in rows:
                     conn.execute(
-                        "UPDATE chunks SET content = ?, content_hash = ?, updated_at = datetime('now') WHERE id = ?",
+                        "UPDATE chunks SET content = ?, content_hash = ?, summary = NULL, updated_at = datetime('now') WHERE id = ?",
                         [content, new_hash, chunk_id],
                     )
                     embed_err = _try_embed(conn, chunk_id, content) or embed_err

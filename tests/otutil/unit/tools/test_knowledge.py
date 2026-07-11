@@ -3963,3 +3963,405 @@ class TestScrapeResumeState:
 
         state = _json.loads((tmp_path / ".state.json").read_text(encoding="utf-8"))
         assert state["done_urls"] == ["https://docs.example.test/a"]
+
+
+# ===========================================================================
+# Enrichment: config, enrich_db, invalidation, search surfacing, CLI wiring
+# ===========================================================================
+
+def _mock_enrich_config(**overrides: Any) -> MagicMock:
+    cfg = MagicMock()
+    cfg.enrich_model = "test-model"
+    cfg.enrich_prompt = ""
+    cfg.enrich_batch_size = 20
+    cfg.enrich_min_chars = 0
+    cfg.enrich_max_chars = 6000
+    for key, value in overrides.items():
+        setattr(cfg, key, value)
+    return cfg
+
+
+def _mock_llm_client(reply: str = "A concise summary.") -> MagicMock:
+    client = MagicMock()
+    message = MagicMock()
+    message.content = reply
+    choice = MagicMock()
+    choice.message = message
+    client.chat.completions.create.return_value = MagicMock(choices=[choice])
+    return client
+
+
+@contextlib.contextmanager
+def _patch_enrichment(conn: sqlite3.Connection, config: MagicMock, client: MagicMock | None):
+    with (
+        patch("otutil.tools._knowledge.enrichment.get_connection", return_value=conn),
+        patch("otutil.tools._knowledge.enrichment._get_config", return_value=config),
+        patch("otutil.tools._knowledge.enrichment._get_llm_client", return_value=client),
+    ):
+        yield
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestEnrichConfig:
+    """Config fields for enrichment (spec: config schema)."""
+
+    def test_defaults(self):
+        from otutil.tools._knowledge.config import Config
+        cfg = Config()
+        assert cfg.enrich_prompt == ""
+        assert cfg.enrich_batch_size == 20
+        assert cfg.enrich_min_chars == 400
+        assert cfg.enrich_max_chars == 6000
+
+    def test_batch_size_bounds_rejected(self):
+        from pydantic import ValidationError
+        from otutil.tools._knowledge.config import Config
+        with pytest.raises(ValidationError):
+            Config(enrich_batch_size=0)
+
+    def test_unknown_keys_still_rejected(self):
+        from pydantic import ValidationError
+        from otutil.tools._knowledge.config import Config
+        with pytest.raises(ValidationError):
+            Config(enrich_frobnicate=True)
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestEnrichDB:
+    """enrich_db selection, skip, failure, durability semantics."""
+
+    def _db(self) -> sqlite3.Connection:
+        conn = _make_in_memory_conn()
+        _apply_schema(conn)
+        return conn
+
+    def test_backfill_selects_only_missing_summaries(self):
+        from otutil.tools._knowledge.enrichment import enrich_db
+        conn = self._db()
+        _insert_chunk(conn, "c1", "a/one", "Content one")
+        _insert_chunk(conn, "c2", "b/two", "Content two")
+        _insert_chunk(conn, "c3", "c/three", "Content three")
+        conn.execute("UPDATE chunks SET summary = 'already done' WHERE id = 'c3'")
+        conn.commit()
+
+        client = _mock_llm_client()
+        with _patch_enrichment(conn, _mock_enrich_config(), client):
+            result = enrich_db(db_name="test")
+
+        assert result.enriched == 2
+        assert client.chat.completions.create.call_count == 2
+        rows = conn.execute("SELECT id, summary FROM chunks ORDER BY id").fetchall()
+        assert all(summary for _, summary in rows)
+        assert conn.execute("SELECT summary FROM chunks WHERE id='c3'").fetchone()[0] == "already done"
+
+    def test_force_reprocesses_all(self):
+        from otutil.tools._knowledge.enrichment import enrich_db
+        conn = self._db()
+        _insert_chunk(conn, "c1", "a/one", "Content one")
+        conn.execute("UPDATE chunks SET summary = 'stale' WHERE id = 'c1'")
+        conn.commit()
+
+        client = _mock_llm_client("fresh summary")
+        with _patch_enrichment(conn, _mock_enrich_config(), client):
+            result = enrich_db(db_name="test", force=True)
+
+        assert result.enriched == 1
+        assert conn.execute("SELECT summary FROM chunks WHERE id='c1'").fetchone()[0] == "fresh summary"
+
+    def test_limit_bounds_run(self):
+        from otutil.tools._knowledge.enrichment import enrich_db
+        conn = self._db()
+        for i in range(3):
+            _insert_chunk(conn, f"c{i}", f"t/{i}", f"Content {i}")
+
+        client = _mock_llm_client()
+        with _patch_enrichment(conn, _mock_enrich_config(), client):
+            result = enrich_db(db_name="test", limit=1)
+
+        assert result.enriched == 1
+        assert client.chat.completions.create.call_count == 1
+
+    def test_ids_filter_restricts_selection(self):
+        from otutil.tools._knowledge.enrichment import enrich_db
+        conn = self._db()
+        _insert_chunk(conn, "c1", "a/one", "Content one")
+        _insert_chunk(conn, "c2", "b/two", "Content two")
+
+        client = _mock_llm_client()
+        with _patch_enrichment(conn, _mock_enrich_config(), client):
+            result = enrich_db(db_name="test", ids=["c2"])
+
+        assert result.enriched == 1
+        assert conn.execute("SELECT summary FROM chunks WHERE id='c1'").fetchone()[0] is None
+        assert conn.execute("SELECT summary FROM chunks WHERE id='c2'").fetchone()[0]
+
+    def test_short_chunk_skipped_with_empty_summary(self):
+        from otutil.tools._knowledge.enrichment import enrich_db
+        conn = self._db()
+        _insert_chunk(conn, "c1", "a/one", "tiny")
+
+        client = _mock_llm_client()
+        with _patch_enrichment(conn, _mock_enrich_config(enrich_min_chars=400), client):
+            result = enrich_db(db_name="test")
+
+        assert result.skipped_short == 1
+        assert result.enriched == 0
+        client.chat.completions.create.assert_not_called()
+        assert conn.execute("SELECT summary FROM chunks WHERE id='c1'").fetchone()[0] == ""
+
+    def test_empty_response_is_failure_leaves_null(self):
+        from otutil.tools._knowledge.enrichment import enrich_db
+        conn = self._db()
+        _insert_chunk(conn, "c1", "a/one", "Content one")
+
+        client = _mock_llm_client("   ")
+        with _patch_enrichment(conn, _mock_enrich_config(), client):
+            result = enrich_db(db_name="test")
+
+        assert result.failed == 1
+        assert result.errors and "c1" in result.errors[0]
+        assert conn.execute("SELECT summary FROM chunks WHERE id='c1'").fetchone()[0] is None
+
+    def test_consecutive_failures_abort_run(self):
+        from otutil.tools._knowledge.enrichment import enrich_db
+        conn = self._db()
+        for i in range(7):
+            _insert_chunk(conn, f"c{i}", f"t/{i}", f"Content {i}")
+
+        client = MagicMock()
+        client.chat.completions.create.side_effect = RuntimeError("boom")
+        with _patch_enrichment(conn, _mock_enrich_config(), client):
+            result = enrich_db(db_name="test")
+
+        assert result.failed == 5
+        assert any("2 chunk(s) left unprocessed" in err for err in result.errors)
+
+    def test_per_batch_commit_survives_crash(self, tmp_path: Path):
+        from otutil.tools._knowledge.enrichment import enrich_db
+        db_path = tmp_path / "enrich.db"
+        conn = sqlite3.connect(str(db_path), check_same_thread=False)
+        _apply_schema(conn)
+        for i in range(3):
+            _insert_chunk(conn, f"c{i}", f"t/{i}", f"Content {i}")
+
+        client = _mock_llm_client()
+        # Crash (non-Exception) on the third call, after one batch of 2 committed.
+        good = client.chat.completions.create.return_value
+        client.chat.completions.create.side_effect = [good, good, KeyboardInterrupt()]
+        with _patch_enrichment(conn, _mock_enrich_config(enrich_batch_size=2), client):
+            with pytest.raises(KeyboardInterrupt):
+                enrich_db(db_name="test")
+
+        other = sqlite3.connect(str(db_path))
+        count = other.execute(
+            "SELECT COUNT(*) FROM chunks WHERE summary IS NOT NULL AND summary != ''"
+        ).fetchone()[0]
+        assert count == 2
+
+    def test_updated_at_unchanged_by_enrichment(self):
+        from otutil.tools._knowledge.enrichment import enrich_db
+        conn = self._db()
+        _insert_chunk(conn, "c1", "a/one", "Content one")
+        conn.execute("UPDATE chunks SET updated_at = '2020-01-01 00:00:00' WHERE id='c1'")
+        conn.commit()
+
+        with _patch_enrichment(conn, _mock_enrich_config(), _mock_llm_client()):
+            enrich_db(db_name="test")
+
+        assert conn.execute("SELECT updated_at FROM chunks WHERE id='c1'").fetchone()[0] == "2020-01-01 00:00:00"
+
+    def test_meta_topic_excluded(self):
+        from otutil.tools._knowledge.enrichment import enrich_db
+        conn = self._db()
+        _insert_chunk(conn, "m1", "_meta", "db metadata row")
+
+        client = _mock_llm_client()
+        with _patch_enrichment(conn, _mock_enrich_config(), client):
+            result = enrich_db(db_name="test")
+
+        assert result.enriched == 0
+        client.chat.completions.create.assert_not_called()
+
+    def test_missing_api_key_raises(self):
+        from otutil.tools._knowledge.enrichment import enrich_db
+        conn = self._db()
+        with _patch_enrichment(conn, _mock_enrich_config(), None):
+            with pytest.raises(ValueError, match="OPENAI_API_KEY"):
+                enrich_db(db_name="test")
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestSummaryInvalidation:
+    """Content changes clear stale summaries (design D7)."""
+
+    def test_reindex_changed_content_clears_summary(self, tmp_path: Path):
+        from otutil.tools._knowledge.indexer import index_directory
+        from otutil.tools._knowledge.db import close_connection, get_connection
+
+        md = tmp_path / "a.md"
+        md.write_text("# Alpha\n\nOriginal content.\n", encoding="utf-8")
+        db_name = f"test_enr_{id(tmp_path)}"
+        try:
+            with (
+                patch("otutil.tools._knowledge.indexer._store_embeddings_batch", return_value=None),
+                patch("otutil.tools._knowledge.db._resolve_db_path", return_value=tmp_path / f"{db_name}.db"),
+            ):
+                index_directory(path=str(tmp_path), db_name=db_name)
+                conn = get_connection(db_name)
+                conn.execute("UPDATE chunks SET summary = 'old summary'")
+                conn.commit()
+
+                md.write_text("# Alpha\n\nChanged content.\n", encoding="utf-8")
+                index_directory(path=str(tmp_path), db_name=db_name, overwrite="update")
+
+                summaries = [r[0] for r in conn.execute("SELECT summary FROM chunks").fetchall()]
+                assert all(s is None for s in summaries)
+                # FTS no longer matches the cleared summary text
+                match = conn.execute(
+                    "SELECT COUNT(*) FROM chunks_fts WHERE chunks_fts MATCH 'old'"
+                ).fetchone()[0]
+                assert match == 0
+        finally:
+            close_connection(db_name)
+
+    def test_crud_update_clears_summary(self):
+        from otutil.tools._knowledge import crud
+        conn = _make_in_memory_conn()
+        _apply_schema(conn)
+        _insert_chunk(conn, "c1", "test/topic", "Old content")
+        conn.execute("UPDATE chunks SET summary = 'stale' WHERE id='c1'")
+        conn.commit()
+        with _patch_crud_conn(conn), patch("otutil.tools._knowledge.crud._try_embed"):
+            crud.update(topic="test/topic", content="New content", db="test")
+        assert conn.execute("SELECT summary FROM chunks WHERE id='c1'").fetchone()[0] is None
+
+    def test_crud_append_clears_summary(self):
+        from otutil.tools._knowledge import crud
+        conn = _make_in_memory_conn()
+        _apply_schema(conn)
+        _insert_chunk(conn, "c1", "test/topic", "Original")
+        conn.execute("UPDATE chunks SET summary = 'stale' WHERE id='c1'")
+        conn.commit()
+        with _patch_crud_conn(conn), patch("otutil.tools._knowledge.crud._try_embed"):
+            crud.append(topic="test/topic", content=" more", db="test")
+        assert conn.execute("SELECT summary FROM chunks WHERE id='c1'").fetchone()[0] is None
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestSummaryInSearch:
+    """Summaries participate in FTS and are displayed in kb.search results."""
+
+    def test_fts_matches_summary_only_term(self):
+        from otutil.tools._knowledge.search import search_fts
+        conn = _make_in_memory_conn()
+        _apply_schema(conn)
+        _insert_chunk(conn, "c1", "a/one", "Body text without the special word")
+        conn.execute("UPDATE chunks SET summary = 'Covers zebrafish handling' WHERE id='c1'")
+        conn.commit()
+
+        results = search_fts(conn, "zebrafish", 10)
+        assert len(results) == 1
+        assert results[0]["id"] == "c1"
+        assert results[0]["summary"] == "Covers zebrafish handling"
+
+    def test_search_shows_summary_or_extract(self):
+        from otutil.tools._knowledge import retrieval
+        conn = _make_in_memory_conn()
+        _apply_schema(conn)
+        long_content = "word " * 200
+        _insert_chunk(conn, "c1", "a/one", "summarised chunk searchterm " + long_content)
+        _insert_chunk(conn, "c2", "b/two", "plain chunk searchterm " + long_content)
+        conn.execute("UPDATE chunks SET summary = 'THE SUMMARY LINE' WHERE id='c1'")
+        conn.commit()
+
+        cfg = MagicMock()
+        cfg.search_limit = 10
+        cfg.search_extract = 50
+        with (
+            patch("otutil.tools._knowledge.retrieval.get_connection", return_value=conn),
+            patch("otutil.tools._knowledge.retrieval._get_config", return_value=cfg),
+            patch("otutil.tools._knowledge.retrieval._increment_hit_counts"),
+        ):
+            out = retrieval.search(query="searchterm", db="test", mode="keyword")
+
+        assert "THE SUMMARY LINE" in out
+        assert "..." in out  # c2 fell back to the truncated extract
+
+    def test_ask_synthesis_uses_raw_content(self):
+        from otutil.tools._knowledge import retrieval
+        captured: dict[str, str] = {}
+
+        def fake_synthesise(query: str, context: str) -> str:
+            captured["context"] = context
+            return "answer"
+
+        results = [{
+            "id": "c1", "topic": "a/one", "content": "RAW CONTENT BODY",
+            "summary": "short summary", "score": 1.0,
+            "tags_list": [], "meta_dict": {},
+        }]
+        with (
+            patch("otutil.tools._knowledge.retrieval.get_connection", return_value=MagicMock()),
+            patch("otutil.tools._knowledge.retrieval.search_hybrid", return_value=results),
+            patch("otutil.tools._knowledge.retrieval._synthesise", side_effect=fake_synthesise),
+        ):
+            retrieval.ask(query="q", db="test", rerank=False, expand=False)
+
+        assert "RAW CONTENT BODY" in captured["context"]
+        assert "short summary" not in captured["context"]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestEnrichCLIWiring:
+    """kb index --enrich passes this run's chunk ids; default run makes no LLM calls."""
+
+    def test_index_enrich_passes_only_run_chunk_ids(self, tmp_path: Path):
+        from onetool.kb import cmd_index
+        from otutil.tools._knowledge.indexer import IndexResult
+
+        index_result = IndexResult(indexed=2, chunk_ids=["id-1", "id-2"])
+        with (
+            patch("otutil.tools._knowledge.indexer.index_directory", return_value=index_result),
+            patch("otutil.tools._knowledge.enrichment.enrich_db") as mock_enrich,
+        ):
+            from otutil.tools._knowledge.enrichment import EnrichResult
+            mock_enrich.return_value = EnrichResult(enriched=2)
+            cmd_index(project="p", path=str(tmp_path), overwrite="skip", enrich=True)
+
+        mock_enrich.assert_called_once()
+        assert mock_enrich.call_args.kwargs["ids"] == ["id-1", "id-2"]
+
+    def test_default_index_makes_no_llm_calls(self, tmp_path: Path):
+        from onetool.kb import cmd_index
+        from otutil.tools._knowledge.indexer import IndexResult
+
+        with (
+            patch("otutil.tools._knowledge.indexer.index_directory", return_value=IndexResult(indexed=1)),
+            patch("otutil.tools._knowledge.enrichment.enrich_db") as mock_enrich,
+        ):
+            cmd_index(project="p", path=str(tmp_path), overwrite="skip", enrich=False)
+
+        mock_enrich.assert_not_called()
+
+    def test_upsert_populates_chunk_ids_without_embeddings(self, tmp_path: Path):
+        from otutil.tools._knowledge.indexer import index_directory
+        from otutil.tools._knowledge.db import close_connection
+
+        (tmp_path / "a.md").write_text("# Alpha\n\nContent A.\n", encoding="utf-8")
+        db_name = f"test_ids_{id(tmp_path)}"
+        try:
+            with (
+                patch("otutil.tools._knowledge.indexer._store_embeddings_batch", return_value=None),
+                patch("otutil.tools._knowledge.indexer._db_embeddings_enabled", return_value=False),
+                patch("otutil.tools._knowledge.db._resolve_db_path", return_value=tmp_path / f"{db_name}.db"),
+            ):
+                result = index_directory(path=str(tmp_path), db_name=db_name)
+            assert result.indexed >= 1
+            assert len(result.chunk_ids) == result.indexed
+        finally:
+            close_connection(db_name)

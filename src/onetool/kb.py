@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
+
+if TYPE_CHECKING:
+    from otutil.tools._knowledge.enrichment import EnrichResult
 from rich.console import Console
 from rich.progress import (
     BarColumn,
@@ -18,7 +21,7 @@ from rich.progress import (
 
 kb_app = typer.Typer(
     name="kb",
-    help="Manage knowledge base databases (index, reindex, stats, info, export).",
+    help="Manage knowledge base databases (index, reindex, enrich, stats, info, export).",
     no_args_is_help=True,
 )
 
@@ -66,11 +69,25 @@ def kb_callback(
         get_config(config, secrets_path=secrets)
 
 
+def _print_enrich_result(result: EnrichResult) -> None:
+    """Print an EnrichResult summary (shared by cmd_enrich and cmd_index --enrich)."""
+    if result.errors:
+        console.print(f"[yellow]Errors ({len(result.errors)}):[/yellow]")
+        for err in result.errors[:5]:
+            console.print(f"  [red]![/red] {err}")
+    console.print(
+        f"[green]✓[/green] Enriched [bold]{result.enriched}[/bold], "
+        f"skipped {result.skipped_short} short, "
+        f"{result.failed} failed."
+    )
+
+
 @kb_app.command("index")
 def cmd_index(
     project: Annotated[str, typer.Argument(help="Project name from onetool.yaml kb config.")],
     path: Annotated[str | None, typer.Option("--path", help="Directory to index (overrides project's output_base_dir).")] = None,
     overwrite: Annotated[str, typer.Option("--overwrite", help="'skip' (default) or 'update'.")] = "skip",
+    enrich: Annotated[bool, typer.Option("--enrich", help="Generate LLM summaries for chunks indexed this run.")] = False,
 ) -> None:
     """Index a project's scraped content into the knowledge database."""
     if overwrite not in ("skip", "update"):
@@ -135,6 +152,50 @@ def cmd_index(
         f"skipped {result.skipped}, "
         f"{result.edges_added} link edge(s) added."
     )
+
+    if enrich:
+        if not result.chunk_ids:
+            console.print("[dim]--enrich: no new or updated chunks to enrich.[/dim]")
+            return
+        from otutil.tools._knowledge.enrichment import enrich_db
+
+        try:
+            enrich_result = enrich_db(db_name=db, ids=result.chunk_ids)
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+        _print_enrich_result(enrich_result)
+
+
+@kb_app.command("enrich")
+def cmd_enrich(
+    db: Annotated[str, _DB_ARG],
+    limit: Annotated[int | None, typer.Option("--limit", help="Max chunks to enrich this run.")] = None,
+    force: Annotated[bool, typer.Option("--force", help="Re-summarise all chunks, not just those missing summaries.")] = False,
+) -> None:
+    """Generate LLM summaries for chunks missing them (backfill)."""
+    from otutil.tools._knowledge.enrichment import enrich_db
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        enrich_task = progress.add_task("[cyan]Enriching[/cyan]", total=None)
+
+        def on_progress(done: int, total: int) -> None:
+            progress.update(enrich_task, completed=done, total=total)
+
+        try:
+            result = enrich_db(db_name=db, limit=limit, force=force, on_progress=on_progress)
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+
+    _print_enrich_result(result)
 
 
 @kb_app.command("reindex")

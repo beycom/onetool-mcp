@@ -36,7 +36,7 @@ def _exec_fts(
     """Execute a single FTS5 MATCH query and return raw rows."""
     sql = """
         SELECT c.id, c.topic, c.content, c.category, c.tags, c.meta, c.hit_count,
-               bm25(chunks_fts) AS score
+               c.summary, bm25(chunks_fts) AS score
         FROM chunks_fts
         JOIN chunks c ON c.rowid = chunks_fts.rowid
         WHERE chunks_fts MATCH ?
@@ -83,7 +83,7 @@ def search_fts(
         if prefix_q != fts_q:
             rows = _exec_fts(conn, prefix_q, limit, category)
 
-    return [_row_to_result(r, abs(r[7])) for r in rows]
+    return [_row_to_result(r, abs(r[8])) for r in rows]
 
 
 def search_vec(
@@ -102,7 +102,7 @@ def search_vec(
 
     sql = """
         SELECT c.id, c.topic, c.content, c.category, c.tags, c.meta, c.hit_count,
-               v.distance AS score
+               c.summary, v.distance AS score
         FROM chunks_vec v
         JOIN chunks c ON c.id = v.chunk_id
         WHERE v.embedding MATCH ? AND k = ?
@@ -124,7 +124,7 @@ def search_vec(
         raise
 
     # Distance is 0..2 (L2) — invert so lower distance = higher score
-    return [_row_to_result(r, 1.0 / (1.0 + r[7])) for r in rows]
+    return [_row_to_result(r, 1.0 / (1.0 + r[8])) for r in rows]
 
 
 def search_hybrid(
@@ -208,6 +208,7 @@ def _row_to_result(row: tuple[Any, ...], score: float) -> dict[str, Any]:
         "tags": row[4],
         "meta": row[5],
         "hit_count": row[6],
+        "summary": row[7] or "",
         "score": round(score, 4),
         # Parsed versions for filtering
         "tags_list": tags,

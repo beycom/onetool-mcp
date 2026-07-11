@@ -41,6 +41,9 @@ class IndexResult:
     skipped: int = 0
     edges_added: int = 0
     errors: list[str] = field(default_factory=list)
+    # Ids of every chunk inserted/updated this run (also when embeddings are
+    # disabled) — consumed by `kb index --enrich`.
+    chunk_ids: list[str] = field(default_factory=list)
 
 
 def index_directory(
@@ -207,11 +210,12 @@ def _upsert_chunk(
         if existing_hash == chunk.content_hash and overwrite == "skip":
             result.skipped += 1
             return None
-        # Update
+        # Update — content changed, so any stored summary is stale (design D7).
         conn.execute(
             """
             UPDATE chunks
             SET topic = ?, content = ?, content_hash = ?, tags = ?, meta = ?,
+                summary = NULL,
                 updated_at = datetime('now')
             WHERE id = ?
             """,
@@ -225,6 +229,7 @@ def _upsert_chunk(
             ],
         )
         result.indexed += 1
+        result.chunk_ids.append(existing_id)
         return (existing_id, chunk.content) if embeddings_enabled else None
     else:
         chunk_id = str(uuid.uuid4())
@@ -247,6 +252,7 @@ def _upsert_chunk(
             ],
         )
         result.indexed += 1
+        result.chunk_ids.append(chunk_id)
         return (chunk_id, chunk.content) if embeddings_enabled else None
 
 
