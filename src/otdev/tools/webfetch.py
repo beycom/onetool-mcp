@@ -58,6 +58,13 @@ class Config(BaseModel):
         le=500000,
         description="Maximum content length in characters",
     )
+    block_private_urls: bool = Field(
+        default=False,
+        description=(
+            "Refuse to fetch URLs whose host resolves to a private, loopback, "
+            "link-local, or reserved address (best-effort SSRF guard)"
+        ),
+    )
 
 
 def _get_config() -> Config:
@@ -96,6 +103,34 @@ def _is_loopback_url(url: str) -> bool:
     parsed = urlparse(url)
     host = (parsed.hostname or "").lower()
     return host in {"127.0.0.1", "localhost", "::1"}
+
+
+def _is_private_url(url: str) -> bool:
+    """Best-effort check that a URL's host is private/loopback/link-local.
+
+    Resolves hostnames via DNS; unresolvable hosts are treated as public
+    (the fetch will fail on its own). Not a hard security boundary.
+    """
+    import ipaddress
+    import socket
+
+    host = (urlparse(url).hostname or "").lower()
+    if not host:
+        return False
+    if host == "localhost" or host.endswith(".localhost") or host.endswith(".local"):
+        return True
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        return False
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            continue
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            return True
+    return False
 
 
 def _validate_options(favor_precision: bool, favor_recall: bool) -> str | None:
@@ -244,6 +279,13 @@ def fetch(
             import trafilatura
 
             # Fetch the page (with optional caching)
+            if _get_config().block_private_urls and _is_private_url(url):
+                s.add(error="private_url_blocked")
+                return (
+                    f"Error: Refusing to fetch private/internal URL: {url} "
+                    "(tools.webfetch.block_private_urls is enabled)"
+                )
+
             fetcher = _fetch_url_cached if use_cache else _fetch_url
             downloaded, content_type, final_url = fetcher(url, timeout)
 
