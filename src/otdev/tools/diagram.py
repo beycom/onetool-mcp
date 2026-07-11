@@ -1127,7 +1127,8 @@ def batch_render(
             return (
                 "Error: batch_render requires self-hosted Kroki.\n"
                 "The public kroki.io service has rate limits.\n"
-                "Run: onetool diagram setup --self-hosted"
+                "Start a local Kroki (docker run -p 8000:8000 yuzutech/kroki) and "
+                "set tools.diagram.backend.self_hosted_url in config."
             )
 
         task_id = f"batch-{uuid.uuid4().hex[:8]}"
@@ -1256,7 +1257,8 @@ def render_directory(
             s.add(error="requires_self_hosted")
             return (
                 "Error: render_directory requires self-hosted Kroki.\n"
-                "Run: onetool diagram setup --self-hosted"
+                "Start a local Kroki (docker run -p 8000:8000 yuzutech/kroki) and "
+                "set tools.diagram.backend.self_hosted_url in config."
             )
 
         dir_path = _resolve_project_path(directory)
