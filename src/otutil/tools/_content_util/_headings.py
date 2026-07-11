@@ -32,7 +32,14 @@ def parse_headings(
     _lines = lines if lines is not None else content.split("\n")
     headings: list[dict[str, Any]] = []
 
+    in_fence = False
     for i, line in enumerate(_lines):
+        stripped = line.lstrip()
+        if stripped.startswith(("```", "~~~")):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
         m = HEADING_RE.match(line)
         if m and len(m.group(1)) <= max_depth:
             headings.append({

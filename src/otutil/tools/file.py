@@ -1147,8 +1147,8 @@ def search(
     Args:
         path: Root directory to search (default: current directory)
         pattern: Filename pattern (e.g., "*test*", "config"). Matches filename only.
-        glob: Full path glob pattern (e.g., "src/**/*.py", "**/*.{yaml,yml}").
-            Supports ** for recursive matching and brace expansion.
+        glob: Full path glob pattern (e.g., "src/**/*.py").
+            Supports ** for recursive matching (no brace expansion).
         file_pattern: Filter by file extension (e.g., "*.py"). Used with pattern.
         case_sensitive: If True, pattern matching is case-sensitive (default: False)
         include_hidden: If True, include hidden files (default: False)
@@ -2112,18 +2112,20 @@ def delete(
             return f"Error: {e}"
 
 
-def copy(*, source: str, dest: str, follow_symlinks: bool = True) -> str:
+def copy(*, source: str, dest: str, follow_symlinks: bool = True, overwrite: bool = False) -> str:
     """Copy a file or directory.
 
     For files, copies content and metadata. For directories, copies
     the entire tree recursively. By default, symlinks are followed
     (copied as their target content) for security. Use follow_symlinks=False
-    to copy symlinks as links.
+    to copy symlinks as links. Refuses to replace an existing destination
+    unless overwrite=True.
 
     Args:
         source: Source path
         dest: Destination path
         follow_symlinks: If True, copy symlink targets; if False, copy as links (default: True)
+        overwrite: If True, allow replacing an existing destination file (default: False)
 
     Returns:
         Success message or error message
@@ -2145,6 +2147,10 @@ def copy(*, source: str, dest: str, follow_symlinks: bool = True) -> str:
             s.add(error=f"dest: {error}")
             return f"Error: {error}"
         assert dest_resolved is not None  # mypy: error check above ensures this
+
+        if not overwrite and dest_resolved.exists() and not src_resolved.is_dir():
+            s.add(error="dest_exists")
+            return f"Error: Destination already exists: {dest}. Use overwrite=True to replace it."
 
         try:
             if src_resolved.is_file() or (src_resolved.is_symlink() and follow_symlinks):
@@ -2176,15 +2182,17 @@ def copy(*, source: str, dest: str, follow_symlinks: bool = True) -> str:
             return f"Error: {e}"
 
 
-def move(*, source: str, dest: str) -> str:
+def move(*, source: str, dest: str, overwrite: bool = False) -> str:
     """Move or rename a file or directory.
 
     Moves source to destination. Can be used for renaming files
-    within the same directory.
+    within the same directory. Refuses to replace an existing destination
+    unless overwrite=True.
 
     Args:
         source: Source path
         dest: Destination path
+        overwrite: If True, allow replacing an existing destination (default: False)
 
     Returns:
         Success message or error message
@@ -2205,6 +2213,10 @@ def move(*, source: str, dest: str) -> str:
             s.add(error=f"dest: {error}")
             return f"Error: {error}"
         assert dest_resolved is not None  # mypy: error check above ensures this
+
+        if not overwrite and dest_resolved.exists():
+            s.add(error="dest_exists")
+            return f"Error: Destination already exists: {dest}. Use overwrite=True to replace it."
 
         # Check destination parent exists
         if not dest_resolved.parent.exists():
