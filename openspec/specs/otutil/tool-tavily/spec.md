@@ -74,6 +74,15 @@ The `tavily.search()` function SHALL search the web using the Tavily AI search A
 - **WHEN** any Tavily function is called
 - **THEN** it SHALL return an error message mentioning TAVILY_API_KEY
 
+### Requirement: API Authentication
+
+Requests to the Tavily API SHALL authenticate via an `Authorization: Bearer` header.
+
+#### Scenario: API key never in URL or body
+- **WHEN** any Tavily function issues an HTTP request
+- **THEN** the API key SHALL be sent only in the `Authorization: Bearer` header
+- **AND** SHALL NOT appear in the query string or request body
+
 ### Requirement: Batch Search
 
 The `tavily.search_batch()` function SHALL execute multiple searches concurrently.
@@ -100,8 +109,8 @@ The `tavily.search_batch()` function SHALL execute multiple searches concurrentl
 - **THEN** queries SHALL be executed in parallel using threads
 
 #### Scenario: Shared parameters forwarded
-- **WHEN** `tavily.search_batch(queries=queries, output_format="sources_only", min_score=0.5)` is called
-- **THEN** it SHALL forward those parameters to each individual `tavily.search()` call
+- **WHEN** `tavily.search_batch(queries=queries, output_format="sources_only", min_score=0.5, days=7, include_domains=["bbc.com"], exclude_domains=["spam.com"])` is called
+- **THEN** it SHALL forward those parameters (including `days`, `include_domains`, and `exclude_domains`) to each individual `tavily.search()` call
 
 #### Scenario: Batch retry guardrails
 - **WHEN** `tavily.search_batch()` is called with retry controls
@@ -126,6 +135,11 @@ The `tavily.extract()` function SHALL extract raw textual content from URLs.
 - **THEN** it SHALL perform deeper extraction
 - **AND** valid values are "basic" (default) and "advanced"
 
+#### Scenario: Extract format
+- **WHEN** `tavily.extract(urls=urls, format="text")` is called
+- **THEN** the API request SHALL include the `format` parameter
+- **AND** valid values are "markdown" (default) and "text"
+
 #### Scenario: Failed extractions
 - **GIVEN** a URL that cannot be extracted
 - **WHEN** `tavily.extract(urls=["https://bad.url"])` is called
@@ -141,11 +155,11 @@ The `tavily.extract_batch()` function SHALL extract content from multiple URL se
 
 #### Scenario: Concurrent extraction
 - **WHEN** `tavily.extract_batch(url_sets=[["url1", "url2"], ["url3"]])` is called
-- **THEN** it SHALL execute extractions for each URL set in parallel and return combined labelled results
+- **THEN** it SHALL execute extractions for each URL set in parallel and return a structured batch result envelope with `results[]` and `meta`
 
 #### Scenario: Labeled extraction sets
 - **WHEN** `tavily.extract_batch(url_sets=[(["url1"], "Docs"), (["url2"], "Blog")])` is called
-- **THEN** each section SHALL use the provided label
+- **THEN** each result item SHALL use the provided label
 
 #### Scenario: Empty url_sets validation
 - **WHEN** `tavily.extract_batch(url_sets=[])` is called
@@ -154,6 +168,12 @@ The `tavily.extract_batch()` function SHALL extract content from multiple URL se
 #### Scenario: Empty inner URL list
 - **WHEN** a URL set contains an empty list
 - **THEN** it SHALL return an error message before executing any requests
+
+#### Scenario: Batch retry guardrails
+- **WHEN** `tavily.extract_batch()` is called with retry controls
+- **THEN** `retries` MUST be an integer in range 0-3
+- **AND** `retry_delay_ms` MUST be in range 0-10000
+- **AND** values outside these ranges SHALL return an error before batch work starts
 
 ### Requirement: Deep Research
 
@@ -183,6 +203,10 @@ The `tavily.research()` function SHALL perform comprehensive multi-source resear
 - **THEN** each sleep SHALL be clamped to the remaining timeout budget
 - **AND** each polling GET request SHALL pass a timeout based on the remaining budget
 
+#### Scenario: Repeated polling failures
+- **GIVEN** status polling fails 5 consecutive times
+- **THEN** it SHALL return an error identifying the polling failure instead of retrying until the overall timeout
+
 #### Scenario: Empty input validation
 - **WHEN** `tavily.research(input="")` is called
 - **THEN** it SHALL return `"Error: input cannot be empty"`
@@ -208,7 +232,7 @@ The `tavily.research()` function SHALL perform comprehensive multi-source resear
 ## Logging
 
 HTTP requests SHALL be logged as structured runtime events.
-Search operations SHALL log query, depth, result count, and credits where available.
+Search operations SHALL log a truncated query (first 80 characters), depth, result count, and credits where available.
 Batch search and extract operations SHALL log batch size and result counts where available.
 URL extractions SHALL log the target URL count and extraction result count.
 Research tasks SHALL log model and elapsed time where available.

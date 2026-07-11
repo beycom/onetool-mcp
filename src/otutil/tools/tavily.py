@@ -27,7 +27,6 @@ __ot_requires__ = {
 }
 
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -39,7 +38,6 @@ from otpack import (
     batch_execute_enveloped,
     create_json_http_client,
     extract_structured_data,
-    format_batch_results,
     format_sources,
     get_tool_config,
     lazy_client,
@@ -100,15 +98,21 @@ def _get_config() -> Config:
 
 def _make_request(
     endpoint: str,
-    payload: dict[str, Any],
+    payload: dict[str, Any] | None = None,
     timeout: float | None = None,
+    *,
+    method: str = "POST",
 ) -> tuple[bool, dict[str, Any] | str]:
-    """Make HTTP POST request to Tavily API.
+    """Make HTTP request to Tavily API.
+
+    Authenticates via an Authorization: Bearer header; the API key never
+    appears in the request body or query string.
 
     Args:
         endpoint: API endpoint path (e.g., "/search")
-        payload: JSON request body
+        payload: JSON request body (POST only)
         timeout: Request timeout in seconds
+        method: HTTP method - "POST" (default) or "GET" (used for polling)
 
     Returns:
         Tuple of (success, result). If success, result is parsed JSON dict.
@@ -124,17 +128,23 @@ def _make_request(
     with LogSpan(
         span="tavily.request",
         endpoint=endpoint,
-        query=payload.get("query", ""),
+        method=method,
+        query=(payload or {}).get("query", "")[:80],
     ) as span:
         try:
             client = _get_http_client()
             if client is None:
                 return False, "Error: HTTP client not initialized"
-            response = client.post(
-                endpoint,
-                json={**payload, "api_key": api_key},
-                timeout=timeout,
-            )
+            headers = {"Authorization": f"Bearer {api_key}"}
+            if method == "GET":
+                response = client.get(endpoint, headers=headers, timeout=timeout)
+            else:
+                response = client.post(
+                    endpoint,
+                    json=payload or {},
+                    headers=headers,
+                    timeout=timeout,
+                )
             response.raise_for_status()
 
             result = response.json()
@@ -144,43 +154,6 @@ def _make_request(
         except Exception as e:
             span.add(error=f"{type(e).__name__}: {e}")
             return False, _format_http_error(e)
-
-
-def _make_get_request(
-    path: str,
-    params: dict[str, Any] | None = None,
-    timeout: float | None = None,
-) -> tuple[bool, dict[str, Any] | str]:
-    """Make HTTP GET request to Tavily API (used for polling).
-
-    Args:
-        path: API path (e.g., "/research/task_id")
-        params: Query parameters
-        timeout: Request timeout in seconds
-
-    Returns:
-        Tuple of (success, result). If success, result is parsed JSON dict.
-        If failure, result is error message string.
-    """
-    api_key, err = require_api_key("TAVILY_API_KEY")
-    if err:
-        return False, err
-
-    try:
-        client = _get_http_client()
-        if client is None:
-            return False, "Error: HTTP client not initialized"
-        response = client.get(
-            path,
-            params={**(params or {}), "api_key": api_key},
-            timeout=timeout,
-        )
-        response.raise_for_status()
-        return True, response.json()
-
-    except Exception as e:
-        return False, _format_http_error(e)
-
 
 
 def _format_search_results(
@@ -488,14 +461,12 @@ def search(
     if exclude_domains:
         payload["exclude_domains"] = exclude_domains
 
-    with LogSpan(span="tavily.search", query=query, depth=search_depth) as s:
+    with LogSpan(span="tavily.search", query=query[:80], depth=search_depth) as s:
         success, result = _make_request("/search", payload)
 
         if not success:
             return str(result)
         assert isinstance(result, dict)
-
-        output = _format_search_results(result, output_format, min_score, max_sources=max_sources)
 
         if extract_schema is not None:
             sources = result.get("results", []) or []
@@ -508,12 +479,14 @@ def search(
                 if isinstance(content, str) and content:
                     extract_text_parts.append(content)
             return extract_structured_data(
-            confidence_key="score",
+                confidence_key="score",
                 text="\n".join(extract_text_parts),
                 sources=sources,
                 extract_schema=extract_schema,
                 return_provenance=return_provenance,
             )
+
+        output = _format_search_results(result, output_format, min_score, max_sources=max_sources)
 
         filtered = result.get("results", [])
         if min_score is not None:
@@ -567,6 +540,7 @@ def extract(
     with LogSpan(span="tavily.extract", urlCount=len(urls)) as span:
         payload: dict[str, Any] = {
             "urls": urls,
+            "format": format,
             "extract_depth": extract_depth,
         }
 
@@ -586,7 +560,9 @@ def extract_batch(
     url_sets: list[tuple[list[str], str] | list[str]],
     format: str = "markdown",
     extract_depth: str = "basic",
-) -> str:
+    retries: int = 0,
+    retry_delay_ms: int = 250,
+) -> BatchEnvelope | str:
     """Extract content from multiple URL sets concurrently.
 
     URL sets are processed in parallel using threads for better performance.
@@ -602,7 +578,7 @@ def extract_batch(
         extract_depth: Extraction depth - "basic" (default) or "advanced"
 
     Returns:
-        Combined formatted results with labels, or error message
+        Structured batch result envelope with `results[]` and `meta`, or error
 
     Example:
         # Simple sets
@@ -624,6 +600,8 @@ def extract_batch(
         return error
     if error := _validate_extract_depth(extract_depth):
         return error
+    if error := validate_batch_retry_controls(retries, retry_delay_ms):
+        return error
 
     # Normalize: convert list[str] → (list[str], label)
     normalized: list[tuple[list[str], str]] = []
@@ -640,29 +618,24 @@ def extract_batch(
         if error := _validate_urls(urls_list):
             return error
 
-    with LogSpan(span="tavily.batch", urlSetCount=len(normalized)) as s:
+    with LogSpan(span="tavily.extract_batch", urlSetCount=len(normalized)) as s:
 
-        def _extract_one(urls_list: list[str], label: str) -> tuple[str, str]:
-            result = extract(urls=urls_list, format=format, extract_depth=extract_depth)
-            return label, result
+        def _extract_one(urls_key: str, _label: str) -> str:
+            return extract(
+                urls=urls_key.split("\n"), format=format, extract_depth=extract_depth
+            )
 
-        results: dict[str, str] = {}
+        # Encode each URL set as a newline-joined key (URLs cannot contain newlines)
+        items = [("\n".join(urls_list), label) for urls_list, label in normalized]
 
-        with ThreadPoolExecutor(max_workers=min(len(normalized), 10)) as executor:
-            futures = {
-                executor.submit(_extract_one, urls_list, label): label
-                for urls_list, label in normalized
-            }
-            for future in as_completed(futures):
-                label, result = future.result()
-                results[label] = result
-
-        # Preserve order using format_batch_results convention
-        output = format_batch_results(
-            results,
-            [(label, label) for _, label in normalized],
+        output = batch_execute_enveloped(
+            _extract_one,
+            items,
+            retries=retries,
+            retry_delay_ms=retry_delay_ms,
+            max_workers=min(len(normalized), 10),
         )
-        s.add(outputLen=len(output))
+        s.add(successCount=output["meta"]["success_count"], errorCount=output["meta"]["error_count"])
         return output
 
 
@@ -676,6 +649,9 @@ def search_batch(
     min_score: float | None = None,
     max_sources: int | None = None,
     time_range: str | None = None,
+    days: int = 3,
+    include_domains: list[str] | None = None,
+    exclude_domains: list[str] | None = None,
     extract_schema: dict[str, Any] | None = None,
     return_provenance: bool = False,
     retries: int = 0,
@@ -699,6 +675,9 @@ def search_batch(
         min_score: Minimum relevance score to include (0.0-1.0, default: None)
         max_sources: Maximum number of sources per query (default: None, all sources)
         time_range: Filter results by time - "day", "week", "month", "year"
+        days: For news topic, number of days back to search (1-30, default: 3)
+        include_domains: Restrict results to these domains (e.g., ["bbc.com"])
+        exclude_domains: Exclude results from these domains
 
     Returns:
         Structured batch result envelope with `results[]` and `meta`, or error
@@ -730,6 +709,8 @@ def search_batch(
         return error
     if error := _validate_time_range(time_range):
         return error
+    if error := _validate_days(days):
+        return error
     if error := _validate_extract_schema(extract_schema):
         return error
     if error := validate_batch_retry_controls(retries, retry_delay_ms):
@@ -744,7 +725,7 @@ def search_batch(
     normalized = [(q, label or q) for q, label in normalized]
 
     with LogSpan(
-        span="tavily.batch", query_count=len(normalized), max_results=max_results
+        span="tavily.search_batch", query_count=len(normalized), max_results=max_results
     ) as s:
 
         def _search_one(query: str, _label: str) -> dict[str, Any] | str:
@@ -757,6 +738,9 @@ def search_batch(
                 min_score=min_score,
                 max_sources=max_sources,
                 time_range=time_range,
+                days=days,
+                include_domains=include_domains,
+                exclude_domains=exclude_domains,
                 extract_schema=extract_schema,
                 return_provenance=return_provenance,
             )
@@ -849,6 +833,8 @@ def research(
 
         wait_time = 2.0
         max_wait = 10.0
+        consecutive_failures = 0
+        max_consecutive_failures = 5
 
         while True:
             elapsed = time.monotonic() - start_time
@@ -868,13 +854,22 @@ def research(
                 return f"Error: research timed out after {timeout_seconds} seconds"
 
             poll_timeout = max(0.1, min(_get_config().timeout, remaining))
-            poll_success, poll_result = _make_get_request(
+            poll_success, poll_result = _make_request(
                 f"/research/{task_id}",
                 timeout=poll_timeout,
+                method="GET",
             )
 
             if not poll_success:
+                consecutive_failures += 1
+                if consecutive_failures >= max_consecutive_failures:
+                    s.add(status="poll_failed", pollFailures=consecutive_failures)
+                    return (
+                        f"Error: research polling failed {consecutive_failures} "
+                        f"consecutive times: {poll_result}"
+                    )
                 continue
+            consecutive_failures = 0
             assert isinstance(poll_result, dict)
 
             poll_status = poll_result.get("status", "")

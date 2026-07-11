@@ -519,6 +519,21 @@ class TestSearch:
         assert payload["include_domains"] == ["docs.python.org"]
         assert payload["exclude_domains"] == ["spam.com"]
 
+    def test_api_key_sent_as_bearer_header(self):
+        response_data = {"results": [], "answer": ""}
+        mock_client = MagicMock()
+        mock_client.post.return_value = _make_mock_response(response_data)
+
+        with (
+            patch("otutil.tools.tavily._get_http_client", return_value=mock_client),
+            patch("otutil.tools.tavily.require_api_key", return_value=("test-key", None)),
+        ):
+            search(query="test")
+
+        call_kwargs = mock_client.post.call_args.kwargs
+        assert call_kwargs["headers"]["Authorization"] == "Bearer test-key"
+        assert "api_key" not in call_kwargs["json"]
+
     def test_include_answer_sent_to_api(self):
         response_data = {"results": [], "answer": ""}
         mock_client = MagicMock()
@@ -608,6 +623,27 @@ class TestSearch:
         result = search(query="x", extract_schema={"fields": []})
         assert "extract_schema.fields must be a non-empty list" in result
 
+    def test_extract_schema_skips_result_formatting(self):
+        response_data = {
+            "answer": "name: Alice",
+            "results": [{"title": "X", "url": "https://x.invalid", "content": "name: Alice", "score": 0.9}],
+        }
+        mock_client = MagicMock()
+        mock_client.post.return_value = _make_mock_response(response_data)
+
+        with (
+            patch("otutil.tools.tavily._get_http_client", return_value=mock_client),
+            patch("otutil.tools.tavily.require_api_key", return_value=("test-key", None)),
+            patch("otutil.tools.tavily._format_search_results") as mock_fmt,
+        ):
+            result = search(
+                query="alice",
+                extract_schema={"fields": [{"name": "name", "type": "string"}]},
+            )
+
+        assert result["mode"] == "structured_extraction"
+        mock_fmt.assert_not_called()
+
 
 @pytest.mark.unit
 @pytest.mark.tools
@@ -661,6 +697,34 @@ class TestExtract:
         payload = mock_client.post.call_args[1]["json"]
         assert payload["extract_depth"] == "advanced"
 
+    def test_format_sent_in_payload(self):
+        response_data = {"results": [{"url": "https://a.com", "raw_content": "x"}], "failed_results": []}
+        mock_client = MagicMock()
+        mock_client.post.return_value = _make_mock_response(response_data)
+
+        with (
+            patch("otutil.tools.tavily._get_http_client", return_value=mock_client),
+            patch("otutil.tools.tavily.require_api_key", return_value=("test-key", None)),
+        ):
+            extract(urls=["https://a.com"], format="text")
+
+        payload = mock_client.post.call_args[1]["json"]
+        assert payload["format"] == "text"
+
+    def test_default_format_sent_in_payload(self):
+        response_data = {"results": [{"url": "https://a.com", "raw_content": "x"}], "failed_results": []}
+        mock_client = MagicMock()
+        mock_client.post.return_value = _make_mock_response(response_data)
+
+        with (
+            patch("otutil.tools.tavily._get_http_client", return_value=mock_client),
+            patch("otutil.tools.tavily.require_api_key", return_value=("test-key", None)),
+        ):
+            extract(urls=["https://a.com"])
+
+        payload = mock_client.post.call_args[1]["json"]
+        assert payload["format"] == "markdown"
+
     def test_missing_api_key(self):
         with patch("otutil.tools.tavily.require_api_key", return_value=("", "Error: TAVILY_API_KEY secret not configured")):
             result = extract(urls=["https://test.invalid"])
@@ -687,7 +751,11 @@ class TestExtractBatch:
                 ["https://b.com"],
             ])
 
-        assert "https://a.com" in result or "Content A" in result
+        assert isinstance(result, dict)
+        assert result["meta"]["query_count"] == 2
+        assert result["results"][0]["label"] == "https://a.com"
+        assert result["results"][0]["status"] == "ok"
+        assert "Content A" in result["results"][0]["data"]
 
     def test_labeled_sets(self):
         response_data = {
@@ -705,7 +773,28 @@ class TestExtractBatch:
                 (["https://docs.react.dev"], "React Docs"),
             ])
 
-        assert "React Docs" in result
+        assert result["results"][0]["label"] == "React Docs"
+        assert "React docs" in result["results"][0]["data"]
+
+    def test_multi_url_set_forwarded_to_extract(self):
+        response_data = {
+            "results": [{"url": "https://a.com/1", "raw_content": "x"}],
+            "failed_results": [],
+        }
+        mock_client = MagicMock()
+        mock_client.post.return_value = _make_mock_response(response_data)
+
+        with (
+            patch("otutil.tools.tavily._get_http_client", return_value=mock_client),
+            patch("otutil.tools.tavily.require_api_key", return_value=("test-key", None)),
+        ):
+            result = extract_batch(url_sets=[
+                (["https://a.com/1", "https://a.com/2"], "Docs"),
+            ])
+
+        payload = mock_client.post.call_args[1]["json"]
+        assert payload["urls"] == ["https://a.com/1", "https://a.com/2"]
+        assert result["results"][0]["status"] == "ok"
 
     def test_empty_url_sets(self):
         result = extract_batch(url_sets=[])
@@ -718,6 +807,13 @@ class TestExtractBatch:
     def test_validation_error_invalid_format(self):
         result = extract_batch(url_sets=[["https://a.com"]], format="html")
         assert "Error" in result
+
+    def test_rejects_invalid_retry_controls(self):
+        result = extract_batch(url_sets=[["https://a.com"]], retries=-1)
+        assert "retries must be between 0 and 3" in result
+
+        result = extract_batch(url_sets=[["https://a.com"]], retry_delay_ms=10_001)
+        assert "retry_delay_ms must be between 0 and 10000" in result
 
 
 @pytest.mark.unit
@@ -745,6 +841,31 @@ class TestSearchBatch:
     def test_validation_error_invalid_depth(self):
         result = search_batch(queries=["test"], search_depth="bad")
         assert "Error" in result
+
+    def test_validation_error_invalid_days(self):
+        result = search_batch(queries=["test"], days=0)
+        assert "days must be between 1 and 30" in result
+
+    def test_days_and_domain_filters_forwarded(self):
+        response_data = {"results": [], "answer": ""}
+        mock_client = MagicMock()
+        mock_client.post.return_value = _make_mock_response(response_data)
+
+        with (
+            patch("otutil.tools.tavily._get_http_client", return_value=mock_client),
+            patch("otutil.tools.tavily.require_api_key", return_value=("test-key", None)),
+        ):
+            search_batch(
+                queries=["q"],
+                days=7,
+                include_domains=["docs.python.org"],
+                exclude_domains=["spam.com"],
+            )
+
+        payload = mock_client.post.call_args[1]["json"]
+        assert payload["days"] == 7
+        assert payload["include_domains"] == ["docs.python.org"]
+        assert payload["exclude_domains"] == ["spam.com"]
 
     def test_empty_queries(self):
         result = search_batch(queries=[])
@@ -906,6 +1027,26 @@ class TestResearch:
             result = research(input="Some topic", timeout_seconds=60)
 
         assert "Research complete." in result
+        get_kwargs = mock_client.get.call_args.kwargs
+        assert get_kwargs["headers"]["Authorization"] == "Bearer test-key"
+
+    def test_poll_failure_cap(self):
+        """Research aborts after 5 consecutive polling failures."""
+        start_response = {"id": "task-999", "status": "processing"}
+
+        mock_client = MagicMock()
+        mock_client.post.return_value = _make_mock_response(start_response)
+        mock_client.get.side_effect = Exception("connection reset")
+
+        with (
+            patch("otutil.tools.tavily._get_http_client", return_value=mock_client),
+            patch("otutil.tools.tavily.require_api_key", return_value=("test-key", None)),
+            patch("otutil.tools.tavily.time.sleep"),
+        ):
+            result = research(input="Some topic", timeout_seconds=300)
+
+        assert "Error: research polling failed 5 consecutive times" in result
+        assert mock_client.get.call_count == 5
 
     def test_timeout_exceeded(self):
         """Research times out when polling never completes."""
@@ -937,8 +1078,10 @@ class TestResearch:
         monotonic_values = iter([0.0, 58.0, 59.5, 59.5, 59.5])
 
         with (
-            patch("otutil.tools.tavily._make_request", return_value=(True, start_response)),
-            patch("otutil.tools.tavily._make_get_request", return_value=(True, poll_response)) as mock_get,
+            patch(
+                "otutil.tools.tavily._make_request",
+                side_effect=[(True, start_response), (True, poll_response)],
+            ) as mock_request,
             patch("otutil.tools.tavily.require_api_key", return_value=("test-key", None)),
             patch("otutil.tools.tavily.time.sleep") as mock_sleep,
             patch("otutil.tools.tavily.time.monotonic", side_effect=monotonic_values),
@@ -947,7 +1090,8 @@ class TestResearch:
 
         assert "Research complete." in result
         mock_sleep.assert_called_once_with(2.0)
-        assert mock_get.call_args.kwargs["timeout"] == 0.5
+        assert mock_request.call_args.kwargs["timeout"] == 0.5
+        assert mock_request.call_args.kwargs["method"] == "GET"
 
     def test_research_task_failed(self):
         """Research task fails on server side."""
@@ -967,3 +1111,41 @@ class TestResearch:
 
         assert "Error" in result
         assert "failed" in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestLogSpans:
+    def test_search_spans_truncate_query(self):
+        long_query = "q" * 200
+        response_data = {"results": [], "answer": ""}
+        mock_client = MagicMock()
+        mock_client.post.return_value = _make_mock_response(response_data)
+
+        with (
+            patch("otutil.tools.tavily._get_http_client", return_value=mock_client),
+            patch("otutil.tools.tavily.require_api_key", return_value=("test-key", None)),
+            patch("otutil.tools.tavily.LogSpan") as mock_span,
+        ):
+            search(query=long_query)
+
+        assert mock_span.call_args_list
+        for call in mock_span.call_args_list:
+            assert len(call.kwargs.get("query", "")) <= 80
+
+    def test_batch_span_names_are_distinct(self):
+        response_data = {"results": [], "answer": "", "failed_results": []}
+        mock_client = MagicMock()
+        mock_client.post.return_value = _make_mock_response(response_data)
+
+        with (
+            patch("otutil.tools.tavily._get_http_client", return_value=mock_client),
+            patch("otutil.tools.tavily.require_api_key", return_value=("test-key", None)),
+            patch("otutil.tools.tavily.LogSpan") as mock_span,
+        ):
+            search_batch(queries=["q"])
+            extract_batch(url_sets=[["https://a.com"]])
+
+        spans = [c.kwargs.get("span") for c in mock_span.call_args_list]
+        assert "tavily.search_batch" in spans
+        assert "tavily.extract_batch" in spans
