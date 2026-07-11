@@ -283,7 +283,10 @@ def _pick_best_library(
     return lib_id if lib_id.count("/") >= 2 else None
 
 
-@cache.memoize(ttl=3600)  # Cache library ID resolutions for 1 hour
+class _SearchUnavailableError(RuntimeError):
+    """Raised when the Context7 search API cannot be reached."""
+
+
 def _resolve_library_id(library_id: str) -> tuple[str, bool, bool]:
     """Resolve a library ID, searching if needed.
 
@@ -308,21 +311,31 @@ def _resolve_library_id(library_id: str) -> tuple[str, bool, bool]:
 
     # Otherwise, search for the library using the name portion
     search_term = normalized.lstrip("/")
+    try:
+        best = _search_best_library(search_term)
+    except _SearchUnavailableError:
+        # Transient transport failure — deliberately not memoized, so one
+        # network blip doesn't mark the library "not found" for an hour.
+        return normalized, True, False
+    if best:
+        return best, True, True
+    return normalized, True, False
+
+
+@cache.memoize(ttl=3600)  # Cache successful searches (incl. definitive not-found) for 1 hour
+def _search_best_library(search_term: str) -> str | None:
+    """Search Context7 for the best library match; raise if the API is unreachable."""
     success, data = _make_request(
         CONTEXT7_SEARCH_URL,
         params={"query": search_term, "libraryName": search_term},
     )
-
     if not success:
-        return normalized, True, False
+        raise _SearchUnavailableError(str(data))
 
     # Use smart scoring to pick the best match
-    best = _pick_best_library(
+    return _pick_best_library(
         data if isinstance(data, (dict, list)) else None, search_term
     )
-    if best:
-        return best, True, True
-    return normalized, True, False
 
 
 def search(*, query: str, library_name: str, output_format: str = "str") -> str | dict[str, Any]:
