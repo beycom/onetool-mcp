@@ -132,12 +132,8 @@ def _get_engine(db_url: str) -> Any:
 
     # Create engine outside lock (slow operation)
     with LogSpan(span="db.connect", dbUrl=resolved_url) as span:
-        try:
-            engine = _create_engine(resolved_url)
-        except Exception:
-            span.add(retry=True)
-            # One retry with fresh engine
-            engine = _create_engine(resolved_url)
+        # create_engine is lazy (no connection made), so no retry is useful here
+        engine = _create_engine(resolved_url)
 
         # Double-check after acquiring lock
         with _engines_lock:
@@ -157,15 +153,6 @@ def _get_engine(db_url: str) -> Any:
 
             span.add(cached=False)
             return engine
-
-
-def _format_value(val: Any) -> str:
-    """Format a value for display."""
-    if val is None:
-        return "NULL"
-    if isinstance(val, (datetime, date)):
-        return val.isoformat()
-    return str(val)
 
 
 def _convert_value_for_json(val: Any) -> Any:
@@ -243,11 +230,15 @@ def tables(
 
                 rows: list[dict[str, Any]] = []
                 for table_name in all_tables:
-                    table = Table(table_name, MetaData(), autoload_with=conn)
-                    row_count = conn.execute(
-                        select(func.count()).select_from(table)
-                    ).scalar_one()
-                    rows.append({"table_name": table_name, "row_count": int(row_count)})
+                    # Per-table tolerance: one broken table must not sink the listing
+                    try:
+                        table = Table(table_name, MetaData(), autoload_with=conn)
+                        row_count = conn.execute(
+                            select(func.count()).select_from(table)
+                        ).scalar_one()
+                        rows.append({"table_name": table_name, "row_count": int(row_count)})
+                    except Exception as e:
+                        rows.append({"table_name": table_name, "row_count": None, "error": str(e)})
 
                 s.add(resultCount=len(rows))
                 return rows
