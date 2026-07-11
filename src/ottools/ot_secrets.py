@@ -395,8 +395,19 @@ def rotate(*, file: str | None = None, backup: bool = False) -> dict[str, Any]:
             str_val = str(value)
             if str_val.startswith(_PREFIX):
                 encoded = str_val[len(_PREFIX) :]
-                ciphertext = base64.b64decode(encoded, validate=True)
-                plaintext = pyrage.decrypt(ciphertext, [old_identity])
+                try:
+                    ciphertext = base64.b64decode(encoded, validate=True)
+                    plaintext = pyrage.decrypt(ciphertext, [old_identity])
+                except (ValueError, pyrage.DecryptError) as exc:
+                    s.add(status="decrypt_failed", key=key)
+                    return {
+                        "error": (
+                            f"Rotation aborted: cannot decrypt '{key}' — value is "
+                            f"corrupted or was encrypted with a different key ({exc}). "
+                            "No changes were written."
+                        ),
+                        "status": "decrypt_failed",
+                    }
                 new_ciphertext = pyrage.encrypt(plaintext, [new_recipient])
                 # Round-trip verify with the NEW identity before committing anything
                 # to disk or the keychain (Decision 7) — abort loudly on mismatch.
@@ -634,8 +645,18 @@ def get(
                     return {"error": _NO_IDENTITY_MSG, "status": "no_identity"}
                 pyrage = _require_pyrage()
                 identity = pyrage.x25519.Identity.from_str(private_key)
-                ciphertext = base64.b64decode(raw_str[len(_PREFIX) :], validate=True)
-                plaintext = pyrage.decrypt(ciphertext, [identity]).decode()
+                try:
+                    ciphertext = base64.b64decode(raw_str[len(_PREFIX) :], validate=True)
+                    plaintext = pyrage.decrypt(ciphertext, [identity]).decode()
+                except (ValueError, pyrage.DecryptError) as exc:
+                    s.add(status="decrypt_failed")
+                    return {
+                        "error": (
+                            "Cannot decrypt value — it is corrupted or was encrypted "
+                            f"with a different key ({exc})."
+                        ),
+                        "status": "decrypt_failed",
+                    }
             else:
                 plaintext = raw_str
             out_path = Path(out_file).expanduser()
