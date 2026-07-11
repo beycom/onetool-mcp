@@ -23,6 +23,7 @@ Reusable development workflows and standards for Python projects using pytest, s
 | [Python Style](python-style.md) | Python coding standards |
 | [Testing](testing.md) | Testing strategy, markers, fixtures |
 | [Logging](logging.md) | LogSpan patterns and best practices |
+| [Error Conventions](error-conventions.md) | How pack tools report failures |
 | [CLI Patterns](cli-patterns.md) | CLI development patterns |
 
 ---
