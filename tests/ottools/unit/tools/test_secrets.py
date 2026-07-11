@@ -107,7 +107,7 @@ def test_pack_name() -> None:
 def test_all_exports() -> None:
     from ottools.ot_secrets import __all__
 
-    assert set(__all__) == {"init", "encrypt", "status", "rotate", "audit", "set", "get"}
+    assert set(__all__) == {"init", "encrypt", "status", "rotate", "audit", "set", "get", "unset"}
 
 
 @pytest.mark.unit

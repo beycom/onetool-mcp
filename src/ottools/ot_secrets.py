@@ -35,7 +35,7 @@ from otpack import LogSpan
 pack = "ot_secrets"
 pack_aliases = ("sec",)
 
-__all__ = ["audit", "encrypt", "get", "init", "rotate", "set", "status"]
+__all__ = ["audit", "encrypt", "get", "init", "rotate", "set", "status", "unset"]
 
 __ot_requires__ = {
     "lib": [
@@ -163,6 +163,47 @@ def init(*, label: str = "", force: bool = False) -> dict[str, Any]:
         }
 
 
+def unset(*, key: str, file: str | None = None) -> dict[str, Any]:
+    """Remove a single key from a secrets YAML file.
+
+    Args:
+        key: Secret key name to remove.
+        file: Path to secrets YAML file. Defaults to the configured secrets path.
+
+    Returns:
+        Dict with ``removed`` flag and key name. Never contains the value.
+    """
+    path = _resolve_secrets_file(file)
+    with LogSpan(span="ot_secrets.unset", file=str(path), key=key) as s:
+        data, err = _load_secrets_mapping(path, s)
+        if err:
+            return err
+        if key not in data:
+            s.add(removed=False)
+            return {"removed": False, "key": key, "status": "not_found"}
+        del data[key]
+        _atomic_write_yaml(path, data)
+        s.add(removed=True)
+        return {"removed": True, "key": key}
+
+
+def _load_secrets_mapping(path: Path, s: Any) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    """Load a secrets YAML mapping. Returns (data, None) or ({}, error_dict)."""
+    if not path.exists():
+        s.add(status="file_not_found")
+        return {}, {"error": f"File not found: {path}", "status": "file_not_found"}
+    try:
+        with path.open() as f:
+            data = yaml.safe_load(f)
+    except yaml.YAMLError as exc:
+        s.add(status="invalid_yaml")
+        return {}, {"error": str(exc), "status": "invalid_yaml"}
+    if not isinstance(data, dict):
+        s.add(status="invalid_yaml")
+        return {}, {"error": "File must be a YAML mapping", "status": "invalid_yaml"}
+    return data, None
+
+
 def encrypt(*, file: str | None = None, backup: bool = False) -> dict[str, Any]:
     """Encrypt plain values in a secrets YAML file in-place.
 
@@ -191,22 +232,13 @@ def encrypt(*, file: str | None = None, backup: bool = False) -> dict[str, Any]:
                 "status": "no_identity",
             }
 
-        if not path.exists():
-            s.add(status="file_not_found")
-            return {"error": f"File not found: {path}", "status": "file_not_found"}
-
-        try:
-            with path.open() as f:
-                data = yaml.safe_load(f)
-        except yaml.YAMLError as exc:
-            s.add(status="invalid_yaml")
-            return {"error": str(exc), "status": "invalid_yaml"}
-
-        if not isinstance(data, dict):
-            s.add(status="invalid_yaml")
-            return {"error": "File must be a YAML mapping", "status": "invalid_yaml"}
+        data, err = _load_secrets_mapping(path, s)
+        if err:
+            return err
 
         recipient = pyrage.x25519.Recipient.from_str(pubkey_str)
+        private_key = keyring.get_password(_SERVICE, _KEY_IDENTITY)
+        identity = pyrage.x25519.Identity.from_str(private_key) if private_key else None
 
         backup_path: str | None = None
         if backup:
@@ -228,6 +260,13 @@ def encrypt(*, file: str | None = None, backup: bool = False) -> dict[str, Any]:
                 skipped_keys.append(key)
             else:
                 ciphertext = pyrage.encrypt(str_val.encode(), [recipient])
+                # Round-trip verify (matching set()/rotate()) before anything is written
+                if identity is not None and pyrage.decrypt(ciphertext, [identity]) != str_val.encode():
+                    s.add(status="verify_failed", key=key)
+                    return {
+                        "error": f"Round-trip verification failed for '{key}'. Nothing written.",
+                        "status": "verify_failed",
+                    }
                 encoded = base64.b64encode(ciphertext).decode()
                 updated[key] = _PREFIX + encoded
                 encrypted_keys.append(key)
@@ -357,20 +396,9 @@ def rotate(*, file: str | None = None, backup: bool = False) -> dict[str, Any]:
                 "status": "no_identity",
             }
 
-        if not path.exists():
-            s.add(status="file_not_found")
-            return {"error": f"File not found: {path}", "status": "file_not_found"}
-
-        try:
-            with path.open() as f:
-                data = yaml.safe_load(f)
-        except yaml.YAMLError as exc:
-            s.add(status="invalid_yaml")
-            return {"error": str(exc), "status": "invalid_yaml"}
-
-        if not isinstance(data, dict):
-            s.add(status="invalid_yaml")
-            return {"error": "File must be a YAML mapping", "status": "invalid_yaml"}
+        data, err = _load_secrets_mapping(path, s)
+        if err:
+            return err
 
         backup_path: str | None = None
         if backup:

@@ -221,6 +221,20 @@ The `ot_secrets` pack SHALL provide an `audit()` function that scans a secrets f
 
 ---
 
+### Requirement: Secrets Pack Key Removal
+
+The `ot_secrets.unset()` function SHALL remove a single key from the secrets file without exposing its value.
+
+#### Scenario: Remove an existing key
+- **WHEN** `ot_secrets.unset(key="OLD_KEY")` is called and the key exists
+- **THEN** the key SHALL be removed via an atomic write and the result SHALL be `{"removed": true, "key": "OLD_KEY"}`
+
+#### Scenario: Key not present
+- **WHEN** `ot_secrets.unset(key="MISSING")` is called and the key does not exist
+- **THEN** it SHALL return `{"removed": false, "key": "MISSING", "status": "not_found"}` without modifying the file
+
+---
+
 ### Requirement: Secrets Pack Dependency Declaration
 
 The `ot_secrets` pack SHALL declare its runtime library dependencies.
