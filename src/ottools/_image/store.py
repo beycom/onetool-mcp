@@ -10,6 +10,7 @@ from __future__ import annotations
 import atexit
 import base64
 import json
+import threading
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
@@ -24,6 +25,10 @@ from .config import get_image_config
 # Session LRU cache — sized once at module load from config.
 # Config changes after first import of this module are not reflected.
 _session_cache = Cache(max_size=get_image_config().session_cache_size)
+
+# Serialises meta.json read-modify-write — the background-summary daemon
+# thread races the main thread in save_summary().
+_meta_lock = threading.Lock()
 
 
 def _images_dir() -> Path:
@@ -87,6 +92,10 @@ def load_meta(handle_name: str) -> dict[str, Any] | None:
 def save_summary(handle_name: str, summary_dict: dict[str, Any]) -> None:
     """Write the summary field into an existing ``meta.json`` in-place.
 
+    The read-modify-write runs under ``_meta_lock`` and the file is replaced
+    atomically (tmp file + ``Path.replace``) — safe against the background
+    summary daemon thread racing the main thread.
+
     Args:
         handle_name: Handle name without ``#`` prefix.
         summary_dict: Summary dict to store in the ``"summary"`` field.
@@ -94,12 +103,15 @@ def save_summary(handle_name: str, summary_dict: dict[str, Any]) -> None:
     Raises:
         FileNotFoundError: If ``meta.json`` does not exist for the handle.
     """
-    meta = load_meta(handle_name)
-    if meta is None:
-        raise FileNotFoundError(f"meta.json not found for handle: {handle_name}")
-    meta["summary"] = summary_dict
-    path = _images_dir() / f"{handle_name}.meta.json"
-    path.write_text(json.dumps(meta, indent=2, default=str), encoding="utf-8")
+    with _meta_lock:
+        meta = load_meta(handle_name)
+        if meta is None:
+            raise FileNotFoundError(f"meta.json not found for handle: {handle_name}")
+        meta["summary"] = summary_dict
+        path = _images_dir() / f"{handle_name}.meta.json"
+        tmp = path.parent / f"{path.name}.tmp"
+        tmp.write_text(json.dumps(meta, indent=2, default=str), encoding="utf-8")
+        tmp.replace(path)
 
 
 def find_by_hash(sha256_hex: str) -> str | None:

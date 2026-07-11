@@ -119,7 +119,7 @@ class TestImageLifecycle:
         ):
             result = purge_images(minutes=60)
 
-        assert result["deleted"] == 1
+        assert result["purged"] == 1
 
 
 @pytest.mark.integration

@@ -11,16 +11,16 @@ Defines the `ot_image` pack providing image loading, querying, and lifecycle man
 `image.load()` SHALL accept images in the following formats: PNG, JPEG, GIF, WebP, TIFF, HEIC, and AVIF.
 
 - TIFF is supported natively via Pillow (no extra dependency).
-- HEIC, HEIF, and AVIF require `pillow-heif` to be installed; if it is missing, `load()` SHALL surface a clear `ImportError` message directing the user to `pip install pillow-heif`.
-- SVG is supported via rasterisation with `cairosvg`; if it is missing, `load()` SHALL surface a clear `ImportError` message directing the user to `pip install cairosvg`.
+- HEIC, HEIF, and AVIF require `pillow-heif` to be installed; if it is missing, `load()` SHALL return an `{"error": ...}` dict with a clear message directing the user to `pip install pillow-heif`.
+- SVG is supported via rasterisation with `resvg-py`; if it is missing, `load()` SHALL return an `{"error": ...}` dict with a clear message directing the user to `pip install resvg-py`.
 
 #### Scenario: Supported raster format loads
 - **WHEN** `image.load(img="photo.png")` is called for a supported raster image
 - **THEN** the image SHALL be accepted and stored
 
 #### Scenario: Missing optional decoder
-- **WHEN** `image.load(...)` is called for a HEIC, HEIF, AVIF, or SVG source and the required optional decoder is missing
-- **THEN** the error SHALL name the missing install requirement
+- **WHEN** `image.load(...)` is called for a HEIC, HEIF, AVIF, SVG, or clipboard source and a required optional dependency is missing
+- **THEN** it SHALL return an `{"error": ...}` dict (not raise) whose message names the missing dependency and install requirement
 
 ---
 
@@ -271,19 +271,19 @@ given handle.
 - **WHEN** `image.purge(minutes=120)` is called
 - **THEN** it SHALL delete all image files and meta.json pairs whose `created_at`
   is more than 120 minutes ago
-- **AND** return `{"deleted": N, "bytes_freed": N}`
+- **AND** return `{"purged": N, "bytes_freed": N}`
 
 #### Scenario: Purge default (no argument)
 
 - **WHEN** `image.purge()` is called with no arguments
 - **THEN** it SHALL delete images older than 15 minutes (the default)
-- **AND** return `{"deleted": N, "bytes_freed": N}`
+- **AND** return `{"purged": N, "bytes_freed": N}`
 
 #### Scenario: Purge all
 
 - **WHEN** `image.purge(all=True)` is called
 - **THEN** it SHALL delete all images in the session images directory regardless of age
-- **AND** return `{"deleted": N, "bytes_freed": N}`
+- **AND** return `{"purged": N, "bytes_freed": N}`
 
 #### Scenario: Zero or negative minutes raises
 

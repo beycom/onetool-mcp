@@ -30,11 +30,6 @@ from .store import (
 )
 from .vision import ask_questions, extract_summary
 
-# Track last clipboard handle for metadata/observability only.
-# Clipboard reads for ask/summary always refresh via load(img="clip"),
-# which deduplicates unchanged content by hash.
-_clip_handle: str | None = None
-
 
 def _background_summarise(handle_name: str, model_bytes: bytes) -> None:
     """Run extract_summary() and persist the result — called in a daemon thread.
@@ -78,6 +73,39 @@ def _get_model_bytes(handle_name: str, max_edge: int) -> bytes | None:
     return prep.model_bytes
 
 
+def _resolve_handle_name(img: str, max_edge: int) -> tuple[str, dict[str, Any] | None]:
+    """Resolve an image reference to a handle name, auto-loading when needed.
+
+    Clipboard sources are always re-read so the latest content is picked up;
+    ``load()`` deduplicates unchanged bytes by hash. File/URL sources that are
+    not already loaded are loaded fresh.
+
+    Args:
+        img: Handle (``"#name"`` or bare ``"name"``), file path, URL, or
+            ``"clip"``/``"clipboard"``.
+        max_edge: Maximum longest edge passed to ``load()`` for fresh loads.
+
+    Returns:
+        ``(handle_name, None)`` on success, or ``("", error_dict)`` on failure
+        where ``error_dict`` is ready to return from the calling tool.
+    """
+    if img in ("clip", "clipboard"):
+        result = load(img="clip", max_edge=max_edge)
+        if "error" in result:
+            return "", {"error": result["error"], "handle": "clip"}
+        return result["handle"].lstrip("#"), None
+    if img.startswith("#"):
+        return img[1:], None
+    if load_meta(img) is not None:
+        # Bare handle name (without # prefix)
+        return img, None
+    # Auto-load from file/url
+    result = load(img=img, max_edge=max_edge)
+    if "error" in result:
+        return "", {"error": result["error"], "handle": img}
+    return result["handle"].lstrip("#"), None
+
+
 def load(*, img: str, handle: str | None = None, max_edge: int = 1568) -> dict[str, Any]:
     """Load a single image into session storage and return a stable handle.
 
@@ -108,8 +136,6 @@ def load(*, img: str, handle: str | None = None, max_edge: int = 1568) -> dict[s
         image.load(img="~/screenshots/ui.png")
         image.load(img="https://example.org/diagram.png", handle="ref")
     """
-    global _clip_handle
-
     with LogSpan(span="ot_image.load", source=img) as s:
         # Resolve source type and raw bytes
         try:
@@ -117,6 +143,9 @@ def load(*, img: str, handle: str | None = None, max_edge: int = 1568) -> dict[s
         except NotImplementedError as e:
             s.add(error="clipboard_unsupported")
             return {"error": str(e)}
+        except ImportError as e:
+            s.add(error=str(e))
+            return {"error": f"missing optional dependency — {e}"}
         except (FileNotFoundError, IsADirectoryError, ValueError, RuntimeError) as e:
             s.add(error=str(e))
             return {"error": str(e)}
@@ -164,10 +193,12 @@ def load(*, img: str, handle: str | None = None, max_edge: int = 1568) -> dict[s
                 if cache_get(existing) is None:
                     disk = load_raw_bytes(existing)
                     if disk is not None:
-                        prep = prepare_for_model(disk, max_edge)
+                        try:
+                            prep = prepare_for_model(disk, max_edge)
+                        except ImportError as e:
+                            s.add(error=str(e))
+                            return {"error": f"missing optional dependency — {e}"}
                         cache_put(existing, prep.model_bytes)
-                if source_type == "clipboard":
-                    _clip_handle = existing
                 s.add(handle=existing, dedup=True)
                 existing_meta = load_meta(existing)
                 return {
@@ -193,8 +224,6 @@ def load(*, img: str, handle: str | None = None, max_edge: int = 1568) -> dict[s
                         )
                     }
                 # Same content, same named handle — dedup
-                if source_type == "clipboard":
-                    _clip_handle = handle_name
                 s.add(handle=handle_name, dedup=True)
                 return {
                     "handle": f"#{handle_name}",
@@ -204,7 +233,11 @@ def load(*, img: str, handle: str | None = None, max_edge: int = 1568) -> dict[s
                     "dedup": True,
                 }
 
-        prep = prepare_for_model(raw_bytes, max_edge)
+        try:
+            prep = prepare_for_model(raw_bytes, max_edge)
+        except ImportError as e:
+            s.add(error=str(e))
+            return {"error": f"missing optional dependency — {e}"}
 
         source_label = img if source_type in ("url", "file") else source_type
         image_meta: dict[str, Any] = {
@@ -229,9 +262,6 @@ def load(*, img: str, handle: str | None = None, max_edge: int = 1568) -> dict[s
             daemon=True,
         )
         thread.start()
-
-        if source_type == "clipboard":
-            _clip_handle = handle_name
 
         s.add(
             handle=handle_name,
@@ -322,27 +352,10 @@ def ask(
         config = get_image_config()
 
         # Resolve handle name
-        handle_name: str
-        if img in ("clip", "clipboard"):
-            # Always re-read clipboard to pick up latest content.
-            # load() deduplicates unchanged bytes and updates _clip_handle.
-            result = load(img="clip", max_edge=max_edge)
-            if "error" in result:
-                s.add(error=result["error"])
-                return {"error": result["error"], "handle": "clip"}
-            handle_name = result["handle"].lstrip("#")
-        elif img.startswith("#"):
-            handle_name = img[1:]
-        elif load_meta(img) is not None:
-            # Bare handle name (without # prefix)
-            handle_name = img
-        else:
-            # Auto-load from file/url
-            result = load(img=img, max_edge=max_edge)
-            if "error" in result:
-                s.add(error=result["error"])
-                return {"error": result["error"], "handle": img}
-            handle_name = result["handle"].lstrip("#")
+        handle_name, err = _resolve_handle_name(img, max_edge)
+        if err is not None:
+            s.add(error=err["error"])
+            return err
 
         s.add(handle=handle_name)
 
@@ -390,26 +403,10 @@ def summary(*, img: str) -> dict[str, Any]:
         config = get_image_config()
 
         # Resolve handle name
-        handle_name: str
-        if img in ("clip", "clipboard"):
-            # Always re-read clipboard to pick up latest content.
-            # load() deduplicates unchanged bytes and updates _clip_handle.
-            result = load(img="clip", max_edge=config.max_edge)
-            if "error" in result:
-                s.add(error=result["error"])
-                return {"error": result["error"], "handle": "clip"}
-            handle_name = result["handle"].lstrip("#")
-        elif img.startswith("#"):
-            handle_name = img[1:]
-        elif load_meta(img) is not None:
-            # Bare handle name (without # prefix)
-            handle_name = img
-        else:
-            result = load(img=img)
-            if "error" in result:
-                s.add(error=result["error"])
-                return {"error": result["error"], "handle": img}
-            handle_name = result["handle"].lstrip("#")
+        handle_name, err = _resolve_handle_name(img, config.max_edge)
+        if err is not None:
+            s.add(error=err["error"])
+            return err
 
         s.add(handle=handle_name)
 

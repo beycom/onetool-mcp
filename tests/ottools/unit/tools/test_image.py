@@ -453,6 +453,41 @@ class TestStore:
             assert loaded is not None
             assert loaded["summary"]["text"] == "hello"
 
+    def test_save_summary_atomic_leaves_no_tmp_file(self, tmp_path: Path) -> None:
+        from ottools._image import store
+
+        with patch.object(store, "_images_dir", return_value=tmp_path):
+            store.save_image(_make_png_bytes(), "img_atomic", _make_meta("img_atomic"))
+            store.save_summary("img_atomic", {"type": "ui"})
+
+        assert not list(tmp_path.glob("*.tmp"))
+        loaded = json.loads((tmp_path / "img_atomic.meta.json").read_text(encoding="utf-8"))
+        assert loaded["summary"] == {"type": "ui"}
+
+    def test_save_summary_concurrent_writes_stay_valid(self, tmp_path: Path) -> None:
+        """Concurrent save_summary calls (daemon vs main thread) never tear meta.json."""
+        import threading
+
+        from ottools._image import store
+
+        with patch.object(store, "_images_dir", return_value=tmp_path):
+            store.save_image(_make_png_bytes(), "img_race", _make_meta("img_race"))
+
+            def worker(i: int) -> None:
+                for _ in range(20):
+                    store.save_summary("img_race", {"type": f"t{i}"})
+
+            threads = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+            final = store.load_meta("img_race")  # raises if JSON is torn
+
+        assert final is not None
+        assert final["summary"]["type"] in {"t0", "t1", "t2", "t3"}
+
     def test_find_by_hash_returns_existing(self, tmp_path: Path) -> None:
         from ottools._image import store
 
@@ -752,8 +787,6 @@ class TestLoad:
             from ottools._image.config import Config
 
             mock_cfg.return_value = Config(session_cache_size=10)
-            tools._clip_handle = None
-
             result = tools.load(img=str(img_path))
 
         assert result["handle"].startswith("#img_")
@@ -776,8 +809,6 @@ class TestLoad:
             from ottools._image.config import Config
 
             mock_cfg.return_value = Config(session_cache_size=10)
-            tools._clip_handle = None
-
             tools.load(img=str(img_path))
             result = tools.load(img=str(img_path))  # dedup
 
@@ -805,8 +836,6 @@ class TestLoad:
             from ottools._image.config import Config
 
             mock_cfg.return_value = Config(session_cache_size=10)
-            tools._clip_handle = None
-
             h1 = tools.load(img=str(img_path))
             h2 = tools.load(img=str(img_path))
 
@@ -829,8 +858,6 @@ class TestLoad:
             from ottools._image.config import Config
 
             mock_cfg.return_value = Config(session_cache_size=10)
-            tools._clip_handle = None
-
             tools.load(img=str(path_a), handle="myref")
             result = tools.load(img=str(path_b), handle="myref")
 
@@ -845,6 +872,48 @@ class TestLoad:
 
         assert "error" in result
         assert "linux" in result["error"].lower()
+
+    def test_clipboard_missing_pillow_returns_friendly_error(self) -> None:
+        from ottools._image import tools
+
+        with patch(
+            "ottools._image.sources._grab_clipboard",
+            side_effect=ImportError(
+                "Pillow is required for clipboard capture. Install with: pip install Pillow"
+            ),
+        ):
+            result = tools.load(img="clip")
+
+        assert "error" in result
+        assert "missing optional dependency" in result["error"]
+        assert "pip install Pillow" in result["error"]
+
+    def test_missing_decoder_returns_friendly_error(self, tmp_path: Path) -> None:
+        from ottools._image import store, tools
+
+        png = _make_png_bytes()
+        img_path = tmp_path / "dep_test.png"
+        img_path.write_bytes(png)
+
+        with (
+            patch.object(store, "_images_dir", return_value=tmp_path),
+            patch(
+                "ottools._image.tools.prepare_for_model",
+                side_effect=ImportError(
+                    "resvg-py is required for SVG support. Install with: pip install resvg-py"
+                ),
+            ),
+        ):
+            result = tools.load(img=str(img_path))
+
+        assert "error" in result
+        assert "missing optional dependency" in result["error"]
+        assert "pip install resvg-py" in result["error"]
+
+    def test_clip_handle_state_removed(self) -> None:
+        from ottools._image import tools
+
+        assert not hasattr(tools, "_clip_handle")
 
     def test_background_summary_spawned_on_load(self, tmp_path: Path) -> None:
         from ottools._image import store, tools
@@ -863,7 +932,6 @@ class TestLoad:
                 session_cache_size=10,
                 model="openai/gpt-4o-mini",
             )
-            tools._clip_handle = None
             mock_t = MagicMock()
             mock_thread.return_value = mock_t
 
@@ -922,8 +990,6 @@ class TestAsk:
             session_cache_size=10,
             model="openai/gpt-4o-mini",
         )
-        tools._clip_handle = None
-
         with patch.object(store, "_images_dir", return_value=tmp_path):
             handle = tools.load(img=str(img_path))["handle"]
         return handle
@@ -977,7 +1043,6 @@ class TestAsk:
             patch("ottools._image.tools.get_image_config") as mock_cfg,
         ):
             mock_cfg.return_value = Config(session_cache_size=10, model="")
-            tools._clip_handle = None
             handle = tools.load(img=str(img_path))["handle"]
             result = tools.ask(img=handle, q="test")
 
@@ -1019,7 +1084,6 @@ class TestAsk:
             patch("ottools._image.sources._grab_clipboard", side_effect=[img_a, img_b]) as mock_clip,
         ):
             mock_cfg.return_value = Config(session_cache_size=10, model="openai/gpt-4o-mini")
-            tools._clip_handle = None
             first = tools.ask(img="clip", q="q1")
             second = tools.ask(img="clip", q="q2")
 
@@ -1076,8 +1140,6 @@ class TestSummary:
                 model="openai/gpt-4o-mini",
             )
             MockOAI.return_value.chat.completions.create.return_value = mock_resp
-            tools._clip_handle = None
-
             handle = tools.load(img=str(img_path))["handle"]
             result = tools.summary(img=handle)
 
@@ -1112,8 +1174,6 @@ class TestSummary:
                 model="openai/gpt-4o-mini",
             )
             MockOAI.return_value.chat.completions.create.return_value = mock_resp
-            tools._clip_handle = None
-
             handle = tools.load(img=str(img_path))["handle"]
             tools.summary(img=handle)  # First call
             result = tools.summary(img=handle)  # Second call — should be cached
@@ -1121,6 +1181,43 @@ class TestSummary:
         assert result["cached"] is True
         # Model should only have been called once
         assert MockOAI.return_value.chat.completions.create.call_count == 1
+
+    def test_auto_load_uses_configured_max_edge(self, tmp_path: Path) -> None:
+        """summary() auto-load passes config.max_edge through to load()."""
+        from ottools._image import store, tools
+        from ottools._image.config import Config
+
+        png = _make_png_bytes()
+        img_path = tmp_path / "sum_edge.png"
+        img_path.write_bytes(png)
+
+        summary_data = {
+            "type": "ui",
+            "mode": "light",
+            "colours": [],
+            "description": "d",
+            "content": "c",
+        }
+        mock_resp = MagicMock()
+        mock_resp.choices[0].message.content = json.dumps(summary_data)
+
+        with (
+            patch.object(store, "_images_dir", return_value=tmp_path),
+            patch("ottools._image.tools.get_image_config") as mock_cfg,
+            patch("ottools._image.vision.OpenAI") as MockOAI,
+        ):
+            mock_cfg.return_value = Config(
+                session_cache_size=10,
+                model="openai/gpt-4o-mini",
+                max_edge=512,
+            )
+            MockOAI.return_value.chat.completions.create.return_value = mock_resp
+
+            result = tools.summary(img=str(img_path))  # auto-load path
+            meta = store.load_meta(result["handle"].lstrip("#"))
+
+        assert meta is not None
+        assert meta["max_edge"] == 512
 
     def test_clip_ask_delegates_to_ask(self, tmp_path: Path) -> None:
         from ottools._image import tools
@@ -1171,7 +1268,6 @@ class TestSummary:
             patch("ottools._image.tools.threading.Thread"),
         ):
             MockOAI.return_value.chat.completions.create.return_value = mock_resp
-            tools._clip_handle = None
             first = tools.summary(img="clip")
             second = tools.summary(img="clip")
 
@@ -1268,7 +1364,8 @@ class TestLifecycle:
         ):
             result = purge_images(all=True)
 
-        assert result["deleted"] == 2
+        assert result["purged"] == 2
+        assert "deleted" not in result
         assert not list(tmp_path.glob("*.meta.json"))
 
     def test_purge_by_age_skips_recent(self, tmp_path: Path) -> None:
@@ -1287,7 +1384,7 @@ class TestLifecycle:
         ):
             result = purge_images(minutes=120)
 
-        assert result["deleted"] == 1
+        assert result["purged"] == 1
         assert (tmp_path / "img_new.meta.json").exists()
         assert not (tmp_path / "img_old.meta.json").exists()
 
@@ -1310,7 +1407,7 @@ class TestLifecycle:
         ):
             result = purge_images()
 
-        assert result["deleted"] == 0
+        assert result["purged"] == 0
 
 
 # ---------------------------------------------------------------------------

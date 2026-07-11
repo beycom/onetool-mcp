@@ -114,6 +114,6 @@ def purge_images(*, all: bool = False, minutes: int = 15) -> dict[str, Any]:
             count += 1
             total_freed += freed
 
-    return {"deleted": count, "bytes_freed": total_freed}
+    return {"purged": count, "bytes_freed": total_freed}
 
 
