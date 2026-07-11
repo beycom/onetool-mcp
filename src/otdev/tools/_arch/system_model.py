@@ -802,72 +802,118 @@ def svg_markup(svg_text: str) -> str:
     return opening_tag + markup[tag_close + 1 :]
 
 
-def _build_system_block(*, system_id: str, level: str, graph: EntityGraph) -> dict[str, Any]:
+@dataclass(frozen=True, slots=True)
+class ProjectScope:
+    """Project-stage scoping for `_build_system_block` (design D3): child
+    filtering by the stage's included ids plus change-class decoration."""
+
+    explicit_system_ids: set[str]
+    included_app_ids: set[str]
+    included_cmp_ids: set[str]
+    change_lookup: dict[tuple[str, str], str]
+
+
+def _build_system_block(
+    *,
+    system_id: str,
+    level: str,
+    graph: EntityGraph,
+    scope: ProjectScope | None = None,
+) -> dict[str, Any]:
     row = graph.sys_rows.get(system_id)
     system_name = str((row or {}).get("name") or system_id)
-    sys_id = _sanitize_d2_id(system_id)
     # All nodes in this block (the system itself and its apps/components)
     # belong to `system_id`, so they all link to that system's page (D4).
     system_link = f"./{system_page_name(system_id)}"
     block: dict[str, Any] = {
-        "id": sys_id,
+        "id": _sanitize_d2_id(system_id),
         "label": _quote_d2(system_name),
         "placeholder": False,
         "direct_components": [],
         "apps": [],
         "link": system_link,
     }
+    if scope is not None:
+        system_change_class = _resolve_change_class(scope.change_lookup, "system", system_id)
+        if system_change_class:
+            block["change_class"] = system_change_class
 
     app_ids = graph.sys_app_ids.get(system_id, [])
     cmp_rows_direct = graph.sys_direct_cmp_rows.get(system_id, [])
 
-    if level == LEVEL_SYS or (not app_ids and not cmp_rows_direct):
-        block["placeholder"] = True
-        return block
+    # Placeholder rules differ (D3): without scope, a childless block is a
+    # placeholder up front; with scope, placeholder is re-set only after
+    # filtering leaves no children (bottom of this function).
+    include_all = True
+    if scope is None:
+        if level == LEVEL_SYS or (not app_ids and not cmp_rows_direct):
+            block["placeholder"] = True
+            return block
+    else:
+        if level == LEVEL_SYS:
+            block["placeholder"] = True
+            return block
+        include_all = system_id in scope.explicit_system_ids
+        app_ids = [
+            app_id for app_id in app_ids if include_all or app_id in scope.included_app_ids
+        ]
+        cmp_rows_direct = [
+            cmp_row
+            for cmp_row in cmp_rows_direct
+            if include_all or str(cmp_row.get("id", "")).strip() in scope.included_cmp_ids
+        ]
 
     if level == LEVEL_CMP:
         for cmp_row in cmp_rows_direct:
             cmp_id = str(cmp_row.get("id", "")).strip()
             if not cmp_id:
                 continue
-            cmp_name = str(cmp_row.get("name") or cmp_id)
-            cmp_class = _component_class_from_row(cmp_row)
-            block["direct_components"].append(
-                {
-                    "id": _sanitize_d2_id(cmp_id),
-                    "label": _wrap_label(cmp_name, COMPONENT_MAX_LINE_WIDTH),
-                    "class": cmp_class,
-                    "link": system_link,
-                }
-            )
+            direct_component: dict[str, Any] = {
+                "id": _sanitize_d2_id(cmp_id),
+                "label": _wrap_label(str(cmp_row.get("name") or cmp_id), COMPONENT_MAX_LINE_WIDTH),
+                "class": _component_class_from_row(cmp_row),
+                "link": system_link,
+            }
+            if scope is not None:
+                cmp_change_class = _resolve_change_class(scope.change_lookup, "component", cmp_id)
+                if cmp_change_class:
+                    direct_component["change_class"] = cmp_change_class
+            block["direct_components"].append(direct_component)
 
     for app_id in app_ids:
         app_row = graph.app_rows[app_id]
-        app_name = str(app_row.get("name") or app_id)
-        app_cmp_rows = graph.app_cmp_rows.get(app_id, [])
-
         app_block: dict[str, Any] = {
             "id": _sanitize_d2_id(app_id),
-            "label": _wrap_label(app_name),
+            "label": _wrap_label(str(app_row.get("name") or app_id)),
             "components": [],
             "link": system_link,
         }
-        if level == LEVEL_CMP and app_cmp_rows:
-            for cmp_row in app_cmp_rows:
+        if scope is not None:
+            app_change_class = _resolve_change_class(scope.change_lookup, "application", app_id)
+            if app_change_class:
+                app_block["change_class"] = app_change_class
+        if level == LEVEL_CMP:
+            for cmp_row in graph.app_cmp_rows.get(app_id, []):
                 cmp_id = str(cmp_row.get("id", "")).strip()
                 if not cmp_id:
                     continue
-                cmp_name = str(cmp_row.get("name") or cmp_id)
-                cmp_class = _component_class_from_row(cmp_row)
-                app_block["components"].append(
-                    {
-                        "id": _sanitize_d2_id(cmp_id),
-                        "label": _wrap_label(cmp_name, COMPONENT_MAX_LINE_WIDTH),
-                        "class": cmp_class,
-                        "link": system_link,
-                    }
-                )
+                if scope is not None and not include_all and cmp_id not in scope.included_cmp_ids:
+                    continue
+                app_component: dict[str, Any] = {
+                    "id": _sanitize_d2_id(cmp_id),
+                    "label": _wrap_label(str(cmp_row.get("name") or cmp_id), COMPONENT_MAX_LINE_WIDTH),
+                    "class": _component_class_from_row(cmp_row),
+                    "link": system_link,
+                }
+                if scope is not None:
+                    cmp_change_class = _resolve_change_class(scope.change_lookup, "component", cmp_id)
+                    if cmp_change_class:
+                        app_component["change_class"] = cmp_change_class
+                app_block["components"].append(app_component)
         block["apps"].append(app_block)
+
+    if scope is not None and not block["apps"] and not block["direct_components"]:
+        block["placeholder"] = True
     return block
 
 
@@ -1383,98 +1429,6 @@ def _resolve_change_class(
     return _change_class_for(change_lookup.get((item_type, item_id)))
 
 
-def _build_project_system_block(
-    *,
-    system_id: str,
-    level: str,
-    graph: EntityGraph,
-    explicit_system_ids: set[str],
-    included_app_ids: set[str],
-    included_cmp_ids: set[str],
-    change_lookup: dict[tuple[str, str], str],
-) -> dict[str, Any]:
-    row = graph.sys_rows.get(system_id)
-    system_name = str((row or {}).get("name") or system_id)
-    # All nodes in this block (the system itself and its apps/components)
-    # belong to `system_id`, so they all link to that system's page (D4).
-    system_link = f"./{system_page_name(system_id)}"
-    block: dict[str, Any] = {
-        "id": _sanitize_d2_id(system_id),
-        "label": _quote_d2(system_name),
-        "placeholder": level == LEVEL_SYS,
-        "direct_components": [],
-        "apps": [],
-        "link": system_link,
-    }
-    system_change_class = _resolve_change_class(change_lookup, "system", system_id)
-    if system_change_class:
-        block["change_class"] = system_change_class
-    if level == LEVEL_SYS:
-        return block
-
-    include_all = system_id in explicit_system_ids
-    app_ids = [
-        app_id
-        for app_id in graph.sys_app_ids.get(system_id, [])
-        if include_all or app_id in included_app_ids
-    ]
-    direct_cmp_rows = [
-        cmp_row
-        for cmp_row in graph.sys_direct_cmp_rows.get(system_id, [])
-        if include_all or str(cmp_row.get("id", "")).strip() in included_cmp_ids
-    ]
-
-    if level == LEVEL_CMP:
-        for cmp_row in direct_cmp_rows:
-            cmp_id = str(cmp_row.get("id", "")).strip()
-            if not cmp_id:
-                continue
-            direct_component: dict[str, Any] = {
-                "id": _sanitize_d2_id(cmp_id),
-                "label": _wrap_label(str(cmp_row.get("name") or cmp_id), COMPONENT_MAX_LINE_WIDTH),
-                "class": _component_class_from_row(cmp_row),
-                "link": system_link,
-            }
-            cmp_change_class = _resolve_change_class(change_lookup, "component", cmp_id)
-            if cmp_change_class:
-                direct_component["change_class"] = cmp_change_class
-            block["direct_components"].append(direct_component)
-
-    for app_id in app_ids:
-        app_row = graph.app_rows[app_id]
-        app_block: dict[str, Any] = {
-            "id": _sanitize_d2_id(app_id),
-            "label": _wrap_label(str(app_row.get("name") or app_id)),
-            "components": [],
-            "link": system_link,
-        }
-        app_change_class = _resolve_change_class(change_lookup, "application", app_id)
-        if app_change_class:
-            app_block["change_class"] = app_change_class
-        if level == LEVEL_CMP:
-            for cmp_row in graph.app_cmp_rows.get(app_id, []):
-                cmp_id = str(cmp_row.get("id", "")).strip()
-                if not cmp_id:
-                    continue
-                if not include_all and cmp_id not in included_cmp_ids:
-                    continue
-                app_component: dict[str, Any] = {
-                    "id": _sanitize_d2_id(cmp_id),
-                    "label": _wrap_label(str(cmp_row.get("name") or cmp_id), COMPONENT_MAX_LINE_WIDTH),
-                    "class": _component_class_from_row(cmp_row),
-                    "link": system_link,
-                }
-                cmp_change_class = _resolve_change_class(change_lookup, "component", cmp_id)
-                if cmp_change_class:
-                    app_component["change_class"] = cmp_change_class
-                app_block["components"].append(app_component)
-        block["apps"].append(app_block)
-
-    if not block["apps"] and not block["direct_components"]:
-        block["placeholder"] = True
-    return block
-
-
 def build_project_view(
     *,
     project_id: str,
@@ -1519,15 +1473,18 @@ def build_project_view(
         for row in _project_scope_rows(project_id=project_id, stage=stage, entities=entities)
         if _project_scope_item_type(row) == "system"
     }
+    scope = ProjectScope(
+        explicit_system_ids=explicit_system_ids,
+        included_app_ids=app_ids,
+        included_cmp_ids=cmp_ids,
+        change_lookup=change_lookup,
+    )
     system_blocks = [
-        _build_project_system_block(
+        _build_system_block(
             system_id=system_id,
             level=detail_level,
             graph=graph,
-            explicit_system_ids=explicit_system_ids,
-            included_app_ids=app_ids,
-            included_cmp_ids=cmp_ids,
-            change_lookup=change_lookup,
+            scope=scope,
         )
         for system_id in sorted(system_ids)
         if system_id in graph.sys_rows and not is_external_system(graph.sys_rows[system_id])

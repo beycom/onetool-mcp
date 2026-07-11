@@ -536,12 +536,13 @@ class TestGenerate:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         from otdev.tools import arch
+        from otdev.tools._arch import generate as arch_generate
 
         def _raise_not_found(*args: object, **kwargs: object) -> object:
             _ = args, kwargs
             raise FileNotFoundError("[Errno 2] No such file or directory: 'd2'")
 
-        monkeypatch.setattr(arch.subprocess, "run", _raise_not_found)
+        monkeypatch.setattr(arch_generate.subprocess, "run", _raise_not_found)
 
         result = arch.generate(
             input_path=str(_FIXTURES / "architecture.xlsx"),
@@ -561,6 +562,7 @@ class TestGenerate:
         import subprocess
 
         from otdev.tools import arch
+        from otdev.tools._arch import generate as arch_generate
 
         seen_timeouts: list[object] = []
 
@@ -569,7 +571,7 @@ class TestGenerate:
             seen_timeouts.append(kwargs.get("timeout"))
             raise subprocess.TimeoutExpired(cmd="d2", timeout=kwargs.get("timeout") or 0)
 
-        monkeypatch.setattr(arch.subprocess, "run", _raise_timeout)
+        monkeypatch.setattr(arch_generate.subprocess, "run", _raise_timeout)
 
         result = arch.generate(
             input_path=str(_FIXTURES / "architecture.xlsx"),
@@ -579,10 +581,13 @@ class TestGenerate:
         assert result["ok"] is False
         assert result["operation"] == "generate"
         assert result["error"]["code"] == "engine_command_timeout"
-        assert f"timed out after {arch._RENDER_TIMEOUT_SECONDS}s" in result["error"]["message"]
-        assert result["error"]["details"]["timeout_seconds"] == arch._RENDER_TIMEOUT_SECONDS
+        assert (
+            f"timed out after {arch_generate._RENDER_TIMEOUT_SECONDS}s"
+            in result["error"]["message"]
+        )
+        assert result["error"]["details"]["timeout_seconds"] == arch_generate._RENDER_TIMEOUT_SECONDS
         assert seen_timeouts and all(
-            value == arch._RENDER_TIMEOUT_SECONDS for value in seen_timeouts
+            value == arch_generate._RENDER_TIMEOUT_SECONDS for value in seen_timeouts
         )
 
     def test_generate_uses_profile_yaml_as_the_run_profile(
@@ -826,7 +831,7 @@ class TestGenerate:
         assert '"sys_a"."app_a"."cmp_a" -> "sys_b"."app_b"."cmp_b"' in target_d2_text
 
     def test_build_project_d2_uses_project_detail_and_connect_levels(self, tmp_path: Path) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_project_d2
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_project_d2 as _build_project_d2
 
         entities = _project_entities()
         graph = _build_entity_graph(entities=entities)
@@ -846,7 +851,7 @@ class TestGenerate:
         assert 'edge="sys_a"."app_a"."cmp_a" -> "sys_b"."app_b"."cmp_b"' in rendered
 
     def test_build_system_d2_merges_interfaces_with_template_arrowheads(self, tmp_path: Path) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_system_d2
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_system_d2 as _build_system_d2
 
         template_path = tmp_path / "system.d2.j2"
         template_path.write_text(
@@ -922,7 +927,7 @@ class TestGenerate:
         assert "direction: up" in rendered
 
     def test_build_system_d2_hides_interface_labels_when_disabled(self, tmp_path: Path) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_system_d2
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_system_d2 as _build_system_d2
 
         template_path = tmp_path / "system.d2.j2"
         template_path.write_text(
@@ -990,7 +995,7 @@ class TestGenerate:
         arrow_direction: str,
         expected_edge: str,
     ) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_system_d2
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_system_d2 as _build_system_d2
 
         entities: dict[str, list[dict[str, object]]] = {
             "sys": [
@@ -1023,7 +1028,7 @@ class TestGenerate:
         assert expected_edge in rendered
 
     def test_build_system_d2_defaults_secondary_systems_to_system_detail(self, tmp_path: Path) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_system_d2
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_system_d2 as _build_system_d2
 
         entities = _secondary_detail_entities()
         graph = _build_entity_graph(entities=entities)
@@ -1043,7 +1048,7 @@ class TestGenerate:
         assert 'edge="sys_a"."app_a"."cmp_a" -> "sys_b"' in rendered
 
     def test_build_system_d2_renders_secondary_systems_at_app_detail(self, tmp_path: Path) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_system_d2
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_system_d2 as _build_system_d2
 
         entities = _secondary_detail_entities()
         graph = _build_entity_graph(entities=entities)
@@ -1066,7 +1071,7 @@ class TestGenerate:
         assert 'edge="sys_a" -> "sys_b"."app_b"' in rendered
 
     def test_build_system_d2_renders_and_connects_secondary_systems_at_cmp_detail(self, tmp_path: Path) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_system_d2
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_system_d2 as _build_system_d2
 
         entities = _secondary_detail_entities()
         graph = _build_entity_graph(entities=entities)
@@ -1088,7 +1093,7 @@ class TestGenerate:
         assert 'edge="sys_a"."app_a" -> "sys_b"."app_b"."cmp_b"' in rendered
 
     def test_build_system_d2_matches_secondary_detail_to_primary_diagram_level(self, tmp_path: Path) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_system_d2
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_system_d2 as _build_system_d2
 
         entities = _secondary_detail_entities()
         graph = _build_entity_graph(entities=entities)
@@ -1124,7 +1129,7 @@ class TestGenerate:
         assert 'edge="sys_a"."app_a"."cmp_a" -> "sys_b"."app_b"."cmp_b"' in cmp_rendered
 
     def test_build_system_d2_rejects_invalid_secondary_profile_options(self, tmp_path: Path) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_system_d2
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_system_d2 as _build_system_d2
 
         entities = _secondary_detail_entities()
         graph = _build_entity_graph(entities=entities)
@@ -1150,7 +1155,7 @@ class TestGenerate:
             )
 
     def test_solution_system_context_uses_interface_key_field(self) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_solution_system_context
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_solution_system_context as _build_solution_system_context
 
         entities: dict[str, list[dict[str, object]]] = {
             "sys": [{"id": "sys_a", "name": "System A"}],
@@ -1185,7 +1190,7 @@ class TestGenerate:
         assert context["additional_diagrams"] == []
 
     def test_solution_system_context_splits_additional_diagrams(self) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_solution_system_context
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_solution_system_context as _build_solution_system_context
 
         entities: dict[str, list[dict[str, object]]] = {
             "sys": [{"id": "sys_a", "name": "System A"}],
@@ -1514,7 +1519,7 @@ class TestChangeTypeAndInteractionStyling:
         }
 
     def test_change_class_varies_by_stage(self, tmp_path: Path) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_project_d2
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_project_d2 as _build_project_d2
 
         entities = self._entities()
         graph = _build_entity_graph(entities=entities)
@@ -1541,7 +1546,7 @@ class TestChangeTypeAndInteractionStyling:
         assert "cmp=sys_a.app_a.cmp_a change=ChangeNew" in target_rendered
 
     def test_change_class_neutral_for_existing_and_unscoped(self, tmp_path: Path) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_project_d2
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_project_d2 as _build_project_d2
 
         entities = self._entities()
         graph = _build_entity_graph(entities=entities)
@@ -1567,7 +1572,7 @@ class TestChangeTypeAndInteractionStyling:
         assert all(line.endswith("change=NONE") for line in edge_lines)
 
     def test_edge_change_class_for_non_existing_scoped_interface(self, tmp_path: Path) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_project_d2
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_project_d2 as _build_project_d2
 
         entities: dict[str, list[dict[str, object]]] = {
             "sys": [
@@ -1613,9 +1618,9 @@ class TestChangeTypeAndInteractionStyling:
         ][0]
 
     def test_scope_table_change_type_badge_html(self) -> None:
-        from otdev.tools.arch import (
-            _build_entity_graph,
-            _build_solution_project_context,
+        from otdev.tools._arch.system_model import (
+            build_entity_graph as _build_entity_graph,
+            build_solution_project_context as _build_solution_project_context,
         )
 
         entities: dict[str, list[dict[str, object]]] = {
@@ -1667,7 +1672,7 @@ class TestChangeTypeAndInteractionStyling:
     def test_interaction_class_for_all_recognized_values_and_fallback(
         self, tmp_path: Path
     ) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_system_d2
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_system_d2 as _build_system_d2
 
         entities: dict[str, list[dict[str, object]]] = {
             "sys": [{"id": "sys_a", "name": "System A"}, {"id": "sys_b", "name": "System B"}],
@@ -1707,7 +1712,7 @@ class TestChangeTypeAndInteractionStyling:
     def test_interaction_class_coexists_with_focus_direction_class(
         self, tmp_path: Path
     ) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_system_d2
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_system_d2 as _build_system_d2
 
         entities: dict[str, list[dict[str, object]]] = {
             "sys": [{"id": "sys_a", "name": "System A"}, {"id": "sys_b", "name": "System B"}],
@@ -1739,7 +1744,7 @@ class TestChangeTypeAndInteractionStyling:
         assert "interaction=IntQueue" in rendered
 
     def test_interfaces_table_interaction_type_badge(self) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_solution_system_context
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_solution_system_context as _build_solution_system_context
 
         entities: dict[str, list[dict[str, object]]] = {
             "sys": [{"id": "sys_a", "name": "System A"}, {"id": "sys_b", "name": "System B"}],
@@ -1797,7 +1802,7 @@ class TestClickableNodesAndNavigation:
     def test_app_node_links_to_owning_system_page_unknown_and_person_have_none(
         self, tmp_path: Path
     ) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_system_d2
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_system_d2 as _build_system_d2
 
         entities: dict[str, list[dict[str, object]]] = {
             "sys": [{"id": "sys_a", "name": "System A"}],
@@ -1825,7 +1830,7 @@ class TestClickableNodesAndNavigation:
     def test_related_projects_appears_via_app_scope_row_and_empty_for_untouched(
         self,
     ) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_solution_system_context
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_solution_system_context as _build_solution_system_context
 
         entities: dict[str, list[dict[str, object]]] = {
             "sys": [
@@ -1875,7 +1880,7 @@ class TestClickableNodesAndNavigation:
         assert context_untouched["related_projects"] == []
 
     def test_scope_item_link_vs_plain_text_split(self) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_solution_project_context
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_solution_project_context as _build_solution_project_context
 
         entities: dict[str, list[dict[str, object]]] = {
             "sys": [{"id": "sys_a", "name": "System A"}],
@@ -1984,7 +1989,7 @@ class TestDiagramLegend:
 
     def test_legend_context_contains_every_change_and_interaction_style(self) -> None:
         from otdev.tools._arch.render_styles import CHANGE_TYPE_STYLES, INTERACTION_TYPE_STYLES
-        from otdev.tools.arch import _build_entity_graph, _build_solution_system_context
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_solution_system_context as _build_solution_system_context
 
         entities: dict[str, list[dict[str, object]]] = {
             "sys": [{"id": "sys_a", "name": "System A"}],
@@ -2012,10 +2017,10 @@ class TestDiagramLegend:
         assert legend["node_classes"]
 
     def test_show_change_types_differs_between_project_and_system_context(self) -> None:
-        from otdev.tools.arch import (
-            _build_entity_graph,
-            _build_solution_project_context,
-            _build_solution_system_context,
+        from otdev.tools._arch.system_model import (
+            build_entity_graph as _build_entity_graph,
+            build_solution_project_context as _build_solution_project_context,
+            build_solution_system_context as _build_solution_system_context,
         )
 
         entities: dict[str, list[dict[str, object]]] = {
@@ -2082,7 +2087,7 @@ class TestSolutionIndexSummary:
         }
 
     def test_aggregation_counts_include_unrecognized_interaction_type_by_literal_text(self) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_solution_index_context
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_solution_index_context as _build_solution_index_context
 
         entities = self._entities()
         graph = _build_entity_graph(entities=entities)
@@ -2097,7 +2102,7 @@ class TestSolutionIndexSummary:
         assert interfaces_by_type == {"API": 1, "REST": 1}
 
     def test_zero_projects_omits_project_total_and_breakdown(self) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_solution_index_context
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_solution_index_context as _build_solution_index_context
 
         entities = self._entities()
         graph = _build_entity_graph(entities=entities)
@@ -2109,7 +2114,7 @@ class TestSolutionIndexSummary:
         assert summary["projects_by_status"] == []
 
     def test_entity_table_shapes_and_link_hrefs(self) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_solution_index_context
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_solution_index_context as _build_solution_index_context
 
         entities = self._entities()
         entities["project"] = [{"id": "wallet", "name": "Wallet Project", "status": "active"}]
@@ -2395,7 +2400,7 @@ class TestRenderingPolish:
         ), f"no d2 template carries the {direction_literal} fallback"
 
     def test_build_system_d2_renders_direct_system_component(self, tmp_path: Path) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_system_d2
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_system_d2 as _build_system_d2
 
         entities = {
             "sys": [
@@ -2430,7 +2435,7 @@ class TestRenderingPolish:
         assert 'edge="sys_a"."cmp_direct" -> "sys_b"' in rendered
 
     def test_build_system_d2_uses_neutral_class_for_undirected_edges(self, tmp_path: Path) -> None:
-        from otdev.tools.arch import _build_entity_graph, _build_system_d2
+        from otdev.tools._arch.system_model import build_entity_graph as _build_entity_graph, build_system_d2 as _build_system_d2
 
         template_path = tmp_path / "system.d2.j2"
         template_path.write_text(
@@ -3019,7 +3024,7 @@ class TestDrawioEmitter:
         attribute from the root `<svg>` opening tag so inline HTML markup
         never carries the embedded model (design D9)."""
         from otdev.tools._arch.drawio import build_mxfile, inject_content
-        from otdev.tools.arch import _svg_markup
+        from otdev.tools._arch.system_model import svg_markup as _svg_markup
 
         context = self._sample_render_context()
         mxfile_xml = build_mxfile(
@@ -3041,7 +3046,7 @@ class TestDrawioEmitter:
         assert markup.startswith("<svg")
 
     def test_svg_markup_no_content_attribute_is_a_no_op(self) -> None:
-        from otdev.tools.arch import _svg_markup
+        from otdev.tools._arch.system_model import svg_markup as _svg_markup
 
         assert _svg_markup(self._SAMPLE_SVG).startswith("<svg")
         assert _svg_markup(self._SAMPLE_SVG) == self._SAMPLE_SVG[self._SAMPLE_SVG.find("<svg") :]
@@ -3131,3 +3136,342 @@ class TestArchDiagramSheet:
         assert 'aria-label="AWS Sequence Example"' in html
         assert "AWS Sequence Example" in html
         assert "<svg" in html
+
+
+class TestIncrementalGeneration:
+    """Incremental output reuse, stale sweep, and `force` (spec: Regenerated solution output)."""
+
+    _SVG = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>'
+
+    def _workbook(self, build_arch_workbook: object, path: Path) -> Path:
+        return build_arch_workbook(
+            path,
+            {
+                "sys": [
+                    ["id", "name"],
+                    ["sys_a", "System A"],
+                    ["sys_b", "System B"],
+                ],
+                "app": [["id", "name", "sys"], ["app_a", "App A", "sys_a"]],
+                "cmp": [["id", "name", "app"]],
+                "interface": [["id", "key", "name", "provider", "consumer"]],
+                "usr": [["id", "name", "app"]],
+            },
+        )
+
+    def _install_counting_render(self, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+        from otdev.tools._arch import generate as arch_generate
+
+        calls: list[str] = []
+
+        def _fake_render(
+            *, target_config: object, render_context: dict[str, object]
+        ) -> tuple[bool, dict[str, object]]:
+            _ = target_config
+            output = str(render_context["paths"]["output"])  # type: ignore[index]
+            calls.append(output)
+            Path(output).write_text(self._SVG, encoding="utf-8")
+            return True, {"command": "fake-render", "target": "solution", "engine": "d2"}
+
+        monkeypatch.setattr(arch_generate, "_execute_render_engine", _fake_render)
+        return calls
+
+    def test_unchanged_rerun_skips_all_engine_renders(
+        self, tmp_path: Path, build_arch_workbook: object, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from otdev.tools import arch
+
+        calls = self._install_counting_render(monkeypatch)
+        workbook = self._workbook(build_arch_workbook, tmp_path / "arch.xlsx")
+        out_dir = tmp_path / "out"
+
+        first = arch.generate(input_path=str(workbook), output_dir=str(out_dir))
+        assert first["ok"] is True
+        assert first["summary"]["renders"]["executed"] > 0
+        assert first["summary"]["renders"]["skipped"] == 0
+        first_call_count = len(calls)
+
+        second = arch.generate(input_path=str(workbook), output_dir=str(out_dir))
+        assert second["ok"] is True
+        assert second["summary"]["renders"]["executed"] == 0
+        assert second["summary"]["renders"]["skipped"] == first["summary"]["renders"]["executed"]
+        assert len(calls) == first_call_count
+
+    def test_model_change_rerenders_only_affected_diagrams(
+        self, tmp_path: Path, build_arch_workbook: object, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from otdev.tools import arch
+
+        calls = self._install_counting_render(monkeypatch)
+        workbook = self._workbook(build_arch_workbook, tmp_path / "arch.xlsx")
+        out_dir = tmp_path / "out"
+        assert arch.generate(input_path=str(workbook), output_dir=str(out_dir))["ok"] is True
+        calls.clear()
+
+        build_arch_workbook(
+            tmp_path / "arch.xlsx",
+            {
+                "sys": [
+                    ["id", "name"],
+                    ["sys_a", "System A"],
+                    ["sys_b", "System B Renamed"],
+                ],
+                "app": [["id", "name", "sys"], ["app_a", "App A", "sys_a"]],
+                "cmp": [["id", "name", "app"]],
+                "interface": [["id", "key", "name", "provider", "consumer"]],
+                "usr": [["id", "name", "app"]],
+            },
+        )
+        result = arch.generate(input_path=str(workbook), output_dir=str(out_dir))
+
+        assert result["ok"] is True
+        assert result["summary"]["renders"]["executed"] == 3
+        assert result["summary"]["renders"]["skipped"] == 3
+        assert all("sys_b" in Path(item).name for item in calls)
+
+    def test_stale_files_removed_after_successful_run(
+        self, tmp_path: Path, build_arch_workbook: object, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from otdev.tools import arch
+
+        self._install_counting_render(monkeypatch)
+        workbook = self._workbook(build_arch_workbook, tmp_path / "arch.xlsx")
+        out_dir = tmp_path / "out"
+        assert arch.generate(input_path=str(workbook), output_dir=str(out_dir))["ok"] is True
+
+        solution_dir = out_dir / "solution"
+        stale_page = solution_dir / "stale.html"
+        stale_image = solution_dir / "images" / "stale.svg"
+        stale_page.write_text("old", encoding="utf-8")
+        stale_image.write_text("old", encoding="utf-8")
+
+        result = arch.generate(input_path=str(workbook), output_dir=str(out_dir))
+
+        assert result["ok"] is True
+        assert not stale_page.exists()
+        assert not stale_image.exists()
+        assert (solution_dir / "index.html").exists()
+
+    def test_stale_files_retained_when_run_fails(
+        self, tmp_path: Path, build_arch_workbook: object, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from otdev.tools import arch
+        from otdev.tools._arch import generate as arch_generate
+
+        self._install_counting_render(monkeypatch)
+        workbook = self._workbook(build_arch_workbook, tmp_path / "arch.xlsx")
+        out_dir = tmp_path / "out"
+        assert arch.generate(input_path=str(workbook), output_dir=str(out_dir))["ok"] is True
+
+        solution_dir = out_dir / "solution"
+        stale_page = solution_dir / "stale.html"
+        stale_page.write_text("old", encoding="utf-8")
+        index_page = solution_dir / "index.html"
+
+        def _failing_render(
+            *, target_config: object, render_context: dict[str, object]
+        ) -> tuple[bool, dict[str, object]]:
+            _ = target_config, render_context
+            return False, {
+                "code": "engine_command_failed",
+                "message": "boom",
+                "details": {},
+            }
+
+        monkeypatch.setattr(arch_generate, "_execute_render_engine", _failing_render)
+        result = arch.generate(input_path=str(workbook), output_dir=str(out_dir), force=True)
+
+        assert result["ok"] is False
+        assert stale_page.exists()
+        assert index_page.exists()
+
+    def test_force_rerenders_everything(
+        self, tmp_path: Path, build_arch_workbook: object, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from otdev.tools import arch
+
+        calls = self._install_counting_render(monkeypatch)
+        workbook = self._workbook(build_arch_workbook, tmp_path / "arch.xlsx")
+        out_dir = tmp_path / "out"
+        first = arch.generate(input_path=str(workbook), output_dir=str(out_dir))
+        assert first["ok"] is True
+        first_call_count = len(calls)
+
+        result = arch.generate(input_path=str(workbook), output_dir=str(out_dir), force=True)
+
+        assert result["ok"] is True
+        assert result["summary"]["renders"]["executed"] == first["summary"]["renders"]["executed"]
+        assert result["summary"]["renders"]["skipped"] == 0
+        assert len(calls) == 2 * first_call_count
+
+    def test_drawio_toggle_flip_forces_rerender_despite_unchanged_d2(
+        self, tmp_path: Path, build_arch_workbook: object, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from otdev.tools import arch
+
+        calls = self._install_counting_render(monkeypatch)
+        workbook = self._workbook(build_arch_workbook, tmp_path / "arch.xlsx")
+        out_dir = tmp_path / "out"
+
+        first = arch.generate(
+            input_path=str(workbook),
+            output_dir=str(out_dir),
+            profile_yaml="data:\n  drawio_export: true\n",
+        )
+        assert first["ok"] is True
+        calls.clear()
+
+        result = arch.generate(
+            input_path=str(workbook),
+            output_dir=str(out_dir),
+            profile_yaml="data:\n  drawio_export: false\n",
+        )
+
+        assert result["ok"] is True
+        assert result["summary"]["renders"]["executed"] == first["summary"]["renders"]["executed"]
+        assert result["summary"]["renders"]["skipped"] == 0
+        assert calls
+
+
+class TestValidationWarnings:
+    """Non-blocking warnings (spec: tool-arch-validation-warnings)."""
+
+    @staticmethod
+    def _entities(**overrides: list[dict[str, object]]) -> dict[str, list[dict[str, object]]]:
+        entities: dict[str, list[dict[str, object]]] = {
+            "sys": [{"id": "sys_a", "name": "System A", "_sheet_row": 2}],
+            "app": [{"id": "app_a", "name": "App A", "sys": "sys_a", "_sheet_row": 2}],
+            "cmp": [],
+            "interface": [],
+            "usr": [],
+            "project": [],
+            "project_scope": [],
+        }
+        entities.update(overrides)
+        return entities
+
+    def test_orphan_system_flagged(self) -> None:
+        from otdev.tools._arch.validate import validate_entities
+
+        result = validate_entities(entities=self._entities())
+
+        assert result["valid"] is True
+        codes = [item["code"] for item in result["issues"]["warnings"]]
+        assert "orphan_system" in codes
+        orphan = next(item for item in result["issues"]["warnings"] if item["code"] == "orphan_system")
+        assert orphan["details"]["id"] == "sys_a"
+        assert result["summary"]["warnings"] == len(result["issues"]["warnings"])
+
+    def test_system_connected_via_owned_app_not_flagged(self) -> None:
+        from otdev.tools._arch.validate import validate_entities
+
+        entities = self._entities(
+            sys=[
+                {"id": "sys_a", "name": "System A", "_sheet_row": 2},
+                {"id": "sys_b", "name": "System B", "_sheet_row": 3},
+            ],
+            interface=[
+                {
+                    "id": "int_1",
+                    "provider": "app_a",
+                    "consumer": "sys_b",
+                    "_sheet_row": 2,
+                }
+            ],
+        )
+        result = validate_entities(entities=entities)
+
+        assert result["valid"] is True
+        assert not any(item["code"] == "orphan_system" for item in result["issues"]["warnings"])
+
+    def test_duplicate_name_in_same_sheet_flagged(self) -> None:
+        from otdev.tools._arch.validate import validate_entities
+
+        entities = self._entities(
+            app=[
+                {"id": "app_a", "name": "Billing", "sys": "sys_a", "_sheet_row": 2},
+                {"id": "app_b", "name": " billing ", "sys": "sys_a", "_sheet_row": 3},
+            ],
+        )
+        result = validate_entities(entities=entities)
+
+        duplicates = [item for item in result["issues"]["warnings"] if item["code"] == "duplicate_name"]
+        assert len(duplicates) == 1
+        assert duplicates[0]["details"]["sheet"] == "app"
+        assert sorted(duplicates[0]["details"]["ids"]) == ["app_a", "app_b"]
+
+    def test_same_name_across_sheets_not_flagged(self) -> None:
+        from otdev.tools._arch.validate import validate_entities
+
+        entities = self._entities(
+            app=[{"id": "app_a", "name": "System A", "sys": "sys_a", "_sheet_row": 2}],
+        )
+        result = validate_entities(entities=entities)
+
+        assert not any(item["code"] == "duplicate_name" for item in result["issues"]["warnings"])
+
+    def test_self_interface_flagged(self) -> None:
+        from otdev.tools._arch.validate import validate_entities
+
+        entities = self._entities(
+            interface=[
+                {"id": "int_1", "provider": "app_a", "consumer": "app_a", "_sheet_row": 2}
+            ],
+        )
+        result = validate_entities(entities=entities)
+
+        assert result["valid"] is True
+        loops = [item for item in result["issues"]["warnings"] if item["code"] == "self_interface"]
+        assert len(loops) == 1
+        assert loops[0]["details"]["value"] == "app_a"
+
+    def test_warnings_alongside_errors_keep_valid_false(self) -> None:
+        from otdev.tools._arch.validate import validate_entities
+
+        entities = self._entities(
+            app=[
+                # Unknown system reference -> blocking error; system A stays orphaned.
+                {"id": "app_a", "name": "App A", "sys": "sys_missing", "_sheet_row": 2},
+            ],
+        )
+        result = validate_entities(entities=entities)
+
+        assert result["valid"] is False
+        assert result["issues"]["errors"]
+        assert result["issues"]["warnings"]
+        assert result["summary"]["errors"] == len(result["issues"]["errors"])
+        assert result["summary"]["warnings"] == len(result["issues"]["warnings"])
+
+    def test_warning_only_workbook_validates_and_generates(
+        self,
+        tmp_path: Path,
+        build_arch_workbook: object,
+        fake_render_engine: object,
+    ) -> None:
+        from otdev.tools import arch
+
+        workbook = build_arch_workbook(
+            tmp_path / "arch.xlsx",
+            {
+                "sys": [["id", "name"], ["sys_a", "System A"]],
+                "app": [["id", "name", "sys"], ["app_a", "App A", "sys_a"]],
+                "cmp": [["id", "name", "app"]],
+                "interface": [["id", "key", "name", "provider", "consumer"]],
+                "usr": [["id", "name", "app"]],
+            },
+        )
+
+        validation = arch.validate(input_path=str(workbook))
+        assert validation["ok"] is True
+        assert validation["valid"] is True
+        assert any(
+            item["code"] == "orphan_system" for item in validation["issues"]["warnings"]
+        )
+        assert validation["summary"]["warnings"] == len(validation["issues"]["warnings"])
+
+        result = arch.generate(input_path=str(workbook), output_dir=str(tmp_path / "out"))
+        assert result["ok"] is True
+        assert result["summary"]["warnings"] == validation["summary"]["warnings"]
+        assert any(
+            item["code"] == "orphan_system" for item in result["issues"]["warnings"]
+        )

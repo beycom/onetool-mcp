@@ -171,6 +171,21 @@ class Issue:
         return {"code": self.code, "message": self.message, "details": self.details}
 
 
+def error_payload(
+    *, operation: str, code: str, message: str, details: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Structured error payload shared by the arch facade and generation pipeline."""
+    return {
+        "ok": False,
+        "operation": operation,
+        "error": {
+            "code": code,
+            "message": message,
+            "details": details or {},
+        },
+    }
+
+
 def normalize_key(value: Any) -> str:
     """Normalize worksheet header names into stable keys."""
     if value is None:
@@ -310,6 +325,7 @@ __all__ = [
     "MissingDependencyError",
     "canonical_sheet_name",
     "ensure_openpyxl",
+    "error_payload",
     "first_value",
     "format_cell_list",
     "normalize_cell",

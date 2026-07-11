@@ -49,6 +49,7 @@ Architecture workflows for Excel ingestion, validation, generation, round-trip c
 | `output_path` | str | Output file path for `export_yaml` / `import_yaml`, or optional ZIP target for `bundle_solution` |
 | `include_tags` | list[str] | Keep only entities matching included tags |
 | `exclude_tags` | list[str] | Omit entities matching excluded tags |
+| `force` | bool | Re-render every diagram and rewrite every output file in `arch.generate`, bypassing incremental reuse (default `false`) |
 | `template_path` | str | Excel template workbook used by `import_yaml` |
 | `directory` | str | Solution directory passed to `bundle_solution` |
 | `include` | str | Optional file, directory, or glob pattern of extra files to add under `data/` in bundle ZIP |
@@ -151,7 +152,7 @@ tools:
 - `secondary_system_connect_level` controls only secondary-system interface endpoints. It uses the configured level when the interface row contains enough detail and the referenced node is visible; otherwise it falls back toward system level.
 - Each generated project page has one diagram per `project_scope.stage`. Project diagrams have no primary system; `project.detail_level` and `project.connect_level` apply to all scoped systems and interfaces.
 - Code fallback defaults for `data` options equal the bundled default profile values, so a custom profile that omits an option behaves like the shipped `simple` profile.
-- `arch.generate` fully regenerates the `solution/` output directory; stale files from prior runs are removed.
+- `arch.generate` fully owns the `solution/` output directory and updates it incrementally: files are rewritten only when content changes, diagram renders are skipped when the `.d2` source is unchanged (and the SVG's draw.io-embed state matches the run's `drawio_export` setting), and stale files from prior runs are removed after a successful run. `force=true` re-renders everything. `summary.renders` reports executed vs skipped engine renders.
 - Engine command templates run via argv execution (`shell=False`) after rendering.
 - Legacy placeholder aliases in engine commands (for example `${{input_file}}`) are not supported. Use Jinja placeholders only: `{{ input }}` and `{{ output }}`.
 - Unknown/removed config keys, removed values, invalid enum values, and missing required command-template variables fail fast with explicit structured errors.
@@ -271,7 +272,7 @@ Every generated system-level (`sys`/`app`/`cmp`) and project-stage diagram SVG d
 
 Boxes can be dragged; connected edges stay attached because containers (systems containing apps/components) and edges reference their vertices by id, and edges use draw.io's orthogonal routing style so they re-route automatically as boxes move.
 
-**One-way snapshot**: the embedded model is a snapshot taken at generation time. Edits made in a draw.io editor do not flow back into the workbook or model — re-running `arch.generate` regenerates and overwrites the SVG (and its embedded model) from scratch. Save edited copies under a different filename if you want to keep them.
+**One-way snapshot**: the embedded model is a snapshot taken at generation time. Edits made in a draw.io editor do not flow back into the workbook or model — re-running `arch.generate` after a model change (or with `force=true`) overwrites the SVG (and its embedded model) from scratch. Save edited copies under a different filename if you want to keep them.
 
 **Restyle on first edit**: draw.io renders its own shape styling (chosen to approximate the D2 color scheme) rather than reusing the rendered SVG's visuals, and it replaces the visuals with its own rendering as soon as you make and save an edit. The pristine, unedited export always matches the report's D2 styling exactly; edited copies will look visually different from the report going forward.
 

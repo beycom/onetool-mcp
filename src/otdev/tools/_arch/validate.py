@@ -333,6 +333,110 @@ def _check_refs(
     return issues
 
 
+def _collect_warnings(
+    *,
+    entities: dict[str, list[dict[str, Any]]],
+    system_ids: set[str],
+) -> list[Issue]:
+    """Non-blocking data-quality warnings (design D5): `orphan_system`,
+    `duplicate_name`, and `self_interface`. Never affect validity."""
+    warnings: list[Issue] = []
+
+    app_to_sys: dict[str, str] = {}
+    for row in entities.get(SHEET_APP, []):
+        app_id = str(row.get("id") or "").strip()
+        sys_id = str(first_value(row, SYS_REF_KEYS) or "").strip()
+        if app_id and sys_id:
+            app_to_sys[app_id] = sys_id
+
+    cmp_to_sys: dict[str, str] = {}
+    for row in entities.get(SHEET_CMP, []):
+        cmp_id = str(row.get("id") or "").strip()
+        if not cmp_id:
+            continue
+        app_ref = str(first_value(row, APP_REF_KEYS) or "").strip()
+        owner = app_to_sys.get(app_ref) if app_ref else str(first_value(row, SYS_REF_KEYS) or "").strip()
+        if owner:
+            cmp_to_sys[cmp_id] = owner
+
+    def _owning_system(endpoint_id: str) -> str | None:
+        if endpoint_id in system_ids:
+            return endpoint_id
+        return app_to_sys.get(endpoint_id) or cmp_to_sys.get(endpoint_id)
+
+    referenced_system_ids: set[str] = set()
+    for row in entities.get(SHEET_INTERFACE, []):
+        for field in ("provider", "consumer"):
+            endpoint = str(first_value(row, (field,)) or "").strip()
+            if endpoint:
+                owner = _owning_system(endpoint)
+                if owner:
+                    referenced_system_ids.add(owner)
+    for row in entities.get(SHEET_PROJECT_SCOPE, []):
+        item_id = str(row.get("item_id") or "").strip()
+        if item_id:
+            owner = _owning_system(item_id)
+            if owner:
+                referenced_system_ids.add(owner)
+
+    for row in entities.get(SHEET_SYS, []):
+        sys_id = str(row.get("id") or "").strip()
+        if not sys_id or sys_id in referenced_system_ids:
+            continue
+        warnings.append(
+            Issue(
+                code="orphan_system",
+                message=(
+                    f"System '{sys_id}' is not referenced by any interface endpoint "
+                    "or project scope row"
+                ),
+                details={"sheet": SHEET_SYS, "row": int(row.get("_sheet_row", 0)), "id": sys_id},
+            )
+        )
+
+    for sheet in (SHEET_SYS, SHEET_APP, SHEET_CMP, SHEET_USR):
+        ids_by_name: dict[str, list[str]] = {}
+        display_name: dict[str, str] = {}
+        for row in entities.get(sheet, []):
+            row_id = str(row.get("id") or "").strip()
+            name = str(row.get("name") or "").strip()
+            if not row_id or not name:
+                continue
+            key = name.lower()
+            ids = ids_by_name.setdefault(key, [])
+            if row_id not in ids:
+                ids.append(row_id)
+            display_name.setdefault(key, name)
+        for key, ids in ids_by_name.items():
+            if len(ids) > 1:
+                warnings.append(
+                    Issue(
+                        code="duplicate_name",
+                        message=f"Duplicate name '{display_name[key]}' in {sheet}: {ids}",
+                        details={"sheet": sheet, "name": display_name[key], "ids": ids},
+                    )
+                )
+
+    for row in entities.get(SHEET_INTERFACE, []):
+        provider = str(first_value(row, ("provider",)) or "").strip()
+        consumer = str(first_value(row, ("consumer",)) or "").strip()
+        if provider and provider == consumer:
+            warnings.append(
+                Issue(
+                    code="self_interface",
+                    message=f"Interface provider and consumer are both '{provider}'",
+                    details={
+                        "sheet": SHEET_INTERFACE,
+                        "row": int(row.get("_sheet_row", 0)),
+                        "id": str(row.get("id") or ""),
+                        "value": provider,
+                    },
+                )
+            )
+
+    return warnings
+
+
 def validate_entities(*, entities: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     """Validate required fields, duplicates, and reference integrity."""
     errors: list[Issue] = []
@@ -379,17 +483,19 @@ def validate_entities(*, entities: dict[str, list[dict[str, Any]]]) -> dict[str,
         )
     )
 
+    warnings = _collect_warnings(entities=entities, system_ids=system_ids)
+
     summary = {
         "counts": {sheet: len(rows) for sheet, rows in entities.items()},
         "errors": len(errors),
-        "warnings": 0,
+        "warnings": len(warnings),
     }
 
     return {
         "valid": len(errors) == 0,
         "issues": {
             "errors": [item.to_dict() for item in errors],
-            "warnings": [],
+            "warnings": [item.to_dict() for item in warnings],
         },
         "summary": summary,
     }

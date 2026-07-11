@@ -756,3 +756,49 @@ class TestArchDrawioExport:
             _x, _y, w, h = geometry[path_id]
             assert w > 0
             assert h > 0
+
+
+class TestArchIncrementalGeneration:
+    @_requires_d2
+    def test_second_run_skips_renders_and_matches_forced_run(self, tmp_path: Path) -> None:
+        from otdev.tools.arch import generate
+
+        def _snapshot(root: Path) -> dict[str, str]:
+            # HTML pages embed generated_at timestamps; compare the stable
+            # artifacts (d2 sources + svgs) by content and pages by presence.
+            snapshot: dict[str, str] = {}
+            for path in sorted(root.rglob("*")):
+                if not path.is_file():
+                    continue
+                rel = str(path.relative_to(root))
+                if path.suffix in {".d2", ".svg"}:
+                    snapshot[rel] = path.read_text(encoding="utf-8")
+                else:
+                    snapshot[rel] = "<present>"
+            return snapshot
+
+        out_dir = tmp_path / "out"
+        first = generate(input_path=str(_FIXTURES / "architecture.xlsx"), output_dir=str(out_dir))
+        assert first["ok"] is True
+        assert first["summary"]["renders"]["executed"] > 0
+
+        second = generate(input_path=str(_FIXTURES / "architecture.xlsx"), output_dir=str(out_dir))
+        assert second["ok"] is True
+        assert second["summary"]["renders"]["executed"] == 0
+        assert second["summary"]["renders"]["skipped"] == first["summary"]["renders"]["executed"]
+        incremental_snapshot = _snapshot(out_dir / "solution")
+
+        forced_dir = tmp_path / "forced"
+        forced = generate(
+            input_path=str(_FIXTURES / "architecture.xlsx"),
+            output_dir=str(forced_dir),
+            force=True,
+        )
+        assert forced["ok"] is True
+        assert forced["summary"]["renders"]["skipped"] == 0
+        forced_snapshot = _snapshot(forced_dir / "solution")
+
+        assert incremental_snapshot.keys() == forced_snapshot.keys()
+        for rel, content in incremental_snapshot.items():
+            if rel.endswith(".d2"):
+                assert content == forced_snapshot[rel], rel

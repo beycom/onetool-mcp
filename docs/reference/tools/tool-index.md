@@ -6,7 +6,7 @@ packs=28 tools=247
 ```python
 arch.bundle_solution(directory: str, output_path: str | None=None, include: str | None=None)  # Bundle generated solution outputs by inlining SVG and zipping directory.
 arch.export_yaml(input_path: str, output_path: str)  # Export Excel entity sheets to YAML.
-arch.generate(input_path: str, output_dir: str | None=None, profile: str | None=None, profile_yaml: str | None=None, title: str | None=None, include_tags: list[str] | None=None, exclude_tags: list[str] | None=None)  # Generate architecture outputs from workbook input.
+arch.generate(input_path: str, output_dir: str | None=None, profile: str | None=None, profile_yaml: str | None=None, title: str | None=None, include_tags: list[str] | None=None, exclude_tags: list[str] | None=None, force: bool=False)  # Generate architecture outputs from workbook input.
 arch.import_yaml(input_path: str, template_path: str, output_path: str)  # Import YAML entities into a template workbook.
 arch.validate(input_path: str)  # Validate architecture workbook input.
 ```
