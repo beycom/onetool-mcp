@@ -30,6 +30,8 @@ from typing import (  # noqa: UP035 - List avoids shadowing by the `list` tool b
     List,
 )
 
+from pydantic import ValidationError
+
 from ot.console.models import ConsoleKind, ShowRequest
 from ot.console.state import (
     STATE,
@@ -67,9 +69,14 @@ def show(
         console.show(kind="text", content="build finished")
     """
     with LogSpan(span="console.show", kind=kind):
-        request = ShowRequest.model_validate(
-            {"kind": kind, "metadata": metadata or {}, "content": content}
-        )
+        try:
+            request = ShowRequest.model_validate(
+                {"kind": kind, "metadata": metadata or {}, "content": content}
+            )
+        except ValidationError as e:
+            first = e.errors()[0] if e.errors() else {}
+            field = ".".join(str(p) for p in first.get("loc", ())) or "arguments"
+            raise ValueError(f"console.show: invalid {field}: {first.get('msg', e)}") from e
         result = STATE.add_message(request=request)
         return result.model_dump(mode="json")
 
