@@ -305,7 +305,7 @@ def search(
         if filenames_only:
             args.append("--files-with-matches")
 
-        args.extend([pattern, str(search_path)])
+        args.extend(["-e", pattern, str(search_path)])
 
         success, output = _run_rg(args)
 
@@ -402,7 +402,7 @@ def count(
         if no_ignore:
             args.append("--no-ignore")
 
-        args.extend([pattern, str(search_path)])
+        args.extend(["-e", pattern, str(search_path)])
 
         success, output = _run_rg(args)
 
