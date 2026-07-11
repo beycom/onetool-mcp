@@ -127,13 +127,13 @@ def _is_html_content_type(content_type: str | None) -> bool:
     return ct_lower in ("text/html", "application/xhtml+xml")
 
 
-@cache.memoize(ttl=300)  # Cache fetched pages for 5 minutes
-def _fetch_url_cached(url: str, timeout: float) -> tuple[str | None, str | None]:
-    """Fetch URL with caching to avoid redundant requests.
+def _fetch_url(url: str, timeout: float) -> tuple[str | None, str | None, str]:
+    """Fetch a URL.
 
     Returns:
-        Tuple of (content, content_type). Content is the decoded response,
-        content_type is the Content-Type header value.
+        Tuple of (content, content_type, final_url). Content is the decoded
+        response, content_type is the Content-Type header value, final_url is
+        the post-redirect URL (falls back to the requested URL).
     """
     with LogSpan(span="webfetch.download", url=url, timeout=timeout) as span:
         import trafilatura
@@ -144,15 +144,22 @@ def _fetch_url_cached(url: str, timeout: float) -> tuple[str | None, str | None]
         )
         if response is None:
             span.add(success=False)
-            return None, None
+            return None, None, url
         content = response.html
         content_type = (
             response.headers.get("content-type") if response.headers else None
         )
+        final_url = getattr(response, "url", None) or url
         span.add(success=content is not None, contentType=content_type)
         if content:
             span.add(responseLen=len(content))
-        return content, content_type
+        return content, content_type, final_url
+
+
+@cache.memoize(ttl=300)  # Cache fetched pages for 5 minutes
+def _fetch_url_cached(url: str, timeout: float) -> tuple[str | None, str | None, str]:
+    """Cached variant of _fetch_url."""
+    return _fetch_url(url, timeout)
 
 
 def fetch(
@@ -237,21 +244,8 @@ def fetch(
             import trafilatura
 
             # Fetch the page (with optional caching)
-            if use_cache:
-                downloaded, content_type = _fetch_url_cached(url, timeout)
-            else:
-                response = trafilatura.fetch_response(
-                    url, config=config, with_headers=True, decode=True
-                )
-                if response is None:
-                    downloaded, content_type = None, None
-                else:
-                    downloaded = response.html
-                    content_type = (
-                        response.headers.get("content-type")
-                        if response.headers
-                        else None
-                    )
+            fetcher = _fetch_url_cached if use_cache else _fetch_url
+            downloaded, content_type, final_url = fetcher(url, timeout)
 
             if downloaded is None:
                 s.add(error="fetch_failed")
@@ -312,7 +306,7 @@ def fetch(
                     {
                         "content": content_data,
                         "metadata": {
-                            "final_url": url,
+                            "final_url": final_url,
                             "content_type": content_type,
                             **extracted_metadata,
                         },
@@ -325,7 +319,7 @@ def fetch(
                     result, max_length, indicator="\n\n[Content truncated...]"
                 )
 
-            s.add(contentLen=len(result), cached=use_cache)
+            s.add(contentLen=len(result), cacheEnabled=use_cache)
             return result
 
         except TimeoutError:

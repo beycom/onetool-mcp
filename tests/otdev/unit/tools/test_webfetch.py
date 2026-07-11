@@ -187,7 +187,7 @@ class TestFetch:
 
         with (
             patch("otdev.tools.webfetch._require_trafilatura"),
-            patch("otdev.tools.webfetch._fetch_url_cached", return_value=("<html>test</html>", "text/html")),
+            patch("otdev.tools.webfetch._fetch_url_cached", return_value=("<html>test</html>", "text/html", "http://final.test/")),
             patch("trafilatura.extract", return_value="Extracted content"),
         ):
             result = fetch(url="https://test.invalid/page")
@@ -199,7 +199,7 @@ class TestFetch:
 
         with (
             patch("otdev.tools.webfetch._require_trafilatura"),
-            patch("otdev.tools.webfetch._fetch_url_cached", return_value=(None, None)),
+            patch("otdev.tools.webfetch._fetch_url_cached", return_value=(None, None, "http://final.test/")),
         ):
             result = fetch(url="https://test.invalid/page")
 
@@ -211,7 +211,7 @@ class TestFetch:
 
         with (
             patch("otdev.tools.webfetch._require_trafilatura"),
-            patch("otdev.tools.webfetch._fetch_url_cached", return_value=("<html></html>", "text/html")),
+            patch("otdev.tools.webfetch._fetch_url_cached", return_value=("<html></html>", "text/html", "http://final.test/")),
             patch("trafilatura.extract", return_value=None),
         ):
             result = fetch(url="https://test.invalid/page")
@@ -225,7 +225,7 @@ class TestFetch:
         raw = '{"key": "value"}'
         with (
             patch("otdev.tools.webfetch._require_trafilatura"),
-            patch("otdev.tools.webfetch._fetch_url_cached", return_value=(raw, "application/json")),
+            patch("otdev.tools.webfetch._fetch_url_cached", return_value=(raw, "application/json", "http://final.test/")),
         ):
             result = fetch(url="https://test.invalid/data.json")
 
@@ -236,7 +236,7 @@ class TestFetch:
 
         with (
             patch("otdev.tools.webfetch._require_trafilatura"),
-            patch("otdev.tools.webfetch._fetch_url_cached", return_value=("<html><body><p>Hello</p></body></html>", "text/html")),
+            patch("otdev.tools.webfetch._fetch_url_cached", return_value=("<html><body><p>Hello</p></body></html>", "text/html", "http://final.test/")),
             patch("trafilatura.extract", return_value="<p>Hello</p>") as mock_extract,
         ):
             result = fetch(url="https://test.invalid/page", output_format="html")
@@ -253,7 +253,7 @@ class TestFetch:
 
         with (
             patch("otdev.tools.webfetch._require_trafilatura"),
-            patch("otdev.tools.webfetch._fetch_url_cached", return_value=("<html>hi</html>", "text/html; charset=utf-8")),
+            patch("otdev.tools.webfetch._fetch_url_cached", return_value=("<html>hi</html>", "text/html; charset=utf-8", "http://final.test/")),
             patch("trafilatura.extract", return_value='{"title": "Hi"}'),
         ):
             result = fetch(url="https://test.invalid/page", output_format="json", include_metadata=True)
@@ -271,7 +271,7 @@ class TestFetch:
             patch("otdev.tools.webfetch._require_trafilatura"),
             patch(
                 "otdev.tools.webfetch._fetch_url_cached",
-                return_value=("<html><body>Hello</body></html>", "text/html"),
+                return_value=("<html><body>Hello</body></html>", "text/html", "http://final.test/"),
             ),
             patch("trafilatura.extract", return_value=payload),
         ):
@@ -291,7 +291,7 @@ class TestFetch:
 
         with (
             patch("otdev.tools.webfetch._require_trafilatura"),
-            patch("otdev.tools.webfetch._fetch_url_cached", return_value=(None, None)),
+            patch("otdev.tools.webfetch._fetch_url_cached", return_value=(None, None, "http://final.test/")),
         ):
             result = fetch(url="http://127.0.0.1:18888/injection-web.html")
 
