@@ -14,7 +14,6 @@ from otutil.tools.brave import (
     _FRESHNESS_VALUES,
     _SAFESEARCH_IMAGE_VALUES,
     _SAFESEARCH_WEB_VALUES,
-    _clamp,
     _format_image_results,
     _format_news_results,
     _format_video_results,
@@ -39,26 +38,11 @@ from otutil.tools.brave import (
 
 @pytest.mark.unit
 @pytest.mark.tools
-class TestClamp:
-    """Test _clamp value clamping function."""
+class TestConfigDefaults:
+    """Test pack Config defaults."""
 
     def test_default_timeout_is_180(self):
         assert Config().timeout == 180.0
-
-    def test_value_within_range(self):
-        assert _clamp(5, 1, 10) == 5
-
-    def test_value_below_min(self):
-        assert _clamp(-5, 1, 10) == 1
-
-    def test_value_above_max(self):
-        assert _clamp(15, 1, 10) == 10
-
-    def test_value_equals_min(self):
-        assert _clamp(1, 1, 10) == 1
-
-    def test_value_equals_max(self):
-        assert _clamp(10, 1, 10) == 10
 
 
 @pytest.mark.unit

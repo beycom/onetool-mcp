@@ -1,6 +1,6 @@
 """Brave Search API tools.
 
-Provides web search, local search, news search, image search, and video search
+Provides web search, news search, image search, and video search
 via the Brave Search API. Requires BRAVE_API_KEY secret in secrets.yaml.
 
 API docs: https://api-dashboard.search.brave.com/app/documentation
@@ -61,7 +61,7 @@ VIDEO_DESC_MAX_LENGTH = 150
 
 # Thread-safe lazy client using SDK utility
 _get_http_client = lazy_client(
-    lambda: create_json_http_client(BRAVE_API_BASE, timeout=180.0)
+    lambda: create_json_http_client(BRAVE_API_BASE, timeout=_get_config().timeout)
 )
 
 
@@ -399,11 +399,6 @@ def _validate_country(country: str) -> str | None:
     if isinstance(country, str) and _COUNTRY_RE.match(country):
         return None
     return f"Error: Invalid country '{country}'. Use a 2-letter uppercase country code (e.g. 'US', 'GB')"
-
-
-def _clamp(value: int, min_val: int, max_val: int) -> int:
-    """Clamp a value between min and max."""
-    return min(max(value, min_val), max_val)
 
 
 def _validate_query(query: str) -> str | None:
