@@ -184,7 +184,7 @@ async def _convert_file_async(
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Run conversion in shared thread pool for async execution."""
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     executor = _get_conversion_executor()
     return await loop.run_in_executor(
         executor,
@@ -192,13 +192,12 @@ async def _convert_file_async(
     )
 
 
-async def _convert_batch_async(
-    files: list[Path],
+async def _gather_conversions(
+    work: list[tuple[Path, ConverterFunc]],
     output_dir: Path,
-    converter: Any,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Convert multiple files in parallel."""
+    """Run (path, converter) pairs in bounded concurrent chunks."""
     converted = 0
     failed = 0
     outputs: list[str] = []
@@ -206,17 +205,14 @@ async def _convert_batch_async(
     concurrency = _get_conversion_concurrency()
 
     # Process in bounded chunks to avoid creating unbounded task/result lists.
-    for i in range(0, len(files), concurrency):
-        chunk = files[i:i + concurrency]
-        tasks = []
-        for path in chunk:
-            source_rel = _get_source_rel(path)
-            tasks.append(
-                _convert_file_async(converter, path, output_dir, source_rel, **kwargs)
-            )
-
+    for i in range(0, len(work), concurrency):
+        chunk = work[i:i + concurrency]
+        tasks = [
+            _convert_file_async(converter, path, output_dir, _get_source_rel(path), **kwargs)
+            for path, converter in chunk
+        ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        for path, res in zip(chunk, results, strict=True):
+        for (path, _converter), res in zip(chunk, results, strict=True):
             if isinstance(res, BaseException):
                 failed += 1
                 errors.append(f"{path.name}: {res}")
@@ -230,6 +226,16 @@ async def _convert_batch_async(
         "outputs": outputs,
         "errors": errors,
     }
+
+
+async def _convert_batch_async(
+    files: list[Path],
+    output_dir: Path,
+    converter: Any,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Convert multiple files in parallel."""
+    return await _gather_conversions([(f, converter) for f in files], output_dir, **kwargs)
 
 
 async def _convert_auto_batch_async(
@@ -258,35 +264,53 @@ async def _convert_auto_batch_async(
             "errors": [],
         }
 
-    converted = 0
-    failed = 0
-    outputs: list[str] = []
-    errors: list[str] = []
-    concurrency = _get_conversion_concurrency()
+    result = await _gather_conversions(work, output_dir)
+    return {**result, "skipped": skipped}
 
-    for i in range(0, len(work), concurrency):
-        chunk = work[i:i + concurrency]
-        tasks = []
-        for path, converter in chunk:
-            source_rel = _get_source_rel(path)
-            tasks.append(_convert_file_async(converter, path, output_dir, source_rel))
 
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        for (path, _converter), res in zip(chunk, results, strict=True):
-            if isinstance(res, BaseException):
-                failed += 1
-                errors.append(f"{path.name}: {res}")
-            else:
-                converted += 1
-                outputs.append(res["output"])
+def _run_conversion(
+    *,
+    span: str,
+    pattern: str,
+    output_dir: str,
+    converter: ConverterFunc,
+    single_summary: Any,
+    span_extras: dict[str, Any] | None = None,
+    **kwargs: Any,
+) -> str:
+    """Shared glob -> convert -> summarise scaffold for the per-format tools.
 
-    return {
-        "converted": converted,
-        "failed": failed,
-        "skipped": skipped,
-        "outputs": outputs,
-        "errors": errors,
-    }
+    ``single_summary(result)`` returns ``(stats_for_span, summary_text)`` for
+    the single-file path; batch runs report converted/failed counts.
+    """
+    with LogSpan(span=span, pattern=pattern, outputDir=output_dir, **(span_extras or {})) as s:
+        files = _resolve_glob(pattern)
+        if not files:
+            s.add(error="no_match")
+            return f"No files matched pattern: {pattern}"
+
+        out_path = _resolve_output_dir(output_dir)
+
+        if len(files) == 1:
+            try:
+                source_rel = _get_source_rel(files[0])
+                result = converter(files[0], out_path, source_rel, **kwargs)
+                stats, text = single_summary(result)
+                s.add(converted=1, **stats)
+                return f"Converted {files[0].name}: {text}\nOutput: {result['output']}"
+            except Exception as e:
+                s.add(error=str(e))
+                return f"Error converting {files[0].name}: {e}"
+
+        try:
+            result = run_coro_sync(_convert_batch_async(files, out_path, converter, **kwargs))
+            s.add(converted=result["converted"], failed=result["failed"])
+            return _format_batch_result(
+                result, f"Converted {result['converted']} files, {result['failed']} failed"
+            )
+        except Exception as e:
+            s.add(error=str(e))
+            return f"Error: {e}"
 
 
 def pdf(
@@ -310,36 +334,16 @@ def pdf(
         convert.pdf(pattern="docs/report.pdf", output_dir="docs/md")
         convert.pdf(pattern="input/*.pdf", output_dir="output")
     """
-    with LogSpan(span="convert.pdf", pattern=pattern, outputDir=output_dir) as s:
-        files = _resolve_glob(pattern)
-        if not files:
-            s.add(error="no_match")
-            return f"No files matched pattern: {pattern}"
-
-        out_path = _resolve_output_dir(output_dir)
-
-        if len(files) == 1:
-            # Single file conversion
-            try:
-                source_rel = _get_source_rel(files[0])
-                result = convert_pdf(files[0], out_path, source_rel)
-                s.add(converted=1, pages=result["pages"], images=result["images"])
-                return f"Converted {files[0].name}: {result['pages']} pages, {result['images']} images\nOutput: {result['output']}"
-            except Exception as e:
-                s.add(error=str(e))
-                return f"Error converting {files[0].name}: {e}"
-
-        # Batch conversion
-        try:
-            result = run_coro_sync(_convert_batch_async(files, out_path, convert_pdf))
-            s.add(converted=result["converted"], failed=result["failed"])
-
-            return _format_batch_result(
-                result, f"Converted {result['converted']} files, {result['failed']} failed"
-            )
-        except Exception as e:
-            s.add(error=str(e))
-            return f"Error: {e}"
+    return _run_conversion(
+        span="convert.pdf",
+        pattern=pattern,
+        output_dir=output_dir,
+        converter=convert_pdf,
+        single_summary=lambda r: (
+            {"pages": r["pages"], "images": r["images"]},
+            f"{r['pages']} pages, {r['images']} images",
+        ),
+    )
 
 
 def word(
@@ -363,39 +367,16 @@ def word(
         convert.word(pattern="specs/design.docx", output_dir="specs/md")
         convert.word(pattern="docs/**/*.docx", output_dir="output")
     """
-    with LogSpan(span="convert.word", pattern=pattern, outputDir=output_dir) as s:
-        files = _resolve_glob(pattern)
-        if not files:
-            s.add(error="no_match")
-            return f"No files matched pattern: {pattern}"
-
-        out_path = _resolve_output_dir(output_dir)
-
-        if len(files) == 1:
-            try:
-                source_rel = _get_source_rel(files[0])
-                result = convert_word(files[0], out_path, source_rel)
-                s.add(
-                    converted=1,
-                    paragraphs=result["paragraphs"],
-                    tables=result["tables"],
-                    images=result["images"],
-                )
-                return f"Converted {files[0].name}: {result['paragraphs']} paragraphs, {result['tables']} tables, {result['images']} images\nOutput: {result['output']}"
-            except Exception as e:
-                s.add(error=str(e))
-                return f"Error converting {files[0].name}: {e}"
-
-        try:
-            result = run_coro_sync(_convert_batch_async(files, out_path, convert_word))
-            s.add(converted=result["converted"], failed=result["failed"])
-
-            return _format_batch_result(
-                result, f"Converted {result['converted']} files, {result['failed']} failed"
-            )
-        except Exception as e:
-            s.add(error=str(e))
-            return f"Error: {e}"
+    return _run_conversion(
+        span="convert.word",
+        pattern=pattern,
+        output_dir=output_dir,
+        converter=convert_word,
+        single_summary=lambda r: (
+            {"paragraphs": r["paragraphs"], "tables": r["tables"], "images": r["images"]},
+            f"{r['paragraphs']} paragraphs, {r['tables']} tables, {r['images']} images",
+        ),
+    )
 
 
 def powerpoint(
@@ -421,45 +402,18 @@ def powerpoint(
         convert.powerpoint(pattern="slides/deck.pptx", output_dir="slides/md")
         convert.powerpoint(pattern="presentations/*.pptx", output_dir="output", include_notes=True)
     """
-    with LogSpan(
+    return _run_conversion(
         span="convert.powerpoint",
         pattern=pattern,
         output_dir=output_dir,
+        converter=convert_powerpoint,
+        span_extras={"include_notes": include_notes},
         include_notes=include_notes,
-    ) as s:
-        files = _resolve_glob(pattern)
-        if not files:
-            s.add(error="no_match")
-            return f"No files matched pattern: {pattern}"
-
-        out_path = _resolve_output_dir(output_dir)
-
-        if len(files) == 1:
-            try:
-                source_rel = _get_source_rel(files[0])
-                result = convert_powerpoint(
-                    files[0], out_path, source_rel, include_notes=include_notes
-                )
-                s.add(converted=1, slides=result["slides"], images=result["images"])
-                return f"Converted {files[0].name}: {result['slides']} slides, {result['images']} images\nOutput: {result['output']}"
-            except Exception as e:
-                s.add(error=str(e))
-                return f"Error converting {files[0].name}: {e}"
-
-        try:
-            result = run_coro_sync(
-                _convert_batch_async(
-                    files, out_path, convert_powerpoint, include_notes=include_notes
-                )
-            )
-            s.add(converted=result["converted"], failed=result["failed"])
-
-            return _format_batch_result(
-                result, f"Converted {result['converted']} files, {result['failed']} failed"
-            )
-        except Exception as e:
-            s.add(error=str(e))
-            return f"Error: {e}"
+        single_summary=lambda r: (
+            {"slides": r["slides"], "images": r["images"]},
+            f"{r['slides']} slides, {r['images']} images",
+        ),
+    )
 
 
 def excel(
@@ -489,50 +443,22 @@ def excel(
         convert.excel(pattern="spreadsheets/*.xlsx", output_dir="output", include_formulas=True)
         convert.excel(pattern="data/*.xlsx", output_dir="out", compute_formulas=True)
     """
-    with LogSpan(
+    return _run_conversion(
         span="convert.excel",
         pattern=pattern,
         output_dir=output_dir,
+        converter=convert_excel,
+        span_extras={
+            "include_formulas": include_formulas,
+            "compute_formulas": compute_formulas,
+        },
         include_formulas=include_formulas,
         compute_formulas=compute_formulas,
-    ) as s:
-        files = _resolve_glob(pattern)
-        if not files:
-            s.add(error="no_match")
-            return f"No files matched pattern: {pattern}"
-
-        out_path = _resolve_output_dir(output_dir)
-
-        if len(files) == 1:
-            try:
-                source_rel = _get_source_rel(files[0])
-                result = convert_excel(
-                    files[0], out_path, source_rel,
-                    include_formulas=include_formulas,
-                    compute_formulas=compute_formulas,
-                )
-                s.add(converted=1, sheets=result["sheets"], rows=result["rows"])
-                return f"Converted {files[0].name}: {result['sheets']} sheets, {result['rows']} rows\nOutput: {result['output']}"
-            except Exception as e:
-                s.add(error=str(e))
-                return f"Error converting {files[0].name}: {e}"
-
-        try:
-            result = run_coro_sync(
-                _convert_batch_async(
-                    files, out_path, convert_excel,
-                    include_formulas=include_formulas,
-                    compute_formulas=compute_formulas,
-                )
-            )
-            s.add(converted=result["converted"], failed=result["failed"])
-
-            return _format_batch_result(
-                result, f"Converted {result['converted']} files, {result['failed']} failed"
-            )
-        except Exception as e:
-            s.add(error=str(e))
-            return f"Error: {e}"
+        single_summary=lambda r: (
+            {"sheets": r["sheets"], "rows": r["rows"]},
+            f"{r['sheets']} sheets, {r['rows']} rows",
+        ),
+    )
 
 
 def auto(
