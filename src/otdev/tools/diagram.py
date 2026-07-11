@@ -197,15 +197,25 @@ def _get_config() -> Config:
     return get_tool_config("diagram", Config)
 
 
-# Shared HTTP client for connection pooling
-_http_client = httpx.Client(
-    timeout=30.0,
-    limits=httpx.Limits(
-        max_keepalive_connections=20,
-        max_connections=100,
-        keepalive_expiry=30.0,
-    ),
-)
+# Shared HTTP client for connection pooling — created lazily so the timeout
+# honors tools.diagram.backend.timeout instead of a hardcoded value.
+_http_client_lock = threading.Lock()
+_http_client_instance: httpx.Client | None = None
+
+
+def _http_client_get() -> httpx.Client:
+    global _http_client_instance
+    with _http_client_lock:
+        if _http_client_instance is None:
+            _http_client_instance = httpx.Client(
+                timeout=_get_config().backend.timeout,
+                limits=httpx.Limits(
+                    max_keepalive_connections=20,
+                    max_connections=100,
+                    keepalive_expiry=30.0,
+                ),
+            )
+        return _http_client_instance
 
 
 # ==================== Constants ====================
@@ -270,12 +280,21 @@ FORMAT_MIME_TYPES = {
     "svg": "image/svg+xml",
     "png": "image/png",
     "pdf": "application/pdf",
-    "jpeg": "image/jpeg",
 }
 
-# Async task storage for batch operations
+# Async task storage for batch operations (bounded: finished tasks evicted)
 _render_tasks: dict[str, dict[str, Any]] = {}
 _render_tasks_lock = threading.Lock()
+_MAX_RENDER_TASKS = 100
+
+
+def _evict_finished_tasks() -> None:
+    """Drop oldest finished task records beyond the cap. Caller holds the lock."""
+    overflow = len(_render_tasks) - _MAX_RENDER_TASKS + 1
+    if overflow <= 0:
+        return
+    for key in [k for k, v in _render_tasks.items() if v.get("status") != "running"][:overflow]:
+        del _render_tasks[key]
 
 # Cached backend URL to avoid redundant health checks
 # TTL-based invalidation: cache expires after _CACHE_TTL_SECONDS
@@ -380,19 +399,6 @@ def encode_source(source: str) -> str:
     return base64.urlsafe_b64encode(compressed).decode("ascii")
 
 
-def _decode_source(encoded: str) -> str:
-    """Decode diagram source from GET URL encoding.
-
-    Args:
-        encoded: The encoded diagram source.
-
-    Returns:
-        Original diagram source code.
-    """
-    compressed = base64.urlsafe_b64decode(encoded)
-    return zlib.decompress(compressed).decode("utf-8")
-
-
 def _encode_plantuml(source: str) -> str:
     """Encode diagram source using PlantUML-specific encoding.
 
@@ -462,7 +468,7 @@ def _get_kroki_url() -> str:
     elif prefer == "auto":
         # Try self-hosted first, fall back to remote
         try:
-            resp = _http_client.get(f"{self_hosted_url}/health", timeout=2.0)
+            resp = _http_client_get().get(f"{self_hosted_url}/health", timeout=2.0)
             if resp.status_code == 200:
                 _cached_backend["url"] = self_hosted_url
                 _cached_backend["is_self_hosted"] = True
@@ -514,7 +520,7 @@ def _render_via_kroki(
     url = f"{kroki_url}/{provider}/{output_format}"
 
     with LogSpan(span="diagram.kroki", provider=provider, format=output_format, url=url) as span:
-        resp = _http_client.post(
+        resp = _http_client_get().post(
             url,
             content=source.encode("utf-8"),
             headers={"Content-Type": "text/plain"},
@@ -926,6 +932,7 @@ def render_diagram(
                 timeout = _get_config().backend.timeout
 
                 with _render_tasks_lock:
+                    _evict_finished_tasks()
                     _render_tasks[task_id] = {
                         "status": "running",
                         "source": source,
@@ -1110,7 +1117,9 @@ def batch_render(
         max_concurrent: Maximum concurrent render requests (default: 5).
 
     Returns:
-        Task ID for polling status with get_render_status().
+        Summary string with completed/failed counts. The call runs
+        synchronously and returns only after all renders finish; the task ID
+        in the summary is an audit reference, not a polling handle.
 
     Example:
         result = diagram.batch_render(
@@ -1134,6 +1143,7 @@ def batch_render(
         task_id = f"batch-{uuid.uuid4().hex[:8]}"
 
         with _render_tasks_lock:
+            _evict_finished_tasks()
             _render_tasks[task_id] = {
                 "status": "running",
                 "type": "batch",
