@@ -221,6 +221,11 @@ def _process_text_shape(shape: BaseShape) -> str:
     return text
 
 
+def _escape_cell(text: str) -> str:
+    """Escape pipes and newlines so cell text cannot break the Markdown table."""
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
 def _process_table(table: Any) -> str:
     """Convert table to Markdown."""
     if not hasattr(table, "rows") or not table.rows:
@@ -231,7 +236,7 @@ def _process_table(table: Any) -> str:
     # Header row
     header_cells: list[str] = []
     for cell in table.rows[0].cells:
-        header_cells.append(cell.text.strip() if hasattr(cell, "text") else "")
+        header_cells.append(_escape_cell(cell.text.strip()) if hasattr(cell, "text") else "")
 
     if not header_cells:
         return ""
@@ -244,7 +249,7 @@ def _process_table(table: Any) -> str:
         row = table.rows[i]
         cells: list[str] = []
         for cell in row.cells:
-            cells.append(cell.text.strip() if hasattr(cell, "text") else "")
+            cells.append(_escape_cell(cell.text.strip()) if hasattr(cell, "text") else "")
 
         while len(cells) < len(header_cells):
             cells.append("")

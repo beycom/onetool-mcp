@@ -147,14 +147,14 @@ def _resolve_glob(pattern: str) -> list[Path]:
             base = cwd
 
         glob_pattern = str(Path(*glob_parts)) if glob_parts else "*"
-        return list(base.glob(glob_pattern))
+        return sorted(base.glob(glob_pattern))
 
     # Simple glob in directory
     if not parent.is_absolute():
         parent = cwd / parent.relative_to(".") if str(parent) != "." else cwd
 
     if parent.exists():
-        return list(parent.glob(glob_pattern))
+        return sorted(parent.glob(glob_pattern))
 
     return []
 

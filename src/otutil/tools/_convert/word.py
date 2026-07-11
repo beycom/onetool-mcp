@@ -141,6 +141,10 @@ def _process_paragraph(
     """Process a paragraph, handling headings, text, and images."""
     text = paragraph.text.strip()
     if not text:
+        # Image-only paragraphs still carry inline images that must be extracted
+        formatted = _format_paragraph_runs(paragraph, doc, images_dir, processed_rels)
+        if formatted.strip():
+            writer.write(formatted + "\n\n")
         return
 
     # Get style
@@ -260,13 +264,18 @@ def _process_drawing(
     return ""
 
 
+def _escape_cell(text: str) -> str:
+    """Escape pipes and newlines so cell text cannot break the Markdown table."""
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
 def _process_table(table: Table, writer: IncrementalWriter) -> None:
     """Convert table to Markdown format."""
     if not table.rows:
         return
 
     # Process header row
-    header_cells = [cell.text.strip() for cell in table.rows[0].cells]
+    header_cells = [_escape_cell(cell.text.strip()) for cell in table.rows[0].cells]
     if not header_cells:
         return
 
@@ -275,7 +284,7 @@ def _process_table(table: Table, writer: IncrementalWriter) -> None:
 
     # Process data rows
     for row in table.rows[1:]:
-        cells = [cell.text.strip() for cell in row.cells]
+        cells = [_escape_cell(cell.text.strip()) for cell in row.cells]
         while len(cells) < len(header_cells):
             cells.append("")
         writer.write("| " + " | ".join(cells[: len(header_cells)]) + " |\n")
