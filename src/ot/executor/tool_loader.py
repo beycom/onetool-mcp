@@ -317,6 +317,15 @@ def _load_inprocess_tools(
             spec.loader.exec_module(module)
 
             pack = getattr(module, "pack", None)
+            if not pack:
+                # Not a pack module (e.g. a shared implementation that a pack
+                # shim imports, like ottools/server.py) — don't register bare
+                # names in the flat registry, and drop the duplicate module
+                # instance so state like locks stays singleton via the normal
+                # import path.
+                sys.modules.pop(module_name, None)
+                continue
+
             aliases = getattr(module, "pack_aliases", ())
             if pack and aliases:
                 pack_aliases[pack] = tuple(str(alias) for alias in aliases)
