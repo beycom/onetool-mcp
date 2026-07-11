@@ -29,6 +29,8 @@ doc_slug = "db"
 __all__ = ["query", "sample", "schema", "tables"]
 
 import contextlib
+import json
+import re
 import threading
 from collections import OrderedDict
 from datetime import date, datetime
@@ -405,16 +407,39 @@ def sample(
 
 
 
-_READ_ONLY_KEYWORDS = ("SELECT", "EXPLAIN", "PRAGMA")
+_READ_ONLY_KEYWORDS = ("SELECT", "EXPLAIN", "PRAGMA", "WITH", "VALUES", "SHOW", "DESCRIBE")
+
+_MUTATING_KEYWORDS = (
+    "INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "TRUNCATE",
+    "REPLACE", "MERGE", "GRANT", "REVOKE", "ATTACH", "DETACH", "VACUUM",
+    "REINDEX", "CALL", "EXEC", "EXECUTE", "COPY",
+)
 
 
 def _is_read_only_sql(sql: str) -> bool:
-    """Return True if sql's first keyword is SELECT, EXPLAIN, or PRAGMA."""
+    """Best-effort check that sql is a single read-only statement.
+
+    Advisory, not a security boundary: rejects multi-statement batches,
+    PRAGMA assignments, non-read first keywords, and any statement containing
+    a mutating keyword as a whole word (so CTE reads like ``WITH ... SELECT``
+    pass but ``WITH ... DELETE`` and ``SELECT 1; DROP TABLE x`` do not).
+    May false-reject reads that mention mutating keywords in identifiers or
+    literals. Use a read-only database user for a real guarantee.
+    """
     stripped = sql.strip()
     if not stripped:
         return False
-    first_word = stripped.split(None, 1)[0].upper()
-    return first_word in _READ_ONLY_KEYWORDS
+    body = stripped.rstrip("; \t\r\n")
+    if ";" in body:  # multi-statement batch
+        return False
+    first_word = body.split(None, 1)[0].upper()
+    if first_word not in _READ_ONLY_KEYWORDS:
+        return False
+    if first_word == "PRAGMA" and "=" in body:  # PRAGMA assignment mutates
+        return False
+    # Crude literal strip so 'DROP' inside a string doesn't always trip the scan
+    upper = re.sub(r"'[^']*'", "''", body.upper())
+    return not any(re.search(rf"\b{kw}\b", upper) for kw in _MUTATING_KEYWORDS)
 
 
 def query(
@@ -433,8 +458,9 @@ def query(
         sql: SQL query to execute
         db_url: Database URL (required)
         params: Query parameters for safe substitution
-        read_only: If True, reject any statement whose first keyword is not
-            SELECT, EXPLAIN, or PRAGMA (default: False)
+        read_only: If True, reject statements that do not look like a single
+            read-only query (advisory best-effort check, not a security
+            boundary — use a read-only DB user for a guarantee; default: False)
 
     Returns:
         Dict with rows/row_count/truncated for SELECT, success dict for INSERT/UPDATE/DELETE, or error string
@@ -469,7 +495,7 @@ def query(
 
         if read_only and not _is_read_only_sql(sql):
             s.add(error="read_only_violation")
-            return "Error: read_only=True but statement is not SELECT/EXPLAIN/PRAGMA"
+            return "Error: read_only=True but statement does not look like a single read-only query"
 
         try:
             engine = _get_engine(db_url)
@@ -487,10 +513,16 @@ def query(
                         "message": f"{affected} rows affected",
                     }
 
-                max_rows = _get_config().max_chars // 100  # Rough estimate for row limit
+                max_chars = _get_config().max_chars
+                max_rows = max_chars // 100  # Rough estimate for row limit
                 rows_data, row_count, truncated = _convert_query_results_to_json(
                     cursor_result, max_rows
                 )
+                # Enforce the documented character bound on the serialized payload
+                while rows_data and len(json.dumps(rows_data, default=str)) > max_chars:
+                    del rows_data[-max(1, len(rows_data) // 5):]
+                    truncated = True
+                row_count = len(rows_data)
                 s.add(rows=row_count, truncated=truncated)
 
                 return {
