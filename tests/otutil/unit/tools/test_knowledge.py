@@ -6,6 +6,7 @@ shapes, error paths (missing sqlite-vec, FTS5), and smoke tests for config.
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import sqlite3
 import tempfile
@@ -25,6 +26,16 @@ def _make_in_memory_conn() -> sqlite3.Connection:
     conn = sqlite3.connect(":memory:", check_same_thread=False)
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
+
+
+@contextlib.contextmanager
+def _patch_crud_conn(conn: sqlite3.Connection):
+    """Patch both crud connection entry points to the given connection."""
+    with (
+        patch("otutil.tools._knowledge.crud.get_connection", return_value=conn),
+        patch("otutil.tools._knowledge.crud.use_connection", return_value=contextlib.nullcontext(conn)),
+    ):
+        yield
 
 
 def _apply_schema(conn: sqlite3.Connection) -> None:
@@ -128,18 +139,31 @@ class TestKnowledgeDBSchema:
             )
             conn.commit()
 
-    def test_topic_allows_duplicates(self):
+    def test_topic_allows_duplicates_for_indexed_chunks(self):
+        """Indexed chunks (source_path set) may share a topic after root stripping."""
+        conn = _make_in_memory_conn()
+        _apply_schema(conn)
+        for cid, sp in (("c1", "docs/a/page"), ("c2", "docs/b/page")):
+            content_hash = hashlib.sha256(cid.encode()).hexdigest()
+            conn.execute(
+                "INSERT INTO chunks (id, topic, content, content_hash, category, source_path, anchor) VALUES (?,?,?,?,?,?,?)",
+                [cid, "same/topic", cid, content_hash, "reference", sp, ""],
+            )
+        conn.commit()
+        rows = conn.execute("SELECT id FROM chunks WHERE topic = 'same/topic'").fetchall()
+        assert len(rows) == 2
+
+    def test_topic_unique_for_manual_writes(self):
+        """Manual writes (source_path NULL) enforce topic uniqueness at the DB level."""
         conn = _make_in_memory_conn()
         _apply_schema(conn)
         _insert_chunk(conn, "c1", "same/topic", "first")
         content_hash = hashlib.sha256(b"second").hexdigest()
-        conn.execute(
-            "INSERT INTO chunks (id, topic, content, content_hash, category) VALUES (?,?,?,?,?)",
-            ["c2", "same/topic", "second", content_hash, "reference"],
-        )
-        conn.commit()
-        rows = conn.execute("SELECT id FROM chunks WHERE topic = 'same/topic'").fetchall()
-        assert len(rows) == 2
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(
+                "INSERT INTO chunks (id, topic, content, content_hash, category) VALUES (?,?,?,?,?)",
+                ["c2", "same/topic", "second", content_hash, "reference"],
+            )
 
     def test_kb_setup_rejects_non_positive_dimensions(self):
         from otutil.tools._knowledge.db import _kb_setup
@@ -827,7 +851,7 @@ class TestKnowledgeCRUD:
     def test_write_creates_entry(self):
         from otutil.tools._knowledge import crud
         conn = self._patch_db()
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             with patch("otutil.tools._knowledge.crud._try_embed"):
                 result = crud.write(topic="test/topic", content="Hello world", db="test")
         assert "Written" in result
@@ -839,7 +863,7 @@ class TestKnowledgeCRUD:
         from otutil.tools._knowledge import crud
         conn = self._patch_db()
         _insert_chunk(conn, "existing", "test/topic", "original")
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             result = crud.write(topic="test/topic", content="duplicate", db="test")
         assert "Error" in result
         assert "already exists" in result
@@ -848,14 +872,14 @@ class TestKnowledgeCRUD:
         from otutil.tools._knowledge import crud
         conn = self._patch_db()
         _insert_chunk(conn, "c1", "test/topic", "My content here")
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             result = crud.read(topic="test/topic", db="test")
         assert "My content here" in result
 
     def test_read_missing_topic_returns_error(self):
         from otutil.tools._knowledge import crud
         conn = self._patch_db()
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             result = crud.read(topic="nonexistent/topic", db="test")
         assert "Error" in result
 
@@ -863,7 +887,7 @@ class TestKnowledgeCRUD:
         from otutil.tools._knowledge import crud
         conn = self._patch_db()
         _insert_chunk(conn, "c1", "test/topic", "Original")
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             with patch("otutil.tools._knowledge.crud._try_embed"):
                 crud.append(topic="test/topic", content="\nAppended", db="test")
         row = conn.execute("SELECT content FROM chunks WHERE topic='test/topic'").fetchone()
@@ -874,7 +898,7 @@ class TestKnowledgeCRUD:
         from otutil.tools._knowledge import crud
         conn = self._patch_db()
         _insert_chunk(conn, "c1", "test/topic", "Old content")
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             with patch("otutil.tools._knowledge.crud._try_embed"):
                 crud.update(topic="test/topic", content="New content", db="test")
         row = conn.execute("SELECT content FROM chunks WHERE topic='test/topic'").fetchone()
@@ -884,7 +908,7 @@ class TestKnowledgeCRUD:
         from otutil.tools._knowledge import crud
         conn = self._patch_db()
         _insert_chunk(conn, "c1", "test/topic", "To be deleted")
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             result = crud.delete(topic="test/topic", db="test")
         assert "Deleted" in result
         row = conn.execute("SELECT id FROM chunks WHERE topic='test/topic'").fetchone()
@@ -893,7 +917,7 @@ class TestKnowledgeCRUD:
     def test_write_invalid_category_returns_error(self):
         from otutil.tools._knowledge import crud
         conn = self._patch_db()
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             result = crud.write(topic="x/y", content="content", db="test", category="invalid_cat")
         assert "Error" in result
         assert "Invalid category" in result
@@ -902,7 +926,7 @@ class TestKnowledgeCRUD:
         """kb.write() with source in meta populates the source column."""
         from otutil.tools._knowledge import crud
         conn = self._patch_db()
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             with patch("otutil.tools._knowledge.crud._try_embed"):
                 crud.write(topic="a/page", content="Content", db="test", meta={"source": "mysite"})
         row = conn.execute("SELECT source FROM chunks WHERE topic='a/page'").fetchone()
@@ -913,7 +937,7 @@ class TestKnowledgeCRUD:
         """kb.write() without meta leaves source column as empty string."""
         from otutil.tools._knowledge import crud
         conn = self._patch_db()
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             with patch("otutil.tools._knowledge.crud._try_embed"):
                 crud.write(topic="b/page", content="Content", db="test")
         row = conn.execute("SELECT source FROM chunks WHERE topic='b/page'").fetchone()
@@ -955,7 +979,7 @@ class TestKnowledgeCRUDMultiChunk:
         conn = self._patch_db()
         self._insert(conn, "c1", "cmd/move", "Page content", source_path="path/move", anchor="")
         self._insert(conn, "c2", "cmd/move", "Intro section", source_path="path/move", anchor="intro")
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             result = crud.read(topic="cmd/move", db="test")
         # Only one chunk returned — no separator
         assert "---" not in result
@@ -966,7 +990,7 @@ class TestKnowledgeCRUDMultiChunk:
         conn = self._patch_db()
         self._insert(conn, "c1", "cmd/move", "Page content", source_path="path/move", anchor="")
         self._insert(conn, "c2", "cmd/move", "Intro section", source_path="path/move", anchor="intro")
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             result = crud.read(id="c2", db="test")
         assert "Intro section" in result
         assert "Page content" not in result
@@ -977,7 +1001,7 @@ class TestKnowledgeCRUDMultiChunk:
         self._insert(conn, "c1", "cmd/move", "Page content", source_path="path/move", anchor="")
         self._insert(conn, "c2", "cmd/move", "Intro section", source_path="path/move", anchor="intro")
         self._insert(conn, "c3", "cmd/other", "Other page", source_path="path/other", anchor="")
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             result = crud.read(source_path="path/move", db="test")
         assert "Page content" in result
         assert "Intro section" in result
@@ -988,7 +1012,7 @@ class TestKnowledgeCRUDMultiChunk:
         conn = self._patch_db()
         self._insert(conn, "c1", "cmd/move", "Page content", source_path="path/move", anchor="")
         self._insert(conn, "c2", "cmd/move", "Intro section", source_path="path/move", anchor="intro")
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             result = crud.delete(source_path="path/move", db="test")
         assert "Deleted" in result
         assert "(2 chunks)" in result
@@ -1000,7 +1024,7 @@ class TestKnowledgeCRUDMultiChunk:
         conn = self._patch_db()
         self._insert(conn, "c1", "cmd/move", "Old intro", source_path="path/move", anchor="intro")
         self._insert(conn, "c2", "cmd/move", "Options section", source_path="path/move", anchor="options")
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             with patch("otutil.tools._knowledge.crud._try_embed"):
                 result = crud.update(topic="cmd/move", content="New intro", db="test",
                                      source_path="path/move", anchor="intro")
@@ -1013,7 +1037,7 @@ class TestKnowledgeCRUDMultiChunk:
     def test_delete_requires_topic_or_source_path(self):
         from otutil.tools._knowledge import crud
         conn = self._patch_db()
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             result = crud.delete(db="test")
         assert "Error" in result
 
@@ -1023,7 +1047,7 @@ class TestKnowledgeCRUDMultiChunk:
         conn = self._patch_db()
         self._insert(conn, "c1", "cmd/move", "Old content", source_path="path/move", anchor="")
         self._insert(conn, "c2", "cmd/move", "Other chunk", source_path="path/move", anchor="intro")
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             with patch("otutil.tools._knowledge.crud._try_embed"):
                 result = crud.update(id="c1", topic="ignored", content="New content", db="test")
         assert "Updated" in result
@@ -1037,7 +1061,7 @@ class TestKnowledgeCRUDMultiChunk:
         from otutil.tools._knowledge import crud
         conn = self._patch_db()
         self._insert(conn, "c1", "cmd/move", "Original", source_path="path/move", anchor="")
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             with patch("otutil.tools._knowledge.crud._try_embed"):
                 result = crud.append(id="c1", topic="ignored", content=" appended", db="test")
         assert "Appended" in result
@@ -1050,7 +1074,7 @@ class TestKnowledgeCRUDMultiChunk:
         conn = self._patch_db()
         self._insert(conn, "c1", "cmd/move", "Page content", source_path="path/move", anchor="")
         self._insert(conn, "c2", "cmd/move", "Intro section", source_path="path/move", anchor="intro")
-        with patch("otutil.tools._knowledge.crud.get_connection", return_value=conn):
+        with _patch_crud_conn(conn):
             result = crud.delete(id="c1", db="test")
         assert "Deleted" in result
         assert conn.execute("SELECT id FROM chunks WHERE id = 'c1'").fetchone() is None
@@ -3312,10 +3336,12 @@ class TestSearchEmbeddingsGuard:
         ), patch.object(retrieval, "get_connection", return_value=mock_conn):
             result = retrieval.search(query="x", db="testdb", mode="semantic")
 
+        # Points at the CLI command — kb.reindex()/kb.index() are not exported tools
         assert (
             result
-            == "No embeddings found for 'testdb'. Run kb.reindex(db='testdb') to generate them."
+            == "No embeddings found for 'testdb'. Generate them with the CLI: onetool kb reindex testdb"
         )
+        assert "kb.reindex(" not in result
 
 
 @pytest.mark.unit
@@ -3357,3 +3383,583 @@ class TestRetrievalUntrustedContextBoundary:
         _a, kwargs = client.chat.completions.create.call_args
         system = next(m for m in kwargs["messages"] if m["role"] == "system")
         assert "untrusted" in system["content"].lower()
+
+
+# ===========================================================================
+# Bug-fix pass — graph expansion, dimensions, degradation, counts, race,
+# resume, cache bound, unified embedding path, update errors, fences, timeout
+# ===========================================================================
+
+def _seed_result(chunk_id: str, topic: str, content: str = "seed content") -> dict:
+    """Minimal search-result dict as consumed by kb.ask."""
+    return {
+        "id": chunk_id, "topic": topic, "content": content,
+        "category": "reference", "tags": "[]", "meta": "{}",
+        "hit_count": 0, "score": 1.0, "tags_list": [], "meta_dict": {},
+    }
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestAskGraphExpansion:
+    """kb.ask(expand=True) must actually include graph neighbours."""
+
+    def _conn_with_edge(self) -> sqlite3.Connection:
+        conn = _make_in_memory_conn()
+        _apply_schema(conn)
+        _insert_chunk(conn, "c1", "t/one", "seed content")
+        _insert_chunk(conn, "c2", "t/two", "neighbour content")
+        conn.execute(
+            "INSERT INTO edges (id, src_id, dst_id, edge_type, anchor_text) VALUES (?,?,?,?,?)",
+            ["e1", "c1", "c2", "link", "see also"],
+        )
+        conn.commit()
+        return conn
+
+    def test_graph_expand_allows_neighbours_beyond_k(self):
+        from otutil.tools._knowledge.retrieval import _graph_expand
+
+        conn = self._conn_with_edge()
+        seeds = [_seed_result("c1", "t/one")]
+        expanded = _graph_expand(conn, seeds, limit=2)
+        assert [r["id"] for r in expanded] == ["c1", "c2"]
+
+    def test_ask_expand_true_includes_neighbours(self):
+        from otutil.tools._knowledge import retrieval
+
+        conn = self._conn_with_edge()
+        seeds = [_seed_result("c1", "t/one")]
+        with (
+            patch.object(retrieval, "get_connection", return_value=conn),
+            patch.object(retrieval, "search_hybrid", return_value=seeds),
+            patch.object(retrieval, "_synthesise", return_value="answer"),
+        ):
+            result = retrieval.ask(query="q", db="test", k=1, rerank=False, expand=True)
+
+        assert "t/one" in result
+        assert "t/two" in result, "1-hop neighbour must appear in the sources"
+
+    def test_ask_expand_false_excludes_neighbours(self):
+        from otutil.tools._knowledge import retrieval
+
+        conn = self._conn_with_edge()
+        seeds = [_seed_result("c1", "t/one")]
+        with (
+            patch.object(retrieval, "get_connection", return_value=conn),
+            patch.object(retrieval, "search_hybrid", return_value=seeds),
+            patch.object(retrieval, "_synthesise", return_value="answer"),
+        ):
+            result = retrieval.ask(query="q", db="test", k=1, rerank=False, expand=False)
+
+        assert "t/two" not in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestEmbeddingDimensions:
+    """dimensions config is passed to embeddings.create when non-default."""
+
+    def _cfg(self, dimensions: int = 1536) -> MagicMock:
+        cfg = MagicMock()
+        cfg.model = "text-embedding-3-small"
+        cfg.dimensions = dimensions
+        cfg.max_embedding_tokens = 8191
+        cfg.base_url = ""
+        return cfg
+
+    def _client(self, dims: int = 4) -> MagicMock:
+        item = MagicMock()
+        item.embedding = [0.1] * dims
+        item.index = 0
+        resp = MagicMock()
+        resp.data = [item]
+        client = MagicMock()
+        client.embeddings.create.return_value = resp
+        return client
+
+    def test_dimensions_param_non_default_returned(self):
+        from otutil.tools._knowledge.embedding import _dimensions_param
+        assert _dimensions_param("text-embedding-3-small", self._cfg(512)) == 512
+
+    def test_dimensions_param_default_omitted(self):
+        from otutil.tools._knowledge.embedding import _dimensions_param
+        assert _dimensions_param("text-embedding-3-small", self._cfg(1536)) is None
+
+    def test_dimensions_param_unknown_model_omitted(self):
+        from otutil.tools._knowledge.embedding import _dimensions_param
+        assert _dimensions_param("custom-embed", self._cfg(512)) is None
+
+    def test_generate_embedding_passes_dimensions(self):
+        import otutil.tools._knowledge.embedding as emb_mod
+
+        client = self._client()
+        emb_mod._EMBED_CACHE.clear()
+        with (
+            patch("otutil.tools._knowledge.embedding._get_config", return_value=self._cfg(512)),
+            patch("otutil.tools._knowledge.embedding._get_openai_client", return_value=client),
+            patch("otutil.tools._knowledge.embedding._chunk_text_by_tokens", side_effect=lambda t, *a: [t]),
+        ):
+            emb_mod.generate_embedding("query")
+        assert client.embeddings.create.call_args.kwargs["dimensions"] == 512
+        emb_mod._EMBED_CACHE.clear()
+
+    def test_generate_embedding_omits_default_dimensions(self):
+        import otutil.tools._knowledge.embedding as emb_mod
+
+        client = self._client()
+        emb_mod._EMBED_CACHE.clear()
+        with (
+            patch("otutil.tools._knowledge.embedding._get_config", return_value=self._cfg(1536)),
+            patch("otutil.tools._knowledge.embedding._get_openai_client", return_value=client),
+            patch("otutil.tools._knowledge.embedding._chunk_text_by_tokens", side_effect=lambda t, *a: [t]),
+        ):
+            emb_mod.generate_embedding("query")
+        assert "dimensions" not in client.embeddings.create.call_args.kwargs
+        emb_mod._EMBED_CACHE.clear()
+
+    def test_embed_batch_with_retry_passes_dimensions(self):
+        from otutil.tools._knowledge.embedding import _embed_batch_with_retry
+
+        client = self._client()
+        _embed_batch_with_retry(client, "text-embedding-3-small", ["a"], dimensions=512)
+        assert client.embeddings.create.call_args.kwargs["dimensions"] == 512
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestSearchDegradation:
+    """Search lane failures surface instead of silently returning []."""
+
+    def test_exec_fts_query_syntax_error_returns_empty(self):
+        from otutil.tools._knowledge.search import _exec_fts
+
+        conn = _make_in_memory_conn()
+        _apply_schema(conn)
+        assert _exec_fts(conn, "AND", 10, None) == []
+
+    def test_exec_fts_missing_table_raises(self):
+        from otutil.tools._knowledge.search import _exec_fts
+
+        conn = _make_in_memory_conn()  # no schema — chunks_fts missing
+        with pytest.raises(sqlite3.OperationalError):
+            _exec_fts(conn, "hello", 10, None)
+
+    def test_search_vec_missing_table_raises(self):
+        from otutil.tools._knowledge.search import search_vec
+
+        conn = _make_in_memory_conn()
+        _apply_schema(conn)  # no chunks_vec table (sqlite-vec not loaded)
+        with (
+            patch("otutil.tools._knowledge.db._require_vec"),
+            patch("otutil.tools._knowledge.search.generate_embedding", return_value=[0.0] * 4),
+            pytest.raises(sqlite3.OperationalError),
+        ):
+            search_vec(conn, "query", 10)
+
+    def test_ask_degrades_to_fts_with_warning(self):
+        from otutil.tools._knowledge import retrieval
+
+        conn = _make_in_memory_conn()
+        _apply_schema(conn)
+        seeds = [_seed_result("c1", "t/one")]
+        with (
+            patch.object(retrieval, "get_connection", return_value=conn),
+            patch.object(retrieval, "search_hybrid", side_effect=RuntimeError("vec broken")),
+            patch.object(retrieval, "search_fts", return_value=seeds),
+            patch.object(retrieval, "_synthesise", return_value="answer"),
+        ):
+            result = retrieval.ask(query="q", db="test", k=1, rerank=False)
+
+        assert result.startswith("(warning: vector search failed")
+        assert "vec broken" in result
+        assert "answer" in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestReindexCounts:
+    """reindex() counts only embeddings added by this run; errors never negative."""
+
+    def test_preexisting_embeddings_not_counted(self):
+        from otutil.tools._knowledge.indexing import reindex
+
+        conn = sqlite3.connect(":memory:")
+        conn.execute("CREATE TABLE chunks (id TEXT, content TEXT)")
+        conn.execute("CREATE TABLE chunks_vec (chunk_id TEXT PRIMARY KEY, embedding BLOB)")
+        conn.executemany(
+            "INSERT INTO chunks VALUES (?, ?)",
+            [("id1", "a"), ("id2", "b"), ("id3", "c")],
+        )
+        # id1 already embedded before this run
+        conn.execute("INSERT INTO chunks_vec VALUES ('id1', ?)", [b"\x00" * 8])
+        conn.commit()
+
+        def fake_store(conn: object, pending: object, on_progress: object = None, **kwargs: object) -> str:
+            conn.execute(  # type: ignore[union-attr]
+                "INSERT INTO chunks_vec VALUES ('id2', ?)", [b"\x00" * 8]
+            )
+            conn.commit()  # type: ignore[union-attr]
+            return "Embedding storage failed for 1 of 2 chunk(s): ..."
+
+        with (
+            patch("otutil.tools._knowledge.indexing._store_embeddings_batch", side_effect=fake_store),
+            patch("otutil.tools._knowledge.indexing.get_connection", return_value=conn),
+        ):
+            result = reindex(db="testdb")
+
+        assert "Reindexed 1 chunks" in result
+        assert "(1 errors)" in result
+
+    def test_error_count_never_negative(self):
+        from otutil.tools._knowledge.indexing import reindex
+
+        conn = sqlite3.connect(":memory:")
+        conn.execute("CREATE TABLE chunks (id TEXT, content TEXT)")
+        conn.execute("CREATE TABLE chunks_vec (chunk_id TEXT PRIMARY KEY, embedding BLOB)")
+        conn.execute("INSERT INTO chunks VALUES ('id1', 'a')")
+        conn.commit()
+
+        def fake_store(conn: object, pending: object, on_progress: object = None, **kwargs: object) -> None:
+            conn.execute(  # type: ignore[union-attr]
+                "INSERT INTO chunks_vec VALUES ('id1', ?)", [b"\x00" * 8]
+            )
+            conn.commit()  # type: ignore[union-attr]
+            return None
+
+        with (
+            patch("otutil.tools._knowledge.indexing._store_embeddings_batch", side_effect=fake_store),
+            patch("otutil.tools._knowledge.indexing.get_connection", return_value=conn),
+        ):
+            result = reindex(db="testdb")
+
+        assert result == "Reindexed 1 chunks"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestWriteTopicRace:
+    """A concurrent duplicate insert surfaces as a friendly error, not a crash."""
+
+    def test_integrity_error_returns_already_exists(self):
+        from otutil.tools._knowledge import crud
+
+        inner = _make_in_memory_conn()
+        _apply_schema(inner)
+
+        class RaceConn:
+            """Simulates a writer that slipped in between check and insert."""
+
+            def execute(self, sql: str, params: object = None):
+                if sql.strip().startswith("INSERT INTO chunks"):
+                    raise sqlite3.IntegrityError("UNIQUE constraint failed: chunks.topic")
+                return inner.execute(sql, params or [])
+
+            def commit(self) -> None:
+                inner.commit()
+
+            def rollback(self) -> None:
+                inner.rollback()
+
+        with patch(
+            "otutil.tools._knowledge.crud.use_connection",
+            return_value=contextlib.nullcontext(RaceConn()),
+        ):
+            result = crud.write(topic="race/topic", content="x", db="test")
+
+        assert "already exists" in result
+        assert "Error" in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestUpdateEmbedErrors:
+    """kb.update() surfaces embedding failures instead of discarding them."""
+
+    def test_update_surfaces_embed_error(self):
+        from otutil.tools._knowledge import crud
+
+        conn = _make_in_memory_conn()
+        _apply_schema(conn)
+        _insert_chunk(conn, "c1", "t/x", "old content")
+        with (
+            _patch_crud_conn(conn),
+            patch("otutil.tools._knowledge.crud._try_embed", return_value="embed boom"),
+        ):
+            result = crud.update(topic="t/x", content="new content", db="test")
+
+        assert "Updated: t/x" in result
+        assert "embedding failed" in result
+        assert "embed boom" in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestEmbedCacheBound:
+    """Query embedding cache is a bounded LRU keyed by hashed text."""
+
+    def _cfg(self) -> MagicMock:
+        cfg = MagicMock()
+        cfg.model = "text-embedding-3-small"
+        cfg.dimensions = 1536
+        cfg.max_embedding_tokens = 8191
+        cfg.base_url = ""
+        return cfg
+
+    def _client(self) -> MagicMock:
+        item = MagicMock()
+        item.embedding = [0.1]
+        item.index = 0
+        resp = MagicMock()
+        resp.data = [item]
+        client = MagicMock()
+        client.embeddings.create.return_value = resp
+        return client
+
+    def test_cache_size_is_capped(self):
+        import otutil.tools._knowledge.embedding as emb_mod
+
+        emb_mod._EMBED_CACHE.clear()
+        with (
+            patch("otutil.tools._knowledge.embedding._get_config", return_value=self._cfg()),
+            patch("otutil.tools._knowledge.embedding._get_openai_client", return_value=self._client()),
+            patch("otutil.tools._knowledge.embedding._chunk_text_by_tokens", side_effect=lambda t, *a: [t]),
+            patch.object(emb_mod, "_EMBED_CACHE_MAX", 3),
+        ):
+            for i in range(5):
+                emb_mod.generate_embedding(f"query {i}")
+
+        assert len(emb_mod._EMBED_CACHE) == 3
+        emb_mod._EMBED_CACHE.clear()
+
+    def test_cache_keys_are_hashes_not_text(self):
+        import otutil.tools._knowledge.embedding as emb_mod
+
+        emb_mod._EMBED_CACHE.clear()
+        long_text = "a very long document body " * 100
+        with (
+            patch("otutil.tools._knowledge.embedding._get_config", return_value=self._cfg()),
+            patch("otutil.tools._knowledge.embedding._get_openai_client", return_value=self._client()),
+            patch("otutil.tools._knowledge.embedding._chunk_text_by_tokens", side_effect=lambda t, *a: [t]),
+        ):
+            emb_mod.generate_embedding(long_text)
+
+        keys = list(emb_mod._EMBED_CACHE)
+        assert keys, "cache should hold the entry"
+        assert all(len(k[0]) == 64 and k[0] != long_text for k in keys)
+        emb_mod._EMBED_CACHE.clear()
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestEmbeddingUnifiedPath:
+    """The same text embeds identically regardless of code path (first window)."""
+
+    def test_long_text_uses_first_window_only(self):
+        import otutil.tools._knowledge.embedding as emb_mod
+
+        cfg = MagicMock()
+        cfg.model = "text-embedding-3-small"
+        cfg.dimensions = 1536
+        cfg.max_embedding_tokens = 8191
+        cfg.base_url = ""
+        item = MagicMock()
+        item.embedding = [0.1]
+        item.index = 0
+        resp = MagicMock()
+        resp.data = [item]
+        client = MagicMock()
+        client.embeddings.create.return_value = resp
+
+        emb_mod._EMBED_CACHE.clear()
+        with (
+            patch("otutil.tools._knowledge.embedding._get_config", return_value=cfg),
+            patch("otutil.tools._knowledge.embedding._get_openai_client", return_value=client),
+            patch("otutil.tools._knowledge.embedding._chunk_text_by_tokens", return_value=["window1", "window2"]),
+        ):
+            emb_mod.generate_embedding("long text")
+
+        assert client.embeddings.create.call_count == 1
+        assert client.embeddings.create.call_args.kwargs["input"] == "window1"
+        emb_mod._EMBED_CACHE.clear()
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestOpenAIClientTimeout:
+    """OpenAI clients are constructed with an explicit timeout."""
+
+    def test_embedding_client_has_timeout(self):
+        from otutil.tools._knowledge import embedding as emb_mod
+
+        cfg = MagicMock()
+        cfg.base_url = ""
+        with (
+            patch("otutil.tools._knowledge.embedding.get_secret", return_value="sk-test"),
+            patch("otutil.tools._knowledge.embedding._get_config", return_value=cfg),
+            patch("otutil.tools._knowledge.embedding.get_llm_config") as mock_llm,
+            patch("openai.OpenAI") as mock_openai,
+        ):
+            mock_llm.return_value.base_url = ""
+            emb_mod._get_openai_client()
+
+        assert mock_openai.call_args.kwargs["timeout"] == emb_mod._CLIENT_TIMEOUT_S
+
+    def test_llm_client_has_timeout(self):
+        from otutil.tools._knowledge import retrieval
+
+        cfg = MagicMock()
+        cfg.base_url = ""
+        with (
+            patch("otpack.get_secret", return_value="sk-test"),
+            patch("otutil.tools._knowledge.retrieval._get_config", return_value=cfg),
+            patch("ot.config.get_llm_config") as mock_llm,
+            patch("openai.OpenAI") as mock_openai,
+        ):
+            mock_llm.return_value.base_url = ""
+            retrieval._create_llm_client()
+
+        assert mock_openai.call_args.kwargs["timeout"] == retrieval._CLIENT_TIMEOUT_S
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestChunkerFencedCodeBlocks:
+    """Headings inside fenced code blocks must not create sections."""
+
+    def test_heading_inside_fence_not_split(self, tmp_path: Path):
+        from otutil.tools._knowledge.chunker import chunk_file
+
+        pad = "\n".join(["some body text for padding the section length"] * 55)
+        body = (
+            "# One\n\n" + pad + "\n\n"
+            "# Two\n\n"
+            "```python\n"
+            "# Fake Heading inside a code block\n"
+            "print('hi')\n"
+            "```\n\n" + pad + "\n"
+        )
+        md = tmp_path / "doc.md"
+        md.write_text(body, encoding="utf-8")
+
+        chunks = chunk_file(md, Path("doc.md"))
+        anchors = {c.anchor for c in chunks}
+        assert anchors == {"one", "two"}
+        two = next(c for c in chunks if c.anchor == "two")
+        assert "# Fake Heading inside a code block" in two.content
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestScrapeResumeState:
+    """resume creates/consumes .state.json even when it doesn't pre-exist."""
+
+    def _kwargs(self, tmp_path: Path, **overrides: Any) -> dict[str, Any]:
+        kwargs: dict[str, Any] = dict(
+            url="https://docs.example.test/",
+            output_dir=tmp_path,
+            source_name="docs",
+            depth=1,
+            max_pages=10,
+            url_prefix="",
+            check_robots_txt=True,
+            delay_min=0,
+            delay_max=0,
+            user_agent="",
+            wait_for="",
+            page_timeout=30000,
+            cache=False,
+            process_iframes=False,
+            content_filter_threshold=0.48,
+            min_word_threshold=50,
+            crawl_strategy="bfs",
+            seed_urls=[],
+            score={},
+            css_selector="",
+            js_code="",
+            include_images=False,
+            resume=False,
+            flat_files=False,
+            on_page=None,
+            category=None,
+            tags=[],
+            debug=False,
+        )
+        kwargs.update(overrides)
+        return kwargs
+
+    def _capture_run_config(self, fake_modules: dict[str, Any]) -> list[dict[str, Any]]:
+        captured: list[dict[str, Any]] = []
+
+        class CapturingConfig:
+            def __init__(self, **kwargs: Any) -> None:
+                self.kwargs = kwargs
+                captured.append(kwargs)
+
+        fake_modules["crawl4ai"].CrawlerRunConfig = CapturingConfig
+        return captured
+
+    async def test_deep_crawl_resume_passes_state_file_when_absent(self, tmp_path: Path):
+        import sys
+        from otutil.tools._knowledge.scraper import _run_scrape_async
+
+        fake_modules, _crawler = _make_fake_crawl4ai_modules(deep=True)
+        captured = self._capture_run_config(fake_modules)
+        with patch.dict(sys.modules, fake_modules):
+            await _run_scrape_async(**self._kwargs(tmp_path, resume=True))
+
+        state_files = [c.get("state_file") for c in captured if "state_file" in c]
+        assert state_files == [str(tmp_path / ".state.json")]
+
+    async def test_deep_crawl_no_resume_omits_state_file(self, tmp_path: Path):
+        import sys
+        from otutil.tools._knowledge.scraper import _run_scrape_async
+
+        fake_modules, _crawler = _make_fake_crawl4ai_modules(deep=True)
+        captured = self._capture_run_config(fake_modules)
+        with patch.dict(sys.modules, fake_modules):
+            await _run_scrape_async(**self._kwargs(tmp_path, resume=False))
+
+        assert all("state_file" not in c for c in captured)
+
+    async def test_seed_urls_resume_skips_done_and_updates_state(self, tmp_path: Path):
+        import json as _json
+        import sys
+        from otutil.tools._knowledge.scraper import _run_scrape_async
+
+        fake_modules, crawler = _make_fake_crawl4ai_modules()
+        (tmp_path / ".state.json").write_text(
+            _json.dumps({"done_urls": ["https://docs.example.test/a"]}), encoding="utf-8"
+        )
+        with patch.dict(sys.modules, fake_modules):
+            result = await _run_scrape_async(**self._kwargs(
+                tmp_path,
+                crawl_strategy="seed_urls",
+                seed_urls=["https://docs.example.test/a", "https://docs.example.test/b"],
+                resume=True,
+            ))
+
+        assert crawler.arun.call_count == 1, "already-done seed must be skipped"
+        assert crawler.arun.call_args.args[0] == "https://docs.example.test/b"
+        assert result.written == 1
+        state = _json.loads((tmp_path / ".state.json").read_text(encoding="utf-8"))
+        assert set(state["done_urls"]) == {
+            "https://docs.example.test/a",
+            "https://docs.example.test/b",
+        }
+
+    async def test_seed_urls_resume_creates_state_when_absent(self, tmp_path: Path):
+        import json as _json
+        import sys
+        from otutil.tools._knowledge.scraper import _run_scrape_async
+
+        fake_modules, _crawler = _make_fake_crawl4ai_modules()
+        with patch.dict(sys.modules, fake_modules):
+            await _run_scrape_async(**self._kwargs(
+                tmp_path,
+                crawl_strategy="seed_urls",
+                seed_urls=["https://docs.example.test/a"],
+                resume=True,
+            ))
+
+        state = _json.loads((tmp_path / ".state.json").read_text(encoding="utf-8"))
+        assert state["done_urls"] == ["https://docs.example.test/a"]

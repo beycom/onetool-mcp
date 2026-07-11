@@ -1,6 +1,7 @@
 """CRUD operations for the knowledge pack."""
 from __future__ import annotations
 
+import sqlite3
 import uuid
 from typing import Any
 
@@ -17,6 +18,7 @@ from .db import (
     get_connection,
     serialize_meta,
     serialize_tags,
+    use_connection,
 )
 from .embedding import generate_embedding, vec_to_bytes
 
@@ -51,24 +53,30 @@ def write(
 
     with LogSpan(span="kb.write", topic=topic, db=db) as s:
         try:
-            conn = get_connection(db)
-            existing = conn.execute("SELECT id FROM chunks WHERE topic = ?", [topic]).fetchone()
-            if existing:
-                return f"Error: Topic '{topic}' already exists. Use kb.update() to replace it."
+            with use_connection(db) as conn:
+                existing = conn.execute("SELECT id FROM chunks WHERE topic = ?", [topic]).fetchone()
+                if existing:
+                    return f"Error: Topic '{topic}' already exists. Use kb.update() to replace it."
 
-            chunk_id = str(uuid.uuid4())
-            hash_ = _content_hash(content)
-            conn.execute(
-                """
-                INSERT INTO chunks (id, topic, content, content_hash, category, tags, meta, source)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                [chunk_id, topic, content, hash_, category,
-                 serialize_tags(tags), serialize_meta(meta),
-                 (meta or {}).get("source", "")],
-            )
-            embed_err = _try_embed(conn, chunk_id, content)
-            conn.commit()
+                chunk_id = str(uuid.uuid4())
+                hash_ = _content_hash(content)
+                try:
+                    conn.execute(
+                        """
+                        INSERT INTO chunks (id, topic, content, content_hash, category, tags, meta, source)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        [chunk_id, topic, content, hash_, category,
+                         serialize_tags(tags), serialize_meta(meta),
+                         (meta or {}).get("source", "")],
+                    )
+                except sqlite3.IntegrityError:
+                    # Unique-index backstop for a concurrent writer that got in
+                    # between the existence check and the insert.
+                    conn.rollback()
+                    return f"Error: Topic '{topic}' already exists. Use kb.update() to replace it."
+                embed_err = _try_embed(conn, chunk_id, content)
+                conn.commit()
             s.add("chunkId", chunk_id)
             if embed_err:
                 return f"Written: {topic} (warning: embedding failed — semantic search unavailable: {embed_err})"
@@ -164,30 +172,30 @@ def append(*, topic: str, content: str, db: str, id: str | None = None) -> str:
     """
     with LogSpan(span="kb.append", topic=topic, db=db):
         try:
-            conn = get_connection(db)
-            if id is not None:
-                row = conn.execute(
-                    "SELECT id, content FROM chunks WHERE id = ? ORDER BY created_at DESC LIMIT 1",
-                    [id],
-                ).fetchone()
-                if not row:
-                    return f"Error: No entry found with id '{id}'"
-            else:
-                row = conn.execute(
-                    "SELECT id, content FROM chunks WHERE topic = ? ORDER BY created_at DESC LIMIT 1",
-                    [topic],
-                ).fetchone()
-                if not row:
-                    return f"Error: No entry found for topic '{topic}'"
-            chunk_id, old_content = row
-            new_content = old_content + content
-            new_hash = _content_hash(new_content)
-            conn.execute(
-                "UPDATE chunks SET content = ?, content_hash = ?, updated_at = datetime('now') WHERE id = ?",
-                [new_content, new_hash, chunk_id],
-            )
-            embed_err = _try_embed(conn, chunk_id, new_content)
-            conn.commit()
+            with use_connection(db) as conn:
+                if id is not None:
+                    row = conn.execute(
+                        "SELECT id, content FROM chunks WHERE id = ? ORDER BY created_at DESC LIMIT 1",
+                        [id],
+                    ).fetchone()
+                    if not row:
+                        return f"Error: No entry found with id '{id}'"
+                else:
+                    row = conn.execute(
+                        "SELECT id, content FROM chunks WHERE topic = ? ORDER BY created_at DESC LIMIT 1",
+                        [topic],
+                    ).fetchone()
+                    if not row:
+                        return f"Error: No entry found for topic '{topic}'"
+                chunk_id, old_content = row
+                new_content = old_content + content
+                new_hash = _content_hash(new_content)
+                conn.execute(
+                    "UPDATE chunks SET content = ?, content_hash = ?, updated_at = datetime('now') WHERE id = ?",
+                    [new_content, new_hash, chunk_id],
+                )
+                embed_err = _try_embed(conn, chunk_id, new_content)
+                conn.commit()
             if embed_err:
                 return f"Appended to: {topic} (warning: embedding failed — semantic search unavailable: {embed_err})"
             return f"Appended to: {topic}"
@@ -218,33 +226,36 @@ def update(*, topic: str, content: str, db: str, id: str | None = None, source_p
     """
     with LogSpan(span="kb.update", topic=topic, db=db):
         try:
-            conn = get_connection(db)
-            if id is not None:
-                rows = conn.execute("SELECT id FROM chunks WHERE id = ?", [id]).fetchall()
-                if not rows:
-                    return f"Error: No entry found with id '{id}'"
-            else:
-                sql = "SELECT id FROM chunks WHERE topic = ?"
-                params: list[object] = [topic]
-                if source_path is not None:
-                    sql += " AND source_path = ?"
-                    params.append(source_path)
-                if anchor is not None:
-                    sql += " AND anchor = ?"
-                    params.append(anchor)
-                rows = conn.execute(sql, params).fetchall()
-                if not rows:
-                    return f"Error: No entry found for topic '{topic}'"
-            new_hash = _content_hash(content)
-            for (chunk_id,) in rows:
-                conn.execute(
-                    "UPDATE chunks SET content = ?, content_hash = ?, updated_at = datetime('now') WHERE id = ?",
-                    [content, new_hash, chunk_id],
-                )
-                _try_embed(conn, chunk_id, content)
-            conn.commit()
+            with use_connection(db) as conn:
+                if id is not None:
+                    rows = conn.execute("SELECT id FROM chunks WHERE id = ?", [id]).fetchall()
+                    if not rows:
+                        return f"Error: No entry found with id '{id}'"
+                else:
+                    sql = "SELECT id FROM chunks WHERE topic = ?"
+                    params: list[object] = [topic]
+                    if source_path is not None:
+                        sql += " AND source_path = ?"
+                        params.append(source_path)
+                    if anchor is not None:
+                        sql += " AND anchor = ?"
+                        params.append(anchor)
+                    rows = conn.execute(sql, params).fetchall()
+                    if not rows:
+                        return f"Error: No entry found for topic '{topic}'"
+                new_hash = _content_hash(content)
+                embed_err: str | None = None
+                for (chunk_id,) in rows:
+                    conn.execute(
+                        "UPDATE chunks SET content = ?, content_hash = ?, updated_at = datetime('now') WHERE id = ?",
+                        [content, new_hash, chunk_id],
+                    )
+                    embed_err = _try_embed(conn, chunk_id, content) or embed_err
+                conn.commit()
             count = len(rows)
             suffix = f" ({count} chunks)" if count > 1 else ""
+            if embed_err:
+                return f"Updated: {topic}{suffix} (warning: embedding failed — semantic search unavailable: {embed_err})"
             return f"Updated: {topic}{suffix}"
         except Exception as e:
             return f"Error updating in '{db}': {e}"
@@ -272,21 +283,21 @@ def delete(*, topic: str | None = None, source_path: str | None = None, id: str 
 
     with LogSpan(span="kb.delete", topic=topic, sourcePath=source_path, db=db):
         try:
-            conn = get_connection(db)
-            if id is not None:
-                rows = conn.execute("SELECT id FROM chunks WHERE id = ?", [id]).fetchall()
-                label = f"id '{id}'"
-            elif source_path is not None:
-                rows = conn.execute("SELECT id FROM chunks WHERE source_path = ?", [source_path]).fetchall()
-                label = f"source_path '{source_path}'"
-            else:
-                rows = conn.execute("SELECT id FROM chunks WHERE topic = ?", [topic]).fetchall()
-                label = f"topic '{topic}'"
-            if not rows:
-                return f"Error: No entries found for {label}"
-            for (chunk_id,) in rows:
-                conn.execute("DELETE FROM chunks WHERE id = ?", [chunk_id])
-            conn.commit()
+            with use_connection(db) as conn:
+                if id is not None:
+                    rows = conn.execute("SELECT id FROM chunks WHERE id = ?", [id]).fetchall()
+                    label = f"id '{id}'"
+                elif source_path is not None:
+                    rows = conn.execute("SELECT id FROM chunks WHERE source_path = ?", [source_path]).fetchall()
+                    label = f"source_path '{source_path}'"
+                else:
+                    rows = conn.execute("SELECT id FROM chunks WHERE topic = ?", [topic]).fetchall()
+                    label = f"topic '{topic}'"
+                if not rows:
+                    return f"Error: No entries found for {label}"
+                for (chunk_id,) in rows:
+                    conn.execute("DELETE FROM chunks WHERE id = ?", [chunk_id])
+                conn.commit()
             count = len(rows)
             suffix = f" ({count} chunks)" if count > 1 else ""
             label_short = id or source_path or topic
@@ -298,7 +309,9 @@ def delete(*, topic: str | None = None, source_path: str | None = None, id: str 
 def _try_embed(conn: Any, chunk_id: str, content: str) -> str | None:
     """Try to generate and store embedding.
 
-    Returns an error string if embedding failed (so callers can surface it), else None.
+    Embeds first and only then swaps the stored vector, so a failed re-embed
+    never deletes the existing one. Returns an error string if embedding
+    failed (so callers can surface it), else None.
     """
     try:
         vec = generate_embedding(content)

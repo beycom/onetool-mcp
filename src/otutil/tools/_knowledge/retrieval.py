@@ -4,6 +4,9 @@ from __future__ import annotations
 from collections import deque
 from typing import TYPE_CHECKING, Any, cast
 
+from loguru import logger
+
+from ot.logging import LogEntry
 from ot.utils.factory import lazy_client
 from otpack import LogSpan
 
@@ -13,6 +16,9 @@ from .search import apply_metadata_filters, search_fts, search_hybrid, search_ve
 
 if TYPE_CHECKING:
     from openai import OpenAI
+
+
+_CLIENT_TIMEOUT_S = 60.0
 
 
 def _create_llm_client() -> OpenAI | None:
@@ -28,7 +34,7 @@ def _create_llm_client() -> OpenAI | None:
             return None
         config = _get_config()
         base_url = config.base_url or get_llm_config().base_url or None
-        return OpenAI(api_key=api_key, base_url=base_url)
+        return OpenAI(api_key=api_key, base_url=base_url, timeout=_CLIENT_TIMEOUT_S)
     except Exception:
         return None
 
@@ -125,7 +131,7 @@ def search(
                 if not has_embeddings:
                     return (
                         f"No embeddings found for '{db}'. "
-                        f"Run kb.reindex(db='{db}') to generate them."
+                        f"Generate them with the CLI: onetool kb reindex {db}"
                     )
 
             if mode == "hybrid":
@@ -203,27 +209,37 @@ def ask(
             conn = get_connection(db)
 
             # 1. Retrieve
+            degraded = ""
             try:
                 results = search_hybrid(conn, query, k * 2)
-            except Exception:
+            except Exception as retrieval_err:
+                logger.warning(
+                    LogEntry(
+                        event="knowledge.ask.hybrid_degraded",
+                        errorType=type(retrieval_err).__name__,
+                        error=str(retrieval_err),
+                    )
+                )
                 results = search_fts(conn, query, k * 2)
+                degraded = f"(warning: vector search failed — keyword-only retrieval: {retrieval_err})\n\n"
             results = results[:k]
 
             if not results:
-                return f"No relevant entries found for: {query}"
+                return degraded + f"No relevant entries found for: {query}"
 
-            # 2. Optional: graph expand (add 1-hop neighbours)
+            # 2. Optional: graph expand (add 1-hop neighbours of the top-k
+            # seeds; the limit leaves room so neighbours can appear in results)
             if expand and results:
-                results = _graph_expand(conn, results, limit=k)
+                results = _graph_expand(conn, results, limit=k * 2)
 
             # 3. Optional: rerank
             if rerank and results:
                 results = _llm_rerank(query, results)
 
-            # 4. Synthesise
+            # 4. Synthesise (results is already bounded to k, or 2k when expanded)
             context_parts = []
             citations = []
-            for i, r in enumerate(results[:k], 1):
+            for i, r in enumerate(results, 1):
                 context_parts.append(f"[{i}] {r['topic']}\n{r['content'][:1000]}")
                 meta = r["meta_dict"]
                 url = meta.get("url", "")
@@ -235,7 +251,7 @@ def ask(
             s.add("chunkCount", len(results))
 
             cite_lines = [f"  [{c['num']}] {c['topic']}" + (f" ({c['url']})" if c["url"] else "") for c in citations]
-            return f"{answer}\n\n**Sources:**\n" + "\n".join(cite_lines)
+            return degraded + f"{answer}\n\n**Sources:**\n" + "\n".join(cite_lines)
 
         except Exception as e:
             s.add("error", str(e))

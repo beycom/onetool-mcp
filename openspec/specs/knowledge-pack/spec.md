@@ -47,6 +47,10 @@ The `knowledge` pack SHALL read named database configurations from `onetool.yaml
 - **WHEN** `kb.write(topic='...', content='...', db='docs')` is called without `category`
 - **THEN** the chunk is stored with `category='note'`
 
+#### Scenario: Duplicate topic rejected atomically
+- **WHEN** two writers race `kb.write()` with the same topic
+- **THEN** at most one row is inserted — a partial UNIQUE index on `topic` (for rows with `source_path IS NULL`) backs the application-level check, and the losing writer receives the "already exists" error instead of an exception
+
 ---
 
 ### Requirement: kb.search — Hybrid retrieval
@@ -100,6 +104,7 @@ The `knowledge` pack SHALL read named database configurations from `onetool.yaml
 #### Scenario: Graph expansion adds neighbours
 - **WHEN** `kb.ask(query='...', db='docs', expand=True)` is called
 - **THEN** 1-hop outbound neighbours of top-k chunks are included as supplementary context (deduplicated)
+- **AND** neighbours are retained even when retrieval already filled all `k` slots — expansion may grow the context beyond `k` (bounded at `2k`)
 
 ### Requirement: kb.grep — Regex content search
 `kb.grep()` SHALL search entry content with a regex pattern, returning matching chunks with matched lines.
@@ -226,6 +231,10 @@ Parameters:
 - **WHEN** `kb.update(source_path='rhino/8mac/help/en-us/commands/move', anchor='', db='rhino', content='new content')` is called
 - **THEN** exactly the page-level preamble chunk for that file is updated
 
+#### Scenario: Re-embed failure is surfaced, previous vector retained
+- **WHEN** the re-embedding of updated content fails
+- **THEN** the content update still succeeds, the previously stored vector is NOT deleted (embed-then-swap), and the return message carries an embedding-failure warning
+
 ---
 
 ### Requirement: kb.delete — Remove entry
@@ -296,10 +305,22 @@ The `kb index` embedding phase SHALL be resilient to transient API failures.
 - **THEN** all previously successful sub-batches are already committed; only the failed sub-batch's chunks lack embeddings
 - **AND** the overall error count reflects only the failed sub-batch, not the entire pending set
 
+#### Scenario: Non-default dimensions are passed to the API
+- **WHEN** `tools.knowledge.dimensions` differs from the embedding model's native output size
+- **THEN** every `embeddings.create` call SHALL pass `dimensions=` so the returned vectors match the `vec0` table created from `config.dimensions`
+
+#### Scenario: Same text embeds identically on every code path
+- **WHEN** a text longer than the embedding token limit is embedded via the single path (`generate_embedding`) or the batch path
+- **THEN** both paths SHALL embed the first token window only, producing the same vector for the same text
+
+#### Scenario: reindex counts only newly generated embeddings
+- **WHEN** `kb reindex` runs against a database where some chunks already have embeddings
+- **THEN** the reported "Reindexed N" count SHALL include only embeddings added by this run, and the error count SHALL never be negative
+
 ---
 
 ### Requirement: Query embedding cache
-Repeated query embeddings within a session SHALL be served from a short-lived in-memory cache.
+Repeated query embeddings within a session SHALL be served from a short-lived in-memory cache. The cache SHALL be a bounded LRU and SHALL key on a hash of the text (never the full text), so long-running sessions do not retain document contents or grow without bound.
 
 #### Scenario: Cache hit avoids API call
 - **WHEN** `kb.search` or `kb.ask` issues the same query within 15 minutes
@@ -308,6 +329,10 @@ Repeated query embeddings within a session SHALL be served from a short-lived in
 #### Scenario: Cache keyed on query + model + dimensions
 - **WHEN** two queries differ in text, model, or dimensions
 - **THEN** each generates a distinct API call
+
+#### Scenario: Cache is bounded
+- **WHEN** more distinct texts are embedded than the cache capacity
+- **THEN** the least-recently-used entries are evicted and the cache never exceeds its cap
 
 ---
 
@@ -494,7 +519,7 @@ During indexing, `topic_roots` entries in `IndexProjectConfig` SHALL be stripped
 ---
 
 ### Requirement: source_path and anchor deduplication
-The `chunks` table SHALL deduplicate on `(source_path, anchor)` — not on `topic`. `source_path` is the canonical file path (same as canonical topic before `topic_roots` stripping). `anchor` is the heading slug within the file (`""` for page-level preamble). `topic` is a non-unique human-readable label with a plain (non-unique) index.
+The `chunks` table SHALL deduplicate on `(source_path, anchor)` — not on `topic`. `source_path` is the canonical file path (same as canonical topic before `topic_roots` stripping). `anchor` is the heading slug within the file (`""` for page-level preamble). `topic` is a non-unique human-readable label with a plain (non-unique) index for indexed chunks; manual writes (`source_path IS NULL`) additionally get a partial UNIQUE index on `topic` to close the `kb.write()` check-then-insert race.
 
 #### Scenario: Re-index unchanged chunk is skipped
 - **WHEN** a chunk with the same `(source_path, anchor)` is re-indexed and content hash is unchanged
@@ -512,9 +537,10 @@ The `chunks` table SHALL deduplicate on `(source_path, anchor)` — not on `topi
 - **WHEN** two files produce chunks with the same `topic` value but different `source_path`
 - **THEN** both rows are stored without constraint violation
 
-#### Scenario: topic index is non-unique
+#### Scenario: topic index is non-unique for indexed chunks
 - **WHEN** the `chunks` table is created
 - **THEN** `idx_chunks_topic` SHALL be a plain index (not `UNIQUE`)
+- **AND** `idx_chunks_topic_manual` SHALL be a partial `UNIQUE` index on `topic` restricted to rows `WHERE source_path IS NULL` (manual `kb.write()` entries)
 
 ---
 
@@ -615,8 +641,9 @@ generated yet.
 - **WHEN** `kb.search(q='...', db='rhino', mode='semantic')` is called
 - **AND** `tools.knowledge.kb.rhino.db.embeddings_enabled` is `true` (or unset, which defaults to `true`)
 - **AND** the database's `chunks_vec` table has no rows (no chunk has ever been embedded)
-- **THEN** the call SHALL return "No embeddings found for 'rhino'. Run kb.reindex(db='rhino') to generate them."
+- **THEN** the call SHALL return "No embeddings found for 'rhino'. Generate them with the CLI: onetool kb reindex rhino"
 - **AND** SHALL NOT surface a raw SQL or `sqlite-vec` exception message
+- **AND** SHALL NOT advertise `kb.reindex()`/`kb.index()` call syntax — those are CLI-only commands, not exported pack tools
 
 #### Scenario: Keyword mode is unaffected
 - **WHEN** `kb.search(q='...', db='rhino', mode='keyword')` is called
@@ -659,3 +686,21 @@ retrieved context in a single `user` message with no instruction to disregard em
 - **THEN** a text answer is still returned alongside a list of source citations (topic + url), exactly
   as before this change — the system message is additive and does not alter the response contract
 
+
+---
+
+### Requirement: Search lane failures surface instead of silently degrading
+
+Failures in the FTS or vector search lanes SHALL be logged and surfaced rather than swallowed into empty result lists. Hybrid search MUST NOT silently become FTS-only.
+
+#### Scenario: Corrupt or missing vector table surfaces an error
+- **WHEN** the `chunks_vec` query fails (missing table, corruption, or dimension mismatch)
+- **THEN** `search_vec` SHALL log the failure and raise, so `kb.search(mode='hybrid'|'semantic')` returns an error message instead of silently returning FTS-only or empty results
+
+#### Scenario: Corrupt FTS table surfaces an error
+- **WHEN** the `chunks_fts` query fails for a reason other than FTS5 query syntax
+- **THEN** the failure SHALL be logged and raised; only benign FTS5 query-syntax errors may return an empty row set (logged)
+
+#### Scenario: kb.ask degrades loudly
+- **WHEN** hybrid retrieval fails inside `kb.ask` and the keyword lane still works
+- **THEN** the answer SHALL be prefixed with a visible warning that retrieval was keyword-only, and the failure SHALL be logged

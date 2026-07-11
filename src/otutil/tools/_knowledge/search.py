@@ -2,13 +2,15 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any
+import sqlite3
+from typing import Any
+
+from loguru import logger
+
+from ot.logging import LogEntry
 
 from .db import deserialize_meta, deserialize_tags
 from .embedding import generate_embedding, vec_to_bytes
-
-if TYPE_CHECKING:
-    import sqlite3
 
 _RRF_K = 60
 
@@ -47,8 +49,18 @@ def _exec_fts(
     params.append(limit)
     try:
         return conn.execute(sql, params).fetchall()
-    except Exception:
-        return []
+    except sqlite3.OperationalError as e:
+        # Benign FTS5 query-syntax errors return no rows; anything else
+        # (missing/corrupt table) must surface instead of silently degrading.
+        if "syntax error" in str(e).lower() or "malformed match" in str(e).lower():
+            logger.warning(
+                LogEntry(event="knowledge.search.fts_query_error", query=fts_q, error=str(e))
+            )
+            return []
+        logger.warning(
+            LogEntry(event="knowledge.search.fts_failed", errorType=type(e).__name__, error=str(e))
+        )
+        raise
 
 
 def search_fts(
@@ -103,8 +115,13 @@ def search_vec(
 
     try:
         rows = conn.execute(sql, params).fetchall()
-    except Exception:
-        return []
+    except Exception as e:
+        # A failing vec table (missing, corrupt, or dimension mismatch) must
+        # surface — swallowing it silently turns hybrid search into FTS-only.
+        logger.warning(
+            LogEntry(event="knowledge.search.vec_failed", errorType=type(e).__name__, error=str(e))
+        )
+        raise
 
     # Distance is 0..2 (L2) — invert so lower distance = higher score
     return [_row_to_result(r, 1.0 / (1.0 + r[7])) for r in rows]

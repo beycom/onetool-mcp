@@ -94,15 +94,24 @@ Each source SHALL honour per-source `delay_min` and `delay_max` settings to thro
 ---
 
 ### Requirement: Resume support
-The pipeline SHALL support resuming an interrupted crawl from a `.state.json` file in the output directory.
+The pipeline SHALL support resuming an interrupted crawl from a `.state.json` file in the output directory. When `resume` is enabled, the state file SHALL be consumed if present and created when absent, so a later resume can continue — for deep-crawl strategies (via crawl4ai's `state_file`) and the `seed_urls` strategy alike.
 
 #### Scenario: Resume skips already-crawled URLs
 - **GIVEN** a prior crawl was interrupted and `.state.json` exists in the output directory
 - **WHEN** `onetool kb scrape mysite --resume` is run
 - **THEN** URLs already present in `.state.json` SHALL be skipped and the crawl SHALL continue from saved state
 
+#### Scenario: State file created on first resume-enabled run
+- **WHEN** a crawl runs with `resume=True` and no `.state.json` exists yet
+- **THEN** the state file SHALL still be engaged (created during the run) rather than silently ignored
+
+#### Scenario: seed_urls strategy honours resume
+- **GIVEN** `crawl_strategy: seed_urls` and a prior resume-enabled run recorded completed URLs in `.state.json`
+- **WHEN** the scrape re-runs with `resume=True`
+- **THEN** seed URLs already recorded as done SHALL be skipped, and newly completed seeds SHALL be appended to `.state.json`
+
 #### Scenario: State file location tied to output dir
-- **WHEN** a crawl runs
+- **WHEN** a crawl runs with resume enabled
 - **THEN** `.state.json` SHALL be written to the output directory
 - **AND** resume SHALL only work if `--output` (or config `output_dir`) resolves to the same directory
 

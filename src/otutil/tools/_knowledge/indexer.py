@@ -275,6 +275,7 @@ def _store_embeddings_batch(
         return "sqlite-vec not installed — embeddings skipped (install with: uv add sqlite-vec)"
 
     from .embedding import (
+        _dimensions_param,
         _embed_batch_with_retry,
         _get_openai_client,
         _prepare_safe_batch,
@@ -284,6 +285,7 @@ def _store_embeddings_batch(
     if batch_size is None:
         batch_size = config.embedding_batch_size
     client = _get_openai_client()
+    dims = _dimensions_param(config.model, config)
     total = len(pending)
     errors: list[str] = []
     total_failed = 0
@@ -296,7 +298,7 @@ def _store_embeddings_batch(
         safe_batch = _prepare_safe_batch(contents, config, config.model)
 
         try:
-            vecs = _embed_batch_with_retry(client, config.model, safe_batch)
+            vecs = _embed_batch_with_retry(client, config.model, safe_batch, dimensions=dims)
             pairs: list[tuple[str, list[float]]] = list(zip(chunk_ids, vecs, strict=True))
         except Exception:
             # Batch failed — fall back to per-item embedding to isolate bad chunk(s).
@@ -306,7 +308,7 @@ def _store_embeddings_batch(
             consecutive_failures = 0
             for j, (cid, text) in enumerate(zip(chunk_ids, safe_batch, strict=True)):
                 try:
-                    single = _embed_batch_with_retry(client, config.model, [text], max_attempts=1)
+                    single = _embed_batch_with_retry(client, config.model, [text], max_attempts=1, dimensions=dims)
                     pairs.append((cid, single[0]))
                     consecutive_failures = 0
                 except Exception as item_err:

@@ -234,7 +234,15 @@ def _split_by_headings(body: str, base_topic: str, source_path_val: str, meta: d
     lines = body.split("\n")
     sections: list[tuple[str | None, int]] = []  # (heading_text, start_line_idx)
 
+    in_fence = False
     for i, line in enumerate(lines):
+        stripped = line.lstrip()
+        if stripped.startswith(("```", "~~~")):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            # `# comment` lines inside fenced code blocks are not headings
+            continue
         m = _HEADING_RE.match(line)
         if m:
             sections.append((m.group(2).strip(), i))

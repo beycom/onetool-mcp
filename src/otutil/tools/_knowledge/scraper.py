@@ -232,6 +232,53 @@ def _extract_markdown(page: object, include_images: bool) -> str:
     return out
 
 
+def _process_page(
+    page: Any,
+    page_url: str,
+    slug: str,
+    elapsed_s: float,
+    result: ScrapeResult,
+    output_dir: Path,
+    source_name: str,
+    *,
+    include_images: bool,
+    category: str | None,
+    tags: list[str],
+    flat_files: bool,
+    debug: bool,
+    on_page: Callable[[int, str], None] | None,
+) -> str:
+    """Classify one crawled page (failed/empty/ok), write output, and record it.
+
+    Shared by the seed-URL and deep-crawl loops. Returns the page status.
+    """
+    if not page.success:
+        result.failed += 1
+        status, content = "failed", ""
+        error = str(getattr(page, "error_message", "") or "")
+    else:
+        content = _extract_markdown(page, include_images)
+        if not content:
+            result.skipped += 1
+            status, error = "empty", ""
+        else:
+            _write_page(output_dir, page_url, content, source_name,
+                        page_metadata=dict(getattr(page, "metadata", None) or {}),
+                        category=category, tags=tags, flat_files=flat_files)
+            result.written += 1
+            status, error = "ok", ""
+    result.pages.append(PageRecord(
+        url=page_url, slug=slug, status=status,
+        content_len=len(content) if status == "ok" else 0,
+        elapsed_s=round(elapsed_s, 3), error=error,
+    ))
+    if debug:
+        _write_debug_artifacts(page, slug, output_dir)
+    if on_page:
+        on_page(result.written, page_url)
+    return status
+
+
 def _build_deep_filter_chain(url: str, url_prefix: str) -> object:
     """Build domain + URL-prefix + binary-exclusion filter chain for deep crawl strategies."""
     from crawl4ai.deep_crawling.filters import (  # type: ignore[import-untyped]
@@ -303,7 +350,9 @@ def run_scrape(
         score: Scorer config for best_first (e.g. {"keyword_relevance": ["term:1.0"]}).
         css_selector: CSS selector to restrict content extraction (e.g. "#mc-main-content").
         js_code: JavaScript to run on each page before extraction.
-        resume: Resume from .state.json if present.
+        resume: Resume from .state.json in output_dir. The state file is created
+            when absent so a later resume can continue; applies to deep-crawl
+            and seed_urls strategies alike.
         on_page: Callback(pages_written_so_far, current_url) called after each page attempt.
 
     Returns:
@@ -444,9 +493,21 @@ async def _run_scrape_async(
         if debug:
             seed_run_cfg_kwargs["screenshot"] = True
         seed_run_cfg = CrawlerRunConfig(**seed_run_cfg_kwargs)
+
+        # Seed-URL resume: track completed seeds in .state.json ourselves
+        # (the deep-crawl strategies persist state via crawl4ai instead).
+        seed_done: set[str] = set()
+        if resume and state_file.exists():
+            try:
+                seed_done = set(json.loads(state_file.read_text(encoding="utf-8")).get("done_urls", []))
+            except Exception:
+                seed_done = set()
+
         async with AsyncWebCrawler(config=browser_cfg) as crawler:
             first_url = True
             for seed_url in seed_urls:
+                if seed_url in seed_done:
+                    continue
                 if not first_url:
                     await asyncio.sleep(random.uniform(delay_min, delay_max))
                 first_url = False
@@ -468,44 +529,17 @@ async def _run_scrape_async(
                     if on_page:
                         on_page(result.written, page_url)
                     continue
-                if not page.success:
-                    result.failed += 1
-                    result.pages.append(PageRecord(
-                        url=page_url, slug=slug, status="failed",
-                        content_len=0, elapsed_s=round(asyncio.get_running_loop().time() - t_page_start, 3),
-                        error=str(getattr(page, "error_message", "") or ""),
-                    ))
-                    if debug:
-                        _write_debug_artifacts(page, slug, output_dir)
-                    if on_page:
-                        on_page(result.written, page_url)
-                    continue
-                content = _extract_markdown(page, include_images)
-                if not content:
-                    result.skipped += 1
-                    result.pages.append(PageRecord(
-                        url=page_url, slug=slug, status="empty",
-                        content_len=0, elapsed_s=round(asyncio.get_running_loop().time() - t_page_start, 3),
-                        error="",
-                    ))
-                    if debug:
-                        _write_debug_artifacts(page, slug, output_dir)
-                    if on_page:
-                        on_page(result.written, page_url)
-                    continue
-                _write_page(output_dir, page_url, content, source_name,
-                            page_metadata=dict(getattr(page, "metadata", None) or {}),
-                            category=category, tags=tags, flat_files=flat_files)
-                result.written += 1
-                result.pages.append(PageRecord(
-                    url=page_url, slug=slug, status="ok",
-                    content_len=len(content), elapsed_s=round(asyncio.get_running_loop().time() - t_page_start, 3),
-                    error="",
-                ))
-                if debug:
-                    _write_debug_artifacts(page, slug, output_dir)
-                if on_page:
-                    on_page(result.written, page_url)
+                status = _process_page(
+                    page, page_url, slug,
+                    asyncio.get_running_loop().time() - t_page_start,
+                    result, output_dir, source_name,
+                    include_images=include_images, category=category, tags=tags,
+                    flat_files=flat_files, debug=debug, on_page=on_page,
+                )
+                if status != "failed":
+                    seed_done.add(seed_url)
+                    if resume:
+                        _write_atomic(state_file, json.dumps({"done_urls": sorted(seed_done)}))
     else:
         from crawl4ai.deep_crawling import (  # type: ignore[import-untyped]
             BFSDeepCrawlStrategy,
@@ -559,62 +593,28 @@ async def _run_scrape_async(
         }
         if debug:
             run_cfg_kwargs["screenshot"] = True
-        if resume and state_file.exists():
+        if resume:
+            # Pass the state file even when it doesn't exist yet so crawl4ai
+            # creates it on the first run and consumes it on later resumes.
             run_cfg_kwargs["state_file"] = str(state_file)
 
         run_cfg = CrawlerRunConfig(**run_cfg_kwargs)
 
         async with AsyncWebCrawler(config=browser_cfg) as crawler:
+            t_page_start = asyncio.get_running_loop().time()
             async for page in (await crawler.arun(url, config=run_cfg)):
                 page_url = page.url
                 slug = url_to_slug(page_url)
-                t_page_start = asyncio.get_running_loop().time()
-
-                if not page.success:
-                    result.failed += 1
-                    elapsed = asyncio.get_running_loop().time() - t_page_start
-                    result.pages.append(PageRecord(
-                        url=page_url, slug=slug, status="failed",
-                        content_len=0, elapsed_s=round(elapsed, 3),
-                        error=str(getattr(page, "error_message", "") or ""),
-                    ))
-                    if debug:
-                        _write_debug_artifacts(page, slug, output_dir)
-                    if on_page:
-                        on_page(result.written, page_url)
-                    continue
-
-                content = _extract_markdown(page, include_images)
-                if not content:
-                    result.skipped += 1
-                    elapsed = asyncio.get_running_loop().time() - t_page_start
-                    result.pages.append(PageRecord(
-                        url=page_url, slug=slug, status="empty",
-                        content_len=0, elapsed_s=round(elapsed, 3),
-                        error="",
-                    ))
-                    if debug:
-                        _write_debug_artifacts(page, slug, output_dir)
-                    if on_page:
-                        on_page(result.written, page_url)
-                    continue
-
-                _write_page(output_dir, page_url, content, source_name,
-                            page_metadata=dict(getattr(page, "metadata", None) or {}),
-                            category=category, tags=tags, flat_files=flat_files)
-                elapsed = asyncio.get_running_loop().time() - t_page_start
-                result.written += 1
-                result.pages.append(PageRecord(
-                    url=page_url, slug=slug, status="ok",
-                    content_len=len(content), elapsed_s=round(elapsed, 3),
-                    error="",
-                ))
-                if debug:
-                    _write_debug_artifacts(page, slug, output_dir)
-                if on_page:
-                    on_page(result.written, page_url)
+                _process_page(
+                    page, page_url, slug,
+                    asyncio.get_running_loop().time() - t_page_start,
+                    result, output_dir, source_name,
+                    include_images=include_images, category=category, tags=tags,
+                    flat_files=flat_files, debug=debug, on_page=on_page,
+                )
                 if result.written >= max_pages:
                     break
+                t_page_start = asyncio.get_running_loop().time()
 
     result.elapsed_s = round(asyncio.get_running_loop().time() - t_start, 3)
     result.end_time = datetime.now(UTC).isoformat()

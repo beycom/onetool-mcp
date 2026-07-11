@@ -88,6 +88,10 @@ CREATE INDEX IF NOT EXISTS idx_chunks_topic ON chunks(topic);
 CREATE INDEX IF NOT EXISTS idx_chunks_content_hash ON chunks(content_hash);
 CREATE INDEX IF NOT EXISTS idx_chunks_category ON chunks(category);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_chunks_source ON chunks(source_path, anchor) WHERE source_path IS NOT NULL;
+-- Manual writes (kb.write) have no source_path; enforce topic uniqueness for
+-- them at the DB level so concurrent writers cannot race past the app check.
+-- Indexed chunks (source_path set) may legitimately share a topic.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_chunks_topic_manual ON chunks(topic) WHERE source_path IS NULL;
 
 CREATE TABLE IF NOT EXISTS edges (
     id          TEXT PRIMARY KEY,

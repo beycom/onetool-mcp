@@ -83,18 +83,22 @@ def reindex(
 
             pending = [(row[0], row[1]) for row in missing]
 
+            before = conn.execute("SELECT COUNT(*) FROM chunks_vec").fetchone()[0]
             embed_err = _store_embeddings_batch(conn, pending, on_progress=on_progress)
+            after = conn.execute("SELECT COUNT(*) FROM chunks_vec").fetchone()[0]
 
-            # Count how many embeddings are now present to report accurate numbers
-            stored = conn.execute("SELECT COUNT(*) FROM chunks_vec").fetchone()[0]
-            generated = stored
-            errors = len(missing) - generated if embed_err else 0
+            # Count only embeddings actually added by this run — pre-existing
+            # ones must not be reported as reindexed.
+            generated = after - before
+            errors = max(0, len(missing) - generated)
 
             s.add("generated", generated)
             s.add("errors", errors)
             result = f"Reindexed {generated} chunks"
             if errors:
                 result += f" ({errors} errors)"
+            if embed_err:
+                result += f"\n{embed_err}"
             return result
         except Exception as e:
             s.add("error", str(e))
