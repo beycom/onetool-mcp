@@ -92,9 +92,18 @@ def create_ext(
         ot_forge.create_ext(name="my_tool", function="search")
     """
     with LogSpan(span="ot_forge.create_ext", name=name) as s:
-        # Validate name
+        # Validate template inputs — all are substituted into generated source
         if not re.match(r"^[a-z][a-z0-9_]*$", name):
             return "Error: Name must be lowercase alphanumeric with underscores, starting with a letter"
+        if pack_name is not None and not re.match(r"^[a-z][a-z0-9_]*$", pack_name):
+            return "Error: pack_name must be lowercase alphanumeric with underscores, starting with a letter"
+        if not re.match(r"^[a-z][a-z0-9_]*$", function):
+            return "Error: function must be lowercase alphanumeric with underscores, starting with a letter"
+        if api_key and not re.match(r"^[A-Z][A-Z0-9_]*$", api_key):
+            return "Error: api_key must be an UPPER_SNAKE_CASE secret name"
+        for label, text in (("description", description), ("function_description", function_description)):
+            if '"""' in text or "'''" in text or "\n" in text or "\\" in text:
+                return f"Error: {label} must be a single line without quotes-triples or backslashes"
 
         # Get extension template
         templates_dir = _get_templates_dir()
@@ -233,7 +242,7 @@ def _check_best_practices(
     return checks, warnings
 
 
-def _get_exported_functions(tree: ast.Module) -> list[ast.FunctionDef]:
+def _get_exported_functions(tree: ast.Module) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
     """Get functions that are exported via __all__."""
     all_names: set[str] = set()
     for node in ast.walk(tree):
@@ -244,9 +253,9 @@ def _get_exported_functions(tree: ast.Module) -> list[ast.FunctionDef]:
                         if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
                             all_names.add(elt.value)
 
-    funcs: list[ast.FunctionDef] = []
+    funcs: list[ast.FunctionDef | ast.AsyncFunctionDef] = []
     for node in tree.body:
-        if isinstance(node, ast.FunctionDef) and node.name in all_names:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in all_names:
             funcs.append(node)
     return funcs
 
@@ -309,6 +318,32 @@ def validate_ext(*, path: str) -> str:
         )
         if not has_all:
             errors.append("Missing '__all__ = [...]' export list")
+
+        # Check: every __all__ name must be defined at module level
+        defined_names = {
+            n.name
+            for n in tree.body
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        } | {
+            t.id
+            for n in tree.body
+            if isinstance(n, ast.Assign)
+            for t in n.targets
+            if isinstance(t, ast.Name)
+        }
+        for node in tree.body:
+            if (
+                isinstance(node, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets)
+                and isinstance(node.value, (ast.List, ast.Tuple))
+            ):
+                    for elt in node.value.elts:
+                        if (
+                            isinstance(elt, ast.Constant)
+                            and isinstance(elt.value, str)
+                            and elt.value not in defined_names
+                        ):
+                            errors.append(f"__all__ lists '{elt.value}' but it is not defined in the module")
 
         # Check 4: Best practices
         checks, bp_warnings = _check_best_practices(content, tree)
