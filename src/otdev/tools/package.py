@@ -180,6 +180,18 @@ def _compare_versions(current: str | None, latest: str) -> str:
     if current_clean == latest_clean:
         return "current"
 
+    # Prefer real version semantics; fall back to naive parsing for
+    # non-PEP440 strings (e.g. some npm pre-release formats).
+    try:
+        from packaging.version import Version
+
+        cur, lat = Version(current_clean), Version(latest_clean)
+        if cur >= lat:
+            return "current"
+        return "major_update" if lat.major > cur.major else "update_available"
+    except Exception:
+        pass
+
     # Try to parse semver for major version comparison
     current_parts = current_clean.split(".")
     latest_parts = latest_clean.split(".")
@@ -278,12 +290,16 @@ def audit(
         deps: dict[str, str] = {}
         manifest_name = manifest_path.name
 
-        if manifest_name == "pyproject.toml":
-            deps = _parse_pyproject_toml(manifest_path)
-        elif manifest_name == "requirements.txt":
-            deps = _parse_requirements_txt(manifest_path)
-        elif manifest_name == "package.json":
-            deps = _parse_package_json(manifest_path)
+        try:
+            if manifest_name == "pyproject.toml":
+                deps = _parse_pyproject_toml(manifest_path)
+            elif manifest_name == "requirements.txt":
+                deps = _parse_requirements_txt(manifest_path)
+            elif manifest_name == "package.json":
+                deps = _parse_package_json(manifest_path)
+        except Exception as e:
+            span.add(error=f"manifest_parse_failed: {e}")
+            return {"error": f"Could not parse {manifest_name}: {e}"}
 
         if not deps:
             span.add(error="no_dependencies")
