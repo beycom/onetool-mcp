@@ -400,9 +400,9 @@ The `ctx.delete()` function SHALL remove a single handle and all associated data
 
 The `ctx.purge()` function SHALL bulk-delete handles matching age, source, or status criteria.
 
-#### Scenario: Default purge (older than 15 minutes)
+#### Scenario: Default purge (expired handles only)
 - **WHEN** `ctx.purge()` is called with no arguments
-- **THEN** it SHALL delete all handles created more than 15 minutes ago
+- **THEN** it SHALL delete only handles that have passed their TTL (`expires_at`), so routine cleanup never removes handles still within their advertised lifetime
 - **AND** return `{"deleted": N, "bytes_freed": N}` where `bytes_freed` is the sum of `size_bytes` of deleted handles
 
 #### Scenario: Purge by age
@@ -412,11 +412,11 @@ The `ctx.purge()` function SHALL bulk-delete handles matching age, source, or st
 
 #### Scenario: Purge by source pattern
 - **WHEN** `ctx.purge(source="webfetch")` is called
-- **THEN** it SHALL delete all handles whose source matches "webfetch" AND are older than 15 minutes (default)
+- **THEN** it SHALL delete all handles whose source matches "webfetch" AND are past their TTL (default age filter)
 
 #### Scenario: Purge by status
 - **WHEN** `ctx.purge(status="failed")` is called
-- **THEN** it SHALL delete all handles with `status="failed"` AND older than 15 minutes (default)
+- **THEN** it SHALL delete all handles with `status="failed"` AND past their TTL (default age filter)
 
 #### Scenario: Purge all (no filters)
 - **WHEN** `ctx.purge(delete_all=True)` is called with no source or status filters

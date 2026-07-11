@@ -7,7 +7,7 @@ from typing import Any
 from ot.logging import LogSpan
 
 from .config import _get_config
-from .store import HandleStore, _get_store, is_expired
+from .store import HandleStore, _get_store, _resolve_handle, is_expired
 
 
 def _parse_numbered_answers(result: str, n: int) -> list[str]:
@@ -58,6 +58,7 @@ def ctx_ask(
         ctx.ask("3539ec02", q=["What are common mistakes?", "What is asyncio.gather?"])
     """
     questions = [q] if isinstance(q, str) else list(q)
+    handle = _resolve_handle(handle)
 
     with LogSpan(span="ctx.ask", handle=handle, questionCount=len(questions)) as s:
         if store is None:

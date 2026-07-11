@@ -5,7 +5,7 @@ from typing import Any
 
 from ot.logging import LogSpan
 
-from .store import HandleStore, _get_store, _resolve_handle, now_ts
+from .store import HandleStore, _get_store, _resolve_handle, is_expired, now_ts
 
 log = LogSpan
 
@@ -40,23 +40,25 @@ def ctx_delete(
 def ctx_purge(
     *,
     delete_all: bool = False,
-    minutes: int = 15,
+    minutes: int | None = None,
     source: str = "",
     status: str = "",
     store: HandleStore | None = None,
 ) -> dict[str, Any]:
     """Delete handles matching the given filters.
 
-    With no filters: deletes handles older than ``minutes`` (default 15).
+    With no filters: deletes only handles that have passed their TTL, so a
+    routine cleanup never removes handles a caller may still hold.
+    With ``minutes``: deletes handles older than that many minutes regardless
+    of TTL.
     With ``delete_all=True``: ignores the age filter — deletes every handle
     that matches the ``source``/``status`` filters (or all handles when no
     filters are given).
-    With ``source``/``status``: bulk-deletes matching handles older than
-    ``minutes``.
 
     Args:
         delete_all: If True, bypass the age filter. Source/status filters still apply.
         minutes: Delete handles older than this many minutes. Must be positive.
+            Defaults to deleting only expired handles.
             Ignored when ``delete_all=True``.
         source: Source substring filter (case-insensitive).
         status: Status filter ("ready", "failed").
@@ -69,15 +71,15 @@ def ctx_purge(
         ValueError: If ``minutes`` is zero or negative.
 
     Examples:
-        ctx.purge()                                 # delete handles older than 15 min
+        ctx.purge()                                 # delete expired handles (past TTL)
         ctx.purge(delete_all=True)                  # wipe everything
         ctx.purge(minutes=60)                       # delete handles older than 1 hour
-        ctx.purge(source="brave")                   # delete brave handles older than 15 min
+        ctx.purge(source="brave")                   # delete expired brave handles
         ctx.purge(delete_all=True, source="brave")  # delete ALL brave handles regardless of age
-        ctx.purge(status="failed")                  # delete failed handles older than 15 min
+        ctx.purge(status="failed")                  # delete expired failed handles
         ctx.purge(delete_all=True, status="failed") # delete ALL failed handles regardless of age
     """
-    if not delete_all and minutes <= 0:
+    if not delete_all and minutes is not None and minutes <= 0:
         raise ValueError("minutes must be a positive integer")
 
     with log(
@@ -90,11 +92,13 @@ def ctx_purge(
         if store is None:
             store = _get_store()
 
-        cutoff_ts = None if delete_all else (now_ts() - minutes * 60)
+        cutoff_ts = None if (delete_all or minutes is None) else (now_ts() - minutes * 60)
         all_meta = store.list_handles()
 
         to_delete: list[dict[str, Any]] = []
         for meta in all_meta:
+            if not delete_all and minutes is None and not is_expired(meta):
+                continue
             if cutoff_ts is not None and meta.get("created_at", 0) > cutoff_ts:
                 continue
             if source and source.lower() not in (meta.get("source") or "").lower():

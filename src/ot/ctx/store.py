@@ -92,10 +92,16 @@ class HandleStore:
     def exists(self, handle: str) -> bool:
         return self.meta_path(handle).exists() and self.content_path(handle).exists()
 
+    @staticmethod
+    def _write_atomic(path: Path, text: str) -> None:
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_text(text, encoding="utf-8")
+        tmp.replace(path)
+
     def write(self, handle: str, content: str, meta: dict[str, Any]) -> None:
-        """Write content file then metadata file atomically (content-first)."""
-        self.content_path(handle).write_text(content, encoding="utf-8")
-        self.meta_path(handle).write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        """Write content file then metadata file, each via tmp+rename (content-first)."""
+        self._write_atomic(self.content_path(handle), content)
+        self._write_atomic(self.meta_path(handle), json.dumps(meta, indent=2))
 
     def read_content(self, handle: str) -> str:
         return self.content_path(handle).read_text(encoding="utf-8")
@@ -105,8 +111,8 @@ class HandleStore:
         return result
 
     def update_meta(self, handle: str, meta: dict[str, Any]) -> None:
-        """Overwrite the metadata file."""
-        self.meta_path(handle).write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        """Overwrite the metadata file via tmp+rename."""
+        self._write_atomic(self.meta_path(handle), json.dumps(meta, indent=2))
 
     def list_handles(self) -> list[dict[str, Any]]:
         """Return metadata dicts for all handles that have both files.
