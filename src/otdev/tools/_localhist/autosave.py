@@ -148,6 +148,9 @@ def autosave_start_project(*, path: str | None = None) -> dict[str, object]:
             ],
             cwd=str(paths.project_root),
             env={**os.environ, "OT_CWD": str(paths.project_root)},
+            # Watcher output is discarded by design; failures surface through
+            # recent_errors in the state file. A log file in state_dir was
+            # considered and skipped as low value.
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

@@ -215,7 +215,9 @@ Instructions:
         s.add(model=used_model, jsonMode=json_mode)
 
         try:
-            # Build API call kwargs
+            # Deliberately minimal call surface: no retry/backoff, no input
+            # size guard, no per-call temperature/max_tokens overrides. Retry
+            # and a size guard are worthwhile — add on demand.
             api_kwargs: dict[str, Any] = {
                 "model": used_model,
                 "messages": [

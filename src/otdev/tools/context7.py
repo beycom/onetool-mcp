@@ -471,7 +471,9 @@ def doc(
             note = f"[Resolved '{library_id}' → '{resolved_id}']\n\n"
 
         # Fetch context
-        # query is validated non-empty above
+        # query is validated non-empty above. type is fixed to "txt"; a
+        # token-budget param and a cache-bypass flag were considered and
+        # skipped as low value — add on demand.
         params: dict[str, str | int] = {"libraryId": resolved_id, "type": "txt", "query": query}
 
         success, data = _make_request(CONTEXT7_CONTEXT_URL, params=params)

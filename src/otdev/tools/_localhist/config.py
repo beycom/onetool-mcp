@@ -61,7 +61,12 @@ def load_config() -> Config:
 
 @contextmanager
 def project_context(project_root: Path) -> Iterator[None]:
-    """Temporarily resolve project paths against a specific project root."""
+    """Temporarily resolve project paths against a specific project root.
+
+    Known limitation (accepted): mutating OT_CWD is process-global, so
+    concurrent calls targeting different projects would race. Refactor to an
+    explicit parameter only if serve gains concurrent multi-project calls.
+    """
 
     previous = os.environ.get("OT_CWD")
     os.environ["OT_CWD"] = str(project_root)

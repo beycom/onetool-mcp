@@ -5,6 +5,12 @@ No API keys required.
 
 Based on mcp-package-version by Sam McLeod (MIT License).
 https://github.com/sammcj/mcp-package-version
+
+Known gaps (accepted as low value, 2026-07-11 review — pick up on demand):
+mixed error conventions across tools (migrate to structured dicts per
+dev/practices/error-conventions.md when reworked); requirements parsing
+silently skips unparseable lines; the OpenRouter catalogue is fetched
+uncached; audit() compares manifest constraints, not lockfile versions.
 """
 
 from __future__ import annotations

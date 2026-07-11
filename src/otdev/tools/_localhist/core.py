@@ -815,7 +815,11 @@ def restore_paths(
     paths: list[str],
     dry_run: bool,
 ) -> dict[str, object]:
-    """Restore selected paths from a snapshot."""
+    """Restore selected paths from a snapshot.
+
+    Whole-snapshot restore (every path at a ref, no explicit list) is a known
+    gap — add on demand.
+    """
 
     try:
         if not paths:

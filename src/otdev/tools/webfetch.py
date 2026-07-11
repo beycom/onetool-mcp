@@ -44,7 +44,12 @@ def _require_trafilatura() -> None:
 
 
 class Config(BaseModel):
-    """Pack configuration - discovered by registry."""
+    """Pack configuration - discovered by registry.
+
+    Deliberately minimal: no retry, custom UA/headers, or pre-download size
+    cap (max_length bounds only the extracted output). A download cap is
+    worthwhile — add on demand.
+    """
 
     timeout: float = Field(
         default=30.0,

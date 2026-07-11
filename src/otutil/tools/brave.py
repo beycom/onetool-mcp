@@ -188,7 +188,11 @@ def _format_news_results(
     output_format: OutputFormat = "full",
     max_sources: int | None = None,
 ) -> str:
-    """Format news search results for display."""
+    """Format news search results for display.
+
+    Known gap (accepted, low value): the full format for news/image/video has
+    no sources section, so max_sources only affects sources_only output here.
+    """
     results = data.get("results", [])
 
     if not results:
