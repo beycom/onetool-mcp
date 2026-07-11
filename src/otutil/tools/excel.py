@@ -161,6 +161,7 @@ def create(
         excel.create(filepath="data.xlsx", sheet_names=["Sales", "Config", "Summary"])
     """
     with LogSpan(span="excel.create", filepath=filepath, sheet=sheet_name) as s:
+        wb = None
         try:
             _ensure_parent_dir(filepath)
             wb = Workbook()
@@ -178,6 +179,9 @@ def create(
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
+        finally:
+            if wb is not None:
+                wb.close()
 
 
 def add_sheet(*, filepath: str, sheet_name: str) -> str:
@@ -194,6 +198,7 @@ def add_sheet(*, filepath: str, sheet_name: str) -> str:
         excel.add_sheet(filepath="report.xlsx", sheet_name="Summary")
     """
     with LogSpan(span="excel.add_sheet", filepath=filepath, sheet=sheet_name) as s:
+        wb = None
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -211,6 +216,9 @@ def add_sheet(*, filepath: str, sheet_name: str) -> str:
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
+        finally:
+            if wb is not None:
+                wb.close()
 
 
 def read(
@@ -236,6 +244,7 @@ def read(
         excel.read(filepath="data.xlsx", sheet_name="Sales", start_cell="B2", end_cell="D10")
     """
     with LogSpan(span="excel.read", filepath=filepath, sheet=sheet_name) as s:
+        wb = None
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -285,6 +294,9 @@ def read(
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
+        finally:
+            if wb is not None:
+                wb.close()
 
 
 def write(
@@ -313,6 +325,7 @@ def write(
         excel.write(filepath="new.xlsx", data=[["Test"]], create_if_missing=True)
     """
     with LogSpan(span="excel.write", filepath=filepath, sheet=sheet_name, rows=len(data)) as s:
+        wb = None
         try:
             path = _expand_path(filepath)
             if not path.exists():
@@ -356,6 +369,9 @@ def write(
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
+        finally:
+            if wb is not None:
+                wb.close()
 
 
 def info(*, filepath: str, include_ranges: bool = False) -> dict[str, Any] | str:
@@ -432,6 +448,7 @@ def formula(
         excel.formula(filepath="data.xlsx", cell="A1", formula="=TODAY()", sheet_name="Summary")
     """
     with LogSpan(span="excel.formula", filepath=filepath, cell=cell) as s:
+        wb = None
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -454,6 +471,9 @@ def formula(
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
+        finally:
+            if wb is not None:
+                wb.close()
 
 
 # =============================================================================
@@ -565,6 +585,7 @@ def search(
         excel.search(filepath="data.xlsx", pattern="Total", first_only=True)
     """
     with LogSpan(span="excel.search", filepath=filepath, pattern=pattern) as s:
+        wb = None
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -600,12 +621,14 @@ def search(
                             s.add(resultCount=1)
                             return [matches[0]]
 
-            wb.close()
             s.add(resultCount=len(matches))
             return matches
         except Exception as e:
             s.add(error=str(e))
             return f"Error: {e}"
+        finally:
+            if wb is not None:
+                wb.close()
 
 
 # =============================================================================
