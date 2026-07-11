@@ -358,10 +358,10 @@ def search(*, query: str, library_name: str, output_format: str = "str") -> str 
         context7.search(query="fastapi", library_name="fastapi", output_format="dict")
     """
     if not query or not query.strip():
-        return "query is required — used for LLM relevance ranking of search results."
+        return "Error: query is required — used for LLM relevance ranking of search results."
 
     if output_format not in ("str", "dict"):
-        return f"Invalid output_format '{output_format}'. Valid options: 'str', 'dict'."
+        return f"Error: Invalid output_format '{output_format}'. Valid options: 'str', 'dict'."
 
     with LogSpan(
         span="context7.search",
@@ -450,7 +450,7 @@ def doc(
         context7.doc(library_id="react", query="How do hooks work?")
     """
     if not query or not query.strip():
-        return "query is required — the Context7 API does not accept empty queries."
+        return "Error: query is required — the Context7 API does not accept empty queries."
 
     with LogSpan(span="context7.doc", libraryId=library_id, query=query) as s:
         # Normalize and resolve library ID (searches if needed)
@@ -471,16 +471,15 @@ def doc(
             note = f"[Resolved '{library_id}' → '{resolved_id}']\n\n"
 
         # Fetch context
-        params: dict[str, str | int] = {"libraryId": resolved_id, "type": "txt"}
-        if query:
-            params["query"] = query
+        # query is validated non-empty above
+        params: dict[str, str | int] = {"libraryId": resolved_id, "type": "txt", "query": query}
 
         success, data = _make_request(CONTEXT7_CONTEXT_URL, params=params)
         s.add(success=success)
 
         if not success:
             error_str = str(data)
-            if "404" in error_str:
+            if re.search(r"\b404\b", error_str):
                 return (
                     f"Library '{resolved_id}' was not found in Context7. "
                     f'Use context7.search(query="...", library_name="...") '
