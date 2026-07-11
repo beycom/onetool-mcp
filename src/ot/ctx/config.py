@@ -28,4 +28,4 @@ class Config(BaseModel):
 
 def _get_config() -> Config:
     """Get ctx pack configuration."""
-    return get_tool_config("ctx", Config)
+    return get_tool_config("ot_context", Config)
