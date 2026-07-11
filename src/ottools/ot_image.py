@@ -22,6 +22,12 @@ from __future__ import annotations
 pack = "ot_image"
 pack_aliases = ("img",)
 
+__ot_requires__ = {
+    "lib": [
+        ("PIL", "pip install Pillow"),
+    ],
+}
+
 __all__ = ["ask", "clip_ask", "clip_view", "delete", "list", "load", "load_batch", "purge", "summary"]
 
 from ottools._image.lifecycle import delete_image as delete

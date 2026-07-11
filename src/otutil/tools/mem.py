@@ -10,6 +10,13 @@ from __future__ import annotations
 # Pack for dot notation: mem.write(), mem.search(), etc.
 pack = "mem"
 
+__ot_requires__ = {
+    "lib": [
+        ("yaml", "pip install pyyaml"),
+        ("jmespath", "pip install jmespath"),
+    ],
+}
+
 # Only public functions are exposed as MCP tools.
 __all__ = [
     "append",

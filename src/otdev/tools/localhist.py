@@ -22,7 +22,9 @@ __all__ = [
     "status",
 ]
 
-__ot_requires__: dict[str, list[tuple[str, str]]] = {}
+__ot_requires__: dict[str, list[tuple[str, str]]] = {
+    "cli": [("git", "brew install git")],
+}
 
 from otdev.tools._localhist.autosave import (
     autosave_list_project,

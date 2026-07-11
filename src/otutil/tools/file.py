@@ -24,6 +24,13 @@ from typing import List  # noqa: UP035
 pack = "file"
 pack_aliases = ("f",)
 
+__ot_requires__ = {
+    "lib": [
+        ("pathspec", "pip install pathspec"),
+        ("send2trash", "pip install send2trash"),
+    ],
+}
+
 __all__ = [
     "copy",
     "delete",

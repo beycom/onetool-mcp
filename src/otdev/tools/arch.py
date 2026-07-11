@@ -4,6 +4,10 @@ from __future__ import annotations
 
 pack = "arch"
 
+__ot_requires__ = {
+    "cli": [("d2", "brew install d2")],
+}
+
 __all__ = ["bundle_solution", "export_yaml", "generate", "import_yaml", "validate"]
 
 import re
