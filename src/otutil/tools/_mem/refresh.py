@@ -2,26 +2,14 @@
 from __future__ import annotations
 
 import builtins
-import uuid
 from pathlib import Path
 
 from otpack import LogSpan
 
-from .content import (
-    _check_staleness,
-    _content_hash,
-    _encode_sections,
-    _parse_headings,
-    _redact,
-    _topic_filter,
-)
-from .db import (
-    _deserialize_meta,
-    _serialize_embedding,
-    _serialize_meta,
-    _use_connection,
-)
-from .embedding import _maybe_embed
+from .content import _check_staleness, _redact, _topic_filter
+from .db import _deserialize_meta, _use_connection
+from .embedding import _embed_now, _enqueue_after_commit
+from .mutations import _apply_memory_update
 
 _builtins_list = builtins.list
 
@@ -109,42 +97,24 @@ def refresh(
                             continue
 
                         new_content = _redact(new_content)
-                        new_hash = _content_hash(new_content)
-                        new_mtime = str(p.stat().st_mtime)
 
-                        # Save history
-                        history_id = str(uuid.uuid4())
+                        # Update source_mtime
+                        meta["source_mtime"] = str(p.stat().st_mtime)
+
+                        # Embedding API call happens outside the DB lock
+                        embedding = _embed_now(new_content)
+
                         with _use_connection() as conn:
-                            conn.execute(
-                                "INSERT INTO memory_history (id, memory_id, content) VALUES (?, ?, ?)",
-                                [history_id, mem_id, old_content],
-                            )
-
-                            # Recompute TOC if sections existed
-                            if "sections" in meta:
-                                headings = _parse_headings(new_content)
-                                if headings:
-                                    meta["sections"] = _encode_sections(headings)
-                                    meta["section_count"] = str(len(headings))
-                                else:
-                                    del meta["sections"]
-                                    meta.pop("section_count", None)
-
-                            # Update source_mtime
-                            meta["source_mtime"] = new_mtime
-
-                            embedding = _maybe_embed(mem_id, new_content)
-
-                            conn.execute(
-                                """
-                                UPDATE memories
-                                SET content = ?, content_hash = ?, embedding = ?, meta = ?, updated_at = datetime('now')
-                                WHERE id = ?
-                                """,
-                                [new_content, new_hash, _serialize_embedding(embedding),
-                                 _serialize_meta(meta), mem_id],
+                            _apply_memory_update(
+                                conn,
+                                memory_id=mem_id,
+                                old_content=old_content,
+                                new_content=new_content,
+                                meta=meta,
+                                embedding=embedding,
                             )
                             conn.commit()
+                        _enqueue_after_commit(mem_id)
 
                         parts.append(f"    - {mem_topic} ({len(old_content)} -> {len(new_content)} chars)")
 

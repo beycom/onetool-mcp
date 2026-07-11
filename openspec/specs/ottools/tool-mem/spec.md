@@ -70,6 +70,12 @@ The `mem.read()` function SHALL retrieve memories by topic or ID.
 - **THEN** it SHALL return the content (metadata included only when `meta=True`)
 - **AND** increment the access count
 
+#### Scenario: Read topic matching rules
+- **GIVEN** a topic argument
+- **WHEN** `mem.read(topic=...)` is called
+- **THEN** a plain topic SHALL match exactly, a trailing `/` SHALL match the topic and everything under it, and `*` SHALL act as a wildcard
+- **AND** when multiple memories match, the most recently created one SHALL be returned
+
 #### Scenario: Read by ID
 - **GIVEN** a memory ID
 - **WHEN** `mem.read(id="abc-123")` is called
@@ -276,8 +282,13 @@ The `mem.update()`, `mem.append()`, and `mem.delete()` functions SHALL manage ex
 #### Scenario: Update single memory
 - **GIVEN** a topic matching exactly one memory
 - **WHEN** `mem.update(topic="projects/rules", content="new text")` is called
-- **THEN** it SHALL update the content and re-generate the embedding
+- **THEN** it SHALL update the content and re-generate the embedding (when embeddings are enabled)
 - **AND** it SHALL store the old content in memory_history
+
+#### Scenario: Update preserves embedding when embeddings disabled
+- **GIVEN** `embeddings_enabled: false` and a memory with a stored embedding
+- **WHEN** `mem.update()`, `mem.append()`, `mem.update_batch()`, or `mem.refresh()` modifies the memory
+- **THEN** the stored embedding SHALL be preserved (not overwritten with NULL)
 
 #### Scenario: Update rejects multiple matches
 - **GIVEN** a topic matching multiple memories
@@ -371,8 +382,9 @@ The `mem.dump()` function SHALL output YAML. The `mem.load()` function SHALL imp
 
 #### Scenario: Dump to YAML
 - **WHEN** `mem.dump()` is called
-- **THEN** it SHALL output all memories in YAML format
+- **THEN** it SHALL output all memories in YAML format (emitted with a YAML library, not string templating)
 - **AND** it SHALL include the `meta` column in the YAML output
+- **AND** quotes and special characters in topics, tags, and content SHALL round-trip losslessly through `mem.load()`
 
 #### Scenario: Dump to file
 - **WHEN** `mem.dump(output="memories.yaml")` is called
@@ -382,6 +394,11 @@ The `mem.dump()` function SHALL output YAML. The `mem.load()` function SHALL imp
 - **WHEN** `mem.load(file="backup.yaml")` is called
 - **THEN** it SHALL import memories, skipping duplicates
 - **AND** it SHALL restore the `meta` column from the YAML if present
+
+#### Scenario: Import applies write invariants
+- **WHEN** `mem.load()` imports entries
+- **THEN** content SHALL be redacted with the same rules as `mem.write()`
+- **AND** category and tags SHALL be validated; invalid entries are reported and skipped without aborting the import
 
 ### Requirement: Snapshot and Restore
 
@@ -427,6 +444,18 @@ The `mem.snapshot()` and `mem.restore()` functions SHALL provide lossless file-b
 #### Scenario: Restore with overwrite
 - **WHEN** `mem.restore(input="backup/consult", overwrite=True)` is called
 - **THEN** it SHALL replace existing memories with same topic and content hash
+- **AND** it SHALL delete the replaced memory's `memory_history` rows (no orphans)
+
+#### Scenario: Path confinement
+- **GIVEN** a topic or index `file` entry containing `..`, an absolute path, or other traversal
+- **WHEN** `mem.snapshot()` writes content files or `mem.restore()` reads them
+- **THEN** the entry SHALL be rejected and reported as an error
+- **AND** every final resolved path SHALL be validated against `allowed_file_dirs` and `exclude_file_patterns`
+
+#### Scenario: Restore applies write invariants
+- **WHEN** `mem.restore()` recreates memories
+- **THEN** content SHALL be redacted with the same rules as `mem.write()`
+- **AND** category and tags SHALL be validated; invalid entries are reported and skipped without aborting the restore
 
 #### Scenario: Restore topic override
 - **WHEN** `mem.restore(input="backup/consult", topic="new-base")` is called
@@ -512,6 +541,17 @@ Embeddings SHALL be opt-in, disabled by default. The mem pack SHALL load and fun
 - **THEN** it SHALL return immediately with NULL embedding
 - **AND** a background worker SHALL generate the embedding and update the row
 
+#### Scenario: Embedding calls do not hold the DB lock
+- **GIVEN** any operation that generates an embedding (write, update, append, batch update, refresh, import, restore, reindex, or the background worker)
+- **WHEN** the OpenAI embedding call is made
+- **THEN** the global SQLite connection lock SHALL NOT be held during the API round-trip
+- **AND** the background worker's write-back SHALL be guarded on unchanged content so a concurrent update is never overwritten with a stale vector
+
+#### Scenario: Embedding dimension mismatch
+- **GIVEN** stored embeddings whose dimensions differ from the query embedding
+- **WHEN** cosine similarity is computed during semantic search
+- **THEN** it SHALL raise a clear error naming both dimensions and pointing to `mem.reindex(dry_run=False)` (never silently truncate)
+
 #### Scenario: Semantic search when disabled
 - **GIVEN** `embeddings_enabled: false`
 - **WHEN** `mem.search(mode="semantic")` or `mem.search(mode="hybrid")` is called
@@ -533,6 +573,8 @@ The `mem.embed()` function SHALL generate embeddings for memories that don't hav
 #### Scenario: Generate embeddings
 - **WHEN** `mem.embed(dry_run=False)` is called
 - **THEN** it SHALL generate embeddings for all un-embedded memories
+- **AND** it SHALL commit per memory so a mid-run failure does not lose earlier progress
+- **AND** on partial failure it SHALL report the generated and failed counts with the first error
 
 #### Scenario: Topic-scoped backfill
 - **WHEN** `mem.embed(topic="project/", dry_run=False)` is called
@@ -545,7 +587,7 @@ The `mem.embed()` function SHALL generate embeddings for memories that don't hav
 
 ### Requirement: Flush
 
-The `mem.flush()` function SHALL wait for all pending background embeddings to complete.
+The `mem.flush()` function SHALL wait for pending background embeddings to complete, bounded by a timeout.
 
 #### Scenario: Flush queue
 - **GIVEN** background embeddings are in progress
@@ -556,6 +598,16 @@ The `mem.flush()` function SHALL wait for all pending background embeddings to c
 - **GIVEN** no background worker is running
 - **WHEN** `mem.flush()` is called
 - **THEN** it SHALL return immediately
+
+#### Scenario: Timeout
+- **GIVEN** the queue does not drain within `timeout` seconds (default: 60)
+- **WHEN** `mem.flush(timeout=...)` is called
+- **THEN** it SHALL return an error reporting the timeout and pending job count instead of hanging
+
+#### Scenario: Dead worker detected
+- **GIVEN** the background worker thread has died while jobs are pending
+- **WHEN** `mem.flush()` is called
+- **THEN** it SHALL return an error indicating the worker is not running instead of waiting forever
 
 ### Requirement: Staleness Check
 

@@ -1,14 +1,19 @@
 """Memory dump and load (YAML I/O)."""
 from __future__ import annotations
 
-import json
 import uuid
 from typing import Any
 
 from otpack import LogSpan
 
 from .config import _validate_file_path
-from .content import _content_hash, _topic_filter
+from .content import (
+    _content_hash,
+    _redact,
+    _topic_filter,
+    _validate_category,
+    _validate_tags,
+)
 from .db import (
     _deserialize_meta,
     _deserialize_tags,
@@ -18,7 +23,7 @@ from .db import (
     _serialize_tags,
     _use_connection,
 )
-from .embedding import _maybe_embed
+from .embedding import _embed_now, _enqueue_after_commit
 
 
 def dump(
@@ -83,30 +88,50 @@ def dump(
 
 
 def _export_yaml(rows: list[tuple[Any, ...]]) -> str:
-    """Export memories to YAML format."""
-    lines = ["memories:"]
-    for r in rows:
-        tags_str = "[" + ", ".join(f'"{t}"' for t in _deserialize_tags(r[4])) + "]"
-        # Use block scalar |- for content to safely handle newlines and special chars
-        content_lines = r[2].split("\n")
-        indented_content = "\n".join(f"      {line}" for line in content_lines)
-        meta_dict = _deserialize_meta(r[9])
-        meta_json = json.dumps(meta_dict) if meta_dict else "{}"
-        lines.extend([
-            f"  - id: \"{r[0]}\"",
-            f"    topic: \"{r[1]}\"",
-            "    content: |-",
-            indented_content,
-            f"    category: \"{r[3]}\"",
-            f"    tags: {tags_str}",
-            f"    relevance: {r[5]}",
-            f"    access_count: {r[6]}",
-            f"    created_at: \"{r[7]}\"",
-            f"    updated_at: \"{r[8]}\"",
-            f"    meta: '{meta_json}'",
-            "",
-        ])
-    return "\n".join(lines)
+    """Export memories to YAML via yaml.safe_dump (round-trips with load()).
+
+    Multiline content is emitted as a literal block scalar for readability;
+    everything else uses standard YAML quoting so quotes and special
+    characters survive the dump/load round-trip.
+    """
+    try:
+        import yaml
+    except ImportError as e:
+        raise ImportError(
+            "pyyaml is required for YAML dump. Install with: pip install pyyaml"
+        ) from e
+
+    class _Dumper(yaml.SafeDumper):
+        pass
+
+    def _repr_str(dumper: Any, data: str) -> Any:
+        style = "|" if "\n" in data else None
+        return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=style)
+
+    _Dumper.add_representer(str, _repr_str)
+
+    memories = [
+        {
+            "id": r[0],
+            "topic": r[1],
+            "content": r[2],
+            "category": r[3],
+            "tags": _deserialize_tags(r[4]),
+            "relevance": r[5],
+            "access_count": r[6],
+            "created_at": r[7],
+            "updated_at": r[8],
+            "meta": _deserialize_meta(r[9]),
+        }
+        for r in rows
+    ]
+    return yaml.dump(
+        {"memories": memories},
+        Dumper=_Dumper,
+        default_flow_style=False,
+        allow_unicode=True,
+        sort_keys=False,
+    )
 
 
 def load(
@@ -115,7 +140,10 @@ def load(
 ) -> str:
     """Import memories from a YAML file. Skips duplicates by content hash.
 
-    Does not generate embeddings. Use mem.reindex() after import if needed.
+    Applies the same invariants as mem.write(): content is redacted and
+    category/tags are validated (invalid entries are reported and skipped).
+    Embeddings follow the embeddings config (sync or background); use
+    mem.reindex() to backfill if embeddings were disabled during import.
 
     Args:
         file: Path to YAML file to import
@@ -145,9 +173,10 @@ def load(
                 return "Error: Invalid YAML format - expected 'memories' key"
 
             memories = data["memories"]
-            imported = 0
             skipped = 0
             malformed = 0
+            errors: list[str] = []
+            pending: list[tuple[str, str, str, str, str, list[str], int, str]] = []
 
             with _use_connection() as conn:
                 for mem_data in memories:
@@ -157,6 +186,18 @@ def load(
                         malformed += 1
                         continue
 
+                    category = mem_data.get("category", "note")
+                    mem_tags = mem_data.get("tags", [])
+                    try:
+                        # Apply the same invariants as mem.write()
+                        _validate_category(category)
+                        mem_tags = _validate_tags(mem_tags)
+                    except ValueError as e:
+                        malformed += 1
+                        errors.append(f"{topic}: {e}")
+                        continue
+
+                    content = _redact(content)
                     content_hash = _content_hash(content)
 
                     # Check for existing
@@ -170,8 +211,6 @@ def load(
                         continue
 
                     memory_id = mem_data.get("id", str(uuid.uuid4()))
-                    category = mem_data.get("category", "note")
-                    mem_tags = mem_data.get("tags", [])
                     relevance = max(1, min(10, int(mem_data.get("relevance", 5))))
 
                     # Restore meta if present
@@ -184,8 +223,15 @@ def load(
                     else:
                         meta_str = "{}"
 
-                    embedding = _maybe_embed(memory_id, content)
+                    pending.append((memory_id, topic, content, content_hash,
+                                    category, mem_tags, relevance, meta_str))
 
+            # Embedding API calls happen outside the DB lock
+            with_embeddings = [(entry, _embed_now(entry[2])) for entry in pending]
+
+            with _use_connection() as conn:
+                for entry, embedding in with_embeddings:
+                    memory_id, topic, content, content_hash, category, mem_tags, relevance, meta_str = entry
                     conn.execute(
                         """
                         INSERT INTO memories (id, topic, content, content_hash, category, tags, relevance, embedding, meta)
@@ -194,15 +240,19 @@ def load(
                         [memory_id, topic, content, content_hash, category,
                          _serialize_tags(mem_tags), relevance, _serialize_embedding(embedding), meta_str],
                     )
-                    imported += 1
-
                 conn.commit()
+            for entry, _embedding in with_embeddings:
+                _enqueue_after_commit(entry[0])
+
+            imported = len(with_embeddings)
             s.add("imported", imported)
             s.add("skipped", skipped)
             s.add("malformed", malformed)
             msg = f"Imported {imported} memories, skipped {skipped} duplicates"
             if malformed:
-                msg += f", {malformed} malformed (missing topic or content)"
+                msg += f", {malformed} malformed (missing topic/content or invalid category/tags)"
+            for err in errors[:5]:
+                msg += f"\n  - {err}"
             return msg
 
         except ImportError as e:

@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from otpack import LogSpan
 
+from .config import _get_config
 from .content import (
     _content_hash,
     _encode_sections,
@@ -19,7 +20,65 @@ from .db import (
     _serialize_meta,
     _use_connection,
 )
-from .embedding import _maybe_embed
+from .embedding import _embed_now, _enqueue_after_commit
+
+if TYPE_CHECKING:
+    import sqlite3
+
+
+def _apply_memory_update(
+    conn: sqlite3.Connection,
+    *,
+    memory_id: str,
+    old_content: str,
+    new_content: str,
+    meta: dict[str, str],
+    embedding: list[float] | None,
+) -> None:
+    """Save history, recompute TOC sections, and update a memory row.
+
+    Shared by update(), append(), update_batch(), and refresh(). Must be
+    called with the connection lock held; compute `embedding` beforehand via
+    _embed_now() so the OpenAI round-trip happens outside the lock. When
+    embeddings are disabled the stored embedding is preserved instead of
+    being overwritten with NULL.
+    """
+    conn.execute(
+        "INSERT INTO memory_history (id, memory_id, content) VALUES (?, ?, ?)",
+        [str(uuid.uuid4()), memory_id, old_content],
+    )
+
+    # Recompute toc if the memory already has sections
+    if "sections" in meta:
+        headings = _parse_headings(new_content)
+        if headings:
+            meta["sections"] = _encode_sections(headings)
+            meta["section_count"] = str(len(headings))
+        else:
+            del meta["sections"]
+            meta.pop("section_count", None)
+
+    new_hash = _content_hash(new_content)
+    if _get_config().embeddings_enabled:
+        conn.execute(
+            """
+            UPDATE memories
+            SET content = ?, content_hash = ?, embedding = ?, meta = ?, updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            [new_content, new_hash, _serialize_embedding(embedding),
+             _serialize_meta(meta), memory_id],
+        )
+    else:
+        # Preserve any stored embedding when embeddings are disabled
+        conn.execute(
+            """
+            UPDATE memories
+            SET content = ?, content_hash = ?, meta = ?, updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            [new_content, new_hash, _serialize_meta(meta), memory_id],
+        )
 
 
 def delete(
@@ -104,7 +163,8 @@ def update(
     """Update a memory's content. Must match exactly one memory.
 
     Stores previous content in history for rollback.
-    Re-generates embedding for the new content.
+    Re-generates the embedding for the new content when embeddings are
+    enabled; when disabled, the stored embedding is preserved.
 
     Args:
         topic: Topic to find the memory (must match exactly one)
@@ -130,53 +190,36 @@ def update(
                         "SELECT id, content, meta FROM memories WHERE topic = ?", [topic]
                     ).fetchall()
 
-                if not rows:
-                    s.add("error", "not_found")
-                    return f"No memory found for topic '{topic}'" if not id else f"No memory found with id '{id}'"
+            if not rows:
+                s.add("error", "not_found")
+                return f"No memory found for topic '{topic}'" if not id else f"No memory found with id '{id}'"
 
-                if len(rows) > 1:
-                    s.add("error", "multiple_matches")
-                    return f"Multiple memories ({len(rows)}) match topic '{topic}'. Use id= for specific update."
+            if len(rows) > 1:
+                s.add("error", "multiple_matches")
+                return f"Multiple memories ({len(rows)}) match topic '{topic}'. Use id= for specific update."
 
-                memory_id = rows[0][0]
-                old_content = rows[0][1]
-                existing_meta: dict[str, str] = _deserialize_meta(rows[0][2])
+            memory_id = rows[0][0]
+            old_content = rows[0][1]
+            existing_meta: dict[str, str] = _deserialize_meta(rows[0][2])
 
-                # Save history
-                history_id = str(uuid.uuid4())
-                conn.execute(
-                    "INSERT INTO memory_history (id, memory_id, content) VALUES (?, ?, ?)",
-                    [history_id, memory_id, old_content],
-                )
+            content = _redact(content)
+            # Embedding API call happens outside the DB lock
+            embedding = _embed_now(content)
 
-                # Redact and update
-                content = _redact(content)
-                new_hash = _content_hash(content)
-                embedding = _maybe_embed(memory_id, content)
-
-                # Recompute toc if the memory already has sections
-                if "sections" in existing_meta:
-                    headings = _parse_headings(content)
-                    if headings:
-                        existing_meta["sections"] = _encode_sections(headings)
-                        existing_meta["section_count"] = str(len(headings))
-                    else:
-                        del existing_meta["sections"]
-                        existing_meta.pop("section_count", None)
-
-                conn.execute(
-                    """
-                    UPDATE memories
-                    SET content = ?, content_hash = ?, embedding = ?, meta = ?, updated_at = datetime('now')
-                    WHERE id = ?
-                    """,
-                    [content, new_hash, _serialize_embedding(embedding),
-                     _serialize_meta(existing_meta), memory_id],
+            with _use_connection() as conn:
+                _apply_memory_update(
+                    conn,
+                    memory_id=memory_id,
+                    old_content=old_content,
+                    new_content=content,
+                    meta=existing_meta,
+                    embedding=embedding,
                 )
                 conn.commit()
+            _enqueue_after_commit(memory_id)
 
-                s.add("memoryId", memory_id)
-                return f"Updated memory {memory_id} in topic '{topic}'"
+            s.add("memoryId", memory_id)
+            return f"Updated memory {memory_id} in topic '{topic}'"
 
         except Exception as e:
             s.add("error", str(e))
@@ -220,53 +263,37 @@ def append(
                         return f"Multiple memories ({len(rows)}) match topic '{topic}'. Use id= for specific append."
                     row = rows[0] if rows else None
 
-                if not row:
-                    s.add("error", "not_found")
-                    return f"No memory found for topic '{topic}'" if not id else f"No memory found with id '{id}'"
+            if not row:
+                s.add("error", "not_found")
+                return f"No memory found for topic '{topic}'" if not id else f"No memory found with id '{id}'"
 
-                memory_id = row[0]
-                old_content = row[1]
-                existing_meta: dict[str, str] = _deserialize_meta(row[2])
+            memory_id = row[0]
+            old_content = row[1]
+            existing_meta: dict[str, str] = _deserialize_meta(row[2])
 
-                # Save history
-                history_id = str(uuid.uuid4())
-                conn.execute(
-                    "INSERT INTO memory_history (id, memory_id, content) VALUES (?, ?, ?)",
-                    [history_id, memory_id, old_content],
-                )
+            new_content = old_content + separator + _redact(content)
+            # Embedding API call happens outside the DB lock
+            embedding = _embed_now(new_content)
 
-                new_content = old_content + separator + _redact(content)
-                new_hash = _content_hash(new_content)
-                embedding = _maybe_embed(memory_id, new_content)
-
-                # Recompute toc if the memory already has sections
-                if "sections" in existing_meta:
-                    headings = _parse_headings(new_content)
-                    if headings:
-                        existing_meta["sections"] = _encode_sections(headings)
-                        existing_meta["section_count"] = str(len(headings))
-                    else:
-                        del existing_meta["sections"]
-                        existing_meta.pop("section_count", None)
-
-                conn.execute(
-                    """
-                    UPDATE memories
-                    SET content = ?, content_hash = ?, embedding = ?, meta = ?, updated_at = datetime('now')
-                    WHERE id = ?
-                    """,
-                    [new_content, new_hash, _serialize_embedding(embedding),
-                     _serialize_meta(existing_meta), memory_id],
+            with _use_connection() as conn:
+                _apply_memory_update(
+                    conn,
+                    memory_id=memory_id,
+                    old_content=old_content,
+                    new_content=new_content,
+                    meta=existing_meta,
+                    embedding=embedding,
                 )
                 conn.commit()
+            _enqueue_after_commit(memory_id)
 
-                s.add("memoryId", memory_id)
-                s.add("newLen", len(new_content))
-                return f"Appended to memory {memory_id} in topic '{topic}' (now {len(new_content)} chars)"
+            s.add("memoryId", memory_id)
+            s.add("newLen", len(new_content))
+            return f"Appended to memory {memory_id} in topic '{topic}' (now {len(new_content)} chars)"
 
         except Exception as e:
             s.add("error", str(e))
             return f"Error appending to memory: {e}"
 
 
-__all__ = ["append", "delete", "update"]
+__all__ = ["_apply_memory_update", "append", "delete", "update"]

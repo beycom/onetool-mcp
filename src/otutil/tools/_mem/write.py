@@ -16,7 +16,7 @@ from .content import (
     _validate_tags,
 )
 from .db import _serialize_embedding, _serialize_meta, _serialize_tags, _use_connection
-from .embedding import _maybe_embed
+from .embedding import _embed_now, _enqueue_after_commit
 
 
 def write(
@@ -97,19 +97,30 @@ def write(
                     meta["sections"] = _encode_sections(headings)
                     meta["section_count"] = str(len(headings))
 
+            # Check for duplicate content in same topic (before paying for an embedding)
             with _use_connection() as conn:
-                # Check for duplicate content in same topic
                 existing = conn.execute(
                     "SELECT id FROM memories WHERE topic = ? AND content_hash = ?",
                     [topic, content_hash],
                 ).fetchone()
 
+            if existing:
+                s.add("duplicate", True)
+                return f"Duplicate: Memory with same content already exists in topic '{topic}' (id: {existing[0]})"
+
+            memory_id = str(uuid.uuid4())
+            # Embedding API call happens outside the DB lock
+            embedding = _embed_now(content)
+
+            with _use_connection() as conn:
+                # Re-check: another writer may have inserted while we embedded
+                existing = conn.execute(
+                    "SELECT id FROM memories WHERE topic = ? AND content_hash = ?",
+                    [topic, content_hash],
+                ).fetchone()
                 if existing:
                     s.add("duplicate", True)
                     return f"Duplicate: Memory with same content already exists in topic '{topic}' (id: {existing[0]})"
-
-                memory_id = str(uuid.uuid4())
-                embedding = _maybe_embed(memory_id, content)
 
                 conn.execute(
                     """
@@ -121,6 +132,7 @@ def write(
                      _serialize_embedding(embedding), _serialize_meta(meta)],
                 )
                 conn.commit()
+            _enqueue_after_commit(memory_id)
 
             s.add("memoryId", memory_id)
             s.add("contentLen", len(content))

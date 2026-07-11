@@ -190,6 +190,36 @@ class TestMemDBIdentifiers:
             _has_column(conn, 'memories"; DROP TABLE memories;--', "topic")
 
 
+@pytest.mark.unit
+@pytest.mark.tools
+class TestCosineSimilarity:
+    """Test the cosine_similarity UDF, including dimension mismatch handling."""
+
+    def test_similarity_of_identical_vectors(self):
+        import struct
+
+        from otutil.tools._mem.db import _cosine_similarity
+
+        blob = struct.pack("<3f", 1.0, 2.0, 3.0)
+        assert _cosine_similarity(blob, blob) == pytest.approx(1.0)
+
+    def test_none_inputs_return_none(self):
+        from otutil.tools._mem.db import _cosine_similarity
+
+        assert _cosine_similarity(None, b"\x00" * 4) is None
+        assert _cosine_similarity(b"\x00" * 4, None) is None
+
+    def test_dimension_mismatch_raises_clear_error(self):
+        import struct
+
+        from otutil.tools._mem.db import _cosine_similarity
+
+        a = struct.pack("<3f", 1.0, 2.0, 3.0)
+        b = struct.pack("<2f", 1.0, 2.0)
+        with pytest.raises(ValueError, match="dimension mismatch.*3 vs 2.*reindex"):
+            _cosine_similarity(a, b)
+
+
 # ---------------------------------------------------------------------------
 # CRUD operation tests with mocked SQLite
 # ---------------------------------------------------------------------------
@@ -200,7 +230,7 @@ class TestMemDBIdentifiers:
 class TestWrite:
     """Test mem.write() with mocked database and embeddings."""
 
-    @patch("otutil.tools._mem.write._maybe_embed")
+    @patch("otutil.tools._mem.write._embed_now")
     @patch("otutil.tools._mem.write._use_connection")
     def test_stores_new_memory(self, mock_conn, mock_embed):
         from otutil.tools.mem import write
@@ -255,7 +285,7 @@ class TestWrite:
         assert result == "Error: Provide content or file"
 
     @pytest.mark.usefixtures("_mock_cwd")
-    @patch("otutil.tools._mem.write._maybe_embed")
+    @patch("otutil.tools._mem.write._embed_now")
     @patch("otutil.tools._mem.write._use_connection")
     def test_reads_from_file(self, mock_conn, mock_embed, tmp_path):
         from otutil.tools.mem import write
@@ -656,32 +686,96 @@ class TestSearch:
 
 @pytest.mark.unit
 @pytest.mark.tools
-class TestMaybeEmbed:
-    """Test _maybe_embed helper with different config states."""
+class TestEmbedHelpers:
+    """Test _embed_now/_enqueue_after_commit helpers with different config states."""
 
     @patch("otutil.tools._mem.embedding._get_config", return_value=Config(embeddings_enabled=False))
     def test_disabled_returns_none(self, _mock_config):
-        from otutil.tools._mem.embedding import _maybe_embed
+        from otutil.tools._mem.embedding import _embed_now
 
-        result = _maybe_embed("mem-id", "some content")
+        result = _embed_now("some content")
         assert result is None
 
     @patch("otutil.tools._mem.embedding._generate_embedding", return_value=[0.1, 0.2, 0.3])
     @patch("otutil.tools._mem.embedding._get_config", return_value=Config(embeddings_enabled=True, embeddings_async=False))
     def test_sync_returns_vector(self, _mock_config, _mock_embed):
-        from otutil.tools._mem.embedding import _maybe_embed
+        from otutil.tools._mem.embedding import _embed_now
 
-        result = _maybe_embed("mem-id", "some content")
+        result = _embed_now("some content")
         assert result == [0.1, 0.2, 0.3]
+
+    @patch("otutil.tools._mem.embedding._get_config", return_value=Config(embeddings_enabled=True, embeddings_async=True))
+    def test_async_returns_none_without_enqueue(self, _mock_config):
+        from otutil.tools._mem.embedding import _embed_now
+
+        result = _embed_now("some content")
+        assert result is None
 
     @patch("otutil.tools._mem.embedding._enqueue_embedding")
     @patch("otutil.tools._mem.embedding._get_config", return_value=Config(embeddings_enabled=True, embeddings_async=True))
-    def test_async_enqueues_and_returns_none(self, _mock_config, mock_enqueue):
-        from otutil.tools._mem.embedding import _maybe_embed
+    def test_enqueue_after_commit_async(self, _mock_config, mock_enqueue):
+        from otutil.tools._mem.embedding import _enqueue_after_commit
 
-        result = _maybe_embed("mem-id", "some content")
-        assert result is None
+        _enqueue_after_commit("mem-id")
         mock_enqueue.assert_called_once_with("mem-id")
+
+    @patch("otutil.tools._mem.embedding._enqueue_embedding")
+    @patch("otutil.tools._mem.embedding._get_config", return_value=Config(embeddings_enabled=False))
+    def test_enqueue_after_commit_disabled_noop(self, _mock_config, mock_enqueue):
+        from otutil.tools._mem.embedding import _enqueue_after_commit
+
+        _enqueue_after_commit("mem-id")
+        mock_enqueue.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestProcessEmbeddingJob:
+    """Test the background worker job: embed outside the lock, guarded write-back."""
+
+    @patch("otutil.tools._mem.embedding._generate_embedding", return_value=[0.1, 0.2])
+    @patch("otutil.tools._mem.embedding._use_connection")
+    def test_embeds_outside_lock_with_content_guard(self, mock_conn, mock_embed):
+        from otutil.tools._mem.embedding import _process_embedding_job
+
+        conn = MagicMock()
+        mock_conn.return_value.__enter__.return_value = conn
+        conn.execute.return_value.fetchone.return_value = ("stored content",)
+
+        # Track lock state at embedding time: __enter__/__exit__ pair count
+        lock_depth = {"current": 0, "at_embed": None}
+        mock_conn.return_value.__enter__.side_effect = lambda *a: (
+            lock_depth.__setitem__("current", lock_depth["current"] + 1) or conn
+        )
+        mock_conn.return_value.__exit__.side_effect = lambda *a: (
+            lock_depth.__setitem__("current", lock_depth["current"] - 1) or False
+        )
+        mock_embed.side_effect = lambda _content: (
+            lock_depth.__setitem__("at_embed", lock_depth["current"]) or [0.1, 0.2]
+        )
+
+        _process_embedding_job("mem-id")
+
+        # Embedding generated while no connection lock held
+        assert lock_depth["at_embed"] == 0
+        # Write-back guarded on unchanged content
+        update_calls = [c for c in conn.execute.call_args_list if "UPDATE" in str(c)]
+        assert len(update_calls) == 1
+        assert "AND content = ?" in update_calls[0][0][0]
+        assert update_calls[0][0][1][2] == "stored content"
+
+    @patch("otutil.tools._mem.embedding._generate_embedding")
+    @patch("otutil.tools._mem.embedding._use_connection")
+    def test_deleted_memory_skipped(self, mock_conn, mock_embed):
+        from otutil.tools._mem.embedding import _process_embedding_job
+
+        conn = MagicMock()
+        mock_conn.return_value.__enter__.return_value = conn
+        conn.execute.return_value.fetchone.return_value = None
+
+        _process_embedding_job("gone-id")
+
+        mock_embed.assert_not_called()
 
 
 @pytest.mark.unit
@@ -741,7 +835,7 @@ class TestSearchNoEmbeddings:
 class TestWriteWithoutEmbeddings:
     """Test that write stores NULL embedding when disabled."""
 
-    @patch("otutil.tools._mem.write._maybe_embed", return_value=None)
+    @patch("otutil.tools._mem.write._embed_now", return_value=None)
     @patch("otutil.tools._mem.write._use_connection")
     def test_write_stores_null_embedding(self, mock_conn, _mock_embed):
         from otutil.tools.mem import write
@@ -787,10 +881,11 @@ class TestReindex:
         result = reindex(dry_run=True)
         assert "2 memories" in result
 
+    @patch("otutil.tools._mem.lifecycle._use_connection")
     @patch("otutil.tools._mem.lifecycle._generate_embedding", return_value=[0.1] * 1536)
     @patch("otutil.tools._mem.lifecycle._get_config", return_value=Config(embeddings_enabled=True))
     @patch("otutil.tools._mem.lifecycle._get_connection")
-    def test_generates_embeddings(self, mock_conn, _mock_config, _mock_embed):
+    def test_generates_embeddings(self, mock_conn, _mock_config, _mock_embed, mock_use):
         from otutil.tools.mem import reindex
 
         conn = MagicMock()
@@ -798,9 +893,37 @@ class TestReindex:
         conn.execute.return_value.fetchall.return_value = [
             ("id-1", "content one"),
         ]
+        mock_use.return_value.__enter__.return_value = conn
 
         result = reindex(dry_run=False)
         assert "Generated embeddings for 1 memories" in result
+
+    @patch("otutil.tools._mem.lifecycle._use_connection")
+    @patch("otutil.tools._mem.lifecycle._generate_embedding")
+    @patch("otutil.tools._mem.lifecycle._get_config", return_value=Config(embeddings_enabled=True))
+    @patch("otutil.tools._mem.lifecycle._get_connection")
+    def test_partial_failure_keeps_progress(self, mock_conn, _mock_config, mock_embed, mock_use):
+        """One failed embedding must not lose progress: commit is per item."""
+        from otutil.tools.mem import reindex
+
+        conn = MagicMock()
+        mock_conn.return_value = conn
+        conn.execute.return_value.fetchall.return_value = [
+            ("id-1", "content one"),
+            ("id-2", "content two"),
+            ("id-3", "content three"),
+        ]
+        write_conn = MagicMock()
+        mock_use.return_value.__enter__.return_value = write_conn
+        mock_embed.side_effect = [[0.1], RuntimeError("API down"), [0.3]]
+
+        result = reindex(dry_run=False)
+
+        assert "Generated embeddings for 2 memories" in result
+        assert "1 failed" in result
+        assert "API down" in result
+        # One commit per successful item
+        assert write_conn.commit.call_count == 2
 
     @patch("otutil.tools._mem.lifecycle._get_config", return_value=Config(embeddings_enabled=True))
     @patch("otutil.tools._mem.lifecycle._get_connection")
@@ -818,13 +941,51 @@ class TestReindex:
 @pytest.mark.unit
 @pytest.mark.tools
 class TestFlush:
-    """Test mem.flush() queue drain."""
+    """Test mem.flush() queue drain, timeout, and dead-worker detection."""
+
+    @pytest.fixture()
+    def _worker_state(self):
+        """Isolate embedding worker module state (incl. queue) around a test."""
+        import queue as queue_mod
+
+        from otutil.tools._mem import embedding as emb
+
+        saved = (emb._embedding_worker_started, emb._embedding_worker_thread, emb._embedding_queue)
+        emb._embedding_queue = queue_mod.Queue(maxsize=10)
+        yield emb
+        (emb._embedding_worker_started, emb._embedding_worker_thread, emb._embedding_queue) = saved
 
     def test_no_worker_returns_immediately(self):
         from otutil.tools.mem import flush
 
         result = flush()
         assert "No background embeddings pending" in result
+
+    def test_dead_worker_detected(self, _worker_state):
+        from otutil.tools.mem import flush
+
+        emb = _worker_state
+        emb._embedding_worker_started = True
+        emb._embedding_worker_thread = MagicMock(is_alive=MagicMock(return_value=False))
+        emb._embedding_queue.put_nowait("mem-id")
+
+        result = flush(timeout=1.0)
+
+        assert "Error" in result
+        assert "worker is not running" in result
+
+    def test_timeout_with_stuck_queue(self, _worker_state):
+        from otutil.tools.mem import flush
+
+        emb = _worker_state
+        emb._embedding_worker_started = True
+        emb._embedding_worker_thread = MagicMock(is_alive=MagicMock(return_value=True))
+        emb._embedding_queue.put_nowait("mem-id")
+
+        result = flush(timeout=0.15)
+
+        assert "Error" in result
+        assert "timed out" in result
 
 
 @pytest.mark.unit
@@ -1013,7 +1174,7 @@ class TestDelete:
 class TestUpdate:
     """Test mem.update() with mocked database and embeddings."""
 
-    @patch("otutil.tools._mem.mutations._maybe_embed")
+    @patch("otutil.tools._mem.mutations._embed_now")
     @patch("otutil.tools._mem.mutations._use_connection")
     def test_updates_single_match(self, mock_conn, mock_embed):
         from otutil.tools.mem import update
@@ -1059,10 +1220,76 @@ class TestUpdate:
 
 @pytest.mark.unit
 @pytest.mark.tools
+class TestUpdateEmbeddingHandling:
+    """Updates must not destroy stored embeddings when embeddings are disabled."""
+
+    @patch("otutil.tools._mem.mutations._get_config", return_value=Config(embeddings_enabled=False))
+    @patch("otutil.tools._mem.mutations._embed_now", return_value=None)
+    @patch("otutil.tools._mem.mutations._use_connection")
+    def test_update_preserves_embedding_when_disabled(self, mock_conn, _mock_embed, _mock_config):
+        from otutil.tools.mem import update
+
+        conn = MagicMock()
+        mock_conn.return_value.__enter__.return_value = conn
+        conn.execute.return_value.fetchall.return_value = [
+            ("id-123", "old content", '{}'),
+        ]
+
+        result = update(topic="test/topic", content="new content")
+
+        assert "Updated memory" in result
+        update_calls = [c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)]
+        assert len(update_calls) == 1
+        # The embedding column must not be touched
+        assert "embedding" not in update_calls[0][0][0]
+
+    @patch("otutil.tools._mem.mutations._get_config", return_value=Config(embeddings_enabled=True, embeddings_async=False))
+    @patch("otutil.tools._mem.mutations._embed_now", return_value=[0.5, 0.5])
+    @patch("otutil.tools._mem.mutations._use_connection")
+    def test_update_writes_embedding_when_enabled(self, mock_conn, _mock_embed, _mock_config):
+        from otutil.tools._mem.db import _serialize_embedding
+        from otutil.tools.mem import update
+
+        conn = MagicMock()
+        mock_conn.return_value.__enter__.return_value = conn
+        conn.execute.return_value.fetchall.return_value = [
+            ("id-123", "old content", '{}'),
+        ]
+
+        result = update(topic="test/topic", content="new content")
+
+        assert "Updated memory" in result
+        update_calls = [c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)]
+        assert len(update_calls) == 1
+        assert "embedding" in update_calls[0][0][0]
+        assert update_calls[0][0][1][2] == _serialize_embedding([0.5, 0.5])
+
+    @patch("otutil.tools._mem.mutations._get_config", return_value=Config(embeddings_enabled=False))
+    @patch("otutil.tools._mem.mutations._embed_now", return_value=None)
+    @patch("otutil.tools._mem.mutations._use_connection")
+    def test_append_preserves_embedding_when_disabled(self, mock_conn, _mock_embed, _mock_config):
+        from otutil.tools.mem import append
+
+        conn = MagicMock()
+        mock_conn.return_value.__enter__.return_value = conn
+        conn.execute.return_value.fetchall.return_value = [
+            ("id-123", "original content", '{}'),
+        ]
+
+        result = append(topic="test/topic", content="more")
+
+        assert "Appended to memory" in result
+        update_calls = [c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)]
+        assert len(update_calls) == 1
+        assert "embedding" not in update_calls[0][0][0]
+
+
+@pytest.mark.unit
+@pytest.mark.tools
 class TestAppend:
     """Test mem.append() with mocked database and embeddings."""
 
-    @patch("otutil.tools._mem.mutations._maybe_embed")
+    @patch("otutil.tools._mem.mutations._embed_now")
     @patch("otutil.tools._mem.mutations._use_connection")
     def test_appends_content(self, mock_conn, mock_embed):
         from otutil.tools.mem import append
@@ -1301,7 +1528,7 @@ class TestLoad:
         assert "not found" in result.lower()
 
     @pytest.mark.usefixtures("_mock_cwd")
-    @patch("otutil.tools._mem.io._maybe_embed")
+    @patch("otutil.tools._mem.io._embed_now")
     @patch("otutil.tools._mem.io._use_connection")
     def test_imports_from_yaml(self, mock_conn, mock_embed, tmp_path):
         from otutil.tools.mem import load
@@ -1328,6 +1555,69 @@ class TestLoad:
 
 @pytest.mark.unit
 @pytest.mark.tools
+class TestLoadInvariants:
+    """load() must apply the same redaction/validation as mem.write()."""
+
+    @pytest.mark.usefixtures("_mock_cwd")
+    @patch("otutil.tools._mem.io._embed_now", return_value=None)
+    @patch("otutil.tools._mem.io._use_connection")
+    def test_load_redacts_content(self, mock_conn, _mock_embed, tmp_path):
+        from otutil.tools.mem import load
+
+        conn = MagicMock()
+        mock_conn.return_value.__enter__.return_value = conn
+        conn.execute.return_value.fetchone.return_value = None
+
+        yaml_file = tmp_path / "memories.yaml"
+        yaml_file.write_text(
+            'memories:\n'
+            '  - topic: "test/leaky"\n'
+            '    content: "key: sk-abc123def456ghi789jkl0123"\n'
+            '    category: "note"\n'
+        )
+
+        result = load(file=str(yaml_file))
+
+        assert "Imported 1 memories" in result
+        insert_calls = [c for c in conn.execute.call_args_list if "INSERT" in str(c)]
+        assert len(insert_calls) == 1
+        content_param = insert_calls[0][0][1][2]
+        assert "sk-" not in content_param
+        assert "[REDACTED:api_key]" in content_param
+
+    @pytest.mark.usefixtures("_mock_cwd")
+    @patch("otutil.tools._mem.io._embed_now", return_value=None)
+    @patch("otutil.tools._mem.io._use_connection")
+    def test_load_rejects_invalid_category(self, mock_conn, _mock_embed, tmp_path):
+        from otutil.tools.mem import load
+
+        conn = MagicMock()
+        mock_conn.return_value.__enter__.return_value = conn
+        conn.execute.return_value.fetchone.return_value = None
+
+        yaml_file = tmp_path / "memories.yaml"
+        yaml_file.write_text(
+            'memories:\n'
+            '  - topic: "test/bad"\n'
+            '    content: "content"\n'
+            '    category: "not-a-category"\n'
+            '  - topic: "test/good"\n'
+            '    content: "content"\n'
+            '    category: "note"\n'
+        )
+
+        result = load(file=str(yaml_file))
+
+        assert "Imported 1 memories" in result
+        assert "1 malformed" in result
+        assert "Invalid category" in result
+        insert_calls = [c for c in conn.execute.call_args_list if "INSERT" in str(c)]
+        assert len(insert_calls) == 1
+        assert insert_calls[0][0][1][1] == "test/good"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
 class TestLoadDump:
     """Test mem.load() dump surface."""
 
@@ -1338,7 +1628,7 @@ class TestLoadDump:
         assert callable(mem.load)
 
     @pytest.mark.usefixtures("_mock_cwd")
-    @patch("otutil.tools._mem.io._maybe_embed")
+    @patch("otutil.tools._mem.io._embed_now")
     @patch("otutil.tools._mem.io._use_connection")
     def test_load_imports_export_yaml_and_restores_meta(self, mock_conn, mock_embed, tmp_path):
         from otutil.tools.mem import load
@@ -1378,7 +1668,7 @@ class TestLoadDump:
         assert params[8] == '{"sections": "Intro:1-2"}'
 
     @pytest.mark.usefixtures("_mock_cwd")
-    @patch("otutil.tools._mem.io._maybe_embed")
+    @patch("otutil.tools._mem.io._embed_now")
     @patch("otutil.tools._mem.io._use_connection")
     def test_load_skips_duplicates(self, mock_conn, mock_embed, tmp_path):
         from otutil.tools.mem import load
@@ -1550,7 +1840,7 @@ class TestRestore:
     """Test mem.restore() from snapshot directory."""
 
     @pytest.mark.usefixtures("_mock_cwd")
-    @patch("otutil.tools._mem.snapshots._maybe_embed")
+    @patch("otutil.tools._mem.snapshots._embed_now")
     @patch("otutil.tools._mem.snapshots._use_connection")
     def test_restore_from_snapshot(self, mock_conn, mock_embed, tmp_path):
         from otutil.tools.mem import restore
@@ -1589,7 +1879,7 @@ class TestRestore:
         assert insert_params[6] == 7  # relevance
 
     @pytest.mark.usefixtures("_mock_cwd")
-    @patch("otutil.tools._mem.snapshots._maybe_embed")
+    @patch("otutil.tools._mem.snapshots._embed_now")
     @patch("otutil.tools._mem.snapshots._use_connection")
     def test_restore_skips_duplicates(self, mock_conn, mock_embed, tmp_path):
         from otutil.tools.mem import restore
@@ -1616,7 +1906,7 @@ class TestRestore:
         assert "skipped 1" in result
 
     @pytest.mark.usefixtures("_mock_cwd")
-    @patch("otutil.tools._mem.snapshots._maybe_embed")
+    @patch("otutil.tools._mem.snapshots._embed_now")
     @patch("otutil.tools._mem.snapshots._use_connection")
     def test_restore_overwrite(self, mock_conn, mock_embed, tmp_path):
         from otutil.tools.mem import restore
@@ -1644,6 +1934,10 @@ class TestRestore:
         # Should have DELETE + INSERT
         delete_calls = [c for c in conn.execute.call_args_list if "DELETE" in str(c)]
         assert len(delete_calls) >= 1
+        # Overwrite must also remove the replaced memory's history rows
+        history_deletes = [c for c in delete_calls if "memory_history" in str(c)]
+        assert len(history_deletes) == 1
+        assert history_deletes[0][0][1] == ["existing-id"]
 
     @pytest.mark.usefixtures("_mock_cwd")
     def test_restore_missing_index(self, tmp_path):
@@ -1682,7 +1976,7 @@ class TestRestore:
         assert "1 errors" in result
 
     @pytest.mark.usefixtures("_mock_cwd")
-    @patch("otutil.tools._mem.snapshots._maybe_embed")
+    @patch("otutil.tools._mem.snapshots._embed_now")
     @patch("otutil.tools._mem.snapshots._use_connection")
     def test_restore_topic_override(self, mock_conn, mock_embed, tmp_path):
         from otutil.tools.mem import restore
@@ -1713,6 +2007,122 @@ class TestRestore:
         insert_params = insert_calls[0][0][1]
         assert insert_params[1] == "new-base/ask"  # remapped topic
 
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestSnapshotRestorePathSafety:
+    """Snapshot/restore must confine topic-derived paths to the target directory."""
+
+    @pytest.mark.usefixtures("_mock_cwd")
+    @patch("otutil.tools._mem.snapshots._get_connection")
+    def test_snapshot_rejects_traversal_topic(self, mock_conn, tmp_path):
+        from otutil.tools.mem import snapshot
+
+        conn = MagicMock()
+        mock_conn.return_value = conn
+        conn.execute.return_value.fetchall.return_value = [
+            ("id-1", "../evil", "escape attempt", "note", '[]', 5, 0,
+             datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
+            ("id-2", "safe/topic", "safe content", "note", '[]', 5, 0,
+             datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
+        ]
+
+        out_dir = tmp_path / "backup"
+        result = snapshot(output=str(out_dir))
+
+        assert "1 errors" in result
+        assert "unsafe path" in result
+        assert not (tmp_path / "evil").exists()
+        assert (out_dir / "safe/topic").exists()
+
+    @pytest.mark.usefixtures("_mock_cwd")
+    @patch("otutil.tools._mem.snapshots._get_connection")
+    def test_snapshot_rejects_absolute_topic(self, mock_conn, tmp_path):
+        from otutil.tools.mem import snapshot
+
+        conn = MagicMock()
+        mock_conn.return_value = conn
+        conn.execute.return_value.fetchall.return_value = [
+            ("id-1", "/etc/passwd-clone", "escape attempt", "note", '[]', 5, 0,
+             datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
+        ]
+
+        result = snapshot(output=str(tmp_path / "backup"))
+
+        assert "1 errors" in result
+        assert "unsafe path" in result
+
+    @pytest.mark.usefixtures("_mock_cwd")
+    @patch("otutil.tools._mem.snapshots._use_connection")
+    def test_restore_rejects_traversal_file(self, mock_conn, tmp_path):
+        from otutil.tools.mem import restore
+
+        conn = MagicMock()
+        mock_conn.return_value.__enter__.return_value = conn
+        conn.execute.return_value.fetchone.return_value = None
+
+        # A secret file outside the snapshot dir that must not be readable
+        (tmp_path / "secret.txt").write_text("secret data")
+        snap_dir = tmp_path / "snap"
+        snap_dir.mkdir()
+        (snap_dir / "index.yaml").write_text(
+            'memories:\n'
+            '  - topic: "test/a"\n'
+            '    file: "../secret.txt"\n'
+            '    category: "note"\n'
+            '    tags: []\n'
+            '    relevance: 5\n'
+        )
+
+        result = restore(input=str(snap_dir))
+
+        assert "1 errors" in result
+        assert "unsafe path" in result
+        insert_calls = [c for c in conn.execute.call_args_list if "INSERT" in str(c)]
+        assert insert_calls == []
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestRestoreInvariants:
+    """Restore must apply the same redaction/validation as mem.write()."""
+
+    @pytest.mark.usefixtures("_mock_cwd")
+    @patch("otutil.tools._mem.snapshots._use_connection")
+    def test_restore_redacts_and_validates_category(self, mock_conn, tmp_path):
+        from otutil.tools.mem import restore
+
+        conn = MagicMock()
+        mock_conn.return_value.__enter__.return_value = conn
+        conn.execute.return_value.fetchone.return_value = None
+
+        snap_dir = tmp_path / "snap"
+        snap_dir.mkdir()
+        (snap_dir / "leaky.md").write_text("key: sk-abc123def456ghi789jkl0123")
+        (snap_dir / "bad.md").write_text("content")
+        (snap_dir / "index.yaml").write_text(
+            'memories:\n'
+            '  - topic: "test/leaky"\n'
+            '    file: "leaky.md"\n'
+            '    category: "note"\n'
+            '    tags: []\n'
+            '    relevance: 5\n'
+            '  - topic: "test/bad"\n'
+            '    file: "bad.md"\n'
+            '    category: "not-a-category"\n'
+            '    tags: []\n'
+            '    relevance: 5\n'
+        )
+
+        result = restore(input=str(snap_dir))
+
+        assert "Restored 1 memories" in result
+        assert "1 errors" in result
+        insert_calls = [c for c in conn.execute.call_args_list if "INSERT" in str(c)]
+        assert len(insert_calls) == 1
+        content_param = insert_calls[0][0][1][2]
+        assert "sk-" not in content_param
+        assert "[REDACTED:api_key]" in content_param
 
 
 # ---------------------------------------------------------------------------
@@ -2002,7 +2412,7 @@ class TestWriteValidation:
 @pytest.mark.unit
 @pytest.mark.tools
 class TestDumpYaml:
-    """Test _export_yaml handles multi-line content."""
+    """Test _export_yaml output and round-trip safety."""
 
     def test_multiline_content_uses_block_scalar(self):
         from otutil.tools._mem.io import _export_yaml
@@ -2014,10 +2424,33 @@ class TestDumpYaml:
         result = _export_yaml(rows)
 
         assert "content: |-" in result
-        assert "      line one" in result
-        assert "      line two" in result
+        assert "line one" in result
+        assert "line two" in result
         # Should NOT have broken YAML double-quoted strings
         assert 'content: "' not in result
+
+    def test_quotes_round_trip(self):
+        """Quotes in topic/content/tags must survive dump -> load parsing."""
+        import yaml
+
+        from otutil.tools._mem.io import _export_yaml
+
+        content = 'He said "hello" and \'bye\'\nsecond "quoted" line'
+        topic = 'topic/with "quotes"'
+        rows = [
+            ("id-1", topic, content, "note", '["ta\\"g"]', 5, 0,
+             "2026-01-01 00:00:00", "2026-01-01 00:00:00", '{"key": "va\\"lue"}'),
+        ]
+
+        result = _export_yaml(rows)
+        data = yaml.safe_load(result)
+
+        mem = data["memories"][0]
+        assert mem["topic"] == topic
+        assert mem["content"] == content
+        assert mem["tags"] == ['ta"g']
+        assert mem["meta"] == {"key": 'va"lue'}
+        assert mem["created_at"] == "2026-01-01 00:00:00"
 
 
 # ---------------------------------------------------------------------------
@@ -2475,7 +2908,7 @@ class TestQuery:
 class TestWriteWithToc:
     """Test mem.write() with toc=True."""
 
-    @patch("otutil.tools._mem.write._maybe_embed")
+    @patch("otutil.tools._mem.write._embed_now")
     @patch("otutil.tools._mem.write._use_connection")
     def test_stores_sections_in_meta(self, mock_conn, mock_embed):
         from otutil.tools.mem import write
@@ -2499,7 +2932,7 @@ class TestWriteWithToc:
         assert "section_count" in meta
         assert meta["section_count"] == "4"
 
-    @patch("otutil.tools._mem.write._maybe_embed")
+    @patch("otutil.tools._mem.write._embed_now")
     @patch("otutil.tools._mem.write._use_connection")
     def test_without_toc_has_empty_meta(self, mock_conn, mock_embed):
         from otutil.tools.mem import write
@@ -2522,7 +2955,7 @@ class TestWriteWithToc:
 class TestUpdateRecomputesToc:
     """Test that update() recomputes toc when sections exist in meta."""
 
-    @patch("otutil.tools._mem.mutations._maybe_embed")
+    @patch("otutil.tools._mem.mutations._embed_now")
     @patch("otutil.tools._mem.mutations._use_connection")
     def test_recomputes_sections(self, mock_conn, mock_embed):
         from otutil.tools.mem import update
@@ -2540,15 +2973,17 @@ class TestUpdateRecomputesToc:
         result = update(topic="test/topic", content=new_content)
 
         assert "Updated memory" in result
-        # Verify UPDATE was called with recomputed meta (serialised as JSON)
+        # Verify UPDATE was called with recomputed meta (serialised as JSON).
+        # Embeddings are disabled by default, so the UPDATE omits the
+        # embedding column: params are [content, hash, meta, id].
         update_calls = [c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)]
         assert len(update_calls) >= 1
         update_params = update_calls[0][0][1]
-        meta = _deserialize_meta(update_params[3])  # meta is 4th param in UPDATE (JSON string)
+        meta = _deserialize_meta(update_params[2])
         assert "sections" in meta
         assert meta["section_count"] == "2"
 
-    @patch("otutil.tools._mem.mutations._maybe_embed")
+    @patch("otutil.tools._mem.mutations._embed_now")
     @patch("otutil.tools._mem.mutations._use_connection")
     def test_no_recompute_without_sections(self, mock_conn, mock_embed):
         from otutil.tools.mem import update
@@ -2565,7 +3000,7 @@ class TestUpdateRecomputesToc:
         assert "Updated memory" in result
         update_calls = [c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)]
         update_params = update_calls[0][0][1]
-        meta = _deserialize_meta(update_params[3])
+        meta = _deserialize_meta(update_params[2])
         assert "sections" not in meta
 
 
@@ -2574,7 +3009,7 @@ class TestUpdateRecomputesToc:
 class TestAppendRecomputesToc:
     """Test that append() recomputes toc when sections exist in meta."""
 
-    @patch("otutil.tools._mem.mutations._maybe_embed")
+    @patch("otutil.tools._mem.mutations._embed_now")
     @patch("otutil.tools._mem.mutations._use_connection")
     def test_recomputes_sections_on_append(self, mock_conn, mock_embed):
         from otutil.tools.mem import append
@@ -2591,10 +3026,11 @@ class TestAppendRecomputesToc:
         result = append(topic="test/topic", content="# New Section\n\nAppended")
 
         assert "Appended to memory" in result
+        # Embeddings disabled by default: params are [content, hash, meta, id]
         update_calls = [c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)]
         assert len(update_calls) >= 1
         update_params = update_calls[0][0][1]
-        meta = _deserialize_meta(update_params[3])  # meta is 4th param in UPDATE (JSON string)
+        meta = _deserialize_meta(update_params[2])
         assert "sections" in meta
         assert meta["section_count"] == "2"
 
@@ -2913,7 +3349,7 @@ class TestRefresh:
         conn_mock = MagicMock()
         with (
             _mock_use_conn(rows, conn=conn_mock),
-            patch("otutil.tools._mem.refresh._maybe_embed", return_value=None),
+            patch("otutil.tools._mem.refresh._embed_now", return_value=None),
         ):
             result = refresh(topic="docs/", dry_run=False)
 
@@ -2977,7 +3413,7 @@ class TestRefresh:
         conn_mock = MagicMock()
         with (
             _mock_use_conn(rows, conn=conn_mock),
-            patch("otutil.tools._mem.refresh._maybe_embed", return_value=None),
+            patch("otutil.tools._mem.refresh._embed_now", return_value=None),
         ):
             result = refresh(topic="docs/", dry_run=False)
 
@@ -2985,9 +3421,9 @@ class TestRefresh:
         # Verify the meta was updated with new sections by checking the UPDATE call
         update_calls = [c for c in conn_mock.execute.call_args_list if "UPDATE" in str(c)]
         assert len(update_calls) > 0
-        # The meta arg should contain "New Heading"
+        # Embeddings disabled by default: params are [content, hash, meta, id]
         update_args = update_calls[0]
-        meta_arg = update_args[0][1][3]  # 4th positional param is meta
+        meta_arg = update_args[0][1][2]
         assert "New Heading" in meta_arg
 
 

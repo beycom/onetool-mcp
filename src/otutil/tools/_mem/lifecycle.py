@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -239,17 +240,33 @@ def reindex(
                 return f"Found {len(rows)} memories without embeddings. Run with dry_run=False to generate."
 
             generated = 0
-            with _use_connection() as conn:
-                for memory_id, content in rows:
+            failed = 0
+            first_error: str | None = None
+            for memory_id, content in rows:
+                try:
+                    # Embedding API call happens outside the DB lock
                     embedding = _generate_embedding(content)
+                except Exception as e:
+                    failed += 1
+                    if first_error is None:
+                        first_error = str(e)
+                    continue
+                # Commit per memory so one failure doesn't lose earlier progress
+                with _use_connection() as conn:
                     conn.execute(
                         "UPDATE memories SET embedding = ? WHERE id = ?",
                         [_serialize_embedding(embedding), memory_id],
                     )
-                    generated += 1
+                    conn.commit()
+                generated += 1
 
-                conn.commit()
             s.add("generated", generated)
+            if failed:
+                s.add("failed", failed)
+                return (
+                    f"Generated embeddings for {generated} memories "
+                    f"({failed} failed; first error: {first_error})"
+                )
             return f"Generated embeddings for {generated} memories"
 
         except Exception as e:
@@ -257,14 +274,19 @@ def reindex(
             return f"Error generating embeddings: {e}"
 
 
-def flush() -> str:
-    """Wait for all pending background embeddings to complete.
+def flush(*, timeout: float = 60.0) -> str:
+    """Wait for pending background embeddings to complete.
+
+    Args:
+        timeout: Maximum seconds to wait (default: 60)
 
     Returns:
-        Completion status.
+        Completion status, or an error if the wait times out or the
+        background worker has died.
 
     Example:
         mem.flush()
+        mem.flush(timeout=10)
     """
     # Access embedding module state via lazy import to get mutable references
     from . import embedding as _emb
@@ -272,7 +294,20 @@ def flush() -> str:
     if not _emb._embedding_worker_started:
         return "No background embeddings pending"
     try:
-        _emb._embedding_queue.join()
+        deadline = time.monotonic() + timeout
+        while _emb._embedding_queue.unfinished_tasks:
+            worker = _emb._embedding_worker_thread
+            if worker is None or not worker.is_alive():
+                return (
+                    "Error: embedding worker is not running "
+                    f"({_emb._embedding_queue.qsize()} jobs pending)"
+                )
+            if time.monotonic() >= deadline:
+                return (
+                    f"Error: flush timed out after {timeout}s "
+                    f"({_emb._embedding_queue.qsize()} jobs still pending)"
+                )
+            time.sleep(0.05)
         return "All pending embeddings completed"
     except Exception as e:
         return f"Error: {e}"

@@ -33,12 +33,17 @@ def read(
     meta: bool = False,
     mode: str | None = None,
 ) -> str:
-    """Read a memory by exact topic match or ID.
+    """Read a memory by topic or ID.
+
+    A plain topic matches exactly; a trailing "/" matches the topic and
+    everything under it; "*" acts as a wildcard. When multiple memories
+    match, the most recently created one is returned.
 
     Increments the access count on each read.
 
     Args:
-        topic: Exact topic path to read
+        topic: Topic path to read (trailing "/" = prefix match, "*" = wildcard;
+            newest match wins when several match)
         id: Optional memory ID for direct lookup (overrides topic match)
         meta: If True, include metadata header (topic, category, tags, etc.)
 

@@ -3,12 +3,19 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from pathlib import PurePosixPath
+from typing import TYPE_CHECKING, Any
 
 from otpack import LogSpan
 
 from .config import _validate_file_path
-from .content import _content_hash, _topic_filter
+from .content import (
+    _content_hash,
+    _redact,
+    _topic_filter,
+    _validate_category,
+    _validate_tags,
+)
 from .db import (
     _deserialize_meta,
     _deserialize_tags,
@@ -18,7 +25,27 @@ from .db import (
     _serialize_tags,
     _use_connection,
 )
-from .embedding import _maybe_embed
+from .embedding import _embed_now, _enqueue_after_commit
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
+def _resolve_member_path(base: Path, rel: str) -> tuple[Path | None, str | None]:
+    """Resolve a topic-derived relative path inside a snapshot directory.
+
+    Rejects absolute paths and `..` traversal in the (untrusted) relative
+    path, then validates the final joined path against allowed_file_dirs
+    and exclude_file_patterns. Returns (path, error); path is None on error.
+    """
+    pure = PurePosixPath(rel)
+    parts = [seg for seg in pure.parts if seg not in ("", ".", "/")]
+    if pure.is_absolute() or not parts or ".." in parts:
+        return None, f"unsafe path '{rel}' (absolute or traversal)"
+    validated, error = _validate_file_path(str(base.joinpath(*parts)), must_exist=False)
+    if error:
+        return None, error
+    return validated, None
 
 
 def snapshot(
@@ -87,6 +114,7 @@ def snapshot(
             written = 0
             skipped = 0
             index_entries = []
+            errors: list[str] = []
 
             for r in rows:
                 _id, mem_topic, content, category, raw_tags, relevance = (
@@ -103,7 +131,10 @@ def snapshot(
                     rel_topic = mem_topic.rsplit("/", 1)[-1]
 
                 file_rel = rel_topic + ext
-                file_path = validated_path / file_rel
+                file_path, path_error = _resolve_member_path(validated_path, file_rel)
+                if file_path is None:
+                    errors.append(f"{mem_topic}: {path_error}")
+                    continue
 
                 if file_path.exists() and on_conflict == "skip":
                     skipped += 1
@@ -168,7 +199,13 @@ def snapshot(
             s.add("written", written)
             s.add("skipped", skipped)
             s.add("total", len(index_entries))
-            return f"Snapshot {len(index_entries)} memories to {validated_path} ({written} written, {skipped} skipped)"
+            msg = f"Snapshot {len(index_entries)} memories to {validated_path} ({written} written, {skipped} skipped)"
+            if errors:
+                s.add("errors", len(errors))
+                msg += f", {len(errors)} errors"
+                for err in errors[:5]:
+                    msg += f"\n  - {err}"
+            return msg
 
         except Exception as e:
             s.add("error", str(e))
@@ -184,11 +221,14 @@ def restore(
     """Restore memories from a snapshot directory (created by `mem.snapshot`).
 
     Reads index.yaml and content files, recreating memories with full metadata.
+    Applies the same invariants as mem.write(): content is redacted and
+    category/tags are validated (invalid entries are reported and skipped).
 
     Args:
         input: Input directory path (must contain index.yaml)
         topic: Override base topic (otherwise uses topics from index)
-        overwrite: If True, overwrite existing memories with same topic+hash
+        overwrite: If True, replace existing memories with same topic+hash
+            (their history entries are removed along with the old row)
 
     Returns:
         Restore summary.
@@ -227,9 +267,9 @@ def restore(
             original_filter = snapshot_meta.get("topic_filter")
 
             memories = data["memories"]
-            restored = 0
             skipped = 0
             errors = []
+            pending: list[tuple[str, str, str, str, str, list[str], int, str, str | None]] = []
 
             with _use_connection() as conn:
                 for entry in memories:
@@ -252,6 +292,14 @@ def restore(
                         errors.append("Missing topic or file in index entry")
                         continue
 
+                    try:
+                        # Apply the same invariants as mem.write()
+                        _validate_category(category)
+                        tags = _validate_tags(tags)
+                    except ValueError as e:
+                        errors.append(f"{mem_topic}: {e}")
+                        continue
+
                     # Remap topic if override provided
                     if topic is not None:
                         # Strip original filter prefix, prepend new topic
@@ -262,13 +310,16 @@ def restore(
                             rel = mem_topic.rsplit("/", 1)[-1]
                         mem_topic = f"{topic}/{rel}" if rel else topic
 
-                    # Read content file
-                    content_path = validated_path / file_rel
+                    # Read content file (index paths are untrusted)
+                    content_path, path_error = _resolve_member_path(validated_path, file_rel)
+                    if content_path is None:
+                        errors.append(f"{file_rel}: {path_error}")
+                        continue
                     if not content_path.exists():
                         errors.append(f"File not found: {file_rel}")
                         continue
 
-                    content = content_path.read_text(encoding="utf-8")
+                    content = _redact(content_path.read_text(encoding="utf-8"))
                     content_hash = _content_hash(content)
 
                     # Check for existing
@@ -281,11 +332,20 @@ def restore(
                         skipped += 1
                         continue
 
-                    if existing and overwrite:
-                        conn.execute("DELETE FROM memories WHERE id = ?", [existing[0]])
+                    pending.append((str(uuid.uuid4()), mem_topic, content, content_hash,
+                                    category, tags, relevance, meta_str,
+                                    existing[0] if existing else None))
 
-                    memory_id = str(uuid.uuid4())
-                    embedding = _maybe_embed(memory_id, content)
+            # Embedding API calls happen outside the DB lock
+            with_embeddings = [(entry, _embed_now(entry[2])) for entry in pending]
+
+            with _use_connection() as conn:
+                for entry, embedding in with_embeddings:
+                    memory_id, mem_topic, content, content_hash, category, tags, relevance, meta_str, existing_id = entry
+                    if existing_id is not None:
+                        # Overwrite: remove the old row and its history entries
+                        conn.execute("DELETE FROM memories WHERE id = ?", [existing_id])
+                        conn.execute("DELETE FROM memory_history WHERE memory_id = ?", [existing_id])
 
                     conn.execute(
                         """
@@ -295,9 +355,11 @@ def restore(
                         [memory_id, mem_topic, content, content_hash, category,
                          _serialize_tags(tags), relevance, _serialize_embedding(embedding), meta_str],
                     )
-                    restored += 1
-
                 conn.commit()
+            for entry, _embedding in with_embeddings:
+                _enqueue_after_commit(entry[0])
+
+            restored = len(with_embeddings)
             s.add("restored", restored)
             s.add("skipped", skipped)
             s.add("errors", len(errors))

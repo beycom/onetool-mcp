@@ -2,24 +2,14 @@
 from __future__ import annotations
 
 import builtins
-import uuid
 from typing import Any
 
 from otpack import LogSpan
 
-from .content import (
-    _content_hash,
-    _encode_sections,
-    _parse_headings,
-    _topic_filter,
-)
-from .db import (
-    _deserialize_meta,
-    _serialize_embedding,
-    _serialize_meta,
-    _use_connection,
-)
-from .embedding import _maybe_embed
+from .content import _topic_filter
+from .db import _deserialize_meta, _use_connection
+from .embedding import _embed_now, _enqueue_after_commit
+from .mutations import _apply_memory_update
 
 _builtins_list = builtins.list
 
@@ -139,44 +129,29 @@ def update_batch(
                         lines.append(f"  {r[1]} ({occurrences} occurrence{'s' if occurrences != 1 else ''}) id={r[0][:8]}...")
                     return "\n".join(lines)
 
-                updated = 0
-                for r in rows:
-                    memory_id, _topic, old_content = r[0], r[1], r[2]
-                    existing_meta: dict[str, str] = _deserialize_meta(r[3])
+            updated = 0
+            for r in rows:
+                memory_id, _topic, old_content = r[0], r[1], r[2]
+                existing_meta: dict[str, str] = _deserialize_meta(r[3])
 
-                    # Save history
-                    history_id = str(uuid.uuid4())
-                    conn.execute(
-                        "INSERT INTO memory_history (id, memory_id, content) VALUES (?, ?, ?)",
-                        [history_id, memory_id, old_content],
+                new_content = old_content.replace(search_text, replace_text)
+                # Embedding API call happens outside the DB lock;
+                # commit per memory so one failure doesn't lose progress
+                embedding = _embed_now(new_content)
+
+                with _use_connection() as conn:
+                    _apply_memory_update(
+                        conn,
+                        memory_id=memory_id,
+                        old_content=old_content,
+                        new_content=new_content,
+                        meta=existing_meta,
+                        embedding=embedding,
                     )
+                    conn.commit()
+                _enqueue_after_commit(memory_id)
+                updated += 1
 
-                    new_content = old_content.replace(search_text, replace_text)
-                    new_hash = _content_hash(new_content)
-                    embedding = _maybe_embed(memory_id, new_content)
-
-                    # Recompute TOC if the memory has sections
-                    if "sections" in existing_meta:
-                        headings = _parse_headings(new_content)
-                        if headings:
-                            existing_meta["sections"] = _encode_sections(headings)
-                            existing_meta["section_count"] = str(len(headings))
-                        else:
-                            del existing_meta["sections"]
-                            existing_meta.pop("section_count", None)
-
-                    conn.execute(
-                        """
-                        UPDATE memories
-                        SET content = ?, content_hash = ?, embedding = ?, meta = ?, updated_at = datetime('now')
-                        WHERE id = ?
-                        """,
-                        [new_content, new_hash, _serialize_embedding(embedding),
-                         _serialize_meta(existing_meta), memory_id],
-                    )
-                    updated += 1
-
-                conn.commit()
             s.add("updated", updated)
             return f"Updated {updated} memories: replaced '{search_text}' with '{replace_text}'"
 

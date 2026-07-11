@@ -43,10 +43,16 @@ def _cosine_similarity(a_blob: bytes | None, b_blob: bytes | None) -> float | No
     """
     if a_blob is None or b_blob is None:
         return None
+    if len(a_blob) != len(b_blob):
+        raise ValueError(
+            f"embedding dimension mismatch: {len(a_blob) // 4} vs {len(b_blob) // 4} dims. "
+            "The stored embeddings were generated with a different model/dimensions; "
+            "re-generate them with mem.reindex(dry_run=False)."
+        )
     n = len(a_blob) // 4
     a = struct.unpack(f"<{n}f", a_blob)
     b = struct.unpack(f"<{n}f", b_blob)
-    dot = sum(x * y for x, y in zip(a, b, strict=False))
+    dot = sum(x * y for x, y in zip(a, b, strict=True))
     norm_a = math.sqrt(sum(x * x for x in a))
     norm_b = math.sqrt(sum(x * x for x in b))
     if norm_a == 0.0 or norm_b == 0.0:
