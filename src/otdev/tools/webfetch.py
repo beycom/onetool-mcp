@@ -46,9 +46,7 @@ def _require_trafilatura() -> None:
 class Config(BaseModel):
     """Pack configuration - discovered by registry.
 
-    Deliberately minimal: no retry, custom UA/headers, or pre-download size
-    cap (max_length bounds only the extracted output). A download cap is
-    worthwhile — add on demand.
+    Deliberately minimal: no retry or custom UA/headers — add on demand.
     """
 
     timeout: float = Field(
@@ -62,6 +60,14 @@ class Config(BaseModel):
         ge=1000,
         le=500000,
         description="Maximum content length in characters",
+    )
+    max_download_bytes: int = Field(
+        default=20_000_000,
+        ge=100_000,
+        description=(
+            "Reject responses larger than this many bytes before extraction "
+            "(enforced by trafilatura as MAX_FILE_SIZE)"
+        ),
     )
     block_private_urls: bool = Field(
         default=False,
@@ -83,6 +89,7 @@ def _create_config(timeout: float) -> Any:
 
     config = use_config()
     config.set("DEFAULT", "DOWNLOAD_TIMEOUT", str(int(timeout)))
+    config.set("DEFAULT", "MAX_FILE_SIZE", str(_get_config().max_download_bytes))
     return config
 
 

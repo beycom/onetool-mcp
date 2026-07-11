@@ -297,3 +297,13 @@ class TestFetch:
 
         assert "loopback" in result.lower()
         assert "restricted" in result.lower() or "block" in result.lower()
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_create_config_applies_download_cap():
+    from otdev.tools.webfetch import _create_config
+
+    config = _create_config(10.0)
+    assert config.get("DEFAULT", "MAX_FILE_SIZE") == "20000000"
+    assert config.get("DEFAULT", "DOWNLOAD_TIMEOUT") == "10"
