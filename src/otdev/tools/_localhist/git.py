@@ -141,6 +141,7 @@ class GitRunner:
                 ["git", *args],
                 cwd=self.paths.work_tree,
                 env={
+                    **os.environ,
                     "GIT_DIR": str(self.paths.git_dir),
                     "GIT_WORK_TREE": str(self.paths.work_tree),
                 },

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import inspect
+import io
 import json
 import subprocess
+import threading
+import time
 from typing import TYPE_CHECKING
 
 import pytest
@@ -101,6 +104,46 @@ def test_git_runner_uses_explicit_environment(monkeypatch: pytest.MonkeyPatch, t
     assert isinstance(env, dict)
     assert env["GIT_DIR"] == str(tmp_path / ".localhist")
     assert env["GIT_WORK_TREE"] == str(tmp_path)
+
+
+def test_run_line_window_env_extends_parent_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    monkeypatch.setenv("LOCALHIST_TEST_SENTINEL", "inherited")
+    paths = resolve_paths(Config())
+    captured: dict[str, object] = {}
+
+    class FakeProc:
+        stdout = io.StringIO("line\n")
+        stderr = io.StringIO("")
+
+        def wait(self) -> int:
+            return 0
+
+        def kill(self) -> None:
+            pass
+
+    def fake_popen(args: list[str], **kwargs: object) -> FakeProc:
+        captured["env"] = kwargs["env"]
+        return FakeProc()
+
+    monkeypatch.setattr("otdev.tools._localhist.git.subprocess.Popen", fake_popen)
+    window = GitRunner(paths).run_line_window(
+        ["show", "HEAD:a.txt"],
+        offset=1,
+        limit=None,
+        tail=None,
+        max_bytes=1024,
+    )
+    assert window["content"] == "line\n"
+    env = captured["env"]
+    assert isinstance(env, dict)
+    assert env["GIT_DIR"] == str(tmp_path / ".localhist")
+    assert env["GIT_WORK_TREE"] == str(tmp_path)
+    assert env["LOCALHIST_TEST_SENTINEL"] == "inherited"
+    assert "PATH" in env
 
 
 def test_init_info_status_save_log_and_gitignore(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -298,6 +341,51 @@ def test_autosave_run_once_creates_auto_snapshot(
     assert localhist.log(limit=5)["entries"][0]["subject"].startswith("autosave:")
 
 
+def test_autosave_recovers_from_corrupt_state_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    _write(tmp_path / "a.txt", "one\n")
+    localhist.init()
+    state_file = tmp_path / ".onetool" / "state" / "localhist" / "autosave-state.json"
+    _write(state_file, "{not json")
+
+    state = run_once(project_root=tmp_path)
+
+    assert state["status"] == "running"
+    assert any("state file reset" in error for error in state["recent_errors"])
+    rewritten = json.loads(state_file.read_text())
+    assert rewritten["status"] == "running"
+    assert localhist.autosave_list()["ok"] is True
+
+
+def test_run_once_preserves_concurrent_stop_request(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    _write(tmp_path / "a.txt", "one\n")
+    localhist.init()
+    state_file = tmp_path / ".onetool" / "state" / "localhist" / "autosave-state.json"
+    run_once(project_root=tmp_path)
+    entered = threading.Event()
+
+    def slow_signature() -> None:
+        entered.set()
+        time.sleep(0.3)
+        return None
+
+    monkeypatch.setattr(autosave_runtime, "repository_dirty_signature", slow_signature)
+    stopper = threading.Thread(target=lambda: (entered.wait(5), localhist.autosave_stop()))
+    stopper.start()
+    run_once(project_root=tmp_path)
+    stopper.join(timeout=10)
+
+    assert not stopper.is_alive()
+    assert json.loads(state_file.read_text())["stop_requested"] is True
+
+
 def test_autosave_start_list_stop_and_stale_takeover(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -319,6 +407,7 @@ def test_autosave_start_list_stop_and_stale_takeover(
     assert listed["stale"] is False
     assert listed["active_project"] == str(tmp_path)
     assert listed["config"]["autosave"]["heartbeat_timeout_seconds"] == 120.0
+    assert not (tmp_path / ".onetool" / "state" / "localhist" / "autosave-shared.json").exists()
 
     state_file = tmp_path / ".onetool" / "state" / "localhist" / "autosave-state.json"
     data = state_file.read_text()

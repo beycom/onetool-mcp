@@ -255,21 +255,6 @@ def _status_output(git: GitRunner, path: str | None = None) -> str:
     return git.run_list(args)
 
 
-def repository_dirty() -> bool:
-    """Return whether localhist has any tracked or untracked changes."""
-
-    config = load_config()
-    paths = resolve_paths(config)
-    if not (paths.git_dir / "HEAD").exists():
-        return False
-    git = GitRunner(paths)
-    output, _ = git.run_limited(
-        ["status", "--porcelain", "--untracked-files=all"],
-        max_bytes=1,
-    )
-    return bool(output)
-
-
 def repository_dirty_signature() -> str | None:
     """Return a stable signature for the current dirty worktree state."""
 

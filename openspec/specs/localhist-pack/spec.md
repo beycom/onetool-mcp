@@ -250,6 +250,14 @@ The system SHALL expose opt-in background autosave watcher lifecycle tools while
 - **WHEN** `localhist.autosave_stop()` is called
 - **THEN** the system SHALL request the active watcher to stop and return structured stop status.
 
+#### Scenario: Stop request survives a watcher iteration
+- **WHEN** `localhist.autosave_stop()` records a stop request while the watcher is mid-iteration
+- **THEN** the watcher SHALL update the state file under the same lock as start and stop so the stop request is not overwritten.
+
+#### Scenario: Corrupt watcher state file is recoverable
+- **WHEN** the autosave watcher reads a corrupt or unreadable state file
+- **THEN** the watcher SHALL keep running, record the failure in `recent_errors`, and rewrite a valid state file instead of terminating.
+
 #### Scenario: No direct autosave snapshot tool
 - **WHEN** users need autosave snapshots
 - **THEN** the system SHALL NOT expose `localhist.autosave(reason=...)`; autosave snapshots SHALL be created only by an active watcher.

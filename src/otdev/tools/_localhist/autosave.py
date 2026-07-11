@@ -27,7 +27,6 @@ from otdev.tools._localhist.core import (
 )
 
 STATE_FILE = "autosave-state.json"
-SHARED_FILE = "autosave-shared.json"
 LOCK_FILE = "autosave.lock"
 
 
@@ -51,19 +50,20 @@ def _state_path(paths: Paths) -> Path:
     return paths.state_dir / STATE_FILE
 
 
-def _shared_path(paths: Paths) -> Path:
-    return paths.state_dir / SHARED_FILE
-
-
 def _lock_path(paths: Paths) -> Path:
     paths.state_dir.mkdir(parents=True, exist_ok=True)
     return paths.state_dir / LOCK_FILE
 
 
 def _read_json(path: Path) -> dict[str, Any]:
-    if not path.exists():
+    try:
+        data = json.loads(path.read_text())
+    except FileNotFoundError:
         return {}
-    data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        # A corrupt or unreadable state file must not kill the watcher.
+        # Report the failure through recent_errors and let callers rebuild.
+        return {"recent_errors": [f"state file reset ({type(exc).__name__}): {exc}"]}
     return data if isinstance(data, dict) else {}
 
 
@@ -157,7 +157,6 @@ def autosave_start_project(*, path: str | None = None) -> dict[str, object]:
         state["status"] = "running"
         state["heartbeat_at"] = _now()
         _write_json(_state_path(paths), state)
-        _write_json(_shared_path(paths), {"active_project": str(paths.project_root), "pid": proc.pid})
         return {
             "ok": True,
             "started": True,
@@ -229,34 +228,37 @@ def run_once(*, project_root: Path) -> dict[str, object]:
     """Run one autosave scheduling iteration for tests and the watcher loop."""
 
     config, paths = resolve_project(str(project_root))
-    state = _state(paths) or _new_state(config, paths, status="running")
-    with project_context(paths.project_root):
-        dirty_signature = repository_dirty_signature()
-    dirty = dirty_signature is not None
-    now = _now()
-    state["heartbeat_at"] = now
-    state["status"] = "running"
-    if dirty and state.get("last_dirty_signature") != dirty_signature:
-        state["last_event_at"] = now
-        state["last_dirty_signature"] = dirty_signature
-    last_event = state.get("last_event_at")
-    last_save = state.get("last_save") or {}
-    last_save_at = last_save.get("timestamp") if isinstance(last_save, dict) else None
-    quiet = not last_event or now - float(last_event) >= config.autosave.quiet_period_seconds
-    interval_ok = not last_save_at or now - float(last_save_at) >= config.autosave.min_save_interval_seconds
-    if dirty and quiet and interval_ok:
-        result = save_snapshot_for_project(
-            project_root=paths.project_root,
-            message=f"{config.autosave.message_prefix}: {time.strftime('%Y-%m-%d %H:%M:%S')}",
-            kind="auto",
-        )
-        state["last_save"] = {"timestamp": now, "result": result}
-        state["last_event_at"] = None
-    elif not dirty:
-        state["last_save"] = {"timestamp": now, "result": {"ok": True, "created": False, "reason": "no_changes"}}
-        state["last_event_at"] = None
-        state["last_dirty_signature"] = None
-    _write_json(_state_path(paths), state)
+    # Hold the same lock as start/stop for the whole read-modify-write so a
+    # concurrent stop_requested=True cannot be clobbered by this iteration.
+    with FileLock(str(_lock_path(paths))):
+        state = _state(paths) or _new_state(config, paths, status="running")
+        with project_context(paths.project_root):
+            dirty_signature = repository_dirty_signature()
+        dirty = dirty_signature is not None
+        now = _now()
+        state["heartbeat_at"] = now
+        state["status"] = "running"
+        if dirty and state.get("last_dirty_signature") != dirty_signature:
+            state["last_event_at"] = now
+            state["last_dirty_signature"] = dirty_signature
+        last_event = state.get("last_event_at")
+        last_save = state.get("last_save") or {}
+        last_save_at = last_save.get("timestamp") if isinstance(last_save, dict) else None
+        quiet = not last_event or now - float(last_event) >= config.autosave.quiet_period_seconds
+        interval_ok = not last_save_at or now - float(last_save_at) >= config.autosave.min_save_interval_seconds
+        if dirty and quiet and interval_ok:
+            result = save_snapshot_for_project(
+                project_root=paths.project_root,
+                message=f"{config.autosave.message_prefix}: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+                kind="auto",
+            )
+            state["last_save"] = {"timestamp": now, "result": result}
+            state["last_event_at"] = None
+        elif not dirty:
+            state["last_save"] = {"timestamp": now, "result": {"ok": True, "created": False, "reason": "no_changes"}}
+            state["last_event_at"] = None
+            state["last_dirty_signature"] = None
+        _write_json(_state_path(paths), state)
     return state
 
 
@@ -265,20 +267,22 @@ def run_loop(*, project_root: Path) -> None:
 
     while True:
         _, paths = resolve_project(str(project_root))
-        state = _read_json(_state_path(paths))
-        if state.get("stop_requested"):
-            state["status"] = "stopped"
-            state["heartbeat_at"] = _now()
-            _write_json(_state_path(paths), state)
-            return
+        with FileLock(str(_lock_path(paths))):
+            state = _read_json(_state_path(paths))
+            if state.get("stop_requested"):
+                state["status"] = "stopped"
+                state["heartbeat_at"] = _now()
+                _write_json(_state_path(paths), state)
+                return
         try:
             state = dict(run_once(project_root=project_root))
         except Exception as exc:  # pragma: no cover - defensive process loop
-            state = _read_json(_state_path(paths))
-            errors = [str(exc), *state.get("recent_errors", [])][:5]
-            state["recent_errors"] = errors
-            state["heartbeat_at"] = _now()
-            _write_json(_state_path(paths), state)
+            with FileLock(str(_lock_path(paths))):
+                state = _read_json(_state_path(paths))
+                errors = [str(exc), *state.get("recent_errors", [])][:5]
+                state["recent_errors"] = errors
+                state["heartbeat_at"] = _now()
+                _write_json(_state_path(paths), state)
         time.sleep(float(state.get("poll_interval_seconds", 30.0)))
 
 
