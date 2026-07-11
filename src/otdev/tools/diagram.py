@@ -878,7 +878,7 @@ def render_diagram(
 
             # Load source from file if needed
             if source_file is not None:
-                file_path = Path(source_file)
+                file_path = _resolve_project_path(source_file)
                 if not file_path.exists():
                     raise FileNotFoundError(f"Source file not found: {source_file}")
 
@@ -1259,7 +1259,7 @@ def render_directory(
                 "Run: onetool diagram setup --self-hosted"
             )
 
-        dir_path = Path(directory)
+        dir_path = _resolve_project_path(directory)
         if not dir_path.exists():
             s.add(error="dir_not_found")
             return f"Error: Directory not found: {directory}"
