@@ -30,7 +30,6 @@ if TYPE_CHECKING:
 PROTOCOL = "onetool.console"
 PROTOCOL_VERSION = 1
 OUTBOX_PATH = "/api/console/outbox"
-OUTBOX_ACK_PATH = "/api/console/outbox/ack"
 
 ConsoleEventType = Literal["instance.snapshot", "console.message.created"]
 
@@ -50,7 +49,7 @@ class ConsoleOutboxState:
 
     instance_id: str | None = None
     sequence: int = 0
-    acked_through: int = 0
+    last_evicted: int = 0
     entries: deque[OutboxEntry] = field(default_factory=deque)
     lock: Lock = field(default_factory=Lock)
     _last_snapshot: tuple[str, int] | None = field(default=None, repr=False)
@@ -63,7 +62,7 @@ class ConsoleOutboxState:
             elif self.instance_id != instance_id:
                 self.instance_id = instance_id
                 self.sequence = 0
-                self.acked_through = 0
+                self.last_evicted = 0
                 self.entries.clear()
                 self._last_snapshot = None
 
@@ -103,19 +102,18 @@ class ConsoleOutboxState:
         """Return a stable batch without mutating retained events."""
         with self.lock:
             instance_id = self.instance_id or "mcp-uninitialized"
-            cursor = max(0, self.acked_through if after is None else after)
+            cursor = max(0, 0 if after is None else after)
             batch_limit = max(1, min(500, limit))
             eligible = [entry for entry in self.entries if entry.sequence > cursor]
             selected = eligible[:batch_limit]
             next_cursor = selected[-1].sequence if selected else cursor
             # `oldest_retained` lets a consumer detect retention-driven loss:
-            # the sequence of the oldest entry still retained, or (when the
-            # outbox holds no entries) `acked_through` as the empty-outbox
-            # value. A consumer whose cursor is `c` has lost events whenever
-            # `oldest_retained > c + 1` (the events `c+1 .. oldest_retained-1`
-            # were evicted by bounded retention before it acknowledged them).
+            # the sequence of the oldest entry still retained, or one past the
+            # most recently evicted sequence when the outbox is empty. A
+            # consumer whose cursor is `c` has lost events whenever
+            # `oldest_retained > c + 1`.
             oldest_retained = (
-                self.entries[0].sequence if self.entries else self.acked_through
+                self.entries[0].sequence if self.entries else self.last_evicted + 1
             )
             batch = {
                 "protocol": PROTOCOL,
@@ -130,31 +128,6 @@ class ConsoleOutboxState:
             }
         batch["events"] = [_serialize_entry(entry) for entry in selected]
         return batch
-
-    def ack(self, *, acked_through: int, instance_id: str) -> dict[str, Any]:
-        """Record acknowledgement and drop acknowledged entries.
-
-        Acknowledgement is keyed on `(instance_id, acked_through)` only; the
-        poll batch identity (`batch_id`) is not part of the ack contract.
-        """
-        with self.lock:
-            if self.instance_id is not None and instance_id != self.instance_id:
-                raise ValueError(
-                    "ack instance_id does not match current outbox instance"
-                )
-            if acked_through < self.acked_through:
-                acked_through = self.acked_through
-            self.acked_through = min(acked_through, self.sequence)
-            while self.entries and self.entries[0].sequence <= self.acked_through:
-                self.entries.popleft()
-            return {
-                "protocol": PROTOCOL,
-                "protocol_version": PROTOCOL_VERSION,
-                "instance_id": self.instance_id or instance_id,
-                "acked_through": self.acked_through,
-                "retained": len(self.entries),
-                "created_at": _iso_now(),
-            }
 
     def note_snapshot(self, *, status: str, message_count: int) -> bool:
         """Record an instance-snapshot fingerprint, returning whether it is new.
@@ -175,24 +148,32 @@ class ConsoleOutboxState:
     def drop_message(self, *, message_id: str) -> None:
         """Drop retained `console.message.created` events for a removed Console message."""
         with self.lock:
+            removed = [
+                entry
+                for entry in self.entries
+                if entry.event.get("type") == "console.message.created"
+                and entry.event.get("payload", {}).get("id") == message_id
+            ]
+            if removed:
+                self.last_evicted = max(self.last_evicted, removed[-1].sequence)
             self.entries = deque(
                 entry
                 for entry in self.entries
-                if not (
-                    entry.event.get("type") == "console.message.created"
-                    and entry.event.get("payload", {}).get("id") == message_id
-                )
+                if entry not in removed
             )
 
     def clear(self) -> None:
         """Clear all retained events while preserving sequence monotonicity."""
         with self.lock:
+            if self.entries:
+                self.last_evicted = max(self.last_evicted, self.entries[-1].sequence)
             self.entries.clear()
 
     def _enforce_retention_locked(self) -> None:
         limit = queue_message_limit()
         while len(self.entries) > limit:
-            self.entries.popleft()
+            evicted = self.entries.popleft()
+            self.last_evicted = max(self.last_evicted, evicted.sequence)
 
 
 STATE = ConsoleOutboxState()
@@ -312,10 +293,17 @@ def _serialize_entry(entry: OutboxEntry) -> dict[str, Any]:
         message = read_message_body(message_id=entry.message_id)
     except FileNotFoundError:
         # Eviction/clear raced this poll between entry selection (under the
-        # outbox lock) and hydration (outside it). Return the body-free event
-        # rather than failing the whole batch — the matching drop/clear event
-        # reaches the consumer through the same protocol.
-        return entry.event
+        # outbox lock) and hydration (outside it). Complete the body-free
+        # metadata so the fallback still satisfies the protocol schema.
+        event = dict(entry.event)
+        payload = dict(event["payload"])
+        wire_payload = dict(payload["payload"])
+        if wire_payload.get("mode") == "inline":
+            wire_payload["content"] = None
+        payload["payload"] = wire_payload
+        payload["preview"] = None
+        event["payload"] = payload
+        return event
     event = dict(entry.event)
     event["payload"] = build_console_message_payload(
         metadata=message.metadata,
@@ -328,23 +316,6 @@ def _serialize_entry(entry: OutboxEntry) -> dict[str, Any]:
 def poll_outbox(*, limit: int = 100, after: int | None = None) -> dict[str, Any]:
     """Return an outbox batch."""
     return STATE.poll(limit=limit, after=after)
-
-
-def ack_outbox(*, payload: dict[str, Any]) -> dict[str, Any]:
-    """Acknowledge an outbox batch payload."""
-    if (
-        payload.get("protocol") != PROTOCOL
-        or payload.get("protocol_version") != PROTOCOL_VERSION
-    ):
-        raise ValueError("unsupported Console protocol identity")
-    instance_id = payload.get("instance_id")
-    acked_through = payload.get("acked_through")
-    # `batch_id` is no longer part of the ack contract; accept and ignore it
-    # for backward tolerance if a consumer still sends it.
-    payload.pop("batch_id", None)
-    if not isinstance(instance_id, str) or not isinstance(acked_through, int):
-        raise ValueError("invalid outbox ack payload")
-    return STATE.ack(acked_through=acked_through, instance_id=instance_id)
 
 
 def _json_compatible(value: object) -> object:
@@ -423,12 +394,10 @@ def _iso_now() -> str:
 
 
 __all__ = [
-    "OUTBOX_ACK_PATH",
     "OUTBOX_PATH",
     "PROTOCOL",
     "PROTOCOL_VERSION",
     "STATE",
-    "ack_outbox",
     "build_console_message_payload",
     "build_instance_snapshot",
     "current_allowed_roots",

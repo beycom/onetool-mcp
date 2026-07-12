@@ -146,12 +146,11 @@ The API SHALL expose:
 - signed `GET /ready`
 - signed `POST /run`
 - signed `GET /api/console/outbox`
-- signed `POST /api/console/outbox/ack`
 
 Requests and responses SHALL use OneTool HMAC headers. Two keys SHALL exist under the active
 OT_DIR, both created `0600`:
 - `auth/mcp-direct.key` — authorizes `/health`, `/ready`, and `/run` only
-- `auth/console-outbox.key` — authorizes the Console outbox endpoints only
+- `auth/console-outbox.key` — authorizes the Console outbox endpoint only
 
 Every request SHALL verify method, path, body hash, timestamp, nonce, and
 signature before doing work, against the key scoped to that endpoint. Replayed nonces SHALL
@@ -184,7 +183,7 @@ be rejected. Every response, including errors, SHALL be signed.
 #### Scenario: Console outbox key is ensured eagerly at startup
 
 - **GIVEN** `direct.host.enabled: true`
-- **WHEN** the direct API app is created and the Console outbox routes are
+- **WHEN** the direct API app is created and the Console outbox route is
   mounted
 - **THEN** `auth/console-outbox.key` SHALL exist on disk immediately, before
   any Console outbox request is served
@@ -248,4 +247,3 @@ limit before command execution.
 
 Multiple MCP processes SHALL be supported by binding distinct ports; users
 select the target process with `onetool direct run --port PORT`.
-

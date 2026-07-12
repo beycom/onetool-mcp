@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from starlette.testclient import TestClient
 
-from ot.console.outbox import OUTBOX_ACK_PATH, OUTBOX_PATH
+from ot.console.outbox import OUTBOX_PATH
 from ot.console.outbox import STATE as CONSOLE_STATE
 from ot.direct_api import MAX_REQUEST_BODY_BYTES, create_app
 from ot.direct_auth import (
@@ -40,7 +40,7 @@ def _reset_console_state(instance_id: str = "mcp-test") -> None:
     """
     CONSOLE_STATE.instance_id = instance_id
     CONSOLE_STATE.sequence = 0
-    CONSOLE_STATE.acked_through = 0
+    CONSOLE_STATE.last_evicted = 0
     CONSOLE_STATE.entries.clear()
 
 
@@ -241,47 +241,19 @@ def test_console_outbox_poll_returns_batch_with_identity_and_cursors() -> None:
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_console_outbox_ack_records_and_advances_cursor() -> None:
-    """Acknowledging a batch advances the cursor and drops acked entries."""
+def test_console_outbox_ack_route_does_not_exist() -> None:
+    """Protocol v1 has no acknowledgement endpoint."""
     client = TestClient(create_app())
-    _reset_console_state()
-    CONSOLE_STATE.append(
-        event_type="instance.snapshot", payload={"id": "mcp-test", "status": "running"}
-    )
-    CONSOLE_STATE.append(event_type="console.message.created", payload={"id": "m1"})
-    batch = CONSOLE_STATE.poll(limit=10)
-    body = (
-        f'{{"protocol":"onetool.console","protocol_version":1,'
-        f'"instance_id":"mcp-test",'
-        f'"acked_through":{batch["next_cursor"]}}}'
-    ).encode()
 
-    response = client.post(
-        OUTBOX_ACK_PATH,
-        content=body,
-        headers={
-            "content-type": "application/json",
-            **signed_console_headers(method="POST", path=OUTBOX_ACK_PATH, body=body),
-        },
-    )
+    response = client.post("/api/console/outbox/ack", content=b"{}")
 
-    verify_console_response(
-        path=OUTBOX_ACK_PATH,
-        body=response.content,
-        headers=dict(response.headers),
-        status_code=response.status_code,
-    )
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["acked_through"] == batch["next_cursor"]
-    assert payload["retained"] == 0
-    assert len(CONSOLE_STATE.entries) == 0
+    assert response.status_code == 404
 
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_console_outbox_redelivers_unacked_events_at_least_once() -> None:
-    """Events not yet acked stay eligible for redelivery on the next poll."""
+def test_console_outbox_redelivers_events_for_the_same_cursor() -> None:
+    """Events stay eligible for independent consumers using the same cursor."""
     client = TestClient(create_app())
     _reset_console_state()
     CONSOLE_STATE.append(
@@ -337,7 +309,7 @@ def test_console_key_does_not_authorize_run_health_or_ready() -> None:
 @pytest.mark.unit
 @pytest.mark.core
 def test_direct_key_does_not_authorize_console_outbox() -> None:
-    """The general direct key must not authorize Console outbox endpoints."""
+    """The general direct key must not authorize the Console outbox endpoint."""
     client = TestClient(create_app())
 
     response = client.get(
@@ -351,28 +323,10 @@ def test_direct_key_does_not_authorize_console_outbox() -> None:
     )
     assert response.status_code == 401
 
-    ack_body = b'{"protocol":"onetool.console","protocol_version":1}'
-    ack_response = client.post(
-        OUTBOX_ACK_PATH,
-        content=ack_body,
-        headers={
-            "content-type": "application/json",
-            **signed_headers(method="POST", path=OUTBOX_ACK_PATH, body=ack_body),
-        },
-    )
-    verify_console_response(
-        path=OUTBOX_ACK_PATH,
-        body=ack_response.content,
-        headers=dict(ack_response.headers),
-        status_code=ack_response.status_code,
-    )
-    assert ack_response.status_code == 401
-
-
 @pytest.mark.unit
 @pytest.mark.core
-def test_unsigned_console_outbox_endpoints_return_signed_401() -> None:
-    """Console outbox endpoints require the Console HMAC key, not just any signature."""
+def test_unsigned_console_outbox_endpoint_returns_signed_401() -> None:
+    """The Console outbox endpoint requires its dedicated HMAC key."""
     client = TestClient(create_app())
 
     poll_response = client.get(OUTBOX_PATH)
@@ -383,16 +337,6 @@ def test_unsigned_console_outbox_endpoints_return_signed_401() -> None:
         status_code=poll_response.status_code,
     )
     assert poll_response.status_code == 401
-
-    ack_response = client.post(OUTBOX_ACK_PATH, content=b"{}")
-    verify_console_response(
-        path=OUTBOX_ACK_PATH,
-        body=ack_response.content,
-        headers=dict(ack_response.headers),
-        status_code=ack_response.status_code,
-    )
-    assert ack_response.status_code == 401
-
 
 @pytest.mark.unit
 @pytest.mark.core

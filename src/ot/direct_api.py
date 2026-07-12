@@ -40,9 +40,7 @@ def create_app() -> Any:
     from starlette.routing import Route
 
     from ot.console.outbox import (
-        OUTBOX_ACK_PATH,
         OUTBOX_PATH,
-        ack_outbox,
         ensure_instance_snapshot,
         poll_outbox,
     )
@@ -234,44 +232,12 @@ def create_app() -> Any:
             path=OUTBOX_PATH,
         )
 
-    async def console_outbox_ack_endpoint(request: Any) -> Any:
-        try:
-            raw_body = await _read_limited_body(request)
-        except ValueError as e:
-            return signed_console_json_response(
-                {"protocol": "onetool.console", "protocol_version": 1, "error": str(e)},
-                path=OUTBOX_ACK_PATH,
-                status_code=413,
-            )
-        try:
-            verify_console_request(
-                method=request.method,
-                path=OUTBOX_ACK_PATH,
-                body=raw_body,
-                headers=dict(request.headers),
-            )
-        except HmacAuthError as e:
-            return console_auth_error_response(e, path=OUTBOX_ACK_PATH)
-        try:
-            payload = json.loads(raw_body.decode("utf-8"))
-            if not isinstance(payload, dict):
-                raise ValueError("invalid outbox ack payload")
-            result = ack_outbox(payload=payload)
-        except Exception as e:
-            return signed_console_json_response(
-                {"protocol": "onetool.console", "protocol_version": 1, "error": str(e)},
-                path=OUTBOX_ACK_PATH,
-                status_code=400,
-            )
-        return signed_console_json_response(result, path=OUTBOX_ACK_PATH)
-
     return Starlette(
         routes=[
             Route(HEALTH_PATH, health_endpoint, methods=["GET"]),
             Route(READY_PATH, ready_endpoint, methods=["GET"]),
             Route(RUN_PATH, run_endpoint, methods=["POST"]),
             Route(OUTBOX_PATH, console_outbox_endpoint, methods=["GET"]),
-            Route(OUTBOX_ACK_PATH, console_outbox_ack_endpoint, methods=["POST"]),
         ]
     )
 

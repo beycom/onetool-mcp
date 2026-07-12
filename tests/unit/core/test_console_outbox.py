@@ -20,7 +20,6 @@ from ot.console.outbox import (
     PROTOCOL,
     PROTOCOL_VERSION,
     ConsoleOutboxState,
-    ack_outbox,
     build_console_message_payload,
     build_instance_snapshot,
     ensure_instance_snapshot,
@@ -32,7 +31,7 @@ from ot.console.outbox import STATE as GLOBAL_STATE
 def _reset_global_state() -> None:
     GLOBAL_STATE.instance_id = None
     GLOBAL_STATE.sequence = 0
-    GLOBAL_STATE.acked_through = 0
+    GLOBAL_STATE.last_evicted = 0
     GLOBAL_STATE.entries.clear()
     GLOBAL_STATE._last_snapshot = None
 
@@ -80,7 +79,7 @@ def _write_inline_body(
 @pytest.mark.unit
 @pytest.mark.core
 class TestConsoleOutboxState:
-    """Sequence, ack, retention, and instance-reset semantics."""
+    """Sequence, cursor polling, retention, and instance-reset semantics."""
 
     def test_append_assigns_monotonic_sequence(self) -> None:
         state = ConsoleOutboxState()
@@ -107,8 +106,8 @@ class TestConsoleOutboxState:
         assert first_batch["events"] == second_batch["events"]
         assert len(first_batch["events"]) == 1
 
-    def test_at_least_once_delivery_without_ack(self) -> None:
-        """Unacknowledged events remain eligible for later polls."""
+    def test_cursor_controls_delivery_without_mutating_retention(self) -> None:
+        """Independent cursors select events without mutating retention."""
         state = ConsoleOutboxState()
         state.configure_instance(instance_id="mcp-test")
         state.append(event_type="instance.snapshot", payload={"id": "mcp-test"})
@@ -118,50 +117,39 @@ class TestConsoleOutboxState:
         assert len(batch["events"]) == 1
         assert batch["has_more"] is True
 
-        # Polling again without acking returns the same first event.
+        # A second consumer with the same cursor receives the same first event.
         replay = state.poll(limit=1)
         assert replay["events"] == batch["events"]
 
-    def test_ack_advances_cursor_and_drops_entries(self) -> None:
+    def test_consumers_advance_independently(self) -> None:
         state = ConsoleOutboxState()
         state.configure_instance(instance_id="mcp-test")
         state.append(event_type="instance.snapshot", payload={"id": "mcp-test"})
         state.append(event_type="console.message.created", payload={"id": "m1"})
 
-        batch = state.poll(limit=10)
-        ack_result = state.ack(
-            acked_through=batch["next_cursor"],
-            instance_id="mcp-test",
+        first_consumer = state.poll(limit=1, after=0)
+        second_consumer = state.poll(limit=10, after=0)
+        first_consumer_next = state.poll(
+            limit=10, after=first_consumer["next_cursor"]
         )
 
-        assert ack_result["acked_through"] == batch["next_cursor"]
-        assert ack_result["retained"] == 0
-        assert len(state.entries) == 0
-
-        next_batch = state.poll(limit=10)
-        assert next_batch["events"] == []
-        assert next_batch["cursor"] == batch["next_cursor"]
-
-    def test_ack_rejects_mismatched_instance(self) -> None:
-        state = ConsoleOutboxState()
-        state.configure_instance(instance_id="mcp-test")
-        state.append(event_type="instance.snapshot", payload={"id": "mcp-test"})
-
-        with pytest.raises(ValueError, match="does not match"):
-            state.ack(acked_through=1, instance_id="mcp-other")
+        assert [event["sequence"] for event in first_consumer["events"]] == [1]
+        assert [event["sequence"] for event in second_consumer["events"]] == [1, 2]
+        assert [event["sequence"] for event in first_consumer_next["events"]] == [2]
+        assert len(state.entries) == 2
 
     def test_configure_instance_reset_on_id_change(self) -> None:
-        """Re-configuring with a different instance id resets sequence/ack/entries."""
+        """Re-configuring with a different instance id resets outbox state."""
         state = ConsoleOutboxState()
         state.configure_instance(instance_id="mcp-first")
         state.append(event_type="instance.snapshot", payload={"id": "mcp-first"})
-        state.ack(acked_through=1, instance_id="mcp-first")
+        state.clear()
 
         state.configure_instance(instance_id="mcp-second")
 
         assert state.instance_id == "mcp-second"
         assert state.sequence == 0
-        assert state.acked_through == 0
+        assert state.last_evicted == 0
         assert len(state.entries) == 0
 
     def test_configure_instance_same_id_is_noop(self) -> None:
@@ -174,7 +162,7 @@ class TestConsoleOutboxState:
         assert state.sequence == 1
         assert len(state.entries) == 1
 
-    def test_retention_bound_drops_oldest_unacked_entries(
+    def test_retention_bound_drops_oldest_entries(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr("ot.console.outbox.queue_message_limit", lambda: 3)
@@ -193,10 +181,10 @@ class TestConsoleOutboxState:
     def test_poll_reports_oldest_retained_for_gap_detection(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """After retention evicts unacked events, `oldest_retained` reveals the gap.
+        """After retention evicts events, `oldest_retained` reveals the gap.
 
         A fresh consumer polls with cursor 0, expecting sequence 1 next. Because
-        bounded retention dropped sequences 1 and 2 before any acknowledgement,
+        bounded retention dropped sequences 1 and 2 before this consumer polled,
         `oldest_retained` is 3 (> cursor + 1), so the consumer can detect that
         events 1 and 2 were lost.
         """
@@ -213,22 +201,28 @@ class TestConsoleOutboxState:
         assert batch["cursor"] == 0
         assert batch["oldest_retained"] == 3
         # Consumer expected cursor + 1 == 1 next; oldest_retained > cursor + 1
-        # signals that sequences 1 and 2 were evicted before acknowledgement.
+        # signals that sequences 1 and 2 were evicted before polling.
         assert batch["oldest_retained"] > batch["cursor"] + 1
 
-    def test_poll_empty_outbox_reports_oldest_retained_as_acked_through(self) -> None:
-        """With no retained entries, `oldest_retained` equals `acked_through`."""
+    def test_poll_empty_outbox_reports_next_available_sequence(self) -> None:
         state = ConsoleOutboxState()
         state.configure_instance(instance_id="mcp-test")
-        state.append(event_type="instance.snapshot", payload={"id": "mcp-test"})
-        batch = state.poll(limit=10)
-        state.ack(acked_through=batch["next_cursor"], instance_id="mcp-test")
 
         empty = state.poll(limit=10)
         assert empty["events"] == []
-        assert empty["oldest_retained"] == state.acked_through
-        # No gap: oldest_retained == cursor, not greater than cursor + 1.
-        assert empty["oldest_retained"] == empty["cursor"]
+        assert empty["oldest_retained"] == 1
+        assert empty["oldest_retained"] == empty["cursor"] + 1
+
+    def test_poll_empty_outbox_reports_sequence_after_clear(self) -> None:
+        state = ConsoleOutboxState()
+        state.configure_instance(instance_id="mcp-test")
+        state.append(event_type="instance.snapshot", payload={"id": "mcp-test"})
+
+        state.clear()
+
+        empty = state.poll(limit=10)
+        assert empty["events"] == []
+        assert empty["oldest_retained"] == 2
 
     def test_append_requires_configured_instance(self) -> None:
         state = ConsoleOutboxState()
@@ -283,7 +277,7 @@ class TestConsoleOutboxState:
 @pytest.mark.unit
 @pytest.mark.core
 class TestConsoleOutboxModuleHelpers:
-    """Module-level publish/poll/ack helpers over the global singleton."""
+    """Module-level publish and poll helpers over the global singleton."""
 
     def test_ensure_instance_snapshot_appends_event(self) -> None:
         ensure_instance_snapshot(message_count=0)
@@ -325,23 +319,6 @@ class TestConsoleOutboxModuleHelpers:
         snapshots = [e for e in batch["events"] if e["type"] == "instance.snapshot"]
         assert len(snapshots) == 1
         assert batch["instance_id"] == "mcp-b"
-
-    def test_ack_outbox_validates_protocol_identity(self) -> None:
-        ensure_instance_snapshot(message_count=0)
-        batch = poll_outbox(limit=10)
-
-        with pytest.raises(ValueError, match="unsupported Console protocol"):
-            ack_outbox(payload={"protocol": "other", "protocol_version": 1})
-
-        result = ack_outbox(
-            payload={
-                "protocol": PROTOCOL,
-                "protocol_version": PROTOCOL_VERSION,
-                "instance_id": batch["instance_id"],
-                "acked_through": batch["next_cursor"],
-            }
-        )
-        assert result["acked_through"] == batch["next_cursor"]
 
     def test_build_instance_snapshot_matches_schema_shape(self) -> None:
         snapshot = build_instance_snapshot(message_count=3, status="running")
@@ -499,7 +476,7 @@ class TestSnapshotRoots:
 @pytest.mark.unit
 @pytest.mark.core
 def test_poll_falls_back_to_body_free_event_when_body_vanished() -> None:
-    """A poll racing eviction/clear returns the body-free event, not an error."""
+    """A poll racing eviction/clear returns a schema-valid body-free event."""
     metadata = _make_metadata()
     preview = BoundedPreview(
         text="hello", truncated=False, size_bytes=5, limit_bytes=100
@@ -519,6 +496,16 @@ def test_poll_falls_back_to_body_free_event_when_body_vanished() -> None:
 
     events = [e for e in batch["events"] if e["type"] == "console.message.created"]
     assert len(events) == 1
-    assert events[0]["payload"]["id"] == metadata.id
-    assert "content" not in events[0]["payload"]["payload"]
-    assert "preview" not in events[0]["payload"]
+    event = events[0]
+    assert event["payload"]["id"] == metadata.id
+    assert event["payload"]["payload"]["content"] is None
+    assert event["payload"]["preview"] is None
+
+    import json
+    from pathlib import Path
+
+    schema = json.loads(
+        Path("tests/fixtures/console-protocol/schemas/console-message.schema.json")
+        .read_text(encoding="utf-8")
+    )
+    Draft202012Validator(schema).validate(event["payload"])

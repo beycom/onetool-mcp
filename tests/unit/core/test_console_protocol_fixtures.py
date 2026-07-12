@@ -30,7 +30,6 @@ def test_vendored_console_fixtures_validate_against_schemas() -> None:
     cases = [
         ("empty-outbox-batch.json", "outbox-batch.schema.json"),
         ("outbox-batch.json", "outbox-batch.schema.json"),
-        ("outbox-ack.json", "outbox-ack.schema.json"),
         ("instance-snapshot.json", "instance-snapshot.schema.json"),
         ("inline-console-message.json", "console-message.schema.json"),
         ("file-ref-console-message.json", "console-message.schema.json"),

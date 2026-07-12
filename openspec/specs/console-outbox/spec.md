@@ -5,10 +5,10 @@
 Defines the signed MCP-owned Console outbox protocol used by the separate OneTool Console App to
 consume read-only MCP instance and display events.
 
-**Status: protocol v1.** The `/api/console/outbox` and `/api/console/outbox/ack` HTTP routes
-and the MCP-owned outbox state emit all three protocol payload modes: `inline`, `file_ref`,
-and `file_diff_ref`. File-reference payloads carry paths only; consumers fetch file content
-locally, validated against the `allowed_roots` published in instance snapshots.
+**Status: protocol v1.** The `/api/console/outbox` HTTP route and the MCP-owned outbox state
+emit all three protocol payload modes: `inline`, `file_ref`, and `file_diff_ref`.
+File-reference payloads carry paths only; consumers fetch file content locally, validated
+against the `allowed_roots` published in instance snapshots.
 ## Requirements
 ### Requirement: Console Outbox Protocol
 
@@ -27,19 +27,20 @@ The protocol SHALL use JSON-compatible payloads with:
 - **THEN** the MCP Direct API SHALL return a signed outbox batch containing protocol identity, MCP instance identity, batch identity, cursors, `oldest_retained`, `has_more`, and zero or more events
 - **AND** the request SHALL NOT remove events from the MCP outbox
 
-> The `batch_id` remains in the poll batch for logging and diagnostics only; it is not part of the acknowledgement contract.
+> The `batch_id` remains in the poll batch for logging and diagnostics only. Consumer progress
+> is represented solely by the consumer-owned `after` cursor.
 
-#### Scenario: Acknowledge consumed events
+#### Scenario: Consumers advance independently
 
-- **WHEN** a signed Console consumer posts `POST /api/console/outbox/ack` with matching protocol identity, MCP instance identity, and `acked_through`
-- **THEN** the MCP Direct API SHALL record the acknowledgement
-- **AND** acknowledged outbox entries MAY be dropped earlier than natural queue expiry
-- **AND** the ack SHALL NOT require a batch identity; a `batch_id` field, if present, SHALL be ignored
+- **WHEN** multiple signed Console consumers poll the same MCP instance with their own `after` cursors
+- **THEN** each consumer SHALL receive retained events after its cursor independently
+- **AND** polling by one consumer SHALL NOT remove events or advance another consumer's cursor
+- **AND** the MCP Direct API SHALL NOT expose an acknowledgement endpoint
 
-#### Scenario: At-least-once delivery
+#### Scenario: Cursor-polled delivery
 
-- **WHEN** Console polls the outbox without acknowledging delivered events
-- **THEN** MCP SHALL keep retained events eligible for later poll responses until they are acknowledged or removed by bounded retention
+- **WHEN** Console polls the outbox with cursor `c`
+- **THEN** MCP SHALL keep retained events with sequence greater than `c` eligible for later poll responses until producer-side retention or message removal clears them
 - **AND** Console SHALL be able to de-duplicate events by event `id` or by `(instance_id, sequence)`
 
 ### Requirement: Consumers Tolerate Additive Fields
@@ -56,19 +57,19 @@ Within `protocol_version: 1`, servers MAY add new fields to outbox batches, even
 
 ### Requirement: Console Outbox Authentication
 
-Console outbox endpoints SHALL use a separate outbox consumer key and SHALL NOT reuse the general Direct API `/run` key for Console authority.
+The Console outbox endpoint SHALL use a separate outbox consumer key and SHALL NOT reuse the general Direct API `/run` key for Console authority.
 
-#### Scenario: Outbox key authorizes only Console endpoints
+#### Scenario: Outbox key authorizes only the Console endpoint
 
 - **WHEN** a request is signed with the Console outbox consumer key
-- **THEN** it SHALL be accepted only for Console outbox poll and ack endpoints
+- **THEN** it SHALL be accepted only for the Console outbox poll endpoint
 - **AND** it SHALL NOT authorize `/run` or other general MCP Direct API operations
 
 #### Scenario: Invalid Console signature rejected
 
 - **WHEN** a Console outbox request has no valid outbox signature, a stale timestamp, a mismatched body hash, or a replayed nonce
 - **THEN** the MCP Direct API SHALL return a signed authentication error
-- **AND** the request SHALL NOT poll, acknowledge, or mutate outbox state
+- **AND** the request SHALL NOT poll or mutate outbox state
 
 #### Scenario: Outbox key location
 
@@ -89,14 +90,14 @@ MCP SHALL keep Console outbox state bounded so tool execution and MCP startup do
 #### Scenario: Retention limit exceeded
 
 - **WHEN** the Console outbox exceeds its configured retention limit
-- **THEN** MCP SHALL remove the oldest unacknowledged events according to bounded retention
+- **THEN** MCP SHALL remove the oldest events according to bounded retention
 - **AND** newer events SHALL remain eligible for Console polling
 
-#### Scenario: Gap signaled when retention evicts unacknowledged events
+#### Scenario: Gap signaled when retention evicts events
 
 - **WHEN** a poll batch is returned
-- **THEN** it SHALL include an `oldest_retained` integer equal to the sequence of the oldest retained entry, or (when no entries are retained) equal to `acked_through`
-- **AND** a consumer whose cursor is `c` SHALL treat events `c+1 .. oldest_retained-1` as lost whenever `oldest_retained > c + 1`, because bounded retention evicted them before acknowledgement
+- **THEN** it SHALL include an `oldest_retained` integer equal to the sequence of the oldest retained entry, or one greater than the latest evicted sequence when no entries are retained
+- **AND** a consumer whose cursor is `c` SHALL treat events `c+1 .. oldest_retained-1` as lost whenever `oldest_retained > c + 1`
 
 ### Requirement: Console Event Types
 
@@ -120,10 +121,16 @@ MCP SHALL publish small, stable Console events for instance metadata and display
 
 #### Scenario: Message entries retain no body copies
 
-- **WHEN** MCP retains a `console.message.created` entry before acknowledgement
+- **WHEN** MCP retains a `console.message.created` entry
 - **THEN** the outbox entry SHALL retain only its event metadata and message id
 - **AND** it SHALL NOT retain the bounded preview or inline payload
 - **AND** polling SHALL load those body fields from the session-scoped message file and serialize the same protocol v1 event shape
+
+#### Scenario: Message body disappears during poll hydration
+
+- **WHEN** a retained `console.message.created` entry loses its message body while a poll is being serialized
+- **THEN** MCP SHALL return a schema-valid body-free event with `preview: null`
+- **AND** an inline payload SHALL include `content: null`
 
 #### Scenario: Unknown future event type
 
@@ -208,4 +215,4 @@ snapshot-relevant state (status or message count) changes. The server SHALL NOT 
 #### Scenario: Instance change resets outbox
 
 - **WHEN** the outbox is configured with a different instance id than it is currently bound to
-- **THEN** sequence, ack cursor, and retained entries SHALL reset for the new instance
+- **THEN** sequence, eviction position, and retained entries SHALL reset for the new instance

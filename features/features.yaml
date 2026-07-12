@@ -329,14 +329,13 @@ features:
     console.list(limit=10)
   value: 8
   loc: 1234
-- feature: Console outbox retention and acknowledgements
+- feature: Console outbox retention and cursor polling
   pack: console
   date: '2026-07-04'
   release: 3.0.0
-  description: Console events are signed, instance-scoped, retained until acknowledged or FIFO-evicted,
-    and expose snapshot plus message-created event types for a separate onetool-console app.
-  examples: 'console.show(kind="markdown", content="# Done") GET /api/console/outbox POST /api/console/outbox/ack
-    {"acked_through": 42}'
+  description: Console events are signed, instance-scoped, independently cursor-polled by consumers,
+    and retained until FIFO-evicted or their underlying message is removed.
+  examples: 'console.show(kind="markdown", content="# Done") GET /api/console/outbox?after=42'
   value: 8
   loc: 1234
 - feature: Canonical __onetool trigger
