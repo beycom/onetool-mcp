@@ -177,7 +177,7 @@ class TestConsoleOutboxState:
     def test_retention_bound_drops_oldest_unacked_entries(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr("ot.console.outbox._retention_limit", lambda: 3)
+        monkeypatch.setattr("ot.console.outbox.queue_message_limit", lambda: 3)
         state = ConsoleOutboxState()
         state.configure_instance(instance_id="mcp-test")
 
@@ -200,7 +200,7 @@ class TestConsoleOutboxState:
         `oldest_retained` is 3 (> cursor + 1), so the consumer can detect that
         events 1 and 2 were lost.
         """
-        monkeypatch.setattr("ot.console.outbox._retention_limit", lambda: 3)
+        monkeypatch.setattr("ot.console.outbox.queue_message_limit", lambda: 3)
         state = ConsoleOutboxState()
         state.configure_instance(instance_id="mcp-test")
 

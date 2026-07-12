@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from secrets import token_hex
 from threading import Lock
+from typing import Any
 
 from ot.console.models import (
     BoundedPreview,
@@ -25,11 +26,10 @@ from ot.console.models import (
     MessageRead,
     PayloadReference,
     ShowRequest,
+    queue_message_limit,
 )
 from ot.runtime_meta import STARTED_AT, get_or_create_instance_id
 
-DEFAULT_MAX_MESSAGE_RECORDS = 1000
-MAX_MESSAGE_RECORDS_CEILING = 5000
 PREVIEW_LIMIT_BYTES = 64 * 1024
 MAX_INLINE_LIST_ITEMS = 500
 MESSAGE_ID_HEX_CHARS = 12
@@ -76,46 +76,14 @@ class ConsoleState:
 
     def add_message(self, *, request: ShowRequest) -> MessageMetadata:
         """Add a validated inline Console message to the current instance."""
-        instance = self.get_or_create_instance()
-        now = _utcnow()
         payload, preview, inline_payload = _build_payload(request)
-        expired_ids: list[str] = []
-        with self._lock:
-            message_id = _new_message_id(instance.message_id_set)
-            metadata = MessageMetadata(
-                id=message_id,
-                kind=request.kind,
-                metadata=dict(request.metadata),
-                preview_lines=_preview_line_count(preview),
-                created_at=now,
-                updated_at=now,
-                payload=payload,
-            )
-            message = ConsoleMessage(
-                id=message_id,
-                metadata=metadata,
-                preview=preview,
-                inline_payload=inline_payload,
-            )
-            # Deliberately written under the lock: a failed write aborts the
-            # add before any metadata is registered, so "metadata present"
-            # always implies "body file exists".
-            _write_message_body(message=message, instance_id=instance.id)
-            instance.messages[message_id] = metadata
-            instance.message_ids.append(message_id)
-            instance.message_id_set.add(message_id)
-            max_records = self._max_records()
-            while len(instance.message_ids) > max_records:
-                expired_id = instance.message_ids.pop(0)
-                instance.messages.pop(expired_id, None)
-                instance.message_id_set.discard(expired_id)
-                expired_ids.append(expired_id)
-            instance.updated_at = now
-        _publish_console_message(metadata=metadata)
-        for expired_id in expired_ids:
-            _drop_console_message(message_id=expired_id)
-            _unlink_message_body(message_id=expired_id, instance_id=instance.id)
-        return metadata
+        return self._register_message(
+            kind=request.kind,
+            metadata=dict(request.metadata),
+            payload=payload,
+            preview=preview,
+            inline_payload=inline_payload,
+        )
 
     def add_file_message(
         self,
@@ -132,18 +100,35 @@ class ConsoleState:
         `file_diff_ref` payload. Paths must be absolute and already validated
         by the caller (existence and allowed-roots containment).
         """
-        instance = self.get_or_create_instance()
-        now = _utcnow()
         payload, preview = _build_file_payload(
             path=path, old_path=old_path, new_path=new_path
         )
+        return self._register_message(
+            kind=kind,
+            metadata=dict(metadata or {}),
+            payload=payload,
+            preview=preview,
+            inline_payload=None,
+        )
+
+    def _register_message(
+        self,
+        *,
+        kind: ConsoleKind,
+        metadata: dict[str, str],
+        payload: PayloadReference,
+        preview: BoundedPreview | None,
+        inline_payload: Any | None,
+    ) -> MessageMetadata:
+        instance = self.get_or_create_instance()
+        now = _utcnow()
         expired_ids: list[str] = []
         with self._lock:
             message_id = _new_message_id(instance.message_id_set)
             message_metadata = MessageMetadata(
                 id=message_id,
                 kind=kind,
-                metadata=dict(metadata or {}),
+                metadata=metadata,
                 preview_lines=_preview_line_count(preview),
                 created_at=now,
                 updated_at=now,
@@ -153,8 +138,11 @@ class ConsoleState:
                 id=message_id,
                 metadata=message_metadata,
                 preview=preview,
-                inline_payload=None,
+                inline_payload=inline_payload,
             )
+            # Deliberately written under the lock: a failed write aborts the
+            # add before any metadata is registered, so "metadata present"
+            # always implies "body file exists".
             _write_message_body(message=message, instance_id=instance.id)
             instance.messages[message_id] = message_metadata
             instance.message_ids.append(message_id)
@@ -255,7 +243,7 @@ class ConsoleState:
     def _max_records(self) -> int:
         if self._max_records_override is not None:
             return self._max_records_override
-        return _max_message_records()
+        return queue_message_limit()
 
 
 STATE = ConsoleState()
@@ -276,25 +264,6 @@ def _utcnow() -> datetime:
 def _tail_offset(*, total: int, limit: int, offset: int) -> int:
     """Return an offset from the end while preserving ascending item order."""
     return max(0, total - limit - offset)
-
-
-def _max_message_records() -> int:
-    """Return configured MCP-side Console message queue retention.
-
-    Reads `config.console.max_queue_messages` from the typed config, falling
-    back to `DEFAULT_MAX_MESSAGE_RECORDS` if config access fails for any
-    reason (e.g. in isolated unit tests that never load a config).
-    """
-    try:
-        from ot.config import get_config
-
-        console_config = getattr(get_config(), "console", None)
-        max_queue_messages = getattr(console_config, "max_queue_messages", None)
-        if not isinstance(max_queue_messages, int):
-            return DEFAULT_MAX_MESSAGE_RECORDS
-        return max(1, min(MAX_MESSAGE_RECORDS_CEILING, max_queue_messages))
-    except Exception:
-        return DEFAULT_MAX_MESSAGE_RECORDS
 
 
 def _instance_metadata(instance: ConsoleInstance) -> InstanceMetadata:
@@ -535,9 +504,7 @@ def _clear_console_messages(*, instance_id: str) -> None:
 
 
 __all__ = [
-    "DEFAULT_MAX_MESSAGE_RECORDS",
     "MAX_INLINE_LIST_ITEMS",
-    "MAX_MESSAGE_RECORDS_CEILING",
     "PREVIEW_LIMIT_BYTES",
     "STATE",
     "ConsoleInstance",

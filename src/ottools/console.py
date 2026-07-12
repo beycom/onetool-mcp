@@ -26,9 +26,13 @@ __all__ = ["clear", "display", "list", "read", "show"]
 
 from pathlib import Path
 from typing import (  # noqa: UP035 - List avoids shadowing by the `list` tool below
+    TYPE_CHECKING,
     Any,
     List,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 from pydantic import ValidationError
 
@@ -57,7 +61,9 @@ def show(
     """Create one inline Console message and publish it to the outbox.
 
     Args:
-        kind: Message kind: text, markdown, code, diff, json, mermaid, yaml, or table.
+        kind: Message kind: text, markdown, code, diff, json, mermaid, yaml, table,
+            file, or image. The file and image kinds are normally produced via
+            `display(path=...)`, which publishes a file reference instead.
         content: Inline content (string, mapping, or list). Oversized content is
             truncated to the configured inline payload limit rather than erroring.
         metadata: Optional user-provided key-value metadata.
@@ -74,7 +80,7 @@ def show(
                 {"kind": kind, "metadata": metadata or {}, "content": content}
             )
         except ValidationError as e:
-            first = e.errors()[0] if e.errors() else {}
+            first: Mapping[str, Any] = e.errors()[0] if e.errors() else {}
             field = ".".join(str(p) for p in first.get("loc", ())) or "arguments"
             raise ValueError(f"console.show: invalid {field}: {first.get('msg', e)}") from e
         result = STATE.add_message(request=request)

@@ -18,6 +18,7 @@ from secrets import token_hex
 from threading import Lock
 from typing import TYPE_CHECKING, Any, Literal
 
+from ot.console.models import queue_message_limit
 from ot.paths import get_effective_cwd
 from ot.runtime_meta import STARTED_AT, get_or_create_instance_id
 
@@ -28,8 +29,6 @@ if TYPE_CHECKING:
 
 PROTOCOL = "onetool.console"
 PROTOCOL_VERSION = 1
-DEFAULT_RETENTION_LIMIT = 1000
-MAX_RETENTION_LIMIT = 5000
 OUTBOX_PATH = "/api/console/outbox"
 OUTBOX_ACK_PATH = "/api/console/outbox/ack"
 
@@ -191,7 +190,7 @@ class ConsoleOutboxState:
             self.entries.clear()
 
     def _enforce_retention_locked(self) -> None:
-        limit = _retention_limit()
+        limit = queue_message_limit()
         while len(self.entries) > limit:
             self.entries.popleft()
 
@@ -417,25 +416,6 @@ def _repo_root(cwd: Path) -> Path:
         if (parent / ".git").exists():
             return parent
     return cwd
-
-
-def _retention_limit() -> int:
-    """Return the configured retention limit, defaulting defensively.
-
-    Reads `config.console.max_queue_messages` from the typed config, falling
-    back to `DEFAULT_RETENTION_LIMIT` if config access fails for any reason
-    (e.g. in isolated unit tests that never load a config).
-    """
-    try:
-        from ot.config import get_config
-
-        console_config = getattr(get_config(), "console", None)
-        max_queue_messages = getattr(console_config, "max_queue_messages", None)
-        if not isinstance(max_queue_messages, int):
-            return DEFAULT_RETENTION_LIMIT
-        return max(1, min(MAX_RETENTION_LIMIT, max_queue_messages))
-    except Exception:
-        return DEFAULT_RETENTION_LIMIT
 
 
 def _iso_now() -> str:

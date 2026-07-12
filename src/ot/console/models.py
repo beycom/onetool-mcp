@@ -123,3 +123,26 @@ class ShowRequest(BaseModel):
     kind: ConsoleKind
     metadata: dict[str, str] = Field(default_factory=dict)
     content: str | dict[str, Any] | list[Any]
+
+
+DEFAULT_QUEUE_MESSAGE_LIMIT = 1000
+QUEUE_MESSAGE_LIMIT_CEILING = 5000
+
+
+def queue_message_limit() -> int:
+    """Return the configured Console message queue retention limit.
+
+    Reads `config.console.max_queue_messages` from the typed config, falling
+    back to `DEFAULT_QUEUE_MESSAGE_LIMIT` if config access fails for any
+    reason (e.g. in isolated unit tests that never load a config).
+    """
+    try:
+        from ot.config import get_config
+
+        console_config = getattr(get_config(), "console", None)
+        max_queue_messages = getattr(console_config, "max_queue_messages", None)
+        if not isinstance(max_queue_messages, int):
+            return DEFAULT_QUEUE_MESSAGE_LIMIT
+        return max(1, min(QUEUE_MESSAGE_LIMIT_CEILING, max_queue_messages))
+    except Exception:
+        return DEFAULT_QUEUE_MESSAGE_LIMIT

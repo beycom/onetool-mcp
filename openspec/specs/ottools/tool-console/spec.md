@@ -18,7 +18,7 @@ preview and inline payload to the current instance's disk store, and append a bo
 
 #### Scenario: Show an inline message
 
-- **WHEN** an agent calls `console.show(content="build finished", kind="note")`
+- **WHEN** an agent calls `console.show(content="build finished", kind="text")`
 - **THEN** message metadata SHALL be retained in memory with a unique message id
 - **AND** the preview and inline payload SHALL be written to the message's JSON body file
 - **AND** a `console.message.created` event (wire name fixed by protocol v1) with `payload.mode: "inline"` SHALL be appended to the Console outbox
