@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <strong>🧿 One MCP for developers - No tool tax, no context rot.<br>240+ tools including Brave, Google, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Image Vision, Playwright & Chrome DevTools Utils and many more.</strong>
+  <strong>🧿 One MCP for developers - no tool tax, no context rot.<br>250+ tools your agent calls as Python code: search, docs, files, databases, diagrams, vision, memory - plus a proxy for every MCP server you already use.</strong>
 </p>
 
 <p align="center">
@@ -17,14 +17,14 @@
 </p>
 
 <p align="center">
-  Works with Claude Code or any MCP client
+  Works with Claude Code, Cursor, Codex - any MCP client
 </p>
 
 ---
 
 ## The Problem
 
-Each MCP server consumes **3K-30K tokens per request**. Connect 5 servers and you've burned 55K tokens before the conversation starts. Connect 10+ and you're at 100K tokens.
+Every MCP server re-sends its tool definitions on every request: **3K-30K tokens each**. Connect 5 servers and you've burned 55K tokens before the conversation starts. Connect 10+ and you're at 100K.
 
 The math is brutal: Claude Opus 4.5 at $5/M input tokens, 20 days × 10 conversations × 10 messages × 3K tokens = **$30/month per MCP server** - even if you never use the tools.
 
@@ -35,35 +35,43 @@ And then there's **context rot** - your AI literally gets dumber as you add more
 OneTool is **one MCP server** that exposes tools as a Python API. Instead of reading tool definitions, your agent writes code:
 
 ```python
-__onetool brave.search(query="react docs 2026")
+__onetool brave.search(query="react 19 server components")
 ```
 
-Configure one MCP server. Use unlimited tools.
+Configure one MCP server. Use unlimited tools - ~2K tokens no matter how many you add.
 
 > "Agents scale better by writing code to call tools instead. This reduces the token usage from 150,000 tokens to 2,000 tokens...a cost saving of 98.7%"
 >
 > — [Anthropic Engineering](https://www.anthropic.com/engineering/code-execution-with-mcp)
 
-**96% fewer tokens. 30× lower cost. No context rot.**
+**97% fewer tokens. 30× lower cost. No context rot.** ([Measured](https://onetool.beycom.online/learn/comparison/) - 47,660 → 1,131 input tokens against 18 MCP servers.)
 
 [📖 Read the full story](https://onetool.beycom.online/about/about-onetool/)
 
 ---
 
-## Why not just use FastMCP Code Mode?
+## Code Is the Interface
 
-**Framework feature vs. installed product.** FastMCP is a toolkit for *building* MCP servers;
-Code Mode, ProxyProvider, and the Monty sandbox are ingredients a *developer* must adopt and
-expose when authoring their own MCP server. None of them reach an end user (a Claude Code /
-Cursor / Codex user) unless someone builds and ships a server around them. OneTool *is* that
-shipped server: it turns those framework capabilities into something a user installs and uses
-immediately, wrapped with 200+ curated tools, the param/alias/snippet forgiveness layer, ctx
-handles, the prompt + skill that teach an LLM to drive it, rich config, and a security model.
-**A framework capability you'd have to build vs. a product you install.**
+Because tools are Python functions, your agent does things tool-call JSON can't: batch, chain, loop, compose.
 
-Corollary: adopting a FastMCP internal (Code Mode, ProxyProvider, Monty) is an *implementation*
-choice OneTool makes internally — never a *positioning* risk, because the story is the product,
-not the plumbing.
+```python
+__onetool
+page = webfetch.fetch(url="https://fastmcp.dev/changelog", output_format="markdown")
+notes = ot_llm.transform(data=page, prompt="Summarise the breaking changes")
+mem.write(topic="deps/fastmcp", content=notes)
+```
+
+Three packs, one request. Intermediate results flow between tools as variables - the page body never touches your context window, and the summarising runs on a cheap model instead of your expensive coding agent.
+
+Every call is explicit and reviewable - `__onetool brave.search(query="...")` shows you exactly what runs. No tool-selection guessing.
+
+And the runtime is built for how agents actually type:
+
+- `mem.search(q="auth")` works - any unambiguous parameter prefix resolves (`q=` → `query=`)
+- `wb.draw(...)` works - packs have short aliases (`wb`, `ctx`, `img`)
+- `github.listRepositories()` works on proxied servers - snake/camel/Pascal all resolve
+- A typo'd tool gets a did-you-mean, a disconnected server names the command that fixes it
+- Oversized results come back as a searchable handle instead of flooding the window
 
 ---
 
@@ -90,11 +98,11 @@ to your client (`claude-code`, `claude-desktop`, `cursor`, or `vscode`):
 onetool init mcp-config --client claude-code   # or omit --client for all four
 ```
 
-That's it. All 240+ tools work out of the box.
+That's it. All 250+ tools work out of the box.
 
 Verify: `onetool init validate --config ~/.onetool/onetool.yaml`
 
-Install the `ot-ref` skill into your agent with [vercel-labs/skills](https://github.com/vercel-labs/skills):
+Install the `ot-ref` skill into your agent with [vercel-labs/skills](https://github.com/vercel-labs/skills) - it teaches the call conventions and ships a greppable index of every tool signature:
 
 ```bash
 npx skills add https://github.com/beycom/onetool-mcp --skill ot-ref --agent claude
@@ -104,86 +112,62 @@ npx skills add https://github.com/beycom/onetool-mcp --skill ot-ref --agent clau
 
 ---
 
-## Use from the CLI
+## What's Inside
 
-Works as an MCP server **and** as a direct CLI bridge into a running MCP process. Useful for agent harnesses, scripts, and automation:
-
-```bash
-# Recommended local MCP root mode: stdio
-onetool serve --config .onetool/onetool.yaml
-
-# URL-based MCP root mode for containerized clients
-onetool serve --transport http --config .onetool/onetool.yaml --host 127.0.0.1 --port 8767 --path /mcp
-
-# Enable the MCP-owned direct API in onetool.yaml:
-# direct.host.enabled: true
-
-# Start OneTool as MCP, then use the port printed in startup logs.
-onetool direct run --port 8765 "ot.packs()" --format json | jq '.[0].name'
-onetool direct run --port 8765 "brave.search(query='latest AI news')" --format raw
-```
-
-[📖 Direct usage guide](https://onetool.beycom.online/learn/direct-usage/)
-
----
-
-## Features
-
-| Feature                  | Description                                                   |
-| ------------------------ | ------------------------------------------------------------- |
-| **96% Token Savings**    | ~2K tokens no matter how many tools you add                   |
-| **240+ Built-in Tools**  | Web search, databases, file ops, diagrams, conversions        |
-| **Explicit Execution**   | See exactly what runs — `__onetool brave.search(q="AI")`           |
-| **Live Whiteboard**      | Draw diagrams with a Mermaid-compatible DSL via Excalidraw    |
-| **MCP Server Proxy**     | Wrap existing MCP servers without the tool tax                |
-| **Encrypted Secrets**    | age-encrypted `secrets.yaml` backed by your OS keychain       |
-| **Forge Tools**          | Build new tools as part of the conversation                   |
-| **Image Vision**         | Routes to a cheaper, better vision model via `ot_image` (`img`). Zero host tokens. Supports local files, URLs, clipboard; PNG, JPEG, GIF, WebP, TIFF, HEIC, AVIF, SVG. |
-| **Smart Context**        | `ot_context` (`ctx`) — SQLite+FTS5 store. Search and navigate large outputs without filling the context window. |
-| **Smart Tools**          | Delegate to cheaper LLMs (10× savings)                        |
-| **Security Layers**      | AST validation, path boundaries, output sanitisation          |
+| | |
+| --- | --- |
+| **Search & docs** | Brave, Google-grounded, and Tavily search (each with batch + answer modes), Context7 library docs, web fetch with extraction controls |
+| **Files & data** | File ops with path boundaries, full Excel control, SQL databases, PDF/Word/PowerPoint → Markdown, ripgrep, package versions |
+| **Context economy** | `ctx` handles for large outputs, partial file reads (`toc`/`slice`), image vision on a dedicated cheap model (zero host tokens), LLM delegation (10× savings) |
+| **Persistent state** | `mem` memory with semantic + keyword search, history and rollback; `knowledge` RAG bases with AI enrichment; `localhist` Git-backed project snapshots |
+| **Visual** | Live Excalidraw whiteboard with a Mermaid-compatible DSL and offline auto-layout, Mermaid/PlantUML/D2 diagrams, architecture models → draw.io-editable SVG |
+| **Runtime** | MCP server proxy with runtime enable/disable/restart, direct CLI/API into the running process, `ot-ref` agent skill, in-conversation tool forging |
+| **Trust** | age-encrypted secrets backed by your OS keychain, AST validation, path boundaries, output sanitisation, runtime stats with estimated savings |
 
 ---
 
 ## Tools
 
-27+ packs, 240+ tools ready to use:
+28 packs, 253 tools ready to use (`console` in beta):
 
-| Pack          | Tools                                          | Extra    | Description                    |
-| ------------- | ---------------------------------------------- | -------- | ------------------------------ |
-| `brave`       | `search`, `news`                               | `[util]` | Web and news search            |
-| `chrome_util` | `highlight_element`, `guide_user`              | `[dev]`  | Browser annotations (DevTools) |
-| `console`     | `show`, `list`, `read`, `clear`                |          | onetool-console outbox messages |
-| `context7`    | `search`, `doc`                                | `[dev]`  | Library documentation          |
-| `convert`     | `pdf_to_md`, `docx_to_md`, `pptx_to_md`        | `[util]` | Document conversion            |
-| `db`          | `query`, `schema`, `tables`, `sample`          | `[dev]`  | Database operations            |
-| `diagram`     | `create`, `get_playground_url`                 | `[dev]`  | Mermaid / Kroki diagrams       |
-| `excel`       | `read`, `write`, `query`                       | `[util]` | Excel files                    |
-| `file`        | `read`, `write`, `grep`, `slice`, `toc`        | `[util]` | File operations                |
-| `ground`      | `search`                                       | `[util]` | Google Grounding search        |
-| `knowledge`   | `search`, `ask`, `write`, `read`, `grep`       | `[util]` | RAG knowledge base (FTS5+vector) |
-| `mem`         | `write`, `read`, `search`, `grep`, `ask`, `inspect`, `query` | `[util]` | Persistent memory              |
-| `ot_forge`    | `create_ext`, `validate_ext`                   |          | Scaffold new tool packs        |
-| `ot_context` (`ctx`) | `write`, `read`, `search`, `grep`, `slice`, `toc`                 |          | Smart context store (SQLite+FTS5)   |
-| `ot_image` (`img`)   | `load`, `load_batch`, `ask`, `summary`, `list`, `delete`, `purge` | `[util]` | Image vision via dedicated model    |
-| `ot_llm`      | `transform`, `transform_file`                  |          | LLM-powered transforms         |
-| `ot_secrets`  | `init`, `encrypt`, `audit`, `rotate`           |          | Secrets encryption             |
-| `ot_timer`    | `start`, `elapsed`, `list`                     |          | Named timers                   |
-| `ot`          | `help`, `tools`, `stats`, `status`             |          | Introspection                  |
-| `package`     | `npm`, `pypi`, `cargo`                         | `[dev]`  | Package versions               |
-| `play_util`   | `highlight_element`, `guide_user`              | `[dev]`  | Browser annotations (Playwright)|
-| `ripgrep`     | `search`, `count`                              | `[dev]`  | Fast code search               |
-| `tavily`      | `search`, `search_batch`, `research`           | `[util]` | AI-native search               |
-| `webfetch`    | `fetch`, `fetch_batch`                         | `[dev]`  | Web fetching                   |
-| `whiteboard`  | `open`, `draw`, `screenshot`, `save`           | `[util]` | Live Excalidraw canvas         |
+| Pack          | Tools                                                        | Extra    | Description                          |
+| ------------- | ------------------------------------------------------------ | -------- | ------------------------------------ |
+| `arch`        | `generate`, `validate`, `bundle_solution`, …                 | `[dev]`  | Architecture models → draw.io-editable SVG |
+| `brave`       | `search`, `news`, `image`, `video`, `search_batch`           | `[util]` | Brave web search                     |
+| `chrome_util` | `highlight_element`, `guide_user`, …                         | `[dev]`  | Browser annotations (Chrome DevTools) |
+| `console` *(beta)* | `show`, `display`, `list`, `read`, `clear`              |          | Messages to the upcoming onetool-console app |
+| `context7`    | `search`, `doc`                                              | `[dev]`  | Library documentation                |
+| `convert`     | `pdf`, `word`, `powerpoint`, `excel`, `auto`                 | `[util]` | Documents → Markdown                 |
+| `db`          | `query`, `schema`, `tables`, `sample`                        | `[dev]`  | SQL databases                        |
+| `diagram`     | `render_diagram`, `batch_render`, `get_template`, …          | `[dev]`  | Mermaid / PlantUML / D2 via Kroki    |
+| `excel`       | `read`, `write`, `formula`, `create_table`, … (24 tools)     | `[util]` | Full Excel control                   |
+| `file`        | `read`, `write`, `edit`, `grep`, `slice`, `toc`, … (16 tools) | `[util]` | File ops with path boundaries        |
+| `ground`      | `search`, `dev`, `docs`, `reddit`, `search_batch`            | `[util]` | Google-grounded search with sources  |
+| `knowledge`   | `search`, `ask`, `write`, `related`, … (15 tools)            | `[util]` | RAG knowledge bases (hybrid search)  |
+| `localhist`   | `save`, `diff`, `restore`, `autosave_start`, … (15 tools)    | `[dev]`  | Git-backed local history snapshots   |
+| `mem`         | `write`, `search`, `ask`, `history`, `rollback`, … (31 tools) | `[util]` | Persistent memory with semantic search |
+| `ot`          | `help`, `tools`, `stats`, `status`, `result`, … (18 tools)   |          | Introspection and management         |
+| `ot_context` (`ctx`) | `write`, `read`, `grep`, `slice`, `toc`, `ask`, … (13 tools) |    | Smart context store for large outputs |
+| `ot_forge`    | `create_ext`, `validate_ext`                                 |          | Scaffold new tool packs              |
+| `ot_image` (`img`) | `load`, `ask`, `clip_ask`, `summary`, … (9 tools)       |          | Image vision via a dedicated model   |
+| `ot_llm`      | `transform`, `transform_file`                                |          | LLM-powered transforms               |
+| `ot_secrets`  | `set`, `encrypt`, `audit`, `rotate`, … (8 tools)             |          | Encrypted secrets management         |
+| `ot_servers`  | `enable`, `disable`, `restart`, `status`                     |          | Runtime control of proxied servers   |
+| `ot_timer`    | `start`, `stop`, `elapsed`, `list`, `clear`                  |          | Named timers                         |
+| `package`     | `pypi`, `npm`, `version`, `audit`, `models`                  | `[dev]`  | Package versions and staleness       |
+| `play_util`   | `highlight_element`, `guide_user`, …                         | `[dev]`  | Browser annotations (Playwright)     |
+| `ripgrep`     | `search`, `count`, `files`, `types`                          | `[dev]`  | Fast code search                     |
+| `tavily`      | `search`, `research`, `extract`, `search_batch`, …           | `[util]` | AI-native search and extraction      |
+| `webfetch`    | `fetch`, `fetch_batch`                                       | `[dev]`  | Web content extraction               |
+| `whiteboard` (`wb`) | `open`, `draw`, `layout`, `screenshot`, … (22 tools)   | `[util]` | Live Excalidraw canvas               |
 
-[📖 Complete tools reference](https://onetool.beycom.online/reference/tools/) — full summary table with all 240+ tools
+[📖 Complete tools reference](https://onetool.beycom.online/reference/tools/) — every signature, generated from source
 
 ---
 
 ## MCP Server Proxy
 
-Wrap any existing MCP server and call it explicitly - simple yaml config without the tool tax:
+Keep the MCP servers you already use. Wrap them in YAML and call them explicitly - as Python namespaces, without their tool tax:
 
 ```yaml
 # .onetool/onetool.yaml
@@ -204,7 +188,45 @@ servers:
 __onetool private_api.read_resource(path="README.md")
 ```
 
-[📖 Configuration guide](https://onetool.beycom.online/learn/configuration/#external-mcp-servers)
+Proxied servers can be enabled, disabled, and restarted mid-conversation with `ot_servers` - no client restart.
+
+[📖 Configuration guide](https://onetool.beycom.online/reference/cli/onetool-config/#external-mcp-servers)
+
+---
+
+## Secrets You Can Commit
+
+`onetool init` walks you through encrypted secrets: values in `secrets.yaml` are age-encrypted, the private key lives in your OS keychain, and decryption happens transparently at load.
+
+```yaml
+# secrets.yaml - safe to inspect, safe to commit
+brave_api_key: age1enc:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNT...
+```
+
+[📖 Security guide](https://onetool.beycom.online/learn/security/)
+
+---
+
+## Use from the CLI
+
+Works as an MCP server **and** as a direct CLI bridge into the same running process - loaded config, secrets, and proxy connections stay warm. Useful for agent harnesses, scripts, and automation:
+
+```bash
+# Recommended local MCP root mode: stdio
+onetool serve --config .onetool/onetool.yaml
+
+# URL-based MCP root mode for containerized clients
+onetool serve --transport http --config .onetool/onetool.yaml --host 127.0.0.1 --port 8767 --path /mcp
+
+# Enable the MCP-owned direct API in onetool.yaml:
+# direct.host.enabled: true
+
+# Start OneTool as MCP, then use the port printed in startup logs.
+onetool direct run --port 8765 "ot.packs()" --format json | jq '.[0].name'
+onetool direct run --port 8765 "brave.search(query='latest AI news')" --format raw
+```
+
+[📖 Direct usage guide](https://onetool.beycom.online/learn/direct-usage/)
 
 ---
 
@@ -236,8 +258,8 @@ __onetool wiki.summary(title="Python_(programming_language)")
 - [Quickstart](https://onetool.beycom.online/learn/quickstart/) - 30 seconds to first tool call
 - [Installation](https://onetool.beycom.online/learn/installation/) - All platforms
 - [Configuration](https://onetool.beycom.online/learn/configuration/) - YAML schema
-- [Tools Reference](https://onetool.beycom.online/reference/tools/) - All 240+ tools
-- [Security](https://onetool.beycom.online/learn/security/) - Security layers
+- [Tools Reference](https://onetool.beycom.online/reference/tools/) - All 253 tools
+- [Security](https://onetool.beycom.online/learn/security/) - The layered security model
 - [Extending](https://onetool.beycom.online/learn/extension-tools/) - Build your own
 - [Dev Docs](https://github.com/beycom/onetool-mcp/blob/main/dev/index.md) - Internal developer documentation
 - [Specifications](https://github.com/beycom/onetool-mcp/blob/main/openspec/specs/INDEX.md) - OpenSpec specifications index

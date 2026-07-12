@@ -19,7 +19,35 @@ just release::prep 1.0.0b2
 - Updates version in `pyproject.toml` and `server.json`
 - Generates changelog from git commits (via git-cliff)
 - Opens `CHANGELOG.md` and `tmp/changelog-entry.md` in editor
-- Copy/paste the generated entry into CHANGELOG.md
+- Copy/paste the generated entry into CHANGELOG.md, then edit it to match the
+  changelog conventions below
+
+### Changelog conventions
+
+Every entry in `CHANGELOG.md` follows the same format (normalized 2026-07-12; keep
+new entries consistent):
+
+- **Entry heading**: `## [x.y.z] - YYYY-MM-DD`, entries separated by `---`.
+- **Sections** (`###`, title case), in this order, using only these names —
+  omit any that don't apply:
+  1. `Highlights` — the release announcement: lead with the stories that sell the
+     release (the homepage/README may link here).
+  2. `Breaking Changes` — every break, each with a one-line migration note. A
+     single merged `Removed` list of deleted surfaces lives here as a sub-bullet.
+  3. `New Tool Packs`
+  4. `New Features`
+  5. Topical improvement sections — `Tool Improvements`, or per-area headings such
+     as `Memory (\`mem\`) Improvements`, `Whiteboard Improvements`, `Direct API`.
+  6. `Configuration` / `Deployment`
+  7. `Fixed`
+  8. `Changed` — non-breaking behavior changes only; anything requiring user
+     action belongs in `Breaking Changes`.
+  9. `Documentation`
+- **Bullet style**: `**Feature name** — description.` Em-dash (`—`, not `-`),
+  sentence case, closing period. Backticks around pack/tool/config names.
+- **Wording**: user-facing prose, not commit messages — no "add X", no internal
+  verification notes (file paths, "verified against src/"), no drafting residue.
+  Use current pack names as of that release.
 
 ---
 

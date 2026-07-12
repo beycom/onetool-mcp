@@ -8,8 +8,10 @@ Consistent claims for OneTool marketing, based on benchmark evidence.
 
 | Context    | Recommended Claim                      |
 | ---------- | -------------------------------------- |
-| Headlines  | "96% fewer tokens" or "30x lower cost" |
+| Headlines  | "97% fewer tokens" or "30x lower cost" |
 | Cost focus | "$30/server/month in wasted tokens"    |
+
+Standardise on **97%** (the measured figure below); retire the older "96%" rounding still present in README/homepage copy.
 
 ### $30 per MCP server per month
 
@@ -17,10 +19,10 @@ Each MCP server you add costs approximately $30 per MCP server per month in wast
 
 **Assumptions:**
 
-- 18 MCP servers cause ~$485/month overhead ($485 / 18 = $27, rounded to $30)
-- Developer workload: 20 working days, 10 conversations/day, 10 turns each
+- Derivation: 3K tokens/server/request × 20 working days × 10 conversations/day × 10 turns = 6M tokens × $5/M = $30/server/month
+- Cross-check from the measured benchmark: ~$385/month waste across 18 servers ≈ $21/server with that mix — so "$30" assumes the typical 3K-token server; say "up to $30" where precision matters
 - Model: Claude Opus 4.5 @ $5/M input tokens
-- Source: [compare.md](../../../docs/learn/comparison.md)
+- Source: [comparison.md](../../../docs/learn/comparison.md)
 
 ---
 
@@ -47,10 +49,13 @@ OneTool reduces input token usage by ~97% compared to multiple MCP servers.
 
 ---
 
+### 30× lower cost
+
+OneTool cuts conversation cost roughly 30× compared to multiple MCP servers.
+
 **Assumptions:**
 
-- 7.35c / 0.30c = 24.5x (presented as "up to 30x" in marketing copy)
-- 3-turn conversation
-- Source: [compare.md](../../../docs/learn/comparison.md)
+- One-shot: 2.42¢ vs 0.09¢ = 28×; 3-turn: 5.99¢ vs 0.17¢ = 34× — presented as "30×"
+- Source: [comparison.md](../../../docs/learn/comparison.md)
 
 ---

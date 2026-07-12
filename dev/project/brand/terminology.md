@@ -69,11 +69,16 @@ Use Anthropic's standard MCP terminology consistently.
 
 | Term | Definition |
 |------|------------|
+| **tool tax** | Per-request token cost of tool definitions resent by every MCP server |
 | **context rot** | Performance degradation as context window fills with tool definitions |
+| **context economy** | Keeping tool outputs (not just definitions) out of the context window — `ctx` handles, `img` delegation, `file.slice` |
 | **pack** | A collection of related tools (e.g., `brave`, `file`, `db`) |
 | **explicit calls** | Direct tool invocation via code instead of agent selection |
 | **snippet** | Reusable code template with Jinja2 substitution |
-| **alias** | Short name for a tool function |
+| **alias** | Short name for a pack (`wb`, `ctx`, `img`) or tool function |
+| **handle** | Stable reference to a stored large output (`ctx_…`) or loaded image (`#…`) |
+| **`__onetool`** | Canonical explicit trigger (short form `__ot`); `__run`/`__r` removed in v3 |
+| **direct API / direct CLI** | Authenticated HTTP/shell access to a running OneTool process, bypassing MCP |
 
 ---
 
