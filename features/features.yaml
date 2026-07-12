@@ -1,0 +1,1356 @@
+# Current OneTool features — source of truth. See feature-tracking.md for how to update.
+# value: subjective 1-10 usefulness. loc: approximate cloc over the feature's source area;
+# rows sharing an implementation area share loc — do not sum the column.
+coverage: cb502fd0
+features:
+- feature: Whiteboard named boards everywhere
+  pack: whiteboard
+  date: '2026-07-12'
+  release: 3.0.0
+  description: 'board= parameter on all 13 board-touching tools with uniform semantics: omitted keeps
+    the CWD-keyed default board, explicit targets a named session file, and canvas-reading tools (save/style/read_scene)
+    rerender the named board first.'
+  examples: wb.note(input='n[note:\nhi\n]', board='review'); wb.save(file='out.excalidraw', board='review')
+  value: 7
+  loc: 2945
+- feature: Whiteboard offline ELK layout
+  pack: whiteboard
+  date: '2026-07-12'
+  release: 3.0.0
+  description: layout() runs against a vendored elkjs 0.11.0 bundle injected over CDP (EPL-2.0 licensed,
+    shipped in the wheel) — no CDN fetch, works fully offline; layout computation extracted into pure,
+    unit-testable helpers.
+  examples: wb.layout(direction='RIGHT', algorithm='layered')
+  value: 6
+  loc: 2945
+- feature: Shared embedding infrastructure
+  pack: otpack
+  date: '2026-07-12'
+  release: 3.0.0
+  description: 'otpack.embedding: EmbeddingClient (retry on 429/500/503, batching, opt-in LRU query cache,
+    dimensions handling), token windowing, canonical little-endian float32 serialization, and RRF fusion;
+    mem and knowledge delegate to it; ships in the onetool-pack wheel behind an optional [embedding] extra.'
+  examples: EmbeddingClient(api_key=..., model='text-embedding-3-small', log_prefix='kb').embed(text)
+  value: 6
+  loc: 289
+- feature: Multi-image vision ask
+  pack: ot_image
+  date: '2026-07-12'
+  release: 3.0.0
+  description: ask() accepts a list of up to 8 image references sent in one vision call with per-image
+    labels, enabling comparison questions; list input returns handles, string input keeps the single-handle
+    shape.
+  examples: img.ask(img=['#before', '#after'], q='What differs between image 1 and image 2?')
+  value: 7
+  loc: 828
+- feature: Format-true image storage and batched answers
+  pack: ot_image
+  date: '2026-07-12'
+  release: 3.0.0
+  description: Stored originals keep their source-format extension (jpg/svg/webp/...) with a file meta
+    key and legacy .png fallback; batched multi-question answers use a JSON contract with lossless per-question
+    fallback instead of fragile numbered-list parsing.
+  examples: img.load(img='photo.jpeg'); img.ask(img='#h', q=['Extract text', 'Dark mode?'])
+  value: 6
+  loc: 828
+- feature: Memory indexed search
+  pack: mem
+  date: '2026-07-12'
+  release: 3.0.0
+  description: Keyword search upgraded from LIKE to an FTS5 BM25 index (with query sanitisation, prefix
+    fallback, and LIKE fallback on exotic SQLite builds); semantic search upgraded from a full-table cosine
+    scan to sqlite-vec KNN over normalised vectors with automatic backfill migration and dimension-change
+    rebuild.
+  examples: mem.search(query='auth patterns', mode='hybrid'); mem.search(query='rollback steps', mode='keyword')
+  value: 9
+  loc: 3258
+- feature: Memory history and rollback
+  pack: mem
+  date: '2026-07-12'
+  release: 3.0.0
+  description: mem.history() lists prior versions of a memory (numbered, with stable history-id prefixes);
+    mem.rollback() restores a version through the standard update flow, so rollbacks are themselves undoable
+    and TOC/embeddings recompute.
+  examples: mem.history(topic='notes/x'); mem.rollback(topic='notes/x', version=2)
+  value: 7
+  loc: 3258
+- feature: Knowledge AI enrichment
+  pack: knowledge
+  date: '2026-07-12'
+  release: 3.0.0
+  description: onetool kb enrich generates short LLM summaries per chunk (backfill semantics, retry/abort
+    policy, per-batch commits, untrusted-context boundary); summaries surface in FTS matching and kb.search
+    display, invalidate on content change, and kb index --enrich scopes enrichment to that run's chunks.
+  examples: onetool kb enrich docs --limit 100; onetool kb index docs --enrich
+  value: 8
+  loc: 3086
+- feature: Architecture incremental generation
+  pack: arch
+  date: '2026-07-12'
+  release: 3.0.0
+  description: 'arch.generate updates the solution directory incrementally: content-compare writes, d2
+    render skips for unchanged diagrams, mtime skips for workbook diagrams, stale-file sweep after success
+    (no destructive pre-clean), force= escape hatch, and summary.renders executed/skipped counts.'
+  examples: arch.generate(input_path='model.xlsx'); arch.generate(input_path='model.xlsx', force=True)
+  value: 8
+  loc: 5107
+- feature: Architecture validation warnings
+  pack: arch
+  date: '2026-07-12'
+  release: 3.0.0
+  description: 'Non-blocking data-quality warnings in validate/generate payloads: orphan_system, duplicate_name,
+    and self_interface — populated in issues.warnings with counts in summary.warnings, never affecting
+    validity.'
+  examples: arch.validate(input_path='model.xlsx')
+  value: 6
+  loc: 5107
+- feature: Web fetch guardrails
+  pack: webfetch
+  date: '2026-07-11'
+  release: 3.0.0
+  description: Opt-in block_private_urls guard rejects private-range fetches; max_download_bytes caps
+    download size via trafilatura; responses report the post-redirect final_url with honest cache telemetry.
+  examples: webfetch.fetch(url='https://example.org', max_download_bytes=1000000)
+  value: 6
+  loc: 291
+- feature: Local history pruning
+  pack: localhist
+  date: '2026-07-11'
+  release: 3.0.0
+  description: localhist.prune() applies retention to the snapshot history with baseline squash and git
+    gc, keeping local history bounded.
+  examples: localhist.prune(keep_days=30)
+  value: 6
+  loc: 1505
+- feature: Ground vertical model overrides
+  pack: ground
+  date: '2026-07-11'
+  release: 3.0.0
+  description: Per-vertical Gemini model override on the dev, docs, and reddit grounded-search verticals.
+  examples: ground.dev(query='sqlite fts5 rank', model='gemini-2.5-pro')
+  value: 5
+  loc: 394
+- feature: Secrets unset tool
+  pack: ot_secrets
+  date: '2026-07-11'
+  release: 3.0.0
+  description: ot_secrets.unset() removes a stored secret; bulk encrypt verifies a round-trip before committing.
+  examples: ot_secrets.unset(key='OLD_API_KEY')
+  value: 4
+  loc: 481
+- feature: Timer stop tool
+  pack: ot_timer
+  date: '2026-07-11'
+  release: 3.0.0
+  description: ot_timer.stop() ends a named timer; restart refreshes eviction and missing timers return
+    a structured error.
+  examples: ot_timer.stop(name='index-run')
+  value: 3
+  loc: 72
+- feature: Architecture project reports
+  pack: arch
+  date: '2026-07-09'
+  release: 3.0.0
+  description: Solution report adds per-project pages with stage diagrams, change-type styling and badges,
+    a shared style legend on system/project pages, and an index with summary cards and global entity tables
+    linking systems, apps, components, interfaces, and projects.
+  examples: arch.generate(input_path="architecture.xlsx") open arch/solution/index.html open arch/solution/project-p1.html
+  value: 8
+  loc: 5107
+- feature: Architecture draw.io editable SVG export
+  pack: arch
+  date: '2026-07-09'
+  release: 3.0.0
+  description: Every generated system/project diagram SVG doubles as an editable draw.io file via an embedded
+    mxfile model using real rendered geometry; per-profile `data.drawio_export` toggle and per-diagram
+    'Export to draw.io' controls; workbook-supplied and inlined SVGs never carry the model.
+  examples: 'arch.generate(input_path="architecture.xlsx") # open arch/solution/images/sys_a-app.svg in
+    https://app.diagrams.net arch.generate(input_path="architecture.xlsx", profile_yaml="data:\n  drawio_export:
+    false")'
+  value: 7
+  loc: 5107
+- feature: Console display routing
+  pack: console
+  date: '2026-07-05'
+  release: 3.0.0
+  description: '`console.display` routes verbose results, files, images, and diffs to the Console and
+    returns a compact receipt to the model, keeping large visual/output payloads out of context.'
+  examples: console.display(knowledge.search(query="config", db="docs"), title="KB hits") console.display(path="/abs/path/diagram.svg")
+    console.display(old_path="/tmp/a.py", new_path="/tmp/b.py")
+  value: 9
+  loc: 1234
+- feature: Direct API discovery files
+  pack: direct
+  date: '2026-07-05'
+  release: 3.0.0
+  description: When the MCP-owned direct API binds, it writes atomic 0600 discovery files containing instance
+    id, bound port, pid, and start time so external clients can find live instances after port auto-increment.
+  examples: 'cat .onetool/runtime/direct-api/*.json onetool direct run --port 8765 "ot.status()" --format
+    json # consumers ignore files whose pid is stale'
+  value: 8
+  loc: 714
+- feature: Compatible browser server names
+  pack: chrome_util/play_util
+  date: '2026-07-03'
+  release: 3.0.0
+  description: Browser annotation utilities accept compatible server names rather than requiring one fixed
+    configured MCP server.
+  examples: chrome_util.inject_annotations(server="chrome_devtools") chrome_util.highlight_element(selector="button.submit",
+    label="Submit") play_util.enable_auto_inject(server="playwright")
+  value: 6
+  loc: 336
+- feature: Hardened run-tool pipeline
+  pack: core
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Execution now handles isError contracts, non-blocking exec, resilient serialization, shared
+    error wrapping, and single-pass deflection.
+  examples: __onetool ot.help(query="search") __onetool ot.tools(pattern="grep") __onetool ot.result(handle="abc123",
+    tail=20)
+  value: 10
+  loc: 2742
+- feature: Run contract and command index
+  pack: core
+  date: '2026-07-04'
+  release: 3.0.0
+  description: The run contract was rewritten with a three-layer command index via ot-ref and clearer
+    recovery guidance.
+  examples: __onetool ot.help(query="search") __onetool ot.tools(pattern="grep") __onetool ot.result(handle="abc123",
+    tail=20)
+  value: 10
+  loc: 2742
+- feature: ot-ref agent skill distribution
+  pack: skills
+  date: '2026-07-04'
+  release: 3.0.0
+  description: OneTool ships as an installable agent skill (ot-ref) carrying the pack map, call conventions,
+    and a greppable three-layer index of every command, so agents get full OneTool fluency via a standard
+    skill installer instead of bespoke prompt instructions.
+  examples: 'npx skills add onetool-mcp/skills/ot-ref # agent loads ot-ref before first OneTool call rg
+    "file.resolve" .claude/skills/ot-ref/reference/'
+  value: 8
+  loc: 486
+- feature: Direct API lifecycle
+  pack: direct
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Authenticated MCP-managed direct host lifecycle, bound-port routing, context sync, readiness,
+    and /run, /health, /ready endpoints.
+  examples: onetool direct run --port 8765 "ot.packs()" --format json onetool direct start --config .onetool/onetool.yaml
+    onetool direct logs
+  value: 10
+  loc: 714
+- feature: Memory topic tree and metadata
+  pack: mem
+  date: '2026-07-04'
+  release: 3.0.0
+  description: mem tracks topic, category, tags, relevance, source metadata, sections, content hashes,
+    access counts, and tree/list statistics for long-lived project memory.
+  examples: mem.write(topic="project/api/auth", content="JWT rules", category="design", tags=["auth"])
+    mem.list(format="tree", topic="project/") mem.stats() mem.inspect(topic="project/api/auth")
+  value: 9
+  loc: 3258
+- feature: Guided encrypted secrets flow
+  pack: ot_secrets
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Secrets set/get, keyring validation, atomic 0600 writes, guarded startup, redaction, and
+    safer decrypt errors.
+  examples: ot_secrets.init(label="work") ot_secrets.set(key="BRAVE_API_KEY", value="...") ot_secrets.audit()
+  value: 9
+  loc: 481
+- feature: Architecture model pack
+  pack: arch
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Model-centric architecture tools generate, validate, export/import YAML, render diagrams,
+    and bundle solution outputs.
+  examples: arch.validate(input_path="architecture.xlsx") arch.generate(input_path="input/", profile="simple",
+    output_dir="build/arch") arch.bundle_solution(directory="build/arch/solution")
+  value: 8
+  loc: 5107
+- feature: Architecture strict template contracts
+  pack: arch
+  date: '2026-07-04'
+  release: 3.0.0
+  description: arch rendering uses canonical model payloads, strict Jinja template contexts, workbook-defined
+    diagram sheets, tag filters, YAML round trips, and bundled HTML solution outputs.
+  examples: arch.generate(input_path="architecture.xlsx", include_tags=["core"]) arch.export_yaml(input_path="architecture.xlsx",
+    output_path="tmp/arch.yaml") arch.import_yaml(input_path="tmp/arch.yaml", template_path="template.xlsx",
+    output_path="updated.xlsx")
+  value: 8
+  loc: 5107
+- feature: Search batch retry envelope
+  pack: brave/ground/tavily
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Batch search tools return structured result envelopes with labels, status, errors, retry
+    metadata, and partial-success summaries instead of plain concatenated text only.
+  examples: brave.search_batch(queries=[("a","python"),("b","ruff")], retries=1) ground.search_batch(queries=["fastmcp",
+    "mcp auth"], return_provenance=True) tavily.search_batch(queries=["agent tools", "context rot"] )
+  value: 8
+  loc: 483
+- feature: Install and MCP config bootstrap
+  pack: cli
+  date: '2026-07-04'
+  release: 3.0.0
+  description: CLI init can bootstrap config directories, materialize prompt/snippet/server/security templates,
+    generate client MCP config blocks, run idempotently, and protect secrets startup.
+  examples: onetool init --config .onetool onetool init mcp-config --client claude-code --config .onetool/onetool.yaml
+    onetool init validate --config .onetool/onetool.yaml
+  value: 8
+  loc: 1061
+- feature: Config validation and unknown-key warnings
+  pack: config
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Typed config rejects invalid pack configuration where strict models apply and warns on
+    unrecognized root or nested attributes so typoed settings are visible without keeping legacy aliases
+    alive.
+  examples: 'onetool init validate --config .onetool/onetool.yaml __onetool ot.status() # invalid typed
+    config values surface during startup/validation'
+  value: 8
+  loc: 3084
+- feature: Direct host config restructure
+  pack: config
+  date: '2026-07-04'
+  release: 3.0.0
+  description: direct settings now live under direct.host with scoped auth and project state paths.
+  examples: __onetool ot.help(query="Direct host config restructure")
+  value: 8
+  loc: 2335
+- feature: Console outbox and inline console pack
+  pack: console
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Signed direct-API outbox endpoints plus console show/list/read/clear for inline messages
+    consumed by onetool-console.
+  examples: console.display(ground.search(query="MCP news"), title="Search results") console.display(path="/abs/path/diagram.svg")
+    console.list(limit=10)
+  value: 8
+  loc: 1234
+- feature: Console outbox retention and acknowledgements
+  pack: console
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Console events are signed, instance-scoped, retained until acknowledged or FIFO-evicted,
+    and expose snapshot plus message-created event types for a separate onetool-console app.
+  examples: 'console.show(kind="markdown", content="# Done") GET /api/console/outbox POST /api/console/outbox/ack
+    {"acked_through": 42}'
+  value: 8
+  loc: 1234
+- feature: Canonical __onetool trigger
+  pack: core
+  date: '2026-07-04'
+  release: 3.0.0
+  description: __onetool is the canonical explicit trigger, with old removed forms excluded from current
+    docs and runtime behavior.
+  examples: __onetool ot.help(query="search") __onetool ot.tools(pattern="grep") __onetool ot.result(handle="abc123",
+    tail=20)
+  value: 8
+  loc: 376
+- feature: fastmcp v3 runtime
+  pack: core
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Server wiring upgraded to fastmcp v3 with raised dependency floors for fastmcp, mcp, openai,
+    and uvicorn.
+  examples: __onetool ot.help(query="search") __onetool ot.tools(pattern="grep") __onetool ot.result(handle="abc123",
+    tail=20)
+  value: 8
+  loc: 2742
+- feature: File reference resolver
+  pack: file
+  date: '2026-07-04'
+  release: 3.0.0
+  description: '`file.resolve` turns fuzzy names, globs, and match strings into concrete relative or absolute
+    paths, respecting `.gitignore` and multi-result policies. Directory reads default to list output and
+    grep match limits align with ripgrep behavior.'
+  examples: file.resolve(match="feature inventory", kind="file", max_results=5) file.resolve(glob="docs/reference/tools/*.md",
+    kind="file", multi="all") file.resolve(path="src", match=["server", "config"], path_type="relative")
+  value: 8
+  loc: 1679
+- feature: Local history pack
+  pack: localhist
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Project-local snapshot history with protected storage, scoped save paths, force-include
+    handling, autosave, diff, show, and restore.
+  examples: localhist.init() localhist.save(message="before refactor", paths="src/ot") localhist.diff(ref="HEAD",
+    path="src/ot/server.py") localhist.restore(ref="HEAD~1", paths=["src/ot/server.py"], dry_run=True)
+  value: 8
+  loc: 1505
+- feature: Memory file-backed freshness
+  pack: mem
+  date: '2026-07-04'
+  release: 3.0.0
+  description: File-backed memories remember source paths and modification times, can report stale or
+    missing sources, and refresh changed content while preserving history.
+  examples: mem.write(topic="docs/config", file="docs/learn/configuration.md") mem.stale(topic="docs/")
+    mem.refresh(topic="docs/", dry_run=False)
+  value: 8
+  loc: 3258
+- feature: Memory snapshots and restore
+  pack: mem
+  date: '2026-07-04'
+  release: 3.0.0
+  description: mem can dump or snapshot memories to YAML/files with metadata and restore them later, preserving
+    topic hierarchy and supporting conflict behavior.
+  examples: mem.snapshot(output="backup/mem", topic="project/") mem.dump(topic="project/", output="backup/project.yaml")
+    mem.restore(input="backup/mem", overwrite=True)
+  value: 8
+  loc: 3258
+- feature: Help ask mode and diagnostics
+  pack: ot
+  date: '2026-07-04'
+  release: 3.0.0
+  description: ot.help ask mode, richer status diagnostics, cache reset on reload, and clearer run-output
+    guidance.
+  examples: __onetool ot.help(query="search") __onetool ot.tools(pattern="grep") __onetool ot.result(handle="abc123",
+    tail=20)
+  value: 8
+  loc: 2138
+- feature: Runtime status diagnostics
+  pack: ot
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Runtime status reports config, storage, root MCP transport, direct API state, registry,
+    proxy connections, and warnings for degraded components.
+  examples: ot.status() ot.debug(verbose=True, env_vars=True, dependencies=True) ot.version()
+  value: 8
+  loc: 2138
+- feature: Ripgrep repository search differentiators
+  pack: ripgrep
+  date: '2026-07-04'
+  release: 3.0.0
+  description: '`ripgrep` wraps rg with repository-oriented controls: file listing, type listing, counts,
+    context, glob/file-type filters, hidden/no-ignore switches, smart case, symlink following, filenames-only,
+    and match limits.'
+  examples: ripgrep.search(pattern="LogSpan", path="src", context=2, smart_case=True) ripgrep.files(path="src",
+    glob="*.py", sort="path") ripgrep.count(pattern="pack_aliases", path="src") ripgrep.types()
+  value: 8
+  loc: 266
+- feature: Database sampling and read-only mode
+  pack: db
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Database tools support table sampling, optional row counts, read_only configuration, and
+    stronger identifier handling.
+  examples: db.tables(db_url="sqlite:///app.db", include_row_count=True) db.sample(db_url="sqlite:///app.db",
+    table="users") db.query(db_url="sqlite:///app.db", sql="select * from users limit 5", read_only=True)
+  value: 7
+  loc: 287
+- feature: Diagram render workflow controls
+  pack: diagram
+  date: '2026-07-04'
+  release: 3.0.0
+  description: diagram supports source generation, templates, provider instructions/policy, async render
+    status, directory rendering, batch rendering, compound extensions, and playground URLs.
+  examples: diagram.generate_source(provider="mermaid", name="flow", source="graph TD; A-->B") diagram.render_directory(directory="diagrams",
+    recursive=True, max_concurrent=5) diagram.get_render_status(task_id="...")
+  value: 7
+  loc: 1068
+- feature: file.read raw-lines default
+  pack: file
+  date: '2026-07-04'
+  release: 3.0.0
+  description: file.read now returns raw lines by default with line numbers opt-in.
+  examples: file.resolve(match="config", kind="file") file.toc(path="docs/reference/tools/file.md") file.slice(path="docs/reference/tools/file.md",
+    select="Examples")
+  value: 7
+  loc: 1679
+- feature: Ground structured extraction
+  pack: ground
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Ground search supports structured extraction, provenance, batch envelopes, timeouts, and
+    clearer error behavior.
+  examples: ground.search(query="FastMCP v3 docs", extract_schema={"title":"str","url":"str"}, return_provenance=True)
+    ground.docs(query="pydantic settings", technology="python")
+  value: 7
+  loc: 394
+- feature: Knowledge graph links and related content
+  pack: knowledge
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Knowledge entries track links and metadata, exposing related-topic traversal plus category/tag/date
+    filters around FTS5/vector search.
+  examples: knowledge.related(topic="configuration", db="docs", direction="out", depth=2) knowledge.search(query="snippets",
+    db="docs", category="guide", after="2026-01-01") knowledge.stats(db="docs")
+  value: 7
+  loc: 3086
+- feature: Pack API parameter cleanup
+  pack: multiple
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Current pack parameters were unified, including kb query, mem keyword, brave max_results,
+    and related snippet template refreshes.
+  examples: __onetool ot.help(query="Pack API parameter cleanup")
+  value: 7
+  loc: 1123
+- feature: Server management pack
+  pack: ot_servers
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Agent-loop enable, disable, restart, and status operations for configured proxied MCP servers;
+    ot.server remains read-only.
+  examples: ot_servers.enable(name="playwright") ot_servers.status(name="playwright") ot_servers.restart(name="github")
+  value: 7
+  loc: 191
+- feature: HTTP root MCP transport
+  pack: cli
+  date: '2026-07-04'
+  release: 3.0.0
+  description: onetool serve --transport http runs the root MCP server over streamable HTTP with configurable
+    host, port, and path for URL-based MCP clients such as containers and agent harnesses, alongside the
+    default stdio transport and distinct from the direct API.
+  examples: 'onetool serve --transport http --host 127.0.0.1 --port 9000 --config .onetool/onetool.yaml
+    onetool serve --config .onetool/onetool.yaml  # stdio default'
+  value: 7
+  loc: 1061
+- feature: Ripgrep search options
+  pack: ripgrep
+  date: '2026-07-04'
+  release: 3.0.0
+  description: follow_symlinks, smart_case, filenames_only, timeout, and retry guardrails improve repository
+    search.
+  examples: ripgrep.search(pattern="resolve_kwargs", path="src", smart_case=True, context=2) ripgrep.files(path="src",
+    glob="*.py") ripgrep.count(pattern="LogSpan", path="src")
+  value: 7
+  loc: 266
+- feature: Shipped-surface quality gate
+  pack: testing
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Lint/typecheck coverage now spans ot, ottools, onetool, otdev, otutil, and otpack shipped
+    surfaces.
+  examples: __onetool ot.help(query="Shipped-surface quality gate")
+  value: 7
+  loc: 326
+- feature: Generated tool reference and shipped-surface docs
+  pack: docsgen
+  date: '2026-07-04'
+  release: 3.0.0
+  description: Generated reference docs and tool indexes keep docs aligned with the current shipped pack/tool
+    surface, including pack counts, signatures, docs URLs, and stale-reference checks.
+  examples: python -m otdev.docsgen.tool_index just docs::sync rg "packs=28 tools=247" docs/reference/tools/tool-index.md
+  value: 6
+  loc: 434
+- feature: Package audit and model lookup
+  pack: package
+  date: '2026-07-04'
+  release: 3.0.0
+  description: The package pack checks PyPI/npm versions, audits project dependencies, lists model packages/providers,
+    and handles dotted dependencies or empty version inputs cleanly.
+  examples: package.pypi(packages=["pydantic", "fastapi"]) package.npm(packages=["typescript", "vite"])
+    package.audit(path=".") package.models(query="gpt", provider="openai")
+  value: 6
+  loc: 345
+- feature: Bundled otpack runtime
+  pack: packaging
+  date: '2026-04-03'
+  release: 2.2.2
+  description: onetool-pack is bundled directly into the wheel so new installs do not need a separate
+    package.
+  examples: __onetool ot.help(query="Bundled otpack runtime")
+  value: 7
+  loc: 326
+- feature: Direct CLI
+  pack: direct
+  date: '2026-04-03'
+  release: 2.2.1
+  description: onetool direct run/repl/start/stop/status/logs/list/search/help provides shell and HTTP
+    access without MCP overhead.
+  examples: onetool direct run --port 8765 "ot.packs()" --format json onetool direct start --config .onetool/onetool.yaml
+    onetool direct logs
+  value: 9
+  loc: 714
+- feature: Direct CLI discovery and help surface
+  pack: direct
+  date: '2026-04-03'
+  release: 2.2.1
+  description: The direct CLI offers run, repl, start/stop/restart/status/logs, list/search/help, JSON/YAML/raw
+    output, stdin/file command input, and fallback to in-process execution.
+  examples: onetool direct list --config .onetool/onetool.yaml onetool direct help "file.read" echo "ot.packs()"
+    | onetool direct run --stdin --format yml_h
+  value: 9
+  loc: 714
+- feature: Webfetch extraction controls
+  pack: webfetch
+  date: '2026-04-03'
+  release: 2.2.1
+  description: webfetch differentiates from a raw HTTP client with boilerplate removal, markdown/text/json/html
+    output, table/link/image/comment toggles, precision/recall modes, fast mode, language filter, metadata,
+    caching, and loopback-aware errors.
+  examples: webfetch.fetch(url="https://docs.python.org/3/tutorial/", output_format="markdown", include_links=True)
+    webfetch.fetch(url="https://pypi.org/pypi/requests/json", output_format="json", include_metadata=True)
+    webfetch.fetch(url="https://fastapi.tiangolo.com/", favor_precision=True, fast=True)
+  value: 8
+  loc: 291
+- feature: Brave multimodal search and source-only output
+  pack: brave
+  date: '2026-04-03'
+  release: 2.2.1
+  description: Brave covers web, news, image, and video search, validates query size, sorts news by recency,
+    and can return `sources_only` for cheap citation collection.
+  examples: brave.image(query="onetool logo", max_results=5) brave.video(query="FastMCP tutorial") brave.search(query="MCP
+    server docs", output_format="sources_only")
+  value: 7
+  loc: 483
+- feature: Search output controls
+  pack: brave/webfetch/tavily/ctx
+  date: '2026-04-03'
+  release: 2.2.1
+  description: Brave sources_only, webfetch HTML output, Tavily max_sources, and integer ctx slices improved
+    research ergonomics.
+  examples: ctx.write(content={"items":[1,2]}, source="demo") ctx.query(handle=h["handle"], expr="items[0]")
+    ctx.read(handle=h["handle"], tail=20)
+  value: 7
+  loc: 520
+- feature: Whiteboard persistent sessions
+  pack: whiteboard
+  date: '2026-04-03'
+  release: 2.2.1
+  description: File-backed board state and live browser updates preserve canvas state across reconnects
+    and restarts.
+  examples: whiteboard.open() whiteboard.draw(input="a[API]; b[DB]; a-->b") whiteboard.layout(direction="RIGHT")
+    whiteboard.save(file="diagrams/arch.excalidraw")
+  value: 7
+  loc: 2945
+- feature: Runtime env overrides
+  pack: config
+  date: '2026-04-03'
+  release: 2.2.1
+  description: OT_LOG_LEVEL, OT_LOG_DIR, and compact-length environment overrides configure runtime behavior
+    without editing YAML.
+  examples: __onetool ot.help(query="Runtime env overrides")
+  value: 6
+  loc: 2335
+- feature: Docker deployment
+  pack: deploy
+  date: '2026-04-03'
+  release: 2.2.1
+  description: Dockerfile and container tests support containerized OneTool deployments.
+  examples: __onetool ot.help(query="Docker deployment")
+  value: 5
+  loc: 326
+- feature: Context file-backed store
+  pack: ot_context
+  date: '2026-04-01'
+  release: 2.2.0
+  description: ctx moved from SQLite to file-backed handles with toc, slice, grep, query, and append tools.
+  examples: ctx.write(content={"items":[1,2]}, source="demo") ctx.query(handle=h["handle"], expr="items[0]")
+    ctx.read(handle=h["handle"], tail=20)
+  value: 9
+  loc: 1207
+- feature: Context handle format awareness
+  pack: ot_context
+  date: '2026-04-01'
+  release: 2.2.0
+  description: ctx detects text/markdown/json/yaml formats and provides format-aware TOC, slices, JMESPath
+    query, read modes, grep, ask, stats, purge, and append for stored outputs.
+  examples: h = ctx.write(content={"items":[{"name":"a"}]}, source="demo") ctx.toc(handle=h["handle"])
+    ctx.query(handle=h["handle"], expr="items[].name") ctx.slice(handle=h["handle"], select="1")
+  value: 9
+  loc: 1207
+- feature: Memory semantic/keyword/hybrid search
+  pack: mem
+  date: '2026-04-01'
+  release: 2.2.0
+  description: mem search can use semantic embeddings, keyword matching, or hybrid retrieval, with embeddings
+    optional and background reindex/flush tools for deferred indexing.
+  examples: mem.search(query="auth rules", mode="hybrid", tags=["auth"]) mem.reindex(topic="project/",
+    dry_run=False) mem.flush()
+  value: 9
+  loc: 3258
+- feature: Top-level shared LLM settings
+  pack: config
+  date: '2026-04-01'
+  release: 2.2.0
+  description: A top-level `llm:` block supplies shared OpenAI-compatible base URL, model, embedding model,
+    and token defaults to LLM-using packs such as mem, knowledge, ot_image, ctx, and ot_llm.
+  examples: 'llm:   base_url: https://api.openai.com/v1   model: gpt-5.4-nano   embedding_model: text-embedding-3-small
+    llm.transform(data="hello", prompt="Translate to French")'
+  value: 8
+  loc: 3084
+- feature: Knowledge base pack
+  pack: knowledge
+  date: '2026-04-01'
+  release: 2.2.0
+  description: Local markdown knowledge bases with indexing, semantic/full-text search, RRF results, CRUD,
+    stats, and export.
+  examples: knowledge.search(query="configuration includes", db="docs", mode="hybrid") knowledge.ask(query="How
+    do snippets work?", db="docs") knowledge.grep(pattern="include:", db="docs")
+  value: 8
+  loc: 3086
+- feature: Memory ask/inspect/query
+  pack: mem
+  date: '2026-04-01'
+  release: 2.2.0
+  description: Memory gained natural-language ask, detailed inspect, and structured query filters.
+  examples: mem.write(topic="project/rules", content="Use just, not make.", tags=["dev"]) mem.search(query="testing
+    rules", mode="hybrid") mem.grep(pattern="pytest", topic="project/")
+  value: 8
+  loc: 3258
+- feature: Knowledge base scrape/index CLI
+  pack: knowledge
+  date: '2026-04-01'
+  release: 2.2.0
+  description: The `onetool kb` CLI indexes, reindexes, stats, exports, and scrapes configured knowledge
+    sources with overwrite/resume/debug controls and per-source safety warnings.
+  examples: onetool kb index --db docs --path docs/learn onetool kb stats --db docs onetool kb scrape
+    --project python-docs --resume --debug
+  value: 7
+  loc: 3086
+- feature: Whiteboard pydoll driver
+  pack: whiteboard
+  date: '2026-04-01'
+  release: 2.2.0
+  description: The whiteboard browser driver migrated to pydoll and later folded its extra into util.
+  examples: whiteboard.open() whiteboard.draw(input="a[API]; b[DB]; a-->b") whiteboard.layout(direction="RIGHT")
+    whiteboard.save(file="diagrams/arch.excalidraw")
+  value: 7
+  loc: 2945
+- feature: Context content string responses
+  pack: ot_context
+  date: '2026-03-10'
+  release: 2.1.1
+  description: ctx responses now return one content string with capped ask bytes and faster filtering.
+  examples: ctx.write(content={"items":[1,2]}, source="demo") ctx.query(handle=h["handle"], expr="items[0]")
+    ctx.read(handle=h["handle"], tail=20)
+  value: 8
+  loc: 1207
+- feature: Context store pack
+  pack: ot_context
+  date: '2026-03-06'
+  release: 2.1.0
+  description: Context handles store large tool outputs across calls and provide search, grep, read, slice,
+    toc, append, and query operations.
+  examples: ctx.write(content={"items":[1,2]}, source="demo") ctx.query(handle=h["handle"], expr="items[0]")
+    ctx.read(handle=h["handle"], tail=20)
+  value: 9
+  loc: 1207
+- feature: Large-output handle backend
+  pack: ot_context/ot
+  date: '2026-03-06'
+  release: 2.1.0
+  description: Oversized tool output is stored through the result backend, now defaulting to ctx-style
+    handles with follow-up commands for pagination, search, tails, table-of-contents, and LLM ask.
+  examples: result = ground.search(query="long topic") ot.result(handle="abc123", search="error", context=3)
+    ctx.toc(handle="ctx_...") ctx.ask(handle="ctx_...", q="Summarise the errors")
+  value: 9
+  loc: 1207
+- feature: Image session cache and clipboard helpers
+  pack: ot_image
+  date: '2026-03-06'
+  release: 2.1.0
+  description: Image vision stores loaded images by stable handle, resizes for model limits, caches summaries,
+    supports batch loading, clipboard ask/view, and cleanup/purge.
+  examples: img.load(img="screenshots/error.png", handle="error") img.ask(img="error", q=["What failed?",
+    "What text is visible?"]) img.summary(img="error") img.purge(minutes=60)
+  value: 8
+  loc: 828
+- feature: Image vision pack
+  pack: ot_image
+  date: '2026-03-06'
+  release: 2.1.0
+  description: Image load, summary, ask, clipboard, batch, format support, and model-prepared image storage
+    for vision workflows.
+  examples: img.load(img="screenshot.png", handle="ui") img.ask(img="ui", q=["What error is shown?", "Which
+    button is primary?"]) img.clip_view()
+  value: 8
+  loc: 828
+- feature: Whiteboard layout and scene tools
+  pack: whiteboard
+  date: '2026-03-06'
+  release: 2.1.0
+  description: Auto-layout, alignment, auto-sized shapes, chained edge DSL, and read_scene made the canvas
+    more editable and inspectable.
+  examples: whiteboard.open() whiteboard.draw(input="a[API]; b[DB]; a-->b") whiteboard.layout(direction="RIGHT")
+    whiteboard.save(file="diagrams/arch.excalidraw")
+  value: 8
+  loc: 2945
+- feature: Session directory lifecycle
+  pack: config
+  date: '2026-03-04'
+  release: 2.1.0
+  description: Runtime artifacts such as ctx handles, image cache, logs, stats, and direct API discovery
+    live under session/runtime directories with retention policies instead of ad hoc files.
+  examples: ot.status() ctx.stats() img.list() ot.stats(period="day")
+  value: 7
+  loc: 3084
+- feature: Context retention and cleanup
+  pack: ot_context
+  date: '2026-03-04'
+  release: 2.1.0
+  description: ctx stores handles in the session directory with TTL metadata, listing, inspection, purge
+    filters, and storage stats so large outputs do not accumulate silently.
+  examples: ctx.list() ctx.inspect(handle="ctx_...") ctx.stats() ctx.purge(minutes=60, source="ground.search")
+  value: 7
+  loc: 1207
+- feature: Excel multi-sheet create
+  pack: excel
+  date: '2026-03-06'
+  release: 2.1.0
+  description: Workbook creation supports multiple named sheets and reliable datetime serialization.
+  examples: excel.create(filepath="report.xlsx", sheet_names=["Inputs", "Summary"]) excel.write(filepath="report.xlsx",
+    sheet_name="Inputs", start_cell="A1", data=[["x",1]]) excel.formulas(filepath="report.xlsx")
+  value: 6
+  loc: 837
+- feature: Playwright auto-inject annotations
+  pack: play_util
+  date: '2026-03-06'
+  release: 2.1.0
+  description: Playwright annotation injection can be enabled across multi-page sessions.
+  examples: __onetool ot.help(query="Playwright auto-inject annotations")
+  value: 6
+  loc: 342
+- feature: Anonymous telemetry with opt-out
+  pack: core
+  date: '2026-03-06'
+  release: 2.1.0
+  description: Anonymous startup pings (event type, version, OS, machine UUID) via PostHog with opt-out
+    through config or the DO_NOT_TRACK environment variable; no personal data, prompts, or tool contents
+    are collected.
+  examples: 'telemetry:   enabled: false DO_NOT_TRACK=1 onetool serve --config .onetool/onetool.yaml'
+  value: 4
+  loc: 73
+- feature: Explicit --config/--secrets config model
+  pack: config
+  date: '2026-03-01'
+  release: 2.0.0
+  description: Server startup moved to explicit config and secrets file arguments with versioned config
+    validation.
+  examples: __onetool ot.help(query="Explicit --config/--secrets config model")
+  value: 9
+  loc: 2335
+- feature: File Markdown navigation
+  pack: file
+  date: '2026-03-01'
+  release: 2.0.0
+  description: '`file.toc`, `file.slice`, and `file.slice_batch` provide heading/section/line-range navigation
+    over files so agents can read targeted parts instead of whole documents.'
+  examples: file.toc(path="docs/reference/tools/file.md") file.slice(path="docs/reference/tools/file.md",
+    select="Examples") file.slice_batch(items=[{"path":"README.md","select":"Tools"},{"path":"CHANGELOG.md","select":"3.0.0"}])
+  value: 9
+  loc: 1679
+- feature: Large result navigation
+  pack: ot
+  date: '2026-03-01'
+  release: 2.0.0
+  description: ot.result navigation supports tail/search/context/progress style access to large stored
+    outputs.
+  examples: __onetool ot.help(query="search") __onetool ot.tools(pattern="grep") __onetool ot.result(handle="abc123",
+    tail=20)
+  value: 9
+  loc: 2138
+- feature: Encrypted secrets pack
+  pack: ot_secrets
+  date: '2026-03-01'
+  release: 2.0.0
+  description: Age/keyring encrypted secrets file support with init, encrypt, rotate, audit, status, set,
+    and get tools.
+  examples: ot_secrets.init(label="work") ot_secrets.set(key="BRAVE_API_KEY", value="...") ot_secrets.audit()
+  value: 9
+  loc: 481
+- feature: Interactive init TUI
+  pack: cli
+  date: '2026-03-01'
+  release: 2.0.0
+  description: onetool init gained an interactive setup flow for selecting extensions and producing usable
+    config without manual YAML editing.
+  examples: __onetool ot.help(query="Interactive init TUI")
+  value: 8
+  loc: 1061
+- feature: Slim server prompt
+  pack: core
+  date: '2026-03-01'
+  release: 2.0.0
+  description: Server instructions were reduced and made dynamic so pack discovery carries more of the
+    tool surface.
+  examples: __onetool ot.help(query="search") __onetool ot.tools(pattern="grep") __onetool ot.result(handle="abc123",
+    tail=20)
+  value: 8
+  loc: 376
+- feature: Tool and pack short aliases
+  pack: core
+  date: '2026-03-01'
+  release: 2.0.0
+  description: Packs expose short aliases such as `br`, `wf`, `rg`, `ctx`, `img`, `wb`, and `sec`, reducing
+    prompt and call size without changing the canonical pack names.
+  examples: br.search(query="docs", max_results=3) wf.fetch(url="https://docs.python.org/3/") rg.search(pattern="TODO",
+    path="src") wb.draw(input="a-->b")
+  value: 8
+  loc: 1123
+- feature: File grep with gitignore awareness
+  pack: file
+  date: '2026-03-01'
+  release: 2.0.0
+  description: '`file.grep` is a pure-Python regex search for environments without ripgrep, with context
+    lines, fixed-string mode, match caps, and `.gitignore` awareness by default.'
+  examples: file.grep(pattern="TODO", path="src", context=3) file.grep(pattern="foo.bar()", fixed_strings=True)
+    file.grep(pattern="secret", path=".", gitignore=True, max_matches=20)
+  value: 8
+  loc: 1679
+- feature: Whiteboard DSL and ASCII notes
+  pack: whiteboard
+  date: '2026-03-01'
+  release: 2.0.0
+  description: 'Whiteboard is more than browser control: it has a Mermaid-compatible DSL, inline style
+    shorthand, auto-sized shapes, deduplicated edges, ASCII table/tree/sequence/timeline notes, save/load/sync/share,
+    and native Excalidraw files.'
+  examples: whiteboard.draw(input="a[API] bc:blue; b[(DB)]; a-->|read|b") whiteboard.note(input="t[table:\nName,Role\nAlice,Dev\n]")
+    whiteboard.share()
+  value: 8
+  loc: 2945
+- feature: Whiteboard pack
+  pack: whiteboard
+  date: '2026-03-01'
+  release: 2.0.0
+  description: Live Excalidraw canvas with Mermaid-compatible DSL, drawing, screenshots, save/load, layout,
+    notes, and scene operations.
+  examples: whiteboard.open() whiteboard.draw(input="a[API]; b[DB]; a-->b") whiteboard.layout(direction="RIGHT")
+    whiteboard.save(file="diagrams/arch.excalidraw")
+  value: 8
+  loc: 2945
+- feature: Context7 v2 interface
+  pack: context7
+  date: '2026-03-01'
+  release: 2.0.0
+  description: Context7 lookup moved to the newer API with better library resolution and documentation
+    retrieval.
+  examples: context7.search(query="pydantic settings") context7.doc(library_id="/pydantic/pydantic", query="BaseSettings")
+  value: 7
+  loc: 248
+- feature: Tool scaffolding pack
+  pack: ot_forge
+  date: '2026-03-01'
+  release: 2.0.0
+  description: Scaffold and validate extension tool packs with required structure, typing, pack declarations,
+    and templates.
+  examples: ot_forge.create_ext(name="acme", function="search") ot_forge.validate_ext(path=".onetool/tools/acme.py")
+    ot.reload()
+  value: 7
+  loc: 246
+- feature: Tavily search pack
+  pack: tavily
+  date: '2026-03-01'
+  release: 2.0.0
+  description: AI-native search, extraction, batch calls, and deep research mode complement Brave and
+    Ground.
+  examples: tavily.search(query="agentic coding tools", max_sources=5) tavily.extract(urls=["https://docs.python.org/3/"])
+    tavily.research(query="compare search APIs", timeout_seconds=60)
+  value: 7
+  loc: 520
+- feature: Diagram playground URLs
+  pack: diagram
+  date: '2026-03-01'
+  release: 2.0.0
+  description: Diagram tools can generate shareable Kroki playground URLs alongside rendered diagrams.
+  examples: diagram.render_diagram(provider="mermaid", source="graph TD; A-->B", name="flow") diagram.get_playground_url(provider="mermaid",
+    source="graph TD; A-->B") diagram.batch_render(sources=[{"provider":"mermaid","source":"graph TD;
+    A-->B","name":"flow"}])
+  value: 6
+  loc: 1068
+- feature: File safe write/edit/delete ergonomics
+  pack: file
+  date: '2026-02-18'
+  release: 1.1.0
+  description: File mutation tools support dry runs, backups, create_dirs, occurrence-scoped edits, recursive
+    delete controls, symlink behavior, and explicit encodings.
+  examples: file.write(path="tmp/out.txt", content="hello", create_dirs=True) file.edit(path="tmp/out.txt",
+    old_text="hello", new_text="hi", dry_run=True) file.delete(path="tmp/out.txt", backup=True, dry_run=True)
+  value: 8
+  loc: 1679
+- feature: File safety and batch options
+  pack: file
+  date: '2026-02-18'
+  release: 1.1.0
+  description: Dry run, symlink handling, hidden files, recursive delete, encoding, read_batch, slice,
+    slice_batch, toc, and gitignore-aware grep.
+  examples: file.resolve(match="config", kind="file") file.toc(path="docs/reference/tools/file.md") file.slice(path="docs/reference/tools/file.md",
+    select="Examples")
+  value: 8
+  loc: 1679
+- feature: Install extras split
+  pack: packaging
+  date: '2026-02-18'
+  release: 1.1.0
+  description: Optional util/dev/all extras keep base installs lean while grouping document, search, browser,
+    and developer packs.
+  examples: __onetool ot.help(query="Install extras split")
+  value: 8
+  loc: 326
+- feature: Automatic proxy tool-name aliasing
+  pack: proxy
+  date: '2026-02-16'
+  release: 1.0.2
+  description: Hyphenated, camelCase, PascalCase, and snake_case proxy tool names resolve to callable
+    Python attributes.
+  examples: __onetool ot.help(query="Automatic proxy tool-name aliasing")
+  value: 8
+  loc: 834
+- feature: Browser annotation manual selection
+  pack: chrome_util/play_util
+  date: '2026-02-16'
+  release: 1.0.2
+  description: Browser annotation utilities inject overlays, guide multi-step workflows, support user
+    manual selection/readback, and target compatible Chrome DevTools or Playwright MCP server names.
+  examples: chrome_util.guide_user(task="Checkout", steps=[{"selector":"input[name=email]","label":"Email"}])
+    chrome_util.scan_annotations() play_util.highlight_element(server="playwright", selector="button",
+    label="Click")
+  value: 7
+  loc: 336
+- feature: Browser annotation utility packs
+  pack: chrome_util/play_util
+  date: '2026-02-16'
+  release: 1.0.2
+  description: Chrome DevTools and Playwright annotation helpers inject highlights, scan markers, clear
+    overlays, and guide users.
+  examples: chrome_util.inject_annotations(server="chrome_devtools") chrome_util.highlight_element(selector="button.submit",
+    label="Submit") play_util.enable_auto_inject(server="playwright")
+  value: 7
+  loc: 336
+- feature: Persistent memory pack
+  pack: mem
+  date: '2026-02-10'
+  release: 1.0.1
+  description: SQLite-backed memory storage for durable notes, metadata, sections, search, snapshots,
+    and restore.
+  examples: mem.write(topic="project/rules", content="Use just, not make.", tags=["dev"]) mem.search(query="testing
+    rules", mode="hybrid") mem.grep(pattern="pytest", topic="project/")
+  value: 9
+  loc: 3258
+- feature: Memory grep search
+  pack: mem
+  date: '2026-02-10'
+  release: 1.0.1
+  description: Regex search across memories with context lines for fast retrieval.
+  examples: mem.write(topic="project/rules", content="Use just, not make.", tags=["dev"]) mem.search(query="testing
+    rules", mode="hybrid") mem.grep(pattern="pytest", topic="project/")
+  value: 8
+  loc: 3258
+- feature: Memory line-level grep and slice hints
+  pack: mem
+  date: '2026-02-10'
+  release: 1.0.1
+  description: mem.grep returns grouped line-level regex matches with context, fixed-string mode, limits,
+    and slice hints for follow-up extraction.
+  examples: mem.grep(pattern="def \w+\(", topic="code/", context=2) mem.grep(pattern="foo.bar()", fixed_strings=True)
+    mem.slice(topic="code/module", select="20-60")
+  value: 8
+  loc: 3258
+- feature: Timer pack
+  pack: ot_timer
+  date: '2026-02-10'
+  release: 1.0.1
+  description: Named timers persist across tool calls for profiling agent workflows.
+  examples: 'ot_timer.start(name="build") # run work ot_timer.elapsed(name="build", store_as="last_build")
+    ot_timer.clear(results=True)'
+  value: 5
+  loc: 72
+- feature: Python execution pipeline
+  pack: core
+  date: '2026-02-09'
+  release: 1.0.0
+  description: The executor parses explicit code, applies validation and argument resolution, routes calls
+    to local packs or proxied MCP tools, serializes native Python results, and stores oversized output
+    behind handles.
+  examples: __onetool data = ripgrep.search(pattern="LogSpan", path="src", limit=10); data __onetool __format__="yml_h";
+    ot.tool_info(name="file.read")
+  value: 10
+  loc: 2742
+- feature: Single run-tool MCP server
+  pack: core
+  date: '2026-02-09'
+  release: 1.0.0
+  description: One MCP server exposes a single explicit `run` surface that lets an agent call any loaded
+    pack through Python code. This keeps the MCP handshake small while preserving access to the full current
+    tool catalog.
+  examples: __onetool brave.search(query="python packaging news", max_results=5) __onetool result = file.read(path="README.md",
+    limit=40); result
+  value: 10
+  loc: 2742
+- feature: AST validation and output sanitization
+  pack: security
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Code validation blocks disallowed imports/calls and output sanitization wraps external
+    content with format-native boundaries while neutralizing OneTool trigger strings and external-content
+    tags.
+  examples: __onetool ot.security(check="pickle.load") __onetool __sanitize__=True; webfetch.fetch(url="https://docs.python.org/3/library/json.html")
+  value: 10
+  loc: 725
+- feature: Config model and path handling
+  pack: config
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Typed config models validate global and per-tool settings, resolve OneTool file layout
+    paths, support explicit config/secrets files, and provide runtime directories for logs, stats, sessions,
+    and result stores.
+  examples: onetool serve --config .onetool/onetool.yaml --secrets .onetool/secrets.yaml __onetool ot.config()
+    __onetool ot.status()
+  value: 9
+  loc: 2335
+- feature: Configurable pack registry
+  pack: core
+  date: '2026-02-09'
+  release: 1.0.0
+  description: AST-based discovery loads pack declarations, exported functions, aliases, doc slugs, tool
+    signatures, and config classes from current source and configured tools directories.
+  examples: __onetool ot.packs(info="min") __onetool ot.tool_info(pattern="knowledge.", info="default")
+  value: 9
+  loc: 1123
+- feature: Explicit invocation and snippets
+  pack: core
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Agents can run explicit pack calls or server-side snippet templates. Snippets provide reusable
+    command templates with typed/required parameters, while direct calls remain normal Python.
+  examples: __onetool brave.search(query="MCP proxy docs") :b_q q="MCP proxy docs" max_results=3 :rg p="def
+    resolve_kwargs" path="src/ot"
+  value: 9
+  loc: 376
+- feature: File operations pack
+  pack: file
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Project-scoped file read/write/list/delete helpers provide agent-safe filesystem access.
+  examples: file.resolve(match="config", kind="file") file.toc(path="docs/reference/tools/file.md") file.slice(path="docs/reference/tools/file.md",
+    select="Examples")
+  value: 9
+  loc: 1679
+- feature: Built-in metadata/help tools
+  pack: ot
+  date: '2026-02-09'
+  release: 1.0.0
+  description: 'The `ot` pack provides runtime discovery and diagnostics: tools, packs, aliases, snippets,
+    servers, status, debug, version, config, stats, security, and large-result navigation.'
+  examples: __onetool ot.help(query="file resolve", ask="How do I find a file by fuzzy name?") __onetool
+    ot.status() __onetool ot.debug(verbose=True, dependencies=True)
+  value: 9
+  loc: 2138
+- feature: MCP proxy integration
+  pack: proxy
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Configured external MCP servers appear as callable packs with status, instructions, tool
+    schemas, Python-safe naming, and runtime connect/disconnect handling.
+  examples: __onetool ot.servers(info="full") __onetool github.list_repositories(owner="beycom") __onetool
+    ot_servers.restart(name="playwright")
+  value: 9
+  loc: 834
+- feature: Format-native sanitization boundaries
+  pack: security
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Sanitization uses comments suitable for JSON/YAML/raw output, replaces trigger-like strings,
+    strips hostile external-content tags, and can be explicitly disabled only by trusted local calls.
+  examples: __sanitize__=True; webfetch.fetch(url="https://docs.python.org/3/") __format__="json_h"; brave.search(query="security
+    docs") ot.security(check="__sanitize__")
+  value: 9
+  loc: 741
+- feature: Config includes and template materialization
+  pack: config
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Configuration supports `include:` files for snippets, prompts, security, servers, and tool
+    config, with init writing template files and validation showing include source/status.
+  examples: 'include:   - snippets.yaml   - servers.yaml   - security.yaml onetool init validate --config
+    .onetool/onetool.yaml'
+  value: 8
+  loc: 3084
+- feature: Convert document structure preservation
+  pack: convert
+  date: '2026-02-09'
+  release: 1.0.0
+  description: 'Converters preserve useful structure while writing Markdown: extracted images, frontmatter/checksums,
+    separate TOC files, notes/formulas options, and batch auto-detection.'
+  examples: convert.pdf(pattern="input/*.pdf", output_dir="out/md") convert.powerpoint(pattern="slides/*.pptx",
+    output_dir="out/md", include_notes=True) convert.excel(pattern="models/*.xlsx", output_dir="out/md",
+    include_formulas=True, compute_formulas=True)
+  value: 8
+  loc: 1245
+- feature: Document conversion pack
+  pack: convert
+  date: '2026-02-09'
+  release: 1.0.0
+  description: PDF, Word, PowerPoint, Excel, and auto conversion to Markdown with images, frontmatter,
+    and TOC support.
+  examples: convert.pdf(pattern="docs/*.pdf", output_dir="tmp/md") convert.auto(pattern="inputs/*", output_dir="tmp/converted")
+    convert.excel(pattern="data/*.xlsx", output_dir="tmp/md", compute_formulas=True)
+  value: 8
+  loc: 1245
+- feature: Tool argument prefix matching
+  pack: core
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Keyword arguments can be abbreviated by unique or signature-ordered prefix for both local
+    packs and MCP proxy tools, with collision refusal when two provided keys claim the same target parameter.
+  examples: 'brave.search(q="python", max=5)  # q -> query, max -> max_results file.grep(pat="TODO", path="src")  #
+    unresolved names still fall through to normal TypeError # query="x", q="y" is rejected because both
+    resolve to query'
+  value: 8
+  loc: 370
+- feature: Security explain tool
+  pack: ot
+  date: '2026-02-09'
+  release: 1.0.0
+  description: '`ot.security()` summarizes allowlists and explains whether a specific import, builtin,
+    call, dunder, or tool namespace is allowed, blocked, or warned.'
+  examples: ot.security() ot.security(check="json") ot.security(check="pickle.load") ot.security(check="brave.search")
+  value: 8
+  loc: 741
+- feature: Configurable server prompts
+  pack: config
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Server instructions and tool descriptions are externalized to a prompts.yaml config include,
+    so operators can customize the MCP instruction surface without code changes; onetool init materializes
+    the template.
+  examples: 'include:   - prompts.yaml onetool init --config .onetool onetool init validate --config .onetool/onetool.yaml'
+  value: 7
+  loc: 107
+- feature: Ripgrep search pack
+  pack: ripgrep
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Fast repository text search with contextual, structured, and batch-friendly outputs.
+  examples: ripgrep.search(pattern="resolve_kwargs", path="src", smart_case=True, context=2) ripgrep.files(path="src",
+    glob="*.py") ripgrep.count(pattern="LogSpan", path="src")
+  value: 8
+  loc: 266
+- feature: Path-boundary and file safety model
+  pack: security
+  date: '2026-02-09'
+  release: 1.0.0
+  description: File/path helpers resolve project and OneTool state paths through controlled utilities
+    rather than broad path expansion, supporting scoped allowed roots and safer filesystem access.
+  examples: 'file.info(path=".") file.delete(path="tmp/generated.txt", dry_run=True) console.display(path="/abs/path/report.md")  #
+    console validates against allowed roots'
+  value: 8
+  loc: 741
+- feature: Runtime stats and structured logs
+  pack: stats
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Run-level and tool-level JSONL stats plus structured LogSpan logs track calls, durations,
+    failures, attribution, runtime metadata, and estimated context/time savings.
+  examples: __onetool ot.stats(period="week", info="full") __onetool ot.stats(output="stats.html") OT_LOG_LEVEL=DEBUG
+    onetool serve --config .onetool/onetool.yaml
+  value: 8
+  loc: 1238
+- feature: Brave search pack
+  pack: brave
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Web/news search with formatting, validation, batching, and source-oriented output for research
+    workflows.
+  examples: brave.search(query="Python 3.12 release notes", output_format="sources_only") brave.news(query="AI
+    announcements", freshness="pw") brave.search_batch(queries=["uv python", "ruff formatter"], retries=1)
+  value: 7
+  loc: 483
+- feature: Context7 documentation pack
+  pack: context7
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Resolve libraries and retrieve current documentation snippets from Context7.
+  examples: context7.search(query="pydantic settings") context7.doc(library_id="/pydantic/pydantic", query="BaseSettings")
+  value: 7
+  loc: 248
+- feature: Output format controls
+  pack: core
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Magic variables let a call choose compact JSON, human JSON/YAML, raw output, or forced
+    context behavior while keeping output serialization explicit and inspectable.
+  examples: __format__="yml_h"; ot.tools(pattern="file") __format__="raw"; file.read(path="README.md",
+    limit=20) __force_context__=True; ground.search(query="short answer")
+  value: 7
+  loc: 2742
+- feature: MCP resource discovery
+  pack: core
+  date: '2026-02-09'
+  release: 1.0.0
+  description: The root MCP server exposes ot://tools and ot://tool/{name} resources so MCP clients can
+    browse the tool registry through native resource reads, complementing ot.tools() introspection inside
+    run.
+  examples: '# MCP client resource reads ot://tools ot://tool/file.read'
+  value: 6
+  loc: 2742
+- feature: Database query pack
+  pack: db
+  date: '2026-02-09'
+  release: 1.0.0
+  description: SQLAlchemy-backed database metadata, query, and sampling helpers for configured database
+    URLs.
+  examples: db.tables(db_url="sqlite:///app.db", include_row_count=True) db.sample(db_url="sqlite:///app.db",
+    table="users") db.query(db_url="sqlite:///app.db", sql="select * from users limit 5", read_only=True)
+  value: 7
+  loc: 287
+- feature: Diagram generation pack
+  pack: diagram
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Kroki-based diagram rendering with templates and multiple diagram syntaxes.
+  examples: diagram.render_diagram(provider="mermaid", source="graph TD; A-->B", name="flow") diagram.get_playground_url(provider="mermaid",
+    source="graph TD; A-->B") diagram.batch_render(sources=[{"provider":"mermaid","source":"graph TD;
+    A-->B","name":"flow"}])
+  value: 7
+  loc: 1068
+- feature: Excel workbook pack
+  pack: excel
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Spreadsheet creation, reading, writing, ranges, formulas, tables, and workbook inspection
+    tools.
+  examples: excel.create(filepath="report.xlsx", sheet_names=["Inputs", "Summary"]) excel.write(filepath="report.xlsx",
+    sheet_name="Inputs", start_cell="A1", data=[["x",1]]) excel.formulas(filepath="report.xlsx")
+  value: 7
+  loc: 837
+- feature: Grounded Google search pack
+  pack: ground
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Gemini grounded search tools for web, docs, dev, and Reddit-style research queries.
+  examples: ground.search(query="FastMCP v3 docs", extract_schema={"title":"str","url":"str"}, return_provenance=True)
+    ground.docs(query="pydantic settings", technology="python")
+  value: 7
+  loc: 394
+- feature: Structured logging developer API
+  pack: logging
+  date: '2026-02-09'
+  release: 1.0.0
+  description: LogEntry and LogSpan provide auto-timed structured logs with field truncation, secret redaction,
+    success/failure helpers, and dev-friendly formatting.
+  examples: 'from ot.logging import LogSpan with LogSpan(span="mytool.run", path="README.md") as s:     s.add("rows",
+    10) # logs appear under runtime/logs with redacted secrets'
+  value: 7
+  loc: 1238
+- feature: LLM transform pack
+  pack: ot_llm
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Text and file transformation utilities call a configured LLM without leaving the OneTool
+    runtime.
+  examples: 'llm.transform(data="Name: Alice", prompt="Extract YAML") llm.transform_file(path="notes.md",
+    prompt="Summarise decisions")'
+  value: 7
+  loc: 181
+- feature: Web fetch pack
+  pack: webfetch
+  date: '2026-02-09'
+  release: 1.0.0
+  description: URL fetching and extraction with validation, timeout handling, and batch support.
+  examples: webfetch.fetch(url="https://docs.python.org/3/library/json.html", output_format="markdown")
+    webfetch.fetch(url="https://pypi.org/pypi/requests/json", output_format="json", include_metadata=True)
+  value: 7
+  loc: 291
+- feature: Package version pack
+  pack: package
+  date: '2026-02-09'
+  release: 1.0.0
+  description: Package version checks and dependency lookup helpers for development workflows.
+  examples: __onetool ot.help(query="Package version pack")
+  value: 5
+  loc: 345
