@@ -49,6 +49,11 @@ Publish messages from tool calls to a connected onetool-console app via the sign
 ### Defaults
 
 - Retained messages are scoped to the current MCP runtime instance and cleared when the instance restarts.
+- Message metadata is retained in memory; bounded previews and inline payloads are
+  written through to session-scoped files under
+  `.onetool/state/console/instances/<mcp-instance-id>/messages/`.
+- `console.list` reads metadata only. `console.read`, Console polling, and payload
+  views load a body for the request and discard it afterward.
 - Instance snapshots publish `allowed_roots` (the file pack's `allowed_dirs` plus the working directory); file references outside these roots fall back to bounded inline publication with `metadata.fallback = "outside-allowed-roots"`.
 
 ## Examples
@@ -105,3 +110,7 @@ console.clear()
 - When `direct.host.enabled` is false, nothing can ever poll the outbox, so `console.display` returns the bounded preview text (prefixed with a note) instead of a receipt — content is never silently dropped.
 - Messages are delivered to a connected onetool-console app over the signed `/api/console/outbox` protocol (see [Console Outbox Protocol](../console-outbox-protocol.md)); this pack only produces messages.
 - `console.read` returns an error string (not an exception) when the message has been cleared or has expired past the retention bound.
+- `console.clear()` removes the current instance's message files. Normal shutdown
+  removes the instance directory, while the next startup sweeps state left by
+  dead sessions — each instance directory records its owning pid, so live
+  concurrent sessions on the same project are preserved.

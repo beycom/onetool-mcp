@@ -1,8 +1,7 @@
-"""Process-local, in-memory state for the Console message store.
+"""Process-local metadata state for the Console message store.
 
 Message id generation, bounded retention, bounded inline payload truncation,
-file-reference message construction, and the Console outbox publish hooks.
-No disk cache and no browser focus/event-polling plumbing.
+file-reference message construction, disk-backed bodies, and Console outbox hooks.
 """
 
 from __future__ import annotations
@@ -43,13 +42,13 @@ class ConsoleInstance:
     id: str
     started_at: datetime
     updated_at: datetime
-    messages: OrderedDict[str, ConsoleMessage] = field(default_factory=OrderedDict)
+    messages: OrderedDict[str, MessageMetadata] = field(default_factory=OrderedDict)
     message_ids: list[str] = field(default_factory=list)
     message_id_set: set[str] = field(default_factory=set)
 
 
 class ConsoleState:
-    """Process-local Console message state (inline-only, bounded, in-memory)."""
+    """Bounded metadata state with session-scoped message bodies on disk."""
 
     def __init__(self, *, max_records: int | None = None) -> None:
         self._lock = Lock()
@@ -93,11 +92,16 @@ class ConsoleState:
                 payload=payload,
             )
             message = ConsoleMessage(
+                id=message_id,
                 metadata=metadata,
                 preview=preview,
                 inline_payload=inline_payload,
             )
-            instance.messages[message_id] = message
+            # Deliberately written under the lock: a failed write aborts the
+            # add before any metadata is registered, so "metadata present"
+            # always implies "body file exists".
+            _write_message_body(message=message, instance_id=instance.id)
+            instance.messages[message_id] = metadata
             instance.message_ids.append(message_id)
             instance.message_id_set.add(message_id)
             max_records = self._max_records()
@@ -107,11 +111,10 @@ class ConsoleState:
                 instance.message_id_set.discard(expired_id)
                 expired_ids.append(expired_id)
             instance.updated_at = now
-        _publish_console_message(
-            metadata=metadata, preview=preview, inline_payload=inline_payload
-        )
+        _publish_console_message(metadata=metadata)
         for expired_id in expired_ids:
             _drop_console_message(message_id=expired_id)
+            _unlink_message_body(message_id=expired_id, instance_id=instance.id)
         return metadata
 
     def add_file_message(
@@ -147,9 +150,13 @@ class ConsoleState:
                 payload=payload,
             )
             message = ConsoleMessage(
-                metadata=message_metadata, preview=preview, inline_payload=None
+                id=message_id,
+                metadata=message_metadata,
+                preview=preview,
+                inline_payload=None,
             )
-            instance.messages[message_id] = message
+            _write_message_body(message=message, instance_id=instance.id)
+            instance.messages[message_id] = message_metadata
             instance.message_ids.append(message_id)
             instance.message_id_set.add(message_id)
             max_records = self._max_records()
@@ -159,19 +166,24 @@ class ConsoleState:
                 instance.message_id_set.discard(expired_id)
                 expired_ids.append(expired_id)
             instance.updated_at = now
-        _publish_console_message(
-            metadata=message_metadata, preview=preview, inline_payload=None
-        )
+        _publish_console_message(metadata=message_metadata)
         for expired_id in expired_ids:
             _drop_console_message(message_id=expired_id)
+            _unlink_message_body(message_id=expired_id, instance_id=instance.id)
         return message_metadata
 
     def read_message(self, *, id: str) -> MessageRead | None:
         """Read one message's metadata and preview by ID."""
         instance = self.get_or_create_instance()
         with self._lock:
-            message = instance.messages.get(id)
-        if message is None:
+            metadata = instance.messages.get(id)
+        if metadata is None:
+            return None
+        try:
+            message = _read_message_body(message_id=id, instance_id=instance.id)
+        except FileNotFoundError:
+            # Raced clear()/eviction between the metadata snapshot and the
+            # body read — semantically the message is no longer retained.
             return None
         return MessageRead(metadata=message.metadata, preview=message.preview)
 
@@ -179,8 +191,14 @@ class ConsoleState:
         """Return the full retained inline payload for one message."""
         instance = self.get_or_create_instance()
         with self._lock:
-            message = instance.messages.get(id)
-        if message is None:
+            metadata = instance.messages.get(id)
+        if metadata is None:
+            return None
+        try:
+            message = _read_message_body(message_id=id, instance_id=instance.id)
+        except FileNotFoundError:
+            # Raced clear()/eviction between the metadata snapshot and the
+            # body read — semantically the message is no longer retained.
             return None
         return {
             "metadata": message.metadata.model_dump(mode="json"),
@@ -203,8 +221,7 @@ class ConsoleState:
         instance = self.get_or_create_instance()
         with self._lock:
             items = [
-                instance.messages[message_id].metadata
-                for message_id in instance.message_ids
+                instance.messages[message_id] for message_id in instance.message_ids
             ]
         if kind is not None:
             items = [item for item in items if item.kind == kind]
@@ -232,6 +249,7 @@ class ConsoleState:
             instance.message_id_set.clear()
             instance.updated_at = _utcnow()
         _clear_console_outbox()
+        _clear_console_messages(instance_id=instance.id)
         return cleared
 
     def _max_records(self) -> int:
@@ -465,15 +483,11 @@ def _ensure_console_snapshot(*, message_count: int) -> None:
 def _publish_console_message(
     *,
     metadata: MessageMetadata,
-    preview: BoundedPreview | None,
-    inline_payload: object | None,
 ) -> None:
     try:
         from ot.console.outbox import publish_console_message
 
-        publish_console_message(
-            metadata=metadata, preview=preview, inline_payload=inline_payload
-        )
+        publish_console_message(metadata=metadata)
     except Exception:
         return
 
@@ -494,6 +508,30 @@ def _clear_console_outbox() -> None:
         console_outbox.clear()
     except Exception:
         return
+
+
+def _write_message_body(*, message: ConsoleMessage, instance_id: str) -> None:
+    from ot.console.storage import write_message_body
+
+    write_message_body(message=message, instance_id=instance_id)
+
+
+def _read_message_body(*, message_id: str, instance_id: str) -> ConsoleMessage:
+    from ot.console.storage import read_message_body
+
+    return read_message_body(message_id=message_id, instance_id=instance_id)
+
+
+def _unlink_message_body(*, message_id: str, instance_id: str) -> None:
+    from ot.console.storage import unlink_message_body
+
+    unlink_message_body(message_id=message_id, instance_id=instance_id)
+
+
+def _clear_console_messages(*, instance_id: str) -> None:
+    from ot.console.storage import clear_console_messages
+
+    clear_console_messages(instance_id=instance_id)
 
 
 __all__ = [

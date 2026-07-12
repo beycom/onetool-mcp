@@ -42,6 +42,7 @@ Canonical ownership rules for files created by OneTool and bundled packs.
   .localhist/
   .onetool/
     state/
+      console/instances/<mcp-instance-id>/messages/<message-id>.json
       localhist/
       whiteboard/
       <pack>/
@@ -57,6 +58,11 @@ Canonical ownership rules for files created by OneTool and bundled packs.
 - Telemetry remains `{OT_DIR}/telemetry/`.
 - Direct API auth belongs under `{OT_DIR}/auth/mcp-direct.key`.
 - Project-local pack state belongs under `{CWD}/.onetool/state/{pack}/`.
+- Console message bodies are session-scoped under
+  `{CWD}/.onetool/state/console/instances/<mcp-instance-id>/messages/`; startup
+  sweeps instance directories left by dead sessions (live concurrent
+  sessions are preserved via a pid record) and shutdown removes the
+  current instance.
 - Generated project artifacts stay visible under `{CWD}`.
 - Caller-owned paths remain caller-owned.
 - `{HOME}` is not used for project-specific runtime or tool state.

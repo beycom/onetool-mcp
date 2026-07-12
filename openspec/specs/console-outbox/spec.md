@@ -118,6 +118,13 @@ MCP SHALL publish small, stable Console events for instance metadata and display
 - **WHEN** `display.show(...)` creates a display message
 - **THEN** MCP SHALL append a `console.message.created` event containing the display message metadata, payload mode, bounded preview metadata, and stable message ID
 
+#### Scenario: Message entries retain no body copies
+
+- **WHEN** MCP retains a `console.message.created` entry before acknowledgement
+- **THEN** the outbox entry SHALL retain only its event metadata and message id
+- **AND** it SHALL NOT retain the bounded preview or inline payload
+- **AND** polling SHALL load those body fields from the session-scoped message file and serialize the same protocol v1 event shape
+
 #### Scenario: Unknown future event type
 
 - **WHEN** a Console consumer receives an event type it does not understand
@@ -202,4 +209,3 @@ snapshot-relevant state (status or message count) changes. The server SHALL NOT 
 
 - **WHEN** the outbox is configured with a different instance id than it is currently bound to
 - **THEN** sequence, ack cursor, and retained entries SHALL reset for the new instance
-

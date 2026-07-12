@@ -2,7 +2,9 @@
 
 OneTool MCP exposes a narrow signed outbox for the separate OneTool Console App when `direct.host.enabled: true`.
 
-**Status: protocol v1 — served from 3.0.0, inline payloads only; file modes ship with the full display experience in 3.1.** The endpoints and MCP-owned outbox state ship in 3.0.0 emitting `inline` payloads only. The `file_ref` and `file_diff_ref` payload modes remain part of protocol v1 but are not emitted until 3.1.
+**Status: protocol v1.** The endpoints and MCP-owned outbox emit `inline`,
+`file_ref`, and `file_diff_ref` payload modes. File-reference events carry paths
+only; the Console reads file content locally after validating `allowed_roots`.
 
 ## Endpoints
 
@@ -93,6 +95,12 @@ Polling is at-least-once. A poll response does not remove events. MCP removes ev
 
 Each poll batch includes an `oldest_retained` integer: the sequence of the oldest retained entry, or `acked_through` when no entries are retained (for example an empty outbox at startup reports `oldest_retained: 0`). A consumer whose cursor is `c` detects retention-driven loss when `oldest_retained > c + 1` — events `c+1 .. oldest_retained-1` were evicted by bounded retention before they were acknowledged.
 
+The producer keeps message metadata and IDs in memory, but not preview or inline
+payload bodies. Those fields are written through to the runtime instance's
+session-scoped message files and hydrated when a poll response is serialized.
+This is an implementation detail of retention: the protocol v1 event shape and
+acknowledgement semantics are unchanged.
+
 ## Tolerant readers
 
 Consumers MUST ignore unknown fields anywhere in the protocol — outbox batches, event envelopes, and payloads. Within `protocol_version: 1`, servers MAY add new fields without a version bump. The checked-in JSON Schemas keep `additionalProperties: false` as a strict producer-conformance check for the shipped server; they are not a consumer validation contract.
@@ -101,4 +109,3 @@ Protocol schemas and fixtures are checked in under:
 
 - `tests/fixtures/console-protocol/schemas/`
 - `tests/fixtures/console-protocol/fixtures/`
-

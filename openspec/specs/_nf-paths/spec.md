@@ -107,6 +107,12 @@ project directory, not under global config-scoped storage.
 - **WHEN** current tool state is read
 - **THEN** OneTool SHALL NOT silently read that legacy location as a fallback
 
+#### Scenario: Console session message state
+- **GIVEN** a Console message belongs to runtime instance `<instance-id>`
+- **WHEN** its preview and inline payload are retained
+- **THEN** its body SHALL be written under `{CWD}/.onetool/state/console/instances/<instance-id>/messages/`
+- **AND** the instance directory SHALL be removed when that runtime session ends
+
 ### Requirement: Initialization And Backup Safety
 
 Initialization flows SHALL avoid destructive overwrites of user-owned

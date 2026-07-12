@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -39,6 +39,20 @@ import pytest
 # guarantees these modules bind the real `ot.config.get_config` and never observe a
 # mocked one.
 import ot.meta  # noqa: F401
+
+
+@pytest.fixture(autouse=True)
+def isolate_console_storage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Keep session-scoped Console body files out of the working tree."""
+    from ot.console import storage
+
+    monkeypatch.setattr(
+        storage,
+        "get_project_state_dir",
+        lambda pack: tmp_path / ".onetool" / "state" / pack,
+    )
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -83,6 +97,8 @@ def require(condition: bool, reason: str, request: pytest.FixtureRequest) -> Non
 _project_root = Path(__file__).parent.parent
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from _pytest.nodes import Item
 
 SPEED_MARKERS = {"smoke", "unit", "integration", "slow"}

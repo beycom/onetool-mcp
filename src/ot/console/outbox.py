@@ -42,6 +42,7 @@ class OutboxEntry:
 
     sequence: int
     event: dict[str, Any]
+    message_id: str | None = None
 
 
 @dataclass
@@ -68,7 +69,11 @@ class ConsoleOutboxState:
                 self._last_snapshot = None
 
     def append(
-        self, *, event_type: ConsoleEventType, payload: dict[str, Any]
+        self,
+        *,
+        event_type: ConsoleEventType,
+        payload: dict[str, Any],
+        message_id: str | None = None,
     ) -> dict[str, Any]:
         """Append one protocol event and return it."""
         with self.lock:
@@ -85,7 +90,13 @@ class ConsoleOutboxState:
                 "created_at": _iso_now(),
                 "payload": payload,
             }
-            self.entries.append(OutboxEntry(sequence=self.sequence, event=event))
+            self.entries.append(
+                OutboxEntry(
+                    sequence=self.sequence,
+                    event=event,
+                    message_id=message_id,
+                )
+            )
             self._enforce_retention_locked()
             return dict(event)
 
@@ -107,7 +118,7 @@ class ConsoleOutboxState:
             oldest_retained = (
                 self.entries[0].sequence if self.entries else self.acked_through
             )
-            return {
+            batch = {
                 "protocol": PROTOCOL,
                 "protocol_version": PROTOCOL_VERSION,
                 "instance_id": instance_id,
@@ -116,9 +127,10 @@ class ConsoleOutboxState:
                 "next_cursor": next_cursor,
                 "oldest_retained": oldest_retained,
                 "has_more": len(eligible) > len(selected),
-                "events": [entry.event for entry in selected],
                 "created_at": _iso_now(),
             }
+        batch["events"] = [_serialize_entry(entry) for entry in selected]
+        return batch
 
     def ack(self, *, acked_through: int, instance_id: str) -> dict[str, Any]:
         """Record acknowledgement and drop acknowledged entries.
@@ -208,19 +220,14 @@ def ensure_instance_snapshot(*, message_count: int, status: str = "running") -> 
 def publish_console_message(
     *,
     metadata: MessageMetadata,
-    preview: BoundedPreview | None,
-    inline_payload: object | None,
 ) -> None:
-    """Append a `console.message.created` event for Console consumption."""
+    """Append an id-only `console.message.created` outbox entry."""
     instance_id = _runtime_instance_id()
     STATE.configure_instance(instance_id=instance_id)
     STATE.append(
         event_type="console.message.created",
-        payload=build_console_message_payload(
-            metadata=metadata,
-            preview=preview,
-            inline_payload=inline_payload,
-        ),
+        payload=_build_console_message_metadata_payload(metadata=metadata),
+        message_id=metadata.id,
     )
 
 
@@ -258,6 +265,17 @@ def build_console_message_payload(
     inline_payload: object | None,
 ) -> dict[str, Any]:
     """Return the public Console `console.message.created` payload."""
+    result = _build_console_message_metadata_payload(metadata=metadata)
+    if metadata.payload.mode == "inline":
+        result["payload"]["content"] = _json_compatible(inline_payload)
+    result["preview"] = preview.model_dump(mode="json") if preview else None
+    return result
+
+
+def _build_console_message_metadata_payload(
+    *, metadata: MessageMetadata
+) -> dict[str, Any]:
+    """Return the body-free portion of a Console message wire payload."""
     payload = metadata.payload
     wire_payload: dict[str, Any] = {
         "mode": payload.mode,
@@ -265,11 +283,9 @@ def build_console_message_payload(
         "size_bytes": payload.size_bytes,
         "language": payload.language,
     }
-    if payload.mode == "inline":
-        wire_payload["content"] = _json_compatible(inline_payload)
-    elif payload.mode == "file_ref":
+    if payload.mode == "file_ref":
         wire_payload["path"] = payload.path
-    else:
+    elif payload.mode == "file_diff_ref":
         if payload.path is not None:
             wire_payload["path"] = payload.path
         if payload.old_path is not None:
@@ -283,9 +299,31 @@ def build_console_message_payload(
         "created_at": metadata.created_at.isoformat(),
         "updated_at": metadata.updated_at.isoformat(),
         "payload": wire_payload,
-        "preview": preview.model_dump(mode="json") if preview else None,
     }
     return result
+
+
+def _serialize_entry(entry: OutboxEntry) -> dict[str, Any]:
+    """Hydrate one retained id-only message entry for a poll response."""
+    if entry.message_id is None:
+        return entry.event
+    from ot.console.storage import read_message_body
+
+    try:
+        message = read_message_body(message_id=entry.message_id)
+    except FileNotFoundError:
+        # Eviction/clear raced this poll between entry selection (under the
+        # outbox lock) and hydration (outside it). Return the body-free event
+        # rather than failing the whole batch — the matching drop/clear event
+        # reaches the consumer through the same protocol.
+        return entry.event
+    event = dict(entry.event)
+    event["payload"] = build_console_message_payload(
+        metadata=message.metadata,
+        preview=message.preview,
+        inline_payload=message.inline_payload,
+    )
+    return event
 
 
 def poll_outbox(*, limit: int = 100, after: int | None = None) -> dict[str, Any]:

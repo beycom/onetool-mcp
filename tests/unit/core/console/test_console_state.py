@@ -1,19 +1,23 @@
-"""Tests for the slim, in-memory, inline-only Console message state."""
+"""Tests for metadata-only Console state and disk-backed message bodies."""
 
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
-from ot.console.models import ShowRequest
+from ot.console.models import MessageMetadata, ShowRequest
 from ot.console.state import PREVIEW_LIMIT_BYTES, ConsoleState
+from ot.console.storage import message_body_path
 
 
 @pytest.mark.unit
 @pytest.mark.core
 class TestConsoleState:
-    """Test in-memory Console message state behavior."""
+    """Test metadata retention and message-body persistence."""
 
     def test_status_does_not_create_message(self) -> None:
         state = ConsoleState()
@@ -38,6 +42,47 @@ class TestConsoleState:
         assert metadata.preview_lines == 1
         assert page.total == 1
         assert page.items[0].id == metadata.id
+        instance = state.get_or_create_instance()
+        assert isinstance(instance.messages[metadata.id], MessageMetadata)
+
+    def test_add_writes_json_body_that_round_trips(self) -> None:
+        state = ConsoleState()
+        metadata = state.add_message(
+            request=ShowRequest(
+                kind="json",
+                content={"status": "ready"},
+                metadata={"source": "unit"},
+            )
+        )
+        instance = state.get_or_create_instance()
+        path = message_body_path(message_id=metadata.id, instance_id=instance.id)
+
+        record = json.loads(path.read_text(encoding="utf-8"))
+
+        assert record["id"] == metadata.id
+        assert record["metadata"] == metadata.model_dump(mode="json")
+        assert record["preview"]["text"] == '{\n  "status": "ready"\n}'
+        assert record["inline_payload"] == {"status": "ready"}
+
+    def test_failed_body_write_fails_add_and_removes_temporary_file(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        state = ConsoleState()
+
+        def _fail_replace(_path: Path, _target: Path) -> Path:
+            raise OSError("disk full")
+
+        monkeypatch.setattr(Path, "replace", _fail_replace)
+
+        with pytest.raises(OSError, match="disk full"):
+            state.add_message(request=ShowRequest(kind="text", content="hello"))
+
+        instance = state.get_or_create_instance()
+        messages_dir = message_body_path(
+            message_id="unused", instance_id=instance.id
+        ).parent
+        assert state.list_messages(limit=10, offset=0).total == 0
+        assert list(messages_dir.iterdir()) == []
 
     def test_show_retries_message_id_collision(
         self, monkeypatch: pytest.MonkeyPatch
@@ -70,6 +115,36 @@ class TestConsoleState:
         assert result.preview is not None
         assert result.preview.text == "hello"
 
+    def test_read_loads_body_outside_state_lock(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from ot.console import storage
+
+        state = ConsoleState()
+        metadata = state.add_message(request=ShowRequest(kind="text", content="hello"))
+        real_read = storage.read_message_body
+
+        def _read_without_lock(*, message_id: str, instance_id: str | None = None):
+            assert state._lock.acquire(blocking=False)
+            state._lock.release()
+            return real_read(message_id=message_id, instance_id=instance_id)
+
+        monkeypatch.setattr(storage, "read_message_body", _read_without_lock)
+
+        assert state.read_message(id=metadata.id) is not None
+
+    def test_list_does_not_read_message_bodies(self) -> None:
+        state = ConsoleState()
+        state.add_message(request=ShowRequest(kind="text", content="hello"))
+
+        with patch(
+            "ot.console.storage.read_message_body",
+            side_effect=AssertionError("list touched disk"),
+        ):
+            page = state.list_messages(limit=10, offset=0)
+
+        assert page.total == 1
+
     def test_read_unknown_id_returns_none(self) -> None:
         state = ConsoleState()
 
@@ -86,6 +161,10 @@ class TestConsoleState:
         assert state.status().message_count == 0
         assert state.list_messages(limit=10, offset=0).total == 0
         assert state.read_message(id=first.id) is None
+        assert not message_body_path(
+            message_id=first.id,
+            instance_id=state.get_or_create_instance().id,
+        ).parent.exists()
 
     def test_retention_bound_drops_oldest_records(self) -> None:
         state = ConsoleState(max_records=3)
@@ -98,10 +177,14 @@ class TestConsoleState:
             if index == 0:
                 first_id = metadata.id
 
+        instance = state.get_or_create_instance()
         page = state.list_messages(limit=10, offset=0)
         assert page.total == 3
         assert first_id not in [item.id for item in page.items]
         assert state.read_message(id=first_id) is None
+        assert not message_body_path(
+            message_id=first_id, instance_id=instance.id
+        ).exists()
 
     def test_tail_list_returns_latest_messages_in_oldest_to_newest_order(self) -> None:
         state = ConsoleState()
@@ -246,6 +329,14 @@ class TestConsoleFileMessages:
         assert read is not None
         assert read.preview is not None
         assert read.preview.text == "a = 1\nb = 2\n"
+        record = json.loads(
+            message_body_path(
+                message_id=metadata.id,
+                instance_id=state.get_or_create_instance().id,
+            ).read_text(encoding="utf-8")
+        )
+        assert record["id"] == metadata.id
+        assert record["inline_payload"] is None
         assert read.preview.truncated is False
 
     def test_binary_file_ref_has_no_preview(self, tmp_path) -> None:
@@ -274,3 +365,30 @@ class TestConsoleFileMessages:
         assert metadata.payload.mode == "file_diff_ref"
         assert metadata.payload.old_path == str(old)
         assert metadata.payload.new_path == str(new)
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestHydrationRaces:
+    """Body reads race clear()/eviction gracefully instead of raising."""
+
+    def test_read_returns_none_when_body_file_vanished(self) -> None:
+        from ot.console.storage import unlink_message_body
+
+        state = ConsoleState()
+        metadata = state.add_message(request=ShowRequest(kind="text", content="hello"))
+        instance = state.get_or_create_instance()
+        # Simulate clear()/eviction winning the race after the metadata snapshot
+        unlink_message_body(message_id=metadata.id, instance_id=instance.id)
+
+        assert state.read_message(id=metadata.id) is None
+
+    def test_payload_view_returns_none_when_body_file_vanished(self) -> None:
+        from ot.console.storage import unlink_message_body
+
+        state = ConsoleState()
+        metadata = state.add_message(request=ShowRequest(kind="text", content="hello"))
+        instance = state.get_or_create_instance()
+        unlink_message_body(message_id=metadata.id, instance_id=instance.id)
+
+        assert state.payload_view(id=metadata.id) is None

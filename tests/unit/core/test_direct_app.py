@@ -10,6 +10,17 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _stub_console_storage_lifecycle(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep general lifespan tests focused and free of real Console state I/O."""
+    monkeypatch.setattr(
+        "ot.console.storage.initialize_console_storage", lambda **_kwargs: None
+    )
+    monkeypatch.setattr(
+        "ot.console.storage.cleanup_console_instance", lambda **_kwargs: None
+    )
+
+
 @pytest.mark.unit
 @pytest.mark.core
 def test_direct_auth_key_uses_config_scoped_auth_file() -> None:
@@ -260,6 +271,56 @@ def test_lifespan_disabled_direct_api_never_touches_discovery_files() -> None:
     sweep_mock.assert_not_called()
     write_mock.assert_not_called()
     remove_mock.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_lifespan_initializes_and_cleans_console_storage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """MCP lifespan sweeps at startup and removes its instance at shutdown."""
+    from ot import server
+
+    async def _run_lifespan() -> None:
+        async with server._lifespan(SimpleNamespace()):
+            pass
+
+    cfg = SimpleNamespace(
+        _config_dir=Path("/tmp/onetool/config"),
+        servers={},
+        include=[],
+        prompts=[],
+        direct=SimpleNamespace(host=SimpleNamespace(enabled=False)),
+        stats=SimpleNamespace(enabled=False),
+        get_log_dir_path=lambda: Path("/tmp/onetool/logs"),
+        get_stats_file_path=lambda: Path("/tmp/onetool/stats.jsonl"),
+    )
+    initialize = MagicMock()
+    cleanup = MagicMock()
+    monkeypatch.setattr("ot.console.storage.initialize_console_storage", initialize)
+    monkeypatch.setattr("ot.console.storage.cleanup_console_instance", cleanup)
+
+    with (
+        patch.object(server, "_config", cfg),
+        patch.object(
+            server,
+            "get_proxy_manager",
+            return_value=SimpleNamespace(
+                connect_background=lambda _servers: None,
+                servers={},
+                is_connecting=False,
+            ),
+        ),
+        patch.object(server, "get_registry", return_value=SimpleNamespace(tools={})),
+        patch("ot.executor.tool_loader.load_tool_registry"),
+        patch("ot.telemetry.ping"),
+        patch("ot.runtime_meta.get_or_create_instance_id", return_value="mcp-fixedid"),
+        patch.object(server, "logger"),
+    ):
+        asyncio.run(_run_lifespan())
+
+    initialize.assert_called_once_with(instance_id="mcp-fixedid")
+    cleanup.assert_called_once_with(instance_id="mcp-fixedid")
 
 
 @pytest.mark.unit

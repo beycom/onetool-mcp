@@ -1,4 +1,4 @@
-"""Models for the in-memory Console message store.
+"""Models for Console metadata, disk-backed bodies, and wire payloads.
 
 Inline payloads carry bounded content on the wire; file-backed payload modes
 (`file_ref`, `file_diff_ref`) carry only paths plus size/mime/language so the
@@ -73,10 +73,11 @@ class MessageMetadata(BaseModel):
 
 
 class ConsoleMessage(BaseModel):
-    """Stored Console message with optional bounded preview."""
+    """Disk-backed Console message body with its JSON-safe metadata."""
 
     model_config = ConfigDict(extra="forbid")
 
+    id: str
     metadata: MessageMetadata
     preview: BoundedPreview | None = None
     inline_payload: Any | None = None

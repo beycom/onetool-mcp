@@ -4,26 +4,29 @@
 Provide the agent-facing `console` pack for publishing messages to a connected
 onetool-console consumer via the Console outbox: inline messages via `console.show`,
 context-saving display of tool output and file references via `console.display`, and
-bounded in-memory retention with list/read/clear introspection.
+bounded metadata retention with session-scoped disk bodies and list/read/clear
+introspection.
 
 ## Requirements
 ### Requirement: Console Pack Inline Messages
 
 The `console` pack SHALL let an agent publish inline messages to a connected onetool-console.
 `console.show` SHALL accept inline content (string, mapping, or list), bound it to the
-configured inline payload limit, retain a message record in memory, and append a
-`console.message.created` event (wire name fixed by protocol v1) to the Console outbox.
+configured inline payload limit, retain message metadata in memory, atomically write the
+preview and inline payload to the current instance's disk store, and append a body-free
+`console.message.created` outbox entry (wire name fixed by protocol v1).
 
 #### Scenario: Show an inline message
 
 - **WHEN** an agent calls `console.show(content="build finished", kind="note")`
-- **THEN** a message record SHALL be retained with a unique message id and metadata
+- **THEN** message metadata SHALL be retained in memory with a unique message id
+- **AND** the preview and inline payload SHALL be written to the message's JSON body file
 - **AND** a `console.message.created` event (wire name fixed by protocol v1) with `payload.mode: "inline"` SHALL be appended to the Console outbox
 
 #### Scenario: Oversized inline content bounded
 
 - **WHEN** `console.show` is called with content exceeding the inline payload bound
-- **THEN** the stored payload SHALL be truncated to the bound with truncation indicated
+- **THEN** the disk-backed payload SHALL be truncated to the bound with truncation indicated
 - **AND** the call SHALL succeed rather than error
 
 ### Requirement: Console Display With Digest Receipts
@@ -97,26 +100,60 @@ with a note instead of a receipt, so content is never silently dropped.
 
 ### Requirement: Console Message Retention And Introspection
 
-The pack SHALL provide `console.list`, `console.read`, and `console.clear` over an in-memory,
-bounded message store scoped to the current runtime instance.
+The pack SHALL provide `console.list`, `console.read`, and `console.clear` over a bounded
+message store scoped to the current runtime instance. Memory SHALL retain metadata only.
+Each message body SHALL be stored as
+`{CWD}/.onetool/state/console/instances/<instance-id>/messages/<message-id>.json` with
+`id`, JSON-safe `metadata`, `preview`, and `inline_payload` fields. Body writes SHALL use
+a temporary file in the same directory followed by atomic replacement.
 
 #### Scenario: List and read retained messages
 
 - **WHEN** messages have been shown and the agent calls `console.list` then `console.read` with a returned message id
 - **THEN** `list` SHALL return message metadata (id, kind, created-at) newest-last with a bounded count
-- **AND** `read` SHALL return the full retained message payload
+- **AND** `list` SHALL NOT read message body files
+- **AND** `read` SHALL load and return the retained message body without retaining it in memory
+
+#### Scenario: Body write fails
+
+- **WHEN** a message body cannot be written and atomically replaced
+- **THEN** message creation SHALL fail with the storage error
+- **AND** no metadata record or partial body file SHALL be retained
 
 #### Scenario: Clear removes retained messages and notifies
 
 - **WHEN** the agent calls `console.clear`
 - **THEN** retained message records SHALL be removed
+- **AND** the current instance's messages directory SHALL be removed
 - **AND** the cleared count SHALL be returned
 
 #### Scenario: Retention bound respected
 
 - **WHEN** more messages are shown than the configured retention limit
 - **THEN** the oldest message records SHALL be dropped
+- **AND** each dropped message's body file SHALL be unlinked
 - **AND** the store SHALL never exceed the configured limit
+
+### Requirement: Console Message Storage Lifecycle
+
+Console message bodies SHALL exist only for their runtime session. Each instance
+directory SHALL record its owning process id; server startup SHALL sweep sibling
+instance directories whose owning process is no longer alive (a missing or unreadable
+pid record counts as dead), leaving live concurrent sessions untouched. Normal shutdown
+SHALL remove the current instance directory, and process exit SHALL register a
+best-effort cleanup backstop. Cleanup SHALL not use age-based retention and SHALL not
+read or migrate removed Display state paths.
+
+#### Scenario: Runtime starts after an unclean exit
+
+- **WHEN** a Console runtime instance starts with sibling instance directories present
+- **THEN** siblings whose owning process is dead (or unrecorded) SHALL be removed before new messages are retained
+- **AND** siblings owned by a live process SHALL be left in place
+
+#### Scenario: Runtime shuts down normally
+
+- **WHEN** the MCP server lifespan ends
+- **THEN** the current Console instance directory SHALL be removed
 
 ### Requirement: Console Pack Works Without A Consumer
 

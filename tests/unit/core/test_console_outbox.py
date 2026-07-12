@@ -10,7 +10,12 @@ from jsonschema import Draft202012Validator
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-from ot.console.models import BoundedPreview, MessageMetadata, PayloadReference
+from ot.console.models import (
+    BoundedPreview,
+    ConsoleMessage,
+    MessageMetadata,
+    PayloadReference,
+)
 from ot.console.outbox import (
     PROTOCOL,
     PROTOCOL_VERSION,
@@ -52,6 +57,23 @@ def _make_metadata(message_id: str = "abc123def456") -> MessageMetadata:
         created_at=now,
         updated_at=now,
         payload=PayloadReference(mode="inline", size_bytes=5),
+    )
+
+
+def _write_inline_body(
+    *, metadata: MessageMetadata, preview: BoundedPreview, content: object
+) -> None:
+    from ot.console.storage import write_message_body
+    from ot.runtime_meta import get_or_create_instance_id
+
+    write_message_body(
+        message=ConsoleMessage(
+            id=metadata.id,
+            metadata=metadata,
+            preview=preview,
+            inline_payload=content,
+        ),
+        instance_id=get_or_create_instance_id(),
     )
 
 
@@ -344,6 +366,25 @@ class TestConsoleOutboxModuleHelpers:
         assert payload["payload"]["content"] == "hello"
         assert payload["preview"]["text"] == "hello"
 
+    def test_outbox_retains_id_only_and_poll_hydrates_body(self) -> None:
+        metadata = _make_metadata()
+        preview = BoundedPreview(
+            text="hello", truncated=False, size_bytes=5, limit_bytes=100
+        )
+        _write_inline_body(metadata=metadata, preview=preview, content="hello")
+        from ot.console.outbox import publish_console_message
+
+        publish_console_message(metadata=metadata)
+
+        entry = GLOBAL_STATE.entries[-1]
+        assert entry.message_id == metadata.id
+        assert "preview" not in entry.event["payload"]
+        assert "content" not in entry.event["payload"]["payload"]
+
+        event = poll_outbox(limit=10)["events"][0]
+        assert event["payload"]["preview"]["text"] == "hello"
+        assert event["payload"]["payload"]["content"] == "hello"
+
 
 @pytest.mark.unit
 @pytest.mark.core
@@ -366,9 +407,10 @@ def test_emitted_events_validate_against_shipped_schemas() -> None:
     preview = BoundedPreview(
         text="hello", truncated=False, size_bytes=5, limit_bytes=100
     )
+    _write_inline_body(metadata=metadata, preview=preview, content="hello")
     from ot.console.outbox import publish_console_message
 
-    publish_console_message(metadata=metadata, preview=preview, inline_payload="hello")
+    publish_console_message(metadata=metadata)
 
     batch = poll_outbox(limit=10)
     for event in batch["events"]:
@@ -452,3 +494,31 @@ class TestSnapshotRoots:
         assert str(get_effective_cwd().resolve()) in roots
         assert all(root.startswith("/") for root in roots)
         assert len(roots) == len(set(roots))
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_poll_falls_back_to_body_free_event_when_body_vanished() -> None:
+    """A poll racing eviction/clear returns the body-free event, not an error."""
+    metadata = _make_metadata()
+    preview = BoundedPreview(
+        text="hello", truncated=False, size_bytes=5, limit_bytes=100
+    )
+    _write_inline_body(metadata=metadata, preview=preview, content="hello")
+    from ot.console.outbox import publish_console_message
+    from ot.console.storage import unlink_message_body
+    from ot.runtime_meta import get_or_create_instance_id
+
+    publish_console_message(metadata=metadata)
+    # Simulate eviction/clear winning the race between entry selection and hydration
+    unlink_message_body(
+        message_id=metadata.id, instance_id=get_or_create_instance_id()
+    )
+
+    batch = poll_outbox(limit=10)
+
+    events = [e for e in batch["events"] if e["type"] == "console.message.created"]
+    assert len(events) == 1
+    assert events[0]["payload"]["id"] == metadata.id
+    assert "content" not in events[0]["payload"]["payload"]
+    assert "preview" not in events[0]["payload"]

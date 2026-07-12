@@ -270,6 +270,10 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
 
     with LogSpan(span="mcp.server.start", transport=runtime.transport) as start_span:
         start_time = time.monotonic()
+        from ot.console.storage import initialize_console_storage
+        from ot.runtime_meta import get_or_create_instance_id
+
+        initialize_console_storage(instance_id=get_or_create_instance_id())
         if runtime.transport == "streamable-http":
             start_span.add(
                 host=runtime.host,
@@ -382,6 +386,11 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
         _direct_api_server = None
         _direct_api_thread = None
         _direct_api_port = None
+
+        from ot.console.storage import cleanup_console_instance
+        from ot.runtime_meta import get_or_create_instance_id
+
+        cleanup_console_instance(instance_id=get_or_create_instance_id())
 
         # Shutdown: stop stats writer
         if _stats_writer is not None:
