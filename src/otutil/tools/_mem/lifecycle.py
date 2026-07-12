@@ -10,7 +10,14 @@ from otpack import LogSpan
 
 from .config import _get_config
 from .content import _topic_filter
-from .db import _get_connection, _serialize_embedding, _use_connection
+from .db import (
+    _check_fts_available,
+    _check_vec_available,
+    _get_connection,
+    _serialize_embedding,
+    _sync_vec_index,
+    _use_connection,
+)
 from .embedding import _generate_embedding
 
 
@@ -105,6 +112,14 @@ def decay(
             return f"Error applying decay: {e}"
 
 
+def _vec_index_status(conn: Any) -> str:
+    """Vector index status line for stats(): row count or fallback marker."""
+    if not _check_vec_available():
+        return "scan-fallback"
+    vec_rows = conn.execute("SELECT COUNT(*) FROM memories_vec").fetchone()[0]
+    return f"sqlite-vec ({vec_rows} rows)"
+
+
 def stats() -> str:
     """Show memory statistics - counts, sizes, category breakdown, topic tree.
 
@@ -173,6 +188,9 @@ def stats() -> str:
                 f"  Without embeddings: {without_embeddings}",
                 f"  Pending in queue: {_emb._embedding_queue.qsize()}",
                 f"  Embedding errors: {_emb._embedding_errors}",
+                "\nSearch indexes:",
+                f"  Keyword: {'fts5' if _check_fts_available() else 'like-fallback'}",
+                f"  Vector: {_vec_index_status(conn)}",
                 "\nCategories:",
             ]
             for cat, cnt in categories:
@@ -257,6 +275,7 @@ def reindex(
                         "UPDATE memories SET embedding = ? WHERE id = ?",
                         [_serialize_embedding(embedding), memory_id],
                     )
+                    _sync_vec_index(conn, memory_id, embedding)
                     conn.commit()
                 generated += 1
 

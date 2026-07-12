@@ -13,7 +13,7 @@ from ot.logging import LogEntry
 from otpack import LogSpan, get_secret
 
 from .config import _get_config
-from .db import _serialize_embedding, _use_connection
+from .db import _serialize_embedding, _sync_vec_index, _use_connection
 
 if TYPE_CHECKING:
     from types import ModuleType
@@ -213,10 +213,12 @@ def _process_embedding_job(memory_id: str) -> None:
             # API round-trip happens outside the DB lock
             embedding = _generate_embedding(row[0])
             with _use_connection() as conn:
-                conn.execute(
+                cursor = conn.execute(
                     "UPDATE memories SET embedding = ? WHERE id = ? AND content = ?",
                     [_serialize_embedding(embedding), memory_id, row[0]],
                 )
+                if cursor.rowcount:
+                    _sync_vec_index(conn, memory_id, embedding)
                 conn.commit()
             return
         except Exception:

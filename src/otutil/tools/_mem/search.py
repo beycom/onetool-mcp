@@ -5,15 +5,40 @@ import builtins
 import re
 from typing import Any
 
+from loguru import logger
+
+from ot.logging import LogEntry
 from otpack import LogSpan
 from otutil.tools._content_util import grep_lines
 
 from .config import _get_config
 from .content import _tags_filter_sql, _topic_filter
-from .db import _deserialize_tags, _get_connection, _serialize_embedding
+from .db import (
+    _check_fts_available,
+    _check_vec_available,
+    _deserialize_tags,
+    _get_connection,
+    _normalize_vec,
+    _serialize_embedding,
+)
 from .embedding import _generate_embedding
 
 _builtins_list = builtins.list
+
+_STOPWORDS = frozenset({
+    "how", "do", "i", "what", "is", "the", "a", "an", "to", "of",
+    "in", "for", "on", "with", "can", "my", "me",
+})
+
+# One-time LIKE-fallback warning flag (FTS5 unavailable in this SQLite build).
+_like_fallback_warned = False
+
+
+def _fts_query(text: str) -> str:
+    """Preprocess a query for FTS5: strip operator chars and remove stopwords."""
+    sanitized = re.sub(r'[?!":\^*()\-]', ' ', text).strip()
+    tokens = [t for t in sanitized.split() if t.lower() not in _STOPWORDS]
+    return " ".join(tokens) if tokens else sanitized
 
 
 def grep(
@@ -212,7 +237,81 @@ def _search_semantic(
     tags: list[str] | None,
     limit: int,
 ) -> list[dict[str, Any]]:
-    """Semantic search using vector cosine similarity."""
+    """Semantic search: vec0 KNN when the index is usable, else UDF scan.
+
+    KNN uses L2 distance over L2-normalised vectors, which orders identically
+    to cosine similarity; the reported score converts back losslessly via
+    `1 - distance²/2`, preserving the 0..1 cosine semantics of the scan path.
+    """
+    if _check_vec_available():
+        has_vec_rows = conn.execute("SELECT 1 FROM memories_vec LIMIT 1").fetchone()
+        if has_vec_rows:
+            return _search_semantic_knn(conn, query, topic, category, tags, limit)
+    return _search_semantic_scan(conn, query, topic, category, tags, limit)
+
+
+def _search_semantic_knn(
+    conn: Any,
+    query: str,
+    topic: str | None,
+    category: str | None,
+    tags: list[str] | None,
+    limit: int,
+) -> list[dict[str, Any]]:
+    """Indexed KNN semantic search via the memories_vec vec0 table."""
+    embedding = _normalize_vec(_generate_embedding(query))
+    query_blob = _serialize_embedding(embedding)
+
+    # KNN selects k nearest BEFORE the join filters apply — over-fetch when
+    # filters are present so the outer filters still leave enough candidates.
+    has_filters = bool(topic or category or tags)
+    k = max(limit * 4, 50) if has_filters else limit
+
+    sql = """
+        SELECT m.id, m.topic, m.content, m.category, m.tags, m.relevance, m.access_count,
+               v.distance AS distance
+        FROM memories_vec v
+        JOIN memories m ON m.id = v.memory_id
+        WHERE v.embedding MATCH ? AND k = ?
+    """
+    params: list[Any] = [query_blob, k]
+
+    topic_sql, topic_params = _topic_filter(topic, column="m.topic")
+    sql += topic_sql
+    params.extend(topic_params)
+
+    if category:
+        sql += " AND m.category = ?"
+        params.append(category)
+
+    if tags:
+        tags_sql, tags_params = _tags_filter_sql(tags, column="m.tags")
+        sql += tags_sql
+        params.extend(tags_params)
+
+    sql += " ORDER BY v.distance LIMIT ?"
+    params.append(limit)
+
+    rows = conn.execute(sql, params).fetchall()
+    return [
+        {
+            "id": r[0], "topic": r[1], "content": r[2], "category": r[3],
+            "tags": _deserialize_tags(r[4]), "relevance": r[5], "access_count": r[6],
+            "score": round(1 - (r[7] ** 2) / 2, 4),
+        }
+        for r in rows
+    ]
+
+
+def _search_semantic_scan(
+    conn: Any,
+    query: str,
+    topic: str | None,
+    category: str | None,
+    tags: list[str] | None,
+    limit: int,
+) -> list[dict[str, Any]]:
+    """Fallback semantic search: full-table scan through the cosine UDF."""
     embedding = _generate_embedding(query)
     query_blob = _serialize_embedding(embedding)
 
@@ -259,7 +358,95 @@ def _search_keyword(
     tags: list[str] | None,
     limit: int,
 ) -> list[dict[str, Any]]:
-    """Pattern search using LIKE matching (case-insensitive in SQLite by default)."""
+    """Keyword search: FTS5 BM25 ranking, falling back to LIKE without FTS5."""
+    global _like_fallback_warned
+    if not _check_fts_available():
+        if not _like_fallback_warned:
+            _like_fallback_warned = True
+            logger.warning(
+                LogEntry(
+                    event="mem.search.like_fallback",
+                    reason="FTS5 unavailable in this SQLite build",
+                )
+            )
+        return _search_keyword_like(conn, query, topic, category, tags, limit)
+
+    fts_q = _fts_query(query)
+    if not fts_q:
+        return []
+
+    rows = _exec_fts(conn, fts_q, topic, category, tags, limit)
+    if not rows:
+        # Prefix fallback: suffix each term with * for partial matching,
+        # preserving the substring-ish forgiveness LIKE used to give.
+        prefix_q = " ".join(t + "*" for t in fts_q.split())
+        if prefix_q != fts_q:
+            rows = _exec_fts(conn, prefix_q, topic, category, tags, limit)
+
+    return [
+        {
+            "id": r[0], "topic": r[1], "content": r[2], "category": r[3],
+            "tags": _deserialize_tags(r[4]), "relevance": r[5], "access_count": r[6],
+            "score": round(abs(r[7]), 4),
+        }
+        for r in rows
+    ]
+
+
+def _exec_fts(
+    conn: Any,
+    fts_q: str,
+    topic: str | None,
+    category: str | None,
+    tags: list[str] | None,
+    limit: int,
+) -> list[Any]:
+    """Execute one FTS5 MATCH query joined to memories with the shared filters."""
+    sql = """
+        SELECT m.id, m.topic, m.content, m.category, m.tags, m.relevance, m.access_count,
+               bm25(memories_fts) AS score
+        FROM memories_fts
+        JOIN memories m ON m.rowid = memories_fts.rowid
+        WHERE memories_fts MATCH ?
+    """
+    params: list[Any] = [fts_q]
+
+    topic_sql, topic_params = _topic_filter(topic, column="m.topic")
+    sql += topic_sql
+    params.extend(topic_params)
+
+    if category:
+        sql += " AND m.category = ?"
+        params.append(category)
+
+    if tags:
+        tags_sql, tags_params = _tags_filter_sql(tags, column="m.tags")
+        sql += tags_sql
+        params.extend(tags_params)
+
+    sql += " ORDER BY score LIMIT ?"
+    params.append(limit)
+    try:
+        return _builtins_list(conn.execute(sql, params).fetchall())
+    except Exception as e:
+        # Benign FTS5 query-syntax errors return no rows; anything else surfaces.
+        if "syntax error" in str(e).lower() or "malformed match" in str(e).lower():
+            logger.warning(
+                LogEntry(event="mem.search.fts_query_error", query=fts_q, error=str(e))
+            )
+            return []
+        raise
+
+
+def _search_keyword_like(
+    conn: Any,
+    query: str,
+    topic: str | None,
+    category: str | None,
+    tags: list[str] | None,
+    limit: int,
+) -> list[dict[str, Any]]:
+    """Fallback pattern search using LIKE matching (no relevance ranking)."""
     sql = """
         SELECT id, topic, content, category, tags, relevance, access_count
         FROM memories
@@ -304,9 +491,11 @@ def _search_hybrid(
     tags: list[str] | None,
     limit: int,
 ) -> list[dict[str, Any]]:
-    """Hybrid search combining semantic and pattern results via RRF.
+    """Hybrid search fusing the semantic and keyword ranked lists via RRF.
 
-    Uses Reciprocal Rank Fusion: rrf_score = sum(1 / (k + rank))
+    Uses Reciprocal Rank Fusion: rrf_score = sum(1 / (k + rank)). Both input
+    lists are relevance-ranked (KNN/cosine and BM25 respectively), so fusion
+    order is meaningful on both sides.
     """
     k = 60  # RRF constant
 
@@ -363,9 +552,13 @@ def _format_search_results(results: list[dict[str, Any]], query: str, extract: i
 
 __all__ = [
     "_format_search_results",
+    "_fts_query",
     "_search_hybrid",
     "_search_keyword",
+    "_search_keyword_like",
     "_search_semantic",
+    "_search_semantic_knn",
+    "_search_semantic_scan",
     "grep",
     "search",
 ]

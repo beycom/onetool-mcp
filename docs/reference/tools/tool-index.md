@@ -1,6 +1,6 @@
 # OneTool MCP Tool Index
 
-packs=28 tools=247
+packs=28 tools=249
 
 ## arch
 ```python
@@ -180,6 +180,7 @@ mem.delete(topic: str | None=None, id: str | None=None, confirm: bool=False)  # 
 mem.dump(topic: str | None=None, output: str | None=None)  # Dump memories to YAML format.
 mem.flush()  # Wait for all pending background embeddings to complete.
 mem.grep(pattern: str, topic: str | None=None, category: str | None=None, tags: list[str] | None=None, context: int=2, case_sensitive: bool=True, limit: int=50, max_per_memory: int=10, fixed_strings: bool=False)  # Regex search across memory content with line-level results.
+mem.history(topic: str | None=None, id: str | None=None, limit: int=10)  # List prior versions of a memory, newest first.
 mem.inspect(topic: str, id: str | None=None)  # Return structured metadata for a single memory.
 mem.list(topic: str | None=None, category: str | None=None, limit: int=50, format: str='list', depth: int=0)  # List memories with optional topic prefix and category filtering.
 mem.load(file: str)  # Import memories from a YAML file. Skips duplicates by content hash.
@@ -189,6 +190,7 @@ mem.read_batch(topic: str | None=None, ids: list[str] | None=None, category: str
 mem.refresh(topic: str | None=None, dry_run: bool=True)  # Re-read source files for stale file-backed memories.
 mem.reindex(topic: str | None=None, limit: int=100, dry_run: bool=True)  # Backfill or update vector embeddings for memories missing them.
 mem.restore(input: str, topic: str | None=None, overwrite: bool=False)  # Restore memories from a snapshot directory (created by `mem.snapshot`).
+mem.rollback(topic: str | None=None, id: str | None=None, version: int=1, history_id: str | None=None)  # Restore a memory to a prior version from mem.history().
 mem.search(query: str, mode: str='semantic', topic: str | None=None, category: str | None=None, limit: int | None=None, tags: list[str] | None=None, extract: int | None=None)  # Search memories by semantic similarity, keyword matching, or hybrid.
 mem.slice(topic: str, select: int | str | list[int | str], id: str | None=None)  # Extract content by section number, heading path, line range, or mixed list.
 mem.slice_batch(items: list[dict[str, Any]])  # Extract sections from multiple memories in a single call.

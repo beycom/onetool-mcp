@@ -18,6 +18,7 @@ from .db import (
     _deserialize_meta,
     _serialize_embedding,
     _serialize_meta,
+    _sync_vec_index,
     _use_connection,
 )
 from .embedding import _embed_now, _enqueue_after_commit
@@ -69,6 +70,9 @@ def _apply_memory_update(
             [new_content, new_hash, _serialize_embedding(embedding),
              _serialize_meta(meta), memory_id],
         )
+        # embedding=None (async mode) removes the now-stale vec row; the
+        # worker re-syncs it after the new embedding is generated.
+        _sync_vec_index(conn, memory_id, embedding)
     else:
         # Preserve any stored embedding when embeddings are disabled
         conn.execute(

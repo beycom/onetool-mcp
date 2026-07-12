@@ -575,10 +575,11 @@ class TestReadBatch:
 class TestSearch:
     """Test mem.search() with mocked database and embeddings."""
 
+    @patch("otutil.tools._mem.search._check_vec_available", return_value=False)
     @patch("otutil.tools._mem.search._get_config", return_value=Config(embeddings_enabled=True))
     @patch("otutil.tools._mem.search._generate_embedding")
     @patch("otutil.tools._mem.search._get_connection")
-    def test_semantic_search(self, mock_conn, mock_embed, _mock_config):
+    def test_semantic_search(self, mock_conn, mock_embed, _mock_config, _mock_vec):
         from otutil.tools.mem import search
 
         mock_embed.return_value = [0.1] * 1536
@@ -1438,6 +1439,7 @@ class TestStats:
             (5000, 500, 2000),  # size stats
             (3,),            # history count
             (2,),            # without embeddings count
+            (7,),            # memories_vec row count (vec index status)
         ]
         conn.execute.return_value.fetchall.side_effect = [
             [("note", 5), ("rule", 3), ("decision", 2)],  # categories
@@ -1449,6 +1451,7 @@ class TestStats:
         assert "10" in result
         assert "Memory Statistics" in result
         assert "Embeddings:" in result
+        assert "Search indexes:" in result
 
     @patch("otutil.tools._mem.lifecycle._get_connection")
     def test_empty_stats(self, mock_conn):
@@ -3556,3 +3559,473 @@ class TestSliceBatch:
 
         assert "'select' is required" in result
         assert "docs/a.md [H1]" in result
+
+
+# ---------------------------------------------------------------------------
+# FTS5 keyword index, vec0 KNN index, history/rollback (mem-search-and-history)
+# ---------------------------------------------------------------------------
+
+import hashlib as _hashlib
+import sqlite3 as _sqlite3
+import struct as _struct
+
+
+def _real_mem_conn(dims: int = 4) -> _sqlite3.Connection:
+    """Real in-memory connection with the full mem setup (FTS + vec + triggers)."""
+    from otutil.tools._mem import db as mem_db
+
+    conn = _sqlite3.connect(":memory:", check_same_thread=False)
+    with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=dims)):
+        mem_db._mem_setup(conn)
+    conn.commit()
+    return conn
+
+
+def _insert_memory(
+    conn: _sqlite3.Connection,
+    memory_id: str,
+    topic: str,
+    content: str,
+    *,
+    category: str = "note",
+    tags: str = "[]",
+    embedding: bytes | None = None,
+    meta: str = "{}",
+) -> None:
+    conn.execute(
+        "INSERT INTO memories (id, topic, content, content_hash, category, tags, embedding, meta) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [memory_id, topic, content, _hashlib.sha256(content.encode()).hexdigest(),
+         category, tags, embedding, meta],
+    )
+    conn.commit()
+
+
+def _pack_vec(vec: list[float]) -> bytes:
+    return _struct.pack(f"<{len(vec)}f", *vec)
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestMemKeywordFTS:
+    """BM25 keyword search over memories_fts (spec: BM25-ranked keyword search)."""
+
+    def test_bm25_ranks_strong_match_above_weak(self):
+        from otutil.tools._mem.search import _search_keyword
+
+        conn = _real_mem_conn()
+        _insert_memory(conn, "weak", "a/weak", "authentication mentioned once among many other words " + "filler " * 50)
+        _insert_memory(conn, "strong", "a/strong", "authentication guide: authentication flows and authentication tokens")
+
+        results = _search_keyword(conn, "authentication", None, None, None, 10)
+
+        assert [r["id"] for r in results[:2]] == ["strong", "weak"]
+        assert all(r["score"] != 1.0 for r in results)
+
+    def test_operator_laden_query_does_not_error(self):
+        from otutil.tools._mem.search import _search_keyword
+
+        conn = _real_mem_conn()
+        _insert_memory(conn, "m1", "a/one", "some searchable content")
+
+        results = _search_keyword(conn, 'what is "content:(-x)^*"?', None, None, None, 10)
+        assert isinstance(results, list)
+
+    def test_prefix_fallback_finds_partial_terms(self):
+        from otutil.tools._mem.search import _search_keyword
+
+        conn = _real_mem_conn()
+        _insert_memory(conn, "m1", "a/one", "authentication patterns for services")
+
+        results = _search_keyword(conn, "authent", None, None, None, 10)
+        assert [r["id"] for r in results] == ["m1"]
+
+    def test_filters_apply(self):
+        from otutil.tools._mem.search import _search_keyword
+
+        conn = _real_mem_conn()
+        _insert_memory(conn, "m1", "projects/a", "shared token content", category="rule", tags='["x"]')
+        _insert_memory(conn, "m2", "notes/b", "shared token content two", category="note", tags='["y"]')
+
+        by_topic = _search_keyword(conn, "shared token", "projects/", None, None, 10)
+        assert [r["id"] for r in by_topic] == ["m1"]
+        by_cat = _search_keyword(conn, "shared token", None, "note", None, 10)
+        assert [r["id"] for r in by_cat] == ["m2"]
+        by_tag = _search_keyword(conn, "shared token", None, None, ["x"], 10)
+        assert [r["id"] for r in by_tag] == ["m1"]
+
+    def test_like_fallback_when_fts_unavailable(self):
+        import importlib
+
+        mem_search = importlib.import_module("otutil.tools._mem.search")
+
+        conn = _real_mem_conn()
+        _insert_memory(conn, "m1", "a/one", "fallback searchable content")
+
+        with patch("otutil.tools._mem.search._check_fts_available", return_value=False), \
+             patch.object(mem_search, "_like_fallback_warned", False), \
+             patch("otutil.tools._mem.search.logger") as mock_logger:
+            results = mem_search._search_keyword(conn, "fallback", None, None, None, 10)
+
+        assert [r["id"] for r in results] == ["m1"]
+        assert results[0]["score"] == 1.0
+        mock_logger.warning.assert_called_once()
+
+    def test_migration_rebuilds_fts_for_preexisting_rows(self):
+        from otutil.tools._mem import db as mem_db
+
+        conn = _sqlite3.connect(":memory:", check_same_thread=False)
+        # Simulate a pre-FTS database: memories table + rows, no memories_fts
+        conn.execute(
+            "CREATE TABLE memories (id TEXT PRIMARY KEY, topic TEXT NOT NULL, "
+            "content TEXT NOT NULL, content_hash TEXT NOT NULL, category TEXT DEFAULT 'note', "
+            "tags TEXT DEFAULT '[]', relevance INTEGER DEFAULT 5, access_count INTEGER DEFAULT 0, "
+            "created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')), "
+            "last_accessed TEXT DEFAULT (datetime('now')), embedding BLOB, meta TEXT DEFAULT '{}')"
+        )
+        conn.execute(
+            "INSERT INTO memories (id, topic, content, content_hash) VALUES ('m1', 'a/one', 'legacy searchable row', 'h')"
+        )
+        conn.commit()
+
+        with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+            mem_db._mem_setup(conn)
+
+        count = conn.execute(
+            "SELECT COUNT(*) FROM memories_fts WHERE memories_fts MATCH 'legacy'"
+        ).fetchone()[0]
+        assert count == 1
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestMemVecIndex:
+    """vec0 KNN index: sync, normalisation, parity, lifecycle, migration."""
+
+    def _vec_norm(self, conn: _sqlite3.Connection, memory_id: str) -> float:
+        blob = conn.execute(
+            "SELECT embedding FROM memories_vec WHERE memory_id = ?", [memory_id]
+        ).fetchone()[0]
+        vec = _struct.unpack(f"<{len(blob) // 4}f", blob)
+        return sum(x * x for x in vec) ** 0.5
+
+    def test_sync_writes_normalised_rows(self):
+        from otutil.tools._mem.db import _sync_vec_index
+
+        conn = _real_mem_conn()
+        _insert_memory(conn, "m1", "a/one", "content", embedding=_pack_vec([3.0, 0.0, 4.0, 0.0]))
+        with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+            _sync_vec_index(conn, "m1", [3.0, 0.0, 4.0, 0.0])
+        conn.commit()
+
+        assert abs(self._vec_norm(conn, "m1") - 1.0) < 1e-6
+
+    def test_knn_matches_scan_scores(self):
+        from otutil.tools._mem.search import _search_semantic_knn, _search_semantic_scan
+        from otutil.tools._mem.db import _sync_vec_index
+
+        conn = _real_mem_conn()
+        vectors = {"m1": [1.0, 0.0, 0.0, 0.0], "m2": [0.6, 0.8, 0.0, 0.0], "m3": [0.0, 0.0, 1.0, 0.0]}
+        for mid, vec in vectors.items():
+            _insert_memory(conn, mid, f"t/{mid}", f"content {mid}", embedding=_pack_vec(vec))
+            with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+                _sync_vec_index(conn, mid, vec)
+        conn.commit()
+
+        query_vec = [1.0, 0.0, 0.0, 0.0]
+        with patch("otutil.tools._mem.search._generate_embedding", return_value=query_vec):
+            knn = _search_semantic_knn(conn, "q", None, None, None, 3)
+            scan = _search_semantic_scan(conn, "q", None, None, None, 3)
+
+        assert [r["id"] for r in knn] == [r["id"] for r in scan]
+        for k, sc in zip(knn, scan, strict=True):
+            assert abs(k["score"] - sc["score"]) < 1e-3
+
+    def test_filtered_knn_overfetches_and_respects_limit(self):
+        from otutil.tools._mem.search import _search_semantic_knn
+        from otutil.tools._mem.db import _sync_vec_index
+
+        conn = _real_mem_conn()
+        for i in range(6):
+            vec = [1.0, float(i) * 0.1, 0.0, 0.0]
+            topic = f"projects/p{i}" if i < 3 else f"notes/n{i}"
+            _insert_memory(conn, f"m{i}", topic, f"content {i}", embedding=_pack_vec(vec))
+            with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+                _sync_vec_index(conn, f"m{i}", vec)
+        conn.commit()
+
+        with patch("otutil.tools._mem.search._generate_embedding", return_value=[1.0, 0.0, 0.0, 0.0]):
+            results = _search_semantic_knn(conn, "q", "projects/", None, None, 2)
+
+        assert len(results) == 2
+        assert all(r["topic"].startswith("projects/") for r in results)
+
+    def test_delete_trigger_removes_vec_row(self):
+        from otutil.tools._mem.db import _sync_vec_index
+
+        conn = _real_mem_conn()
+        _insert_memory(conn, "m1", "a/one", "content", embedding=_pack_vec([1.0, 0.0, 0.0, 0.0]))
+        with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+            _sync_vec_index(conn, "m1", [1.0, 0.0, 0.0, 0.0])
+        conn.execute("DELETE FROM memories WHERE id = 'm1'")
+        conn.commit()
+
+        assert conn.execute("SELECT COUNT(*) FROM memories_vec").fetchone()[0] == 0
+
+    def test_update_replaces_vec_row_and_disabled_preserves(self):
+        from otutil.tools._mem.db import _sync_vec_index
+        from otutil.tools._mem.mutations import _apply_memory_update
+
+        conn = _real_mem_conn()
+        _insert_memory(conn, "m1", "a/one", "content", embedding=_pack_vec([1.0, 0.0, 0.0, 0.0]))
+        with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+            _sync_vec_index(conn, "m1", [1.0, 0.0, 0.0, 0.0])
+            _sync_vec_index(conn, "m1", [0.0, 1.0, 0.0, 0.0])
+        conn.commit()
+        blob = conn.execute("SELECT embedding FROM memories_vec WHERE memory_id='m1'").fetchone()[0]
+        assert _struct.unpack("<4f", blob)[1] == pytest.approx(1.0)
+
+        # Embeddings-disabled update path preserves BLOB and vec row untouched
+        with patch("otutil.tools._mem.mutations._get_config", return_value=Config(embeddings_enabled=False)):
+            _apply_memory_update(
+                conn, memory_id="m1", old_content="content", new_content="new content",
+                meta={}, embedding=None,
+            )
+        conn.commit()
+        assert conn.execute("SELECT COUNT(*) FROM memories_vec WHERE memory_id='m1'").fetchone()[0] == 1
+        assert conn.execute("SELECT embedding FROM memories WHERE id='m1'").fetchone()[0] is not None
+
+    def test_dim_mismatch_skips_vec_upsert(self):
+        from otutil.tools._mem.db import _sync_vec_index
+
+        conn = _real_mem_conn()
+        _insert_memory(conn, "m1", "a/one", "content")
+        with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+            _sync_vec_index(conn, "m1", [1.0, 0.0])
+        conn.commit()
+        assert conn.execute("SELECT COUNT(*) FROM memories_vec").fetchone()[0] == 0
+
+    def test_migration_backfills_and_skips_mismatched_dims(self):
+        from otutil.tools._mem import db as mem_db
+
+        conn = _sqlite3.connect(":memory:", check_same_thread=False)
+        conn.execute(
+            "CREATE TABLE memories (id TEXT PRIMARY KEY, topic TEXT NOT NULL, "
+            "content TEXT NOT NULL, content_hash TEXT NOT NULL, category TEXT DEFAULT 'note', "
+            "tags TEXT DEFAULT '[]', relevance INTEGER DEFAULT 5, access_count INTEGER DEFAULT 0, "
+            "created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')), "
+            "last_accessed TEXT DEFAULT (datetime('now')), embedding BLOB, meta TEXT DEFAULT '{}')"
+        )
+        conn.execute(
+            "INSERT INTO memories (id, topic, content, content_hash, embedding) VALUES "
+            "('good', 't/a', 'c', 'h1', ?)", [_pack_vec([1.0, 2.0, 2.0, 0.0])]
+        )
+        conn.execute(
+            "INSERT INTO memories (id, topic, content, content_hash, embedding) VALUES "
+            "('bad', 't/b', 'c', 'h2', ?)", [_pack_vec([1.0, 2.0])]
+        )
+        conn.commit()
+
+        with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+            mem_db._mem_setup(conn)
+
+        ids = [r[0] for r in conn.execute("SELECT memory_id FROM memories_vec").fetchall()]
+        assert ids == ["good"]
+
+    def test_dimension_change_recreates_vec_table(self):
+        from otutil.tools._mem import db as mem_db
+
+        conn = _real_mem_conn(dims=4)
+        _insert_memory(conn, "m1", "a/one", "content", embedding=_pack_vec([1.0, 0.0, 0.0, 0.0]))
+        with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+            mem_db._sync_vec_index(conn, "m1", [1.0, 0.0, 0.0, 0.0])
+        conn.commit()
+
+        with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=8)):
+            mem_db._ensure_tables(conn)
+
+        assert mem_db._vec_table_dims(conn) == 8
+        # Old 4-dim BLOB is skipped by the dims guard during backfill
+        assert conn.execute("SELECT COUNT(*) FROM memories_vec").fetchone()[0] == 0
+
+    def test_vec_fallback_uses_scan(self):
+        import importlib
+
+        mem_search = importlib.import_module("otutil.tools._mem.search")
+
+        conn = _real_mem_conn()
+        _insert_memory(conn, "m1", "a/one", "content", embedding=_pack_vec([1.0, 0.0, 0.0, 0.0]))
+        conn.commit()
+
+        with patch("otutil.tools._mem.search._check_vec_available", return_value=False), \
+             patch("otutil.tools._mem.search._generate_embedding", return_value=[1.0, 0.0, 0.0, 0.0]):
+            results = mem_search._search_semantic(conn, "q", None, None, None, 5)
+
+        assert [r["id"] for r in results] == ["m1"]
+        assert results[0]["score"] == pytest.approx(1.0)
+
+
+@contextmanager
+def _history_env(conn: _sqlite3.Connection):
+    """Patch history/mutations modules onto a real connection with embeddings off."""
+    from contextlib import nullcontext
+
+    with (
+        patch("otutil.tools._mem.history._use_connection", side_effect=lambda: nullcontext(conn)),
+        patch("otutil.tools._mem.history._embed_now", return_value=None),
+        patch("otutil.tools._mem.history._enqueue_after_commit"),
+        patch("otutil.tools._mem.mutations._use_connection", side_effect=lambda: nullcontext(conn)),
+        patch("otutil.tools._mem.mutations._embed_now", return_value=None),
+        patch("otutil.tools._mem.mutations._enqueue_after_commit"),
+        patch("otutil.tools._mem.mutations._get_config", return_value=Config(embeddings_enabled=False)),
+    ):
+        yield
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestMemHistory:
+    """mem.history() listing (spec: version history)."""
+
+    def test_lists_versions_newest_first(self):
+        from otutil.tools._mem.history import history
+        from otutil.tools._mem.mutations import update
+
+        conn = _real_mem_conn()
+        _insert_memory(conn, "m1", "a/one", "version zero")
+        with _history_env(conn):
+            update(topic="a/one", content="version one")
+            update(topic="a/one", content="version two")
+            out = history(topic="a/one")
+
+        assert "current: 11 chars" in out
+        lines = out.splitlines()
+        assert "v1 [" in lines[2] and "version one" in lines[2]
+        assert "v2 [" in lines[3] and "version zero" in lines[3]
+
+    def test_no_history_message(self):
+        from otutil.tools._mem.history import history
+
+        conn = _real_mem_conn()
+        _insert_memory(conn, "m1", "a/one", "never updated")
+        with _history_env(conn):
+            out = history(topic="a/one")
+        assert "No history" in out
+
+    def test_zero_and_multi_match_errors(self):
+        from otutil.tools._mem.history import history
+
+        conn = _real_mem_conn()
+        _insert_memory(conn, "m1", "dup/topic", "one")
+        _insert_memory(conn, "m2", "dup/topic", "two")
+        with _history_env(conn):
+            assert "No memory found" in history(topic="missing/topic")
+            assert "Multiple memories" in history(topic="dup/topic")
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestMemRollback:
+    """mem.rollback() restore semantics (spec: rollback)."""
+
+    def test_rollback_restores_and_is_undoable(self):
+        from otutil.tools._mem.history import rollback
+        from otutil.tools._mem.mutations import update
+
+        conn = _real_mem_conn()
+        _insert_memory(conn, "m1", "a/one", "original")
+        with _history_env(conn):
+            update(topic="a/one", content="changed")
+            out = rollback(topic="a/one")
+            assert "Rolled back" in out
+            assert conn.execute("SELECT content FROM memories WHERE id='m1'").fetchone()[0] == "original"
+            # Rollback of the rollback returns the pre-rollback content
+            rollback(topic="a/one")
+            assert conn.execute("SELECT content FROM memories WHERE id='m1'").fetchone()[0] == "changed"
+
+    def test_version_out_of_range_names_valid_range(self):
+        from otutil.tools._mem.history import rollback
+        from otutil.tools._mem.mutations import update
+
+        conn = _real_mem_conn()
+        _insert_memory(conn, "m1", "a/one", "original")
+        with _history_env(conn):
+            update(topic="a/one", content="changed")
+            out = rollback(topic="a/one", version=2)
+        assert "out of range" in out
+        assert "v1..v1" in out
+
+    def test_history_id_prefix_selection_and_ambiguity(self):
+        from otutil.tools._mem.history import rollback
+
+        conn = _real_mem_conn()
+        _insert_memory(conn, "m1", "a/one", "current")
+        conn.execute(
+            "INSERT INTO memory_history (id, memory_id, content, updated_at) VALUES "
+            "('aa111111-0000-0000-0000-000000000000', 'm1', 'older', '2020-01-01 00:00:00')"
+        )
+        conn.execute(
+            "INSERT INTO memory_history (id, memory_id, content, updated_at) VALUES "
+            "('aa222222-0000-0000-0000-000000000000', 'm1', 'newer', '2021-01-01 00:00:00')"
+        )
+        conn.commit()
+
+        with _history_env(conn):
+            assert "ambiguous" in rollback(topic="a/one", history_id="aa")
+            assert "No history entry matches" in rollback(topic="a/one", history_id="zz")
+            out = rollback(topic="a/one", history_id="aa111")
+        assert "Rolled back" in out
+        assert conn.execute("SELECT content FROM memories WHERE id='m1'").fetchone()[0] == "older"
+
+    def test_rollback_recomputes_toc_sections(self):
+        from otutil.tools._mem.history import rollback
+
+        conn = _real_mem_conn()
+        _insert_memory(
+            conn, "m1", "a/one", "# New\n\ncurrent body",
+            meta='{"sections": "New:1", "section_count": "1"}',
+        )
+        conn.execute(
+            "INSERT INTO memory_history (id, memory_id, content) VALUES (?, ?, ?)",
+            ["bb111111-0000-0000-0000-000000000000", "m1", "# Old A\n\nx\n\n# Old B\n\ny"],
+        )
+        conn.commit()
+
+        with _history_env(conn):
+            rollback(topic="a/one")
+
+        meta = _deserialize_meta(conn.execute("SELECT meta FROM memories WHERE id='m1'").fetchone()[0])
+        assert meta["section_count"] == "2"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestMemStatsIndexes:
+    """stats() search-index status lines (spec: observability)."""
+
+    def _run_stats(self, fts: bool, vec: bool) -> str:
+        from otutil.tools._mem.lifecycle import stats
+
+        conn = MagicMock()
+        conn.execute.return_value.fetchone.side_effect = [
+            (10,), (5000, 500, 2000), (3,), (2,), (7,),
+        ]
+        conn.execute.return_value.fetchall.side_effect = [
+            [("note", 5)], [("projects", 7)],
+        ]
+        with (
+            patch("otutil.tools._mem.lifecycle._get_connection", return_value=conn),
+            patch("otutil.tools._mem.lifecycle._check_fts_available", return_value=fts),
+            patch("otutil.tools._mem.lifecycle._check_vec_available", return_value=vec),
+        ):
+            return stats()
+
+    def test_available_modes(self):
+        out = self._run_stats(fts=True, vec=True)
+        assert "Keyword: fts5" in out
+        assert "Vector: sqlite-vec (7 rows)" in out
+
+    def test_fallback_modes(self):
+        out = self._run_stats(fts=False, vec=False)
+        assert "Keyword: like-fallback" in out
+        assert "Vector: scan-fallback" in out

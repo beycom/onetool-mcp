@@ -21,6 +21,7 @@ from .db import (
     _serialize_embedding,
     _serialize_meta,
     _serialize_tags,
+    _sync_vec_index,
     _use_connection,
 )
 from .embedding import _embed_now, _enqueue_after_commit
@@ -240,6 +241,8 @@ def load(
                         [memory_id, topic, content, content_hash, category,
                          _serialize_tags(mem_tags), relevance, _serialize_embedding(embedding), meta_str],
                     )
+                    if embedding is not None:
+                        _sync_vec_index(conn, memory_id, embedding)
                 conn.commit()
             for entry, _embedding in with_embeddings:
                 _enqueue_after_commit(entry[0])

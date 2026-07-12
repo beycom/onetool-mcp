@@ -21,33 +21,35 @@ def _content_hash(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
-def _topic_filter(topic: str | None) -> tuple[str, list[Any]]:
+def _topic_filter(topic: str | None, *, column: str = "topic") -> tuple[str, list[Any]]:
     """Build SQL WHERE clause for topic filtering.
 
-    Supports exact match and prefix matching with trailing /.
+    Supports exact match and prefix matching with trailing /. `column` allows
+    a qualified name (e.g. "m.topic") in joined queries.
     Returns (sql_fragment, params).
     """
     if not topic:
         return "", []
 
     if topic.endswith("/"):
-        return " AND (topic = ? OR topic LIKE ?)", [topic.rstrip("/"), topic + "%"]
+        return f" AND ({column} = ? OR {column} LIKE ?)", [topic.rstrip("/"), topic + "%"]
     elif "*" in topic:
         like_pattern = topic.replace("*", "%")
-        return " AND topic LIKE ?", [like_pattern]
+        return f" AND {column} LIKE ?", [like_pattern]
     else:
-        return " AND topic = ?", [topic]
+        return f" AND {column} = ?", [topic]
 
 
-def _tags_filter_sql(tags: list[str]) -> tuple[str, list[str]]:
+def _tags_filter_sql(tags: list[str], *, column: str = "tags") -> tuple[str, list[str]]:
     """Build SQL WHERE clause fragment for tag filtering.
 
     Tags are stored as a JSON array in a TEXT column. Uses json_each() to
-    check if any of the provided tags exist in the stored array.
+    check if any of the provided tags exist in the stored array. `column`
+    allows a qualified name (e.g. "m.tags") in joined queries.
     Returns (sql_fragment, params).
     """
     placeholders = ", ".join("?" for _ in tags)
-    sql = f" AND EXISTS (SELECT 1 FROM json_each(tags) WHERE json_each.value IN ({placeholders}))"
+    sql = f" AND EXISTS (SELECT 1 FROM json_each({column}) WHERE json_each.value IN ({placeholders}))"
     return sql, tags
 
 

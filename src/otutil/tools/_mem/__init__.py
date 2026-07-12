@@ -26,6 +26,7 @@ __all__ = [
     "dump",
     "flush",
     "grep",
+    "history",
     "inspect",
     "list",
     "load",
@@ -35,6 +36,7 @@ __all__ = [
     "refresh",
     "reindex",
     "restore",
+    "rollback",
     "search",
     "slice",
     "slice_batch",
@@ -61,6 +63,7 @@ from .ask import ask
 from .config import VALID_CATEGORIES, Config
 from .db import _close_connection, _get_connection  # noqa: F401
 from .formatting import stale
+from .history import history, rollback
 from .inspect import inspect
 from .io import dump, load
 from .lifecycle import decay, flush, reindex, stats

@@ -5,10 +5,10 @@ Persistent memory for AI agents with SQLite storage and optional semantic search
 ## Highlights
 
 - Topic-based memory with path hierarchy (`projects/onetool/rules`)
-- Semantic, keyword, and hybrid (RRF) search modes
+- Semantic (indexed KNN via sqlite-vec), keyword (FTS5 BM25), and hybrid (RRF) search modes
 - SHA-256 content dedup prevents duplicate storage
 - Automatic secret/PII redaction on write
-- History tracking on updates for rollback
+- History tracking on updates with `mem.history()` / `mem.rollback()`
 - Chunk-and-average embeddings for large content (full document semantics preserved)
 - In-memory read cache with TTL and LRU eviction (auto-invalidated on writes)
 - Importance decay based on age and access patterns
@@ -36,6 +36,8 @@ Persistent memory for AI agents with SQLite storage and optional semantic search
 | `mem.count(topic, category)` | Count memories |
 | `mem.delete(topic, id, confirm)` | Delete memories |
 | `mem.update(topic, content, id)` | Update a memory (recomputes toc if sections exist) |
+| `mem.history(topic, id, limit)` | List prior versions of a memory, newest first |
+| `mem.rollback(topic, id, version, history_id)` | Restore a memory to a prior version (undoable) |
 | `mem.append(topic, content, id)` | Append to a memory (recomputes toc if sections exist) |
 | `mem.context(topic, limit)` | Load hot cache context |
 | `mem.update_batch(search_text, replace_text, ...)` | Batch search-and-replace (recomputes toc if sections exist) |
@@ -149,6 +151,27 @@ Returns a numbered section index with line ranges. Warns if the source file has 
 | `topic` | str | Topic of the memory |
 | `select` | int/str/list | Section selector: section number (int), line range (":50", "400:", "151:200"), heading path (str), or mixed list |
 | `id` | str | Optional memory ID (overrides topic) |
+
+### `mem.history()`
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `topic` | str | Topic to find the memory (must match exactly one) |
+| `id` | str | Optional memory ID (overrides topic) |
+| `limit` | int | Max versions to list (default: 10) |
+
+Versions are numbered v1..vN (v1 = most recent prior version); numbers shift as new history accrues. The bracketed 8-char history-id prefix is the stable selector for `mem.rollback(history_id=...)`.
+
+### `mem.rollback()`
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `topic` | str | Topic to find the memory (must match exactly one) |
+| `id` | str | Optional memory ID (overrides topic) |
+| `version` | int | Version number from `mem.history()` (default: 1) |
+| `history_id` | str | History-row id (full or unambiguous prefix; overrides version) |
+
+Restores content only (category/tags/relevance are kept). The current content is saved to history first, so a rollback is itself undoable. TOC sections and embeddings are recomputed.
 
 ### `mem.update_batch()`
 

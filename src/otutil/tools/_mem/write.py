@@ -15,7 +15,13 @@ from .content import (
     _validate_category,
     _validate_tags,
 )
-from .db import _serialize_embedding, _serialize_meta, _serialize_tags, _use_connection
+from .db import (
+    _serialize_embedding,
+    _serialize_meta,
+    _serialize_tags,
+    _sync_vec_index,
+    _use_connection,
+)
 from .embedding import _embed_now, _enqueue_after_commit
 
 
@@ -131,6 +137,8 @@ def write(
                      _serialize_tags(validated_tags), relevance,
                      _serialize_embedding(embedding), _serialize_meta(meta)],
                 )
+                if embedding is not None:
+                    _sync_vec_index(conn, memory_id, embedding)
                 conn.commit()
             _enqueue_after_commit(memory_id)
 
