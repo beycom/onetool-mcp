@@ -2451,13 +2451,22 @@ dependencies = [
     { name = "pyyaml" },
 ]
 
+[package.optional-dependencies]
+embedding = [
+    { name = "openai" },
+    { name = "tiktoken" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "loguru", specifier = ">=0.7.3" },
+    { name = "openai", marker = "extra == 'embedding'", specifier = ">=2.44.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "tiktoken", marker = "extra == 'embedding'", specifier = ">=0.12.0" },
 ]
+provides-extras = ["embedding"]
 
 [[package]]
 name = "openai"
