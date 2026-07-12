@@ -16,11 +16,12 @@ from .db import (
     deserialize_meta,
     deserialize_tags,
     get_connection,
+    serialize_embedding,
     serialize_meta,
     serialize_tags,
     use_connection,
 )
-from .embedding import generate_embedding, vec_to_bytes
+from .embedding import generate_embedding
 
 
 def write(
@@ -315,7 +316,7 @@ def _try_embed(conn: Any, chunk_id: str, content: str) -> str | None:
     """
     try:
         vec = generate_embedding(content)
-        blob = vec_to_bytes(vec)
+        blob = serialize_embedding(vec)
         conn.execute("DELETE FROM chunks_vec WHERE chunk_id = ?", [chunk_id])
         conn.execute(
             "INSERT INTO chunks_vec(chunk_id, embedding) VALUES (?, ?)",

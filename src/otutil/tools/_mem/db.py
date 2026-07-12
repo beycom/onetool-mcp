@@ -5,12 +5,12 @@ import builtins
 import json
 import math
 import re
-import struct
 from typing import TYPE_CHECKING, cast
 
 from loguru import logger
 
 from ot.logging import LogEntry
+from otpack import cosine_similarity_blobs, deserialize_embedding, serialize_embedding
 
 from .config import _get_config
 
@@ -76,25 +76,16 @@ def _get_db_path() -> Path:
 def _cosine_similarity(a_blob: bytes | None, b_blob: bytes | None) -> float | None:
     """Cosine similarity between two packed float32 BLOB vectors.
 
-    Registered as a SQLite UDF so it can be used in ORDER BY clauses.
+    Registered as a SQLite UDF so it can be used in ORDER BY clauses. Delegates
+    to otpack, keeping the mem-specific dimension-mismatch guidance.
     """
-    if a_blob is None or b_blob is None:
-        return None
-    if len(a_blob) != len(b_blob):
+    if a_blob is not None and b_blob is not None and len(a_blob) != len(b_blob):
         raise ValueError(
             f"embedding dimension mismatch: {len(a_blob) // 4} vs {len(b_blob) // 4} dims. "
             "The stored embeddings were generated with a different model/dimensions; "
             "re-generate them with mem.reindex(dry_run=False)."
         )
-    n = len(a_blob) // 4
-    a = struct.unpack(f"<{n}f", a_blob)
-    b = struct.unpack(f"<{n}f", b_blob)
-    dot = sum(x * y for x, y in zip(a, b, strict=True))
-    norm_a = math.sqrt(sum(x * x for x in a))
-    norm_b = math.sqrt(sum(x * x for x in b))
-    if norm_a == 0.0 or norm_b == 0.0:
-        return 0.0
-    return float(dot / (norm_a * norm_b))
+    return cosine_similarity_blobs(a_blob, b_blob)
 
 
 def _mem_setup(conn: sqlite3.Connection) -> None:
@@ -389,19 +380,9 @@ def _sync_vec_index(conn: sqlite3.Connection, memory_id: str, vec: list[float] |
 # ---------------------------------------------------------------------------
 
 
-def _serialize_embedding(vec: list[float] | None) -> bytes | None:
-    """Pack a float list into a BLOB for SQLite storage."""
-    if vec is None:
-        return None
-    return struct.pack(f"<{len(vec)}f", *vec)
-
-
-def _deserialize_embedding(blob: bytes | None) -> list[float] | None:
-    """Unpack a BLOB back to a float list."""
-    if blob is None:
-        return None
-    n = len(blob) // 4
-    return _builtins_list(struct.unpack(f"<{n}f", blob))
+# Canonical float32 serialization lives in otpack (little-endian <{n}f).
+_serialize_embedding = serialize_embedding
+_deserialize_embedding = deserialize_embedding
 
 
 def _serialize_tags(tags: list[str] | None) -> str:

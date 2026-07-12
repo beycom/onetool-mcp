@@ -24,10 +24,10 @@ from .config import _get_config, _get_kb_project
 from .db import (
     deserialize_meta,
     get_connection,
+    serialize_embedding,
     serialize_meta,
     serialize_tags,
 )
-from .embedding import vec_to_bytes
 
 if TYPE_CHECKING:
     import sqlite3
@@ -280,18 +280,12 @@ def _store_embeddings_batch(
     if not _check_vec_available():
         return "sqlite-vec not installed — embeddings skipped (install with: uv add sqlite-vec)"
 
-    from .embedding import (
-        _dimensions_param,
-        _embed_batch_with_retry,
-        _get_openai_client,
-        _prepare_safe_batch,
-    )
+    from .embedding import _get_embedding_client
 
     config = _get_config()
     if batch_size is None:
         batch_size = config.embedding_batch_size
-    client = _get_openai_client()
-    dims = _dimensions_param(config.model, config)
+    client = _get_embedding_client()
     total = len(pending)
     errors: list[str] = []
     total_failed = 0
@@ -301,10 +295,9 @@ def _store_embeddings_batch(
         sub = pending[i : i + batch_size]
         chunk_ids = [p[0] for p in sub]
         contents = [p[1] for p in sub]
-        safe_batch = _prepare_safe_batch(contents, config, config.model)
 
         try:
-            vecs = _embed_batch_with_retry(client, config.model, safe_batch, dimensions=dims)
+            vecs = client.embed_batch(contents, batch_size=len(sub))
             pairs: list[tuple[str, list[float]]] = list(zip(chunk_ids, vecs, strict=True))
         except Exception:
             # Batch failed — fall back to per-item embedding to isolate bad chunk(s).
@@ -312,9 +305,9 @@ def _store_embeddings_batch(
             # (signals an API outage, not a content problem).
             pairs = []
             consecutive_failures = 0
-            for j, (cid, text) in enumerate(zip(chunk_ids, safe_batch, strict=True)):
+            for j, (cid, text) in enumerate(zip(chunk_ids, contents, strict=True)):
                 try:
-                    single = _embed_batch_with_retry(client, config.model, [text], max_attempts=1, dimensions=dims)
+                    single = client.embed_batch([text], max_attempts=1)
                     pairs.append((cid, single[0]))
                     consecutive_failures = 0
                 except Exception as item_err:
@@ -335,7 +328,7 @@ def _store_embeddings_batch(
                     on_progress(min(done + j + 1, total), total)
 
         for chunk_id, vec in pairs:
-            blob = vec_to_bytes(vec)
+            blob = serialize_embedding(vec)
             conn.execute("DELETE FROM chunks_vec WHERE chunk_id = ?", [chunk_id])
             conn.execute(
                 "INSERT INTO chunks_vec(chunk_id, embedding) VALUES (?, ?)",

@@ -8,9 +8,10 @@ from typing import Any
 from loguru import logger
 
 from ot.logging import LogEntry
+from otpack import rrf_merge
 
-from .db import deserialize_meta, deserialize_tags
-from .embedding import generate_embedding, vec_to_bytes
+from .db import deserialize_meta, deserialize_tags, serialize_embedding
+from .embedding import generate_embedding
 
 _RRF_K = 60
 
@@ -98,7 +99,7 @@ def search_vec(
     _require_vec()
 
     vec = generate_embedding(query)
-    blob = vec_to_bytes(vec)
+    blob = serialize_embedding(vec)
 
     sql = """
         SELECT c.id, c.topic, c.content, c.category, c.tags, c.meta, c.hit_count,
@@ -146,33 +147,18 @@ def _rrf_merge(
     list_b: list[dict[str, Any]],
     limit: int,
 ) -> list[dict[str, Any]]:
-    """Reciprocal Rank Fusion: score = sum(1 / (k + rank))."""
-    rrf: dict[str, float] = {}
-    result_map: dict[str, dict[str, Any]] = {}
+    """Reciprocal Rank Fusion with the knowledge hit_count boost.
 
-    for rank, r in enumerate(list_a, 1):
-        mid = r["id"]
-        rrf[mid] = rrf.get(mid, 0.0) + 1.0 / (_RRF_K + rank)
-        result_map[mid] = r
-
-    for rank, r in enumerate(list_b, 1):
-        mid = r["id"]
-        rrf[mid] = rrf.get(mid, 0.0) + 1.0 / (_RRF_K + rank)
-        if mid not in result_map:
-            result_map[mid] = r
-
-    # Apply hit_count boost: frequently accessed chunks get up to +0.1
-    for mid, r in result_map.items():
-        hit = r.get("hit_count", 0) or 0
-        rrf[mid] += 0.1 * min(hit, 10) / 10
-
-    sorted_ids = sorted(rrf, key=lambda x: rrf[x], reverse=True)[:limit]
-    merged = []
-    for mid in sorted_ids:
-        r = dict(result_map[mid])
-        r["score"] = round(rrf[mid], 4)
-        merged.append(r)
-    return merged
+    Thin wrapper over otpack.rrf_merge: frequently accessed chunks get up
+    to +0.1.
+    """
+    return rrf_merge(
+        list_a,
+        list_b,
+        limit,
+        k=_RRF_K,
+        boost=lambda r: 0.1 * min(r.get("hit_count", 0) or 0, 10) / 10,
+    )
 
 
 def apply_metadata_filters(

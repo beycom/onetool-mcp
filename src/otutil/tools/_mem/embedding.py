@@ -1,29 +1,24 @@
-"""OpenAI embedding generation and background worker."""
+"""OpenAI embedding generation and background worker.
+
+Generation is a thin adapter over :class:`otpack.EmbeddingClient`
+(``long_text="mean"``: over-limit texts are window-embedded and averaged).
+The background queue/worker machinery stays here.
+"""
 from __future__ import annotations
 
 import queue
 import threading
 import time
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any
 
 from loguru import logger
 
 from ot.config import get_llm_config
 from ot.logging import LogEntry
-from otpack import LogSpan, get_secret
+from otpack import EmbeddingClient, get_secret
 
 from .config import _get_config
 from .db import _serialize_embedding, _sync_vec_index, _use_connection
-
-if TYPE_CHECKING:
-    from types import ModuleType
-
-    from openai import OpenAI
-
-
-# Safety margin subtracted from token limit to avoid edge-case overflows.
-# Standard safety margin for embedding token limits.
-_TOKEN_SAFETY_MARGIN = 100
 
 # Bounded queue: stores only memory IDs (not content) to avoid memory bloat.
 # maxsize=1000 bounds memory usage.
@@ -34,117 +29,61 @@ _embedding_worker_lock = threading.Lock()
 _embedding_errors: int = 0  # Surfaced in mem.stats()
 _embedding_dropped: int = 0  # Count dropped jobs when queue is saturated
 
+# Module-cached client keyed on the resolved inputs so config reloads rebuild it.
+_client: EmbeddingClient | None = None
+_client_key: tuple[str, str, str, int] | None = None
+_client_lock = threading.Lock()
 
-def _get_openai_client() -> OpenAI:
-    """Get OpenAI client for embedding generation."""
-    try:
-        from openai import OpenAI
-    except ImportError as e:
-        raise ImportError(
-            "openai is required for mem. Install with: pip install openai"
-        ) from e
 
+def _get_embedding_model(config: Any) -> str:
+    """Resolve the embedding model, falling back to top-level llm config."""
+    if config.model:
+        return str(config.model)
+    return get_llm_config().embedding_model or "text-embedding-3-small"
+
+
+def _get_embedding_client() -> EmbeddingClient:
+    """Get (or build) the shared EmbeddingClient from resolved config values."""
+    global _client, _client_key
     api_key = get_secret("OPENAI_API_KEY") or ""
     if not api_key:
         raise ValueError(
             "OPENAI_API_KEY not configured in secrets.yaml (required for memory embeddings)"
         )
     config = _get_config()
-    base_url = config.base_url or get_llm_config().base_url or None
-    return OpenAI(api_key=api_key, base_url=base_url)
-
-
-def _import_tiktoken() -> ModuleType:
-    """Lazy import tiktoken module."""
-    try:
-        import tiktoken
-    except ImportError as e:
-        raise ImportError(
-            "tiktoken is required for mem embedding truncation. Install with: pip install tiktoken"
-        ) from e
-    return tiktoken
-
-
-def _get_tiktoken_encoding(model: str) -> Any:
-    """Get tiktoken encoding for a model, with fallback."""
-    tiktoken = _import_tiktoken()
-    try:
-        return tiktoken.encoding_for_model(model)
-    except KeyError:
-        return tiktoken.get_encoding("cl100k_base")
-
-
-def _chunk_text_by_tokens(text: str, max_tokens: int, model: str) -> list[str]:
-    """Split text into chunks that each fit within the token limit.
-
-    Returns a list of text chunks. If the text fits in one chunk, returns [text].
-    """
-    encoding = _get_tiktoken_encoding(model)
-    tokens = encoding.encode(text)
-
-    if len(tokens) <= max_tokens:
-        return [text]
-
-    chunks = []
-    for i in range(0, len(tokens), max_tokens):
-        chunk_tokens = tokens[i : i + max_tokens]
-        chunks.append(encoding.decode(chunk_tokens))
-    return chunks
-
-
-def _get_embedding_model(config: Any) -> str:
-    """Resolve the embedding model, falling back to top-level llm config."""
-    if config.model:
-        return cast("str", config.model)
-    return cast("str", get_llm_config().embedding_model or "text-embedding-3-small")
+    model = _get_embedding_model(config)
+    base_url = config.base_url or get_llm_config().base_url or ""
+    key = (api_key, model, base_url, int(config.max_embedding_tokens))
+    with _client_lock:
+        if _client is None or _client_key != key:
+            _client = EmbeddingClient(
+                api_key=api_key,
+                model=model,
+                base_url=base_url or None,
+                max_tokens=int(config.max_embedding_tokens),
+                log_prefix="mem",
+            )
+            _client_key = key
+        return _client
 
 
 def _generate_embedding(text: str) -> list[float]:
     """Generate embedding vector for text.
 
-    If text exceeds the token limit, splits into chunks, embeds each,
-    and returns the averaged vector. This preserves semantic coverage
+    If text exceeds the token limit, windows are embedded in one batched API
+    call and averaged (``long_text="mean"``) — preserving semantic coverage
     of the full document rather than silently losing the tail.
     """
-    config = _get_config()
-    model = _get_embedding_model(config)
-    effective_limit = max(1, config.max_embedding_tokens - _TOKEN_SAFETY_MARGIN)
-    chunks = _chunk_text_by_tokens(text, effective_limit, model)
+    return _get_embedding_client().embed(text, long_text="mean")
 
-    with LogSpan(
-        span="mem.embedding",
-        model=model,
-        textLen=len(text),
-        chunks=len(chunks),
-    ) as span:
-        client = _get_openai_client()
 
-        if len(chunks) == 1:
-            response = client.embeddings.create(
-                model=model,
-                input=chunks[0],
-            )
-            span.add("dimensions", len(response.data[0].embedding))
-            return response.data[0].embedding
+def _generate_query_embedding(text: str) -> list[float]:
+    """Embed a search query, served from the client's bounded LRU cache.
 
-        # Batch embed all chunks in one API call
-        response = client.embeddings.create(
-            model=model,
-            input=chunks,
-        )
-        vectors = [item.embedding for item in response.data]
-        dims = len(vectors[0])
-        span.add("dimensions", dims)
-
-        # Average the vectors
-        averaged = [0.0] * dims
-        for vec in vectors:
-            for i in range(dims):
-                averaged[i] += vec[i]
-        n = len(vectors)
-        averaged = [v / n for v in averaged]
-
-        return averaged
+    Content writes and the background worker stay uncached — only the query
+    path benefits from repeats.
+    """
+    return _get_embedding_client().embed(text, long_text="mean", use_cache=True)
 
 
 def _enqueue_embedding(memory_id: str) -> None:
@@ -262,8 +201,6 @@ def _enqueue_after_commit(memory_id: str) -> None:
 
 
 __all__ = [
-    "_TOKEN_SAFETY_MARGIN",
-    "_chunk_text_by_tokens",
     "_embed_now",
     "_embedding_dropped",
     "_embedding_errors",
@@ -276,8 +213,8 @@ __all__ = [
     "_enqueue_embedding",
     "_ensure_embedding_worker",
     "_generate_embedding",
-    "_get_openai_client",
-    "_get_tiktoken_encoding",
-    "_import_tiktoken",
+    "_generate_query_embedding",
+    "_get_embedding_client",
+    "_get_embedding_model",
     "_process_embedding_job",
 ]

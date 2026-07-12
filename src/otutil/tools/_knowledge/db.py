@@ -1,13 +1,12 @@
 """SQLite schema, connection management, and serialisation for the knowledge pack."""
 from __future__ import annotations
 
-import builtins
 import json
-import struct
 import threading
 from typing import TYPE_CHECKING, Any, cast
 
 from ot.utils.sqlite_pool import SqlitePool
+from otpack import deserialize_embedding, serialize_embedding
 
 from .config import _get_config, _get_kb_project
 
@@ -15,8 +14,6 @@ if TYPE_CHECKING:
     import sqlite3
     from contextlib import AbstractContextManager
     from pathlib import Path
-
-_builtins_list = builtins.list
 
 # Per-database pools — keyed by db_name
 _pools: dict[str, SqlitePool] = {}
@@ -221,20 +218,8 @@ def close_connection(db_name: str | None = None) -> None:
 # ── Serialisation helpers ──────────────────────────────────────────────────
 
 
-def serialize_embedding(vec: list[float] | None) -> bytes | None:
-    """Pack a float list into a BLOB for SQLite storage."""
-    if vec is None:
-        return None
-    return struct.pack(f"<{len(vec)}f", *vec)
-
-
-def deserialize_embedding(blob: bytes | None) -> list[float] | None:
-    """Unpack a BLOB back to a float list."""
-    if blob is None:
-        return None
-    n = len(blob) // 4
-    return _builtins_list(struct.unpack(f"<{n}f", blob))
-
+# Canonical float32 serialization lives in otpack (little-endian <{n}f);
+# re-exported here so pack call sites keep importing from db.
 
 def serialize_tags(tags: list[str] | None) -> str:
     return json.dumps(tags or [])

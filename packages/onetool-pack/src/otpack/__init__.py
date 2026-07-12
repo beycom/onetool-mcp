@@ -1,7 +1,8 @@
 """OneTool Pack — standalone infrastructure utilities for OneTool packs.
 
 Provides logging, config, caching, HTTP helpers, paths, text formatting,
-batch execution, dependency checks, and path security.
+batch execution, dependency checks, path security, and embedding
+infrastructure (tokenization, serialization, RRF fusion, EmbeddingClient).
 
 All symbols are importable directly from otpack:
 
@@ -35,6 +36,18 @@ from otpack.config import (
     get_secret,
     get_tool_config,
     is_log_verbose,
+)
+from otpack.embedding import (
+    MODEL_NATIVE_DIMS,
+    TOKEN_SAFETY_MARGIN,
+    EmbeddingClient,
+    chunk_text_by_tokens,
+    cosine_similarity_blobs,
+    deserialize_embedding,
+    dimensions_param,
+    get_tiktoken_encoding,
+    rrf_merge,
+    serialize_embedding,
 )
 from otpack.deps import (
     Dependency,
@@ -79,6 +92,8 @@ from otpack.validate import validate_choice, validate_int_range
 
 __all__ = [
     "DEFAULT_EXCLUDE_PATTERNS",
+    "MODEL_NATIVE_DIMS",
+    "TOKEN_SAFETY_MARGIN",
     "BatchEnvelope",
     "BatchError",
     "BatchMeta",
@@ -86,6 +101,7 @@ __all__ = [
     "Cache",
     "Dependency",
     "DepsCheckResult",
+    "EmbeddingClient",
     "HmacAuthError",
     "LazyClient",
     "LogEntry",
@@ -100,8 +116,12 @@ __all__ = [
     "check_cli",
     "check_lib",
     "check_secret",
+    "chunk_text_by_tokens",
     "configure_standalone",
+    "cosine_similarity_blobs",
     "create_json_http_client",
+    "deserialize_embedding",
+    "dimensions_param",
     "ensure_cli",
     "ensure_hmac_key",
     "ensure_hmac_key_file",
@@ -117,6 +137,7 @@ __all__ = [
     "get_project_state_dir",
     "get_secret",
     "get_state",
+    "get_tiktoken_encoding",
     "get_tool_config",
     "is_log_verbose",
     "is_path_excluded",
@@ -127,8 +148,10 @@ __all__ = [
     "requires_cli",
     "requires_lib",
     "resolve_cwd_path",
+    "rrf_merge",
     "run_command",
     "safe_request",
+    "serialize_embedding",
     "set_state",
     "sign_http_message",
     "truncate",

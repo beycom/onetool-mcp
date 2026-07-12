@@ -8,7 +8,7 @@ from typing import Any
 from loguru import logger
 
 from ot.logging import LogEntry
-from otpack import LogSpan
+from otpack import LogSpan, rrf_merge
 from otutil.tools._content_util import grep_lines
 
 from .config import _get_config
@@ -21,7 +21,7 @@ from .db import (
     _normalize_vec,
     _serialize_embedding,
 )
-from .embedding import _generate_embedding
+from .embedding import _generate_query_embedding
 
 _builtins_list = builtins.list
 
@@ -259,7 +259,7 @@ def _search_semantic_knn(
     limit: int,
 ) -> list[dict[str, Any]]:
     """Indexed KNN semantic search via the memories_vec vec0 table."""
-    embedding = _normalize_vec(_generate_embedding(query))
+    embedding = _normalize_vec(_generate_query_embedding(query))
     query_blob = _serialize_embedding(embedding)
 
     # KNN selects k nearest BEFORE the join filters apply — over-fetch when
@@ -312,7 +312,7 @@ def _search_semantic_scan(
     limit: int,
 ) -> list[dict[str, Any]]:
     """Fallback semantic search: full-table scan through the cosine UDF."""
-    embedding = _generate_embedding(query)
+    embedding = _generate_query_embedding(query)
     query_blob = _serialize_embedding(embedding)
 
     sql = """
@@ -493,41 +493,15 @@ def _search_hybrid(
 ) -> list[dict[str, Any]]:
     """Hybrid search fusing the semantic and keyword ranked lists via RRF.
 
-    Uses Reciprocal Rank Fusion: rrf_score = sum(1 / (k + rank)). Both input
-    lists are relevance-ranked (KNN/cosine and BM25 respectively), so fusion
-    order is meaningful on both sides.
+    Uses Reciprocal Rank Fusion (otpack.rrf_merge, k=60, no boost). Both
+    input lists are relevance-ranked (KNN/cosine and BM25 respectively), so
+    fusion order is meaningful on both sides.
     """
-    k = 60  # RRF constant
-
     # Get both result sets (fetch more than limit for better fusion)
     fetch_limit = limit * 3
     semantic_results = _search_semantic(conn, query, topic, category, tags, fetch_limit)
     pattern_results = _search_keyword(conn, query, topic, category, tags, fetch_limit)
-
-    # Build RRF scores
-    rrf_scores: dict[str, float] = {}
-    result_map: dict[str, dict[str, Any]] = {}
-
-    for rank, r in enumerate(semantic_results, 1):
-        mid = r["id"]
-        rrf_scores[mid] = rrf_scores.get(mid, 0) + 1.0 / (k + rank)
-        result_map[mid] = r
-
-    for rank, r in enumerate(pattern_results, 1):
-        mid = r["id"]
-        rrf_scores[mid] = rrf_scores.get(mid, 0) + 1.0 / (k + rank)
-        if mid not in result_map:
-            result_map[mid] = r
-
-    # Sort by RRF score and return top N
-    sorted_ids = sorted(rrf_scores, key=lambda x: rrf_scores[x], reverse=True)[:limit]
-    results = []
-    for mid in sorted_ids:
-        r = result_map[mid]
-        r["score"] = round(rrf_scores[mid], 4)
-        results.append(r)
-
-    return results
+    return rrf_merge(semantic_results, pattern_results, limit)
 
 
 def _format_search_results(results: list[dict[str, Any]], query: str, extract: int) -> str:

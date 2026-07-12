@@ -577,7 +577,7 @@ class TestSearch:
 
     @patch("otutil.tools._mem.search._check_vec_available", return_value=False)
     @patch("otutil.tools._mem.search._get_config", return_value=Config(embeddings_enabled=True))
-    @patch("otutil.tools._mem.search._generate_embedding")
+    @patch("otutil.tools._mem.search._generate_query_embedding")
     @patch("otutil.tools._mem.search._get_connection")
     def test_semantic_search(self, mock_conn, mock_embed, _mock_config, _mock_vec):
         from otutil.tools.mem import search
@@ -620,7 +620,7 @@ class TestSearch:
         assert "Invalid mode" in result
 
     @patch("otutil.tools._mem.search._get_config", return_value=Config(embeddings_enabled=True))
-    @patch("otutil.tools._mem.search._generate_embedding")
+    @patch("otutil.tools._mem.search._generate_query_embedding")
     @patch("otutil.tools._mem.search._get_connection")
     def test_no_results(self, mock_conn, mock_embed, _mock_config):
         from otutil.tools.mem import search
@@ -636,7 +636,7 @@ class TestSearch:
         assert "No memories found" in result
 
     @patch("otutil.tools._mem.search._get_config", return_value=Config(embeddings_enabled=True))
-    @patch("otutil.tools._mem.search._generate_embedding")
+    @patch("otutil.tools._mem.search._generate_query_embedding")
     @patch("otutil.tools._mem.search._get_connection")
     def test_search_custom_extract(self, mock_conn, mock_embed, _mock_config):
         from otutil.tools.mem import search
@@ -659,7 +659,7 @@ class TestSearch:
         assert "..." in result
 
     @patch("otutil.tools._mem.search._get_config", return_value=Config(embeddings_enabled=True))
-    @patch("otutil.tools._mem.search._generate_embedding")
+    @patch("otutil.tools._mem.search._generate_query_embedding")
     @patch("otutil.tools._mem.search._get_connection")
     def test_search_extract_zero_returns_full(self, mock_conn, mock_embed, _mock_config):
         from otutil.tools.mem import search
@@ -2135,43 +2135,57 @@ class TestRestoreInvariants:
 
 @pytest.mark.unit
 @pytest.mark.tools
-class TestGetOpenAIClient:
-    """Test _get_openai_client function."""
+class TestGetEmbeddingClient:
+    """Test _get_embedding_client adapter."""
+
+    def _reset(self):
+        import otutil.tools._mem.embedding as emb_mod
+        emb_mod._client = None
+        emb_mod._client_key = None
 
     @patch("otutil.tools._mem.embedding.get_secret")
     def test_raises_without_api_key(self, mock_secret):
-        from otutil.tools._mem.embedding import _get_openai_client
+        from otutil.tools._mem.embedding import _get_embedding_client
 
         mock_secret.return_value = ""
+        self._reset()
 
         with pytest.raises(ValueError, match="OPENAI_API_KEY"):
-            _get_openai_client()
+            _get_embedding_client()
 
-    @patch("openai.OpenAI")
+    @patch("otutil.tools._mem.embedding.get_llm_config")
+    @patch("otutil.tools._mem.embedding._get_config")
     @patch("otutil.tools._mem.embedding.get_secret")
-    def test_creates_client_with_key(self, mock_secret, mock_openai):
-        from otutil.tools._mem.embedding import _get_openai_client
+    def test_builds_client_with_mem_prefix(self, mock_secret, mock_cfg, mock_llm):
+        from otutil.tools._mem.embedding import _get_embedding_client
 
         mock_secret.return_value = "sk-test"
+        mock_cfg.return_value.model = "text-embedding-3-small"
+        mock_cfg.return_value.base_url = ""
+        mock_cfg.return_value.max_embedding_tokens = 8191
+        mock_llm.return_value.base_url = ""
+        self._reset()
 
-        _get_openai_client()
+        client = _get_embedding_client()
 
-        mock_openai.assert_called_once()
+        assert client._log_prefix == "mem"
+        assert client.model == "text-embedding-3-small"
+        self._reset()
 
 
 @pytest.mark.unit
 @pytest.mark.tools
 class TestChunkTextByTokens:
-    """Test _chunk_text_by_tokens token-aware splitting."""
+    """Token-aware splitting (shared otpack implementation)."""
 
     def test_short_text_single_chunk(self):
-        from otutil.tools._mem.embedding import _chunk_text_by_tokens
+        from otpack import chunk_text_by_tokens as _chunk_text_by_tokens
 
         chunks = _chunk_text_by_tokens("hello world", 8191, "text-embedding-3-small")
         assert chunks == ["hello world"]
 
     def test_long_text_splits_into_chunks(self):
-        from otutil.tools._mem.embedding import _chunk_text_by_tokens
+        from otpack import chunk_text_by_tokens as _chunk_text_by_tokens
 
         text = "word " * 20000  # ~20000 tokens
         chunks = _chunk_text_by_tokens(text, 100, "text-embedding-3-small")
@@ -2184,7 +2198,7 @@ class TestChunkTextByTokens:
     def test_exact_limit_single_chunk(self):
         import tiktoken
 
-        from otutil.tools._mem.embedding import _chunk_text_by_tokens
+        from otpack import chunk_text_by_tokens as _chunk_text_by_tokens
 
         encoding = tiktoken.encoding_for_model("text-embedding-3-small")
         text = "hello world this is a test"
@@ -2193,7 +2207,7 @@ class TestChunkTextByTokens:
         assert chunks == [text]
 
     def test_unknown_model_falls_back(self):
-        from otutil.tools._mem.embedding import _chunk_text_by_tokens
+        from otpack import chunk_text_by_tokens as _chunk_text_by_tokens
 
         chunks = _chunk_text_by_tokens("hello world", 8191, "unknown-model-xyz")
         assert chunks == ["hello world"]
@@ -2201,7 +2215,7 @@ class TestChunkTextByTokens:
     def test_chunks_cover_all_content(self):
         import tiktoken
 
-        from otutil.tools._mem.embedding import _chunk_text_by_tokens
+        from otpack import chunk_text_by_tokens as _chunk_text_by_tokens
 
         encoding = tiktoken.encoding_for_model("text-embedding-3-small")
         text = "word " * 500  # moderate text
@@ -2217,77 +2231,86 @@ class TestChunkTextByTokens:
 @pytest.mark.unit
 @pytest.mark.tools
 class TestGenerateEmbedding:
-    """Test _generate_embedding function."""
+    """_generate_embedding via the shared otpack client (mean strategy)."""
 
-    @patch("otutil.tools._mem.embedding._get_openai_client")
-    def test_generates_embedding_short_text(self, mock_client):
+    def _make_client(self, **kwargs):
+        from otpack import EmbeddingClient
+
+        defaults = {"api_key": "sk-test", "model": "text-embedding-3-small", "log_prefix": "mem"}
+        defaults.update(kwargs)
+        client = EmbeddingClient(**defaults)
+        mock_openai = MagicMock()
+        client._client = mock_openai
+        return client, mock_openai.embeddings.create
+
+    @staticmethod
+    def _resp(vecs):
+        data = []
+        for i, vec in enumerate(vecs):
+            item = MagicMock()
+            item.index = i
+            item.embedding = vec
+            data.append(item)
+        resp = MagicMock()
+        resp.data = data
+        return resp
+
+    def test_generates_embedding_short_text(self):
         from otutil.tools._mem.embedding import _generate_embedding
 
-        mock_openai = MagicMock()
-        mock_client.return_value = mock_openai
-
-        mock_response = MagicMock()
-        mock_response.data = [MagicMock()]
-        mock_response.data[0].embedding = [0.1, 0.2, 0.3]
-        mock_openai.embeddings.create.return_value = mock_response
-
-        result = _generate_embedding("test text")
+        client, create = self._make_client()
+        create.return_value = self._resp([[0.1, 0.2, 0.3]])
+        with patch("otutil.tools._mem.embedding._get_embedding_client", return_value=client):
+            result = _generate_embedding("test text")
 
         assert result == [0.1, 0.2, 0.3]
-        mock_openai.embeddings.create.assert_called_once()
+        create.assert_called_once()
 
-    @patch("otutil.tools._mem.embedding._chunk_text_by_tokens")
-    @patch("otutil.tools._mem.embedding._get_openai_client")
-    def test_averages_multi_chunk_embeddings(self, mock_client, mock_chunk):
+    def test_averages_multi_window_embeddings(self):
+        """Long text is window-embedded in one batch and element-wise averaged."""
         from otutil.tools._mem.embedding import _generate_embedding
 
-        # Simulate text splitting into 2 chunks
-        mock_chunk.return_value = ["chunk one", "chunk two"]
+        client, create = self._make_client(max_tokens=110)  # effective limit 10
+        create.side_effect = lambda **kw: self._resp(
+            [[float(i), 1.0] for i in range(len(kw["input"]))]
+        )
+        long_text = "word " * 25  # > 10 tokens → multiple windows
+        with patch("otutil.tools._mem.embedding._get_embedding_client", return_value=client):
+            result = _generate_embedding(long_text)
 
-        mock_openai = MagicMock()
-        mock_client.return_value = mock_openai
+        sent = create.call_args.kwargs["input"]
+        n = len(sent)
+        assert n > 1  # all windows in one batched call
+        assert result[0] == pytest.approx(sum(range(n)) / n)  # element-wise mean
+        assert result[1] == pytest.approx(1.0)
 
-        # API returns 2 embeddings (one per chunk)
-        embed1 = MagicMock()
-        embed1.embedding = [1.0, 0.0, 0.0]
-        embed2 = MagicMock()
-        embed2.embedding = [0.0, 1.0, 0.0]
-        mock_response = MagicMock()
-        mock_response.data = [embed1, embed2]
-        mock_openai.embeddings.create.return_value = mock_response
-
-        result = _generate_embedding("very long text")
-
-        # Should average the two vectors
-        assert result == [0.5, 0.5, 0.0]
-        # Should pass both chunks as a batch
-        call_kwargs = mock_openai.embeddings.create.call_args[1]
-        assert call_kwargs["input"] == ["chunk one", "chunk two"]
-
-    @patch("otutil.tools._mem.embedding._chunk_text_by_tokens")
-    @patch("otutil.tools._mem.embedding._get_openai_client")
-    def test_single_chunk_passes_string_not_list(self, mock_client, mock_chunk):
+    def test_sync_path_retries_transient_429(self):
+        """The sync embed path retries HTTP 429 (converged retry policy)."""
         from otutil.tools._mem.embedding import _generate_embedding
 
-        mock_chunk.return_value = ["short text"]
+        client, create = self._make_client()
+        err = type("APIStatusError", (Exception,), {"status_code": 429})("rate limited")
+        create.side_effect = [err, self._resp([[0.7]])]
+        with (
+            patch("otutil.tools._mem.embedding._get_embedding_client", return_value=client),
+            patch("otpack.embedding.time"),
+        ):
+            result = _generate_embedding("test text")
 
-        mock_openai = MagicMock()
-        mock_client.return_value = mock_openai
-        mock_response = MagicMock()
-        mock_response.data = [MagicMock()]
-        mock_response.data[0].embedding = [0.1, 0.2, 0.3]
-        mock_openai.embeddings.create.return_value = mock_response
+        assert result == [0.7]
+        assert create.call_count == 2
 
-        _generate_embedding("short text")
+    def test_repeated_query_embedding_hits_cache(self):
+        """_generate_query_embedding serves repeats from the LRU cache."""
+        from otutil.tools._mem.embedding import _generate_query_embedding
 
-        # Single chunk: should pass string directly, not a list
-        call_kwargs = mock_openai.embeddings.create.call_args[1]
-        assert call_kwargs["input"] == "short text"
+        client, create = self._make_client()
+        create.return_value = self._resp([[0.9]])
+        with patch("otutil.tools._mem.embedding._get_embedding_client", return_value=client):
+            _generate_query_embedding("same query")
+            _generate_query_embedding("same query")
 
-    def test_safety_margin_applied(self):
-        from otutil.tools._mem.embedding import _TOKEN_SAFETY_MARGIN
-
-        assert _TOKEN_SAFETY_MARGIN == 100
+        assert create.call_count == 1
 
 
 # ---------------------------------------------------------------------------
@@ -3733,7 +3756,7 @@ class TestMemVecIndex:
         conn.commit()
 
         query_vec = [1.0, 0.0, 0.0, 0.0]
-        with patch("otutil.tools._mem.search._generate_embedding", return_value=query_vec):
+        with patch("otutil.tools._mem.search._generate_query_embedding", return_value=query_vec):
             knn = _search_semantic_knn(conn, "q", None, None, None, 3)
             scan = _search_semantic_scan(conn, "q", None, None, None, 3)
 
@@ -3754,7 +3777,7 @@ class TestMemVecIndex:
                 _sync_vec_index(conn, f"m{i}", vec)
         conn.commit()
 
-        with patch("otutil.tools._mem.search._generate_embedding", return_value=[1.0, 0.0, 0.0, 0.0]):
+        with patch("otutil.tools._mem.search._generate_query_embedding", return_value=[1.0, 0.0, 0.0, 0.0]):
             results = _search_semantic_knn(conn, "q", "projects/", None, None, 2)
 
         assert len(results) == 2
@@ -3858,7 +3881,7 @@ class TestMemVecIndex:
         conn.commit()
 
         with patch("otutil.tools._mem.search._check_vec_available", return_value=False), \
-             patch("otutil.tools._mem.search._generate_embedding", return_value=[1.0, 0.0, 0.0, 0.0]):
+             patch("otutil.tools._mem.search._generate_query_embedding", return_value=[1.0, 0.0, 0.0, 0.0]):
             results = mem_search._search_semantic(conn, "q", None, None, None, 5)
 
         assert [r["id"] for r in results] == ["m1"]

@@ -704,84 +704,55 @@ class TestKnowledgeChunkerStubFilter:
 # 4.4 — Embedding cache
 # ===========================================================================
 
+
+def _make_kb_embedding_client(**kwargs):
+    """Real otpack EmbeddingClient with a mocked OpenAI handle installed."""
+    from otpack import EmbeddingClient
+
+    defaults = {"api_key": "sk-test", "model": "text-embedding-3-small", "log_prefix": "kb"}
+    defaults.update(kwargs)
+    client = EmbeddingClient(**defaults)
+    mock_openai = MagicMock()
+    client._client = mock_openai
+    return client, mock_openai.embeddings.create
+
+
+def _fake_embed_response(vecs):
+    data = []
+    for i, vec in enumerate(vecs):
+        item = MagicMock()
+        item.index = i
+        item.embedding = vec
+        data.append(item)
+    resp = MagicMock()
+    resp.data = data
+    return resp
+
+
 @pytest.mark.unit
 @pytest.mark.tools
 class TestEmbeddingCache:
-    """Query embedding TTL cache."""
+    """Query embedding TTL cache (served by the shared otpack EmbeddingClient)."""
 
     def test_cache_hit_avoids_api_call(self):
-        import otutil.tools._knowledge.embedding as emb_mod
-        from unittest.mock import patch, MagicMock
+        from otutil.tools._knowledge.embedding import generate_embedding
 
-        cfg = MagicMock()
-        cfg.model = "text-embedding-3-small"
-        cfg.dimensions = 1536
-        cfg.max_embedding_tokens = 8191
-        cfg.base_url = ""
-
-        fake_vec = [0.1] * 1536
-
-        call_count = 0
-
-        def fake_create(**kwargs):
-            nonlocal call_count
-            call_count += 1
-            item = MagicMock()
-            item.embedding = fake_vec
-            item.index = 0
-            resp = MagicMock()
-            resp.data = [item]
-            return resp
-
-        client_mock = MagicMock()
-        client_mock.embeddings.create.side_effect = fake_create
-
-        # Clear cache before test
-        emb_mod._EMBED_CACHE.clear()
-
-        with patch("otutil.tools._knowledge.embedding._get_config", return_value=cfg):
-            with patch("otutil.tools._knowledge.embedding._get_openai_client", return_value=client_mock):
-                with patch("otutil.tools._knowledge.embedding._chunk_text_by_tokens", return_value=["test query"]):
-                    emb_mod.generate_embedding("test query")
-                    emb_mod.generate_embedding("test query")
-
-        assert call_count == 1, "Second call should have hit the cache"
+        client, create = _make_kb_embedding_client()
+        create.return_value = _fake_embed_response([[0.1] * 4])
+        with patch("otutil.tools._knowledge.embedding._get_embedding_client", return_value=client):
+            generate_embedding("test query")
+            generate_embedding("test query")
+        assert create.call_count == 1, "Second call should have hit the cache"
 
     def test_cache_miss_on_different_query(self):
-        import otutil.tools._knowledge.embedding as emb_mod
-        from unittest.mock import patch, MagicMock
+        from otutil.tools._knowledge.embedding import generate_embedding
 
-        cfg = MagicMock()
-        cfg.model = "text-embedding-3-small"
-        cfg.dimensions = 1536
-        cfg.max_embedding_tokens = 8191
-        cfg.base_url = ""
-
-        fake_vec = [0.1] * 1536
-        call_count = 0
-
-        def fake_create(**kwargs):
-            nonlocal call_count
-            call_count += 1
-            item = MagicMock()
-            item.embedding = fake_vec
-            item.index = 0
-            resp = MagicMock()
-            resp.data = [item]
-            return resp
-
-        client_mock = MagicMock()
-        client_mock.embeddings.create.side_effect = fake_create
-
-        emb_mod._EMBED_CACHE.clear()
-
-        with patch("otutil.tools._knowledge.embedding._get_config", return_value=cfg):
-            with patch("otutil.tools._knowledge.embedding._get_openai_client", return_value=client_mock):
-                with patch("otutil.tools._knowledge.embedding._chunk_text_by_tokens", side_effect=lambda t, *a: [t]):
-                    emb_mod.generate_embedding("query one")
-                    emb_mod.generate_embedding("query two")
-
-        assert call_count == 2, "Different queries should each make an API call"
+        client, create = _make_kb_embedding_client()
+        create.return_value = _fake_embed_response([[0.1] * 4])
+        with patch("otutil.tools._knowledge.embedding._get_embedding_client", return_value=client):
+            generate_embedding("query one")
+            generate_embedding("query two")
+        assert create.call_count == 2, "Different queries should each make an API call"
 
 
 # ===========================================================================
@@ -1325,19 +1296,7 @@ class TestKnowledgeErrorHandling:
 @pytest.mark.unit
 @pytest.mark.tools
 class TestKnowledgeBatchEmbedding:
-    """generate_embeddings_batch: batching, ordering, and empty input."""
-
-    def _fake_openai_response(self, vecs: list[list[float]]) -> MagicMock:
-        """Build a mock OpenAI embeddings response for the given vectors."""
-        data = []
-        for i, vec in enumerate(vecs):
-            item = MagicMock()
-            item.index = i
-            item.embedding = vec
-            data.append(item)
-        resp = MagicMock()
-        resp.data = data
-        return resp
+    """generate_embeddings_batch and _store_embeddings_batch over the shared client."""
 
     def test_empty_input_returns_empty(self):
         from otutil.tools._knowledge.embedding import generate_embeddings_batch
@@ -1347,17 +1306,10 @@ class TestKnowledgeBatchEmbedding:
     def test_single_batch_returns_all_vectors(self):
         from otutil.tools._knowledge.embedding import generate_embeddings_batch
 
-        texts = ["hello", "world", "foo"]
-        vecs = [[0.1] * 3, [0.2] * 3, [0.3] * 3]
-        mock_client = MagicMock()
-        mock_client.embeddings.create.return_value = self._fake_openai_response(vecs)
-
-        with patch("otutil.tools._knowledge.embedding._get_openai_client", return_value=mock_client):
-            with patch("otutil.tools._knowledge.embedding._get_config") as mock_cfg:
-                mock_cfg.return_value.model = "text-embedding-3-small"
-                mock_cfg.return_value.max_embedding_tokens = 8191
-                mock_cfg.return_value.base_url = None
-                result = generate_embeddings_batch(texts, batch_size=500)
+        client, create = _make_kb_embedding_client()
+        create.return_value = _fake_embed_response([[0.1] * 3, [0.2] * 3, [0.3] * 3])
+        with patch("otutil.tools._knowledge.embedding._get_embedding_client", return_value=client):
+            result = generate_embeddings_batch(["hello", "world", "foo"], batch_size=500)
 
         assert len(result) == 3
         assert result[0] == [0.1] * 3
@@ -1365,28 +1317,20 @@ class TestKnowledgeBatchEmbedding:
     def test_multiple_batches_are_concatenated(self):
         from otutil.tools._knowledge.embedding import generate_embeddings_batch
 
-        texts = ["a", "b", "c", "d", "e"]
-        # Two batches: [a,b,c] and [d,e]
         batch1_vecs = [[float(i)] * 2 for i in range(3)]
         batch2_vecs = [[float(i)] * 2 for i in range(3, 5)]
-
         call_count = 0
 
         def fake_create(**kwargs: object) -> MagicMock:
             nonlocal call_count
             vecs = batch1_vecs if call_count == 0 else batch2_vecs
             call_count += 1
-            return self._fake_openai_response(vecs)
+            return _fake_embed_response(vecs)
 
-        mock_client = MagicMock()
-        mock_client.embeddings.create.side_effect = fake_create
-
-        with patch("otutil.tools._knowledge.embedding._get_openai_client", return_value=mock_client):
-            with patch("otutil.tools._knowledge.embedding._get_config") as mock_cfg:
-                mock_cfg.return_value.model = "text-embedding-3-small"
-                mock_cfg.return_value.max_embedding_tokens = 8191
-                mock_cfg.return_value.base_url = None
-                result = generate_embeddings_batch(texts, batch_size=3)
+        client, create = _make_kb_embedding_client()
+        create.side_effect = fake_create
+        with patch("otutil.tools._knowledge.embedding._get_embedding_client", return_value=client):
+            result = generate_embeddings_batch(["a", "b", "c", "d", "e"], batch_size=3)
 
         assert call_count == 2
         assert len(result) == 5
@@ -1404,39 +1348,31 @@ class TestKnowledgeBatchEmbedding:
         assert "sqlite-vec" in result
 
     def test_retry_on_api_status_error(self):
-        """_embed_batch_with_retry retries on HTTP 429 and succeeds on the third attempt."""
-        from otutil.tools._knowledge.embedding import _embed_batch_with_retry
-
-        vecs = [[0.1, 0.2], [0.3, 0.4]]
+        """The shared client retries on HTTP 429 and succeeds on the third attempt."""
+        client, create = _make_kb_embedding_client()
         call_count = 0
 
         def fake_create(**kwargs: object) -> MagicMock:
             nonlocal call_count
             call_count += 1
             if call_count < 3:
-                err = MagicMock()
-                err.status_code = 429
-                raise type("APIStatusError", (Exception,), {"status_code": 429})(
-                    "rate limited"
-                )
-            return self._fake_openai_response(vecs)
+                raise type("APIStatusError", (Exception,), {"status_code": 429})("rate limited")
+            return _fake_embed_response([[0.1, 0.2], [0.3, 0.4]])
 
-        mock_client = MagicMock()
-        mock_client.embeddings.create.side_effect = fake_create
-
+        create.side_effect = fake_create
         with (
-            patch("otutil.tools._knowledge.embedding.time") as mock_time,
-            patch("otutil.tools._knowledge.embedding.logger.warning") as mock_warning,
+            patch("otpack.embedding.time") as mock_time,
+            patch("otpack.embedding.logger.warning") as mock_warning,
         ):
-            result = _embed_batch_with_retry(mock_client, "text-embedding-3-small", ["a", "b"])
+            result = client.embed_batch(["a", "b"])
 
         assert call_count == 3
         assert len(result) == 2
         assert mock_time.sleep.call_count == 2
         entries = [call.args[0] for call in mock_warning.call_args_list]
         assert [entry.fields["event"] for entry in entries] == [
-            "knowledge.embedding.retry",
-            "knowledge.embedding.retry",
+            "kb.embedding.retry",
+            "kb.embedding.retry",
         ]
         assert entries[0].fields["statusCode"] == 429
         assert entries[0].fields["attempt"] == 1
@@ -1444,32 +1380,25 @@ class TestKnowledgeBatchEmbedding:
         assert entries[0].fields["waitSeconds"] == 1.0
 
     def test_valueerror_not_retried(self):
-        """_embed_batch_with_retry does NOT retry ValueError — batch rejection is not transient."""
-        from otutil.tools._knowledge.embedding import _embed_batch_with_retry
+        """The client does NOT retry ValueError — batch rejection is not transient."""
+        client, create = _make_kb_embedding_client()
+        create.side_effect = ValueError("No embedding data received")
 
-        mock_client = MagicMock()
-        mock_client.embeddings.create.side_effect = ValueError("No embedding data received")
-
-        with patch("otutil.tools._knowledge.embedding.time") as mock_time:
+        with patch("otpack.embedding.time") as mock_time:
             with pytest.raises(ValueError, match="No embedding data received"):
-                _embed_batch_with_retry(mock_client, "text-embedding-3-small", ["x"])
+                client.embed_batch(["x"])
 
-        assert mock_client.embeddings.create.call_count == 1
+        assert create.call_count == 1
         mock_time.sleep.assert_not_called()
 
     def test_count_mismatch_raises_valueerror(self):
-        """_embed_batch_with_retry raises ValueError if response count != input count."""
-        from otutil.tools._knowledge.embedding import _embed_batch_with_retry
+        """The client raises ValueError if response count != input count."""
+        client, create = _make_kb_embedding_client()
+        create.return_value = _fake_embed_response([[0.1, 0.2]])
 
-        # API returns 1 vector but we sent 2 texts — should raise after exhausting retries
-        mock_client = MagicMock()
-        mock_client.embeddings.create.return_value = self._fake_openai_response([[0.1, 0.2]])
-
-        with patch("otutil.tools._knowledge.embedding.time"):
+        with patch("otpack.embedding.time"):
             with pytest.raises(ValueError, match="Expected 2 embeddings, got 1"):
-                _embed_batch_with_retry(
-                    mock_client, "text-embedding-3-small", ["a", "b"], max_attempts=1
-                )
+                client.embed_batch(["a", "b"], max_attempts=1)
 
     def test_store_embeddings_batch_partial_failure(self):
         """First sub-batch is stored; second sub-batch fails → fallback embeds items individually."""
@@ -1483,27 +1412,24 @@ class TestKnowledgeBatchEmbedding:
         conn.commit()
 
         # Two sub-batches of 2: first succeeds, second fails as batch but succeeds per-item
-        batch_size = 2
         pending = [("id1", "text one"), ("id2", "text two"), ("id3", "text three"), ("id4", "text four")]
-
         call_count = 0
 
-        def fake_embed(client: object, model: object, safe_batch: object, **kwargs: object) -> list[list[float]]:
+        def fake_embed_batch(texts: list, **kwargs: object) -> list:
             nonlocal call_count
             call_count += 1
-            batch = list(safe_batch)  # type: ignore[arg-type]
-            # Second call (batch call for sub-batch 2) fails; individual retries succeed
-            if call_count == 2 and len(batch) > 1:
+            if call_count == 2 and len(texts) > 1:
                 raise ValueError("No embedding data received")
-            return [[float(i + call_count)] * 2 for i in range(len(batch))]
+            return [[float(i + call_count)] * 2 for i in range(len(texts))]
+
+        mock_client = MagicMock()
+        mock_client.embed_batch.side_effect = fake_embed_batch
 
         with patch("otutil.tools._knowledge.db._check_vec_available", return_value=True):
-            with patch("otutil.tools._knowledge.embedding._embed_batch_with_retry", side_effect=fake_embed):
-                with patch("otutil.tools._knowledge.embedding._get_openai_client", return_value=MagicMock()):
-                    with patch("otutil.tools._knowledge.embedding._prepare_safe_batch", side_effect=lambda t, _c, _m: t):
-                        with patch("otutil.tools._knowledge.indexer._get_config") as mock_cfg:
-                            mock_cfg.return_value.model = "text-embedding-3-small"
-                            result = _store_embeddings_batch(conn, pending, batch_size=batch_size)
+            with patch("otutil.tools._knowledge.embedding._get_embedding_client", return_value=mock_client):
+                with patch("otutil.tools._knowledge.indexer._get_config") as mock_cfg:
+                    mock_cfg.return_value.model = "text-embedding-3-small"
+                    result = _store_embeddings_batch(conn, pending, batch_size=2)
 
         # No errors — fallback per-item calls succeed
         assert result is None
@@ -1522,22 +1448,22 @@ class TestKnowledgeBatchEmbedding:
 
         pending = [("id1", "good"), ("id2", "bad"), ("id3", "good2")]
 
-        def fake_embed(client: object, model: object, safe_batch: object, **kwargs: object) -> list[list[float]]:
-            batch = list(safe_batch)  # type: ignore[arg-type]
+        def fake_embed_batch(texts: list, **kwargs: object) -> list:
             # Batch call fails; individual "bad" chunk fails; others succeed
-            if len(batch) > 1:
+            if len(texts) > 1:
                 raise ValueError("No embedding data received")
-            if batch[0] == "bad":
+            if texts[0] == "bad":
                 raise ValueError("content policy")
             return [[0.1, 0.2]]
 
+        mock_client = MagicMock()
+        mock_client.embed_batch.side_effect = fake_embed_batch
+
         with patch("otutil.tools._knowledge.db._check_vec_available", return_value=True):
-            with patch("otutil.tools._knowledge.embedding._embed_batch_with_retry", side_effect=fake_embed):
-                with patch("otutil.tools._knowledge.embedding._get_openai_client", return_value=MagicMock()):
-                    with patch("otutil.tools._knowledge.embedding._prepare_safe_batch", side_effect=lambda t, _c, _m: t):
-                        with patch("otutil.tools._knowledge.indexer._get_config") as mock_cfg:
-                            mock_cfg.return_value.model = "text-embedding-3-small"
-                            result = _store_embeddings_batch(conn, pending, batch_size=10)
+            with patch("otutil.tools._knowledge.embedding._get_embedding_client", return_value=mock_client):
+                with patch("otutil.tools._knowledge.indexer._get_config") as mock_cfg:
+                    mock_cfg.return_value.model = "text-embedding-3-small"
+                    result = _store_embeddings_batch(conn, pending, batch_size=10)
 
         # Error reported for "id2" only
         assert result is not None
@@ -1558,21 +1484,21 @@ class TestKnowledgeBatchEmbedding:
 
         # 20 chunks in one sub-batch; all fail individually
         pending = [(f"id{i}", f"text{i}") for i in range(20)]
-
         api_call_count = 0
 
-        def fake_embed(client: object, model: object, safe_batch: object, **kwargs: object) -> list[list[float]]:
+        def fake_embed_batch(texts: list, **kwargs: object) -> list:
             nonlocal api_call_count
             api_call_count += 1
             raise ValueError("No embedding data received")
 
+        mock_client = MagicMock()
+        mock_client.embed_batch.side_effect = fake_embed_batch
+
         with patch("otutil.tools._knowledge.db._check_vec_available", return_value=True):
-            with patch("otutil.tools._knowledge.embedding._embed_batch_with_retry", side_effect=fake_embed):
-                with patch("otutil.tools._knowledge.embedding._get_openai_client", return_value=MagicMock()):
-                    with patch("otutil.tools._knowledge.embedding._prepare_safe_batch", side_effect=lambda t, _c, _m: t):
-                        with patch("otutil.tools._knowledge.indexer._get_config") as mock_cfg:
-                            mock_cfg.return_value.model = "text-embedding-3-small"
-                            result = _store_embeddings_batch(conn, pending, batch_size=20)
+            with patch("otutil.tools._knowledge.embedding._get_embedding_client", return_value=mock_client):
+                with patch("otutil.tools._knowledge.indexer._get_config") as mock_cfg:
+                    mock_cfg.return_value.model = "text-embedding-3-small"
+                    result = _store_embeddings_batch(conn, pending, batch_size=20)
 
         # Should have aborted after 1 batch call + _FALLBACK_ABORT_AFTER individual calls
         assert api_call_count == 1 + _FALLBACK_ABORT_AFTER
@@ -3459,70 +3385,41 @@ class TestAskGraphExpansion:
 class TestEmbeddingDimensions:
     """dimensions config is passed to embeddings.create when non-default."""
 
-    def _cfg(self, dimensions: int = 1536) -> MagicMock:
-        cfg = MagicMock()
-        cfg.model = "text-embedding-3-small"
-        cfg.dimensions = dimensions
-        cfg.max_embedding_tokens = 8191
-        cfg.base_url = ""
-        return cfg
-
-    def _client(self, dims: int = 4) -> MagicMock:
-        item = MagicMock()
-        item.embedding = [0.1] * dims
-        item.index = 0
-        resp = MagicMock()
-        resp.data = [item]
-        client = MagicMock()
-        client.embeddings.create.return_value = resp
-        return client
-
     def test_dimensions_param_non_default_returned(self):
-        from otutil.tools._knowledge.embedding import _dimensions_param
-        assert _dimensions_param("text-embedding-3-small", self._cfg(512)) == 512
+        from otpack import dimensions_param
+        assert dimensions_param("text-embedding-3-small", 512) == 512
 
     def test_dimensions_param_default_omitted(self):
-        from otutil.tools._knowledge.embedding import _dimensions_param
-        assert _dimensions_param("text-embedding-3-small", self._cfg(1536)) is None
+        from otpack import dimensions_param
+        assert dimensions_param("text-embedding-3-small", 1536) is None
 
     def test_dimensions_param_unknown_model_omitted(self):
-        from otutil.tools._knowledge.embedding import _dimensions_param
-        assert _dimensions_param("custom-embed", self._cfg(512)) is None
+        from otpack import dimensions_param
+        assert dimensions_param("custom-embed", 512) is None
 
     def test_generate_embedding_passes_dimensions(self):
-        import otutil.tools._knowledge.embedding as emb_mod
+        from otutil.tools._knowledge.embedding import generate_embedding
 
-        client = self._client()
-        emb_mod._EMBED_CACHE.clear()
-        with (
-            patch("otutil.tools._knowledge.embedding._get_config", return_value=self._cfg(512)),
-            patch("otutil.tools._knowledge.embedding._get_openai_client", return_value=client),
-            patch("otutil.tools._knowledge.embedding._chunk_text_by_tokens", side_effect=lambda t, *a: [t]),
-        ):
-            emb_mod.generate_embedding("query")
-        assert client.embeddings.create.call_args.kwargs["dimensions"] == 512
-        emb_mod._EMBED_CACHE.clear()
+        client, create = _make_kb_embedding_client(dimensions=512)
+        create.return_value = _fake_embed_response([[0.1] * 4])
+        with patch("otutil.tools._knowledge.embedding._get_embedding_client", return_value=client):
+            generate_embedding("query")
+        assert create.call_args.kwargs["dimensions"] == 512
 
     def test_generate_embedding_omits_default_dimensions(self):
-        import otutil.tools._knowledge.embedding as emb_mod
+        from otutil.tools._knowledge.embedding import generate_embedding
 
-        client = self._client()
-        emb_mod._EMBED_CACHE.clear()
-        with (
-            patch("otutil.tools._knowledge.embedding._get_config", return_value=self._cfg(1536)),
-            patch("otutil.tools._knowledge.embedding._get_openai_client", return_value=client),
-            patch("otutil.tools._knowledge.embedding._chunk_text_by_tokens", side_effect=lambda t, *a: [t]),
-        ):
-            emb_mod.generate_embedding("query")
-        assert "dimensions" not in client.embeddings.create.call_args.kwargs
-        emb_mod._EMBED_CACHE.clear()
+        client, create = _make_kb_embedding_client(dimensions=1536)
+        create.return_value = _fake_embed_response([[0.1] * 4])
+        with patch("otutil.tools._knowledge.embedding._get_embedding_client", return_value=client):
+            generate_embedding("query")
+        assert "dimensions" not in create.call_args.kwargs
 
-    def test_embed_batch_with_retry_passes_dimensions(self):
-        from otutil.tools._knowledge.embedding import _embed_batch_with_retry
-
-        client = self._client()
-        _embed_batch_with_retry(client, "text-embedding-3-small", ["a"], dimensions=512)
-        assert client.embeddings.create.call_args.kwargs["dimensions"] == 512
+    def test_embed_batch_passes_dimensions(self):
+        client, create = _make_kb_embedding_client(dimensions=512)
+        create.return_value = _fake_embed_response([[0.1] * 4])
+        client.embed_batch(["a"])
+        assert create.call_args.kwargs["dimensions"] == 512
 
 
 @pytest.mark.unit
@@ -3697,56 +3594,29 @@ class TestUpdateEmbedErrors:
 class TestEmbedCacheBound:
     """Query embedding cache is a bounded LRU keyed by hashed text."""
 
-    def _cfg(self) -> MagicMock:
-        cfg = MagicMock()
-        cfg.model = "text-embedding-3-small"
-        cfg.dimensions = 1536
-        cfg.max_embedding_tokens = 8191
-        cfg.base_url = ""
-        return cfg
-
-    def _client(self) -> MagicMock:
-        item = MagicMock()
-        item.embedding = [0.1]
-        item.index = 0
-        resp = MagicMock()
-        resp.data = [item]
-        client = MagicMock()
-        client.embeddings.create.return_value = resp
-        return client
-
     def test_cache_size_is_capped(self):
-        import otutil.tools._knowledge.embedding as emb_mod
+        from otutil.tools._knowledge.embedding import generate_embedding
 
-        emb_mod._EMBED_CACHE.clear()
-        with (
-            patch("otutil.tools._knowledge.embedding._get_config", return_value=self._cfg()),
-            patch("otutil.tools._knowledge.embedding._get_openai_client", return_value=self._client()),
-            patch("otutil.tools._knowledge.embedding._chunk_text_by_tokens", side_effect=lambda t, *a: [t]),
-            patch.object(emb_mod, "_EMBED_CACHE_MAX", 3),
-        ):
+        client, create = _make_kb_embedding_client(cache_max=3)
+        create.return_value = _fake_embed_response([[0.1]])
+        with patch("otutil.tools._knowledge.embedding._get_embedding_client", return_value=client):
             for i in range(5):
-                emb_mod.generate_embedding(f"query {i}")
+                generate_embedding(f"query {i}")
 
-        assert len(emb_mod._EMBED_CACHE) == 3
-        emb_mod._EMBED_CACHE.clear()
+        assert len(client._cache) == 3
 
     def test_cache_keys_are_hashes_not_text(self):
-        import otutil.tools._knowledge.embedding as emb_mod
+        from otutil.tools._knowledge.embedding import generate_embedding
 
-        emb_mod._EMBED_CACHE.clear()
+        client, create = _make_kb_embedding_client()
+        create.return_value = _fake_embed_response([[0.1]])
         long_text = "a very long document body " * 100
-        with (
-            patch("otutil.tools._knowledge.embedding._get_config", return_value=self._cfg()),
-            patch("otutil.tools._knowledge.embedding._get_openai_client", return_value=self._client()),
-            patch("otutil.tools._knowledge.embedding._chunk_text_by_tokens", side_effect=lambda t, *a: [t]),
-        ):
-            emb_mod.generate_embedding(long_text)
+        with patch("otutil.tools._knowledge.embedding._get_embedding_client", return_value=client):
+            generate_embedding(long_text)
 
-        keys = list(emb_mod._EMBED_CACHE)
+        keys = list(client._cache)
         assert keys, "cache should hold the entry"
         assert all(len(k[0]) == 64 and k[0] != long_text for k in keys)
-        emb_mod._EMBED_CACHE.clear()
 
 
 @pytest.mark.unit
@@ -3755,32 +3625,19 @@ class TestEmbeddingUnifiedPath:
     """The same text embeds identically regardless of code path (first window)."""
 
     def test_long_text_uses_first_window_only(self):
-        import otutil.tools._knowledge.embedding as emb_mod
+        from otutil.tools._knowledge.embedding import generate_embedding
 
-        cfg = MagicMock()
-        cfg.model = "text-embedding-3-small"
-        cfg.dimensions = 1536
-        cfg.max_embedding_tokens = 8191
-        cfg.base_url = ""
-        item = MagicMock()
-        item.embedding = [0.1]
-        item.index = 0
-        resp = MagicMock()
-        resp.data = [item]
-        client = MagicMock()
-        client.embeddings.create.return_value = resp
+        client, create = _make_kb_embedding_client(max_tokens=110)  # effective limit 10
+        create.return_value = _fake_embed_response([[0.1]])
+        long_text = "word " * 100
+        with patch("otutil.tools._knowledge.embedding._get_embedding_client", return_value=client):
+            generate_embedding(long_text)
 
-        emb_mod._EMBED_CACHE.clear()
-        with (
-            patch("otutil.tools._knowledge.embedding._get_config", return_value=cfg),
-            patch("otutil.tools._knowledge.embedding._get_openai_client", return_value=client),
-            patch("otutil.tools._knowledge.embedding._chunk_text_by_tokens", return_value=["window1", "window2"]),
-        ):
-            emb_mod.generate_embedding("long text")
-
-        assert client.embeddings.create.call_count == 1
-        assert client.embeddings.create.call_args.kwargs["input"] == "window1"
-        emb_mod._EMBED_CACHE.clear()
+        assert create.call_count == 1
+        sent = create.call_args.kwargs["input"]
+        assert len(sent) == 1
+        assert sent[0] != long_text
+        assert long_text.startswith(sent[0])
 
 
 @pytest.mark.unit
@@ -3793,16 +3650,22 @@ class TestOpenAIClientTimeout:
 
         cfg = MagicMock()
         cfg.base_url = ""
+        cfg.model = "text-embedding-3-small"
+        cfg.dimensions = 1536
+        cfg.max_embedding_tokens = 8191
+        emb_mod._client = None
+        emb_mod._client_key = None
         with (
             patch("otutil.tools._knowledge.embedding.get_secret", return_value="sk-test"),
             patch("otutil.tools._knowledge.embedding._get_config", return_value=cfg),
             patch("otutil.tools._knowledge.embedding.get_llm_config") as mock_llm,
-            patch("openai.OpenAI") as mock_openai,
         ):
             mock_llm.return_value.base_url = ""
-            emb_mod._get_openai_client()
+            client = emb_mod._get_embedding_client()
 
-        assert mock_openai.call_args.kwargs["timeout"] == emb_mod._CLIENT_TIMEOUT_S
+        assert client._timeout == emb_mod._CLIENT_TIMEOUT_S
+        emb_mod._client = None
+        emb_mod._client_key = None
 
     def test_llm_client_has_timeout(self):
         from otutil.tools._knowledge import retrieval
@@ -4365,3 +4228,29 @@ class TestEnrichCLIWiring:
             assert len(result.chunk_ids) == result.indexed
         finally:
             close_connection(db_name)
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestByteOrderCompat:
+    """Blobs written by the pre-change native packer stay readable (design D4)."""
+
+    def test_native_packed_blob_reads_and_ranks_correctly(self):
+        import struct
+
+        from otpack import cosine_similarity_blobs, deserialize_embedding, serialize_embedding
+
+        vec_near = [1.0, 0.0, 0.0]
+        vec_far = [0.0, 1.0, 0.0]
+        # Pre-change knowledge writer used native byte order ({n}f) — on all
+        # supported (little-endian) platforms this is byte-identical to <{n}f.
+        legacy_near = struct.pack("3f", *vec_near)
+        legacy_far = struct.pack("3f", *vec_far)
+        assert legacy_near == serialize_embedding(vec_near)
+
+        assert deserialize_embedding(legacy_near) == vec_near
+        query = serialize_embedding([0.9, 0.1, 0.0])
+        near_score = cosine_similarity_blobs(query, legacy_near)
+        far_score = cosine_similarity_blobs(query, legacy_far)
+        assert near_score is not None and far_score is not None
+        assert near_score > far_score  # nearest neighbour ordering preserved
