@@ -86,9 +86,22 @@ def _normalize_force_include_rule(rule: str) -> str:
     normalized = PurePosixPath(clean.lstrip("/")).as_posix()
     while normalized.startswith("./"):
         normalized = normalized[2:]
-    if normalized in {"", "."} or normalized.startswith("../"):
+    if normalized in {"", "."} or ".." in PurePosixPath(normalized).parts:
         raise ValueError(f"force-include rule must stay inside the work tree: {rule}")
     return normalized
+
+
+def _leading_literal(rule: str) -> str:
+    """Return the rule's literal prefix before its first pathspec wildcard.
+
+    `git add -f` pathspec wildcards (`*`, `?`, `[`) match across `/`, and `\\`
+    escapes the next character, so only the leading literal run anchors where
+    a rule can match.
+    """
+    for index, char in enumerate(rule):
+        if char in "*?[\\":
+            return rule[:index]
+    return rule
 
 
 def _validate_force_include_rules(config: Config, paths: Paths, rules: list[str]) -> list[str]:
@@ -98,9 +111,17 @@ def _validate_force_include_rules(config: Config, paths: Paths, rules: list[str]
         normalized = _normalize_force_include_rule(rule)
         if not normalized:
             continue
+        literal = _leading_literal(normalized)
+        has_wildcard = literal != normalized
         for prefix in protected:
             directory = prefix.rstrip("/")
             if normalized == directory or normalized.startswith(prefix):
+                raise ValueError(f"force-include rule targets protected localhist path: {rule}")
+            # A wildcard rule can only match paths starting with its leading
+            # literal, so it can reach a protected path iff that literal and
+            # the protected prefix are prefix-compatible (e.g. `?git/HEAD`
+            # has literal `` and `.git*` has literal `.git`).
+            if has_wildcard and (prefix.startswith(literal) or literal.startswith(prefix)):
                 raise ValueError(f"force-include rule targets protected localhist path: {rule}")
         validated.append(normalized)
     return validated

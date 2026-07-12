@@ -300,6 +300,11 @@ def test_force_include_rejects_localhist_protected_paths(
         "./.localhist/HEAD",
         ".onetool/state/localhist/force-include",
         ":(glob).localhist/**",
+        "?git/HEAD",
+        ".gi[t]/HEAD",
+        ".git/*",
+        "\\.git/HEAD",
+        "wip/../.git/HEAD",
     ]:
         result = localhist.add_force_include(rule=rule)
         assert result["ok"] is False

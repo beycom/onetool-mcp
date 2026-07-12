@@ -129,6 +129,10 @@ The system SHALL use Git-native ignore behavior for local-history staging, with 
 - **WHEN** `localhist.add_force_include(...)` targets the primary `.git/` directory, `.onetool/state/localhist/`, the configured local-history Git directory, or uses Git pathspec magic
 - **THEN** the system SHALL reject the rule and SHALL NOT append it to `.onetool/state/localhist/force-include`.
 
+#### Scenario: Wildcard force-include rule that could reach a protected path
+- **WHEN** `localhist.add_force_include(...)` supplies a rule containing `..` path segments, or whose pathspec wildcards (`*`, `?`, `[`) or `\` escapes appear before the rule's leading literal diverges from every protected prefix (e.g. `?git/HEAD`, `.gi[t]/HEAD`, `wip/../.git/HEAD`)
+- **THEN** the system SHALL reject the rule and SHALL NOT append it to `.onetool/state/localhist/force-include`.
+
 #### Scenario: Snapshot force-adds configured includes
 - **WHEN** force-include rules exist and `localhist.save(...)` stages a snapshot
 - **THEN** the system SHALL run normal Git staging and then force-add those pathspecs.
