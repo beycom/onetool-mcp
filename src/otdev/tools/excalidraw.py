@@ -55,6 +55,7 @@ import threading
 from importlib import resources
 from typing import Any
 
+from otdev.tools._excalidraw import layout as _elk_layout
 from otdev.tools._excalidraw import session as _session
 from otpack import LogSpan, resolve_cwd_path
 
@@ -75,6 +76,41 @@ def _load_js(filename: str) -> str:
         .joinpath(filename)
         .read_text(encoding="utf-8")
     )
+
+
+# Cached separately from _load_js: the ELK bundle is a ~1.6 MB UMD script,
+# not a function expression (EPL-2.0 — see _excalidraw/ELK_LICENSE.txt).
+_ELK_BUNDLE_CACHE: str | None = None
+
+
+def _elk_bundle() -> str:
+    """Load (and cache) the vendored elkjs bundle."""
+    global _ELK_BUNDLE_CACHE
+    if _ELK_BUNDLE_CACHE is None:
+        _ELK_BUNDLE_CACHE = (
+            resources.files("otdev.tools._excalidraw")
+            .joinpath("elk.bundled.js")
+            .read_text(encoding="utf-8")
+        )
+    return _ELK_BUNDLE_CACHE
+
+
+def _ensure_elk_loaded() -> str | None:
+    """Inject the vendored ELK bundle into the page when window.ELK is missing.
+
+    The elkjs UMD wrapper assigns ``window.ELK`` under function-scope
+    evaluation, and CDP ``Runtime.evaluate`` bypasses page CSP — no network
+    fetch, no <script> tag. Returns an error string on failure, else None.
+    """
+    if _browser_evaluate_json("() => typeof window.ELK !== 'undefined'"):
+        return None
+    _browser_evaluate("() => {\n" + _elk_bundle() + "\n}")
+    if not _browser_evaluate_json("() => typeof window.ELK !== 'undefined'"):
+        return (
+            "Error: ELK bundle injection failed — window.ELK is undefined "
+            "after injecting the vendored elkjs bundle"
+        )
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -1280,7 +1316,7 @@ _NOTE_PADDING = 20
 _NOTE_DEFAULT_BG = "#f5f5dc"
 
 
-def note(*, input: str, background: str = _NOTE_DEFAULT_BG) -> str:
+def note(*, input: str, background: str = _NOTE_DEFAULT_BG, board: str | None = None) -> str:
     """Insert ASCII-rendered text annotations onto the canvas.
 
     Parses tagged blocks and renders each as a code-font rectangle below
@@ -1331,6 +1367,7 @@ def note(*, input: str, background: str = _NOTE_DEFAULT_BG) -> str:
     Args:
         input: Note DSL string with one or more blocks.
         background: Background color for note boxes (default beige #f5f5dc).
+        board: Named board to operate on. Defaults to the CWD-keyed board.
 
     Returns:
         Summary of notes inserted.
@@ -1394,7 +1431,7 @@ def note(*, input: str, background: str = _NOTE_DEFAULT_BG) -> str:
 
         inserted = len(shape_payloads)
         if inserted:
-            state = _session.load()
+            state = _session.load(board)
             shapes = state["shapes"]
             max_y = float(state.get("canvas_max_y", 60.0))
             for payload in shape_payloads:
@@ -1415,7 +1452,7 @@ def note(*, input: str, background: str = _NOTE_DEFAULT_BG) -> str:
                 "groups": state["groups"],
                 "edge_keys": state["edge_keys"],
                 "canvas_max_y": max_y,
-            })
+            }, board)
 
         for payload in shape_payloads:
             _js_batch_draw(shapes=[payload], edges=[], subgraphs=[])
@@ -1424,12 +1461,15 @@ def note(*, input: str, background: str = _NOTE_DEFAULT_BG) -> str:
         return f"inserted {inserted} note(s)"
 
 
-def embed_dsl() -> str:
+def embed_dsl(*, board: str | None = None) -> str:
     """Embed the current DSL as a note element on the canvas.
 
     Inserts a grey code-font box with id ``dsl`` containing the full DSL
     text. Calling again overwrites the previous embed (idempotent). The element
     is excluded from save() snapshots.
+
+    Args:
+        board: Named board to operate on. Defaults to the CWD-keyed board.
 
     Returns:
         Summary such as "embedded DSL (12 lines)".
@@ -1443,7 +1483,7 @@ def embed_dsl() -> str:
             s.add("error", err)
             return err
 
-        dsl_text = _build_dsl(_session.load())
+        dsl_text = _build_dsl(_session.load(board))
         if not dsl_text.strip():
             return "nothing to embed — canvas is empty"
 
@@ -1571,7 +1611,7 @@ def erase(*, ids: list[str], board: str | None = None) -> str:
         return f"erased {n} element(s){browser_warning}"
 
 
-def save(*, file: str) -> str:
+def save(*, file: str, board: str | None = None) -> str:
     """Save current diagram to a native ``.excalidraw`` JSON file.
 
     Writes the full Excalidraw scene (including user-added elements and
@@ -1583,6 +1623,9 @@ def save(*, file: str) -> str:
     Args:
         file: Output file path (relative to project root). Conventionally
               uses the ``.excalidraw`` extension.
+        board: Named board to operate on. Defaults to the CWD-keyed board. An
+              explicit board is rerendered onto the canvas before the scene
+              snapshot; ``None`` snapshots the live canvas as-is.
 
     Returns:
         Summary of elements saved.
@@ -1596,8 +1639,12 @@ def save(*, file: str) -> str:
             s.add("error", err)
             return err
 
+        # An explicit board is rerendered first so the snapshot reflects it
+        if board is not None:
+            _rerender_from_state(_session.load(board))
+
         # Write current DSL as __otDSL element so load() can restore Python state
-        dsl_str = _build_dsl(_session.load())
+        dsl_str = _build_dsl(_session.load(board))
         if dsl_str.strip():
             _write_dsl_to_canvas(dsl_str)
 
@@ -1625,7 +1672,7 @@ def save(*, file: str) -> str:
         return f"saved {n} elements to {file}"
 
 
-def load(*, file: str) -> str:
+def load(*, file: str, board: str | None = None) -> str:
     """Restore diagram from a native ``.excalidraw`` file.
 
     Loads the full Excalidraw scene and restores Python DSL state from the
@@ -1635,6 +1682,8 @@ def load(*, file: str) -> str:
 
     Args:
         file: Path to a ``.excalidraw`` file.
+        board: Named board to operate on. Defaults to the CWD-keyed board. The
+              restored state is written to this board.
 
     Returns:
         Summary of elements loaded.
@@ -1680,11 +1729,11 @@ def load(*, file: str) -> str:
         dsl_str = _read_dsl_from_canvas()
         if dsl_str:
             new_state = _parse_dsl_to_state(dsl_str)
-            _session.save(new_state)
+            _session.save(new_state, board)
             warning = ""
         else:
             new_state = {"shapes": {}, "edges": [], "groups": {}, "edge_keys": set(), "canvas_max_y": 60.0}
-            _session.save(new_state)
+            _session.save(new_state, board)
             warning = " [warning: no __otDSL element — Python state is empty; call whiteboard.sync() after adding one]"
 
         n_shapes = len(new_state["shapes"])
@@ -1698,7 +1747,7 @@ def load(*, file: str) -> str:
         return f"loaded {n_shapes} shapes, {n_edges} edges"
 
 
-def sync() -> str:
+def sync(*, board: str | None = None) -> str:
     """Sync Python DSL state from the ``__otDSL`` canvas element.
 
     Reads the ``__otDSL`` text element from the current Excalidraw canvas
@@ -1707,6 +1756,10 @@ def sync() -> str:
     - Loading a file directly in the Excalidraw UI (File → Open)
     - Drag-and-dropping an ``.excalidraw`` file onto the canvas
     - Any operation that bypasses ``whiteboard.load``
+
+    Args:
+        board: Named board to operate on. Defaults to the CWD-keyed board. The
+              synced state is written to this board.
 
     Returns:
         Summary like ``"synced: 4 shapes, 3 edges"``.
@@ -1728,7 +1781,7 @@ def sync() -> str:
             )
 
         new_state = _parse_dsl_to_state(dsl_str)
-        _session.save(new_state)
+        _session.save(new_state, board)
 
         n_shapes = len(new_state["shapes"])
         n_edges = len(new_state["edges"])
@@ -1752,7 +1805,7 @@ def help() -> str:
     return _load_js("dsl-reference.md")
 
 
-def style(*, ids: list[str], style: str) -> str:
+def style(*, ids: list[str], style: str, board: str | None = None) -> str:
     """Apply visual style properties to existing canvas elements in bulk.
 
     Applies Excalidraw style properties to the named elements. Never touches
@@ -1790,6 +1843,9 @@ def style(*, ids: list[str], style: str) -> str:
     Args:
         ids:   List of node IDs to style.
         style: Style string, e.g. ``"bc:#bbf7d0,sc:#16a34a,sw:2"``.
+        board: Named board to operate on. Defaults to the CWD-keyed board. An
+               explicit board is rerendered first (clobbering prior
+               visual-only styling); ``None`` styles the live canvas.
 
     Returns:
         Summary like ``"styled 3 element(s)"``.
@@ -1803,6 +1859,9 @@ def style(*, ids: list[str], style: str) -> str:
         if err:
             s.add("error", err)
             return err
+
+        if board is not None:
+            _rerender_from_state(_session.load(board))
 
         if not style.strip():
             return "Error: style string is empty"
@@ -1820,7 +1879,7 @@ def style(*, ids: list[str], style: str) -> str:
 _VALID_READ_SCENE_LEVELS = {"min", "default", "full", "debug"}
 
 
-def read_scene(*, info: str = "default") -> str:
+def read_scene(*, info: str = "default", board: str | None = None) -> str:
     """Return a structured text summary of all canvas elements.
 
     Inspects the live Excalidraw canvas and returns a report listing every
@@ -1842,6 +1901,9 @@ def read_scene(*, info: str = "default") -> str:
 
     Args:
         info: Detail level — ``"min"``, ``"default"``, ``"full"``, or ``"debug"``.
+        board: Named board to operate on. Defaults to the CWD-keyed board. An
+              explicit board is rerendered first; ``None`` reports the live
+              canvas.
 
     Returns:
         Text summary of the scene at the requested detail level.
@@ -1862,6 +1924,9 @@ def read_scene(*, info: str = "default") -> str:
         if err:
             s.add("error", err)
             return err
+
+        if board is not None:
+            _rerender_from_state(_session.load(board))
 
         result = _browser_evaluate_json(
             f"() => window._read_scene({json.dumps(info)})"
@@ -2059,12 +2124,13 @@ def fit() -> str:
     return zoom(level=0)
 
 
-_ELK_CDN = "https://unpkg.com/elkjs@0.11.0/lib/elk.bundled.js"
-_ELK_DIRECTIONS = {"RIGHT", "LEFT", "DOWN", "UP"}
-_ELK_ALGORITHMS = {"layered", "stress", "mrtree", "radial", "force"}
-_ELK_NODE_PLACEMENTS = {"BRANDES_KOEPF", "NETWORK_SIMPLEX", "LINEAR_SEGMENTS", "SIMPLE"}
-_ELK_CROSSING_MINS = {"LAYER_SWEEP", "MEDIAN_LAYER_SWEEP", "NONE"}
-_ELK_CYCLE_BREAKINGS = {"GREEDY", "DEPTH_FIRST", "MODEL_ORDER"}
+# Constant tables live with the pure layout helpers; re-exported here for
+# backward compatibility.
+_ELK_DIRECTIONS = _elk_layout.ELK_DIRECTIONS
+_ELK_ALGORITHMS = _elk_layout.ELK_ALGORITHMS
+_ELK_NODE_PLACEMENTS = _elk_layout.ELK_NODE_PLACEMENTS
+_ELK_CROSSING_MINS = _elk_layout.ELK_CROSSING_MINS
+_ELK_CYCLE_BREAKINGS = _elk_layout.ELK_CYCLE_BREAKINGS
 
 
 def layout(
@@ -2082,11 +2148,11 @@ def layout(
 ) -> str:
     """Apply ELK.js graph layout to the current whiteboard.
 
-    Loads ELK.js from CDN (once), runs the chosen layout algorithm in the
-    browser, patches every shape's position, recomputes subgraph bounding
-    boxes, writes the computed positions back into the board session state
-    (so later rerenders keep the layout), and calls ``whiteboard.fit()``
-    to zoom-to-fit.
+    Injects the bundled ELK.js asset into the page (once per page load, no
+    network access), runs the chosen layout algorithm in the browser, patches
+    every shape's position, recomputes subgraph bounding boxes, writes the
+    computed positions back into the board session state (so later rerenders
+    keep the layout), and calls ``whiteboard.fit()`` to zoom-to-fit.
 
     Args:
         direction:      Layout direction — ``RIGHT``, ``LEFT``, ``DOWN`` (default), ``UP``.
@@ -2182,256 +2248,40 @@ def layout(
         if not isinstance(scene_js, dict):
             return "Error: could not read live scene"
 
-        scene_nodes: list[dict[str, Any]] = scene_js.get("nodes", [])
-        scene_edges: list[dict[str, Any]] = scene_js.get("edges", [])
-        selected_ids: list[str] = scene_js.get("selectedIds", [])
-
-        # Determine scope: selection or all
-        use_selection = len(selected_ids) > 0
-        # Save full node map before selection filter (needed to look up positions of
-        # non-selected nodes when fixing boundary arrows later).
-        all_node_map: dict[str, dict[str, Any]] = {n["id"]: n for n in scene_nodes}
-        if use_selection:
-            selected_set = set(selected_ids)
-            scene_nodes = [n for n in scene_nodes if n["id"] in selected_set]
-
-        if not scene_nodes:
+        build = _elk_layout.build_elk_graph(
+            scene_js,
+            direction=direction,
+            gap_layer=gap_layer,
+            gap_node=gap_node,
+            algorithm=algorithm,
+            node_placement=node_placement,
+            crossing_min=crossing_min,
+            cycle_breaking=cycle_breaking,
+            elk_options=elk_options,
+        )
+        if build is None:
             return "nothing to layout — canvas has no eligible shapes"
 
-        # ELK layout offset: for a selection layout anchor to the selection's top-left
-        # so nodes stay roughly in place; for a full layout use the standard canvas padding.
-        if use_selection and scene_nodes:
-            layout_offset_x = float(min(n.get("x", 0) for n in scene_nodes))
-            layout_offset_y = float(min(n.get("y", 0) for n in scene_nodes))
-        else:
-            layout_offset_x = 60.0
-            layout_offset_y = 60.0
+        scope_label = "selection" if build.use_selection else None
 
-        # Collapse Excalidraw groups into atomic ELK nodes
-        # Elements sharing a groupId are treated as a single node (bounding box of members)
-        group_to_members: dict[str, list[dict[str, Any]]] = {}
-        ungrouped: list[dict[str, Any]] = []
-        for n in scene_nodes:
-            gids = n.get("groupIds") or []
-            if gids:
-                gid = gids[0]  # primary group
-                group_to_members.setdefault(gid, []).append(n)
-            else:
-                ungrouped.append(n)
+        err = _ensure_elk_loaded()
+        if err:
+            s.add("error", err)
+            return err
 
-        # Map each element id → ELK node id (for edge lookup)
-        elem_to_elk: dict[str, str] = {}
-        elk_nodes = []
-        node_dims: dict[str, tuple[int, int]] = {}
-
-        for n in ungrouped:
-            eid = n["id"]
-            w, h = int(n["w"]), int(n["h"])
-            elk_nodes.append({"id": eid, "width": w, "height": h})
-            node_dims[eid] = (w, h)
-            elem_to_elk[eid] = eid
-
-        for gid, members in group_to_members.items():
-            min_x = min_y = float("inf")
-            max_x = max_y = float("-inf")
-            for m in members:
-                mx, my = float(m.get("x", 0)), float(m.get("y", 0))
-                min_x = min(min_x, mx)
-                max_x = max(max_x, mx + float(m["w"]))
-                min_y = min(min_y, my)
-                max_y = max(max_y, my + float(m["h"]))
-                elem_to_elk[m["id"]] = gid
-            w, h = int(max_x - min_x) or 160, int(max_y - min_y) or 60
-            elk_nodes.append({"id": gid, "width": w, "height": h})
-            node_dims[gid] = (w, h)
-
-        # Build ELK edge list from live scene arrows (both endpoints in node set)
-        elk_node_set = {n["id"] for n in elk_nodes}
-        elk_edges = []
-        seen_edge_ids: set[str] = set()
-        scene_edge_map: dict[str, dict[str, str]] = {}  # eid → {src, dst} for STRAIGHT recompute
-        # Boundary edges: exactly one endpoint is in the selection / elk_node_set.
-        # After layout we update the selected-side endpoint to its new position.
-        boundary_edges: list[dict[str, Any]] = []
-        for edge in scene_edges:
-            eid = edge["id"]
-            if eid in seen_edge_ids:
-                continue
-            src_elk = elem_to_elk.get(edge["src"])
-            dst_elk = elem_to_elk.get(edge["dst"])
-            src_in = src_elk is not None and src_elk in elk_node_set
-            dst_in = dst_elk is not None and dst_elk in elk_node_set
-            if src_in and dst_in:
-                assert src_elk is not None
-                assert dst_elk is not None
-                seen_edge_ids.add(eid)
-                elk_edges.append({"id": eid, "sources": [src_elk], "targets": [dst_elk]})
-                scene_edge_map[eid] = {"src": src_elk, "dst": dst_elk}
-            elif src_in != dst_in:
-                # One endpoint is in the layout scope; track for post-layout fixup
-                boundary_edges.append({
-                    "id": eid,
-                    "src": edge["src"],
-                    "dst": edge["dst"],
-                    "src_elk": src_elk,
-                    "dst_elk": dst_elk,
-                    "src_in": src_in,
-                })
-
-        scope_label = "selection" if use_selection else None
-
-        layered_only = algorithm == "layered"
-        layout_opts: dict[str, str] = {
-            "elk.algorithm": algorithm,
-            "elk.direction": direction,
-            "elk.spacing.nodeNode": str(gap_node),
-            "elk.padding": "[top=60,left=60,bottom=60,right=60]",
-        }
-        if layered_only:
-            layout_opts.update({
-                "elk.layered.spacing.nodeNodeBetweenLayers": str(gap_layer),
-                "elk.layered.spacing.edgeNodeBetweenLayers": str(gap_layer // 2),
-                "elk.layered.spacing.edgeEdgeBetweenLayers": "10",
-                "elk.layered.nodePlacement.strategy": node_placement,
-                "elk.layered.crossingMinimization.strategy": crossing_min,
-                "elk.layered.cycleBreaking.strategy": cycle_breaking,
-            })
-        if algorithm == "stress":
-            layout_opts["elk.stress.desiredEdgeLength"] = str(gap_node * 3)
-        if elk_options:
-            layout_opts.update(elk_options)
-
-        graph = {
-            "id": "root",
-            "layoutOptions": layout_opts,
-            "children": elk_nodes,
-            "edges": elk_edges,
-        }
-        graph_json = json.dumps(graph)
-        cdn = _ELK_CDN
-
-        js = f"""
-async () => {{
-  if (typeof ELK === 'undefined') {{
-    await new Promise((resolve, reject) => {{
-      const sc = document.createElement('script');
-      sc.src = '{cdn}';
-      sc.onload = resolve;
-      sc.onerror = () => reject(new Error('Failed to load ELK from CDN'));
-      document.head.appendChild(sc);
-    }});
-  }}
-  const elk = new ELK();
-  const graph = {graph_json};
-  const result = await elk.layout(graph);
-  const offsetX = {layout_offset_x}, offsetY = {layout_offset_y};
-  const nodes = result.children.map(n => ({{id: n.id, x: n.x + offsetX, y: n.y + offsetY}}));
-  return {{nodes, edges: []}};
-}}
-"""
-        elk_result = _browser_evaluate_json(js)
+        elk_result = _browser_evaluate_json(_elk_layout.elk_run_js(build))
         if not isinstance(elk_result, dict):
             return f"Error: ELK returned unexpected result: {elk_result!r}"
 
         positions_list: list[dict[str, Any]] = elk_result.get("nodes", [])
 
-        # Patch node positions in the browser
-        patches: list[dict[str, Any]] = []
-        for pos in positions_list:
-            id_ = pos["id"]
-            x, y = float(pos["x"]), float(pos["y"])
-            w, h = node_dims.get(id_, (160, 60))
-            patches.append({"id": id_, "x": x, "y": y})
-            # Also reposition the DSL-drawn text element if present
-            dsl_shape = layout_state["shapes"].get(id_)
-            if dsl_shape is not None:
-                font_size = _DEFAULT_FONT_SIZE
-                line_count = len((dsl_shape.get("label") or "").split("\n"))
-                text_h = line_count * font_size * 1.25
-                patches.append({"id": id_ + "-text", "x": x + 8, "y": y + (h - text_h) / 2})
-
-        # Recompute each arrow's endpoints from the new node positions — ELK does not
-        # return waypoints; arrows stay bound via startBinding.
-        pos_map: dict[str, tuple[float, float]] = {
-            pos["id"]: (float(pos["x"]), float(pos["y"])) for pos in positions_list
-        }
-        for eid, einfo in scene_edge_map.items():
-            src_id, dst_id = einfo["src"], einfo["dst"]
-            if src_id not in pos_map or dst_id not in pos_map:
-                continue
-            sx, sy = pos_map[src_id]
-            ex, ey = pos_map[dst_id]
-            sw, sh = float(node_dims.get(src_id, (160, 60))[0]), float(node_dims.get(src_id, (160, 60))[1])
-            dw, dh = float(node_dims.get(dst_id, (160, 60))[0]), float(node_dims.get(dst_id, (160, 60))[1])
-            if direction == "RIGHT":
-                start: list[float] = [sx + sw, sy + sh / 2]
-                end: list[float] = [ex, ey + dh / 2]
-            elif direction == "LEFT":
-                start = [sx, sy + sh / 2]
-                end = [ex + dw, ey + dh / 2]
-            elif direction == "DOWN":
-                start = [sx + sw / 2, sy + sh]
-                end = [ex + dw / 2, ey]
-            else:  # UP
-                start = [sx + sw / 2, sy]
-                end = [ex + dw / 2, ey + dh]
-            patches.append({"id": eid, "points": [start, end]})
-
-        # Fix boundary arrows: one endpoint inside the selection, one outside.
-        # Move the inside endpoint to track its node's new position; outside stays put.
-        # The connection side depends on whether the anchored node is the arrow's
-        # source (arrow leaves → use the exit side) or destination (arrow arrives →
-        # use the entry side), which is the *opposite* side from the layout direction.
-        for bedge in boundary_edges:
-            eid = bedge["id"]
-            src_inside: bool = bedge["src_in"]
-            anchored_elk = bedge["src_elk"] if src_inside else bedge["dst_elk"]
-            free_id = bedge["dst"] if src_inside else bedge["src"]
-            if anchored_elk not in pos_map:
-                continue
-            anc_x, anc_y = pos_map[anchored_elk]
-            anc_w, anc_h = float(node_dims.get(anchored_elk, (160, 60))[0]), float(node_dims.get(anchored_elk, (160, 60))[1])
-            free_node = all_node_map.get(free_id) or {}
-            free_x = float(free_node.get("x", 0))
-            free_y = float(free_node.get("y", 0))
-            free_w = float(free_node.get("w", 160))
-            free_h = float(free_node.get("h", 60))
-
-            # Determine connection points: the anchored node uses the side
-            # appropriate for its role (source=exit side, dest=entry side).
-            # For RIGHT layout: source exits right, dest enters left.
-            # Uses this edge's own containment (src_inside) — never the loop
-            # variable from the classification pass above.
-            if direction == "RIGHT":
-                if src_inside:
-                    anc_pt: list[float] = [anc_x + anc_w, anc_y + anc_h / 2]
-                    free_pt: list[float] = [free_x, free_y + free_h / 2]
-                else:
-                    anc_pt = [anc_x, anc_y + anc_h / 2]
-                    free_pt = [free_x + free_w, free_y + free_h / 2]
-            elif direction == "LEFT":
-                if src_inside:
-                    anc_pt = [anc_x, anc_y + anc_h / 2]
-                    free_pt = [free_x + free_w, free_y + free_h / 2]
-                else:
-                    anc_pt = [anc_x + anc_w, anc_y + anc_h / 2]
-                    free_pt = [free_x, free_y + free_h / 2]
-            elif direction == "DOWN":
-                if src_inside:
-                    anc_pt = [anc_x + anc_w / 2, anc_y + anc_h]
-                    free_pt = [free_x + free_w / 2, free_y]
-                else:
-                    anc_pt = [anc_x + anc_w / 2, anc_y]
-                    free_pt = [free_x + free_w / 2, free_y + free_h]
-            else:  # UP
-                if src_inside:
-                    anc_pt = [anc_x + anc_w / 2, anc_y]
-                    free_pt = [free_x + free_w / 2, free_y + free_h]
-                else:
-                    anc_pt = [anc_x + anc_w / 2, anc_y + anc_h]
-                    free_pt = [free_x + free_w / 2, free_y]
-            start_pt, end_pt = (anc_pt, free_pt) if src_inside else (free_pt, anc_pt)
-            patches.append({"id": eid, "points": [start_pt, end_pt]})
+        # Node + bound-text patches, in-scope arrow endpoints, boundary arrows
+        patches = _elk_layout.build_node_patches(
+            positions_list, build, layout_state, font_size=_DEFAULT_FONT_SIZE
+        )
+        positions = _elk_layout.position_map(positions_list)
+        patches.extend(_elk_layout.build_edge_patches(build, positions, direction))
+        patches.extend(_elk_layout.build_boundary_arrow_patches(build, positions, direction))
 
         patches_json = json.dumps(patches)
         _browser_evaluate(f"""() => {{
@@ -2461,7 +2311,7 @@ async () => {{
 
         # Patch arrow_type on all layout-affected arrows if requested
         if arrow_type is not None:
-            affected_edge_ids = list(scene_edge_map.keys())
+            affected_edge_ids = list(build.scene_edge_map.keys())
             if affected_edge_ids:
                 edge_ids_json = json.dumps(affected_edge_ids)
                 at_roundness = "null" if arrow_type in ("sharp", "elbow") else "{ type: 2 }"
@@ -2482,32 +2332,12 @@ async () => {{
 
         # Recompute subgraph bounding boxes using updated node positions
         if layout_state["groups"]:
-            subgraph_payloads = [
-                {"id": gid, "label": group["label"],
-                 "memberIds": group["members"], "savedBounds": None}
-                for gid, group in layout_state["groups"].items()
-            ]
-            sg_json = json.dumps(subgraph_payloads)
+            sg_json = json.dumps(_elk_layout.build_subgraph_updates(layout_state))
             _browser_evaluate(f"() => window._batch_draw([], [], {sg_json})")
 
         # Persist computed positions in session state so subsequent rerenders
         # (screenshot/share/reload) keep this layout instead of re-gridding.
-        moved = 0
-        for pos in positions_list:
-            shape = layout_state["shapes"].get(pos["id"])
-            if shape is None:
-                continue
-            shape["x"] = float(pos["x"])
-            shape["y"] = float(pos["y"])
-            moved += 1
-        if moved:
-            new_max = max(
-                float(pos["y"]) + float(node_dims.get(pos["id"], (160, 60))[1])
-                for pos in positions_list
-            )
-            if use_selection:
-                new_max = max(new_max, float(layout_state.get("canvas_max_y", 60.0)))
-            layout_state["canvas_max_y"] = new_max
+        if _elk_layout.writeback_positions(layout_state, positions_list, build):
             _session.save(layout_state, board)
 
         fit()

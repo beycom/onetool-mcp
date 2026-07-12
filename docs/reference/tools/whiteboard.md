@@ -33,22 +33,22 @@ Source of truth: `src/otdev/tools/excalidraw.py` (`__all__` + function docstring
 | `whiteboard.clear(*, board: str | None = None) -> str` | Delete the session file for the given board and optionally clear the canvas. |
 | `whiteboard.close() -> str` | Close the excalidraw browser and reset all Python state. |
 | `whiteboard.draw(*, input: str, board: str | None = None) -> str` | Add or update diagram elements from DSL. Always additive — never clears. |
-| `whiteboard.embed_dsl() -> str` | Embed the current DSL as a note element on the canvas. |
+| `whiteboard.embed_dsl(*, board: str | None = None) -> str` | Embed the current DSL as a note element on the canvas. |
 | `whiteboard.erase(*, ids: list[str], board: str | None = None) -> str` | Remove individual elements from the canvas and Python state. |
 | `whiteboard.fit() -> str` | Fit all elements in view. |
 | `whiteboard.hard_reset() -> str` | Reset Python DSL state unconditionally; attempt canvas clear if browser is available. |
 | `whiteboard.help() -> str` | Return the full DSL and style reference. Call this before using whiteboard.draw or whiteboard.style. |
 | `whiteboard.layout(*, direction: str = 'DOWN', gap_layer: int = 80, gap_node: int = 40, algorithm: str = 'layered', node_placement: str = 'NETWORK_SIMPLEX', crossing_min: str = 'LAYER_SWEEP', cycle_breaking: str = 'GREEDY', arrow_type: str | None = None, elk_options: dict[str, str] | None = None, board: str | None = None) -> str` | Apply ELK.js graph layout to the current whiteboard. |
-| `whiteboard.load(*, file: str) -> str` | Restore diagram from a native ``.excalidraw`` file. |
-| `whiteboard.note(*, input: str, background: str = '#f5f5dc') -> str` | Insert ASCII-rendered text annotations onto the canvas. |
+| `whiteboard.load(*, file: str, board: str | None = None) -> str` | Restore diagram from a native ``.excalidraw`` file. |
+| `whiteboard.note(*, input: str, background: str = '#f5f5dc', board: str | None = None) -> str` | Insert ASCII-rendered text annotations onto the canvas. |
 | `whiteboard.open() -> str` | Open excalidraw.com and start with a clean canvas. |
-| `whiteboard.read_scene(*, info: str = 'default') -> str` | Return a structured text summary of all canvas elements. |
-| `whiteboard.save(*, file: str) -> str` | Save current diagram to a native ``.excalidraw`` JSON file. |
+| `whiteboard.read_scene(*, info: str = 'default', board: str | None = None) -> str` | Return a structured text summary of all canvas elements. |
+| `whiteboard.save(*, file: str, board: str | None = None) -> str` | Save current diagram to a native ``.excalidraw`` JSON file. |
 | `whiteboard.screenshot(*, file: str | None = None, board: str | None = None) -> Any` | Take a screenshot of the current canvas as PNG. |
 | `whiteboard.scroll(*, dx: int = 0, dy: int = 0) -> str` | Pan the canvas by (dx, dy) pixels. |
 | `whiteboard.share(*, board: str | None = None) -> str` | Generate a shareable Excalidraw link for the current canvas. |
-| `whiteboard.style(*, ids: list[str], style: str) -> str` | Apply visual style properties to existing canvas elements in bulk. |
-| `whiteboard.sync() -> str` | Sync Python DSL state from the ``__otDSL`` canvas element. |
+| `whiteboard.style(*, ids: list[str], style: str, board: str | None = None) -> str` | Apply visual style properties to existing canvas elements in bulk. |
+| `whiteboard.sync(*, board: str | None = None) -> str` | Sync Python DSL state from the ``__otDSL`` canvas element. |
 | `whiteboard.zoom(*, level: float) -> str` | Set zoom level. Pass 0 to fit all elements in view. |
 <!-- END GENERATED:WB_HELP_SUMMARY -->
 
@@ -197,7 +197,7 @@ whiteboard.align(ids=["a", "b", "c"], axis="hdistribute") # even horizontal spac
 
 ### `layout(...)`
 
-Apply ELK.js graph auto-layout to the canvas. Loads ELK.js from CDN (once per session), runs the chosen algorithm in the browser, patches every node position, recomputes subgraph bounding boxes, and calls `wb.fit()`. Works on the full canvas or a selection.
+Apply ELK.js graph auto-layout to the canvas. Injects the bundled ELK.js asset into the page (once per session, no network access), runs the chosen algorithm in the browser, patches every node position, recomputes subgraph bounding boxes, and calls `wb.fit()`. Works on the full canvas or a selection.
 
 ```python
 whiteboard.layout()                                         # layered, top-to-bottom

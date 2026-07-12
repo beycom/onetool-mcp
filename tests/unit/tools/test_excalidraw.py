@@ -3318,7 +3318,9 @@ class TestLayoutGroupBbox:
             excalidraw.layout()
 
         assert captured_elk, "ELK layout JS was not invoked"
-        m = re.search(r"const graph = (\{.*\});", captured_elk[0])
+        # The ELK-presence check (bundled-asset injection guard) is also an
+        # "ELK"-matching eval; search all captured JS for the graph.
+        m = re.search(r"const graph = (\{.*\});", " ".join(captured_elk))
         assert m, "could not find ELK graph in JS"
         graph = json.loads(m[1])
         g1 = next(c for c in graph["children"] if c["id"] == "g1")
@@ -3636,3 +3638,362 @@ class TestBrowserPushFailureReported:
         assert "a" not in state["shapes"]
 
     _reset_exc_state()
+
+
+# ===========================================================================
+# whiteboard-runtime-hardening: vendored ELK, board= coverage, layout helpers
+# ===========================================================================
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestElkVendoring:
+    """layout() loads ELK from the vendored bundle, never the network."""
+
+    _SCENE = {"nodes": [{"id": "a", "w": 160, "h": 60, "groupIds": []}],
+              "edges": [], "selectedIds": []}
+    _ELK_RESPONSE = {"nodes": [{"id": "a", "x": 100, "y": 60}], "edges": []}
+
+    def _json_side_effect(self, elk_present: bool) -> Any:
+        def _side_effect(js: str) -> Any:
+            if "__downloadQueue" in js:
+                return []
+            if "typeof window.ELK" in js:
+                return elk_present
+            if "selectedIds" in js:
+                return dict(self._SCENE)
+            return dict(self._ELK_RESPONSE)
+        return _side_effect
+
+    def test_no_reinjection_when_elk_present(self) -> None:
+        """Second layout() call does not re-inject given window.ELK is defined."""
+        from unittest.mock import patch
+
+        from otdev.tools import excalidraw
+
+        _reset_exc_state()
+        with (
+            patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+            patch("otdev.tools.excalidraw._browser_evaluate_json",
+                  side_effect=self._json_side_effect(elk_present=True)),
+            patch("otdev.tools.excalidraw._browser_evaluate"),
+            patch("otdev.tools.excalidraw._elk_bundle") as mock_bundle,
+        ):
+            r1 = excalidraw.layout()
+            r2 = excalidraw.layout()
+
+        assert "layout applied" in r1
+        assert "layout applied" in r2
+        mock_bundle.assert_not_called()
+
+    def test_injection_failure_returns_error(self) -> None:
+        """When window.ELK stays undefined after injection, layout() errors."""
+        from unittest.mock import patch
+
+        from otdev.tools import excalidraw
+
+        _reset_exc_state()
+        with (
+            patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+            patch("otdev.tools.excalidraw._browser_evaluate_json",
+                  side_effect=self._json_side_effect(elk_present=False)),
+            patch("otdev.tools.excalidraw._browser_evaluate"),
+            patch("otdev.tools.excalidraw._elk_bundle", return_value="/* bundle */") as mock_bundle,
+        ):
+            result = excalidraw.layout()
+
+        assert result.startswith("Error: ELK bundle injection failed")
+        mock_bundle.assert_called_once()
+
+    def test_no_cdn_reference_remains(self) -> None:
+        """The module carries no unpkg/CDN reference and no _ELK_CDN constant."""
+        import inspect
+
+        from otdev.tools import excalidraw
+
+        source = inspect.getsource(excalidraw)
+        assert "unpkg" not in source
+        assert not hasattr(excalidraw, "_ELK_CDN")
+
+    def test_bundle_asset_ships_with_package(self) -> None:
+        """The vendored bundle and its license are importable package data."""
+        from importlib import resources
+
+        pkg = resources.files("otdev.tools._excalidraw")
+        assert pkg.joinpath("elk.bundled.js").is_file()
+        assert pkg.joinpath("ELK_LICENSE.txt").is_file()
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestBoardParam:
+    """board= on note/embed_dsl/save/load/sync/style/read_scene (uniform semantics)."""
+
+    def _in_dir(self, tmp_path: Any) -> Any:
+        from unittest.mock import patch as _patch
+
+        from otdev.tools._excalidraw import session as _sess
+
+        return _patch.object(_sess, "_whiteboard_dir", return_value=tmp_path)
+
+    def test_note_board_writes_named_board(self, tmp_path: Any) -> None:
+        from unittest.mock import patch
+
+        from otdev.tools import excalidraw
+        from otdev.tools._excalidraw import session as _sess
+
+        _reset_exc_state()
+        with (
+            self._in_dir(tmp_path),
+            patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+        ):
+            result = excalidraw.note(input="n[note:\nhello\n]", board="alpha")
+            default_path = _sess.session_path(None)
+
+        assert "inserted 1 note(s)" in result
+        assert (tmp_path / "alpha.json").exists()
+        assert not default_path.exists()
+
+    def test_sync_board_writes_named_board(self, tmp_path: Any) -> None:
+        from unittest.mock import patch
+
+        from otdev.tools import excalidraw
+
+        _reset_exc_state()
+        with (
+            self._in_dir(tmp_path),
+            patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+            patch("otdev.tools.excalidraw._read_dsl_from_canvas", return_value='a["A"]'),
+        ):
+            result = excalidraw.sync(board="alpha")
+
+        assert "synced: 1 shapes" in result
+        assert (tmp_path / "alpha.json").exists()
+
+    def test_load_board_targets_named_board(self, tmp_path: Any) -> None:
+        import json as _json
+        from unittest.mock import patch
+
+        from otdev.tools import excalidraw
+
+        _reset_exc_state()
+        diag = tmp_path / "diag.excalidraw"
+        diag.write_text(_json.dumps({"type": "excalidraw", "version": 2, "elements": []}))
+        with (
+            self._in_dir(tmp_path),
+            patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+            patch("otdev.tools.excalidraw.resolve_cwd_path", return_value=diag),
+            patch("otdev.tools.excalidraw._read_dsl_from_canvas", return_value='a["A"]'),
+        ):
+            result = excalidraw.load(file="diag.excalidraw", board="alpha")
+
+        assert "loaded 1 shapes" in result
+        assert (tmp_path / "alpha.json").exists()
+
+    def test_save_board_rerenders_named_board(self, tmp_path: Any) -> None:
+        from unittest.mock import patch
+
+        from otdev.tools import excalidraw
+
+        _reset_exc_state()
+        with self._in_dir(tmp_path):
+            excalidraw.draw(input='a["A"]', board="alpha")
+            with (
+                patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+                patch("otdev.tools.excalidraw._rerender_from_state") as mock_rr,
+                patch("otdev.tools.excalidraw.resolve_cwd_path",
+                      return_value=tmp_path / "out.excalidraw"),
+            ):
+                excalidraw.save(file="out.excalidraw", board="alpha")
+
+        mock_rr.assert_called_once()
+        assert "a" in mock_rr.call_args.args[0]["shapes"]
+
+    def test_read_scene_board_rerenders_named_board(self, tmp_path: Any) -> None:
+        from unittest.mock import patch
+
+        from otdev.tools import excalidraw
+
+        _reset_exc_state()
+        with self._in_dir(tmp_path):
+            excalidraw.draw(input='b["B"]', board="alpha")
+            with (
+                patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+                patch("otdev.tools.excalidraw._rerender_from_state") as mock_rr,
+                patch("otdev.tools.excalidraw._browser_evaluate_json", return_value="Scene: ok"),
+            ):
+                excalidraw.read_scene(board="alpha")
+
+        mock_rr.assert_called_once()
+        assert "b" in mock_rr.call_args.args[0]["shapes"]
+
+    def test_read_scene_without_board_does_not_rerender(self, tmp_path: Any) -> None:
+        from unittest.mock import patch
+
+        from otdev.tools import excalidraw
+
+        _reset_exc_state()
+        with (
+            self._in_dir(tmp_path),
+            patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+            patch("otdev.tools.excalidraw._rerender_from_state") as mock_rr,
+            patch("otdev.tools.excalidraw._browser_evaluate_json", return_value="Scene: ok"),
+        ):
+            excalidraw.read_scene()
+
+        mock_rr.assert_not_called()
+
+    def test_style_board_rerenders_first(self, tmp_path: Any) -> None:
+        from unittest.mock import patch
+
+        from otdev.tools import excalidraw
+
+        _reset_exc_state()
+        with self._in_dir(tmp_path):
+            excalidraw.draw(input='c["C"]', board="alpha")
+            with (
+                patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+                patch("otdev.tools.excalidraw._rerender_from_state") as mock_rr,
+                patch("otdev.tools.excalidraw._js_style_elements", return_value=1),
+            ):
+                excalidraw.style(ids=["c"], style="bc:green", board="alpha")
+                excalidraw.style(ids=["c"], style="bc:green")
+
+        mock_rr.assert_called_once()  # only the board= call rerenders
+
+    def test_embed_dsl_board_uses_named_board_state(self, tmp_path: Any) -> None:
+        from unittest.mock import patch
+
+        from otdev.tools import excalidraw
+
+        _reset_exc_state()
+        with self._in_dir(tmp_path):
+            excalidraw.draw(input='d["D"]', board="alpha")
+            with (
+                patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+                patch("otdev.tools.excalidraw._js_batch_draw"),
+                patch("otdev.tools.excalidraw._get_canvas_max_y", return_value=60.0),
+            ):
+                result = excalidraw.embed_dsl(board="alpha")
+                default_result = excalidraw.embed_dsl()
+
+        assert "embedded DSL" in result
+        assert default_result == "nothing to embed — canvas is empty"
+
+    def test_invalid_board_name_raises(self, tmp_path: Any) -> None:
+        from unittest.mock import patch
+
+        from otdev.tools import excalidraw
+
+        _reset_exc_state()
+        with (
+            self._in_dir(tmp_path),
+            patch("otdev.tools.excalidraw._tab", _make_mock_tab()),
+            patch("otdev.tools.excalidraw._read_dsl_from_canvas", return_value='a["A"]'),
+            pytest.raises(ValueError, match="Invalid board name"),
+        ):
+            excalidraw.sync(board="../evil")
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestLayoutPureHelpers:
+    """Direct tests for _excalidraw.layout pure computation (no browser mocks)."""
+
+    def _scene(self) -> dict[str, Any]:
+        return {
+            "nodes": [
+                {"id": "a", "w": 100, "h": 50, "groupIds": [], "x": 0, "y": 0},
+                {"id": "g1", "w": 80, "h": 40, "groupIds": ["grp"], "x": 200, "y": 0},
+                {"id": "g2", "w": 80, "h": 40, "groupIds": ["grp"], "x": 300, "y": 60},
+                {"id": "out", "w": 60, "h": 30, "groupIds": [], "x": 900, "y": 900},
+            ],
+            "edges": [
+                {"id": "e1", "src": "a", "dst": "g1"},
+                {"id": "e2", "src": "a", "dst": "out"},
+            ],
+            "selectedIds": ["a", "g1", "g2"],
+        }
+
+    def _build(self, direction: str = "RIGHT") -> Any:
+        from otdev.tools._excalidraw import layout as L
+
+        build = L.build_elk_graph(
+            self._scene(),
+            direction=direction, gap_layer=80, gap_node=40,
+            algorithm="layered", node_placement="NETWORK_SIMPLEX",
+            crossing_min="LAYER_SWEEP", cycle_breaking="GREEDY",
+        )
+        assert build is not None
+        return build
+
+    def test_graph_build_with_groups_and_selection(self) -> None:
+        build = self._build()
+
+        # Grouped members collapse into one ELK node under the group id
+        assert build.elem_to_elk["g1"] == "grp"
+        assert build.elem_to_elk["g2"] == "grp"
+        assert build.elk_node_set == {"a", "grp"}
+        # Group bbox spans both members: x 200..380, y 0..100
+        grp = next(n for n in build.graph["children"] if n["id"] == "grp")
+        assert (grp["width"], grp["height"]) == (180, 100)
+        # e1 (a→grp) is in-scope; e2 (a→out) is a boundary edge
+        assert [e["id"] for e in build.graph["edges"]] == ["e1"]
+        assert [b["id"] for b in build.boundary_edges] == ["e2"]
+        assert build.boundary_edges[0]["src_in"] is True
+        # Selection anchors the offset at the selection's top-left
+        assert build.use_selection is True
+        assert (build.offset_x, build.offset_y) == (0.0, 0.0)
+
+    def test_boundary_patch_sides_per_direction(self) -> None:
+        from otdev.tools._excalidraw import layout as L
+
+        positions = {"a": (0.0, 0.0)}
+        # a is 100x50 at (0,0); free node "out" is 60x30 at (900,900)
+        expected_anchor = {
+            "RIGHT": [100.0, 25.0],  # source exits right
+            "LEFT": [0.0, 25.0],
+            "DOWN": [50.0, 50.0],
+            "UP": [50.0, 0.0],
+        }
+        for direction, anchor_pt in expected_anchor.items():
+            build = self._build(direction)
+            patches = L.build_boundary_arrow_patches(build, positions, direction)
+            assert len(patches) == 1
+            assert patches[0]["id"] == "e2"
+            # src is inside → arrow starts at the anchored node's exit side
+            assert patches[0]["points"][0] == anchor_pt
+
+    def test_boundary_patch_dst_inside_uses_entry_side(self) -> None:
+        from otdev.tools._excalidraw import layout as L
+
+        scene = self._scene()
+        scene["edges"] = [{"id": "e3", "src": "out", "dst": "a"}]
+        build = L.build_elk_graph(
+            scene, direction="RIGHT", gap_layer=80, gap_node=40,
+            algorithm="layered", node_placement="NETWORK_SIMPLEX",
+            crossing_min="LAYER_SWEEP", cycle_breaking="GREEDY",
+        )
+        assert build is not None
+        patches = L.build_boundary_arrow_patches(build, {"a": (0.0, 0.0)}, "RIGHT")
+        assert len(patches) == 1
+        # dst inside → arrow ends at the anchored node's entry side (left)
+        assert patches[0]["points"][1] == [0.0, 25.0]
+        # start stays at the free node's exit side
+        assert patches[0]["points"][0] == [960.0, 915.0]
+
+    def test_writeback_mutates_state_and_max_y(self) -> None:
+        from otdev.tools._excalidraw import layout as L
+
+        build = self._build()
+        state = {
+            "shapes": {"a": {"x": 0.0, "y": 0.0}},
+            "canvas_max_y": 500.0,
+        }
+        moved = L.writeback_positions(
+            state, [{"id": "a", "x": 10.0, "y": 20.0}], build
+        )
+        assert moved == 1
+        assert (state["shapes"]["a"]["x"], state["shapes"]["a"]["y"]) == (10.0, 20.0)
+        # Selection layout never shrinks canvas_max_y
+        assert state["canvas_max_y"] == 500.0

@@ -344,21 +344,21 @@ whiteboard.boards()  # List all active whiteboard session boards.
 whiteboard.clear(board: str | None=None)  # Delete the session file for the given board and optionally clear the canvas.
 whiteboard.close()  # Close the excalidraw browser and reset all Python state.
 whiteboard.draw(input: str, board: str | None=None)  # Add or update diagram elements from DSL. Always additive — never clears.
-whiteboard.embed_dsl()  # Embed the current DSL as a note element on the canvas.
+whiteboard.embed_dsl(board: str | None=None)  # Embed the current DSL as a note element on the canvas.
 whiteboard.erase(ids: list[str], board: str | None=None)  # Remove individual elements from the canvas and Python state.
 whiteboard.fit()  # Fit all elements in view.
 whiteboard.hard_reset()  # Reset Python DSL state unconditionally; attempt canvas clear if browser is available.
 whiteboard.help()  # Return the full DSL and style reference. Call this before using whiteboard.draw or whiteboard.style.
 whiteboard.layout(direction: str='DOWN', gap_layer: int=80, gap_node: int=40, algorithm: str='layered', node_placement: str='NETWORK_SIMPLEX', crossing_min: str='LAYER_SWEEP', cycle_breaking: str='GREEDY', arrow_type: str | None=None, elk_options: dict[str, str] | None=None, board: str | None=None)  # Apply ELK.js graph layout to the current whiteboard.
-whiteboard.load(file: str)  # Restore diagram from a native ``.excalidraw`` file.
-whiteboard.note(input: str, background: str='#f5f5dc')  # Insert ASCII-rendered text annotations onto the canvas.
+whiteboard.load(file: str, board: str | None=None)  # Restore diagram from a native ``.excalidraw`` file.
+whiteboard.note(input: str, background: str='#f5f5dc', board: str | None=None)  # Insert ASCII-rendered text annotations onto the canvas.
 whiteboard.open()  # Open excalidraw.com and start with a clean canvas.
-whiteboard.read_scene(info: str='default')  # Return a structured text summary of all canvas elements.
-whiteboard.save(file: str)  # Save current diagram to a native ``.excalidraw`` JSON file.
+whiteboard.read_scene(info: str='default', board: str | None=None)  # Return a structured text summary of all canvas elements.
+whiteboard.save(file: str, board: str | None=None)  # Save current diagram to a native ``.excalidraw`` JSON file.
 whiteboard.screenshot(file: str | None=None, board: str | None=None)  # Take a screenshot of the current canvas as PNG.
 whiteboard.scroll(dx: int=0, dy: int=0)  # Pan the canvas by (dx, dy) pixels.
 whiteboard.share(board: str | None=None)  # Generate a shareable Excalidraw link for the current canvas.
-whiteboard.style(ids: list[str], style: str)  # Apply visual style properties to existing canvas elements in bulk.
-whiteboard.sync()  # Sync Python DSL state from the ``__otDSL`` canvas element.
+whiteboard.style(ids: list[str], style: str, board: str | None=None)  # Apply visual style properties to existing canvas elements in bulk.
+whiteboard.sync(board: str | None=None)  # Sync Python DSL state from the ``__otDSL`` canvas element.
 whiteboard.zoom(level: float)  # Set zoom level. Pass 0 to fit all elements in view.
 ```
