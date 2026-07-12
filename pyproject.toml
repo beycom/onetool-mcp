@@ -67,7 +67,7 @@ util = [
 dev = [
     "beautifulsoup4>=4.14.3",
     "filelock>=3.29.0",
-    "lxml>=5.3,<6",
+    "lxml>=6.1,<7",   # >=6.1 fixes PYSEC-2026-87
     "markdown>=3.9",
     "openpyxl>=3.1.5",
     "sqlalchemy>=2.0.49",
@@ -113,6 +113,9 @@ dev = [
 
 [tool.uv]
 default-groups = ["dev", "docs"]
+constraint-dependencies = [
+    "lxml-html-clean>=0.4.5",   # transitive via justext[html-clean]; fixes CVE-2026-49825
+]
 
 [tool.uv.workspace]
 members = ["packages/onetool-pack"]

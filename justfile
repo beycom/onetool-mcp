@@ -98,8 +98,10 @@ deps-check:
     uvx deptry . 2>&1 | grep -v "^Assuming"
 
 # Audit installed dependencies for known vulnerabilities (requires: pip-audit)
+# PYSEC-2026-597: nltk (via crawl4ai) has no fixed release yet — drop the
+# ignore once one ships.
 audit:
-    uv run --with pip-audit pip-audit --skip-editable
+    uv run --with pip-audit pip-audit --skip-editable --ignore-vuln PYSEC-2026-597
 
 # Scan for secrets with gitleaks
 secrets-check:
