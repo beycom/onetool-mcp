@@ -1,6 +1,13 @@
 # tool-arch-validation-warnings Specification
 
-## ADDED Requirements
+## Purpose
+
+Defines the non-blocking validation warnings channel for the `arch` tool: which
+data-quality conditions produce warnings (`orphan_system`, `duplicate_name`,
+`self_interface`), their payload shape, and the guarantee that warnings never
+affect validity or block generation.
+
+## Requirements
 
 ### Requirement: Non-blocking validation warnings
 `arch.validate` and `arch.generate` SHALL report non-blocking data-quality findings in the

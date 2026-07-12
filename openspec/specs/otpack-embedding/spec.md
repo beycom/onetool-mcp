@@ -1,6 +1,17 @@
-# otpack-embedding Specification (delta)
+# otpack-embedding Specification
 
-## ADDED Requirements
+## Purpose
+
+Defines the shared embedding infrastructure in `otpack` (`otpack/embedding.py`):
+the `EmbeddingClient` (retry, batching, opt-in query caching, `dimensions=`
+handling), token-windowing helpers, canonical little-endian float32 vector
+serialization, and the Reciprocal Rank Fusion helper — all free of `ot.*`
+imports so the module ships in the standalone `onetool-pack` wheel with an
+optional `embedding` extra. The `mem` and `knowledge` packs delegate to this
+layer while keeping config/secret resolution and their intentional behavioral
+differences (long-text strategy, RRF boost) in the packs.
+
+## Requirements
 
 ### Requirement: Shared embedding client from resolved values
 
