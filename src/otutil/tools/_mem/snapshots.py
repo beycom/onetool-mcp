@@ -49,6 +49,19 @@ def _resolve_member_path(base: Path, rel: str) -> tuple[Path | None, str | None]
     return validated, None
 
 
+def _strip_topic_prefix(mem_topic: str, prefix: str | None) -> str:
+    """Return mem_topic relative to a topic-filter prefix.
+
+    A topic under `prefix` keeps the remainder; a topic exactly equal to the
+    prefix (without its trailing slash) keeps only its final segment.
+    """
+    if prefix and mem_topic.startswith(prefix):
+        return mem_topic[len(prefix):]
+    if prefix and mem_topic == prefix.rstrip("/"):
+        return mem_topic.rsplit("/", 1)[-1]
+    return mem_topic
+
+
 def snapshot(
     *,
     output: str,
@@ -125,11 +138,7 @@ def snapshot(
                 raw_meta = _deserialize_meta(r[9])
 
                 # Compute relative file path
-                rel_topic = mem_topic
-                if strip_prefix and mem_topic.startswith(strip_prefix):
-                    rel_topic = mem_topic[len(strip_prefix):]
-                elif strip_prefix and mem_topic == strip_prefix.rstrip("/"):
-                    rel_topic = mem_topic.rsplit("/", 1)[-1]
+                rel_topic = _strip_topic_prefix(mem_topic, strip_prefix)
 
                 file_rel = rel_topic + ext
                 file_path, path_error = _resolve_member_path(validated_path, file_rel)
@@ -304,11 +313,7 @@ def restore(
                     # Remap topic if override provided
                     if topic is not None:
                         # Strip original filter prefix, prepend new topic
-                        rel = mem_topic
-                        if original_filter and mem_topic.startswith(original_filter):
-                            rel = mem_topic[len(original_filter):]
-                        elif original_filter and mem_topic == original_filter.rstrip("/"):
-                            rel = mem_topic.rsplit("/", 1)[-1]
+                        rel = _strip_topic_prefix(mem_topic, original_filter)
                         mem_topic = f"{topic}/{rel}" if rel else topic
 
                     # Read content file (index paths are untrusted)

@@ -2124,15 +2124,6 @@ def fit() -> str:
     return zoom(level=0)
 
 
-# Constant tables live with the pure layout helpers; re-exported here for
-# backward compatibility.
-_ELK_DIRECTIONS = _elk_layout.ELK_DIRECTIONS
-_ELK_ALGORITHMS = _elk_layout.ELK_ALGORITHMS
-_ELK_NODE_PLACEMENTS = _elk_layout.ELK_NODE_PLACEMENTS
-_ELK_CROSSING_MINS = _elk_layout.ELK_CROSSING_MINS
-_ELK_CYCLE_BREAKINGS = _elk_layout.ELK_CYCLE_BREAKINGS
-
-
 def layout(
     *,
     direction: str = "DOWN",
@@ -2198,16 +2189,16 @@ def layout(
     crossing_min = crossing_min.upper()
     cycle_breaking = cycle_breaking.upper()
 
-    if direction not in _ELK_DIRECTIONS:
-        return f"Error: direction must be one of {sorted(_ELK_DIRECTIONS)}"
-    if algorithm not in _ELK_ALGORITHMS:
-        return f"Error: algorithm must be one of {sorted(_ELK_ALGORITHMS)}"
-    if node_placement not in _ELK_NODE_PLACEMENTS:
-        return f"Error: node_placement must be one of {sorted(_ELK_NODE_PLACEMENTS)}"
-    if crossing_min not in _ELK_CROSSING_MINS:
-        return f"Error: crossing_min must be one of {sorted(_ELK_CROSSING_MINS)}"
-    if cycle_breaking not in _ELK_CYCLE_BREAKINGS:
-        return f"Error: cycle_breaking must be one of {sorted(_ELK_CYCLE_BREAKINGS)}"
+    if direction not in _elk_layout.ELK_DIRECTIONS:
+        return f"Error: direction must be one of {sorted(_elk_layout.ELK_DIRECTIONS)}"
+    if algorithm not in _elk_layout.ELK_ALGORITHMS:
+        return f"Error: algorithm must be one of {sorted(_elk_layout.ELK_ALGORITHMS)}"
+    if node_placement not in _elk_layout.ELK_NODE_PLACEMENTS:
+        return f"Error: node_placement must be one of {sorted(_elk_layout.ELK_NODE_PLACEMENTS)}"
+    if crossing_min not in _elk_layout.ELK_CROSSING_MINS:
+        return f"Error: crossing_min must be one of {sorted(_elk_layout.ELK_CROSSING_MINS)}"
+    if cycle_breaking not in _elk_layout.ELK_CYCLE_BREAKINGS:
+        return f"Error: cycle_breaking must be one of {sorted(_elk_layout.ELK_CYCLE_BREAKINGS)}"
     if arrow_type is not None and arrow_type not in _ARROW_TYPE_VALUES:
         return f"Error: arrow_type must be None or one of {sorted(_ARROW_TYPE_VALUES)}"
 

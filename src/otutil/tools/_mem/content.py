@@ -187,10 +187,6 @@ def _check_staleness(meta: dict[str, str]) -> str:
     return "fresh"
 
 
-# Re-export for convenience: modules that import _deserialize_meta and _deserialize_tags
-# from content for backward-compat should import from db instead. These are in db.py.
-
-
 __all__ = [
     "VALID_CATEGORIES",
     "_BUILTIN_REDACTION_PATTERNS",
