@@ -1,8 +1,9 @@
 """Disk storage and session LRU cache for the image pack.
 
-Images are stored in ``.onetool/images/`` as ``{handle}.png`` +
-``{handle}.meta.json`` pairs. An in-memory LRU cache holds base64-encoded
-model bytes for the most recently used images to avoid redundant disk I/O.
+Images are stored in ``.onetool/images/`` as ``{handle}.{ext}`` (the original
+bytes under their source-format extension) + ``{handle}.meta.json`` pairs. An
+in-memory LRU cache holds base64-encoded model bytes for the most recently
+used images to avoid redundant disk I/O.
 """
 
 from __future__ import annotations
@@ -30,6 +31,23 @@ _session_cache = Cache(max_size=get_image_config().session_cache_size)
 # thread races the main thread in save_summary().
 _meta_lock = threading.Lock()
 
+# Detected format (from validate_image_bytes) → stored file extension.
+_FORMAT_EXTENSIONS: dict[str, str] = {
+    "PNG": "png",
+    "JPEG": "jpg",
+    "GIF": "gif",
+    "WEBP": "webp",
+    "TIFF": "tiff",
+    "HEIC": "heic",
+    "AVIF": "avif",
+    "SVG": "svg",
+}
+
+
+def ext_for_format(fmt: str) -> str:
+    """Map a detected image format to a file extension (default: png)."""
+    return _FORMAT_EXTENSIONS.get(fmt.upper(), "png")
+
 
 def _images_dir() -> Path:
     """Return (and create) the images subdirectory within the session directory."""
@@ -43,22 +61,51 @@ def _images_dir() -> Path:
 # ---------------------------------------------------------------------------
 
 
-def save_image(raw_bytes: bytes, handle_name: str, meta: dict[str, Any]) -> None:
+def save_image(
+    raw_bytes: bytes, handle_name: str, meta: dict[str, Any], *, fmt: str = "PNG"
+) -> None:
     """Save image bytes and metadata to ``.onetool/images/``.
 
-    Writes ``{handle_name}.png`` (verbatim original) and
-    ``{handle_name}.meta.json``.
+    Writes ``{handle_name}.{ext}`` (verbatim original bytes under their
+    source-format extension) and ``{handle_name}.meta.json``. The stored
+    filename is recorded as ``meta["file"]`` before serialisation.
 
     Args:
         raw_bytes: Original image bytes (saved unmodified).
         handle_name: Handle name without ``#`` prefix (e.g. ``"img_a3f7b2c4"``).
         meta: Metadata dict to serialise as JSON.
+        fmt: Detected image format (from ``validate_image_bytes``), mapped to
+            the stored extension; unknown values default to ``png``.
     """
     images = _images_dir()
-    (images / f"{handle_name}.png").write_bytes(raw_bytes)
+    filename = f"{handle_name}.{ext_for_format(fmt)}"
+    meta["file"] = filename
+    (images / filename).write_bytes(raw_bytes)
     (images / f"{handle_name}.meta.json").write_text(
         json.dumps(meta, indent=2, default=str), encoding="utf-8"
     )
+
+
+def _content_file(handle_name: str) -> Path | None:
+    """Resolve the content file for a handle.
+
+    Prefers ``meta["file"]``; falls back to globbing ``{handle}.*`` (excluding
+    ``.meta.json`` and ``.tmp``) so legacy ``.png`` entries whose meta lacks
+    the ``file`` key stay readable.
+    """
+    images = _images_dir()
+    meta = load_meta(handle_name)
+    if meta is not None:
+        filename = meta.get("file")
+        if filename:
+            path = images / str(filename)
+            if path.exists():
+                return path
+    for path in images.glob(f"{handle_name}.*"):
+        if path.name.endswith((".meta.json", ".tmp")):
+            continue
+        return path
+    return None
 
 
 def load_raw_bytes(handle_name: str) -> bytes | None:
@@ -70,8 +117,8 @@ def load_raw_bytes(handle_name: str) -> bytes | None:
     Returns:
         Raw bytes, or ``None`` if the file does not exist.
     """
-    path = _images_dir() / f"{handle_name}.png"
-    return path.read_bytes() if path.exists() else None
+    path = _content_file(handle_name)
+    return path.read_bytes() if path is not None else None
 
 
 def load_meta(handle_name: str) -> dict[str, Any] | None:
@@ -134,19 +181,22 @@ def find_by_hash(sha256_hex: str) -> str | None:
 
 
 def delete_handle_files(handle_name: str) -> tuple[bool, int]:
-    """Delete the ``.png`` and ``.meta.json`` files for a handle.
+    """Delete all files for a handle (content file, meta.json, stray tmp).
+
+    Handle names cannot collide across the dot boundary, so the
+    ``{handle}.*`` glob is exact.
 
     Args:
         handle_name: Handle name without ``#`` prefix.
 
     Returns:
-        Tuple of ``(found, bytes_freed)`` — ``found`` is False if neither
+        Tuple of ``(found, bytes_freed)`` — ``found`` is False if no
         file existed.
     """
     images = _images_dir()
-    png = images / f"{handle_name}.png"
-    meta_path = images / f"{handle_name}.meta.json"
-    freed = sum(unlink_tracking_bytes(p) for p in (png, meta_path))
+    freed = sum(
+        unlink_tracking_bytes(p) for p in sorted(images.glob(f"{handle_name}.*"))
+    )
     found = freed > 0
     return found, freed
 

@@ -251,7 +251,7 @@ ot_forge.validate_ext(path: str)  # Validate an extension before reload.
 
 ## ot_image, img
 ```python
-ot_image.ask(img: str, q: str | list[str], max_edge: int=1568)  # Send one or more questions about an image to the vision model.
+ot_image.ask(img: str | list[str], q: str | list[str], max_edge: int=1568)  # Send one or more questions about one or more images to the vision model.
 ot_image.clip_ask(q: str | list[str], max_edge: int=1568)  # Ask a question about the current clipboard image.
 ot_image.clip_view()  # Extract a structured summary of the current clipboard image.
 ot_image.delete(handle: str)  # Delete a loaded image and remove it from the session cache.

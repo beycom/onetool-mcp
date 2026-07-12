@@ -1,8 +1,8 @@
 """Vision model calls for the image pack.
 
 Uses the OpenAI-compatible messages API with base64 image content blocks.
-Supports single questions, batched numbered questions, and structured summary
-extraction.
+Supports single questions, JSON-contract batched questions (with per-question
+fallback), multi-image calls, and structured summary extraction.
 """
 
 from __future__ import annotations
@@ -10,9 +10,11 @@ from __future__ import annotations
 import base64
 import json
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from openai import OpenAI
+
+from otpack import LogSpan
 
 from .config import get_image_api_key
 
@@ -55,12 +57,24 @@ Rules for the 'content' field:
 - Skip purely decorative elements (icons without labels, background imagery)."""
 
 
-def call_vision(model_bytes: bytes, prompt: str, config: Config) -> str:
-    """Send image bytes and a text prompt to the configured vision model.
+def _image_block(model_bytes: bytes) -> dict[str, Any]:
+    b64 = base64.b64encode(model_bytes).decode()
+    return {
+        "type": "image_url",
+        "image_url": {"url": f"data:image/png;base64,{b64}"},
+    }
+
+
+def call_vision(images: list[bytes], prompt: str, config: Config) -> str:
+    """Send one or more images and a text prompt to the configured vision model.
+
+    Multi-image calls interleave a text label before each image block
+    (``"Image 1:"``, image, ``"Image 2:"``, image, …, prompt) so questions can
+    reference "image 1" / "image 2" unambiguously.
 
     Args:
-        model_bytes: PNG bytes ready for upload (should already be resized).
-        prompt: Text prompt to accompany the image.
+        images: PNG byte payloads ready for upload (already resized).
+        prompt: Text prompt to accompany the image(s).
         config: Image pack config (must have ``model``).
 
     Returns:
@@ -78,24 +92,20 @@ def call_vision(model_bytes: bytes, prompt: str, config: Config) -> str:
             "set OPENAI_API_KEY in secrets.yaml"
         )
 
-    b64 = base64.b64encode(model_bytes).decode()
+    content: list[dict[str, Any]] = []
+    if len(images) > 1:
+        for i, model_bytes in enumerate(images, start=1):
+            content.append({"type": "text", "text": f"Image {i}:"})
+            content.append(_image_block(model_bytes))
+    else:
+        content.append(_image_block(images[0]))
+    content.append({"type": "text", "text": prompt})
 
     try:
         client = _get_client(config)
         response = client.chat.completions.create(
             model=config.model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{b64}"},
-                        },
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ],
+            messages=cast("Any", [{"role": "user", "content": content}]),
             temperature=0.1,
         )
         return response.choices[0].message.content or ""
@@ -106,14 +116,39 @@ def call_vision(model_bytes: bytes, prompt: str, config: Config) -> str:
         return f"Error: {error_msg}"
 
 
-def ask_questions(model_bytes: bytes, questions: list[str], config: Config) -> list[str]:
+def parse_json_payload(text: str) -> dict[str, Any] | None:
+    """Parse a JSON object from model output.
+
+    Strips markdown code fences, tries ``json.loads``, then falls back to the
+    first embedded ``{...}`` object. Returns ``None`` when no object parses.
+    """
+    text = text.strip()
+    text = re.sub(r"^```[a-z]*\n?", "", text)
+    text = re.sub(r"\n?```$", "", text.strip())
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        if not m:
+            return None
+        try:
+            data = json.loads(m.group())
+        except json.JSONDecodeError:
+            return None
+    return data if isinstance(data, dict) else None
+
+
+def ask_questions(images: list[bytes], questions: list[str], config: Config) -> list[str]:
     """Send one or more questions to the vision model in a single call.
 
-    Formats multiple questions as a numbered list and parses the numbered
-    response back into individual answers.
+    Multi-question batches use a JSON answer contract (return only
+    ``{"answers": [...]}`` with exactly N strings in question order). When the
+    batched response fails to parse or the answer count mismatches, falls back
+    to one ``call_vision()`` per question so a question never gets another
+    question's answer or a silent empty string.
 
     Args:
-        model_bytes: PNG bytes ready for upload.
+        images: PNG byte payloads ready for upload.
         questions: One or more question strings.
         config: Image pack config.
 
@@ -122,45 +157,38 @@ def ask_questions(model_bytes: bytes, questions: list[str], config: Config) -> l
         Returns a single-element list with an error string if the call fails.
     """
     if len(questions) == 1:
-        prompt = questions[0]
-    else:
-        numbered = "\n".join(f"{i + 1}. {q}" for i, q in enumerate(questions))
-        prompt = (
-            "Answer each of the following questions about the image.\n"
-            "Start each answer with only its question number followed by a period and space "
-            f"(e.g. '1. your answer'). Do not use headings or bold formatting.\n"
-            f"Questions:\n{numbered}"
-        )
-
-    result = call_vision(model_bytes, prompt, config)
-    if result.startswith("Error:"):
-        return [result]
-
-    if len(questions) == 1:
+        # Single question stays plain text — no JSON round-trip
+        result = call_vision(images, questions[0], config)
+        if result.startswith("Error:"):
+            return [result]
         return [result.strip()]
 
-    # Parse numbered answers from response
-    answers: list[str] = []
-    current_lines: list[str] = []
+    numbered = "\n".join(f"{i + 1}. {q}" for i, q in enumerate(questions))
+    prompt = (
+        "Answer each of the following questions about the image(s).\n"
+        'Return ONLY a JSON object of the form {"answers": ["<answer 1>", ...]} '
+        f"with exactly {len(questions)} answer strings, in question order. "
+        "No markdown, no other keys, no commentary.\n"
+        f"Questions:\n{numbered}"
+    )
 
-    _num_pat = re.compile(r"^\s*(?:[#*]+\s*)?(\d+)[.)]\s*(?:[#*]*\s*)?")
-    for line in result.strip().split("\n"):
-        m = _num_pat.match(line)
-        if m and 1 <= int(m.group(1)) <= len(questions):
-            if current_lines:
-                answers.append("\n".join(current_lines).strip())
-            current_lines = [_num_pat.sub("", line, count=1)]
-        else:
-            current_lines.append(line)
+    with LogSpan(span="ot_image.ask_questions", questionCount=len(questions)) as s:
+        result = call_vision(images, prompt, config)
+        if result.startswith("Error:"):
+            # Fallback would fail identically — short-circuit
+            s.add(error=result)
+            return [result]
 
-    if current_lines:
-        answers.append("\n".join(current_lines).strip())
+        payload = parse_json_payload(result)
+        answers = payload.get("answers") if payload else None
+        if isinstance(answers, list) and len(answers) == len(questions):
+            return [str(a) for a in answers]
 
-    # Pad if parsing missed answers
-    while len(answers) < len(questions):
-        answers.append("")
-
-    return answers[: len(questions)]
+        # Batched contract violated — recover losslessly, one call per question
+        s.add(fallback="per_question")
+        return [
+            call_vision(images, question, config).strip() for question in questions
+        ]
 
 
 def extract_summary(model_bytes: bytes, config: Config) -> dict[str, object] | str:
@@ -179,27 +207,14 @@ def extract_summary(model_bytes: bytes, config: Config) -> dict[str, object] | s
         Returns an error string if the model is not configured or the response
         cannot be parsed.
     """
-    result = call_vision(model_bytes, _SUMMARY_PROMPT, config)
+    result = call_vision([model_bytes], _SUMMARY_PROMPT, config)
     if result.startswith("Error:"):
         return result
 
-    text = result.strip()
-    # Strip markdown code fences if present
-    text = re.sub(r"^```[a-z]*\n?", "", text)
-    text = re.sub(r"\n?```$", "", text.strip())
-
-    data: dict[str, object] = {}
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        m = re.search(r"\{.*\}", text, re.DOTALL)
-        if m:
-            try:
-                data = json.loads(m.group())
-            except json.JSONDecodeError:
-                return "Error: Could not parse vision model response as JSON"
-        else:
-            return "Error: Could not parse vision model response as JSON"
+    parsed = parse_json_payload(result)
+    if parsed is None:
+        return "Error: Could not parse vision model response as JSON"
+    data: dict[str, object] = dict(parsed)
 
     # Fill missing required keys with safe defaults
     if "colours" not in data:

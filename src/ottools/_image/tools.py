@@ -178,7 +178,10 @@ def load(*, img: str, handle: str | None = None, max_edge: int = 1568) -> dict[s
         raw_bytes = bytes(data)
 
         try:
-            validate_image_bytes(raw_bytes, img)
+            # Detected format drives the stored extension. Do NOT use
+            # prep.original_format for this — SVG rasterises to PNG before
+            # Pillow sees it.
+            detected_format = validate_image_bytes(raw_bytes, img)
         except ValueError as e:
             s.add(error=str(e))
             return {"error": str(e)}
@@ -252,7 +255,7 @@ def load(*, img: str, handle: str | None = None, max_edge: int = 1568) -> dict[s
             "created_at": datetime.now(UTC).isoformat(),
             "summary": None,
         }
-        save_image(raw_bytes, handle_name, image_meta)
+        save_image(raw_bytes, handle_name, image_meta, fmt=detected_format)
         cache_put(handle_name, prep.model_bytes)
 
         # Spawn background summary — silently skipped if model not set
@@ -318,68 +321,100 @@ def load_batch(*, img: str | list[str], max_edge: int = 1568) -> list[dict[str, 
         return results
 
 
+# Providers commonly cap images per request; 8 keeps payloads sane at
+# max_edge 1568.
+_MAX_ASK_IMAGES = 8
+
+
 def ask(
     *,
-    img: str,
+    img: str | list[str],
     q: str | list[str],
     max_edge: int = 1568,
 ) -> dict[str, Any]:
-    """Send one or more questions about an image to the vision model.
+    """Send one or more questions about one or more images to the vision model.
 
-    Accepts a handle reference (``"#name"``), a file path, URL, or ``"clip"``.
+    Accepts handle references (``"#name"``), file paths, URLs, or ``"clip"``.
+    A list of image references (max 8) sends all images in a single model
+    call — questions can reference "image 1" / "image 2" for comparisons.
     Multiple questions are batched into a single model call.
 
     Args:
-        img: Image reference — handle (``"#name"`` or bare ``"name"``), file
-            path, URL, or ``"clip"``. Clipboard sources are auto-loaded if not
-            already in session.
+        img: Image reference or list of references — each entry may be a
+            handle (``"#name"`` or bare ``"name"``), file path, URL, or
+            ``"clip"``. Sources not already in session are auto-loaded.
         q: Question string or list of question strings.
-        max_edge: Maximum longest edge for resize if the image is loaded fresh.
+        max_edge: Maximum longest edge for resize if an image is loaded fresh.
 
     Returns:
-        ``{"result": list[{"question": str, "answer": str}], "handle": str}`` —
-        each entry pairs the original question with its answer. Returns
-        ``{"error": str, "handle": str}`` on failure (handle not found, file
-        missing, load error).
+        For string ``img``: ``{"result": pairs, "handle": "#name"}``.
+        For list ``img`` (including single-element lists):
+        ``{"result": pairs, "handles": ["#a", "#b", ...]}``.
+        ``pairs`` is ``list[{"question": str, "answer": str}]``. Returns
+        ``{"error": str, "handle": str}`` on failure (empty list, more than
+        8 images, handle not found, file missing, load error) — resolution
+        failures identify the failing reference and skip the model call.
 
     Example:
         image.ask(img="#img_a3f7b2c4", q="What framework is shown?")
         image.ask(img="clip", q=["Extract text", "Is this dark mode?"])
+        image.ask(img=["#before", "#after"], q="What differs between image 1 and image 2?")
     """
     questions = [q] if isinstance(q, str) else list(q)
+    is_multi = isinstance(img, list)
+    img_refs = list(img) if isinstance(img, list) else [img]
 
-    with LogSpan(span="ot_image.ask", questionCount=len(questions)) as s:
+    with LogSpan(
+        span="ot_image.ask", questionCount=len(questions), imageCount=len(img_refs)
+    ) as s:
+        if not img_refs:
+            s.add(error="empty_img_list")
+            return {"error": "img list is empty"}
+        if len(img_refs) > _MAX_ASK_IMAGES:
+            s.add(error="too_many_images")
+            return {
+                "error": (
+                    f"too many images ({len(img_refs)}) — "
+                    f"ask() accepts at most {_MAX_ASK_IMAGES} images per call"
+                )
+            }
+
         config = get_image_config()
 
-        # Resolve handle name
-        handle_name, err = _resolve_handle_name(img, max_edge)
-        if err is not None:
-            s.add(error=err["error"])
-            return err
+        # Resolve every reference before any model call (fail fast)
+        handle_names: list[str] = []
+        for ref in img_refs:
+            handle_name, err = _resolve_handle_name(ref, max_edge)
+            if err is not None:
+                s.add(error=err["error"])
+                return err
+            handle_names.append(handle_name)
 
-        s.add(handle=handle_name)
+        s.add(handles=handle_names)
 
-        # Verify handle exists
-        if load_meta(handle_name) is None:
-            err = f"Error: handle #{handle_name} not found"
-            s.add(error=err)
-            return {"error": err, "handle": f"#{handle_name}"}
+        images: list[bytes] = []
+        for handle_name in handle_names:
+            if load_meta(handle_name) is None:
+                err_msg = f"Error: handle #{handle_name} not found"
+                s.add(error=err_msg)
+                return {"error": err_msg, "handle": f"#{handle_name}"}
+            model_bytes = _get_model_bytes(handle_name, max_edge)
+            if model_bytes is None:
+                err_msg = f"Error: image file not found for handle #{handle_name}"
+                s.add(error=err_msg)
+                return {"error": err_msg, "handle": f"#{handle_name}"}
+            images.append(model_bytes)
 
-        # Get model bytes (from cache or disk)
-        model_bytes = _get_model_bytes(handle_name, max_edge)
-        if model_bytes is None:
-            err = f"Error: image file not found for handle #{handle_name}"
-            s.add(error=err)
-            return {"error": err, "handle": f"#{handle_name}"}
-
-        answers = ask_questions(model_bytes, questions, config)
+        answers = ask_questions(images, questions, config)
 
         if len(answers) == 1 and answers[0].startswith("Error:"):
             s.add(error=answers[0])
-            return {"error": answers[0], "handle": f"#{handle_name}"}
+            return {"error": answers[0], "handle": f"#{handle_names[0]}"}
 
         pairs = [{"question": q, "answer": a} for q, a in zip(questions, answers, strict=False)]
-        return {"result": pairs, "handle": f"#{handle_name}"}
+        if is_multi:
+            return {"result": pairs, "handles": [f"#{h}" for h in handle_names]}
+        return {"result": pairs, "handle": f"#{handle_names[0]}"}
 
 
 def summary(*, img: str) -> dict[str, Any]:
@@ -412,9 +447,9 @@ def summary(*, img: str) -> dict[str, Any]:
 
         meta = load_meta(handle_name)
         if meta is None:
-            err = f"Error: handle #{handle_name} not found"
-            s.add(error=err)
-            return {"error": err, "handle": f"#{handle_name}"}
+            err_msg = f"Error: handle #{handle_name} not found"
+            s.add(error=err_msg)
+            return {"error": err_msg, "handle": f"#{handle_name}"}
 
         # Return cached summary if present
         if meta.get("summary") is not None:
@@ -428,9 +463,9 @@ def summary(*, img: str) -> dict[str, Any]:
         # Call vision model
         model_bytes = _get_model_bytes(handle_name, config.max_edge)
         if model_bytes is None:
-            err = f"Error: image file not found for handle #{handle_name}"
-            s.add(error=err)
-            return {"error": err, "handle": f"#{handle_name}"}
+            err_msg = f"Error: image file not found for handle #{handle_name}"
+            s.add(error=err_msg)
+            return {"error": err_msg, "handle": f"#{handle_name}"}
 
         result_data = extract_summary(model_bytes, config)
         if isinstance(result_data, str):

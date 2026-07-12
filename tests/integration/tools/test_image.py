@@ -157,3 +157,21 @@ class TestImageVision:
             pytest.fail(f"ask() returned unexpected error: {err}")
         assert "result" in result
         assert result["result"][0]["answer"]
+
+    def test_multi_image_ask_returns_answer_and_handles(self, tmp_path: Path) -> None:
+        """ask(img=[h1, h2]) sends both images and returns both handles."""
+        from ottools._image import store
+        from ottools.ot_image import ask, load
+
+        red = _make_png(tmp_path, name="red.png", size=(60, 60))
+        blue = _make_png(tmp_path, name="blue.png", size=(90, 90))
+        with patch.object(store, "_images_dir", return_value=tmp_path):
+            h1 = load(img=str(red))["handle"]
+            h2 = load(img=str(blue))["handle"]
+            result = ask(img=[h1, h2], q="What differs between image 1 and image 2?")
+
+        if "error" in result:
+            pytest.fail(f"multi-image ask() returned unexpected error: {result['error']}")
+        assert result["handles"] == [h1, h2]
+        assert len(result["result"]) == 1
+        assert result["result"][0]["answer"]

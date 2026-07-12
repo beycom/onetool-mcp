@@ -17,7 +17,7 @@ Short alias: `img`
 |----------|-------------|
 | `ot_image.load(img, ...)` | Load a single image; return a stable handle |
 | `ot_image.load_batch(img, ...)` | Load multiple images from a glob or list |
-| `ot_image.ask(img, q, ...)` | Ask one or more questions about an image |
+| `ot_image.ask(img, q, ...)` | Ask one or more questions about one or more images (max 8) |
 | `ot_image.clip_ask(q, ...)` | Shorthand: ask about the current clipboard image |
 | `ot_image.clip_view()` | Shorthand: structured summary of the current clipboard image |
 | `ot_image.summary(img)` | Extract and cache a structured summary of an image |
@@ -32,6 +32,7 @@ Short alias: `img`
 | `img` | str | Image source: file path, `"https://..."` URL, `"clip"` for clipboard, or `"#handle"` to reference an existing handle |
 | `handle` | str | Custom handle name for `load()` (e.g. `"logo"`). Omit for auto-generated `img_<8hex>` |
 | `q` | str \| list[str] | Question(s) to ask. Multiple questions are batched into one model call |
+| `img` (in `ask()`) | str \| list[str] | Image reference or list of references (max 8) — a list sends all images in one call for comparison questions; response carries `handles` instead of `handle` |
 | `max_edge` | int | Max longest edge in pixels for in-memory model resize. Default: `1568` |
 | `all` | bool | `purge(all=True)` deletes all images regardless of age |
 | `minutes` | int | `purge(minutes=N)` deletes images older than N minutes. Default: `15` |
@@ -87,6 +88,9 @@ ot_image.ask(
 # Load with a custom handle name
 ot_image.load(img="~/assets/logo.png", handle="logo")
 ot_image.ask(img="#logo", q="What colour is the logo?")
+
+# Compare two images in one call
+ot_image.ask(img=["#before", "#after"], q="What differs between image 1 and image 2?")
 
 # Clipboard shortcuts (no load step needed)
 ot_image.clip_ask(q="Extract all text from this screenshot")

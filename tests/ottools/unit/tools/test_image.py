@@ -600,7 +600,7 @@ class TestVision:
         from ottools._image.vision import call_vision
 
         config = self._make_config(model="")
-        result = call_vision(b"png", "What is this?", config)
+        result = call_vision([b"png"], "What is this?", config)
         assert result.startswith("Error:")
         assert "model" in result or "ot_image" in result
 
@@ -610,7 +610,7 @@ class TestVision:
         config = self._make_config()
         self._api_key_patch.stop()
         with patch("ottools._image.vision.get_image_api_key", return_value=None):
-            result = call_vision(b"png", "What is this?", config)
+            result = call_vision([b"png"], "What is this?", config)
         self._api_key_patch.start()
         assert result.startswith("Error:")
 
@@ -623,30 +623,31 @@ class TestVision:
 
         with patch("ottools._image.vision.OpenAI") as MockOpenAI:
             MockOpenAI.return_value.chat.completions.create.return_value = mock_response
-            answers = ask_questions(_make_png_bytes(), ["What is in the image?"], config)
+            answers = ask_questions([_make_png_bytes()], ["What is in the image?"], config)
 
         assert answers == ["It is a cat."]
 
     def test_batch_questions_parsed_in_order(self) -> None:
+        """Batched JSON response is parsed into ordered answers."""
         from ottools._image.vision import ask_questions
 
         config = self._make_config()
         mock_response = MagicMock()
-        mock_response.choices[0].message.content = (
-            "1. A screenshot of a terminal.\n2. Yes, it is dark mode."
+        mock_response.choices[0].message.content = json.dumps(
+            {"answers": ["A screenshot of a terminal.", "Yes, it is dark mode."]}
         )
 
         with patch("ottools._image.vision.OpenAI") as MockOpenAI:
-            MockOpenAI.return_value.chat.completions.create.return_value = mock_response
+            create = MockOpenAI.return_value.chat.completions.create
+            create.return_value = mock_response
             answers = ask_questions(
-                _make_png_bytes(),
+                [_make_png_bytes()],
                 ["What is shown?", "Is it dark mode?"],
                 config,
             )
 
-        assert len(answers) == 2
-        assert "screenshot" in answers[0].lower() or "terminal" in answers[0].lower()
-        assert "dark" in answers[1].lower()
+        assert answers == ["A screenshot of a terminal.", "Yes, it is dark mode."]
+        assert create.call_count == 1  # no fallback
 
     def test_summary_json_parsed_correctly(self) -> None:
         from ottools._image.vision import extract_summary
@@ -699,53 +700,142 @@ class TestVision:
             MockOpenAI.return_value.chat.completions.create.side_effect = RuntimeError(
                 "Connection refused"
             )
-            result = call_vision(_make_png_bytes(), "test", config)
+            result = call_vision([_make_png_bytes()], "test", config)
 
         assert result.startswith("Error:")
 
-    def test_batch_questions_markdown_header_format(self) -> None:
-        """Model returns answers with ### N. heading format — must be split correctly."""
+    def test_batch_fenced_json_with_preamble_parsed(self) -> None:
+        """Fenced / preambled JSON is still recovered without fallback."""
         from ottools._image.vision import ask_questions
 
         config = self._make_config()
         mock_response = MagicMock()
         mock_response.choices[0].message.content = (
-            "### 1. A screenshot of a terminal.\n### 2. Yes, it is dark mode."
+            'Here you go:\n```json\n{"answers": ["A terminal.", "Dark mode."]}\n```'
         )
 
         with patch("ottools._image.vision.OpenAI") as MockOpenAI:
-            MockOpenAI.return_value.chat.completions.create.return_value = mock_response
+            create = MockOpenAI.return_value.chat.completions.create
+            create.return_value = mock_response
             answers = ask_questions(
-                _make_png_bytes(),
+                [_make_png_bytes()],
                 ["What is shown?", "Is it dark mode?"],
                 config,
             )
 
-        assert len(answers) == 2
-        assert "terminal" in answers[0].lower() or "screenshot" in answers[0].lower()
-        assert "dark" in answers[1].lower()
+        assert answers == ["A terminal.", "Dark mode."]
+        assert create.call_count == 1
 
-    def test_batch_questions_bold_number_format(self) -> None:
-        """Model returns answers with **N.** bold format — must be split correctly."""
+    def test_malformed_batch_response_falls_back_per_question(self) -> None:
+        """Non-JSON batched response triggers one call per question, in order."""
         from ottools._image.vision import ask_questions
 
         config = self._make_config()
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = (
-            "**1.** Python code editor.\n**2.** Light mode."
-        )
+
+        def _resp(text: str) -> MagicMock:
+            m = MagicMock()
+            m.choices[0].message.content = text
+            return m
 
         with patch("ottools._image.vision.OpenAI") as MockOpenAI:
-            MockOpenAI.return_value.chat.completions.create.return_value = mock_response
+            create = MockOpenAI.return_value.chat.completions.create
+            create.side_effect = [
+                _resp("**1.** Python code editor.\n**2.** Light mode."),  # bad batch
+                _resp("Python code editor."),
+                _resp("Light mode."),
+            ]
             answers = ask_questions(
-                _make_png_bytes(),
+                [_make_png_bytes()],
                 ["What is shown?", "What is the colour mode?"],
                 config,
             )
 
-        assert len(answers) == 2
-        assert "python" in answers[0].lower() or "editor" in answers[0].lower()
-        assert "light" in answers[1].lower()
+        assert answers == ["Python code editor.", "Light mode."]
+        assert create.call_count == 3
+
+    def test_answer_count_mismatch_falls_back(self) -> None:
+        """Valid JSON with the wrong answer count triggers the fallback."""
+        from ottools._image.vision import ask_questions
+
+        config = self._make_config()
+
+        def _resp(text: str) -> MagicMock:
+            m = MagicMock()
+            m.choices[0].message.content = text
+            return m
+
+        with patch("ottools._image.vision.OpenAI") as MockOpenAI:
+            create = MockOpenAI.return_value.chat.completions.create
+            create.side_effect = [
+                _resp(json.dumps({"answers": ["only one"]})),
+                _resp("Answer one."),
+                _resp("Answer two."),
+            ]
+            answers = ask_questions(
+                [_make_png_bytes()],
+                ["Q1?", "Q2?"],
+                config,
+            )
+
+        assert answers == ["Answer one.", "Answer two."]
+        assert create.call_count == 3
+
+    def test_batch_api_error_short_circuits_without_fallback(self) -> None:
+        """An API error on the batched call returns [error] with no retries."""
+        from ottools._image.vision import ask_questions
+
+        config = self._make_config()
+
+        with patch("ottools._image.vision.OpenAI") as MockOpenAI:
+            create = MockOpenAI.return_value.chat.completions.create
+            create.side_effect = RuntimeError("Connection refused")
+            answers = ask_questions(
+                [_make_png_bytes()],
+                ["Q1?", "Q2?"],
+                config,
+            )
+
+        assert len(answers) == 1
+        assert answers[0].startswith("Error:")
+        assert create.call_count == 1
+
+    def test_multi_image_call_interleaves_labels(self) -> None:
+        """Multi-image calls send labelled image blocks in order."""
+        from ottools._image.vision import call_vision
+
+        config = self._make_config()
+        mock_response = MagicMock()
+        mock_response.choices[0].message.content = "They differ in colour."
+
+        with patch("ottools._image.vision.OpenAI") as MockOpenAI:
+            create = MockOpenAI.return_value.chat.completions.create
+            create.return_value = mock_response
+            result = call_vision([b"img-one", b"img-two"], "what differs?", config)
+
+        assert result == "They differ in colour."
+        content = create.call_args.kwargs["messages"][0]["content"]
+        kinds = [block["type"] for block in content]
+        assert kinds == ["text", "image_url", "text", "image_url", "text"]
+        assert content[0]["text"] == "Image 1:"
+        assert content[2]["text"] == "Image 2:"
+
+    def test_extract_summary_uses_shared_json_helper(self) -> None:
+        """extract_summary() parses via parse_json_payload (fenced JSON works)."""
+        from ottools._image.vision import extract_summary
+
+        config = self._make_config()
+        mock_response = MagicMock()
+        mock_response.choices[0].message.content = (
+            '```json\n{"type": "photo", "mode": "light", "colours": ["red"], '
+            '"description": "d", "content": "c"}\n```'
+        )
+
+        with patch("ottools._image.vision.OpenAI") as MockOpenAI:
+            MockOpenAI.return_value.chat.completions.create.return_value = mock_response
+            result = extract_summary(_make_png_bytes(), config)
+
+        assert isinstance(result, dict)
+        assert result["type"] == "photo"
 
 
 # ---------------------------------------------------------------------------
@@ -1424,3 +1514,208 @@ class TestPackConstants:
         import ottools.ot_image as image
 
         assert image.pack_aliases == ("img",)
+
+
+# ---------------------------------------------------------------------------
+# Format-preserving storage + multi-image ask (ot-image-capabilities)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestStoreExtensions:
+    """Stored originals keep their source-format extension (design D2)."""
+
+    def setup_method(self) -> None:
+        self._thread_patcher = patch("ottools._image.tools.threading.Thread")
+        self._thread_patcher.start().return_value = MagicMock()
+
+    def teardown_method(self) -> None:
+        self._thread_patcher.stop()
+
+    def _load(self, tmp_path: Path, data: bytes, name: str) -> str:
+        from ottools._image import store, tools
+        from ottools._image.config import Config
+
+        img_path = tmp_path / name
+        img_path.write_bytes(data)
+        with (
+            patch.object(store, "_images_dir", return_value=tmp_path),
+            patch("ottools._image.tools.get_image_config") as mock_cfg,
+        ):
+            mock_cfg.return_value = Config(session_cache_size=10)
+            result = tools.load(img=str(img_path))
+        assert "error" not in result, result
+        return str(result["handle"]).lstrip("#")
+
+    def test_jpeg_stored_as_jpg_with_file_meta(self, tmp_path: Path) -> None:
+        from ottools._image import store
+
+        handle = self._load(tmp_path, _make_jpeg_bytes(), "photo.jpeg")
+        assert (tmp_path / f"{handle}.jpg").exists()
+        assert not (tmp_path / f"{handle}.png").exists()
+        with patch.object(store, "_images_dir", return_value=tmp_path):
+            meta = store.load_meta(handle)
+        assert meta is not None
+        assert meta["file"] == f"{handle}.jpg"
+
+    def test_svg_stored_as_svg(self, tmp_path: Path) -> None:
+        svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="red"/></svg>'
+        handle = self._load(tmp_path, svg, "shape.svg")
+        assert (tmp_path / f"{handle}.svg").exists()
+        assert (tmp_path / f"{handle}.svg").read_bytes() == svg
+
+    def test_legacy_png_without_file_key_still_resolves(self, tmp_path: Path) -> None:
+        from ottools._image import store
+
+        png = _make_png_bytes()
+        (tmp_path / "img_legacy1.png").write_bytes(png)
+        (tmp_path / "img_legacy1.meta.json").write_text(
+            json.dumps({"handle": "img_legacy1", "hash": "x"}), encoding="utf-8"
+        )
+        with patch.object(store, "_images_dir", return_value=tmp_path):
+            assert store.load_raw_bytes("img_legacy1") == png
+            found, freed = store.delete_handle_files("img_legacy1")
+        assert found is True
+        assert freed > 0
+        assert not (tmp_path / "img_legacy1.png").exists()
+        assert not (tmp_path / "img_legacy1.meta.json").exists()
+
+    def test_delete_frees_non_png_content_files(self, tmp_path: Path) -> None:
+        from ottools._image import store
+
+        handle = self._load(tmp_path, _make_jpeg_bytes(), "photo.jpeg")
+        jpg_size = (tmp_path / f"{handle}.jpg").stat().st_size
+        with patch.object(store, "_images_dir", return_value=tmp_path):
+            found, freed = store.delete_handle_files(handle)
+        assert found is True
+        assert freed >= jpg_size
+        assert not list(tmp_path.glob(f"{handle}.*"))
+
+    def test_purge_frees_non_png_entries(self, tmp_path: Path) -> None:
+        from ottools._image import lifecycle, store
+
+        handle = self._load(tmp_path, _make_jpeg_bytes(), "photo.jpeg")
+        with patch.object(store, "_images_dir", return_value=tmp_path), \
+             patch("ottools._image.lifecycle._images_dir", return_value=tmp_path):
+            result = lifecycle.purge_images(all=True)
+        assert result["purged"] >= 1
+        assert result["bytes_freed"] > 0
+        assert not (tmp_path / f"{handle}.jpg").exists()
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestAskMultiImage:
+    """ask() with a list of image references (design D1)."""
+
+    def setup_method(self) -> None:
+        import ottools._image.vision as _v
+        _v._client = None
+        _v._client_key = ("", "")
+        self._thread_patcher = patch("ottools._image.tools.threading.Thread")
+        self._thread_patcher.start().return_value = MagicMock()
+        self._api_key_patch = patch(
+            "ottools._image.vision.get_image_api_key", return_value="sk-test"
+        )
+        self._api_key_patch.start()
+
+    def teardown_method(self) -> None:
+        self._thread_patcher.stop()
+        self._api_key_patch.stop()
+
+    def _load_two(self, tmp_path: Path, mock_cfg: MagicMock) -> tuple[str, str]:
+        from ottools._image import store, tools
+        from ottools._image.config import Config
+
+        mock_cfg.return_value = Config(session_cache_size=10, model="openai/gpt-4o-mini")
+        (tmp_path / "a.png").write_bytes(_make_png_bytes(20, 20))
+        (tmp_path / "b.png").write_bytes(_make_png_bytes(40, 40))
+        with patch.object(store, "_images_dir", return_value=tmp_path):
+            h1 = tools.load(img=str(tmp_path / "a.png"))["handle"]
+            h2 = tools.load(img=str(tmp_path / "b.png"))["handle"]
+        return h1, h2
+
+    def test_two_handles_return_handles_list_and_ordered_payloads(self, tmp_path: Path) -> None:
+        from ottools._image import store, tools
+
+        with (
+            patch.object(store, "_images_dir", return_value=tmp_path),
+            patch("ottools._image.tools.get_image_config") as mock_cfg,
+        ):
+            h1, h2 = self._load_two(tmp_path, mock_cfg)
+
+            captured: dict[str, Any] = {}
+
+            def fake_ask(images: list[bytes], questions: list[str], config: Any) -> list[str]:
+                captured["images"] = images
+                return ["they differ"]
+
+            with patch("ottools._image.tools.ask_questions", side_effect=fake_ask):
+                result = tools.ask(img=[h1, h2], q="what differs?")
+
+        assert result["handles"] == [h1, h2]
+        assert "handle" not in result
+        assert len(captured["images"]) == 2
+        assert captured["images"][0] != captured["images"][1]
+
+    def test_single_element_list_returns_handles_key(self, tmp_path: Path) -> None:
+        from ottools._image import store, tools
+
+        with (
+            patch.object(store, "_images_dir", return_value=tmp_path),
+            patch("ottools._image.tools.get_image_config") as mock_cfg,
+        ):
+            h1, _ = self._load_two(tmp_path, mock_cfg)
+            with patch("ottools._image.tools.ask_questions", return_value=["one"]):
+                result = tools.ask(img=[h1], q="q?")
+
+        assert result["handles"] == [h1]
+        assert "handle" not in result
+
+    def test_string_input_still_returns_handle_key(self, tmp_path: Path) -> None:
+        from ottools._image import store, tools
+
+        with (
+            patch.object(store, "_images_dir", return_value=tmp_path),
+            patch("ottools._image.tools.get_image_config") as mock_cfg,
+        ):
+            h1, _ = self._load_two(tmp_path, mock_cfg)
+            with patch("ottools._image.tools.ask_questions", return_value=["one"]):
+                result = tools.ask(img=h1, q="q?")
+
+        assert result["handle"] == h1
+        assert "handles" not in result
+
+    def test_empty_list_and_cap_error_without_model_call(self, tmp_path: Path) -> None:
+        from ottools._image import store, tools
+
+        with (
+            patch.object(store, "_images_dir", return_value=tmp_path),
+            patch("ottools._image.tools.get_image_config") as mock_cfg,
+            patch("ottools._image.tools.ask_questions") as mock_ask,
+        ):
+            from ottools._image.config import Config
+
+            mock_cfg.return_value = Config(session_cache_size=10)
+            empty = tools.ask(img=[], q="q?")
+            over = tools.ask(img=[f"#h{i}" for i in range(9)], q="q?")
+
+        assert empty["error"] == "img list is empty"
+        assert "8" in over["error"]
+        mock_ask.assert_not_called()
+
+    def test_unresolvable_entry_fails_fast_naming_reference(self, tmp_path: Path) -> None:
+        from ottools._image import store, tools
+
+        with (
+            patch.object(store, "_images_dir", return_value=tmp_path),
+            patch("ottools._image.tools.get_image_config") as mock_cfg,
+            patch("ottools._image.tools.ask_questions") as mock_ask,
+        ):
+            h1, _ = self._load_two(tmp_path, mock_cfg)
+            result = tools.ask(img=[h1, str(tmp_path / "missing.png")], q="q?")
+
+        assert "error" in result
+        assert result["handle"] == str(tmp_path / "missing.png")
+        mock_ask.assert_not_called()
