@@ -40,7 +40,6 @@ INIT_TEMPLATE_FILES = (
     "diagram.yaml",
 )
 INIT_TEMPLATE_DIRS = {
-    "arch-templates": "templates/arch",
     "diagram-templates": "templates/diagram",
 }
 

@@ -1,0 +1,115 @@
+.root {
+  --explorer-navigation-width: 17rem;
+  --explorer-inspector-width: 20rem;
+  background: var(--ot-surface);
+  color: var(--ot-text);
+  display: grid;
+  grid-template:
+    'header header header' auto
+    'navigation canvas inspector' minmax(28rem, 1fr)
+    'navigation data data' auto /
+    var(--explorer-navigation-width) minmax(0, 1fr) var(--explorer-inspector-width);
+  min-height: 100vh;
+}
+
+.header {
+  align-items: center;
+  background: var(--ot-surface);
+  border-block-end: 1px solid var(--ot-border);
+  display: flex;
+  gap: var(--mantine-spacing-md);
+  grid-area: header;
+  justify-content: space-between;
+  min-height: 4.25rem;
+  padding: var(--mantine-spacing-sm) var(--mantine-spacing-lg);
+}
+
+.navigation {
+  background: var(--ot-surface-muted);
+  border-inline-end: 1px solid var(--ot-border);
+  grid-area: navigation;
+  min-width: 0;
+  overflow: auto;
+  padding: var(--mantine-spacing-md);
+}
+
+.canvas {
+  background: var(--ot-canvas);
+  grid-area: canvas;
+  min-height: 28rem;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.inspector {
+  background: var(--ot-surface);
+  border-inline-start: 1px solid var(--ot-border);
+  grid-area: inspector;
+  min-width: 0;
+  overflow: auto;
+  padding: var(--mantine-spacing-md);
+}
+
+.dataRegion {
+  border-block-start: 1px solid var(--ot-border);
+  grid-area: data;
+  min-width: 0;
+  padding: var(--mantine-spacing-md);
+}
+
+@media (max-width: 70rem) {
+  .root {
+    grid-template:
+      'header header' auto
+      'navigation canvas' minmax(28rem, 1fr)
+      'inspector inspector' auto
+      'data data' auto /
+      minmax(14rem, var(--explorer-navigation-width)) minmax(0, 1fr);
+  }
+
+  .inspector {
+    border-block-start: 1px solid var(--ot-border);
+    border-inline-start: 0;
+    max-height: 18rem;
+  }
+}
+
+@media (max-width: 48rem) {
+  .root {
+    display: block;
+  }
+
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .navigation,
+  .inspector {
+    border: 0;
+    border-block-end: 1px solid var(--ot-border);
+    max-height: 18rem;
+  }
+
+  .canvas {
+    height: 58vh;
+  }
+}
+
+@media print {
+  .root {
+    display: block;
+  }
+
+  .header,
+  .navigation,
+  .inspector,
+  .dataRegion {
+    display: none;
+  }
+
+  .canvas {
+    height: 100vh;
+  }
+}

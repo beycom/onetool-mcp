@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "title": "Architecture Explorer",
+  "initialGraphId": "sample-base",
+  "graphs": [
+    {
+      "id": "sample-base",
+      "selection": {
+        "id": "selection-sample",
+        "state_id": "sample-base",
+        "roadmap_id": "sample",
+        "order": 0,
+        "through": "base",
+        "selection": {
+          "browse_by": "system",
+          "visibility": "all",
+          "focus": [],
+          "display_statuses": [],
+          "include_future": false,
+          "system_set": { "systems": [], "system_groups": [], "changes": [], "change_groups": [], "tags": [] },
+          "interface_depth": 0,
+          "level": "system",
+          "color_by": "change_status",
+          "theme": "clean"
+        }
+      },
+      "resolved_state": { "id": "sample-base" },
+      "nodes": [
+        { "id": "platform", "entity_kind": "system", "name": "Payments Platform", "children": ["web", "api", "database"], "status": "no_change", "tombstone": false, "future": false, "tags": ["core"], "groups": [], "related_changes": ["payment-modernization"], "properties": {} },
+        { "id": "web", "entity_kind": "application", "name": "Web Application", "parent": "platform", "children": [], "status": "change", "tombstone": false, "future": false, "tags": [], "groups": [], "related_changes": ["payment-modernization"], "properties": { "owner": "Experience" } },
+        { "id": "api", "entity_kind": "application", "name": "Payments API", "parent": "platform", "children": ["ledger", "fraud"], "status": "new", "tombstone": false, "future": false, "tags": [], "groups": [], "related_changes": ["payment-modernization"], "properties": { "owner": "Payments" } },
+        { "id": "ledger", "entity_kind": "component", "name": "Ledger", "parent": "api", "children": [], "status": "new", "tombstone": false, "future": false, "tags": [], "groups": [], "related_changes": ["payment-modernization"], "properties": {} },
+        { "id": "fraud", "entity_kind": "component", "name": "Fraud Checks", "parent": "api", "children": [], "status": "change", "tombstone": false, "future": false, "tags": [], "groups": [], "related_changes": ["payment-modernization"], "properties": {} },
+        { "id": "database", "entity_kind": "application", "name": "Payments Database", "parent": "platform", "children": [], "status": "no_change", "tombstone": false, "future": false, "tags": [], "groups": [], "related_changes": [], "properties": {} },
+        { "id": "customer", "entity_kind": "user", "name": "Customer", "children": [], "status": "no_change", "tombstone": false, "future": false, "tags": [], "groups": [], "related_changes": [], "properties": {} }
+      ],
+      "containers": ["api", "platform"],
+      "edges": [
+        { "id": "payment-submit", "entity_kind": "interface", "name": "Submits payment", "source_id": "customer", "target_id": "web", "status": "change", "tombstone": false, "future": false, "interface_ids": ["payment-submit"], "related_changes": ["payment-modernization"], "properties": { "type": "https" } },
+        { "id": "payment-api", "entity_kind": "interface", "name": "POST /payments", "source_id": "web", "target_id": "api", "status": "new", "tombstone": false, "future": false, "interface_ids": ["payment-api"], "related_changes": ["payment-modernization"], "properties": { "type": "api" } }
+      ],
+      "changes": [
+        { "id": "payment-modernization", "name": "Payment modernization", "order": 1, "metadata": { "owner": "Team Payments" }, "affected_systems": ["platform"], "operation_counts": { "add": 2, "modify": 2 } }
+      ],
+      "focus": [],
+      "focus_overrides": [],
+      "diagram_ids": ["index", "payment_flow"],
+      "hints": { "theme": "clean", "visibility": "all" }
+    }
+  ],
+  "likec4ViewByGraph": { "sample-base": "index" },
+  "canonicalToLikec4ByGraph": {
+    "sample-base": {
+      "platform": "platform",
+      "web": "platform.web",
+      "api": "platform.api",
+      "ledger": "platform.api.ledger",
+      "fraud": "platform.api.fraud",
+      "database": "platform.database",
+      "customer": "customer"
+    }
+  },
+  "likec4EdgeToCanonicalByGraph": { "sample-base": {} },
+  "diagramCatalogByGraph": { "sample-base": [] },
+  "attachments": {},
+  "tableConfigs": [],
+  "solutionSnapshots": {},
+  "presentation": {
+    "title": "Architecture Explorer",
+    "default_theme": "clean",
+    "palettes": {
+      "change_status": {
+        "system": { "no_change": {}, "changed": {}, "added": {}, "removed": {} },
+        "application": { "no_change": {}, "changed": {}, "added": {}, "removed": {} },
+        "component": { "no_change": {}, "changed": {}, "added": {}, "removed": {} },
+        "interface": { "no_change": {}, "changed": {}, "added": {}, "removed": {} }
+      },
+      "integration_type": {},
+      "tag": {}
+    },
+    "resolved_themes": {
+      "clean": {
+        "elements": {},
+        "statuses": {}
+      }
+    }
+  },
+  "unavailableOrders": [],
+  "diagnostics": []
+}

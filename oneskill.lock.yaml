@@ -1,0 +1,15 @@
+schemaVersion: 1
+sources:
+- source: /Users/gavin/01-work-thor/projects/group-hobby/onetool-mcp/skills
+  requestedRef: null
+  path: null
+  resolvedCommit: null
+  skills:
+  - name: ot-ref
+    version: 1
+    hash: a0afa33e38c8921649035307b65b99ad1b185c93321cb03e23d140a097b6d16f
+    resourcesHash: 04c0e5764281a6d67242bcc00791093279e23893bf3a8ca0268d534f2b3a421e
+    method: copy
+    targets:
+    - claude-code
+    - codex

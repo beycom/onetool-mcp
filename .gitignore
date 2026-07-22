@@ -117,6 +117,7 @@ demo/.onetool/logs/
 demo/tmp/
 
 # AI tool directories
+.agents/
 .claude/
 .opencode/
 .codex/
@@ -128,6 +129,7 @@ demo/tmp/
 
 # Worktree state files
 .gitworktree.json
+/skills-lock.json
 
 
 # Explore test outputs (local state)

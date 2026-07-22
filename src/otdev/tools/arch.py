@@ -1,491 +1,239 @@
-"""Architecture workflow tools for Excel ingestion, validation, generation, and bundling."""
+"""Schema-v2 architecture state, roadmap, explorer, and export tools."""
 
 from __future__ import annotations
 
 pack = "arch"
 
-__ot_requires__ = {
-    "cli": [("d2", "brew install d2")],
-}
+__all__ = ["bundle", "convert", "diff", "export", "generate", "init", "resolve", "validate"]
 
-__all__ = ["bundle_solution", "export_yaml", "generate", "import_yaml", "validate"]
-
-import traceback
 from typing import Any
 
-import yaml
+from pydantic import BaseModel, ConfigDict, Field
 
-from otdev.tools._arch.bundle import BundleError, bundle_solution_directory
-from otdev.tools._arch.config import (
-    ArchProfileConfig,
-    ConfigResolutionError,
-    get_active_profile,
-    get_arch_config,
-    resolve_output_dir,
-)
-from otdev.tools._arch.exporters import apply_tag_filters
-from otdev.tools._arch.generate import (
-    build_model_payload,
-    clean_diagram_rows,
-    collect_workbook_diagram_specs,
-    generate_solution,
-)
-from otdev.tools._arch.ingest import IngestError, ingest_input
-from otdev.tools._arch.models import (
-    DEFAULT_LIST_CELL_SEPARATOR,
-    MODEL_VERSION,
-    MissingDependencyError,
-    error_payload,
-)
-from otdev.tools._arch.roundtrip import (
-    RoundtripError,
-    export_entities_to_yaml,
-    import_yaml_into_template,
-    load_yaml_entities,
-)
-from otdev.tools._arch.validate import validate_entities
-from otpack import LogSpan, resolve_cwd_path
+from otdev.tools._arch.v2 import api
+from otdev.tools._arch.v2.models import Presentation
+from otpack import LogSpan, get_tool_config
 
 
-def _resolve_drawio_export_toggle(profile_data: dict[str, Any]) -> bool:
-    """Read the `drawio_export` profile `data` toggle (design D10): `data`
-    is a free-form mapping (`ArchProfileConfig.data`, `extra="forbid"` does
-    not apply to its contents), so the flag is read with an explicit type
-    check here rather than a typed config field. Defaults to enabled; a
-    non-boolean value fails generation fast with `ConfigResolutionError`
-    rather than being silently coerced (spec 'Invalid value rejected')."""
-    value = profile_data.get("drawio_export", True)
-    if not isinstance(value, bool):
-        raise ConfigResolutionError(
-            f"tools.arch.profiles.<name>.data.drawio_export must be a boolean, got {value!r}"
-        )
-    return value
+class Config(BaseModel):
+    """Architecture pack configuration discovered by the registry."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    presentation: Presentation = Field(
+        default_factory=Presentation,
+        description="Explorer defaults, themes, palettes, and table presentation",
+    )
 
 
-def _resolve_generation_profile(
-    *,
-    config: Any,
-    profile: str | None,
-    profile_yaml: str | None,
-) -> tuple[str, ArchProfileConfig]:
-    if profile_yaml is not None and profile is not None:
-        raise ConfigResolutionError("arch.generate accepts only one of profile or profile_yaml")
-
-    if profile_yaml is not None:
-        if not profile_yaml.strip():
-            raise ConfigResolutionError("profile_yaml must be a non-empty YAML string")
-        try:
-            parsed = yaml.safe_load(profile_yaml)
-        except yaml.YAMLError as exc:
-            raise ConfigResolutionError(f"Invalid profile_yaml: {exc}") from exc
-        if not isinstance(parsed, dict):
-            raise ConfigResolutionError("profile_yaml must define a YAML mapping for ArchProfileConfig")
-        try:
-            resolved_profile = ArchProfileConfig.model_validate(parsed)
-        except Exception as exc:
-            raise ConfigResolutionError(f"Invalid profile_yaml profile config: {exc}") from exc
-        return "profile_yaml", resolved_profile
-
-    return get_active_profile(config=config, profile=profile)
+def _get_config() -> Config:
+    """Return validated tools.arch configuration."""
+    return get_tool_config("arch", Config)
 
 
-def _resolve_list_cell_separator() -> str:
-    """Resolve the configured list-cell separator, falling back to the default.
-
-    Kept resilient (never raises) so validate/round-trip do not fail on unrelated
-    profile-config errors that generate() would otherwise surface.
-    """
-    try:
-        return get_arch_config().list_cell_separator
-    except ConfigResolutionError:
-        return DEFAULT_LIST_CELL_SEPARATOR
-
-
-def validate(*, input_path: str) -> dict[str, Any]:
-    """Validate architecture workbook input.
+def init(*, output_path: str, template: str = "solution") -> dict[str, Any]:
+    """Create a canonical paired schema-v2 architecture workspace.
 
     Args:
-        input_path: Workbook file, directory, or glob path.
+        output_path: New workspace directory.
+        template: Workspace template. Only ``solution`` is supported.
 
     Returns:
-        Structured validation payload with summary and issues.
+        Common operation envelope with created artifacts and diagnostics.
     """
-    with LogSpan(span="arch.validate", inputPath=input_path) as span:
-        try:
-            workbooks, entities, _passthrough = ingest_input(
-                input_path=input_path,
-                list_cell_separator=_resolve_list_cell_separator(),
-            )
-            validation = validate_entities(entities=entities)
-            payload: dict[str, Any] = {
-                "ok": validation["valid"],
-                "operation": "validate",
-                "input": {
-                    "path": str(resolve_cwd_path(input_path)),
-                    "workbooks": [str(path) for path in workbooks],
-                },
-                "valid": validation["valid"],
-                "issues": validation["issues"],
-                "summary": validation["summary"],
-            }
-            if not validation["valid"]:
-                payload["error"] = {
-                    "code": "validation_failed",
-                    "message": "Validation found blocking issues",
-                    "details": {
-                        "error_count": validation["summary"]["errors"],
-                    },
-                }
-            span.add(valid=validation["valid"], errorCount=validation["summary"]["errors"])
-            return payload
-        except (IngestError, MissingDependencyError, RoundtripError) as exc:
-            span.add(error=str(exc))
-            return error_payload(
-                operation="validate",
-                code="ingest_error",
-                message=str(exc),
-                details={"input_path": input_path},
-            )
-        except Exception as exc:  # pragma: no cover - defensive
-            span.add(error=str(exc))
-            return error_payload(
-                operation="validate",
-                code="unexpected_error",
-                message=str(exc),
-                details={"traceback": traceback.format_exc(limit=5)},
-            )
+    with LogSpan(span="arch.init", outputPath=output_path, template=template):
+        return api.init(output_path=output_path, template=template)
+
+
+def validate(
+    *,
+    input_path: str,
+    roadmaps: list[str] | None = None,
+    views: list[str] | None = None,
+) -> dict[str, Any]:
+    """Validate a schema-v2 architecture workspace through production paths.
+
+    Args:
+        input_path: YAML file, Excel workbook, or workspace directory.
+        roadmaps: Optional roadmap IDs to validate.
+        views: Optional saved view IDs to validate.
+
+    Returns:
+        Common operation envelope with validity, summary, and diagnostics.
+    """
+    with LogSpan(span="arch.validate", inputPath=input_path):
+        return api.validate(
+            input_path=input_path,
+            roadmaps=roadmaps,
+            views=views,
+            presentation=_get_config().presentation,
+        )
+
+
+def convert(*, input_path: str, output_path: str) -> dict[str, Any]:
+    """Convert a schema-v2 YAML or Excel workspace/state.
+
+    Args:
+        input_path: Source YAML file or Excel workbook.
+        output_path: Destination inferred from its YAML or Excel extension.
+
+    Returns:
+        Common operation envelope with conversion artifact and diagnostics.
+    """
+    with LogSpan(span="arch.convert", inputPath=input_path, outputPath=output_path):
+        return api.convert(
+            input_path=input_path,
+            output_path=output_path,
+            presentation=_get_config().presentation,
+        )
+
+
+def resolve(
+    *,
+    input_path: str,
+    output_path: str,
+    state: str | None = None,
+    roadmap: str | None = None,
+    through: str | None = None,
+    order: int | None = None,
+    output_state_id: str | None = None,
+) -> dict[str, Any]:
+    """Resolve and materialize one complete architecture state.
+
+    Args:
+        input_path: Source workspace.
+        output_path: Complete YAML or Excel state destination.
+        state: Optional authored complete-state ID.
+        roadmap: Optional roadmap ID.
+        through: Optional change ID or ``base`` endpoint.
+        order: Optional numeric roadmap order, including base order 0.
+        output_state_id: Optional explicit materialized state ID.
+
+    Returns:
+        Common operation envelope with resolved selection and artifact.
+    """
+    with LogSpan(span="arch.resolve", inputPath=input_path, outputPath=output_path):
+        return api.resolve(
+            input_path=input_path,
+            output_path=output_path,
+            state=state,
+            roadmap=roadmap,
+            through=through,
+            order=order,
+            output_state_id=output_state_id,
+            presentation=_get_config().presentation,
+        )
+
+
+def diff(
+    *,
+    base_path: str,
+    target_path: str,
+    output_path: str | None = None,
+    change_id: str | None = None,
+) -> dict[str, Any]:
+    """Compare complete states and optionally materialize a derived change.
+
+    Args:
+        base_path: Base complete state or workspace selection.
+        target_path: Target complete state or workspace selection.
+        output_path: Optional derived change destination.
+        change_id: Required stable ID when materializing a derived change.
+
+    Returns:
+        Common operation envelope with net differences and contributing history.
+    """
+    with LogSpan(span="arch.diff", basePath=base_path, targetPath=target_path):
+        return api.diff(
+            base_path=base_path,
+            target_path=target_path,
+            output_path=output_path,
+            change_id=change_id,
+            presentation=_get_config().presentation,
+        )
 
 
 def generate(
     *,
     input_path: str,
-    output_dir: str | None = None,
-    profile: str | None = None,
-    profile_yaml: str | None = None,
-    title: str | None = None,
-    include_tags: list[str] | None = None,
-    exclude_tags: list[str] | None = None,
+    output_path: str,
+    selections: list[str | dict[str, Any]] | None = None,
     force: bool = False,
 ) -> dict[str, Any]:
-    """Generate architecture outputs from workbook input.
+    """Generate the self-contained offline OneTool architecture explorer.
 
     Args:
-        input_path: Workbook file, directory, or glob path.
-        output_dir: Output directory for generated files.
-        profile: Profile override. Defaults to tools.arch.default_profile.
-        profile_yaml: Inline YAML profile block for this run. Mutually exclusive with profile.
-        title: Optional title for the generated solution index page.
-        include_tags: Include-only tag filter.
-        exclude_tags: Exclude tag filter.
-        force: Re-render every diagram and rewrite every output file, bypassing
-            the incremental unchanged-output reuse.
+        input_path: Source schema-v2 workspace.
+        output_path: Explorer output file or directory.
+        selections: Optional saved-view IDs or typed ad hoc selections.
+        force: Replace a user-owned destination when true.
 
     Returns:
-        Structured generation payload with solution output files.
+        Common operation envelope with generated explorer artifacts.
     """
-    with LogSpan(
-        span="arch.generate",
-        inputPath=input_path,
-        profile=profile or "<default>",
-        profileYaml=bool(profile_yaml and profile_yaml.strip()),
-    ) as span:
-        try:
-            config = get_arch_config()
-        except ConfigResolutionError as exc:
-            span.add(error=str(exc))
-            return error_payload(
-                operation="generate",
-                code="invalid_config",
-                message=str(exc),
-            )
-
-        try:
-            output_root = resolve_output_dir(output_dir=output_dir, config=config)
-            workbooks, entities, _passthrough = ingest_input(
-                input_path=input_path,
-                list_cell_separator=config.list_cell_separator,
-            )
-            profile_name, active_profile = _resolve_generation_profile(
-                config=config,
-                profile=profile,
-                profile_yaml=profile_yaml,
-            )
-            # Fail-fast (design D10): validate the drawio_export toggle at
-            # generation start, before any output is written.
-            drawio_export_enabled = _resolve_drawio_export_toggle(active_profile.data)
-            filtered = apply_tag_filters(
-                entities=entities,
-                include_tags=include_tags,
-                exclude_tags=exclude_tags,
-            )
-            validation = validate_entities(entities=filtered)
-            if not validation["valid"]:
-                span.add(valid=False, errorCount=validation["summary"]["errors"])
-                return {
-                    **error_payload(
-                        operation="generate",
-                        code="validation_failed",
-                        message="Validation failed; generation did not run",
-                        details={"error_count": validation["summary"]["errors"]},
-                    ),
-                    "valid": False,
-                    "issues": validation["issues"],
-                    "summary": validation["summary"],
-                }
-
-            diagram_specs, diagram_issues = collect_workbook_diagram_specs(entities=filtered)
-            if diagram_issues["errors"]:
-                return {
-                    **error_payload(
-                        operation="generate",
-                        code="validation_failed",
-                        message="Diagram validation failed; generation did not run",
-                        details={"error_count": len(diagram_issues["errors"])},
-                    ),
-                    "valid": False,
-                    "issues": {
-                        **validation["issues"],
-                        "diagram": diagram_issues,
-                    },
-                    "summary": {
-                        **validation["summary"],
-                        "diagram_rows": len(filtered.get("diagram", [])),
-                    },
-                }
-
-            model_payload = build_model_payload(
-                entities=filtered,
-                diagrams=clean_diagram_rows(entities=filtered),
-                include_tags=include_tags,
-                exclude_tags=exclude_tags,
-            )
-            solution_result = generate_solution(
-                output_root=output_root,
-                entities=filtered,
-                diagram_specs=diagram_specs,
-                profile_name=profile_name,
-                profile=active_profile,
-                model_payload=model_payload,
-                title=title,
-                drawio_export=drawio_export_enabled,
-                force=force,
-            )
-            if not solution_result["ok"]:
-                return solution_result
-            solution_files: list[str] = solution_result["files"]
-
-            summary = {
-                "formats": ["solution"],
-                "generated_files": len(solution_files),
-                "counts": validation["summary"]["counts"],
-                "warnings": validation["summary"]["warnings"],
-                "diagram_rows": len(filtered.get("diagram", [])),
-                "model_version": MODEL_VERSION,
-                "renders": solution_result["renders"],
-            }
-            span.add(valid=True, profile=profile_name, generatedFiles=summary["generated_files"])
-            return {
-                "ok": True,
-                "operation": "generate",
-                "input": {
-                    "path": str(resolve_cwd_path(input_path)),
-                    "workbooks": [str(path) for path in workbooks],
-                },
-                "output_dir": str(output_root),
-                "profile": profile_name,
-                "filters": {
-                    "include_tags": include_tags or [],
-                    "exclude_tags": exclude_tags or [],
-                },
-                "files": {"solution": solution_files},
-                "issues": validation["issues"],
-                "model": {"version": MODEL_VERSION},
-                "summary": summary,
-            }
-        except (IngestError, MissingDependencyError, RoundtripError) as exc:
-            span.add(error=str(exc))
-            return error_payload(
-                operation="generate",
-                code="ingest_error",
-                message=str(exc),
-                details={"input_path": input_path},
-            )
-        # Error-code scheme: "invalid_config" = tools.arch config itself is
-        # invalid (get_arch_config, render-target resolution);
-        # "template_not_found" = a report/diagram template is missing;
-        # "config_error" = profile resolution/validation at generate() level
-        # (profile/profile_yaml args, profile data toggles).
-        except ConfigResolutionError as exc:
-            span.add(error=str(exc))
-            return error_payload(
-                operation="generate",
-                code="config_error",
-                message=str(exc),
-            )
-        except Exception as exc:  # pragma: no cover - defensive
-            span.add(error=str(exc))
-            return error_payload(
-                operation="generate",
-                code="unexpected_error",
-                message=str(exc),
-                details={"traceback": traceback.format_exc(limit=5)},
-            )
+    with LogSpan(span="arch.generate", inputPath=input_path, outputPath=output_path):
+        return api.generate(
+            input_path=input_path,
+            output_path=output_path,
+            selections=selections,
+            force=force,
+            presentation=_get_config().presentation,
+        )
 
 
-def export_yaml(*, input_path: str, output_path: str) -> dict[str, Any]:
-    """Export Excel entity sheets to YAML.
-
-    Args:
-        input_path: Workbook file, directory, or glob path.
-        output_path: YAML output path.
-
-    Returns:
-        Structured export result.
-    """
-    with LogSpan(span="arch.export_yaml", inputPath=input_path, outputPath=output_path) as span:
-        try:
-            _, entities, passthrough = ingest_input(
-                input_path=input_path,
-                list_cell_separator=_resolve_list_cell_separator(),
-            )
-            destination = resolve_cwd_path(output_path)
-            exported = export_entities_to_yaml(
-                entities=entities,
-                output_path=destination,
-                passthrough=passthrough,
-            )
-            span.add(ok=True)
-            return {
-                "ok": True,
-                "operation": "export_yaml",
-                "output_path": exported,
-                "summary": {"counts": {sheet: len(rows) for sheet, rows in entities.items()}},
-            }
-        except (IngestError, MissingDependencyError, RoundtripError) as exc:
-            span.add(error=str(exc))
-            return error_payload(
-                operation="export_yaml",
-                code="roundtrip_error",
-                message=str(exc),
-                details={"input_path": input_path, "output_path": output_path},
-            )
-        except Exception as exc:  # pragma: no cover - defensive
-            span.add(error=str(exc))
-            return error_payload(
-                operation="export_yaml",
-                code="unexpected_error",
-                message=str(exc),
-                details={"traceback": traceback.format_exc(limit=5)},
-            )
-
-
-def import_yaml(*, input_path: str, template_path: str, output_path: str) -> dict[str, Any]:
-    """Import YAML entities into a template workbook.
-
-    Args:
-        input_path: YAML input path.
-        template_path: Workbook template path.
-        output_path: Output workbook path.
-
-    Returns:
-        Structured import result including validation.
-    """
-    with LogSpan(
-        span="arch.import_yaml",
-        inputPath=input_path,
-        templatePath=template_path,
-        outputPath=output_path,
-    ) as span:
-        try:
-            entities, passthrough = load_yaml_entities(input_path=resolve_cwd_path(input_path))
-            imported_path = import_yaml_into_template(
-                entities=entities,
-                template_path=resolve_cwd_path(template_path),
-                output_path=resolve_cwd_path(output_path),
-                list_cell_separator=_resolve_list_cell_separator(),
-                passthrough=passthrough,
-            )
-            validation_result = validate(input_path=imported_path)
-            response: dict[str, Any] = {
-                "ok": validation_result.get("valid", False),
-                "operation": "import_yaml",
-                "output_path": imported_path,
-                "validation": validation_result,
-            }
-            if not response["ok"]:
-                response["error"] = {
-                    "code": "validation_failed",
-                    "message": "Imported workbook failed validation",
-                    "details": {
-                        "error_count": validation_result.get("summary", {}).get("errors", 0)
-                    },
-                }
-            span.add(ok=response["ok"])
-            return response
-        except (RoundtripError, MissingDependencyError, IngestError) as exc:
-            span.add(error=str(exc))
-            return error_payload(
-                operation="import_yaml",
-                code="roundtrip_error",
-                message=str(exc),
-                details={
-                    "input_path": input_path,
-                    "template_path": template_path,
-                    "output_path": output_path,
-                },
-            )
-        except Exception as exc:  # pragma: no cover - defensive
-            span.add(error=str(exc))
-            return error_payload(
-                operation="import_yaml",
-                code="unexpected_error",
-                message=str(exc),
-                details={"traceback": traceback.format_exc(limit=5)},
-            )
-
-
-def bundle_solution(
+def export(
     *,
-    directory: str,
-    output_path: str | None = None,
-    include: str | None = None,
+    input_path: str,
+    output_path: str,
+    formats: list[str],
+    selections: list[str | dict[str, Any]] | None = None,
+    drawio_mode: str = "per-view",
+    continue_on_error: bool = False,
+    force: bool = False,
 ) -> dict[str, Any]:
-    """Bundle generated solution outputs by inlining SVG and zipping directory.
+    """Export normalized architecture selections in production formats.
 
     Args:
-        directory: Solution directory.
-        output_path: Optional explicit zip path.
-        include: Optional file, directory, or glob pattern for extra bundle files.
+        input_path: Source schema-v2 workspace.
+        output_path: Owned export destination.
+        formats: Requested output formats.
+        selections: Optional saved-view IDs or typed ad hoc selections.
+        drawio_mode: ``per-view`` or ``multi-tab`` Draw.io output.
+        continue_on_error: Continue independent artifacts after a failure.
+        force: Replace a user-owned destination when true.
 
     Returns:
-        Structured bundle result.
+        Common operation envelope with per-artifact outcomes and fidelity issues.
     """
-    with LogSpan(span="arch.bundle_solution", directory=directory) as span:
-        try:
-            result = bundle_solution_directory(
-                directory=resolve_cwd_path(directory),
-                output_path=resolve_cwd_path(output_path) if output_path else None,
-                include=include,
-            )
-            span.add(ok=True, archivedFiles=len(result["archived_files"]))
-            return {
-                "ok": True,
-                "operation": "bundle_solution",
-                **result,
-            }
-        except (BundleError, MissingDependencyError) as exc:
-            span.add(error=str(exc))
-            return error_payload(
-                operation="bundle_solution",
-                code="bundle_error",
-                message=str(exc),
-                details={"directory": directory, "output_path": output_path, "include": include},
-            )
-        except Exception as exc:  # pragma: no cover - defensive
-            span.add(error=str(exc))
-            return error_payload(
-                operation="bundle_solution",
-                code="unexpected_error",
-                message=str(exc),
-                details={"traceback": traceback.format_exc(limit=5)},
-            )
+    with LogSpan(span="arch.export", inputPath=input_path, outputPath=output_path):
+        return api.export(
+            input_path=input_path,
+            output_path=output_path,
+            formats=formats,
+            selections=selections,
+            drawio_mode=drawio_mode,
+            continue_on_error=continue_on_error,
+            force=force,
+            presentation=_get_config().presentation,
+        )
+
+
+def bundle(
+    *, input_path: str, output_path: str, include_generated: bool = False
+) -> dict[str, Any]:
+    """Create a deterministic portable schema-v2 workspace bundle.
+
+    Args:
+        input_path: Source workspace.
+        output_path: Destination archive.
+        include_generated: Include only manifest-owned generated outputs.
+
+    Returns:
+        Common operation envelope with deterministic bundle artifact.
+    """
+    with LogSpan(span="arch.bundle", inputPath=input_path, outputPath=output_path):
+        return api.bundle(
+            input_path=input_path,
+            output_path=output_path,
+            include_generated=include_generated,
+        )

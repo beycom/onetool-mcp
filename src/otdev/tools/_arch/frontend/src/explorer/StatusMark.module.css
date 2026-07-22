@@ -1,0 +1,20 @@
+.root {
+  align-items: center;
+  background: color-mix(in srgb, var(--status-color) 12%, transparent);
+  border: 1px var(--status-border-style) var(--status-color);
+  border-radius: 999px;
+  color: var(--ot-text);
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 600;
+  gap: 0.35rem;
+  line-height: 1;
+  padding: 0.3rem 0.5rem;
+  white-space: nowrap;
+}
+
+.cue {
+  color: var(--status-color);
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 700;
+}

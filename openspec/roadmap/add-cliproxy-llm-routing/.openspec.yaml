@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-07-19
+goal: Route LLM-backed tools through explicit CLIProxyAPI or direct generation
+  backends with shared model and effort controls while keeping embeddings separate.

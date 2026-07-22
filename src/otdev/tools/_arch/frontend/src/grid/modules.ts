@@ -1,0 +1,40 @@
+import {
+  CellStyleModule,
+  ClientSideRowModelModule,
+  ColumnApiModule,
+  ColumnAutoSizeModule,
+  CsvExportModule,
+  DateFilterModule,
+  ExternalFilterModule,
+  GridStateModule,
+  ModuleRegistry,
+  NumberFilterModule,
+  QuickFilterModule,
+  RowSelectionModule,
+  RowStyleModule,
+  ScrollApiModule,
+  TextFilterModule,
+  TooltipModule,
+  ValidationModule,
+} from 'ag-grid-community'
+
+export const ARCH_GRID_COMMUNITY_MODULES = [
+  CellStyleModule,
+  ClientSideRowModelModule,
+  ColumnApiModule,
+  ColumnAutoSizeModule,
+  CsvExportModule,
+  DateFilterModule,
+  ExternalFilterModule,
+  GridStateModule,
+  NumberFilterModule,
+  QuickFilterModule,
+  RowSelectionModule,
+  RowStyleModule,
+  ScrollApiModule,
+  TextFilterModule,
+  TooltipModule,
+  ValidationModule,
+] as const
+
+ModuleRegistry.registerModules([...ARCH_GRID_COMMUNITY_MODULES])

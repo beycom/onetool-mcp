@@ -88,6 +88,12 @@ details belong under `openspec/changes/`, not in this index.
 | [tool-console](ottools/tool-console/spec.md) | Console messages to onetool-console: show, display with digest receipts and file refs, list/read/clear |
 | [tool-timer](ottools/tool-timer/spec.md) | Named stopwatch timers |
 
+## Shared Libraries
+
+| Spec | Purpose |
+|------|---------|
+| [otpack-embedding](otpack-embedding/spec.md) | Standalone embedding, token-windowing, serialization, retry, and ranking helpers |
+
 ## Domain Tools (`[util]` Extra)
 
 | Spec | Purpose |
@@ -103,7 +109,13 @@ details belong under `openspec/changes/`, not in this index.
 
 | Spec | Purpose |
 |------|---------|
-| [tool-arch-model-centric-rendering](otdev/tool-arch-model-centric-rendering/spec.md) | Architecture model import, validation, export, and rendering |
+| [tool-arch-diagram-catalog](otdev/tool-arch-diagram-catalog/spec.md) | Architecture diagram catalog, view-only LikeC4 sources, variants, and portable attachments |
+| [tool-arch-likec4-explorer](otdev/tool-arch-likec4-explorer/spec.md) | Deterministic LikeC4 model generation and the offline architecture explorer |
+| [tool-arch-multi-format-export](otdev/tool-arch-multi-format-export/spec.md) | Deterministic multi-format architecture exports and artifact ownership |
+| [tool-arch-state-change-roadmap](otdev/tool-arch-state-change-roadmap/spec.md) | Architecture states, sparse changes, replay, and roadmap resolution |
+| [tool-arch-validation](otdev/tool-arch-validation/spec.md) | Unified architecture validation, diagnostics, and acceptance checks |
+| [tool-arch-view-resolution](otdev/tool-arch-view-resolution/spec.md) | Typed selections and deterministic architecture view resolution |
+| [tool-arch-yaml-excel-parity](otdev/tool-arch-yaml-excel-parity/spec.md) | Semantic parity and conversion between YAML and Excel workspaces |
 | [tool-context7](otdev/tool-context7/spec.md) | Context7 documentation lookup |
 | [tool-db](otdev/tool-db/spec.md) | SQL database introspection and querying |
 | [tool-diagram](otdev/tool-diagram/spec.md) | Diagram generation and rendering |
@@ -123,6 +135,7 @@ details belong under `openspec/changes/`, not in this index.
 | Browser Utilities | 2 |
 | Knowledge, Context, And Memory | 6 |
 | Core Built-In Tool Packs | 6 |
+| Shared Libraries | 1 |
 | Domain Tools `[util]` | 6 |
-| Domain Tools `[dev]` | 9 |
-| **Total** | **59** |
+| Domain Tools `[dev]` | 15 |
+| **Total** | **66** |

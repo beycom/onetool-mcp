@@ -1,0 +1,52 @@
+{
+  "name": "@onetool/arch-explorer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "overrides": {
+    "esbuild": "0.28.1",
+    "lodash-es": "4.18.1"
+  },
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:compat": "vitest run compat",
+    "verify:dependencies": "node scripts/verify-dependencies.mjs",
+    "verify:renderer-boundary": "node scripts/verify-renderer-boundary.mjs",
+    "verify:offline": "node scripts/verify-offline-build.mjs",
+    "generate:icons": "node scripts/generate-icon-inventory.mjs",
+    "benchmark:grid": "node scripts/benchmark-grid.mjs",
+    "check": "npm run typecheck && npm run test:compat && npm run verify:renderer-boundary && npm run build && npm run verify:dependencies && npm run verify:offline"
+  },
+  "dependencies": {
+    "@fontsource-variable/ibm-plex-sans": "5.2.8",
+    "@fontsource/ibm-plex-mono": "5.2.7",
+    "@likec4/core": "1.58.0",
+    "@likec4/diagram": "1.58.0",
+    "@likec4/generators": "1.58.0",
+    "@likec4/icons": "1.46.4",
+    "@likec4/layouts": "1.58.0",
+    "@mantine/core": "9.2.2",
+    "@mantine/hooks": "9.2.2",
+    "ag-grid-community": "36.0.1",
+    "ag-grid-react": "36.0.1",
+    "likec4": "1.58.0",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.1",
+    "@types/react": "19.2.16",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.3",
+    "playwright": "1.60.0",
+    "typescript": "6.0.3",
+    "vite": "8.1.5",
+    "vite-plugin-singlefile": "2.3.3",
+    "vitest": "4.1.10"
+  }
+}

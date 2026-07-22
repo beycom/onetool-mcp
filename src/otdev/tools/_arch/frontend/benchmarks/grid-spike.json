@@ -1,0 +1,12 @@
+{
+  "fixtureRows": 5000,
+  "filterMs": 73.7,
+  "keyboardFocusVisible": true,
+  "networkRequests": [],
+  "pageHtmlBytes": 6748047,
+  "screenReaderRolesPresent": true,
+  "shellOverlayRendered": true,
+  "sortMs": 52.5,
+  "startupMs": 903.8,
+  "timestamp": "2026-07-20T13:37:56.769Z"
+}

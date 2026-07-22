@@ -128,7 +128,7 @@ npx skills add https://github.com/beycom/onetool-mcp --skill ot-ref --agent clau
 
 ## Tools
 
-28 packs, 253 tools ready to use (`console` in beta):
+28 packs, 256 tools ready to use (`console` in beta):
 
 | Pack          | Tools                                                        | Extra    | Description                          |
 | ------------- | ------------------------------------------------------------ | -------- | ------------------------------------ |
@@ -258,7 +258,7 @@ __onetool wiki.summary(title="Python_(programming_language)")
 - [Quickstart](https://onetool.beycom.online/learn/quickstart/) - 30 seconds to first tool call
 - [Installation](https://onetool.beycom.online/learn/installation/) - All platforms
 - [Configuration](https://onetool.beycom.online/learn/configuration/) - YAML schema
-- [Tools Reference](https://onetool.beycom.online/reference/tools/) - All 253 tools
+- [Tools Reference](https://onetool.beycom.online/reference/tools/) - All 256 tools
 - [Security](https://onetool.beycom.online/learn/security/) - The layered security model
 - [Extending](https://onetool.beycom.online/learn/extension-tools/) - Build your own
 - [Dev Docs](https://github.com/beycom/onetool-mcp/blob/main/dev/index.md) - Internal developer documentation

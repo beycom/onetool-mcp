@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-07-18
+goal: Launch and observe supported coding harnesses through one managed
+  CLIProxyAPI route using onetool {harness} {model}.

@@ -1,0 +1,6 @@
+views {
+  dynamic view platform_delivery {
+    title 'Platform delivery flow'
+    @{B} -> @{C} 'Deliver ledger update'
+  }
+}

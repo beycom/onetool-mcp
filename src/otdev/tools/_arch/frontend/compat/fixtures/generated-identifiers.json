@@ -1,0 +1,14 @@
+{
+  "canonicalToLikeC4": {
+    "actor:customer": "customer",
+    "system:platform": "platform",
+    "application:platform/web": "platform.web",
+    "application:platform/api": "platform.api",
+    "component:platform/api/ledger": "platform.api.ledger",
+    "component:platform/api/fraud": "platform.api.fraud",
+    "application:platform/database": "platform.database",
+    "view:landscape": "index",
+    "view:platform-components": "platform_components",
+    "view:payment-flow": "payment_flow"
+  }
+}

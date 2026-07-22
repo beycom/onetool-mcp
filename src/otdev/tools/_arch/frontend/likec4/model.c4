@@ -1,0 +1,52 @@
+specification {
+  element actor {
+    style {
+      shape person
+    }
+  }
+  element system
+  element application
+  element component
+}
+
+model {
+  customer = actor 'Customer'
+
+  platform = system 'Payments Platform' {
+    web = application 'Web Application'
+    api = application 'Payments API' {
+      ledger = component 'Ledger'
+      fraud = component 'Fraud Checks'
+    }
+    database = application 'Payments Database'
+
+    web -> api 'Submits payment'
+    api -> database 'Stores payment'
+    api.fraud -> api.ledger 'Approves payment'
+  }
+
+  customer -> platform.web 'Uses'
+}
+
+views {
+  view index {
+    title 'Payments landscape'
+    include *
+  }
+
+  view platform_components {
+    title 'Platform components'
+    include platform.**
+  }
+
+  dynamic view payment_flow {
+    title 'Payment flow'
+    customer -> platform.web 'Submits payment'
+    platform.web -> platform.api.fraud 'POST /payments'
+    parallel {
+      platform.api.fraud -> platform.api.ledger 'Approves payment'
+      platform.web -> platform.api.ledger 'Records intent'
+    }
+    platform.api.ledger -> platform.database 'Commits payment'
+  }
+}

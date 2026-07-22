@@ -1,0 +1,4 @@
+interface:
+  display_name: "OneTool Architecture"
+  short_description: "Model and document solution architecture"
+  default_prompt: "Use $ot-arch to model, validate, and publish this solution architecture."

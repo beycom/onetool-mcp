@@ -1,14 +1,17 @@
 # OneTool MCP Tool Index
 
-packs=28 tools=253
+packs=28 tools=256
 
 ## arch
 ```python
-arch.bundle_solution(directory: str, output_path: str | None=None, include: str | None=None)  # Bundle generated solution outputs by inlining SVG and zipping directory.
-arch.export_yaml(input_path: str, output_path: str)  # Export Excel entity sheets to YAML.
-arch.generate(input_path: str, output_dir: str | None=None, profile: str | None=None, profile_yaml: str | None=None, title: str | None=None, include_tags: list[str] | None=None, exclude_tags: list[str] | None=None, force: bool=False)  # Generate architecture outputs from workbook input.
-arch.import_yaml(input_path: str, template_path: str, output_path: str)  # Import YAML entities into a template workbook.
-arch.validate(input_path: str)  # Validate architecture workbook input.
+arch.bundle(input_path: str, output_path: str, include_generated: bool=False)  # Create a deterministic portable schema-v2 workspace bundle.
+arch.convert(input_path: str, output_path: str)  # Convert a schema-v2 YAML or Excel workspace/state.
+arch.diff(base_path: str, target_path: str, output_path: str | None=None, change_id: str | None=None)  # Compare complete states and optionally materialize a derived change.
+arch.export(input_path: str, output_path: str, formats: list[str], selections: list[str | dict[str, Any]] | None=None, drawio_mode: str='per-view', continue_on_error: bool=False, force: bool=False)  # Export normalized architecture selections in production formats.
+arch.generate(input_path: str, output_path: str, selections: list[str | dict[str, Any]] | None=None, force: bool=False)  # Generate the self-contained offline OneTool architecture explorer.
+arch.init(output_path: str, template: str='solution')  # Create a canonical paired schema-v2 architecture workspace.
+arch.resolve(input_path: str, output_path: str, state: str | None=None, roadmap: str | None=None, through: str | None=None, order: int | None=None, output_state_id: str | None=None)  # Resolve and materialize one complete architecture state.
+arch.validate(input_path: str, roadmaps: list[str] | None=None, views: list[str] | None=None)  # Validate a schema-v2 architecture workspace through production paths.
 ```
 
 ## brave, br

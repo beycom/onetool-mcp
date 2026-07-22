@@ -8,6 +8,10 @@ set positional-arguments := true
 ot_config := justfile_directory() + "/.onetool/onetool.yaml"
 ot_dir := justfile_directory() + "/.onetool"
 direct_port := "8765"
+oneskill_project := "/Users/gavin/01-work-thor/projects/group-hobby/oneskill"
+apm_manifest := justfile_directory() + "/apm.yaml"
+agents_ot_ref := justfile_directory() + "/.agents/skills/ot-ref"
+codex_skills := justfile_directory() + "/.codex/skills"
 
 # Default: show available commands
 default:
@@ -25,8 +29,29 @@ install:
 install-locked:
     uv sync --locked --group dev --all-extras
 
-# Run all quality checks (lint, typecheck, test)
-check: lint typecheck test
+# Install project skills for Claude and Codex
+skills-install *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for arg in "$@"; do
+        if [[ "$arg" == "--dry-run" ]]; then
+            exec uv run --project {{ quote(oneskill_project) }} oneskill install \
+                --manifest {{ quote(apm_manifest) }} "$@"
+        fi
+    done
+    mkdir -p {{ quote(justfile_directory() + "/.agents/skills") }}
+    if [[ -d {{ quote(codex_skills + "/ot-ref") }} ]]; then
+        rm -rf {{ quote(agents_ot_ref) }}
+        cp -R {{ quote(codex_skills + "/ot-ref") }} {{ quote(agents_ot_ref) }}
+    fi
+    uv run --project {{ quote(oneskill_project) }} oneskill install \
+        --manifest {{ quote(apm_manifest) }} "$@"
+    mkdir -p {{ quote(codex_skills) }}
+    rm -rf {{ quote(codex_skills + "/ot-ref") }}
+    mv {{ quote(agents_ot_ref) }} {{ quote(codex_skills + "/ot-ref") }}
+
+# Run all quality checks (lint, typecheck, test, architecture frontend)
+check: lint typecheck test arch-frontend-check
 
 # Run the MCP server in development mode (uses dev config)
 dev *args:
@@ -55,6 +80,11 @@ test-int *args:
 # Run all tests including integration (strict)
 test-all *args:
     uv run --all-extras pytest {{ args }}
+
+# Reproducibly install and verify the pinned offline architecture frontend
+arch-frontend-check:
+    cd src/otdev/tools/_arch/frontend && npm ci --ignore-scripts
+    cd src/otdev/tools/_arch/frontend && npm_config_offline=true npm run check
 
 # Download test data from beycom/onetool-mcp-test into tests/data/
 test-setup:

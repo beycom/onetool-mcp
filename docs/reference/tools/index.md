@@ -1,6 +1,6 @@
 # Tool Reference
 
-**28 Packs. 253 Tools.**
+**28 Packs. 256 Tools.**
 
 Complete reference of all built-in tool packs and functions.
 
@@ -27,7 +27,7 @@ uv tool install 'onetool-mcp[util,dev]'  # most tools
 
 | Pack | Extra | Description | Tool Count | Credits | Tools |
 |------|-------|-------------|---|---------|-------|
-| [**Arch**](arch.md) | `[dev]` | Architecture workflows for Excel ingest, validation, generation, round-trip, and bundling. | 5 | MIT | `bundle_solution`, `export_yaml`, `generate`, `import_yaml`, `validate` |
+| [**Arch**](arch.md) | `[dev]` | Schema-v2 state, change, roadmap, LikeC4 explorer, validation, and export workflows. | 8 | MIT | `bundle`, `convert`, `diff`, `export`, `generate`, `init`, `resolve`, `validate` |
 | [**Brave**](brave.md) | `[util]` | Web search via Brave Search API. | 5 | [brave-search-mcp-server](https://github.com/brave/brave-search-mcp-server) (MIT) | `image`, `news`, `search`, `search_batch`, `video` |
 | [**Chrome DevTools Util**](chrome-util.md) | `[dev]` | Visual element annotation for a Chrome DevTools-compatible MCP server. | 5 | MIT | `clear_annotations`, `guide_user`, `highlight_element`, `inject_annotations`, `scan_annotations` |
 | [**Console**](console.md) | core | Publish inline messages to a connected onetool-console app via the signed Console outbox. | 5 | MIT | `clear`, `display`, `list`, `read`, `show` |

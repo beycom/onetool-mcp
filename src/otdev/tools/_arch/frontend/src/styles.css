@@ -1,0 +1,253 @@
+@layer reset, base, mantine, xyflow, tokens, recipes, utilities;
+
+@import '@mantine/core/styles.layer.css';
+@import '@likec4/diagram/styles-min.css';
+
+:root {
+  color-scheme: light dark;
+  font-family: 'IBM Plex Sans Variable', system-ui, sans-serif;
+  --ot-accent: #008fc7;
+  --ot-border: #d9e1e8;
+  --ot-canvas: #f8fafb;
+  --ot-focus: #0079a8;
+  --ot-surface: #ffffff;
+  --ot-surface-muted: #f3f6f8;
+  --ot-text: #17212b;
+  --ot-text-muted: #5f6f7c;
+}
+
+[data-mantine-color-scheme='dark'] {
+  --ot-border: #34424f;
+  --ot-canvas: #0f171d;
+  --ot-focus: #47c5f4;
+  --ot-surface: #131b22;
+  --ot-surface-muted: #1b2630;
+  --ot-text: #edf4f8;
+  --ot-text-muted: #aebbc5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--ot-surface-muted);
+  color: var(--ot-text);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--ot-focus) 48%, transparent);
+  outline-offset: 2px;
+}
+
+.skip-link {
+  background: var(--ot-accent);
+  border-radius: 0.25rem;
+  color: white;
+  left: 1rem;
+  padding: 0.7rem 1rem;
+  position: fixed;
+  top: -5rem;
+  z-index: 1000;
+}
+
+.skip-link:focus {
+  top: 1rem;
+}
+
+.eyebrow {
+  color: var(--ot-accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+[aria-label='Architecture diagram'] > div:not(.canvas-toolbar) {
+  height: 100%;
+  width: 100%;
+}
+
+.canvas-toolbar {
+  background: color-mix(in srgb, var(--ot-surface) 90%, transparent);
+  border: 1px solid var(--ot-border);
+  border-radius: 0.4rem;
+  inset-block-end: 0.75rem;
+  inset-inline-start: 0.75rem;
+  padding: 0.35rem;
+  position: absolute;
+  z-index: 8;
+}
+
+.external-diagram {
+  background: var(--ot-surface);
+  border: 0;
+  height: 100%;
+  min-height: 32rem;
+  object-fit: contain;
+  width: 100%;
+}
+
+.solution-summary {
+  left: 0.75rem;
+  max-width: min(42rem, calc(100% - 1.5rem));
+  position: absolute;
+  top: 0.75rem;
+  z-index: 4;
+}
+
+.open-full-explorer {
+  inset-block-start: 0.75rem;
+  inset-inline-end: 0.75rem;
+  position: absolute;
+  z-index: 8;
+}
+
+.full-explorer-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+  height: calc(100dvh - 4rem);
+  min-height: 30rem;
+}
+
+.full-explorer-canvas {
+  min-width: 0;
+}
+
+.full-explorer-details {
+  background: var(--ot-surface);
+  border-inline-start: 1px solid var(--ot-border);
+  overflow: auto;
+  padding: var(--mantine-spacing-md);
+}
+
+.diagram-status-cue {
+  align-items: center;
+  background: var(--ot-surface);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  display: inline-flex;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  height: 1.35rem;
+  inset-block-start: 0.35rem;
+  inset-inline-end: 0.35rem;
+  justify-content: center;
+  position: absolute;
+  width: 1.35rem;
+}
+
+[data-onetool-node][data-context-status='future'] {
+  border-style: dashed;
+}
+
+[data-onetool-node][data-context-status='decommission'] {
+  opacity: 0.84;
+}
+
+.browse-item {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 3.25rem;
+  border-radius: var(--mantine-radius-sm);
+}
+
+.diagnostics-region {
+  inset-block-end: 1rem;
+  inset-inline-end: 1rem;
+  max-width: min(30rem, calc(100vw - 2rem));
+  position: fixed;
+  z-index: 100;
+}
+
+.data-toolbar {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: space-between;
+  margin-block-end: 0.75rem;
+}
+
+.data-toolbar > * {
+  flex: 0 1 auto;
+}
+
+.row-count {
+  color: var(--ot-text-muted);
+  display: block;
+  font-size: 0.78rem;
+}
+
+.grid-shell {
+  height: min(48vh, 34rem);
+  min-height: 20rem;
+}
+
+[data-density='compact'] .ag-cell,
+[data-density='compact'] .ag-header-cell {
+  font-size: 0.82rem;
+}
+
+.ag-row-selected .ag-cell:first-of-type {
+  box-shadow: inset 3px 0 0 var(--ot-accent);
+}
+
+@media (max-width: 48rem) {
+  .full-explorer-layout {
+    display: block;
+  }
+
+  .full-explorer-canvas {
+    height: 65dvh;
+  }
+
+  .full-explorer-details {
+    border-block-start: 1px solid var(--ot-border);
+    border-inline-start: 0;
+  }
+
+  .data-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .data-toolbar > * {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  body {
+    background: white;
+  }
+
+  .canvas-toolbar,
+  .open-full-explorer,
+  .diagnostics-region {
+    display: none;
+  }
+}

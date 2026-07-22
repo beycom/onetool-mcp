@@ -113,3 +113,4 @@ src/
 | [Proxy Flow](proxy-flow.md) | External MCP server communication (sequence diagram) |
 | [Security Model](security-model.md) | Four-layer defence, validation, sanitisation |
 | [Configuration Architecture](configuration-architecture.md) | Config files, resolution, output formatting |
+| [Solution Renderer Boundary](solution-renderer-boundary.md) | Canonical solution contracts, LikeC4 allowlist, migration triggers, performance budgets |

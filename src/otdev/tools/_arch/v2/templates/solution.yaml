@@ -1,0 +1,118 @@
+schema_version: 2
+states:
+  - id: arch-v2-base
+    systems:
+      - id: A
+        name: System A
+        description: Existing payment entry point
+        tags: [core]
+        group: [payments, core-platform]
+        properties: {owner: payments, tier: one}
+      - id: D
+        name: System D
+        description: Retiring dependency
+      - id: E
+        name: System E
+      - id: F
+        name: System F
+      - id: G
+        name: System G
+      - id: H
+        name: System H
+    applications:
+      - id: app-a
+        name: Application A
+        system: A
+      - id: app-d
+        name: Application D
+        system: D
+    components:
+      - id: cmp-d
+        name: Component D
+        application: app-d
+    interfaces:
+      - id: arch-v2-interface-a-to-d
+        name: A to D
+        provider: app-a
+        consumer: app-d
+        direction: provider_to_consumer
+        type: api
+    users:
+      - id: customer
+        name: Customer
+        kind: actor
+changes:
+  - id: arch-v2-change-2027
+    name: 2027 delivery
+    deliver_date: 2027-06-30
+    owner: Team Payments
+    group: [wave-one]
+    related_products: [wallet, payments]
+    portfolio_code: P-2027
+    patches:
+      systems:
+        - id: A
+          change_type: changed
+          description: Modernized payment entry point
+          change_note: Improve customer payment flow
+        - id: B
+          change_type: added
+          name: System B
+          description: New orchestration service
+        - id: C
+          change_type: added
+          name: System C
+          description: New ledger service
+        - id: D
+          change_type: removed
+          change_note: Retire legacy dependency
+  - id: arch-v2-change-2028
+    name: 2028 delivery
+    deliver_date: 2028-06-30
+    owner: Team Ledger
+    patches:
+      systems:
+        - id: C
+          change_type: changed
+          description: Expanded ledger service
+          expected:
+            description: New ledger service
+        - id: I
+          change_type: added
+          name: System I
+          description: Reporting service
+roadmaps:
+  - id: preferred
+    base: arch-v2-base
+    items:
+      - change: arch-v2-change-2027
+        order: 1
+      - change: arch-v2-change-2028
+        order: 2
+views:
+  - id: state-2027
+    name: State at 2027
+    roadmap: preferred
+    through: arch-v2-change-2027
+  - id: compare-base-2027
+    name: Base to 2027
+    roadmap: preferred
+    through: arch-v2-change-2027
+    compare_from: base
+    visibility: changes_with_context
+  - id: focus-2027-at-2028
+    name: 2027 focus at 2028
+    roadmap: preferred
+    through: arch-v2-change-2028
+    focus: [arch-v2-change-2027]
+diagrams:
+  - id: platform-delivery
+    name: Platform delivery flow
+    kind: dynamic
+    source: views/platform-delivery.c4
+    variants:
+      - id: diagram
+        kind: diagram
+      - id: sequence
+        kind: sequence
+    systems: [A, B, C]

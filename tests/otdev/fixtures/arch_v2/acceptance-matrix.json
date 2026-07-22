@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "outcomes": [
+    {
+      "id": "canonical-validation-parity",
+      "test": "tests/otdev/integration/tools/test_arch_v2_validation.py::test_validate_canonical_yaml_excel_identically"
+    },
+    {
+      "id": "sparse-normalization",
+      "test": "tests/otdev/unit/tools/test_arch_v2_normalize.py::test_sparse_change_a_b_c_d"
+    },
+    {
+      "id": "blank-unset",
+      "test": "tests/otdev/unit/tools/test_arch_v2_normalize.py::test_blank_versus_unset"
+    },
+    {
+      "id": "cascade-removal",
+      "test": "tests/otdev/unit/tools/test_arch_v2_normalize.py::test_cascade_system_removal"
+    },
+    {
+      "id": "resolve-base",
+      "test": "tests/otdev/unit/tools/test_arch_v2_replay.py::test_resolve_base_zero"
+    },
+    {
+      "id": "resolve-final",
+      "test": "tests/otdev/unit/tools/test_arch_v2_replay.py::test_resolve_final_default"
+    },
+    {
+      "id": "order-diagnostics",
+      "test": "tests/otdev/integration/tools/test_arch_v2_validation.py::test_reorder_diagnostic_complete"
+    },
+    {
+      "id": "diff-materialization",
+      "test": "tests/otdev/integration/tools/test_arch_v2_resolve_diff.py::test_diff_base_target_materialization"
+    },
+    {
+      "id": "resolve-format-parity",
+      "test": "tests/otdev/integration/tools/test_arch_v2_resolve_diff.py::test_resolve_2027_yaml_excel"
+    },
+    {
+      "id": "convert-roundtrip",
+      "test": "tests/otdev/integration/tools/test_arch_v2_portable.py::test_yaml_excel_yaml_golden"
+    },
+    {
+      "id": "canonical-init",
+      "test": "tests/otdev/integration/tools/test_arch_v2_portable.py::test_init_canonical_fixture_no_drift"
+    },
+    {
+      "id": "offline-bundle",
+      "test": "tests/otdev/integration/tools/test_arch_v2_portable.py::test_bundle_offline_spaced_path"
+    },
+    {
+      "id": "comparison-view",
+      "test": "tests/otdev/unit/tools/test_arch_v2_viewgraph.py::test_compare_base_to_2027"
+    },
+    {
+      "id": "focus-view",
+      "test": "tests/otdev/unit/tools/test_arch_v2_viewgraph.py::test_focus_2027_at_2028"
+    },
+    {
+      "id": "context-projection",
+      "test": "tests/otdev/unit/tools/test_arch_v2_viewgraph.py::test_changes_with_context"
+    },
+    {
+      "id": "future-context",
+      "test": "tests/otdev/unit/tools/test_arch_v2_viewgraph.py::test_future_i_opt_in"
+    },
+    {
+      "id": "likec4-compilation",
+      "test": "tests/otdev/integration/tools/test_arch_v2_likec4.py::test_standard_view_compilation"
+    },
+    {
+      "id": "clean-theme",
+      "test": "tests/otdev/unit/tools/test_arch_v2_likec4_presentation.py::test_clean_status_palette"
+    },
+    {
+      "id": "safe-icons",
+      "test": "tests/otdev/unit/tools/test_arch_v2_likec4_presentation.py::test_nested_local_svg_portable"
+    },
+    {
+      "id": "grid-contract",
+      "test": "src/otdev/tools/_arch/frontend/tests/explorer.test.ts::grid-current-view-export"
+    },
+    {
+      "id": "fragment-restore",
+      "test": "src/otdev/tools/_arch/frontend/tests/explorer.test.ts::fragment-link-restore"
+    },
+    {
+      "id": "browser-navigation",
+      "test": "tests/otdev/integration/tools/test_arch_v2_explorer.py::test_explorer_groups_preserve_endpoint"
+    },
+    {
+      "id": "offline-order-switch",
+      "test": "tests/otdev/integration/tools/test_arch_v2_explorer.py::test_base_2027_2028_offline_switch"
+    },
+    {
+      "id": "diagram-catalog",
+      "test": "tests/otdev/unit/tools/test_arch_v2_diagram.py::test_catalog_all_diagram_classes"
+    },
+    {
+      "id": "view-only-safety",
+      "test": "tests/otdev/unit/tools/test_arch_v2_diagram.py::test_logical_declaration_rejected"
+    },
+    {
+      "id": "attachment-safety",
+      "test": "tests/otdev/unit/tools/test_arch_v2_diagram.py::test_unsafe_attachment"
+    },
+    {
+      "id": "direct-svg",
+      "test": "tests/otdev/integration/tools/test_arch_v2_export.py::test_svg_all_diagram_classes"
+    },
+    {
+      "id": "native-drawio",
+      "test": "tests/otdev/integration/tools/test_arch_v2_export.py::test_drawio_per_view_multitab"
+    },
+    {
+      "id": "state-export-parity",
+      "test": "tests/otdev/integration/tools/test_arch_v2_export.py::test_state_yaml_excel_export_equivalent"
+    },
+    {
+      "id": "incremental-manifest",
+      "test": "tests/otdev/integration/tools/test_arch_v2_export.py::test_manifest_incremental_reuse"
+    },
+    {
+      "id": "partial-export",
+      "test": "tests/otdev/integration/tools/test_arch_v2_export.py::test_partial_export_envelope"
+    },
+    {
+      "id": "duplicate-diagnostics",
+      "test": "tests/otdev/integration/tools/test_arch_v2_validation.py::test_duplicate_id_all_locations"
+    },
+    {
+      "id": "publication-gate",
+      "test": "tests/otdev/integration/tools/test_arch_v2_validation.py::test_export_prerequisite_and_publication_gate"
+    },
+    {
+      "id": "runtime-absence",
+      "test": "tests/otdev/unit/tools/test_arch_v2_cleanup.py::test_no_legacy_revision_runtime"
+    },
+    {
+      "id": "public-contract",
+      "test": "tests/otdev/unit/tools/test_arch_v2_contract.py::test_schema_v2_contract"
+    }
+  ]
+}
