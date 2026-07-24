@@ -1,0 +1,1401 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SoaP report prototype</title>
+  <link rel="stylesheet" href="../../src/otdev/tools/_arch/frontend/node_modules/ag-grid-community/styles/ag-grid.css">
+  <link rel="stylesheet" href="../../src/otdev/tools/_arch/frontend/node_modules/ag-grid-community/styles/ag-theme-quartz.css">
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, system-ui, sans-serif;
+      --ink: #1f2930;
+      --muted: #69777f;
+      --line: #e1e7ea;
+      --wash: #f6f8f9;
+      --paper: #fff;
+      --dark: #273740;
+      --accent: #147c91;
+      --accent-soft: #edf7f8;
+      --selected: #eef8fa;
+      --reach: #f6f1e7;
+      --danger: #98413a;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; overflow-x: clip; }
+    body { background: #fff; color: var(--ink); }
+    button, select, input { font: inherit; }
+    button { cursor: pointer; }
+    :focus-visible { outline: 3px solid rgb(11 120 147 / 35%); outline-offset: 2px; }
+
+    .app {
+      display: block;
+      min-height: 100vh;
+    }
+    .topbar {
+      align-items: flex-start;
+      background: white;
+      border-bottom: 1px solid #edf1f3;
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 22px clamp(12px, 1.5vw, 28px) 16px;
+      z-index: 30;
+    }
+    .title b { display: block; font-size: 24px; letter-spacing: -.025em; }
+    .title span { color: var(--muted); display: block; font-size: 11px; margin-top: 5px; }
+    .global-controls {
+      align-items: end;
+      display: flex;
+      gap: 18px;
+      padding-bottom: 14px;
+      width: 100%;
+    }
+    .field label {
+      color: var(--muted);
+      display: block;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+    }
+    .field select {
+      background: white;
+      border: 1px solid #d4dde1;
+      border-radius: 2px;
+      color: var(--ink);
+      font-size: 12px;
+      min-height: 36px;
+      min-width: 220px;
+      padding: 6px 30px 6px 9px;
+    }
+    .button {
+      background: white;
+      border: 1px solid #dbe2e5;
+      border-radius: 2px;
+      color: #34444d;
+      font-size: 9px;
+      font-weight: 650;
+      min-height: 26px;
+      padding: 4px 7px;
+    }
+    .button.icon-button {
+      align-items: center;
+      display: inline-flex;
+      justify-content: center;
+      min-width: 27px;
+      padding: 2px 5px;
+    }
+    .button.icon-button svg {
+      fill: none;
+      height: 14px;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.8;
+      width: 14px;
+    }
+    dialog {
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      color: var(--ink);
+      max-width: min(520px, calc(100vw - 24px));
+      padding: 0;
+      width: 100%;
+    }
+    dialog::backdrop { background: rgb(15 28 37 / 38%); }
+    .dialog-head {
+      align-items: center;
+      background: #fafbfb;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 12px;
+    }
+    .dialog-head b { font-size: 12px; }
+    .dialog-body { padding: 12px; }
+    .dialog-actions {
+      border-top: 1px solid var(--line);
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+      padding: 9px 12px;
+    }
+    .text-field {
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      font-size: 10px;
+      min-height: 30px;
+      padding: 5px 7px;
+      width: 100%;
+    }
+    .column-list { display: grid; gap: 4px; margin-top: 9px; }
+    .column-config-row {
+      align-items: center;
+      background: var(--wash);
+      border-radius: 1px;
+      display: grid;
+      font-size: 9px;
+      gap: 6px;
+      grid-template-columns: auto minmax(0, 1fr) 110px;
+      padding: 5px 6px;
+    }
+    .column-config-row select {
+      background: white;
+      border: 1px solid #dbe2e5;
+      border-radius: 1px;
+      font-size: 9px;
+      min-height: 26px;
+      padding: 3px 5px;
+    }
+    .yaml-preview {
+      background: #182731;
+      border-radius: 2px;
+      color: #d7e5ec;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 8px;
+      margin-top: 9px;
+      max-height: 130px;
+      overflow: auto;
+      padding: 8px;
+      white-space: pre-wrap;
+    }
+
+    .layout-shell {
+      margin: 0;
+      max-width: none;
+      overflow: visible;
+      padding: 0 clamp(12px, 1.5vw, 28px) 32px;
+      width: 100%;
+    }
+    .scope-builder {
+      padding: 24px 0 30px;
+    }
+    .scope-heading,
+    .report-control-bar {
+      align-items: flex-end;
+      display: flex;
+      gap: 18px;
+      justify-content: space-between;
+    }
+    .scope-heading h2,
+    .report-control-bar h2 {
+      font-size: 17px;
+      letter-spacing: -.015em;
+      margin: 0;
+    }
+    .scope-heading p,
+    .report-control-bar p {
+      color: var(--muted);
+      font-size: 10px;
+      margin: 4px 0 0;
+    }
+    .scope-content { margin-top: 16px; }
+    .scope-toolbar {
+      align-items: center;
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+      margin-bottom: 9px;
+    }
+    .scope-toolbar > div { align-items: center; display: flex; gap: 6px; }
+    .scope-table-wrap {
+      border-bottom: 1px solid #edf1f3;
+      border-top: 1px solid #e4e9ec;
+      border-radius: 0;
+      overflow-x: auto;
+    }
+    .scope-table { font-family: Inter, system-ui, sans-serif; font-size: 10px; }
+    .scope-table th { background: #f8f9fa; font-size: 10px; padding: 8px 9px; }
+    .scope-table td { border-bottom: 0; padding: 9px; }
+    .scope-table b { font-weight: 400; }
+    .scope-table .scope-check { text-align: center; width: 42px; }
+    .scope-table tbody tr {
+      cursor: pointer;
+    }
+    .scope-table tbody tr:hover { background: #f7fafb; }
+    .scope-table tbody tr:has(input:checked) {
+      background: var(--selected);
+    }
+    .scope-table input { margin: 0; }
+    .scope-pagination {
+      align-items: center;
+      color: var(--muted);
+      display: flex;
+      font-size: 9px;
+      gap: 7px;
+      justify-content: flex-end;
+      padding-top: 8px;
+    }
+    .scope-pagination[hidden] { display: none; }
+    .scope-actions {
+      align-items: center;
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
+    .scope-actions p { color: var(--muted); font-size: 9px; margin: 0; }
+    .button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+      font-size: 10px;
+      min-height: 34px;
+      padding-inline: 14px;
+    }
+    .scope-builder.submitted { display: none; }
+    #report-shell[hidden] { display: none; }
+    .report-control-bar {
+      align-items: flex-start;
+      border-bottom: 0;
+      flex-direction: column;
+      gap: 14px;
+      padding: 24px 0 16px;
+    }
+    .report-control-bar .global-controls {
+      justify-content: flex-start;
+      padding: 0;
+      width: 100%;
+    }
+    .report-control-bar .field select { min-width: 190px; }
+    .report-summary { align-items: center; display: flex; gap: 10px; min-width: 260px; }
+    .report-summary .kind { display: block; margin-top: 7px; }
+    .report { display: block; }
+    .section {
+      background: transparent;
+      border: 0;
+      border-bottom: 0;
+      border-radius: 0;
+      margin: 0;
+      min-width: 0;
+      overflow: visible;
+    }
+    .section-header {
+      align-items: center;
+      background: #f7f9fa;
+      border: 0;
+      border-bottom: 0;
+      border-left: 2px solid #dce5e8;
+      display: flex;
+      justify-content: space-between;
+      margin-top: 18px;
+      min-height: 40px;
+      overflow: hidden;
+      padding: 9px 12px;
+      position: relative;
+      text-align: left;
+      width: 100%;
+    }
+    .section.open-focus .section-header { border-left-color: var(--accent); }
+    .section-header:hover { background: #f2f6f7; }
+    .section-title { align-items: baseline; display: flex; gap: 8px; }
+    .section-title b { font-size: 15px; }
+    .section-title span { color: var(--muted); font-size: 9px; }
+    .section-actions { align-items: center; display: flex; gap: 5px; }
+    .section-actions .button { pointer-events: auto; }
+    .disclosure {
+      align-items: center;
+      background: #e9f1f3;
+      border-radius: 1px;
+      color: var(--accent);
+      display: inline-flex;
+      font-size: 12px;
+      height: 18px;
+      justify-content: center;
+      width: 18px;
+    }
+    .section-body { padding: 12px 0 22px; }
+    .section.closed .section-body { display: none; }
+    .section.closed .section-header {
+      background: #f4f7f8;
+      border-bottom: 0;
+      border-left-color: #c8d8dd;
+    }
+    .section.closed .section-header::after {
+      border-color: transparent #a9c9d1 transparent transparent;
+      border-style: solid;
+      border-width: 0 18px 18px 0;
+      content: "";
+      height: 0;
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: 0;
+    }
+    .section.closed .disclosure { transform: rotate(-90deg); }
+
+    .grid-toolbar {
+      align-items: center;
+      display: flex;
+      gap: 6px;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .grid-toolbar .left,
+    .grid-toolbar .right { align-items: center; display: flex; gap: 5px; }
+    .grid-toolbar .right:has(.section-field) { align-items: flex-end; }
+    .section-field label { font-size: 7px; margin-bottom: 3px; }
+    .section-field select {
+      font-size: 10px;
+      min-height: 30px;
+      min-width: 165px;
+      padding: 4px 26px 4px 7px;
+    }
+    .search {
+      border: 1px solid #dbe2e5;
+      border-radius: 1px;
+      font-size: 10px;
+      min-height: 30px;
+      padding: 5px 8px;
+      width: 220px;
+    }
+    .segmented {
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      padding: 0;
+    }
+    .segmented button {
+      background: transparent;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+      color: var(--muted);
+      font-size: 8px;
+      padding: 7px 9px 5px;
+    }
+    .segmented button.active { border-bottom-color: var(--accent); color: var(--ink); font-weight: 800; }
+    .ag-grid-mock {
+      border: 0;
+      border-radius: 0;
+      max-height: 210px;
+      overflow: auto;
+    }
+    .actual-grid {
+      --ag-background-color: #fff;
+      --ag-border-color: transparent;
+      --ag-border-radius: 0;
+      --ag-font-family: Inter, system-ui, sans-serif;
+      --ag-font-size: 10px;
+      --ag-header-background-color: #f8f9fa;
+      --ag-header-height: 32px;
+      --ag-odd-row-background-color: #fff;
+      --ag-row-border-color: transparent;
+      --ag-row-border-width: 0px;
+      --ag-row-height: 30px;
+      --ag-selected-row-background-color: var(--selected);
+      height: auto;
+      min-height: 0;
+      overflow: hidden;
+      width: 100%;
+    }
+    .actual-grid .ag-layout-auto-height .ag-center-cols-container,
+    .actual-grid .ag-layout-auto-height .ag-center-cols-viewport,
+    .actual-grid.ag-layout-auto-height .ag-center-cols-container,
+    .actual-grid.ag-layout-auto-height .ag-center-cols-viewport {
+      min-height: 0 !important;
+    }
+    .actual-grid .ag-root-wrapper { border: 0; border-radius: 0; }
+    .actual-grid .ag-header { border-bottom: 1px solid #e5ebee; }
+    .actual-grid .ag-cell { border-right: 0 !important; }
+    .actual-grid .ag-row { border: 0 !important; }
+    .actual-grid .ag-row-hover { background-color: #fafcfc !important; }
+    .actual-grid .ag-paging-panel {
+      border-top: 0;
+      min-width: 0;
+      overflow-x: auto;
+    }
+    table { border-collapse: collapse; font-size: 8px; width: 100%; }
+    thead { position: sticky; top: 0; z-index: 2; }
+    th {
+      background: #edf1f3;
+      color: #52636f;
+      font-weight: 800;
+      text-align: left;
+    }
+    th, td { border-bottom: 1px solid #edf1f3; padding: 5px 6px; white-space: nowrap; }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover { background: #f7fafb; }
+    tbody tr.selected { background: var(--selected); }
+    tbody tr.out-of-scope { color: #9aa6ad; opacity: .58; }
+    .component-row { display: none; }
+    .show-components .component-row { display: table-row; }
+    .component-name { padding-left: 20px; }
+    .kind { color: var(--muted); font-size: 7px; text-transform: uppercase; }
+    .tag {
+      background: #f2f5f6;
+      border-radius: 999px;
+      display: inline-block;
+      margin-right: 2px;
+      padding: 2px 4px;
+    }
+    .reach {
+      background: var(--reach);
+      border-radius: 999px;
+      color: #7d5718;
+      display: inline-block;
+      font-weight: 750;
+      padding: 2px 4px;
+    }
+    .status {
+      border-radius: 999px;
+      display: inline-block;
+      font-weight: 800;
+      padding: 2px 4px;
+    }
+    .status.changed { background: #fff1d8; color: #945c06; }
+    .status.added { background: #edf6f1; color: #2d6b4c; }
+    .status.removed { background: #faf0ef; color: var(--danger); }
+    .status.current { background: #f2f5f6; color: #63727a; }
+
+    .diagram-list { display: grid; gap: 7px; }
+    .diagram-card {
+      border: 0;
+      border-radius: 0;
+      min-width: 0;
+      overflow: visible;
+    }
+    .diagram-card-header {
+      align-items: center;
+      background: white;
+      border-bottom: 0;
+      display: flex;
+      justify-content: space-between;
+      min-height: 34px;
+      padding: 6px 0 8px;
+    }
+    .diagram-card-header.actions-only { justify-content: flex-end; }
+    .diagram-card-header b { display: block; font-size: 12px; }
+    .diagram-card-header span { color: var(--muted); display: block; font-size: 8px; margin-top: 2px; }
+    .diagram-card-header > div:last-child { align-items: flex-end; display: flex; gap: 6px; }
+    .diagram-card-header .field { min-width: 150px; }
+    .diagram-card-header .field label { margin-bottom: 2px; }
+    .diagram-card-header .field select {
+      font-size: 9px;
+      min-height: 26px;
+      min-width: 150px;
+      padding: 3px 26px 3px 7px;
+    }
+    .diagram-card-header .button { height: 26px; min-height: 26px; }
+    .diagram-card.collapsed .diagram-stage { display: none; }
+    .diagram-card.collapsed .diagram-card-header { border-bottom: 0; }
+    .diagram-stage {
+      background-color: #fbfcfc;
+      background-image: none;
+      border-bottom: 0;
+      height: 420px;
+      position: relative;
+    }
+    .diagram-stage.small { height: 230px; }
+    .diagram-stage svg { height: 100%; inset: 0; position: absolute; width: 100%; }
+    .diagram-node {
+      background: white;
+      border: 1px solid #c8d2d7;
+      border-radius: 1px;
+      padding: 6px 7px;
+      position: absolute;
+      width: 112px;
+      z-index: 2;
+    }
+    .diagram-node strong { display: block; font-size: 8px; }
+    .diagram-node span { color: var(--muted); display: block; font-size: 6px; margin-top: 2px; }
+    .diagram-node.highlighted {
+      border: 2px solid var(--accent);
+    }
+    .diagram-edge { fill: none; stroke: #91a4b0; stroke-width: 2; }
+    .diagram-edge.highlighted { stroke: var(--accent); stroke-width: 5; }
+    .d-customer { left: 7%; top: 43%; }
+    .d-edge { left: 39%; top: 13%; }
+    .d-commerce { left: 40%; top: 50%; }
+    .d-erp { right: 7%; top: 32%; }
+    .d-analytics { right: 9%; top: 70%; }
+    .diagram-tools {
+      display: flex;
+      gap: 3px;
+      left: 7px;
+      position: absolute;
+      top: 7px;
+      z-index: 3;
+    }
+    .diagram-tools .button { min-height: 25px; }
+    .diagram-card.popout {
+      background: white;
+      border: 0;
+      border-radius: 0;
+      inset: 0;
+      position: fixed;
+      z-index: 200;
+    }
+    .diagram-card.popout .diagram-stage { height: calc(100vh - 34px); }
+    .sequence {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(4, 1fr);
+      height: 100%;
+      padding: 24px 35px 15px;
+    }
+    .lifeline { border-left: 1px dashed #9cadb7; position: relative; }
+    .lifeline b {
+      background: white;
+      border: 1px solid #cbd4d8;
+      border-radius: 1px;
+      display: block;
+      font-size: 7px;
+      left: -40px;
+      padding: 5px;
+      position: absolute;
+      text-align: center;
+      top: -12px;
+      width: 80px;
+    }
+    .message {
+      border-top: 1px solid #667c89;
+      font-size: 6px;
+      left: 0;
+      padding-top: 2px;
+      position: absolute;
+      width: calc(300% + 24px);
+    }
+    .m1 { top: 55px; }
+    .m2 { top: 100px; width: calc(200% + 16px); }
+    .m3 { top: 145px; }
+    .additional-diagrams { margin-top: 22px; }
+    .diagram-tabs {
+      border-bottom: 1px solid #e8edef;
+      display: flex;
+      gap: 18px;
+      overflow-x: auto;
+    }
+    .diagram-tabs button {
+      background: transparent;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 9px 1px 7px;
+      white-space: nowrap;
+    }
+    .diagram-tabs button[aria-selected="true"] {
+      border-bottom-color: var(--accent);
+      color: var(--ink);
+    }
+    [data-diagram-panel][hidden] { display: none; }
+
+    @media (max-width: 760px) {
+      .app { display: block; min-height: 100vh; }
+      .topbar { align-items: flex-start; flex-direction: column; position: static; }
+      .global-controls { align-items: stretch; flex-wrap: wrap; width: 100%; }
+      .field { flex: 1 1 40%; }
+      .field select { width: 100%; }
+      .layout-shell { overflow: visible; padding: 6px; }
+      .scope-heading, .report-control-bar { align-items: stretch; flex-direction: column; }
+      .scope-toolbar { align-items: stretch; flex-direction: column; }
+      .scope-toolbar > div { flex-wrap: wrap; }
+      .report-control-bar .global-controls { justify-content: stretch; width: 100%; }
+      .section { margin-bottom: 6px !important; }
+      .grid-toolbar { align-items: stretch; flex-direction: column; }
+      .grid-toolbar .left, .grid-toolbar .right { flex-wrap: wrap; }
+      .search { width: 100%; }
+      .ag-grid-mock { max-height: 240px !important; overflow: auto; }
+      .actual-grid { height: auto !important; }
+      table { min-width: 700px; }
+      .diagram-stage { height: 430px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="title"><b>ACME Commerce Modernisation</b></div>
+    </header>
+
+    <div class="layout-shell">
+      <section class="scope-builder" id="scope-builder">
+        <div class="scope-heading">
+          <div><h2>Scope</h2></div>
+        </div>
+        <div class="scope-content">
+          <div class="scope-toolbar">
+            <input aria-label="Search systems for report scope" class="search" id="scope-search" placeholder="Search systems, groups or tags">
+          </div>
+          <div class="scope-table-wrap">
+            <table aria-label="Select Systems" class="scope-table">
+              <thead><tr><th class="scope-check"><input aria-label="Select all visible systems" id="scope-select-all" type="checkbox"></th><th>System</th><th>System group</th><th>Tags</th><th>Owner</th></tr></thead>
+              <tbody id="scope-options"></tbody>
+            </table>
+          </div>
+          <div class="scope-pagination" id="scope-pagination" hidden>
+            <button aria-label="Previous scope page" class="button icon-button" id="scope-previous-page" type="button">‹</button>
+            <span id="scope-page-label"></span>
+            <button aria-label="Next scope page" class="button icon-button" id="scope-next-page" type="button">›</button>
+          </div>
+          <div class="scope-actions">
+            <button class="button primary" id="generate-report" type="button">Generate report</button>
+          </div>
+        </div>
+      </section>
+
+      <div id="report-shell" hidden>
+        <div class="report-control-bar">
+          <div class="report-summary"><h2>Report</h2><button class="button" id="edit-scope" type="button">Edit scope</button></div>
+          <div class="global-controls">
+            <div class="field"><label for="saved-view-control">View</label><select id="saved-view-control"><option value="default">Generated default</option><option value="core-commerce">Core commerce cutover</option><option value="save-current">Save current view…</option></select></div>
+            <div class="field"><label for="reach-control">System Scope</label><select id="reach-control"><option value="0" selected>Selected systems only</option><option value="1">Selected + 1 interface hop</option><option value="2">Selected + 2 interface hops</option><option value="3">Selected + 3 interface hops</option></select></div>
+            <div class="field"><label for="state-control">State</label><select id="state-control"><option value="base" selected>Base</option><option value="2026">2026</option><option value="2027">2027</option><option value="2028">2028</option><option value="2029">2029</option><option value="2031">2031</option></select></div>
+          </div>
+        </div>
+
+        <main class="report">
+        <section class="section open-focus" id="systems-section" data-section>
+          <button aria-expanded="true" class="section-header" data-section-toggle>
+            <span class="section-title"><span class="disclosure">▾</span><b>1. Systems</b></span>
+          </button>
+          <div class="section-body">
+            <div class="grid-toolbar"><div class="left"><input aria-label="Search systems" class="search" data-grid-search="systems" placeholder="Search systems"></div><div class="right"><button aria-label="Configure Systems columns" class="button icon-button" data-config-columns="systems" title="Configure columns"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.94 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.57 15 1.7 1.7 0 0 0 3 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.57 1.7 1.7 0 0 0 10 3h4v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 21 10h.08v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg></button></div></div>
+            <div aria-label="Systems AG Grid" class="ag-theme-quartz actual-grid" id="systems-grid"></div>
+          </div>
+        </section>
+
+        <section class="section" id="apps-section" data-section>
+          <button aria-expanded="true" class="section-header" data-section-toggle>
+            <span class="section-title"><span class="disclosure">▾</span><b>2. Applications and Components</b></span>
+          </button>
+          <div class="section-body">
+            <div class="grid-toolbar"><div class="left"><input aria-label="Search applications" class="search" data-grid-search="apps" placeholder="Search applications"></div><div class="right"><div class="field section-field"><label for="application-level-control">Application Level</label><select id="application-level-control"><option value="apps">Application</option><option value="components">Component</option></select></div><button aria-label="Configure Applications columns" class="button icon-button" data-config-columns="apps" title="Configure columns"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.94 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.57 15 1.7 1.7 0 0 0 3 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.57 1.7 1.7 0 0 0 10 3h4v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 21 10h.08v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg></button></div></div>
+            <div aria-label="Applications AG Grid" class="ag-theme-quartz actual-grid" id="apps-grid"></div>
+          </div>
+        </section>
+
+        <section class="section" id="interfaces-section" data-section>
+          <button aria-expanded="true" class="section-header" data-section-toggle>
+            <span class="section-title"><span class="disclosure">▾</span><b>3. Interfaces</b></span>
+          </button>
+          <div class="section-body">
+            <div class="grid-toolbar"><div class="left"><input aria-label="Search interfaces" class="search" data-grid-search="interfaces" placeholder="Search interfaces"></div><div class="right"><button aria-label="Configure Interfaces columns" class="button icon-button" data-config-columns="interfaces" title="Configure columns"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.94 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.57 15 1.7 1.7 0 0 0 3 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.57 1.7 1.7 0 0 0 10 3h4v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 21 10h.08v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg></button></div></div>
+            <div aria-label="Interfaces AG Grid" class="ag-theme-quartz actual-grid" id="interfaces-grid"></div>
+          </div>
+        </section>
+
+        <section class="section" id="solution-diagram-section" data-section>
+          <button aria-expanded="true" class="section-header" data-section-toggle>
+            <span class="section-title"><span class="disclosure">▾</span><b>4. Solution Diagram</b></span>
+          </button>
+          <div class="section-body">
+            <div class="diagram-list">
+              <article class="diagram-card" data-diagram-card="solution">
+                <header class="diagram-card-header actions-only"><div><div class="field"><label for="diagram-detail-control">Level of detail</label><select id="diagram-detail-control"><option value="system">System</option><option value="application">Application</option><option value="component">Component</option></select></div><button class="button" data-popout>Full screen</button></div></header>
+                <div class="diagram-stage">
+                  <svg viewBox="0 0 1000 520" aria-hidden="true"><path class="diagram-edge" data-diagram-edge="edge-catalogue" d="M180 260 C310 260 305 120 480 120"/><path class="diagram-edge" data-diagram-edge="edge-orders" d="M585 135 C730 135 715 250 865 250"/><path class="diagram-edge" data-diagram-edge="edge-events" d="M580 335 C720 335 710 390 855 390"/><path class="diagram-edge" data-diagram-edge="edge-identity" d="M180 280 C320 280 315 340 485 340"/></svg>
+                  <div class="diagram-tools"><button class="button" aria-label="Zoom in">＋</button><button class="button" aria-label="Zoom out">−</button><button class="button">Fit</button><button class="button">Reset</button></div>
+                  <div class="diagram-node d-customer"><strong>Customer</strong><span>Actor</span></div>
+                  <div class="diagram-node d-edge" data-component-label="Web Experience" data-diagram-entity="edge" data-system-label="Commerce Edge" data-application-label="Storefront"><strong>Commerce Edge</strong><span>System</span></div>
+                  <div class="diagram-node d-commerce" data-component-label="Order Orchestrator" data-diagram-entity="commerce" data-system-label="Commerce Platform" data-application-label="Checkout Service"><strong>Commerce Platform</strong><span>System</span></div>
+                  <div class="diagram-node d-erp" data-component-label="Order Management Core" data-diagram-entity="erp" data-system-label="ERP &amp; WMS" data-application-label="Order Management"><strong>ERP &amp; WMS</strong><span>System</span></div>
+                  <div class="diagram-node d-analytics" data-component-label="Event Processor" data-diagram-entity="analytics" data-system-label="Analytics" data-application-label="Event Analytics"><strong>Analytics</strong><span>System · 1 hop</span></div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="other-diagrams-section" data-section>
+          <button aria-expanded="true" class="section-header" data-section-toggle>
+            <span class="section-title"><span class="disclosure">▾</span><b>5. Other diagrams</b></span>
+          </button>
+          <div class="section-body">
+            <div class="diagram-list">
+              <div class="additional-diagrams" style="margin-top: 0">
+                <div aria-label="Additional diagrams" class="diagram-tabs" role="tablist">
+                  <button aria-controls="sequence-panel" aria-selected="true" data-diagram-tab="sequence" role="tab">Place Order Sequence</button>
+                  <button aria-controls="integration-panel" aria-selected="false" data-diagram-tab="integration" role="tab">Integration Context</button>
+                  <button aria-controls="cutover-panel" aria-selected="false" data-diagram-tab="cutover" role="tab">Cutover Transition</button>
+                </div>
+
+                <article class="diagram-card" data-diagram-card="sequence" data-diagram-panel="sequence" id="sequence-panel" role="tabpanel">
+                  <header class="diagram-card-header actions-only"><div><button class="button" data-popout>Full screen</button></div></header>
+                  <div class="diagram-stage small"><div class="sequence"><div class="lifeline"><b>Customer</b><span class="message m1">1. Submit checkout →</span></div><div class="lifeline"><b>Commerce Edge</b><span class="message m2">2. Create order →</span></div><div class="lifeline"><b>Commerce Platform</b><span class="message m3">3. Publish order →</span></div><div class="lifeline"><b>ERP &amp; WMS</b></div></div></div>
+                </article>
+
+                <article class="diagram-card" data-diagram-card="integration" data-diagram-panel="integration" hidden id="integration-panel" role="tabpanel">
+                  <header class="diagram-card-header actions-only"><div><button class="button" data-popout>Full screen</button></div></header>
+                  <div class="diagram-stage small"><div class="diagram-node d-commerce"><strong>Commerce Platform</strong><span>Integration hub</span></div><div class="diagram-node d-erp"><strong>ERP &amp; WMS</strong><span>Orders</span></div><div class="diagram-node d-analytics"><strong>Analytics</strong><span>Events</span></div></div>
+                </article>
+
+                <article class="diagram-card" data-diagram-card="cutover" data-diagram-panel="cutover" hidden id="cutover-panel" role="tabpanel">
+                  <header class="diagram-card-header actions-only"><div><button class="button" data-popout>Full screen</button></div></header>
+                  <div class="diagram-stage small"><div class="sequence"><div class="lifeline"><b>Current</b><span class="message m1">Commerce v1 →</span></div><div class="lifeline"><b>Transition</b><span class="message m2">Dual run →</span></div><div class="lifeline"><b>Cutover</b><span class="message m3">2031 →</span></div><div class="lifeline"><b>Target</b></div></div></div>
+                </article>
+              </div>
+            </div>
+          </div>
+        </section>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <dialog id="save-view-dialog">
+    <form method="dialog">
+      <header class="dialog-head"><b>Save report as a YAML view</b><button aria-label="Close save view dialog" class="button" value="cancel">×</button></header>
+      <div class="dialog-body">
+        <label class="kind" for="view-name">View name</label>
+        <input class="text-field" id="view-name" value="Core commerce review">
+        <p class="kind">The view includes selected systems, System Scope, the active optional diagram, and every AG Grid filter, sort, and column state.</p>
+        <pre class="yaml-preview" id="yaml-preview"></pre>
+      </div>
+      <footer class="dialog-actions"><button class="button" id="download-view-yaml" type="button">Download YAML</button><button class="button" value="cancel">Cancel</button><button class="button" id="confirm-save-view" type="button">Save View</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="column-dialog">
+    <form method="dialog">
+      <header class="dialog-head"><b id="column-dialog-title">Configure columns</b><button aria-label="Close column configuration" class="button" value="cancel">×</button></header>
+      <div class="dialog-body">
+        <span class="kind">Show or hide columns and choose where they are pinned. Drag headers in the table to reorder columns.</span>
+        <div class="column-list" id="column-list"></div>
+      </div>
+      <footer class="dialog-actions"><button class="button" id="reset-columns" type="button">Reset</button><button class="button" value="cancel">Cancel</button><button class="button" id="apply-columns" type="button">Apply</button></footer>
+    </form>
+  </dialog>
+
+  <script src="../../src/otdev/tools/_arch/frontend/node_modules/ag-grid-community/dist/ag-grid-community.min.js"></script>
+  <script>
+    const sections = [...document.querySelectorAll("[data-section]")];
+    const gridApis = {};
+    const savedViews = new Map();
+    const defaultSystemIds = ["commerce", "edge", "erp"];
+    let draftSelectedSystems = new Set(defaultSystemIds);
+    let submittedSelectedSystems = new Set();
+    let appMode = "apps";
+    let configuredGrid = null;
+    let activeDiagram = "sequence";
+
+    agGrid.ModuleRegistry.registerModules([agGrid.AllCommunityModule]);
+
+    const systemRows = [
+      { id: "commerce", System: "Commerce Platform", Groups: "Core commerce", Tags: "strategic, core", Status: "Changed", Owner: "Digital Commerce", changeOrder: 5, highlight: "commerce" },
+      { id: "edge", System: "Commerce Edge", Groups: "Digital channels", Tags: "customer, edge", Status: "Added", Owner: "Digital Experience", introducedOrder: 3, highlight: "edge" },
+      { id: "erp", System: "ERP & WMS", Groups: "Operations", Tags: "system-of-record", Status: "Current", Owner: "Operations", highlight: "erp" },
+      { id: "analytics", System: "Analytics", Groups: "Data platforms", Tags: "data, strategic", Status: "Added", Owner: "Data Office", introducedOrder: 5, highlight: "analytics" },
+      { id: "identity", System: "Identity Platform", Groups: "Shared platforms", Tags: "security", Status: "Current", Owner: "Cyber Security", highlight: "identity" },
+      { id: "payments", System: "Payment Provider", Groups: "External services", Tags: "payments, external", Status: "Current", Owner: "External", highlight: "payments" },
+      { id: "crm", System: "Customer CRM", Groups: "Customer platforms", Tags: "customer, engagement", Status: "Current", Owner: "Sales Operations", highlight: "crm" },
+      { id: "marketing", System: "Marketing Automation", Groups: "Customer platforms", Tags: "campaigns", Status: "Current", Owner: "Marketing", highlight: "marketing" },
+      { id: "service", System: "Service Management", Groups: "Enterprise platforms", Tags: "support", Status: "Current", Owner: "Service Operations", highlight: "service" },
+      { id: "finance", System: "Finance Platform", Groups: "Corporate platforms", Tags: "finance, ledger", Status: "Current", Owner: "Finance", highlight: "finance" },
+      { id: "shipping", System: "Shipping Provider", Groups: "External services", Tags: "logistics, external", Status: "Current", Owner: "External", highlight: "shipping" },
+      { id: "notifications", System: "Notification Platform", Groups: "Shared platforms", Tags: "email, sms", Status: "Added", Owner: "Digital Platform", introducedOrder: 4, highlight: "notifications" }
+    ];
+    systemRows.push(...Array.from({ length: 16 }, (_, index) => ({
+      id: `enterprise-system-${index + 1}`,
+      System: `${["Risk", "Workforce", "Document", "Procurement", "Asset", "Partner", "Knowledge", "Compliance"][index % 8]} Platform ${index + 1}`,
+      Groups: ["Corporate platforms", "Shared platforms", "Enterprise platforms"][index % 3],
+      Tags: ["enterprise", "shared", "operations"][index % 3],
+      Status: "Current",
+      Owner: ["Enterprise Technology", "Business Operations", "Corporate Services"][index % 3],
+      highlight: null
+    })));
+
+    const applicationRows = [
+      { id: "checkout", Name: "Checkout Service", Kind: "Application", System: "Commerce Platform", systemId: "commerce", Reach: "Selected", Status: "Changed", changeOrder: 5, Tags: "orders", highlight: "commerce" },
+      { id: "order-orchestrator", Name: "↳ Order Orchestrator", Kind: "Component", System: "Commerce Platform", systemId: "commerce", Reach: "Selected", Status: "Added", introducedOrder: 5, Tags: "events", highlight: "commerce" },
+      { id: "payment-adapter", Name: "↳ Payment Adapter", Kind: "Component", System: "Commerce Platform", systemId: "commerce", Reach: "Selected", Status: "Current", Tags: "payments", highlight: "commerce" },
+      { id: "catalogue", Name: "Catalogue Service", Kind: "Application", System: "Commerce Platform", systemId: "commerce", Reach: "Selected", Status: "Changed", changeOrder: 5, Tags: "product", highlight: "commerce" },
+      { id: "storefront", Name: "Storefront", Kind: "Application", System: "Commerce Edge", systemId: "edge", Reach: "Selected", Status: "Added", introducedOrder: 3, Tags: "customer", highlight: "edge" },
+      { id: "web-experience", Name: "↳ Web Experience", Kind: "Component", System: "Commerce Edge", systemId: "edge", Reach: "Selected", Status: "Added", introducedOrder: 3, Tags: "web", highlight: "edge" },
+      { id: "order-management", Name: "Order Management", Kind: "Application", System: "ERP & WMS", systemId: "erp", Reach: "Selected", Status: "Current", Tags: "orders", highlight: "erp" },
+      { id: "event-analytics", Name: "Event Analytics", Kind: "Application", System: "Analytics", systemId: "analytics", Reach: "1 hop", Status: "Added", introducedOrder: 5, Tags: "data", highlight: "analytics" },
+      { id: "identity-broker", Name: "Identity Broker", Kind: "Application", System: "Identity Platform", systemId: "identity", Reach: "1 hop", Status: "Current", Tags: "security", highlight: "identity" }
+    ];
+    applicationRows.push(...Array.from({ length: 24 }, (_, index) => {
+      const systems = [
+        ["commerce", "Commerce Platform", "commerce"],
+        ["edge", "Commerce Edge", "edge"],
+        ["erp", "ERP & WMS", "erp"]
+      ];
+      const [systemId, System, highlight] = systems[index % systems.length];
+      const component = index % 4 === 3;
+      return {
+        id: `portfolio-${index + 1}`,
+        Name: `${component ? "↳ " : ""}${["Pricing", "Inventory", "Customer", "Fulfilment", "Returns", "Promotion"][index % 6]} ${component ? "Component" : "Service"} ${index + 1}`,
+        Kind: component ? "Component" : "Application",
+        System,
+        systemId,
+        Reach: "Selected",
+        Status: index % 5 === 0 ? "Changed" : "Current",
+        changeOrder: index % 5 === 0 ? 5 : undefined,
+        Tags: ["orders", "product", "customer"][index % 3],
+        highlight
+      };
+    }));
+
+    const interfaceRows = [
+      { id: "submit-order", Interface: "Submit order", SourceSystem: "Commerce Platform", SourceEntity: "Order Orchestrator", TargetSystem: "ERP & WMS", TargetEntity: "Order Management", Direction: "Outbound", Type: "Event", Scope: "Selected", Status: "Changed", changeOrder: 5, systems: ["commerce", "erp"], highlight: "edge-orders" },
+      { id: "publish-events", Interface: "Publish commerce events", SourceSystem: "Commerce Platform", SourceEntity: "Order Orchestrator", TargetSystem: "Analytics", TargetEntity: "Event Analytics", Direction: "Outbound", Type: "Event", Scope: "1 hop", Status: "Added", introducedOrder: 5, systems: ["commerce", "analytics"], highlight: "edge-events" },
+      { id: "serve-catalogue", Interface: "Serve catalogue", SourceSystem: "Commerce Platform", SourceEntity: "Catalogue Service", TargetSystem: "Commerce Edge", TargetEntity: "Storefront", Direction: "Outbound", Type: "API", Scope: "Selected", Status: "Current", systems: ["commerce", "edge"], highlight: "edge-catalogue" },
+      { id: "authenticate", Interface: "Authenticate", SourceSystem: "Commerce Edge", SourceEntity: "Storefront", TargetSystem: "Identity Platform", TargetEntity: "Identity Broker", Direction: "Outbound", Type: "OIDC", Scope: "Boundary", Status: "Current", systems: ["edge", "identity"], highlight: "edge-identity" }
+    ];
+    interfaceRows.push(...Array.from({ length: 24 }, (_, index) => ({
+      id: `interface-${index + 1}`,
+      Interface: `${["Reserve stock", "Price order", "Dispatch order", "Update customer", "Publish status", "Process return"][index % 6]} ${index + 1}`,
+      SourceSystem: index % 2 ? "Commerce Platform" : "Commerce Edge",
+      SourceEntity: index % 2 ? "Order Orchestrator" : "Storefront",
+      TargetSystem: index % 3 ? "ERP & WMS" : "Commerce Platform",
+      TargetEntity: index % 3 ? "Order Management" : "Catalogue Service",
+      Direction: "Outbound",
+      Type: index % 2 ? "Event" : "API",
+      Scope: "Selected",
+      Status: index % 5 === 0 ? "Changed" : "Current",
+      changeOrder: index % 5 === 0 ? 5 : undefined,
+      systems: index % 2 ? ["commerce", "erp"] : ["edge", "commerce"],
+      highlight: index % 2 ? "edge-orders" : "edge-catalogue"
+    })));
+
+    const systemLinks = [
+      ["commerce", "analytics"],
+      ["analytics", "crm"],
+      ["crm", "marketing"],
+      ["edge", "identity"],
+      ["identity", "notifications"],
+      ["notifications", "service"],
+      ["erp", "finance"],
+      ["finance", "shipping"],
+      ["shipping", "payments"]
+    ];
+
+    const commonGridOptions = {
+      theme: "legacy",
+      defaultColDef: {
+        filter: true,
+        flex: 1,
+        sortable: true,
+        resizable: true,
+        minWidth: 90
+      },
+      animateRows: false,
+      domLayout: "autoHeight",
+      getRowId: (params) => params.data.id
+    };
+
+    function makeGrid(elementId, options) {
+      return agGrid.createGrid(document.getElementById(elementId), {
+        ...commonGridOptions,
+        ...options
+      });
+    }
+
+    const applicationColumnDefs = {
+      apps: [
+        { field: "System", width: 180, pinned: "left" },
+        { field: "Application", width: 200 },
+        { field: "ApplicationDetails", headerName: "Application details", width: 240 }
+      ],
+      components: [
+        { field: "System", width: 180, pinned: "left" },
+        { field: "Application", width: 190 },
+        { field: "Component", width: 190 },
+        { field: "ComponentDetails", headerName: "Component details", width: 240 }
+      ]
+    };
+
+    gridApis.systems = makeGrid("systems-grid", {
+      pagination: false,
+      rowData: [],
+      columnDefs: [
+        { field: "System", width: 175, pinned: "left" },
+        { field: "Scope", width: 100 },
+        { field: "Groups", headerName: "System groups", width: 150 },
+        { field: "Tags", width: 165 },
+        { field: "Status", width: 90 },
+        { field: "Owner", width: 150 }
+      ],
+      onRowClicked: (event) => highlight(event.data.highlight)
+    });
+
+    gridApis.apps = makeGrid("apps-grid", {
+      pagination: true,
+      paginationPageSize: 20,
+      paginationPageSizeSelector: false,
+      rowData: [],
+      columnDefs: applicationColumnDefs.apps,
+      onRowClicked: (event) => highlight(event.data.highlight)
+    });
+
+    gridApis.interfaces = makeGrid("interfaces-grid", {
+      pagination: true,
+      paginationPageSize: 20,
+      paginationPageSizeSelector: false,
+      rowData: [],
+      columnDefs: [
+        { field: "Interface", width: 180, pinned: "left" },
+        { field: "SourceSystem", headerName: "Source system", width: 145 },
+        { field: "SourceEntity", headerName: "Source app / container", width: 155 },
+        { field: "TargetSystem", headerName: "Target system", width: 145 },
+        { field: "TargetEntity", headerName: "Target app / container", width: 155 },
+        { field: "Direction", width: 90 },
+        { field: "Type", width: 80 },
+        { field: "Scope", width: 90 },
+        { field: "Status", width: 90 }
+      ],
+      onRowClicked: (event) => highlight(event.data.highlight)
+    });
+
+    document.querySelectorAll("[data-section-toggle]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        if (event.target.closest(".button")) return;
+        const section = button.closest("[data-section]");
+        section.classList.toggle("closed");
+        section.classList.toggle("open-focus", !section.classList.contains("closed"));
+        button.setAttribute("aria-expanded", String(!section.classList.contains("closed")));
+      });
+    });
+
+    const stateProfiles = {
+      base: { order: 0 },
+      2026: { order: 1 },
+      2027: { order: 2 },
+      2028: { order: 3 },
+      2029: { order: 4 },
+      2031: { order: 5 }
+    };
+
+    function selectedSystems() {
+      return new Set(submittedSelectedSystems);
+    }
+
+    function rowAtState(row, order) {
+      if ((row.introducedOrder ?? 0) > order) return null;
+      let Status = row.Status;
+      if (row.Status === "Added" && row.introducedOrder !== order) Status = "Current";
+      if (row.Status === "Changed" && row.changeOrder !== order) Status = "Current";
+      return { ...row, Status };
+    }
+
+    function effectiveSystems(selected, hops) {
+      const neighbours = new Map(systemRows.map((row) => [row.id, new Set()]));
+      systemLinks.forEach(([source, target]) => {
+        neighbours.get(source)?.add(target);
+        neighbours.get(target)?.add(source);
+      });
+      const distances = new Map([...selected].map((system) => [system, 0]));
+      let frontier = new Set(selected);
+      for (let distance = 1; distance <= hops; distance += 1) {
+        const next = new Set();
+        frontier.forEach((system) => {
+          neighbours.get(system)?.forEach((neighbour) => {
+            if (!distances.has(neighbour)) next.add(neighbour);
+          });
+        });
+        next.forEach((system) => distances.set(system, distance));
+        frontier = next;
+      }
+      return distances;
+    }
+
+    function parentApplicationName(row) {
+      const namedParents = {
+        "order-orchestrator": "Checkout Service",
+        "payment-adapter": "Checkout Service",
+        "web-experience": "Storefront"
+      };
+      return namedParents[row.id] ?? row.Name.replace(/^↳\s*/, "").replace(/\s+Component(\s+\d+)?$/, " Service");
+    }
+
+    function setApplicationGridColumns() {
+      gridApis.apps.setGridOption("columnDefs", applicationColumnDefs[appMode]);
+      document.querySelector('[data-grid-search="apps"]').placeholder = appMode === "components" ? "Search components" : "Search applications";
+    }
+
+    function updateScope() {
+      if (!gridApis.systems || !gridApis.apps || !gridApis.interfaces || submittedSelectedSystems.size === 0) return;
+      const selected = selectedSystems();
+      const hops = Number(document.getElementById("reach-control").value);
+      const state = stateProfiles[document.getElementById("state-control").value];
+      const effective = effectiveSystems(selected, hops);
+      const reportSystems = systemRows
+        .filter((row) => effective.has(row.id))
+        .map((row) => rowAtState(row, state.order))
+        .filter(Boolean)
+        .map((row) => {
+          const distance = effective.get(row.id);
+          return { ...row, Scope: distance === 0 ? "Selected" : `${distance} hop${distance === 1 ? "" : "s"}` };
+        });
+      const visibleSystemIds = new Set(reportSystems.map((row) => row.id));
+      const availableApplicationRows = applicationRows
+        .filter((row) => visibleSystemIds.has(row.systemId))
+        .map((row) => rowAtState(row, state.order))
+        .filter(Boolean);
+      const appRows = appMode === "components"
+        ? availableApplicationRows
+          .filter((row) => row.Kind === "Component")
+          .map((row) => ({
+            ...row,
+            Application: parentApplicationName(row),
+            Component: row.Name.replace(/^↳\s*/, ""),
+            ComponentDetails: `${row.Status} · ${row.Tags}`
+          }))
+        : availableApplicationRows
+          .filter((row) => row.Kind === "Application")
+          .map((row) => ({
+            ...row,
+            Application: row.Name,
+            ApplicationDetails: `${row.Status} · ${row.Tags}`
+          }));
+      const reportInterfaces = interfaceRows
+        .filter((row) => row.systems.some((system) => visibleSystemIds.has(system)))
+        .map((row) => rowAtState(row, state.order))
+        .filter(Boolean)
+        .map((row) => ({ ...row, Scope: row.systems.every((system) => selected.has(system)) ? "Selected" : "Boundary" }));
+
+      gridApis.systems.setGridOption("rowData", reportSystems);
+      gridApis.apps.setGridOption("suppressPaginationPanel", appRows.length <= 20);
+      gridApis.apps.setGridOption("rowData", appRows);
+      gridApis.interfaces.setGridOption("suppressPaginationPanel", reportInterfaces.length <= 20);
+      gridApis.interfaces.setGridOption("rowData", reportInterfaces);
+    }
+
+    function resetReportView() {
+      document.getElementById("reach-control").value = "0";
+      document.getElementById("state-control").value = "base";
+      document.getElementById("diagram-detail-control").value = "system";
+      appMode = "apps";
+      document.getElementById("application-level-control").value = appMode;
+      setApplicationGridColumns();
+      sections.forEach((section) => {
+        section.classList.remove("closed");
+        section.querySelector("[data-section-toggle]").setAttribute("aria-expanded", "true");
+      });
+      selectDiagram("sequence");
+      updateDiagramDetail();
+      updateScope();
+    }
+    document.getElementById("reach-control").addEventListener("change", updateScope);
+    document.getElementById("state-control").addEventListener("change", updateScope);
+
+    const scopeOptions = document.getElementById("scope-options");
+    const scopeSearch = document.getElementById("scope-search");
+    const scopePageSize = 20;
+    let scopePage = 0;
+
+    function visibleScopeSystems() {
+      const query = scopeSearch.value.trim().toLowerCase();
+      if (!query) return systemRows;
+      return systemRows.filter((row) => [row.System, row.Groups, row.Tags, row.Owner].some((value) => value.toLowerCase().includes(query)));
+    }
+
+    function pagedScopeSystems() {
+      const visible = visibleScopeSystems();
+      return visible.slice(scopePage * scopePageSize, (scopePage + 1) * scopePageSize);
+    }
+
+    function updateScopeSelectionSummary() {
+      document.getElementById("generate-report").disabled = draftSelectedSystems.size === 0;
+      const visible = pagedScopeSystems();
+      const selectedVisible = visible.filter((row) => draftSelectedSystems.has(row.id)).length;
+      const selectAll = document.getElementById("scope-select-all");
+      selectAll.checked = visible.length > 0 && selectedVisible === visible.length;
+      selectAll.indeterminate = selectedVisible > 0 && selectedVisible < visible.length;
+    }
+
+    function renderScopeSystems() {
+      const visible = visibleScopeSystems();
+      const pageCount = Math.max(1, Math.ceil(visible.length / scopePageSize));
+      scopePage = Math.min(scopePage, pageCount - 1);
+      scopeOptions.replaceChildren();
+      pagedScopeSystems().forEach((system) => {
+        const row = document.createElement("tr");
+        row.dataset.systemId = system.id;
+        row.innerHTML = `<td class="scope-check"><input aria-label="Select ${system.System}" ${draftSelectedSystems.has(system.id) ? "checked" : ""} type="checkbox"></td><td><b>${system.System}</b></td><td>${system.Groups}</td><td>${system.Tags}</td><td>${system.Owner}</td>`;
+        scopeOptions.append(row);
+      });
+      document.getElementById("scope-pagination").hidden = pageCount <= 1;
+      document.getElementById("scope-page-label").textContent = `${scopePage + 1} / ${pageCount}`;
+      document.getElementById("scope-previous-page").disabled = scopePage === 0;
+      document.getElementById("scope-next-page").disabled = scopePage === pageCount - 1;
+      updateScopeSelectionSummary();
+    }
+
+    scopeOptions.addEventListener("change", (event) => {
+      const row = event.target.closest("[data-system-id]");
+      if (!row) return;
+      if (event.target.checked) draftSelectedSystems.add(row.dataset.systemId);
+      else draftSelectedSystems.delete(row.dataset.systemId);
+      updateScopeSelectionSummary();
+    });
+
+    scopeOptions.addEventListener("click", (event) => {
+      if (event.target.matches("input")) return;
+      const row = event.target.closest("[data-system-id]");
+      if (!row) return;
+      const checkbox = row.querySelector("input");
+      checkbox.checked = !checkbox.checked;
+      checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    document.getElementById("scope-select-all").addEventListener("change", (event) => {
+      pagedScopeSystems().forEach((system) => {
+        if (event.target.checked) draftSelectedSystems.add(system.id);
+        else draftSelectedSystems.delete(system.id);
+      });
+      renderScopeSystems();
+    });
+    scopeSearch.addEventListener("input", () => {
+      scopePage = 0;
+      renderScopeSystems();
+    });
+    document.getElementById("scope-previous-page").addEventListener("click", () => {
+      scopePage -= 1;
+      renderScopeSystems();
+    });
+    document.getElementById("scope-next-page").addEventListener("click", () => {
+      scopePage += 1;
+      renderScopeSystems();
+    });
+    document.getElementById("generate-report").addEventListener("click", () => {
+      if (draftSelectedSystems.size === 0) return;
+      submittedSelectedSystems = new Set(draftSelectedSystems);
+      document.getElementById("scope-builder").classList.add("submitted");
+      document.getElementById("report-shell").hidden = false;
+      resetReportView();
+      document.getElementById("report-shell").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    document.getElementById("edit-scope").addEventListener("click", () => {
+      document.getElementById("scope-builder").classList.remove("submitted");
+      document.getElementById("report-shell").hidden = true;
+      document.getElementById("scope-search").focus();
+    });
+
+    document.getElementById("application-level-control").addEventListener("change", (event) => {
+      appMode = event.target.value;
+      setApplicationGridColumns();
+      updateScope();
+    });
+
+    renderScopeSystems();
+
+    function highlight(target) {
+      document.querySelectorAll(".diagram-node.highlighted,.diagram-edge.highlighted").forEach((item) => item.classList.remove("highlighted"));
+      document.querySelectorAll(`[data-diagram-entity="${target}"],[data-diagram-edge="${target}"]`).forEach((item) => item.classList.add("highlighted"));
+    }
+
+    document.querySelectorAll("[data-diagram-entity]").forEach((node) => node.addEventListener("click", () => {
+      highlight(node.dataset.diagramEntity);
+    }));
+
+    function updateDiagramDetail() {
+      const detail = document.getElementById("diagram-detail-control").value;
+      document.querySelectorAll("[data-system-label][data-application-label][data-component-label]").forEach((node) => {
+        node.querySelector("strong").textContent = node.dataset[`${detail}Label`];
+        node.querySelector("span").textContent = detail[0].toUpperCase() + detail.slice(1);
+      });
+    }
+    document.getElementById("diagram-detail-control").addEventListener("change", updateDiagramDetail);
+
+    document.querySelectorAll("[data-grid-search]").forEach((input) => input.addEventListener("input", () => {
+      gridApis[input.dataset.gridSearch].setGridOption("quickFilterText", input.value);
+    }));
+
+    function selectDiagram(name) {
+      activeDiagram = name;
+      document.querySelectorAll("[data-diagram-tab]").forEach((tab) => {
+        tab.setAttribute("aria-selected", String(tab.dataset.diagramTab === name));
+      });
+      document.querySelectorAll("[data-diagram-panel]").forEach((panel) => {
+        panel.hidden = panel.dataset.diagramPanel !== name;
+      });
+    }
+
+    document.querySelectorAll("[data-diagram-tab]").forEach((tab) => {
+      tab.addEventListener("click", () => selectDiagram(tab.dataset.diagramTab));
+    });
+
+    document.querySelectorAll("[data-popout]").forEach((button) => button.addEventListener("click", () => {
+      const card = button.closest("[data-diagram-card]");
+      card.classList.remove("collapsed");
+      card.classList.toggle("popout");
+      button.textContent = card.classList.contains("popout") ? "Close full screen" : "Full screen";
+    }));
+
+    function captureView(name) {
+      const grids = {};
+      Object.entries(gridApis).forEach(([key, api]) => {
+        grids[key] = {
+          columns: api.getColumnState(),
+          filters: api.getFilterModel(),
+          page: api.paginationGetCurrentPage()
+        };
+      });
+      return {
+        view: {
+          id: name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
+          name,
+          selected_systems: [...selectedSystems()],
+          system_scope_hops: Number(document.getElementById("reach-control").value),
+          state: document.getElementById("state-control").value,
+          active_diagram: activeDiagram,
+          solution_diagram_detail: document.getElementById("diagram-detail-control").value,
+          application_grid_mode: appMode === "components" ? "applications_and_components" : "applications",
+          sections: Object.fromEntries(sections.map((section) => [section.id, !section.classList.contains("closed")])),
+          grids
+        }
+      };
+    }
+
+    function yamlScalar(value) {
+      if (value === null) return "null";
+      if (typeof value === "boolean" || typeof value === "number") return String(value);
+      const text = String(value);
+      return /^[A-Za-z0-9_.-]+$/.test(text) ? text : JSON.stringify(text);
+    }
+
+    function toYaml(value, indent = 0) {
+      const pad = " ".repeat(indent);
+      if (Array.isArray(value)) {
+        if (value.length === 0) return "[]";
+        return value.map((item) => {
+          if (item && typeof item === "object") return `${pad}-\n${toYaml(item, indent + 2)}`;
+          return `${pad}- ${yamlScalar(item)}`;
+        }).join("\n");
+      }
+      if (value && typeof value === "object") {
+        return Object.entries(value).map(([key, item]) => {
+          if (item && typeof item === "object" && Object.keys(item).length > 0) {
+            return `${pad}${key}:\n${toYaml(item, indent + 2)}`;
+          }
+          return `${pad}${key}: ${item && typeof item === "object" ? "[]" : yamlScalar(item)}`;
+        }).join("\n");
+      }
+      return `${pad}${yamlScalar(value)}`;
+    }
+
+    function viewYaml(name) {
+      return `${toYaml(captureView(name))}\n`;
+    }
+
+    const saveDialog = document.getElementById("save-view-dialog");
+    function openSaveDialog() {
+      document.getElementById("yaml-preview").textContent = viewYaml(document.getElementById("view-name").value);
+      saveDialog.showModal();
+    }
+    document.getElementById("view-name").addEventListener("input", (event) => {
+      document.getElementById("yaml-preview").textContent = viewYaml(event.target.value || "Untitled view");
+    });
+
+    function saveCurrentView() {
+      const name = document.getElementById("view-name").value.trim() || "Untitled view";
+      const state = captureView(name);
+      const yaml = `${toYaml(state)}\n`;
+      savedViews.set(state.view.id, state);
+      localStorage.setItem(`onetool.soap.view.${state.view.id}.yaml`, yaml);
+      const select = document.getElementById("saved-view-control");
+      let option = [...select.options].find((item) => item.value === state.view.id);
+      if (!option) {
+        option = new Option(name, state.view.id);
+        select.add(option);
+      }
+      select.value = state.view.id;
+      saveDialog.close();
+    }
+
+    document.getElementById("confirm-save-view").addEventListener("click", saveCurrentView);
+    document.getElementById("download-view-yaml").addEventListener("click", () => {
+      const name = document.getElementById("view-name").value.trim() || "Untitled view";
+      const yaml = viewYaml(name);
+      const anchor = document.createElement("a");
+      anchor.href = URL.createObjectURL(new Blob([yaml], { type: "application/yaml" }));
+      anchor.download = `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.yaml`;
+      anchor.click();
+      URL.revokeObjectURL(anchor.href);
+    });
+
+    function applyView(state) {
+      const view = state.view;
+      document.getElementById("reach-control").value = String(view.system_scope_hops);
+      document.getElementById("state-control").value = view.state;
+      document.getElementById("diagram-detail-control").value = view.solution_diagram_detail;
+      appMode = view.application_grid_mode === "applications_and_components" ? "components" : "apps";
+      document.getElementById("application-level-control").value = appMode;
+      setApplicationGridColumns();
+      submittedSelectedSystems = new Set(view.selected_systems);
+      draftSelectedSystems = new Set(view.selected_systems);
+      renderScopeSystems();
+      Object.entries(view.grids).forEach(([key, grid]) => {
+        gridApis[key].applyColumnState({ state: grid.columns, applyOrder: true });
+        gridApis[key].setFilterModel(grid.filters);
+        gridApis[key].paginationGoToPage(grid.page ?? 0);
+      });
+      sections.forEach((section) => section.classList.toggle("closed", !view.sections[section.id]));
+      selectDiagram(view.active_diagram);
+      updateDiagramDetail();
+      updateScope();
+    }
+
+    document.getElementById("saved-view-control").addEventListener("change", (event) => {
+      if (event.target.value === "default") {
+        resetReportView();
+        return;
+      }
+      if (event.target.value === "save-current") {
+        event.target.value = "default";
+        openSaveDialog();
+        return;
+      }
+      if (event.target.value === "core-commerce") {
+        const current = captureView("Core commerce cutover");
+        current.view.selected_systems = ["commerce", "edge"];
+        current.view.system_scope_hops = 1;
+        applyView(current);
+        return;
+      }
+      const state = savedViews.get(event.target.value);
+      if (state) applyView(state);
+    });
+
+    const columnDialog = document.getElementById("column-dialog");
+    const columnList = document.getElementById("column-list");
+
+    function populateColumnConfig(key) {
+      configuredGrid = key;
+      const api = gridApis[key];
+      document.getElementById("column-dialog-title").textContent = `Configure ${key} columns`;
+      columnList.replaceChildren();
+      api.getColumnState().forEach((state) => {
+        const def = api.getColumnDef(state.colId);
+        const row = document.createElement("div");
+        row.className = "column-config-row";
+        row.dataset.colId = state.colId;
+        const name = def?.headerName ?? def?.field ?? state.colId;
+        row.innerHTML = `<input aria-label="Show ${name}" ${state.hide ? "" : "checked"} type="checkbox"><span>${name}</span><select aria-label="Pin ${name}"><option value="" ${state.pinned ? "" : "selected"}>Not pinned</option><option value="left" ${state.pinned === "left" ? "selected" : ""}>Pin left</option><option value="right" ${state.pinned === "right" ? "selected" : ""}>Pin right</option></select>`;
+        columnList.append(row);
+      });
+    }
+
+    function renderColumnConfig(key) {
+      populateColumnConfig(key);
+      columnDialog.showModal();
+    }
+
+    document.querySelectorAll("[data-config-columns]").forEach((button) => button.addEventListener("click", () => renderColumnConfig(button.dataset.configColumns)));
+    document.getElementById("reset-columns").addEventListener("click", () => {
+      gridApis[configuredGrid].resetColumnState();
+      populateColumnConfig(configuredGrid);
+    });
+    document.getElementById("apply-columns").addEventListener("click", () => {
+      const state = [...columnList.children].map((row) => ({
+        colId: row.dataset.colId,
+        hide: !row.querySelector("input").checked,
+        pinned: row.querySelector("select").value || null
+      }));
+      gridApis[configuredGrid].applyColumnState({ state });
+      columnDialog.close();
+    });
+
+  </script>
+</body>
+</html>
