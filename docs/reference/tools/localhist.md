@@ -26,6 +26,7 @@ OneTool Local History snapshots backed by Git.
 | `localhist.history(path, ...)` | List snapshots that touched a project-relative path |
 | `localhist.diff(ref, against, path)` | Return a patch for a snapshot, ref comparison, or worktree comparison |
 | `localhist.show(ref, path, offset, limit, tail)` | Return full or partial file content from a snapshot |
+| `localhist.prune(older_than_days, gc, dry_run)` | Preview or apply snapshot retention and repository cleanup |
 | `localhist.restore(ref, paths, ...)` | Restore selected paths from a snapshot |
 
 ## Key Parameters
@@ -43,6 +44,8 @@ OneTool Local History snapshots backed by Git.
 | `limit` | int \| None | Maximum status entries, log/history entries, or lines returned by `show()` |
 | `tail` | int \| None | Return the last N lines from `show()` |
 | `dry_run` | bool | Restore preview mode. Defaults to `true`. |
+| `older_than_days` | int | Prune snapshots older than this cutoff. Defaults to `30`. |
+| `gc` | bool | Reclaim pruned objects after applied retention. Defaults to `true`. |
 
 ## Requires
 
@@ -94,6 +97,7 @@ tools:
 - `diff()` and `show()` cap returned content at 1 MB and include `truncated`, `max_bytes`, and `bytes_returned` metadata.
 - `autosave_start()` and `autosave_list()` return the effective `tools.localhist` config, including `autosave` scheduling values.
 - Autosave watcher runtime state is stored under `.onetool/state/localhist/`.
+- Complete same-project Git mutation sequences are serialized across processes by `.onetool/state/localhist/repository.lock`, which is excluded from snapshots. Autosave acquires its watcher-state lock before this repository lock; restore keeps one ownership across its safety and audit snapshots. Different projects use independent locks.
 - The short pack alias is `lh`.
 - No public `localhist.autosave(reason=...)` tool is exposed; autosave snapshots are created only by an active watcher.
 

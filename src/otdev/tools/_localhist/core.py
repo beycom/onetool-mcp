@@ -16,6 +16,7 @@ from otdev.tools._localhist.config import (
     validate_project_path,
 )
 from otdev.tools._localhist.git import GitRunner, LocalhistGitError
+from otdev.tools._localhist.locking import repository_lock
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -291,15 +292,20 @@ def _status_output(git: GitRunner, path: str | None = None) -> str:
     return git.run_list(args)
 
 
+def _repository_dirty_signature_unlocked(paths: Paths) -> str | None:
+    if not (paths.git_dir / "HEAD").exists():
+        return None
+    git = GitRunner(paths)
+    return git.run_stdout_sha256(["status", "--porcelain", "--untracked-files=all"])
+
+
 def repository_dirty_signature() -> str | None:
     """Return a stable signature for the current dirty worktree state."""
 
     config = load_config()
     paths = resolve_paths(config)
-    if not (paths.git_dir / "HEAD").exists():
-        return None
-    git = GitRunner(paths)
-    return git.run_stdout_sha256(["status", "--porcelain", "--untracked-files=all"])
+    with repository_lock(paths):
+        return _repository_dirty_signature_unlocked(paths)
 
 
 def _dirty_counts_from_status(output: str) -> dict[str, int]:
@@ -373,36 +379,41 @@ def _parse_log_entries(
     return entries
 
 
+def _init_repository_unlocked(config: Config, paths: Paths) -> dict[str, object]:
+    already_initialized = (paths.git_dir / "HEAD").exists()
+    git = GitRunner(paths)
+    if not already_initialized:
+        paths.git_dir.mkdir(parents=True, exist_ok=True)
+        git.init_database()
+        git.run("config", "core.bare", "false")
+        git.run("config", "core.worktree", str(paths.work_tree))
+    git.run("config", "user.name", LOCALHIST_USER_NAME)
+    git.run("config", "user.email", LOCALHIST_USER_EMAIL)
+    git.run("config", "commit.gpgsign", "false")
+    ignore_added = _ensure_nested_gitignore(paths)
+    exclude_added = _append_info_exclude(
+        paths.git_dir, _required_info_excludes(config, paths)
+    )
+    _ensure_force_include_file(paths)
+    return {
+        "ok": True,
+        "initialized": True,
+        "created": not already_initialized,
+        "already_initialized": already_initialized,
+        "exclude_entries_added": exclude_added,
+        "gitignore_updated": ignore_added,
+        **_repo_info(config),
+    }
+
+
 def init_repository() -> dict[str, object]:
     """Initialize the local-history Git database."""
 
     try:
         config = load_config()
         paths = resolve_paths(config)
-        already_initialized = (paths.git_dir / "HEAD").exists()
-        git = GitRunner(paths)
-        if not already_initialized:
-            paths.git_dir.mkdir(parents=True, exist_ok=True)
-            git.init_database()
-            git.run("config", "core.bare", "false")
-            git.run("config", "core.worktree", str(paths.work_tree))
-        git.run("config", "user.name", LOCALHIST_USER_NAME)
-        git.run("config", "user.email", LOCALHIST_USER_EMAIL)
-        git.run("config", "commit.gpgsign", "false")
-        ignore_added = _ensure_nested_gitignore(paths)
-        exclude_added = _append_info_exclude(
-            paths.git_dir, _required_info_excludes(config, paths)
-        )
-        _ensure_force_include_file(paths)
-        return {
-            "ok": True,
-            "initialized": True,
-            "created": not already_initialized,
-            "already_initialized": already_initialized,
-            "exclude_entries_added": exclude_added,
-            "gitignore_updated": ignore_added,
-            **_repo_info(config),
-        }
+        with repository_lock(paths):
+            return _init_repository_unlocked(config, paths)
     except Exception as exc:
         return _error(exc)
 
@@ -565,20 +576,16 @@ def _stage_snapshot(
         git.run_pathspec_file(["add", "-f"], force_rules)
 
 
-def create_snapshot(
+def _create_snapshot_unlocked(
+    config: Config,
+    paths: Paths,
     *,
     message: str,
     kind: SnapshotKind,
     pathspecs: str | list[str] | None = None,
 ) -> dict[str, object]:
-    """Create a local-history snapshot."""
-
-    if not message.strip():
-        return {"ok": False, "error": "message is required"}
-    config = load_config()
-    paths = resolve_paths(config)
     if not (paths.git_dir / "HEAD").exists():
-        init_result = init_repository()
+        init_result = _init_repository_unlocked(config, paths)
         if not init_result.get("ok"):
             return init_result
     scoped_paths = _validate_snapshot_pathspecs(config, paths, pathspecs)
@@ -608,6 +615,31 @@ def create_snapshot(
     }
 
 
+def create_snapshot(
+    *,
+    message: str,
+    kind: SnapshotKind,
+    pathspecs: str | list[str] | None = None,
+) -> dict[str, object]:
+    """Create a local-history snapshot."""
+
+    if not message.strip():
+        return {"ok": False, "error": "message is required"}
+    try:
+        config = load_config()
+        paths = resolve_paths(config)
+        with repository_lock(paths):
+            return _create_snapshot_unlocked(
+                config,
+                paths,
+                message=message,
+                kind=kind,
+                pathspecs=pathspecs,
+            )
+    except Exception as exc:
+        return _error(exc)
+
+
 def save_snapshot(
     *,
     message: str,
@@ -616,10 +648,7 @@ def save_snapshot(
 ) -> dict[str, object]:
     """Save a manual or restore snapshot."""
 
-    try:
-        return create_snapshot(message=message, kind=kind, pathspecs=paths)
-    except Exception as exc:
-        return _error(exc)
+    return create_snapshot(message=message, kind=kind, pathspecs=paths)
 
 
 def save_snapshot_for_project(
@@ -708,8 +737,12 @@ def list_history(
         return _error(exc)
 
 
-def prune_history(
-    *, older_than_days: int = 30, gc: bool = True, dry_run: bool = True
+def _prune_history_unlocked(
+    paths: Paths,
+    *,
+    older_than_days: int = 30,
+    gc: bool = True,
+    dry_run: bool = True,
 ) -> dict[str, object]:
     """Drop snapshots older than the cutoff by rewriting the linear history.
 
@@ -722,8 +755,6 @@ def prune_history(
     try:
         if older_than_days < 1:
             return {"ok": False, "error": "older_than_days must be >= 1"}
-        config = load_config()
-        paths = resolve_paths(config)
         if not (paths.git_dir / "HEAD").exists():
             return {"ok": True, "initialized": False, "dropped": 0}
         git = GitRunner(paths)
@@ -793,6 +824,25 @@ def prune_history(
             git.run("gc", "--prune=now", "--quiet")
 
         return {"ok": True, "dropped": dropped, "kept": len(keep) + 1, "gc": gc}
+    except Exception as exc:
+        return _error(exc)
+
+
+def prune_history(
+    *, older_than_days: int = 30, gc: bool = True, dry_run: bool = True
+) -> dict[str, object]:
+    """Serialize applied retention, ref rewrites, reflog expiry, and GC."""
+
+    try:
+        config = load_config()
+        paths = resolve_paths(config)
+        with repository_lock(paths):
+            return _prune_history_unlocked(
+                paths,
+                older_than_days=older_than_days,
+                gc=gc,
+                dry_run=dry_run,
+            )
     except Exception as exc:
         return _error(exc)
 
@@ -903,7 +953,9 @@ def _paths_changed_against_head(git: GitRunner, rel_paths: list[str]) -> bool:
     return bool(output.strip())
 
 
-def restore_paths(
+def _restore_paths_unlocked(
+    config: Config,
+    resolved: Paths,
     *,
     ref: str,
     paths: list[str],
@@ -918,8 +970,6 @@ def restore_paths(
     try:
         if not paths:
             return {"ok": False, "error": "restore requires explicit paths"}
-        config = load_config()
-        resolved = resolve_paths(config)
         rel_paths = [
             relpath(validate_project_path(item, resolved), resolved) for item in paths
         ]
@@ -941,13 +991,15 @@ def restore_paths(
             }
         pre_restore_snapshot = None
         if _paths_changed_against_head(git, rel_paths):
-            pre_restore_snapshot = create_snapshot(
+            pre_restore_snapshot = _create_snapshot_unlocked(
+                config,
+                resolved,
                 message=f"pre-restore safety before {resolved_ref}",
                 kind="restore",
             )
         git.run_pathspec_file(["checkout", resolved_ref], rel_paths)
-        audit_snapshot = create_snapshot(
-            message=f"restore from {resolved_ref}", kind="restore"
+        audit_snapshot = _create_snapshot_unlocked(
+            config, resolved, message=f"restore from {resolved_ref}", kind="restore"
         )
         return {
             "ok": True,
@@ -963,14 +1015,37 @@ def restore_paths(
         return _error(exc)
 
 
-def append_exclude_rules(*, rules: list[str]) -> dict[str, object]:
-    """Append localhist-only exclude rules."""
+def restore_paths(
+    *,
+    ref: str,
+    paths: list[str],
+    dry_run: bool,
+) -> dict[str, object]:
+    """Restore under one repository lock, including safety/audit snapshots."""
 
     try:
         config = load_config()
-        paths = resolve_paths(config)
+        resolved = resolve_paths(config)
+        with repository_lock(resolved):
+            return _restore_paths_unlocked(
+                config,
+                resolved,
+                ref=ref,
+                paths=paths,
+                dry_run=dry_run,
+            )
+    except Exception as exc:
+        return _error(exc)
+
+
+def _append_exclude_rules_unlocked(
+    config: Config, paths: Paths, *, rules: list[str]
+) -> dict[str, object]:
+    """Append localhist-only exclude rules."""
+
+    try:
         if not (paths.git_dir / "HEAD").exists():
-            init_result = init_repository()
+            init_result = _init_repository_unlocked(config, paths)
             if not init_result.get("ok"):
                 return init_result
         exclude = _info_file(paths.git_dir, "exclude")
@@ -987,14 +1062,26 @@ def append_exclude_rules(*, rules: list[str]) -> dict[str, object]:
         return _error(exc)
 
 
-def append_force_include_rules(*, rules: list[str]) -> dict[str, object]:
-    """Append force-include pathspec rules."""
+def append_exclude_rules(*, rules: list[str]) -> dict[str, object]:
+    """Append localhist-only exclude rules under the repository lock."""
 
     try:
         config = load_config()
         paths = resolve_paths(config)
+        with repository_lock(paths):
+            return _append_exclude_rules_unlocked(config, paths, rules=rules)
+    except Exception as exc:
+        return _error(exc)
+
+
+def _append_force_include_rules_unlocked(
+    config: Config, paths: Paths, *, rules: list[str]
+) -> dict[str, object]:
+    """Append force-include pathspec rules."""
+
+    try:
         if not (paths.git_dir / "HEAD").exists():
-            init_result = init_repository()
+            init_result = _init_repository_unlocked(config, paths)
             if not init_result.get("ok"):
                 return init_result
         force_include = _ensure_force_include_file(paths)
@@ -1009,5 +1096,17 @@ def append_force_include_rules(*, rules: list[str]) -> dict[str, object]:
             "initialized": True,
             **_repo_info(config),
         }
+    except Exception as exc:
+        return _error(exc)
+
+
+def append_force_include_rules(*, rules: list[str]) -> dict[str, object]:
+    """Append force-includes under the repository lock."""
+
+    try:
+        config = load_config()
+        paths = resolve_paths(config)
+        with repository_lock(paths):
+            return _append_force_include_rules_unlocked(config, paths, rules=rules)
     except Exception as exc:
         return _error(exc)

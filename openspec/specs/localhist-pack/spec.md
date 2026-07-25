@@ -137,6 +137,25 @@ The system SHALL use Git-native ignore behavior for local-history staging, with 
 - **WHEN** force-include rules exist and `localhist.save(...)` stages a snapshot
 - **THEN** the system SHALL run normal Git staging and then force-add those pathspecs.
 
+### Requirement: Serialized Repository Mutations
+The system SHALL serialize complete local-history Git mutation sequences with one deterministic project-scoped interprocess lock stored outside snapshot content.
+
+#### Scenario: Same-project mutations
+- **WHEN** initialization, manual or autosave snapshots, applied restore, applied prune and GC, exclude mutation, or force-include mutation overlap for one project
+- **THEN** at most one operation SHALL mutate that project's local-history Git database, index, work tree, or refs at a time.
+
+#### Scenario: Autosave lock order
+- **WHEN** an autosave iteration holds its watcher-state lock and needs the repository lock
+- **THEN** it SHALL acquire the watcher-state lock before the repository lock.
+
+#### Scenario: Nested restore snapshots
+- **WHEN** applied restore creates pre-restore safety and post-restore audit snapshots
+- **THEN** restore SHALL retain one repository-lock ownership across checkout and both snapshots without recursively acquiring the lock.
+
+#### Scenario: Independent projects
+- **WHEN** local-history mutations run concurrently for different project roots
+- **THEN** each project SHALL use an independent lock and the operations SHALL be able to progress concurrently.
+
 ### Requirement: History Inspection
 The system SHALL allow agents to inspect local-history status, logs, diffs, and file contents using structured tool results.
 
@@ -266,12 +285,8 @@ The system SHALL expose opt-in background autosave watcher lifecycle tools while
 - **WHEN** users need autosave snapshots
 - **THEN** the system SHALL NOT expose `localhist.autosave(reason=...)`; autosave snapshots SHALL be created only by an active watcher.
 
-### Requirement: Deferred Localhist Capabilities
-The system SHALL defer retention cleanup and whole-project restore.
-
-#### Scenario: Deferred prune
-- **WHEN** users need retention cleanup in phase one
-- **THEN** the system SHALL NOT expose `localhist.prune()` as part of the phase-one API.
+### Requirement: Deferred Whole-Project Restore
+The system SHALL defer whole-project restore.
 
 #### Scenario: Deferred whole-project restore
 - **WHEN** users need whole-project restore in phase one
