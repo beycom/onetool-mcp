@@ -1,4 +1,14 @@
-# Exclude everything not needed for the Docker build.
-# All packages are installed from PyPI; no local files are COPY'd.
+# Exclude everything except the application sources needed to build the wheel.
 *
 !Dockerfile
+!pyproject.toml
+!README.md
+!src/
+!src/**
+!packages/
+packages/*
+!packages/onetool-pack/
+packages/onetool-pack/*
+!packages/onetool-pack/pyproject.toml
+!packages/onetool-pack/src/
+!packages/onetool-pack/src/**
