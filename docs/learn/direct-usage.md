@@ -66,6 +66,11 @@ onetool direct run --port 9000 "ot.version()"
 The selected MCP process determines which config, secrets, tools, proxy
 connections, state, and stats writer are used.
 
+Direct API bodies are consumed incrementally before authentication. `run`
+accepts at most 1,000,000 bytes; health, readiness, and Console outbox requests
+accept at most 65,536 bytes. Oversized bodies receive a signed HTTP `413`
+without executing commands or reading readiness/outbox state.
+
 ---
 
 ## Discovering Tools

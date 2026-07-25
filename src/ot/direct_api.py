@@ -12,26 +12,34 @@ from typing import Any
 
 PROTOCOL_VERSION = 1
 MAX_REQUEST_BODY_BYTES = 1_000_000
+MAX_CONTROL_BODY_BYTES = 65_536
 
 
 def _protocol_payload(**values: Any) -> dict[str, Any]:
     return {"protocol_version": PROTOCOL_VERSION, **values}
 
 
-async def _read_limited_body(request: Any) -> bytes:
-    """Read a request body after enforcing a small direct-API payload limit."""
+async def _read_limited_body(request: Any, *, limit: int) -> bytes:
+    """Incrementally read at most ``limit`` bytes from one request body."""
     content_length = request.headers.get("content-length")
     if content_length is not None:
         try:
-            if int(content_length) > MAX_REQUEST_BODY_BYTES:
-                raise ValueError("request body too large")
-        except ValueError as e:
-            raise ValueError("request body too large") from e
+            declared_length = int(content_length)
+        except ValueError:
+            declared_length = None
+        if (
+            declared_length is not None
+            and declared_length >= 0
+            and declared_length > limit
+        ):
+            raise ValueError("request body too large")
 
-    body: bytes = await request.body()
-    if len(body) > MAX_REQUEST_BODY_BYTES:
-        raise ValueError("request body too large")
-    return body
+    body = bytearray()
+    async for chunk in request.stream():
+        if len(body) + len(chunk) > limit:
+            raise ValueError("request body too large")
+        body.extend(chunk)
+    return bytes(body)
 
 
 def create_app() -> Any:
@@ -75,7 +83,14 @@ def create_app() -> Any:
     ensure_instance_snapshot(message_count=0)
 
     async def health_endpoint(request: Any) -> Any:
-        body = await request.body()
+        try:
+            body = await _read_limited_body(request, limit=MAX_CONTROL_BODY_BYTES)
+        except ValueError as e:
+            return signed_json_response(
+                _protocol_payload(result=str(e), success=False),
+                path=HEALTH_PATH,
+                status_code=413,
+            )
         try:
             verify_request(
                 method=request.method,
@@ -91,7 +106,14 @@ def create_app() -> Any:
         )
 
     async def ready_endpoint(request: Any) -> Any:
-        body = await request.body()
+        try:
+            body = await _read_limited_body(request, limit=MAX_CONTROL_BODY_BYTES)
+        except ValueError as e:
+            return signed_json_response(
+                _protocol_payload(result=str(e), success=False),
+                path=READY_PATH,
+                status_code=413,
+            )
         try:
             verify_request(
                 method=request.method,
@@ -123,7 +145,10 @@ def create_app() -> Any:
     async def run_endpoint(request: Any) -> Any:
         start = time.monotonic()
         try:
-            raw_body = await _read_limited_body(request)
+            raw_body = await _read_limited_body(
+                request,
+                limit=MAX_REQUEST_BODY_BYTES,
+            )
         except ValueError as e:
             return signed_json_response(
                 _protocol_payload(result=str(e), success=False),
@@ -203,7 +228,18 @@ def create_app() -> Any:
         )
 
     async def console_outbox_endpoint(request: Any) -> Any:
-        body = await request.body()
+        try:
+            body = await _read_limited_body(request, limit=MAX_CONTROL_BODY_BYTES)
+        except ValueError as e:
+            return signed_console_json_response(
+                {
+                    "protocol": "onetool.console",
+                    "protocol_version": 1,
+                    "error": str(e),
+                },
+                path=OUTBOX_PATH,
+                status_code=413,
+            )
         try:
             verify_console_request(
                 method=request.method,

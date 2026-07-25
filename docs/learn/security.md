@@ -194,6 +194,13 @@ installed Python environment. OneTool does not provide process isolation,
 automatic dependency installation from inline metadata, or hard termination
 of synchronous tool work.
 
+Execution timeouts are soft caller deadlines: the caller receives an error, but
+the Python thread can continue and may still cause side effects. OneTool admits
+at most eight running or queued in-process commands at once; timed-out and
+cancelled calls keep their slot until the underlying thread really finishes.
+When all slots are occupied, new execution is rejected instead of building an
+unbounded queue. Server shutdown stops new admission and waits for admitted work.
+
 Install extension dependencies in the OneTool environment and review extension
 code before configuring it. External MCP servers remain separate services
 connected through the proxy manager.

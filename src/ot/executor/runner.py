@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 
 from ot.config import get_config
+from ot.executor.admission import ExecutionCapacityError, submit_execution
 from ot.executor.fence_processor import strip_fences
 from ot.executor.pack_proxy import build_execution_namespace
 from ot.executor.tool_loader import load_tool_functions, load_tool_registry
@@ -750,8 +751,16 @@ async def execute_command(
             )
         )
         try:
-            # Always run user code on a worker thread with a bounded timeout so the
-            # event loop is never blocked and a runaway call cannot hang forever.
+            # The underlying concurrent future owns its capacity slot until the
+            # thread really finishes. Shielding prevents caller timeout or
+            # cancellation from releasing that slot while side effects continue.
+            execution_future = submit_execution(
+                execute_python_code,
+                stripped,
+                tool_functions=tool_namespace,
+                validate=should_validate,
+                default_format="json",
+            )
             (
                 text_result,
                 raw_result,
@@ -760,13 +769,7 @@ async def execute_command(
                 force_context,
                 raw_serialized,
             ) = await asyncio.wait_for(
-                asyncio.to_thread(
-                    execute_python_code,
-                    stripped,
-                    tool_functions=tool_namespace,
-                    validate=should_validate,
-                    default_format="json",
-                ),
+                asyncio.shield(asyncio.wrap_future(execution_future)),
                 timeout=_TOOL_EXECUTION_TIMEOUT_SECS,
             )
 
@@ -829,14 +832,22 @@ async def execute_command(
                 should_sanitize=effective_sanitize,
                 format=result_fmt,
             )
+        except ExecutionCapacityError as e:
+            return CommandResult(
+                command=command,
+                result=str(e),
+                executor="python",
+                success=False,
+                error_type="ExecutionCapacityError",
+                should_sanitize=False,
+            )
         except TimeoutError:
-            # D3: the worker thread keeps running but the caller gets a clean
-            # failure that flows through the D2 ToolError path instead of hanging.
             return CommandResult(
                 command=command,
                 result=(
                     f"Execution timed out after {_TOOL_EXECUTION_TIMEOUT_SECS:.0f}s. "
-                    "The command took too long to complete."
+                    "Underlying in-process work may continue and cause side effects "
+                    "until it finishes."
                 ),
                 executor="python",
                 success=False,

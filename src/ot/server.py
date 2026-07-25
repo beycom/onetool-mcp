@@ -267,6 +267,9 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
     global _stats_writer, _direct_api_server, _direct_api_thread, _direct_api_port
 
     runtime = _root_runtime or RootRuntime(transport="stdio")
+    from ot.executor.admission import start_execution_admission
+
+    start_execution_admission()
 
     with LogSpan(span="mcp.server.start", transport=runtime.transport) as start_span:
         start_time = time.monotonic()
@@ -386,6 +389,11 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
         _direct_api_server = None
         _direct_api_thread = None
         _direct_api_port = None
+
+        from ot.executor.admission import shutdown_execution_admission
+
+        await shutdown_execution_admission()
+        stop_span.add("executionAdmissionStopped", True)
 
         from ot.console.storage import cleanup_console_instance
         from ot.runtime_meta import get_or_create_instance_id

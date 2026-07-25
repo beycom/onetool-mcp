@@ -387,20 +387,33 @@ class TestExecutionTimeout:
     """D3: a tool call exceeding the timeout raises a clean failure, not a hang."""
 
     async def test_timeout_produces_clean_failure(self, monkeypatch) -> None:
-        import time
+        import asyncio
+        import threading
 
         import ot.executor.runner as runner
+        from ot.executor.admission import execution_work_state
 
         monkeypatch.setattr(runner, "_TOOL_EXECUTION_TIMEOUT_SECS", 0.2)
+        release = threading.Event()
 
-        def _slow(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
-            time.sleep(5)
+        def _slow(*_args, **_kwargs):  # noqa: ANN002, ANN003, ANN202
+            release.wait(timeout=5)
             return ("x", None, True, "json", False, None)
 
         # execute_command dispatches this on a worker thread; the wait_for timeout
         # must return a clean failure instead of blocking for the full sleep.
         monkeypatch.setattr(runner, "execute_python_code", _slow)
-        result = await execute_command("1 + 1")
-        assert not result.success
-        assert result.error_type == "TimeoutError"
-        assert "timed out" in result.result.lower()
+        try:
+            result = await execute_command("1 + 1")
+            assert not result.success
+            assert result.error_type == "TimeoutError"
+            assert "timed out" in result.result.lower()
+            assert "may continue" in result.result.lower()
+            assert execution_work_state()["active"] == 1
+        finally:
+            release.set()
+            for _ in range(100):
+                if execution_work_state()["active"] == 0:
+                    break
+                await asyncio.sleep(0.01)
+            assert execution_work_state()["active"] == 0
