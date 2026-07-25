@@ -123,4 +123,4 @@ __onetool :pkg_npm packages=react,typescript
 That's it.
 
 🧿 One MCP for developers - No tool tax, no context rot.
-100+ tools including Brave, Google, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more.
+250+ tools including Brave, Google, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more.

@@ -260,7 +260,7 @@ Use this decision tree:
 
 **Examples:**
 - ✅ "Terminology: 'pack' vs 'tool' vs 'function'"
-- ✅ "Brand claims: '96% token reduction'"
+- ✅ "Brand claims: '97% token reduction'"
 - ❌ "How to use the tool packs" (use project/guides/)
 - ❌ "Architecture of tool packs" (use project/arch/)
 - ❌ "Tool reference descriptions" (use docs/reference/tools/)

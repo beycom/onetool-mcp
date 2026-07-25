@@ -86,7 +86,7 @@ OneTool is the one and only MCP server you need to configure. No matter how many
 
 MCP stays king. You just stop paying the tool tax on every request.
 
-This results in [**96% fewer tokens, 30× lower cost, and improved accuracy**](../learn/comparison.md).
+This results in [**97% fewer tokens, 30× lower cost, and improved accuracy**](../learn/comparison.md).
 
 And yes — like any engineer — I couldn't help engineering a few party tricks along the way.
 
@@ -104,9 +104,9 @@ If you're now coding in your agent prompt, you need powerful snippets for reusab
 
 You'll also get tired of typing `query="..."`, so I added smart parameter prefixes: use `q` instead of `query`, `p` instead of `pattern`. Any unambiguous prefix works.
 
-### Batteries included: 100+ tools
+### Batteries included: 250+ tools
 
-OneTool includes [100+ tools](../reference/tools/index.md) including Brave, Google, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more.
+OneTool includes [250+ tools](../reference/tools/index.md) including Brave, Google, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more.
 
 It even has "Smart Tools" -  [LLM-powered transformation](../reference/tools/ot_llm.md). Delegate work to cheaper LLMs instead of using your expensive AI coding agent. For example: fetch a page, summarise it with Gemini-3-Flash ($0.50/M input tokens), then pass the result back to Claude Opus 4.5 ($5/M input tokens). That's a 10× saving.
 
@@ -134,7 +134,7 @@ Every developer loves plugins, extensions, and ways to make tools even better. O
 
 OneTool was written with strong engineering practices:
 
-- 1,200+ tests (smoke, unit, integration tiers)
+- 3,000+ tests (smoke, unit, integration tiers)
 - OpenSpec as a change proposal process (specs before code)
 - Python best practices: type hints, Ruff formatting/linting and other Python best practices
 
@@ -147,7 +147,7 @@ Keep the king. Stop the tax.
 Download and install it, and give your agentic engineering the boost it needs.
 
 🧿 One MCP for developers - No tool tax, no context rot. 
-100+ tools including Brave, Google, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more.
+250+ tools including Brave, Google, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more.
 
 --- 
 

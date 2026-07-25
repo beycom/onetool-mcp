@@ -6,7 +6,7 @@ OneTool is a single MCP server that exposes configured tool packs through one `r
 __onetool brave.search(query="react docs")
 ```
 
-This delivers ~96% token savings and eliminates context rot.
+This delivers ~97% token savings and eliminates context rot.
 
 ## Architecture Diagram
 
