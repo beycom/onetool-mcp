@@ -233,7 +233,8 @@ Parameters:
 
 #### Scenario: Re-embed failure is surfaced, previous vector retained
 - **WHEN** the re-embedding of updated content fails
-- **THEN** the content update still succeeds, the previously stored vector is NOT deleted (embed-then-swap), and the return message carries an embedding-failure warning
+- **THEN** the content update still succeeds, the previously stored vector is retained byte-for-byte by rolling back only the vector-replacement savepoint, and the return message carries an embedding-failure warning
+- **AND** multi-chunk updates continue replacing vectors for unaffected chunks
 
 ---
 
@@ -271,8 +272,12 @@ Parameters:
 
 ---
 
-### Requirement: kb.index — Stub chunk filtering
-When indexing markdown files, the chunker SHALL skip or merge low-content chunks to avoid polluting semantic search results.
+### Requirement: kb.index — Chunk filtering and link-graph reconciliation
+When indexing markdown files, the chunker SHALL skip or merge low-content
+chunks to avoid polluting semantic search results. After successful indexing,
+the link-graph pass SHALL atomically reconcile stored `link` edges with the
+complete set derived from current chunk content, including anchor text, without
+changing edges of other types.
 
 #### Scenario: Heading-only stubs are skipped
 - **WHEN** a section heading has no body text (the next line is another heading)
@@ -282,6 +287,16 @@ When indexing markdown files, the chunker SHALL skip or merge low-content chunks
 - **WHEN** a section's non-heading body text is fewer than `min_chunk_chars` characters (default 200)
 - **THEN** the chunk is merged into the preceding chunk rather than stored separately
 - **AND** if there is no preceding chunk, the short chunk is skipped
+
+#### Scenario: Link graph reflects current content
+- **WHEN** an indexed link is removed, retargeted, changes anchor text, or no longer resolves
+- **THEN** obsolete stored link edges are removed and current resolved edges and anchor text are stored
+- **AND** unchanged or duplicate observations are not reported as newly added edges
+
+#### Scenario: Link graph reconciliation is atomic
+- **WHEN** deleting or inserting a link edge fails during reconciliation
+- **THEN** the caller rolls back the graph transaction to the exact previous edge set
+- **AND** non-link edges remain unchanged
 
 #### Scenario: min_chunk_chars=0 disables merge
 - **WHEN** `tools.knowledge.min_chunk_chars` is set to 0
@@ -308,6 +323,13 @@ The `kb index` embedding phase SHALL be resilient to transient API failures.
 #### Scenario: Non-default dimensions are passed to the API
 - **WHEN** `tools.knowledge.dimensions` differs from the embedding model's native output size
 - **THEN** every `embeddings.create` call SHALL pass `dimensions=` so the returned vectors match the `vec0` table created from `config.dimensions`
+
+#### Scenario: Dimensions are fixed for an existing database
+- **WHEN** a database's vector table is first created
+- **THEN** its configured dimensions SHALL match the embedding model and remain fixed for that existing database
+- **AND** changing `tools.knowledge.dimensions` SHALL NOT migrate the existing vector table
+- **AND** `kb reindex` SHALL only backfill missing vectors, not repair dimension drift
+- **AND** a user who changes the setting accidentally SHALL restore that database's original model and dimension configuration
 
 #### Scenario: Same text embeds identically on every code path
 - **WHEN** a text longer than the embedding token limit is embedded via the single path (`generate_embedding`) or the batch path

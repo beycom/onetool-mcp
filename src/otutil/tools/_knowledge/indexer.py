@@ -148,8 +148,16 @@ def index_directory(
         conn.commit()
 
     # Second pass: build link graph
-    result.edges_added = _build_link_graph(conn, root, on_progress=on_link_progress)
-    conn.commit()
+    try:
+        result.edges_added = _build_link_graph(
+            conn,
+            root,
+            on_progress=on_link_progress,
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
 
     return result
 
@@ -357,9 +365,10 @@ def _build_link_graph(
     _root: Path,
     on_progress: Callable[[int, int], None] | None = None,
 ) -> int:
-    """Extract markdown hyperlinks from chunk content and insert edge rows.
+    """Reconcile stored link edges with hyperlinks in current chunk content.
 
-    Returns number of edges inserted.
+    The caller owns the surrounding transaction. Returns the number of durable
+    link rows newly inserted by this rebuild.
     """
     # Build url → chunk_id index from meta.url and topic; deserialize meta once per row
     url_to_id: dict[str, str] = {}
@@ -378,7 +387,7 @@ def _build_link_graph(
         url_to_id[topic] = chunk_id
 
     total = len(rows)
-    edges_added = 0
+    desired: dict[tuple[str, str], str] = {}
     for i, (chunk_id, _, content, meta) in enumerate(rows, 1):
         if on_progress:
             on_progress(i, total)
@@ -395,8 +404,7 @@ def _build_link_graph(
                     norm, _ = urldefrag(href)
                     dst_id = url_to_id.get(norm)
                     if dst_id and dst_id != chunk_id:
-                        _insert_edge(conn, chunk_id, dst_id, anchor_text, "link")
-                        edges_added += 1
+                        desired.setdefault((chunk_id, dst_id), anchor_text)
                 continue
 
             # Resolve relative URL against the chunk's own url
@@ -404,24 +412,44 @@ def _build_link_graph(
             norm, _ = urldefrag(resolved)
             dst_id = url_to_id.get(norm)
             if dst_id and dst_id != chunk_id:
-                _insert_edge(conn, chunk_id, dst_id, anchor_text, "link")
-                edges_added += 1
+                desired.setdefault((chunk_id, dst_id), anchor_text)
+
+    existing_rows = conn.execute(
+        """
+        SELECT id, src_id, dst_id, anchor_text
+        FROM edges
+        WHERE edge_type = 'link'
+        """
+    ).fetchall()
+    existing = {
+        (src_id, dst_id): (edge_id, anchor_text)
+        for edge_id, src_id, dst_id, anchor_text in existing_rows
+    }
+
+    for key, (edge_id, anchor_text) in existing.items():
+        desired_anchor = desired.get(key)
+        if desired_anchor is None:
+            conn.execute("DELETE FROM edges WHERE id = ?", [edge_id])
+        elif desired_anchor != anchor_text:
+            conn.execute(
+                "UPDATE edges SET anchor_text = ? WHERE id = ?",
+                [desired_anchor, edge_id],
+            )
+
+    edges_added = 0
+    for (src_id, dst_id), anchor_text in desired.items():
+        if (src_id, dst_id) in existing:
+            continue
+        cursor = conn.execute(
+            """
+            INSERT INTO edges (id, src_id, dst_id, edge_type, anchor_text)
+            VALUES (?, ?, ?, 'link', ?)
+            """,
+            [str(uuid.uuid4()), src_id, dst_id, anchor_text],
+        )
+        edges_added += cursor.rowcount
 
     return edges_added
-
-
-def _insert_edge(
-    conn: sqlite3.Connection,
-    src_id: str,
-    dst_id: str,
-    anchor_text: str,
-    edge_type: str,
-) -> None:
-    """Insert an edge row, ignoring duplicates."""
-    conn.execute(
-        "INSERT OR IGNORE INTO edges (id, src_id, dst_id, edge_type, anchor_text) VALUES (?, ?, ?, ?, ?)",
-        [str(uuid.uuid4()), src_id, dst_id, edge_type, anchor_text],
-    )
 
 
 __all__ = [

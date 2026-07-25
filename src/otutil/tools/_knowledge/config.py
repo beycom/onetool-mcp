@@ -334,7 +334,10 @@ class Config(BaseModel):
     )
     dimensions: int = Field(
         default=1536,
-        description="Embedding dimensions (must match model)",
+        description=(
+            "Embedding dimensions; must match the model and remain unchanged "
+            "for an existing database"
+        ),
     )
     max_embedding_tokens: int = Field(
         default=8191,

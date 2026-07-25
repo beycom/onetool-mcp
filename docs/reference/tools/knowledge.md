@@ -60,7 +60,7 @@ Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis.
 |-----|------|---------|-------------|
 | `tools.knowledge.model` | string | `""` | OpenAI embedding model. Falls back to `llm.embedding_model`; built-in default: `text-embedding-3-small`. |
 | `tools.knowledge.base_url` | string | `""` | OpenAI-compatible API base URL. Empty = inherit from top-level `llm.base_url`. |
-| `tools.knowledge.dimensions` | int | `1536` | Embedding dimensions. Must match the configured model. |
+| `tools.knowledge.dimensions` | int | `1536` | Embedding dimensions. Must match the model and remain unchanged for an existing database. |
 | `tools.knowledge.max_embedding_tokens` | int | `8191` | Max tokens per embedding input. |
 | `tools.knowledge.embedding_batch_size` | int | `200` | Texts per embeddings API call. Range: `1-2048`. |
 | `tools.knowledge.search_limit` | int | `10` | Default max search results. Range: `1-100`. |
@@ -73,6 +73,10 @@ Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis.
 | `tools.knowledge.min_chunk_chars` | int | `200` | Minimum body characters per chunk. Chunks below threshold are merged. `0` disables. |
 
 Project registry (under `tools.knowledge.kb`):
+
+The dimension is fixed when each database's vector table is created. Changing
+`tools.knowledge.dimensions` does not migrate an existing database; if changed
+accidentally, restore that database's original model and dimension setting.
 
 ```yaml
 tools:
@@ -211,6 +215,7 @@ onetool kb enrich docs --force
 ### onetool kb reindex
 
 Backfill missing embeddings for all chunks in an existing database.
+This does not rebuild the vector table or repair a model/dimension mismatch.
 
 ```bash
 onetool kb reindex <db>

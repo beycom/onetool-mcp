@@ -348,18 +348,27 @@ def delete(
 def _try_embed(conn: Any, chunk_id: str, content: str) -> str | None:
     """Try to generate and store embedding.
 
-    Embeds first and only then swaps the stored vector, so a failed re-embed
-    never deletes the existing one. Returns an error string if embedding
-    failed (so callers can surface it), else None.
+    Embeds first, then replaces the stored vector inside a savepoint so a
+    failed replacement retains the exact prior vector without rolling back the
+    caller's content transaction. Returns an error string if embedding failed
+    (so callers can surface it), else None.
     """
     try:
         vec = generate_embedding(content)
         blob = serialize_embedding(vec)
-        conn.execute("DELETE FROM chunks_vec WHERE chunk_id = ?", [chunk_id])
-        conn.execute(
-            "INSERT INTO chunks_vec(chunk_id, embedding) VALUES (?, ?)",
-            [chunk_id, blob],
-        )
+        conn.execute("SAVEPOINT knowledge_vector_replace")
+        try:
+            conn.execute("DELETE FROM chunks_vec WHERE chunk_id = ?", [chunk_id])
+            conn.execute(
+                "INSERT INTO chunks_vec(chunk_id, embedding) VALUES (?, ?)",
+                [chunk_id, blob],
+            )
+        except BaseException:
+            conn.execute("ROLLBACK TO SAVEPOINT knowledge_vector_replace")
+            conn.execute("RELEASE SAVEPOINT knowledge_vector_replace")
+            raise
+        else:
+            conn.execute("RELEASE SAVEPOINT knowledge_vector_replace")
         return None
     except Exception as e:
         logger.warning(
