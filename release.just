@@ -58,13 +58,14 @@ publish version *args:
 # INDIVIDUAL PUBLISH STEPS (escape hatches)
 # ============================================================================
 
-# Set version in pyproject.toml, server.json, and package workspaces
+# Set version in all release manifests and refresh the lockfile
 set-version version:
     @echo "Setting version to {{ version }}"
     sed -i '' 's/^version = ".*"/version = "{{ version }}"/' pyproject.toml
     sed -i '' 's/"version": ".*"/"version": "{{ version }}"/g' server.json
     sed -i '' 's/^version = ".*"/version = "{{ version }}"/' packages/onetool-pack/pyproject.toml
-    @echo "Updated pyproject.toml, server.json, and package pyprojects."
+    uv lock
+    @echo "Updated pyproject.toml, server.json, package pyproject, and uv.lock."
 
 # Build package
 build:
@@ -86,16 +87,17 @@ docs:
 
 # Commit, tag, and push
 tag version:
-    git add -A
-    git commit -m "Release {{ version }}" || true
+    uv run python -c "from scripts.release_publish import preflight_release; preflight_release('{{ version }}')"
+    git add -- pyproject.toml packages/onetool-pack/pyproject.toml server.json CHANGELOG.md uv.lock
+    git commit -m "Release {{ version }}"
     git tag -a "v{{ version }}" -m "Release {{ version }}"
     git push origin main
     git push origin "v{{ version }}"
 
 # Create GitHub release (extracts notes from CHANGELOG.md)
 gh-release version:
-    uv run python -c "from scripts.release_publish import extract_release_notes; n=extract_release_notes('{{ version }}'); open('tmp/release-notes.md','w').write(n) if n else None"
-    gh release create "v{{ version }}" --title "v{{ version }}" --notes-file tmp/release-notes.md || gh release create "v{{ version }}" --title "v{{ version }}" --generate-notes
+    uv run python -c "from pathlib import Path; from scripts.release_publish import extract_release_notes; n=extract_release_notes('{{ version }}'); assert n, 'matching non-empty release notes are required'; Path('tmp').mkdir(exist_ok=True); Path('tmp/release-notes.md').write_text(n)"
+    gh release create "v{{ version }}" --title "v{{ version }}" --notes-file tmp/release-notes.md
 
 # Delete a release (GitHub release + local/remote tags)
 delete-release version:

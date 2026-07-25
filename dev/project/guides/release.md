@@ -16,7 +16,8 @@ Three steps: **prepare → check → publish**
 just release::prep 1.0.0b2
 ```
 
-- Updates version in `pyproject.toml` and `server.json`
+- Updates the version in root and `onetool-pack` `pyproject.toml` files and
+  `server.json`, then refreshes `uv.lock`
 - Generates changelog from git commits (via git-cliff)
 - Opens `CHANGELOG.md` and `tmp/changelog-entry.md` in editor
 - Copy/paste the generated entry into CHANGELOG.md, then edit it to match the
@@ -108,6 +109,23 @@ just release::publish 1.0.0b2       # Dry-run (safe, shows what will happen)
 just release::publish 1.0.0b2 --force  # Actually publish
 ```
 
+Both commands begin with the same read-only preflight. Before cleanup, builds, or
+any Git/network write, it requires:
+
+- the requested version to exactly match both `pyproject.toml` files,
+  `server.json`, and the `onetool-mcp` / `onetool-pack` workspace versions in
+  `uv.lock`
+- a non-empty matching release section in `CHANGELOG.md`
+- the current branch to be `main` and the corresponding `vVERSION` tag not to
+  exist
+- every tracked or untracked worktree change to be one of
+  `pyproject.toml`, `packages/onetool-pack/pyproject.toml`, `server.json`,
+  `CHANGELOG.md`, or `uv.lock`
+
+The Git step stages exactly that allow-list. A failed commit stops the release
+before tagging or publishing. Temporary files under `tmp/` remain ignored and
+are never staged.
+
 Prompts before each step:
 1. Build package artifacts (`uv build`)
 2. Commit, tag, push to GitHub
@@ -121,7 +139,7 @@ Prompts before each step:
 ## Helper Tasks
 
 ```bash
-just release::set-version 1.0.0b2  # Update version only
+just release::set-version 1.0.0b2  # Update all versions and refresh uv.lock
 just release::changelog            # Preview changelog
 just release::sanity               # Run sanity tests only
 ```
@@ -131,7 +149,7 @@ just release::sanity               # Run sanity tests only
 ```bash
 just release::build     # uv build
 just release::pypi      # uv publish
-just release::tag 1.0.0b2  # Commit, tag, push
+just release::tag 1.0.0b2  # Run preflight, commit exact release files, tag, push
 just release::mcp       # mcp-publisher publish
 just release::docs      # mkdocs gh-deploy
 ```
