@@ -190,7 +190,7 @@ class TestQuery:
         )
         assert isinstance(result, str)
         assert result.startswith("Error:")
-        assert "SELECT/EXPLAIN/PRAGMA" in result
+        assert "single read-only query" in result
         # The row must NOT have been inserted.
         check = db.query(sql="SELECT COUNT(*) AS n FROM users", db_url=db_url)
         assert check["rows"][0]["n"] == 3

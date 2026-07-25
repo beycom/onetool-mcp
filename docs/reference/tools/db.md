@@ -30,7 +30,7 @@ Database introspection and query execution via SQLAlchemy. Supports any SQLAlche
 | `table` | str | Table to preview (sample only) |
 | `limit` | int | Max rows to return for `db.sample()` (default: 10) |
 | `params` | dict | Query parameters for safe substitution (query only) |
-| `read_only` | bool | Reject non-SELECT/EXPLAIN/PRAGMA statements when True (query only, default: False) |
+| `read_only` | bool | Reject statements that do not look like a single read-only query when True (query only, default: False) |
 
 ## Project Configuration
 
@@ -111,7 +111,9 @@ db.query(
 ## Security
 
 - Queries run under AUTOCOMMIT with no read-only restriction by default — any valid SQL (SELECT, INSERT, UPDATE, DELETE, DDL) executes
-- Pass `read_only=True` to reject non-SELECT/EXPLAIN/PRAGMA statements
+- Pass `read_only=True` to reject statements that do not look like a single
+  read-only query. This is a best-effort advisory check, not a security boundary;
+  use a read-only database user for a guarantee.
 - Use parameterized queries for user input
 - Configure `max_chars` to prevent excessive output
 

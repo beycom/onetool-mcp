@@ -73,7 +73,7 @@ matches the current runtime interface.
 - **WHEN** the section describes query execution
 - **THEN** it SHALL NOT claim queries are read-only by default
 - **AND** it SHALL state that `db.query()` executes any valid SQL (SELECT, INSERT, UPDATE, DELETE, DDL) under AUTOCOMMIT isolation by default
-- **AND** if an opt-in `read_only=True` parameter exists on `db.query()` at documentation time, it SHALL be documented as the way to reject non-SELECT/EXPLAIN/PRAGMA statements
+- **AND** if an opt-in `read_only=True` parameter exists on `db.query()` at documentation time, it SHALL be documented as a best-effort advisory check that rejects statements which do not look like a single read-only query, not as a security boundary
 
 #### Scenario: db.query return-shape documentation matches the implementation
 - **GIVEN** a user reads `db.query()`'s docstring `Returns:` section
