@@ -14,20 +14,21 @@ from .mutations import _apply_memory_update
 
 def _resolve_memory(
     conn: Any, *, topic: str | None, id: str | None
-) -> tuple[str, str, str, str] | str:
+) -> tuple[str, str, str, str, str] | str:
     """Resolve exactly one memory by id or exact topic (same rule as update()).
 
-    Returns (memory_id, content, meta_raw, updated_at) or an error string.
+    Returns (memory_id, content, content_hash, meta_raw, updated_at) or an error string.
     """
     if not topic and not id:
         return "Error: Must specify topic or id"
     if id:
         rows = conn.execute(
-            "SELECT id, content, meta, updated_at FROM memories WHERE id = ?", [id]
+            "SELECT id, content, content_hash, meta, updated_at FROM memories WHERE id = ?",
+            [id],
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT id, content, meta, updated_at FROM memories WHERE topic = ?",
+            "SELECT id, content, content_hash, meta, updated_at FROM memories WHERE topic = ?",
             [topic],
         ).fetchall()
     if not rows:
@@ -38,7 +39,7 @@ def _resolve_memory(
         )
     if len(rows) > 1:
         return f"Multiple memories ({len(rows)}) match topic '{topic}'. Use id= to disambiguate."
-    return rows[0][0], rows[0][1], rows[0][2], rows[0][3]
+    return rows[0][0], rows[0][1], rows[0][2], rows[0][3], rows[0][4]
 
 
 def _history_rows(conn: Any, memory_id: str, limit: int | None = None) -> list[Any]:
@@ -85,7 +86,7 @@ def history(
                 if isinstance(resolved, str):
                     s.add("error", "not_resolved")
                     return resolved
-                memory_id, content, _meta_raw, updated_at = resolved
+                memory_id, content, _content_hash, _meta_raw, updated_at = resolved
                 rows = _history_rows(conn, memory_id, limit)
 
             label = topic or memory_id
@@ -150,7 +151,13 @@ def rollback(
                 if isinstance(resolved, str):
                     s.add("error", "not_resolved")
                     return resolved
-                memory_id, current_content, meta_raw, _updated_at = resolved
+                (
+                    memory_id,
+                    current_content,
+                    current_content_hash,
+                    meta_raw,
+                    _updated_at,
+                ) = resolved
                 rows = _history_rows(conn, memory_id)
 
             label = topic or memory_id
@@ -193,11 +200,11 @@ def rollback(
                     conn,
                     memory_id=memory_id,
                     old_content=current_content,
+                    old_content_hash=current_content_hash,
                     new_content=restored_content,
                     meta=existing_meta,
                     embedding=embedding,
                 )
-                conn.commit()
             _enqueue_after_commit(memory_id)
 
             s.add("memoryId", memory_id)

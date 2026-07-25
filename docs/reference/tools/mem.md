@@ -173,6 +173,12 @@ Versions are numbered v1..vN (v1 = most recent prior version); numbers shift as 
 
 Restores content only (category/tags/relevance are kept). The current content is saved to history first, so a rollback is itself undoable. TOC sections and embeddings are recomputed.
 
+### Concurrent mutations
+
+`update`, `append`, `rollback`, applied `update_batch`, and applied `refresh` compare the exact content predecessor they read before committing. History, content/metadata, and vector state commit atomically; a conflicting operation reports an error without adding history, changing vectors, or enqueueing an asynchronous embedding. Embedding generation remains outside the database lock.
+
+Concurrent appends retry a bounded number of times. Every retry rereads the latest content, rebuilds the append result, and regenerates its embedding, so successful concurrent appends preserve both additions.
+
 ### `mem.update_batch()`
 
 | Parameter | Type | Description |

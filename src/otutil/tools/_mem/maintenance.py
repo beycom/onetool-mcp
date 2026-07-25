@@ -114,7 +114,7 @@ def update_batch(
                     .replace("%", "\\%")
                     .replace("_", "\\_")
                 )
-                sql = "SELECT id, topic, content, meta FROM memories WHERE content LIKE ? ESCAPE '\\'"
+                sql = "SELECT id, topic, content, content_hash, meta FROM memories WHERE content LIKE ? ESCAPE '\\'"
                 params: list[Any] = [f"%{escaped}%"]
 
                 topic_sql, topic_params = _topic_filter(topic)
@@ -140,8 +140,8 @@ def update_batch(
 
             updated = 0
             for r in rows:
-                memory_id, _topic, old_content = r[0], r[1], r[2]
-                existing_meta: dict[str, str] = _deserialize_meta(r[3])
+                memory_id, _topic, old_content, old_content_hash = r[:4]
+                existing_meta: dict[str, str] = _deserialize_meta(r[4])
 
                 new_content = old_content.replace(search_text, replace_text)
                 # Embedding API call happens outside the DB lock;
@@ -153,11 +153,11 @@ def update_batch(
                         conn,
                         memory_id=memory_id,
                         old_content=old_content,
+                        old_content_hash=old_content_hash,
                         new_content=new_content,
                         meta=existing_meta,
                         embedding=embedding,
                     )
-                    conn.commit()
                 _enqueue_after_commit(memory_id)
                 updated += 1
 

@@ -1183,8 +1183,9 @@ class TestUpdate:
         mock_embed.return_value = None
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
+        conn.execute.return_value.rowcount = 1
         conn.execute.return_value.fetchall.return_value = [
-            ("id-123", "old content", '{}'),
+            ("id-123", "old content", _content_hash("old content"), '{}'),
         ]
 
         result = update(topic="test/topic", content="new content")
@@ -1198,8 +1199,8 @@ class TestUpdate:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "content 1", '{}'),
-            ("id-2", "content 2", '{}'),
+            ("id-1", "content 1", _content_hash("content 1"), '{}'),
+            ("id-2", "content 2", _content_hash("content 2"), '{}'),
         ]
 
         result = update(topic="ambiguous/topic", content="new")
@@ -1232,8 +1233,9 @@ class TestUpdateEmbeddingHandling:
 
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
+        conn.execute.return_value.rowcount = 1
         conn.execute.return_value.fetchall.return_value = [
-            ("id-123", "old content", '{}'),
+            ("id-123", "old content", _content_hash("old content"), '{}'),
         ]
 
         result = update(topic="test/topic", content="new content")
@@ -1253,8 +1255,9 @@ class TestUpdateEmbeddingHandling:
 
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
+        conn.execute.return_value.rowcount = 1
         conn.execute.return_value.fetchall.return_value = [
-            ("id-123", "old content", '{}'),
+            ("id-123", "old content", _content_hash("old content"), '{}'),
         ]
 
         result = update(topic="test/topic", content="new content")
@@ -1273,8 +1276,9 @@ class TestUpdateEmbeddingHandling:
 
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
+        conn.execute.return_value.rowcount = 1
         conn.execute.return_value.fetchall.return_value = [
-            ("id-123", "original content", '{}'),
+            ("id-123", "original content", _content_hash("original content"), '{}'),
         ]
 
         result = append(topic="test/topic", content="more")
@@ -1299,9 +1303,10 @@ class TestAppend:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
 
-        # Mock for single match via fetchall (id, content, meta)
+        # Mock for single match via fetchall (id, content, content_hash, meta)
+        conn.execute.return_value.rowcount = 1
         conn.execute.return_value.fetchall.return_value = [
-            ("id-123", "original content", '{}'),
+            ("id-123", "original content", _content_hash("original content"), '{}'),
         ]
 
         result = append(topic="test/topic", content="appended text")
@@ -2991,8 +2996,9 @@ class TestUpdateRecomputesToc:
         mock_conn.return_value.__enter__.return_value = conn
 
         old_sections = _encode_sections([{"heading": "Old", "start": 1, "end": 5}])
+        conn.execute.return_value.rowcount = 1
         conn.execute.return_value.fetchall.return_value = [
-            ("id-123", "old content", _serialize_meta({"sections": old_sections, "section_count": "1"})),
+            ("id-123", "old content", _content_hash("old content"), _serialize_meta({"sections": old_sections, "section_count": "1"})),
         ]
 
         new_content = "# New Heading\n\nNew content\n\n## Second\n\nMore"
@@ -3001,7 +3007,7 @@ class TestUpdateRecomputesToc:
         assert "Updated memory" in result
         # Verify UPDATE was called with recomputed meta (serialised as JSON).
         # Embeddings are disabled by default, so the UPDATE omits the
-        # embedding column: params are [content, hash, meta, id].
+        # embedding column: params include content, hash, meta, and CAS fields.
         update_calls = [c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)]
         assert len(update_calls) >= 1
         update_params = update_calls[0][0][1]
@@ -3017,8 +3023,9 @@ class TestUpdateRecomputesToc:
         mock_embed.return_value = None
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
+        conn.execute.return_value.rowcount = 1
         conn.execute.return_value.fetchall.return_value = [
-            ("id-123", "old content", '{}'),
+            ("id-123", "old content", _content_hash("old content"), '{}'),
         ]
 
         result = update(topic="test/topic", content="# New\n\nContent")
@@ -3045,14 +3052,15 @@ class TestAppendRecomputesToc:
         mock_conn.return_value.__enter__.return_value = conn
 
         old_sections = _encode_sections([{"heading": "Old", "start": 1, "end": 3}])
+        conn.execute.return_value.rowcount = 1
         conn.execute.return_value.fetchall.return_value = [
-            ("id-123", "# Old\n\nOld content", _serialize_meta({"sections": old_sections, "section_count": "1"})),
+            ("id-123", "# Old\n\nOld content", _content_hash("# Old\n\nOld content"), _serialize_meta({"sections": old_sections, "section_count": "1"})),
         ]
 
         result = append(topic="test/topic", content="# New Section\n\nAppended")
 
         assert "Appended to memory" in result
-        # Embeddings disabled by default: params are [content, hash, meta, id]
+        # Embeddings disabled by default: params include CAS predecessor fields.
         update_calls = [c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)]
         assert len(update_calls) >= 1
         update_params = update_calls[0][0][1]
@@ -3162,6 +3170,7 @@ def _mock_use_conn(rows, *, conn=None):
         assert any("UPDATE" in str(c) for c in conn.execute.call_args_list)
     """
     ctx = conn or MagicMock()
+    ctx.execute.return_value.rowcount = 1
     ctx.execute.return_value.fetchall.return_value = rows
     with (
         patch("otutil.tools._mem.formatting._use_connection") as mock_fmt,
@@ -3348,7 +3357,7 @@ class TestRefresh:
         stale_file.write_text("new content here")
         meta = json.dumps({"source": str(stale_file), "source_mtime": str(stale_file.stat().st_mtime - 100)})
 
-        rows = [("mem-1", "docs/stale.md", "old content", meta)]
+        rows = [("mem-1", "docs/stale.md", "old content", _content_hash("old content"), meta)]
         ctx = MagicMock()
         with _mock_use_conn(rows, conn=ctx):
             result = refresh(topic="docs/")
@@ -3370,7 +3379,7 @@ class TestRefresh:
         stale_file.write_text("updated content")
         meta = json.dumps({"source": str(stale_file), "source_mtime": str(stale_file.stat().st_mtime - 100)})
 
-        rows = [("mem-1", "docs/stale.md", "old content", meta)]
+        rows = [("mem-1", "docs/stale.md", "old content", _content_hash("old content"), meta)]
 
         conn_mock = MagicMock()
         with (
@@ -3394,7 +3403,7 @@ class TestRefresh:
         from otutil.tools.mem import refresh
 
         meta = json.dumps({"source": str(tmp_path / "gone.md"), "source_mtime": "100"})
-        rows = [("mem-1", "docs/gone.md", "content", meta)]
+        rows = [("mem-1", "docs/gone.md", "content", _content_hash("content"), meta)]
 
         with _mock_use_conn(rows):
             result = refresh(topic="docs/", dry_run=False)
@@ -3412,7 +3421,7 @@ class TestRefresh:
         fresh_file.write_text("content")
         meta = json.dumps({"source": str(fresh_file), "source_mtime": str(fresh_file.stat().st_mtime)})
 
-        rows = [("mem-1", "docs/fresh.md", "content", meta)]
+        rows = [("mem-1", "docs/fresh.md", "content", _content_hash("content"), meta)]
         with _mock_use_conn(rows):
             result = refresh(topic="docs/")
 
@@ -3434,7 +3443,7 @@ class TestRefresh:
             "section_count": "1",
         })
 
-        rows = [("mem-1", "docs/stale.md", "# Old Heading\n\nOld content\n", meta)]
+        rows = [("mem-1", "docs/stale.md", "# Old Heading\n\nOld content\n", _content_hash("# Old Heading\n\nOld content\n"), meta)]
 
         conn_mock = MagicMock()
         with (
@@ -3447,7 +3456,7 @@ class TestRefresh:
         # Verify the meta was updated with new sections by checking the UPDATE call
         update_calls = [c for c in conn_mock.execute.call_args_list if "UPDATE" in str(c)]
         assert len(update_calls) > 0
-        # Embeddings disabled by default: params are [content, hash, meta, id]
+        # Embeddings disabled by default: params include CAS predecessor fields.
         update_args = update_calls[0]
         meta_arg = update_args[0][1][2]
         assert "New Heading" in meta_arg
@@ -3811,7 +3820,7 @@ class TestMemVecIndex:
         # Embeddings-disabled update path preserves BLOB and vec row untouched
         with patch("otutil.tools._mem.mutations._get_config", return_value=Config(embeddings_enabled=False)):
             _apply_memory_update(
-                conn, memory_id="m1", old_content="content", new_content="new content",
+                conn, memory_id="m1", old_content="content", old_content_hash=_content_hash("content"), new_content="new content",
                 meta={}, embedding=None,
             )
         conn.commit()

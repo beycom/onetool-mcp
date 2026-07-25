@@ -41,7 +41,10 @@ def refresh(
     with LogSpan(span="mem.refresh", topic=topic or "(all)", dryRun=dry_run) as s:
         try:
             with _use_connection() as conn:
-                sql = "SELECT id, topic, content, meta FROM memories WHERE 1=1"
+                sql = (
+                    "SELECT id, topic, content, content_hash, meta "
+                    "FROM memories WHERE 1=1"
+                )
                 topic_sql, params = _topic_filter(topic)
                 sql += topic_sql
                 sql += " ORDER BY topic"
@@ -53,12 +56,12 @@ def refresh(
 
             fresh_count = 0
             stale_entries: _builtins_list[
-                tuple[str, str, str, dict[str, str], str]
+                tuple[str, str, str, str, dict[str, str], str]
             ] = []
             missing_entries: _builtins_list[str] = []
             skipped = 0
 
-            for mem_id, mem_topic, old_content, raw_meta in rows:
+            for mem_id, mem_topic, old_content, old_content_hash, raw_meta in rows:
                 meta = _deserialize_meta(raw_meta)
                 status = _check_staleness(meta)
                 if status == "fresh":
@@ -66,7 +69,14 @@ def refresh(
                 elif status == "stale":
                     source_path = meta["source"]
                     stale_entries.append(
-                        (mem_id, mem_topic, old_content, meta, source_path)
+                        (
+                            mem_id,
+                            mem_topic,
+                            old_content,
+                            old_content_hash,
+                            meta,
+                            source_path,
+                        )
                     )
                 elif status == "missing":
                     missing_entries.append(mem_topic)
@@ -87,7 +97,14 @@ def refresh(
             if stale_entries:
                 verb = "would update" if dry_run else "updated"
                 parts.append(f"  {len(stale_entries)} stale - {verb}:")
-                for mem_id, mem_topic, old_content, meta, source_path in stale_entries:
+                for (
+                    mem_id,
+                    mem_topic,
+                    old_content,
+                    old_content_hash,
+                    meta,
+                    source_path,
+                ) in stale_entries:
                     p = Path(source_path)
                     if dry_run:
                         new_size = p.stat().st_size if p.exists() else 0
@@ -120,11 +137,11 @@ def refresh(
                                 conn,
                                 memory_id=mem_id,
                                 old_content=old_content,
+                                old_content_hash=old_content_hash,
                                 new_content=new_content,
                                 meta=meta,
                                 embedding=embedding,
                             )
-                            conn.commit()
                         _enqueue_after_commit(mem_id)
 
                         parts.append(
