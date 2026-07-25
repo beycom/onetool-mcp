@@ -359,8 +359,8 @@ def _copy_file(ot_dir: Path, filename: str) -> bool:
 def _guided_secrets_setup(secrets_path: Path) -> None:
     """Guided "Set up encrypted secrets?" flow — never leaves plaintext on disk.
 
-    Prompts for key/value pairs, writes them, then runs init()+encrypt() in-process
-    so the values only ever hit disk as age1enc: ciphertext.
+    Values remain in memory until verified ciphertext and the intentional secure
+    recovery backup can be committed together.
     """
     import questionary
     import yaml
@@ -386,82 +386,82 @@ def _guided_secrets_setup(secrets_path: Path) -> None:
             break
         pairs[key] = value
 
-    if not pairs:
-        if cancelled:
-            console.print("[dim]Encrypted-secrets setup cancelled.[/dim]")
-        return
-
-    # Merge the entered pairs into the materialised secrets.yaml (plaintext for now).
-    # Snapshot whether the file pre-existed with content already fully encrypted
-    # (all age1enc: values, or empty) — this decides the safest scrub below if
-    # init()/encrypt() fails after this plaintext write.
-    existing: dict[str, object] = {}
-    file_pre_existed = secrets_path.exists()
-    pre_merge_text: str | None = None
-    pre_merge_all_encrypted = True
-    if file_pre_existed:
-        pre_merge_text = secrets_path.read_text()
-        loaded = yaml.safe_load(pre_merge_text) or {}
-        if isinstance(loaded, dict):
-            existing = loaded
-            pre_merge_all_encrypted = all(
-                v is None or str(v).startswith("age1enc:") for v in existing.values()
-            )
-
-    existing.update(pairs)
-    secrets_path.write_text(
-        yaml.dump(existing, default_flow_style=False, allow_unicode=True, sort_keys=False)
-    )
-    secrets_path.chmod(0o600)
-
     if cancelled:
-        console.print(
-            f"[yellow]![/yellow] {secrets_path.name} has unencrypted values pending "
-            "ot_secrets.encrypt()."
-        )
+        console.print("[dim]Encrypted-secrets setup cancelled.[/dim]")
         return
+    if not pairs:
+        return
+
+    existing: dict[str, object] = {}
+    if secrets_path.exists():
+        loaded = yaml.safe_load(secrets_path.read_bytes())
+        if loaded is not None and not isinstance(loaded, dict):
+            raise RuntimeError(f"{secrets_path} must contain a YAML mapping")
+        existing = loaded or {}
 
     from ottools import ot_secrets
 
+    stage_path: Path | None = None
     try:
         init_result = ot_secrets.init()
         if init_result.get("status") == "exists":
             reuse = questionary.confirm(
-                "An age identity already exists. Reuse it? (No overwrites it)",
+                "An age identity already exists. Reuse it?",
                 default=True,
             ).ask()
-            if reuse is False:
-                ot_secrets.init(force=True)
+            if reuse is not True:
+                console.print("[dim]Encrypted-secrets setup cancelled.[/dim]")
+                return
+        elif "error" in init_result or init_result.get("status") != "stored":
+            raise RuntimeError(
+                str(init_result.get("error", "Age identity initialisation failed"))
+            )
 
-        ot_secrets.encrypt(file=str(secrets_path), backup=False)
-        audit = ot_secrets.audit(file=str(secrets_path))
+        existing.update(pairs)
+        recovery_bytes = ot_secrets._yaml_bytes(existing)
+        encrypted_bytes, prepare_result = ot_secrets._prepare_guided_encryption(
+            existing
+        )
+        if encrypted_bytes is None or "error" in prepare_result:
+            raise RuntimeError(
+                str(prepare_result.get("error", "Secrets encryption failed"))
+            )
+
+        stage_path = ot_secrets._secure_staging_file(secrets_path, encrypted_bytes)
+        encrypt_result = ot_secrets.encrypt(file=str(stage_path), backup=False)
+        if "error" in encrypt_result:
+            raise RuntimeError(
+                str(encrypt_result.get("error", "Secrets encryption failed"))
+            )
+
+        audit = ot_secrets.audit(file=str(stage_path))
+        if "error" in audit:
+            raise RuntimeError(str(audit["error"]))
+        if audit.get("safe") is not True:
+            raise RuntimeError(
+                f"Encryption did not secure all values: {audit.get('plain_keys')}"
+            )
+
+        ot_secrets._commit_with_backup(
+            secrets_path,
+            stage_path.read_bytes(),
+            backup_bytes=recovery_bytes,
+        )
     except Exception:
-        # Never leave plaintext on disk (docstring guarantee): scrub back to the
-        # safest known state before re-raising. If the pre-existing file content
-        # was already fully encrypted, restore exactly that; otherwise (file
-        # didn't exist, or had plaintext of its own) delete it outright rather
-        # than risk restoring plaintext.
-        if file_pre_existed and pre_merge_all_encrypted and pre_merge_text is not None:
-            secrets_path.write_text(pre_merge_text)
-            secrets_path.chmod(0o600)
-        else:
-            secrets_path.unlink(missing_ok=True)
         console.print(
             f"[red]✗[/red] Encrypted-secrets setup failed — {secrets_path.name} "
-            "scrubbed of plaintext values."
+            "was not changed."
         )
         raise
+    finally:
+        if stage_path is not None:
+            stage_path.unlink(missing_ok=True)
 
-    if audit.get("safe") is True:
-        console.print(
-            f"[green]✓[/green] {secrets_path.name} encrypted "
-            f"({len(pairs)} value(s)) — safe to commit."
-        )
-    else:
-        console.print(
-            f"[red]✗[/red] Encryption did not secure all values in {secrets_path.name}: "
-            f"{audit.get('plain_keys')}. Run ot_secrets.encrypt() manually."
-        )
+    console.print(
+        f"[green]✓[/green] {secrets_path.name} encrypted "
+        f"({len(pairs)} value(s)); plaintext recovery backup created at "
+        f"{secrets_path.name}.bak."
+    )
 
 
 def _copy_diagram(ot_dir: Path) -> bool:

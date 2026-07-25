@@ -10,7 +10,6 @@ from __future__ import annotations
 import base64
 import contextlib
 import os
-import shutil
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -35,7 +34,7 @@ from otpack import LogSpan
 pack = "ot_secrets"
 pack_aliases = ("sec",)
 
-__all__ = ["audit", "encrypt", "get", "init", "rotate", "set", "status", "unset"]
+__all__ = ["audit", "encrypt", "get", "init", "set", "status", "unset"]
 
 __ot_requires__ = {
     "lib": [
@@ -50,11 +49,8 @@ _KEY_PUBKEY = "age_pubkey"
 _KEY_LABEL = "age_label"
 _PREFIX = "age1enc:"
 
-# _NO_IDENTITY_MSG, _SECURE_BACKENDS, _InsecureKeyringError, and
-# _assert_secure_keyring_backend() now live in ot.config.keyring (hoisted so
-# core's ot.config.secrets doesn't import a leaf pack's private symbols).
-# Re-imported above as module-level aliases for backwards compatibility —
-# existing call sites and tests in this module keep working unchanged.
+# These keyring definitions live in the core configuration package so core code
+# does not depend on a leaf tool pack.
 
 
 def _resolve_secrets_file(file: str | None) -> Path:
@@ -75,27 +71,86 @@ def _resolve_secrets_file(file: str | None) -> Path:
     return get_config_dir() / "secrets.yaml"
 
 
-def _atomic_write_yaml(path: Path, data: dict[str, Any]) -> None:
-    """Write ``data`` to ``path`` atomically at mode 0600 (temp file + rename).
+def _yaml_bytes(data: dict[str, Any]) -> bytes:
+    """Serialize a secrets mapping deterministically without touching disk."""
+    return yaml.dump(
+        data,
+        default_flow_style=False,
+        allow_unicode=True,
+        sort_keys=False,
+    ).encode()
 
-    A crash mid-write leaves the original file untouched — no truncation window.
-    """
-    fd, temp_path = tempfile.mkstemp(
-        dir=str(path.parent), prefix=".tmp_", suffix=".yaml"
-    )
+
+def _secure_atomic_write_bytes(path: Path, data: bytes) -> None:
+    """Atomically replace ``path`` with ``data`` at mode 0600."""
+    fd, temp_path = tempfile.mkstemp(dir=str(path.parent), prefix=".tmp_")
+    descriptor_open = True
     try:
-        with os.fdopen(fd, "w") as f:
-            yaml.dump(
-                data, f, default_flow_style=False, allow_unicode=True, sort_keys=False
-            )
-        Path(temp_path).chmod(0o600)
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "wb") as stream:
+            descriptor_open = False
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
         Path(temp_path).replace(path)
     except BaseException:
+        if descriptor_open:
+            os.close(fd)
         with contextlib.suppress(OSError):
             Path(temp_path).unlink()
         raise
-    # Re-assert 0600 after replace (covers platforms where mkstemp perms differ).
-    path.chmod(0o600)
+
+
+def _atomic_write_yaml(path: Path, data: dict[str, Any]) -> None:
+    """Write ``data`` to ``path`` atomically at mode 0600."""
+    _secure_atomic_write_bytes(path, _yaml_bytes(data))
+
+
+def _commit_with_backup(
+    path: Path,
+    target_bytes: bytes,
+    *,
+    backup_bytes: bytes | None,
+) -> str | None:
+    """Commit a secure target and optional backup, restoring backup on failure."""
+    if backup_bytes is None:
+        _secure_atomic_write_bytes(path, target_bytes)
+        return None
+
+    backup_path = Path(f"{path}.bak")
+    previous_backup = backup_path.read_bytes() if backup_path.exists() else None
+    _secure_atomic_write_bytes(backup_path, backup_bytes)
+    try:
+        _secure_atomic_write_bytes(path, target_bytes)
+    except BaseException:
+        if previous_backup is None:
+            backup_path.unlink(missing_ok=True)
+        else:
+            _secure_atomic_write_bytes(backup_path, previous_backup)
+        raise
+    return str(backup_path)
+
+
+def _secure_staging_file(path: Path, data: bytes) -> Path:
+    """Create a mode-0600 sibling staging file containing only encrypted data."""
+    fd, stage_name = tempfile.mkstemp(
+        dir=str(path.parent), prefix=".secrets_stage_", suffix=".yaml"
+    )
+    descriptor_open = True
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "wb") as stream:
+            descriptor_open = False
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except BaseException:
+        if descriptor_open:
+            os.close(fd)
+        with contextlib.suppress(OSError):
+            Path(stage_name).unlink()
+        raise
+    return Path(stage_name)
 
 
 def _require_keyring() -> Any:
@@ -123,12 +178,11 @@ def _pubkey_hint(pubkey: str) -> str:
     return pubkey[:8] + "..." + pubkey[-3:]
 
 
-def init(*, label: str = "", force: bool = False) -> dict[str, Any]:
+def init(*, label: str = "") -> dict[str, Any]:
     """Generate an age X25519 identity and store it in the OS keychain.
 
     Args:
         label: Optional label to identify this identity (e.g., "macbook-gavin").
-        force: If True, overwrite existing identity.
 
     Returns:
         Dict with pubkey, label, and status.
@@ -139,11 +193,15 @@ def init(*, label: str = "", force: bool = False) -> dict[str, Any]:
 
         _assert_secure_keyring_backend(keyring)
 
-        existing = keyring.get_password(_SERVICE, _KEY_IDENTITY)
-        if existing and not force:
+        existing_private = keyring.get_password(_SERVICE, _KEY_IDENTITY)
+        existing_public = keyring.get_password(_SERVICE, _KEY_PUBKEY)
+        if existing_private or existing_public:
             s.add(status="exists")
             return {
-                "error": "Identity already exists in keychain. Pass force=True to overwrite.",
+                "error": (
+                    "Identity state already exists in keychain. Keep the original "
+                    "identity to decrypt existing ciphertext."
+                ),
                 "status": "exists",
             }
 
@@ -204,15 +262,164 @@ def _load_secrets_mapping(path: Path, s: Any) -> tuple[dict[str, Any], dict[str,
     return data, None
 
 
-def encrypt(*, file: str | None = None, backup: bool = False) -> dict[str, Any]:
+def _load_secrets_snapshot(
+    path: Path, s: Any
+) -> tuple[dict[str, Any], bytes, dict[str, Any] | None]:
+    """Load one exact byte snapshot for both parsing and recovery backup."""
+    if not path.exists():
+        s.add(status="file_not_found")
+        return {}, b"", {
+            "error": f"File not found: {path}",
+            "status": "file_not_found",
+        }
+    source = path.read_bytes()
+    try:
+        data = yaml.safe_load(source)
+    except yaml.YAMLError as exc:
+        s.add(status="invalid_yaml")
+        return {}, source, {"error": str(exc), "status": "invalid_yaml"}
+    if not isinstance(data, dict):
+        s.add(status="invalid_yaml")
+        return {}, source, {
+            "error": "File must be a YAML mapping",
+            "status": "invalid_yaml",
+        }
+    return data, source, None
+
+
+def _identity_error(s: Any, message: str) -> dict[str, Any]:
+    s.add(status="identity_inconsistent")
+    return {"error": message, "status": "identity_inconsistent"}
+
+
+def _validated_identity(
+    keyring: Any, pyrage: Any, s: Any
+) -> tuple[tuple[str, Any, Any] | None, dict[str, Any] | None]:
+    """Return a parsed, matching, operational private/public identity pair."""
+    private_key = keyring.get_password(_SERVICE, _KEY_IDENTITY)
+    public_key = keyring.get_password(_SERVICE, _KEY_PUBKEY)
+    if not private_key or not public_key:
+        return None, _identity_error(
+            s,
+            "Age identity is incomplete. Both private and public keychain entries "
+            "are required; keep the original identity for existing ciphertext.",
+        )
+
+    try:
+        identity = pyrage.x25519.Identity.from_str(private_key)
+        recipient = pyrage.x25519.Recipient.from_str(public_key)
+        derived_public = str(identity.to_public())
+    except Exception as exc:
+        return None, _identity_error(s, f"Stored age identity is invalid: {exc}")
+
+    if derived_public != str(recipient):
+        return None, _identity_error(
+            s,
+            "Stored age private and public identity entries do not match.",
+        )
+
+    representative = b"onetool-age-identity-check"
+    try:
+        ciphertext = pyrage.encrypt(representative, [recipient])
+        decrypted = pyrage.decrypt(ciphertext, [identity])
+    except Exception as exc:
+        return None, _identity_error(
+            s, f"Stored age identity failed operational verification: {exc}"
+        )
+    if decrypted != representative:
+        return None, _identity_error(
+            s, "Stored age identity failed operational verification."
+        )
+    return (public_key, recipient, identity), None
+
+
+def _prepare_encrypted_mapping(
+    data: dict[str, Any],
+    *,
+    pyrage: Any,
+    recipient: Any,
+    identity: Any,
+    s: Any,
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """Encrypt and verify a mapping entirely in memory."""
+    encrypted_keys: list[str] = []
+    skipped_keys: list[str] = []
+    null_keys: list[str] = []
+    updated = dict(data)
+
+    for key, value in data.items():
+        if value is None:
+            null_keys.append(key)
+            continue
+        plaintext = str(value).encode()
+        if plaintext.startswith(_PREFIX.encode()):
+            skipped_keys.append(key)
+            continue
+        try:
+            ciphertext = pyrage.encrypt(plaintext, [recipient])
+            verified = pyrage.decrypt(ciphertext, [identity])
+        except Exception as exc:
+            s.add(status="verify_failed", key=key)
+            return None, {
+                "error": (
+                    f"Round-trip verification failed for '{key}': {exc}. "
+                    "Nothing written."
+                ),
+                "status": "verify_failed",
+            }
+        if verified != plaintext:
+            s.add(status="verify_failed", key=key)
+            return None, {
+                "error": (
+                    f"Round-trip verification failed for '{key}'. Nothing written."
+                ),
+                "status": "verify_failed",
+            }
+        updated[key] = _PREFIX + base64.b64encode(ciphertext).decode()
+        encrypted_keys.append(key)
+
+    return updated, {
+        "encrypted": encrypted_keys,
+        "skipped": skipped_keys,
+        "null_keys": null_keys,
+    }
+
+
+def _prepare_guided_encryption(
+    data: dict[str, Any],
+) -> tuple[bytes | None, dict[str, Any]]:
+    """Prepare guided ciphertext in memory using the same encryption boundary."""
+    with LogSpan(span="ot_secrets.guided_prepare") as s:
+        keyring = _require_keyring()
+        pyrage = _require_pyrage()
+        _assert_secure_keyring_backend(keyring)
+        validated, error = _validated_identity(keyring, pyrage, s)
+        if error:
+            return None, error
+        assert validated is not None
+        public_key, recipient, identity = validated
+        updated, result = _prepare_encrypted_mapping(
+            data,
+            pyrage=pyrage,
+            recipient=recipient,
+            identity=identity,
+            s=s,
+        )
+        if updated is None:
+            return None, result
+        result["pubkey_hint"] = _pubkey_hint(public_key)
+        return _yaml_bytes(updated), result
+
+
+def encrypt(*, file: str | None = None, backup: bool = True) -> dict[str, Any]:
     """Encrypt plain values in a secrets YAML file in-place.
 
     Skips values already prefixed with `age1enc:`. Writes atomically at mode 0600.
 
     Args:
         file: Path to secrets YAML file. Defaults to the configured secrets path.
-        backup: If True, create a plaintext .bak copy (mode 0600) before modifying.
-            Defaults to False — an unencrypted backup on disk defeats "safe to commit".
+        backup: Create an exact plaintext .bak recovery copy at mode 0600.
+            Defaults to True.
 
     Returns:
         Dict with encryption summary including encrypted, skipped, and plain key lists.
@@ -224,62 +431,39 @@ def encrypt(*, file: str | None = None, backup: bool = False) -> dict[str, Any]:
 
         _assert_secure_keyring_backend(keyring)
 
-        pubkey_str = keyring.get_password(_SERVICE, _KEY_PUBKEY)
-        if not pubkey_str:
-            s.add(status="no_identity")
-            return {
-                "error": _NO_IDENTITY_MSG,
-                "status": "no_identity",
-            }
+        validated, error = _validated_identity(keyring, pyrage, s)
+        if error:
+            return error
+        assert validated is not None
+        pubkey_str, recipient, identity = validated
 
-        data, err = _load_secrets_mapping(path, s)
+        data, original_bytes, err = _load_secrets_snapshot(path, s)
         if err:
             return err
+        updated, result = _prepare_encrypted_mapping(
+            data,
+            pyrage=pyrage,
+            recipient=recipient,
+            identity=identity,
+            s=s,
+        )
+        if updated is None:
+            return result
+        backup_path = _commit_with_backup(
+            path,
+            _yaml_bytes(updated),
+            backup_bytes=original_bytes if backup else None,
+        )
 
-        recipient = pyrage.x25519.Recipient.from_str(pubkey_str)
-        private_key = keyring.get_password(_SERVICE, _KEY_IDENTITY)
-        identity = pyrage.x25519.Identity.from_str(private_key) if private_key else None
-
-        backup_path: str | None = None
-        if backup:
-            backup_path = str(path) + ".bak"
-            shutil.copy2(path, backup_path)
-            Path(backup_path).chmod(0o600)
-
-        encrypted_keys: list[str] = []
-        skipped_keys: list[str] = []
-        null_keys: list[str] = []
-        updated = dict(data)
-
-        for key, value in data.items():
-            if value is None:
-                null_keys.append(key)
-                continue
-            str_val = str(value)
-            if str_val.startswith(_PREFIX):
-                skipped_keys.append(key)
-            else:
-                ciphertext = pyrage.encrypt(str_val.encode(), [recipient])
-                # Round-trip verify (matching set()/rotate()) before anything is written
-                if identity is not None and pyrage.decrypt(ciphertext, [identity]) != str_val.encode():
-                    s.add(status="verify_failed", key=key)
-                    return {
-                        "error": f"Round-trip verification failed for '{key}'. Nothing written.",
-                        "status": "verify_failed",
-                    }
-                encoded = base64.b64encode(ciphertext).decode()
-                updated[key] = _PREFIX + encoded
-                encrypted_keys.append(key)
-
-        _atomic_write_yaml(path, updated)
-
+        encrypted_keys = result["encrypted"]
+        skipped_keys = result["skipped"]
         s.add(encryptedCount=len(encrypted_keys), skippedCount=len(skipped_keys))
         return {
             "file": str(path),
             "backup": backup_path,
             "encrypted": encrypted_keys,
             "skipped": skipped_keys,
-            "null_keys": null_keys,
+            "null_keys": result["null_keys"],
             "pubkey_hint": _pubkey_hint(pubkey_str),
         }
 
@@ -363,121 +547,6 @@ def status(*, file: str | None = None) -> dict[str, Any]:
 
         s.add(identity="found")
         return result
-
-
-def rotate(*, file: str | None = None, backup: bool = False) -> dict[str, Any]:
-    """Generate a new identity and re-encrypt all encrypted values in-place.
-
-    Plain (non-`age1enc:`) values are left unchanged.
-
-    Args:
-        file: Path to secrets YAML file. Defaults to the configured secrets path.
-        backup: If True, create a plaintext .bak copy (mode 0600) before modifying.
-            Defaults to False.
-
-    Returns:
-        Dict with rotation summary.
-    """
-    path = _resolve_secrets_file(file)
-    with LogSpan(span="ot_secrets.rotate", file=str(path)) as s:
-        keyring = _require_keyring()
-        pyrage = _require_pyrage()
-
-        _assert_secure_keyring_backend(keyring)
-
-        old_private = keyring.get_password(_SERVICE, _KEY_IDENTITY)
-        old_pubkey = keyring.get_password(_SERVICE, _KEY_PUBKEY)
-        label = keyring.get_password(_SERVICE, _KEY_LABEL) or ""
-
-        if not old_private:
-            s.add(status="no_identity")
-            return {
-                "error": _NO_IDENTITY_MSG,
-                "status": "no_identity",
-            }
-
-        data, err = _load_secrets_mapping(path, s)
-        if err:
-            return err
-
-        backup_path: str | None = None
-        if backup:
-            backup_path = str(path) + ".bak"
-            shutil.copy2(path, backup_path)
-            Path(backup_path).chmod(0o600)
-
-        old_identity = pyrage.x25519.Identity.from_str(old_private)
-
-        new_identity = pyrage.x25519.Identity.generate()
-        new_private = str(new_identity)
-        new_pubkey = str(new_identity.to_public())
-        new_recipient = pyrage.x25519.Recipient.from_str(new_pubkey)
-
-        rotated_keys: list[str] = []
-        skipped_keys: list[str] = []
-        updated = dict(data)
-
-        for key, value in data.items():
-            if value is None:
-                continue
-            str_val = str(value)
-            if str_val.startswith(_PREFIX):
-                encoded = str_val[len(_PREFIX) :]
-                try:
-                    ciphertext = base64.b64decode(encoded, validate=True)
-                    plaintext = pyrage.decrypt(ciphertext, [old_identity])
-                except (ValueError, pyrage.DecryptError) as exc:
-                    s.add(status="decrypt_failed", key=key)
-                    return {
-                        "error": (
-                            f"Rotation aborted: cannot decrypt '{key}' — value is "
-                            f"corrupted or was encrypted with a different key ({exc}). "
-                            "No changes were written."
-                        ),
-                        "status": "decrypt_failed",
-                    }
-                new_ciphertext = pyrage.encrypt(plaintext, [new_recipient])
-                # Round-trip verify with the NEW identity before committing anything
-                # to disk or the keychain (Decision 7) — abort loudly on mismatch.
-                verify = pyrage.decrypt(new_ciphertext, [new_identity])
-                if verify != plaintext:
-                    s.add(status="verify_failed", key=key)
-                    return {
-                        "error": (
-                            f"Rotation aborted: re-encrypted value for '{key}' failed "
-                            "round-trip verification with the new identity. No changes "
-                            "were written."
-                        ),
-                        "status": "verify_failed",
-                    }
-                new_encoded = base64.b64encode(new_ciphertext).decode()
-                updated[key] = _PREFIX + new_encoded
-                rotated_keys.append(key)
-            else:
-                skipped_keys.append(key)
-
-        # Crash-safety invariant (Decision 7): write the new-key file atomically
-        # FIRST, and only update the keychain to the new identity AFTER the write
-        # succeeds. A crash before the write leaves the old file + old identity
-        # intact; a crash after the write but before the keychain update is
-        # recoverable by re-running rotate() (which fails to decrypt with the
-        # mismatched identity — a clear error, not silent data loss).
-        _atomic_write_yaml(path, updated)
-
-        keyring.set_password(_SERVICE, _KEY_IDENTITY, new_private)
-        keyring.set_password(_SERVICE, _KEY_PUBKEY, new_pubkey)
-        keyring.set_password(_SERVICE, _KEY_LABEL, label)
-
-        s.add(rotatedCount=len(rotated_keys), status="rotated")
-        return {
-            "old_pubkey_hint": _pubkey_hint(old_pubkey) if old_pubkey else None,
-            "new_pubkey_hint": _pubkey_hint(new_pubkey),
-            "file": str(path),
-            "backup": backup_path,
-            "rotated": rotated_keys,
-            "skipped": skipped_keys,
-            "status": "rotated",
-        }
 
 
 def audit(*, file: str | None = None) -> dict[str, Any]:

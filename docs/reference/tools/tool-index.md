@@ -1,6 +1,6 @@
 # OneTool MCP Tool Index
 
-packs=28 tools=252
+packs=28 tools=251
 
 ## arch
 ```python
@@ -272,10 +272,9 @@ ot_llm.transform_file(prompt: str, in_file: str, out_file: str, model: str | Non
 ## ot_secrets, sec
 ```python
 ot_secrets.audit(file: str | None=None)  # Scan a secrets YAML file for unencrypted values.
-ot_secrets.encrypt(file: str | None=None, backup: bool=False)  # Encrypt plain values in a secrets YAML file in-place.
+ot_secrets.encrypt(file: str | None=None, backup: bool=True)  # Encrypt plain values in a secrets YAML file in-place.
 ot_secrets.get(key: str, file: str | None=None, out_file: str | None=None)  # Look up a secret's existence/metadata, never returning its plaintext value.
-ot_secrets.init(label: str='', force: bool=False)  # Generate an age X25519 identity and store it in the OS keychain.
-ot_secrets.rotate(file: str | None=None, backup: bool=False)  # Generate a new identity and re-encrypt all encrypted values in-place.
+ot_secrets.init(label: str='')  # Generate an age X25519 identity and store it in the OS keychain.
 ot_secrets.set(key: str, value: str, file: str | None=None)  # Set a single secret, encrypting it in place if an identity exists.
 ot_secrets.status(file: str | None=None)  # Check secrets identity status and optionally inspect a secrets file.
 ot_secrets.unset(key: str, file: str | None=None)  # Remove a single key from a secrets YAML file.

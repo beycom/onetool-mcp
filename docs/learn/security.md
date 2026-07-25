@@ -178,7 +178,13 @@ __onetool ot_secrets.init(label="my-machine")      # Generate identity, store in
 __onetool ot_secrets.encrypt(file="~/.onetool/secrets.yaml")  # Encrypt values in-place
 ```
 
-Once encrypted, `secrets.yaml` is safe to inspect and commit — values cannot be recovered without the OS keychain key. See [Encrypting Secrets at Rest](../reference/cli/onetool-config.md#encrypting-secrets-at-rest) for full setup and usage.
+Once encrypted, `secrets.yaml` is safe to inspect and commit — values cannot be
+recovered without the original OS-keychain identity. Encryption creates a
+mode-`0600` plaintext `.bak` recovery file by default; that backup must remain
+private and out of version control. The identity is not replaceable through the
+v3 secrets tools because doing so would make existing ciphertext unreadable.
+See [Encrypting Secrets at Rest](../reference/cli/onetool-config.md#encrypting-secrets-at-rest)
+for full setup and usage.
 
 ### 8. In-Process Tool Execution
 

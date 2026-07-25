@@ -1,175 +1,294 @@
-"""Unit tests for onetool.cli._guided_secrets_setup (FIX-G).
-
-Covers: (a) the plaintext interim write is always chmod 0600 regardless of
-whether a prior template-copy chmod ran, and (b) a failure in ot_secrets
-init()/encrypt() never leaves plaintext secrets on disk — the file is
-restored to its pre-merge content (if that content was already fully
-encrypted) or deleted outright otherwise.
-"""
+"""Transactional tests for ``onetool.cli._guided_secrets_setup``."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import base64
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-
-if TYPE_CHECKING:
-    from pathlib import Path
+import yaml
 
 
-def _mock_confirm_yes(monkeypatch: pytest.MonkeyPatch) -> None:
+class _FakeSecureBackend:
+    """Stand-in for an allow-listed OS keyring backend."""
+
+
+_FakeSecureBackend.__module__ = "keyring.backends.macOS"
+_FakeSecureBackend.__qualname__ = "Keyring"
+
+
+def _keyring(store: dict[tuple[str, str], str]) -> MagicMock:
+    keyring = MagicMock()
+    keyring.get_keyring.return_value = _FakeSecureBackend()
+    keyring.get_password.side_effect = lambda service, key: store.get((service, key))
+    keyring.set_password.side_effect = lambda service, key, value: store.__setitem__(
+        (service, key), value
+    )
+    return keyring
+
+
+def _identity_store(pyrage: Any) -> tuple[Any, dict[tuple[str, str], str]]:
+    identity = pyrage.x25519.Identity.generate()
+    return identity, {
+        ("onetool", "age_identity"): str(identity),
+        ("onetool", "age_pubkey"): str(identity.to_public()),
+        ("onetool", "age_label"): "original",
+    }
+
+
+def _prompt(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    confirmations: list[bool | None],
+    keys: list[str | None],
+    values: list[str | None],
+) -> None:
     import questionary
 
+    from ot import _tui
+
+    confirm_answers = iter(confirmations)
     monkeypatch.setattr(
-        questionary, "confirm", lambda *a, **k: MagicMock(ask=lambda: True)
+        questionary,
+        "confirm",
+        lambda *_args, **_kwargs: MagicMock(ask=lambda: next(confirm_answers)),
     )
+    monkeypatch.setattr(_tui, "ask_text_sync", MagicMock(side_effect=keys))
+    monkeypatch.setattr(_tui, "ask_password_sync", MagicMock(side_effect=values))
 
 
-def _mock_one_pair_entry(
-    monkeypatch: pytest.MonkeyPatch, key: str = "MY_KEY", value: str = "my_value"
-) -> None:
-    """Simulate entering exactly one key/value pair, then finishing normally."""
-    import ot._tui as tui
-
-    monkeypatch.setattr(tui, "ask_text_sync", MagicMock(side_effect=[key, ""]))
-    monkeypatch.setattr(tui, "ask_password_sync", MagicMock(side_effect=[value]))
+def _assert_no_residue(directory: Path) -> None:
+    assert not list(directory.glob(".secrets_stage_*"))
+    assert not list(directory.glob(".tmp_*"))
 
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_write_is_chmod_0600_even_without_prior_template_chmod(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("keys", "values"),
+    [
+        ([None], []),
+        (["ONE", None], ["secret-one"]),
+        (["ONE"], [None]),
+        (["ONE", "TWO", None], ["secret-one", "secret-two"]),
+    ],
+)
+def test_cancellation_never_creates_target_backup_or_temp(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    keys: list[str | None],
+    values: list[str | None],
 ) -> None:
-    """The interim plaintext write is chmod 0600 unconditionally (FIX-G part a),
-    not relying on a prior template-copy chmod that may have been skipped."""
     from onetool.cli import _guided_secrets_setup
-    from ottools import ot_secrets
 
-    secrets_path = tmp_path / "secrets.yaml"
-    _mock_confirm_yes(monkeypatch)
-    _mock_one_pair_entry(monkeypatch)
-
-    monkeypatch.setattr(
-        ot_secrets, "init", MagicMock(return_value={"status": "stored"})
-    )
-    monkeypatch.setattr(ot_secrets, "encrypt", MagicMock(return_value={}))
-    monkeypatch.setattr(
-        ot_secrets, "audit", MagicMock(return_value={"safe": True, "plain_keys": []})
+    target = tmp_path / "secrets.yaml"
+    _prompt(
+        monkeypatch,
+        confirmations=[True],
+        keys=keys,
+        values=values,
     )
 
-    _guided_secrets_setup(secrets_path)
+    _guided_secrets_setup(target)
 
-    assert secrets_path.exists()
-    assert (secrets_path.stat().st_mode & 0o777) == 0o600
+    assert not target.exists()
+    assert not Path(f"{target}.bak").exists()
+    _assert_no_residue(tmp_path)
 
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_failure_unlinks_when_file_did_not_pre_exist(
+def test_cancellation_preserves_existing_target_and_backup_exactly(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """No pre-existing file + init()/encrypt() failure -> plaintext is deleted,
-    not left on disk (FIX-G part b)."""
     from onetool.cli import _guided_secrets_setup
-    from ottools import ot_secrets
 
-    secrets_path = tmp_path / "secrets.yaml"
-    assert not secrets_path.exists()
-
-    _mock_confirm_yes(monkeypatch)
-    _mock_one_pair_entry(monkeypatch)
-
-    monkeypatch.setattr(
-        ot_secrets, "init", MagicMock(side_effect=RuntimeError("keychain exploded"))
+    target = tmp_path / "secrets.yaml"
+    backup = Path(f"{target}.bak")
+    target_bytes = b"EXISTING: 'age1enc:YWJj'\n"
+    backup_bytes = b"OLD-RECOVERY: exact\n"
+    target.write_bytes(target_bytes)
+    backup.write_bytes(backup_bytes)
+    _prompt(
+        monkeypatch,
+        confirmations=[True],
+        keys=["ONE", "TWO", None],
+        values=["secret-one", "secret-two"],
     )
 
-    with pytest.raises(RuntimeError, match="keychain exploded"):
-        _guided_secrets_setup(secrets_path)
+    _guided_secrets_setup(target)
 
-    assert not secrets_path.exists()
+    assert target.read_bytes() == target_bytes
+    assert backup.read_bytes() == backup_bytes
+    _assert_no_residue(tmp_path)
 
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_failure_restores_pre_merge_content_when_already_encrypted(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("reuse_answer", [False, None])
+def test_declining_or_cancelling_reuse_preserves_global_identity_and_ciphertext(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reuse_answer: bool | None,
 ) -> None:
-    """Pre-existing file whose content was already fully encrypted -> on failure,
-    restore that exact pre-merge content rather than leaving the newly-merged
-    plaintext value on disk."""
+    pyrage = pytest.importorskip("pyrage")
     from onetool.cli import _guided_secrets_setup
     from ottools import ot_secrets
 
-    secrets_path = tmp_path / "secrets.yaml"
-    original = "EXISTING: 'age1enc:ZmFrZQ=='\n"
-    secrets_path.write_text(original)
-
-    _mock_confirm_yes(monkeypatch)
-    _mock_one_pair_entry(monkeypatch)
-
-    monkeypatch.setattr(
-        ot_secrets, "init", MagicMock(side_effect=RuntimeError("encrypt failed"))
+    identity, store = _identity_store(pyrage)
+    original_store = dict(store)
+    other_file = tmp_path / "other.yaml"
+    other_plaintext = b"still-readable"
+    ciphertext = pyrage.encrypt(other_plaintext, [identity.to_public()])
+    other_bytes = (
+        "OTHER: 'age1enc:" + base64.b64encode(ciphertext).decode() + "'\n"
+    ).encode()
+    other_file.write_bytes(other_bytes)
+    target = tmp_path / "secrets.yaml"
+    _prompt(
+        monkeypatch,
+        confirmations=[True, reuse_answer],
+        keys=["NEW", ""],
+        values=["new-value"],
     )
+    monkeypatch.setattr(ot_secrets, "_require_keyring", lambda: _keyring(store))
 
-    with pytest.raises(RuntimeError, match="encrypt failed"):
-        _guided_secrets_setup(secrets_path)
+    _guided_secrets_setup(target)
 
-    assert secrets_path.exists()
-    assert secrets_path.read_text() == original
-    assert "my_value" not in secrets_path.read_text()
-    assert (secrets_path.stat().st_mode & 0o777) == 0o600
+    assert store == original_store
+    assert other_file.read_bytes() == other_bytes
+    loaded = yaml.safe_load(other_file.read_text())
+    encrypted = base64.b64decode(loaded["OTHER"][len("age1enc:") :], validate=True)
+    assert pyrage.decrypt(encrypted, [identity]) == other_plaintext
+    assert not target.exists()
+    assert not Path(f"{target}.bak").exists()
+    _assert_no_residue(tmp_path)
 
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_failure_unlinks_when_pre_existing_content_had_plaintext(
+def test_reuse_success_preserves_identity_and_writes_verified_pair(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Pre-existing file already contained an unencrypted value of its own ->
-    on failure, delete rather than restore (restoring would still leave
-    plaintext of the pre-existing key on disk)."""
+    pyrage = pytest.importorskip("pyrage")
     from onetool.cli import _guided_secrets_setup
     from ottools import ot_secrets
 
-    secrets_path = tmp_path / "secrets.yaml"
-    secrets_path.write_text("EXISTING: plain_value\n")
-
-    _mock_confirm_yes(monkeypatch)
-    _mock_one_pair_entry(monkeypatch)
-
-    monkeypatch.setattr(
-        ot_secrets, "init", MagicMock(side_effect=RuntimeError("encrypt failed"))
+    identity, store = _identity_store(pyrage)
+    original_store = dict(store)
+    target = tmp_path / "secrets.yaml"
+    _prompt(
+        monkeypatch,
+        confirmations=[True, True],
+        keys=["NEW_SECRET", ""],
+        values=["new-value"],
     )
+    monkeypatch.setattr(ot_secrets, "_require_keyring", lambda: _keyring(store))
 
-    with pytest.raises(RuntimeError, match="encrypt failed"):
-        _guided_secrets_setup(secrets_path)
+    _guided_secrets_setup(target)
 
-    assert not secrets_path.exists()
+    assert store == original_store
+    target_data = yaml.safe_load(target.read_text())
+    encoded = target_data["NEW_SECRET"]
+    assert encoded.startswith("age1enc:")
+    ciphertext = base64.b64decode(encoded[len("age1enc:") :], validate=True)
+    assert pyrage.decrypt(ciphertext, [identity]) == b"new-value"
+    backup = Path(f"{target}.bak")
+    assert backup.read_bytes() == b"NEW_SECRET: new-value\n"
+    assert (target.stat().st_mode & 0o777) == 0o600
+    assert (backup.stat().st_mode & 0o777) == 0o600
+    _assert_no_residue(tmp_path)
 
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_encrypt_failure_also_scrubs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    "failure",
+    [
+        "init_return",
+        "init_raise",
+        "encrypt_return",
+        "encrypt_raise",
+        "audit_return",
+        "audit_raise",
+        "audit_unsafe",
+        "commit_raise",
+    ],
+)
+def test_lifecycle_failures_preserve_existing_files_and_leave_no_plaintext(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
 ) -> None:
-    """A failure in encrypt() (after init() succeeds) also scrubs the plaintext."""
+    pyrage = pytest.importorskip("pyrage")
     from onetool.cli import _guided_secrets_setup
     from ottools import ot_secrets
 
-    secrets_path = tmp_path / "secrets.yaml"
-
-    _mock_confirm_yes(monkeypatch)
-    _mock_one_pair_entry(monkeypatch)
-
-    monkeypatch.setattr(
-        ot_secrets, "init", MagicMock(return_value={"status": "stored"})
+    _, store = _identity_store(pyrage)
+    target = tmp_path / "secrets.yaml"
+    backup = Path(f"{target}.bak")
+    target_bytes = b"EXISTING: 'age1enc:YWJj'\n"
+    backup_bytes = b"EXISTING: old-recovery\n"
+    target.write_bytes(target_bytes)
+    backup.write_bytes(backup_bytes)
+    _prompt(
+        monkeypatch,
+        confirmations=[True, True],
+        keys=["NEW", ""],
+        values=["never-write-this"],
     )
-    monkeypatch.setattr(
-        ot_secrets, "encrypt", MagicMock(side_effect=RuntimeError("disk full"))
-    )
+    monkeypatch.setattr(ot_secrets, "_require_keyring", lambda: _keyring(store))
 
-    with pytest.raises(RuntimeError, match="disk full"):
-        _guided_secrets_setup(secrets_path)
+    if failure == "init_return":
+        monkeypatch.setattr(
+            ot_secrets,
+            "init",
+            MagicMock(return_value={"error": "init failed", "status": "failed"}),
+        )
+    elif failure == "init_raise":
+        monkeypatch.setattr(
+            ot_secrets, "init", MagicMock(side_effect=RuntimeError("init failed"))
+        )
+    elif failure == "encrypt_return":
+        monkeypatch.setattr(
+            ot_secrets,
+            "encrypt",
+            MagicMock(return_value={"error": "encrypt failed", "status": "failed"}),
+        )
+    elif failure == "encrypt_raise":
+        monkeypatch.setattr(
+            ot_secrets, "encrypt", MagicMock(side_effect=RuntimeError("encrypt failed"))
+        )
+    elif failure == "audit_return":
+        monkeypatch.setattr(
+            ot_secrets,
+            "audit",
+            MagicMock(return_value={"error": "audit failed", "status": "failed"}),
+        )
+    elif failure == "audit_raise":
+        monkeypatch.setattr(
+            ot_secrets, "audit", MagicMock(side_effect=RuntimeError("audit failed"))
+        )
+    elif failure == "audit_unsafe":
+        monkeypatch.setattr(
+            ot_secrets,
+            "audit",
+            MagicMock(return_value={"safe": False, "plain_keys": ["NEW"]}),
+        )
+    else:
+        monkeypatch.setattr(
+            ot_secrets,
+            "_commit_with_backup",
+            MagicMock(side_effect=RuntimeError("commit failed")),
+        )
 
-    assert not secrets_path.exists()
+    with pytest.raises(RuntimeError):
+        _guided_secrets_setup(target)
+
+    assert target.read_bytes() == target_bytes
+    assert backup.read_bytes() == backup_bytes
+    for file_path in tmp_path.iterdir():
+        assert b"never-write-this" not in file_path.read_bytes()
+    _assert_no_residue(tmp_path)

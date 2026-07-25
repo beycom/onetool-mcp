@@ -1,10 +1,4 @@
-# tool-secrets Specification
-
-## Purpose
-
-Provides agent-callable functions for managing age-encrypted secrets in `secrets.yaml`. The `ot_secrets` pack enables setup and management of encrypted secrets entirely through the OneTool agent interface.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Secrets Pack Identity Initialisation
 
@@ -32,8 +26,6 @@ already exists.
 - **WHEN** `ot_secrets.init()` is called with no `label` argument
 - **THEN** the stored label SHALL be an empty string
 - **AND** the function SHALL succeed normally when no identity state exists
-
----
 
 ### Requirement: Secrets Pack Encryption
 
@@ -107,108 +99,12 @@ secrets YAML file.
 - **THEN** it SHALL return a verification error
 - **AND** it SHALL NOT replace the target or backup
 
----
+## REMOVED Requirements
 
-### Requirement: Secrets Pack Status
+### Requirement: Secrets Pack Rotation
 
-The `ot_secrets` pack SHALL provide a `status()` function reporting the current secrets configuration.
+**Reason**: A file-scoped operation cannot safely replace the one global identity
+that may protect other secrets files, and interruption can orphan ciphertext.
 
-#### Scenario: Identity found, no file
-- **WHEN** `ot_secrets.status()` is called
-- **AND** an identity is stored in the keychain
-- **THEN** it SHALL return `{"identity": "found", "pubkey_hint": "age1ql3z...c8p", "label": str, "file": null, "values": null}`
-
-#### Scenario: Identity found with file
-- **WHEN** `ot_secrets.status(file="~/.onetool/secrets.yaml")` is called
-- **THEN** it SHALL parse the YAML and count encrypted vs plain values
-- **AND** return `{"identity": "found", "pubkey_hint": str, "label": str, "file": str, "values": {"encrypted": [...], "plain": [...], "null_keys": [...]}}`
-
-#### Scenario: File not found
-- **WHEN** `ot_secrets.status(file="...")` is called
-- **AND** the path does not exist
-- **THEN** it SHALL set `file_error` in the result with a "not found" message
-- **AND** `file` and `values` SHALL remain `null`
-
-#### Scenario: File is not a YAML mapping
-- **WHEN** `ot_secrets.status(file="...")` is called
-- **AND** the file exists but `yaml.safe_load` does not return a dict (e.g. empty or comment-only file)
-- **THEN** it SHALL set `file_error` in the result indicating the file must be a YAML mapping
-- **AND** `file` and `values` SHALL remain `null`
-
-#### Scenario: Invalid YAML in status
-- **WHEN** `ot_secrets.status(file="...")` is called
-- **AND** the file contains malformed YAML that cannot be parsed
-- **THEN** it SHALL set `file_error` in the result with the parse error message
-- **AND** `file` and `values` SHALL remain `null`
-- **AND** SHALL NOT raise an unhandled exception
-
-#### Scenario: No identity found
-- **WHEN** `ot_secrets.status()` is called
-- **AND** no identity is stored in the keychain
-- **THEN** `identity` SHALL be `"not found"`
-- **AND** the response SHALL suggest running `ot_secrets.init()`
-
----
-
-### Requirement: Secrets Pack Audit
-
-The `ot_secrets` pack SHALL provide an `audit()` function that scans a secrets file for unencrypted values.
-
-#### Scenario: All values encrypted
-- **WHEN** `ot_secrets.audit(file="~/.onetool/secrets.yaml")` is called
-- **AND** all values start with `age1enc:`
-- **THEN** it SHALL return `{"file": str, "safe": true, "plain_keys": [], "encrypted_keys": [...]}`
-
-#### Scenario: Plain values detected
-- **WHEN** `ot_secrets.audit(file="...")` is called
-- **AND** some values are plain text
-- **THEN** `safe` SHALL be `false`
-- **AND** `plain_keys` SHALL contain the key names of unencrypted values
-- **AND** `plain_keys` SHALL NEVER contain the actual plaintext values
-- **AND** the response SHALL include a message: `"Run ot_secrets.encrypt() to secure these values before committing."`
-
-#### Scenario: Audit never exposes values
-- **WHEN** `ot_secrets.audit(file="...")` is called
-- **THEN** the return value SHALL contain only key names, never secret values
-
-#### Scenario: Empty or comment-only file
-- **WHEN** `ot_secrets.audit(file="...")` is called
-- **AND** the file is syntactically valid YAML but has no top-level mapping (e.g. all comments)
-- **THEN** it SHALL return `{"error": "File must be a YAML mapping", "status": "no_mapping"}`
-
-#### Scenario: Invalid YAML in audit
-- **WHEN** `ot_secrets.audit(file="...")` is called
-- **AND** the file contains malformed YAML that cannot be parsed
-- **THEN** it SHALL return `{"error": "<parse error>", "status": "invalid_yaml"}`
-- **AND** SHALL NOT raise an unhandled exception
-
-#### Scenario: Null values tracked separately
-- **WHEN** `ot_secrets.audit(file="...")` is called
-- **AND** the file contains keys with `null` values
-- **THEN** those keys SHALL appear in `null_keys`, not in `plain_keys` or `encrypted_keys`
-- **AND** the result SHALL always include a `null_keys` list (empty if none)
-
----
-
-### Requirement: Secrets Pack Key Removal
-
-The `ot_secrets.unset()` function SHALL remove a single key from the secrets file without exposing its value.
-
-#### Scenario: Remove an existing key
-- **WHEN** `ot_secrets.unset(key="OLD_KEY")` is called and the key exists
-- **THEN** the key SHALL be removed via an atomic write and the result SHALL be `{"removed": true, "key": "OLD_KEY"}`
-
-#### Scenario: Key not present
-- **WHEN** `ot_secrets.unset(key="MISSING")` is called and the key does not exist
-- **THEN** it SHALL return `{"removed": false, "key": "MISSING", "status": "not_found"}` without modifying the file
-
----
-
-### Requirement: Secrets Pack Dependency Declaration
-
-The `ot_secrets` pack SHALL declare its runtime library dependencies.
-
-#### Scenario: Dependency declaration
-- **WHEN** `ot_secrets.py` is loaded
-- **THEN** it SHALL declare `__ot_requires__ = {"lib": [("pyrage", "pip install pyrage"), ("keyring", "pip install keyring")]}`
-- **AND** `onetool check` SHALL surface missing packages with the install hint
+**Migration**: Continue using the original initialized identity for existing
+ciphertext. V3 provides no in-process identity replacement or rotation path.

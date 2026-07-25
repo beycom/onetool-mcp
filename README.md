@@ -128,7 +128,7 @@ npx skills add https://github.com/beycom/onetool-mcp --skill ot-ref --agent clau
 
 ## Tools
 
-28 packs, 252 tools ready to use (`console` in beta):
+28 packs, 251 tools ready to use (`console` in beta):
 
 | Pack          | Tools                                                        | Extra    | Description                          |
 | ------------- | ------------------------------------------------------------ | -------- | ------------------------------------ |
@@ -151,7 +151,7 @@ npx skills add https://github.com/beycom/onetool-mcp --skill ot-ref --agent clau
 | `ot_forge`    | `create_ext`, `validate_ext`                                 |          | Scaffold new tool packs              |
 | `ot_image` (`img`) | `load`, `ask`, `clip_ask`, `summary`, … (9 tools)       |          | Image vision via a dedicated model   |
 | `ot_llm`      | `transform`, `transform_file`                                |          | LLM-powered transforms               |
-| `ot_secrets`  | `set`, `encrypt`, `audit`, `rotate`, … (8 tools)             |          | Encrypted secrets management         |
+| `ot_secrets`  | `set`, `encrypt`, `audit`, `status`, … (7 tools)             |          | Encrypted secrets management         |
 | `ot_servers`  | `enable`, `disable`, `restart`, `status`                     |          | Runtime control of proxied servers   |
 | `ot_timer`    | `start`, `stop`, `elapsed`, `list`, `clear`                  |          | Named timers                         |
 | `package`     | `pypi`, `npm`, `version`, `audit`, `models`                  | `[dev]`  | Package versions and staleness       |
@@ -258,7 +258,7 @@ __onetool wiki.summary(title="Python_(programming_language)")
 - [Quickstart](https://onetool.beycom.online/learn/quickstart/) - 30 seconds to first tool call
 - [Installation](https://onetool.beycom.online/learn/installation/) - All platforms
 - [Configuration](https://onetool.beycom.online/learn/configuration/) - YAML schema
-- [Tools Reference](https://onetool.beycom.online/reference/tools/) - All 252 tools
+- [Tools Reference](https://onetool.beycom.online/reference/tools/) - All 251 tools
 - [Security](https://onetool.beycom.online/learn/security/) - The layered security model
 - [Extending](https://onetool.beycom.online/learn/extension-tools/) - Build your own
 - [Dev Docs](https://github.com/beycom/onetool-mcp/blob/main/dev/index.md) - Internal developer documentation

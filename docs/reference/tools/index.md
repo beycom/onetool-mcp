@@ -1,6 +1,6 @@
 # Tool Reference
 
-**28 Packs. 252 Tools.**
+**28 Packs. 251 Tools.**
 
 Complete reference of all built-in tool packs and functions.
 
@@ -46,7 +46,7 @@ uv tool install 'onetool-mcp[util,dev]'  # most tools
 | [**OT Forge**](ot_forge.md) | core | Create and validate extension tools. | 2 | MIT | `create_ext`, `validate_ext` |
 | [**OT Image**](ot_image.md) | core | Load images and ask vision questions via OpenAI-compatible API. | 9 | MIT | `ask`, `clip_ask`, `clip_view`, `delete`, `list`, `load`, `load_batch`, `purge`, `summary` |
 | [**OT LLM**](ot_llm.md) | core | AI-powered data transformation. | 2 | MIT | `transform`, `transform_file` |
-| [**OT Secrets**](ot_secrets.md) | core | Age-encrypted secrets management. | 8 | MIT | `audit`, `encrypt`, `get`, `init`, `rotate`, `set`, `status`, `unset` |
+| [**OT Secrets**](ot_secrets.md) | core | Age-encrypted secrets management. | 7 | MIT | `audit`, `encrypt`, `get`, `init`, `set`, `status`, `unset` |
 | [**OT Servers**](ot_servers.md) | core | Runtime proxy server state changes (enable, disable, restart, status). | 4 | MIT | `disable`, `enable`, `restart`, `status` |
 | [**Package**](package.md) | `[dev]` | Package version lookup and security audits. | 5 | MIT | `audit`, `models`, `npm`, `pypi`, `version` |
 | [**Playwright Util**](play-util.md) | `[dev]` | Visual element annotation for a Playwright-compatible MCP server. | 6 | MIT | `clear_annotations`, `enable_auto_inject`, `guide_user`, `highlight_element`, `inject_annotations`, `scan_annotations` |

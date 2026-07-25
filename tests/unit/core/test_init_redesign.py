@@ -207,8 +207,6 @@ def test_init_validate_succeeds_with_config_flag(tmp_path: Path) -> None:
     assert result.exit_code == 0
 
 
-
-
 # =============================================================================
 # Conflict handling: _safe_copy / _safe_write
 # =============================================================================
@@ -620,7 +618,7 @@ def test_init_secrets_yaml_not_in_include_and_0600(tmp_path: Path) -> None:
 @pytest.mark.unit
 @pytest.mark.core
 def test_init_secrets_yaml_encrypted_step(tmp_path: Path) -> None:
-    """Confirming the encrypted step runs init()+encrypt(backup=False)+audit()."""
+    """Selecting secrets invokes the transactional guided encryption flow."""
     from unittest.mock import MagicMock, patch
 
     from typer.testing import CliRunner
@@ -632,32 +630,20 @@ def test_init_secrets_yaml_encrypted_step(tmp_path: Path) -> None:
     secrets_path = ot_dir / "secrets.yaml"
 
     mock_tui = MagicMock()
-    # config path, then one secret name, then blank to finish
-    mock_tui.ask_text_sync.side_effect = [str(config_path), "BRAVE_API_KEY", ""]
-    mock_tui.ask_password_sync.return_value = "sk-secret"
+    mock_tui.ask_text_sync.side_effect = [str(config_path)]
     mock_tui.ask_checkbox.return_value = ["secrets.yaml"]
-    q = MagicMock()
-    q.confirm.return_value.ask.return_value = True  # accept "Set up encrypted secrets?"
-
-    ot_secrets = MagicMock()
-    ot_secrets.init.return_value = {"status": "stored"}
-    ot_secrets.encrypt.return_value = {"file": str(secrets_path)}
-    ot_secrets.audit.return_value = {"safe": True}
-    ottools_mod = MagicMock()
-    ottools_mod.ot_secrets = ot_secrets
+    guided_setup = MagicMock()
 
     runner = CliRunner()
-    with patch.dict(
-        "sys.modules",
-        {"ot._tui": mock_tui, "questionary": q, "ottools": ottools_mod},
+    with (
+        patch.dict("sys.modules", {"ot._tui": mock_tui}),
+        patch("onetool.cli._stdin_is_tty", return_value=True),
+        patch("onetool.cli._guided_secrets_setup", guided_setup),
     ):
-        with patch("onetool.cli._stdin_is_tty", return_value=True):
-            result = runner.invoke(app, ["init", "-c", str(config_path)])
+        result = runner.invoke(app, ["init", "-c", str(config_path)])
 
     assert result.exit_code == 0, result.output
-    ot_secrets.init.assert_called_once()
-    ot_secrets.encrypt.assert_called_once_with(file=str(secrets_path), backup=False)
-    ot_secrets.audit.assert_called_once()
+    guided_setup.assert_called_once_with(secrets_path)
 
 
 # ---------------------------------------------------------------------------

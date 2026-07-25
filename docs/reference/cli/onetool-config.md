@@ -321,6 +321,13 @@ OPENAI_API_KEY: "age1enc:YWdlLWVuY3J5cHRpb24ub3JnL3Yy..."
 
 The file is safe to inspect — values cannot be recovered without the private key in your OS keychain. Encrypted values are safe to commit to version control if needed.
 
+By default, encryption also creates an exact plaintext recovery file at
+`secrets.yaml.bak` with mode `0600`. That backup is intentionally recoverable,
+but it is **not** safe to inspect, share, or commit. Keep both the backup and the
+original OS-keychain identity: existing ciphertext cannot be recovered without
+that original identity. Pass `backup=False` only when you explicitly accept
+having no plaintext recovery copy.
+
 **How it works:**
 
 - The private key is stored in the OS keychain (macOS Keychain, Windows Credential Locker, GNOME libsecret) — never on disk
@@ -337,9 +344,10 @@ __onetool ot_secrets.status(file="~/.onetool/secrets.yaml")
 # Scan for any unencrypted values (safe to run before committing)
 __onetool ot_secrets.audit(file="~/.onetool/secrets.yaml")
 
-# Rotate to a new key (re-encrypts all values)
-__onetool ot_secrets.rotate(file="~/.onetool/secrets.yaml")
 ```
+
+V3 does not expose identity replacement. `ot_secrets.init()` refuses to replace
+existing identity state because the global identity may protect multiple files.
 
 **Headless / CI environments:** This is a local-dev security feature. CI/CD should continue using environment variables (existing behavior). Plain `secrets.yaml` files are completely unaffected — encryption only triggers when `age1enc:` values are present.
 

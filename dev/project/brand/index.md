@@ -144,7 +144,7 @@ with `uv run python scripts/list_tool_inventory.py --output -`; token/cost
 figures come from [claims.md](claims.md).
 
 ```text
-- 28 packs, 252 tools (v3.0.0 tool-index baseline; say "250+ tools" in copy)
+- 28 packs, 251 tools (v3.0.0 tool-index baseline; say "250+ tools" in copy)
 - 97% fewer input tokens (47,660 → 1,131 one-shot; 40× at 3 turns)
 - 30× lower cost (28×–34× measured; say "30×")
 - ~$30 per MCP server per month in tool tax

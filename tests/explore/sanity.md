@@ -31,7 +31,7 @@ When testing:
 - mem: use `tmp/test/` topic prefix for all writes. Test write, read, list, search, toc, slice, snapshot/restore, stale/refresh, write_batch, read_batch, slice_batch, stats, dump/load, update, delete, decay, context, flush. Clean up with `mem.delete(topic="tmp/", confirm=True)` when done.
 - diagram: list_providers, get_template, generate_source, render_diagram, get_playground_url
 - ot_forge: create_ext, validate_ext
-- ot_secrets: test status and audit; avoid rotate/encrypt/init on real secrets unless using a temporary file.
+- ot_secrets: test status and audit; avoid encrypt/init on real secrets unless using a temporary file.
 - ot_servers: status/list a configured server; enable/restart/disable only for explicit proxy-server test cases.
 - ot_timer: start, elapsed, list, clear with a unique temporary timer name.
 - webfetch with a known URL like https://en.wikipedia.org/wiki/Python_(programming_language)

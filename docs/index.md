@@ -22,7 +22,7 @@ hide:
 
     - :material-rocket-launch: **One-command install** — a `curl | sh` bootstrap installs uv and OneTool, initialises config, and `onetool init mcp-config` prints ready-to-paste client config for Claude Code, Claude Desktop, Cursor, or VS Code
     - :material-lock: **Guided encrypted secrets** — `onetool init` creates and encrypts `secrets.yaml` in one flow: age encryption, private key in your OS keychain, atomic `0600` writes — safe to inspect, safe to commit
-    - :material-school: **ot-ref agent skill** — a standard installable skill (`npx skills add`) that teaches your agent the call conventions, plus a greppable index of all 252 tool signatures that never enters the context window
+    - :material-school: **ot-ref agent skill** — a standard installable skill (`npx skills add`) that teaches your agent the call conventions, plus a greppable index of all 251 tool signatures that never enters the context window
     - :material-brain: **Memory, upgraded** — BM25 keyword + vector semantic search, per-memory history and rollback, snapshots, file-backed freshness
     - :material-book-open-variant: **Knowledge AI enrichment** — `onetool kb enrich` adds per-chunk LLM summaries that sharpen retrieval
     - :material-draw: **Whiteboard auto-layout** — offline ELK layout engine, named boards on every tool
@@ -95,7 +95,7 @@ __onetool brave.search(q="AI")
 
 Web search (Brave, Google, Tavily), Context7 docs, files, Excel, SQL databases, document→Markdown conversion, ripgrep, package versions, diagrams, vision, memory — curated, configured, ready.
 
-[:octicons-arrow-right-24: Browse all 252 tools](reference/tools/index.md)
+[:octicons-arrow-right-24: Browse all 251 tools](reference/tools/index.md)
 
 </div>
 
