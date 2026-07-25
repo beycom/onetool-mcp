@@ -22,6 +22,7 @@ class Config(BaseModel):
     )
     session_cache_size: int = Field(
         default=10,
+        gt=0,
         description="Maximum number of images to keep in the in-memory session LRU cache",
     )
     base_url: str = Field(

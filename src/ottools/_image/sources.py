@@ -1,12 +1,21 @@
 """Source resolution for the image pack.
 
-Detects the input type (clipboard, handle reference, URL, glob, file path)
-and loads raw image bytes from the appropriate source.
+Detects the input type (clipboard, URL, glob, or file path) and loads raw image
+bytes from the appropriate source.
 """
 
 from __future__ import annotations
 
 import sys
+
+import httpx
+
+MAX_ORIGINAL_RESPONSE_BYTES = 20 * 1024 * 1024
+
+
+class ImageSourceError(RuntimeError):
+    """Expected source failure that public image tools return as an error."""
+
 
 # Supported format magic bytes for validation
 _MAGIC: list[tuple[bytes, str]] = [
@@ -77,7 +86,7 @@ def _is_glob(img: str) -> bool:
 def resolve_source(img: str) -> tuple[str, bytes | str]:
     """Detect image source type and load raw bytes.
 
-    Detection order: ``"clip"`` → ``"#handle"`` → URL → glob → file path.
+    Detection order: ``"clip"`` → URL → glob → file path.
 
     Args:
         img: Source specifier string.
@@ -85,11 +94,10 @@ def resolve_source(img: str) -> tuple[str, bytes | str]:
     Returns:
         Tuple of ``(source_type, data)`` where:
 
-        - ``source_type``: one of ``"clipboard"``, ``"handle"``, ``"url"``,
-          ``"glob"``, ``"file"``
-        - ``data``: raw bytes for clipboard/url/file; handle name str (without
-          ``#``) for handle references; the original ``img`` string for glob
-          (callers handle globs as an error in ``load()``).
+        - ``source_type``: one of ``"clipboard"``, ``"url"``, ``"glob"``,
+          ``"file"``
+        - ``data``: raw bytes for clipboard/url/file or the original ``img``
+          string for glob (callers handle globs as an error in ``load()``).
 
     Raises:
         FileNotFoundError: If a file path does not exist.
@@ -101,7 +109,9 @@ def resolve_source(img: str) -> tuple[str, bytes | str]:
         return "clipboard", _grab_clipboard()
 
     if img.startswith("#"):
-        return "handle", img[1:]
+        raise ImageSourceError(
+            "image.load() accepts sources, not image handle references"
+        )
 
     if _is_url(img):
         return "url", _fetch_url(img)
@@ -138,8 +148,23 @@ def _load_file(path: str) -> bytes:
     return raw
 
 
+def _content_length(headers: httpx.Headers) -> int | None:
+    value = headers.get("content-length")
+    if value is None:
+        return None
+    try:
+        length = int(value)
+    except ValueError as exc:
+        raise ImageSourceError(
+            f"URL returned an invalid content-length: {value!r}"
+        ) from exc
+    if length < 0:
+        raise ImageSourceError(f"URL returned an invalid content-length: {value!r}")
+    return length
+
+
 def _fetch_url(url: str) -> bytes:
-    """Download image bytes from a URL using the shared HTTP client.
+    """Stream bounded image bytes from a URL using the shared HTTP client.
 
     Args:
         url: Full HTTP/HTTPS URL to download.
@@ -148,8 +173,7 @@ def _fetch_url(url: str) -> bytes:
         Raw response bytes.
 
     Raises:
-        ValueError: If the response content-type is not ``image/*``.
-        RuntimeError: On HTTP or network errors.
+        ImageSourceError: For expected status, network, content, or size errors.
     """
     from ot.http_client import _get_shared_client
     from ot.logging import LogSpan
@@ -157,18 +181,35 @@ def _fetch_url(url: str) -> bytes:
     with LogSpan(span="ot_image.fetch_url", url=url) as s:
         try:
             client = _get_shared_client()
-            response = client.get(url, timeout=30.0)
-            response.raise_for_status()
-            content_type = response.headers.get("content-type", "")
-            s.add(status=response.status_code, contentType=content_type)
-            if not content_type.startswith("image/"):
-                raise ValueError(
-                    f"URL did not return an image (content-type: {content_type!r})"
-                )
-            return response.content
-        except Exception as e:
-            s.add(error=str(e))
-            raise
+            with client.stream("GET", url, timeout=30.0) as response:
+                response.raise_for_status()
+                content_type = response.headers.get("content-type", "")
+                s.add(status=response.status_code, contentType=content_type)
+                if not content_type.lower().startswith("image/"):
+                    raise ImageSourceError(
+                        f"URL did not return an image (content-type: {content_type!r})"
+                    )
+
+                declared_length = _content_length(response.headers)
+                if (
+                    declared_length is not None
+                    and declared_length > MAX_ORIGINAL_RESPONSE_BYTES
+                ):
+                    raise ImageSourceError(
+                        "remote image exceeds the 20 MiB original-response limit"
+                    )
+
+                data = bytearray()
+                for chunk in response.iter_bytes():
+                    if len(data) + len(chunk) > MAX_ORIGINAL_RESPONSE_BYTES:
+                        raise ImageSourceError(
+                            "remote image exceeds the 20 MiB original-response limit"
+                        )
+                    data.extend(chunk)
+                return bytes(data)
+        except httpx.HTTPError as exc:
+            s.add(error=str(exc))
+            raise ImageSourceError(f"failed to download image: {exc}") from exc
 
 
 def _grab_clipboard() -> bytes:
@@ -192,8 +233,7 @@ def _grab_clipboard() -> bytes:
         from PIL import Image, ImageGrab
     except ImportError as exc:
         raise ImportError(
-            "Pillow is required for clipboard capture. "
-            "Install with: pip install Pillow"
+            "Pillow is required for clipboard capture. Install with: pip install Pillow"
         ) from exc
 
     import io

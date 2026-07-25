@@ -7,6 +7,7 @@ lifecycle — all with mocked I/O and no network calls.
 from __future__ import annotations
 
 import base64
+import hashlib
 import io
 import json
 import sys
@@ -19,6 +20,7 @@ import pytest
 
 try:
     import cairosvg  # noqa: F401
+
     _CAIROSVG_AVAILABLE = True
 except (ImportError, OSError):
     _CAIROSVG_AVAILABLE = False
@@ -49,6 +51,10 @@ def _make_jpeg_bytes(width: int = 50, height: int = 50) -> bytes:
     return buf.getvalue()
 
 
+def _canonical_handle(seed: str) -> str:
+    return f"img_{hashlib.sha256(seed.encode()).hexdigest()}"
+
+
 def _make_meta(
     handle_name: str,
     dims: list[int] | None = None,
@@ -59,7 +65,7 @@ def _make_meta(
     return {
         "handle": handle_name,
         "source": "file",
-        "hash": sha or "a" * 64,
+        "hash": sha or handle_name.removeprefix("img_"),
         "original_dims": d,
         "model_dims": d,
         "resized": False,
@@ -83,7 +89,9 @@ class TestImageConfig:
     @patch("ottools._image.config.get_tool_config")
     @patch("ottools._image.config.get_secret")
     @patch("ot.config.get_llm_config", side_effect=Exception("no llm config"))
-    def test_defaults(self, _mock_llm: MagicMock, mock_secret: MagicMock, mock_gtc: MagicMock) -> None:
+    def test_defaults(
+        self, _mock_llm: MagicMock, mock_secret: MagicMock, mock_gtc: MagicMock
+    ) -> None:
         from ottools._image.config import Config, get_image_config
 
         mock_gtc.return_value = Config()
@@ -181,7 +189,9 @@ class TestValidateImageBytes:
     def test_valid_svg(self) -> None:
         from ottools._image.sources import validate_image_bytes
 
-        fmt = validate_image_bytes(b"<svg xmlns='http://www.w3.org/2000/svg'>", "icon.svg")
+        fmt = validate_image_bytes(
+            b"<svg xmlns='http://www.w3.org/2000/svg'>", "icon.svg"
+        )
         assert fmt == "SVG"
 
     def test_valid_svg_xml_declaration(self) -> None:
@@ -199,7 +209,9 @@ class TestValidateImageBytes:
     def test_valid_svg_uppercase(self) -> None:
         from ottools._image.sources import validate_image_bytes
 
-        fmt = validate_image_bytes(b"<SVG xmlns='http://www.w3.org/2000/svg'>", "icon.svg")
+        fmt = validate_image_bytes(
+            b"<SVG xmlns='http://www.w3.org/2000/svg'>", "icon.svg"
+        )
         assert fmt == "SVG"
 
     def test_invalid_format_raises(self) -> None:
@@ -240,12 +252,12 @@ class TestResolveSource:
             source_type, _ = resolve_source("clipboard")
         assert source_type == "clipboard"
 
-    def test_handle_detected(self) -> None:
-        from ottools._image.sources import resolve_source
+    def test_handle_rejected_as_load_source(self) -> None:
+        from ottools._image.sources import ImageSourceError, resolve_source
 
-        source_type, handle_name = resolve_source("#img_abc12345")
-        assert source_type == "handle"
-        assert handle_name == "img_abc12345"
+        handle = f"#{_canonical_handle('source')}"
+        with pytest.raises(ImageSourceError, match="sources"):
+            resolve_source(handle)
 
     def test_url_detected(self) -> None:
         from ottools._image.sources import resolve_source
@@ -281,7 +293,9 @@ class TestResolveSource:
         with pytest.raises(NotImplementedError, match="Linux"):
             _grab_clipboard()
 
-    @pytest.mark.skipif(sys.platform == "linux", reason="clipboard not supported on Linux")
+    @pytest.mark.skipif(
+        sys.platform == "linux", reason="clipboard not supported on Linux"
+    )
     def test_clipboard_file_reference_loads_first_path(self, tmp_path: Path) -> None:
         """list return from ImageGrab.grabclipboard() resolves to first path."""
         from ottools._image.sources import _grab_clipboard
@@ -295,7 +309,9 @@ class TestResolveSource:
 
         assert result == png
 
-    @pytest.mark.skipif(sys.platform == "linux", reason="clipboard not supported on Linux")
+    @pytest.mark.skipif(
+        sys.platform == "linux", reason="clipboard not supported on Linux"
+    )
     def test_clipboard_empty_list_raises(self) -> None:
         from ottools._image.sources import _grab_clipboard
 
@@ -377,7 +393,9 @@ class TestPrepareForModel:
         with patch.dict("sys.modules", {"pillow_heif": mock_heif}):
             with patch("PIL.Image.open", return_value=mock_img) as mock_open:
                 mock_img.resize.return_value = mock_img
-                mock_img.save = MagicMock(side_effect=lambda buf, format: buf.write(b"\x89PNG\r\n\x1a\n"))
+                mock_img.save = MagicMock(
+                    side_effect=lambda buf, format: buf.write(b"\x89PNG\r\n\x1a\n")
+                )
                 prepare_for_model(heic_bytes, max_edge=1568)
 
         mock_heif.register_heif_opener.assert_called_once()
@@ -399,7 +417,9 @@ class TestPrepareForModel:
             if original is not None:
                 sys.modules["pillow_heif"] = original
 
-    @pytest.mark.skipif(not _CAIROSVG_AVAILABLE, reason="cairosvg/libcairo not available")
+    @pytest.mark.skipif(
+        not _CAIROSVG_AVAILABLE, reason="cairosvg/libcairo not available"
+    )
     def test_svg_rasterized_to_png(self) -> None:
         from ottools._image.resize import prepare_for_model
 
@@ -430,38 +450,48 @@ class TestStore:
     def test_save_and_load_meta_round_trip(self, tmp_path: Path) -> None:
         from ottools._image import store
 
+        handle = _canonical_handle("round-trip")
         with patch.object(store, "_images_dir", return_value=tmp_path):
-            store.save_image(_make_png_bytes(), "img_abc12345", _make_meta("img_abc12345"))
-            loaded = store.load_meta("img_abc12345")
+            store.save_image(_make_png_bytes(), handle, _make_meta(handle), fmt="PNG")
+            loaded = store.load_meta(handle)
             assert loaded is not None
-            assert loaded["handle"] == "img_abc12345"
+            assert loaded["handle"] == handle
 
     def test_load_meta_returns_none_for_missing(self, tmp_path: Path) -> None:
         from ottools._image import store
 
         with patch.object(store, "_images_dir", return_value=tmp_path):
-            result = store.load_meta("nonexistent")
+            result = store.load_meta(_canonical_handle("missing"))
             assert result is None
 
     def test_save_summary_writes_in_place(self, tmp_path: Path) -> None:
         from ottools._image import store
 
+        handle = _canonical_handle("summary")
         with patch.object(store, "_images_dir", return_value=tmp_path):
-            store.save_image(_make_png_bytes(), "img_test1", _make_meta("img_test1", dims=[50, 50]))
-            store.save_summary("img_test1", {"text": "hello", "mode": "light"})
-            loaded = store.load_meta("img_test1")
+            store.save_image(
+                _make_png_bytes(),
+                handle,
+                _make_meta(handle, dims=[50, 50]),
+                fmt="PNG",
+            )
+            store.save_summary(handle, {"text": "hello", "mode": "light"})
+            loaded = store.load_meta(handle)
             assert loaded is not None
             assert loaded["summary"]["text"] == "hello"
 
     def test_save_summary_atomic_leaves_no_tmp_file(self, tmp_path: Path) -> None:
         from ottools._image import store
 
+        handle = _canonical_handle("atomic")
         with patch.object(store, "_images_dir", return_value=tmp_path):
-            store.save_image(_make_png_bytes(), "img_atomic", _make_meta("img_atomic"))
-            store.save_summary("img_atomic", {"type": "ui"})
+            store.save_image(_make_png_bytes(), handle, _make_meta(handle), fmt="PNG")
+            store.save_summary(handle, {"type": "ui"})
 
         assert not list(tmp_path.glob("*.tmp"))
-        loaded = json.loads((tmp_path / "img_atomic.meta.json").read_text(encoding="utf-8"))
+        loaded = json.loads(
+            (tmp_path / f"{handle}.meta.json").read_text(encoding="utf-8")
+        )
         assert loaded["summary"] == {"type": "ui"}
 
     def test_save_summary_concurrent_writes_stay_valid(self, tmp_path: Path) -> None:
@@ -470,12 +500,13 @@ class TestStore:
 
         from ottools._image import store
 
+        handle = _canonical_handle("race")
         with patch.object(store, "_images_dir", return_value=tmp_path):
-            store.save_image(_make_png_bytes(), "img_race", _make_meta("img_race"))
+            store.save_image(_make_png_bytes(), handle, _make_meta(handle), fmt="PNG")
 
             def worker(i: int) -> None:
                 for _ in range(20):
-                    store.save_summary("img_race", {"type": f"t{i}"})
+                    store.save_summary(handle, {"type": f"t{i}"})
 
             threads = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
             for t in threads:
@@ -483,25 +514,21 @@ class TestStore:
             for t in threads:
                 t.join()
 
-            final = store.load_meta("img_race")  # raises if JSON is torn
+            final = store.load_meta(handle)  # raises if JSON is torn
 
         assert final is not None
         assert final["summary"]["type"] in {"t0", "t1", "t2", "t3"}
 
-    def test_find_by_hash_returns_existing(self, tmp_path: Path) -> None:
+    def test_complete_hash_maps_to_exact_handle(self) -> None:
         from ottools._image import store
 
-        with patch.object(store, "_images_dir", return_value=tmp_path):
-            sha = "a" * 64
-            store.save_image(_make_png_bytes(10, 10), "img_aaaaaaaa", _make_meta("img_aaaaaaaa", dims=[10, 10], sha=sha))
-            found = store.find_by_hash(sha)
-            assert found == "img_aaaaaaaa"
+        sha = "a" * 64
+        assert store.handle_name_for_hash(sha) == f"img_{sha}"
 
-    def test_find_by_hash_returns_none_for_unknown(self, tmp_path: Path) -> None:
+    def test_hash_scan_api_removed(self) -> None:
         from ottools._image import store
 
-        with patch.object(store, "_images_dir", return_value=tmp_path):
-            assert store.find_by_hash("b" * 64) is None
+        assert not hasattr(store, "find_by_hash")
 
     def test_lru_eviction_at_limit(self) -> None:
         from ottools._image import store
@@ -526,15 +553,15 @@ class TestStore:
         store._session_cache.clear()
 
         dummy = _make_png_bytes(10, 10)
-        store.cache_put("a", dummy)
-        store.cache_put("b", dummy)
-        store.cache_put("c", dummy)
+        handles = [_canonical_handle(seed) for seed in ("a", "b", "c")]
+        for handle in handles:
+            store.cache_put(handle, dummy)
 
         # Access "a" to make it MRU
-        store.cache_get("a")
+        store.cache_get(handles[0])
 
         keys = store._session_cache.keys()
-        assert keys[-1] == "a"  # "a" is most recently used
+        assert keys[-1] == handles[0]
 
         store._session_cache.clear()
 
@@ -544,10 +571,11 @@ class TestStore:
         store._session_cache.clear()
 
         dummy = _make_png_bytes(10, 10)
-        store.cache_put("evict_me", dummy)
-        store.cache_evict("evict_me")
+        handle = _canonical_handle("evict")
+        store.cache_put(handle, dummy)
+        store.cache_evict(handle)
 
-        assert store.cache_get("evict_me") is None
+        assert store.cache_get(handle) is None
 
         store._session_cache.clear()
 
@@ -574,6 +602,7 @@ class TestVision:
 
     def setup_method(self) -> None:
         import ottools._image.vision as _v
+
         _v._client = None
         _v._client_key = ("", "")
         self._api_key_patch = patch(
@@ -623,7 +652,9 @@ class TestVision:
 
         with patch("ottools._image.vision.OpenAI") as MockOpenAI:
             MockOpenAI.return_value.chat.completions.create.return_value = mock_response
-            answers = ask_questions([_make_png_bytes()], ["What is in the image?"], config)
+            answers = ask_questions(
+                [_make_png_bytes()], ["What is in the image?"], config
+            )
 
         assert answers == ["It is a cat."]
 
@@ -710,7 +741,9 @@ class TestVision:
 
         config = self._make_config()
         mock_response = MagicMock()
-        mock_response.choices[0].message.content = (
+        mock_response.choices[
+            0
+        ].message.content = (
             'Here you go:\n```json\n{"answers": ["A terminal.", "Dark mode."]}\n```'
         )
 
@@ -931,28 +964,13 @@ class TestLoad:
 
         assert h1["handle"] == h2["handle"]
 
-    def test_named_handle_collision_returns_error(self, tmp_path: Path) -> None:
-        from ottools._image import store, tools
+    def test_custom_handle_parameter_removed(self, tmp_path: Path) -> None:
+        from ottools._image import tools
 
-        png_a = _make_png_bytes(50, 50)
-        png_b = _make_png_bytes(80, 80)
-        path_a = tmp_path / "a.png"
-        path_b = tmp_path / "b.png"
-        path_a.write_bytes(png_a)
-        path_b.write_bytes(png_b)
-
-        with (
-            patch.object(store, "_images_dir", return_value=tmp_path),
-            patch("ottools._image.tools.get_image_config") as mock_cfg,
-        ):
-            from ottools._image.config import Config
-
-            mock_cfg.return_value = Config(session_cache_size=10)
-            tools.load(img=str(path_a), handle="myref")
-            result = tools.load(img=str(path_b), handle="myref")
-
-        assert "error" in result
-        assert "already exists" in result["error"]
+        path = tmp_path / "a.png"
+        path.write_bytes(_make_png_bytes())
+        with pytest.raises(TypeError, match="handle"):
+            tools.load(img=str(path), handle="myref")  # type: ignore[call-arg]
 
     def test_linux_clipboard_returns_error(self) -> None:
         from ottools._image import tools
@@ -1033,17 +1051,23 @@ class TestLoad:
         assert call_kwargs.kwargs.get("daemon") is True
         mock_t.start.assert_called_once()
 
-    def test_background_summary_worker_skips_when_no_model(self, tmp_path: Path) -> None:
-        """Worker exits early when model is not configured; no API call made."""
-        from ottools._image import tools
+    def test_background_summary_not_spawned_when_no_model(self, tmp_path: Path) -> None:
+        from ottools._image import store, tools
         from ottools._image.config import Config
 
-        with patch("ottools._image.tools.get_image_config") as mock_cfg, \
-             patch("ottools._image.tools.extract_summary") as mock_extract:
-            mock_cfg.return_value = Config(session_cache_size=10, model="")
-            tools._background_summarise("img_abc12345", b"fake_bytes")
+        path = tmp_path / "no-model.png"
+        path.write_bytes(_make_png_bytes())
+        with (
+            patch.object(store, "_images_dir", return_value=tmp_path),
+            patch(
+                "ottools._image.tools.get_image_config",
+                return_value=Config(session_cache_size=10, model=""),
+            ),
+            patch("ottools._image.tools.threading.Thread") as mock_thread,
+        ):
+            tools.load(img=str(path))
 
-        mock_extract.assert_not_called()
+        mock_thread.assert_not_called()
 
 
 @pytest.mark.unit
@@ -1053,6 +1077,7 @@ class TestAsk:
 
     def setup_method(self) -> None:
         import ottools._image.vision as _v
+
         _v._client = None
         _v._client_key = ("", "")
         self._thread_patcher = patch("ottools._image.tools.threading.Thread")
@@ -1101,7 +1126,9 @@ class TestAsk:
                 result = tools.ask(img=handle, q="Describe the image.")
 
         assert "result" in result
-        assert result["result"] == [{"question": "Describe the image.", "answer": "A red square."}]
+        assert result["result"] == [
+            {"question": "Describe the image.", "answer": "A red square."}
+        ]
         assert result["handle"] == handle
 
     def test_unknown_handle_returns_error(self, tmp_path: Path) -> None:
@@ -1114,7 +1141,8 @@ class TestAsk:
             from ottools._image.config import Config
 
             mock_cfg.return_value = Config(session_cache_size=10)
-            result = tools.ask(img="#nonexistent", q="test")
+            missing = f"#{_canonical_handle('missing')}"
+            result = tools.ask(img=missing, q="test")
 
         assert "error" in result
         assert "Error" in result["error"]
@@ -1140,7 +1168,7 @@ class TestAsk:
         assert "error" in result
         assert result["error"].startswith("Error:")
 
-    def test_bare_handle_name_accepted(self, tmp_path: Path) -> None:
+    def test_bare_handle_name_rejected(self, tmp_path: Path) -> None:
         from ottools._image import store, tools
 
         with (
@@ -1150,15 +1178,12 @@ class TestAsk:
             handle = self._setup(tmp_path, mock_cfg)
             bare = handle.lstrip("#")  # strip the "#" prefix
 
-            mock_resp = MagicMock()
-            mock_resp.choices[0].message.content = "A red square."
-
             with patch("ottools._image.vision.OpenAI") as MockOAI:
-                MockOAI.return_value.chat.completions.create.return_value = mock_resp
                 result = tools.ask(img=bare, q="Describe the image.")
 
-        assert "result" in result
-        assert result["result"] == [{"question": "Describe the image.", "answer": "A red square."}]
+        assert "error" in result
+        assert "# prefix" in result["error"]
+        MockOAI.assert_not_called()
 
     def test_clip_ask_refreshes_clipboard_each_call(self, tmp_path: Path) -> None:
         from ottools._image import store, tools
@@ -1171,9 +1196,13 @@ class TestAsk:
             patch.object(store, "_images_dir", return_value=tmp_path),
             patch("ottools._image.tools.get_image_config") as mock_cfg,
             patch("ottools._image.tools.ask_questions", return_value=["ok"]),
-            patch("ottools._image.sources._grab_clipboard", side_effect=[img_a, img_b]) as mock_clip,
+            patch(
+                "ottools._image.sources._grab_clipboard", side_effect=[img_a, img_b]
+            ) as mock_clip,
         ):
-            mock_cfg.return_value = Config(session_cache_size=10, model="openai/gpt-4o-mini")
+            mock_cfg.return_value = Config(
+                session_cache_size=10, model="openai/gpt-4o-mini"
+            )
             first = tools.ask(img="clip", q="q1")
             second = tools.ask(img="clip", q="q2")
 
@@ -1188,6 +1217,7 @@ class TestSummary:
 
     def setup_method(self) -> None:
         import ottools._image.vision as _v
+
         _v._client = None
         _v._client_key = ("", "")
         self._thread_patcher = patch("ottools._image.tools.threading.Thread")
@@ -1312,7 +1342,9 @@ class TestSummary:
     def test_clip_ask_delegates_to_ask(self, tmp_path: Path) -> None:
         from ottools._image import tools
 
-        with patch.object(tools, "ask", return_value={"result": [], "handle": "#h"}) as mock_ask:
+        with patch.object(
+            tools, "ask", return_value={"result": [], "handle": "#h"}
+        ) as mock_ask:
             tools.clip_ask(q="What is this?")
 
         mock_ask.assert_called_once_with(img="clip", q="What is this?", max_edge=1568)
@@ -1320,7 +1352,9 @@ class TestSummary:
     def test_clip_ask_custom_max_edge(self, tmp_path: Path) -> None:
         from ottools._image import tools
 
-        with patch.object(tools, "ask", return_value={"result": [], "handle": "#h"}) as mock_ask:
+        with patch.object(
+            tools, "ask", return_value={"result": [], "handle": "#h"}
+        ) as mock_ask:
             tools.clip_ask(q="Describe", max_edge=800)
 
         mock_ask.assert_called_once_with(img="clip", q="Describe", max_edge=800)
@@ -1328,7 +1362,11 @@ class TestSummary:
     def test_clip_view_delegates_to_summary(self, tmp_path: Path) -> None:
         from ottools._image import tools
 
-        with patch.object(tools, "summary", return_value={"summary": {}, "handle": "#h", "cached": False}) as mock_summary:
+        with patch.object(
+            tools,
+            "summary",
+            return_value={"summary": {}, "handle": "#h", "cached": False},
+        ) as mock_summary:
             tools.clip_view()
 
         mock_summary.assert_called_once_with(img="clip")
@@ -1352,8 +1390,13 @@ class TestSummary:
 
         with (
             patch.object(store, "_images_dir", return_value=tmp_path),
-            patch("ottools._image.tools.get_image_config", return_value=Config(session_cache_size=10, model="openai/gpt-4o-mini")),
-            patch("ottools._image.sources._grab_clipboard", side_effect=[img_a, img_b]) as mock_clip,
+            patch(
+                "ottools._image.tools.get_image_config",
+                return_value=Config(session_cache_size=10, model="openai/gpt-4o-mini"),
+            ),
+            patch(
+                "ottools._image.sources._grab_clipboard", side_effect=[img_a, img_b]
+            ) as mock_clip,
             patch("ottools._image.vision.OpenAI") as MockOAI,
             patch("ottools._image.tools.threading.Thread"),
         ):
@@ -1375,12 +1418,13 @@ class TestSummary:
 class TestLifecycle:
     """Tests for list_images(), delete_image(), purge_images()."""
 
-    def _write_meta(self, tmp_path: Path, handle_name: str, **overrides: Any) -> None:
+    def _write_meta(self, tmp_path: Path, seed: str, **overrides: Any) -> str:
         """Write a minimal meta.json for a handle."""
+        handle_name = _canonical_handle(seed)
         meta = {
             "handle": handle_name,
             "source": "file",
-            "hash": "a" * 64,
+            "hash": handle_name.removeprefix("img_"),
             "original_dims": [100, 100],
             "model_dims": [100, 100],
             "resized": False,
@@ -1394,49 +1438,52 @@ class TestLifecycle:
             json.dumps(meta), encoding="utf-8"
         )
         (tmp_path / f"{handle_name}.png").write_bytes(_make_png_bytes())
+        return handle_name
 
     def test_list_empty_dir(self, tmp_path: Path) -> None:
+        from ottools._image import store
         from ottools._image.lifecycle import list_images
 
-        with patch("ottools._image.lifecycle._images_dir", return_value=tmp_path):
+        with patch.object(store, "_images_dir", return_value=tmp_path):
             result = list_images()
 
         assert result == []
 
     def test_list_with_images(self, tmp_path: Path) -> None:
+        from ottools._image import store
         from ottools._image.lifecycle import list_images
 
-        self._write_meta(tmp_path, "img_aaaabbbb")
-        self._write_meta(tmp_path, "img_ccccdddd")
+        first = self._write_meta(tmp_path, "first")
+        second = self._write_meta(tmp_path, "second")
 
-        with patch("ottools._image.lifecycle._images_dir", return_value=tmp_path):
+        with patch.object(store, "_images_dir", return_value=tmp_path):
             result = list_images()
 
         assert len(result) == 2
         handles = {r["handle"] for r in result}
-        assert "#img_aaaabbbb" in handles
-        assert "#img_ccccdddd" in handles
+        assert f"#{first}" in handles
+        assert f"#{second}" in handles
 
     def test_delete_known_handle(self, tmp_path: Path) -> None:
         from ottools._image import store
         from ottools._image.lifecycle import delete_image
 
-        self._write_meta(tmp_path, "img_deleteme")
+        handle = self._write_meta(tmp_path, "delete")
 
         with patch.object(store, "_images_dir", return_value=tmp_path):
-            result = delete_image(handle="#img_deleteme")
+            result = delete_image(handle=f"#{handle}")
 
-        assert result["deleted"] == "#img_deleteme"
+        assert result["deleted"] == f"#{handle}"
         assert "bytes_freed" in result
-        assert not (tmp_path / "img_deleteme.png").exists()
-        assert not (tmp_path / "img_deleteme.meta.json").exists()
+        assert not (tmp_path / f"{handle}.png").exists()
+        assert not (tmp_path / f"{handle}.meta.json").exists()
 
     def test_delete_unknown_handle_returns_error(self, tmp_path: Path) -> None:
         from ottools._image import store
         from ottools._image.lifecycle import delete_image
 
         with patch.object(store, "_images_dir", return_value=tmp_path):
-            result = delete_image(handle="#img_notexist")
+            result = delete_image(handle=f"#{_canonical_handle('not-exist')}")
 
         assert "error" in result
         assert "not found" in result["error"]
@@ -1445,13 +1492,10 @@ class TestLifecycle:
         from ottools._image import store
         from ottools._image.lifecycle import purge_images
 
-        self._write_meta(tmp_path, "img_purge1")
-        self._write_meta(tmp_path, "img_purge2")
+        self._write_meta(tmp_path, "purge-1")
+        self._write_meta(tmp_path, "purge-2")
 
-        with (
-            patch("ottools._image.lifecycle._images_dir", return_value=tmp_path),
-            patch.object(store, "_images_dir", return_value=tmp_path),
-        ):
+        with patch.object(store, "_images_dir", return_value=tmp_path):
             result = purge_images(all=True)
 
         assert result["purged"] == 2
@@ -1465,18 +1509,15 @@ class TestLifecycle:
         old_ts = (datetime.now(timezone.utc) - timedelta(hours=3)).isoformat()
         new_ts = datetime.now(timezone.utc).isoformat()
 
-        self._write_meta(tmp_path, "img_old", created_at=old_ts)
-        self._write_meta(tmp_path, "img_new", created_at=new_ts)
+        old_handle = self._write_meta(tmp_path, "old", created_at=old_ts)
+        new_handle = self._write_meta(tmp_path, "new", created_at=new_ts)
 
-        with (
-            patch("ottools._image.lifecycle._images_dir", return_value=tmp_path),
-            patch.object(store, "_images_dir", return_value=tmp_path),
-        ):
+        with patch.object(store, "_images_dir", return_value=tmp_path):
             result = purge_images(minutes=120)
 
         assert result["purged"] == 1
-        assert (tmp_path / "img_new.meta.json").exists()
-        assert not (tmp_path / "img_old.meta.json").exists()
+        assert (tmp_path / f"{new_handle}.meta.json").exists()
+        assert not (tmp_path / f"{old_handle}.meta.json").exists()
 
     def test_purge_zero_minutes_raises(self) -> None:
         from ottools._image.lifecycle import purge_images
@@ -1489,12 +1530,9 @@ class TestLifecycle:
         from ottools._image import store
         from ottools._image.lifecycle import purge_images
 
-        self._write_meta(tmp_path, "img_fresh")  # created_at = now
+        self._write_meta(tmp_path, "fresh")  # created_at = now
 
-        with (
-            patch("ottools._image.lifecycle._images_dir", return_value=tmp_path),
-            patch.object(store, "_images_dir", return_value=tmp_path),
-        ):
+        with patch.object(store, "_images_dir", return_value=tmp_path):
             result = purge_images()
 
         assert result["purged"] == 0
@@ -1548,7 +1586,7 @@ class TestStoreExtensions:
         assert "error" not in result, result
         return str(result["handle"]).lstrip("#")
 
-    def test_jpeg_stored_as_jpg_with_file_meta(self, tmp_path: Path) -> None:
+    def test_jpeg_stored_as_jpg_without_file_meta(self, tmp_path: Path) -> None:
         from ottools._image import store
 
         handle = self._load(tmp_path, _make_jpeg_bytes(), "photo.jpeg")
@@ -1557,7 +1595,8 @@ class TestStoreExtensions:
         with patch.object(store, "_images_dir", return_value=tmp_path):
             meta = store.load_meta(handle)
         assert meta is not None
-        assert meta["file"] == f"{handle}.jpg"
+        assert "file" not in meta
+        assert meta["original_format"] == "JPEG"
 
     def test_svg_stored_as_svg(self, tmp_path: Path) -> None:
         svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="red"/></svg>'
@@ -1565,7 +1604,7 @@ class TestStoreExtensions:
         assert (tmp_path / f"{handle}.svg").exists()
         assert (tmp_path / f"{handle}.svg").read_bytes() == svg
 
-    def test_legacy_png_without_file_key_still_resolves(self, tmp_path: Path) -> None:
+    def test_legacy_short_handle_is_rejected(self, tmp_path: Path) -> None:
         from ottools._image import store
 
         png = _make_png_bytes()
@@ -1574,12 +1613,10 @@ class TestStoreExtensions:
             json.dumps({"handle": "img_legacy1", "hash": "x"}), encoding="utf-8"
         )
         with patch.object(store, "_images_dir", return_value=tmp_path):
-            assert store.load_raw_bytes("img_legacy1") == png
-            found, freed = store.delete_handle_files("img_legacy1")
-        assert found is True
-        assert freed > 0
-        assert not (tmp_path / "img_legacy1.png").exists()
-        assert not (tmp_path / "img_legacy1.meta.json").exists()
+            with pytest.raises(ValueError, match="64 lowercase"):
+                store.load_raw_bytes("img_legacy1")
+        assert (tmp_path / "img_legacy1.png").read_bytes() == png
+        assert (tmp_path / "img_legacy1.meta.json").exists()
 
     def test_delete_frees_non_png_content_files(self, tmp_path: Path) -> None:
         from ottools._image import store
@@ -1596,8 +1633,7 @@ class TestStoreExtensions:
         from ottools._image import lifecycle, store
 
         handle = self._load(tmp_path, _make_jpeg_bytes(), "photo.jpeg")
-        with patch.object(store, "_images_dir", return_value=tmp_path), \
-             patch("ottools._image.lifecycle._images_dir", return_value=tmp_path):
+        with patch.object(store, "_images_dir", return_value=tmp_path):
             result = lifecycle.purge_images(all=True)
         assert result["purged"] >= 1
         assert result["bytes_freed"] > 0
@@ -1611,6 +1647,7 @@ class TestAskMultiImage:
 
     def setup_method(self) -> None:
         import ottools._image.vision as _v
+
         _v._client = None
         _v._client_key = ("", "")
         self._thread_patcher = patch("ottools._image.tools.threading.Thread")
@@ -1628,7 +1665,9 @@ class TestAskMultiImage:
         from ottools._image import store, tools
         from ottools._image.config import Config
 
-        mock_cfg.return_value = Config(session_cache_size=10, model="openai/gpt-4o-mini")
+        mock_cfg.return_value = Config(
+            session_cache_size=10, model="openai/gpt-4o-mini"
+        )
         (tmp_path / "a.png").write_bytes(_make_png_bytes(20, 20))
         (tmp_path / "b.png").write_bytes(_make_png_bytes(40, 40))
         with patch.object(store, "_images_dir", return_value=tmp_path):
@@ -1636,7 +1675,9 @@ class TestAskMultiImage:
             h2 = tools.load(img=str(tmp_path / "b.png"))["handle"]
         return h1, h2
 
-    def test_two_handles_return_handles_list_and_ordered_payloads(self, tmp_path: Path) -> None:
+    def test_two_handles_return_handles_list_and_ordered_payloads(
+        self, tmp_path: Path
+    ) -> None:
         from ottools._image import store, tools
 
         with (
@@ -1647,7 +1688,9 @@ class TestAskMultiImage:
 
             captured: dict[str, Any] = {}
 
-            def fake_ask(images: list[bytes], questions: list[str], config: Any) -> list[str]:
+            def fake_ask(
+                images: list[bytes], questions: list[str], config: Any
+            ) -> list[str]:
                 captured["images"] = images
                 return ["they differ"]
 
@@ -1705,7 +1748,9 @@ class TestAskMultiImage:
         assert "8" in over["error"]
         mock_ask.assert_not_called()
 
-    def test_unresolvable_entry_fails_fast_naming_reference(self, tmp_path: Path) -> None:
+    def test_unresolvable_entry_fails_fast_naming_reference(
+        self, tmp_path: Path
+    ) -> None:
         from ottools._image import store, tools
 
         with (

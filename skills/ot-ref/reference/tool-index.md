@@ -255,11 +255,11 @@ ot_forge.validate_ext(path: str)  # Validate an extension before reload.
 ot_image.ask(img: str | list[str], q: str | list[str], max_edge: int=1568)  # Send one or more questions about one or more images to the vision model.
 ot_image.clip_ask(q: str | list[str], max_edge: int=1568)  # Ask a question about the current clipboard image.
 ot_image.clip_view()  # Extract a structured summary of the current clipboard image.
-ot_image.delete(handle: str)  # Delete a loaded image and remove it from the session cache.
-ot_image.list()  # List all images in ``.onetool/images/``.
-ot_image.load(img: str, handle: str | None=None, max_edge: int=1568)  # Load a single image into session storage and return a stable handle.
+ot_image.delete(handle: str)  # Delete one image by its canonical public reference.
+ot_image.list()  # List valid canonical images in the current session.
+ot_image.load(img: str, max_edge: int=1568)  # Load a single image into session storage and return a stable handle.
 ot_image.load_batch(img: str | list[str], max_edge: int=1568)  # Load multiple images and return a list of result dicts.
-ot_image.purge(all: bool=False, minutes: int=15)  # Delete images from ``.onetool/images/``, optionally filtered by age.
+ot_image.purge(all: bool=False, minutes: int=15)  # Delete valid canonical images, optionally filtered by age.
 ot_image.summary(img: str)  # Extract and cache a structured summary of an image.
 ```
 

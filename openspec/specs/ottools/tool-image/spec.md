@@ -2,392 +2,369 @@
 
 ## Purpose
 
-Defines the `ot_image` pack providing image loading, querying, and lifecycle management for AI agents. Images are stored in `.onetool/images/`, accessed via stable content-hash handles, and queried using a configurable vision model. A session-scoped LRU cache avoids re-reading files on repeated access.
+Defines the `ot_image` pack for bounded image loading, canonical
+content-addressed session storage, lifecycle management, and vision querying.
 
 ## Requirements
 
 ### Requirement: Supported image formats
 
-`image.load()` SHALL accept images in the following formats: PNG, JPEG, GIF, WebP, TIFF, HEIC, and AVIF.
-
-- TIFF is supported natively via Pillow (no extra dependency).
-- HEIC, HEIF, and AVIF require `pillow-heif` to be installed; if it is missing, `load()` SHALL return an `{"error": ...}` dict with a clear message directing the user to `pip install pillow-heif`.
-- SVG is supported via rasterisation with `resvg-py`; if it is missing, `load()` SHALL return an `{"error": ...}` dict with a clear message directing the user to `pip install resvg-py`.
+`image.load()` SHALL accept PNG, JPEG, GIF, WebP, TIFF, HEIC, HEIF, AVIF, and
+SVG. Missing optional HEIC/HEIF/AVIF, SVG, or clipboard dependencies SHALL
+produce a structured error naming the install requirement.
 
 #### Scenario: Supported raster format loads
-- **WHEN** `image.load(img="photo.png")` is called for a supported raster image
-- **THEN** the image SHALL be accepted and stored
+
+- **WHEN** a supported raster image is loaded
+- **THEN** it SHALL be accepted and stored
 
 #### Scenario: Missing optional decoder
-- **WHEN** `image.load(...)` is called for a HEIC, HEIF, AVIF, SVG, or clipboard source and a required optional dependency is missing
-- **THEN** it SHALL return an `{"error": ...}` dict (not raise) whose message names the missing dependency and install requirement
 
----
+- **WHEN** a required optional decoder is absent
+- **THEN** `load()` SHALL return an error dict naming that dependency
+
+### Requirement: Canonical image references and safe storage
+
+The complete SHA-256 digest SHALL identify an image. The only public reference
+form SHALL be `#img_<64 lowercase hexadecimal characters>` and the internal
+storage name SHALL be the same value without `#`. Public reference boundaries
+SHALL reject short, uppercase, bare, named, traversal, separator-containing, or
+otherwise malformed references before storage or model I/O.
+
+Metadata and content operations SHALL use exact direct-child paths derived from
+validated identity and a supported detected format. They SHALL NOT trust a
+metadata filename, scan by hash, glob for lifecycle targets, follow symlink
+redirection, or accept legacy session entries. Metadata whose handle, hash, or
+format does not match the addressed entry SHALL fail closed.
+
+#### Scenario: Deterministic full-digest identity
+
+- **WHEN** bytes with a given SHA-256 digest are loaded
+- **THEN** the handle SHALL be exactly `#img_<complete digest>`
+- **AND** repeat loading SHALL check the exact metadata path without a scan
+
+#### Scenario: Invalid reference forms fail at public boundaries
+
+- **WHEN** `ask`, `summary`, or `delete` receives a noncanonical reference
+- **THEN** it SHALL return an invalid-reference error before storage or model I/O
+
+#### Scenario: Load accepts sources only
+
+- **WHEN** `load()` receives any handle reference as `img`
+- **THEN** it SHALL return a structured error without accessing image storage
+
+#### Scenario: Tamper protection
+
+- **WHEN** a metadata or content path is a symlink, resolves outside the image
+  directory, or metadata identity or format is inconsistent
+- **THEN** the redirected target SHALL not be read, written, or deleted
+
+#### Scenario: Exact deletion
+
+- **WHEN** a canonical image is deleted
+- **THEN** only its exact content and metadata paths SHALL be removed
 
 ### Requirement: Load a single image into session storage
 
-`image.load()` SHALL accept a single image source, save the original verbatim to
-`.onetool/images/` under a filename whose extension matches the detected source
-format, populate the session LRU cache, and return a dict with handle
-and image metadata.
+`image.load()` SHALL accept one file, HTTP/HTTPS URL, or clipboard source,
+derive a canonical handle, save the original verbatim under the detected
+extension, populate the session LRU cache, and return image metadata. It SHALL
+have no custom-handle parameter and SHALL not accept a handle as a source.
 
-#### Scenario: Load from file path
+#### Scenario: Load from file
 
-- **WHEN** `image.load(img="~/screenshots/ui.png")` is called
-- **THEN** it SHALL return `{"handle": "#img_<8hexchars>", "source": "<path>", "dims": [W, H], "resized": bool, "dedup": false}`
-- **AND** the original file SHALL be saved verbatim to `.onetool/images/img_<hash>.<ext>` where `<ext>` matches the detected source format
-- **AND** `img_<hash>.meta.json` SHALL be created with `source`, `hash`,
-  `original_dims`, `model_dims`, `resized`, `max_edge`, `original_format`,
-  `file` (the stored content filename, e.g. `"img_<hash>.jpg"`),
-  `created_at`, and `summary: null`
-- **AND** if `model` is configured, a background daemon thread SHALL be spawned
-  to call `extract_summary()` and persist the result via `save_summary()` — the
-  `load()` call SHALL NOT block on this
+- **WHEN** a supported file is loaded
+- **THEN** the result SHALL include its canonical handle, source, dimensions,
+  resize status, and `dedup: false`
+- **AND** canonical metadata SHALL be stored without a filename field
 
 #### Scenario: Stored extension matches detected format
 
-- **WHEN** `image.load(img="~/photo.jpeg")` is called with JPEG content
-- **THEN** the original SHALL be stored as `img_<hash>.jpg` (not `.png`)
-- **AND** the extension SHALL be derived from content detection, per this mapping: PNG→`.png`, JPEG→`.jpg`, GIF→`.gif`, WebP→`.webp`, TIFF→`.tiff`, HEIC→`.heic`, AVIF→`.avif`, SVG→`.svg`
-- **AND** clipboard captures (re-encoded PNG bytes) SHALL be stored as `.png`
+- **WHEN** content is stored
+- **THEN** its extension SHALL use PNG→`.png`, JPEG→`.jpg`, GIF→`.gif`,
+  WebP→`.webp`, TIFF→`.tiff`, HEIC→`.heic`, AVIF→`.avif`, or SVG→`.svg`
+  according to detected bytes
 
-#### Scenario: Legacy `.png`-named entries remain readable
+#### Scenario: Dedup by exact content address
 
-- **GIVEN** a pre-existing entry stored as `{handle}.png` whose `meta.json` has no `file` key
-- **WHEN** `image.ask()`, `image.summary()`, or `image.delete()` is called for that handle
-- **THEN** the content file SHALL be resolved by extension-insensitive lookup and the operation SHALL succeed
+- **WHEN** identical bytes are loaded again
+- **THEN** the same handle SHALL return with `dedup: true`
+- **AND** files SHALL not be rewritten
 
-#### Scenario: Background summary skipped when no vision model
-- **WHEN** `image.load()` is called and `model` is not configured (empty string)
-- **THEN** no background thread SHALL be spawned for auto-summary
+#### Scenario: Background summary
 
-#### Scenario: Load from clipboard
+- **WHEN** a vision model is configured
+- **THEN** `load()` SHALL start nonblocking summary work
+- **WHEN** no model is configured
+- **THEN** it SHALL not create a summary thread
 
-- **WHEN** `image.load(img="clip")` is called on Windows or macOS with an image in
-  the clipboard
-- **THEN** it SHALL capture the clipboard image, save it, and return a result dict
-- **AND** `source` in `meta.json` SHALL be `"clipboard"`
+#### Scenario: Clipboard
 
-#### Scenario: Load from URL
+- **WHEN** clipboard loading is supported and contains an image
+- **THEN** captured PNG bytes SHALL be stored with source `"clipboard"`
 
-- **WHEN** `image.load(img="https://...")` is called
-- **THEN** it SHALL download the image, save it, and return a result dict
-- **AND** `source` in `meta.json` SHALL be the URL string
+#### Scenario: Linux clipboard unsupported
 
-#### Scenario: Named handle
+- **WHEN** clipboard loading is requested on Linux
+- **THEN** a structured unsupported error SHALL return
 
-- **WHEN** `image.load(img="~/ui.png", handle="vscode")` is called
-- **THEN** the `handle` key in the returned dict SHALL be `"#vscode"`
-- **AND** the files SHALL be saved as `vscode.<ext>` (extension matching the detected source format) and `vscode.meta.json`
+#### Scenario: Glob rejected by load
 
-#### Scenario: Dedup — same content loaded twice (auto-handle)
+- **WHEN** `load()` receives a glob
+- **THEN** it SHALL return an error directing the caller to `load_batch()`
 
-- **GIVEN** `image.load(img="~/a.png")` has been called and returned `{"handle": "#img_a3f7b2c4", ...}`
-- **WHEN** `image.load(img="~/a.png")` is called again without a `handle=` parameter
-- **THEN** it SHALL return a dict with `handle: "#img_a3f7b2c4"` and `dedup: true` without writing new files
+#### Scenario: Model resize preserves original
 
-#### Scenario: Named handle bypasses content dedup
+- **WHEN** an image exceeds `max_edge`
+- **THEN** the disk original SHALL remain full resolution
+- **AND** only model-upload bytes SHALL be resized
 
-- **WHEN** `image.load(img="~/a.png", handle="ref")` is called for content already stored under an auto-handle
-- **THEN** it SHALL create a new entry `"#ref"` — deduplication does NOT apply to named handles
-- **AND** the tool docstring SHALL document this limitation
+### Requirement: Bounded URL downloads and expected failure semantics
 
-#### Scenario: Named handle collision with different content
+Remote responses SHALL be streamed with a fixed maximum of 20 MiB
+(20 × 1024 × 1024 bytes). The source boundary SHALL own status handling,
+network and timeout normalization, content-type validation, limit enforcement,
+and response cleanup.
 
-- **GIVEN** `image.load(img="~/a.png", handle="vscode")` has been called
-- **WHEN** `image.load(img="~/b.png", handle="vscode")` is called with different content
-- **THEN** it SHALL return `{"error": "handle #vscode already exists with different content..."}`
+Expected `httpx` HTTP, connection/request, DNS, and timeout failures SHALL
+become structured errors through `load`, each `load_batch` item, and automatic
+loading from `ask` and `summary`. Unexpected failures such as `AssertionError`
+SHALL propagate.
 
-#### Scenario: Glob rejected by `load()`
+#### Scenario: Declared oversize response
 
-- **WHEN** `image.load(img="~/screenshots/*.png")` is called
-- **THEN** it SHALL return `{"error": "...use load_batch()..."}`
+- **WHEN** valid `Content-Length` exceeds 20 MiB
+- **THEN** loading SHALL fail before body iteration or downstream image work
 
-#### Scenario: Linux clipboard not supported
+#### Scenario: Observed oversize response
 
-- **WHEN** `image.load(img="clip")` is called on Linux
-- **THEN** it SHALL return `{"error": "...Linux clipboard is not yet supported..."}`
+- **WHEN** streamed bytes cross 20 MiB
+- **THEN** loading SHALL stop at the crossing chunk
+- **AND** decoding, persistence, caching, and background work SHALL not run
 
-#### Scenario: Image resize
+#### Scenario: Exact limit
 
-- **GIVEN** `max_edge=1568` (default)
-- **WHEN** an image with longest edge > 1568px is loaded
-- **THEN** the original file SHALL be saved at full resolution
-- **AND** only the in-memory model-upload bytes SHALL be resized — no resized file
-  written to disk
-- **AND** `meta.json` SHALL record both `original_dims` and `model_dims`
+- **WHEN** a valid image response contains exactly 20 MiB
+- **THEN** the transport boundary SHALL accept it
 
----
+#### Scenario: Response cleanup
+
+- **WHEN** a response succeeds or fails due to status, content type, declared
+  size, or streamed overflow
+- **THEN** it SHALL be closed
+
+#### Scenario: Batch continuation
+
+- **WHEN** one source has an expected transport failure
+- **THEN** its batch item SHALL be an error and later sources SHALL still run
+
+#### Scenario: Unexpected failure propagates
+
+- **WHEN** the source boundary raises `AssertionError`
+- **THEN** the public call SHALL propagate it unchanged
 
 ### Requirement: Load multiple images in batch
 
-`image.load_batch()` SHALL accept a glob pattern or a list of source strings, load each,
-and return a list of result dicts (same format as `image.load()`).
+`image.load_batch()` SHALL accept a glob or ordered list of sources and return
+one `load()`-shaped result per source.
 
 #### Scenario: Glob load
 
-- **WHEN** `image.load_batch(img="~/screenshots/*.png")` is called
-- **THEN** it SHALL return a `list[dict]` of result dicts, one per matched file
-- **AND** each image SHALL be loaded as if `image.load()` were called individually
+- **WHEN** a glob matches supported image files
+- **THEN** each SHALL be loaded in sorted path order
 
-#### Scenario: List of sources
+#### Scenario: Ordered source list
 
-- **WHEN** `image.load_batch(img=["~/a.png", "~/b.png", "https://..."])` is called
-- **THEN** it SHALL return a `list[dict]` of result dicts in input order
+- **WHEN** a list of sources is supplied
+- **THEN** results SHALL preserve input order and failures SHALL not stop later items
 
 #### Scenario: Empty glob
 
-- **WHEN** `image.load_batch(img="~/screenshots/*.xyz")` matches no files
-- **THEN** it SHALL return an empty list `[]`
-
----
+- **WHEN** a glob matches no files
+- **THEN** `[]` SHALL return
 
 ### Requirement: Ask questions about a loaded image
 
-`image.ask()` SHALL send one or more images and one or more questions to the configured vision model and return answers. The `img` parameter SHALL accept a single image reference (string) or a list of image references; each reference may be a handle (`"#name"` or bare `"name"`), file path, URL, or `"clip"`.
+`image.ask()` SHALL accept canonical references, file paths, URLs, or `"clip"`
+for one image or a list of up to eight. Sources SHALL be auto-loaded, all
+references SHALL resolve before one vision call, and questions and answers
+SHALL preserve order.
 
-#### Scenario: Single question
+#### Scenario: Canonical handle question
 
-- **WHEN** `image.ask(img="#img_a3f7b2c4", q="What framework is shown?")` is called
-- **THEN** it SHALL return `{"result": [{"question": "What framework is shown?", "answer": "<answer text>"}], "handle": "#img_a3f7b2c4"}`
+- **WHEN** a loaded canonical handle and question are passed
+- **THEN** ordered question/answer pairs and that handle SHALL return
 
-#### Scenario: Batch questions — structured single call
+#### Scenario: Multiple questions
 
-- **WHEN** `image.ask(img="#img_a3f7b2c4", q=["Extract text", "Is this dark mode?"])`
-  is called
-- **THEN** it SHALL send all questions in a single model call requesting a JSON response of the form `{"answers": [...]}` with exactly one answer string per question
-- **AND** it SHALL return `{"result": [{"question": "Extract text", "answer": "<answer1>"}, {"question": "Is this dark mode?", "answer": "<answer2>"}], "handle": "#img_a3f7b2c4"}`
-- **AND** result entries SHALL be in the same order as the input list
+- **WHEN** multiple questions are passed
+- **THEN** one structured model call SHALL be attempted
+- **AND** an unparseable structured response SHALL fall back to complete
+  per-question calls in input order
 
-#### Scenario: Batch answer parsing falls back to per-question calls
+#### Scenario: Multiple images
 
-- **GIVEN** a batched multi-question call whose model response cannot be parsed
-  as JSON with exactly one answer per question
-- **WHEN** `image.ask(img="#h", q=["q1", "q2"])` processes that response
-- **THEN** it SHALL fall back to one model call per question, in input order
-- **AND** each returned `answer` SHALL be the complete answer to its own question — answers SHALL NOT be truncated, merged across questions, or silently replaced with empty strings due to response formatting
+- **WHEN** a list of up to eight references or sources is passed
+- **THEN** all images SHALL be included in one model call in input order
+- **AND** the response SHALL use `handles`
 
-#### Scenario: Multi-image ask
+#### Scenario: Response shape follows input type
 
-- **GIVEN** handles `"#before"` and `"#after"` are loaded
-- **WHEN** `image.ask(img=["#before", "#after"], q="What changed between these screenshots?")` is called
-- **THEN** it SHALL send both images in a single model call, each preceded by a positional label (`"Image 1"`, `"Image 2"`, ...) in list order
-- **AND** it SHALL return `{"result": [{"question": ..., "answer": ...}], "handles": ["#before", "#after"]}`
+- **WHEN** `img` is a string
+- **THEN** the response SHALL use `handle`
+- **WHEN** `img` is a list, including one item
+- **THEN** the response SHALL use `handles`
 
-#### Scenario: Multi-image response shape keyed by input type
+#### Scenario: Resolution failure is fail-fast
 
-- **WHEN** `image.ask(img=["#only"], q="...")` is called with a single-element list
-- **THEN** the response SHALL contain `handles: ["#only"]` (a list), not `handle`
-- **WHEN** `image.ask(img="#only", q="...")` is called with a plain string
-- **THEN** the response SHALL contain `handle: "#only"` (a string), not `handles`
+- **WHEN** any reference or source cannot resolve
+- **THEN** that input SHALL be identified and no model call SHALL run
 
-#### Scenario: Multi-image list entries accept any reference form
+#### Scenario: Empty list and cap
 
-- **WHEN** `image.ask(img=["#h1", "~/b.png", "https://example.org/c.png"], q="...")` is called
-- **THEN** each entry SHALL be resolved as `image.load()` would resolve it (handles pass through; paths and URLs are auto-loaded with hash dedup)
+- **WHEN** the list is empty or contains more than eight inputs
+- **THEN** an error SHALL return without a model call
 
-#### Scenario: Multi-image resolution failure fails fast
+#### Scenario: Clipboard refresh
 
-- **WHEN** `image.ask(img=["#h1", "#missing"], q="...")` is called and `"#missing"` cannot be resolved
-- **THEN** it SHALL return `{"error": "...", "handle": "#missing"}` identifying the failing reference
-- **AND** it SHALL NOT make a vision model call
+- **WHEN** `"clip"` is used successively
+- **THEN** current clipboard bytes SHALL be loaded each time and deduplicated by
+  content
 
-#### Scenario: Empty image list
+#### Scenario: Model not configured
 
-- **WHEN** `image.ask(img=[], q="...")` is called
-- **THEN** it SHALL return an `{"error": ...}` dict stating the list is empty
-- **AND** it SHALL NOT make a vision model call
-
-#### Scenario: Multi-image cap
-
-- **WHEN** `image.ask(img=[...], q="...")` is called with more than 8 image references
-- **THEN** it SHALL return an `{"error": ...}` dict naming the 8-image limit
-- **AND** it SHALL NOT make a vision model call
-
-#### Scenario: `"clip"` shorthand — auto-load
-
-- **WHEN** `image.ask(img="clip", q="What is this?")` is called with no prior clipboard
-  load this session
-- **THEN** it SHALL auto-load the clipboard image, then proceed with the question
-- **AND** the returned handle SHALL match what `image.load(img="clip")` would return
-
-#### Scenario: `"clip"` shorthand — refresh clipboard each call
-
-- **GIVEN** `image.load(img="clip")` or `image.ask(img="clip", ...)` was called
-  earlier this session
-- **WHEN** `image.ask(img="clip", q="What is this?")` is called again
-- **THEN** it SHALL read current clipboard bytes again before answering
-- **AND** if clipboard bytes are unchanged, it SHALL return the existing handle via hash dedup
-- **AND** if clipboard bytes changed, it SHALL return the handle for the new clipboard image
-
-#### Scenario: Unknown handle
-
-- **WHEN** `image.ask(img="#notexist", q="...")` is called
-- **THEN** it SHALL return `{"error": "Error: handle #notexist not found", "handle": "#notexist"}`
-
-#### Scenario: Bare handle name (without # prefix)
-
-- **WHEN** `image.ask(img="img_a3f7b2c4", q="...")` is called (no `#` prefix)
-- **AND** a handle named `"img_a3f7b2c4"` exists in storage
-- **THEN** it SHALL resolve to that handle and proceed normally
-
-#### Scenario: Vision model not configured
-
-- **WHEN** `image.ask()` is called and no `model` is set in config
-- **THEN** it SHALL return `{"error": "Error: ...", "handle": "..."}` where `error` starts with `"Error:"`
-- **AND** it SHALL NOT raise an exception
-
----
+- **WHEN** no vision model is configured
+- **THEN** a structured `Error:` result SHALL return
 
 ### Requirement: Extract and cache a structured image summary
 
-`image.summary()` SHALL run a generic extraction prompt once per image, cache the result
-in `meta.json`, and return immediately on repeat calls.
+`image.summary()` SHALL accept a canonical reference, file path, URL, or
+`"clip"`, auto-load sources, extract once per image, and cache the result in
+canonical metadata.
 
-#### Scenario: First call — triggers model
+#### Scenario: First and repeat call
 
-- **WHEN** `image.summary(img="#img_a3f7b2c4")` is called and `summary` is `null` in
-  `meta.json`
-- **THEN** it SHALL call the vision model with the extraction prompt
-- **AND** return `{"summary": {"type": ..., "mode": ..., "colours": [...], "description": ..., "content": ...}, "handle": "#img_a3f7b2c4", "cached": false}`
-- **AND** write the `summary` dict into `meta.json`
+- **WHEN** no summary is cached
+- **THEN** the model SHALL run, persist the summary, and return `cached: false`
+- **WHEN** the summary is already cached
+- **THEN** it SHALL return with `cached: true` and no model call
 
-#### Scenario: Repeat call — cached, no model call
+#### Scenario: Clipboard summary
 
-- **GIVEN** `image.summary(img="#img_a3f7b2c4")` has been called once
-- **WHEN** `image.summary(img="#img_a3f7b2c4")` is called again
-- **THEN** it SHALL return the cached summary with `"cached": true`
-- **AND** SHALL NOT make a vision model API call
+- **WHEN** `"clip"` is summarized successively
+- **THEN** current clipboard content SHALL be loaded each time
 
-#### Scenario: `"clip"` summary — refresh clipboard each call
+#### Scenario: clip_view
 
-- **GIVEN** `image.load(img="clip")`, `image.ask(img="clip", ...)`, or `image.summary(img="clip")`
-  was called earlier this session
-- **WHEN** `image.summary(img="clip")` is called again
-- **THEN** it SHALL read current clipboard bytes again before summarising
-- **AND** if clipboard bytes are unchanged, it SHALL return the existing handle via hash dedup
-- **AND** if clipboard bytes changed, it SHALL return the handle for the new clipboard image
+- **WHEN** `clip_view()` is called
+- **THEN** it SHALL behave exactly as `summary(img="clip")`
 
-#### Scenario: `clip_view()` delegates to clipboard summary
+#### Scenario: Summary shape
 
-- **WHEN** `image.clip_view()` is called
-- **THEN** it SHALL behave exactly like `image.summary(img="clip")`
-- **AND** it SHALL return the same response shape as `image.summary()`
-
-#### Scenario: Summary JSON keys
-
-- **WHEN** a summary is returned
-- **THEN** it SHALL contain exactly the keys: `type`, `mode`, `colours`, `description`, `content`
-- **AND** `mode` SHALL be one of `"dark"`, `"light"`, `"unknown"`
-- **AND** `content` SHALL be an empty string (not null) if no text is visible
-
----
+- **WHEN** extraction succeeds
+- **THEN** the summary SHALL contain exactly `type`, `mode`, `colours`,
+  `description`, and `content`
 
 ### Requirement: List loaded images
 
-`image.list()` SHALL return metadata for all images currently in the session images directory.
+`image.list()` SHALL return metadata only for valid canonical entries and SHALL
+not follow or report malformed or redirected metadata or content paths.
 
 #### Scenario: Basic list
 
-- **WHEN** `image.list()` is called after loading two images
-- **THEN** it SHALL return a list of dicts, one per image
-- **AND** each dict SHALL contain: `handle`, `source`, `dims`, `resized`,
-  `created_at`, `summary` (bool), `type` (null if summary not called)
+- **WHEN** valid images are loaded
+- **THEN** their canonical handles and metadata SHALL return
+
+#### Scenario: Invalid entry
+
+- **WHEN** malformed filenames, symlinks, or inconsistent metadata exist
+- **THEN** they SHALL not be followed or reported
 
 #### Scenario: Empty store
 
-- **WHEN** `image.list()` is called with no images loaded
-- **THEN** it SHALL return an empty list `[]`
-
----
+- **WHEN** no valid entries exist
+- **THEN** `[]` SHALL return
 
 ### Requirement: Delete a loaded image
 
-`image.delete()` SHALL remove the stored content file (whatever its extension), `meta.json`, and session cache entry for a given handle.
+`image.delete()` SHALL require a canonical public reference and remove only its
+exact content path, metadata path, and cache entry.
 
 #### Scenario: Successful delete
 
-- **GIVEN** handle `"#img_a3f7b2c4"` is loaded with a stored content file `img_a3f7b2c4.<ext>`
-- **WHEN** `image.delete(handle="#img_a3f7b2c4")` is called
-- **THEN** it SHALL delete the content file and `img_a3f7b2c4.meta.json` from the session images directory, regardless of the content file's extension
-- **AND** remove the entry from the session LRU cache
-- **AND** return a confirmation string
+- **WHEN** a valid loaded reference is deleted
+- **THEN** its exact files and cache entry SHALL be removed
+- **AND** similarly prefixed files SHALL remain
 
-#### Scenario: Delete unknown handle
+#### Scenario: Invalid or unknown handle
 
-- **WHEN** `image.delete(handle="#notexist")` is called
-- **THEN** it SHALL return an error string indicating the handle was not found
+- **WHEN** a reference is malformed or absent
+- **THEN** an error SHALL return without deleting another path
 
 ### Requirement: Purge images by age
 
-`image.purge()` SHALL delete images older than a given number of minutes, or all images when `all=True`.
+`image.purge()` SHALL delete valid canonical entries older than a positive
+number of minutes, or every valid entry with `all=True`, without following
+malformed, tampered, or symlink entries.
 
-#### Scenario: Purge with minutes
+#### Scenario: Age and default
 
-- **WHEN** `image.purge(minutes=120)` is called
-- **THEN** it SHALL delete all image files and meta.json pairs whose `created_at`
-  is more than 120 minutes ago
-- **AND** return `{"purged": N, "bytes_freed": N}`
-
-#### Scenario: Purge default (no argument)
-
-- **WHEN** `image.purge()` is called with no arguments
-- **THEN** it SHALL delete images older than 15 minutes (the default)
-- **AND** return `{"purged": N, "bytes_freed": N}`
+- **WHEN** positive `minutes` is passed
+- **THEN** older valid entries SHALL be exactly deleted
+- **WHEN** omitted
+- **THEN** the threshold SHALL be 15 minutes
 
 #### Scenario: Purge all
 
-- **WHEN** `image.purge(all=True)` is called
-- **THEN** it SHALL delete all images in the session images directory regardless of age
-- **AND** return `{"purged": N, "bytes_freed": N}`
+- **WHEN** `all=True`
+- **THEN** every valid canonical entry and only those entries SHALL be deleted
 
-#### Scenario: Zero or negative minutes raises
+#### Scenario: Invalid minutes
 
-- **WHEN** `image.purge(minutes=0)` or `image.purge(minutes=-1)` is called
-- **THEN** it SHALL raise `ValueError`
-
----
+- **WHEN** minutes is zero or negative while `all` is false
+- **THEN** `ValueError` SHALL be raised
 
 ### Requirement: Session cache is bounded
 
-The in-memory session LRU cache SHALL enforce a maximum entry count to prevent unbounded
-memory growth.
+The session LRU cache SHALL retain exactly the configured positive number of
+entries while leaving evicted originals on disk.
 
-#### Scenario: Eviction at limit
+#### Scenario: Capacity one and positive capacity
 
-- **GIVEN** `session_cache_size=10` (default)
-- **WHEN** an 11th distinct image is loaded
-- **THEN** the least-recently-used entry SHALL be evicted from the in-memory cache
-- **AND** the evicted image's file SHALL remain on disk unaffected
+- **WHEN** more than configured capacity is admitted
+- **THEN** exactly the most recently used configured number SHALL remain,
+  including exactly one when capacity is one
 
 #### Scenario: Re-access after eviction
 
-- **GIVEN** an image was evicted from the session cache
-- **WHEN** `image.ask()` is called with its handle
-- **THEN** it SHALL re-read the file from disk and re-encode for the model call
-
----
+- **WHEN** an evicted canonical image is referenced
+- **THEN** its exact content path SHALL be read and the cache repopulated
 
 ### Requirement: Configuration via `tools.image` block
 
-The `ot_image` pack SHALL be configurable via `onetool.yaml` under `tools.ot_image`.
+The pack SHALL be configured under `tools.ot_image`.
+`session_cache_size` SHALL be a positive integer, with hosted and standalone
+configuration using the same typed field validation and pack-and-field failure
+semantics.
 
-#### Scenario: model required for ask and summary
+#### Scenario: Non-positive cache size
 
-- **WHEN** `tools.ot_image.model` is not set
-- **AND** `image.ask()` or `image.summary()` is called
-- **THEN** it SHALL return an error string (not raise) indicating the setting is missing
+- **WHEN** zero or a negative cache size is configured in either mode
+- **THEN** configuration SHALL fail for `tools.ot_image.session_cache_size`
 
-#### Scenario: Inherit model and base_url from top-level llm config
+#### Scenario: Inherit LLM values
 
-- **WHEN** `tools.ot_image.model` is not set
-- **THEN** `image` SHALL use `llm.model` from the top-level `llm:` config block
-- **WHEN** `tools.ot_image.base_url` is not set
-- **THEN** `image` SHALL use `llm.base_url` from the top-level `llm:` config block
-- **AND** the API key is always read from the `OPENAI_API_KEY` secret — there is no `tools.ot_image.api_key` config field
+- **WHEN** image model or base URL is empty
+- **THEN** top-level `llm` values SHALL be inherited
+- **AND** the API key SHALL use `OPENAI_API_KEY` when present, otherwise
+  `OT_LLM_API_KEY`
+
+#### Scenario: Model required for vision
+
+- **WHEN** no image or top-level model is configured
+- **THEN** `ask` and `summary` SHALL return a model-setting error
 
 #### Scenario: max_edge override
 
-- **WHEN** `tools.ot_image.max_edge: 800` is set in config
-- **AND** `image.load(img="~/large.png")` is called with a 2000×1500px image
-- **THEN** the model-upload bytes SHALL be resized to fit within 800px on the long edge
+- **WHEN** `tools.ot_image.max_edge` is configured
+- **THEN** model-upload resizing SHALL honor it

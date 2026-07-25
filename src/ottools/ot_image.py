@@ -4,13 +4,16 @@ Load images from files, URLs, or the clipboard once; reference them by handle
 for follow-up questions. A vision model answers questions and extracts
 structured summaries cached in meta.json.
 
+Handles use the complete content digest: ``#img_<64 lowercase hex>``. Remote
+originals are streamed with a fixed 20 MiB limit.
+
 **Configuration (onetool.yaml):**
 
     tools:
       ot_image:
         model: openai/gpt-4o-mini   # overrides llm.model for vision calls
         max_edge: 1568              # default resize limit
-        session_cache_size: 10     # default LRU cap
+        session_cache_size: 10      # positive exact LRU cap
 
 API key, base URL, and model are inherited from the top-level ``llm:`` config if not set.
 """
@@ -28,7 +31,17 @@ __ot_requires__ = {
     ],
 }
 
-__all__ = ["ask", "clip_ask", "clip_view", "delete", "list", "load", "load_batch", "purge", "summary"]
+__all__ = [
+    "ask",
+    "clip_ask",
+    "clip_view",
+    "delete",
+    "list",
+    "load",
+    "load_batch",
+    "purge",
+    "summary",
+]
 
 from ottools._image.lifecycle import delete_image as delete
 from ottools._image.lifecycle import list_images as list

@@ -9,6 +9,7 @@ Vision (ask/summary) requires a configured API key and is skipped when absent.
 from __future__ import annotations
 
 import io
+import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -19,7 +20,9 @@ import pytest
 from .conftest import get_test_secret
 
 
-def _make_png(tmp_path: Path, name: str = "test.png", size: tuple[int, int] = (100, 100)) -> Path:
+def _make_png(
+    tmp_path: Path, name: str = "test.png", size: tuple[int, int] = (100, 100)
+) -> Path:
     """Write a minimal PNG to tmp_path and return the path."""
     try:
         from PIL import Image as PIL_Image
@@ -81,10 +84,7 @@ class TestImageLifecycle:
         with patch.object(store, "_images_dir", return_value=tmp_path):
             handle = load(img=str(img_path))["handle"]
 
-        with (
-            patch.object(store, "_images_dir", return_value=tmp_path),
-            patch("ottools._image.lifecycle._images_dir", return_value=tmp_path),
-        ):
+        with patch.object(store, "_images_dir", return_value=tmp_path):
             result = delete_image(handle=handle)
             handles = [r["handle"] for r in list_images()]
 
@@ -97,11 +97,12 @@ class TestImageLifecycle:
         from ottools._image.lifecycle import purge_images
 
         old_ts = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
-        handle_name = "img_oldimage"
+        digest = hashlib.sha256(b"old-image").hexdigest()
+        handle_name = f"img_{digest}"
         meta = {
             "handle": handle_name,
             "source": "file",
-            "hash": "a" * 64,
+            "hash": digest,
             "original_dims": [10, 10],
             "model_dims": [10, 10],
             "resized": False,
@@ -113,10 +114,7 @@ class TestImageLifecycle:
         (tmp_path / f"{handle_name}.meta.json").write_text(json.dumps(meta))
         (tmp_path / f"{handle_name}.png").write_bytes(b"fake")
 
-        with (
-            patch.object(store, "_images_dir", return_value=tmp_path),
-            patch("ottools._image.lifecycle._images_dir", return_value=tmp_path),
-        ):
+        with patch.object(store, "_images_dir", return_value=tmp_path):
             result = purge_images(minutes=60)
 
         assert result["purged"] == 1
@@ -132,10 +130,15 @@ class TestImageVision:
     @pytest.fixture(autouse=True)
     def require_vision_config(self) -> None:
         """Skip if vision API key or model is not configured."""
-        if not get_test_secret("OPENAI_API_KEY") and not get_test_secret("OT_LLM_API_KEY"):
-            pytest.fail("No vision API key configured (OPENAI_API_KEY or OT_LLM_API_KEY)")
+        if not get_test_secret("OPENAI_API_KEY") and not get_test_secret(
+            "OT_LLM_API_KEY"
+        ):
+            pytest.fail(
+                "No vision API key configured (OPENAI_API_KEY or OT_LLM_API_KEY)"
+            )
 
         from ottools._image.config import get_image_config
+
         config = get_image_config()
         if not config.model:
             pytest.fail("tools.ot_image.model not configured in onetool.yaml")
@@ -153,7 +156,9 @@ class TestImageVision:
         if "error" in result:
             err = result["error"]
             if "Authentication" in err or "api_key" in err.lower():
-                pytest.fail(f"Vision API auth failed (check OPENAI_API_KEY / OT_LLM_API_KEY): {err}")
+                pytest.fail(
+                    f"Vision API auth failed (check OPENAI_API_KEY / OT_LLM_API_KEY): {err}"
+                )
             pytest.fail(f"ask() returned unexpected error: {err}")
         assert "result" in result
         assert result["result"][0]["answer"]
@@ -171,7 +176,9 @@ class TestImageVision:
             result = ask(img=[h1, h2], q="What differs between image 1 and image 2?")
 
         if "error" in result:
-            pytest.fail(f"multi-image ask() returned unexpected error: {result['error']}")
+            pytest.fail(
+                f"multi-image ask() returned unexpected error: {result['error']}"
+            )
         assert result["handles"] == [h1, h2]
         assert len(result["result"]) == 1
         assert result["result"][0]["answer"]

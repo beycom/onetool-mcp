@@ -296,10 +296,10 @@ OneTool is setup correctly with all dependencies and secrets needed.
   - Example: `tavily.search(query="Python", max_results=2)` not `tavily.search(query="Python", count=2)`
 - **ot_image tools**: All tools use `img=` as the image reference parameter (not `path=` or `handle=`)
   - `ot_image.load(img="tests/data/file_example_1.jpg")` — file path, URL, or `"clip"` for clipboard
-  - `ot_image.ask(img="#img_handle", q="What is in this image?")` — use `q=` not `questions=`
-  - `ot_image.summary(img="#img_handle")` — extracts and caches structured summary
-  - `ot_image.delete(handle="img_handle")` — handle without `#` prefix
-  - Handles are returned as `"#img_<8hexchars>"` from `load()`; use bare `"img_<8hexchars>"` for `delete()`
+  - `ot_image.ask(img=loaded["handle"], q="What is in this image?")` — use `q=` not `questions=`
+  - `ot_image.summary(img=loaded["handle"])` — extracts and caches structured summary
+  - `ot_image.delete(handle=loaded["handle"])` — use the returned handle unchanged
+  - Handles are canonical `"#img_<64 lowercase hex>"` content digests; short, named, and bare forms are invalid
 - **whiteboard.draw**: Use `input=` not `dsl=`
   - Example: `whiteboard.draw(input="A --> B --> C")` not `whiteboard.draw(dsl="...")`
 - **mem.flush**: Replaces `mem.cache_clear()` (removed in refactor). Flushes the background embedding queue.
