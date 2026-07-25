@@ -184,7 +184,9 @@ def test_pdf_error_handling(test_pdf: Path, tmp_path: Path) -> None:
 
 @pytest.mark.unit
 @pytest.mark.tools
-def test_pdf_single_file_does_not_use_async_bridge(test_pdf: Path, tmp_path: Path) -> None:
+def test_pdf_single_file_does_not_use_async_bridge(
+    test_pdf: Path, tmp_path: Path
+) -> None:
     """Verify single-file conversion stays on the direct synchronous path."""
     from otutil.tools.convert import pdf
 
@@ -211,16 +213,18 @@ async def test_batch_conversions_run_inside_running_loop(tmp_path: Path) -> None
     from otutil.tools import convert
 
     files_by_ext = {
-        "pdf": [tmp_path / "a.pdf", tmp_path / "b.pdf"],
-        "docx": [tmp_path / "a.docx", tmp_path / "b.docx"],
-        "pptx": [tmp_path / "a.pptx", tmp_path / "b.pptx"],
-        "xlsx": [tmp_path / "a.xlsx", tmp_path / "b.xlsx"],
+        "pdf": [tmp_path / "pdf-a.pdf", tmp_path / "pdf-b.pdf"],
+        "docx": [tmp_path / "word-a.docx", tmp_path / "word-b.docx"],
+        "pptx": [tmp_path / "slides-a.pptx", tmp_path / "slides-b.pptx"],
+        "xlsx": [tmp_path / "sheet-a.xlsx", tmp_path / "sheet-b.xlsx"],
     }
     for paths in files_by_ext.values():
         for path in paths:
             path.write_bytes(b"content")
 
-    def _result(input_path: Path, _output_dir: Path, _source_rel: str, **_kwargs: Any) -> dict[str, Any]:
+    def _result(
+        input_path: Path, _output_dir: Path, _source_rel: str, **_kwargs: Any
+    ) -> dict[str, Any]:
         data: dict[str, Any] = {"output": f"{input_path.stem}.md"}
         if input_path.suffix == ".pdf":
             data.update({"pages": 1, "images": 0})
@@ -239,10 +243,143 @@ async def test_batch_conversions_run_inside_running_loop(tmp_path: Path) -> None
         patch("otutil.tools.convert.convert_excel", side_effect=_result),
     ):
         assert "Converted 2 files" in convert.pdf(pattern="*.pdf", output_dir="output")
-        assert "Converted 2 files" in convert.word(pattern="*.docx", output_dir="output")
-        assert "Converted 2 files" in convert.powerpoint(pattern="*.pptx", output_dir="output")
-        assert "Converted 2 files" in convert.excel(pattern="*.xlsx", output_dir="output")
+        assert "Converted 2 files" in convert.word(
+            pattern="*.docx", output_dir="output"
+        )
+        assert "Converted 2 files" in convert.powerpoint(
+            pattern="*.pptx", output_dir="output"
+        )
+        assert "Converted 2 files" in convert.excel(
+            pattern="*.xlsx", output_dir="output"
+        )
         assert "Converted 8 files" in convert.auto(pattern="*", output_dir="output")
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+@pytest.mark.parametrize(
+    ("tool_name", "suffix", "converter_name", "has_images"),
+    [
+        ("pdf", ".pdf", "convert_pdf", True),
+        ("word", ".docx", "convert_word", True),
+        ("powerpoint", ".pptx", "convert_powerpoint", True),
+        ("excel", ".xlsx", "convert_excel", False),
+    ],
+)
+def test_batch_same_stem_collision_fails_before_output_or_dispatch(
+    tmp_path: Path,
+    tool_name: str,
+    suffix: str,
+    converter_name: str,
+    has_images: bool,
+) -> None:
+    from otutil.tools import convert
+
+    sources = [tmp_path / "a" / f"report{suffix}", tmp_path / "b" / f"report{suffix}"]
+    for source in sources:
+        source.parent.mkdir()
+        source.write_bytes(b"source")
+    output_dir = tmp_path / "output"
+
+    with (
+        patch(f"otutil.tools.convert.{converter_name}") as converter,
+        patch("otutil.tools.convert.run_coro_sync") as bridge,
+        patch("otutil.tools.convert._get_conversion_executor") as executor,
+    ):
+        result = getattr(convert, tool_name)(
+            pattern=f"**/*{suffix}",
+            output_dir="output",
+        )
+
+    assert result.startswith("Error: Output collisions detected:")
+    assert "output/report.md" in result
+    assert "output/report.toc.md" in result
+    assert ("output/report_images" in result) is has_images
+    for source in sources:
+        assert str(source) in result
+    converter.assert_not_called()
+    bridge.assert_not_called()
+    executor.assert_not_called()
+    assert not output_dir.exists()
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_auto_cross_format_collision_preserves_existing_outputs(tmp_path: Path) -> None:
+    from otutil.tools.convert import auto
+
+    supported = [tmp_path / "a" / "report.pdf", tmp_path / "b" / "report.docx"]
+    unsupported = tmp_path / "c" / "report.txt"
+    for source in [*supported, unsupported]:
+        source.parent.mkdir()
+        source.write_bytes(b"source")
+
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    existing = {
+        output_dir / "report.md": b"existing markdown",
+        output_dir / "report.toc.md": b"existing toc",
+    }
+    for path, content in existing.items():
+        path.write_bytes(content)
+
+    with (
+        patch("otutil.tools.convert.convert_pdf") as pdf_converter,
+        patch("otutil.tools.convert.convert_word") as word_converter,
+        patch("otutil.tools.convert.run_coro_sync") as bridge,
+        patch("otutil.tools.convert._get_conversion_executor") as executor,
+    ):
+        result = auto(pattern="**/*", output_dir="output")
+
+    assert result.startswith("Error: Output collisions detected:")
+    assert str(supported[0]) in result
+    assert str(supported[1]) in result
+    assert str(unsupported) not in result
+    pdf_converter.assert_not_called()
+    word_converter.assert_not_called()
+    bridge.assert_not_called()
+    executor.assert_not_called()
+    assert {path: path.read_bytes() for path in existing} == existing
+    assert set(output_dir.iterdir()) == set(existing)
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_auto_non_colliding_sources_have_distinct_summary_outputs(
+    tmp_path: Path,
+) -> None:
+    from otutil.tools.convert import auto
+
+    sources = [
+        tmp_path / "a" / "first.pdf",
+        tmp_path / "b" / "second.docx",
+        tmp_path / "c" / "third.pptx",
+        tmp_path / "d" / "fourth.xlsx",
+    ]
+    for source in sources:
+        source.parent.mkdir()
+        source.write_bytes(b"source")
+
+    def converted(
+        input_path: Path,
+        output_dir: Path,
+        _source_rel: str,
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
+        return {"output": str(output_dir / f"{input_path.stem}.md")}
+
+    with (
+        patch("otutil.tools.convert.convert_pdf", side_effect=converted),
+        patch("otutil.tools.convert.convert_word", side_effect=converted),
+        patch("otutil.tools.convert.convert_powerpoint", side_effect=converted),
+        patch("otutil.tools.convert.convert_excel", side_effect=converted),
+    ):
+        result = auto(pattern="**/*", output_dir="output")
+
+    assert result.startswith("Converted 4 files, 0 failed")
+    outputs = [line.strip() for line in result.splitlines() if line.startswith("  ")]
+    assert len(outputs) == 4
+    assert len(set(outputs)) == 4
 
 
 # =============================================================================
@@ -328,7 +465,9 @@ def test_powerpoint_with_notes(test_pptx: Path, tmp_path: Path) -> None:
         "images": 0,
     }
 
-    with patch("otutil.tools.convert.convert_powerpoint", return_value=mock_result) as mock:
+    with patch(
+        "otutil.tools.convert.convert_powerpoint", return_value=mock_result
+    ) as mock:
         powerpoint(pattern=str(test_pptx), output_dir="output", include_notes=True)
 
     # Verify include_notes was passed
@@ -444,15 +583,18 @@ def test_auto_mixed_formats(tmp_path: Path) -> None:
     from otutil.tools.convert import auto
 
     # Create files of different types
-    (tmp_path / "doc.pdf").write_bytes(b"pdf")
-    (tmp_path / "doc.docx").write_bytes(b"docx")
+    (tmp_path / "document.pdf").write_bytes(b"pdf")
+    (tmp_path / "notes.docx").write_bytes(b"docx")
     (tmp_path / "doc.txt").write_text("txt")
 
     mock_result = {"output": "out.md", "pages": 1, "images": 0}
 
     with (
         patch("otutil.tools.convert.convert_pdf", return_value=mock_result),
-        patch("otutil.tools.convert.convert_word", return_value={**mock_result, "paragraphs": 1, "tables": 0, "images": 0}),
+        patch(
+            "otutil.tools.convert.convert_word",
+            return_value={**mock_result, "paragraphs": 1, "tables": 0, "images": 0},
+        ),
     ):
         result = auto(pattern="*", output_dir="output")
 
@@ -498,7 +640,10 @@ def test_resolve_output_dir(tmp_path: Path) -> None:
 @pytest.mark.tools
 def test_checksum_cache_thread_safe(tmp_path: Path) -> None:
     """Verify checksum cache uses lru_cache for thread safety."""
-    from otutil.tools._convert.utils import _compute_checksum_cached, compute_file_checksum
+    from otutil.tools._convert.utils import (
+        _compute_checksum_cached,
+        compute_file_checksum,
+    )
 
     # Create a test file
     test_file = tmp_path / "test.txt"

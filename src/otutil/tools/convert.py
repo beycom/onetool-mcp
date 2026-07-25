@@ -59,6 +59,7 @@ from otutil.tools._convert import (
 
 # Type alias for converter functions
 ConverterFunc = Callable[[Path, Path, str], dict[str, Any]]
+_IMAGE_OUTPUT_EXTENSIONS = frozenset({".pdf", ".docx", ".pptx"})
 
 
 def _format_batch_result(result: dict[str, Any], summary: str) -> str:
@@ -189,6 +190,40 @@ def _resolve_output_dir(output_dir: str) -> Path:
     return resolve_cwd_path(output_dir)
 
 
+def _output_identities(input_path: Path, output_dir: Path) -> tuple[Path, ...]:
+    """Return every flat output identity reserved by a supported input."""
+    stem = input_path.stem
+    identities = [
+        output_dir / f"{stem}.md",
+        output_dir / f"{stem}.toc.md",
+    ]
+    if input_path.suffix.lower() in _IMAGE_OUTPUT_EXTENSIONS:
+        identities.append(output_dir / f"{stem}_images")
+    return tuple(identities)
+
+
+def _find_output_collisions(files: list[Path], output_dir: Path) -> str | None:
+    """Describe ambiguous output identities before any converter is invoked."""
+    reservations: dict[Path, list[Path]] = {}
+    for source in files:
+        for identity in _output_identities(source, output_dir):
+            reservations.setdefault(identity, []).append(source)
+
+    conflicts = {
+        identity: sources
+        for identity, sources in reservations.items()
+        if len(sources) > 1
+    }
+    if not conflicts:
+        return None
+
+    lines = ["Error: Output collisions detected:"]
+    for identity in sorted(conflicts, key=str):
+        sources = ", ".join(str(source) for source in sorted(conflicts[identity]))
+        lines.append(f"  {identity} <- {sources}")
+    return "\n".join(lines)
+
+
 async def _convert_file_async(
     converter: Any,
     input_path: Path,
@@ -259,11 +294,11 @@ async def _convert_auto_batch_async(
     files: list[Path],
     output_dir: Path,
     converters: dict[str, ConverterFunc],
+    *,
+    skipped: int = 0,
 ) -> dict[str, Any]:
     """Convert multiple files in parallel with auto-detection."""
     work: list[tuple[Path, ConverterFunc]] = []
-    skipped = 0
-
     for path in files:
         ext = path.suffix.lower()
         if ext not in converters:
@@ -291,6 +326,7 @@ def _run_conversion(
     pattern: str,
     output_dir: str,
     converter: ConverterFunc,
+    supported_extensions: frozenset[str],
     single_summary: Any,
     span_extras: dict[str, Any] | None = None,
     **kwargs: Any,
@@ -308,22 +344,35 @@ def _run_conversion(
             s.add(error="no_match")
             return f"No files matched pattern: {pattern}"
 
-        out_path = _resolve_output_dir(output_dir)
+        supported_files = [
+            path for path in files if path.suffix.lower() in supported_extensions
+        ]
+        if not supported_files:
+            s.add(error="no_supported_files")
+            return f"No supported files matched pattern: {pattern}"
 
-        if len(files) == 1:
+        out_path = _resolve_output_dir(output_dir)
+        if collision := _find_output_collisions(supported_files, out_path):
+            s.add(error="output_collision")
+            return collision
+
+        if len(supported_files) == 1:
             try:
-                source_rel = _get_source_rel(files[0])
-                result = converter(files[0], out_path, source_rel, **kwargs)
+                source_rel = _get_source_rel(supported_files[0])
+                result = converter(supported_files[0], out_path, source_rel, **kwargs)
                 stats, text = single_summary(result)
                 s.add(converted=1, **stats)
-                return f"Converted {files[0].name}: {text}\nOutput: {result['output']}"
+                return (
+                    f"Converted {supported_files[0].name}: {text}\n"
+                    f"Output: {result['output']}"
+                )
             except Exception as e:
                 s.add(error=str(e))
-                return f"Error converting {files[0].name}: {e}"
+                return f"Error converting {supported_files[0].name}: {e}"
 
         try:
             result = run_coro_sync(
-                _convert_batch_async(files, out_path, converter, **kwargs)
+                _convert_batch_async(supported_files, out_path, converter, **kwargs)
             )
             s.add(converted=result["converted"], failed=result["failed"])
             return _format_batch_result(
@@ -361,6 +410,7 @@ def pdf(
         pattern=pattern,
         output_dir=output_dir,
         converter=convert_pdf,
+        supported_extensions=frozenset({".pdf"}),
         single_summary=lambda r: (
             {"pages": r["pages"], "images": r["images"]},
             f"{r['pages']} pages, {r['images']} images",
@@ -394,6 +444,7 @@ def word(
         pattern=pattern,
         output_dir=output_dir,
         converter=convert_word,
+        supported_extensions=frozenset({".docx"}),
         single_summary=lambda r: (
             {
                 "paragraphs": r["paragraphs"],
@@ -433,6 +484,7 @@ def powerpoint(
         pattern=pattern,
         output_dir=output_dir,
         converter=convert_powerpoint,
+        supported_extensions=frozenset({".pptx"}),
         span_extras={"include_notes": include_notes},
         include_notes=include_notes,
         single_summary=lambda r: (
@@ -474,6 +526,7 @@ def excel(
         pattern=pattern,
         output_dir=output_dir,
         converter=convert_excel,
+        supported_extensions=frozenset({".xlsx"}),
         span_extras={
             "include_formulas": include_formulas,
             "compute_formulas": compute_formulas,
@@ -527,6 +580,14 @@ def auto(
         # Single supported file - convert directly
         supported_files = [f for f in files if f.suffix.lower() in converters]
         skipped = len(files) - len(supported_files)
+        if collision := _find_output_collisions(supported_files, out_path):
+            s.add(
+                converted=0,
+                failed=0,
+                skipped=skipped,
+                error="output_collision",
+            )
+            return collision
 
         if len(supported_files) == 1:
             path = supported_files[0]
@@ -549,7 +610,12 @@ def auto(
         # Batch conversion with async parallel processing
         try:
             result = run_coro_sync(
-                _convert_auto_batch_async(files, out_path, converters)
+                _convert_auto_batch_async(
+                    supported_files,
+                    out_path,
+                    converters,
+                    skipped=skipped,
+                )
             )
             s.add(
                 converted=result["converted"],
