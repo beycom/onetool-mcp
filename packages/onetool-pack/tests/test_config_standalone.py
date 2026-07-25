@@ -6,10 +6,50 @@ standalone functions and the public API.
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 import yaml
+from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
+class NestedConfig(BaseModel):
+    """Nested typed settings used to verify standalone validation parity."""
+
+    attempts: int = 3
+
+
+class PackConfig(BaseModel):
+    """Typed pack settings used by standalone public-path tests."""
+
+    timeout: int = 30
+    nested: NestedConfig = Field(default_factory=NestedConfig)
+
+
+class AllowExtraConfig(BaseModel):
+    """Typed settings that explicitly retain arbitrary pack keys."""
+
+    model_config = ConfigDict(extra="allow")
+
+    timeout: int = 30
+
+
+class AllowNestedConfig(BaseModel):
+    """Nested settings that explicitly retain arbitrary keys."""
+
+    model_config = ConfigDict(extra="allow")
+
+    attempts: int = 3
+
+
+class PackWithAllowNestedConfig(BaseModel):
+    """Pack settings with an extra-allowing nested model."""
+
+    nested: AllowNestedConfig = Field(default_factory=AllowNestedConfig)
 
 
 @pytest.fixture
@@ -67,7 +107,7 @@ def test_get_tool_config_reads_from_yaml_standalone(standalone_config: Path) -> 
     from pydantic import BaseModel
 
     from otpack import configure_standalone
-    from otpack.config import _get_standalone_tool_config, get_tool_config
+    from otpack.config import _get_standalone_tool_config
 
     configure_standalone(standalone_config)
 
@@ -98,6 +138,169 @@ def test_get_tool_config_standalone_returns_defaults_for_missing_pack(
     configure_standalone(standalone_config)
     raw = _get_standalone_tool_config("nonexistent_pack")
     assert raw == {}
+
+
+@pytest.mark.unit
+@pytest.mark.pkg
+@pytest.mark.parametrize("value", [0, -1])
+def test_get_tool_config_standalone_rejects_invalid_field(
+    tmp_path: Path, value: int
+) -> None:
+    """Standalone typed config reports the same pack and field failure."""
+    import sys
+
+    from pydantic import BaseModel, Field
+
+    from otpack import configure_standalone
+    from otpack.config import get_tool_config
+
+    class ImageConfig(BaseModel):
+        session_cache_size: int = Field(default=10, gt=0)
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        f"tools:\n  ot_image:\n    session_cache_size: {value}\n",
+        encoding="utf-8",
+    )
+    configure_standalone(config_path)
+
+    with (
+        patch.dict(sys.modules, {"ot.config": None}),
+        pytest.raises(
+            ValueError,
+            match=r"(?s)Invalid tools\.ot_image configuration:.*session_cache_size",
+        ),
+    ):
+        get_tool_config("ot_image", ImageConfig)
+
+
+@pytest.mark.unit
+@pytest.mark.pkg
+@pytest.mark.parametrize(
+    ("configured", "field"),
+    [
+        ({"timeout": "not-an-integer"}, "timeout"),
+        ({"nested": {"attempts": "not-an-integer"}}, "nested.attempts"),
+    ],
+)
+def test_public_typed_config_rejects_invalid_values_standalone(
+    tmp_path: Path,
+    configured: dict[str, object],
+    field: str,
+) -> None:
+    """Public standalone dispatch rejects invalid scalar and nested values."""
+    import sys
+
+    from otpack import configure_standalone, get_tool_config
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump({"tools": {"sample": configured}}),
+        encoding="utf-8",
+    )
+    configure_standalone(config_path)
+
+    with (
+        patch.dict(sys.modules, {"ot.config": None}),
+        pytest.raises(
+            ValueError,
+            match=rf"(?s)Invalid tools\.sample configuration:.*{field}",
+        ),
+    ):
+        get_tool_config("sample", PackConfig)
+
+
+@pytest.mark.unit
+@pytest.mark.pkg
+@pytest.mark.parametrize(
+    ("configured", "field"),
+    [
+        ({"unexpected": True}, "tools.sample.unexpected"),
+        (
+            {"nested": {"unexpected": True}},
+            "tools.sample.nested.unexpected",
+        ),
+    ],
+)
+def test_public_typed_config_rejects_unknown_fields_standalone(
+    tmp_path: Path,
+    configured: dict[str, object],
+    field: str,
+) -> None:
+    """Public standalone dispatch rejects top-level and nested unknown fields."""
+    import sys
+
+    from otpack import configure_standalone, get_tool_config
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump({"tools": {"sample": configured}}),
+        encoding="utf-8",
+    )
+    configure_standalone(config_path)
+
+    with (
+        patch.dict(sys.modules, {"ot.config": None}),
+        pytest.raises(
+            ValueError,
+            match=rf"Invalid tools\.sample configuration:.*{field}",
+        ),
+    ):
+        get_tool_config("sample", PackConfig)
+
+
+@pytest.mark.unit
+@pytest.mark.pkg
+@pytest.mark.parametrize(
+    ("schema", "configured"),
+    [
+        (AllowExtraConfig, {"timeout": 45, "unexpected": True}),
+        (
+            PackWithAllowNestedConfig,
+            {"nested": {"attempts": 5, "unexpected": True}},
+        ),
+    ],
+)
+def test_public_typed_config_honors_extra_allow_standalone(
+    tmp_path: Path,
+    schema: type[BaseModel],
+    configured: dict[str, object],
+) -> None:
+    """Public standalone dispatch preserves explicitly allowed extra fields."""
+    import sys
+
+    from otpack import configure_standalone, get_tool_config
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump({"tools": {"sample": configured}}),
+        encoding="utf-8",
+    )
+    configure_standalone(config_path)
+
+    with patch.dict(sys.modules, {"ot.config": None}):
+        result = get_tool_config("sample", schema)
+
+    target = result if isinstance(result, AllowExtraConfig) else result.nested
+    assert target.model_extra == {"unexpected": True}
+
+
+@pytest.mark.unit
+@pytest.mark.pkg
+def test_public_typed_config_returns_defaults_for_missing_pack_standalone(
+    standalone_config: Path,
+) -> None:
+    """A genuinely missing standalone pack receives its schema defaults."""
+    import sys
+
+    from otpack import configure_standalone, get_tool_config
+
+    configure_standalone(standalone_config)
+
+    with patch.dict(sys.modules, {"ot.config": None}):
+        result = get_tool_config("missing", PackConfig)
+
+    assert result == PackConfig()
 
 
 @pytest.mark.unit
@@ -170,7 +373,9 @@ def test_configure_standalone_explicit_secrets_path_missing(tmp_path: Path) -> N
 
 @pytest.mark.unit
 @pytest.mark.pkg
-def test_configure_standalone_explicit_secrets_path_overrides_adjacent(tmp_path: Path) -> None:
+def test_configure_standalone_explicit_secrets_path_overrides_adjacent(
+    tmp_path: Path,
+) -> None:
     """Explicit secrets_path takes precedence over adjacent secrets.yaml."""
     from otpack import configure_standalone
     from otpack.config import _get_standalone_secret

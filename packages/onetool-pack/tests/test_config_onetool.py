@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,47 +14,51 @@ def test_get_tool_config_delegates_to_ot_config() -> None:
     """get_tool_config should delegate to ot.config.get_tool_config when importable."""
     from pydantic import BaseModel
 
+    from otpack import get_tool_config
+
     class FakeConfig(BaseModel):
         timeout: float = 5.0
 
     fake_config = FakeConfig(timeout=30.0)
+    mock_ot_config = MagicMock()
+    mock_ot_config.get_tool_config.return_value = fake_config
 
-    with patch("otpack.config.get_tool_config") as mock:
-        # Simulate ot.config being importable
-        mock_ot_config = MagicMock()
-        mock_ot_config.get_tool_config = MagicMock(return_value=fake_config)
+    with patch.dict(sys.modules, {"ot.config": mock_ot_config}):
+        result = get_tool_config("sample_pack", FakeConfig)
 
-        import sys
-        original_ot = sys.modules.get("ot")
-        original_ot_config = sys.modules.get("ot.config")
+    assert result is fake_config
+    mock_ot_config.get_tool_config.assert_called_once_with("sample_pack", FakeConfig)
 
-        sys.modules["ot"] = MagicMock()
-        sys.modules["ot.config"] = mock_ot_config
 
-        try:
-            # Import fresh
-            import importlib
+@pytest.mark.unit
+@pytest.mark.pkg
+@pytest.mark.parametrize(
+    "error",
+    [
+        ValueError("hosted validation failed"),
+        RuntimeError("hosted runtime failed"),
+        ImportError("hosted delegate import failed"),
+    ],
+)
+def test_get_tool_config_propagates_hosted_failures(error: Exception) -> None:
+    """Hosted delegate failures propagate instead of selecting standalone mode."""
+    from pydantic import BaseModel
 
-            import otpack.config as cfg
+    from otpack import get_tool_config
 
-            importlib.reload(cfg)
+    class FakeConfig(BaseModel):
+        timeout: int = 30
 
-            # Patch the delegating call
-            with patch.object(
-                mock_ot_config, "get_tool_config", return_value=fake_config
-            ) as ot_mock:
-                result = cfg.get_tool_config("sample_pack", FakeConfig)
-                # The result should come from the ot.config delegation
-                assert result is not None
-        finally:
-            if original_ot is None:
-                sys.modules.pop("ot", None)
-            else:
-                sys.modules["ot"] = original_ot
-            if original_ot_config is None:
-                sys.modules.pop("ot.config", None)
-            else:
-                sys.modules["ot.config"] = original_ot_config
+    mock_ot_config = MagicMock()
+    mock_ot_config.get_tool_config.side_effect = error
+
+    with (
+        patch.dict(sys.modules, {"ot.config": mock_ot_config}),
+        pytest.raises(type(error), match=str(error)),
+    ):
+        get_tool_config("sample", FakeConfig)
+
+    mock_ot_config.get_tool_config.assert_called_once_with("sample", FakeConfig)
 
 
 @pytest.mark.unit
@@ -80,6 +85,7 @@ def test_get_secret_delegates_to_ot_config() -> None:
         importlib.reload(cfg)
 
         result = cfg.get_secret("MY_API_KEY")
+        assert result == "test-api-key"
         mock_secrets.get_secret.assert_called_once_with("MY_API_KEY")
     finally:
         if original_ot is None:
