@@ -8,6 +8,7 @@ set positional-arguments := true
 ot_config := justfile_directory() + "/.onetool/onetool.yaml"
 ot_dir := justfile_directory() + "/.onetool"
 direct_port := "8765"
+production_python_roots := "src/ packages/onetool-pack/src/"
 
 # Default: show available commands
 default:
@@ -65,9 +66,9 @@ test-setup:
     @rm -f /tmp/ot-test-data.zip tests/data/README.md
     @echo "=== Test data ready at tests/data/ ==="
 
-# Run tests with coverage report
+# Run non-integration tests with coverage for every shipped Python package
 test-coverage:
-    uv run pytest --cov=onetool --cov-report=html
+    uv run --all-extras pytest -m "not integration" --cov --cov-report=html:tmp/htmlcov
 
 # ============================================================================
 # CODE QUALITY
@@ -75,19 +76,19 @@ test-coverage:
 
 # Lint code with ruff
 lint:
-    uv run ruff check src/
+    uv run ruff check {{ production_python_roots }}
 
 # Lint and auto-fix issues
 lint-fix:
-    uv run ruff check --fix src/
+    uv run ruff check --fix {{ production_python_roots }}
 
 # Format code with ruff
 fmt:
-    uv run ruff format src/
+    uv run ruff format {{ production_python_roots }}
 
 # Check formatting without changes
 fmt-check:
-    uv run ruff format --check src/
+    uv run ruff format --check {{ production_python_roots }}
 
 # Type check with mypy
 typecheck:

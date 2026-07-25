@@ -171,6 +171,9 @@ known-first-party = ["ot", "ottools", "onetool", "otdev", "otutil", "otpack"]
 "src/ottools/console.py" = ["UP006"]
 "src/ot/executor/*.py" = ["TC003"]
 
+[tool.coverage.run]
+source = ["ot", "ottools", "onetool", "otdev", "otutil", "otpack"]
+
 [tool.mypy]
 python_version = "3.12"
 cache_dir = "tmp/.mypy_cache"

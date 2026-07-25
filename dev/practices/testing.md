@@ -27,7 +27,7 @@ just test              # all tests (strict - errors on missing requirements)
 just test-lenient      # skip tests with missing requirements
 just test-unit         # unit tests only
 just test-integration  # integration tests only
-just test-coverage     # with coverage report
+just test-coverage     # non-integration coverage for every shipped package
 ```
 
 **Direct pytest usage:**

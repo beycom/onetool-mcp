@@ -21,16 +21,16 @@ just test-unit         # unit tests only
 just test-int          # integration tests only
 just test-all          # all tests including integration, strict
 just test-setup        # download test data into tests/data/
-just test-coverage     # with HTML coverage report (tmp/htmlcov/)
+just test-coverage     # non-integration tests, all shipped packages (tmp/htmlcov/)
 ```
 
 ## Code Quality
 
 ```bash
-just lint          # check lint issues (ruff check src/)
+just lint          # check shipped sources (src/ and packages/onetool-pack/src/)
 just lint-fix      # auto-fix lint issues
-just fmt           # format code (ruff format src/)
-just fmt-check     # check formatting without changes
+just fmt           # format shipped sources
+just fmt-check     # check shipped-source formatting without changes
 just typecheck     # run mypy
 just deps-check    # check for unused dependencies (deptry)
 just secrets-check # scan for leaked secrets (gitleaks)
