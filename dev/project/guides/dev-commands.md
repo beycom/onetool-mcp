@@ -11,6 +11,36 @@ just check          # run lint + typecheck + test (use before every commit)
 just dev            # run MCP server in dev mode
 ```
 
+## Worktrees
+
+Install [WTP](https://github.com/satococoa/wtp), then create a new branch and
+bootstrapped worktree:
+
+```bash
+brew install satococoa/tap/wtp
+just worktree-new feature/my-change       # branch from main
+just worktree-new hotfix/urgent v2.0.0    # branch from another ref
+```
+
+The recipe prints the new worktree's absolute path and a shell-safe `cd`
+command. It cannot change the calling shell's directory, so run the printed
+command before starting development.
+
+Worktrees use the final component of the branch name, so
+`feature/my-change` is created at `../onetool-mcp-worktrees/my-change` while
+the Git branch remains `feature/my-change`. Final components must therefore be
+unique across active worktrees.
+
+WTP applies the repository's `.wtp.yml` hooks before the recipe moves the
+worktree to its flat path and installs its locked `.venv`. Each worktree gets
+its own Codex/Claude configuration and OneTool configuration while sharing
+maintained agent skills, work-in-progress artifacts, and OneTool secrets.
+
+Start a fresh Codex or Claude session from the new worktree when testing MCP
+changes. This ensures the client launches that worktree's
+`.venv/bin/onetool`, rather than retaining an MCP process from another
+checkout.
+
 ## Testing
 
 ```bash

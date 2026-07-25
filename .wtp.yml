@@ -1,0 +1,64 @@
+version: "1.0"
+
+defaults:
+  # Keep this repository's worktrees together without colliding with sibling
+  # projects that also use wtp.
+  base_dir: "../onetool-mcp-worktrees"
+
+hooks:
+  post_create:
+    # Share local planning and agent artifacts across worktrees.
+    - type: symlink
+      from: "wip"
+      to: "wip"
+
+    # Snapshot per-worktree agent settings, but share the maintained skills.
+    - type: copy
+      from: ".codex/config.toml"
+      to: ".codex/config.toml"
+
+    - type: symlink
+      from: ".codex/skills"
+      to: ".codex/skills"
+
+    - type: copy
+      from: ".claude/settings.local.json"
+      to: ".claude/settings.local.json"
+
+    - type: symlink
+      from: ".claude/commands"
+      to: ".claude/commands"
+
+    - type: symlink
+      from: ".claude/skills"
+      to: ".claude/skills"
+
+    - type: copy
+      from: ".mcp.json"
+      to: ".mcp.json"
+
+    # Copy configuration inputs so each worktree can evolve independently.
+    # Runtime, state, data, auth, telemetry, and backup files remain local.
+    - type: copy
+      from: ".onetool/onetool.yaml"
+      to: ".onetool/onetool.yaml"
+
+    - type: copy
+      from: ".onetool/servers.yaml"
+      to: ".onetool/servers.yaml"
+
+    - type: copy
+      from: ".onetool/handoff.yaml"
+      to: ".onetool/handoff.yaml"
+
+    - type: copy
+      from: ".onetool/my-snippets.yaml"
+      to: ".onetool/my-snippets.yaml"
+
+    # Keep one secret source instead of duplicating credentials per worktree.
+    - type: symlink
+      from: ".onetool/secrets.yaml"
+      to: ".onetool/secrets.yaml"
+
+    # `just worktree-new` builds .venv after moving slash-named branches to
+    # their final flat path, so generated entry points contain the right path.

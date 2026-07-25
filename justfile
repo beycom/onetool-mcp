@@ -25,6 +25,55 @@ install:
 install-locked:
     uv sync --locked --group dev --all-extras
 
+# Create a new branch in a flat, fully bootstrapped WTP worktree
+worktree-new branch base="main":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v wtp >/dev/null 2>&1; then
+        echo "wtp is required. Install it with: brew install satococoa/tap/wtp" >&2
+        exit 127
+    fi
+    branch={{ quote(branch) }}
+    base={{ quote(base) }}
+    worktree_name="${branch##*/}"
+    main_worktree="$(wtp cd @)"
+    main_parent="$(cd "$(dirname "$main_worktree")" && pwd -P)"
+    worktree_base="$main_parent/onetool-mcp-worktrees"
+    flat_path="$worktree_base/$worktree_name"
+
+    if [[ -z "$worktree_name" ]]; then
+        echo "branch must end with a worktree name" >&2
+        exit 2
+    fi
+    if [[ -e "$flat_path" || -L "$flat_path" ]]; then
+        echo "worktree destination already exists: $flat_path" >&2
+        exit 1
+    fi
+
+    worktree_path="$(wtp add -b "$branch" "$base" --quiet)"
+    case "$worktree_path/" in
+        "$worktree_base/"*) ;;
+        *)
+            echo "wtp created an unexpected path outside $worktree_base: $worktree_path" >&2
+            exit 1
+            ;;
+    esac
+
+    if [[ "$worktree_path" != "$flat_path" ]]; then
+        old_parent="$(dirname "$worktree_path")"
+        git worktree move "$worktree_path" "$flat_path"
+        worktree_path="$flat_path"
+
+        while [[ "$old_parent" != "$worktree_base" ]]; do
+            rmdir "$old_parent" 2>/dev/null || break
+            old_parent="$(dirname "$old_parent")"
+        done
+    fi
+
+    (cd "$worktree_path" && just install-locked)
+    printf 'Created worktree: %s\n' "$worktree_path"
+    printf 'Enter it with: cd %q\n' "$worktree_path"
+
 # Run all quality checks (lint, typecheck, test)
 check: lint typecheck test
 

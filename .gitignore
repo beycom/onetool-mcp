@@ -100,7 +100,7 @@ diagrams/
 .localhist/
 msg/
 plan/
-wip/
+/wip
 openspec/changes/archive/
 openspec/consult/
 global/
@@ -128,6 +128,9 @@ demo/tmp/
 
 # Worktree state files
 .gitworktree.json
+
+# Local skill installer state
+/skills-lock.json
 
 
 # Explore test outputs (local state)
