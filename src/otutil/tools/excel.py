@@ -45,9 +45,12 @@ __ot_requires__ = {
 }
 
 import fnmatch
+import os
 import re
+import tempfile
 from datetime import date, datetime, time
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import Any
 
 try:
     from openpyxl import Workbook, load_workbook
@@ -61,9 +64,6 @@ except ImportError as _openpyxl_err:
         "Install with: pip install onetool-mcp[util]"
     ) from _openpyxl_err
 from otpack import LogSpan, resolve_cwd_path
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 def _expand_path(filepath: str) -> Path:
@@ -93,6 +93,40 @@ def _ensure_parent_dir(filepath: str) -> None:
     parent = _expand_path(filepath).parent
     if parent and not parent.exists():
         parent.mkdir(parents=True, exist_ok=True)
+
+
+def _validate_saved_workbook(path: Path) -> None:
+    """Open a staged workbook to prove the archive is loadable."""
+    validated = load_workbook(path, read_only=True)
+    validated.close()
+
+
+def _safe_save_workbook(wb: Workbook, target: Path) -> None:
+    """Save, validate, and atomically replace a workbook in one owned lifecycle."""
+    temp_path: Path | None = None
+    workbook_closed = False
+    try:
+        suffix = target.suffix or ".xlsx"
+        fd, temp_name = tempfile.mkstemp(
+            prefix=f".{target.name}.tmp-",
+            suffix=suffix,
+            dir=target.parent,
+        )
+        temp_path = Path(temp_name)
+        os.close(fd)
+        wb.save(temp_path)
+        wb.close()
+        workbook_closed = True
+        _validate_saved_workbook(temp_path)
+        temp_path.replace(target)
+        temp_path = None
+    finally:
+        try:
+            if not workbook_closed:
+                wb.close()
+        finally:
+            if temp_path is not None:
+                temp_path.unlink(missing_ok=True)
 
 
 def _get_sheet(wb: Workbook, sheet_name: str | None) -> tuple[Any, str | None]:
@@ -160,7 +194,7 @@ def create(
                     wb.create_sheet(name)
             else:
                 ws.title = sheet_name
-            wb.save(_expand_path(filepath))
+            _safe_save_workbook(wb, _expand_path(filepath))
             s.add(created=True)
             return f"Created workbook: {filepath}"
         except Exception as e:
@@ -197,7 +231,7 @@ def add_sheet(*, filepath: str, sheet_name: str) -> str:
                 return f"Error: Sheet '{sheet_name}' already exists"
 
             wb.create_sheet(title=sheet_name)
-            wb.save(_expand_path(filepath))
+            _safe_save_workbook(wb, _expand_path(filepath))
             s.add(created=True)
             return f"Created sheet: {sheet_name}"
         except Exception as e:
@@ -349,7 +383,7 @@ def write(
                         value=value,
                     )
 
-            wb.save(_expand_path(filepath))
+            _safe_save_workbook(wb, _expand_path(filepath))
             sheet_used = sheet_name or ws.title
             s.add(written=True)
             return f"Wrote {len(data)} {_plural(len(data), 'row')} to {sheet_used}"
@@ -452,7 +486,7 @@ def formula(
             formula_str = formula if formula.startswith("=") else f"={formula}"
 
             ws[cell] = formula_str
-            wb.save(_expand_path(filepath))
+            _safe_save_workbook(wb, _expand_path(filepath))
             s.add(applied=True)
             return f"Applied formula to {cell}: {formula_str}"
         except Exception as e:
@@ -851,8 +885,7 @@ def insert_rows(
                 return err
 
             ws.insert_rows(row, count)
-            wb.save(_expand_path(filepath))
-            wb.close()
+            _safe_save_workbook(wb, _expand_path(filepath))
             s.add(inserted=count)
             return f"Inserted {count} {_plural(count, 'row')} at row {row}"
         except Exception as e:
@@ -897,8 +930,7 @@ def delete_rows(
                 return err
 
             ws.delete_rows(row, count)
-            wb.save(_expand_path(filepath))
-            wb.close()
+            _safe_save_workbook(wb, _expand_path(filepath))
             s.add(deleted=count)
             return f"Deleted {count} {_plural(count, 'row')} starting at row {row}"
         except Exception as e:
@@ -946,8 +978,7 @@ def insert_cols(
             col_idx = _col_to_index(col)
             col_letter = get_column_letter(col_idx)
             ws.insert_cols(col_idx, count)
-            wb.save(_expand_path(filepath))
-            wb.close()
+            _safe_save_workbook(wb, _expand_path(filepath))
             s.add(inserted=count)
             return f"Inserted {count} {_plural(count, 'column')} at column {col_letter}"
         except Exception as e:
@@ -994,8 +1025,7 @@ def delete_cols(
             col_idx = _col_to_index(col)
             col_letter = get_column_letter(col_idx)
             ws.delete_cols(col_idx, count)
-            wb.save(_expand_path(filepath))
-            wb.close()
+            _safe_save_workbook(wb, _expand_path(filepath))
             s.add(deleted=count)
             return f"Deleted {count} {_plural(count, 'column')} starting at column {col_letter}"
         except Exception as e:
@@ -1084,8 +1114,7 @@ def copy_range(
             dest_end_row = target_row + src_range.max_row - src_range.min_row
             dest_range = f"{target_cell}:{dest_end_col}{dest_end_row}"
 
-            wb.save(_expand_path(filepath))
-            wb.close()
+            _safe_save_workbook(wb, _expand_path(filepath))
             s.add(copied=True)
             return f"Copied {source_range} to {dest_range}"
         except Exception as e:
@@ -1150,8 +1179,7 @@ def create_table(
             table.tableStyleInfo = style
             ws.add_table(table)
 
-            wb.save(_expand_path(filepath))
-            wb.close()
+            _safe_save_workbook(wb, _expand_path(filepath))
             s.add(created=table_name)
             return f"Created table '{table_name}' from {data_range}"
         except Exception as e:
