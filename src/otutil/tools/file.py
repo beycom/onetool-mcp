@@ -51,6 +51,7 @@ __all__ = [
 ]
 
 import builtins
+import errno
 import fnmatch
 import os
 import re
@@ -2148,21 +2149,149 @@ def delete(
             return f"Error: {e}"
 
 
-def copy(
-    *, source: str, dest: str, follow_symlinks: bool = True, overwrite: bool = False
-) -> str:
+def _open_copy_source(
+    path: str | Path,
+    *,
+    display_path: Path,
+    dir_fd: int | None = None,
+) -> tuple[int, os.stat_result]:
+    """Open a copy source without following a symlink at the final component."""
+    no_follow = getattr(os, "O_NOFOLLOW", 0)
+    if no_follow == 0:
+        raise OSError(errno.ENOTSUP, "No-follow file opens are unavailable")
+
+    flags = (
+        os.O_RDONLY
+        | no_follow
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
+    try:
+        descriptor = os.open(path, flags, dir_fd=dir_fd)
+    except OSError as exc:
+        if exc.errno in {errno.ELOOP, errno.EMLINK}:
+            raise ValueError(
+                f"Symlinks are not allowed in copy source: {display_path}"
+            ) from exc
+        raise
+
+    source_stat = os.fstat(descriptor)
+    if stat.S_ISLNK(source_stat.st_mode):
+        os.close(descriptor)
+        raise ValueError(f"Symlinks are not allowed in copy source: {display_path}")
+    return descriptor, source_stat
+
+
+def _apply_copy_metadata(destination: Path, source_stat: os.stat_result) -> None:
+    """Apply portable mode and timestamp metadata without following links."""
+    destination.chmod(stat.S_IMODE(source_stat.st_mode), follow_symlinks=False)
+    os.utime(
+        destination,
+        ns=(source_stat.st_atime_ns, source_stat.st_mtime_ns),
+        follow_symlinks=False,
+    )
+
+
+def _copy_regular_descriptor(
+    source_fd: int,
+    destination: Path,
+    source_stat: os.stat_result,
+    *,
+    destination_fd: int | None = None,
+) -> None:
+    """Copy regular-file bytes from an already no-follow-open descriptor."""
+    destination_file = (
+        os.fdopen(os.dup(destination_fd), "wb")
+        if destination_fd is not None
+        else destination.open("xb")
+    )
+    with (
+        os.fdopen(os.dup(source_fd), "rb") as source_file,
+        destination_file,
+    ):
+        shutil.copyfileobj(source_file, destination_file)
+        destination_file.flush()
+        os.fsync(destination_file.fileno())
+    _apply_copy_metadata(destination, source_stat)
+
+
+def _copy_directory_descriptor(
+    source_fd: int,
+    source_path: Path,
+    destination: Path,
+    source_stat: os.stat_result,
+    exclude_patterns: builtins.list[str],
+) -> None:
+    """Recursively copy a directory using descriptor-relative no-follow opens."""
+    for name in sorted(os.listdir(source_fd)):
+        source_entry = source_path / name
+        if is_path_excluded(source_entry, exclude_patterns):
+            raise ValueError(
+                f"Access denied: path matches exclude pattern: {source_entry}"
+            )
+
+        entry_fd, entry_stat = _open_copy_source(
+            name,
+            display_path=source_entry,
+            dir_fd=source_fd,
+        )
+        destination_entry = destination / name
+        try:
+            if stat.S_ISREG(entry_stat.st_mode):
+                _copy_regular_descriptor(entry_fd, destination_entry, entry_stat)
+            elif stat.S_ISDIR(entry_stat.st_mode):
+                destination_entry.mkdir(mode=stat.S_IMODE(entry_stat.st_mode))
+                _copy_directory_descriptor(
+                    entry_fd,
+                    source_entry,
+                    destination_entry,
+                    entry_stat,
+                    exclude_patterns,
+                )
+            else:
+                raise ValueError(
+                    f"Unsupported source entry type for copy: {source_entry}"
+                )
+        finally:
+            os.close(entry_fd)
+
+    _apply_copy_metadata(destination, source_stat)
+
+
+def _validate_staged_copy(path: Path) -> None:
+    """Reject any link in the private staging result before publication."""
+    if stat.S_ISLNK(path.lstat().st_mode):
+        raise ValueError(f"Symlink found in staged copy: {path}")
+    for entry in path.rglob("*"):
+        if stat.S_ISLNK(entry.lstat().st_mode):
+            raise ValueError(f"Symlink found in staged copy: {entry}")
+
+
+def _remove_copy_stage(path: Path | None) -> None:
+    """Remove an unpublished file, directory, or link staging path."""
+    if path is None:
+        return
+    try:
+        mode = path.lstat().st_mode
+    except FileNotFoundError:
+        return
+    if stat.S_ISDIR(mode):
+        shutil.rmtree(path)
+    else:
+        path.unlink()
+
+
+def copy(*, source: str, dest: str, overwrite: bool = False) -> str:
     """Copy a file or directory.
 
-    For files, copies content and metadata. For directories, copies
-    the entire tree recursively. By default, symlinks are followed
-    (copied as their target content) for security. Use follow_symlinks=False
-    to copy symlinks as links. Refuses to replace an existing destination
-    unless overwrite=True.
+    Copies regular files and link-free directory trees without dereferencing
+    symlinks. The completed copy is published atomically from a unique staging
+    path beside the destination. Refuses to replace an existing destination
+    unless ``overwrite=True`` for a regular file.
 
     Args:
         source: Source path
         dest: Destination path
-        follow_symlinks: If True, copy symlink targets; if False, copy as links (default: True)
         overwrite: If True, allow replacing an existing destination file (default: False)
 
     Returns:
@@ -2171,7 +2300,6 @@ def copy(
     Example:
         file.copy(source="config.yaml", dest="config.backup.yaml")
         file.copy(source="src/", dest="src_backup/")
-        file.copy(source="src/", dest="backup/", follow_symlinks=False)  # Preserve symlinks
     """
     with LogSpan(span="file.copy", source=source, dest=dest) as s:
         src_resolved, error = _validate_path(source, must_exist=True)
@@ -2186,44 +2314,78 @@ def copy(
             return f"Error: {error}"
         assert dest_resolved is not None  # mypy: error check above ensures this
 
-        if not overwrite and dest_resolved.exists() and not src_resolved.is_dir():
-            s.add(error="dest_exists")
-            return f"Error: Destination already exists: {dest}. Use overwrite=True to replace it."
-
+        source_fd: int | None = None
+        stage_path: Path | None = None
         try:
-            if src_resolved.is_file() or (
-                src_resolved.is_symlink() and follow_symlinks
-            ):
-                # Copy file with metadata (follows symlinks by default)
-                shutil.copy2(
-                    src_resolved, dest_resolved, follow_symlinks=follow_symlinks
-                )
-                s.add(copied=True, type="file")
-                return f"OK: Copied file: {source} -> {dest}"
-            elif src_resolved.is_symlink() and not follow_symlinks:
-                # Copy symlink as a link
-                link_target = src_resolved.readlink()
-                dest_resolved.symlink_to(link_target)
-                s.add(copied=True, type="symlink")
-                return f"OK: Copied symlink: {source} -> {dest}"
-            elif src_resolved.is_dir():
-                # Copy directory tree
-                if dest_resolved.exists():
-                    s.add(error="dest_exists")
-                    return f"Error: Destination already exists: {dest}"
-                # symlinks=True preserves symlinks as links, False follows them
-                shutil.copytree(
-                    src_resolved, dest_resolved, symlinks=not follow_symlinks
-                )
-                s.add(copied=True, type="directory")
-                return f"OK: Copied directory: {source} -> {dest}"
-            else:
+            source_fd, source_stat = _open_copy_source(
+                src_resolved,
+                display_path=src_resolved,
+            )
+            source_is_file = stat.S_ISREG(source_stat.st_mode)
+            source_is_directory = stat.S_ISDIR(source_stat.st_mode)
+            if not source_is_file and not source_is_directory:
                 s.add(error="unknown_type")
                 return f"Error: Cannot copy: {source}"
 
-        except OSError as e:
+            if dest_resolved.exists() and (
+                source_is_directory or not overwrite or dest_resolved.is_dir()
+            ):
+                s.add(error="dest_exists")
+                message = f"Error: Destination already exists: {dest}"
+                if source_is_file and not overwrite:
+                    message += ". Use overwrite=True to replace it."
+                return message
+
+            cfg = _get_file_config()
+            if source_is_file:
+                stage_fd, stage_name = tempfile.mkstemp(
+                    prefix=f".{dest_resolved.name}.copy-",
+                    suffix=dest_resolved.suffix,
+                    dir=dest_resolved.parent,
+                )
+                stage_path = Path(stage_name)
+                try:
+                    _copy_regular_descriptor(
+                        source_fd,
+                        stage_path,
+                        source_stat,
+                        destination_fd=stage_fd,
+                    )
+                finally:
+                    os.close(stage_fd)
+                copied_type = "file"
+            else:
+                stage_path = Path(
+                    tempfile.mkdtemp(
+                        prefix=f".{dest_resolved.name}.copy-",
+                        dir=dest_resolved.parent,
+                    )
+                )
+                _copy_directory_descriptor(
+                    source_fd,
+                    src_resolved,
+                    stage_path,
+                    source_stat,
+                    cfg.exclude_patterns,
+                )
+                copied_type = "directory"
+
+            _validate_staged_copy(stage_path)
+            stage_path.replace(dest_resolved)
+            stage_path = None
+            if copied_type == "file":
+                s.add(copied=True, type="file")
+                return f"OK: Copied file: {source} -> {dest}"
+            s.add(copied=True, type="directory")
+            return f"OK: Copied directory: {source} -> {dest}"
+
+        except (OSError, ValueError) as e:
             s.add(error=str(e))
             return f"Error: {e}"
+        finally:
+            if source_fd is not None:
+                os.close(source_fd)
+            _remove_copy_stage(stage_path)
 
 
 def move(*, source: str, dest: str, overwrite: bool = False) -> str:

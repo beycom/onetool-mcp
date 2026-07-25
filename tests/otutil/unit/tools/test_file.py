@@ -6,7 +6,9 @@ Uses tmp_path fixture for isolated test files.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import inspect
+import os
+from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 
 import pytest
@@ -1111,29 +1113,186 @@ def test_delete_dry_run(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 @pytest.mark.tools
-def test_copy_follow_symlinks(tmp_path: Path) -> None:
-    """Verify copy follow_symlinks parameter works (P2)."""
+def test_copy_signature_has_no_symlink_mode() -> None:
+    """Copy exposes only its current no-symlink contract."""
     from otutil.tools.file import copy
 
-    # Create a file and a symlink to it
+    assert tuple(inspect.signature(copy).parameters) == ("source", "dest", "overwrite")
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+@pytest.mark.parametrize("target_kind", ["file", "directory"])
+@pytest.mark.parametrize("link_location", ["top", "nested"])
+@pytest.mark.parametrize("target_location", ["in_bound", "out_of_bound"])
+def test_copy_rejects_every_source_symlink(
+    tmp_path: Path,
+    target_kind: str,
+    link_location: str,
+    target_location: str,
+) -> None:
+    """No source symlink is followed or published."""
+    from otutil.tools.file import copy
+
+    target_root = (
+        tmp_path / "targets"
+        if target_location == "in_bound"
+        else tmp_path.parent / f"{tmp_path.name}-outside"
+    )
+    target_root.mkdir(exist_ok=True)
+    target = target_root / f"secret-{target_kind}"
+    secret = "never-read-secret"
+    if target_kind == "file":
+        target.write_text(secret)
+    else:
+        target.mkdir()
+        (target / "secret.txt").write_text(secret)
+
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    if link_location == "top":
+        source = tmp_path / "source-link"
+        source.symlink_to(target, target_is_directory=target_kind == "directory")
+    else:
+        source = source_root
+        link = source / "nested-link"
+        link.symlink_to(target, target_is_directory=target_kind == "directory")
+        (source / "safe.txt").write_text("safe")
+
+    destination = tmp_path / "destination"
+    result = copy(source=str(source), dest=str(destination))
+
+    assert result.startswith("Error:")
+    assert not destination.exists()
+    assert list(tmp_path.glob(f".{destination.name}.copy-*")) == []
+    assert secret not in result
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_copy_symlink_failure_preserves_existing_destination(tmp_path: Path) -> None:
+    """A rejected source link cannot alter an overwrite destination."""
+    from otutil.tools.file import copy
+
+    target = tmp_path / "target.txt"
+    target.write_bytes(b"target bytes must not be read")
+    source = tmp_path / "source-link"
+    source.symlink_to(target)
+    destination = tmp_path / "destination.txt"
+    original = b"existing destination bytes"
+    destination.write_bytes(original)
+
+    result = copy(source=str(source), dest=str(destination), overwrite=True)
+
+    assert result.startswith("Error:")
+    assert destination.read_bytes() == original
+    assert list(tmp_path.glob(f".{destination.name}.copy-*")) == []
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_copy_rejects_entry_swapped_to_symlink_after_discovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Descriptor-relative opening rejects a deterministic traversal race."""
+    from otutil.tools import file as file_tool
+
+    source = tmp_path / "source"
+    source.mkdir()
+    victim = source / "victim.txt"
+    victim.write_bytes(b"safe source bytes")
+    target = tmp_path / "secret.txt"
+    secret = b"target bytes must never be read"
+    target.write_bytes(secret)
+    destination = tmp_path / "destination"
+    original_listdir = os.listdir
+    original_fdopen = os.fdopen
+    target_identity = (target.stat().st_dev, target.stat().st_ino)
+    swapped = False
+    target_opened_for_read = False
+
+    def swap_after_discovery(path: int | str | os.PathLike[str]) -> list[str]:
+        nonlocal swapped
+        names = original_listdir(path)
+        if not swapped and "victim.txt" in names:
+            victim.unlink()
+            victim.symlink_to(target)
+            swapped = True
+        return names
+
+    def track_opened_descriptor(
+        descriptor: int, *args: Any, **kwargs: Any
+    ) -> Any:
+        nonlocal target_opened_for_read
+        descriptor_stat = os.fstat(descriptor)
+        if (descriptor_stat.st_dev, descriptor_stat.st_ino) == target_identity:
+            target_opened_for_read = True
+        return original_fdopen(descriptor, *args, **kwargs)
+
+    monkeypatch.setattr("otutil.tools.file.os.listdir", swap_after_discovery)
+    monkeypatch.setattr("otutil.tools.file.os.fdopen", track_opened_descriptor)
+
+    result = file_tool.copy(source=str(source), dest=str(destination))
+
+    assert swapped
+    assert result.startswith("Error:")
+    assert not target_opened_for_read
+    assert not destination.exists()
+    assert list(tmp_path.glob(f".{destination.name}.copy-*")) == []
+    assert not any(
+        path.is_file() and secret in path.read_bytes()
+        for path in tmp_path.rglob("*")
+        if not path.is_symlink() and path != target
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+def test_copy_directory_tree_and_file_overwrite(tmp_path: Path) -> None:
+    """Regular directory and overwrite behavior remain supported."""
+    from otutil.tools.file import copy
+
+    source_dir = tmp_path / "source"
+    nested = source_dir / "nested"
+    nested.mkdir(parents=True)
+    (source_dir / "root.txt").write_text("root")
+    (nested / "child.txt").write_text("child")
+    destination_dir = tmp_path / "destination"
+
+    directory_result = copy(source=str(source_dir), dest=str(destination_dir))
+
+    assert directory_result.startswith("OK:")
+    assert (destination_dir / "root.txt").read_text() == "root"
+    assert (destination_dir / "nested" / "child.txt").read_text() == "child"
+    original_tree = {
+        path.relative_to(destination_dir): path.read_bytes()
+        for path in destination_dir.rglob("*")
+        if path.is_file()
+    }
+
+    (source_dir / "root.txt").write_text("changed")
+    existing_result = copy(source=str(source_dir), dest=str(destination_dir))
+
+    assert existing_result == f"Error: Destination already exists: {destination_dir}"
+    assert {
+        path.relative_to(destination_dir): path.read_bytes()
+        for path in destination_dir.rglob("*")
+        if path.is_file()
+    } == original_tree
+
     source_file = tmp_path / "source.txt"
-    source_file.write_text("content")
-    symlink = tmp_path / "link.txt"
-    symlink.symlink_to(source_file)
-    dest = tmp_path / "dest.txt"
+    source_file.write_bytes(b"replacement")
+    destination_file = tmp_path / "destination.txt"
+    destination_file.write_bytes(b"original")
 
-    # Default: follow symlinks (copy content)
-    result = copy(source=str(symlink), dest=str(dest))
-    assert "OK" in result
-    assert dest.is_file() and not dest.is_symlink()
+    file_result = copy(
+        source=str(source_file),
+        dest=str(destination_file),
+        overwrite=True,
+    )
 
-    # Clean up for next test
-    dest.unlink()
-
-    # Without follow: copy as symlink
-    result = copy(source=str(symlink), dest=str(dest), follow_symlinks=False)
-    assert "OK" in result
-    assert dest.is_symlink()
+    assert file_result.startswith("OK:")
+    assert destination_file.read_bytes() == b"replacement"
 
 
 # =============================================================================

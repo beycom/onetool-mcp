@@ -106,7 +106,7 @@ excel.write(filepath: str, data: list[list[Any]], sheet_name: str | None=None, s
 
 ## file, f
 ```python
-file.copy(source: str, dest: str, follow_symlinks: bool=True, overwrite: bool=False)  # Copy a file or directory.
+file.copy(source: str, dest: str, overwrite: bool=False)  # Copy a file or directory.
 file.delete(path: str, backup: bool=True, recursive: bool=False, dry_run: bool=False)  # Delete a file or directory.
 file.edit(path: str, old_text: str, new_text: str, occurrence: int | None=None, encoding: str='utf-8', dry_run: bool=False)  # Edit a file by replacing text.
 file.grep(pattern: str, path: str='.', glob: str | None=None, context: int=2, case_sensitive: bool=True, max_matches: int=500, fixed_strings: bool=False, gitignore: bool=True)  # Search file contents with regex (pure Python, no external tools required).

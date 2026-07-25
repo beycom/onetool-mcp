@@ -53,7 +53,7 @@ Short alias: `f`
 
 | Function | Description |
 |----------|-------------|
-| `file.copy(source, dest, follow_symlinks)` | Copy file or directory |
+| `file.copy(source, dest, overwrite)` | Atomically copy a regular file or link-free directory |
 | `file.move(source, dest)` | Move or rename file or directory |
 | `file.delete(path, backup, recursive, dry_run)` | Delete file or directory |
 
@@ -76,7 +76,7 @@ Short alias: `f`
 | `encoding` | str | Character encoding (default: utf-8) |
 | `dry_run` | bool | Show what would happen without making changes |
 | `recursive` | bool | Delete non-empty directories |
-| `follow_symlinks` | bool | Follow symlinks or treat as links |
+| `follow_symlinks` | bool | Follow symlinks for `file.info` or `file.list` |
 | `include_hidden` | bool | Include hidden files and path segments in `file.resolve` (default: `true`) and hidden files in listing/search helpers when supported |
 | `context` | int | Context lines before/after each match in grep (default: 2) |
 | `max_matches` | int | Max total grep matches before stopping (default: 500) |
@@ -290,9 +290,6 @@ file.copy(source="config.yaml", dest="config.backup.yaml")
 
 # Copy directory
 file.copy(source="src/", dest="src_backup/")
-
-# Copy preserving symlinks
-file.copy(source="src/", dest="backup/", follow_symlinks=False)
 
 # Move/rename file
 file.move(source="old_name.py", dest="new_name.py")
