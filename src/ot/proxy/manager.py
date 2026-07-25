@@ -115,6 +115,8 @@ class ProxyManager:
         self._initialized = False
         self._loop: asyncio.AbstractEventLoop | None = None
         self._connect_task: asyncio.Task[None] | None = None
+        self._lifecycle_task: asyncio.Task[None] | None = None
+        self._lifecycle_lock = asyncio.Lock()
         self._mutation_lock = threading.RLock()
 
     @property
@@ -124,8 +126,11 @@ class ProxyManager:
 
     @property
     def is_connecting(self) -> bool:
-        """True if a background connection task is still in progress."""
-        return self._connect_task is not None and not self._connect_task.done()
+        """True if a background connect or reconnect is still in progress."""
+        return any(
+            task is not None and not task.done()
+            for task in (self._connect_task, self._lifecycle_task)
+        )
 
     @property
     def tool_count(self) -> int:
@@ -560,16 +565,27 @@ class ProxyManager:
                         )
                         return False
 
-                results = await asyncio.gather(
-                    *(connect_one(name, config) for name, config in enabled_configs.items())
-                )
+                connection_tasks = [
+                    asyncio.create_task(connect_one(name, config))
+                    for name, config in enabled_configs.items()
+                ]
+                try:
+                    results = await asyncio.gather(*connection_tasks)
+                except asyncio.CancelledError:
+                    for task in connection_tasks:
+                        task.cancel()
+                    await asyncio.gather(*connection_tasks, return_exceptions=True)
+                    raise
                 connected = sum(1 for result in results if result)
                 failed = len(results) - connected
 
                 span.add("connected", connected)
                 span.add("failed", failed)
                 span.add("toolCount", self.tool_count)
-        finally:
+        except asyncio.CancelledError:
+            self._initialized = False
+            raise
+        else:
             self._initialized = True
 
     def connect_background(self, configs: dict[str, McpServerConfig]) -> asyncio.Task[None]:
@@ -726,6 +742,7 @@ class ProxyManager:
             self._server_instructions.clear()
             self._initialized = False
             self._connect_task = None
+            self._lifecycle_task = None
 
     async def _close_client_transport(self, client: Client) -> None:  # type: ignore[type-arg]
         """Close the underlying transport when FastMCP exposes an async close hook."""
@@ -733,36 +750,64 @@ class ProxyManager:
         if transport is not None and hasattr(transport, "close"):
             await transport.close()
 
-    async def shutdown(self) -> None:
-        """Disconnect from all MCP servers."""
+    async def _shutdown_unlocked(self) -> None:
+        """Disconnect after the caller serializes the lifecycle transition."""
         # Cancel background connect task if still running
-        if self._connect_task is not None and not self._connect_task.done():
-            self._connect_task.cancel()
+        connect_task = self._connect_task
+        if connect_task is not None and not connect_task.done():
+            connect_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
-                await self._connect_task
-        self._connect_task = None
+                await connect_task
+        if self._connect_task is connect_task:
+            self._connect_task = None
 
-        if not self._clients:
-            return
+        clients = list(self._clients.items())
+        if clients:
+            with LogSpan(span="proxy.shutdown", serverCount=len(clients)):
+                for name, client in clients:
+                    try:
+                        await client.__aexit__(None, None, None)  # type: ignore[no-untyped-call]
+                        # transport.close() terminates stdio subprocesses left alive
+                        # by FastMCP keep_alive after __aexit__ exits the session.
+                        await self._close_client_transport(client)
+                        logger.debug(f"Disconnected from MCP server '{name}'")
+                    except (Exception, asyncio.CancelledError) as e:
+                        logger.debug(f"Error disconnecting from '{name}': {e}")
 
-        with LogSpan(span="proxy.shutdown", serverCount=len(self._clients)):
-            for name, client in list(self._clients.items()):
-                try:
-                    await client.__aexit__(None, None, None)  # type: ignore[no-untyped-call]
-                    # transport.close() terminates stdio subprocesses left alive by
-                    # FastMCP keep_alive after __aexit__ exits the session.
-                    await self._close_client_transport(client)
-                    logger.debug(f"Disconnected from MCP server '{name}'")
-                except (Exception, asyncio.CancelledError) as e:
-                    logger.debug(f"Error disconnecting from '{name}': {e}")
+        with self._mutation_lock:
+            self._clients.clear()
+            self._tools_by_server.clear()
+            self._errors.clear()
+            self._server_timeouts.clear()
+            self._server_instructions.clear()
+            self._initialized = False
 
-            with self._mutation_lock:
-                self._clients.clear()
-                self._tools_by_server.clear()
-                self._errors.clear()
-                self._server_timeouts.clear()
-                self._server_instructions.clear()
-                self._initialized = False
+    async def shutdown(self) -> None:
+        """Serialize shutdown and leave every connection state reconnectable."""
+        async with self._lifecycle_lock:
+            await self._shutdown_unlocked()
+
+    def _finish_lifecycle_task(self, task: asyncio.Task[None]) -> None:
+        """Observe background reconnect failures and clear readiness state."""
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.warning(LogEntry(event="proxy.reconnect.failed").failure(e))
+        finally:
+            if self._lifecycle_task is task:
+                self._lifecycle_task = None
+
+    def _start_background_reconnect(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        configs: dict[str, McpServerConfig],
+    ) -> None:
+        """Schedule same-loop reconnect while preserving the immediate return."""
+        task = loop.create_task(self.reconnect(configs))
+        self._lifecycle_task = task
+        task.add_done_callback(self._finish_lifecycle_task)
 
     def _evict_proxy_caches(self, name: str | None) -> None:
         """Evict per-server proxy resolution caches so a restart binds to the new schema.
@@ -784,18 +829,13 @@ class ProxyManager:
         reset()
 
     async def reconnect(self, configs: dict[str, McpServerConfig]) -> None:
-        """Reconnect to all MCP servers.
-
-        Shuts down existing connections and reconnects with fresh config.
-
-        Args:
-            configs: Dictionary of server name -> configuration.
-        """
-        await self.shutdown()
-        await self.connect(configs)
-        # D14: schemas may have changed across the restart — drop all cached proxy
-        # resolutions so subsequent calls bind against the fresh tool lists.
-        self._evict_proxy_caches(None)
+        """Serialize full cleanup before connecting a fresh configuration."""
+        async with self._lifecycle_lock:
+            await self._shutdown_unlocked()
+            await self.connect(configs)
+            # D14: schemas may have changed across the restart — drop all cached
+            # proxy resolutions so later calls bind against the fresh tool lists.
+            self._evict_proxy_caches(None)
 
     async def connect_additional(self, name: str, config: McpServerConfig) -> str:
         """Connect a single new server without disrupting existing connections.
@@ -920,7 +960,9 @@ class ProxyManager:
     def reconnect_sync(self, configs: dict[str, McpServerConfig]) -> None:
         """Synchronously reconnect to all MCP servers.
 
-        Blocking wrapper for reconnect, suitable for calling from sync code.
+        Cross-thread callers block for completion. Same-loop callers retain the
+        immediate reload contract while a serialized background reconnect drives
+        readiness to its eventual connected or failed state.
 
         Args:
             configs: Dictionary of server name -> configuration.
@@ -942,8 +984,7 @@ class ProxyManager:
         with contextlib.suppress(RuntimeError):
             running_loop = asyncio.get_running_loop()
             if running_loop is loop:
-                self._reset_state()
-                self._connect_task = loop.create_task(self.connect(configs))
+                self._start_background_reconnect(loop, configs)
                 return
 
         future = asyncio.run_coroutine_threadsafe(

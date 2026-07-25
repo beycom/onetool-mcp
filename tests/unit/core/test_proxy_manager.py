@@ -26,6 +26,7 @@ class TestProxyManager:
         assert manager._initialized is False
         assert manager._loop is None
         assert manager._connect_task is None
+        assert manager._lifecycle_task is None
 
     def test_get_server_timeout_returns_configured_value(self) -> None:
         """Should return the timeout stored for a connected server."""
@@ -133,7 +134,9 @@ class TestProxyManagerReconnectSync:
             patch.object(manager, "connect", side_effect=fake_connect) as mock_connect,
         ):
             manager.reconnect_sync(configs)
-            await asyncio.wait_for(manager._connect_task, timeout=1)
+            lifecycle_task = manager._lifecycle_task
+            assert lifecycle_task is not None
+            await asyncio.wait_for(lifecycle_task, timeout=1)
 
         mock_threadsafe.assert_not_called()
         mock_connect.assert_called_once_with(configs)
@@ -648,8 +651,8 @@ class TestProxyManagerCancelledError:
     """Tests for CancelledError handling in connect() and _connect_server()."""
 
     @pytest.mark.asyncio
-    async def test_connect_sets_initialized_on_cancellation(self) -> None:
-        """_initialized must be True even when CancelledError aborts the loop."""
+    async def test_connect_remains_reconnectable_on_cancellation(self) -> None:
+        """Cancelled initialization must not leave the manager initialized."""
         from ot.config.models import McpServerConfig
 
         manager = ProxyManager()
@@ -662,7 +665,7 @@ class TestProxyManagerCancelledError:
             with contextlib.suppress(asyncio.CancelledError):
                 await manager.connect({"srv": config})
 
-        assert manager._initialized is True
+        assert manager._initialized is False
 
     @pytest.mark.asyncio
     async def test_connect_records_error_on_cancellation(self) -> None:
@@ -874,6 +877,190 @@ class TestProxyManagerBackgroundConnect:
         assert result["servers"]["ok"] == {"status": "connected", "tool_count": 2}
         assert result["servers"]["bad"] == {"status": "failed", "error": "boom"}
         assert result["servers"]["pending"] == {"status": "connecting"}
+
+    @pytest.mark.asyncio
+    async def test_zero_client_cancel_then_reconnect_uses_fresh_generation(
+        self,
+    ) -> None:
+        """A zero-client cancelled startup cannot suppress the fresh connect."""
+        from ot.config.models import McpServerConfig
+
+        manager = ProxyManager()
+        old_started = asyncio.Event()
+        never_release = asyncio.Event()
+
+        async def fake_connect(name: str, config: McpServerConfig) -> None:
+            if config.command == "old":
+                old_started.set()
+                await never_release.wait()
+            manager._clients[name] = MagicMock()
+            manager._tools_by_server[name] = []
+
+        old = McpServerConfig(type="stdio", command="old")
+        fresh = McpServerConfig(type="stdio", command="fresh")
+
+        with patch.object(manager, "_connect_server", side_effect=fake_connect):
+            manager.connect_background({"old": old})
+            await asyncio.wait_for(old_started.wait(), timeout=1)
+            await manager.reconnect({"fresh": fresh})
+
+        assert set(manager._clients) == {"fresh"}
+        assert manager._initialized is True
+        assert manager.readiness(("fresh",))["ready"] is True
+
+    @pytest.mark.asyncio
+    async def test_delayed_cancelled_startup_cleans_stale_client_before_reconnect(
+        self,
+    ) -> None:
+        """A cancellation-suppressing old task finishes before the new generation."""
+        from ot.config.models import McpServerConfig
+
+        manager = ProxyManager()
+        manager._loop = asyncio.get_running_loop()
+        old_started = asyncio.Event()
+        old_cancelled = asyncio.Event()
+        release_old = asyncio.Event()
+        fresh_started = asyncio.Event()
+        stale_client = MagicMock()
+        stale_client.__aexit__ = AsyncMock(return_value=None)
+
+        async def fake_connect(name: str, config: McpServerConfig) -> None:
+            if config.command == "old":
+                old_started.set()
+                try:
+                    await asyncio.Event().wait()
+                except asyncio.CancelledError:
+                    old_cancelled.set()
+                    await release_old.wait()
+                    manager._clients[name] = stale_client
+                    manager._tools_by_server[name] = []
+                    return
+            fresh_started.set()
+            manager._clients[name] = MagicMock()
+            manager._tools_by_server[name] = []
+
+        old = McpServerConfig(type="stdio", command="old")
+        fresh = McpServerConfig(type="stdio", command="fresh")
+
+        with patch.object(manager, "_connect_server", side_effect=fake_connect):
+            manager.connect_background({"stale": old})
+            await asyncio.wait_for(old_started.wait(), timeout=1)
+            manager.reconnect_sync({"fresh": fresh})
+            lifecycle_task = manager._lifecycle_task
+            assert lifecycle_task is not None
+            await asyncio.wait_for(old_cancelled.wait(), timeout=1)
+
+            assert fresh_started.is_set() is False
+            assert manager.readiness(("fresh",))["ready"] is False
+
+            release_old.set()
+            await asyncio.wait_for(lifecycle_task, timeout=1)
+
+        assert set(manager._clients) == {"fresh"}
+        stale_client.__aexit__.assert_awaited_once_with(None, None, None)
+        assert (
+            manager.readiness(("fresh",))["servers"]["fresh"]["status"] == "connected"
+        )
+
+    @pytest.mark.asyncio
+    async def test_partial_client_cleanup_closes_once_before_reconnect(self) -> None:
+        """Partial startup state is closed exactly once before fresh connection."""
+        from ot.config.models import McpServerConfig
+
+        manager = ProxyManager()
+        partial_client = MagicMock()
+        partial_client.__aexit__ = AsyncMock(return_value=None)
+        manager._clients["partial"] = partial_client
+        manager._tools_by_server["partial"] = []
+        blocker_started = asyncio.Event()
+
+        async def fake_connect(name: str, config: McpServerConfig) -> None:
+            if config.command == "blocked":
+                blocker_started.set()
+                await asyncio.Event().wait()
+            manager._clients[name] = MagicMock()
+            manager._tools_by_server[name] = []
+
+        blocked = McpServerConfig(type="stdio", command="blocked")
+        fresh = McpServerConfig(type="stdio", command="fresh")
+
+        with patch.object(manager, "_connect_server", side_effect=fake_connect):
+            manager.connect_background({"blocked": blocked})
+            await asyncio.wait_for(blocker_started.wait(), timeout=1)
+            await manager.reconnect({"fresh": fresh})
+
+        partial_client.__aexit__.assert_awaited_once_with(None, None, None)
+        assert set(manager._clients) == {"fresh"}
+
+    @pytest.mark.asyncio
+    async def test_full_shutdown_resets_all_state_and_closes_each_client(self) -> None:
+        """Full shutdown leaves a reconnectable empty manager."""
+        manager = ProxyManager()
+        clients = {"one": MagicMock(), "two": MagicMock()}
+        for client in clients.values():
+            client.__aexit__ = AsyncMock(return_value=None)
+        manager._clients = clients.copy()
+        manager._tools_by_server = {"one": [], "two": []}
+        manager._errors = {"bad": "boom"}
+        manager._server_timeouts = {"one": 1.0}
+        manager._server_instructions = {"one": "instructions"}
+        manager._initialized = True
+
+        await manager.shutdown()
+
+        for client in clients.values():
+            client.__aexit__.assert_awaited_once_with(None, None, None)
+        assert manager._clients == {}
+        assert manager._tools_by_server == {}
+        assert manager._errors == {}
+        assert manager._server_timeouts == {}
+        assert manager._server_instructions == {}
+        assert manager._initialized is False
+
+    @pytest.mark.asyncio
+    async def test_no_server_reconnect_finishes_ready(self) -> None:
+        """An empty configuration still completes a real reconnect generation."""
+        manager = ProxyManager()
+        manager._initialized = True
+
+        await manager.reconnect({})
+
+        assert manager._initialized is True
+        assert manager.readiness(()) == {
+            "ready": True,
+            "status": "ok",
+            "configured": 0,
+            "connected": 0,
+            "failed": 0,
+            "servers": {},
+        }
+
+    @pytest.mark.asyncio
+    async def test_background_reconnect_readiness_surfaces_failure(self) -> None:
+        """Immediate reload completion is separate from eventual failed readiness."""
+        from ot.config.models import McpServerConfig
+
+        manager = ProxyManager()
+        manager._loop = asyncio.get_running_loop()
+        config = McpServerConfig(type="stdio", command="bad")
+
+        async def fail_connect(_name: str, _config: McpServerConfig) -> None:
+            raise RuntimeError("fresh failure")
+
+        with patch.object(manager, "_connect_server", side_effect=fail_connect):
+            manager.reconnect_sync({"bad": config})
+            lifecycle_task = manager._lifecycle_task
+            assert lifecycle_task is not None
+            assert manager.readiness(("bad",))["ready"] is False
+            await asyncio.wait_for(lifecycle_task, timeout=1)
+
+        readiness = manager.readiness(("bad",))
+        assert readiness["ready"] is True
+        assert readiness["status"] == "degraded"
+        assert readiness["servers"]["bad"] == {
+            "status": "failed",
+            "error": "fresh failure",
+        }
 
 
 @pytest.mark.unit

@@ -65,6 +65,13 @@ ot.servers(info="default")   # configured servers, connection status, call_as na
 
 `ot_servers.*` changes state; `ot.servers()` only reads it.
 
+A full `ot.reload()` keeps its immediate `"OK: Configuration reloaded"` return
+while reconnecting proxy servers in the background on the server event loop.
+During that transition readiness reports `connecting`; after cleanup and the
+fresh connection attempt finish, readiness reports the real connected or failed
+state. Cancelled startup generations are fully cleaned before a fresh generation
+can register clients.
+
 ## chrome_util / play_util are proxy companions, not replacements
 
 The `chrome_util` and `play_util` packs are **thin wrappers over the same proxy manager** with a

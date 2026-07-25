@@ -225,3 +225,45 @@ The `ProxyManager` SHALL support disconnecting a single server without affecting
 - **THEN** it SHALL NOT block that loop waiting on a `run_coroutine_threadsafe(...).result()` scheduled onto the same loop
 - **AND** it SHALL return promptly (not after the multi-second/multi-minute blocking timeout)
 
+### Requirement: Serialized full proxy lifecycle
+
+The `ProxyManager` SHALL serialize full reconnect and shutdown transitions on
+its owning event loop. Shutdown SHALL cancel and await any tracked startup
+generation before cleaning every client that generation registered, and SHALL
+leave zero-, partial-, and full-client states reconnectable. A new generation
+SHALL NOT begin until prior startup cleanup finishes.
+
+Same-loop `ot.reload()` SHALL retain its immediate success return while the
+serialized reconnect continues in the background. Proxy readiness SHALL report
+that transition as connecting, then expose the actual connected or failed
+result after it completes.
+
+#### Scenario: Zero-client startup cancellation reconnects
+
+- **GIVEN** background startup is blocked before registering any client
+- **WHEN** a full reconnect cancels that startup
+- **THEN** shutdown SHALL await the cancelled startup cleanup
+- **AND** the fresh generation SHALL connect from a non-initialized state
+
+#### Scenario: Delayed stale startup cannot cross generations
+
+- **GIVEN** an old startup task delays its cancellation cleanup
+- **WHEN** a reconnect is requested and that old task is later released
+- **THEN** the fresh generation SHALL not start before the old task finishes
+- **AND** any client registered by the old task SHALL be closed exactly once before the fresh generation starts
+- **AND** no stale client SHALL remain in the fresh generation
+
+#### Scenario: Partial and full shutdown reset lifecycle state
+
+- **GIVEN** startup has registered some or all configured clients
+- **WHEN** shutdown runs
+- **THEN** every registered client SHALL be closed exactly once
+- **AND** all connection metadata SHALL be cleared
+- **AND** a subsequent reconnect SHALL be admitted
+
+#### Scenario: Same-loop reload exposes eventual readiness
+
+- **WHEN** `ot.reload()` schedules a same-loop full reconnect
+- **THEN** it SHALL return its current immediate success string
+- **AND** readiness SHALL report connecting until the background lifecycle task finishes
+- **AND** readiness SHALL then report each configured server as connected or failed
