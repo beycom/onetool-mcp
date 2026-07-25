@@ -8,7 +8,7 @@ from ot.executor.result_store import QueryResult, StoredResult
 
 
 class CtxResultStoreBackend:
-    """Store large outputs in the ctx flat-file backend."""
+    """Store large outputs in the immutable ctx record backend."""
 
     def store(
         self,

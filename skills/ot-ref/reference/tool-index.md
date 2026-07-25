@@ -1,6 +1,6 @@
 # OneTool MCP Tool Index
 
-packs=28 tools=253
+packs=28 tools=252
 
 ## arch
 ```python
@@ -230,9 +230,8 @@ ot.version()  # Return OneTool version string.
 
 ## ot_context, ctx
 ```python
-ot_context.append(handle: str, content: str, store: HandleStore | None=None)  # Append content to an existing handle.
 ot_context.ask(handle: str, q: str | list[str], model: str | None=None, store: HandleStore | None=None)  # Send one or more questions about stored content to an LLM.
-ot_context.delete(handle: str, store: HandleStore | None=None)  # Delete a single handle and both associated files.
+ot_context.delete(handle: str, store: HandleStore | None=None)  # Delete a single immutable handle record.
 ot_context.grep(handle: str, pattern: str, context: int=0, ignore_case: bool=True, limit: int=500, store: HandleStore | None=None, config: Config | None=None)  # Regex line search with optional context lines and long-line truncation.
 ot_context.inspect(handle: str, store: HandleStore | None=None)  # Return detailed metadata for a single handle.
 ot_context.list(source: str='', status: str='', store: HandleStore | None=None)  # Return all active (non-expired) handles with summary information.

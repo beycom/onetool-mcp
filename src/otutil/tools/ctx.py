@@ -1,6 +1,6 @@
 """Smart context store for OneTool tool outputs.
 
-Flat-file TTL-expiring storage for large tool outputs.
+Immutable TTL-expiring storage for large tool outputs.
 Replace context-window saturation with targeted retrieval.
 
 Tools:
@@ -11,7 +11,6 @@ Tools:
     toc      - Format-aware table of contents (markdown headings / json keys)
     query    - jmespath query on json or yaml handles
     ask      - Multi-question LLM query over stored content (optional)
-    append   - Add content and update format/TOC
     list     - All active handles
     inspect  - Detailed metadata for one handle
     stats    - Session storage metrics
@@ -28,7 +27,7 @@ pack_aliases = ("ctx",)
 __ot_requires__: dict[str, str] = {}
 
 __all__ = [
-    "append", "ask", "delete", "grep", "inspect", "list", "purge", "query",
+    "ask", "delete", "grep", "inspect", "list", "purge", "query",
     "read", "slice", "stats", "toc", "write",
 ]
 
@@ -45,9 +44,6 @@ def register_services(registry: object) -> None:
         else None
     )
 
-from ot.ctx import (
-    ctx_append as append,
-)
 from ot.ctx import (
     ctx_ask as ask,
 )

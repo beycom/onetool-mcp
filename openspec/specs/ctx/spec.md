@@ -2,21 +2,27 @@
 
 ## Purpose
 
-Defines the `ctx` pack providing a smart-context store backed by flat files. The pack enables agents to store, navigate, and query large content blobs without filling the context window. Content is stored with a TTL, format-detected on write, and accessible through a set of focused read/search/navigation/query tools.
+Defines the `ctx` pack providing a smart-context store backed by immutable
+per-handle records. The pack enables agents to store, navigate, and query large
+content blobs without filling the context window. Content is stored with a TTL,
+format-detected on write, and accessible through focused
+read/search/navigation/query tools.
 
 ## Requirements
 
 ### Requirement: Write Content to Context Store
 
 The `ctx.write()` function SHALL store content synchronously, detect its format,
-normalise it, generate a TOC, and return a compact handle dict immediately.
+normalise it, generate a TOC, and return a compact immutable handle dict
+immediately. A handle SHALL become visible only when its complete content and
+metadata record has been atomically published.
 
 #### Scenario: Basic write returns immediately
 - **WHEN** `ctx.write("some content")` is called
 - **THEN** it SHALL return a dict containing `handle`, `source`, `size_bytes`,
   `total_lines`, `format`, and `status`
 - **AND** `status` SHALL be `"ready"` immediately (write is synchronous)
-- **AND** `handle` SHALL be a short opaque string (8 hex chars)
+- **AND** `handle` SHALL be a 32-character opaque hexadecimal string
 - **AND** `format` SHALL be one of `"json"`, `"yaml"`, `"markdown"`, `"text"`
 
 #### Scenario: Write detects JSON and pretty-prints
@@ -42,7 +48,7 @@ normalise it, generate a TOC, and return a compact handle dict immediately.
 - **THEN** `format` SHALL be `"text"`
 
 #### Scenario: Write with source label
-- **WHEN** `ctx.write(content, source="webfetch:docs.example.com")` is called
+- **WHEN** `ctx.write(content, source="webfetch:docs.test")` is called
 - **THEN** `source` SHALL appear in the returned dict and be retrievable via `ctx.list`
 
 #### Scenario: Verbose mode
@@ -60,19 +66,41 @@ normalise it, generate a TOC, and return a compact handle dict immediately.
 
 #### Scenario: Handle-dict passed as `handle` argument (read-side tools)
 - **WHEN** any read-side tool (`ctx.read`, `ctx.toc`, `ctx.grep`, `ctx.slice`,
-  `ctx.query`, `ctx.append`, `ctx.inspect`, `ctx.delete`) is called with a handle
-  dict (e.g. `{"handle": "b2d18a1b", ...}`) in place of a string handle
+  `ctx.query`, `ctx.inspect`, `ctx.delete`) is called with a handle
+  dict (e.g. `{"handle": "b2d18a1b9f9e4c86a3fbeb9ba2685107", ...}`) in
+  place of a string handle
 - **THEN** the tool SHALL transparently extract the `"handle"` key and proceed
   as if the string ID was passed directly
 - **WHEN** a non-string, non-handle-dict value is passed as `handle`
 - **THEN** the tool SHALL return `{"error": "handle must be a string ... use h['handle']"}`
   without raising an exception or leaking an OS error
 
+#### Scenario: Atomic immutable publication
+- **GIVEN** a new handle record is being created
+- **WHEN** a reader checks the handle before, during, or after publication
+- **THEN** the reader SHALL observe either handle-not-found or the complete
+  immutable content and metadata record
+- **AND** no subsequent operation SHALL update that handle
+
+#### Scenario: Creation failure
+- **GIVEN** content serialization, content writing, metadata writing, or record
+  publication fails
+- **WHEN** `ctx.write` attempts to create the handle
+- **THEN** no handle SHALL become visible
+- **AND** no staging record SHALL remain
+
+#### Scenario: Concurrent handle collision
+- **GIVEN** independent writers generate the same candidate handle
+- **WHEN** they publish concurrently
+- **THEN** one writer SHALL publish that handle exclusively
+- **AND** every other writer SHALL retry with a new handle without replacing it
+
 ---
 
 ### Requirement: Read Raw Content
 
-The `ctx.read()` function SHALL return paginated raw content with long lines truncated.
+The `ctx.read()` function SHALL return paginated raw content with long lines
+truncated and SHALL NOT mutate the stored record.
 
 #### Scenario: Basic read with defaults
 - **GIVEN** a stored handle `h`
@@ -103,8 +131,13 @@ The `ctx.read()` function SHALL return paginated raw content with long lines tru
 
 #### Scenario: Read mode meta
 - **WHEN** `ctx.read(h, mode="meta")` is called
-- **THEN** it SHALL return handle metadata: source, format, size_bytes, total_lines,
-  status, created_at, access_count
+- **THEN** it SHALL return handle metadata: source, format, size_bytes,
+  total_lines, status, and created_at
+
+#### Scenario: Repeated reads are immutable
+- **GIVEN** a stored handle
+- **WHEN** it is read repeatedly in raw, TOC, or metadata mode
+- **THEN** its stored bytes and modification times SHALL remain unchanged
 
 #### Scenario: Unknown handle
 - **WHEN** `ctx.read("badhandle")` is called
@@ -309,25 +342,6 @@ The `ctx.ask()` function SHALL accept one or more questions about stored content
 
 ---
 
-### Requirement: Append Content
-
-The `ctx.append()` function SHALL add content to an existing handle, re-detect
-format on the combined content, regenerate the TOC, and update metadata.
-
-#### Scenario: Basic append
-- **GIVEN** a ready handle `h`
-- **WHEN** `ctx.append(h, "additional content")` is called
-- **THEN** the combined content SHALL be available via `ctx.read`
-- **AND** format SHALL be re-detected on the combined content
-- **AND** TOC SHALL be regenerated from the combined content
-- **AND** `status` SHALL remain `"ready"` on success
-
-#### Scenario: Append to unknown handle
-- **WHEN** `ctx.append("badhandle", "content")` is called
-- **THEN** it SHALL return an error message indicating handle not found
-
----
-
 ### Requirement: List Active Handles
 
 The `ctx.list()` function SHALL return all active (non-expired) handles with summary information.
@@ -358,13 +372,14 @@ The `ctx.list()` function SHALL return all active (non-expired) handles with sum
 
 ### Requirement: Inspect Handle
 
-The `ctx.inspect()` function SHALL return detailed metadata for a single handle.
+The `ctx.inspect()` function SHALL return detailed immutable metadata for a
+single handle.
 
 #### Scenario: Inspect ready handle
 - **GIVEN** a ready handle
 - **WHEN** `ctx.inspect(h)` is called
-- **THEN** it SHALL return: handle, source, format, size_bytes, total_lines, status,
-  toc_entries, ttl_remaining, access_count
+- **THEN** it SHALL return: handle, source, format, size_bytes, total_lines,
+  status, created_at, toc_entries, and ttl_remaining
 
 #### Scenario: Inspect unknown handle
 - **WHEN** `ctx.inspect("badhandle")` is called
@@ -386,18 +401,25 @@ The `ctx.stats()` function SHALL return session-level storage metrics.
 
 ### Requirement: Delete Handle
 
-The `ctx.delete()` function SHALL remove a single handle and all associated data.
+The `ctx.delete()` function SHALL remove a single immutable handle record and
+all of its data.
 
 #### Scenario: Delete a handle
 - **GIVEN** a stored handle `h`
 - **WHEN** `ctx.delete(h)` is called
-- **THEN** it SHALL remove the handle and its backing content file
+- **THEN** it SHALL remove the complete handle directory
 - **AND** subsequent `ctx.read(h)` SHALL return handle not found
 - **AND** it SHALL return `{"deleted": h}`
 
 #### Scenario: Delete unknown handle
 - **WHEN** `ctx.delete("badhandle")` is called
 - **THEN** it SHALL return `{"error": "Handle not found: badhandle"}`
+
+#### Scenario: Delete races a read
+- **GIVEN** deletion and a read overlap
+- **WHEN** the record is removed
+- **THEN** the read MAY return handle-not-found
+- **AND** it SHALL NOT observe a partial replacement record
 
 ---
 

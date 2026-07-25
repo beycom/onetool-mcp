@@ -15,7 +15,7 @@ def ctx_delete(
     *,
     store: HandleStore | None = None,
 ) -> dict[str, Any]:
-    """Delete a single handle and both associated files.
+    """Delete a single immutable handle record.
 
     Args:
         handle: Context store handle to delete.

@@ -59,26 +59,24 @@ def ctx_write(
 
         size_bytes = len(normalised.encode("utf-8"))
         total_lines = len(normalised.splitlines())
-        handle = secrets.token_hex(4)  # 8 hex chars
-        while store.exists(handle):  # collision is vanishingly rare — never clobber
-            handle = secrets.token_hex(4)
-        created = now_ts()
-        exp = expires_at_ts(config.ttl)
-
-        meta: dict[str, Any] = {
-            "handle": handle,
-            "source": source,
-            "format": fmt,
-            "size_bytes": size_bytes,
-            "total_lines": total_lines,
-            "status": "ready",
-            "created_at": created,
-            "expires_at": exp,
-            "access_count": 0,
-            "toc": toc,
-        }
-
-        store.write(handle, normalised, meta)
+        while True:
+            handle = secrets.token_hex(16)
+            meta: dict[str, Any] = {
+                "handle": handle,
+                "source": source,
+                "format": fmt,
+                "size_bytes": size_bytes,
+                "total_lines": total_lines,
+                "status": "ready",
+                "created_at": now_ts(),
+                "expires_at": expires_at_ts(config.ttl),
+                "toc": toc,
+            }
+            try:
+                store.write(handle, normalised, meta)
+            except FileExistsError:
+                continue
+            break
 
         result: dict[str, Any] = {
             "handle": handle,

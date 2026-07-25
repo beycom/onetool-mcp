@@ -1,6 +1,6 @@
 # Tool Reference
 
-**28 Packs. 253 Tools.**
+**28 Packs. 252 Tools.**
 
 Complete reference of all built-in tool packs and functions.
 
@@ -41,7 +41,7 @@ uv tool install 'onetool-mcp[util,dev]'  # most tools
 | [**Knowledge**](knowledge.md) | `[util]` | Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis. | 15 | MIT | `append`, `ask`, `dbs`, `delete`, `grep`, `info`, `list`, `read`, `related`, `search`, `slice`, `stats`, `toc`, `update`, `write` |
 | [**Localhist**](localhist.md) | `[dev]` | OneTool Local History snapshots backed by Git. | 15 | MIT | `add_exclude`, `add_force_include`, `autosave_list`, `autosave_start`, `autosave_stop`, `diff`, `history`, `info`, `init`, `log`, `prune`, `restore`, `save`, `show`, `status` |
 | [**Mem**](mem.md) | `[util]` | Persistent AI agent memory with semantic search. | 31 | MIT | `append`, `ask`, `context`, `count`, `decay`, `delete`, `dump`, `flush`, `grep`, `history`, `inspect`, `load`, `list`, `query`, `read`, `read_batch`, `refresh`, `reindex`, `restore`, `rollback`, `search`, `slice`, `slice_batch`, `snapshot`, `stale`, `stats`, `toc`, `update`, `update_batch`, `write`, `write_batch` |
-| [**OT Context**](ot_context.md) | core | TTL-expiring, BM25-indexed storage for large tool outputs. | 13 | MIT | `append`, `ask`, `delete`, `grep`, `inspect`, `list`, `purge`, `query`, `read`, `slice`, `stats`, `toc`, `write` |
+| [**OT Context**](ot_context.md) | core | Immutable TTL-expiring storage for large tool outputs. | 12 | MIT | `ask`, `delete`, `grep`, `inspect`, `list`, `purge`, `query`, `read`, `slice`, `stats`, `toc`, `write` |
 | [**OT Core**](ot_core.md) | core | Introspection and management tools. | 18 | MIT | `aliases`, `config`, `debug`, `help`, `pack_info`, `packs`, `reload`, `result`, `security`, `server`, `servers`, `snippet_info`, `snippets`, `stats`, `status`, `tool_info`, `tools`, `version` |
 | [**OT Forge**](ot_forge.md) | core | Create and validate extension tools. | 2 | MIT | `create_ext`, `validate_ext` |
 | [**OT Image**](ot_image.md) | core | Load images and ask vision questions via OpenAI-compatible API. | 9 | MIT | `ask`, `clip_ask`, `clip_view`, `delete`, `list`, `load`, `load_batch`, `purge`, `summary` |

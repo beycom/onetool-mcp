@@ -1,7 +1,7 @@
-"""Unit tests for the ctx pack (flat-file implementation).
+"""Unit tests for the ctx pack (immutable record implementation).
 
 Covers: format detection/normalisation/TOC, HandleStore, write, read, toc,
-grep, slice, query, append, management, maintenance, and ask.
+grep, slice, query, management, maintenance, and ask.
 """
 from __future__ import annotations
 
@@ -40,6 +40,32 @@ def _write_handle(
     config = Config(ttl=ttl)
     result = ctx_write(content, source=source, store=store, config=config)
     return result["handle"]
+
+
+def _write_record(
+    store: HandleStore,
+    handle: str,
+    *,
+    content: str = "content",
+    source: str = "",
+    status: str = "ready",
+    created_at: float | None = None,
+    expires_at: float | None = None,
+) -> str:
+    """Publish a test record with deliberately selected immutable metadata."""
+    meta: dict[str, Any] = {
+        "handle": handle,
+        "source": source,
+        "format": "text",
+        "size_bytes": len(content.encode()),
+        "total_lines": len(content.splitlines()),
+        "status": status,
+        "created_at": now_ts() if created_at is None else created_at,
+        "expires_at": expires_at,
+        "toc": [],
+    }
+    store.write(handle, content, meta)
+    return handle
 
 
 # ===========================================================================
@@ -201,7 +227,7 @@ class TestHandleStore:
         assert store.read_content("abc123") == "hello world"
         assert store.read_meta("abc123") == meta
 
-    def test_exists_both_files(self, tmp_path: Path) -> None:
+    def test_exists_requires_complete_record(self, tmp_path: Path) -> None:
         store = _make_store(tmp_path)
         assert not store.exists("missing")
         store.write("abc123", "content", {"handle": "abc123"})
@@ -217,13 +243,12 @@ class TestHandleStore:
         result = store.list_handles()
         assert all(m["handle"] != "aaa" for m in result)
 
-    def test_delete_removes_both_files(self, tmp_path: Path) -> None:
+    def test_delete_removes_record_directory(self, tmp_path: Path) -> None:
         store = _make_store(tmp_path)
         store.write("xyz", "content", {"handle": "xyz"})
         assert store.exists("xyz")
         store.delete("xyz")
-        assert not store.content_path("xyz").exists()
-        assert not store.meta_path("xyz").exists()
+        assert not store.record_path("xyz").exists()
         assert not store.exists("xyz")
 
     def test_list_handles_returns_metas(self, tmp_path: Path) -> None:
@@ -233,6 +258,217 @@ class TestHandleStore:
         handles = [m["handle"] for m in store.list_handles()]
         assert "h1" in handles
         assert "h2" in handles
+
+    def test_write_never_replaces_existing_record(self, tmp_path: Path) -> None:
+        store = _make_store(tmp_path)
+        store.write("same", "first", {"handle": "same"})
+
+        with pytest.raises(FileExistsError):
+            store.write("same", "second", {"handle": "same"})
+
+        assert store.read_content("same") == "first"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+class TestImmutablePublication:
+    def test_public_pack_has_no_append_export(self) -> None:
+        from otutil.tools import ctx
+
+        assert "append" not in ctx.__all__
+        assert not hasattr(ctx, "append")
+
+    def test_concurrent_creation_through_independent_stores(
+        self, tmp_path: Path
+    ) -> None:
+        from concurrent.futures import ThreadPoolExecutor
+
+        from ot.ctx.config import Config
+        from ot.ctx.write import ctx_write
+
+        ctx_dir = tmp_path / "ctx"
+
+        def create(value: int) -> tuple[str, str]:
+            store = HandleStore(ctx_dir)
+            content = f"value-{value}"
+            result = ctx_write(content, store=store, config=Config())
+            return result["handle"], content
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            created = list(executor.map(create, range(24)))
+
+        assert len({handle for handle, _ in created}) == len(created)
+        reader = HandleStore(ctx_dir)
+        assert all(reader.read_content(handle) == content for handle, content in created)
+
+    def test_concurrent_forced_collision_retries_without_replacement(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Barrier, Lock
+
+        from ot.ctx.config import Config
+        from ot.ctx.write import ctx_write
+
+        collision = "a" * 32
+        calls = 0
+        calls_lock = Lock()
+
+        def token_hex(_: int) -> str:
+            nonlocal calls
+            with calls_lock:
+                calls += 1
+                if calls <= 2:
+                    return collision
+                return f"{calls:032x}"
+
+        original_write = HandleStore.write
+        collision_barrier = Barrier(2)
+
+        def synchronized_write(
+            store: HandleStore,
+            handle: str,
+            content: str,
+            meta: dict[str, Any],
+        ) -> None:
+            if handle == collision:
+                collision_barrier.wait()
+            original_write(store, handle, content, meta)
+
+        monkeypatch.setattr("ot.ctx.write.secrets.token_hex", token_hex)
+        monkeypatch.setattr(HandleStore, "write", synchronized_write)
+        ctx_dir = tmp_path / "ctx"
+
+        def create(content: str) -> tuple[str, str]:
+            result = ctx_write(
+                content,
+                store=HandleStore(ctx_dir),
+                config=Config(),
+            )
+            return result["handle"], content
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            created = list(executor.map(create, ("first", "second")))
+
+        assert len({handle for handle, _ in created}) == 2
+        reader = HandleStore(ctx_dir)
+        assert all(reader.read_content(handle) == content for handle, content in created)
+
+    def test_reader_observes_absent_or_complete_record(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from threading import Event, Thread
+
+        from ot.ctx.config import Config
+        from ot.ctx.read import ctx_read
+        from ot.ctx.write import ctx_write
+        from ot.ctx import store as store_module
+
+        handle = "b" * 32
+        store = _make_store(tmp_path)
+        publication_ready = Event()
+        publication_release = Event()
+        original_rename = store_module.os.rename
+
+        def paused_rename(source: Path, target: Path) -> None:
+            publication_ready.set()
+            assert publication_release.wait(timeout=5)
+            original_rename(source, target)
+
+        monkeypatch.setattr("ot.ctx.write.secrets.token_hex", lambda _: handle)
+        monkeypatch.setattr(store_module.os, "rename", paused_rename)
+        result: dict[str, Any] = {}
+
+        def create() -> None:
+            result.update(
+                ctx_write(
+                    "complete content",
+                    store=HandleStore(store._dir),
+                    config=Config(),
+                )
+            )
+
+        writer = Thread(target=create)
+        before = ctx_read(handle, store=store, config=Config())
+        assert before == {"error": f"Handle not found: {handle}"}
+        writer.start()
+        assert publication_ready.wait(timeout=5)
+        during = ctx_read(handle, store=store, config=Config())
+        assert during == {"error": f"Handle not found: {handle}"}
+        publication_release.set()
+        writer.join(timeout=5)
+        assert not writer.is_alive()
+        assert result["handle"] == handle
+        assert store.read_content(handle) == "complete content"
+        assert store.read_meta(handle)["handle"] == handle
+
+    @pytest.mark.parametrize(
+        "failure_point",
+        ["serialization", "content_write", "metadata_write", "publication"],
+    )
+    def test_creation_failure_leaves_no_record_or_staging(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        failure_point: str,
+    ) -> None:
+        from ot.ctx.config import Config
+        from ot.ctx.write import ctx_write
+        from ot.ctx import store as store_module
+
+        handle = "c" * 32
+        store = _make_store(tmp_path)
+        monkeypatch.setattr("ot.ctx.write.secrets.token_hex", lambda _: handle)
+
+        if failure_point == "serialization":
+            monkeypatch.setattr(
+                "ot.ctx.write.normalize_content",
+                lambda *_: (_ for _ in ()).throw(ValueError("serialization failed")),
+            )
+        elif failure_point in {"content_write", "metadata_write"}:
+            original_write = HandleStore._write_durable
+            failed_name = "content" if failure_point == "content_write" else "meta.json"
+
+            def failed_write(path: Path, text: str) -> None:
+                if path.name == failed_name:
+                    raise OSError(f"{failed_name} write failed")
+                original_write(path, text)
+
+            monkeypatch.setattr(
+                HandleStore,
+                "_write_durable",
+                staticmethod(failed_write),
+            )
+        else:
+            monkeypatch.setattr(
+                store_module.os,
+                "rename",
+                lambda *_: (_ for _ in ()).throw(OSError("publication failed")),
+            )
+
+        with pytest.raises((OSError, ValueError)):
+            ctx_write("content", store=store, config=Config())
+
+        assert not store.exists(handle)
+        assert list(store._dir.iterdir()) == []
+
+    def test_repeated_reads_preserve_record_bytes_and_mtimes(
+        self, tmp_path: Path
+    ) -> None:
+        from ot.ctx.config import Config
+        from ot.ctx.read import ctx_read
+
+        store = _make_store(tmp_path)
+        handle = _write_handle(store, "# Heading\ncontent")
+        paths = (store.content_path(handle), store.meta_path(handle))
+        before = [(path.read_bytes(), path.stat().st_mtime_ns) for path in paths]
+
+        assert "error" not in ctx_read(handle, store=store, config=Config())
+        assert "error" not in ctx_read(handle, mode="meta", store=store, config=Config())
+        assert "error" not in ctx_read(handle, mode="toc", store=store, config=Config())
+
+        after = [(path.read_bytes(), path.stat().st_mtime_ns) for path in paths]
+        assert after == before
 
 
 # ===========================================================================
@@ -278,6 +514,7 @@ class TestCtxWrite:
         store = _make_store(tmp_path)
         result = ctx_write("# Hello\nSome text.", store=store, config=Config())
         assert "handle" in result
+        assert len(result["handle"]) == 32
         assert result["format"] == "markdown"
         assert result["status"] == "ready"
 
@@ -407,11 +644,11 @@ class TestCtxRead:
         from ot.ctx.config import Config
 
         store = _make_store(tmp_path)
-        handle = _write_handle(store, "content", ttl=1)
-        # Expire it manually
-        meta = store.read_meta(handle)
-        meta["expires_at"] = now_ts() - 1
-        store.update_meta(handle, meta)
+        handle = _write_record(
+            store,
+            "e" * 32,
+            expires_at=now_ts() - 1,
+        )
 
         result = ctx_read(handle, store=store, config=Config())
         assert "error" in result
@@ -823,71 +1060,6 @@ class TestCtxQuery:
 
 
 # ===========================================================================
-# 11.3 ctx_append
-# ===========================================================================
-
-
-@pytest.mark.unit
-@pytest.mark.tools
-class TestCtxAppend:
-    def test_append_combined_content(self, tmp_path: Path) -> None:
-        from ot.ctx.append import ctx_append
-        from ot.ctx.read import ctx_read
-        from ot.ctx.config import Config
-
-        store = _make_store(tmp_path)
-        handle = _write_handle(store, "first line")
-        ctx_append(handle, "second line", store=store)
-        read_result = ctx_read(handle, limit=200, store=store, config=Config())
-        assert "first line" in read_result["content"]
-        assert "second line" in read_result["content"]
-
-    def test_append_format_redetected(self, tmp_path: Path) -> None:
-        from ot.ctx.append import ctx_append
-
-        store = _make_store(tmp_path)
-        handle = _write_handle(store, "plain text")
-        # Appending a markdown heading should shift format to markdown
-        result = ctx_append(handle, "\n# New Section\nContent", store=store)
-        assert result["format"] == "markdown"
-
-    def test_append_toc_regenerated(self, tmp_path: Path) -> None:
-        from ot.ctx.append import ctx_append
-
-        store = _make_store(tmp_path)
-        handle = _write_handle(store, "# First Section\nContent")
-        ctx_append(handle, "\n## Sub Section\nMore", store=store)
-        meta = store.read_meta(handle)
-        toc = meta["toc"]
-        assert len(toc) == 2
-
-    def test_append_unknown_handle(self, tmp_path: Path) -> None:
-        from ot.ctx.append import ctx_append
-
-        store = _make_store(tmp_path)
-        result = ctx_append("badhandle", "content", store=store)
-        assert "error" in result
-
-    def test_append_accepts_handle_dict(self, tmp_path: Path) -> None:
-        from ot.ctx.append import ctx_append
-
-        store = _make_store(tmp_path)
-        handle_str = _write_handle(store, "line one")
-        handle_dict = {"handle": handle_str, "format": "text"}
-        result = ctx_append(handle_dict, "\nline two", store=store)  # type: ignore[arg-type]
-        assert "error" not in result
-        assert result["total_lines"] >= 2
-
-    def test_append_bad_handle_type_returns_error(self, tmp_path: Path) -> None:
-        from ot.ctx.append import ctx_append
-
-        store = _make_store(tmp_path)
-        result = ctx_append({"no_handle_key": True}, "content", store=store)  # type: ignore[arg-type]
-        assert "error" in result
-        assert "handle must be a string" in result["error"]
-
-
-# ===========================================================================
 # 12.4 ctx_list, ctx_inspect, ctx_stats
 # ===========================================================================
 
@@ -899,11 +1071,11 @@ class TestManagement:
         from ot.ctx.management import ctx_list
 
         store = _make_store(tmp_path)
-        h = _write_handle(store, "content", ttl=1)
-        # Expire it
-        meta = store.read_meta(h)
-        meta["expires_at"] = now_ts() - 1
-        store.update_meta(h, meta)
+        h = _write_record(
+            store,
+            "e" * 32,
+            expires_at=now_ts() - 1,
+        )
 
         result = ctx_list(store=store)
         assert all(item["handle"] != h for item in result)
@@ -921,11 +1093,7 @@ class TestManagement:
         from ot.ctx.management import ctx_list
 
         store = _make_store(tmp_path)
-        h = _write_handle(store, "content")
-        # Mark as failed
-        meta = store.read_meta(h)
-        meta["status"] = "failed"
-        store.update_meta(h, meta)
+        h = _write_record(store, "f" * 32, status="failed")
 
         result = ctx_list(status="failed", store=store)
         handles = [item["handle"] for item in result]
@@ -989,7 +1157,7 @@ class TestManagement:
 @pytest.mark.unit
 @pytest.mark.tools
 class TestMaintenance:
-    def test_delete_removes_both_files(self, tmp_path: Path) -> None:
+    def test_delete_removes_complete_record(self, tmp_path: Path) -> None:
         from ot.ctx.maintenance import ctx_delete
 
         store = _make_store(tmp_path)
@@ -998,6 +1166,7 @@ class TestMaintenance:
         result = ctx_delete(h, store=store)
         assert result == {"deleted": h}
         assert not store.exists(h)
+        assert list(store._dir.iterdir()) == []
 
     def test_delete_unknown_handle(self, tmp_path: Path) -> None:
         from ot.ctx.maintenance import ctx_delete
@@ -1028,12 +1197,13 @@ class TestMaintenance:
         from ot.ctx.maintenance import ctx_purge
 
         store = _make_store(tmp_path)
-        h_old = _write_handle(store, "old content")
+        h_old = _write_record(
+            store,
+            "a" * 32,
+            content="old content",
+            created_at=now_ts() - 20 * 60,
+        )
         h_new = _write_handle(store, "new content")
-        # Make h_old old
-        meta = store.read_meta(h_old)
-        meta["created_at"] = now_ts() - 20 * 60  # 20 minutes ago
-        store.update_meta(h_old, meta)
 
         result = ctx_purge(minutes=15, store=store)
         assert result["deleted"] >= 1
@@ -1044,13 +1214,20 @@ class TestMaintenance:
         from ot.ctx.maintenance import ctx_purge
 
         store = _make_store(tmp_path)
-        h_brave = _write_handle(store, "a", source="brave:search")
-        h_other = _write_handle(store, "b", source="tavily")
-        # Make both old
-        for h in (h_brave, h_other):
-            meta = store.read_meta(h)
-            meta["created_at"] = now_ts() - 20 * 60
-            store.update_meta(h, meta)
+        h_brave = _write_record(
+            store,
+            "b" * 32,
+            content="a",
+            source="brave:search",
+            created_at=now_ts() - 20 * 60,
+        )
+        h_other = _write_record(
+            store,
+            "c" * 32,
+            content="b",
+            source="tavily",
+            created_at=now_ts() - 20 * 60,
+        )
 
         ctx_purge(source="brave", minutes=15, store=store)
         assert not store.exists(h_brave)
@@ -1060,17 +1237,19 @@ class TestMaintenance:
         from ot.ctx.maintenance import ctx_purge
 
         store = _make_store(tmp_path)
-        h_failed = _write_handle(store, "failed content")
-        h_ready = _write_handle(store, "ready content")
-        # Make h_failed old and set status
-        meta = store.read_meta(h_failed)
-        meta["created_at"] = now_ts() - 20 * 60
-        meta["status"] = "failed"
-        store.update_meta(h_failed, meta)
-        # Make h_ready old too
-        meta2 = store.read_meta(h_ready)
-        meta2["created_at"] = now_ts() - 20 * 60
-        store.update_meta(h_ready, meta2)
+        h_failed = _write_record(
+            store,
+            "d" * 32,
+            content="failed content",
+            status="failed",
+            created_at=now_ts() - 20 * 60,
+        )
+        h_ready = _write_record(
+            store,
+            "e" * 32,
+            content="ready content",
+            created_at=now_ts() - 20 * 60,
+        )
 
         ctx_purge(status="failed", minutes=15, store=store)
         assert not store.exists(h_failed)

@@ -1,6 +1,6 @@
 """Integration tests for the ot_context (ctx) pack.
 
-Exercises real flat-file I/O — no mocked connections.
+Exercises real immutable-record I/O — no mocked connections.
 Tests the full stack: write → read/grep/toc/slice/query/list/delete/stats.
 """
 
@@ -23,7 +23,7 @@ class TestCtxWriteRead:
         result = write("hello world\nline two\nline three")
 
         assert "handle" in result
-        assert len(result["handle"]) >= 8
+        assert len(result["handle"]) == 32
 
     def test_write_returns_format(self) -> None:
         """write() returns a format field."""

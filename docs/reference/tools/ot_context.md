@@ -1,30 +1,28 @@
 # OT Context
 
-TTL-expiring, BM25-indexed storage for large tool outputs. Replace context-window saturation with targeted retrieval.
+TTL-expiring storage for large tool outputs in immutable, atomically published
+per-handle records. Replace context-window saturation with targeted retrieval.
 
 ## Highlights
 
 - Handles large outputs (API responses, logs, docs) without saturating the context window
 - `ctx.query()` for structured JSON/YAML extraction using JMESPath
-- ~1ms write latency — indexing runs in a background daemon thread
+- Synchronous format detection and table-of-contents generation
 - TTL-expiring handles (default 3600s); no-expiry with `ttl=0`
-- Large content (>256KB) spills to disk automatically; handle stays the same
-- Regex and fuzzy grep with context lines
+- Regex grep with context lines
 - Section slicing by number, heading, or line range
-- Optional semantic embeddings via ot_llm (when configured)
 - `ctx.ask()` sends one or more questions about stored content to an LLM in a single batched call
-- Pure stdlib — no external dependencies
+- Uses only OneTool's core runtime and its bundled JMESPath dependency
 
 ## Functions
 
 | Function | Description |
 |----------|-------------|
 | `ctx.write(content, source, verbose)` | Store content, return handle + optional preview |
-| `ctx.append(handle, content)` | Append content and re-index |
 | `ctx.read(handle, offset, limit, tail, mode)` | Paginated raw content, metadata, or TOC |
 | `ctx.toc(handle)` | Numbered section index with vocabulary hints |
 | `ctx.query(handle, expr)` | Evaluate JMESPath expression against JSON/YAML handles |
-| `ctx.grep(handle, pattern, context, fuzzy)` | Regex or fuzzy line search |
+| `ctx.grep(handle, pattern, context, ignore_case, limit)` | Regex line search |
 | `ctx.slice(handle, select)` | Extract by section number, heading, or line range |
 | `ctx.ask(handle, q, model)` | Multi-question LLM query over stored content (optional) |
 | `ctx.list(source, status)` | All active handles with summary |
@@ -43,7 +41,9 @@ TTL-expiring, BM25-indexed storage for large tool outputs. Replace context-windo
 | `source` | str | Optional label (e.g. "brave", "api") for filtering |
 | `verbose` | bool | Include a short preview in the returned payload |
 
-Returns a dict with `handle`, `size_bytes`, `total_lines`, `status`, and `abstract` (populated asynchronously). Pass `verbose=True` to also include `preview` (first 5 non-empty lines).
+Returns a dict with `handle`, `size_bytes`, `total_lines`, `format`, and `status`.
+The 32-character hexadecimal handle is immutable after publication. Pass
+`verbose=True` to also include `preview` (first 5 non-empty lines).
 
 ### `ctx.read()`
 
@@ -69,9 +69,10 @@ Returns `{handle, expr, result}` on success, or an error payload when format/exp
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `handle` | str | Handle from ctx.write() |
-| `pattern` | str | Regex pattern (or plain text if `fuzzy=True`) |
+| `pattern` | str | Regex pattern |
 | `context` | int | Lines before/after each match (default 0) |
-| `fuzzy` | bool | Use SequenceMatcher instead of regex |
+| `ignore_case` | bool | Match case-insensitively by default |
+| `limit` | int | Maximum matching lines to return (default 500) |
 
 ### `ctx.slice()`
 
@@ -89,7 +90,7 @@ Returns `{handle, expr, result}` on success, or an error payload when format/exp
 | `source` | str | Delete handles matching source substring |
 | `status` | str | Delete handles with this status |
 
-With no arguments, deletes handles older than 15 minutes, then compacts the DB.
+With no arguments, deletes handles that have passed their configured TTL.
 
 ## Configuration
 
@@ -148,7 +149,7 @@ ctx.ask(h["handle"], q=["What errors are possible?", "What is the rate limit?"])
 # Maintenance
 ctx.list()                                  # all active handles
 ctx.stats()                                 # storage metrics
-ctx.purge()                                 # delete expired handles + compact
+ctx.purge()                                 # delete expired handles
 ctx.purge(delete_all=True)                  # wipe everything
 ctx.purge(status="failed")                  # remove failed indexing handles
 ctx.purge(minutes=60)                       # remove handles older than 1 hour

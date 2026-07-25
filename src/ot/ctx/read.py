@@ -68,9 +68,6 @@ def ctx_read(
 
         # mode=meta — return metadata fields without reading content
         if mode == "meta":
-            # Increment access_count
-            meta["access_count"] = meta.get("access_count", 0) + 1
-            store.update_meta(handle, meta)
             return {
                 "handle": meta["handle"],
                 "source": meta.get("source", ""),
@@ -79,14 +76,10 @@ def ctx_read(
                 "total_lines": meta.get("total_lines", 0),
                 "status": meta.get("status", "ready"),
                 "created_at": meta.get("created_at"),
-                "access_count": meta["access_count"],
             }
 
         # mode=toc
         if mode == "toc":
-            # Increment access_count
-            meta["access_count"] = meta.get("access_count", 0) + 1
-            store.update_meta(handle, meta)
             return ctx_toc(handle, store=store)
 
         # Raw content read
@@ -119,10 +112,6 @@ def ctx_read(
         else:
             pct = int((end_line / total_lines) * 100)
             progress = f"lines {offset}-{end_line} of {total_lines} ({pct}%)"
-
-        # Increment access_count
-        meta["access_count"] = meta.get("access_count", 0) + 1
-        store.update_meta(handle, meta)
 
         result: dict[str, Any] = {
             "handle": handle,

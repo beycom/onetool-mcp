@@ -99,7 +99,6 @@ def ctx_inspect(
             "total_lines": meta.get("total_lines", 0),
             "status": meta.get("status", "ready"),
             "created_at": meta.get("created_at"),
-            "access_count": meta.get("access_count", 0),
             "toc_entries": len(toc),
             "ttl_remaining": int(ttl_remaining(meta)),
         }
