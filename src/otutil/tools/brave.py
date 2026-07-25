@@ -56,6 +56,7 @@ class Config(BaseModel):
         description="Request timeout in seconds",
     )
 
+
 BRAVE_API_BASE = "https://api.search.brave.com/res/v1"
 
 # Truncation length for video descriptions (147 chars + "..." = 150 total)
@@ -87,7 +88,7 @@ def _make_request(
     endpoint: str,
     params: dict[str, Any],
     timeout: float | None = None,
-) -> tuple[bool, dict[str, Any] | str]:
+) -> tuple[Literal[True], dict[str, Any]] | tuple[Literal[False], str]:
     """Make HTTP GET request to Brave API.
 
     Args:
@@ -128,7 +129,6 @@ def _make_request(
         except Exception as e:
             span.add(error=f"{type(e).__name__}: {e}")
             return False, _format_http_error(e)
-
 
 
 def _format_web_results(
@@ -242,7 +242,6 @@ def _format_news_results(
         lines.append("")
 
     return "\n".join(lines)
-
 
 
 def _format_image_results(
@@ -484,12 +483,14 @@ def search(
     if freshness:
         params["freshness"] = freshness
 
-    success, result = _make_request("/web/search", params)
+    response = _make_request("/web/search", params)
 
-    if not success:
-        return str(result)
+    if not response[0]:
+        return response[1]
 
-    return _format_web_results(result, output_format=output_format, max_sources=max_sources)  # type: ignore[arg-type]
+    return _format_web_results(
+        response[1], output_format=output_format, max_sources=max_sources
+    )
 
 
 def news(
@@ -560,12 +561,13 @@ def news(
     if freshness:
         params["freshness"] = freshness
 
-    success, result = _make_request("/news/search", params)
+    response = _make_request("/news/search", params)
 
-    if not success:
-        return str(result)
-    return _format_news_results(result, output_format=output_format, max_sources=max_sources)  # type: ignore[arg-type]
-
+    if not response[0]:
+        return response[1]
+    return _format_news_results(
+        response[1], output_format=output_format, max_sources=max_sources
+    )
 
 
 def image(
@@ -621,11 +623,13 @@ def image(
         "safesearch": safesearch,
     }
 
-    success, result = _make_request("/images/search", params)
+    response = _make_request("/images/search", params)
 
-    if not success:
-        return str(result)
-    return _format_image_results(result, output_format=output_format, max_sources=max_sources)  # type: ignore[arg-type]
+    if not response[0]:
+        return response[1]
+    return _format_image_results(
+        response[1], output_format=output_format, max_sources=max_sources
+    )
 
 
 def video(
@@ -684,11 +688,13 @@ def video(
     if freshness:
         params["freshness"] = freshness
 
-    success, result = _make_request("/videos/search", params)
+    response = _make_request("/videos/search", params)
 
-    if not success:
-        return str(result)
-    return _format_video_results(result, output_format=output_format, max_sources=max_sources)  # type: ignore[arg-type]
+    if not response[0]:
+        return response[1]
+    return _format_video_results(
+        response[1], output_format=output_format, max_sources=max_sources
+    )
 
 
 def search_batch(
@@ -758,7 +764,9 @@ def search_batch(
     # Fall back empty labels to query text
     normalized = [(q, label or q) for q, label in normalized]
 
-    with LogSpan(span="brave.batch", queryCount=len(normalized), count=max_results) as s:
+    with LogSpan(
+        span="brave.batch", queryCount=len(normalized), count=max_results
+    ) as s:
 
         def _search_one(query: str, _label: str) -> str:
             """Execute a single search and return raw result payload."""
@@ -780,5 +788,8 @@ def search_batch(
             retry_delay_ms=retry_delay_ms,
             max_workers=min(len(normalized), 10),
         )
-        s.add(successCount=output["meta"]["success_count"], errorCount=output["meta"]["error_count"])
+        s.add(
+            successCount=output["meta"]["success_count"],
+            errorCount=output["meta"]["error_count"],
+        )
         return output

@@ -414,10 +414,10 @@ Call `.mkdir(parents=True, exist_ok=True)` yourself if you need a directory.
 ### Batch operations
 
 ```python
-from ot.utils.batch import batch_execute, normalize_items, format_batch_results
+from otpack import batch_execute, format_batch_results, normalize_items
 ```
 
-Used by brave, tavily, ground, file — use the same pattern for consistency.
+Used by Brave, Ground, Tavily, and Webfetch — use the same pattern for consistency.
 
 ### What NOT to reimplement
 

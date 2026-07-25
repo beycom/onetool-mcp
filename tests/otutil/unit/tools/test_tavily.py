@@ -815,6 +815,34 @@ class TestExtractBatch:
         result = extract_batch(url_sets=[["https://a.com"]], retry_delay_ms=10_001)
         assert "retry_delay_ms must be between 0 and 10000" in result
 
+    @patch("otutil.tools.tavily.extract")
+    def test_worker_exception_is_per_item_error(self, mock_extract):
+        def execute(*, urls, **_kwargs):
+            if urls == ["https://bad.invalid"]:
+                raise ValueError("boom")
+            return f"result:{urls[0]}"
+
+        mock_extract.side_effect = execute
+        result = extract_batch(
+            url_sets=[
+                ["https://first.invalid"],
+                ["https://bad.invalid"],
+                ["https://last.invalid"],
+            ],
+            retries=0,
+            retry_delay_ms=0,
+        )
+
+        assert [item["status"] for item in result["results"]] == [
+            "ok",
+            "error",
+            "ok",
+        ]
+        assert result["results"][1]["error"]["error_message"] == "ValueError: boom"
+        assert result["meta"]["success_count"] == 2
+        assert result["meta"]["error_count"] == 1
+        assert result["meta"]["partial_success"] is True
+
 
 @pytest.mark.unit
 @pytest.mark.tools
@@ -962,6 +990,35 @@ class TestSearchBatch:
 
         assert result["results"][0]["status"] == "ok"
         assert result["results"][0]["attempts"] == 2
+
+    @patch("otutil.tools.tavily.search")
+    def test_worker_exception_is_per_item_error(self, mock_search):
+        def execute(*, query, **_kwargs):
+            if query == "bad":
+                raise ValueError("boom")
+            return f"result:{query}"
+
+        mock_search.side_effect = execute
+        result = search_batch(
+            queries=["first", "bad", "last"],
+            retries=0,
+            retry_delay_ms=0,
+        )
+
+        assert [item["query"] for item in result["results"]] == [
+            "first",
+            "bad",
+            "last",
+        ]
+        assert [item["status"] for item in result["results"]] == [
+            "ok",
+            "error",
+            "ok",
+        ]
+        assert result["results"][1]["error"]["error_message"] == "ValueError: boom"
+        assert result["meta"]["success_count"] == 2
+        assert result["meta"]["error_count"] == 1
+        assert result["meta"]["partial_success"] is True
 
 
 @pytest.mark.unit

@@ -55,8 +55,7 @@ def validate_batch_retry_controls(retries: int, retry_delay_ms: int) -> str | No
         or not 0 <= retry_delay_ms <= 10_000
     ):
         return (
-            "Error: retry_delay_ms must be between 0 and 10000 "
-            f"(got {retry_delay_ms})"
+            f"Error: retry_delay_ms must be between 0 and 10000 (got {retry_delay_ms})"
         )
     return None
 
@@ -137,6 +136,33 @@ def _classify_error(error_message: str) -> tuple[str, bool, int | None]:
     return "unknown_error", False, provider_status
 
 
+def _classify_exception(exc: Exception) -> tuple[str, bool, int | None]:
+    """Classify a caught exception without treating its message as provenance."""
+    error_message = f"{type(exc).__name__}: {exc}"
+    exception_name = type(exc).__name__.lower()
+    status_match = _HTTP_STATUS_RE.search(error_message)
+    provider_status = int(status_match.group(1)) if status_match else None
+
+    if isinstance(exc, TimeoutError) or "timeout" in exception_name:
+        return "timeout", True, provider_status
+    if isinstance(exc, ConnectionError) or any(
+        token in exception_name for token in ("connect", "network")
+    ):
+        return "connection_error", True, provider_status
+    if "ratelimit" in exception_name:
+        return "rate_limited", True, provider_status
+    if any(
+        token in exception_name for token in ("http", "request", "response", "status")
+    ):
+        if provider_status == 429:
+            return "rate_limited", True, provider_status
+        if provider_status is not None and 500 <= provider_status <= 599:
+            return "http_5xx", True, provider_status
+        if provider_status is not None and 400 <= provider_status <= 499:
+            return "http_4xx", False, provider_status
+    return "unknown_error", False, provider_status
+
+
 def batch_execute_enveloped(
     func: Callable[[str, str], Any],
     items: list[tuple[str, str]],
@@ -174,23 +200,25 @@ def batch_execute_enveloped(
             attempts += 1
             try:
                 result = func(query, label)
-            except Exception as exc:  # pragma: no cover - exercised via search pack tests
-                result = f"{type(exc).__name__}: {exc}"
+            except Exception as exc:
+                message = f"{type(exc).__name__}: {exc}"
+                error_code, is_transient, provider_status = _classify_exception(exc)
+            else:
+                if _is_error_result(result):
+                    message = str(result)
+                    error_code, is_transient, provider_status = _classify_error(message)
+                else:
+                    return {
+                        "label": label,
+                        "query": query,
+                        "status": "ok",
+                        "data": result,
+                        "error": None,
+                        "attempts": attempts,
+                        "retried": attempts > 1,
+                        "final_failure": False,
+                    }
 
-            if not _is_error_result(result):
-                return {
-                    "label": label,
-                    "query": query,
-                    "status": "ok",
-                    "data": result,
-                    "error": None,
-                    "attempts": attempts,
-                    "retried": attempts > 1,
-                    "final_failure": False,
-                }
-
-            message = str(result)
-            error_code, is_transient, provider_status = _classify_error(message)
             should_retry = is_transient and attempts < max_attempts
             if should_retry:
                 backoff_ms = retry_delay_ms * (2 ** (attempts - 1))
@@ -323,9 +351,7 @@ def batch_execute(
     results: dict[str, R] = {}
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(func, value, label): label for value, label in items
-        }
+        futures = {executor.submit(func, value, label): label for value, label in items}
         for future in as_completed(futures):
             label, result = future.result()
             results[label] = result

@@ -683,6 +683,35 @@ class TestSearchBatchModel:
         assert isinstance(result, dict)
         assert result["meta"]["retries"] == 3
 
+    @patch("otutil.tools.ground.search")
+    def test_search_batch_worker_exception_is_per_item_error(self, mock_search):
+        def execute(*, query, **_kwargs):
+            if query == "bad":
+                raise ValueError("boom")
+            return f"result:{query}"
+
+        mock_search.side_effect = execute
+        result = search_batch(
+            queries=["first", "bad", "last"],
+            retries=0,
+            retry_delay_ms=0,
+        )
+
+        assert [item["query"] for item in result["results"]] == [
+            "first",
+            "bad",
+            "last",
+        ]
+        assert [item["status"] for item in result["results"]] == [
+            "ok",
+            "error",
+            "ok",
+        ]
+        assert result["results"][1]["error"]["error_message"] == "ValueError: boom"
+        assert result["meta"]["success_count"] == 2
+        assert result["meta"]["error_count"] == 1
+        assert result["meta"]["partial_success"] is True
+
 
 @pytest.mark.unit
 @pytest.mark.tools

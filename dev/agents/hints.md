@@ -85,7 +85,7 @@ openspec/       Specifications and proposals
 - HTTP errors: `_format_http_error()` from `ot.http_client`
 - Truncation: `truncate()` from `ot.utils.truncate` (not `[:N] + "..."`)
 - Caching: `CacheNamespace` from `ot.utils.cache`
-- Batch ops: `batch_execute`, `normalize_items` from `ot.utils.batch`
+- Batch ops: `batch_execute`, `normalize_items` from `otpack`
 - Storage dirs: `resolve_ot_path()` from `ot.meta`
 - **Never reimplement** duration parsing, SQLite pools, handle generation — check `ot.utils` first
 

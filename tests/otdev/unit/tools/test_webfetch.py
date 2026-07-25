@@ -307,3 +307,13 @@ def test_create_config_applies_download_cap():
     config = _create_config(10.0)
     assert config.get("DEFAULT", "MAX_FILE_SIZE") == "20000000"
     assert config.get("DEFAULT", "DOWNLOAD_TIMEOUT") == "10"
+
+
+@pytest.mark.unit
+@pytest.mark.tools
+@patch("otdev.tools.webfetch.fetch", side_effect=ValueError("boom"))
+def test_fetch_batch_does_not_turn_worker_exception_into_success(_mock_fetch):
+    from otdev.tools.webfetch import fetch_batch
+
+    with pytest.raises(ValueError, match="boom"):
+        fetch_batch(urls=["https://docs.python.org/"])
