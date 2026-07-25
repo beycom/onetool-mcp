@@ -65,22 +65,6 @@ Maximum include depth: 5 levels.
 
 For tool-specific config (Pydantic Config classes, secrets, path resolution), see [Tool Configuration](../guides/tool-configuration.md).
 
-## Project-Local State
-
-OneTool config is global-only in V2, but `otpack` also exposes a separate project-local state API for small runtime values:
-
-```python
-from otpack import get_state, set_state
-```
-
-This state is not config and is not loaded from `onetool.yaml`. It is stored at:
-
-```text
-<effective project cwd>/.onetool/state/<pack>/state.yaml
-```
-
-Default state directory resolution should use `get_project_state_dir(pack)` because the directory follows the effective project cwd.
-
 ## Key Files
 
 | File | Role |
@@ -88,5 +72,4 @@ Default state directory resolution should use `get_project_state_dir(pack)` beca
 | `src/ot/config/loader.py` | YAML loading, includes, variable expansion |
 | `src/ot/config/models.py` | OneToolConfig Pydantic model |
 | `src/ot/meta/_constants.py` | `resolve_ot_path()` |
-| `packages/onetool-pack/src/otpack/state.py` | Project-local pack state helpers |
 | `src/ot/utils/format.py` | Result serialisation |

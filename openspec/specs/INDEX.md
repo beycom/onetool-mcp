@@ -92,6 +92,7 @@ details belong under `openspec/changes/`, not in this index.
 | Spec | Purpose |
 |------|---------|
 | [otpack-embedding](otpack-embedding/spec.md) | Shared embedding, serialization, and ranking infrastructure |
+| [otpack-project-paths](otpack-project-paths/spec.md) | Pack-owned project state path surface |
 
 ## Domain Tools (`[util]` Extra)
 

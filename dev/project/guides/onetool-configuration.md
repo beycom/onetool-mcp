@@ -130,24 +130,6 @@ workbook = expand_path("~/Downloads/input.xlsx")
 
 If a path is project-relative, do not use `expand_path()`. If a path is OneTool-owned, do not use `resolve_cwd_path()`.
 
-## Project State
-
-`otpack` provides `get_state(pack, key)` and `set_state(pack, key, value)` for small project-local runtime state.
-
-State is not OneTool config and is not read from `onetool.yaml`. It lives under the effective project working directory:
-
-```text
-<effective project cwd>/.onetool/state/<pack>/state.yaml
-```
-
-Because this is project-relative data, resolve pack-owned directories with:
-
-```python
-from otpack import get_project_state_dir
-
-state_path = get_project_state_dir("my_pack") / "state.yaml"
-```
-
 ## Secrets
 
 Access secrets in tool code:

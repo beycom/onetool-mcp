@@ -37,6 +37,17 @@ from otpack.config import (
     get_tool_config,
     is_log_verbose,
 )
+from otpack.deps import (
+    Dependency,
+    DepsCheckResult,
+    check_cli,
+    check_lib,
+    check_secret,
+    ensure_cli,
+    ensure_lib,
+    requires_cli,
+    requires_lib,
+)
 from otpack.embedding import (
     MODEL_NATIVE_DIMS,
     TOKEN_SAFETY_MARGIN,
@@ -48,17 +59,6 @@ from otpack.embedding import (
     get_tiktoken_encoding,
     rrf_merge,
     serialize_embedding,
-)
-from otpack.deps import (
-    Dependency,
-    DepsCheckResult,
-    check_cli,
-    check_lib,
-    check_secret,
-    ensure_cli,
-    ensure_lib,
-    requires_cli,
-    requires_lib,
 )
 from otpack.factory import LazyClient, lazy_client
 from otpack.http import (
@@ -79,7 +79,6 @@ from otpack.paths import (
 )
 from otpack.pathsec import DEFAULT_EXCLUDE_PATTERNS, is_path_excluded, validate_path
 from otpack.platform import get_install_hint
-from otpack.state import get_state, set_state
 from otpack.text import (
     extract_structured_data,
     format_error,
@@ -136,7 +135,6 @@ __all__ = [
     "get_project_artifact_dir",
     "get_project_state_dir",
     "get_secret",
-    "get_state",
     "get_tiktoken_encoding",
     "get_tool_config",
     "is_log_verbose",
@@ -152,7 +150,6 @@ __all__ = [
     "run_command",
     "safe_request",
     "serialize_embedding",
-    "set_state",
     "sign_http_message",
     "truncate",
     "validate_batch_retry_controls",
