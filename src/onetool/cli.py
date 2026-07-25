@@ -761,12 +761,7 @@ def init_validate(
             total_tools = 0
             pack_list = []
             for pack_name, pack_funcs in sorted(registry.packs.items()):
-                from ot.executor.worker_proxy import WorkerPackProxy
-
-                if isinstance(pack_funcs, WorkerPackProxy):
-                    func_count = len(pack_funcs.functions)
-                else:
-                    func_count = len(pack_funcs)
+                func_count = len(pack_funcs)
                 total_tools += func_count
                 pack_list.append((pack_name, func_count))
 

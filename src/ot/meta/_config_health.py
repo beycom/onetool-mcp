@@ -62,8 +62,6 @@ def status() -> dict[str, Any]:
     from ot.executor.tool_loader import load_tool_registry
 
     with log(span="ot.status") as s:
-        from ot.executor.worker_proxy import WorkerPackProxy
-
         runner_registry = load_tool_registry()
         proxy = get_proxy_manager()
         cfg = get_config()
@@ -71,13 +69,7 @@ def status() -> dict[str, Any]:
             name: server for name, server in cfg.servers.items() if server.enabled
         }
 
-        # Count functions, handling both dict and WorkerPackProxy
-        tool_count = 0
-        for funcs in runner_registry.packs.values():
-            if isinstance(funcs, WorkerPackProxy):
-                tool_count += len(funcs.functions)
-            else:
-                tool_count += len(funcs)
+        tool_count = sum(len(funcs) for funcs in runner_registry.packs.values())
         warnings_out: list[str] = []
 
         server_statuses: dict[str, Any] = {}

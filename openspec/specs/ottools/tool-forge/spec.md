@@ -53,11 +53,6 @@ The ot_forge pack SHALL provide a `validate_ext()` function for pre-reload valid
 - **AND** the file is missing `pack` or `__all__`
 - **THEN** it returns "Validation FAILED" with errors
 
-#### Scenario: Warn about ot_sdk imports
-- **WHEN** `ot_forge.validate_ext(path="/path/to/tool.py")` is called
-- **AND** the file imports from `ot_sdk`
-- **THEN** it includes a warning that extension tools should use current `ot.*` imports
-
 #### Scenario: Best practices warnings
 - **WHEN** `ot_forge.validate_ext(path="/path/to/extension.py")` is called
 - **AND** the file violates best practices (pack after imports, missing logging)

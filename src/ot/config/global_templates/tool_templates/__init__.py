@@ -1,6 +1,6 @@
 """Extension tool templates.
 
-Templates for creating user extension tools that run in worker subprocesses.
+Templates for creating user extension tools that run in-process.
 
 Available templates:
 - extension.py: Unified template with optional sections for HTTP, API keys, etc.

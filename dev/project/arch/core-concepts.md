@@ -58,8 +58,8 @@ The namespace passed to `exec()` contains only:
 | Key | Type | Purpose |
 |-----|------|---------|
 | `brave`, `file`, ... | `PackProxy` | Tool pack dot-notation access |
+| configured extensions | `PackProxy` | In-process extension pack access |
 | `github`, ... | `McpProxyPack` | External MCP server proxy |
-| `db`, ... | `WorkerPackProxy` | Subprocess-isolated tools |
 | `__format__` | magic var | Output format control |
 | `__sanitize__` | magic var | Output sanitisation toggle |
 | `str`, `int`, `len`, ... | builtins | Allowlisted safe builtins |

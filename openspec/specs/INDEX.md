@@ -51,7 +51,6 @@ details belong under `openspec/changes/`, not in this index.
 | [serve-stats](serve-stats/spec.md) | Runtime statistics reporting |
 | [serve-telemetry](serve-telemetry/spec.md) | Anonymous startup telemetry |
 | [console-outbox](console-outbox/spec.md) | Console outbox protocol contract (v1, server implementation post-V3) |
-| [tool-execution](tool-execution/spec.md) | Extension tool execution worker behavior |
 | [tool-ot](tool-ot/spec.md) | Internal `ot.*` runtime helper pack |
 | [batch-retry-envelope](batch-retry-envelope/spec.md) | Structured batch retry envelopes |
 | [field-level-provenance](field-level-provenance/spec.md) | Field-level provenance output contracts |
@@ -88,6 +87,12 @@ details belong under `openspec/changes/`, not in this index.
 | [tool-console](ottools/tool-console/spec.md) | Console messages to onetool-console: show, display with digest receipts and file refs, list/read/clear |
 | [tool-timer](ottools/tool-timer/spec.md) | Named stopwatch timers |
 
+## Shared Packages
+
+| Spec | Purpose |
+|------|---------|
+| [otpack-embedding](otpack-embedding/spec.md) | Shared embedding, serialization, and ranking infrastructure |
+
 ## Domain Tools (`[util]` Extra)
 
 | Spec | Purpose |
@@ -103,7 +108,10 @@ details belong under `openspec/changes/`, not in this index.
 
 | Spec | Purpose |
 |------|---------|
+| [tool-arch-drawio-export](otdev/tool-arch-drawio-export/spec.md) | Architecture draw.io export |
 | [tool-arch-model-centric-rendering](otdev/tool-arch-model-centric-rendering/spec.md) | Architecture model import, validation, export, and rendering |
+| [tool-arch-solution-report](otdev/tool-arch-solution-report/spec.md) | Architecture solution-report generation |
+| [tool-arch-validation-warnings](otdev/tool-arch-validation-warnings/spec.md) | Architecture validation warning behavior |
 | [tool-context7](otdev/tool-context7/spec.md) | Context7 documentation lookup |
 | [tool-db](otdev/tool-db/spec.md) | SQL database introspection and querying |
 | [tool-diagram](otdev/tool-diagram/spec.md) | Diagram generation and rendering |
@@ -119,10 +127,11 @@ details belong under `openspec/changes/`, not in this index.
 |----------|-------|
 | Non-Functional | 5 |
 | CLI And Direct APIs | 4 |
-| MCP Server Runtime | 21 |
+| MCP Server Runtime | 20 |
 | Browser Utilities | 2 |
 | Knowledge, Context, And Memory | 6 |
 | Core Built-In Tool Packs | 6 |
+| Shared Packages | 1 |
 | Domain Tools `[util]` | 6 |
-| Domain Tools `[dev]` | 9 |
-| **Total** | **59** |
+| Domain Tools `[dev]` | 12 |
+| **Total** | **62** |

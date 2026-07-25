@@ -120,7 +120,6 @@ def _get_runtime_info() -> dict[str, Any]:
     from datetime import UTC, datetime
 
     from ot.executor.tool_loader import load_tool_registry
-    from ot.executor.worker_proxy import WorkerPackProxy
     from ot.logging.config import get_runtime_log_identity
     from ot.proxy import get_proxy_manager
 
@@ -129,12 +128,7 @@ def _get_runtime_info() -> dict[str, Any]:
     cfg = get_config()
 
     # Count local tools
-    tool_count = 0
-    for funcs in registry.packs.values():
-        if isinstance(funcs, WorkerPackProxy):
-            tool_count += len(funcs.functions)
-        else:
-            tool_count += len(funcs)
+    tool_count = sum(len(funcs) for funcs in registry.packs.values())
 
     # Count proxy connections
     connected = sum(1 for name in cfg.servers if proxy.get_connection(name))

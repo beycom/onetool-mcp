@@ -15,8 +15,7 @@ Example usage in an extension tool:
     brave = get_pack("brave")
     results = brave.search(query="test")
 
-Note: These functions are only available in bundled and extension tools.
-Isolated tools (subprocess with PEP 723) cannot use this API.
+These functions are available in bundled and configured extension tools.
 """
 
 from __future__ import annotations
@@ -61,11 +60,7 @@ def call_tool(name: str, **kwargs: Any) -> Any:
             )
 
         pack_funcs = registry.packs[pack_name]
-        if hasattr(pack_funcs, "__getattr__"):
-            # WorkerPackProxy - list functions differently
-            available_funcs = "use get_pack() to discover functions"
-        else:
-            available_funcs = ", ".join(sorted(pack_funcs.keys()))
+        available_funcs = ", ".join(sorted(pack_funcs.keys()))
         raise KeyError(
             f"Function '{func_name}' not found in pack '{pack_name}'. "
             f"Available: {available_funcs}"

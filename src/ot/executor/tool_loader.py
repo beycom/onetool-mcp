@@ -4,7 +4,6 @@ Handles:
 - Loading tool functions from config-defined tool files
 - Caching based on file modification times
 - Pack extraction from tool modules
-- PEP 723 detection for routing to worker processes
 
 Used by the runner to make tools available during code execution.
 """
@@ -22,10 +21,7 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from ot.executor.pep723 import ToolFileInfo, categorize_tools
-from ot.executor.worker_proxy import create_worker_proxy
 from ot.logging import LogEntry
-from ot.paths import get_effective_cwd
 
 
 def _get_bundled_tools_dir() -> Path | None:
@@ -74,12 +70,6 @@ class LoadedTools:
 
     functions: dict[str, Any]  # Full name -> callable (e.g., "brave.search" -> func)
     packs: dict[str, dict[str, Any]]  # Nested: pack -> {name -> callable}
-    worker_tools: list[ToolFileInfo] = field(
-        default_factory=list
-    )  # Tools using workers
-    extension_tools: list[ToolFileInfo] = field(
-        default_factory=list
-    )  # User extension tools (non-internal inprocess)
     pack_aliases: dict[str, tuple[str, ...]] = field(default_factory=dict)
     doc_slugs: dict[str, str] = field(default_factory=dict)
 
@@ -119,7 +109,7 @@ def _cache_set(key: Path, value: tuple[LoadedTools, dict[str, float], float]) ->
 
 def _get_tool_files(
     tools_dir: Path | None, config: OneToolConfig | None
-) -> tuple[set[Path], set[Path], Path]:
+) -> tuple[set[Path], Path]:
     """Resolve tool files from config, bundled package, or directory.
 
     Always includes bundled tools from ottools package, plus any
@@ -130,18 +120,15 @@ def _get_tool_files(
         config: Loaded configuration (may be None).
 
     Returns:
-        Tuple of (all tool file paths, internal tool paths, cache key).
+        Tuple of (all tool file paths, cache key).
     """
     tool_files: list[Path] = []
-    internal_files: set[Path] = set()
 
     # Always include bundled tools from ottools package
     bundled_dir = _get_bundled_tools_dir()
     if bundled_dir and bundled_dir.exists():
         bundled_files = [f for f in bundled_dir.glob("*.py") if f.name != "__init__.py"]
         tool_files.extend(bundled_files)
-        # Mark bundled tools as internal (shipped with OneTool)
-        internal_files = {f.resolve() for f in bundled_files if f.exists()}
         logger.debug(f"Found {len(bundled_files)} bundled tools from {bundled_dir}")
 
     # Include domain extra tools (otdev, otutil) if installed
@@ -149,7 +136,6 @@ def _get_tool_files(
         if extra_dir.exists():
             extra_files = [f for f in extra_dir.glob("*.py") if f.name != "__init__.py"]
             tool_files.extend(extra_files)
-            internal_files |= {f.resolve() for f in extra_files if f.exists()}
             logger.debug(f"Found {len(extra_files)} domain tools from {extra_dir}")
 
     # Add config-specified tools (these are extension tools, not internal)
@@ -167,10 +153,10 @@ def _get_tool_files(
         cache_key = Path("__bundled__")
 
     if not tool_files:
-        return set(), set(), Path("__no_tools__")
+        return set(), Path("__no_tools__")
 
     current_files = {f.resolve() for f in tool_files if f.exists()}
-    return current_files, internal_files, cache_key
+    return current_files, cache_key
 
 
 def _check_cache(cache_key: Path, current_files: set[Path]) -> LoadedTools | None:
@@ -212,84 +198,15 @@ def _check_cache(cache_key: Path, current_files: set[Path]) -> LoadedTools | Non
     return cached_registry
 
 
-def _load_worker_tools(
-    worker_tools: list[ToolFileInfo],
-    config_dict: dict[str, Any],
-    secrets: dict[str, Any],
-    packs: dict[str, dict[str, Any]],
-    mtimes: dict[str, float],
-) -> tuple[dict[str, Any], list[ToolFileInfo]]:
-    """Load PEP 723 tools via worker proxies.
-
-    Args:
-        worker_tools: List of tool file info for extension tools.
-        config_dict: Configuration as dict.
-        secrets: Secrets dict.
-        packs: Packs dict to populate.
-        mtimes: Modification times dict to populate.
-
-    Returns:
-        Tuple of (functions dict, loaded extension tools list).
-    """
-    functions: dict[str, Any] = {}
-    loaded_workers: list[ToolFileInfo] = []
-
-    for tool_info in worker_tools:
-        py_file = tool_info.path
-        try:
-            mtimes[str(py_file)] = py_file.stat().st_mtime
-
-            pack = tool_info.pack
-            if pack and pack in packs:
-                logger.warning(
-                    f"Pack collision: '{pack}' already defined, "
-                    f"merging functions from {py_file.stem}"
-                )
-
-            proxy = create_worker_proxy(
-                tool_path=py_file,
-                functions=tool_info.functions,
-                config=config_dict,
-                secrets=secrets,
-            )
-
-            if pack:
-                if pack not in packs:
-                    packs[pack] = {}
-                packs[pack] = proxy  # type: ignore[assignment]
-                for func_name in tool_info.functions:
-                    full_name = f"{pack}.{func_name}"
-                    functions[full_name] = getattr(proxy, func_name)
-            else:
-                for func_name in tool_info.functions:
-                    functions[func_name] = getattr(proxy, func_name)
-
-            loaded_workers.append(tool_info)
-            logger.debug(
-                f"Loaded extension tool {py_file.stem} with {len(tool_info.functions)} functions"
-            )
-
-        except Exception as e:
-            logger.warning(
-                LogEntry(
-                    event="tool_loader.extension_load.failed",
-                    module=py_file.stem,
-                    path=py_file,
-                ).failure(e)
-            )
-
-    return functions, loaded_workers
-
-
 def _load_inprocess_tools(
-    inprocess_tools: list[ToolFileInfo],
+    tool_files: list[Path],
     packs: dict[str, dict[str, Any]],
     mtimes: dict[str, float],
 ) -> tuple[dict[str, Any], dict[str, tuple[str, ...]], dict[str, str]]:
     """Load regular Python tools via importlib.
 
     Args:
-        inprocess_tools: List of tool file info for in-process tools.
+        tool_files: Tool files to load in-process.
         packs: Packs dict to populate.
         mtimes: Modification times dict to populate.
 
@@ -300,8 +217,7 @@ def _load_inprocess_tools(
     pack_aliases: dict[str, tuple[str, ...]] = {}
     doc_slugs: dict[str, str] = {}
 
-    for tool_info in inprocess_tools:
-        py_file = tool_info.path
+    for py_file in tool_files:
         # Include parent dir to reduce sys.modules key collisions between tool packages
         module_name = f"ot_tool.{py_file.parent.name}.{py_file.stem}"
 
@@ -361,6 +277,7 @@ def _load_inprocess_tools(
                         functions[name] = obj
 
         except Exception as e:
+            sys.modules.pop(module_name, None)
             logger.warning(
                 LogEntry(
                     event="tool_loader.module_load.failed",
@@ -379,12 +296,9 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
     Reads `pack` module variable from each tool file to group functions.
 
     Tool loading strategy:
-    - Internal tools (bundled with OneTool from ottools package): Run in-process
-      via importlib. These tools have no PEP 723 headers and use ot.* imports.
-    - Extension tools (user-created without PEP 723 headers): Run in-process
-      with full ot.* access (logging, config, inter-tool calling).
-    - Isolated tools (user-created with PEP 723 headers): Run in worker
-      subprocesses with isolated dependencies. Fully standalone, no ot imports.
+    - Bundled and configured tools run in-process via importlib.
+    - Inline script metadata is ordinary Python comment content and does not
+      change loading or install dependencies.
 
     The core 'ot' pack (from meta.py) is always registered regardless of config.
 
@@ -397,10 +311,8 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
         LoadedTools with functions dict (pack-qualified keys) and packs dict.
     """
     from ot.config.loader import get_config
-    from ot.config.secrets import get_secrets
-
     config = get_config()
-    current_files, internal_files, cache_key = _get_tool_files(tools_dir, config)
+    current_files, cache_key = _get_tool_files(tools_dir, config)
 
     if not current_files:
         return LoadedTools(functions={}, packs={})
@@ -414,28 +326,10 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
     packs: dict[str, dict[str, Any]] = {}
     mtimes: dict[str, float] = {}
 
-    # Categorize tools: internal (bundled) vs extension (user-created)
-    # Internal tools run in-process, extension tools with PEP 723 use workers
-    worker_tools, inprocess_tools = categorize_tools(
-        list(current_files), internal_files
-    )
-
-    secrets = get_secrets()
-    config_dict = config.model_dump() if config else {}
-
-    # Inject path context for isolated worker tools
-    config_dict["_project_path"] = str(get_effective_cwd())
-    if config and config._config_dir:
-        config_dict["_config_dir"] = str(config._config_dir)
-
-    worker_funcs, worker_tools_list = _load_worker_tools(
-        worker_tools, config_dict, secrets, packs, mtimes
-    )
     inprocess_funcs, pack_aliases, doc_slugs = _load_inprocess_tools(
-        inprocess_tools, packs, mtimes
+        sorted(current_files), packs, mtimes
     )
-
-    functions = {**worker_funcs, **inprocess_funcs}
+    functions = dict(inprocess_funcs)
 
     # Register the core 'ot' pack from meta.py (not loaded from tools_dir)
     ot_funcs = _register_ot_pack(packs)
@@ -444,8 +338,6 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
     registry = LoadedTools(
         functions=functions,
         packs=packs,
-        worker_tools=worker_tools_list,
-        extension_tools=[t for t in inprocess_tools if not t.is_internal],
         pack_aliases=pack_aliases,
         doc_slugs=doc_slugs,
     )

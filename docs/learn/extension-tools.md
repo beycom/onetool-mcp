@@ -7,7 +7,8 @@ Extension tools run in-process with full access to OneTool's logging, config, se
 ## Quick Reference
 
 - Define `pack = "name"` and exported keyword-only functions.
-- Decorate each callable with `@tool` for registry discovery.
+- Use `@tool` only when you need its optional metadata; exported functions are
+  discovered without it.
 - Use OneTool APIs for config, secrets, logging, and calling other tools.
 - Validate/reload quickly during development with Forge and `ot.reload()`.
 
@@ -188,9 +189,8 @@ For development, create a `.onetool/` directory in your extension repository:
 ```
 my-extension/
 ├── .onetool/
-│   └── config/
-│       ├── onetool.yaml     # Server config (tools_dir, etc.)
-│       ├── secrets.yaml     # API keys for testing
+│   ├── onetool.yaml         # Server config (tools_dir, etc.)
+│   └── secrets.yaml         # API keys for testing
 └── src/
     └── mytool.py
 ```
@@ -200,19 +200,20 @@ my-extension/
 Point `tools_dir` at your extension source:
 
 ```yaml
-# .onetool/config/onetool.yaml
+# .onetool/onetool.yaml
 tools_dir:
   - ./src/*.py
 ```
 
-Run `onetool` from your extension directory. It finds `.onetool/config/onetool.yaml` automatically.
+Run `onetool` from your extension directory. It finds
+`.onetool/onetool.yaml` automatically.
 
 ### secrets.yaml
 
 Add API keys your tool needs during development:
 
 ```yaml
-# .onetool/config/secrets.yaml
+# .onetool/secrets.yaml
 MY_API_KEY: "dev-key-for-testing"
 ```
 
@@ -278,7 +279,7 @@ tools_dir:
 ### Project-Specific
 
 ```yaml
-# project/.onetool/config/onetool.yaml
+# project/.onetool/onetool.yaml
 tools_dir:
   - ~/extensions/my-extension/src/*.py
   - ./local-tools/*.py
@@ -318,6 +319,10 @@ Validate before reloading:
 ```python
 ot_forge.validate_ext(path=".onetool/tools/my_tool/my_tool.py")
 ```
+
+Configured extensions run in the OneTool process. Install their dependencies
+in the same OneTool environment; inline PEP 723 script blocks are treated as
+ordinary comments and do not install packages or change execution routing.
 
 ## Larger Extensions
 

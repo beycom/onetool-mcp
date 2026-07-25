@@ -157,6 +157,56 @@ def test_create_ext_uses_nested_layout_for_tools_star_star_py(mock_ot_dir: Path)
     assert (mock_ot_dir / "tools" / "nested_tool" / "nested_tool.py").exists()
 
 
+@pytest.mark.unit
+@pytest.mark.tools
+def test_forge_extension_with_inline_metadata_loads_and_reloads_in_process(
+    mock_ot_dir: Path,
+) -> None:
+    """Forge output uses the in-process route even with inline script comments."""
+    import subprocess
+
+    from ot.executor import tool_loader
+    from ottools.ot_forge import create_ext
+
+    cfg = type("Cfg", (), {"tools_dir": ["tools/*.py"]})()
+    with patch("ot.config.loader.get_config", return_value=cfg):
+        result = create_ext(name="inline_metadata")
+    assert "Created extension:" in result
+
+    ext_file = mock_ot_dir / "tools" / "inline_metadata.py"
+    content = ext_file.read_text()
+    ext_file.write_text(
+        '# /// script\n# dependencies = ["not-installed-by-onetool"]\n# ///\n'
+        + content
+    )
+
+    with (
+        patch("ot.config.loader.get_config", return_value=None),
+        patch.object(tool_loader, "_get_bundled_tools_dir", return_value=None),
+        patch.object(tool_loader, "_get_domain_tool_dirs", return_value=[]),
+        patch.object(subprocess, "Popen") as popen,
+    ):
+        try:
+            tool_loader.reset()
+            registry = tool_loader.load_tool_registry(tools_dir=ext_file.parent)
+            assert registry.functions["inline_metadata.run"](input="first") == (
+                "Processed: first"
+            )
+            popen.assert_not_called()
+
+            ext_file.write_text(
+                ext_file.read_text().replace("Processed: {input}", "Reloaded: {input}")
+            )
+            tool_loader.reset()
+            reloaded = tool_loader.load_tool_registry(tools_dir=ext_file.parent)
+            assert reloaded.functions["inline_metadata.run"](input="second") == (
+                "Reloaded: second"
+            )
+            popen.assert_not_called()
+        finally:
+            tool_loader.reset()
+
+
 # =============================================================================
 # validate_ext() Tests
 # =============================================================================
@@ -265,47 +315,6 @@ def run(*, input: str) -> str
     result = validate_ext(path=str(ext_file))
 
     assert "Syntax error" in result
-
-
-@pytest.mark.unit
-@pytest.mark.tools
-def test_validate_ext_warns_ot_sdk_deprecated(tmp_path: Path) -> None:
-    """Verify validate_ext() warns about deprecated ot_sdk imports."""
-    from ottools.ot_forge import validate_ext
-
-    ext_file = tmp_path / "old_style.py"
-    ext_file.write_text('''"""My tool using deprecated SDK."""
-
-from __future__ import annotations
-
-pack = "mytool"
-__all__ = ["run"]
-
-from ot_sdk import log, worker_main
-
-def run(*, input: str) -> str:
-    """Run the tool.
-
-    Args:
-        input: The input
-
-    Returns:
-        The result
-
-    Example:
-        mytool.run(input="test")
-    """
-    with log("mytool.run"):
-        return input
-
-if __name__ == "__main__":
-    worker_main()
-''')
-
-    result = validate_ext(path=str(ext_file))
-
-    assert "DEPRECATED" in result
-    assert "ot_sdk" in result
 
 
 @pytest.mark.unit

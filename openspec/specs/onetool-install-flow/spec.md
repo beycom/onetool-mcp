@@ -5,7 +5,7 @@ TBD - created by archiving change p15-install-flow-and-mcp-config. Update Purpos
 ## Requirements
 ### Requirement: Bootstrap installer script
 
-OneTool SHALL ship a POSIX shell bootstrap script (`scripts/install.sh`) and a PowerShell bootstrap script (`scripts/install.ps1`) that wrap `uv` — never replace it — and collapse the install → init → mcp-config sequence into a single documented command. PyInstaller-style single-binary packaging is explicitly rejected: OneTool's worker-pool tools resolve PEP 723 dependencies via `uv run` at runtime (`src/ot/executor/worker_pool.py:220-222`), so a frozen binary would have no `uv` available and would break every worker-pool pack (db, excel, etc.) plus `ot_forge` extensions; a frozen binary also cannot express the optional-extras model and would carry a per-platform sign/notarize burden the bootstrap avoids entirely.
+OneTool SHALL ship a POSIX shell bootstrap script (`scripts/install.sh`) and a PowerShell bootstrap script (`scripts/install.ps1`) that wrap `uv` — never replace it — and collapse the install → init → mcp-config sequence into a single documented command. PyInstaller-style single-binary packaging is explicitly rejected because a frozen binary cannot express OneTool's optional-extras and in-process extension dependency model and would carry a per-platform sign/notarize burden the bootstrap avoids entirely.
 
 Both scripts SHALL, in order:
 1. Detect the host platform.
@@ -93,4 +93,3 @@ Documentation SHALL present install → init → mcp-config → validate as a si
 - **WHEN** the documented sequence (bootstrap install → `onetool init` → paste `onetool init mcp-config` output into an MCP client → `onetool init validate`) is followed exactly as documented, with no manual path edits
 - **THEN** the MCP client SHALL connect to the `onetool` server successfully
 - **AND** a first `ot.status()` call through that client SHALL succeed
-

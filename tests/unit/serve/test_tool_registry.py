@@ -34,33 +34,23 @@ def test_registry_has_packs() -> None:
 def test_registry_packs_have_correct_functions() -> None:
     """Verify each pack has its own functions."""
     from ot.executor.tool_loader import load_tool_registry
-    from ot.executor.worker_proxy import WorkerPackProxy
 
     registry = load_tool_registry()
 
     # brave pack should have brave-specific functions
     brave_pack = registry.packs["brave"]
-    if isinstance(brave_pack, WorkerPackProxy):
-        assert "search" in brave_pack.functions
-        brave_search = brave_pack.search
-    else:
-        assert "search" in brave_pack
-        brave_search = brave_pack["search"]
+    assert "search" in brave_pack
+    brave_search = brave_pack["search"]
 
     # ground pack should have ground-specific functions
     ground_pack = registry.packs["ground"]
-    if isinstance(ground_pack, WorkerPackProxy):
-        assert "search" in ground_pack.functions
-        ground_search = ground_pack.search
-    else:
-        assert "search" in ground_pack
-        ground_search = ground_pack["search"]
-        # Check docstrings for non-proxy functions
-        assert "Gemini" in (ground_search.__doc__ or "") or "grounding" in (
-            ground_search.__doc__ or ""
-        )
+    assert "search" in ground_pack
+    ground_search = ground_pack["search"]
+    assert "Gemini" in (ground_search.__doc__ or "") or "grounding" in (
+        ground_search.__doc__ or ""
+    )
 
-    # These should be different functions/proxies
+    # These should be different functions
     assert brave_search is not ground_search
 
 
@@ -69,17 +59,9 @@ def test_registry_packs_have_correct_functions() -> None:
 def test_registry_counts_all_functions() -> None:
     """Verify we can count all functions across packs without collision."""
     from ot.executor.tool_loader import load_tool_registry
-    from ot.executor.worker_proxy import WorkerPackProxy
 
     registry = load_tool_registry()
-
-    # Count functions per pack - handle both dict and WorkerPackProxy
-    total = 0
-    for pack in registry.packs.values():
-        if isinstance(pack, WorkerPackProxy):
-            total += len(pack.functions)
-        else:
-            total += len(pack)
+    total = sum(len(pack) for pack in registry.packs.values())
 
     # Should have many tools (including duplicates like 'search' in multiple packs)
     assert total >= 30
@@ -120,11 +102,9 @@ def test_pack_proxy_returns_correct_function() -> None:
     brave_search = namespace["brave"].search
     ground_search = namespace["ground"].search
 
-    # They should be different functions/proxies
+    # They should be different functions
     assert brave_search is not ground_search
 
-    # For non-worker-proxy packs, check docstrings
-    # For worker-proxy packs, just verify they're callable
     assert callable(brave_search)
     assert callable(ground_search)
 
@@ -167,7 +147,6 @@ def test_pack_proxy_resolves_abbreviated_params_for_domain_tools() -> None:
 def test_registry_functions_by_full_name() -> None:
     """Verify we can look up functions by full pack.function name from packs dict."""
     from ot.executor.tool_loader import load_tool_registry
-    from ot.executor.worker_proxy import WorkerPackProxy
 
     registry = load_tool_registry()
 
@@ -179,10 +158,6 @@ def test_registry_functions_by_full_name() -> None:
         if pack_name not in registry.packs:
             return None
         pack = registry.packs[pack_name]
-        if isinstance(pack, WorkerPackProxy):
-            if func_name in pack.functions:
-                return getattr(pack, func_name)
-            return None
         return pack.get(func_name)
 
     # Should find each search function

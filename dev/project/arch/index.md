@@ -25,15 +25,12 @@ graph TD
     TL --> REG[registry/<br/>AST-based metadata scan]
 
     R --> SE[SimpleExecutor<br/>Host-process - fast]
-    R --> WP[WorkerPool<br/>Subprocess - PEP 723]
     R --> PM[ProxyManager<br/>External MCP servers]
 
-    SE --> BT[Built-in Tools<br/>brave, file, ripgrep, ...]
-    WP --> WT[Worker Tools<br/>db, excel, ...]
+    SE --> BT[Built-in and Extension Tools<br/>brave, file, custom packs, ...]
     PM --> ET[External Servers<br/>github, devtools, ...]
 
     BT --> SER[Result Serialisation<br/>JSON / YAML / raw]
-    WT --> SER
     ET --> SER
 
     SER --> RESP[MCP Response]
@@ -42,7 +39,6 @@ graph TD
     style S fill:#f3e5f5
     style R fill:#fff3e0
     style SE fill:#e8f5e9
-    style WP fill:#e8f5e9
     style PM fill:#e8f5e9
     style SER fill:#fce4ec
 ```
@@ -65,7 +61,6 @@ src/
       param_resolver.py      #     Keyword argument resolution
       fence_processor.py     #     Strip prefixes & code fences
       simple.py              #     In-process executor
-      worker_pool.py         #     Subprocess executor
       linter.py              #     Code linting
     registry/                #   Tool metadata scanning (AST-based)
     shortcuts/               #   Aliases & snippets

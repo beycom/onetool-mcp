@@ -258,7 +258,7 @@ def check_deps(
             from ot.executor.tool_loader import _get_tool_files
 
             config = get_config()
-            current_files, _internal_files, _cache_key = _get_tool_files(None, config)
+            current_files, _cache_key = _get_tool_files(None, config)
             files.extend(sorted(current_files))
         except Exception:
             pass

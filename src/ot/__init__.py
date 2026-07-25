@@ -21,7 +21,7 @@ from typing import Any
 try:
     __version__ = version("onetool-mcp")
 except PackageNotFoundError:
-    __version__ = "0.0.0-dev"  # Running from source or in worker subprocess
+    __version__ = "0.0.0-dev"  # Running from source
 
 __all__ = ["__version__", "main"]
 

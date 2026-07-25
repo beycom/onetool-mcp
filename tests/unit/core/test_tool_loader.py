@@ -59,7 +59,7 @@ class TestModuleCacheBounds:
         from ot.executor.tool_loader import LoadedTools
 
         loader._MODULE_CACHE_MAXSIZE = 3
-        mock_tools = LoadedTools(functions={}, packs={}, worker_tools=[])
+        mock_tools = LoadedTools(functions={}, packs={})
 
         # Add entries up to and beyond maxsize
         for i in range(5):
@@ -83,7 +83,7 @@ class TestModuleCacheBounds:
         import ot.executor.tool_loader as loader
         from ot.executor.tool_loader import LoadedTools
 
-        mock_tools = LoadedTools(functions={}, packs={}, worker_tools=[])
+        mock_tools = LoadedTools(functions={}, packs={})
 
         # Add two entries
         path1 = Path("/test/lru/1")
@@ -191,3 +191,37 @@ class TestResetClearsNamespaceCache:
         loader.reset()
 
         assert "__test__" not in pack_proxy._namespace_cache
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_failed_extension_does_not_hide_valid_pack(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A missing in-process dependency fails only the affected extension."""
+    import sys
+
+    import ot.executor.tool_loader as loader
+
+    (tmp_path / "good.py").write_text(
+        'pack = "good"\n__all__ = ["run"]\ndef run(*, value: str) -> str:\n'
+        "    return value\n"
+    )
+    (tmp_path / "bad.py").write_text(
+        'import dependency_that_is_not_installed\npack = "bad"\n'
+        '__all__ = ["run"]\ndef run(*, value: str) -> str:\n    return value\n'
+    )
+
+    monkeypatch.setattr("ot.config.loader.get_config", lambda: None)
+    monkeypatch.setattr(loader, "_get_bundled_tools_dir", lambda: None)
+    monkeypatch.setattr(loader, "_get_domain_tool_dirs", lambda: [])
+
+    try:
+        loader.reset()
+        registry = loader.load_tool_registry(tools_dir=tmp_path)
+        assert registry.functions["good.run"](value="ok") == "ok"
+        assert "bad" not in registry.packs
+        assert "bad.run" not in registry.functions
+        assert f"ot_tool.{tmp_path.name}.bad" not in sys.modules
+    finally:
+        loader.reset()

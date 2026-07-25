@@ -290,7 +290,6 @@ def build_execution_namespace(
     Returns:
         Dict suitable for use as exec() globals
     """
-    from ot.executor.worker_proxy import WorkerPackProxy
     from ot.proxy import get_proxy_manager
 
     config = get_config()
@@ -317,11 +316,7 @@ def build_execution_namespace(
 
     # Add pack proxies for dot notation
     for pack_name, pack_funcs in registry.packs.items():
-        if isinstance(pack_funcs, WorkerPackProxy):
-            # Extension tools already have a proxy - use directly
-            namespace[pack_name] = pack_funcs
-        else:
-            namespace[pack_name] = _create_pack_proxy(pack_name, pack_funcs)
+        namespace[pack_name] = _create_pack_proxy(pack_name, pack_funcs)
 
     # Inject aliases declared beside each pack, e.g. wf → webfetch.
     for full_name, aliases in getattr(registry, "pack_aliases", {}).items():

@@ -180,14 +180,17 @@ __onetool ot_secrets.encrypt(file="~/.onetool/secrets.yaml")  # Encrypt values i
 
 Once encrypted, `secrets.yaml` is safe to inspect and commit — values cannot be recovered without the OS keychain key. See [Encrypting Secrets at Rest](../reference/cli/onetool-config.md#encrypting-secrets-at-rest) for full setup and usage.
 
-### 8. Worker Process Isolation
+### 8. In-Process Tool Execution
 
-Tools run in isolated worker processes:
+Bundled and configured extension tools run in the OneTool server process. Tool
+code is trusted code with access to that process, its configured APIs, and the
+installed Python environment. OneTool does not provide process isolation,
+automatic dependency installation from inline metadata, or hard termination
+of synchronous tool work.
 
-- Separate memory space from main server
-- Controlled execution environment (no arbitrary imports)
-- Timeout enforcement per tool
-- Clean process state between calls
+Install extension dependencies in the OneTool environment and review extension
+code before configuring it. External MCP servers remain separate services
+connected through the proxy manager.
 
 ### 9. Output Sanitization (Prompt Injection Protection)
 

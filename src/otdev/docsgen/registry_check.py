@@ -7,7 +7,6 @@ from pathlib import Path
 
 from ot.config.loader import get_config
 from ot.executor.tool_loader import load_tool_registry
-from ot.executor.worker_proxy import WorkerPackProxy
 from otdev.docsgen.metadata import PACK_BY_DISPLAY_NAME
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -43,10 +42,7 @@ def runtime_tool_counts() -> dict[str, int]:
 
     actual_counts: dict[str, int] = {}
     for pack, funcs in reg.packs.items():
-        if isinstance(funcs, WorkerPackProxy):
-            actual_counts[pack] = len(funcs.functions)
-        else:
-            actual_counts[pack] = len(funcs)
+        actual_counts[pack] = len(funcs)
     return actual_counts
 
 
@@ -124,4 +120,3 @@ def main() -> int:
 
     print("docs registry check passed")
     return 0
-

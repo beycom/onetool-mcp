@@ -106,17 +106,8 @@ def tools(
         detail_info: InfoLevel = "full" if want_signatures else info
 
         # Local tools from registry
-        from ot.executor.worker_proxy import WorkerPackProxy
-
         for pack_name, pack_funcs in runner_registry.packs.items():
-            # Handle both dict and WorkerPackProxy
-            if isinstance(pack_funcs, WorkerPackProxy):
-                func_names = list(pack_funcs.functions)
-                func_items = [(n, getattr(pack_funcs, n)) for n in func_names]
-            else:
-                func_items = list(pack_funcs.items())
-
-            for func_name, func in func_items:
+            for func_name, func in pack_funcs.items():
                 full_name = f"{pack_name}.{func_name}"
 
                 if resolved_lower and resolved_lower not in full_name.lower():
@@ -203,16 +194,8 @@ def tool_info(
         all_full_names: list[str] = []
 
         # Local tools
-        from ot.executor.worker_proxy import WorkerPackProxy
-
         for pack_name, pack_funcs in runner_registry.packs.items():
-            if isinstance(pack_funcs, WorkerPackProxy):
-                func_names = list(pack_funcs.functions)
-                func_items = [(n, getattr(pack_funcs, n)) for n in func_names]
-            else:
-                func_items = list(pack_funcs.items())
-
-            for func_name, func in func_items:
+            for func_name, func in pack_funcs.items():
                 full_name = f"{pack_name}.{func_name}"
                 all_full_names.append(full_name)
 
@@ -437,16 +420,11 @@ def pack_info(
 
 def _get_pack_module_description(runner_registry: Any, pack_name: str) -> str:
     """Get description from the pack module docstring first line."""
-    from ot.executor.worker_proxy import WorkerPackProxy
-
     pack_funcs = runner_registry.packs.get(pack_name)
     if not pack_funcs:
         return ""
 
     # Try to get module docstring from the first function's module
-    if isinstance(pack_funcs, WorkerPackProxy):
-        return ""
-
     func = next(iter(pack_funcs.values()), None)
     if func is None:
         return ""
@@ -464,12 +442,8 @@ def _get_pack_tool_names(
     runner_registry: Any, proxy: Any, pack_name: str, is_local: bool
 ) -> list[str]:
     """Get list of tool names for a pack."""
-    from ot.executor.worker_proxy import WorkerPackProxy
-
     if is_local:
         pack_funcs = runner_registry.packs[pack_name]
-        if isinstance(pack_funcs, WorkerPackProxy):
-            return sorted(f"{pack_name}.{n}" for n in pack_funcs.functions)
         return sorted(f"{pack_name}.{n}" for n in pack_funcs)
     else:
         proxy_tools = proxy.list_tools(server=pack_name)

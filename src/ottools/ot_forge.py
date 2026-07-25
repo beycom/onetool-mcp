@@ -349,10 +349,6 @@ def validate_ext(*, path: str) -> str:
         checks, bp_warnings = _check_best_practices(content, tree)
         warnings.extend(bp_warnings)
 
-        # Check 5: Warn about deprecated ot_sdk imports
-        if "from ot_sdk" in content or "import ot_sdk" in content:
-            warnings.append("DEPRECATED: ot_sdk imports are deprecated. Use ot.* imports for extension tools")
-
         # Build result showing what passed and failed
         result: list[str] = []
 

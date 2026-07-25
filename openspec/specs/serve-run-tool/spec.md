@@ -352,7 +352,7 @@ Parameter prefix matching SHALL apply to all tool execution paths.
 - **THEN** prefix matching SHALL be applied
 
 #### Scenario: Extension tool prefix matching
-- **GIVEN** an extension tool (worker subprocess, from `.onetool/tools/`)
+- **GIVEN** a configured in-process extension tool
 - **WHEN** called with abbreviated parameter names
 - **THEN** prefix matching SHALL be applied
 
@@ -625,4 +625,3 @@ The `run` tool's MCP annotations SHALL reflect that it is a general-purpose surf
 - **GIVEN** the `run` tool's registered MCP annotations
 - **WHEN** a client inspects `destructiveHint`
 - **THEN** it SHALL be `true`
-
