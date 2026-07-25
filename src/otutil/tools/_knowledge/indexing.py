@@ -1,4 +1,5 @@
 """kb.index and kb.reindex tool implementations."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -39,13 +40,17 @@ def index(
     """
     with LogSpan(span="kb.index", path=path, db=db, overwrite=overwrite) as s:
         try:
-            result = index_directory(path=path, db_name=db, overwrite=overwrite, ignore=ignore or [])
+            result = index_directory(
+                path=path, db_name=db, overwrite=overwrite, ignore=ignore or []
+            )
             s.add("indexed", result.indexed)
             s.add("skipped", result.skipped)
             s.add("edgesAdded", result.edges_added)
             summary = f"Indexed {result.indexed} chunks, skipped {result.skipped}, {result.edges_added} link edges added"
             if result.errors:
-                summary += f"\nErrors ({len(result.errors)}): {'; '.join(result.errors[:3])}"
+                summary += (
+                    f"\nErrors ({len(result.errors)}): {'; '.join(result.errors[:3])}"
+                )
             return summary
         except Exception as e:
             s.add("error", str(e))

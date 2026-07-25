@@ -1,4 +1,5 @@
 """Memory inspect — structured single-item metadata."""
+
 from __future__ import annotations
 
 from typing import Any

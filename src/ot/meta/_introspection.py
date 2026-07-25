@@ -48,7 +48,11 @@ def aliases(
         items = sorted(cfg.alias.items())
         if pattern:
             pattern_lower = pattern.lower()
-            items = [(k, v) for k, v in items if pattern_lower in k.lower() or pattern_lower in v.lower()]
+            items = [
+                (k, v)
+                for k, v in items
+                if pattern_lower in k.lower() or pattern_lower in v.lower()
+            ]
 
         s.add("count", len(items))
 
@@ -72,7 +76,9 @@ def _build_param_entry(param_def: Any) -> dict[str, Any]:
     return entry
 
 
-def _build_snippet_detail(name: str, snippet_def: Any, info: InfoLevel) -> dict[str, Any]:
+def _build_snippet_detail(
+    name: str, snippet_def: Any, info: InfoLevel
+) -> dict[str, Any]:
     """Build a detail dict for a single snippet at the given info level."""
     if info == "min":
         entry: dict[str, Any] = {
@@ -157,8 +163,10 @@ def snippets(
         if pattern:
             pattern_lower = pattern.lower()
             items = [
-                (k, v) for k, v in items
-                if pattern_lower in k.lower() or pattern_lower in (v.description or "").lower()
+                (k, v)
+                for k, v in items
+                if pattern_lower in k.lower()
+                or pattern_lower in (v.description or "").lower()
             ]
 
         s.add("count", len(items))
@@ -216,7 +224,9 @@ def snippet_info(
         ot.snippet_info(name="c7", info="full")
         ot.snippet_info(pattern="mem")
     """
-    with log(span="ot.snippet_info", name=name or None, pattern=pattern or None, info=info) as s:
+    with log(
+        span="ot.snippet_info", name=name or None, pattern=pattern or None, info=info
+    ) as s:
         cfg = get_config()
 
         # Mutual exclusivity check
@@ -234,8 +244,10 @@ def snippet_info(
             items = sorted(cfg.snippets.items()) if cfg.snippets else []
             pattern_lower = pattern.lower()
             items = [
-                (k, v) for k, v in items
-                if pattern_lower in k.lower() or pattern_lower in (v.description or "").lower()
+                (k, v)
+                for k, v in items
+                if pattern_lower in k.lower()
+                or pattern_lower in (v.description or "").lower()
             ]
             s.add("count", len(items))
             return [_build_snippet_detail(k, v, info) for k, v in items]

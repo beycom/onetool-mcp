@@ -183,13 +183,19 @@ class JsonlStatsWriter:
     def _append_record(self, record: dict[str, Any]) -> None:
         """Append a record with bounded-memory protection."""
         self._buffer.append(record)
-        if self._max_buffer_records > 0 and len(self._buffer) > self._max_buffer_records:
+        if (
+            self._max_buffer_records > 0
+            and len(self._buffer) > self._max_buffer_records
+        ):
             # Drop oldest records first to cap memory usage under persistent write failures.
             overflow = len(self._buffer) - self._max_buffer_records
             del self._buffer[:overflow]
             self._dropped_records += overflow
             # Log occasionally to avoid noisy logs under sustained failure.
-            if self._dropped_records in {1, 10, 100} or self._dropped_records % 1000 == 0:
+            if (
+                self._dropped_records in {1, 10, 100}
+                or self._dropped_records % 1000 == 0
+            ):
                 logger.warning(
                     LogEntry(
                         event="stats.buffer.overflow",

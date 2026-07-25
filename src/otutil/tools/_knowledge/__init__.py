@@ -1,4 +1,5 @@
 """Knowledge pack — SQLite-backed knowledge base with hybrid FTS5+vector search."""
+
 from __future__ import annotations
 
 pack = "knowledge"

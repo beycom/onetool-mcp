@@ -4,6 +4,7 @@ Generation is a thin adapter over :class:`otpack.EmbeddingClient`
 (``long_text="mean"``: over-limit texts are window-embedded and averaged).
 The background queue/worker machinery stays here.
 """
+
 from __future__ import annotations
 
 import queue

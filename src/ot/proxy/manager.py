@@ -110,8 +110,12 @@ class ProxyManager:
         self._clients: dict[str, Client] = {}  # type: ignore[type-arg]
         self._tools_by_server: dict[str, list[types.Tool]] = {}
         self._errors: dict[str, str] = {}  # server name -> last error message
-        self._server_timeouts: dict[str, float] = {}  # server name -> configured timeout
-        self._server_instructions: dict[str, str] = {}  # server name -> native instructions
+        self._server_timeouts: dict[
+            str, float
+        ] = {}  # server name -> configured timeout
+        self._server_instructions: dict[
+            str, str
+        ] = {}  # server name -> native instructions
         self._initialized = False
         self._loop: asyncio.AbstractEventLoop | None = None
         self._connect_task: asyncio.Task[None] | None = None
@@ -157,7 +161,9 @@ class ProxyManager:
         """Return native instructions from the server's InitializeResult, or ''."""
         return self._server_instructions.get(server, "")
 
-    def readiness(self, configured_servers: list[str] | tuple[str, ...]) -> dict[str, Any]:
+    def readiness(
+        self, configured_servers: list[str] | tuple[str, ...]
+    ) -> dict[str, Any]:
         """Return proxy readiness and per-server connection state."""
         servers: dict[str, Any] = {}
         for name in configured_servers:
@@ -174,7 +180,9 @@ class ProxyManager:
                 servers[name] = {"status": "disconnected"}
 
         failed = sum(1 for state in servers.values() if state["status"] == "failed")
-        connected = sum(1 for state in servers.values() if state["status"] == "connected")
+        connected = sum(
+            1 for state in servers.values() if state["status"] == "connected"
+        )
         return {
             "ready": not self.is_connecting,
             "status": "degraded" if failed else "ok",
@@ -204,7 +212,12 @@ class ProxyManager:
                 snapshot = list(self._tools_by_server.items())
             items = [(srv, t) for srv, ts in snapshot for t in ts]
         return [
-            ProxyToolInfo(server=srv, name=t.name, description=t.description or "", input_schema=t.inputSchema)
+            ProxyToolInfo(
+                server=srv,
+                name=t.name,
+                description=t.description or "",
+                input_schema=t.inputSchema,
+            )
             for srv, t in items
         ]
 
@@ -255,7 +268,10 @@ class ProxyManager:
                         server=server,
                         tool=tool,
                         timeout=timeout,
-                    ).failure(error_type="TimeoutError", error_message="proxy tool call timed out")
+                    ).failure(
+                        error_type="TimeoutError",
+                        error_message="proxy tool call timed out",
+                    )
                 )
                 raise TimeoutError(
                     f"Tool {server}.{tool} timed out after {timeout}s"
@@ -275,7 +291,9 @@ class ProxyManager:
                     if resource_text is not None:
                         text_parts.append(resource_text)
                     else:
-                        marker = getattr(resource, "uri", None) or type(resource).__name__
+                        marker = (
+                            getattr(resource, "uri", None) or type(resource).__name__
+                        )
                         text_parts.append(f"[Binary resource: {marker}]")
                 elif hasattr(content, "data"):
                     text_parts.append(f"[Binary content: {type(content).__name__}]")
@@ -288,7 +306,9 @@ class ProxyManager:
                 if structured is None:
                     structured = getattr(result, "data", None)
                 result_value = (
-                    structured if structured is not None else "Tool returned empty response."
+                    structured
+                    if structured is not None
+                    else "Tool returned empty response."
                 )
             elif len(text_parts) == 1:
                 # D13: only coerce text that structurally looks like JSON (an object
@@ -375,7 +395,9 @@ class ProxyManager:
             future.cancel()
             raise
 
-    def list_resources_sync(self, server: str, timeout: float = 5.0) -> list[dict[str, Any]]:
+    def list_resources_sync(
+        self, server: str, timeout: float = 5.0
+    ) -> list[dict[str, Any]]:
         """Synchronously list resources from a proxied MCP server.
 
         Blocking wrapper around list_resources, suitable for sync code.
@@ -389,10 +411,14 @@ class ProxyManager:
         """
         if self._loop is None or not self._loop.is_running():
             return []
-        future = asyncio.run_coroutine_threadsafe(self.list_resources(server), self._loop)
+        future = asyncio.run_coroutine_threadsafe(
+            self.list_resources(server), self._loop
+        )
         return future.result(timeout=timeout)
 
-    def list_prompts_sync(self, server: str, timeout: float = 5.0) -> list[dict[str, Any]]:
+    def list_prompts_sync(
+        self, server: str, timeout: float = 5.0
+    ) -> list[dict[str, Any]]:
         """Synchronously list prompts from a proxied MCP server.
 
         Blocking wrapper around list_prompts, suitable for sync code.
@@ -427,14 +453,20 @@ class ProxyManager:
 
         try:
             resources = await client.list_resources()
-            return [{"uri": r.uri, "name": r.name, "description": r.description or ""} for r in resources]
+            return [
+                {"uri": r.uri, "name": r.name, "description": r.description or ""}
+                for r in resources
+            ]
         except (AttributeError, NotImplementedError):
             # Server doesn't support resources
             return []
         except Exception as e:
             # Check if error indicates unsupported feature
             error_msg = str(e).lower()
-            if any(x in error_msg for x in ["not found", "not supported", "not implemented"]):
+            if any(
+                x in error_msg
+                for x in ["not found", "not supported", "not implemented"]
+            ):
                 return []
             raise
 
@@ -481,18 +513,25 @@ class ProxyManager:
 
         try:
             prompts = await client.list_prompts()
-            return [{"name": p.name, "description": p.description or ""} for p in prompts]
+            return [
+                {"name": p.name, "description": p.description or ""} for p in prompts
+            ]
         except (AttributeError, NotImplementedError):
             # Server doesn't support prompts
             return []
         except Exception as e:
             # Check if error indicates unsupported feature
             error_msg = str(e).lower()
-            if any(x in error_msg for x in ["not found", "not supported", "not implemented"]):
+            if any(
+                x in error_msg
+                for x in ["not found", "not supported", "not implemented"]
+            ):
                 return []
             raise
 
-    async def get_prompt(self, server: str, name: str, arguments: dict[str, Any] | None = None) -> str:
+    async def get_prompt(
+        self, server: str, name: str, arguments: dict[str, Any] | None = None
+    ) -> str:
         """Get a rendered prompt from a proxied MCP server.
 
         Args:
@@ -561,7 +600,9 @@ class ProxyManager:
                     except Exception as e:
                         self._errors[name] = _sanitize_connect_error(str(e))
                         logger.warning(
-                            LogEntry(event="proxy.connect.failed", server=name).failure(e)
+                            LogEntry(event="proxy.connect.failed", server=name).failure(
+                                e
+                            )
                         )
                         return False
 
@@ -588,7 +629,9 @@ class ProxyManager:
         else:
             self._initialized = True
 
-    def connect_background(self, configs: dict[str, McpServerConfig]) -> asyncio.Task[None]:
+    def connect_background(
+        self, configs: dict[str, McpServerConfig]
+    ) -> asyncio.Task[None]:
         """Start connecting to proxy servers in the background.
 
         Returns immediately after scheduling the connection task. The MCP server
@@ -680,13 +723,17 @@ class ProxyManager:
                     scopes=config.auth.scopes or [],
                     client_name="OneTool",
                 )
-                logger.debug(f"Configured OAuth for {name} with scopes: {config.auth.scopes}")
+                logger.debug(
+                    f"Configured OAuth for {name} with scopes: {config.auth.scopes}"
+                )
             else:  # bearer
                 token = expand_vars(config.auth.token) if config.auth.token else ""
                 auth = BearerAuth(token)
                 logger.debug(f"Configured bearer auth for {name}")
 
-        transport = StreamableHttpTransport(url=url, headers=headers if headers else None, auth=auth)
+        transport = StreamableHttpTransport(
+            url=url, headers=headers if headers else None, auth=auth
+        )
         return Client(transport, timeout=float(config.timeout))
 
     def _create_stdio_client(self, name: str, config: McpServerConfig) -> Client:  # type: ignore[type-arg]
@@ -704,6 +751,7 @@ class ProxyManager:
         # Get root-level env from config (if available)
         try:
             from ot.config import get_config
+
             root_config = get_config()
             root_env = root_config.env
         except (ImportError, AttributeError, RuntimeError):
@@ -864,7 +912,9 @@ class ProxyManager:
         except Exception as e:
             with self._mutation_lock:
                 self._errors[name] = _sanitize_connect_error(str(e))
-            logger.warning(LogEntry(event="proxy.connect.failed", server=name).failure(e))
+            logger.warning(
+                LogEntry(event="proxy.connect.failed", server=name).failure(e)
+            )
             return f"failed: {e}"
 
     def _schedule_or_wait(self, coro: Coroutine[Any, Any, str], timeout: float) -> str:

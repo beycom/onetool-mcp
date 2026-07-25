@@ -1,4 +1,5 @@
 """Multi-question LLM query for the ctx pack."""
+
 from __future__ import annotations
 
 import re
@@ -119,7 +120,9 @@ def ctx_ask(
                     "No LLM service is registered. "
                     "Install and load an LLM-capable pack such as ot_llm to use ctx.ask."
                 )
-            elif any(k in err_str.lower() for k in ("not configured", "api_key", "base_url")):
+            elif any(
+                k in err_str.lower() for k in ("not configured", "api_key", "base_url")
+            ):
                 err = (
                     "ot_llm is not configured. "
                     "Set ot_llm.base_url, ot_llm.model, and OPENAI_API_KEY in secrets.yaml. "
@@ -139,7 +142,10 @@ def ctx_ask(
         else:
             answers = _parse_numbered_answers(raw, len(questions))
 
-        pairs = [{"question": qs, "answer": a} for qs, a in zip(questions, answers, strict=False)]
+        pairs = [
+            {"question": qs, "answer": a}
+            for qs, a in zip(questions, answers, strict=False)
+        ]
         result: dict[str, Any] = {"handle": handle, "result": pairs}
 
         if truncated:

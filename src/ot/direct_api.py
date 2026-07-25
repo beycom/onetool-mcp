@@ -176,7 +176,9 @@ def create_app() -> Any:
 
         if body.get("protocol_version") != PROTOCOL_VERSION:
             return signed_json_response(
-                _protocol_payload(result="unsupported direct protocol version", success=False),
+                _protocol_payload(
+                    result="unsupported direct protocol version", success=False
+                ),
                 path=RUN_PATH,
                 status_code=409,
             )
@@ -199,7 +201,9 @@ def create_app() -> Any:
         sanitize = body.get("sanitize", False)
         if not isinstance(fmt, str) or not isinstance(sanitize, bool):
             return signed_json_response(
-                _protocol_payload(result="invalid format or sanitize field", success=False),
+                _protocol_payload(
+                    result="invalid format or sanitize field", success=False
+                ),
                 path=RUN_PATH,
                 status_code=400,
             )
@@ -220,10 +224,14 @@ def create_app() -> Any:
             prepared_code=prepared.code,
             skip_validation=True,
         )
-        text = sanitize_output(result.result, enabled=result.should_sanitize, fmt=result.format)
+        text = sanitize_output(
+            result.result, enabled=result.should_sanitize, fmt=result.format
+        )
         duration_ms = int((time.monotonic() - start) * 1000)
         return signed_json_response(
-            _protocol_payload(result=text, success=result.success, duration_ms=duration_ms),
+            _protocol_payload(
+                result=text, success=result.success, duration_ms=duration_ms
+            ),
             path=RUN_PATH,
         )
 

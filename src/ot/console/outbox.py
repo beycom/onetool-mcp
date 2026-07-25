@@ -157,9 +157,7 @@ class ConsoleOutboxState:
             if removed:
                 self.last_evicted = max(self.last_evicted, removed[-1].sequence)
             self.entries = deque(
-                entry
-                for entry in self.entries
-                if entry not in removed
+                entry for entry in self.entries if entry not in removed
             )
 
     def clear(self) -> None:

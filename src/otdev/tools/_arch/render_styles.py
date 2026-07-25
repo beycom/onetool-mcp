@@ -17,7 +17,11 @@ CHANGE_TYPE_STYLES: dict[str, dict[str, str]] = {
     "changed": {"d2_class": "ChangeChanged", "color": "#F9A825", "label": "Changed"},
     "removed": {"d2_class": "ChangeRemoved", "color": "#C62828", "label": "Removed"},
     "impacted": {"d2_class": "ChangeImpacted", "color": "#6A1B9A", "label": "Impacted"},
-    "dependency": {"d2_class": "ChangeDependency", "color": "#546E7A", "label": "Dependency"},
+    "dependency": {
+        "d2_class": "ChangeDependency",
+        "color": "#546E7A",
+        "label": "Dependency",
+    },
     # "existing" intentionally absent: renders with pre-existing neutral styling
 }
 
@@ -32,12 +36,42 @@ DIRECTION_STYLES: dict[str, dict[str, str]] = {
 
 INTERACTION_TYPE_STYLES: dict[str, dict[str, str]] = {
     # normalized interaction_type -> {"d2_class": ..., "stroke_dash": ..., "stroke_width": ..., "label": ...}
-    "api": {"d2_class": "IntApi", "stroke_dash": "0", "stroke_width": "3", "label": "API"},
-    "event": {"d2_class": "IntEvent", "stroke_dash": "3", "stroke_width": "2", "label": "Event"},
-    "queue": {"d2_class": "IntQueue", "stroke_dash": "5", "stroke_width": "2", "label": "Queue"},
-    "batch": {"d2_class": "IntBatch", "stroke_dash": "8", "stroke_width": "2", "label": "Batch"},
-    "file": {"d2_class": "IntFile", "stroke_dash": "1", "stroke_width": "2", "label": "File"},
-    "pubsub": {"d2_class": "IntPubsub", "stroke_dash": "4", "stroke_width": "3", "label": "Pub/Sub"},
+    "api": {
+        "d2_class": "IntApi",
+        "stroke_dash": "0",
+        "stroke_width": "3",
+        "label": "API",
+    },
+    "event": {
+        "d2_class": "IntEvent",
+        "stroke_dash": "3",
+        "stroke_width": "2",
+        "label": "Event",
+    },
+    "queue": {
+        "d2_class": "IntQueue",
+        "stroke_dash": "5",
+        "stroke_width": "2",
+        "label": "Queue",
+    },
+    "batch": {
+        "d2_class": "IntBatch",
+        "stroke_dash": "8",
+        "stroke_width": "2",
+        "label": "Batch",
+    },
+    "file": {
+        "d2_class": "IntFile",
+        "stroke_dash": "1",
+        "stroke_width": "2",
+        "label": "File",
+    },
+    "pubsub": {
+        "d2_class": "IntPubsub",
+        "stroke_dash": "4",
+        "stroke_width": "3",
+        "label": "Pub/Sub",
+    },
 }
 
 _NON_ALPHANUMERIC = re.compile(r"[^a-z0-9]+")

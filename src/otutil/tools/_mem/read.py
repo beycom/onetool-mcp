@@ -1,4 +1,5 @@
 """Memory read functions."""
+
 from __future__ import annotations
 
 import builtins
@@ -22,7 +23,9 @@ _MODE_HINTS = {
 def _check_mode_removed(func: str, mode: str | None, all_hint: str) -> None:
     if mode is None:
         return
-    hint = _MODE_HINTS.get(mode) or (all_hint if mode == "all" else "The mode parameter has been removed.")
+    hint = _MODE_HINTS.get(mode) or (
+        all_hint if mode == "all" else "The mode parameter has been removed."
+    )
     raise ValueError(f"{func}() no longer accepts mode='{mode}'. {hint}")
 
 
@@ -74,7 +77,11 @@ def read(
 
                 if not row:
                     s.add("found", False)
-                    return f"No memory found for topic '{topic}'" if not id else f"No memory found with id '{id}'"
+                    return (
+                        f"No memory found for topic '{topic}'"
+                        if not id
+                        else f"No memory found with id '{id}'"
+                    )
 
                 # Increment access count
                 conn.execute(
@@ -153,13 +160,17 @@ def read_batch(
         mem.read_batch(ids=["abc-123", "def-456"], meta=True)
         mem.read_batch(category="rule", limit=10)
     """
-    _check_mode_removed("mem.read_batch", mode, "Use mem.read_batch(meta=True) instead.")
+    _check_mode_removed(
+        "mem.read_batch", mode, "Use mem.read_batch(meta=True) instead."
+    )
 
     if not any([topic, ids, category, tags]):
         return "Error: At least one filter (topic, ids, category, or tags) is required"
 
     if ids and any([topic, category, tags]):
-        return "Error: ids cannot be combined with other filters (topic, category, tags)"
+        return (
+            "Error: ids cannot be combined with other filters (topic, category, tags)"
+        )
 
     with LogSpan(span="mem.read_batch", topic=topic, limit=limit) as s:
         try:

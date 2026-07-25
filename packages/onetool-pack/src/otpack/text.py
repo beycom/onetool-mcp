@@ -76,7 +76,7 @@ def extract_structured_data(
                 idx = text.lower().find(token)
                 if idx >= 0:
                     value = token == "true"
-                    snippet = text[max(0, idx - 20):idx + len(token) + 20].strip()
+                    snippet = text[max(0, idx - 20) : idx + len(token) + 20].strip()
                     break
         elif field_type == "number":
             match = _NUMBER_RE.search(text)
@@ -135,7 +135,7 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
     match = _FRONTMATTER_RE.match(content)
     if not match:
         return {}, content
-    body = content[match.end():]
+    body = content[match.end() :]
     try:
         meta = yaml.safe_load(match.group(1)) or {}
     except yaml.YAMLError:

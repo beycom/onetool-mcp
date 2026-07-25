@@ -1,4 +1,5 @@
 """LLM synthesis over memories."""
+
 from __future__ import annotations
 
 import re
@@ -116,7 +117,9 @@ def ask(
             raw = llm_transform(data=content, prompt=prompt, model=model)
         except Exception as e:
             err_str = str(e)
-            if any(k in err_str.lower() for k in ("not configured", "api_key", "base_url")):
+            if any(
+                k in err_str.lower() for k in ("not configured", "api_key", "base_url")
+            ):
                 err = (
                     "ot_llm is not configured. "
                     "Set ot_llm.base_url, ot_llm.model, and OPENAI_API_KEY in secrets.yaml. "
@@ -136,7 +139,10 @@ def ask(
         else:
             answers = _parse_numbered_answers(raw, len(questions))
 
-        pairs = [{"question": qs, "answer": a} for qs, a in zip(questions, answers, strict=False)]
+        pairs = [
+            {"question": qs, "answer": a}
+            for qs, a in zip(questions, answers, strict=False)
+        ]
         s.add(questionCount=len(questions))
         return {"topic": row[1], "result": pairs}
 

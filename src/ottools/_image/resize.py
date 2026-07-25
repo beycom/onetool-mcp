@@ -54,7 +54,9 @@ def prepare_for_model(raw_bytes: bytes, max_edge: int) -> PreparedImage:
                 "resvg-py is required for SVG support. "
                 "Install with: pip install resvg-py"
             ) from exc
-        raw_bytes = resvg_py.svg_to_bytes(svg_string=raw_bytes.decode("utf-8", errors="replace"))
+        raw_bytes = resvg_py.svg_to_bytes(
+            svg_string=raw_bytes.decode("utf-8", errors="replace")
+        )
 
     # Register pillow-heif opener lazily for HEIC/HEIF/AVIF (ISOBMFF containers)
     if len(raw_bytes) >= 12 and raw_bytes[4:8] == b"ftyp":

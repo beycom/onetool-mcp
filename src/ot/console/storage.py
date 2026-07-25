@@ -33,9 +33,7 @@ def console_messages_dir(*, instance_id: str | None = None) -> Path:
     return console_instance_dir(instance_id=instance_id) / "messages"
 
 
-def message_body_path(
-    *, message_id: str, instance_id: str | None = None
-) -> Path:
+def message_body_path(*, message_id: str, instance_id: str | None = None) -> Path:
     """Return the JSON body path for one Console message."""
     return console_messages_dir(instance_id=instance_id) / f"{message_id}.json"
 
@@ -58,7 +56,9 @@ def write_message_body(*, message: ConsoleMessage, instance_id: str) -> None:
         raise
 
 
-def read_message_body(*, message_id: str, instance_id: str | None = None) -> ConsoleMessage:
+def read_message_body(
+    *, message_id: str, instance_id: str | None = None
+) -> ConsoleMessage:
     """Load one Console message body from its session JSON file."""
     path = message_body_path(message_id=message_id, instance_id=instance_id)
     return ConsoleMessage.model_validate_json(path.read_text(encoding="utf-8"))

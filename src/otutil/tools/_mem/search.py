@@ -1,4 +1,5 @@
 """Memory search: grep, semantic, keyword, and hybrid."""
+
 from __future__ import annotations
 
 import builtins
@@ -25,10 +26,27 @@ from .embedding import _generate_query_embedding
 
 _builtins_list = builtins.list
 
-_STOPWORDS = frozenset({
-    "how", "do", "i", "what", "is", "the", "a", "an", "to", "of",
-    "in", "for", "on", "with", "can", "my", "me",
-})
+_STOPWORDS = frozenset(
+    {
+        "how",
+        "do",
+        "i",
+        "what",
+        "is",
+        "the",
+        "a",
+        "an",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "can",
+        "my",
+        "me",
+    }
+)
 
 # One-time LIKE-fallback warning flag (FTS5 unavailable in this SQLite build).
 _like_fallback_warned = False
@@ -36,7 +54,7 @@ _like_fallback_warned = False
 
 def _fts_query(text: str) -> str:
     """Preprocess a query for FTS5: strip operator chars and remove stopwords."""
-    sanitized = re.sub(r'[?!":\^*()\-]', ' ', text).strip()
+    sanitized = re.sub(r'[?!":\^*()\-]', " ", text).strip()
     tokens = [t for t in sanitized.split() if t.lower() not in _STOPWORDS]
     return " ".join(tokens) if tokens else sanitized
 
@@ -121,11 +139,15 @@ def grep(
             total_matches = 0
 
             for _row_id, row_topic, content in rows:
-                groups = grep_lines(content, regex, context=context, max_groups=max_per_memory)
+                groups = grep_lines(
+                    content, regex, context=context, max_groups=max_per_memory
+                )
                 if not groups:
                     continue
 
-                match_count = sum(1 for group in groups for _, _, is_match in group if is_match)
+                match_count = sum(
+                    1 for group in groups for _, _, is_match in group if is_match
+                )
                 total_matches += match_count
                 blocks: _builtins_list[str] = []
                 for group in groups:
@@ -194,9 +216,13 @@ def search(
         extract = config.search_extract
 
     if mode not in ("semantic", "keyword", "hybrid"):
-        return f"Error: Invalid mode '{mode}'. Must be 'semantic', 'keyword', or 'hybrid'"
+        return (
+            f"Error: Invalid mode '{mode}'. Must be 'semantic', 'keyword', or 'hybrid'"
+        )
 
-    with LogSpan(span="mem.search", query=query, mode=mode, topic=topic, limit=limit) as s:
+    with LogSpan(
+        span="mem.search", query=query, mode=mode, topic=topic, limit=limit
+    ) as s:
         try:
             if mode in ("semantic", "hybrid") and not config.embeddings_enabled:
                 return "Semantic search requires embeddings. Enable with: tools.mem.embeddings_enabled: true"
@@ -295,8 +321,13 @@ def _search_semantic_knn(
     rows = conn.execute(sql, params).fetchall()
     return [
         {
-            "id": r[0], "topic": r[1], "content": r[2], "category": r[3],
-            "tags": _deserialize_tags(r[4]), "relevance": r[5], "access_count": r[6],
+            "id": r[0],
+            "topic": r[1],
+            "content": r[2],
+            "category": r[3],
+            "tags": _deserialize_tags(r[4]),
+            "relevance": r[5],
+            "access_count": r[6],
             "score": round(1 - (r[7] ** 2) / 2, 4),
         }
         for r in rows
@@ -342,8 +373,13 @@ def _search_semantic_scan(
     rows = conn.execute(sql, params).fetchall()
     return [
         {
-            "id": r[0], "topic": r[1], "content": r[2], "category": r[3],
-            "tags": _deserialize_tags(r[4]), "relevance": r[5], "access_count": r[6],
+            "id": r[0],
+            "topic": r[1],
+            "content": r[2],
+            "category": r[3],
+            "tags": _deserialize_tags(r[4]),
+            "relevance": r[5],
+            "access_count": r[6],
             "score": round(r[7], 4) if r[7] is not None else 0.0,
         }
         for r in rows
@@ -385,8 +421,13 @@ def _search_keyword(
 
     return [
         {
-            "id": r[0], "topic": r[1], "content": r[2], "category": r[3],
-            "tags": _deserialize_tags(r[4]), "relevance": r[5], "access_count": r[6],
+            "id": r[0],
+            "topic": r[1],
+            "content": r[2],
+            "category": r[3],
+            "tags": _deserialize_tags(r[4]),
+            "relevance": r[5],
+            "access_count": r[6],
             "score": round(abs(r[7]), 4),
         }
         for r in rows
@@ -476,8 +517,14 @@ def _search_keyword_like(
     rows = conn.execute(sql, params).fetchall()
     return [
         {
-            "id": r[0], "topic": r[1], "content": r[2], "category": r[3],
-            "tags": _deserialize_tags(r[4]), "relevance": r[5], "access_count": r[6], "score": 1.0,
+            "id": r[0],
+            "topic": r[1],
+            "content": r[2],
+            "category": r[3],
+            "tags": _deserialize_tags(r[4]),
+            "relevance": r[5],
+            "access_count": r[6],
+            "score": 1.0,
         }
         for r in rows
     ]
@@ -504,7 +551,9 @@ def _search_hybrid(
     return rrf_merge(semantic_results, pattern_results, limit)
 
 
-def _format_search_results(results: list[dict[str, Any]], query: str, extract: int) -> str:
+def _format_search_results(
+    results: list[dict[str, Any]], query: str, extract: int
+) -> str:
     """Format search results for output."""
     lines = [f"Found {len(results)} memories for: {query}\n"]
     for i, r in enumerate(results, 1):

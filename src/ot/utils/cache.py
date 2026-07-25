@@ -40,7 +40,9 @@ class _Entry:
 
     def __init__(self, value: Any, ttl: float | None) -> None:
         self.value = value
-        self.expires_at: float | None = (time.monotonic() + ttl) if ttl is not None else None
+        self.expires_at: float | None = (
+            (time.monotonic() + ttl) if ttl is not None else None
+        )
 
 
 class Cache:

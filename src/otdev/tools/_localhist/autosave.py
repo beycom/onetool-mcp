@@ -83,7 +83,9 @@ def _state(paths: Paths) -> dict[str, Any]:
         or not alive
         or (isinstance(heartbeat, int | float) and _now() - float(heartbeat) > timeout)
     )
-    data["active"] = bool(data) and not stale and data.get("status") in {"starting", "running"}
+    data["active"] = (
+        bool(data) and not stale and data.get("status") in {"starting", "running"}
+    )
     data["stale"] = stale
     return data
 
@@ -126,7 +128,9 @@ def autosave_start_project(*, path: str | None = None) -> dict[str, object]:
                     _request_stop(current_paths, current_state)
     with FileLock(str(_lock_path(paths))):
         current = _state(paths)
-        if current.get("active") and current.get("project_root") == str(paths.project_root):
+        if current.get("active") and current.get("project_root") == str(
+            paths.project_root
+        ):
             return {
                 "ok": True,
                 "started": False,
@@ -213,7 +217,12 @@ def autosave_stop_project(*, path: str | None = None) -> dict[str, object]:
     with FileLock(str(_lock_path(paths))):
         state = _state(paths)
         if not state:
-            return {"ok": True, "stopped": False, "reason": "not_running", "state": None}
+            return {
+                "ok": True,
+                "stopped": False,
+                "reason": "not_running",
+                "state": None,
+            }
         if path is not None and state.get("project_root") != str(paths.project_root):
             return {
                 "ok": True,
@@ -246,9 +255,17 @@ def run_once(*, project_root: Path) -> dict[str, object]:
             state["last_dirty_signature"] = dirty_signature
         last_event = state.get("last_event_at")
         last_save = state.get("last_save") or {}
-        last_save_at = last_save.get("timestamp") if isinstance(last_save, dict) else None
-        quiet = not last_event or now - float(last_event) >= config.autosave.quiet_period_seconds
-        interval_ok = not last_save_at or now - float(last_save_at) >= config.autosave.min_save_interval_seconds
+        last_save_at = (
+            last_save.get("timestamp") if isinstance(last_save, dict) else None
+        )
+        quiet = (
+            not last_event
+            or now - float(last_event) >= config.autosave.quiet_period_seconds
+        )
+        interval_ok = (
+            not last_save_at
+            or now - float(last_save_at) >= config.autosave.min_save_interval_seconds
+        )
         if dirty and quiet and interval_ok:
             result = save_snapshot_for_project(
                 project_root=paths.project_root,
@@ -258,7 +275,10 @@ def run_once(*, project_root: Path) -> dict[str, object]:
             state["last_save"] = {"timestamp": now, "result": result}
             state["last_event_at"] = None
         elif not dirty:
-            state["last_save"] = {"timestamp": now, "result": {"ok": True, "created": False, "reason": "no_changes"}}
+            state["last_save"] = {
+                "timestamp": now,
+                "result": {"ok": True, "created": False, "reason": "no_changes"},
+            }
             state["last_event_at"] = None
             state["last_dirty_signature"] = None
         _write_json(_state_path(paths), state)

@@ -126,7 +126,9 @@ def build_elk_graph(
     elk_node_set = {n["id"] for n in elk_nodes}
     elk_edges = []
     seen_edge_ids: set[str] = set()
-    scene_edge_map: dict[str, dict[str, str]] = {}  # eid → {src, dst} for STRAIGHT recompute
+    scene_edge_map: dict[
+        str, dict[str, str]
+    ] = {}  # eid → {src, dst} for STRAIGHT recompute
     # Boundary edges: exactly one endpoint is in the selection / elk_node_set.
     # After layout we update the selected-side endpoint to its new position.
     boundary_edges: list[dict[str, Any]] = []
@@ -146,14 +148,16 @@ def build_elk_graph(
             scene_edge_map[eid] = {"src": src_elk, "dst": dst_elk}
         elif src_in != dst_in:
             # One endpoint is in the layout scope; track for post-layout fixup
-            boundary_edges.append({
-                "id": eid,
-                "src": edge["src"],
-                "dst": edge["dst"],
-                "src_elk": src_elk,
-                "dst_elk": dst_elk,
-                "src_in": src_in,
-            })
+            boundary_edges.append(
+                {
+                    "id": eid,
+                    "src": edge["src"],
+                    "dst": edge["dst"],
+                    "src_elk": src_elk,
+                    "dst_elk": dst_elk,
+                    "src_in": src_in,
+                }
+            )
 
     layered_only = algorithm == "layered"
     layout_opts: dict[str, str] = {
@@ -163,14 +167,16 @@ def build_elk_graph(
         "elk.padding": "[top=60,left=60,bottom=60,right=60]",
     }
     if layered_only:
-        layout_opts.update({
-            "elk.layered.spacing.nodeNodeBetweenLayers": str(gap_layer),
-            "elk.layered.spacing.edgeNodeBetweenLayers": str(gap_layer // 2),
-            "elk.layered.spacing.edgeEdgeBetweenLayers": "10",
-            "elk.layered.nodePlacement.strategy": node_placement,
-            "elk.layered.crossingMinimization.strategy": crossing_min,
-            "elk.layered.cycleBreaking.strategy": cycle_breaking,
-        })
+        layout_opts.update(
+            {
+                "elk.layered.spacing.nodeNodeBetweenLayers": str(gap_layer),
+                "elk.layered.spacing.edgeNodeBetweenLayers": str(gap_layer // 2),
+                "elk.layered.spacing.edgeEdgeBetweenLayers": "10",
+                "elk.layered.nodePlacement.strategy": node_placement,
+                "elk.layered.crossingMinimization.strategy": crossing_min,
+                "elk.layered.cycleBreaking.strategy": cycle_breaking,
+            }
+        )
     if algorithm == "stress":
         layout_opts["elk.stress.desiredEdgeLength"] = str(gap_node * 3)
     if elk_options:
@@ -219,7 +225,9 @@ def build_node_patches(
     return patches
 
 
-def position_map(positions_list: list[dict[str, Any]]) -> dict[str, tuple[float, float]]:
+def position_map(
+    positions_list: list[dict[str, Any]],
+) -> dict[str, tuple[float, float]]:
     """Map ELK node id → (x, y) from the ELK result."""
     return {pos["id"]: (float(pos["x"]), float(pos["y"])) for pos in positions_list}
 
@@ -281,7 +289,9 @@ def build_boundary_arrow_patches(
         if anchored_elk not in positions:
             continue
         anc_x, anc_y = positions[anchored_elk]
-        anc_w, anc_h = (float(d) for d in build.node_dims.get(anchored_elk, _DEFAULT_DIMS))
+        anc_w, anc_h = (
+            float(d) for d in build.node_dims.get(anchored_elk, _DEFAULT_DIMS)
+        )
         free_node = build.all_node_map.get(free_id) or {}
         free_x = float(free_node.get("x", 0))
         free_y = float(free_node.get("y", 0))
@@ -327,8 +337,12 @@ def build_boundary_arrow_patches(
 def build_subgraph_updates(layout_state: dict[str, Any]) -> list[dict[str, Any]]:
     """Subgraph payloads for the browser-side bbox recompute."""
     return [
-        {"id": gid, "label": group["label"],
-         "memberIds": group["members"], "savedBounds": None}
+        {
+            "id": gid,
+            "label": group["label"],
+            "memberIds": group["members"],
+            "savedBounds": None,
+        }
         for gid, group in layout_state["groups"].items()
     ]
 

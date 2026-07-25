@@ -108,7 +108,9 @@ def sanitize_url(url: str) -> str:
     return url
 
 
-def format_value(value: Any, field_name: str = "", max_length: int | None = None) -> Any:
+def format_value(
+    value: Any, field_name: str = "", max_length: int | None = None
+) -> Any:
     """Format a single value for output with truncation.
 
     Only string values are truncated. Other types pass through unchanged.
@@ -216,10 +218,7 @@ def format_dev_value(value: Any, field_name: str = "", verbose: bool = False) ->
         return "{" + ", ".join(items) + "}"
 
     if isinstance(value, list):
-        items = [
-            format_dev_value(item, field_name, verbose)
-            for item in value[:10]
-        ]
+        items = [format_dev_value(item, field_name, verbose) for item in value[:10]]
         if len(value) > 10:
             items.append("...")
         return "[" + ", ".join(items) + "]"

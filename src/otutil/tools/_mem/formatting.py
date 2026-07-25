@@ -1,4 +1,5 @@
 """Tree formatting, list entry metadata, and staleness display."""
+
 from __future__ import annotations
 
 import builtins
@@ -75,7 +76,9 @@ def stale(
             total_checked = len(fresh) + len(stale_list) + len(missing_list)
             if total_checked == 0:
                 s.add("skipped", skipped)
-                return "No file-backed memories found" + (f" under '{topic}'" if topic else "")
+                return "No file-backed memories found" + (
+                    f" under '{topic}'" if topic else ""
+                )
 
             scope = f' under "{topic}"' if topic else ""
             parts = [f"Checked {total_checked} file-backed memories{scope}:"]
@@ -84,9 +87,15 @@ def stale(
             if stale_list:
                 parts.append(f"  {len(stale_list)} stale:")
                 for st_topic, stored_mt, current_mt in stale_list:
-                    stored_dt = datetime.fromtimestamp(float(stored_mt), tz=UTC).strftime("%Y-%m-%d")
-                    current_dt = datetime.fromtimestamp(float(current_mt), tz=UTC).strftime("%Y-%m-%d")
-                    parts.append(f"    - {st_topic} (stored: {stored_dt}, file: {current_dt})")
+                    stored_dt = datetime.fromtimestamp(
+                        float(stored_mt), tz=UTC
+                    ).strftime("%Y-%m-%d")
+                    current_dt = datetime.fromtimestamp(
+                        float(current_mt), tz=UTC
+                    ).strftime("%Y-%m-%d")
+                    parts.append(
+                        f"    - {st_topic} (stored: {stored_dt}, file: {current_dt})"
+                    )
 
             if missing_list:
                 parts.append(f"  {len(missing_list)} missing:")
@@ -128,7 +137,11 @@ def _format_as_tree(
     for r in rows:
         mem_id, mem_topic, category, tags_raw, relevance = r[0], r[1], r[2], r[3], r[4]
         content_len, meta_json = r[7], r[8]
-        rel_topic = mem_topic[len(prefix):] if prefix and mem_topic.startswith(prefix) else mem_topic
+        rel_topic = (
+            mem_topic[len(prefix) :]
+            if prefix and mem_topic.startswith(prefix)
+            else mem_topic
+        )
         parts = rel_topic.split("/")
         node = tree_dict
         for part in parts[:-1]:
@@ -144,7 +157,15 @@ def _format_as_tree(
         tags_list = _deserialize_tags(tags_raw)
         row_meta = json.loads(meta_json) if meta_json else {}
         section_count = int(row_meta.get("section_count", 0))
-        node[leaf_name] = ("_leaf_", mem_id, category, tags_list, content_len, relevance, section_count)
+        node[leaf_name] = (
+            "_leaf_",
+            mem_id,
+            category,
+            tags_list,
+            content_len,
+            relevance,
+            section_count,
+        )
 
     # Render tree
     lines: _builtins_list[str] = []
@@ -197,10 +218,16 @@ def _render_tree(
         value = node[name]
         if isinstance(value, tuple) and value and value[0] == "_leaf_":
             # Leaf node with metadata
-            _, mem_id, category, tags_list, content_len, relevance, section_count = value
+            _, mem_id, category, tags_list, content_len, relevance, section_count = (
+                value
+            )
             meta = _format_entry_meta(
-                mem_id=mem_id, content_len=content_len, section_count=section_count,
-                relevance=relevance, category=category, tags_list=tags_list,
+                mem_id=mem_id,
+                content_len=content_len,
+                section_count=section_count,
+                relevance=relevance,
+                category=category,
+                tags_list=tags_list,
             )
             lines.append(f"{prefix}{connector}{name}  {meta}")
         elif isinstance(value, dict):
@@ -209,7 +236,8 @@ def _render_tree(
             lines.append(f"{prefix}{connector}{name}/  (mem_count={leaf_count})")
             if not (max_depth > 0 and current_depth >= max_depth):
                 _render_tree(
-                    value, lines,
+                    value,
+                    lines,
                     prefix=prefix + extension,
                     max_depth=max_depth,
                     current_depth=current_depth + 1,

@@ -322,7 +322,9 @@ def _resolve_library_id(library_id: str) -> tuple[str, bool, bool]:
     return normalized, True, False
 
 
-@cache.memoize(ttl=3600)  # Cache successful searches (incl. definitive not-found) for 1 hour
+@cache.memoize(
+    ttl=3600
+)  # Cache successful searches (incl. definitive not-found) for 1 hour
 def _search_best_library(search_term: str) -> str | None:
     """Search Context7 for the best library match; raise if the API is unreachable."""
     success, data = _make_request(
@@ -338,7 +340,9 @@ def _search_best_library(search_term: str) -> str | None:
     )
 
 
-def search(*, query: str, library_name: str, output_format: str = "str") -> str | dict[str, Any]:
+def search(
+    *, query: str, library_name: str, output_format: str = "str"
+) -> str | dict[str, Any]:
     """Search for libraries by name in Context7.
 
     Args:
@@ -389,7 +393,9 @@ def search(*, query: str, library_name: str, output_format: str = "str") -> str 
         else:
             # Filter to results with meaningful name overlap
             matched = [
-                r for r in results if _has_title_overlap(library_name, r.get("title", ""))
+                r
+                for r in results
+                if _has_title_overlap(library_name, r.get("title", ""))
             ]
 
             lines = []
@@ -450,7 +456,9 @@ def doc(
         context7.doc(library_id="react", query="How do hooks work?")
     """
     if not query or not query.strip():
-        return "Error: query is required — the Context7 API does not accept empty queries."
+        return (
+            "Error: query is required — the Context7 API does not accept empty queries."
+        )
 
     with LogSpan(span="context7.doc", libraryId=library_id, query=query) as s:
         # Normalize and resolve library ID (searches if needed)
@@ -474,7 +482,11 @@ def doc(
         # query is validated non-empty above. type is fixed to "txt"; a
         # token-budget param and a cache-bypass flag were considered and
         # skipped as low value — add on demand.
-        params: dict[str, str | int] = {"libraryId": resolved_id, "type": "txt", "query": query}
+        params: dict[str, str | int] = {
+            "libraryId": resolved_id,
+            "type": "txt",
+            "query": query,
+        }
 
         success, data = _make_request(CONTEXT7_CONTEXT_URL, params=params)
         s.add(success=success)

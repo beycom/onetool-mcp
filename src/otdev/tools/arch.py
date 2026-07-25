@@ -69,7 +69,9 @@ def _resolve_generation_profile(
     profile_yaml: str | None,
 ) -> tuple[str, ArchProfileConfig]:
     if profile_yaml is not None and profile is not None:
-        raise ConfigResolutionError("arch.generate accepts only one of profile or profile_yaml")
+        raise ConfigResolutionError(
+            "arch.generate accepts only one of profile or profile_yaml"
+        )
 
     if profile_yaml is not None:
         if not profile_yaml.strip():
@@ -79,11 +81,15 @@ def _resolve_generation_profile(
         except yaml.YAMLError as exc:
             raise ConfigResolutionError(f"Invalid profile_yaml: {exc}") from exc
         if not isinstance(parsed, dict):
-            raise ConfigResolutionError("profile_yaml must define a YAML mapping for ArchProfileConfig")
+            raise ConfigResolutionError(
+                "profile_yaml must define a YAML mapping for ArchProfileConfig"
+            )
         try:
             resolved_profile = ArchProfileConfig.model_validate(parsed)
         except Exception as exc:
-            raise ConfigResolutionError(f"Invalid profile_yaml profile config: {exc}") from exc
+            raise ConfigResolutionError(
+                f"Invalid profile_yaml profile config: {exc}"
+            ) from exc
         return "profile_yaml", resolved_profile
 
     return get_active_profile(config=config, profile=profile)
@@ -136,7 +142,9 @@ def validate(*, input_path: str) -> dict[str, Any]:
                         "error_count": validation["summary"]["errors"],
                     },
                 }
-            span.add(valid=validation["valid"], errorCount=validation["summary"]["errors"])
+            span.add(
+                valid=validation["valid"], errorCount=validation["summary"]["errors"]
+            )
             return payload
         except (IngestError, MissingDependencyError, RoundtripError) as exc:
             span.add(error=str(exc))
@@ -233,7 +241,9 @@ def generate(
                     "summary": validation["summary"],
                 }
 
-            diagram_specs, diagram_issues = collect_workbook_diagram_specs(entities=filtered)
+            diagram_specs, diagram_issues = collect_workbook_diagram_specs(
+                entities=filtered
+            )
             if diagram_issues["errors"]:
                 return {
                     **error_payload(
@@ -283,7 +293,11 @@ def generate(
                 "model_version": MODEL_VERSION,
                 "renders": solution_result["renders"],
             }
-            span.add(valid=True, profile=profile_name, generatedFiles=summary["generated_files"])
+            span.add(
+                valid=True,
+                profile=profile_name,
+                generatedFiles=summary["generated_files"],
+            )
             return {
                 "ok": True,
                 "operation": "generate",
@@ -342,7 +356,9 @@ def export_yaml(*, input_path: str, output_path: str) -> dict[str, Any]:
     Returns:
         Structured export result.
     """
-    with LogSpan(span="arch.export_yaml", inputPath=input_path, outputPath=output_path) as span:
+    with LogSpan(
+        span="arch.export_yaml", inputPath=input_path, outputPath=output_path
+    ) as span:
         try:
             _, entities, passthrough = ingest_input(
                 input_path=input_path,
@@ -359,7 +375,9 @@ def export_yaml(*, input_path: str, output_path: str) -> dict[str, Any]:
                 "ok": True,
                 "operation": "export_yaml",
                 "output_path": exported,
-                "summary": {"counts": {sheet: len(rows) for sheet, rows in entities.items()}},
+                "summary": {
+                    "counts": {sheet: len(rows) for sheet, rows in entities.items()}
+                },
             }
         except (IngestError, MissingDependencyError, RoundtripError) as exc:
             span.add(error=str(exc))
@@ -379,7 +397,9 @@ def export_yaml(*, input_path: str, output_path: str) -> dict[str, Any]:
             )
 
 
-def import_yaml(*, input_path: str, template_path: str, output_path: str) -> dict[str, Any]:
+def import_yaml(
+    *, input_path: str, template_path: str, output_path: str
+) -> dict[str, Any]:
     """Import YAML entities into a template workbook.
 
     Args:
@@ -397,7 +417,9 @@ def import_yaml(*, input_path: str, template_path: str, output_path: str) -> dic
         outputPath=output_path,
     ) as span:
         try:
-            entities, passthrough = load_yaml_entities(input_path=resolve_cwd_path(input_path))
+            entities, passthrough = load_yaml_entities(
+                input_path=resolve_cwd_path(input_path)
+            )
             imported_path = import_yaml_into_template(
                 entities=entities,
                 template_path=resolve_cwd_path(template_path),
@@ -417,7 +439,9 @@ def import_yaml(*, input_path: str, template_path: str, output_path: str) -> dic
                     "code": "validation_failed",
                     "message": "Imported workbook failed validation",
                     "details": {
-                        "error_count": validation_result.get("summary", {}).get("errors", 0)
+                        "error_count": validation_result.get("summary", {}).get(
+                            "errors", 0
+                        )
                     },
                 }
             span.add(ok=response["ok"])
@@ -479,7 +503,11 @@ def bundle_solution(
                 operation="bundle_solution",
                 code="bundle_error",
                 message=str(exc),
-                details={"directory": directory, "output_path": output_path, "include": include},
+                details={
+                    "directory": directory,
+                    "output_path": output_path,
+                    "include": include,
+                },
             )
         except Exception as exc:  # pragma: no cover - defensive
             span.add(error=str(exc))

@@ -252,9 +252,7 @@ def read(
                 # openpyxl reports max_row=1, max_column=1 even for empty sheets,
                 # so check A1 value to distinguish truly empty from single-cell data.
                 empty = (
-                    ws.max_row == 1
-                    and ws.max_column == 1
-                    and ws["A1"].value is None
+                    ws.max_row == 1 and ws.max_column == 1 and ws["A1"].value is None
                 )
                 if empty:
                     s.add(rows=0)
@@ -311,7 +309,9 @@ def write(
         excel.write(filepath="report.xlsx", data=[[1, 2, 3]], sheet_name="Numbers", start_cell="B5")
         excel.write(filepath="new.xlsx", data=[["Test"]], create_if_missing=True)
     """
-    with LogSpan(span="excel.write", filepath=filepath, sheet=sheet_name, rows=len(data)) as s:
+    with LogSpan(
+        span="excel.write", filepath=filepath, sheet=sheet_name, rows=len(data)
+    ) as s:
         wb = None
         try:
             path = _expand_path(filepath)
@@ -835,7 +835,9 @@ def insert_rows(
     Example:
         excel.insert_rows(filepath="data.xlsx", row=5, count=3)
     """
-    with LogSpan(span="excel.insert_rows", filepath=filepath, row=row, count=count) as s:
+    with LogSpan(
+        span="excel.insert_rows", filepath=filepath, row=row, count=count
+    ) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -879,7 +881,9 @@ def delete_rows(
     Example:
         excel.delete_rows(filepath="data.xlsx", row=3, count=2)
     """
-    with LogSpan(span="excel.delete_rows", filepath=filepath, row=row, count=count) as s:
+    with LogSpan(
+        span="excel.delete_rows", filepath=filepath, row=row, count=count
+    ) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -924,7 +928,9 @@ def insert_cols(
         excel.insert_cols(filepath="data.xlsx", col="C", count=2)
         excel.insert_cols(filepath="data.xlsx", col=3, count=2)
     """
-    with LogSpan(span="excel.insert_cols", filepath=filepath, col=col, count=count) as s:
+    with LogSpan(
+        span="excel.insert_cols", filepath=filepath, col=col, count=count
+    ) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -970,7 +976,9 @@ def delete_cols(
     Example:
         excel.delete_cols(filepath="data.xlsx", col="B", count=2)
     """
-    with LogSpan(span="excel.delete_cols", filepath=filepath, col=col, count=count) as s:
+    with LogSpan(
+        span="excel.delete_cols", filepath=filepath, col=col, count=count
+    ) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")
@@ -1019,7 +1027,12 @@ def copy_range(
         excel.copy_range(filepath="data.xlsx", source_range="A1:C10", target_cell="E1")
         excel.copy_range(filepath="data.xlsx", source_range="A1:C10", target_cell="A1", target_sheet="Backup")
     """
-    with LogSpan(span="excel.copy_range", filepath=filepath, source=source_range, target=target_cell) as s:
+    with LogSpan(
+        span="excel.copy_range",
+        filepath=filepath,
+        source=source_range,
+        target=target_cell,
+    ) as s:
         try:
             if not _expand_path(filepath).exists():
                 s.add(error="file_not_found")

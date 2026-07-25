@@ -325,7 +325,9 @@ class IncrementalWriter:
         # Close previous heading
         if self._current_heading:
             prev_level, prev_title, prev_start = self._current_heading
-            self._headings.append((prev_level, prev_title, prev_start, self._line_count))
+            self._headings.append(
+                (prev_level, prev_title, prev_start, self._line_count)
+            )
 
         # Start new heading
         heading_line = self._line_count + 1
@@ -339,7 +341,9 @@ class IncrementalWriter:
         """Close the current heading section."""
         if self._current_heading:
             prev_level, prev_title, prev_start = self._current_heading
-            self._headings.append((prev_level, prev_title, prev_start, self._line_count))
+            self._headings.append(
+                (prev_level, prev_title, prev_start, self._line_count)
+            )
             self._current_heading = None
 
     def get_content(self) -> str:

@@ -316,7 +316,9 @@ def check_deps(
 
         # Check secret dependencies (secrets are always strings)
         for secret_item in tool.requires.get("secrets", []):
-            secret_name = str(secret_item) if not isinstance(secret_item, str) else secret_item
+            secret_name = (
+                str(secret_item) if not isinstance(secret_item, str) else secret_item
+            )
             dep = check_secret(secret_name)
             dep.install = "Add to secrets.yaml"
             tool_result.dependencies.append(dep)

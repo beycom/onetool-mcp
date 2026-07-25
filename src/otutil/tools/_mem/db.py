@@ -1,4 +1,5 @@
 """SQLite connection management, schema, and serialisation helpers."""
+
 from __future__ import annotations
 
 import builtins
@@ -43,6 +44,7 @@ def _check_vec_available() -> bool:
     if _VEC_AVAILABLE is None:
         try:
             import sqlite_vec  # type: ignore[import-untyped]  # noqa: F401
+
             _VEC_AVAILABLE = True
         except ImportError:
             _VEC_AVAILABLE = False
@@ -345,7 +347,9 @@ def _normalize_vec(vec: list[float]) -> list[float]:
     return [x / norm for x in vec]
 
 
-def _sync_vec_index(conn: sqlite3.Connection, memory_id: str, vec: list[float] | None) -> None:
+def _sync_vec_index(
+    conn: sqlite3.Connection, memory_id: str, vec: list[float] | None
+) -> None:
     """Keep the derived memories_vec row in sync with an embedding write.
 
     Deletes any existing row, then inserts the L2-normalised vector when its

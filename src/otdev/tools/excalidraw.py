@@ -62,12 +62,19 @@ from otpack import LogSpan, resolve_cwd_path
 
 def _edge_key(e: dict[str, Any]) -> tuple[str, str, str, str | None, str | None]:
     """Return the deduplication key for an edge."""
-    return (e["src"], e["dst"], e["label"], e.get("startArrowhead"), e.get("endArrowhead"))
+    return (
+        e["src"],
+        e["dst"],
+        e["label"],
+        e.get("startArrowhead"),
+        e.get("endArrowhead"),
+    )
 
 
 # ---------------------------------------------------------------------------
 # JS asset loader
 # ---------------------------------------------------------------------------
+
 
 def _load_js(filename: str) -> str:
     """Load a bundled JavaScript file from disk."""
@@ -117,10 +124,9 @@ def _ensure_elk_loaded() -> str | None:
 # Pydoll browser driver
 # ---------------------------------------------------------------------------
 
-_browser: Any = None   # pydoll Chrome instance
-_tab: Any = None       # pydoll Tab instance
+_browser: Any = None  # pydoll Chrome instance
+_tab: Any = None  # pydoll Tab instance
 _loop: asyncio.AbstractEventLoop | None = None
-
 
 
 def _run(coro: Any) -> Any:
@@ -250,11 +256,13 @@ def _extract_js_value(response: Any) -> Any:
 
 def _browser_evaluate(fn: str) -> str:
     """Evaluate a JS function string in the browser and return result as string."""
-    response = _run(_tab.execute_script(
-        f"({fn})()",
-        return_by_value=True,
-        await_promise=True,
-    ))
+    response = _run(
+        _tab.execute_script(
+            f"({fn})()",
+            return_by_value=True,
+            await_promise=True,
+        )
+    )
     value = _extract_js_value(response)
     if value is None:
         return "null"
@@ -265,11 +273,13 @@ def _browser_evaluate(fn: str) -> str:
 
 def _browser_evaluate_json(fn: str) -> Any:
     """Evaluate a JS function and return a Python-native result."""
-    response = _run(_tab.execute_script(
-        f"({fn})()",
-        return_by_value=True,
-        await_promise=True,
-    ))
+    response = _run(
+        _tab.execute_script(
+            f"({fn})()",
+            return_by_value=True,
+            await_promise=True,
+        )
+    )
     value = _extract_js_value(response)
     if isinstance(value, str):
         try:
@@ -311,7 +321,9 @@ def _js_style_elements(ids: list[str], style_props: dict[str, Any]) -> int:
     """Apply style properties to elements by ID. Returns count of matched elements."""
     ids_json = json.dumps(ids)
     props_json = json.dumps(style_props)
-    result = _browser_evaluate(f"() => window._style_elements({ids_json}, {props_json})")
+    result = _browser_evaluate(
+        f"() => window._style_elements({ids_json}, {props_json})"
+    )
     try:
         return int(result)
     except (ValueError, TypeError):
@@ -330,7 +342,9 @@ def _auto_size(label: str, font_size: int = _DEFAULT_FONT_SIZE) -> tuple[int, in
     """Compute shape dimensions from label content."""
     lines = (label or "").split("\n")
     max_chars = max((len(line) for line in lines), default=1)
-    w = max(_SHAPE_MIN_W, int(max_chars * font_size * _SHAPE_CHAR_W_RATIO + _SHAPE_PAD_X))
+    w = max(
+        _SHAPE_MIN_W, int(max_chars * font_size * _SHAPE_CHAR_W_RATIO + _SHAPE_PAD_X)
+    )
     h = max(_SHAPE_MIN_H, int(len(lines) * font_size * 1.25 + _SHAPE_PAD_Y))
     return w, h
 
@@ -356,16 +370,20 @@ def _shape_payload(
     final_x = style.pop("x", x)
     final_y = style.pop("y", y)
     return {
-        "id": id_, "label": label,
-        "x": final_x, "y": final_y, "w": final_w, "h": final_h,
-        "shape": "rectangle", "styleProps": style,
+        "id": id_,
+        "label": label,
+        "x": final_x,
+        "y": final_y,
+        "w": final_w,
+        "h": final_h,
+        "shape": "rectangle",
+        "styleProps": style,
     }
 
 
 # ---------------------------------------------------------------------------
 # Browser lifecycle
 # ---------------------------------------------------------------------------
-
 
 
 def _ensure_ready() -> str | None:
@@ -459,20 +477,32 @@ def _rerender_from_state(state: dict[str, Any]) -> None:
         )
 
     edge_payloads = [
-        {"id": e["id"], "srcId": e["src"], "dstId": e["dst"],
-         "label": e["label"], "startArrowhead": e.get("startArrowhead"),
-         "endArrowhead": e.get("endArrowhead", "arrow"),
-         "strokeStyle": e.get("strokeStyle"),
-         "styleProps": e.get("styleProps", {})}
+        {
+            "id": e["id"],
+            "srcId": e["src"],
+            "dstId": e["dst"],
+            "label": e["label"],
+            "startArrowhead": e.get("startArrowhead"),
+            "endArrowhead": e.get("endArrowhead", "arrow"),
+            "strokeStyle": e.get("strokeStyle"),
+            "styleProps": e.get("styleProps", {}),
+        }
         for e in state["edges"]
     ]
 
     subgraph_payloads = [
-        {"id": gid, "label": group["label"], "memberIds": group["members"], "savedBounds": None}
+        {
+            "id": gid,
+            "label": group["label"],
+            "memberIds": group["members"],
+            "savedBounds": None,
+        }
         for gid, group in state["groups"].items()
     ]
 
-    _js_batch_draw(shapes=shape_payloads, edges=edge_payloads, subgraphs=subgraph_payloads)
+    _js_batch_draw(
+        shapes=shape_payloads, edges=edge_payloads, subgraphs=subgraph_payloads
+    )
 
 
 def _get_canvas_max_y() -> float:
@@ -498,28 +528,86 @@ def _get_canvas_max_y() -> float:
 # ---------------------------------------------------------------------------
 
 # Edge operator pattern used in ID pre-normalisation (longest first to avoid prefix clashes)
-_EDGE_OP_RE = re.compile(r'(<-->|-\.->|-\.-|--[ox]|-->|---)')
+_EDGE_OP_RE = re.compile(r"(<-->|-\.->|-\.-|--[ox]|-->|---)")
 
-_RE_HEADER   = re.compile(r"^(?:flowchart|graph)\s+\w+$")
+_RE_HEADER = re.compile(r"^(?:flowchart|graph)\s+\w+$")
 _RE_SUBGRAPH = re.compile(r'^subgraph\s+([\w-]+)(?:\s+\[\s*"([^"]+)"\s*\])?$')
 
 # Rectangle shape — trailing content after ] is parsed as inline style props
-_RE_SHAPE_RECT    = re.compile(r'^([\w-]+)\s*\[\s*"?([^"\]]*)"?\s*\]\s*(.*)$')
+_RE_SHAPE_RECT = re.compile(r'^([\w-]+)\s*\[\s*"?([^"\]]*)"?\s*\]\s*(.*)$')
 # Hints for deprecated ellipse/diamond syntax (to provide a clear error)
-_RE_SHAPE_ELLIPSE = re.compile(r'^[\w-]+\s*\(\s*\(')
-_RE_SHAPE_DIAMOND = re.compile(r'^[\w-]+\s*\{')
+_RE_SHAPE_ELLIPSE = re.compile(r"^[\w-]+\s*\(\s*\(")
+_RE_SHAPE_DIAMOND = re.compile(r"^[\w-]+\s*\{")
 # Bare id + inline style props:  a bc:green,sw:2
-_RE_BARE_STYLE    = re.compile(r'^([\w-]+)\s+([a-z]+:.+)$')
+_RE_BARE_STYLE = re.compile(r"^([\w-]+)\s+([a-z]+:.+)$")
 
 # (pattern, id_suffix, has_label, start_arrowhead, end_arrowhead, directed, stroke_style)
-_EDGE_PATTERNS: list[tuple[re.Pattern[str], str, bool, str | None, str | None, bool, str | None]] = [
-    (re.compile(r"^([\w-]+)\s*<-->\s*(?:\|([^|]*)\|)?\s*([\w-]+)$"),    "-bidir",      True,  "arrow", "arrow", True,  None),
-    (re.compile(r"^([\w-]+)\s*-\.->\s*(?:\|([^|]*)\|)?\s*([\w-]+)$"),   "-dashed",     True,  None,    "arrow", True,  "dashed"),
-    (re.compile(r"^([\w-]+)\s*-\.-\s*([\w-]+)$"),                         "-dashed-und", False, None,    None,    False, "dashed"),
-    (re.compile(r"^([\w-]+)\s*--o\s*(?:\|([^|]*)\|)?\s*([\w-]+)$"),     "-dot",        True,  None,    "dot",   True,  None),
-    (re.compile(r"^([\w-]+)\s*--x\s*(?:\|([^|]*)\|)?\s*([\w-]+)$"),     "-bar",        True,  None,    "bar",   True,  None),
-    (re.compile(r"^([\w-]+)\s*-->\s*(?:\|([^|]*)\|)?\s*([\w-]+)$"),     "",            True,  None,    "arrow", True,  None),
-    (re.compile(r"^([\w-]+)\s*---\s*([\w-]+)$"),                          "-und",        False, None,    None,    False, None),
+_EDGE_PATTERNS: list[
+    tuple[re.Pattern[str], str, bool, str | None, str | None, bool, str | None]
+] = [
+    (
+        re.compile(r"^([\w-]+)\s*<-->\s*(?:\|([^|]*)\|)?\s*([\w-]+)$"),
+        "-bidir",
+        True,
+        "arrow",
+        "arrow",
+        True,
+        None,
+    ),
+    (
+        re.compile(r"^([\w-]+)\s*-\.->\s*(?:\|([^|]*)\|)?\s*([\w-]+)$"),
+        "-dashed",
+        True,
+        None,
+        "arrow",
+        True,
+        "dashed",
+    ),
+    (
+        re.compile(r"^([\w-]+)\s*-\.-\s*([\w-]+)$"),
+        "-dashed-und",
+        False,
+        None,
+        None,
+        False,
+        "dashed",
+    ),
+    (
+        re.compile(r"^([\w-]+)\s*--o\s*(?:\|([^|]*)\|)?\s*([\w-]+)$"),
+        "-dot",
+        True,
+        None,
+        "dot",
+        True,
+        None,
+    ),
+    (
+        re.compile(r"^([\w-]+)\s*--x\s*(?:\|([^|]*)\|)?\s*([\w-]+)$"),
+        "-bar",
+        True,
+        None,
+        "bar",
+        True,
+        None,
+    ),
+    (
+        re.compile(r"^([\w-]+)\s*-->\s*(?:\|([^|]*)\|)?\s*([\w-]+)$"),
+        "",
+        True,
+        None,
+        "arrow",
+        True,
+        None,
+    ),
+    (
+        re.compile(r"^([\w-]+)\s*---\s*([\w-]+)$"),
+        "-und",
+        False,
+        None,
+        None,
+        False,
+        None,
+    ),
 ]
 
 
@@ -567,13 +655,13 @@ def _expand_combined_shape_edge(line: str) -> list[str]:
 
     extra: list[str] = []
     if src_bracket > 0:
-        extra.append(src_raw)           # e.g. 'a["Hello"]' → shape declaration
+        extra.append(src_raw)  # e.g. 'a["Hello"]' → shape declaration
         src_part = src_raw[:src_bracket].strip()
     else:
         src_part = src_raw
 
     if dst_bracket > 0:
-        extra.append(dst_raw)           # e.g. 'b["World"]' → shape declaration
+        extra.append(dst_raw)  # e.g. 'b["World"]' → shape declaration
         dst_part = dst_raw[:dst_bracket].strip()
     else:
         dst_part = dst_raw
@@ -604,7 +692,11 @@ def _prenorm_line(line: str) -> str:
         m = re.match(r"^(subgraph\s+)(.*?)(\s*(?:\[.*)?$)", line)
         if m:
             raw_id = m[2].strip()
-            return "subgraph " + _norm_id(raw_id) + (" " + m[3].strip() if m[3].strip() else "")
+            return (
+                "subgraph "
+                + _norm_id(raw_id)
+                + (" " + m[3].strip() if m[3].strip() else "")
+            )
         return line
 
     # Edge line — find operator and normalise src and dst independently
@@ -621,7 +713,15 @@ def _prenorm_line(line: str) -> str:
         # Labeled edge: -->|label|dst
         if lm := re.match(r"^\s*\|([^|]*)\|\s*(.*)", rest):
             dst_raw = lm[2].strip()
-            return _norm_id(src_raw) + op + "|" + lm[1] + "|" + _norm_id(dst_raw) + style_suffix
+            return (
+                _norm_id(src_raw)
+                + op
+                + "|"
+                + lm[1]
+                + "|"
+                + _norm_id(dst_raw)
+                + style_suffix
+            )
         return _norm_id(src_raw) + op + _norm_id(rest.strip()) + style_suffix
 
     # Shape declaration: id["Label"] [optional inline style]
@@ -645,47 +745,54 @@ def _prenorm_line(line: str) -> str:
 # ---------------------------------------------------------------------------
 
 _STYLE_SHORTHANDS: dict[str, str] = {
-    "bc":    "backgroundColor",
-    "sc":    "strokeColor",
-    "sw":    "strokeWidth",
-    "ss":    "strokeStyle",
-    "r":     "roughness",
-    "o":     "opacity",
-    "f":     "fontFamily",
-    "fs":    "fontSize",
-    "ta":    "textAlign",
-    "va":    "verticalAlign",
-    "fi":    "fillStyle",    # solid, hachure, cross-hatch, dots, zigzag, zigzag-line
-    "cr":    "corners",      # shape-only: round (default) | sharp
-    "at":    "arrowType",    # edge-only: curve (default) | sharp | elbow
-    "shape": "shape",        # special — triggers delete+recreate in JS
-    "x":     "x",
-    "y":     "y",
-    "w":     "width",
-    "h":     "height",
+    "bc": "backgroundColor",
+    "sc": "strokeColor",
+    "sw": "strokeWidth",
+    "ss": "strokeStyle",
+    "r": "roughness",
+    "o": "opacity",
+    "f": "fontFamily",
+    "fs": "fontSize",
+    "ta": "textAlign",
+    "va": "verticalAlign",
+    "fi": "fillStyle",  # solid, hachure, cross-hatch, dots, zigzag, zigzag-line
+    "cr": "corners",  # shape-only: round (default) | sharp
+    "at": "arrowType",  # edge-only: curve (default) | sharp | elbow
+    "shape": "shape",  # special — triggers delete+recreate in JS
+    "x": "x",
+    "y": "y",
+    "w": "width",
+    "h": "height",
 }
 
 _NAMED_COLORS: dict[str, str] = {
-    "green":  "#bbf7d0",
-    "blue":   "#bfdbfe",
-    "red":    "#fecaca",
+    "green": "#bbf7d0",
+    "blue": "#bfdbfe",
+    "red": "#fecaca",
     "purple": "#e9d5ff",
     "yellow": "#fef08a",
     "orange": "#fed7aa",
-    "pink":   "#fce7f3",
-    "gray":   "#e5e7eb",
-    "grey":   "#e5e7eb",
-    "white":  "#ffffff",
-    "black":  "#000000",
+    "pink": "#fce7f3",
+    "gray": "#e5e7eb",
+    "grey": "#e5e7eb",
+    "white": "#ffffff",
+    "black": "#000000",
 }
 
 _FONT_FAMILY_MAP: dict[str, int] = {"hand": 1, "normal": 2, "mono": 3, "excalidraw": 5}
 _STROKE_STYLE_VALUES = {"solid", "dashed", "dotted"}
-_TEXT_ALIGN_VALUES   = {"left", "center", "right"}
-_VERT_ALIGN_VALUES   = {"top", "middle", "bottom"}
-_FILL_STYLE_VALUES   = {"solid", "hachure", "cross-hatch", "dots", "zigzag", "zigzag-line"}
-_CORNER_VALUES       = {"round", "sharp"}
-_ARROW_TYPE_VALUES   = {"curve", "sharp", "elbow"}
+_TEXT_ALIGN_VALUES = {"left", "center", "right"}
+_VERT_ALIGN_VALUES = {"top", "middle", "bottom"}
+_FILL_STYLE_VALUES = {
+    "solid",
+    "hachure",
+    "cross-hatch",
+    "dots",
+    "zigzag",
+    "zigzag-line",
+}
+_CORNER_VALUES = {"round", "sharp"}
+_ARROW_TYPE_VALUES = {"curve", "sharp", "elbow"}
 _SHAPE_MAP: dict[str, str] = {"r": "rectangle", "d": "diamond", "c": "ellipse"}
 
 
@@ -727,7 +834,16 @@ def _parse_style_props(s: str) -> dict[str, Any]:
             props[prop] = _SHAPE_MAP[v_lower]
             continue
         # Numeric coercion
-        if prop in ("strokeWidth", "roughness", "opacity", "fontSize", "x", "y", "width", "height"):
+        if prop in (
+            "strokeWidth",
+            "roughness",
+            "opacity",
+            "fontSize",
+            "x",
+            "y",
+            "width",
+            "height",
+        ):
             try:
                 props[prop] = float(v) if "." in v else int(v)
                 continue
@@ -815,9 +931,13 @@ def _try_edge(line: str, edges: list[dict[str, Any]]) -> bool:
                 src, dst, lbl = _norm_id(m[1]), _norm_id(m[2]), ""
             edge_id = f"edge-{src}-{dst}{id_sfx}" + (f"-{lbl}" if lbl else "")
             edge: dict[str, Any] = {
-                "id": edge_id, "src": src, "dst": dst, "label": lbl,
+                "id": edge_id,
+                "src": src,
+                "dst": dst,
+                "label": lbl,
                 "directed": directed,
-                "startArrowhead": s_head, "endArrowhead": e_head,
+                "startArrowhead": s_head,
+                "endArrowhead": e_head,
             }
             if stroke:
                 edge["strokeStyle"] = stroke
@@ -906,7 +1026,11 @@ def parse_dsl(spec: str) -> dict[str, Any]:
             continue
 
         if m := _RE_SUBGRAPH.match(line):
-            current_subgraph = {"id": _norm_id(m[1]), "label": m[2] or m[1], "members": []}
+            current_subgraph = {
+                "id": _norm_id(m[1]),
+                "label": m[2] or m[1],
+                "members": [],
+            }
             continue
 
         if line == "end" and current_subgraph is not None:
@@ -949,7 +1073,12 @@ def parse_dsl(spec: str) -> dict[str, Any]:
         # Bare node ID fallback — create shape with label = node ID
         shapes[line] = {"label": line, "classes": []}
 
-    return {"shapes": shapes, "edges": edges, "groups": groups, "inline_styles": inline_styles}
+    return {
+        "shapes": shapes,
+        "edges": edges,
+        "groups": groups,
+        "inline_styles": inline_styles,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -971,7 +1100,7 @@ def _build_dsl(state: dict[str, Any]) -> str:
         lines.append(f'{id_}["{label.replace(chr(10), "\\n")}"]')
     for edge in state["edges"]:
         src, dst = edge["src"], edge["dst"]
-        lbl = f'|{edge["label"]}|' if edge["label"] else ""
+        lbl = f"|{edge['label']}|" if edge["label"] else ""
         sh = edge.get("startArrowhead")
         eh = edge.get("endArrowhead", "arrow")
         dashed = edge.get("strokeStyle") == "dashed"
@@ -1099,7 +1228,9 @@ def draw(*, input: str, board: str | None = None) -> str:
         shapes = state["shapes"]
         edges = state["edges"]
         groups = state["groups"]
-        edge_keys: set[tuple[str, str, str, str | None, str | None]] = state["edge_keys"]
+        edge_keys: set[tuple[str, str, str, str | None, str | None]] = state[
+            "edge_keys"
+        ]
 
         parsed = parse_dsl(input)
         inline_styles = parsed.get("inline_styles", {})
@@ -1120,7 +1251,9 @@ def draw(*, input: str, board: str | None = None) -> str:
                 new_shapes[id_] = sh
         new_groups = {gid for gid in parsed["groups"] if gid not in groups}
 
-        new_edges_to_commit: list[tuple[tuple[str, str, str, str | None, str | None], dict[str, Any]]] = []
+        new_edges_to_commit: list[
+            tuple[tuple[str, str, str, str | None, str | None], dict[str, Any]]
+        ] = []
         for e in parsed["edges"]:
             key = _edge_key(e)
             if key not in edge_keys:
@@ -1137,7 +1270,8 @@ def draw(*, input: str, board: str | None = None) -> str:
             if (
                 shape.get("label") is not None
                 and shape["label"] != prev_labels.get(id_)
-            ) or inline_styles.get(id_)
+            )
+            or inline_styles.get(id_)
         )
 
         # Update state: shapes (upsert in place, preserving stored x/y/style)
@@ -1173,7 +1307,11 @@ def draw(*, input: str, board: str | None = None) -> str:
 
         # Position new shapes column-stacked below existing content and persist
         # x/y so rerenders keep this layout (explicit inline x/y wins).
-        base_y = state.get("canvas_max_y", 60.0) + 40 if new_shapes else state.get("canvas_max_y", 60.0)
+        base_y = (
+            state.get("canvas_max_y", 60.0) + 40
+            if new_shapes
+            else state.get("canvas_max_y", 60.0)
+        )
         col_y: dict[str | None, float] = {}
         if new_shapes:
             subgraph_of: dict[str, str | None] = dict.fromkeys(new_shapes, None)
@@ -1196,16 +1334,21 @@ def draw(*, input: str, board: str | None = None) -> str:
                 entry.setdefault("y", col_y[sg])
                 col_y[sg] += 100.0
 
-        new_canvas_max_y = max(col_y.values()) if col_y else state.get("canvas_max_y", 60.0)
+        new_canvas_max_y = (
+            max(col_y.values()) if col_y else state.get("canvas_max_y", 60.0)
+        )
 
         # Save updated state to session file
-        _session.save({
-            "shapes": shapes,
-            "edges": edges,
-            "groups": groups,
-            "edge_keys": edge_keys,
-            "canvas_max_y": new_canvas_max_y,
-        }, board)
+        _session.save(
+            {
+                "shapes": shapes,
+                "edges": edges,
+                "groups": groups,
+                "edge_keys": edge_keys,
+                "canvas_max_y": new_canvas_max_y,
+            },
+            board,
+        )
 
         # Push incremental update to browser if connected: patch existing
         # elements in place (live position preserved), batch-draw new ones.
@@ -1215,7 +1358,9 @@ def draw(*, input: str, board: str | None = None) -> str:
                 patches: list[dict[str, Any]] = []
                 for id_, shape in existing_shape_updates.items():
                     patch: dict[str, Any] = {"id": id_}
-                    if shape.get("label") is not None and shape["label"] != prev_labels.get(id_):
+                    if shape.get("label") is not None and shape[
+                        "label"
+                    ] != prev_labels.get(id_):
                         patch["text"] = shape["label"]
                     patch.update(inline_styles.get(id_) or {})
                     if len(patch) > 1:
@@ -1226,34 +1371,53 @@ def draw(*, input: str, board: str | None = None) -> str:
                 shape_payloads = []
                 for id_ in new_shapes:
                     entry = shapes[id_]
-                    shape_payloads.append(_shape_payload(
-                        id_, entry,
-                        float(entry.get("x", 100.0)), float(entry.get("y", base_y)),
-                        entry.get("style"),
-                    ))
+                    shape_payloads.append(
+                        _shape_payload(
+                            id_,
+                            entry,
+                            float(entry.get("x", 100.0)),
+                            float(entry.get("y", base_y)),
+                            entry.get("style"),
+                        )
+                    )
                 edge_payloads = [
-                    {"id": e["id"], "srcId": e["src"], "dstId": e["dst"],
-                     "label": e["label"], "startArrowhead": e.get("startArrowhead"),
-                     "endArrowhead": e.get("endArrowhead", "arrow"),
-                     "strokeStyle": e.get("strokeStyle"),
-                     "styleProps": e.get("styleProps", {})}
+                    {
+                        "id": e["id"],
+                        "srcId": e["src"],
+                        "dstId": e["dst"],
+                        "label": e["label"],
+                        "startArrowhead": e.get("startArrowhead"),
+                        "endArrowhead": e.get("endArrowhead", "arrow"),
+                        "strokeStyle": e.get("strokeStyle"),
+                        "styleProps": e.get("styleProps", {}),
+                    }
                     for _, e in new_edges_to_commit
                 ]
                 # Subgraphs are redrawn every call so bounds track member positions
                 subgraph_payloads = [
-                    {"id": gid, "label": group["label"],
-                     "memberIds": group["members"], "savedBounds": None}
+                    {
+                        "id": gid,
+                        "label": group["label"],
+                        "memberIds": group["members"],
+                        "savedBounds": None,
+                    }
                     for gid, group in groups.items()
                 ]
                 if shape_payloads or edge_payloads or subgraph_payloads:
                     _js_batch_draw(
-                        shapes=shape_payloads, edges=edge_payloads, subgraphs=subgraph_payloads
+                        shapes=shape_payloads,
+                        edges=edge_payloads,
+                        subgraphs=subgraph_payloads,
                     )
             except Exception as exc:
                 browser_warning = f" [warning: canvas update failed — {exc}]"
 
         new_edge_ids = [e["id"] for _, e in new_edges_to_commit]
-        edge_msg = f", +{len(new_edge_ids)} edge(s): {', '.join(new_edge_ids)}" if new_edge_ids else ""
+        edge_msg = (
+            f", +{len(new_edge_ids)} edge(s): {', '.join(new_edge_ids)}"
+            if new_edge_ids
+            else ""
+        )
         updated_msg = f", {patch_count} updated" if patch_count else ""
         group_msg = f", +{len(new_groups)} group(s)" if new_groups else ""
 
@@ -1282,13 +1446,16 @@ def _get_note_renderers() -> dict[str, Any]:
             render_timeline,
             render_tree,
         )
-        _NOTE_RENDERERS.update({
-            "table": render_table,
-            "tree": render_tree,
-            "seq": render_sequence,
-            "timeline": render_timeline,
-            "note": render_note,
-        })
+
+        _NOTE_RENDERERS.update(
+            {
+                "table": render_table,
+                "tree": render_tree,
+                "seq": render_sequence,
+                "timeline": render_timeline,
+                "note": render_note,
+            }
+        )
     return _NOTE_RENDERERS
 
 
@@ -1316,7 +1483,9 @@ _NOTE_PADDING = 20
 _NOTE_DEFAULT_BG = "#f5f5dc"
 
 
-def note(*, input: str, background: str = _NOTE_DEFAULT_BG, board: str | None = None) -> str:
+def note(
+    *, input: str, background: str = _NOTE_DEFAULT_BG, board: str | None = None
+) -> str:
     """Insert ASCII-rendered text annotations onto the canvas.
 
     Parses tagged blocks and renders each as a code-font rectangle below
@@ -1423,9 +1592,16 @@ def note(*, input: str, background: str = _NOTE_DEFAULT_BG, board: str | None = 
                 "color": "#1e1e1e",
             }
             shape_payloads.append(
-                {"id": block["id"], "label": rendered,
-                 "x": 500.0, "y": y_cursor, "w": w, "h": h,
-                 "shape": "rectangle", "styleProps": style}
+                {
+                    "id": block["id"],
+                    "label": rendered,
+                    "x": 500.0,
+                    "y": y_cursor,
+                    "w": w,
+                    "h": h,
+                    "shape": "rectangle",
+                    "styleProps": style,
+                }
             )
             y_cursor += h + 20
 
@@ -1440,19 +1616,25 @@ def note(*, input: str, background: str = _NOTE_DEFAULT_BG, board: str | None = 
                     "classes": [],
                     "shape": payload["shape"],
                     # Persist size inside style so rerenders restore exact dims
-                    "style": {**payload["styleProps"],
-                              "width": payload["w"], "height": payload["h"]},
+                    "style": {
+                        **payload["styleProps"],
+                        "width": payload["w"],
+                        "height": payload["h"],
+                    },
                     "x": payload["x"],
                     "y": payload["y"],
                 }
                 max_y = max(max_y, float(payload["y"]) + float(payload["h"]))
-            _session.save({
-                "shapes": shapes,
-                "edges": state["edges"],
-                "groups": state["groups"],
-                "edge_keys": state["edge_keys"],
-                "canvas_max_y": max_y,
-            }, board)
+            _session.save(
+                {
+                    "shapes": shapes,
+                    "edges": state["edges"],
+                    "groups": state["groups"],
+                    "edge_keys": state["edge_keys"],
+                    "canvas_max_y": max_y,
+                },
+                board,
+            )
 
         for payload in shape_payloads:
             _js_batch_draw(shapes=[payload], edges=[], subgraphs=[])
@@ -1501,9 +1683,14 @@ def embed_dsl(*, board: str | None = None) -> str:
             "color": "#555555",
         }
         payload = {
-            "id": "dsl", "label": dsl_text,
-            "x": 500.0, "y": _get_canvas_max_y() + 100,
-            "w": w, "h": h, "shape": "rectangle", "styleProps": style,
+            "id": "dsl",
+            "label": dsl_text,
+            "x": 500.0,
+            "y": _get_canvas_max_y() + 100,
+            "w": w,
+            "h": h,
+            "shape": "rectangle",
+            "styleProps": style,
         }
         _js_batch_draw(shapes=[payload], edges=[], subgraphs=[])
 
@@ -1549,7 +1736,9 @@ def erase(*, ids: list[str], board: str | None = None) -> str:
         state = _session.load(board)
         shapes = state["shapes"]
         edges = state["edges"]
-        edge_keys: set[tuple[str, str, str, str | None, str | None]] = state["edge_keys"]
+        edge_keys: set[tuple[str, str, str, str | None, str | None]] = state[
+            "edge_keys"
+        ]
 
         id_set = set(ids)
         edge_ids = {e["id"] for e in edges}
@@ -1562,8 +1751,7 @@ def erase(*, ids: list[str], board: str | None = None) -> str:
 
         # Find edges that become dangling (src or dst is being erased)
         orphaned_edge_ids = [
-            e["id"] for e in edges
-            if e["src"] in id_set or e["dst"] in id_set
+            e["id"] for e in edges if e["src"] in id_set or e["dst"] in id_set
         ]
 
         # Remove shapes
@@ -1577,28 +1765,36 @@ def erase(*, ids: list[str], board: str | None = None) -> str:
             if e["id"] in id_set or e["src"] in id_set or e["dst"] in id_set
         }
         edges[:] = [
-            e for e in edges
+            e
+            for e in edges
             if e["id"] not in id_set
             and e["src"] not in id_set
             and e["dst"] not in id_set
         ]
         edge_keys.difference_update(keys_to_remove)
 
-        _session.save({
-            "shapes": shapes,
-            "edges": edges,
-            "groups": state["groups"],
-            "edge_keys": edge_keys,
-            "canvas_max_y": state.get("canvas_max_y", 60.0),
-        }, board)
+        _session.save(
+            {
+                "shapes": shapes,
+                "edges": edges,
+                "groups": state["groups"],
+                "edge_keys": edge_keys,
+                "canvas_max_y": state.get("canvas_max_y", 60.0),
+            },
+            board,
+        )
 
         # Delete erased elements from browser canvas if connected
         browser_warning = ""
         if _tab is not None:
-            all_erase_ids = to_erase + [eid for eid in orphaned_edge_ids if eid not in to_erase]
+            all_erase_ids = to_erase + [
+                eid for eid in orphaned_edge_ids if eid not in to_erase
+            ]
             if all_erase_ids:
                 try:
-                    _browser_evaluate(f"() => window._batch_erase({json.dumps(all_erase_ids)})")
+                    _browser_evaluate(
+                        f"() => window._batch_erase({json.dumps(all_erase_ids)})"
+                    )
                 except Exception as exc:
                     browser_warning = f" [warning: canvas update failed — {exc}]"
 
@@ -1648,9 +1844,7 @@ def save(*, file: str, board: str | None = None) -> str:
         if dsl_str.strip():
             _write_dsl_to_canvas(dsl_str)
 
-        elements = _browser_evaluate_json(
-            "() => Array.from(window.__drawApi.read())"
-        )
+        elements = _browser_evaluate_json("() => Array.from(window.__drawApi.read())")
         if not isinstance(elements, list):
             return f"Error: could not read scene elements: {elements}"
 
@@ -1710,7 +1904,7 @@ def load(*, file: str, board: str | None = None) -> str:
         if not isinstance(data, dict) or data.get("type") != "excalidraw":
             return (
                 "Error: not a valid .excalidraw file - "
-                "expected {\"type\": \"excalidraw\", ...}"
+                'expected {"type": "excalidraw", ...}'
             )
 
         elements = data.get("elements", [])
@@ -1732,7 +1926,13 @@ def load(*, file: str, board: str | None = None) -> str:
             _session.save(new_state, board)
             warning = ""
         else:
-            new_state = {"shapes": {}, "edges": [], "groups": {}, "edge_keys": set(), "canvas_max_y": 60.0}
+            new_state = {
+                "shapes": {},
+                "edges": [],
+                "groups": {},
+                "edge_keys": set(),
+                "canvas_max_y": 60.0,
+            }
             _session.save(new_state, board)
             warning = " [warning: no __otDSL element — Python state is empty; call whiteboard.sync() after adding one]"
 
@@ -1928,9 +2128,7 @@ def read_scene(*, info: str = "default", board: str | None = None) -> str:
         if board is not None:
             _rerender_from_state(_session.load(board))
 
-        result = _browser_evaluate_json(
-            f"() => window._read_scene({json.dumps(info)})"
-        )
+        result = _browser_evaluate_json(f"() => window._read_scene({json.dumps(info)})")
         if not isinstance(result, str):
             result = str(result)
         s.add("result_length", len(result) if result else 0)
@@ -1962,9 +2160,7 @@ def share(*, board: str | None = None) -> str:
         _rerender_from_state(state)
 
         # Read scene elements
-        elements = _browser_evaluate_json(
-            "() => Array.from(window.__drawApi.read())"
-        )
+        elements = _browser_evaluate_json("() => Array.from(window.__drawApi.read())")
         if not isinstance(elements, list):
             return f"Error: could not read scene elements: {elements}"
 
@@ -2002,7 +2198,11 @@ def share(*, board: str | None = None) -> str:
         )
 
         enc_data = _browser_evaluate_json(encrypt_js)
-        if not isinstance(enc_data, dict) or "data" not in enc_data or "key" not in enc_data:
+        if (
+            not isinstance(enc_data, dict)
+            or "data" not in enc_data
+            or "key" not in enc_data
+        ):
             return f"Error: unexpected encryption result: {enc_data}"
 
         # Upload to Excalidraw storage using Python urllib (bypasses CORS)
@@ -2202,7 +2402,9 @@ def layout(
     if arrow_type is not None and arrow_type not in _ARROW_TYPE_VALUES:
         return f"Error: arrow_type must be None or one of {sorted(_ARROW_TYPE_VALUES)}"
 
-    with LogSpan(span="excalidraw.layout", direction=direction, algorithm=algorithm) as s:
+    with LogSpan(
+        span="excalidraw.layout", direction=direction, algorithm=algorithm
+    ) as s:
         err = _ensure_ready()
         if err:
             s.add("error", err)
@@ -2272,7 +2474,9 @@ def layout(
         )
         positions = _elk_layout.position_map(positions_list)
         patches.extend(_elk_layout.build_edge_patches(build, positions, direction))
-        patches.extend(_elk_layout.build_boundary_arrow_patches(build, positions, direction))
+        patches.extend(
+            _elk_layout.build_boundary_arrow_patches(build, positions, direction)
+        )
 
         patches_json = json.dumps(patches)
         _browser_evaluate(f"""() => {{
@@ -2305,7 +2509,9 @@ def layout(
             affected_edge_ids = list(build.scene_edge_map.keys())
             if affected_edge_ids:
                 edge_ids_json = json.dumps(affected_edge_ids)
-                at_roundness = "null" if arrow_type in ("sharp", "elbow") else "{ type: 2 }"
+                at_roundness = (
+                    "null" if arrow_type in ("sharp", "elbow") else "{ type: 2 }"
+                )
                 at_elbowed = "true" if arrow_type == "elbow" else "false"
                 _browser_evaluate(f"""() => {{
   const now = Date.now();
@@ -2340,12 +2546,12 @@ def layout(
 
 
 _ALIGN_ACTIONS: dict[str, str] = {
-    "left":        "alignLeft",
-    "hcenter":     "alignHorizontallyCentered",
-    "right":       "alignRight",
-    "top":         "alignTop",
-    "vcenter":     "alignVerticallyCentered",
-    "bottom":      "alignBottom",
+    "left": "alignLeft",
+    "hcenter": "alignHorizontallyCentered",
+    "right": "alignRight",
+    "top": "alignTop",
+    "vcenter": "alignVerticallyCentered",
+    "bottom": "alignBottom",
     "hdistribute": "distributeHorizontally",
     "vdistribute": "distributeVertically",
 }
@@ -2479,10 +2685,15 @@ def boards() -> str:
     if not board_list:
         return "no boards found"
     import datetime
+
     lines = []
     for b in board_list:
-        mtime_str = datetime.datetime.fromtimestamp(b["mtime"]).strftime("%Y-%m-%d %H:%M")
-        lines.append(f"  {b['name']}  ({b['shape_count']} shapes, modified {mtime_str})")
+        mtime_str = datetime.datetime.fromtimestamp(b["mtime"]).strftime(
+            "%Y-%m-%d %H:%M"
+        )
+        lines.append(
+            f"  {b['name']}  ({b['shape_count']} shapes, modified {mtime_str})"
+        )
     return "boards:\n" + "\n".join(lines)
 
 

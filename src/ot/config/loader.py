@@ -463,7 +463,9 @@ def load_config(
 # Thread-safety: Protected by _config_lock for safe concurrent access.
 _config: OneToolConfig | None = None
 _config_path: Path | None = None  # Last-loaded config file path (used by reload)
-_secrets_path: Path | str | None = None  # Last-loaded secrets file path (used by reload)
+_secrets_path: Path | str | None = (
+    None  # Last-loaded secrets file path (used by reload)
+)
 _config_lock = threading.Lock()
 
 

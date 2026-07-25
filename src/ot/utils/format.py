@@ -51,7 +51,9 @@ def _degrade_non_finite(obj: Any) -> Any:
     return obj
 
 
-def _json_dumps_safe(result: Any, *, indent: int | None, separators: tuple[str, str] | None) -> str:
+def _json_dumps_safe(
+    result: Any, *, indent: int | None, separators: tuple[str, str] | None
+) -> str:
     """json.dumps that degrades non-JSON-native values instead of raising.
 
     - ``default=str`` degrades datetime/Decimal/set/bytes/Path/custom objects to a

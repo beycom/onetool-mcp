@@ -210,7 +210,9 @@ def expand_snippet(
 
     # Resolve abbreviated param names before applying (prefix resolution)
     param_names = list(snippet_def.params.keys())
-    resolved_input = resolve_kwargs(cast("dict[str, object]", parsed.params), param_names)
+    resolved_input = resolve_kwargs(
+        cast("dict[str, object]", parsed.params), param_names
+    )
 
     # Apply provided values, normalizing boolean strings for bool-typed params
     for key, value in resolved_input.items():
@@ -221,7 +223,11 @@ def expand_snippet(
             context[key] = value
             continue
         param_def = snippet_def.params[key]
-        if isinstance(param_def.default, bool) and isinstance(value, str) and value.lower() in ("true", "false"):
+        if (
+            isinstance(param_def.default, bool)
+            and isinstance(value, str)
+            and value.lower() in ("true", "false")
+        ):
             context[key] = value.lower() == "true"
         else:
             context[key] = value

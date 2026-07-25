@@ -1,4 +1,5 @@
 """Memory mutation functions: delete, update, append."""
+
 from __future__ import annotations
 
 import uuid
@@ -67,8 +68,13 @@ def _apply_memory_update(
             SET content = ?, content_hash = ?, embedding = ?, meta = ?, updated_at = datetime('now')
             WHERE id = ?
             """,
-            [new_content, new_hash, _serialize_embedding(embedding),
-             _serialize_meta(meta), memory_id],
+            [
+                new_content,
+                new_hash,
+                _serialize_embedding(embedding),
+                _serialize_meta(meta),
+                memory_id,
+            ],
         )
         # embedding=None (async mode) removes the now-stale vec row; the
         # worker re-syncs it after the new embedding is generated.
@@ -114,10 +120,14 @@ def delete(
         try:
             with _use_connection() as conn:
                 if id:
-                    result = conn.execute("DELETE FROM memories WHERE id = ? RETURNING id", [id]).fetchone()
+                    result = conn.execute(
+                        "DELETE FROM memories WHERE id = ? RETURNING id", [id]
+                    ).fetchone()
                     if result:
                         # Clean up history too
-                        conn.execute("DELETE FROM memory_history WHERE memory_id = ?", [id])
+                        conn.execute(
+                            "DELETE FROM memory_history WHERE memory_id = ?", [id]
+                        )
                         conn.commit()
                         s.add("deleted", 1)
                         return f"Deleted memory {id}"
@@ -143,7 +153,11 @@ def delete(
                     return f"Would delete {match_count} memories. Set confirm=True to proceed."
 
                 # Delete history for matching memories
-                del_history_sql = "DELETE FROM memory_history WHERE memory_id IN (SELECT id FROM memories WHERE 1=1" + topic_sql + ")"
+                del_history_sql = (
+                    "DELETE FROM memory_history WHERE memory_id IN (SELECT id FROM memories WHERE 1=1"
+                    + topic_sql
+                    + ")"
+                )
                 conn.execute(del_history_sql, topic_params)
 
                 del_sql = "DELETE FROM memories WHERE 1=1" + topic_sql
@@ -191,12 +205,17 @@ def update(
                     ).fetchall()
                 else:
                     rows = conn.execute(
-                        "SELECT id, content, meta FROM memories WHERE topic = ?", [topic]
+                        "SELECT id, content, meta FROM memories WHERE topic = ?",
+                        [topic],
                     ).fetchall()
 
             if not rows:
                 s.add("error", "not_found")
-                return f"No memory found for topic '{topic}'" if not id else f"No memory found with id '{id}'"
+                return (
+                    f"No memory found for topic '{topic}'"
+                    if not id
+                    else f"No memory found with id '{id}'"
+                )
 
             if len(rows) > 1:
                 s.add("error", "multiple_matches")
@@ -260,7 +279,8 @@ def append(
                     ).fetchone()
                 else:
                     rows = conn.execute(
-                        "SELECT id, content, meta FROM memories WHERE topic = ?", [topic]
+                        "SELECT id, content, meta FROM memories WHERE topic = ?",
+                        [topic],
                     ).fetchall()
                     if len(rows) > 1:
                         s.add("error", "multiple_matches")
@@ -269,7 +289,11 @@ def append(
 
             if not row:
                 s.add("error", "not_found")
-                return f"No memory found for topic '{topic}'" if not id else f"No memory found with id '{id}'"
+                return (
+                    f"No memory found for topic '{topic}'"
+                    if not id
+                    else f"No memory found with id '{id}'"
+                )
 
             memory_id = row[0]
             old_content = row[1]

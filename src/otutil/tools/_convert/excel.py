@@ -192,7 +192,11 @@ def _process_sheet(
         while len(row_values) < max_cols:
             row_values.append("")
 
-        writer.write("| " + " | ".join(_escape_pipe(c) for c in row_values[:len(header)]) + " |\n")
+        writer.write(
+            "| "
+            + " | ".join(_escape_pipe(c) for c in row_values[: len(header)])
+            + " |\n"
+        )
 
         # Track formulas for this row (cell values are formulas when include_formulas=True)
         if include_formulas:

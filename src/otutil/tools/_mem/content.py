@@ -1,4 +1,5 @@
 """Content helpers: hashing, SQL filters, redaction, validation, markdown."""
+
 from __future__ import annotations
 
 import hashlib
@@ -32,7 +33,10 @@ def _topic_filter(topic: str | None, *, column: str = "topic") -> tuple[str, lis
         return "", []
 
     if topic.endswith("/"):
-        return f" AND ({column} = ? OR {column} LIKE ?)", [topic.rstrip("/"), topic + "%"]
+        return f" AND ({column} = ? OR {column} LIKE ?)", [
+            topic.rstrip("/"),
+            topic + "%",
+        ]
     elif "*" in topic:
         like_pattern = topic.replace("*", "%")
         return f" AND {column} LIKE ?", [like_pattern]
@@ -156,13 +160,13 @@ def _decode_sections(encoded: str) -> list[dict[str, Any]]:
         if colon_idx == -1:
             continue
         heading = part[:colon_idx].replace("\\\\", "\\")
-        range_str = part[colon_idx + 1:]
+        range_str = part[colon_idx + 1 :]
         dash_idx = range_str.find("-")
         if dash_idx == -1:
             continue
         try:
             start = int(range_str[:dash_idx])
-            end = int(range_str[dash_idx + 1:])
+            end = int(range_str[dash_idx + 1 :])
         except ValueError:
             continue
         sections.append({"heading": heading, "start": start, "end": end})

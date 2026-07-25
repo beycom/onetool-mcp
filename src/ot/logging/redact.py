@@ -24,10 +24,15 @@ SECRET_PATTERNS: list[tuple[str, str]] = [
         r"(?i)(?:api[_-]?key|token|secret)\s*[=:]\s*['\"]?[a-zA-Z0-9_\-]{16,}['\"]?",
         "[REDACTED:secret]",
     ),
-    (r"(?i)(?:postgres|mysql|mongodb|redis)://\S+:\S+@\S+", "[REDACTED:connection_string]"),
+    (
+        r"(?i)(?:postgres|mysql|mongodb|redis)://\S+:\S+@\S+",
+        "[REDACTED:connection_string]",
+    ),
 ]
 
-_COMPILED = [(re.compile(pattern), replacement) for pattern, replacement in SECRET_PATTERNS]
+_COMPILED = [
+    (re.compile(pattern), replacement) for pattern, replacement in SECRET_PATTERNS
+]
 
 
 def redact_secrets(value: str) -> str:

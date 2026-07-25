@@ -17,6 +17,7 @@ Tools:
     delete   - Remove one handle
     purge    - Delete handles (expired, all, or by filter)
 """
+
 from __future__ import annotations
 
 # Pack for dot notation: ot_context.write() or ctx.write() (short alias)
@@ -27,8 +28,18 @@ pack_aliases = ("ctx",)
 __ot_requires__: dict[str, str] = {}
 
 __all__ = [
-    "ask", "delete", "grep", "inspect", "list", "purge", "query",
-    "read", "slice", "stats", "toc", "write",
+    "ask",
+    "delete",
+    "grep",
+    "inspect",
+    "list",
+    "purge",
+    "query",
+    "read",
+    "slice",
+    "stats",
+    "toc",
+    "write",
 ]
 
 
@@ -39,10 +50,13 @@ def register_services(registry: object) -> None:
 
     registry.register_result_store(CtxResultStoreBackend())  # type: ignore[attr-defined]
     registry.register_output_policy(  # type: ignore[attr-defined]
-        lambda tool_name: OutputPolicy(allow_deflect=False)
-        if tool_name.startswith(("ctx.", "ot_context."))
-        else None
+        lambda tool_name: (
+            OutputPolicy(allow_deflect=False)
+            if tool_name.startswith(("ctx.", "ot_context."))
+            else None
+        )
     )
+
 
 from ot.ctx import (
     ctx_ask as ask,

@@ -1,4 +1,5 @@
 """Smart context store for OneTool tool outputs."""
+
 from __future__ import annotations
 
 from .ask import ctx_ask

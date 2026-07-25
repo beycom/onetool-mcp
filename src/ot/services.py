@@ -10,7 +10,9 @@ from typing import Any, Protocol
 class ResultStoreBackend(Protocol):
     """Backend interface for storing and querying large execution results."""
 
-    def store(self, content: str, *, tool: str = "", preview_lines: int | None = None) -> Any:
+    def store(
+        self, content: str, *, tool: str = "", preview_lines: int | None = None
+    ) -> Any:
         """Store content and return backend-specific stored-result metadata."""
         ...
 

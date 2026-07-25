@@ -9,6 +9,7 @@ from multiple threads should use _use_connection() to hold the lock for the
 full operation. MCP tool dispatch is single-threaded so this is safe in normal
 usage.
 """
+
 from __future__ import annotations
 
 # Pack for dot notation: mem.write(), mem.search(), etc.

@@ -31,7 +31,9 @@ def _get_doc_url(pack: str) -> str:
     return f"{DOC_BASE_URL}{slug}/"
 
 
-def _fuzzy_match(query: str, candidates: list[str], threshold: float = 0.6) -> list[str]:
+def _fuzzy_match(
+    query: str, candidates: list[str], threshold: float = 0.6
+) -> list[str]:
     """Return candidates that fuzzy match query, sorted by score.
 
     Args:
@@ -375,7 +377,9 @@ def _format_server_help(
 
     # Layer instructions: native MCP first, then servers.yaml additions
     yaml_instructions = (getattr(server_cfg, "instructions", None) or "").strip()
-    combined = "\n\n".join(filter(None, [native_instructions.strip(), yaml_instructions]))
+    combined = "\n\n".join(
+        filter(None, [native_instructions.strip(), yaml_instructions])
+    )
     if combined:
         lines.append("## Instructions")
         lines.append("")
@@ -393,7 +397,9 @@ def _format_server_help(
     return "\n".join(lines)
 
 
-def _item_matches(item: dict[str, Any] | str, matched_names: list[str], key: str = "name") -> bool:
+def _item_matches(
+    item: dict[str, Any] | str, matched_names: list[str], key: str = "name"
+) -> bool:
     """Check if item name is in matched_names list.
 
     Args:
@@ -506,14 +512,26 @@ def _format_search_results(
             lines.append(f"- {server}")
         lines.append("")
 
-    if not any([tools_results, packs_results, snippets_results, aliases_results, servers_results]):
+    if not any(
+        [
+            tools_results,
+            packs_results,
+            snippets_results,
+            aliases_results,
+            servers_results,
+        ]
+    ):
         lines.append("No matches found.")
         lines.append("")
         if _is_server_intent_query(query):
             lines.append("Try proxy recovery:")
-            lines.append("  ot_servers.enable(name=\"playwright\")  - Enable + connect known server")
-            lines.append("  ot.servers()                       - Use only if server name/status unknown")
-            lines.append("  ot.help(query=\"playwright\")  - See server tools + guidance")
+            lines.append(
+                '  ot_servers.enable(name="playwright")  - Enable + connect known server'
+            )
+            lines.append(
+                "  ot.servers()                       - Use only if server name/status unknown"
+            )
+            lines.append('  ot.help(query="playwright")  - See server tools + guidance')
             lines.append("")
         lines.append("Try browsing with:")
         lines.append("  ot.tools()    - List all tools")

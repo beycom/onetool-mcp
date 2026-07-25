@@ -33,10 +33,15 @@ def _error(exc: Exception) -> dict[str, object]:
 
 
 def _gitignore_entry(config: Config, paths: Paths) -> str | None:
-    if paths.git_dir == paths.project_root or paths.project_root not in paths.git_dir.parents:
+    if (
+        paths.git_dir == paths.project_root
+        or paths.project_root not in paths.git_dir.parents
+    ):
         return None
     try:
-        return paths.git_dir.relative_to(paths.project_root).as_posix().rstrip("/") + "/"
+        return (
+            paths.git_dir.relative_to(paths.project_root).as_posix().rstrip("/") + "/"
+        )
     except ValueError:
         return config.git_dir.rstrip("/") + "/"
 
@@ -70,7 +75,9 @@ def _protected_force_include_prefixes(config: Config, paths: Paths) -> list[str]
     prefixes = _required_info_excludes(config, paths)
     for path in (paths.git_dir, paths.project_root / ".git", paths.state_dir):
         if path == paths.work_tree or paths.work_tree in path.parents:
-            prefixes.append(path.relative_to(paths.work_tree).as_posix().rstrip("/") + "/")
+            prefixes.append(
+                path.relative_to(paths.work_tree).as_posix().rstrip("/") + "/"
+            )
     return list(dict.fromkeys(prefixes))
 
 
@@ -104,7 +111,9 @@ def _leading_literal(rule: str) -> str:
     return rule
 
 
-def _validate_force_include_rules(config: Config, paths: Paths, rules: list[str]) -> list[str]:
+def _validate_force_include_rules(
+    config: Config, paths: Paths, rules: list[str]
+) -> list[str]:
     protected = _protected_force_include_prefixes(config, paths)
     validated: list[str] = []
     for rule in rules:
@@ -116,13 +125,19 @@ def _validate_force_include_rules(config: Config, paths: Paths, rules: list[str]
         for prefix in protected:
             directory = prefix.rstrip("/")
             if normalized == directory or normalized.startswith(prefix):
-                raise ValueError(f"force-include rule targets protected localhist path: {rule}")
+                raise ValueError(
+                    f"force-include rule targets protected localhist path: {rule}"
+                )
             # A wildcard rule can only match paths starting with its leading
             # literal, so it can reach a protected path iff that literal and
             # the protected prefix are prefix-compatible (e.g. `?git/HEAD`
             # has literal `` and `.git*` has literal `.git`).
-            if has_wildcard and (prefix.startswith(literal) or literal.startswith(prefix)):
-                raise ValueError(f"force-include rule targets protected localhist path: {rule}")
+            if has_wildcard and (
+                prefix.startswith(literal) or literal.startswith(prefix)
+            ):
+                raise ValueError(
+                    f"force-include rule targets protected localhist path: {rule}"
+                )
         validated.append(normalized)
     return validated
 
@@ -298,7 +313,9 @@ def _dirty_counts_from_status(output: str) -> dict[str, int]:
     return {"tracked": tracked, "untracked": untracked, "total": tracked + untracked}
 
 
-def _status_entries_from_status(output: str, *, limit: int | None = None) -> list[dict[str, str]]:
+def _status_entries_from_status(
+    output: str, *, limit: int | None = None
+) -> list[dict[str, str]]:
     entries: list[dict[str, str]] = []
     for line in output.splitlines():
         if limit is not None and len(entries) >= limit:
@@ -314,7 +331,11 @@ def _resolve_commit(git: GitRunner, ref: str) -> str:
 
 
 def _format_timestamp(timestamp: str, date_format: str) -> str:
-    return datetime.fromtimestamp(int(timestamp), tz=UTC).astimezone().strftime(date_format)
+    return (
+        datetime.fromtimestamp(int(timestamp), tz=UTC)
+        .astimezone()
+        .strftime(date_format)
+    )
 
 
 def _parse_log_entries(
@@ -328,7 +349,10 @@ def _parse_log_entries(
     for record in output.split("\x1e"):
         if not record.strip():
             continue
-        full, short, timestamp, subject, body = [*record.strip("\n").split("\x00", 4), ""][:5]
+        full, short, timestamp, subject, body = [
+            *record.strip("\n").split("\x00", 4),
+            "",
+        ][:5]
         kind = ""
         for body_line in body.splitlines():
             if body_line.startswith("Localhist-Kind: "):
@@ -366,7 +390,9 @@ def init_repository() -> dict[str, object]:
         git.run("config", "user.email", LOCALHIST_USER_EMAIL)
         git.run("config", "commit.gpgsign", "false")
         ignore_added = _ensure_nested_gitignore(paths)
-        exclude_added = _append_info_exclude(paths.git_dir, _required_info_excludes(config, paths))
+        exclude_added = _append_info_exclude(
+            paths.git_dir, _required_info_excludes(config, paths)
+        )
         _ensure_force_include_file(paths)
         return {
             "ok": True,
@@ -394,7 +420,11 @@ def status_repository(
             return {"ok": False, "error": "limit must be >= 1"}
         config = load_config()
         paths = resolve_paths(config)
-        rel = relpath(validate_project_path(path, paths), paths) if path is not None else None
+        rel = (
+            relpath(validate_project_path(path, paths), paths)
+            if path is not None
+            else None
+        )
         if not (paths.git_dir / "HEAD").exists():
             return {
                 "ok": True,
@@ -410,8 +440,15 @@ def status_repository(
         all_files = _status_entries_from_status(status_output)
         if status is not None:
             if status not in {"tracked", "untracked", "modified", "deleted", "added"}:
-                return {"ok": False, "error": "status must be tracked, untracked, modified, deleted, or added"}
-            all_files = [entry for entry in all_files if _status_category(entry["status"]) == status]
+                return {
+                    "ok": False,
+                    "error": "status must be tracked, untracked, modified, deleted, or added",
+                }
+            all_files = [
+                entry
+                for entry in all_files
+                if _status_category(entry["status"]) == status
+            ]
         total_files = len(all_files)
         files = all_files[:limit] if limit is not None else all_files
         return {
@@ -585,14 +622,18 @@ def save_snapshot(
         return _error(exc)
 
 
-def save_snapshot_for_project(*, project_root: Path, message: str, kind: SnapshotKind) -> dict[str, object]:
+def save_snapshot_for_project(
+    *, project_root: Path, message: str, kind: SnapshotKind
+) -> dict[str, object]:
     """Save a snapshot with path and config resolved for a specific project."""
 
     with project_context(project_root):
         return save_snapshot(message=message, kind=kind)
 
 
-def list_log(*, limit: int, date_format: str = "%Y-%m-%d %H:%M:%S %Z") -> dict[str, object]:
+def list_log(
+    *, limit: int, date_format: str = "%Y-%m-%d %H:%M:%S %Z"
+) -> dict[str, object]:
     """List local-history commits."""
 
     try:
@@ -632,22 +673,44 @@ def list_history(
         paths = resolve_paths(config)
         rel = relpath(validate_project_path(path, paths), paths)
         if not (paths.git_dir / "HEAD").exists():
-            return {"ok": True, "initialized": False, "path": rel, "follow": follow, "entries": []}
+            return {
+                "ok": True,
+                "initialized": False,
+                "path": rel,
+                "follow": follow,
+                "entries": [],
+            }
         git = GitRunner(paths)
         if not git.has_commits():
-            return {"ok": True, "initialized": True, "path": rel, "follow": follow, "entries": []}
+            return {
+                "ok": True,
+                "initialized": True,
+                "path": rel,
+                "follow": follow,
+                "entries": [],
+            }
         args = ["log", f"-{limit}", "--format=%x1e%H%x00%h%x00%ct%x00%s%x00%B"]
         if follow:
             args.append("--follow")
         args.extend(["--", rel])
         output = git.run_list(args)
-        entries = _parse_log_entries(output, date_format=date_format, path=rel, follow=follow)
-        return {"ok": True, "initialized": True, "path": rel, "follow": follow, "entries": entries}
+        entries = _parse_log_entries(
+            output, date_format=date_format, path=rel, follow=follow
+        )
+        return {
+            "ok": True,
+            "initialized": True,
+            "path": rel,
+            "follow": follow,
+            "entries": entries,
+        }
     except Exception as exc:
         return _error(exc)
 
 
-def prune_history(*, older_than_days: int = 30, gc: bool = True, dry_run: bool = True) -> dict[str, object]:
+def prune_history(
+    *, older_than_days: int = 30, gc: bool = True, dry_run: bool = True
+) -> dict[str, object]:
     """Drop snapshots older than the cutoff by rewriting the linear history.
 
     Pre-cutoff snapshots are squashed into a single baseline commit holding the
@@ -685,7 +748,12 @@ def prune_history(*, older_than_days: int = 30, gc: bool = True, dry_run: bool =
         if dropped == 0:
             return {"ok": True, "dropped": 0, "kept": len(commits)}
         if dry_run:
-            return {"ok": True, "dry_run": True, "would_drop": dropped, "kept": len(keep) + 1}
+            return {
+                "ok": True,
+                "dry_run": True,
+                "would_drop": dropped,
+                "kept": len(keep) + 1,
+            }
 
         boundary_sha = old[-1][0]
         branch_ref = git.run("rev-parse", "--symbolic-full-name", "HEAD").strip()
@@ -696,7 +764,10 @@ def prune_history(*, older_than_days: int = 30, gc: bool = True, dry_run: bool =
             boundary_tree,
             "-m",
             f"localhist baseline (pruned {dropped} snapshot(s) older than {older_than_days}d)",
-            extra_env={"GIT_AUTHOR_DATE": boundary_date, "GIT_COMMITTER_DATE": boundary_date},
+            extra_env={
+                "GIT_AUTHOR_DATE": boundary_date,
+                "GIT_COMMITTER_DATE": boundary_date,
+            },
         ).strip()
         for sha, _ts in keep:
             tree = git.run("rev-parse", f"{sha}^{{tree}}").strip()
@@ -732,7 +803,9 @@ def _validate_ref(git: GitRunner, ref: str) -> str | None:
     return None
 
 
-def diff_snapshot(*, ref: str, against: str | None, path: str | None) -> dict[str, object]:
+def diff_snapshot(
+    *, ref: str, against: str | None, path: str | None
+) -> dict[str, object]:
     """Return a diff for a local-history ref."""
 
     try:
@@ -847,12 +920,16 @@ def restore_paths(
             return {"ok": False, "error": "restore requires explicit paths"}
         config = load_config()
         resolved = resolve_paths(config)
-        rel_paths = [relpath(validate_project_path(item, resolved), resolved) for item in paths]
+        rel_paths = [
+            relpath(validate_project_path(item, resolved), resolved) for item in paths
+        ]
         git = GitRunner(resolved)
         if error := _validate_ref(git, ref):
             return {"ok": False, "error": error}
         resolved_ref = _resolve_commit(git, ref)
-        changed = git.run_list(["diff", "--name-only", resolved_ref, "--", *rel_paths]).splitlines()
+        changed = git.run_list(
+            ["diff", "--name-only", resolved_ref, "--", *rel_paths]
+        ).splitlines()
         if dry_run:
             return {
                 "ok": True,
@@ -869,7 +946,9 @@ def restore_paths(
                 kind="restore",
             )
         git.run_pathspec_file(["checkout", resolved_ref], rel_paths)
-        audit_snapshot = create_snapshot(message=f"restore from {resolved_ref}", kind="restore")
+        audit_snapshot = create_snapshot(
+            message=f"restore from {resolved_ref}", kind="restore"
+        )
         return {
             "ok": True,
             "dry_run": False,
@@ -919,7 +998,9 @@ def append_force_include_rules(*, rules: list[str]) -> dict[str, object]:
             if not init_result.get("ok"):
                 return init_result
         force_include = _ensure_force_include_file(paths)
-        mutation = _append_rules(force_include, _validate_force_include_rules(config, paths, rules))
+        mutation = _append_rules(
+            force_include, _validate_force_include_rules(config, paths, rules)
+        )
         return {
             "ok": True,
             **mutation,

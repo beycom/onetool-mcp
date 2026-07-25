@@ -1,4 +1,5 @@
 """Read operation for the ctx pack."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -102,7 +103,9 @@ def ctx_read(
             start_idx = offset - 1
             end_idx = start_idx + limit
 
-        result_lines = [_truncate_line(ln, max_chars) for ln in lines[start_idx:end_idx]]
+        result_lines = [
+            _truncate_line(ln, max_chars) for ln in lines[start_idx:end_idx]
+        ]
         returned = len(result_lines)
         has_more = end_idx < total_lines
         end_line = offset + returned - 1
@@ -125,7 +128,9 @@ def ctx_read(
         }
         if has_more:
             next_offset = offset + returned
-            result["next_query"] = f"ctx.read('{handle}', offset={next_offset}, limit={limit})"
+            result["next_query"] = (
+                f"ctx.read('{handle}', offset={next_offset}, limit={limit})"
+            )
 
         s.add("returned", returned)
         s.add("total_lines", total_lines)

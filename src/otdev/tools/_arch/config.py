@@ -108,9 +108,7 @@ def get_arch_config() -> ArchConfig:
     try:
         return get_tool_config("arch", ArchConfig)
     except Exception as exc:
-        raise ConfigResolutionError(
-            f"Invalid tools.arch configuration: {exc}"
-        ) from exc
+        raise ConfigResolutionError(f"Invalid tools.arch configuration: {exc}") from exc
 
 
 def get_active_profile(
@@ -145,9 +143,7 @@ def resolve_render_target_for_profile(
     """Resolve render target command from an explicit profile object."""
 
     engine_template = (
-        profile.system_engine
-        if target == "solution"
-        else profile.diagram_engine
+        profile.system_engine if target == "solution" else profile.diagram_engine
     ).strip()
     target_key = "system" if target == "solution" else "diagram"
     if not engine_template:
@@ -181,7 +177,9 @@ def resolve_path_with_fallback(*, configured_path: str, fallback_relative: str) 
     if raw.is_absolute():
         resolved = raw.resolve()
         if not resolved.exists():
-            raise ConfigResolutionError(f"Configured absolute path not found: {resolved}")
+            raise ConfigResolutionError(
+                f"Configured absolute path not found: {resolved}"
+            )
         return resolved
 
     config_candidate = _resolve_config_relative(configured_path)
@@ -189,7 +187,9 @@ def resolve_path_with_fallback(*, configured_path: str, fallback_relative: str) 
         return config_candidate
 
     if not Path(configured_path).as_posix().startswith("templates/arch/"):
-        raise ConfigResolutionError(f"Configured relative path not found: {configured_path}")
+        raise ConfigResolutionError(
+            f"Configured relative path not found: {configured_path}"
+        )
 
     fallback = (get_global_templates_dir() / fallback_relative).resolve()
     if fallback.exists():
@@ -200,7 +200,9 @@ def resolve_path_with_fallback(*, configured_path: str, fallback_relative: str) 
     )
 
 
-def _resolve_required_file(*, configured_path: str, fallback_relative: str, label: str) -> Path:
+def _resolve_required_file(
+    *, configured_path: str, fallback_relative: str, label: str
+) -> Path:
     """Resolve a required template file path."""
     path = resolve_path_with_fallback(
         configured_path=configured_path,
@@ -211,7 +213,9 @@ def _resolve_required_file(*, configured_path: str, fallback_relative: str, labe
     return path
 
 
-def resolve_report_template_paths_for_profile(*, profile: ArchProfileConfig) -> ReportTemplateConfig:
+def resolve_report_template_paths_for_profile(
+    *, profile: ArchProfileConfig
+) -> ReportTemplateConfig:
     """Resolve report template files for an explicit profile object."""
     solution_report = _resolve_required_file(
         configured_path=profile.solution_report,
@@ -235,7 +239,9 @@ def resolve_report_template_paths_for_profile(*, profile: ArchProfileConfig) -> 
     )
 
 
-def _resolve_diagram_template(*, configured_path: str, fallback_relative: str, label: str) -> Path:
+def _resolve_diagram_template(
+    *, configured_path: str, fallback_relative: str, label: str
+) -> Path:
     """Resolve a D2 diagram template path (requires a sibling styles.d2)."""
     template_path = resolve_path_with_fallback(
         configured_path=configured_path,
@@ -250,7 +256,9 @@ def _resolve_diagram_template(*, configured_path: str, fallback_relative: str, l
     return template_path
 
 
-def resolve_system_diagram_template_path_for_profile(*, profile: ArchProfileConfig) -> Path:
+def resolve_system_diagram_template_path_for_profile(
+    *, profile: ArchProfileConfig
+) -> Path:
     """Resolve system diagram template path for an explicit profile object."""
     return _resolve_diagram_template(
         configured_path=profile.system_diagram,
@@ -259,7 +267,9 @@ def resolve_system_diagram_template_path_for_profile(*, profile: ArchProfileConf
     )
 
 
-def resolve_project_diagram_template_path_for_profile(*, profile: ArchProfileConfig) -> Path:
+def resolve_project_diagram_template_path_for_profile(
+    *, profile: ArchProfileConfig
+) -> Path:
     """Resolve project diagram template path for an explicit profile object."""
     return _resolve_diagram_template(
         configured_path=profile.project_diagram,

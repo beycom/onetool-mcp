@@ -31,7 +31,9 @@ class CtxResultStoreBackend:
         preview_max_chars = config_obj.output.preview_max_chars
         if preview_max_chars > 0:
             raw_preview = [
-                line[:preview_max_chars] + "…" if len(line) > preview_max_chars else line
+                line[:preview_max_chars] + "…"
+                if len(line) > preview_max_chars
+                else line
                 for line in raw_preview
             ]
 
@@ -40,7 +42,9 @@ class CtxResultStoreBackend:
             handle=str(write_result["handle"]),
             total_lines=total_lines,
             size_bytes=int(write_result["size_bytes"]),
-            summary=f"{total_lines} lines from {tool}" if tool else f"{total_lines} lines stored",
+            summary=f"{total_lines} lines from {tool}"
+            if tool
+            else f"{total_lines} lines stored",
             preview="\n".join(raw_preview),
             status=str(write_result.get("status", "pending")),
             content_type=str(write_result.get("content_type", "text")),
@@ -106,7 +110,9 @@ class CtxResultStoreBackend:
         next_query = ""
         if result.get("has_more"):
             next_offset = int(result["offset"]) + int(result["returned"])
-            next_query = f"ot.result(handle='{handle}', offset={next_offset}, limit={limit})"
+            next_query = (
+                f"ot.result(handle='{handle}', offset={next_offset}, limit={limit})"
+            )
 
         return QueryResult(
             content=result["content"],

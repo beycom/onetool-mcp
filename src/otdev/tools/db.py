@@ -218,7 +218,9 @@ def tables(
                 if filter:
                     if ignore_case:
                         filter_lower = filter.lower()
-                        all_tables = [t for t in all_tables if filter_lower in t.lower()]
+                        all_tables = [
+                            t for t in all_tables if filter_lower in t.lower()
+                        ]
                     else:
                         all_tables = [t for t in all_tables if filter in t]
 
@@ -236,9 +238,17 @@ def tables(
                         row_count = conn.execute(
                             select(func.count()).select_from(table)
                         ).scalar_one()
-                        rows.append({"table_name": table_name, "row_count": int(row_count)})
+                        rows.append(
+                            {"table_name": table_name, "row_count": int(row_count)}
+                        )
                     except Exception as e:
-                        rows.append({"table_name": table_name, "row_count": None, "error": str(e)})
+                        rows.append(
+                            {
+                                "table_name": table_name,
+                                "row_count": None,
+                                "error": str(e),
+                            }
+                        )
 
                 s.add(resultCount=len(rows))
                 return rows
@@ -338,11 +348,13 @@ def _get_table_schema(inspector: Any, table_name: str) -> dict[str, Any]:
     # Process foreign keys into structured format
     relationships = []
     for fk in foreign_keys:
-        relationships.append({
-            "constrained_columns": fk["constrained_columns"],
-            "referred_table": fk["referred_table"],
-            "referred_columns": fk["referred_columns"],
-        })
+        relationships.append(
+            {
+                "constrained_columns": fk["constrained_columns"],
+                "referred_table": fk["referred_table"],
+                "referred_columns": fk["referred_columns"],
+            }
+        )
 
     return {
         "table_name": table_name,
@@ -396,14 +408,36 @@ def sample(
             return f"Error: {e}"
 
 
-
-
-_READ_ONLY_KEYWORDS = ("SELECT", "EXPLAIN", "PRAGMA", "WITH", "VALUES", "SHOW", "DESCRIBE")
+_READ_ONLY_KEYWORDS = (
+    "SELECT",
+    "EXPLAIN",
+    "PRAGMA",
+    "WITH",
+    "VALUES",
+    "SHOW",
+    "DESCRIBE",
+)
 
 _MUTATING_KEYWORDS = (
-    "INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "TRUNCATE",
-    "REPLACE", "MERGE", "GRANT", "REVOKE", "ATTACH", "DETACH", "VACUUM",
-    "REINDEX", "CALL", "EXEC", "EXECUTE", "COPY",
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "DROP",
+    "ALTER",
+    "CREATE",
+    "TRUNCATE",
+    "REPLACE",
+    "MERGE",
+    "GRANT",
+    "REVOKE",
+    "ATTACH",
+    "DETACH",
+    "VACUUM",
+    "REINDEX",
+    "CALL",
+    "EXEC",
+    "EXECUTE",
+    "COPY",
 )
 
 
@@ -511,7 +545,7 @@ def query(
                 )
                 # Enforce the documented character bound on the serialized payload
                 while rows_data and len(json.dumps(rows_data, default=str)) > max_chars:
-                    del rows_data[-max(1, len(rows_data) // 5):]
+                    del rows_data[-max(1, len(rows_data) // 5) :]
                     truncated = True
                 row_count = len(rows_data)
                 s.add(rows=row_count, truncated=truncated)

@@ -332,7 +332,9 @@ def _leaf_vertex(
     )
 
 
-def _system_block_vertices(block: Mapping[str, Any], resolver: _GeometryResolver) -> list[_Vertex]:
+def _system_block_vertices(
+    block: Mapping[str, Any], resolver: _GeometryResolver
+) -> list[_Vertex]:
     """Vertices for one `system_blocks` entry: the system itself, its direct
     components, its apps, and each app's components -- with ids built by
     dot-joining the same segment ids the D2 templates nest under (matching
@@ -419,7 +421,9 @@ def _fmt_num(value: float) -> str:
 
 def _serialize_mxfile(vertices: Sequence[_Vertex], edges: Sequence[_Edge]) -> str:
     mxfile = ET.Element("mxfile", {"host": "onetool-arch"})
-    diagram = ET.SubElement(mxfile, "diagram", {"id": "onetool-arch-diagram", "name": "Page-1"})
+    diagram = ET.SubElement(
+        mxfile, "diagram", {"id": "onetool-arch-diagram", "name": "Page-1"}
+    )
     model = ET.SubElement(diagram, "mxGraphModel", dict(_MX_GRAPH_MODEL_ATTRS))
     root = ET.SubElement(model, "root")
     ET.SubElement(root, "mxCell", {"id": "0"})
@@ -499,9 +503,13 @@ def build_mxfile(
 
         vertices: list[_Vertex] = []
         for user in user_nodes:
-            vertices.append(_leaf_vertex(user, style=STYLE_MAP["Person"], resolver=resolver))
+            vertices.append(
+                _leaf_vertex(user, style=STYLE_MAP["Person"], resolver=resolver)
+            )
         for ext in external_nodes:
-            vertices.append(_leaf_vertex(ext, style=STYLE_MAP["External"], resolver=resolver))
+            vertices.append(
+                _leaf_vertex(ext, style=STYLE_MAP["External"], resolver=resolver)
+            )
         for block in system_blocks:
             vertices.extend(_system_block_vertices(block, resolver))
 

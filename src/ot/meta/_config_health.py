@@ -79,7 +79,11 @@ def status() -> dict[str, Any]:
                 server_statuses[server_name] = "connected"
             else:
                 error = proxy.get_error(server_name)
-                server_statuses[server_name] = {"status": "disconnected", "error": error} if error else "disconnected"
+                server_statuses[server_name] = (
+                    {"status": "disconnected", "error": error}
+                    if error
+                    else "disconnected"
+                )
 
         proxy_ok = (
             all(
@@ -91,7 +95,9 @@ def status() -> dict[str, Any]:
             or not server_statuses
         )
         if not proxy_ok:
-            warnings_out.append("One or more configured proxy servers are disconnected.")
+            warnings_out.append(
+                "One or more configured proxy servers are disconnected."
+            )
 
         direct_status: dict[str, Any] = {
             "configured": cfg.direct.host.enabled,
@@ -99,11 +105,17 @@ def status() -> dict[str, Any]:
         }
         server_module = sys.modules.get("ot.server")
         if cfg.direct.host.enabled:
-            port = getattr(server_module, "_direct_api_port", None) if server_module else None
+            port = (
+                getattr(server_module, "_direct_api_port", None)
+                if server_module
+                else None
+            )
             direct_status["status"] = "ready" if port else "degraded"
             direct_status["port"] = port
             if not port:
-                warnings_out.append("Direct API is enabled but no bound port is recorded.")
+                warnings_out.append(
+                    "Direct API is enabled but no bound port is recorded."
+                )
 
         registry_status = {
             "status": "ok",
@@ -113,7 +125,9 @@ def status() -> dict[str, Any]:
         proxy_status: dict[str, Any] = {
             "status": "ok" if proxy_ok else "degraded",
             "server_count": len(enabled_servers),
-            "connected_count": sum(1 for state in server_statuses.values() if state == "connected"),
+            "connected_count": sum(
+                1 for state in server_statuses.values() if state == "connected"
+            ),
             "background_connecting": proxy.is_connecting,
         }
         if server_statuses:

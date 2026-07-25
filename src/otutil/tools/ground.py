@@ -36,7 +36,13 @@ from otpack import (
 
 # Dependency declarations for CLI validation
 __ot_requires__ = {
-    "lib": [{"name": "google-genai", "import_name": "google.genai", "install": "pip install google-genai"}],
+    "lib": [
+        {
+            "name": "google-genai",
+            "import_name": "google.genai",
+            "install": "pip install google-genai",
+        }
+    ],
     "secrets": ["GEMINI_API_KEY"],
 }
 
@@ -71,7 +77,6 @@ def _validate_request_timeout(timeout: float) -> str | None:
 def _get_config() -> Config:
     """Return validated ground pack configuration."""
     return get_tool_config("ground", Config)
-
 
 
 def _validate_extract_schema(extract_schema: dict[str, Any] | None) -> str | None:
@@ -229,7 +234,11 @@ def _format_error(e: Exception) -> str:
         or "ratelimit" in error_str
     ):
         return "Error: API quota exceeded. Try again later."
-    elif "authentication" in error_str or "api key" in error_str or "unauthorized" in error_str:
+    elif (
+        "authentication" in error_str
+        or "api key" in error_str
+        or "unauthorized" in error_str
+    ):
         return "Error: Invalid GEMINI_API_KEY. Check secrets.yaml."
     elif "timeout" in error_str:
         return "Error: Request timed out. Try a simpler query or increase timeout."
@@ -315,7 +324,14 @@ def _grounded_search(
                 output_format=output_format,
                 max_sources=max_sources,
             )
-            s.add("hasResults", bool(formatted_result and formatted_result not in ("No results found.", "No sources found.")))
+            s.add(
+                "hasResults",
+                bool(
+                    formatted_result
+                    and formatted_result
+                    not in ("No results found.", "No sources found.")
+                ),
+            )
             s.add("resultLen", len(formatted_result))
             return formatted_result
 
@@ -515,7 +531,10 @@ def search_batch(
             retry_delay_ms=retry_delay_ms,
             max_workers=min(len(normalized), 10),
         )
-        s.add(successCount=output["meta"]["success_count"], errorCount=output["meta"]["error_count"])
+        s.add(
+            successCount=output["meta"]["success_count"],
+            errorCount=output["meta"]["error_count"],
+        )
         return output
 
 
@@ -574,17 +593,20 @@ def dev(
 
     prompt = "".join(prompt_parts)
 
-    return cast("str", _grounded_search(
-        prompt,
-        span_name="ground.dev",
-        model=model,
-        timeout=timeout,
-        output_format=output_format,
-        max_sources=max_sources,
-        query=query,
-        language=language or None,
-        framework=framework or None,
-    ))
+    return cast(
+        "str",
+        _grounded_search(
+            prompt,
+            span_name="ground.dev",
+            model=model,
+            timeout=timeout,
+            output_format=output_format,
+            max_sources=max_sources,
+            query=query,
+            language=language or None,
+            framework=framework or None,
+        ),
+    )
 
 
 def docs(
@@ -637,16 +659,19 @@ def docs(
 
     prompt = "".join(prompt_parts)
 
-    return cast("str", _grounded_search(
-        prompt,
-        span_name="ground.docs",
-        model=model,
-        timeout=timeout,
-        output_format=output_format,
-        max_sources=max_sources,
-        query=query,
-        technology=technology or None,
-    ))
+    return cast(
+        "str",
+        _grounded_search(
+            prompt,
+            span_name="ground.docs",
+            model=model,
+            timeout=timeout,
+            output_format=output_format,
+            max_sources=max_sources,
+            query=query,
+            technology=technology or None,
+        ),
+    )
 
 
 def reddit(
@@ -702,13 +727,16 @@ def reddit(
 
     prompt = "".join(prompt_parts)
 
-    return cast("str", _grounded_search(
-        prompt,
-        span_name="ground.reddit",
-        model=model,
-        timeout=timeout,
-        output_format=output_format,
-        max_sources=max_sources,
-        query=query,
-        subreddit=subreddit or None,
-    ))
+    return cast(
+        "str",
+        _grounded_search(
+            prompt,
+            span_name="ground.reddit",
+            model=model,
+            timeout=timeout,
+            output_format=output_format,
+            max_sources=max_sources,
+            query=query,
+            subreddit=subreddit or None,
+        ),
+    )

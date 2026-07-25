@@ -1,4 +1,5 @@
 """Memory slicing by section, heading, or line range."""
+
 from __future__ import annotations
 
 import builtins
@@ -53,7 +54,11 @@ def toc(
 
                 if not row:
                     s.add("found", False)
-                    return f"No memory found for topic '{topic}'" if not id else f"No memory found with id '{id}'"
+                    return (
+                        f"No memory found for topic '{topic}'"
+                        if not id
+                        else f"No memory found with id '{id}'"
+                    )
 
                 row_meta = _deserialize_meta(row[9])
                 sections = _decode_sections(row_meta.get("sections", ""))
@@ -116,7 +121,11 @@ def slice(
 
                 if not row:
                     s.add("found", False)
-                    return f"No memory found for topic '{topic}'" if not id else f"No memory found with id '{id}'"
+                    return (
+                        f"No memory found for topic '{topic}'"
+                        if not id
+                        else f"No memory found with id '{id}'"
+                    )
 
                 content = row[2]
                 lines = content.split("\n")
@@ -179,7 +188,9 @@ def slice_batch(
             # Validate items and collect lookup keys (deduplicated)
             topic_keys_set: set[str] = set()
             id_keys_set: set[str] = set()
-            validated: _builtins_list[tuple[dict[str, Any], str | None, str | None]] = []
+            validated: _builtins_list[
+                tuple[dict[str, Any], str | None, str | None]
+            ] = []
 
             for item in items:
                 if not isinstance(item, dict):
@@ -250,10 +261,14 @@ def slice_batch(
 
                 if sel is None:
                     label = topic or mid or str(item)
-                    result_parts.append(f"# {label}\n\nError: 'select' is required for each item")
+                    result_parts.append(
+                        f"# {label}\n\nError: 'select' is required for each item"
+                    )
                     continue
                 if not topic and not mid:
-                    result_parts.append("# (invalid item)\n\nError: Each item must have 'topic' or 'id'")
+                    result_parts.append(
+                        "# (invalid item)\n\nError: Each item must have 'topic' or 'id'"
+                    )
                     continue
 
                 # Look up row
@@ -261,7 +276,9 @@ def slice_batch(
                 row = row_map.get(key)
                 if not row:
                     label = topic or mid or str(item)
-                    result_parts.append(f"# {label} [{_selector_label(sel)}]\n\nError: No memory found for {'topic' if topic else 'id'} '{label}'")
+                    result_parts.append(
+                        f"# {label} [{_selector_label(sel)}]\n\nError: No memory found for {'topic' if topic else 'id'} '{label}'"
+                    )
                     continue
 
                 # Apply selector
@@ -280,15 +297,21 @@ def slice_batch(
                 display_topic = row[1]  # use actual topic from DB
                 sel_label = _selector_label(sel)
                 if extracted:
-                    result_parts.append(f"# {display_topic} [{sel_label}]\n\n" + "\n\n".join(extracted))
+                    result_parts.append(
+                        f"# {display_topic} [{sel_label}]\n\n" + "\n\n".join(extracted)
+                    )
                     sliced_count += 1
                 else:
-                    result_parts.append(f"# {display_topic} [{sel_label}]\n\nNo matching content found for selector(s)")
+                    result_parts.append(
+                        f"# {display_topic} [{sel_label}]\n\nNo matching content found for selector(s)"
+                    )
 
             s.add("sliced", sliced_count)
             s.add("total", len(items))
             noun = "memory" if sliced_count == 1 else "memories"
-            return f"Sliced {sliced_count} {noun}\n\n---\n\n" + "\n\n---\n\n".join(result_parts)
+            return f"Sliced {sliced_count} {noun}\n\n---\n\n" + "\n\n---\n\n".join(
+                result_parts
+            )
 
         except Exception as e:
             s.add("error", str(e))

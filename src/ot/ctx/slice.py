@@ -1,4 +1,5 @@
 """Section slicing for the ctx pack."""
+
 from __future__ import annotations
 
 import re
@@ -66,7 +67,7 @@ def ctx_slice(
             return {
                 "handle": handle,
                 "select": select,
-                "content": "\n".join(lines[start - 1: end]),
+                "content": "\n".join(lines[start - 1 : end]),
                 "start_line": start,
                 "end_line": end,
             }
@@ -106,7 +107,9 @@ def ctx_slice(
             n = int(m.group(1))
             idx = n - 1  # 0-indexed
             if idx < 0 or idx >= len(toc):
-                return {"error": f"Section {n} not found (handle has {len(toc)} sections)"}
+                return {
+                    "error": f"Section {n} not found (handle has {len(toc)} sections)"
+                }
             entry = toc[idx]
             start = entry["line"]
             end = _section_end_line(toc, idx, total_lines)
@@ -115,7 +118,7 @@ def ctx_slice(
                 "handle": handle,
                 "section": n,
                 "title": entry["title"],
-                "content": "\n".join(lines[start - 1: end]),
+                "content": "\n".join(lines[start - 1 : end]),
                 "start_line": start,
                 "end_line": end,
             }
@@ -131,7 +134,7 @@ def ctx_slice(
                     "handle": handle,
                     "section": i + 1,
                     "title": entry["title"],
-                    "content": "\n".join(lines[start - 1: end]),
+                    "content": "\n".join(lines[start - 1 : end]),
                     "start_line": start,
                     "end_line": end,
                 }
@@ -147,7 +150,7 @@ def _section_end_line(toc: list[dict[str, Any]], idx: int, total_lines: int) -> 
     """
     entry = toc[idx]
     level = entry["level"]
-    for next_entry in toc[idx + 1:]:
+    for next_entry in toc[idx + 1 :]:
         if next_entry["level"] <= level:
             return int(next_entry["line"]) - 1
     return total_lines

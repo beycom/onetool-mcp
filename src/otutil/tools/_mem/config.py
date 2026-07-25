@@ -1,4 +1,5 @@
 """Pack configuration and path validation for mem."""
+
 from __future__ import annotations
 
 import builtins

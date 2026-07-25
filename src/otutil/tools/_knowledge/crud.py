@@ -1,4 +1,5 @@
 """CRUD operations for the knowledge pack."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -55,7 +56,9 @@ def write(
     with LogSpan(span="kb.write", topic=topic, db=db) as s:
         try:
             with use_connection(db) as conn:
-                existing = conn.execute("SELECT id FROM chunks WHERE topic = ?", [topic]).fetchone()
+                existing = conn.execute(
+                    "SELECT id FROM chunks WHERE topic = ?", [topic]
+                ).fetchone()
                 if existing:
                     return f"Error: Topic '{topic}' already exists. Use kb.update() to replace it."
 
@@ -67,9 +70,16 @@ def write(
                         INSERT INTO chunks (id, topic, content, content_hash, category, tags, meta, source)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                        [chunk_id, topic, content, hash_, category,
-                         serialize_tags(tags), serialize_meta(meta),
-                         (meta or {}).get("source", "")],
+                        [
+                            chunk_id,
+                            topic,
+                            content,
+                            hash_,
+                            category,
+                            serialize_tags(tags),
+                            serialize_meta(meta),
+                            (meta or {}).get("source", ""),
+                        ],
                     )
                 except sqlite3.IntegrityError:
                     # Unique-index backstop for a concurrent writer that got in
@@ -87,7 +97,13 @@ def write(
             return f"Error writing to '{db}': {e}"
 
 
-def read(*, topic: str | None = None, source_path: str | None = None, id: str | None = None, db: str) -> str:
+def read(
+    *,
+    topic: str | None = None,
+    source_path: str | None = None,
+    id: str | None = None,
+    db: str,
+) -> str:
     """Read a single entry by topic or id, or all chunks for a source file.
 
     topic and id are read-one: returns the most recently created matching chunk.
@@ -204,7 +220,15 @@ def append(*, topic: str, content: str, db: str, id: str | None = None) -> str:
             return f"Error appending to '{db}': {e}"
 
 
-def update(*, topic: str, content: str, db: str, id: str | None = None, source_path: str | None = None, anchor: str | None = None) -> str:
+def update(
+    *,
+    topic: str,
+    content: str,
+    db: str,
+    id: str | None = None,
+    source_path: str | None = None,
+    anchor: str | None = None,
+) -> str:
     """Replace the content of an existing entry.
 
     When id= is provided it targets that chunk directly. Otherwise topic= is used,
@@ -229,7 +253,9 @@ def update(*, topic: str, content: str, db: str, id: str | None = None, source_p
         try:
             with use_connection(db) as conn:
                 if id is not None:
-                    rows = conn.execute("SELECT id FROM chunks WHERE id = ?", [id]).fetchall()
+                    rows = conn.execute(
+                        "SELECT id FROM chunks WHERE id = ?", [id]
+                    ).fetchall()
                     if not rows:
                         return f"Error: No entry found with id '{id}'"
                 else:
@@ -262,7 +288,13 @@ def update(*, topic: str, content: str, db: str, id: str | None = None, source_p
             return f"Error updating in '{db}': {e}"
 
 
-def delete(*, topic: str | None = None, source_path: str | None = None, id: str | None = None, db: str) -> str:
+def delete(
+    *,
+    topic: str | None = None,
+    source_path: str | None = None,
+    id: str | None = None,
+    db: str,
+) -> str:
     """Remove an entry by topic, id, or all chunks for a source file.
 
     Args:
@@ -286,13 +318,19 @@ def delete(*, topic: str | None = None, source_path: str | None = None, id: str 
         try:
             with use_connection(db) as conn:
                 if id is not None:
-                    rows = conn.execute("SELECT id FROM chunks WHERE id = ?", [id]).fetchall()
+                    rows = conn.execute(
+                        "SELECT id FROM chunks WHERE id = ?", [id]
+                    ).fetchall()
                     label = f"id '{id}'"
                 elif source_path is not None:
-                    rows = conn.execute("SELECT id FROM chunks WHERE source_path = ?", [source_path]).fetchall()
+                    rows = conn.execute(
+                        "SELECT id FROM chunks WHERE source_path = ?", [source_path]
+                    ).fetchall()
                     label = f"source_path '{source_path}'"
                 else:
-                    rows = conn.execute("SELECT id FROM chunks WHERE topic = ?", [topic]).fetchall()
+                    rows = conn.execute(
+                        "SELECT id FROM chunks WHERE topic = ?", [topic]
+                    ).fetchall()
                     label = f"topic '{topic}'"
                 if not rows:
                     return f"Error: No entries found for {label}"

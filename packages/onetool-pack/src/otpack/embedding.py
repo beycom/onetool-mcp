@@ -232,9 +232,9 @@ class EmbeddingClient:
         self._cache_max = cache_max
         self._client: Any = None
         # LRU keyed (sha256(text), model, dimensions) → (vector, monotonic ts)
-        self._cache: OrderedDict[tuple[str, str, int | None], tuple[list[float], float]] = (
-            OrderedDict()
-        )
+        self._cache: OrderedDict[
+            tuple[str, str, int | None], tuple[list[float], float]
+        ] = OrderedDict()
 
     # -- internals ----------------------------------------------------------
 
@@ -290,9 +290,14 @@ class EmbeddingClient:
                 response = client.embeddings.create(
                     model=self.model, input=safe_batch, **extra
                 )
-                vecs = [item.embedding for item in sorted(response.data, key=lambda d: d.index)]
+                vecs = [
+                    item.embedding
+                    for item in sorted(response.data, key=lambda d: d.index)
+                ]
                 if len(vecs) != len(safe_batch):
-                    raise ValueError(f"Expected {len(safe_batch)} embeddings, got {len(vecs)}")
+                    raise ValueError(
+                        f"Expected {len(safe_batch)} embeddings, got {len(vecs)}"
+                    )
                 return vecs
             except Exception as e:
                 status = getattr(e, "status_code", None)
@@ -433,7 +438,9 @@ class EmbeddingClient:
                 model=self.model,
                 batchSize=len(safe_batch),
             ):
-                vecs = self._embed_batch_with_retry(safe_batch, max_attempts=max_attempts)
+                vecs = self._embed_batch_with_retry(
+                    safe_batch, max_attempts=max_attempts
+                )
                 results.extend(vecs)
             if on_batch:
                 on_batch(min(i + batch_size, total), total)

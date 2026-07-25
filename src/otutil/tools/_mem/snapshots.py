@@ -1,4 +1,5 @@
 """Memory snapshot and restore (directory-based snapshots)."""
+
 from __future__ import annotations
 
 import uuid
@@ -56,7 +57,7 @@ def _strip_topic_prefix(mem_topic: str, prefix: str | None) -> str:
     prefix (without its trailing slash) keeps only its final segment.
     """
     if prefix and mem_topic.startswith(prefix):
-        return mem_topic[len(prefix):]
+        return mem_topic[len(prefix) :]
     if prefix and mem_topic == prefix.rstrip("/"):
         return mem_topic.rsplit("/", 1)[-1]
     return mem_topic
@@ -132,7 +133,12 @@ def snapshot(
 
             for r in rows:
                 _id, mem_topic, content, category, raw_tags, relevance = (
-                    r[0], r[1], r[2], r[3], r[4], r[5],
+                    r[0],
+                    r[1],
+                    r[2],
+                    r[3],
+                    r[4],
+                    r[5],
                 )
                 tags = _deserialize_tags(raw_tags)
                 raw_meta = _deserialize_meta(r[9])
@@ -148,28 +154,32 @@ def snapshot(
 
                 if file_path.exists() and on_conflict == "skip":
                     skipped += 1
-                    index_entries.append({
-                        "topic": mem_topic,
-                        "file": file_rel,
-                        "category": category,
-                        "tags": tags,
-                        "relevance": relevance,
-                        "meta": raw_meta,
-                    })
+                    index_entries.append(
+                        {
+                            "topic": mem_topic,
+                            "file": file_rel,
+                            "category": category,
+                            "tags": tags,
+                            "relevance": relevance,
+                            "meta": raw_meta,
+                        }
+                    )
                     continue
 
                 file_path.parent.mkdir(parents=True, exist_ok=True)
                 file_path.write_text(content, encoding="utf-8")
                 written += 1
 
-                index_entries.append({
-                    "topic": mem_topic,
-                    "file": file_rel,
-                    "category": category,
-                    "tags": tags,
-                    "relevance": relevance,
-                    "meta": raw_meta,
-                })
+                index_entries.append(
+                    {
+                        "topic": mem_topic,
+                        "file": file_rel,
+                        "category": category,
+                        "tags": tags,
+                        "relevance": relevance,
+                        "meta": raw_meta,
+                    }
+                )
 
             # Write index.yaml
             try:
@@ -279,7 +289,9 @@ def restore(
             memories = data["memories"]
             skipped = 0
             errors = []
-            pending: list[tuple[str, str, str, str, str, list[str], int, str, str | None]] = []
+            pending: list[
+                tuple[str, str, str, str, str, list[str], int, str, str | None]
+            ] = []
 
             with _use_connection() as conn:
                 for entry in memories:
@@ -317,7 +329,9 @@ def restore(
                         mem_topic = f"{topic}/{rel}" if rel else topic
 
                     # Read content file (index paths are untrusted)
-                    content_path, path_error = _resolve_member_path(validated_path, file_rel)
+                    content_path, path_error = _resolve_member_path(
+                        validated_path, file_rel
+                    )
                     if content_path is None:
                         errors.append(f"{file_rel}: {path_error}")
                         continue
@@ -338,28 +352,60 @@ def restore(
                         skipped += 1
                         continue
 
-                    pending.append((str(uuid.uuid4()), mem_topic, content, content_hash,
-                                    category, tags, relevance, meta_str,
-                                    existing[0] if existing else None))
+                    pending.append(
+                        (
+                            str(uuid.uuid4()),
+                            mem_topic,
+                            content,
+                            content_hash,
+                            category,
+                            tags,
+                            relevance,
+                            meta_str,
+                            existing[0] if existing else None,
+                        )
+                    )
 
             # Embedding API calls happen outside the DB lock
             with_embeddings = [(entry, _embed_now(entry[2])) for entry in pending]
 
             with _use_connection() as conn:
                 for entry, embedding in with_embeddings:
-                    memory_id, mem_topic, content, content_hash, category, tags, relevance, meta_str, existing_id = entry
+                    (
+                        memory_id,
+                        mem_topic,
+                        content,
+                        content_hash,
+                        category,
+                        tags,
+                        relevance,
+                        meta_str,
+                        existing_id,
+                    ) = entry
                     if existing_id is not None:
                         # Overwrite: remove the old row and its history entries
                         conn.execute("DELETE FROM memories WHERE id = ?", [existing_id])
-                        conn.execute("DELETE FROM memory_history WHERE memory_id = ?", [existing_id])
+                        conn.execute(
+                            "DELETE FROM memory_history WHERE memory_id = ?",
+                            [existing_id],
+                        )
 
                     conn.execute(
                         """
                         INSERT INTO memories (id, topic, content, content_hash, category, tags, relevance, embedding, meta)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                        [memory_id, mem_topic, content, content_hash, category,
-                         _serialize_tags(tags), relevance, _serialize_embedding(embedding), meta_str],
+                        [
+                            memory_id,
+                            mem_topic,
+                            content,
+                            content_hash,
+                            category,
+                            _serialize_tags(tags),
+                            relevance,
+                            _serialize_embedding(embedding),
+                            meta_str,
+                        ],
                     )
                     if embedding is not None:
                         _sync_vec_index(conn, memory_id, embedding)

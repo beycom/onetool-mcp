@@ -42,12 +42,14 @@ def parse_headings(
             continue
         m = HEADING_RE.match(line)
         if m and len(m.group(1)) <= max_depth:
-            headings.append({
-                "heading": m.group(2).strip(),
-                "level": len(m.group(1)),
-                "start": i + 1,  # 1-indexed
-                "end": len(_lines),  # adjusted below
-            })
+            headings.append(
+                {
+                    "heading": m.group(2).strip(),
+                    "level": len(m.group(1)),
+                    "start": i + 1,  # 1-indexed
+                    "end": len(_lines),  # adjusted below
+                }
+            )
 
     for idx in range(len(headings) - 1):
         headings[idx]["end"] = headings[idx + 1]["start"] - 1

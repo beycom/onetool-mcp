@@ -1,4 +1,5 @@
 """JMESPath query for structured memory content."""
+
 from __future__ import annotations
 
 import json
@@ -77,6 +78,7 @@ def query(
         except (json.JSONDecodeError, ValueError):
             try:
                 import yaml
+
                 parsed = yaml.safe_load(content)
                 if isinstance(parsed, (dict, list)):
                     data = parsed

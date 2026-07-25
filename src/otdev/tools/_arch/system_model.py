@@ -48,7 +48,9 @@ CONNECT_LOWEST_VISIBLE = "lowest_visible"
 DEFAULT_MERGE_INTERFACES = True
 DEFAULT_SHOW_INTERFACE_LABELS = True
 DEFAULT_SHOW_ARROWHEAD_LABELS = True
-DEFAULT_INTERFACE_LABELS_TEMPLATE = "[{{ row.key }}] {{ row.name }} ({{ row.interaction_type }})"
+DEFAULT_INTERFACE_LABELS_TEMPLATE = (
+    "[{{ row.key }}] {{ row.name }} ({{ row.interaction_type }})"
+)
 DEFAULT_ARROWHEAD_LABELS_TEMPLATE = "{{ row.key }}"
 DEFAULT_SECONDARY_SYSTEM_DETAIL = LEVEL_SYS
 DEFAULT_SECONDARY_CONNECT_LEVEL = LEVEL_APP
@@ -154,7 +156,9 @@ def safe_output_fragment(value: str) -> str:
     """Sanitize a free-text value (e.g. a project stage) into a filename
     fragment. Single source of truth: the SVG writer (`arch.py`) and the page
     links built here must agree byte-for-byte or diagram links break."""
-    cleaned = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in value.strip())
+    cleaned = "".join(
+        ch if ch.isalnum() or ch in "._-" else "_" for ch in value.strip()
+    )
     return cleaned.strip("._-") or "item"
 
 
@@ -165,7 +169,9 @@ def is_external_system(row: dict[str, Any]) -> bool:
     return "external" in tags_for_row(row)
 
 
-def _collect_extra_keys(rows: list[dict[str, Any]], standard_keys: set[str]) -> list[str]:
+def _collect_extra_keys(
+    rows: list[dict[str, Any]], standard_keys: set[str]
+) -> list[str]:
     seen: dict[str, None] = {}
     for row in rows:
         for key in row:
@@ -196,7 +202,9 @@ def _component_class_from_row(row: dict[str, Any]) -> str:
 
 
 def _component_type_label(row: dict[str, Any]) -> str:
-    return _normalize_component_type(first_value(row, ("component_type", "type", "cmp_type", "kind")))
+    return _normalize_component_type(
+        first_value(row, ("component_type", "type", "cmp_type", "kind"))
+    )
 
 
 def build_entity_graph(*, entities: dict[str, list[dict[str, Any]]]) -> EntityGraph:
@@ -392,12 +400,16 @@ def _change_type_badge_html(change_type: str) -> str:
     return f'<span class="badge" style="background:{style["color"]}">{style["label"]}</span>'
 
 
-def _project_scope_item_cell_html(*, item_type: str, item_id: str, graph: EntityGraph) -> str:
+def _project_scope_item_cell_html(
+    *, item_type: str, item_id: str, graph: EntityGraph
+) -> str:
     """Render a scope-table item cell: a link to the owning system's page
     when `item_id` resolves to a system, or an app/component owned by a
     system; plain text otherwise (interfaces, users, unresolved ids — D5
     'Scope table links items to system pages')."""
-    owning_sys = _project_system_for_item(item_type=item_type, item_id=item_id, graph=graph)
+    owning_sys = _project_system_for_item(
+        item_type=item_type, item_id=item_id, graph=graph
+    )
     if owning_sys:
         return f'<a href="{escape(system_page_name(owning_sys))}">{escape(item_id)}</a>'
     return str(escape(item_id))
@@ -433,7 +445,10 @@ def _interaction_type_badge_html(interaction_type: str) -> str:
 # "no hex values hardcoded in templates" rule; this list is plain text only.
 _NODE_CLASS_LEGEND: tuple[dict[str, str], ...] = (
     {"label": "Person", "description": "A user/actor interacting with the solution"},
-    {"label": "External System", "description": "A system outside the solution boundary"},
+    {
+        "label": "External System",
+        "description": "A system outside the solution boundary",
+    },
     {"label": "System", "description": "A system in the solution"},
     {"label": "App", "description": "An application owned by a system"},
     {"label": "Web", "description": "Web-facing component"},
@@ -500,7 +515,9 @@ def _secondary_detail_for_level(*, level: str, secondary_system_detail: str) -> 
     return secondary_system_detail
 
 
-def _profile_option_label_template(*, profile_data: dict[str, Any], option_name: str, default: str) -> str:
+def _profile_option_label_template(
+    *, profile_data: dict[str, Any], option_name: str, default: str
+) -> str:
     value = profile_data.get(option_name, default)
     if not isinstance(value, str):
         raise ConfigResolutionError(
@@ -526,7 +543,9 @@ def _interface_template_row(*, row: dict[str, Any]) -> dict[str, str]:
 
     row_model.setdefault("id", _interface_id(row))
     row_model.setdefault("key", str(row.get("key") or "").strip())
-    row_model.setdefault("name", str(row.get("name") or row_model["id"] or "interface").strip())
+    row_model.setdefault(
+        "name", str(row.get("name") or row_model["id"] or "interface").strip()
+    )
     row_model.setdefault("provider", _interface_provider(row))
     row_model.setdefault("consumer", _interface_consumer(row))
     row_model.setdefault("interaction_type", _interface_type(row))
@@ -554,7 +573,9 @@ def _compile_label_templates(profile_data: dict[str, Any]) -> tuple[Any, Any]:
     )
 
 
-def _render_compiled_interface_option(*, template: Any, row: dict[str, Any], option_name: str) -> str:
+def _render_compiled_interface_option(
+    *, template: Any, row: dict[str, Any], option_name: str
+) -> str:
     try:
         rendered = template.render(row=_interface_template_row(row=row))
     except TemplateError as exc:
@@ -584,7 +605,9 @@ def _endpoint_owner_sys(*, endpoint_id: str, graph: EntityGraph) -> str | None:
     return None
 
 
-def _system_interfaces(*, system_id: str, entities: dict[str, list[dict[str, Any]]], graph: EntityGraph) -> list[dict[str, Any]]:
+def _system_interfaces(
+    *, system_id: str, entities: dict[str, list[dict[str, Any]]], graph: EntityGraph
+) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     for row in entities[SHEET_INTERFACE]:
         provider = _interface_provider(row)
@@ -601,7 +624,9 @@ def _system_interfaces(*, system_id: str, entities: dict[str, list[dict[str, Any
     return result
 
 
-def _related_user_rows(*, system_id: str, entities: dict[str, list[dict[str, Any]]], graph: EntityGraph) -> list[dict[str, Any]]:
+def _related_user_rows(
+    *, system_id: str, entities: dict[str, list[dict[str, Any]]], graph: EntityGraph
+) -> list[dict[str, Any]]:
     # Users reference apps; the system id itself is accepted as a direct reference.
     focus_ids = {system_id}
     for app_id, app_sys in graph.app_to_sys.items():
@@ -629,13 +654,14 @@ def _connect_level_rank(level: str) -> int:
     return {LEVEL_SYS: 0, LEVEL_APP: 1, LEVEL_CMP: 2}[level]
 
 
-def _connect_level_allows(*, configured_level: str, target_level: str, rendered_level: str) -> bool:
+def _connect_level_allows(
+    *, configured_level: str, target_level: str, rendered_level: str
+) -> bool:
     if configured_level == CONNECT_LOWEST_VISIBLE:
         return _connect_level_rank(rendered_level) >= _connect_level_rank(target_level)
-    return (
-        _connect_level_rank(configured_level) >= _connect_level_rank(target_level)
-        and _connect_level_rank(rendered_level) >= _connect_level_rank(target_level)
-    )
+    return _connect_level_rank(configured_level) >= _connect_level_rank(
+        target_level
+    ) and _connect_level_rank(rendered_level) >= _connect_level_rank(target_level)
 
 
 def _secondary_app_path(
@@ -715,7 +741,9 @@ def _node_path_for_level(
     if endpoint_id in graph.app_rows:
         app_sys = graph.app_to_sys.get(endpoint_id)
         if app_sys == focus_system_id and level in {LEVEL_APP, LEVEL_CMP}:
-            return f'"{_sanitize_d2_id(focus_system_id)}"."{_sanitize_d2_id(endpoint_id)}"'
+            return (
+                f'"{_sanitize_d2_id(focus_system_id)}"."{_sanitize_d2_id(endpoint_id)}"'
+            )
         if app_sys:
             if app_sys != focus_system_id:
                 rendered_level = (secondary_system_levels or {}).get(app_sys, LEVEL_SYS)
@@ -743,7 +771,9 @@ def _node_path_for_level(
                     )
                 return f'"{_sanitize_d2_id(focus_system_id)}"."{_sanitize_d2_id(endpoint_id)}"'
             if level == LEVEL_APP and cmp_app:
-                return f'"{_sanitize_d2_id(focus_system_id)}"."{_sanitize_d2_id(cmp_app)}"'
+                return (
+                    f'"{_sanitize_d2_id(focus_system_id)}"."{_sanitize_d2_id(cmp_app)}"'
+                )
             return f'"{_sanitize_d2_id(focus_system_id)}"'
         if cmp_sys:
             rendered_level = (secondary_system_levels or {}).get(cmp_sys, LEVEL_SYS)
@@ -834,7 +864,9 @@ def _build_system_block(
         "link": system_link,
     }
     if scope is not None:
-        system_change_class = _resolve_change_class(scope.change_lookup, "system", system_id)
+        system_change_class = _resolve_change_class(
+            scope.change_lookup, "system", system_id
+        )
         if system_change_class:
             block["change_class"] = system_change_class
 
@@ -855,12 +887,15 @@ def _build_system_block(
             return block
         include_all = system_id in scope.explicit_system_ids
         app_ids = [
-            app_id for app_id in app_ids if include_all or app_id in scope.included_app_ids
+            app_id
+            for app_id in app_ids
+            if include_all or app_id in scope.included_app_ids
         ]
         cmp_rows_direct = [
             cmp_row
             for cmp_row in cmp_rows_direct
-            if include_all or str(cmp_row.get("id", "")).strip() in scope.included_cmp_ids
+            if include_all
+            or str(cmp_row.get("id", "")).strip() in scope.included_cmp_ids
         ]
 
     if level == LEVEL_CMP:
@@ -870,12 +905,16 @@ def _build_system_block(
                 continue
             direct_component: dict[str, Any] = {
                 "id": _sanitize_d2_id(cmp_id),
-                "label": _wrap_label(str(cmp_row.get("name") or cmp_id), COMPONENT_MAX_LINE_WIDTH),
+                "label": _wrap_label(
+                    str(cmp_row.get("name") or cmp_id), COMPONENT_MAX_LINE_WIDTH
+                ),
                 "class": _component_class_from_row(cmp_row),
                 "link": system_link,
             }
             if scope is not None:
-                cmp_change_class = _resolve_change_class(scope.change_lookup, "component", cmp_id)
+                cmp_change_class = _resolve_change_class(
+                    scope.change_lookup, "component", cmp_id
+                )
                 if cmp_change_class:
                     direct_component["change_class"] = cmp_change_class
             block["direct_components"].append(direct_component)
@@ -889,7 +928,9 @@ def _build_system_block(
             "link": system_link,
         }
         if scope is not None:
-            app_change_class = _resolve_change_class(scope.change_lookup, "application", app_id)
+            app_change_class = _resolve_change_class(
+                scope.change_lookup, "application", app_id
+            )
             if app_change_class:
                 app_block["change_class"] = app_change_class
         if level == LEVEL_CMP:
@@ -897,16 +938,24 @@ def _build_system_block(
                 cmp_id = str(cmp_row.get("id", "")).strip()
                 if not cmp_id:
                     continue
-                if scope is not None and not include_all and cmp_id not in scope.included_cmp_ids:
+                if (
+                    scope is not None
+                    and not include_all
+                    and cmp_id not in scope.included_cmp_ids
+                ):
                     continue
                 app_component: dict[str, Any] = {
                     "id": _sanitize_d2_id(cmp_id),
-                    "label": _wrap_label(str(cmp_row.get("name") or cmp_id), COMPONENT_MAX_LINE_WIDTH),
+                    "label": _wrap_label(
+                        str(cmp_row.get("name") or cmp_id), COMPONENT_MAX_LINE_WIDTH
+                    ),
                     "class": _component_class_from_row(cmp_row),
                     "link": system_link,
                 }
                 if scope is not None:
-                    cmp_change_class = _resolve_change_class(scope.change_lookup, "component", cmp_id)
+                    cmp_change_class = _resolve_change_class(
+                        scope.change_lookup, "component", cmp_id
+                    )
                     if cmp_change_class:
                         app_component["change_class"] = cmp_change_class
                 app_block["components"].append(app_component)
@@ -935,7 +984,9 @@ def build_system_view(
     representations of the diagram never drift apart."""
     level_name = {"sys": "System", "app": "Application", "cmp": "Component"}[level]
     title_name = _system_node_name(system_id, graph)
-    merge_interfaces = option_as_bool(profile_data.get("merge_interfaces"), default=DEFAULT_MERGE_INTERFACES)
+    merge_interfaces = option_as_bool(
+        profile_data.get("merge_interfaces"), default=DEFAULT_MERGE_INTERFACES
+    )
     show_interface_labels = option_as_bool(
         profile_data.get("show_interface_labels"), default=DEFAULT_SHOW_INTERFACE_LABELS
     )
@@ -973,12 +1024,16 @@ def build_system_view(
         consumer_sys = _endpoint_owner_sys(endpoint_id=consumer, graph=graph)
 
         if provider_sys and provider_sys != system_id:
-            if provider_sys in graph.sys_rows and not is_external_system(graph.sys_rows[provider_sys]):
+            if provider_sys in graph.sys_rows and not is_external_system(
+                graph.sys_rows[provider_sys]
+            ):
                 related_system_ids.add(provider_sys)
             else:
                 external_system_ids.add(provider_sys)
         if consumer_sys and consumer_sys != system_id:
-            if consumer_sys in graph.sys_rows and not is_external_system(graph.sys_rows[consumer_sys]):
+            if consumer_sys in graph.sys_rows and not is_external_system(
+                graph.sys_rows[consumer_sys]
+            ):
                 related_system_ids.add(consumer_sys)
             else:
                 external_system_ids.add(consumer_sys)
@@ -989,12 +1044,16 @@ def build_system_view(
         if not user_id:
             continue
         user_name = str(user_row.get("name") or user_id)
-        user_nodes.append({"id": _sanitize_d2_id(user_id), "label": _quote_d2(user_name)})
+        user_nodes.append(
+            {"id": _sanitize_d2_id(user_id), "label": _quote_d2(user_name)}
+        )
 
     external_nodes: list[dict[str, str]] = []
     for ext_id in sorted(external_system_ids):
         ext_name = _system_node_name(ext_id, graph)
-        external_nodes.append({"id": _sanitize_d2_id(ext_id), "label": _quote_d2(ext_name)})
+        external_nodes.append(
+            {"id": _sanitize_d2_id(ext_id), "label": _quote_d2(ext_name)}
+        )
 
     system_blocks: list[dict[str, Any]] = [
         _build_system_block(system_id=system_id, level=level, graph=graph)
@@ -1121,13 +1180,17 @@ def build_system_view(
                 "start_path": str(merged_edge["start_path"]),
                 "operator": str(merged_edge["operator"]),
                 "end_path": str(merged_edge["end_path"]),
-                "label": "\\n".join(str(item) for item in merged_edge["labels"]).replace('"', '\\"'),
+                "label": "\\n".join(
+                    str(item) for item in merged_edge["labels"]
+                ).replace('"', '\\"'),
                 "direction_class": str(merged_edge["direction_class"]),
                 "source_arrowhead_id": arrowhead_id.replace('"', '\\"'),
                 "target_arrowhead_id": arrowhead_id.replace('"', '\\"'),
             }
             if merged_edge.get("interaction_class"):
-                merged_entry["interaction_class"] = str(merged_edge["interaction_class"])
+                merged_entry["interaction_class"] = str(
+                    merged_edge["interaction_class"]
+                )
             interface_edges.append(merged_entry)
 
     return {
@@ -1164,7 +1227,11 @@ def build_system_d2(
             profile_data=profile_data,
         )
 
-    env = Environment(loader=FileSystemLoader(str(template_path.parent)), autoescape=False, undefined=StrictUndefined)
+    env = Environment(
+        loader=FileSystemLoader(str(template_path.parent)),
+        autoescape=False,
+        undefined=StrictUndefined,
+    )
     env.globals["class_attr"] = _class_attr
     env.globals["quote_d2"] = _quote_d2
     template = env.get_template(template_path.name)
@@ -1183,7 +1250,9 @@ def build_system_d2(
     return rendered.strip() + "\n"
 
 
-def project_stage_ids(*, project_id: str, entities: dict[str, list[dict[str, Any]]]) -> list[str]:
+def project_stage_ids(
+    *, project_id: str, entities: dict[str, list[dict[str, Any]]]
+) -> list[str]:
     seen: dict[str, None] = {}
     for row in entities.get(SHEET_PROJECT_SCOPE, []):
         if str(first_value(row, ("project", "project_id")) or "").strip() != project_id:
@@ -1194,14 +1263,18 @@ def project_stage_ids(*, project_id: str, entities: dict[str, list[dict[str, Any
     return list(seen)
 
 
-def _project_row(*, project_id: str, entities: dict[str, list[dict[str, Any]]]) -> dict[str, Any] | None:
+def _project_row(
+    *, project_id: str, entities: dict[str, list[dict[str, Any]]]
+) -> dict[str, Any] | None:
     for row in entities.get(SHEET_PROJECT, []):
         if str(row.get("id") or "").strip() == project_id:
             return row
     return None
 
 
-def _project_option_choice(*, row: dict[str, Any], field: str, default: str, choices: set[str]) -> str:
+def _project_option_choice(
+    *, row: dict[str, Any], field: str, default: str, choices: set[str]
+) -> str:
     value = row.get(field, default)
     if value is None or not str(value).strip():
         return default
@@ -1231,7 +1304,9 @@ def _project_scope_item_type(row: dict[str, Any]) -> str:
     return PROJECT_ITEM_TYPES.get(str(row.get("item_type") or "").strip().lower(), "")
 
 
-def _project_system_for_item(*, item_type: str, item_id: str, graph: EntityGraph) -> str | None:
+def _project_system_for_item(
+    *, item_type: str, item_id: str, graph: EntityGraph
+) -> str | None:
     if item_type == "system":
         return item_id if item_id in graph.sys_rows else None
     if item_type == "application":
@@ -1348,7 +1423,9 @@ def _project_context_sets(
     user_ids: set[str] = set()
     interfaces: list[dict[str, Any]] = []
 
-    for row in _project_scope_rows(project_id=project_id, stage=stage, entities=entities):
+    for row in _project_scope_rows(
+        project_id=project_id, stage=stage, entities=entities
+    ):
         item_type = _project_scope_item_type(row)
         item_id = str(row.get("item_id") or "").strip()
         if not item_id:
@@ -1409,7 +1486,9 @@ def _project_change_lookup(
     `existing` rows and rows with no resolvable item_type/item_id produce no
     entry (D2 neutral-styling rule)."""
     lookup: dict[tuple[str, str], str] = {}
-    for row in _project_scope_rows(project_id=project_id, stage=stage, entities=entities):
+    for row in _project_scope_rows(
+        project_id=project_id, stage=stage, entities=entities
+    ):
         item_type = _project_scope_item_type(row)
         item_id = str(row.get("item_id") or "").strip()
         if not item_type or not item_id:
@@ -1466,11 +1545,15 @@ def build_project_view(
         detail_level=detail_level,
         connect_level=connect_level,
     )
-    change_lookup = _project_change_lookup(project_id=project_id, stage=stage, entities=entities)
+    change_lookup = _project_change_lookup(
+        project_id=project_id, stage=stage, entities=entities
+    )
 
     explicit_system_ids = {
         str(row.get("item_id") or "").strip()
-        for row in _project_scope_rows(project_id=project_id, stage=stage, entities=entities)
+        for row in _project_scope_rows(
+            project_id=project_id, stage=stage, entities=entities
+        )
         if _project_scope_item_type(row) == "system"
     }
     scope = ProjectScope(
@@ -1487,15 +1570,23 @@ def build_project_view(
             scope=scope,
         )
         for system_id in sorted(system_ids)
-        if system_id in graph.sys_rows and not is_external_system(graph.sys_rows[system_id])
+        if system_id in graph.sys_rows
+        and not is_external_system(graph.sys_rows[system_id])
     ]
     external_nodes = [
-        {"id": _sanitize_d2_id(system_id), "label": _quote_d2(_system_node_name(system_id, graph))}
+        {
+            "id": _sanitize_d2_id(system_id),
+            "label": _quote_d2(_system_node_name(system_id, graph)),
+        }
         for system_id in sorted(system_ids)
-        if system_id not in graph.sys_rows or is_external_system(graph.sys_rows[system_id])
+        if system_id not in graph.sys_rows
+        or is_external_system(graph.sys_rows[system_id])
     ]
     user_nodes = [
-        {"id": _sanitize_d2_id(user_id), "label": _quote_d2(str(graph.usr_rows[user_id].get("name") or user_id))}
+        {
+            "id": _sanitize_d2_id(user_id),
+            "label": _quote_d2(str(graph.usr_rows[user_id].get("name") or user_id)),
+        }
         for user_id in sorted(user_ids)
         if user_id in graph.usr_rows
     ]
@@ -1558,7 +1649,9 @@ def build_project_view(
         interaction_class = _interaction_class_for(row.get("interaction_type"))
         if interaction_class:
             project_edge["interaction_class"] = interaction_class
-        edge_change_class = _resolve_change_class(change_lookup, "interface", _interface_id(row))
+        edge_change_class = _resolve_change_class(
+            change_lookup, "interface", _interface_id(row)
+        )
         if edge_change_class:
             project_edge["change_class"] = edge_change_class
         interface_edges.append(project_edge)
@@ -1598,7 +1691,11 @@ def build_project_d2(
             profile_data=profile_data,
         )
 
-    env = Environment(loader=FileSystemLoader(str(template_path.parent)), autoescape=False, undefined=StrictUndefined)
+    env = Environment(
+        loader=FileSystemLoader(str(template_path.parent)),
+        autoescape=False,
+        undefined=StrictUndefined,
+    )
     env.globals["class_attr"] = _class_attr
     env.globals["quote_d2"] = _quote_d2
     template = env.get_template(template_path.name)
@@ -1616,7 +1713,13 @@ def build_project_d2(
     return rendered.strip() + "\n"
 
 
-def _project_item_name(*, item_type: str, item_id: str, graph: EntityGraph, entities: dict[str, list[dict[str, Any]]]) -> str:
+def _project_item_name(
+    *,
+    item_type: str,
+    item_id: str,
+    graph: EntityGraph,
+    entities: dict[str, list[dict[str, Any]]],
+) -> str:
     if item_type == "system" and item_id in graph.sys_rows:
         return str(graph.sys_rows[item_id].get("name") or item_id)
     if item_type == "application" and item_id in graph.app_rows:
@@ -1648,18 +1751,34 @@ def build_solution_project_context(
         {"field": "Status", "value": str(escape(str(project.get("status") or "")))},
         {"field": "Owner", "value": str(escape(str(project.get("owner") or "")))},
         {"field": "Sponsor", "value": str(escape(str(project.get("sponsor") or "")))},
-        {"field": "Start Date", "value": str(escape(str(project.get("start_date") or "")))},
-        {"field": "Target Date", "value": str(escape(str(project.get("target_date") or "")))},
-        {"field": "Detail Level", "value": str(escape(str(project.get("detail_level") or LEVEL_APP)))},
-        {"field": "Connect Level", "value": str(escape(str(project.get("connect_level") or LEVEL_APP)))},
+        {
+            "field": "Start Date",
+            "value": str(escape(str(project.get("start_date") or ""))),
+        },
+        {
+            "field": "Target Date",
+            "value": str(escape(str(project.get("target_date") or ""))),
+        },
+        {
+            "field": "Detail Level",
+            "value": str(escape(str(project.get("detail_level") or LEVEL_APP))),
+        },
+        {
+            "field": "Connect Level",
+            "value": str(escape(str(project.get("connect_level") or LEVEL_APP))),
+        },
     ]
     description = first_value(project, ("description",))
     if description is not None and str(description).strip():
         metadata.append({"field": "Description", "value": render_markdown(description)})
     for key in _collect_extra_keys([project], STD_PROJECT_KEYS):
-        metadata.append({"field": title_case(key), "value": render_markdown(project.get(key))})
+        metadata.append(
+            {"field": title_case(key), "value": render_markdown(project.get(key))}
+        )
 
-    scope_rows = _project_scope_rows(project_id=project_id, stage=None, entities=entities)
+    scope_rows = _project_scope_rows(
+        project_id=project_id, stage=None, entities=entities
+    )
     scope_extra_keys = _collect_extra_keys(scope_rows, STD_PROJECT_SCOPE_KEYS)
     scope_data: list[dict[str, Any]] = []
     for row in scope_rows:
@@ -1668,13 +1787,18 @@ def build_solution_project_context(
         entry: dict[str, Any] = {
             "stage": str(row.get("stage") or ""),
             "item_type": item_type,
-            "item_id": _project_scope_item_cell_html(item_type=item_type, item_id=item_id, graph=graph),
-            "name": str(row.get("name") or _project_item_name(
-                item_type=item_type,
-                item_id=item_id,
-                graph=graph,
-                entities=entities,
-            )),
+            "item_id": _project_scope_item_cell_html(
+                item_type=item_type, item_id=item_id, graph=graph
+            ),
+            "name": str(
+                row.get("name")
+                or _project_item_name(
+                    item_type=item_type,
+                    item_id=item_id,
+                    graph=graph,
+                    entities=entities,
+                )
+            ),
             "change_type": _change_type_badge_html(str(row.get("change_type") or "")),
             "owner": str(row.get("owner") or ""),
             "status": str(row.get("status") or ""),
@@ -1690,10 +1814,21 @@ def build_solution_project_context(
         {"title": "Item Type", "field": "item_type", "minWidth": 120},
         {"title": "Item ID", "field": "item_id", "formatter": "html", "minWidth": 140},
         {"title": "Name", "field": "name", "minWidth": 160},
-        {"title": "Change Type", "field": "change_type", "formatter": "html", "minWidth": 130},
+        {
+            "title": "Change Type",
+            "field": "change_type",
+            "formatter": "html",
+            "minWidth": 130,
+        },
         {"title": "Owner", "field": "owner", "minWidth": 120},
         {"title": "Status", "field": "status", "minWidth": 120},
-        {"title": "Description", "field": "description", "formatter": "html", "flex": 4, "minWidth": 200},
+        {
+            "title": "Description",
+            "field": "description",
+            "formatter": "html",
+            "flex": 4,
+            "minWidth": 200,
+        },
     ]
     for key in scope_extra_keys:
         is_wide = key.lower() in wide_fields
@@ -1767,7 +1902,9 @@ def _related_projects_for_system(
         item_id = str(row.get("item_id") or "").strip()
         if not item_type or not item_id:
             continue
-        owning_sys = _project_system_for_item(item_type=item_type, item_id=item_id, graph=graph)
+        owning_sys = _project_system_for_item(
+            item_type=item_type, item_id=item_id, graph=graph
+        )
         if owning_sys != system_id:
             continue
         change_types = change_types_by_project.setdefault(project_id, set())
@@ -1803,7 +1940,10 @@ def build_solution_system_context(
     metadata: list[dict[str, Any]] = [{"field": "ID", "value": str(escape(system_id))}]
     sys_type = first_value(sys_row, ("system_type", "type"))
     metadata.append(
-        {"field": "Type", "value": str(escape(str(sys_type))) if sys_type is not None else "internal"}
+        {
+            "field": "Type",
+            "value": str(escape(str(sys_type))) if sys_type is not None else "internal",
+        }
     )
 
     tags_value = first_value(sys_row, ("tags", "tag"))
@@ -1812,12 +1952,18 @@ def build_solution_system_context(
 
     description_value = first_value(sys_row, ("description",))
     if description_value is not None and str(description_value).strip():
-        metadata.append({"field": "Description", "value": render_markdown(description_value)})
+        metadata.append(
+            {"field": "Description", "value": render_markdown(description_value)}
+        )
 
     for key in _collect_extra_keys([sys_row], STD_SYS_KEYS):
-        metadata.append({"field": title_case(key), "value": render_markdown(sys_row.get(key))})
+        metadata.append(
+            {"field": title_case(key), "value": render_markdown(sys_row.get(key))}
+        )
 
-    apps_in_system = [graph.app_rows[app_id] for app_id in graph.sys_app_ids.get(system_id, [])]
+    apps_in_system = [
+        graph.app_rows[app_id] for app_id in graph.sys_app_ids.get(system_id, [])
+    ]
     app_extra_keys = _collect_extra_keys(apps_in_system, STD_APP_KEYS)
 
     applications_data: list[dict[str, Any]] = []
@@ -1839,7 +1985,9 @@ def build_solution_system_context(
             "id": app_id,
             "name": app_name,
             "components": ", ".join(comp_parts),
-            "description": render_markdown(first_value(app_row, ("description",)) or ""),
+            "description": render_markdown(
+                first_value(app_row, ("description",)) or ""
+            ),
         }
         for key in app_extra_keys:
             app_data[key] = render_markdown(app_row.get(key))
@@ -1855,23 +2003,33 @@ def build_solution_system_context(
                 "id": cmp_id,
                 "name": str(cmp_row.get("name") or cmp_id),
                 "type": _component_type_label(cmp_row),
-                "description": render_markdown(first_value(cmp_row, ("description",)) or ""),
+                "description": render_markdown(
+                    first_value(cmp_row, ("description",)) or ""
+                ),
             }
         )
 
-    system_interfaces = _system_interfaces(system_id=system_id, entities=entities, graph=graph)
+    system_interfaces = _system_interfaces(
+        system_id=system_id, entities=entities, graph=graph
+    )
     interface_extra_keys = _collect_extra_keys(system_interfaces, STD_INTERFACE_KEYS)
     interfaces_data: list[dict[str, Any]] = []
     for interface_row in system_interfaces:
         entry: dict[str, Any] = {
             "key": str(interface_row.get("key") or "").strip(),
             "id": str(interface_row.get("id") or ""),
-            "name": str(interface_row.get("name") or interface_row.get("id") or "interface"),
+            "name": str(
+                interface_row.get("name") or interface_row.get("id") or "interface"
+            ),
             "provider": _interface_provider(interface_row),
             "consumer": _interface_consumer(interface_row),
-            "interaction_type": _interaction_type_badge_html(_interface_type(interface_row)),
+            "interaction_type": _interaction_type_badge_html(
+                _interface_type(interface_row)
+            ),
             "arrow_direction": _interface_arrow_direction(interface_row),
-            "description": render_markdown(first_value(interface_row, ("description",)) or ""),
+            "description": render_markdown(
+                first_value(interface_row, ("description",)) or ""
+            ),
         }
         for key in interface_extra_keys:
             entry[key] = render_markdown(interface_row.get(key))
@@ -1888,7 +2046,13 @@ def build_solution_system_context(
         {"title": "ID", "field": "id", "minWidth": 120},
         {"title": "Name", "field": "name", "minWidth": 150},
         {"title": "Components", "field": "components", "flex": 4, "minWidth": 200},
-        {"title": "Description", "field": "description", "formatter": "html", "flex": 4, "minWidth": 200},
+        {
+            "title": "Description",
+            "field": "description",
+            "formatter": "html",
+            "flex": 4,
+            "minWidth": 200,
+        },
     ]
     for key in app_extra_keys:
         is_wide = key.lower() in wide_fields
@@ -1906,18 +2070,41 @@ def build_solution_system_context(
         {"title": "ID", "field": "id", "minWidth": 120},
         {"title": "Name", "field": "name", "minWidth": 150},
         {"title": "Type", "field": "type", "minWidth": 100},
-        {"title": "Description", "field": "description", "formatter": "html", "flex": 4, "minWidth": 200},
+        {
+            "title": "Description",
+            "field": "description",
+            "formatter": "html",
+            "flex": 4,
+            "minWidth": 200,
+        },
     ]
 
     interface_columns = [
-        {"title": "Key", "field": "key", "minWidth": 100, "maxWidth": 120, "sort": "asc"},
+        {
+            "title": "Key",
+            "field": "key",
+            "minWidth": 100,
+            "maxWidth": 120,
+            "sort": "asc",
+        },
         {"title": "ID", "field": "id", "minWidth": 120},
         {"title": "Name", "field": "name", "minWidth": 150},
         {"title": "Provider", "field": "provider", "minWidth": 120},
         {"title": "Consumer", "field": "consumer", "minWidth": 120},
-        {"title": "Interaction Type", "field": "interaction_type", "formatter": "html", "minWidth": 140},
+        {
+            "title": "Interaction Type",
+            "field": "interaction_type",
+            "formatter": "html",
+            "minWidth": 140,
+        },
         {"title": "Arrow Direction", "field": "arrow_direction", "minWidth": 160},
-        {"title": "Description", "field": "description", "formatter": "html", "flex": 4, "minWidth": 200},
+        {
+            "title": "Description",
+            "field": "description",
+            "formatter": "html",
+            "flex": 4,
+            "minWidth": 200,
+        },
     ]
     for key in interface_extra_keys:
         is_wide = key.lower() in wide_fields
@@ -1932,7 +2119,11 @@ def build_solution_system_context(
         )
 
     diagrams: list[dict[str, Any]] = []
-    for item_level, label in (("sys", "System"), ("app", "Application"), ("cmp", "Component")):
+    for item_level, label in (
+        ("sys", "System"),
+        ("app", "Application"),
+        ("cmp", "Component"),
+    ):
         svg_path = f"images/{system_id}-{item_level}.svg"
         diagram_entry: dict[str, Any] = {
             "level": item_level,
@@ -2013,12 +2204,16 @@ def _breakdown_counts(labels: Any) -> list[dict[str, Any]]:
     return [{"label": label, "count": count} for label, count in sorted(counts.items())]
 
 
-def _owned_entity_name_link_html(*, item_type: str, item_id: str, name: str, graph: EntityGraph) -> str:
+def _owned_entity_name_link_html(
+    *, item_type: str, item_id: str, name: str, graph: EntityGraph
+) -> str:
     """Render an app/component entity-table name cell as a link (using the
     entity's own name as link text) to its owning system's page; plain text
     when the item does not resolve to a system with a generated page (D7
     'apps/components -> owning system page')."""
-    owning_sys = _project_system_for_item(item_type=item_type, item_id=item_id, graph=graph)
+    owning_sys = _project_system_for_item(
+        item_type=item_type, item_id=item_id, graph=graph
+    )
     if owning_sys:
         return f'<a href="{escape(system_page_name(owning_sys))}">{escape(name)}</a>'
     return str(escape(name))
@@ -2033,11 +2228,17 @@ def _interface_endpoint_link_html(*, endpoint_id: str, graph: EntityGraph) -> st
     if not endpoint_id:
         return ""
     if endpoint_id in graph.sys_rows:
-        return _project_scope_item_cell_html(item_type="system", item_id=endpoint_id, graph=graph)
+        return _project_scope_item_cell_html(
+            item_type="system", item_id=endpoint_id, graph=graph
+        )
     if endpoint_id in graph.app_rows:
-        return _project_scope_item_cell_html(item_type="application", item_id=endpoint_id, graph=graph)
+        return _project_scope_item_cell_html(
+            item_type="application", item_id=endpoint_id, graph=graph
+        )
     if endpoint_id in graph.cmp_rows:
-        return _project_scope_item_cell_html(item_type="component", item_id=endpoint_id, graph=graph)
+        return _project_scope_item_cell_html(
+            item_type="component", item_id=endpoint_id, graph=graph
+        )
     return str(escape(endpoint_id))
 
 
@@ -2065,10 +2266,22 @@ def build_solution_index_context(
         for row in entities.get("sys", [])
         if str(row.get("id") or "").strip() and not is_external_system(row)
     ]
-    app_rows = [row for row in entities.get("app", []) if str(row.get("id") or "").strip()]
-    cmp_rows = [row for row in entities.get("cmp", []) if str(row.get("id") or "").strip()]
-    interface_rows = [row for row in entities.get(SHEET_INTERFACE, []) if str(row.get("id") or "").strip()]
-    project_rows = [row for row in entities.get(SHEET_PROJECT, []) if str(row.get("id") or "").strip()]
+    app_rows = [
+        row for row in entities.get("app", []) if str(row.get("id") or "").strip()
+    ]
+    cmp_rows = [
+        row for row in entities.get("cmp", []) if str(row.get("id") or "").strip()
+    ]
+    interface_rows = [
+        row
+        for row in entities.get(SHEET_INTERFACE, [])
+        if str(row.get("id") or "").strip()
+    ]
+    project_rows = [
+        row
+        for row in entities.get(SHEET_PROJECT, [])
+        if str(row.get("id") or "").strip()
+    ]
 
     totals_source = (
         ("Systems", len(internal_sys_rows)),
@@ -2077,15 +2290,21 @@ def build_solution_index_context(
         ("Interfaces", len(interface_rows)),
         ("Projects", len(project_rows)),
     )
-    totals = [{"label": label, "count": count} for label, count in totals_source if count > 0]
+    totals = [
+        {"label": label, "count": count} for label, count in totals_source if count > 0
+    ]
 
     systems_by_type = _breakdown_counts(
-        str(first_value(row, ("system_type", "type")) or "internal").strip() or "internal"
+        str(first_value(row, ("system_type", "type")) or "internal").strip()
+        or "internal"
         for row in internal_sys_rows
     )
-    projects_by_status = _breakdown_counts(str(row.get("status") or "") for row in project_rows)
+    projects_by_status = _breakdown_counts(
+        str(row.get("status") or "") for row in project_rows
+    )
     interfaces_by_type = _breakdown_counts(
-        _interaction_type_breakdown_label(row.get("interaction_type")) for row in interface_rows
+        _interaction_type_breakdown_label(row.get("interaction_type"))
+        for row in interface_rows
     )
 
     summary_cards: dict[str, Any] = {
@@ -2099,7 +2318,13 @@ def build_solution_index_context(
         {"title": "ID", "field": "id", "minWidth": 120},
         {"title": "Name", "field": "name", "formatter": "html", "minWidth": 160},
         {"title": "Type", "field": "type", "minWidth": 120},
-        {"title": "Description", "field": "description", "formatter": "html", "flex": 4, "minWidth": 200},
+        {
+            "title": "Description",
+            "field": "description",
+            "formatter": "html",
+            "flex": 4,
+            "minWidth": 200,
+        },
     ]
     systems_data: list[dict[str, Any]] = []
     for row in internal_sys_rows:
@@ -2110,7 +2335,9 @@ def build_solution_index_context(
                 "id": sys_id,
                 "name": f'<a href="{escape(system_page_name(sys_id))}">{escape(sys_name)}</a>',
                 "type": str(first_value(row, ("system_type", "type")) or "internal"),
-                "description": render_markdown(first_value(row, ("description",)) or ""),
+                "description": render_markdown(
+                    first_value(row, ("description",)) or ""
+                ),
             }
         )
 
@@ -2118,7 +2345,13 @@ def build_solution_index_context(
         {"title": "ID", "field": "id", "minWidth": 120},
         {"title": "Name", "field": "name", "formatter": "html", "minWidth": 160},
         {"title": "System", "field": "system", "minWidth": 120},
-        {"title": "Description", "field": "description", "formatter": "html", "flex": 4, "minWidth": 200},
+        {
+            "title": "Description",
+            "field": "description",
+            "formatter": "html",
+            "flex": 4,
+            "minWidth": 200,
+        },
     ]
     applications_data: list[dict[str, Any]] = []
     for row in app_rows:
@@ -2131,7 +2364,9 @@ def build_solution_index_context(
                     item_type="application", item_id=app_id, name=app_name, graph=graph
                 ),
                 "system": graph.app_to_sys.get(app_id, ""),
-                "description": render_markdown(first_value(row, ("description",)) or ""),
+                "description": render_markdown(
+                    first_value(row, ("description",)) or ""
+                ),
             }
         )
 
@@ -2140,7 +2375,13 @@ def build_solution_index_context(
         {"title": "Name", "field": "name", "formatter": "html", "minWidth": 160},
         {"title": "System", "field": "system", "minWidth": 120},
         {"title": "Type", "field": "type", "minWidth": 100},
-        {"title": "Description", "field": "description", "formatter": "html", "flex": 4, "minWidth": 200},
+        {
+            "title": "Description",
+            "field": "description",
+            "formatter": "html",
+            "flex": 4,
+            "minWidth": 200,
+        },
     ]
     components_data: list[dict[str, Any]] = []
     for row in cmp_rows:
@@ -2154,17 +2395,40 @@ def build_solution_index_context(
                 ),
                 "system": graph.cmp_to_sys.get(cmp_id, ""),
                 "type": _component_type_label(row),
-                "description": render_markdown(first_value(row, ("description",)) or ""),
+                "description": render_markdown(
+                    first_value(row, ("description",)) or ""
+                ),
             }
         )
 
     interfaces_columns = [
         {"title": "ID", "field": "id", "minWidth": 120},
         {"title": "Name", "field": "name", "minWidth": 150},
-        {"title": "Provider", "field": "provider", "formatter": "html", "minWidth": 140},
-        {"title": "Consumer", "field": "consumer", "formatter": "html", "minWidth": 140},
-        {"title": "Interaction Type", "field": "interaction_type", "formatter": "html", "minWidth": 140},
-        {"title": "Description", "field": "description", "formatter": "html", "flex": 4, "minWidth": 200},
+        {
+            "title": "Provider",
+            "field": "provider",
+            "formatter": "html",
+            "minWidth": 140,
+        },
+        {
+            "title": "Consumer",
+            "field": "consumer",
+            "formatter": "html",
+            "minWidth": 140,
+        },
+        {
+            "title": "Interaction Type",
+            "field": "interaction_type",
+            "formatter": "html",
+            "minWidth": 140,
+        },
+        {
+            "title": "Description",
+            "field": "description",
+            "formatter": "html",
+            "flex": 4,
+            "minWidth": 200,
+        },
     ]
     interfaces_data: list[dict[str, Any]] = []
     for row in interface_rows:
@@ -2172,10 +2436,16 @@ def build_solution_index_context(
             {
                 "id": str(row.get("id") or ""),
                 "name": str(row.get("name") or row.get("id") or "interface"),
-                "provider": _interface_endpoint_link_html(endpoint_id=_interface_provider(row), graph=graph),
-                "consumer": _interface_endpoint_link_html(endpoint_id=_interface_consumer(row), graph=graph),
+                "provider": _interface_endpoint_link_html(
+                    endpoint_id=_interface_provider(row), graph=graph
+                ),
+                "consumer": _interface_endpoint_link_html(
+                    endpoint_id=_interface_consumer(row), graph=graph
+                ),
                 "interaction_type": _interaction_type_badge_html(_interface_type(row)),
-                "description": render_markdown(first_value(row, ("description",)) or ""),
+                "description": render_markdown(
+                    first_value(row, ("description",)) or ""
+                ),
             }
         )
 
@@ -2184,7 +2454,13 @@ def build_solution_index_context(
         {"title": "Name", "field": "name", "formatter": "html", "minWidth": 160},
         {"title": "Status", "field": "status", "minWidth": 120},
         {"title": "Owner", "field": "owner", "minWidth": 120},
-        {"title": "Description", "field": "description", "formatter": "html", "flex": 4, "minWidth": 200},
+        {
+            "title": "Description",
+            "field": "description",
+            "formatter": "html",
+            "flex": 4,
+            "minWidth": 200,
+        },
     ]
     projects_data: list[dict[str, Any]] = []
     for row in project_rows:
@@ -2196,16 +2472,38 @@ def build_solution_index_context(
                 "name": f'<a href="{escape(project_page_name(project_id))}">{escape(project_name)}</a>',
                 "status": str(row.get("status") or ""),
                 "owner": str(row.get("owner") or ""),
-                "description": render_markdown(first_value(row, ("description",)) or ""),
+                "description": render_markdown(
+                    first_value(row, ("description",)) or ""
+                ),
             }
         )
 
     entity_tables: dict[str, Any] = {
-        "systems": {"title": "Systems", "columns": systems_columns, "data": systems_data},
-        "applications": {"title": "Applications", "columns": applications_columns, "data": applications_data},
-        "components": {"title": "Components", "columns": components_columns, "data": components_data},
-        "interfaces": {"title": "Interfaces", "columns": interfaces_columns, "data": interfaces_data},
-        "projects": {"title": "Projects", "columns": projects_columns, "data": projects_data},
+        "systems": {
+            "title": "Systems",
+            "columns": systems_columns,
+            "data": systems_data,
+        },
+        "applications": {
+            "title": "Applications",
+            "columns": applications_columns,
+            "data": applications_data,
+        },
+        "components": {
+            "title": "Components",
+            "columns": components_columns,
+            "data": components_data,
+        },
+        "interfaces": {
+            "title": "Interfaces",
+            "columns": interfaces_columns,
+            "data": interfaces_data,
+        },
+        "projects": {
+            "title": "Projects",
+            "columns": projects_columns,
+            "data": projects_data,
+        },
     }
 
     return {

@@ -140,7 +140,9 @@ def transform(
             json_mode=True
         )
     """
-    _ok, text = _transform_impl(data=data, prompt=prompt, model=model, json_mode=json_mode)
+    _ok, text = _transform_impl(
+        data=data, prompt=prompt, model=model, json_mode=json_mode
+    )
     return text
 
 
@@ -261,7 +263,9 @@ Instructions:
             error_msg = str(e)
             # Sanitize sensitive info from error messages
             if "api_key" in error_msg.lower() or "sk-" in error_msg:
-                error_msg = "Authentication error - check OPENAI_API_KEY in secrets.yaml"
+                error_msg = (
+                    "Authentication error - check OPENAI_API_KEY in secrets.yaml"
+                )
             s.add(error=error_msg)
             return False, f"Error: {error_msg}"
 
@@ -313,7 +317,10 @@ def transform_file(
         )
     """
     with LogSpan(
-        span="ot_llm.transform_file", promptLen=len(prompt), inFile=in_file, outFile=out_file
+        span="ot_llm.transform_file",
+        promptLen=len(prompt),
+        inFile=in_file,
+        outFile=out_file,
     ) as s:
         # Validate prompt
         if not prompt or not prompt.strip():

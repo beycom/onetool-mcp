@@ -77,7 +77,9 @@ class LoadedTools:
 # Module cache: stores (LoadedTools, mtime_dict, last_validated) for each tools_dir
 # Uses OrderedDict for LRU eviction with bounded size
 _MODULE_CACHE_MAXSIZE = 16
-_module_cache: OrderedDict[Path, tuple[LoadedTools, dict[str, float], float]] = OrderedDict()
+_module_cache: OrderedDict[Path, tuple[LoadedTools, dict[str, float], float]] = (
+    OrderedDict()
+)
 
 # TTL for skipping per-file mtime checks when the cache was recently validated
 _CACHE_TTL = 1.0  # seconds
@@ -311,6 +313,7 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
         LoadedTools with functions dict (pack-qualified keys) and packs dict.
     """
     from ot.config.loader import get_config
+
     config = get_config()
     current_files, cache_key = _get_tool_files(tools_dir, config)
 
@@ -364,9 +367,11 @@ def _register_ot_pack(packs: dict[str, dict[str, Any]]) -> dict[str, Any]:
     ot_functions = get_ot_pack_functions()
     packs[PACK_NAME] = ot_functions
     get_services().register_output_policy(
-        lambda tool_name: OutputPolicy(allow_deflect=False)
-        if tool_name in {"ot.result", "ot.help", "ot.tool_info"}
-        else None
+        lambda tool_name: (
+            OutputPolicy(allow_deflect=False)
+            if tool_name in {"ot.result", "ot.help", "ot.tool_info"}
+            else None
+        )
     )
 
     # Build full function names

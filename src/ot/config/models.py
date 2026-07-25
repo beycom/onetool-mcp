@@ -50,8 +50,13 @@ class LlmConfig(BaseModel):
     """
 
     model: str = Field(default="gpt-5.4-nano", description="Default completion model")
-    embedding_model: str = Field(default="text-embedding-3-small", description="Default embedding model")
-    base_url: str = Field(default="https://api.openai.com/v1", description="OpenAI-compatible API base URL")
+    embedding_model: str = Field(
+        default="text-embedding-3-small", description="Default embedding model"
+    )
+    base_url: str = Field(
+        default="https://api.openai.com/v1",
+        description="OpenAI-compatible API base URL",
+    )
     max_tokens: int = Field(default=4096, description="Max output tokens")
 
 
@@ -709,7 +714,9 @@ class OneToolConfig(BaseModel):
         try:
             ot_dir = self._config_dir
         except AttributeError as err:
-            raise RuntimeError("_config_dir not set — was load_config() called?") from err
+            raise RuntimeError(
+                "_config_dir not set — was load_config() called?"
+            ) from err
 
         for pattern in self.tools_dir:
             # Expand ~ first
@@ -761,7 +768,9 @@ class OneToolConfig(BaseModel):
         try:
             return (self._config_dir / path).resolve()
         except AttributeError as err:
-            raise RuntimeError("_config_dir not set — was load_config() called?") from err
+            raise RuntimeError(
+                "_config_dir not set — was load_config() called?"
+            ) from err
 
     def get_log_dir_path(self) -> Path:
         """Get the resolved path to the log directory.

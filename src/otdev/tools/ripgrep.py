@@ -358,7 +358,11 @@ def search(
         # Default output cap so broad patterns don't flood an LLM context
         max_chars = get_tool_config("ripgrep", Config).max_output_chars
         if len(result) > max_chars:
-            result = truncate(result, max_chars, indicator="\n... (output truncated; narrow the pattern or set tools.ripgrep.max_output_chars)")
+            result = truncate(
+                result,
+                max_chars,
+                indicator="\n... (output truncated; narrow the pattern or set tools.ripgrep.max_output_chars)",
+            )
             s.add("truncated", True)
 
         return result
@@ -532,7 +536,9 @@ def files(
             args.append("--no-ignore")
 
         if sort:
-            if error := validate_choice("sort", sort, ("path", "modified", "accessed", "created")):
+            if error := validate_choice(
+                "sort", sort, ("path", "modified", "accessed", "created")
+            ):
                 s.add("error", "invalid_sort")
                 return error
             args.extend(["--sort", sort])

@@ -1,4 +1,5 @@
 """Memory write functions."""
+
 from __future__ import annotations
 
 import uuid
@@ -133,9 +134,17 @@ def write(
                     INSERT INTO memories (id, topic, content, content_hash, category, tags, relevance, embedding, meta)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    [memory_id, topic, content, content_hash, category,
-                     _serialize_tags(validated_tags), relevance,
-                     _serialize_embedding(embedding), _serialize_meta(meta)],
+                    [
+                        memory_id,
+                        topic,
+                        content,
+                        content_hash,
+                        category,
+                        _serialize_tags(validated_tags),
+                        relevance,
+                        _serialize_embedding(embedding),
+                        _serialize_meta(meta),
+                    ],
                 )
                 if embedding is not None:
                     _sync_vec_index(conn, memory_id, embedding)
@@ -144,7 +153,9 @@ def write(
 
             s.add("memoryId", memory_id)
             s.add("contentLen", len(content))
-            toc_msg = f" (toc: {meta.get('section_count', '0')} sections)" if toc else ""
+            toc_msg = (
+                f" (toc: {meta.get('section_count', '0')} sections)" if toc else ""
+            )
             return f"Stored memory {memory_id} in topic '{topic}'{toc_msg}"
 
         except ValueError as e:
@@ -234,7 +245,9 @@ def write_batch(
             s.add("skipped", skipped)
             s.add("errors", len(errors))
 
-            parts = [f"Processed {stored + skipped + len(errors)} files: {stored} stored, {skipped} duplicates"]
+            parts = [
+                f"Processed {stored + skipped + len(errors)} files: {stored} stored, {skipped} duplicates"
+            ]
             if errors:
                 parts.append(f", {len(errors)} errors")
                 for err in errors[:5]:

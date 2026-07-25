@@ -1,4 +1,5 @@
 """Hybrid search for the knowledge pack: FTS5 BM25 + sqlite-vec KNN + RRF."""
+
 from __future__ import annotations
 
 import re
@@ -15,15 +16,32 @@ from .embedding import generate_embedding
 
 _RRF_K = 60
 
-_STOPWORDS = frozenset({
-    "how", "do", "i", "what", "is", "the", "a", "an", "to", "of",
-    "in", "for", "on", "with", "can", "my", "me",
-})
+_STOPWORDS = frozenset(
+    {
+        "how",
+        "do",
+        "i",
+        "what",
+        "is",
+        "the",
+        "a",
+        "an",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "can",
+        "my",
+        "me",
+    }
+)
 
 
 def _fts_query(text: str) -> str:
     """Preprocess a query for FTS5: strip operator chars and remove stopwords."""
-    sanitized = re.sub(r'[?!":\^*()\-]', ' ', text).strip()
+    sanitized = re.sub(r'[?!":\^*()\-]', " ", text).strip()
     tokens = [t for t in sanitized.split() if t.lower() not in _STOPWORDS]
     return " ".join(tokens) if tokens else sanitized
 
@@ -55,11 +73,17 @@ def _exec_fts(
         # (missing/corrupt table) must surface instead of silently degrading.
         if "syntax error" in str(e).lower() or "malformed match" in str(e).lower():
             logger.warning(
-                LogEntry(event="knowledge.search.fts_query_error", query=fts_q, error=str(e))
+                LogEntry(
+                    event="knowledge.search.fts_query_error", query=fts_q, error=str(e)
+                )
             )
             return []
         logger.warning(
-            LogEntry(event="knowledge.search.fts_failed", errorType=type(e).__name__, error=str(e))
+            LogEntry(
+                event="knowledge.search.fts_failed",
+                errorType=type(e).__name__,
+                error=str(e),
+            )
         )
         raise
 
@@ -96,6 +120,7 @@ def search_vec(
 ) -> list[dict[str, Any]]:
     """Vector KNN search via sqlite-vec."""
     from .db import _require_vec
+
     _require_vec()
 
     vec = generate_embedding(query)
@@ -120,7 +145,11 @@ def search_vec(
         # A failing vec table (missing, corrupt, or dimension mismatch) must
         # surface — swallowing it silently turns hybrid search into FTS-only.
         logger.warning(
-            LogEntry(event="knowledge.search.vec_failed", errorType=type(e).__name__, error=str(e))
+            LogEntry(
+                event="knowledge.search.vec_failed",
+                errorType=type(e).__name__,
+                error=str(e),
+            )
         )
         raise
 

@@ -96,7 +96,9 @@ def validate_http_root_options(*, host: str, port: int, path: str) -> None:
     if not path.startswith("/"):
         raise ValueError("--path must start with '/'")
     if "?" in path or "#" in path or any(ch.isspace() for ch in path):
-        raise ValueError("--path must be a URL path without whitespace, query, or fragment")
+        raise ValueError(
+            "--path must be a URL path without whitespace, query, or fragment"
+        )
 
 
 def _direct_health_probe_once(host: str, port: int, timeout_secs: float = 0.2) -> bool:
@@ -120,11 +122,15 @@ def _direct_health_probe_once(host: str, port: int, timeout_secs: float = 0.2) -
             )
             payload: dict[str, Any] = json.loads(body.decode("utf-8"))
             healthy = payload.get("status") == "ok"
-            logger.debug(LogEntry(event="direct.api.health_probe", port=port, healthy=healthy))
+            logger.debug(
+                LogEntry(event="direct.api.health_probe", port=port, healthy=healthy)
+            )
             return healthy
     except Exception as e:
         logger.debug(
-            LogEntry(event="direct.api.health_probe", port=port, healthy=False).failure(e)
+            LogEntry(event="direct.api.health_probe", port=port, healthy=False).failure(
+                e
+            )
         )
         return False
 
@@ -177,7 +183,9 @@ def _start_direct_api() -> tuple[Any, threading.Thread, int]:
             log_config=None,
         )
         server = uvicorn.Server(config)
-        thread = threading.Thread(target=server.run, name=f"onetool-direct-{port}", daemon=True)
+        thread = threading.Thread(
+            target=server.run, name=f"onetool-direct-{port}", daemon=True
+        )
         thread.start()
 
         deadline = time.monotonic() + 5.0
@@ -201,7 +209,9 @@ def _start_direct_api() -> tuple[Any, threading.Thread, int]:
 
     start_port = _config.direct.host.port
     logger.error("direct.api.failed | configuredPorts={}..65535", start_port)
-    raise RuntimeError(f"Could not start MCP direct API in configured ports {start_port}..65535")
+    raise RuntimeError(
+        f"Could not start MCP direct API in configured ports {start_port}..65535"
+    )
 
 
 def _stop_direct_api(server: Any, thread: threading.Thread, port: int) -> None:
@@ -308,6 +318,7 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
 
         # Pre-warm tool registry so the first run() call is served from a warm cache
         from ot.executor.tool_loader import load_tool_registry
+
         load_tool_registry()
 
         # Direct API mode: bind one local HTTP listener owned by this MCP process.
@@ -330,7 +341,9 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
 
                 base_url = f"http://127.0.0.1:{api_port}"
                 set_direct_api(base_url=base_url, port=api_port)
-                write_discovery_file(instance_id=get_or_create_instance_id(), port=api_port)
+                write_discovery_file(
+                    instance_id=get_or_create_instance_id(), port=api_port
+                )
             except Exception as e:
                 logger.error(LogEntry(event="direct.api.degraded").failure(e))
                 start_span.add("directApi", "degraded")
@@ -343,6 +356,7 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
 
         # Fire anonymous startup telemetry (non-blocking daemon thread)
         from ot.telemetry import ping as _telemetry_ping
+
         _telemetry_ping()
 
         # Startup: initialize unified JSONL stats writer if enabled
@@ -368,7 +382,9 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
         )
 
         # Log support message
-        logger.info(LogEntry(event="mcp.support_message", message=get_startup_message()))
+        logger.info(
+            LogEntry(event="mcp.support_message", message=get_startup_message())
+        )
 
     yield
 

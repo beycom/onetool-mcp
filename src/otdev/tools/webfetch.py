@@ -164,8 +164,6 @@ def _validate_options(favor_precision: bool, favor_recall: bool) -> str | None:
     return None
 
 
-
-
 def _is_html_content_type(content_type: str | None) -> bool:
     """Check if content type indicates HTML content."""
     if not content_type:

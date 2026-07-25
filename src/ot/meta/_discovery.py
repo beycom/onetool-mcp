@@ -32,6 +32,8 @@ def _signature_line(detail: dict[str, Any]) -> str:
     desc = short_description(detail.get("description", ""))
     line = f"{name}({compact})"
     return f"{line}  # {desc}" if desc else line
+
+
 _VALID_SERVER_INFO_LEVELS = {"min", "default", "full", "resources", "prompts"}
 
 
@@ -95,7 +97,9 @@ def tools(
     with log(span="ot.tools", pattern=pattern or None, info=info) as s:
         runner_registry = load_tool_registry()
         proxy = get_proxy_manager()
-        resolved_pattern = _resolve_pack_alias(pattern, runner_registry) if pattern else pattern
+        resolved_pattern = (
+            _resolve_pack_alias(pattern, runner_registry) if pattern else pattern
+        )
         resolved_lower = resolved_pattern.lower() if resolved_pattern else ""
 
         tools_list: list[dict[str, Any] | str] = []
@@ -178,9 +182,13 @@ def tool_info(
     from ot.executor.tool_loader import load_tool_registry
 
     if info not in _VALID_INFO_LEVELS:
-        raise ValueError(f"info={info!r} is not valid. Use 'min', 'default', or 'full'.")
+        raise ValueError(
+            f"info={info!r} is not valid. Use 'min', 'default', or 'full'."
+        )
 
-    with log(span="ot.tool_info", name=name or None, pattern=pattern or None, info=info) as s:
+    with log(
+        span="ot.tool_info", name=name or None, pattern=pattern or None, info=info
+    ) as s:
         runner_registry = load_tool_registry()
         proxy = get_proxy_manager()
         filter_pattern = name or pattern
@@ -271,7 +279,9 @@ def packs(
         ot.packs(info="full")
     """
     if info not in _VALID_INFO_LEVELS:
-        raise ValueError(f"info={info!r} is not valid. Use 'min', 'default', or 'full'.")
+        raise ValueError(
+            f"info={info!r} is not valid. Use 'min', 'default', or 'full'."
+        )
 
     from ot.executor.tool_loader import load_tool_registry
     from ot.prompts import PromptsError, get_prompts
@@ -286,9 +296,13 @@ def packs(
         all_pack_names = sorted(local_packs | proxy_packs)
 
         # Filter by pattern (resolve short alias)
-        resolved_pat = _resolve_pack_alias(pattern, runner_registry) if pattern else pattern
+        resolved_pat = (
+            _resolve_pack_alias(pattern, runner_registry) if pattern else pattern
+        )
         if resolved_pat:
-            all_pack_names = [p for p in all_pack_names if resolved_pat.lower() in p.lower()]
+            all_pack_names = [
+                p for p in all_pack_names if resolved_pat.lower() in p.lower()
+            ]
 
         # info="min" - just names
         if info == "min":
@@ -319,13 +333,18 @@ def packs(
             short = ", ".join(aliases) if aliases else None
 
             if info == "default":
-                entry: dict[str, Any] = {"name": pack_name, "description": description or "(no description)"}
+                entry: dict[str, Any] = {
+                    "name": pack_name,
+                    "description": description or "(no description)",
+                }
                 if short:
                     entry["short"] = short
                 packs_list.append(entry)
             else:
                 # info == "full"
-                tool_names = _get_pack_tool_names(runner_registry, proxy, pack_name, is_local)
+                tool_names = _get_pack_tool_names(
+                    runner_registry, proxy, pack_name, is_local
+                )
                 full_entry: dict[str, Any] = {
                     "name": pack_name,
                     "source": source,
@@ -363,7 +382,9 @@ def pack_info(
         ot.pack_info(name="excel", info="full")
     """
     if info not in _VALID_INFO_LEVELS:
-        raise ValueError(f"info={info!r} is not valid. Use 'min', 'default', or 'full'.")
+        raise ValueError(
+            f"info={info!r} is not valid. Use 'min', 'default', or 'full'."
+        )
 
     from ot.executor.tool_loader import load_tool_registry
     from ot.prompts import PromptsError, get_pack_instructions, get_prompts
@@ -379,7 +400,9 @@ def pack_info(
 
         if name not in local_packs and name not in proxy_packs:
             s.add("found", False)
-            return {"error": f"Pack '{name}' not found. Use ot.packs() to list available packs."}
+            return {
+                "error": f"Pack '{name}' not found. Use ot.packs() to list available packs."
+            }
 
         is_local = name in local_packs
         source = "local" if is_local else "mcp"
@@ -545,29 +568,35 @@ def servers(
             for server_name in all_server_names:
                 conn = proxy.get_connection(server_name)
                 if not conn:
-                    results_resources.append({
-                        "server": server_name,
-                        "status": "disconnected",
-                        "resources": [],
-                    })
+                    results_resources.append(
+                        {
+                            "server": server_name,
+                            "status": "disconnected",
+                            "resources": [],
+                        }
+                    )
                     continue
 
                 try:
                     resources = proxy.list_resources_sync(server_name, timeout=10.0)
 
-                    results_resources.append({
-                        "server": server_name,
-                        "status": "connected",
-                        "resource_count": len(resources),
-                        "resources": resources,
-                    })
+                    results_resources.append(
+                        {
+                            "server": server_name,
+                            "status": "connected",
+                            "resource_count": len(resources),
+                            "resources": resources,
+                        }
+                    )
                 except Exception as e:
-                    results_resources.append({
-                        "server": server_name,
-                        "status": "error",
-                        "error": str(e),
-                        "resources": [],
-                    })
+                    results_resources.append(
+                        {
+                            "server": server_name,
+                            "status": "error",
+                            "error": str(e),
+                            "resources": [],
+                        }
+                    )
 
             s.add("count", len(results_resources))
             return results_resources
@@ -579,29 +608,35 @@ def servers(
             for server_name in all_server_names:
                 conn = proxy.get_connection(server_name)
                 if not conn:
-                    results_prompts.append({
-                        "server": server_name,
-                        "status": "disconnected",
-                        "prompts": [],
-                    })
+                    results_prompts.append(
+                        {
+                            "server": server_name,
+                            "status": "disconnected",
+                            "prompts": [],
+                        }
+                    )
                     continue
 
                 try:
                     prompts = proxy.list_prompts_sync(server_name, timeout=10.0)
 
-                    results_prompts.append({
-                        "server": server_name,
-                        "status": "connected",
-                        "prompt_count": len(prompts),
-                        "prompts": prompts,
-                    })
+                    results_prompts.append(
+                        {
+                            "server": server_name,
+                            "status": "connected",
+                            "prompt_count": len(prompts),
+                            "prompts": prompts,
+                        }
+                    )
                 except Exception as e:
-                    results_prompts.append({
-                        "server": server_name,
-                        "status": "error",
-                        "error": str(e),
-                        "prompts": [],
-                    })
+                    results_prompts.append(
+                        {
+                            "server": server_name,
+                            "status": "error",
+                            "error": str(e),
+                            "prompts": [],
+                        }
+                    )
 
             s.add("count", len(results_prompts))
             return results_prompts

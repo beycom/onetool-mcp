@@ -4,6 +4,7 @@ Thin adapter over :class:`otpack.EmbeddingClient`: config/secret/model
 resolution stays here; tokenization, retry, batching, caching, and
 ``dimensions=`` handling live in otpack.
 """
+
 from __future__ import annotations
 
 import threading
@@ -43,7 +44,13 @@ def _get_embedding_client() -> EmbeddingClient:
     config = _get_config()
     model = _get_embedding_model(config)
     base_url = config.base_url or get_llm_config().base_url or ""
-    key = (api_key, model, base_url, int(config.dimensions), int(config.max_embedding_tokens))
+    key = (
+        api_key,
+        model,
+        base_url,
+        int(config.dimensions),
+        int(config.max_embedding_tokens),
+    )
     with _client_lock:
         if _client is None or _client_key != key:
             _client = EmbeddingClient(

@@ -104,9 +104,15 @@ def remove_discovery_file(*, instance_id: str, base_dir: Path | None = None) -> 
     try:
         path.unlink(missing_ok=True)
     except OSError as e:
-        logger.warning(LogEntry(event="direct.api.discovery.remove_failed", path=str(path)).failure(e))
+        logger.warning(
+            LogEntry(
+                event="direct.api.discovery.remove_failed", path=str(path)
+            ).failure(e)
+        )
         return
-    logger.info(LogEntry(event="direct.api.discovery.removed", path=str(path)).success())
+    logger.info(
+        LogEntry(event="direct.api.discovery.removed", path=str(path)).success()
+    )
 
 
 def sweep_stale_discovery_files(*, base_dir: Path | None = None) -> list[Path]:
@@ -136,7 +142,9 @@ def sweep_stale_discovery_files(*, base_dir: Path | None = None) -> list[Path]:
                 path.unlink(missing_ok=True)
             except OSError as e:
                 logger.warning(
-                    LogEntry(event="direct.api.discovery.sweep_failed", path=str(path)).failure(e)
+                    LogEntry(
+                        event="direct.api.discovery.sweep_failed", path=str(path)
+                    ).failure(e)
                 )
                 continue
             logger.debug(LogEntry(event="direct.api.discovery.swept", path=str(path)))

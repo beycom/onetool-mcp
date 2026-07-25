@@ -47,11 +47,16 @@ def export_entities_to_yaml(
     for sheet in SHEETS:
         cleaned[sheet] = []
         for row in entities.get(sheet, []):
-            cleaned[sheet].append({k: v for k, v in row.items() if not k.startswith("_")})
+            cleaned[sheet].append(
+                {k: v for k, v in row.items() if not k.startswith("_")}
+            )
 
     if passthrough:
         cleaned[PASSTHROUGH_KEY] = {
-            name: {"headers": list(sheet["headers"]), "rows": [list(r) for r in sheet["rows"]]}
+            name: {
+                "headers": list(sheet["headers"]),
+                "rows": [list(r) for r in sheet["rows"]],
+            }
             for name, sheet in passthrough.items()
         }
 
@@ -80,7 +85,9 @@ def load_yaml_entities(
 
     passthrough = _parse_passthrough(loaded.get(PASSTHROUGH_KEY))
 
-    sections_by_canonical: dict[str, list[tuple[str, Any]]] = {sheet: [] for sheet in SHEETS}
+    sections_by_canonical: dict[str, list[tuple[str, Any]]] = {
+        sheet: [] for sheet in SHEETS
+    }
     for raw_key, raw_rows in loaded.items():
         if raw_key == PASSTHROUGH_KEY:
             continue
@@ -97,7 +104,9 @@ def load_yaml_entities(
         matches = sections_by_canonical[sheet]
         if len(matches) > 1:
             names = [name for name, _ in matches]
-            raise RoundtripError(f"YAML defines multiple sections for '{sheet}': {names}")
+            raise RoundtripError(
+                f"YAML defines multiple sections for '{sheet}': {names}"
+            )
         rows = matches[0][1] if matches else []
         if not isinstance(rows, list):
             raise RoundtripError(f"YAML section '{sheet}' must be a list")
@@ -114,7 +123,9 @@ def _parse_passthrough(raw: Any) -> dict[str, dict[str, Any]]:
     if raw is None:
         return {}
     if not isinstance(raw, dict):
-        raise RoundtripError(f"YAML '{PASSTHROUGH_KEY}' must be a mapping of sheet name -> {{headers, rows}}")
+        raise RoundtripError(
+            f"YAML '{PASSTHROUGH_KEY}' must be a mapping of sheet name -> {{headers, rows}}"
+        )
     passthrough: dict[str, dict[str, Any]] = {}
     for name, sheet in raw.items():
         if not isinstance(sheet, dict) or "headers" not in sheet or "rows" not in sheet:
@@ -127,7 +138,10 @@ def _parse_passthrough(raw: Any) -> dict[str, dict[str, Any]]:
             raise RoundtripError(
                 f"YAML '{PASSTHROUGH_KEY}.{name}' headers and rows must be lists"
             )
-        passthrough[str(name)] = {"headers": list(headers), "rows": [list(r) for r in rows]}
+        passthrough[str(name)] = {
+            "headers": list(headers),
+            "rows": [list(r) for r in rows],
+        }
     return passthrough
 
 
@@ -140,7 +154,9 @@ def _row_value_for_header(*, row: dict[str, Any], header: str) -> Any:
     return first_value(row, FIELD_ALIASES[canonical])
 
 
-def _copy_row_style(*, worksheet: Any, source_row: int, target_row: int, max_col: int) -> None:
+def _copy_row_style(
+    *, worksheet: Any, source_row: int, target_row: int, max_col: int
+) -> None:
     for col in range(1, max_col + 1):
         source = worksheet.cell(row=source_row, column=col)
         target = worksheet.cell(row=target_row, column=col)
@@ -187,7 +203,9 @@ def import_yaml_into_template(
                     )
                 continue
             ws = wb[sheet_name]
-            first_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=False), None)
+            first_row = next(
+                ws.iter_rows(min_row=1, max_row=1, values_only=False), None
+            )
             header_cells = list(first_row) if first_row is not None else []
             headers = [normalize_key(cell.value) for cell in header_cells]
             max_col = len(headers)
@@ -240,10 +258,14 @@ def import_yaml_into_template(
             # Adjust table range to cover written rows (tables must keep at
             # least one data row below their header row).
             non_empty_header_cells = [
-                cell for cell, header in zip(header_cells, headers, strict=True) if header
+                cell
+                for cell, header in zip(header_cells, headers, strict=True)
+                if header
             ]
             col_end = (
-                non_empty_header_cells[-1].column_letter if non_empty_header_cells else "A"
+                non_empty_header_cells[-1].column_letter
+                if non_empty_header_cells
+                else "A"
             )
             for table in ws.tables.values():
                 start_cell = table.ref.split(":", maxsplit=1)[0]
@@ -262,7 +284,9 @@ def import_yaml_into_template(
     return str(output_path)
 
 
-def _write_passthrough_sheets(*, workbook: Any, passthrough: dict[str, dict[str, Any]]) -> None:
+def _write_passthrough_sheets(
+    *, workbook: Any, passthrough: dict[str, dict[str, Any]]
+) -> None:
     """Write opaque passthrough sheets back to the workbook, creating sheets as needed."""
     for name, sheet in passthrough.items():
         headers = list(sheet.get("headers", []))

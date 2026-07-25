@@ -87,15 +87,12 @@ def render_tree(text: str) -> str:
                 space_depths.append(depth)
         else:
             depth = 0
-        items.append((depth, ln[len(raw_indent):].strip()))
+        items.append((depth, ln[len(raw_indent) :].strip()))
 
     # Normalise space-indented depths by smallest non-zero indent (the "unit")
     if space_depths:
         unit = min(space_depths)
-        items = [
-            (d // unit if d > 0 else 0, lbl)
-            for d, lbl in items
-        ]
+        items = [(d // unit if d > 0 else 0, lbl) for d, lbl in items]
 
     n = len(items)
 
@@ -176,8 +173,8 @@ def render_sequence(text: str) -> str:
         return ""
 
     max_label = max((len(m[2]) for m in messages), default=0)
-    bw = {a: len(a) + 4 for a in actors}   # box width: | name |
-    gap = max(max_label - 6, 4)             # gap between box edges
+    bw = {a: len(a) + 4 for a in actors}  # box width: | name |
+    gap = max(max_label - 6, 4)  # gap between box edges
 
     # Center x-position of each actor's vertical line
     cx: dict[str, int] = {}

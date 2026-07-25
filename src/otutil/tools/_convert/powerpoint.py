@@ -71,9 +71,7 @@ def convert_powerpoint(
 
         # Process slides
         for slide_idx, slide in enumerate(prs.slides, 1):
-            imgs = _process_slide(
-                slide, slide_idx, writer, images_dir, include_notes
-            )
+            imgs = _process_slide(slide, slide_idx, writer, images_dir, include_notes)
             images_extracted += imgs
     finally:
         # Ensure presentation resources are released
@@ -236,7 +234,9 @@ def _process_table(table: Any) -> str:
     # Header row
     header_cells: list[str] = []
     for cell in table.rows[0].cells:
-        header_cells.append(_escape_cell(cell.text.strip()) if hasattr(cell, "text") else "")
+        header_cells.append(
+            _escape_cell(cell.text.strip()) if hasattr(cell, "text") else ""
+        )
 
     if not header_cells:
         return ""
@@ -249,7 +249,9 @@ def _process_table(table: Any) -> str:
         row = table.rows[i]
         cells: list[str] = []
         for cell in row.cells:
-            cells.append(_escape_cell(cell.text.strip()) if hasattr(cell, "text") else "")
+            cells.append(
+                _escape_cell(cell.text.strip()) if hasattr(cell, "text") else ""
+            )
 
         while len(cells) < len(header_cells):
             cells.append("")

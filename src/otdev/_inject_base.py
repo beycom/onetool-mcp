@@ -55,7 +55,7 @@ def _extract_result(raw: str) -> str:
     # Playwright: "### Result\n<value>\n### ..."
     marker = "### Result\n"
     if raw.startswith(marker):
-        value = raw[len(marker):]
+        value = raw[len(marker) :]
         end = value.find("\n### ")
         if end != -1:
             value = value[:end]
@@ -65,7 +65,7 @@ def _extract_result(raw: str) -> str:
     json_fence = "```json\n"
     fence_start = raw.find(json_fence)
     if fence_start != -1:
-        value = raw[fence_start + len(json_fence):]
+        value = raw[fence_start + len(json_fence) :]
         fence_end = value.find("\n```")
         if fence_end != -1:
             value = value[:fence_end]
@@ -198,7 +198,9 @@ def enable_auto_inject(server: str, pack_name: str) -> dict[str, Any]:
         try:
             script = get_inject_script()
             # Escape for safe embedding in a JS template literal
-            escaped = script.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
+            escaped = (
+                script.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
+            )
             code = (
                 f"async (page) => {{ "
                 f"await page.addInitScript(`{escaped}`); "
@@ -220,9 +222,7 @@ def enable_auto_inject(server: str, pack_name: str) -> dict[str, Any]:
             return {"success": False, "auto_inject": False, "error": str(e)}
 
 
-def inject_annotations(
-    server: str, tool: str, pack_name: str
-) -> dict[str, Any]:
+def inject_annotations(server: str, tool: str, pack_name: str) -> dict[str, Any]:
     """Inject the annotation script into the current browser page.
 
     Args:
@@ -335,9 +335,7 @@ def highlight_element(
             return {"success": False, "count": 0, "ids": [], "error": str(e)}
 
 
-def scan_annotations(
-    server: str, tool: str, pack_name: str
-) -> list[dict[str, Any]]:
+def scan_annotations(server: str, tool: str, pack_name: str) -> list[dict[str, Any]]:
     """Read all current annotations from the page.
 
     Args:
@@ -360,9 +358,7 @@ def scan_annotations(
             return []
 
         try:
-            raw = _eval_js(
-                server, tool, "window.__inspector.scanAnnotations()"
-            )
+            raw = _eval_js(server, tool, "window.__inspector.scanAnnotations()")
             try:
                 loaded = json.loads(raw)
                 annotations = loaded if isinstance(loaded, list) else []
@@ -376,9 +372,7 @@ def scan_annotations(
             return []
 
 
-def clear_annotations(
-    server: str, tool: str, pack_name: str
-) -> dict[str, Any]:
+def clear_annotations(server: str, tool: str, pack_name: str) -> dict[str, Any]:
     """Remove all annotations and visual highlights from the page.
 
     Args:
@@ -396,9 +390,7 @@ def clear_annotations(
             return {"success": False, "cleared": 0, "error": err}
 
         try:
-            raw = _eval_js(
-                server, tool, "window.__inspector.clearAnnotations()"
-            )
+            raw = _eval_js(server, tool, "window.__inspector.clearAnnotations()")
             try:
                 result = json.loads(raw)
             except (json.JSONDecodeError, TypeError):
@@ -431,18 +423,28 @@ def guide_user(
     Returns:
         Dict with ``task``, ``total``, ``highlighted``, and ``results``.
     """
-    with LogSpan(
-        span=f"{pack_name}.guide_user", task=task, stepCount=len(steps)
-    ) as s:
+    with LogSpan(span=f"{pack_name}.guide_user", task=task, stepCount=len(steps)) as s:
         err = _check_server(server)
         if err:
             s.add(error=err)
-            return {"task": task, "total": len(steps), "highlighted": 0, "results": [], "error": err}
+            return {
+                "task": task,
+                "total": len(steps),
+                "highlighted": 0,
+                "results": [],
+                "error": err,
+            }
 
         inject_err = _ensure_injected(server, tool)
         if inject_err:
             s.add(error=inject_err)
-            return {"task": task, "total": len(steps), "highlighted": 0, "results": [], "error": inject_err}
+            return {
+                "task": task,
+                "total": len(steps),
+                "highlighted": 0,
+                "results": [],
+                "error": inject_err,
+            }
 
         results = []
         highlighted = 0
@@ -467,9 +469,7 @@ def guide_user(
             except Exception as e:
                 result = {"success": False, "count": 0, "ids": [], "error": str(e)}
 
-            results.append(
-                {"step": i, "selector": selector, "label": label, **result}
-            )
+            results.append({"step": i, "selector": selector, "label": label, **result})
             if result.get("success"):
                 highlighted += 1
 

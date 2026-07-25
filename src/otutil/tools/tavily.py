@@ -260,7 +260,6 @@ def _validate_extract_schema(extract_schema: dict[str, Any] | None) -> str | Non
     return None
 
 
-
 # ---------------------------------------------------------------------------
 # Validators
 # ---------------------------------------------------------------------------
@@ -448,7 +447,9 @@ def search(
                 return_provenance=return_provenance,
             )
 
-        output = _format_search_results(result, output_format, min_score, max_sources=max_sources)
+        output = _format_search_results(
+            result, output_format, min_score, max_sources=max_sources
+        )
 
         filtered = result.get("results", [])
         if min_score is not None:
@@ -570,7 +571,9 @@ def extract_batch(
     for i, item in enumerate(url_sets):
         if isinstance(item, tuple):
             urls_list, label = item
-            normalized.append((urls_list, label or (urls_list[0] if urls_list else f"Set {i + 1}")))
+            normalized.append(
+                (urls_list, label or (urls_list[0] if urls_list else f"Set {i + 1}"))
+            )
         else:
             label = item[0] if item else f"Set {i + 1}"
             normalized.append((item, label))
@@ -597,7 +600,10 @@ def extract_batch(
             retry_delay_ms=retry_delay_ms,
             max_workers=min(len(normalized), 10),
         )
-        s.add(successCount=output["meta"]["success_count"], errorCount=output["meta"]["error_count"])
+        s.add(
+            successCount=output["meta"]["success_count"],
+            errorCount=output["meta"]["error_count"],
+        )
         return output
 
 
@@ -714,7 +720,10 @@ def search_batch(
             retry_delay_ms=retry_delay_ms,
             max_workers=min(len(normalized), 10),
         )
-        s.add(successCount=output["meta"]["success_count"], errorCount=output["meta"]["error_count"])
+        s.add(
+            successCount=output["meta"]["success_count"],
+            errorCount=output["meta"]["error_count"],
+        )
         return output
 
 

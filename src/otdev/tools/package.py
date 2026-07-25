@@ -46,6 +46,7 @@ class Config(BaseModel):
         description="Request timeout in seconds",
     )
 
+
 NPM_REGISTRY = "https://registry.npmjs.org"
 PYPI_API = "https://pypi.org/pypi"
 OPENROUTER_API = "https://openrouter.ai/api/v1/models"
@@ -278,7 +279,9 @@ def audit(
                     manifest_path = base_path / "requirements.txt"
                 if not manifest_path.exists():
                     span.add(error="manifest_not_found")
-                    return {"error": f"No pyproject.toml or requirements.txt found in {path}"}
+                    return {
+                        "error": f"No pyproject.toml or requirements.txt found in {path}"
+                    }
             else:
                 span.add(error="invalid_registry")
                 return {"error": f"Invalid registry: {registry}. Use 'npm' or 'pypi'."}
@@ -331,7 +334,9 @@ def audit(
             latest = pkg_result.get("latest", "unknown")
 
             # Get version from required constraint
-            current_ver = _parse_version_constraint(required) if required != "*" else None
+            current_ver = (
+                _parse_version_constraint(required) if required != "*" else None
+            )
             status = _compare_versions(current_ver, latest)
 
             packages.append(

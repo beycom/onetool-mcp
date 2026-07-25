@@ -1,4 +1,5 @@
 """Maintenance tools for the ctx pack: delete and purge."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -92,7 +93,9 @@ def ctx_purge(
         if store is None:
             store = _get_store()
 
-        cutoff_ts = None if (delete_all or minutes is None) else (now_ts() - minutes * 60)
+        cutoff_ts = (
+            None if (delete_all or minutes is None) else (now_ts() - minutes * 60)
+        )
         all_meta = store.list_handles()
 
         to_delete: list[dict[str, Any]] = []

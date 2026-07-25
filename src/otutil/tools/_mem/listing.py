@@ -1,4 +1,5 @@
 """Memory listing and counting."""
+
 from __future__ import annotations
 
 import json
@@ -37,7 +38,9 @@ def list(
         mem.list(category="rule")
         mem.list(format="tree", topic="proj/", depth=1)
     """
-    with LogSpan(span="mem.list", topic=topic, category=category, limit=limit, format=format) as s:
+    with LogSpan(
+        span="mem.list", topic=topic, category=category, limit=limit, format=format
+    ) as s:
         try:
             conn = _get_connection()
 
@@ -75,8 +78,12 @@ def list(
                 row_meta = json.loads(r[8]) if r[8] else {}
                 section_count = int(row_meta.get("section_count", 0))
                 meta_str = _format_entry_meta(
-                    mem_id=r[0], content_len=r[7], section_count=section_count,
-                    relevance=r[4], category=r[2], tags_list=tags_list,
+                    mem_id=r[0],
+                    content_len=r[7],
+                    section_count=section_count,
+                    relevance=r[4],
+                    category=r[2],
+                    tags_list=tags_list,
                 )
                 lines.append(f"  {r[1]} {meta_str}")
             return "\n".join(lines)

@@ -1,4 +1,5 @@
 """Memory version history: list prior versions and roll back."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -26,10 +27,15 @@ def _resolve_memory(
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT id, content, meta, updated_at FROM memories WHERE topic = ?", [topic]
+            "SELECT id, content, meta, updated_at FROM memories WHERE topic = ?",
+            [topic],
         ).fetchall()
     if not rows:
-        return f"No memory found with id '{id}'" if id else f"No memory found for topic '{topic}'"
+        return (
+            f"No memory found with id '{id}'"
+            if id
+            else f"No memory found for topic '{topic}'"
+        )
     if len(rows) > 1:
         return f"Multiple memories ({len(rows)}) match topic '{topic}'. Use id= to disambiguate."
     return rows[0][0], rows[0][1], rows[0][2], rows[0][3]
@@ -154,7 +160,8 @@ def rollback(
 
             if history_id is not None:
                 matches = [
-                    (n, row) for n, row in enumerate(rows, start=1)
+                    (n, row)
+                    for n, row in enumerate(rows, start=1)
                     if str(row[0]).startswith(history_id)
                 ]
                 if not matches:

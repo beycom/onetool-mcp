@@ -1,4 +1,5 @@
 """Write operation for the ctx pack."""
+
 from __future__ import annotations
 
 import secrets
@@ -44,11 +45,15 @@ def ctx_write(
         if isinstance(content, dict) and "handle" in content:
             ref_handle = content["handle"]
             if not store.exists(ref_handle):
-                return {"error": f"Failed to dereference handle {ref_handle!r}: handle not found"}
+                return {
+                    "error": f"Failed to dereference handle {ref_handle!r}: handle not found"
+                }
             try:
                 content = store.read_content(ref_handle)
             except OSError:
-                return {"error": f"Failed to dereference handle {ref_handle!r}: handle not found"}
+                return {
+                    "error": f"Failed to dereference handle {ref_handle!r}: handle not found"
+                }
 
         assert isinstance(content, str)
 

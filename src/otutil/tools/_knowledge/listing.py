@@ -1,4 +1,5 @@
 """Read-only listing operations: list, grep, slice, toc, info, stats, export, dbs."""
+
 from __future__ import annotations
 
 import contextlib
@@ -79,7 +80,9 @@ def list_entries(
                 return "No entries found"
             count_sql = "SELECT COUNT(*) FROM chunks WHERE 1=1"
             count_params: list[Any] = []
-            count_sql, count_params = _apply_topic_filter(count_sql, count_params, topic)
+            count_sql, count_params = _apply_topic_filter(
+                count_sql, count_params, topic
+            )
             if category:
                 count_sql += " AND category = ?"
                 count_params.append(category)
@@ -157,7 +160,10 @@ def grep(
                 total_matches += match_count
                 blocks = []
                 for group in groups:
-                    lines = [f"{'>' if is_match else ' '} {ln:4d} | {line}" for ln, line, is_match in group]
+                    lines = [
+                        f"{'>' if is_match else ' '} {ln:4d} | {line}"
+                        for ln, line, is_match in group
+                    ]
                     blocks.append("\n".join(lines))
                 header = f"## {row_topic} ({match_count} match{'es' if match_count != 1 else ''})"
                 output_parts.append(header + "\n" + "\n  ...\n".join(blocks))
@@ -166,7 +172,10 @@ def grep(
                 s.add("resultCount", 0)
                 return f"No matches found for: {pattern}"
             s.add("resultCount", total_matches)
-            return f"Found {total_matches} matches across {len(output_parts)} entries\n\n" + "\n\n".join(output_parts)
+            return (
+                f"Found {total_matches} matches across {len(output_parts)} entries\n\n"
+                + "\n\n".join(output_parts)
+            )
         except Exception as e:
             s.add("error", str(e))
             return f"Error in grep: {e}"
@@ -211,7 +220,7 @@ def slice_entry(
                 for sec in sections:
                     if sec["heading"].lower() == heading.lower():
                         lines = content.split("\n")
-                        section_lines = lines[sec["start"] - 1: sec["end"]]
+                        section_lines = lines[sec["start"] - 1 : sec["end"]]
                         return "\n".join(section_lines)
                 return f"Error: Heading '{heading}' not found in '{topic}'"
 
@@ -256,7 +265,9 @@ def toc(*, topic: str, db: str) -> str:
             result = [f"TOC for '{topic}' ({len(lines)} lines):"]
             for sec in sections:
                 indent = "  " * (sec["level"] - 1)
-                result.append(f"{indent}{'#' * sec['level']} {sec['heading']} (lines {sec['start']}-{sec['end']})")
+                result.append(
+                    f"{indent}{'#' * sec['level']} {sec['heading']} (lines {sec['start']}-{sec['end']})"
+                )
             return "\n".join(result)
         except Exception as e:
             return f"Error in toc: {e}"
@@ -277,18 +288,23 @@ def info(*, db: str) -> str:
     with LogSpan(span="kb.info", db=db):
         try:
             from .db import _resolve_db_path
+
             conn = get_connection(db)
             db_path = _resolve_db_path(db)
 
             # Try to read _meta chunk
-            meta_row = conn.execute("SELECT content, meta FROM chunks WHERE topic = '_meta'").fetchone()
+            meta_row = conn.execute(
+                "SELECT content, meta FROM chunks WHERE topic = '_meta'"
+            ).fetchone()
             meta_content = meta_row[0] if meta_row else "(no metadata)"
             meta_extra = deserialize_meta(meta_row[1]) if meta_row else {}
 
             total = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
             vec_count = 0
             with contextlib.suppress(Exception):
-                vec_count = conn.execute("SELECT COUNT(*) FROM chunks_vec").fetchone()[0]
+                vec_count = conn.execute("SELECT COUNT(*) FROM chunks_vec").fetchone()[
+                    0
+                ]
             coverage = f"{100 * vec_count // total}%" if total else "N/A"
 
             file_size = db_path.stat().st_size if db_path.exists() else 0
@@ -329,6 +345,7 @@ def stats(*, db: str, top: int = 5) -> str:
     with LogSpan(span="kb.stats", db=db):
         try:
             from .db import _resolve_db_path
+
             conn = get_connection(db)
             db_path = _resolve_db_path(db)
 
@@ -339,7 +356,9 @@ def stats(*, db: str, top: int = 5) -> str:
 
             vec_count = 0
             with contextlib.suppress(Exception):
-                vec_count = conn.execute("SELECT COUNT(*) FROM chunks_vec").fetchone()[0]
+                vec_count = conn.execute("SELECT COUNT(*) FROM chunks_vec").fetchone()[
+                    0
+                ]
 
             file_size = db_path.stat().st_size if db_path.exists() else 0
             size_mb = file_size / (1024 * 1024)
@@ -366,7 +385,9 @@ def stats(*, db: str, top: int = 5) -> str:
                 if top_linked:
                     lines.append("  Most linked pages:")
                     for topic, degree in top_linked:
-                        lines.append(f"    {topic} ({degree} link{'s' if degree != 1 else ''})")
+                        lines.append(
+                            f"    {topic} ({degree} link{'s' if degree != 1 else ''})"
+                        )
 
             # AI enrichments
             with_summary = conn.execute(
@@ -377,7 +398,9 @@ def stats(*, db: str, top: int = 5) -> str:
             ).fetchone()[0]
             summary_pct = f"{100 * with_summary // total}%" if total else "N/A"
             tags_pct = f"{100 * with_tags // total}%" if total else "N/A"
-            lines.append(f"  AI enrichments: summaries {with_summary}/{total} ({summary_pct}), tags {with_tags}/{total} ({tags_pct})")
+            lines.append(
+                f"  AI enrichments: summaries {with_summary}/{total} ({summary_pct}), tags {with_tags}/{total} ({tags_pct})"
+            )
 
             # Most accessed
             top_rows = conn.execute(
@@ -434,14 +457,20 @@ def export_db(
 
             records = [
                 {
-                    "id": r[0], "topic": r[1], "content": r[2],
-                    "category": r[3], "tags": deserialize_tags(r[4]),
+                    "id": r[0],
+                    "topic": r[1],
+                    "content": r[2],
+                    "category": r[3],
+                    "tags": deserialize_tags(r[4]),
                     "meta": deserialize_meta(r[5]),
-                    "created_at": r[6], "updated_at": r[7],
+                    "created_at": r[6],
+                    "updated_at": r[7],
                 }
                 for r in rows
             ]
-            out_path.write_text(json.dumps(records, indent=2, ensure_ascii=False), encoding="utf-8")
+            out_path.write_text(
+                json.dumps(records, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
             s.add("exported", len(records))
             return f"Exported {len(records)} entries to {out_path}"
         except Exception as e:
@@ -449,7 +478,9 @@ def export_db(
             return f"Error exporting '{db}': {e}"
 
 
-def _apply_topic_filter(sql: str, params: list[Any], topic: str | None) -> tuple[str, list[Any]]:
+def _apply_topic_filter(
+    sql: str, params: list[Any], topic: str | None
+) -> tuple[str, list[Any]]:
     if not topic:
         return sql, params
     if topic.endswith("/"):

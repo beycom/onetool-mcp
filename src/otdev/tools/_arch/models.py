@@ -63,7 +63,12 @@ SYS_REF_KEYS: tuple[str, ...] = FIELD_ALIASES["sys"]
 APP_REF_KEYS: tuple[str, ...] = FIELD_ALIASES["app"]
 
 DEFAULT_ARROW_DIRECTION = "consumer_to_provider"
-ARROW_DIRECTIONS = {"consumer_to_provider", "provider_to_consumer", "none", "bidirectional"}
+ARROW_DIRECTIONS = {
+    "consumer_to_provider",
+    "provider_to_consumer",
+    "none",
+    "bidirectional",
+}
 
 # Accepted project-scope `item_type` spellings -> canonical entity kind.
 PROJECT_SCOPE_ITEM_TYPES: dict[str, str] = {

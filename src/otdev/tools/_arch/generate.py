@@ -80,7 +80,9 @@ def _now_timestamp() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _validate_system_id_fragment(*, value: str, field: str, sheet: str, row: int) -> dict[str, Any] | None:
+def _validate_system_id_fragment(
+    *, value: str, field: str, sheet: str, row: int
+) -> dict[str, Any] | None:
     if not value:
         return None
     if _SAFE_ID_FRAGMENT_RE.fullmatch(value):
@@ -97,7 +99,9 @@ def _validate_system_id_fragment(*, value: str, field: str, sheet: str, row: int
     }
 
 
-def _validate_path_fragment(*, value: str, field: str, sheet: str, row: int) -> dict[str, Any] | None:
+def _validate_path_fragment(
+    *, value: str, field: str, sheet: str, row: int
+) -> dict[str, Any] | None:
     if not value:
         return None
     if _UNSAFE_PATH_CHARS_RE.search(value):
@@ -114,7 +118,9 @@ def _validate_path_fragment(*, value: str, field: str, sheet: str, row: int) -> 
     return None
 
 
-def clean_diagram_rows(*, entities: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+def clean_diagram_rows(
+    *, entities: dict[str, list[dict[str, Any]]]
+) -> list[dict[str, Any]]:
     cleaned: list[dict[str, Any]] = []
     for row in entities.get("diagram", []):
         cleaned.append({k: v for k, v in row.items() if not str(k).startswith("_")})
@@ -137,7 +143,9 @@ def collect_workbook_diagram_specs(
     for idx, row in enumerate(entities.get("diagram", []), start=1):
         row_errors_before = len(errors)
         row_number = int(row.get("_sheet_row", idx + 1))
-        sys_id = str(first_value(row, ("sys", "system", "system_id", "sys_id")) or "").strip()
+        sys_id = str(
+            first_value(row, ("sys", "system", "system_id", "sys_id")) or ""
+        ).strip()
         source_value = str(first_value(row, ("file", "source", "path")) or "").strip()
         workbook_value = str(row.get("_source_file") or "").strip()
 
@@ -154,7 +162,12 @@ def collect_workbook_diagram_specs(
                 {
                     "code": "invalid_reference",
                     "message": f"Diagram row references unknown or external system '{sys_id}'",
-                    "details": {"sheet": "diagram", "row": row_number, "field": "sys", "value": sys_id},
+                    "details": {
+                        "sheet": "diagram",
+                        "row": row_number,
+                        "field": "sys",
+                        "value": sys_id,
+                    },
                 }
             )
         else:
@@ -191,7 +204,11 @@ def collect_workbook_diagram_specs(
                 {
                     "code": "invalid_reference",
                     "message": "Diagram row is missing workbook source metadata",
-                    "details": {"sheet": "diagram", "row": row_number, "field": "_source_file"},
+                    "details": {
+                        "sheet": "diagram",
+                        "row": row_number,
+                        "field": "_source_file",
+                    },
                 }
             )
             continue
@@ -235,8 +252,13 @@ def collect_workbook_diagram_specs(
         if len(errors) > row_errors_before:
             continue
 
-        name = str(first_value(row, ("name", "title")) or source_path.stem).strip() or source_path.stem
-        description = str(first_value(row, ("description", "desc", "summary")) or "").strip()
+        name = (
+            str(first_value(row, ("name", "title")) or source_path.stem).strip()
+            or source_path.stem
+        )
+        description = str(
+            first_value(row, ("description", "desc", "summary")) or ""
+        ).strip()
         specs.append(
             WorkbookDiagramSpec(
                 system_id=sys_id,
@@ -667,12 +689,15 @@ def _generate_pages(
             svg_path = images_dir / f"{stem}.svg"
             # Skip the engine when the d2 source is unchanged, the svg exists,
             # and its draw.io-embed state matches this run's toggle (D4).
-            d2_unchanged = d2_path.is_file() and d2_path.read_text(encoding="utf-8") == d2_text
+            d2_unchanged = (
+                d2_path.is_file() and d2_path.read_text(encoding="utf-8") == d2_text
+            )
             skip = (
                 not force
                 and d2_unchanged
                 and svg_path.is_file()
-                and _svg_has_drawio_content(svg_path.read_text(encoding="utf-8")) == drawio_export
+                and _svg_has_drawio_content(svg_path.read_text(encoding="utf-8"))
+                == drawio_export
             )
             if not d2_unchanged:
                 d2_path.parent.mkdir(parents=True, exist_ok=True)
@@ -745,8 +770,12 @@ def generate_solution(
 ) -> dict[str, Any]:
     try:
         report_templates = resolve_report_template_paths_for_profile(profile=profile)
-        system_diagram_template = resolve_system_diagram_template_path_for_profile(profile=profile)
-        project_diagram_template = resolve_project_diagram_template_path_for_profile(profile=profile)
+        system_diagram_template = resolve_system_diagram_template_path_for_profile(
+            profile=profile
+        )
+        project_diagram_template = resolve_project_diagram_template_path_for_profile(
+            profile=profile
+        )
     except ConfigResolutionError as exc:
         return error_payload(
             operation="generate",
@@ -873,8 +902,12 @@ def generate_solution(
             "tag": first_tag_value(row),
             "href": project_page_name(owner_id),
         },
-        page_keys=lambda owner_id: project_stage_ids(project_id=owner_id, entities=entities),
-        output_stem=lambda owner_id, key: f"project-{owner_id}-{safe_output_fragment(key)}",
+        page_keys=lambda owner_id: project_stage_ids(
+            project_id=owner_id, entities=entities
+        ),
+        output_stem=lambda owner_id, key: (
+            f"project-{owner_id}-{safe_output_fragment(key)}"
+        ),
         build_view=lambda owner_id, key: build_project_view(
             project_id=owner_id,
             stage=key,
@@ -934,7 +967,9 @@ def generate_solution(
         )
 
     index_template = env.get_template(report_templates.solution_report_path.name)
-    solution_title = title.strip() if title and title.strip() else "Architecture Solution"
+    solution_title = (
+        title.strip() if title and title.strip() else "Architecture Solution"
+    )
     # Card-grid behavior (systems_list/projects_list above) is unchanged; the
     # index summary cards and global entity tables (D7) are additive.
     index_extra_context = build_solution_index_context(entities=entities, graph=graph)
@@ -1002,7 +1037,9 @@ def _render_workbook_diagrams(
     # when any diagram row carries an error.
     prepared: list[tuple[WorkbookDiagramSpec, int, str, Path]] = []
     for idx, spec in enumerate(diagram_specs, start=1):
-        safe_name = re.sub(r"[^a-zA-Z0-9._-]+", "-", Path(spec.source_value).stem).strip("-")
+        safe_name = re.sub(
+            r"[^a-zA-Z0-9._-]+", "-", Path(spec.source_value).stem
+        ).strip("-")
         if not safe_name:
             safe_name = f"diagram-{idx}"
         svg_name = f"{spec.system_id}-{idx:02d}-{safe_name}.svg"

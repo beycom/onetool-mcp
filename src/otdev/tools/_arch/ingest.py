@@ -46,9 +46,13 @@ def discover_workbooks(*, input_path: str) -> list[Path]:
         else:
             root = resolve_cwd_path(".")
             pattern = input_path
-            candidates = sorted(path.resolve() for path in root.glob(pattern) if path.is_file())
+            candidates = sorted(
+                path.resolve() for path in root.glob(pattern) if path.is_file()
+            )
     elif resolved.is_dir():
-        candidates = sorted(path.resolve() for path in resolved.glob("*.xls*") if path.is_file())
+        candidates = sorted(
+            path.resolve() for path in resolved.glob("*.xls*") if path.is_file()
+        )
     else:
         raise IngestError(f"No workbook(s) found for input_path: {input_path}")
 
@@ -80,7 +84,9 @@ def _sheet_rows_from_workbook(
     if not any(header_values):
         return []
     header_counts = Counter(header for header in header_values if header)
-    duplicate_headers = sorted(header for header, count in header_counts.items() if count > 1)
+    duplicate_headers = sorted(
+        header for header, count in header_counts.items() if count > 1
+    )
     if duplicate_headers:
         raise IngestError(
             f"Workbook '{workbook_path}' sheet '{sheet_name}' has columns that collide "
@@ -138,7 +144,9 @@ def ingest_workbooks(
     return merged
 
 
-def read_passthrough_workbooks(*, workbook_paths: list[Path]) -> dict[str, dict[str, Any]]:
+def read_passthrough_workbooks(
+    *, workbook_paths: list[Path]
+) -> dict[str, dict[str, Any]]:
     """Capture non-canonical worksheets verbatim for lossless round-trip.
 
     Returns a mapping of original sheet name -> {"headers": [...], "rows": [[...], ...]},
@@ -154,13 +162,18 @@ def read_passthrough_workbooks(*, workbook_paths: list[Path]) -> dict[str, dict[
                 if canonical_sheet_name(sheet_name) is not None:
                     continue
                 ws = workbook[sheet_name]
-                first_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), None)
+                first_row = next(
+                    ws.iter_rows(min_row=1, max_row=1, values_only=True), None
+                )
                 if first_row is None or not any(cell is not None for cell in first_row):
                     continue
                 headers = list(first_row)
                 rows: list[list[Any]] = []
                 for row in ws.iter_rows(min_row=2, values_only=True):
-                    cells = [row[idx] if idx < len(row) else None for idx in range(len(headers))]
+                    cells = [
+                        row[idx] if idx < len(row) else None
+                        for idx in range(len(headers))
+                    ]
                     if any(cell is not None for cell in cells):
                         rows.append(list(cells))
                 if sheet_name in passthrough:
@@ -174,7 +187,9 @@ def read_passthrough_workbooks(*, workbook_paths: list[Path]) -> dict[str, dict[
     return passthrough
 
 
-def _load_yaml_input(input_path: Path) -> tuple[dict[str, list[dict[str, Any]]], dict[str, dict[str, Any]]]:
+def _load_yaml_input(
+    input_path: Path,
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, dict[str, Any]]]:
     # Imported lazily to avoid an import cycle (roundtrip imports models only).
     from .roundtrip import load_yaml_entities
 
@@ -201,7 +216,9 @@ def ingest_input(
         return [resolved], entities, passthrough
 
     workbooks = discover_workbooks(input_path=input_path)
-    entities = ingest_workbooks(workbook_paths=workbooks, list_cell_separator=list_cell_separator)
+    entities = ingest_workbooks(
+        workbook_paths=workbooks, list_cell_separator=list_cell_separator
+    )
     passthrough = read_passthrough_workbooks(workbook_paths=workbooks)
     return workbooks, entities, passthrough
 

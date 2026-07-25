@@ -1,4 +1,5 @@
 """SQLite schema, connection management, and serialisation for the knowledge pack."""
+
 from __future__ import annotations
 
 import json
@@ -30,6 +31,7 @@ def _check_vec_available() -> bool:
     if _VEC_AVAILABLE is None:
         try:
             import sqlite_vec  # type: ignore[import-untyped]  # noqa: F401
+
             _VEC_AVAILABLE = True
         except ImportError:
             _VEC_AVAILABLE = False
@@ -220,6 +222,7 @@ def close_connection(db_name: str | None = None) -> None:
 
 # Canonical float32 serialization lives in otpack (little-endian <{n}f);
 # re-exported here so pack call sites keep importing from db.
+
 
 def serialize_tags(tags: list[str] | None) -> str:
     return json.dumps(tags or [])

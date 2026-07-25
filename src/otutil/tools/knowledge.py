@@ -6,6 +6,7 @@ sqlite-vec KNN vector search, link graph from markdown hyperlinks, and AI enrich
 Requires OPENAI_API_KEY in secrets.yaml when embeddings are enabled.
 Requires `pip install onetool-mcp[util]` for sqlite-vec and python-frontmatter.
 """
+
 from __future__ import annotations
 
 # Pack name for dot notation: kb.search(), kb.index(), etc.
@@ -37,12 +38,16 @@ def register_services(registry: object) -> None:
 
     registry.register_reload_hook(reset_runtime_cache)  # type: ignore[attr-defined]
 
+
 # Dependency declarations for CLI validation
 __ot_requires__ = {
     "lib": [
         ("openai", "pip install openai"),
         ("sqlite_vec", "pip install sqlite-vec  (or: pip install onetool-mcp[util])"),
-        ("frontmatter", "pip install python-frontmatter  (or: pip install onetool-mcp[util])"),
+        (
+            "frontmatter",
+            "pip install python-frontmatter  (or: pip install onetool-mcp[util])",
+        ),
     ],
 }
 

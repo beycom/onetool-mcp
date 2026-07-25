@@ -27,7 +27,9 @@ class GitRunner:
     def __init__(self, paths: Paths) -> None:
         self.paths = paths
 
-    def run(self, *args: str, check: bool = True, extra_env: dict[str, str] | None = None) -> str:
+    def run(
+        self, *args: str, check: bool = True, extra_env: dict[str, str] | None = None
+    ) -> str:
         """Run git with explicit GIT_DIR and GIT_WORK_TREE."""
 
         try:
@@ -87,7 +89,10 @@ class GitRunner:
         stderr = proc.stderr.read() if proc.stderr is not None else b""
         return_code = proc.wait()
         if return_code != 0 and not truncated:
-            message = stderr.decode(errors="replace").strip() or f"git exited with {return_code}"
+            message = (
+                stderr.decode(errors="replace").strip()
+                or f"git exited with {return_code}"
+            )
             raise LocalhistGitError(message)
         data = bytes(stdout[:max_bytes])
         return data.decode(errors="replace"), truncated
@@ -118,7 +123,10 @@ class GitRunner:
         stderr = proc.stderr.read() if proc.stderr is not None else b""
         return_code = proc.wait()
         if return_code != 0:
-            message = stderr.decode(errors="replace").strip() or f"git exited with {return_code}"
+            message = (
+                stderr.decode(errors="replace").strip()
+                or f"git exited with {return_code}"
+            )
             raise LocalhistGitError(message)
         if not has_output:
             return None

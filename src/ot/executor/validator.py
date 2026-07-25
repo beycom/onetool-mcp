@@ -67,35 +67,84 @@ class ValidationResult:
 # These are minimal safe defaults used only when security.yaml cannot be loaded.
 # In normal operation, the full allowlists come from security.yaml.
 
-FALLBACK_ALLOWED_BUILTINS = frozenset({
-    # Type constructors
-    "str", "int", "float", "bool", "bytes", "list", "dict", "set", "tuple",
-    # Type checking
-    "isinstance", "issubclass", "type", "callable",
-    # Iteration
-    "len", "iter", "next", "range", "enumerate", "zip", "reversed", "sorted",
-    # Math
-    "min", "max", "sum", "abs", "round", "pow",
-    # Sequence operations
-    "all", "any", "filter", "map",
-    # String/repr
-    "repr", "format", "print",
-    # Exceptions
-    "Exception", "ValueError", "TypeError", "KeyError",
-})
+FALLBACK_ALLOWED_BUILTINS = frozenset(
+    {
+        # Type constructors
+        "str",
+        "int",
+        "float",
+        "bool",
+        "bytes",
+        "list",
+        "dict",
+        "set",
+        "tuple",
+        # Type checking
+        "isinstance",
+        "issubclass",
+        "type",
+        "callable",
+        # Iteration
+        "len",
+        "iter",
+        "next",
+        "range",
+        "enumerate",
+        "zip",
+        "reversed",
+        "sorted",
+        # Math
+        "min",
+        "max",
+        "sum",
+        "abs",
+        "round",
+        "pow",
+        # Sequence operations
+        "all",
+        "any",
+        "filter",
+        "map",
+        # String/repr
+        "repr",
+        "format",
+        "print",
+        # Exceptions
+        "Exception",
+        "ValueError",
+        "TypeError",
+        "KeyError",
+    }
+)
 
-FALLBACK_ALLOWED_IMPORTS = frozenset({
-    "json", "re", "math", "datetime", "collections", "typing",
-    "itertools", "functools", "copy", "dataclasses",
-})
+FALLBACK_ALLOWED_IMPORTS = frozenset(
+    {
+        "json",
+        "re",
+        "math",
+        "datetime",
+        "collections",
+        "typing",
+        "itertools",
+        "functools",
+        "copy",
+        "dataclasses",
+    }
+)
 
-FALLBACK_WARNED_IMPORTS = frozenset({
-    "yaml",
-})
+FALLBACK_WARNED_IMPORTS = frozenset(
+    {
+        "yaml",
+    }
+)
 
-FALLBACK_ALLOWED_DUNDERS = frozenset({
-    "__format__", "__sanitize__", "__force_context__",
-})
+FALLBACK_ALLOWED_DUNDERS = frozenset(
+    {
+        "__format__",
+        "__sanitize__",
+        "__force_context__",
+    }
+)
 
 # Cache stdlib module names for performance (checked per qualified call)
 # Python 3.10+ has sys.stdlib_module_names; older versions get empty set
@@ -338,6 +387,7 @@ class AllowlistValidator(ast.NodeVisitor):
         # User-defined functions (not in Python's builtins) are allowed
         try:
             import builtins
+
             if not hasattr(builtins, func_name):
                 # Not a builtin - allow user-defined functions
                 return

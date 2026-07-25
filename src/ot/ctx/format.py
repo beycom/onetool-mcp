@@ -1,4 +1,5 @@
 """Format detection, normalisation, and TOC building for the ctx pack."""
+
 from __future__ import annotations
 
 import json
@@ -71,7 +72,9 @@ def build_toc(content: str, fmt: str) -> list[dict[str, Any]]:
         for i, line in enumerate(content.splitlines(), start=1):
             m = _HEADING_RE.match(line)
             if m:
-                toc.append({"line": i, "level": len(m.group(1)), "title": m.group(2).strip()})
+                toc.append(
+                    {"line": i, "level": len(m.group(1)), "title": m.group(2).strip()}
+                )
         return toc
 
     if fmt in ("json", "yaml"):
@@ -88,7 +91,10 @@ def build_toc(content: str, fmt: str) -> list[dict[str, Any]]:
             if isinstance(data, dict):
                 result: list[dict[str, Any]] = []
                 for key, value in data.items():
-                    entry: dict[str, Any] = {"key": str(key), "type": type(value).__name__}
+                    entry: dict[str, Any] = {
+                        "key": str(key),
+                        "type": type(value).__name__,
+                    }
                     if isinstance(value, (dict, list)):
                         entry["size"] = len(value)
                     result.append(entry)

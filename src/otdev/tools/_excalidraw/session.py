@@ -58,7 +58,9 @@ def session_path(board: str | None) -> Path:
     d = _whiteboard_dir()
     if board:
         if not _BOARD_NAME_RE.match(board):
-            raise ValueError(f"Invalid board name {board!r}: only A-Z, a-z, 0-9, _ and - are allowed")
+            raise ValueError(
+                f"Invalid board name {board!r}: only A-Z, a-z, 0-9, _ and - are allowed"
+            )
         return d / f"{board}.json"
     return d / f"{cwd_key()}.json"
 
@@ -106,7 +108,9 @@ def save(state: dict[str, Any], board: str | None = None) -> None:
         "edge_keys": [list(k) for k in state.get("edge_keys", set())],
         "canvas_max_y": state.get("canvas_max_y", 60.0),
     }
-    path.write_text(json.dumps(serializable, indent=2, ensure_ascii=False), encoding="utf-8")
+    path.write_text(
+        json.dumps(serializable, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
 
 
 def list_boards() -> list[dict[str, Any]]:
@@ -121,7 +125,9 @@ def list_boards() -> list[dict[str, Any]]:
         mtime = p.stat().st_mtime
         shape_count = 0
         with contextlib.suppress(Exception):
-            shape_count = len(json.loads(p.read_text(encoding="utf-8")).get("shapes", {}))
+            shape_count = len(
+                json.loads(p.read_text(encoding="utf-8")).get("shapes", {})
+            )
         boards.append({"name": name, "mtime": mtime, "shape_count": shape_count})
 
     return boards

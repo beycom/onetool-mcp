@@ -147,34 +147,59 @@ def get_config_dir() -> Path:
 def _validate_relative_fragment(value: str, *, label: str) -> Path:
     """Return a clean relative path fragment for OneTool-owned subtrees."""
     path = Path(value)
-    if not value or path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
-        raise ValueError(f"{label} must be a non-empty relative path fragment: {value!r}")
+    if (
+        not value
+        or path.is_absolute()
+        or any(part in {"", ".", ".."} for part in path.parts)
+    ):
+        raise ValueError(
+            f"{label} must be a non-empty relative path fragment: {value!r}"
+        )
     return path
 
 
 def get_ot_runtime_dir(kind: str) -> Path:
     """Return a runtime directory under OT_DIR/runtime/."""
-    return get_config_dir() / RUNTIME_SUBDIR / _validate_relative_fragment(kind, label="runtime kind")
+    return (
+        get_config_dir()
+        / RUNTIME_SUBDIR
+        / _validate_relative_fragment(kind, label="runtime kind")
+    )
 
 
 def get_ot_data_dir(kind: str) -> Path:
     """Return a tool-owned data directory under OT_DIR/data/."""
-    return get_config_dir() / DATA_SUBDIR / _validate_relative_fragment(kind, label="data kind")
+    return (
+        get_config_dir()
+        / DATA_SUBDIR
+        / _validate_relative_fragment(kind, label="data kind")
+    )
 
 
 def get_ot_template_dir(kind: str) -> Path:
     """Return an editable template override directory under OT_DIR/templates/."""
-    return get_config_dir() / TEMPLATES_SUBDIR / _validate_relative_fragment(kind, label="template kind")
+    return (
+        get_config_dir()
+        / TEMPLATES_SUBDIR
+        / _validate_relative_fragment(kind, label="template kind")
+    )
 
 
 def get_project_state_dir(pack: str) -> Path:
     """Return a project-local pack state directory under CWD/.onetool/state/."""
-    return get_effective_cwd() / ".onetool" / "state" / _validate_relative_fragment(pack, label="pack")
+    return (
+        get_effective_cwd()
+        / ".onetool"
+        / "state"
+        / _validate_relative_fragment(pack, label="pack")
+    )
 
 
 def get_project_artifact_dir(kind: str) -> Path:
     """Return a generated artifact directory under the effective project CWD."""
-    return get_effective_cwd() / _validate_relative_fragment(kind, label="artifact kind")
+    return get_effective_cwd() / _validate_relative_fragment(
+        kind, label="artifact kind"
+    )
 
 
 def get_effective_cwd() -> Path:

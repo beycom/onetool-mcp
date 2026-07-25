@@ -17,7 +17,9 @@ SUPPORT_MESSAGE_SHORT = "Support OneTool development"
 
 # For HTML reports
 SUPPORT_HTML_TITLE = "Support OneTool"
-SUPPORT_HTML_MESSAGE = "If you find this project useful, please consider buying me a coffee!"
+SUPPORT_HTML_MESSAGE = (
+    "If you find this project useful, please consider buying me a coffee!"
+)
 SUPPORT_HTML_BUTTON_TEXT = "Buy me a coffee on Ko-fi"
 
 

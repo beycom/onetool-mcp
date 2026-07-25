@@ -1,4 +1,5 @@
 """Management tools for the ctx pack: list, inspect, stats."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -46,16 +47,18 @@ def ctx_list(
                 continue
 
             handle = meta["handle"]
-            active.append({
-                "handle": handle,
-                "source": meta.get("source") or "",
-                "format": meta.get("format", "text"),
-                "size_bytes": meta.get("size_bytes", 0),
-                "total_lines": meta.get("total_lines", 0),
-                "status": meta.get("status", "ready"),
-                "command": f"ctx.read('{handle}')",
-                "ttl_remaining": int(ttl_remaining(meta)),
-            })
+            active.append(
+                {
+                    "handle": handle,
+                    "source": meta.get("source") or "",
+                    "format": meta.get("format", "text"),
+                    "size_bytes": meta.get("size_bytes", 0),
+                    "total_lines": meta.get("total_lines", 0),
+                    "status": meta.get("status", "ready"),
+                    "command": f"ctx.read('{handle}')",
+                    "ttl_remaining": int(ttl_remaining(meta)),
+                }
+            )
 
         s.add("count", len(active))
         return active

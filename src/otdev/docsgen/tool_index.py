@@ -57,7 +57,9 @@ def tool_inventory(
             continue
 
         pack_name = str(pack_row["name"])
-        details_info: Literal["default", "min"] = "default" if include_tool_descriptions else "min"
+        details_info: Literal["default", "min"] = (
+            "default" if include_tool_descriptions else "min"
+        )
         details = tool_info(pattern=f"{pack_name}.", info=details_info)
         detail_rows = [details] if isinstance(details, dict) else details
 

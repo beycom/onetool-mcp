@@ -82,7 +82,9 @@ def show(
         except ValidationError as e:
             first: Mapping[str, Any] = e.errors()[0] if e.errors() else {}
             field = ".".join(str(p) for p in first.get("loc", ())) or "arguments"
-            raise ValueError(f"console.show: invalid {field}: {first.get('msg', e)}") from e
+            raise ValueError(
+                f"console.show: invalid {field}: {first.get('msg', e)}"
+            ) from e
         result = STATE.add_message(request=request)
         return result.model_dump(mode="json")
 
@@ -132,7 +134,11 @@ def display(
         console.display(path="/repo/diagrams/architecture.svg")
     """
     with LogSpan(span="console.display", kind=kind):
-        forms = [content is not None, path is not None, old_path is not None or new_path is not None]
+        forms = [
+            content is not None,
+            path is not None,
+            old_path is not None or new_path is not None,
+        ]
         if sum(forms) != 1:
             raise ValueError(
                 "console.display accepts exactly one input form: a positional "
@@ -228,7 +234,11 @@ def _display_value(
 ) -> str:
     resolved_kind = kind or _infer_value_kind(content)
     request = ShowRequest.model_validate(
-        {"kind": resolved_kind, "metadata": metadata, "content": _coerce_content(content)}
+        {
+            "kind": resolved_kind,
+            "metadata": metadata,
+            "content": _coerce_content(content),
+        }
     )
     result = STATE.add_message(request=request)
     digest = _value_digest(content, kind=resolved_kind)
@@ -248,8 +258,7 @@ def _display_path(
         kind=resolved_kind, metadata=metadata, path=str(target)
     )
     digest = (
-        f"{target} ({_human_size(target.stat().st_size)}"
-        f"{_language_suffix(target)})"
+        f"{target} ({_human_size(target.stat().st_size)}{_language_suffix(target)})"
     )
     return _finish_receipt(result.id, resolved_kind, digest)
 
@@ -401,8 +410,7 @@ def _is_uniform_records(items: List[Any]) -> bool:
     if not base:
         return False
     return all(
-        len(base & set(item.keys())) / len(base) >= _TABLE_KEY_OVERLAP
-        for item in items
+        len(base & set(item.keys())) / len(base) >= _TABLE_KEY_OVERLAP for item in items
     )
 
 
@@ -433,11 +441,14 @@ def _infer_path_kind(target: Path) -> ConsoleKind:
 
 
 def _value_digest(content: Any, *, kind: str) -> str:
-    if kind == "table" and isinstance(content, List) and content and isinstance(content[0], dict):
+    if (
+        kind == "table"
+        and isinstance(content, List)
+        and content
+        and isinstance(content[0], dict)
+    ):
         columns = [str(key) for key in content[0]][:5]
-        top = ", ".join(
-            f'"{_clip(_title_value(item), 40)}"' for item in content[:2]
-        )
+        top = ", ".join(f'"{_clip(_title_value(item), 40)}"' for item in content[:2])
         digest = f"{len(content)} items ({', '.join(columns)})"
         return f"{digest} — top: {top}" if top else digest
     if isinstance(content, dict):

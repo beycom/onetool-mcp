@@ -1,4 +1,5 @@
 """Memory maintenance operations: delete, purge, stats, and batch update."""
+
 from __future__ import annotations
 
 import builtins
@@ -70,10 +71,7 @@ def context(
 
             lines = [f"Context: {len(rows)} memories loaded\n"]
             for r in rows:
-                lines.append(
-                    f"## {r[1]} [{r[3]}]\n"
-                    f"{r[2]}\n"
-                )
+                lines.append(f"## {r[1]} [{r[3]}]\n{r[2]}\n")
             return "\n".join(lines)
 
         except Exception as e:
@@ -103,10 +101,19 @@ def update_batch(
         mem.update_batch(search_text="old_name", replace_text="new_name", topic="projects/", dry_run=True)
         mem.update_batch(search_text="old_name", replace_text="new_name", topic="projects/", dry_run=False)
     """
-    with LogSpan(span="mem.update_batch", search=search_text, replace=replace_text, dryRun=dry_run) as s:
+    with LogSpan(
+        span="mem.update_batch",
+        search=search_text,
+        replace=replace_text,
+        dryRun=dry_run,
+    ) as s:
         try:
             with _use_connection() as conn:
-                escaped = search_text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+                escaped = (
+                    search_text.replace("\\", "\\\\")
+                    .replace("%", "\\%")
+                    .replace("_", "\\_")
+                )
                 sql = "SELECT id, topic, content, meta FROM memories WHERE content LIKE ? ESCAPE '\\'"
                 params: list[Any] = [f"%{escaped}%"]
 
@@ -126,7 +133,9 @@ def update_batch(
                     lines = [f"Dry run: {len(rows)} memories would be updated:\n"]
                     for r in rows:
                         occurrences = r[2].count(search_text)
-                        lines.append(f"  {r[1]} ({occurrences} occurrence{'s' if occurrences != 1 else ''}) id={r[0][:8]}...")
+                        lines.append(
+                            f"  {r[1]} ({occurrences} occurrence{'s' if occurrences != 1 else ''}) id={r[0][:8]}..."
+                        )
                     return "\n".join(lines)
 
             updated = 0

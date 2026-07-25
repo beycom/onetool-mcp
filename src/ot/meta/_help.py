@@ -62,7 +62,11 @@ def _score_named_result(query: str, name: str, description: str = "") -> float:
 
 
 def _rank_named_items(
-    query: str, items: list[dict[str, Any] | str], *, desc_key: str = "description", threshold: float = 0.6
+    query: str,
+    items: list[dict[str, Any] | str],
+    *,
+    desc_key: str = "description",
+    threshold: float = 0.6,
 ) -> list[str]:
     """Return matched item names sorted by score (best first)."""
     scored: list[tuple[str, float]] = []
@@ -114,10 +118,7 @@ def _with_ask_answer(base_help: str, ask: str) -> str:
                 },
                 {
                     "role": "user",
-                    "content": (
-                        f"Question:\n{ask}\n\n"
-                        f"Help text:\n{base_help}"
-                    ),
+                    "content": (f"Question:\n{ask}\n\nHelp text:\n{base_help}"),
                 },
             ],
             temperature=0.1,
@@ -162,7 +163,9 @@ def help(*, query: str = "", info: HelpInfoLevel = "default", ask: str = "") -> 
         ot.help(query="brave", ask="Which search function should I call?")
     """
     if info not in _VALID_HELP_INFO:
-        raise ValueError(f"info={info!r} is not valid. Use 'min', 'default', or 'full'.")
+        raise ValueError(
+            f"info={info!r} is not valid. Use 'min', 'default', or 'full'."
+        )
 
     with log(span="ot.help", query=query or None, info=info, ask=bool(ask)) as s:
         # No query - show general help
@@ -179,6 +182,7 @@ def help(*, query: str = "", info: HelpInfoLevel = "default", ask: str = "") -> 
         # Check for exact tool match (contains "."); resolve short alias prefix
         if "." in query:
             from ot.meta._discovery import tool_info as _tool_info
+
             pack_prefix, _, tool_suffix = query.partition(".")
             from ot.executor.tool_loader import load_tool_registry
 
@@ -196,12 +200,16 @@ def help(*, query: str = "", info: HelpInfoLevel = "default", ask: str = "") -> 
         # Try exact, then normalize hyphens→underscores (canonical form),
         # then underscores→hyphens (backward compat for old user configs).
         query_as_server = next(
-            (q for q in [query, query.replace("-", "_"), query.replace("_", "-")]
-             if q in cfg.servers),
+            (
+                q
+                for q in [query, query.replace("-", "_"), query.replace("_", "-")]
+                if q in cfg.servers
+            ),
             None,
         )
         if query_as_server is not None:
             from ot.proxy import get_proxy_manager as _get_proxy_mgr
+
             _proxy = _get_proxy_mgr()
             server_cfg = cfg.servers[query_as_server]
             conn = _proxy.get_connection(query_as_server)
@@ -212,7 +220,11 @@ def help(*, query: str = "", info: HelpInfoLevel = "default", ask: str = "") -> 
             s.add("match", query_as_server)
             return _with_ask_answer(
                 _format_server_help(
-                    query_as_server, server_cfg, status, proxy_tools, native_instructions
+                    query_as_server,
+                    server_cfg,
+                    status,
+                    proxy_tools,
+                    native_instructions,
                 ),
                 ask,
             )
@@ -225,6 +237,7 @@ def help(*, query: str = "", info: HelpInfoLevel = "default", ask: str = "") -> 
         pack_names = packs(info="min")
         if resolved_query in pack_names:
             from ot.meta._discovery import pack_info as _pack_info
+
             pi = _pack_info(name=resolved_query, info="default")
             if pi and "error" not in pi:
                 s.add("type", "pack")
@@ -235,6 +248,7 @@ def help(*, query: str = "", info: HelpInfoLevel = "default", ask: str = "") -> 
         if query.startswith(":"):
             snippet_name = query[1:]  # Remove ":"
             from ot.meta._introspection import snippet_info as _snippet_info
+
             si = _snippet_info(name=snippet_name, info="full")
             if "error" not in si:
                 assert isinstance(si, dict)
@@ -267,15 +281,20 @@ def help(*, query: str = "", info: HelpInfoLevel = "default", ask: str = "") -> 
         matched_servers = _fuzzy_match(query, all_server_names)
 
         total_matches = (
-            len(matched_tools) + len(matched_packs) + len(matched_snippets)
-            + len(matched_aliases) + len(matched_servers)
+            len(matched_tools)
+            + len(matched_packs)
+            + len(matched_snippets)
+            + len(matched_aliases)
+            + len(matched_servers)
         )
         s.add("matches", total_matches)
 
         # Filter from already-fetched results — no additional discovery calls
         tools_results = [t for t in all_tools if _item_matches(t, matched_tools)]
         packs_results = [p for p in all_packs if _item_matches(p, matched_packs)]
-        snippets_results = [sn for sn in all_snippets if _snippet_matches(sn, matched_snippets)]
+        snippets_results = [
+            sn for sn in all_snippets if _snippet_matches(sn, matched_snippets)
+        ]
         aliases_results = [a for a in all_aliases if _item_matches(a, matched_aliases)]
         servers_results = [n for n in all_server_names if n in matched_servers]
 

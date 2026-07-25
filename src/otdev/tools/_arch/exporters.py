@@ -27,8 +27,12 @@ def apply_tag_filters(
     exclude_tags: list[str] | None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Filter entities by include/exclude tag lists."""
-    include = {item.strip().lower() for item in include_tags or [] if item and item.strip()}
-    exclude = {item.strip().lower() for item in exclude_tags or [] if item and item.strip()}
+    include = {
+        item.strip().lower() for item in include_tags or [] if item and item.strip()
+    }
+    exclude = {
+        item.strip().lower() for item in exclude_tags or [] if item and item.strip()
+    }
 
     if not include and not exclude:
         return {sheet: [dict(row) for row in rows] for sheet, rows in entities.items()}
@@ -43,17 +47,27 @@ def apply_tag_filters(
                 continue
             filtered[sheet].append(dict(row))
 
-    system_ids = {str(row.get("id", "")).strip() for row in filtered[SHEET_SYS] if row.get("id")}
-    app_ids = {str(row.get("id", "")).strip() for row in filtered[SHEET_APP] if row.get("id")}
-    cmp_ids = {str(row.get("id", "")).strip() for row in filtered[SHEET_CMP] if row.get("id")}
-    usr_ids = {str(row.get("id", "")).strip() for row in filtered[SHEET_USR] if row.get("id")}
+    system_ids = {
+        str(row.get("id", "")).strip() for row in filtered[SHEET_SYS] if row.get("id")
+    }
+    app_ids = {
+        str(row.get("id", "")).strip() for row in filtered[SHEET_APP] if row.get("id")
+    }
+    cmp_ids = {
+        str(row.get("id", "")).strip() for row in filtered[SHEET_CMP] if row.get("id")
+    }
+    usr_ids = {
+        str(row.get("id", "")).strip() for row in filtered[SHEET_USR] if row.get("id")
+    }
 
     filtered[SHEET_APP] = [
         row
         for row in filtered[SHEET_APP]
         if str(first_value(row, SYS_REF_KEYS) or "").strip() in system_ids
     ]
-    app_ids = {str(row.get("id", "")).strip() for row in filtered[SHEET_APP] if row.get("id")}
+    app_ids = {
+        str(row.get("id", "")).strip() for row in filtered[SHEET_APP] if row.get("id")
+    }
 
     filtered[SHEET_CMP] = [
         row
@@ -64,7 +78,9 @@ def apply_tag_filters(
             and str(first_value(row, SYS_REF_KEYS) or "").strip() in system_ids
         )
     ]
-    cmp_ids = {str(row.get("id", "")).strip() for row in filtered[SHEET_CMP] if row.get("id")}
+    cmp_ids = {
+        str(row.get("id", "")).strip() for row in filtered[SHEET_CMP] if row.get("id")
+    }
 
     filtered[SHEET_USR] = [
         row
@@ -72,7 +88,9 @@ def apply_tag_filters(
         if not first_value(row, APP_REF_KEYS)
         or str(first_value(row, APP_REF_KEYS)).strip() in app_ids
     ]
-    usr_ids = {str(row.get("id", "")).strip() for row in filtered[SHEET_USR] if row.get("id")}
+    usr_ids = {
+        str(row.get("id", "")).strip() for row in filtered[SHEET_USR] if row.get("id")
+    }
     node_ids = system_ids | app_ids | cmp_ids | usr_ids
 
     filtered[SHEET_INTERFACE] = [
@@ -103,7 +121,9 @@ def apply_tag_filters(
         if str(first_value(row, ("project", "project_id")) or "").strip() in project_ids
         and str(row.get("item_id") or "").strip()
         in item_ids_by_type.get(
-            PROJECT_SCOPE_ITEM_TYPES.get(str(row.get("item_type") or "").strip().lower(), ""),
+            PROJECT_SCOPE_ITEM_TYPES.get(
+                str(row.get("item_type") or "").strip().lower(), ""
+            ),
             set(),
         )
     ]
@@ -111,13 +131,17 @@ def apply_tag_filters(
     return filtered
 
 
-def serializable_entities(*, entities: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
+def serializable_entities(
+    *, entities: dict[str, list[dict[str, Any]]]
+) -> dict[str, list[dict[str, Any]]]:
     """Return entities without internal bookkeeping keys."""
     cleaned: dict[str, list[dict[str, Any]]] = {}
     for sheet, rows in entities.items():
         cleaned[sheet] = []
         for row in rows:
-            cleaned_row = {key: value for key, value in row.items() if not key.startswith("_")}
+            cleaned_row = {
+                key: value for key, value in row.items() if not key.startswith("_")
+            }
             cleaned[sheet].append(cleaned_row)
     return cleaned
 

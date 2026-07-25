@@ -6,6 +6,7 @@ Rules:
 - YAML frontmatter (---...---) is parsed via python-frontmatter and stored in meta.
 - A .meta.yaml sidecar next to the .md file is also checked for url/source/crawled_at.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -29,8 +30,10 @@ class Chunk:
     topic: str
     content: str
     content_hash: str
-    source_path: str | None = None  # canonical form before topic_roots stripping; None for manual writes
-    anchor: str = ""               # heading slug within the file; "" for page-level preamble
+    source_path: str | None = (
+        None  # canonical form before topic_roots stripping; None for manual writes
+    )
+    anchor: str = ""  # heading slug within the file; "" for page-level preamble
     meta: dict[str, Any] = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)
     category: str = "reference"
@@ -47,9 +50,19 @@ def _load_sidecar(md_path: Path) -> dict[str, Any]:
         return {}
     try:
         import yaml
+
         data = yaml.safe_load(sidecar.read_text(encoding="utf-8")) or {}
         # depth and url_base_path are ignored (computed at index time from canonical form)
-        keys = ("url", "source", "crawled_at", "title", "description", "keywords", "category", "tags")
+        keys = (
+            "url",
+            "source",
+            "crawled_at",
+            "title",
+            "description",
+            "keywords",
+            "category",
+            "tags",
+        )
         return {k: data[k] for k in keys if k in data}
     except Exception:
         return {}
@@ -77,7 +90,7 @@ def canonicalize(path: str, source_dir: str = "") -> str:
     if source_dir:
         norm_source = source_dir.strip("/")
         if p.startswith(norm_source + "/"):
-            p = p[len(norm_source) + 1:]
+            p = p[len(norm_source) + 1 :]
         elif p == norm_source:
             p = ""
 
@@ -117,6 +130,7 @@ def strip_topic_roots(canonical: str, topic_roots: list[str]) -> str:
     for root in topic_roots:
         if root.startswith(("http://", "https://")):
             from urllib.parse import urlparse
+
             parsed = urlparse(root)
             root_canonical = canonicalize(parsed.path)
         else:
@@ -129,7 +143,7 @@ def strip_topic_roots(canonical: str, topic_roots: list[str]) -> str:
             # Exact match — don't reduce to empty, return unchanged
             return canonical
         if canonical.startswith(root_prefix + "/"):
-            return canonical[len(root_prefix) + 1:]
+            return canonical[len(root_prefix) + 1 :]
 
     return canonical
 
@@ -144,7 +158,9 @@ def _make_topic(rel_path: Path, heading: str | None = None) -> str:
     return base
 
 
-def chunk_file(path: Path, rel_path: Path, *, min_chunk_chars: int = 200) -> list[Chunk]:
+def chunk_file(
+    path: Path, rel_path: Path, *, min_chunk_chars: int = 200
+) -> list[Chunk]:
     """Chunk a markdown file into one or more Chunk objects.
 
     Args:
@@ -214,22 +230,41 @@ def chunk_file(path: Path, rel_path: Path, *, min_chunk_chars: int = 200) -> lis
         content = body.strip()
         if not content:
             return []
-        return [Chunk(
-            topic=base_topic,
-            content=content,
-            content_hash=_content_hash(content),
-            source_path=source_path_val,
-            anchor="",
-            meta=meta,
-            tags=tags,
-            category=category,
-        )]
+        return [
+            Chunk(
+                topic=base_topic,
+                content=content,
+                content_hash=_content_hash(content),
+                source_path=source_path_val,
+                anchor="",
+                meta=meta,
+                tags=tags,
+                category=category,
+            )
+        ]
 
     # Split on level-1/2 headings
-    return _split_by_headings(body, base_topic, source_path_val, meta, tags, category=category, min_chunk_chars=min_chunk_chars)
+    return _split_by_headings(
+        body,
+        base_topic,
+        source_path_val,
+        meta,
+        tags,
+        category=category,
+        min_chunk_chars=min_chunk_chars,
+    )
 
 
-def _split_by_headings(body: str, base_topic: str, source_path_val: str, meta: dict[str, Any], tags: list[str], *, category: str = "reference", min_chunk_chars: int = 200) -> list[Chunk]:
+def _split_by_headings(
+    body: str,
+    base_topic: str,
+    source_path_val: str,
+    meta: dict[str, Any],
+    tags: list[str],
+    *,
+    category: str = "reference",
+    min_chunk_chars: int = 200,
+) -> list[Chunk]:
     """Split content on H1/H2 headings into multiple chunks."""
     lines = body.split("\n")
     sections: list[tuple[str | None, int]] = []  # (heading_text, start_line_idx)
@@ -250,9 +285,18 @@ def _split_by_headings(body: str, base_topic: str, source_path_val: str, meta: d
     if not sections:
         # No headings found — treat as single chunk despite length
         content = body.strip()
-        return [Chunk(topic=base_topic, content=content, content_hash=_content_hash(content),
-                      source_path=source_path_val, anchor="",
-                      meta=meta, tags=tags, category=category)]
+        return [
+            Chunk(
+                topic=base_topic,
+                content=content,
+                content_hash=_content_hash(content),
+                source_path=source_path_val,
+                anchor="",
+                meta=meta,
+                tags=tags,
+                category=category,
+            )
+        ]
 
     chunks: list[Chunk] = []
     # Preamble before first heading
@@ -260,16 +304,18 @@ def _split_by_headings(body: str, base_topic: str, source_path_val: str, meta: d
     preamble = "\n".join(preamble_lines).strip()
     if preamble:
         content = preamble
-        chunks.append(Chunk(
-            topic=base_topic,
-            content=content,
-            content_hash=_content_hash(content),
-            source_path=source_path_val,
-            anchor="",
-            meta=dict(meta),
-            tags=list(tags),
-            category=category,
-        ))
+        chunks.append(
+            Chunk(
+                topic=base_topic,
+                content=content,
+                content_hash=_content_hash(content),
+                source_path=source_path_val,
+                anchor="",
+                meta=dict(meta),
+                tags=list(tags),
+                category=category,
+            )
+        )
 
     for idx, (heading, start_idx) in enumerate(sections):
         end_idx = sections[idx + 1][1] if idx + 1 < len(sections) else len(lines)
@@ -306,32 +352,36 @@ def _split_by_headings(body: str, base_topic: str, source_path_val: str, meta: d
         chunk_meta = dict(meta)
         if heading:
             chunk_meta["heading"] = heading
-        chunks.append(Chunk(
-            topic=topic,
-            content=content,
-            content_hash=_content_hash(content),
-            source_path=source_path_val,
-            anchor=slug,
-            meta=chunk_meta,
-            tags=list(tags),
-            category=category,
-        ))
+        chunks.append(
+            Chunk(
+                topic=topic,
+                content=content,
+                content_hash=_content_hash(content),
+                source_path=source_path_val,
+                anchor=slug,
+                meta=chunk_meta,
+                tags=list(tags),
+                category=category,
+            )
+        )
 
     if chunks:
         return chunks
     content = body.strip()
     if not content:
         return []
-    return [Chunk(
-        topic=base_topic,
-        content=content,
-        content_hash=_content_hash(content),
-        source_path=source_path_val,
-        anchor="",
-        meta=meta,
-        tags=tags,
-        category=category,
-    )]
+    return [
+        Chunk(
+            topic=base_topic,
+            content=content,
+            content_hash=_content_hash(content),
+            source_path=source_path_val,
+            anchor="",
+            meta=meta,
+            tags=tags,
+            category=category,
+        )
+    ]
 
 
 def _fill_img_alt(text: str) -> str:

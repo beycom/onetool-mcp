@@ -86,7 +86,9 @@ def status(
         Git-like file status with dirty counts.
     """
 
-    with LogSpan(span="localhist.status", path=path, status=status, limit=limit) as span:
+    with LogSpan(
+        span="localhist.status", path=path, status=status, limit=limit
+    ) as span:
         result = status_repository(path=path, status=status, limit=limit)
         span.add(ok=result.get("ok"), initialized=result.get("initialized"))
         return result
@@ -158,7 +160,9 @@ def save(
         Structured snapshot result with commit details or no-change status.
     """
 
-    path_count = 0 if paths is None else len([paths] if isinstance(paths, str) else paths)
+    path_count = (
+        0 if paths is None else len([paths] if isinstance(paths, str) else paths)
+    )
     with LogSpan(span="localhist.save", kind=kind, pathCount=path_count) as span:
         result = save_snapshot(message=message, kind=kind, paths=paths)
         span.add(ok=result.get("ok"), created=result.get("created"))
@@ -190,7 +194,9 @@ def autosave_list() -> dict[str, object]:
 
     with LogSpan(span="localhist.autosave_list") as span:
         result = autosave_list_project()
-        span.add(ok=result.get("ok"), active=result.get("active"), stale=result.get("stale"))
+        span.add(
+            ok=result.get("ok"), active=result.get("active"), stale=result.get("stale")
+        )
         return result
 
 
@@ -211,7 +217,9 @@ def autosave_stop(*, path: str | None = None) -> dict[str, object]:
         return result
 
 
-def log(*, limit: int = 20, date_format: str = "%Y-%m-%d %H:%M:%S %Z") -> dict[str, object]:
+def log(
+    *, limit: int = 20, date_format: str = "%Y-%m-%d %H:%M:%S %Z"
+) -> dict[str, object]:
     """List local-history snapshots.
 
     Args:
@@ -225,7 +233,9 @@ def log(*, limit: int = 20, date_format: str = "%Y-%m-%d %H:%M:%S %Z") -> dict[s
     with LogSpan(span="localhist.log", limit=limit) as span:
         result = list_log(limit=limit, date_format=date_format)
         entries = result.get("entries", [])
-        span.add(ok=result.get("ok"), count=len(entries) if isinstance(entries, list) else 0)
+        span.add(
+            ok=result.get("ok"), count=len(entries) if isinstance(entries, list) else 0
+        )
         return result
 
 
@@ -248,10 +258,16 @@ def history(
         Structured path-scoped history entries.
     """
 
-    with LogSpan(span="localhist.history", path=path, limit=limit, follow=follow) as span:
-        result = list_history(path=path, limit=limit, follow=follow, date_format=date_format)
+    with LogSpan(
+        span="localhist.history", path=path, limit=limit, follow=follow
+    ) as span:
+        result = list_history(
+            path=path, limit=limit, follow=follow, date_format=date_format
+        )
         entries = result.get("entries", [])
-        span.add(ok=result.get("ok"), count=len(entries) if isinstance(entries, list) else 0)
+        span.add(
+            ok=result.get("ok"), count=len(entries) if isinstance(entries, list) else 0
+        )
         return result
 
 
@@ -305,7 +321,9 @@ def show(
         return result
 
 
-def prune(*, older_than_days: int = 30, gc: bool = True, dry_run: bool = True) -> dict[str, object]:
+def prune(
+    *, older_than_days: int = 30, gc: bool = True, dry_run: bool = True
+) -> dict[str, object]:
     """Drop local-history snapshots older than the cutoff and reclaim disk.
 
     Squashes pre-cutoff snapshots into a single baseline commit (the newest
@@ -325,9 +343,13 @@ def prune(*, older_than_days: int = 30, gc: bool = True, dry_run: bool = True) -
         localhist.prune(older_than_days=90, dry_run=False)  # apply 90-day retention
     """
 
-    with LogSpan(span="localhist.prune", olderThanDays=older_than_days, dryRun=dry_run) as span:
+    with LogSpan(
+        span="localhist.prune", olderThanDays=older_than_days, dryRun=dry_run
+    ) as span:
         result = prune_history(older_than_days=older_than_days, gc=gc, dry_run=dry_run)
-        span.add(ok=result.get("ok"), dropped=result.get("dropped", result.get("would_drop")))
+        span.add(
+            ok=result.get("ok"), dropped=result.get("dropped", result.get("would_drop"))
+        )
         return result
 
 
@@ -348,7 +370,9 @@ def restore(
         Structured dry-run or applied restore result.
     """
 
-    with LogSpan(span="localhist.restore", ref=ref, pathCount=len(paths), dryRun=dry_run) as span:
+    with LogSpan(
+        span="localhist.restore", ref=ref, pathCount=len(paths), dryRun=dry_run
+    ) as span:
         result = restore_paths(ref=ref, paths=paths, dry_run=dry_run)
         span.add(ok=result.get("ok"), dryRun=result.get("dry_run"))
         return result

@@ -233,9 +233,7 @@ def convert_pdf(
             for img in image_list:
                 xref = img[0]
                 try:
-                    result = _extract_and_save_image(
-                        doc, xref, images_dir, writer
-                    )
+                    result = _extract_and_save_image(doc, xref, images_dir, writer)
                     if result:
                         images_extracted += 1
                 except Exception:

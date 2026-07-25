@@ -134,7 +134,9 @@ def bundle_solution_directory(
                 # Qualify colliding basenames so no include silently shadows another.
                 counter = 2
                 while include_arcname in used_arcnames:
-                    include_arcname = f"data/{include_file.stem}_{counter}{include_file.suffix}"
+                    include_arcname = (
+                        f"data/{include_file.stem}_{counter}{include_file.suffix}"
+                    )
                     counter += 1
                 used_arcnames.add(include_arcname)
                 zf.write(include_file, include_arcname)

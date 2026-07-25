@@ -4,6 +4,7 @@ Each published handle is a directory containing a complete record:
     <handle>/content    — raw content (UTF-8 text)
     <handle>/meta.json  — metadata JSON
 """
+
 from __future__ import annotations
 
 import json
@@ -72,7 +73,9 @@ def ttl_remaining(meta: dict[str, Any]) -> float:
     return max(0.0, float(exp) - now_ts())
 
 
-def load_live_meta(store: HandleStore, handle: str) -> tuple[dict[str, Any] | None, str | None]:
+def load_live_meta(
+    store: HandleStore, handle: str
+) -> tuple[dict[str, Any] | None, str | None]:
     """Load a handle's metadata, rejecting missing or expired handles.
 
     Returns:
@@ -172,7 +175,9 @@ class HandleStore:
         return self.content_path(handle).read_text(encoding="utf-8")
 
     def read_meta(self, handle: str) -> dict[str, Any]:
-        result: dict[str, Any] = json.loads(self.meta_path(handle).read_text(encoding="utf-8"))
+        result: dict[str, Any] = json.loads(
+            self.meta_path(handle).read_text(encoding="utf-8")
+        )
         return result
 
     def list_handles(self) -> list[dict[str, Any]]:

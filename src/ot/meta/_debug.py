@@ -242,7 +242,14 @@ def debug(
             from importlib.metadata import version as get_version
 
             deps = {}
-            for pkg in ["fastmcp", "pydantic", "pyyaml", "loguru", "requests", "openai"]:
+            for pkg in [
+                "fastmcp",
+                "pydantic",
+                "pyyaml",
+                "loguru",
+                "requests",
+                "openai",
+            ]:
                 try:
                     deps[pkg] = get_version(pkg)
                 except PackageNotFoundError:

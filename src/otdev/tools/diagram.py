@@ -37,6 +37,7 @@ def register_services(registry: object) -> None:
     """Register diagram runtime cache reset hook."""
     registry.register_reload_hook(reset_runtime_cache)  # type: ignore[attr-defined]
 
+
 import base64
 import re
 import threading
@@ -293,13 +294,20 @@ def _evict_finished_tasks() -> None:
     overflow = len(_render_tasks) - _MAX_RENDER_TASKS + 1
     if overflow <= 0:
         return
-    for key in [k for k, v in _render_tasks.items() if v.get("status") != "running"][:overflow]:
+    for key in [k for k, v in _render_tasks.items() if v.get("status") != "running"][
+        :overflow
+    ]:
         del _render_tasks[key]
+
 
 # Cached backend URL to avoid redundant health checks
 # TTL-based invalidation: cache expires after _CACHE_TTL_SECONDS
 _CACHE_TTL_SECONDS = 300  # 5 minutes
-_cached_backend: dict[str, Any] = {"url": None, "is_self_hosted": None, "timestamp": 0.0}
+_cached_backend: dict[str, Any] = {
+    "url": None,
+    "is_self_hosted": None,
+    "timestamp": 0.0,
+}
 
 
 def reset_runtime_cache() -> None:
@@ -519,7 +527,9 @@ def _render_via_kroki(
     kroki_url = _get_kroki_url()
     url = f"{kroki_url}/{provider}/{output_format}"
 
-    with LogSpan(span="diagram.kroki", provider=provider, format=output_format, url=url) as span:
+    with LogSpan(
+        span="diagram.kroki", provider=provider, format=output_format, url=url
+    ) as span:
         resp = _http_client_get().post(
             url,
             content=source.encode("utf-8"),
@@ -777,7 +787,9 @@ def generate_source(
             name="api-flow"
         )
     """
-    with LogSpan(span="diagram.generate_source", provider=provider, diagramName=name) as s:
+    with LogSpan(
+        span="diagram.generate_source", provider=provider, diagramName=name
+    ) as s:
         try:
             _validate_provider(provider)
 
@@ -1048,12 +1060,18 @@ def get_render_status(*, task_id: str) -> str:
             if isinstance(results, list):
                 result_parts.append(f"Results: {len(results)} items")
                 success_count = sum(
-                    1 for item in results if isinstance(item, dict) and item.get("status") == "success"
+                    1
+                    for item in results
+                    if isinstance(item, dict) and item.get("status") == "success"
                 )
                 failed_count = sum(
-                    1 for item in results if isinstance(item, dict) and item.get("status") == "failed"
+                    1
+                    for item in results
+                    if isinstance(item, dict) and item.get("status") == "failed"
                 )
-                result_parts.append(f"Result summary: success={success_count}, failed={failed_count}")
+                result_parts.append(
+                    f"Result summary: success={success_count}, failed={failed_count}"
+                )
 
         s.add(status=status)
         return "\n".join(result_parts)
@@ -1129,7 +1147,9 @@ def batch_render(
             ]
         )
     """
-    with LogSpan(span="diagram.batch_render", count=len(sources), format=output_format) as s:
+    with LogSpan(
+        span="diagram.batch_render", count=len(sources), format=output_format
+    ) as s:
         # Check for self-hosted requirement
         if not _is_self_hosted():
             s.add(error="requires_self_hosted")
@@ -1262,7 +1282,9 @@ def render_directory(
             recursive=True
         )
     """
-    with LogSpan(span="diagram.render_directory", directory=directory, pattern=pattern) as s:
+    with LogSpan(
+        span="diagram.render_directory", directory=directory, pattern=pattern
+    ) as s:
         if not _is_self_hosted():
             s.add(error="requires_self_hosted")
             return (
@@ -1398,7 +1420,11 @@ def get_diagram_instructions(
     with LogSpan(span="diagram.get_diagram_instructions", provider=provider) as s:
         config = _get_config()
         # Convert Pydantic models to dicts for backward compatibility
-        instructions = {k: v.model_dump() for k, v in config.instructions.items()} if config.instructions else {}
+        instructions = (
+            {k: v.model_dump() for k, v in config.instructions.items()}
+            if config.instructions
+            else {}
+        )
 
         # If no config, use defaults
         if not instructions:
@@ -1517,7 +1543,8 @@ def get_output_config() -> str:
 
         result = (
             "Diagram Output Configuration\n"
-            + "=" * 40 + "\n\n"
+            + "=" * 40
+            + "\n\n"
             + f"Output directory: {output.dir}\n"
             + f"Naming pattern: {output.naming}\n"
             + f"Default format: {output.default_format}\n"
@@ -1578,7 +1605,9 @@ def get_template(*, name: str) -> str:
                 template_rel = Path(file_path).as_posix()
                 if template_rel.startswith("templates/diagram/"):
                     bundled_rel = template_rel.removeprefix("templates/diagram/")
-                    path = get_global_templates_dir() / "diagram-templates" / bundled_rel
+                    path = (
+                        get_global_templates_dir() / "diagram-templates" / bundled_rel
+                    )
 
             if path.exists():
                 source = path.read_text()

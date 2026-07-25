@@ -263,7 +263,9 @@ class StatsReader:
                             acc[1] += 1
                         acc[2] += int(record.get("duration_ms", 0))
         except Exception as e:
-            logger.warning(LogEntry(event="stats.read.failed", path=self._path).failure(e))
+            logger.warning(
+                LogEntry(event="stats.read.failed", path=self._path).failure(e)
+            )
             return AggregatedStats(
                 period=period,
                 start_time=None,
@@ -298,10 +300,9 @@ class StatsReader:
         time_saved = run_count * self._time_overhead_ms
         input_tokens = total_chars_in / self._chars_per_token
         output_tokens = total_chars_out / self._chars_per_token
-        cost_estimate = (
-            (input_tokens / 1_000_000) * self._cost_per_m_input
-            + (output_tokens / 1_000_000) * self._cost_per_m_output
-        )
+        cost_estimate = (input_tokens / 1_000_000) * self._cost_per_m_input + (
+            output_tokens / 1_000_000
+        ) * self._cost_per_m_output
         # Savings are avoided context re-sends (input tokens only — no output avoided).
         savings_usd = (context_saved / 1_000_000) * self._cost_per_m_input
 

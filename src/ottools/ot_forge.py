@@ -52,11 +52,15 @@ def _select_extension_file_path(name: str) -> Path:
     nested_candidate = base_tools_dir / name / f"{name}.py"
     candidates = [flat_candidate, nested_candidate]
 
-    resolved_patterns = [_resolve_tools_pattern(pattern, config_dir) for pattern in patterns]
+    resolved_patterns = [
+        _resolve_tools_pattern(pattern, config_dir) for pattern in patterns
+    ]
 
     for candidate in candidates:
         candidate_str = str(candidate)
-        if any(fnmatch.fnmatch(candidate_str, pattern) for pattern in resolved_patterns):
+        if any(
+            fnmatch.fnmatch(candidate_str, pattern) for pattern in resolved_patterns
+        ):
             return candidate
 
     # Fallback keeps previous behavior if no configured pattern matches candidates.
@@ -101,7 +105,10 @@ def create_ext(
             return "Error: function must be lowercase alphanumeric with underscores, starting with a letter"
         if api_key and not re.match(r"^[A-Z][A-Z0-9_]*$", api_key):
             return "Error: api_key must be an UPPER_SNAKE_CASE secret name"
-        for label, text in (("description", description), ("function_description", function_description)):
+        for label, text in (
+            ("description", description),
+            ("function_description", function_description),
+        ):
             if '"""' in text or "'''" in text or "\n" in text or "\\" in text:
                 return f"Error: {label} must be a single line without quotes-triples or backslashes"
 
@@ -147,7 +154,7 @@ def create_ext(
             "",
             "Next steps:",
             "  1. Edit the file to implement your logic",
-            f"  2. Validate before reload: ot_forge.validate_ext(path=\"{ext_file}\")",
+            f'  2. Validate before reload: ot_forge.validate_ext(path="{ext_file}")',
             "  3. Reload to activate: ot.reload()",
             f"  4. Use your tool: {pack}.{function}()",
         ]
@@ -180,7 +187,9 @@ def _check_best_practices(
     has_future_annotations = "from __future__ import annotations" in content
     checks["future_annotations"] = has_future_annotations
     if not has_future_annotations:
-        warnings.append("Best practice: Add 'from __future__ import annotations' for forward compatibility")
+        warnings.append(
+            "Best practice: Add 'from __future__ import annotations' for forward compatibility"
+        )
 
     # Find line numbers of key elements
     pack_line = None
@@ -189,11 +198,17 @@ def _check_best_practices(
     for i, line in enumerate(lines, 1):
         if line.startswith("pack = ") and pack_line is None:
             pack_line = i
-        if (line.startswith("import ") or line.startswith("from ")) and first_import_line is None and "from __future__" not in line:
+        if (
+            (line.startswith("import ") or line.startswith("from "))
+            and first_import_line is None
+            and "from __future__" not in line
+        ):
             first_import_line = i
 
     # Check: pack before imports
-    pack_before_imports = not (pack_line and first_import_line and pack_line > first_import_line)
+    pack_before_imports = not (
+        pack_line and first_import_line and pack_line > first_import_line
+    )
     checks["pack_before_imports"] = pack_before_imports
     if not pack_before_imports:
         warnings.append("Best practice: 'pack = \"name\"' should appear before imports")
@@ -202,13 +217,17 @@ def _check_best_practices(
     has_log_usage = "LogSpan" in content or "with log(" in content
     checks["log_usage"] = has_log_usage
     if not has_log_usage:
-        warnings.append("Best practice: Consider using LogSpan or log() for observability")
+        warnings.append(
+            "Best practice: Consider using LogSpan or log() for observability"
+        )
 
     # Check for raise statements (should prefer return error strings)
     has_raise = any(isinstance(node, ast.Raise) for node in ast.walk(tree))
     checks["no_raise"] = not has_raise
     if has_raise:
-        warnings.append("Best practice: Consider returning error strings instead of raising exceptions")
+        warnings.append(
+            "Best practice: Consider returning error strings instead of raising exceptions"
+        )
 
     # Check for keyword-only args in exported functions
     exported_funcs = _get_exported_functions(tree)
@@ -219,7 +238,9 @@ def _check_best_practices(
             break
     checks["keyword_only_args"] = all_kwonly
     if not all_kwonly:
-        warnings.append("Best practice: Use keyword-only args (*, param) for API clarity")
+        warnings.append(
+            "Best practice: Use keyword-only args (*, param) for API clarity"
+        )
 
     # Check for complete docstrings (Args, Returns, Example)
     docstring_complete = True
@@ -237,25 +258,36 @@ def _check_best_practices(
             break
     checks["docstring_complete"] = docstring_complete
     if not docstring_complete:
-        warnings.append("Best practice: Docstrings should have Args, Returns, and Example sections")
+        warnings.append(
+            "Best practice: Docstrings should have Args, Returns, and Example sections"
+        )
 
     return checks, warnings
 
 
-def _get_exported_functions(tree: ast.Module) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
+def _get_exported_functions(
+    tree: ast.Module,
+) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
     """Get functions that are exported via __all__."""
     all_names: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
             for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == "__all__" and isinstance(node.value, ast.List):
+                if (
+                    isinstance(target, ast.Name)
+                    and target.id == "__all__"
+                    and isinstance(node.value, ast.List)
+                ):
                     for elt in node.value.elts:
                         if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
                             all_names.add(elt.value)
 
     funcs: list[ast.FunctionDef | ast.AsyncFunctionDef] = []
     for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in all_names:
+        if (
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name in all_names
+        ):
             funcs.append(node)
     return funcs
 
@@ -334,16 +366,20 @@ def validate_ext(*, path: str) -> str:
         for node in tree.body:
             if (
                 isinstance(node, ast.Assign)
-                and any(isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets)
+                and any(
+                    isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets
+                )
                 and isinstance(node.value, (ast.List, ast.Tuple))
             ):
-                    for elt in node.value.elts:
-                        if (
-                            isinstance(elt, ast.Constant)
-                            and isinstance(elt.value, str)
-                            and elt.value not in defined_names
-                        ):
-                            errors.append(f"__all__ lists '{elt.value}' but it is not defined in the module")
+                for elt in node.value.elts:
+                    if (
+                        isinstance(elt, ast.Constant)
+                        and isinstance(elt.value, str)
+                        and elt.value not in defined_names
+                    ):
+                        errors.append(
+                            f"__all__ lists '{elt.value}' but it is not defined in the module"
+                        )
 
         # Check 4: Best practices
         checks, bp_warnings = _check_best_practices(content, tree)
@@ -353,16 +389,30 @@ def validate_ext(*, path: str) -> str:
         result: list[str] = []
 
         result.append("Checks:")
-        result.append(f"  [{'x' if has_pack else ' '}] pack = \"name\" variable")
+        result.append(f'  [{"x" if has_pack else " "}] pack = "name" variable')
         result.append(f"  [{'x' if has_all else ' '}] __all__ export list")
         result.append("  [x] Python syntax valid")
-        result.append(f"  [{'x' if checks.get('module_docstring', True) else ' '}] module docstring")
-        result.append(f"  [{'x' if checks.get('future_annotations', True) else ' '}] from __future__ import annotations")
-        result.append(f"  [{'x' if checks.get('pack_before_imports', True) else ' '}] pack before imports")
-        result.append(f"  [{'x' if checks.get('keyword_only_args', True) else ' '}] keyword-only args")
-        result.append(f"  [{'x' if checks.get('docstring_complete', True) else ' '}] complete docstrings")
-        result.append(f"  [{'x' if checks.get('log_usage', True) else ' '}] logging usage")
-        result.append(f"  [{'x' if checks.get('no_raise', True) else ' '}] returns errors (no raise)")
+        result.append(
+            f"  [{'x' if checks.get('module_docstring', True) else ' '}] module docstring"
+        )
+        result.append(
+            f"  [{'x' if checks.get('future_annotations', True) else ' '}] from __future__ import annotations"
+        )
+        result.append(
+            f"  [{'x' if checks.get('pack_before_imports', True) else ' '}] pack before imports"
+        )
+        result.append(
+            f"  [{'x' if checks.get('keyword_only_args', True) else ' '}] keyword-only args"
+        )
+        result.append(
+            f"  [{'x' if checks.get('docstring_complete', True) else ' '}] complete docstrings"
+        )
+        result.append(
+            f"  [{'x' if checks.get('log_usage', True) else ' '}] logging usage"
+        )
+        result.append(
+            f"  [{'x' if checks.get('no_raise', True) else ' '}] returns errors (no raise)"
+        )
 
         if errors:
             s.add(valid=False, errors=len(errors), warnings=len(warnings))

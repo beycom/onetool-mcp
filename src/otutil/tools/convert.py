@@ -19,11 +19,24 @@ __all__ = ["auto", "excel", "pdf", "powerpoint", "word"]
 __ot_requires__ = {
     "lib": [
         {"name": "pymupdf", "import_name": "fitz", "install": "pip install pymupdf"},
-        {"name": "python-docx", "import_name": "docx", "install": "pip install python-docx"},
-        {"name": "python-pptx", "import_name": "pptx", "install": "pip install python-pptx"},
+        {
+            "name": "python-docx",
+            "import_name": "docx",
+            "install": "pip install python-docx",
+        },
+        {
+            "name": "python-pptx",
+            "import_name": "pptx",
+            "install": "pip install python-pptx",
+        },
         ("openpyxl", "pip install openpyxl"),
         {"name": "Pillow", "import_name": "PIL", "install": "pip install Pillow"},
-        {"name": "formulas", "import_name": "formulas", "install": "pip install formulas", "optional": True},
+        {
+            "name": "formulas",
+            "import_name": "formulas",
+            "install": "pip install formulas",
+            "optional": True,
+        },
     ],
 }
 
@@ -206,9 +219,11 @@ async def _gather_conversions(
 
     # Process in bounded chunks to avoid creating unbounded task/result lists.
     for i in range(0, len(work), concurrency):
-        chunk = work[i:i + concurrency]
+        chunk = work[i : i + concurrency]
         tasks = [
-            _convert_file_async(converter, path, output_dir, _get_source_rel(path), **kwargs)
+            _convert_file_async(
+                converter, path, output_dir, _get_source_rel(path), **kwargs
+            )
             for path, converter in chunk
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -235,7 +250,9 @@ async def _convert_batch_async(
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Convert multiple files in parallel."""
-    return await _gather_conversions([(f, converter) for f in files], output_dir, **kwargs)
+    return await _gather_conversions(
+        [(f, converter) for f in files], output_dir, **kwargs
+    )
 
 
 async def _convert_auto_batch_async(
@@ -283,7 +300,9 @@ def _run_conversion(
     ``single_summary(result)`` returns ``(stats_for_span, summary_text)`` for
     the single-file path; batch runs report converted/failed counts.
     """
-    with LogSpan(span=span, pattern=pattern, outputDir=output_dir, **(span_extras or {})) as s:
+    with LogSpan(
+        span=span, pattern=pattern, outputDir=output_dir, **(span_extras or {})
+    ) as s:
         files = _resolve_glob(pattern)
         if not files:
             s.add(error="no_match")
@@ -303,10 +322,13 @@ def _run_conversion(
                 return f"Error converting {files[0].name}: {e}"
 
         try:
-            result = run_coro_sync(_convert_batch_async(files, out_path, converter, **kwargs))
+            result = run_coro_sync(
+                _convert_batch_async(files, out_path, converter, **kwargs)
+            )
             s.add(converted=result["converted"], failed=result["failed"])
             return _format_batch_result(
-                result, f"Converted {result['converted']} files, {result['failed']} failed"
+                result,
+                f"Converted {result['converted']} files, {result['failed']} failed",
             )
         except Exception as e:
             s.add(error=str(e))
@@ -373,7 +395,11 @@ def word(
         output_dir=output_dir,
         converter=convert_word,
         single_summary=lambda r: (
-            {"paragraphs": r["paragraphs"], "tables": r["tables"], "images": r["images"]},
+            {
+                "paragraphs": r["paragraphs"],
+                "tables": r["tables"],
+                "images": r["images"],
+            },
             f"{r['paragraphs']} paragraphs, {r['tables']} tables, {r['images']} images",
         ),
     )
@@ -522,8 +548,14 @@ def auto(
 
         # Batch conversion with async parallel processing
         try:
-            result = run_coro_sync(_convert_auto_batch_async(files, out_path, converters))
-            s.add(converted=result["converted"], failed=result["failed"], skipped=result["skipped"])
+            result = run_coro_sync(
+                _convert_auto_batch_async(files, out_path, converters)
+            )
+            s.add(
+                converted=result["converted"],
+                failed=result["failed"],
+                skipped=result["skipped"],
+            )
 
             return _format_batch_result(
                 result,

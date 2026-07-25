@@ -3,6 +3,7 @@
 Walk a directory, chunk markdown files, insert into SQLite,
 then run the link-graph second pass.
 """
+
 from __future__ import annotations
 
 import re
@@ -85,6 +86,7 @@ def index_directory(
     all_patterns = list(project_patterns) + (ignore or [])
     spec = _build_pathspec(all_patterns)
     from .db import _check_vec_available
+
     embeddings_enabled = _db_embeddings_enabled(db_name) and _check_vec_available()
 
     conn = get_connection(db_name)
@@ -138,7 +140,9 @@ def index_directory(
 
     # Batch embed all new/updated chunks in one pass
     if pending:
-        embed_err = _store_embeddings_batch(conn, pending, on_progress=on_embed_progress)
+        embed_err = _store_embeddings_batch(
+            conn, pending, on_progress=on_embed_progress
+        )
         if embed_err:
             result.errors.append(embed_err)
         conn.commit()
@@ -177,6 +181,7 @@ def _build_pathspec(patterns: list[str]) -> Any:
         return None
     try:
         import pathspec
+
         return pathspec.PathSpec.from_lines("gitwildmatch", patterns)
     except ImportError:
         logger.warning(
@@ -277,6 +282,7 @@ def _store_embeddings_batch(
     if not pending:
         return None
     from .db import _check_vec_available
+
     if not _check_vec_available():
         return "sqlite-vec not installed — embeddings skipped (install with: uv add sqlite-vec)"
 
@@ -298,7 +304,9 @@ def _store_embeddings_batch(
 
         try:
             vecs = client.embed_batch(contents, batch_size=len(sub))
-            pairs: list[tuple[str, list[float]]] = list(zip(chunk_ids, vecs, strict=True))
+            pairs: list[tuple[str, list[float]]] = list(
+                zip(chunk_ids, vecs, strict=True)
+            )
         except Exception:
             # Batch failed — fall back to per-item embedding to isolate bad chunk(s).
             # Abort the fallback early if _FALLBACK_ABORT_AFTER consecutive items fail
@@ -356,7 +364,10 @@ def _build_link_graph(
     # Build url → chunk_id index from meta.url and topic; deserialize meta once per row
     url_to_id: dict[str, str] = {}
     raw_rows = conn.execute("SELECT id, topic, content, meta FROM chunks").fetchall()
-    rows = [(cid, topic, content, deserialize_meta(meta_raw)) for cid, topic, content, meta_raw in raw_rows]
+    rows = [
+        (cid, topic, content, deserialize_meta(meta_raw))
+        for cid, topic, content, meta_raw in raw_rows
+    ]
     for chunk_id, topic, _, meta in rows:
         url = meta.get("url", "")
         if url:
@@ -413,4 +424,10 @@ def _insert_edge(
     )
 
 
-__all__ = ["IndexResult", "_apply_topic_roots", "_build_link_graph", "_store_embeddings_batch", "index_directory"]
+__all__ = [
+    "IndexResult",
+    "_apply_topic_roots",
+    "_build_link_graph",
+    "_store_embeddings_batch",
+    "index_directory",
+]

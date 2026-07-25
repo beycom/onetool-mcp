@@ -228,7 +228,11 @@ def result(
                 tail=tail,
                 context=context,
             )
-            result = query_result.to_dict() if hasattr(query_result, "to_dict") else dict(query_result)
+            result = (
+                query_result.to_dict()
+                if hasattr(query_result, "to_dict")
+                else dict(query_result)
+            )
             s.add("returned", result["returned"])
             s.add("totalLines", result["total_lines"])
             return result

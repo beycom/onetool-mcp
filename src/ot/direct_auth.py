@@ -81,7 +81,9 @@ def signed_console_headers(
     )
 
 
-def verify_request(*, method: str, path: str, body: bytes, headers: dict[str, str]) -> None:
+def verify_request(
+    *, method: str, path: str, body: bytes, headers: dict[str, str]
+) -> None:
     """Verify a signed MCP direct API request."""
     verify_http_message(
         key=direct_auth_key(),
@@ -117,7 +119,9 @@ def sign_response(*, path: str, body: bytes, status_code: int) -> dict[str, str]
     )
 
 
-def sign_console_response(*, path: str, body: bytes, status_code: int) -> dict[str, str]:
+def sign_console_response(
+    *, path: str, body: bytes, status_code: int
+) -> dict[str, str]:
     """Return signed Console outbox response headers."""
     return sign_http_message(
         key=console_outbox_auth_key(),
@@ -163,13 +167,17 @@ def verify_console_response(
     )
 
 
-def signed_json_response(payload: dict[str, Any], *, path: str, status_code: int = 200) -> Any:
+def signed_json_response(
+    payload: dict[str, Any], *, path: str, status_code: int = 200
+) -> Any:
     """Build a signed Starlette JSON response."""
     from starlette.responses import Response
 
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     headers = sign_response(path=path, body=body, status_code=status_code)
-    return Response(body, status_code=status_code, headers=headers, media_type="application/json")
+    return Response(
+        body, status_code=status_code, headers=headers, media_type="application/json"
+    )
 
 
 def signed_console_json_response(
@@ -180,12 +188,18 @@ def signed_console_json_response(
 
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     headers = sign_console_response(path=path, body=body, status_code=status_code)
-    return Response(body, status_code=status_code, headers=headers, media_type="application/json")
+    return Response(
+        body, status_code=status_code, headers=headers, media_type="application/json"
+    )
 
 
 def auth_error_response(error: Exception, *, path: str = RUN_PATH) -> Any:
     """Build a signed 401 response for auth failures."""
-    return signed_json_response({"protocol_version": 1, "result": str(error), "success": False}, path=path, status_code=401)
+    return signed_json_response(
+        {"protocol_version": 1, "result": str(error), "success": False},
+        path=path,
+        status_code=401,
+    )
 
 
 def console_auth_error_response(error: Exception, *, path: str) -> Any:

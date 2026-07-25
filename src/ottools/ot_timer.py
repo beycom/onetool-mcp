@@ -139,7 +139,11 @@ def clear(*, results: bool = False) -> dict[str, Any]:
         _timers.clear()
         if results:
             _results.clear()
-        return {"status": "cleared", "timers_removed": timer_count, "results_removed": result_count}
+        return {
+            "status": "cleared",
+            "timers_removed": timer_count,
+            "results_removed": result_count,
+        }
 
 
 def _format_duration(seconds: float) -> str:

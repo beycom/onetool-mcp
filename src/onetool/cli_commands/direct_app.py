@@ -33,7 +33,9 @@ def _tcp_probe(host: str, port: int, timeout: float = 0.1) -> bool:
         return False
 
 
-def _signed_get(host: str, port: int, *, path: str, timeout: float, ot_dir: Path) -> dict[str, Any]:
+def _signed_get(
+    host: str, port: int, *, path: str, timeout: float, ot_dir: Path
+) -> dict[str, Any]:
     """Return a signed GET payload from the MCP direct API."""
     import urllib.error
     import urllib.request
@@ -70,14 +72,18 @@ def _signed_get(host: str, port: int, *, path: str, timeout: float, ot_dir: Path
         raise RuntimeError(payload.get("result", payload.get("error", str(e)))) from e
 
 
-def _signed_ready_probe(host: str, port: int, *, ot_dir: Path, timeout: float = 0.5) -> dict[str, Any]:
+def _signed_ready_probe(
+    host: str, port: int, *, ot_dir: Path, timeout: float = 0.5
+) -> dict[str, Any]:
     """Return signed readiness payload from the MCP direct API."""
     from ot.direct_auth import READY_PATH
 
     return _signed_get(host, port, path=READY_PATH, timeout=timeout, ot_dir=ot_dir)
 
 
-def _signed_health_probe(host: str, port: int, *, ot_dir: Path, timeout: float = 0.5) -> dict[str, Any]:
+def _signed_health_probe(
+    host: str, port: int, *, ot_dir: Path, timeout: float = 0.5
+) -> dict[str, Any]:
     """Return signed health payload from the MCP direct API."""
     from ot.direct_auth import HEALTH_PATH
 
@@ -176,7 +182,9 @@ def _resolve_ot_dir(value: Path | None) -> Path:
         return _default_ot_dir()
 
     if not str(value).startswith("~") and not value.is_absolute():
-        err_console.print("[red]Error: --ot-dir must be an absolute path after ~ expansion.[/red]")
+        err_console.print(
+            "[red]Error: --ot-dir must be an absolute path after ~ expansion.[/red]"
+        )
         raise typer.Exit(2)
     resolved = expand_path(str(value))
     return resolved
@@ -197,7 +205,9 @@ def direct_run(
     ] = None,
     port: Annotated[
         int | None,
-        typer.Option("--port", "-p", help="Target MCP direct API port", min=1, max=65535),
+        typer.Option(
+            "--port", "-p", help="Target MCP direct API port", min=1, max=65535
+        ),
     ] = None,
     ot_dir: Annotated[
         Path | None,
@@ -209,13 +219,16 @@ def direct_run(
     fmt: Annotated[
         str,
         typer.Option(
-            "--format", "-f",
+            "--format",
+            "-f",
             help="Output format: json_h (default), json, yml, yml_h, raw",
         ),
     ] = "json_h",
     sanitize: Annotated[
         bool,
-        typer.Option("--sanitize", help="Enable output sanitization (for AI pipeline use)"),
+        typer.Option(
+            "--sanitize", help="Enable output sanitization (for AI pipeline use)"
+        ),
     ] = False,
     timeout_opt: Annotated[
         int | None,
@@ -264,9 +277,13 @@ def direct_run(
             err_console.print(f"[red]Direct API unreachable on 127.0.0.1:{port}[/red]")
             raise typer.Exit(1)
         err_console.print("[dim]direct.run signed health/readiness check[/dim]")
-        health = _signed_health_probe(host, port, ot_dir=resolved_ot_dir, timeout=min(timeout, 5))
+        health = _signed_health_probe(
+            host, port, ot_dir=resolved_ot_dir, timeout=min(timeout, 5)
+        )
         if health.get("protocol_version") != 1:
-            err_console.print("[red]Direct API protocol mismatch during health check[/red]")
+            err_console.print(
+                "[red]Direct API protocol mismatch during health check[/red]"
+            )
             raise typer.Exit(1)
         _signed_ready_probe(host, port, ot_dir=resolved_ot_dir, timeout=min(timeout, 5))
         err_console.print("[dim]direct.run authenticated connect succeeded[/dim]")

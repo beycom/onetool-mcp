@@ -90,7 +90,9 @@ def validate_registry_doc(path: Path = DOC) -> list[str]:
     """Validate the tools reference page against the runtime registry."""
     if not path.exists():
         return [f"missing {path}"]
-    return validate_registry_text(path.read_text(encoding="utf-8"), runtime_tool_counts())
+    return validate_registry_text(
+        path.read_text(encoding="utf-8"), runtime_tool_counts()
+    )
 
 
 def _check_skill_index_in_sync() -> list[str]:
@@ -101,7 +103,9 @@ def _check_skill_index_in_sync() -> list[str]:
         return [f"missing {skill_index} — run `just docs-sync`"]
     if not docs_index.exists():
         return [f"missing {docs_index} — run `just docs-sync`"]
-    if docs_index.read_text(encoding="utf-8") != skill_index.read_text(encoding="utf-8"):
+    if docs_index.read_text(encoding="utf-8") != skill_index.read_text(
+        encoding="utf-8"
+    ):
         return [
             f"{skill_index} differs from {docs_index} — run `just docs-sync` and commit"
         ]

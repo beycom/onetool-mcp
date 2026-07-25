@@ -54,10 +54,7 @@ def grep_lines(
 
     groups: list[list[tuple[int, str, bool]]] = []
     for r_start, r_end in ranges:
-        group = [
-            (i + 1, lines[i], i in match_set)
-            for i in range(r_start, r_end + 1)
-        ]
+        group = [(i + 1, lines[i], i in match_set) for i in range(r_start, r_end + 1)]
         groups.append(group)
 
     return groups

@@ -88,8 +88,13 @@ def highlight_element(
         chrome_util.highlight_element(selector="button.submit", label="Click here")
     """
     return _highlight(
-        server, _TOOL, _PACK,
-        selector=selector, label=label, color=color, element_id=element_id,
+        server,
+        _TOOL,
+        _PACK,
+        selector=selector,
+        label=label,
+        color=color,
+        element_id=element_id,
     )
 
 

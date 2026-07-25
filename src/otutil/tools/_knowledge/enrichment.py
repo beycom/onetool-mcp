@@ -3,6 +3,7 @@
 Populates `chunks.summary` with short LLM-generated summaries. Select-missing
 semantics make every run a backfill; `force=True` re-summarises everything.
 """
+
 from __future__ import annotations
 
 import time
@@ -65,7 +66,9 @@ def _select_chunks(
         for i in range(0, len(ids), _IDS_CHUNK_SIZE):
             sub = ids[i : i + _IDS_CHUNK_SIZE]
             placeholders = ", ".join("?" for _ in sub)
-            rows.extend(conn.execute(f"{base} AND id IN ({placeholders})", sub).fetchall())
+            rows.extend(
+                conn.execute(f"{base} AND id IN ({placeholders})", sub).fetchall()
+            )
         rows.sort(key=lambda row: row[1])
         return rows[:limit] if limit is not None else rows
 
@@ -92,7 +95,10 @@ def _summarise_with_retry(client: Any, *, model: str, system: str, user: str) ->
             return (resp.choices[0].message.content or "").strip()
         except Exception as e:
             status = getattr(e, "status_code", None)
-            if status not in _RETRYABLE_HTTP_STATUS or attempt == _ENRICH_MAX_ATTEMPTS - 1:
+            if (
+                status not in _RETRYABLE_HTTP_STATUS
+                or attempt == _ENRICH_MAX_ATTEMPTS - 1
+            ):
                 raise
             wait = 2.0**attempt
             logger.warning(
@@ -138,7 +144,9 @@ def enrich_db(
     config = _get_config()
     client = _get_llm_client()
     if client is None:
-        raise ValueError("OPENAI_API_KEY not configured in secrets.yaml (required for kb enrich)")
+        raise ValueError(
+            "OPENAI_API_KEY not configured in secrets.yaml (required for kb enrich)"
+        )
 
     from ot.config import get_llm_config
 
@@ -165,10 +173,15 @@ def enrich_db(
             else:
                 user = f"Topic: {topic}\n\n{content[: config.enrich_max_chars]}"
                 try:
-                    summary = _summarise_with_retry(client, model=model, system=system, user=user)
+                    summary = _summarise_with_retry(
+                        client, model=model, system=system, user=user
+                    )
                     if not summary:
                         raise ValueError("empty LLM response")
-                    conn.execute("UPDATE chunks SET summary = ? WHERE id = ?", [summary, chunk_id])
+                    conn.execute(
+                        "UPDATE chunks SET summary = ? WHERE id = ?",
+                        [summary, chunk_id],
+                    )
                     result.enriched += 1
                     uncommitted += 1
                     consecutive_failures = 0

@@ -34,7 +34,14 @@ _REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
 
 _DETAIL_LEVELS = {"sys", "app", "cmp"}
 _CONNECT_LEVELS = {"sys", "app", "cmp", "lowest_visible"}
-_PROJECT_SCOPE_CHANGE_TYPES = {"existing", "new", "changed", "removed", "impacted", "dependency"}
+_PROJECT_SCOPE_CHANGE_TYPES = {
+    "existing",
+    "new",
+    "changed",
+    "removed",
+    "impacted",
+    "dependency",
+}
 
 
 def _missing_required(
@@ -101,7 +108,12 @@ def _check_refs(
                 Issue(
                     code="invalid_reference",
                     message=f"Application references unknown system '{sys_id}'",
-                    details={"sheet": SHEET_APP, "row": row_num, "field": "sys", "value": str(sys_id)},
+                    details={
+                        "sheet": SHEET_APP,
+                        "row": row_num,
+                        "field": "sys",
+                        "value": str(sys_id),
+                    },
                 )
             )
 
@@ -124,7 +136,12 @@ def _check_refs(
                     Issue(
                         code="invalid_reference",
                         message=f"Component references unknown application '{app_id}'",
-                        details={"sheet": SHEET_CMP, "row": row_num, "field": "app", "value": str(app_id)},
+                        details={
+                            "sheet": SHEET_CMP,
+                            "row": row_num,
+                            "field": "app",
+                            "value": str(app_id),
+                        },
                     )
                 )
         elif str(sys_id).strip() not in system_ids:
@@ -132,7 +149,12 @@ def _check_refs(
                 Issue(
                     code="invalid_reference",
                     message=f"Component references unknown system '{sys_id}'",
-                    details={"sheet": SHEET_CMP, "row": row_num, "field": "sys", "value": str(sys_id)},
+                    details={
+                        "sheet": SHEET_CMP,
+                        "row": row_num,
+                        "field": "sys",
+                        "value": str(sys_id),
+                    },
                 )
             )
 
@@ -145,7 +167,11 @@ def _check_refs(
                 Issue(
                     code="missing_reference",
                     message="Interface row must reference provider",
-                    details={"sheet": SHEET_INTERFACE, "row": row_num, "field": "provider"},
+                    details={
+                        "sheet": SHEET_INTERFACE,
+                        "row": row_num,
+                        "field": "provider",
+                    },
                 )
             )
         elif str(provider_id).strip() not in node_ids:
@@ -153,7 +179,12 @@ def _check_refs(
                 Issue(
                     code="invalid_reference",
                     message=f"Interface provider '{provider_id}' not found",
-                    details={"sheet": SHEET_INTERFACE, "row": row_num, "field": "provider", "value": str(provider_id)},
+                    details={
+                        "sheet": SHEET_INTERFACE,
+                        "row": row_num,
+                        "field": "provider",
+                        "value": str(provider_id),
+                    },
                 )
             )
 
@@ -162,7 +193,11 @@ def _check_refs(
                 Issue(
                     code="missing_reference",
                     message="Interface row must reference consumer",
-                    details={"sheet": SHEET_INTERFACE, "row": row_num, "field": "consumer"},
+                    details={
+                        "sheet": SHEET_INTERFACE,
+                        "row": row_num,
+                        "field": "consumer",
+                    },
                 )
             )
         elif str(consumer_id).strip() not in node_ids:
@@ -170,7 +205,12 @@ def _check_refs(
                 Issue(
                     code="invalid_reference",
                     message=f"Interface consumer '{consumer_id}' not found",
-                    details={"sheet": SHEET_INTERFACE, "row": row_num, "field": "consumer", "value": str(consumer_id)},
+                    details={
+                        "sheet": SHEET_INTERFACE,
+                        "row": row_num,
+                        "field": "consumer",
+                        "value": str(consumer_id),
+                    },
                 )
             )
 
@@ -180,7 +220,11 @@ def _check_refs(
                 Issue(
                     code="invalid_value",
                     message="Interface interaction_type must be non-empty when provided",
-                    details={"sheet": SHEET_INTERFACE, "row": row_num, "field": "interaction_type"},
+                    details={
+                        "sheet": SHEET_INTERFACE,
+                        "row": row_num,
+                        "field": "interaction_type",
+                    },
                 )
             )
 
@@ -204,7 +248,11 @@ def _check_refs(
                     )
                 )
 
-    project_ids = {str(row.get("id", "")).strip() for row in entities.get(SHEET_PROJECT, []) if row.get("id")}
+    project_ids = {
+        str(row.get("id", "")).strip()
+        for row in entities.get(SHEET_PROJECT, [])
+        if row.get("id")
+    }
     item_ids_by_type = {
         "sys": system_ids,
         "app": app_ids,
@@ -223,7 +271,10 @@ def _check_refs(
     for row in entities.get(SHEET_PROJECT, []):
         row_num = int(row.get("_sheet_row", 0))
         detail_level = row.get("detail_level")
-        if detail_level is not None and str(detail_level).strip().lower() not in _DETAIL_LEVELS:
+        if (
+            detail_level is not None
+            and str(detail_level).strip().lower() not in _DETAIL_LEVELS
+        ):
             issues.append(
                 Issue(
                     code="invalid_value",
@@ -237,7 +288,10 @@ def _check_refs(
                 )
             )
         connect_level = row.get("connect_level")
-        if connect_level is not None and str(connect_level).strip().lower() not in _CONNECT_LEVELS:
+        if (
+            connect_level is not None
+            and str(connect_level).strip().lower() not in _CONNECT_LEVELS
+        ):
             issues.append(
                 Issue(
                     code="invalid_value",
@@ -288,7 +342,11 @@ def _check_refs(
                 )
             )
         item_id = row.get("item_id")
-        if item_type is not None and item_id is not None and str(item_id).strip() not in item_ids_by_type[item_type]:
+        if (
+            item_type is not None
+            and item_id is not None
+            and str(item_id).strip() not in item_ids_by_type[item_type]
+        ):
             issues.append(
                 Issue(
                     code="invalid_reference",
@@ -304,7 +362,10 @@ def _check_refs(
             )
 
         change_type = row.get("change_type")
-        if change_type is not None and str(change_type).strip().lower() not in _PROJECT_SCOPE_CHANGE_TYPES:
+        if (
+            change_type is not None
+            and str(change_type).strip().lower() not in _PROJECT_SCOPE_CHANGE_TYPES
+        ):
             issues.append(
                 Issue(
                     code="invalid_value",
@@ -326,7 +387,12 @@ def _check_refs(
                 Issue(
                     code="invalid_reference",
                     message=f"User references unknown application '{app_id}'",
-                    details={"sheet": SHEET_USR, "row": row_num, "field": "app", "value": str(app_id)},
+                    details={
+                        "sheet": SHEET_USR,
+                        "row": row_num,
+                        "field": "app",
+                        "value": str(app_id),
+                    },
                 )
             )
 
@@ -355,7 +421,11 @@ def _collect_warnings(
         if not cmp_id:
             continue
         app_ref = str(first_value(row, APP_REF_KEYS) or "").strip()
-        owner = app_to_sys.get(app_ref) if app_ref else str(first_value(row, SYS_REF_KEYS) or "").strip()
+        owner = (
+            app_to_sys.get(app_ref)
+            if app_ref
+            else str(first_value(row, SYS_REF_KEYS) or "").strip()
+        )
         if owner:
             cmp_to_sys[cmp_id] = owner
 
@@ -390,7 +460,11 @@ def _collect_warnings(
                     f"System '{sys_id}' is not referenced by any interface endpoint "
                     "or project scope row"
                 ),
-                details={"sheet": SHEET_SYS, "row": int(row.get("_sheet_row", 0)), "id": sys_id},
+                details={
+                    "sheet": SHEET_SYS,
+                    "row": int(row.get("_sheet_row", 0)),
+                    "id": sys_id,
+                },
             )
         )
 
@@ -448,10 +522,18 @@ def validate_entities(*, entities: dict[str, list[dict[str, Any]]]) -> dict[str,
             errors.extend(_missing_required(sheet=sheet, row=row, row_index=row_num))
         errors.extend(_duplicate_ids(sheet=sheet, rows=rows))
 
-    system_ids = {str(row["id"]).strip() for row in entities.get(SHEET_SYS, []) if row.get("id")}
-    app_ids = {str(row["id"]).strip() for row in entities.get(SHEET_APP, []) if row.get("id")}
-    component_ids = {str(row["id"]).strip() for row in entities.get(SHEET_CMP, []) if row.get("id")}
-    user_ids = {str(row["id"]).strip() for row in entities.get(SHEET_USR, []) if row.get("id")}
+    system_ids = {
+        str(row["id"]).strip() for row in entities.get(SHEET_SYS, []) if row.get("id")
+    }
+    app_ids = {
+        str(row["id"]).strip() for row in entities.get(SHEET_APP, []) if row.get("id")
+    }
+    component_ids = {
+        str(row["id"]).strip() for row in entities.get(SHEET_CMP, []) if row.get("id")
+    }
+    user_ids = {
+        str(row["id"]).strip() for row in entities.get(SHEET_USR, []) if row.get("id")
+    }
 
     # IDs shared across node sheets resolve ambiguously in diagrams; reject them.
     sheets_by_id: dict[str, list[str]] = {}

@@ -1,4 +1,5 @@
 """File-backed memory refresh."""
+
 from __future__ import annotations
 
 import builtins
@@ -51,7 +52,9 @@ def refresh(
                 return "No memories found" + (f" under '{topic}'" if topic else "")
 
             fresh_count = 0
-            stale_entries: _builtins_list[tuple[str, str, str, dict[str, str], str]] = []
+            stale_entries: _builtins_list[
+                tuple[str, str, str, dict[str, str], str]
+            ] = []
             missing_entries: _builtins_list[str] = []
             skipped = 0
 
@@ -62,7 +65,9 @@ def refresh(
                     fresh_count += 1
                 elif status == "stale":
                     source_path = meta["source"]
-                    stale_entries.append((mem_id, mem_topic, old_content, meta, source_path))
+                    stale_entries.append(
+                        (mem_id, mem_topic, old_content, meta, source_path)
+                    )
                 elif status == "missing":
                     missing_entries.append(mem_topic)
                 else:
@@ -71,7 +76,9 @@ def refresh(
             total_checked = fresh_count + len(stale_entries) + len(missing_entries)
             if total_checked == 0:
                 s.add("skipped", skipped)
-                return "No file-backed memories found" + (f" under '{topic}'" if topic else "")
+                return "No file-backed memories found" + (
+                    f" under '{topic}'" if topic else ""
+                )
 
             # Build report
             scope = f' for "{topic}"' if topic else ""
@@ -84,13 +91,17 @@ def refresh(
                     p = Path(source_path)
                     if dry_run:
                         new_size = p.stat().st_size if p.exists() else 0
-                        parts.append(f"    - {mem_topic} ({len(old_content)} -> {new_size} chars)")
+                        parts.append(
+                            f"    - {mem_topic} ({len(old_content)} -> {new_size} chars)"
+                        )
                     else:
                         # Actually refresh
                         try:
                             new_content = p.read_text(encoding="utf-8")
                         except OSError:
-                            parts.append(f"    - {mem_topic} (skipped: source file disappeared)")
+                            parts.append(
+                                f"    - {mem_topic} (skipped: source file disappeared)"
+                            )
                             continue
                         if len(new_content) > 1_000_000:
                             parts.append(f"    - {mem_topic} (skipped: file too large)")
@@ -116,7 +127,9 @@ def refresh(
                             conn.commit()
                         _enqueue_after_commit(mem_id)
 
-                        parts.append(f"    - {mem_topic} ({len(old_content)} -> {len(new_content)} chars)")
+                        parts.append(
+                            f"    - {mem_topic} ({len(old_content)} -> {len(new_content)} chars)"
+                        )
 
             if missing_entries:
                 parts.append(f"  {len(missing_entries)} missing - skipped:")

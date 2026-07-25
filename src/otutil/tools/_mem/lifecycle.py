@@ -1,4 +1,5 @@
 """Memory lifecycle: decay, stats, embed, flush."""
+
 from __future__ import annotations
 
 import math
@@ -68,20 +69,26 @@ def decay(
                 decayed_score = relevance * decay_factor * access_boost
                 new_relevance = max(1, min(relevance, round(decayed_score)))
 
-                decay_results.append({
-                    "id": memory_id,
-                    "topic": topic,
-                    "old_relevance": relevance,
-                    "new_relevance": new_relevance,
-                    "age_days": round(age_days, 1),
-                    "access_count": access_count,
-                })
+                decay_results.append(
+                    {
+                        "id": memory_id,
+                        "topic": topic,
+                        "old_relevance": relevance,
+                        "new_relevance": new_relevance,
+                        "age_days": round(age_days, 1),
+                        "access_count": access_count,
+                    }
+                )
 
             s.add("memoryCount", len(decay_results))
 
             if dry_run:
-                lines = [f"Decay preview ({len(decay_results)} memories, half_life={half_life}d):\n"]
-                changed = [d for d in decay_results if d["old_relevance"] != d["new_relevance"]]
+                lines = [
+                    f"Decay preview ({len(decay_results)} memories, half_life={half_life}d):\n"
+                ]
+                changed = [
+                    d for d in decay_results if d["old_relevance"] != d["new_relevance"]
+                ]
                 for d in changed[:20]:
                     lines.append(
                         f"  {d['topic']}: {d['old_relevance']} -> {d['new_relevance']} "
@@ -163,7 +170,9 @@ def stats() -> str:
             ).fetchone()
 
             # History count
-            history_count = conn.execute("SELECT COUNT(*) FROM memory_history").fetchone()[0]
+            history_count = conn.execute(
+                "SELECT COUNT(*) FROM memory_history"
+            ).fetchone()[0]
 
             # Embedding stats
             without_embeddings = conn.execute(
@@ -233,7 +242,9 @@ def reindex(
     """
     config = _get_config()
     if not config.embeddings_enabled:
-        return "Embeddings are disabled. Enable with: tools.mem.embeddings_enabled: true"
+        return (
+            "Embeddings are disabled. Enable with: tools.mem.embeddings_enabled: true"
+        )
 
     with LogSpan(span="mem.reindex", topic=topic, limit=limit, dryRun=dry_run) as s:
         try:

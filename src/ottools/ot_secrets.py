@@ -245,7 +245,9 @@ def unset(*, key: str, file: str | None = None) -> dict[str, Any]:
         return {"removed": True, "key": key}
 
 
-def _load_secrets_mapping(path: Path, s: Any) -> tuple[dict[str, Any], dict[str, Any] | None]:
+def _load_secrets_mapping(
+    path: Path, s: Any
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
     """Load a secrets YAML mapping. Returns (data, None) or ({}, error_dict)."""
     if not path.exists():
         s.add(status="file_not_found")
@@ -268,10 +270,14 @@ def _load_secrets_snapshot(
     """Load one exact byte snapshot for both parsing and recovery backup."""
     if not path.exists():
         s.add(status="file_not_found")
-        return {}, b"", {
-            "error": f"File not found: {path}",
-            "status": "file_not_found",
-        }
+        return (
+            {},
+            b"",
+            {
+                "error": f"File not found: {path}",
+                "status": "file_not_found",
+            },
+        )
     source = path.read_bytes()
     try:
         data = yaml.safe_load(source)
@@ -280,10 +286,14 @@ def _load_secrets_snapshot(
         return {}, source, {"error": str(exc), "status": "invalid_yaml"}
     if not isinstance(data, dict):
         s.add(status="invalid_yaml")
-        return {}, source, {
-            "error": "File must be a YAML mapping",
-            "status": "invalid_yaml",
-        }
+        return (
+            {},
+            source,
+            {
+                "error": "File must be a YAML mapping",
+                "status": "invalid_yaml",
+            },
+        )
     return data, source, None
 
 
@@ -743,7 +753,9 @@ def get(
                 pyrage = _require_pyrage()
                 identity = pyrage.x25519.Identity.from_str(private_key)
                 try:
-                    ciphertext = base64.b64decode(raw_str[len(_PREFIX) :], validate=True)
+                    ciphertext = base64.b64decode(
+                        raw_str[len(_PREFIX) :], validate=True
+                    )
                     plaintext = pyrage.decrypt(ciphertext, [identity]).decode()
                 except (ValueError, pyrage.DecryptError) as exc:
                     s.add(status="decrypt_failed")

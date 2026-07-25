@@ -1,4 +1,5 @@
 """Retrieval and synthesis tools: kb.search, kb.ask, kb.related."""
+
 from __future__ import annotations
 
 from collections import deque
@@ -90,7 +91,9 @@ def search(
         kb.search(query='async await', db='docs', mode='keyword', k=5)
     """
     if mode not in ("hybrid", "semantic", "keyword"):
-        return f"Error: Invalid mode '{mode}'. Must be 'hybrid', 'semantic', or 'keyword'"
+        return (
+            f"Error: Invalid mode '{mode}'. Must be 'hybrid', 'semantic', or 'keyword'"
+        )
 
     config = _get_config()
     limit = k if k is not None else config.search_limit
@@ -143,7 +146,9 @@ def search(
 
             # Python-side metadata filters
             if source or tag or after:
-                results = apply_metadata_filters(results, source=source, tag=tag, after=after)
+                results = apply_metadata_filters(
+                    results, source=source, tag=tag, after=after
+                )
 
             results = results[:limit]
 
@@ -252,7 +257,10 @@ def ask(
 
             s.add("chunkCount", len(results))
 
-            cite_lines = [f"  [{c['num']}] {c['topic']}" + (f" ({c['url']})" if c["url"] else "") for c in citations]
+            cite_lines = [
+                f"  [{c['num']}] {c['topic']}" + (f" ({c['url']})" if c["url"] else "")
+                for c in citations
+            ]
             return degraded + f"{answer}\n\n**Sources:**\n" + "\n".join(cite_lines)
 
         except Exception as e:
@@ -286,10 +294,14 @@ def related(
     if depth not in (1, 2):
         return "Error: depth must be 1 or 2"
 
-    with LogSpan(span="kb.related", topic=topic, db=db, direction=direction, depth=depth):
+    with LogSpan(
+        span="kb.related", topic=topic, db=db, direction=direction, depth=depth
+    ):
         try:
             conn = get_connection(db)
-            row = conn.execute("SELECT id FROM chunks WHERE topic = ?", [topic]).fetchone()
+            row = conn.execute(
+                "SELECT id FROM chunks WHERE topic = ?", [topic]
+            ).fetchone()
             if not row:
                 return f"Error: No entry found for topic '{topic}'"
             chunk_id = row[0]
@@ -329,7 +341,14 @@ def _get_neighbours(
             if nb_id in seen:
                 continue
             seen.add(nb_id)
-            results.append({"id": nb_id, "topic": nb_topic, "anchor_text": anchor_text, "depth": current_depth})
+            results.append(
+                {
+                    "id": nb_id,
+                    "topic": nb_topic,
+                    "anchor_text": anchor_text,
+                    "depth": current_depth,
+                }
+            )
             if current_depth < depth:
                 queue.append((nb_id, current_depth + 1))
 
@@ -361,7 +380,9 @@ def _get_direct_neighbours(
     return list(out_rows) + list(in_rows)
 
 
-def _graph_expand(conn: Any, results: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+def _graph_expand(
+    conn: Any, results: list[dict[str, Any]], limit: int
+) -> list[dict[str, Any]]:
     """Add 1-hop outbound neighbours of top-k chunks (deduplicated)."""
     seen_ids = {r["id"] for r in results}
     extra = []
@@ -376,12 +397,21 @@ def _graph_expand(conn: Any, results: list[dict[str, Any]], limit: int) -> list[
                 seen_ids.add(row[0])
                 meta = deserialize_meta(row[5])
                 tags = deserialize_tags(row[4])
-                extra.append({
-                    "id": row[0], "topic": row[1], "content": row[2],
-                    "category": row[3], "tags": row[4], "meta": row[5],
-                    "hit_count": row[6], "summary": row[7] or "", "score": 0.0,
-                    "tags_list": tags, "meta_dict": meta,
-                })
+                extra.append(
+                    {
+                        "id": row[0],
+                        "topic": row[1],
+                        "content": row[2],
+                        "category": row[3],
+                        "tags": row[4],
+                        "meta": row[5],
+                        "hit_count": row[6],
+                        "summary": row[7] or "",
+                        "score": 0.0,
+                        "tags_list": tags,
+                        "meta_dict": meta,
+                    }
+                )
     combined = results + extra
     return combined[:limit]
 
@@ -395,6 +425,7 @@ def _llm_rerank(query: str, results: list[dict[str, Any]]) -> list[dict[str, Any
 
         config = _get_config()
         from ot.config import get_llm_config
+
         model = config.enrich_model or get_llm_config().model or "gpt-4o-mini"
 
         snippets = "\n\n".join(
@@ -416,9 +447,18 @@ def _llm_rerank(query: str, results: list[dict[str, Any]]) -> list[dict[str, Any
             max_tokens=100,
         )
         scores_str = resp.choices[0].message.content or ""
-        scores = [float(x.strip()) for x in scores_str.split(",") if x.strip().replace(".", "").isdigit()]
+        scores = [
+            float(x.strip())
+            for x in scores_str.split(",")
+            if x.strip().replace(".", "").isdigit()
+        ]
         if len(scores) == len(results):
-            return [r for _, r in sorted(zip(scores, results, strict=True), key=lambda x: x[0], reverse=True)]
+            return [
+                r
+                for _, r in sorted(
+                    zip(scores, results, strict=True), key=lambda x: x[0], reverse=True
+                )
+            ]
     except Exception:
         pass
     return results
@@ -429,10 +469,14 @@ def _synthesise(query: str, context: str) -> str:
     try:
         client = _get_llm_client()
         if client is None:
-            return "(LLM synthesis requires OPENAI_API_KEY — here are the retrieved chunks:)\n\n" + context[:2000]
+            return (
+                "(LLM synthesis requires OPENAI_API_KEY — here are the retrieved chunks:)\n\n"
+                + context[:2000]
+            )
 
         config = _get_config()
         from ot.config import get_llm_config
+
         model = config.enrich_model or get_llm_config().model or "gpt-4o-mini"
         prompt = (
             f"Answer the following question based on the provided context. "

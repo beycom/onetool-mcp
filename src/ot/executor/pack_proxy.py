@@ -126,7 +126,9 @@ def _create_mcp_proxy_pack(server_name: str, tool_prefix: str | None = None) -> 
 
         def __getattr__(self, accessor_name: str) -> Any:
             if accessor_name.startswith("_"):
-                raise AttributeError(f"Cannot access private attribute '{accessor_name}'")
+                raise AttributeError(
+                    f"Cannot access private attribute '{accessor_name}'"
+                )
 
             if accessor_name in self._function_cache:
                 return self._function_cache[accessor_name]
@@ -170,8 +172,14 @@ def _create_mcp_proxy_pack(server_name: str, tool_prefix: str | None = None) -> 
                         f"Available tools: {len(available_tools)} total."
                     )
                 else:
-                    available = ", ".join(f"'{t}'" for t in sorted(available_tools)[:10])
-                    more = f" (and {len(available_tools) - 10} more)" if len(available_tools) > 10 else ""
+                    available = ", ".join(
+                        f"'{t}'" for t in sorted(available_tools)[:10]
+                    )
+                    more = (
+                        f" (and {len(available_tools) - 10} more)"
+                        if len(available_tools) > 10
+                        else ""
+                    )
                     raise AttributeError(
                         f"Tool '{accessor_name}' not found in MCP server '{server_name}'. "
                         f"Available: {available}{more}"
@@ -184,13 +192,17 @@ def _create_mcp_proxy_pack(server_name: str, tool_prefix: str | None = None) -> 
 
                 # Resolve abbreviated parameter names (cached lookup)
                 if kwargs:
-                    param_names = get_mcp_tool_param_names(server_name, actual_tool_name)
+                    param_names = get_mcp_tool_param_names(
+                        server_name, actual_tool_name
+                    )
                     if param_names:
                         kwargs = resolve_kwargs(kwargs, param_names)
 
                 with timed_tool_call(tool_full_name):
                     timeout = proxy.get_server_timeout(server_name)
-                    return proxy.call_tool_sync(server_name, actual_tool_name, kwargs, timeout=timeout)
+                    return proxy.call_tool_sync(
+                        server_name, actual_tool_name, kwargs, timeout=timeout
+                    )
 
             self._function_cache[accessor_name] = call_proxy_tool
             return call_proxy_tool
@@ -266,9 +278,7 @@ def _create_proxy_introspection_pack() -> Any:
 _NAMESPACE_CACHE_MAXSIZE = 10
 _namespace_cache: OrderedDict[
     tuple[int, frozenset[str], frozenset[tuple[str, str | None]]], dict[str, Any]
-] = (
-    OrderedDict()
-)
+] = OrderedDict()
 
 
 def build_execution_namespace(

@@ -1,4 +1,5 @@
 """Crawl4AI-backed BFS scraping pipeline for `kb scrape`."""
+
 from __future__ import annotations
 
 import asyncio
@@ -82,7 +83,7 @@ def url_to_slug(url: str, base_path: str = "") -> str:
         base_path_only = urlparse(base_path).path if "://" in base_path else base_path
         norm_base = base_path_only.rstrip("/")
         if url_path.startswith(norm_base):
-            url_path = url_path[len(norm_base):]
+            url_path = url_path[len(norm_base) :]
     url_path = url_path.lstrip("/")
     segments = [re.sub(r"[^\w.\-]", "_", s) for s in url_path.split("/") if s]
     return "/".join(segments) or "index"
@@ -200,7 +201,9 @@ def _write_debug_artifacts(page: object, slug: str, output_dir: Path) -> None:
         "js_execution_result": getattr(page, "js_execution_result", None),
         "error_message": str(getattr(page, "error_message", "") or ""),
     }
-    _write_atomic_bytes(debug_dir / "meta.json", json.dumps(meta, default=str, indent=2).encode())
+    _write_atomic_bytes(
+        debug_dir / "meta.json", json.dumps(meta, default=str, indent=2).encode()
+    )
 
 
 def _resolve_image_urls(markdown: str, base_url: str) -> str:
@@ -262,16 +265,28 @@ def _process_page(
             result.skipped += 1
             status, error = "empty", ""
         else:
-            _write_page(output_dir, page_url, content, source_name,
-                        page_metadata=dict(getattr(page, "metadata", None) or {}),
-                        category=category, tags=tags, flat_files=flat_files)
+            _write_page(
+                output_dir,
+                page_url,
+                content,
+                source_name,
+                page_metadata=dict(getattr(page, "metadata", None) or {}),
+                category=category,
+                tags=tags,
+                flat_files=flat_files,
+            )
             result.written += 1
             status, error = "ok", ""
-    result.pages.append(PageRecord(
-        url=page_url, slug=slug, status=status,
-        content_len=len(content) if status == "ok" else 0,
-        elapsed_s=round(elapsed_s, 3), error=error,
-    ))
+    result.pages.append(
+        PageRecord(
+            url=page_url,
+            slug=slug,
+            status=status,
+            content_len=len(content) if status == "ok" else 0,
+            elapsed_s=round(elapsed_s, 3),
+            error=error,
+        )
+    )
     if debug:
         _write_debug_artifacts(page, slug, output_dir)
     if on_page:
@@ -286,6 +301,7 @@ def _build_deep_filter_chain(url: str, url_prefix: str) -> object:
         FilterChain,
         URLPatternFilter,
     )
+
     parsed = urlparse(url)
     domain = parsed.netloc
     filters: list[object] = [DomainFilter(allowed_domains=[domain])]
@@ -358,36 +374,38 @@ def run_scrape(
     Returns:
         ScrapeResult with written/failed/skipped counts and per-page records.
     """
-    return run_coro_sync(_run_scrape_async(
-        url=url,
-        output_dir=output_dir,
-        source_name=source_name,
-        depth=depth,
-        max_pages=max_pages,
-        url_prefix=url_prefix,
-        check_robots_txt=check_robots_txt,
-        delay_min=delay_min,
-        delay_max=delay_max,
-        user_agent=user_agent,
-        wait_for=wait_for,
-        page_timeout=page_timeout,
-        cache=cache,
-        process_iframes=process_iframes,
-        content_filter_threshold=content_filter_threshold,
-        min_word_threshold=min_word_threshold,
-        crawl_strategy=crawl_strategy,
-        seed_urls=seed_urls or [],
-        score=score or {},
-        css_selector=css_selector,
-        js_code=js_code,
-        include_images=include_images,
-        resume=resume,
-        flat_files=flat_files,
-        on_page=on_page,
-        category=category,
-        tags=tags or [],
-        debug=debug,
-    ))
+    return run_coro_sync(
+        _run_scrape_async(
+            url=url,
+            output_dir=output_dir,
+            source_name=source_name,
+            depth=depth,
+            max_pages=max_pages,
+            url_prefix=url_prefix,
+            check_robots_txt=check_robots_txt,
+            delay_min=delay_min,
+            delay_max=delay_max,
+            user_agent=user_agent,
+            wait_for=wait_for,
+            page_timeout=page_timeout,
+            cache=cache,
+            process_iframes=process_iframes,
+            content_filter_threshold=content_filter_threshold,
+            min_word_threshold=min_word_threshold,
+            crawl_strategy=crawl_strategy,
+            seed_urls=seed_urls or [],
+            score=score or {},
+            css_selector=css_selector,
+            js_code=js_code,
+            include_images=include_images,
+            resume=resume,
+            flat_files=flat_files,
+            on_page=on_page,
+            category=category,
+            tags=tags or [],
+            debug=debug,
+        )
+    )
 
 
 async def _run_scrape_async(
@@ -433,6 +451,7 @@ async def _run_scrape_async(
     from crawl4ai.markdown_generation_strategy import (  # type: ignore[import-untyped]
         DefaultMarkdownGenerator,
     )
+
     logging.getLogger("crawl4ai").setLevel(logging.WARNING)
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -499,7 +518,11 @@ async def _run_scrape_async(
         seed_done: set[str] = set()
         if resume and state_file.exists():
             try:
-                seed_done = set(json.loads(state_file.read_text(encoding="utf-8")).get("done_urls", []))
+                seed_done = set(
+                    json.loads(state_file.read_text(encoding="utf-8")).get(
+                        "done_urls", []
+                    )
+                )
             except Exception:
                 seed_done = set()
 
@@ -521,25 +544,42 @@ async def _run_scrape_async(
                     slug = url_to_slug(page_url)
                 except Exception as exc:
                     result.failed += 1
-                    result.pages.append(PageRecord(
-                        url=page_url, slug=slug, status="failed",
-                        content_len=0, elapsed_s=round(asyncio.get_running_loop().time() - t_page_start, 3),
-                        error=str(exc),
-                    ))
+                    result.pages.append(
+                        PageRecord(
+                            url=page_url,
+                            slug=slug,
+                            status="failed",
+                            content_len=0,
+                            elapsed_s=round(
+                                asyncio.get_running_loop().time() - t_page_start, 3
+                            ),
+                            error=str(exc),
+                        )
+                    )
                     if on_page:
                         on_page(result.written, page_url)
                     continue
                 status = _process_page(
-                    page, page_url, slug,
+                    page,
+                    page_url,
+                    slug,
                     asyncio.get_running_loop().time() - t_page_start,
-                    result, output_dir, source_name,
-                    include_images=include_images, category=category, tags=tags,
-                    flat_files=flat_files, debug=debug, on_page=on_page,
+                    result,
+                    output_dir,
+                    source_name,
+                    include_images=include_images,
+                    category=category,
+                    tags=tags,
+                    flat_files=flat_files,
+                    debug=debug,
+                    on_page=on_page,
                 )
                 if status != "failed":
                     seed_done.add(seed_url)
                     if resume:
-                        _write_atomic(state_file, json.dumps({"done_urls": sorted(seed_done)}))
+                        _write_atomic(
+                            state_file, json.dumps({"done_urls": sorted(seed_done)})
+                        )
     else:
         from crawl4ai.deep_crawling import (  # type: ignore[import-untyped]
             BFSDeepCrawlStrategy,
@@ -561,8 +601,13 @@ async def _run_scrape_async(
             from crawl4ai.deep_crawling.scorers import (  # type: ignore[import-untyped]
                 KeywordRelevanceScorer,
             )
+
             kw_entries = score.get("keyword_relevance", [])
-            scorer = KeywordRelevanceScorer(keywords=[e.split(":")[0] for e in kw_entries]) if kw_entries else None
+            scorer = (
+                KeywordRelevanceScorer(keywords=[e.split(":")[0] for e in kw_entries])
+                if kw_entries
+                else None
+            )
             strategy = BestFirstCrawlingStrategy(
                 max_depth=depth,
                 max_pages=max_pages,
@@ -602,15 +647,23 @@ async def _run_scrape_async(
 
         async with AsyncWebCrawler(config=browser_cfg) as crawler:
             t_page_start = asyncio.get_running_loop().time()
-            async for page in (await crawler.arun(url, config=run_cfg)):
+            async for page in await crawler.arun(url, config=run_cfg):
                 page_url = page.url
                 slug = url_to_slug(page_url)
                 _process_page(
-                    page, page_url, slug,
+                    page,
+                    page_url,
+                    slug,
                     asyncio.get_running_loop().time() - t_page_start,
-                    result, output_dir, source_name,
-                    include_images=include_images, category=category, tags=tags,
-                    flat_files=flat_files, debug=debug, on_page=on_page,
+                    result,
+                    output_dir,
+                    source_name,
+                    include_images=include_images,
+                    category=category,
+                    tags=tags,
+                    flat_files=flat_files,
+                    debug=debug,
+                    on_page=on_page,
                 )
                 if result.written >= max_pages:
                     break

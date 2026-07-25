@@ -115,9 +115,9 @@ def ping() -> None:
 
     # Update marker file (silent failure — ping still fires with stale event)
     with contextlib.suppress(Exception):
-        marker.write_text(
-            f"{current_version}\n{machine_uuid}", encoding="utf-8"
-        )
+        marker.write_text(f"{current_version}\n{machine_uuid}", encoding="utf-8")
 
-    t = threading.Thread(target=_fire, args=(event, properties, machine_uuid), daemon=True)
+    t = threading.Thread(
+        target=_fire, args=(event, properties, machine_uuid), daemon=True
+    )
     t.start()

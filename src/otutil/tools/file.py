@@ -91,7 +91,13 @@ class Config(BaseModel):
         description="Allowed directories for file operations (empty = cwd only)",
     )
     exclude_patterns: List[str] = Field(
-        default_factory=lambda: [".git", "node_modules", "__pycache__", ".venv", "venv"],
+        default_factory=lambda: [
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".venv",
+            "venv",
+        ],
         description="Path patterns to exclude from operations",
     )
     max_file_size: int = Field(
@@ -458,7 +464,9 @@ def _glob_resolve_candidates(
         return []
 
     matches = _dedupe_paths(matches)
-    matches.sort(key=lambda path: _display_path(path, cwd=cwd, path_type="relative").lower())
+    matches.sort(
+        key=lambda path: _display_path(path, cwd=cwd, path_type="relative").lower()
+    )
     return matches[:max_results] if max_results > 0 else []
 
 
@@ -536,8 +544,12 @@ def _match_resolve_candidates(
 def _format_resolve_error(selector: str, candidates: List[str]) -> str:
     """Format a multi-match error with numbered candidate paths."""
     lines = [f"Error: Multiple files matched '{selector}':"]
-    lines.extend(f"{idx}. {candidate}" for idx, candidate in enumerate(candidates, start=1))
-    lines.append("Use multi='first' or multi='all' to choose how to handle multiple matches.")
+    lines.extend(
+        f"{idx}. {candidate}" for idx, candidate in enumerate(candidates, start=1)
+    )
+    lines.append(
+        "Use multi='first' or multi='all' to choose how to handle multiple matches."
+    )
     return "\n".join(lines)
 
 
@@ -550,7 +562,9 @@ def _select_resolve_result(
     multi: str,
 ) -> str | List[str]:
     """Apply multi behavior to one selector's resolved paths."""
-    display_paths = [_display_path(path, cwd=cwd, path_type=path_type) for path in paths]
+    display_paths = [
+        _display_path(path, cwd=cwd, path_type=path_type) for path in paths
+    ]
     if multi == "all":
         return display_paths
     if not display_paths:
@@ -787,9 +801,7 @@ def read(
             # Apply pagination
             end_idx = start_idx + limit if limit else total_lines
             selected_lines = [
-                line
-                for i, line in enumerate(lines)
-                if start_idx <= i < end_idx
+                line for i, line in enumerate(lines) if start_idx <= i < end_idx
             ]
             output_lines = (
                 [
@@ -952,7 +964,9 @@ def list(
         file.list(path=".", recursive=True, pattern="*.md")
         file.list(path=".", sort_by="size", reverse=True)
     """
-    with LogSpan(span="file.list", path=path, pattern=pattern, recursive=recursive) as s:
+    with LogSpan(
+        span="file.list", path=path, pattern=pattern, recursive=recursive
+    ) as s:
         resolved, error = _validate_path(path, must_exist=True)
         if error:
             s.add(error=error)
@@ -1164,7 +1178,11 @@ def search(
         file.search(glob="tests/**/test_*.py")
     """
     with LogSpan(
-        span="file.search", path=path, pattern=pattern, glob=glob, filePattern=file_pattern
+        span="file.search",
+        path=path,
+        pattern=pattern,
+        glob=glob,
+        filePattern=file_pattern,
     ) as s:
         # Validate: need either pattern or glob
         if not pattern and not glob:
@@ -1449,7 +1467,9 @@ def read_batch(
         file.read_batch(glob="src/**/*.py", max_files=10)
         file.read_batch(glob="docs/*.md")
     """
-    with LogSpan(span="file.read_batch", paths=len(paths) if paths else 0, glob=glob) as s:
+    with LogSpan(
+        span="file.read_batch", paths=len(paths) if paths else 0, glob=glob
+    ) as s:
         if not paths and not glob:
             s.add(error="missing_input")
             return "Error: Either 'paths' or 'glob' is required"
@@ -1704,14 +1724,18 @@ def slice_batch(
 
         for item in items:
             if not isinstance(item, dict):
-                result_parts.append("# (invalid item)\n\nError: Each item must be a dict with 'path' and 'select'")
+                result_parts.append(
+                    "# (invalid item)\n\nError: Each item must be a dict with 'path' and 'select'"
+                )
                 continue
 
             item_path = item.get("path")
             sel = item.get("select")
 
             if not item_path:
-                result_parts.append("# (missing path)\n\nError: Each item must have 'path'")
+                result_parts.append(
+                    "# (missing path)\n\nError: Each item must have 'path'"
+                )
                 continue
             if sel is None:
                 result_parts.append(f"# {item_path}\n\nError: 'select' is required")
@@ -1739,7 +1763,9 @@ def slice_batch(
                 continue
 
             if _is_binary(raw):
-                result_parts.append(f"# {item_path}\n\nError: Binary file — cannot slice")
+                result_parts.append(
+                    f"# {item_path}\n\nError: Binary file — cannot slice"
+                )
                 continue
 
             content = _decode_content(raw, "utf-8")
@@ -1759,14 +1785,20 @@ def slice_batch(
 
             sel_label = selector_label(sel)
             if extracted:
-                result_parts.append(f"# {item_path} [{sel_label}]\n\n" + "\n\n".join(extracted))
+                result_parts.append(
+                    f"# {item_path} [{sel_label}]\n\n" + "\n\n".join(extracted)
+                )
                 sliced_count += 1
             else:
-                result_parts.append(f"# {item_path} [{sel_label}]\n\nNo matching content found for selector(s)")
+                result_parts.append(
+                    f"# {item_path} [{sel_label}]\n\nNo matching content found for selector(s)"
+                )
 
         s.add(sliced=sliced_count, total=len(items))
         noun = "file" if sliced_count == 1 else "files"
-        return f"Sliced {sliced_count} {noun}\n\n---\n\n" + "\n\n---\n\n".join(result_parts)
+        return f"Sliced {sliced_count} {noun}\n\n---\n\n" + "\n\n---\n\n".join(
+            result_parts
+        )
 
 
 # ============================================================================
@@ -1804,7 +1836,9 @@ def write(
         file.write(path="log.txt", content="New entry\\n", append=True)
         file.write(path="new/dir/file.txt", content="data", create_dirs=True)
     """
-    with LogSpan(span="file.write", path=path, append=append, contentLen=len(content)) as s:
+    with LogSpan(
+        span="file.write", path=path, append=append, contentLen=len(content)
+    ) as s:
         # For new files, validate parent directory
         resolved, error = _validate_path(path, must_exist=False)
         if error:
@@ -1913,7 +1947,9 @@ def edit(
         file.edit(path="config.py", old_text="DEBUG = False", new_text="DEBUG = True")
         file.edit(path="main.py", old_text="TODO", new_text="DONE", occurrence=0)
     """
-    with LogSpan(span="file.edit", path=path, oldLen=len(old_text), newLen=len(new_text)) as s:
+    with LogSpan(
+        span="file.edit", path=path, oldLen=len(old_text), newLen=len(new_text)
+    ) as s:
         resolved, error = _validate_path(path, must_exist=True)
         if error:
             s.add(error=error)
@@ -2112,7 +2148,9 @@ def delete(
             return f"Error: {e}"
 
 
-def copy(*, source: str, dest: str, follow_symlinks: bool = True, overwrite: bool = False) -> str:
+def copy(
+    *, source: str, dest: str, follow_symlinks: bool = True, overwrite: bool = False
+) -> str:
     """Copy a file or directory.
 
     For files, copies content and metadata. For directories, copies
@@ -2153,9 +2191,13 @@ def copy(*, source: str, dest: str, follow_symlinks: bool = True, overwrite: boo
             return f"Error: Destination already exists: {dest}. Use overwrite=True to replace it."
 
         try:
-            if src_resolved.is_file() or (src_resolved.is_symlink() and follow_symlinks):
+            if src_resolved.is_file() or (
+                src_resolved.is_symlink() and follow_symlinks
+            ):
                 # Copy file with metadata (follows symlinks by default)
-                shutil.copy2(src_resolved, dest_resolved, follow_symlinks=follow_symlinks)
+                shutil.copy2(
+                    src_resolved, dest_resolved, follow_symlinks=follow_symlinks
+                )
                 s.add(copied=True, type="file")
                 return f"OK: Copied file: {source} -> {dest}"
             elif src_resolved.is_symlink() and not follow_symlinks:
@@ -2170,7 +2212,9 @@ def copy(*, source: str, dest: str, follow_symlinks: bool = True, overwrite: boo
                     s.add(error="dest_exists")
                     return f"Error: Destination already exists: {dest}"
                 # symlinks=True preserves symlinks as links, False follows them
-                shutil.copytree(src_resolved, dest_resolved, symlinks=not follow_symlinks)
+                shutil.copytree(
+                    src_resolved, dest_resolved, symlinks=not follow_symlinks
+                )
                 s.add(copied=True, type="directory")
                 return f"OK: Copied directory: {source} -> {dest}"
             else:

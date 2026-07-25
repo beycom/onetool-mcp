@@ -1,4 +1,5 @@
 """Regex line search for the ctx pack."""
+
 from __future__ import annotations
 
 import re
@@ -46,7 +47,9 @@ def ctx_grep(
             return {"error": str(e)}
 
         if not pattern:
-            return {"error": "Pattern must not be empty. Use ctx.read() to retrieve all content."}
+            return {
+                "error": "Pattern must not be empty. Use ctx.read() to retrieve all content."
+            }
 
         meta, err = load_live_meta(store, handle)
         if meta is None:
@@ -69,9 +72,7 @@ def ctx_grep(
             result_lines = _grep_with_context(lines, compiled, context, max_chars)
         else:
             result_lines = [
-                _truncate_line(ln, max_chars)
-                for ln in lines
-                if compiled.search(ln)
+                _truncate_line(ln, max_chars) for ln in lines if compiled.search(ln)
             ]
 
         truncated = len(result_lines) > max(1, limit)

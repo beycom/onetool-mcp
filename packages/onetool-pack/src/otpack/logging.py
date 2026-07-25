@@ -240,7 +240,9 @@ def _sanitize_url(url: str) -> str:
     return url
 
 
-def _format_value(value: Any, field_name: str = "", max_length: int | None = None) -> Any:
+def _format_value(
+    value: Any, field_name: str = "", max_length: int | None = None
+) -> Any:
     if not isinstance(value, str):
         return value
     if max_length is None:

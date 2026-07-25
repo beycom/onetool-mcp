@@ -1,4 +1,5 @@
 """Memory dump and load (YAML I/O)."""
+
 from __future__ import annotations
 
 import uuid
@@ -224,22 +225,50 @@ def load(
                     else:
                         meta_str = "{}"
 
-                    pending.append((memory_id, topic, content, content_hash,
-                                    category, mem_tags, relevance, meta_str))
+                    pending.append(
+                        (
+                            memory_id,
+                            topic,
+                            content,
+                            content_hash,
+                            category,
+                            mem_tags,
+                            relevance,
+                            meta_str,
+                        )
+                    )
 
             # Embedding API calls happen outside the DB lock
             with_embeddings = [(entry, _embed_now(entry[2])) for entry in pending]
 
             with _use_connection() as conn:
                 for entry, embedding in with_embeddings:
-                    memory_id, topic, content, content_hash, category, mem_tags, relevance, meta_str = entry
+                    (
+                        memory_id,
+                        topic,
+                        content,
+                        content_hash,
+                        category,
+                        mem_tags,
+                        relevance,
+                        meta_str,
+                    ) = entry
                     conn.execute(
                         """
                         INSERT INTO memories (id, topic, content, content_hash, category, tags, relevance, embedding, meta)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                        [memory_id, topic, content, content_hash, category,
-                         _serialize_tags(mem_tags), relevance, _serialize_embedding(embedding), meta_str],
+                        [
+                            memory_id,
+                            topic,
+                            content,
+                            content_hash,
+                            category,
+                            _serialize_tags(mem_tags),
+                            relevance,
+                            _serialize_embedding(embedding),
+                            meta_str,
+                        ],
                     )
                     if embedding is not None:
                         _sync_vec_index(conn, memory_id, embedding)

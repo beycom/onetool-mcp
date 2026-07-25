@@ -88,8 +88,7 @@ def call_vision(images: list[bytes], prompt: str, config: Config) -> str:
         )
     if not get_image_api_key():
         return (
-            "Error: image API key not configured — "
-            "set OPENAI_API_KEY in secrets.yaml"
+            "Error: image API key not configured — set OPENAI_API_KEY in secrets.yaml"
         )
 
     content: list[dict[str, Any]] = []
@@ -138,7 +137,9 @@ def parse_json_payload(text: str) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
-def ask_questions(images: list[bytes], questions: list[str], config: Config) -> list[str]:
+def ask_questions(
+    images: list[bytes], questions: list[str], config: Config
+) -> list[str]:
     """Send one or more questions to the vision model in a single call.
 
     Multi-question batches use a JSON answer contract (return only
@@ -186,9 +187,7 @@ def ask_questions(images: list[bytes], questions: list[str], config: Config) -> 
 
         # Batched contract violated — recover losslessly, one call per question
         s.add(fallback="per_question")
-        return [
-            call_vision(images, question, config).strip() for question in questions
-        ]
+        return [call_vision(images, question, config).strip() for question in questions]
 
 
 def extract_summary(model_bytes: bytes, config: Config) -> dict[str, object] | str:
