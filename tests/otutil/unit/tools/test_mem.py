@@ -598,8 +598,9 @@ class TestSearch:
         assert "topic/one" in result
         assert "0.95" in result
 
+    @patch("otutil.tools._mem.search._check_fts_available", return_value=False)
     @patch("otutil.tools._mem.search._get_connection")
-    def test_pattern_search(self, mock_conn):
+    def test_pattern_search(self, mock_conn, _mock_fts):
         from otutil.tools.mem import search
 
         conn = MagicMock()
@@ -799,8 +800,11 @@ class TestSearchEmbeddingsDisabled:
         assert "embeddings_enabled" in result
 
     @patch("otutil.tools._mem.search._get_config", return_value=Config(embeddings_enabled=False))
+    @patch("otutil.tools._mem.search._check_fts_available", return_value=False)
     @patch("otutil.tools._mem.search._get_connection")
-    def test_pattern_search_works_when_disabled(self, mock_conn, _mock_config):
+    def test_pattern_search_works_when_disabled(
+        self, mock_conn, _mock_fts, _mock_config
+    ):
         from otutil.tools.mem import search
 
         conn = MagicMock()
