@@ -77,6 +77,21 @@ class TestProxyResultConversion:
         result.content = [_text_content('{"a":1}')]
         assert await _call(ProxyManager(), result) == {"a": 1}
 
+    async def test_binary_content_marker_preserved(self) -> None:
+        content = MagicMock()
+        content.data = b"binary"
+        result = MagicMock()
+        result.content = [content]
+        assert await _call(ProxyManager(), result) == "[Binary content: MagicMock]"
+
+    async def test_upstream_error_raises_with_text_intact(self) -> None:
+        result = MagicMock()
+        result.content = [_text_content("missing required account_id")]
+        result.is_error = True
+
+        with pytest.raises(RuntimeError, match="missing required account_id"):
+            await _call(ProxyManager(), result)
+
 
 @pytest.mark.unit
 @pytest.mark.core

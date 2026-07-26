@@ -92,7 +92,24 @@ def test_streamable_http_root_lists_and_calls_run(tmp_path: Path) -> None:
                 assert any(tool.name == "run" for tool in tools)
 
                 version = await client.call_tool("run", {"command": "ot.version()"})
+                assert version.is_error is False
                 assert OT_VERSION in str(version.content[0].text)
+
+                validation_error = await client.call_tool(
+                    "run",
+                    {"command": ""},
+                    raise_on_error=False,
+                )
+                assert validation_error.is_error is True
+                assert "empty" in str(validation_error.content[0].text).lower()
+
+                execution_error = await client.call_tool(
+                    "run",
+                    {"command": "{}['missing_key']"},
+                    raise_on_error=False,
+                )
+                assert execution_error.is_error is True
+                assert "KeyError" in str(execution_error.content[0].text)
 
                 servers = await client.call_tool("run", {"command": "ot.servers()"})
                 assert "broken_proxy" in str(servers.content[0].text)

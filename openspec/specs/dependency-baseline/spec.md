@@ -18,15 +18,18 @@ latest only if it is listed, by name, with a one-line reason, in the change's ve
   `[project.dependencies]` in `packages/onetool-pack/pyproject.toml`), or, if a direct dependency
   does appear, it is one of the names recorded with a reason in `tasks.md`'s Verification section
 
-### Requirement: fastmcp floor carries the Starlette CVE-2026-48710 fix
-`pyproject.toml`'s `fastmcp` dependency line SHALL read `fastmcp>=3.4.1,<4` (the `<4` upper bound
-is retained — FastMCP 4.0 has not shipped and is out of scope). This floor is a security minimum,
-not a feature dependency: `p12-core-flow-hardening`'s `ToolError`/`isError` fix works on the
-previously-installed `fastmcp` 3.3.1 and does not require this bump.
+### Requirement: fastmcp floor carries the stable v3 runtime baseline
 
-#### Scenario: fastmcp floor is at or above the security minimum
-- **WHEN** `rg -n "fastmcp>=" pyproject.toml` is run
-- **THEN** the output shows `fastmcp>=3.4.1,<4`
+`pyproject.toml`'s `fastmcp` dependency SHALL require version 3.4.4 or newer
+within major version 3. FastMCP 4 pre-releases and releases SHALL remain outside
+the supported dependency range.
+
+#### Scenario: Stable FastMCP floor is enforced
+
+- **WHEN** project dependencies are resolved
+- **THEN** `fastmcp` and `fastmcp-slim` SHALL resolve to version 3.4.4 or newer
+  within major version 3
+- **AND** FastMCP major version 4 SHALL NOT satisfy the declared range
 
 ### Requirement: lxml major-version cap decision is recorded and consistent with test evidence
 `pyproject.toml`'s `lxml` dependency line (`dev` extra) SHALL be widened from `lxml>=5.3,<6` to
@@ -69,4 +72,3 @@ section "4. direct CLI against running root", lines 121-129).
   refreshed dependency set
 - **THEN** every command succeeds and the documented verifications hold (calls execute in the root
   process, real pack calls hit the root registry, output formats are honored, stdin input works)
-

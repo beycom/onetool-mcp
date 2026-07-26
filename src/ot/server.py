@@ -43,7 +43,7 @@ from ot.logging.mcp_logging import (
     register_set_logging_level_handler,
 )
 from ot.prompts import get_prompts, get_tool_description, get_tool_examples
-from ot.proxy import get_proxy_manager
+from ot.proxy import bind_proxy_request_context, get_proxy_manager
 from ot.registry import get_registry
 from ot.stats import (
     JsonlStatsWriter,
@@ -572,7 +572,7 @@ def _get_run_description() -> str:
         "openWorldHint": True,
     },
 )
-async def run(command: str, ctx: Context) -> ToolResult:  # noqa: ARG001
+async def run(command: str, ctx: Context) -> ToolResult:
     # Record start time for stats
     start_time = time.monotonic()
 
@@ -587,14 +587,15 @@ async def run(command: str, ctx: Context) -> ToolResult:  # noqa: ARG001
         ) from e
 
     if prepared.error:
-        raise ToolError(f"Error: {prepared.error}")
+        return ToolResult(content=f"Error: {prepared.error}", is_error=True)
 
     # Step 2: Execute through unified runner (skip validation since already done)
-    result = await execute_command(
-        command,
-        prepared_code=prepared.code,
-        skip_validation=True,
-    )
+    with bind_proxy_request_context(ctx):
+        result = await execute_command(
+            command,
+            prepared_code=prepared.code,
+            skip_validation=True,
+        )
 
     # Record run-level stats if enabled
     if _stats_writer is not None:
@@ -613,13 +614,7 @@ async def run(command: str, ctx: Context) -> ToolResult:  # noqa: ARG001
     text = sanitize_output(
         result.result, enabled=result.should_sanitize, fmt=result.format
     )
-    # D2: a tool-execution failure must surface as isError:true. FastMCP sets isError
-    # only when the handler raises — a *returned* ToolResult is always isError:false.
-    # Raise ToolError (error text preserved) so a client branching on isError can tell
-    # success from failure.
-    if not result.success:
-        raise ToolError(text)
-    return ToolResult(content=text)
+    return ToolResult(content=text, is_error=not result.success)
 
 
 def main() -> None:

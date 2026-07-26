@@ -313,6 +313,7 @@ class TestProxyManagerAuth:
         mock_transport.assert_called_once()
         call_kwargs = mock_transport.call_args[1]
         assert call_kwargs["auth"] is None
+        assert callable(mock_client.call_args.kwargs["elicitation_handler"])
 
     @patch("ot.proxy.manager.OAuth")
     @patch("ot.proxy.manager.StreamableHttpTransport")
@@ -434,6 +435,7 @@ class TestProxyManagerStdio:
         env = mock_transport.call_args[1]["env"]
         assert env["GITHUB_TOKEN"] == "test_token_123"
         assert env["GITHUB_APP_ID"] == "test_app_456"
+        assert callable(mock_client.call_args.kwargs["elicitation_handler"])
 
     @patch("ot.proxy.manager.StdioTransport")
     @patch("ot.proxy.manager.Client")

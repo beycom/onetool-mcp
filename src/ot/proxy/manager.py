@@ -9,15 +9,22 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import contextlib
+import contextvars
 import json
 import os
 import re
 import threading
-from dataclasses import dataclass
+from contextlib import contextmanager
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from fastmcp import Client
+from fastmcp import Client, Context
 from fastmcp.client.auth import BearerAuth, OAuth
+from fastmcp.client.elicitation import (
+    ElicitationHandler,
+    ElicitRequestParams,
+    ElicitResult,
+)
 from fastmcp.client.transports import StdioTransport, StreamableHttpTransport
 from loguru import logger
 from mcp import types
@@ -27,8 +34,10 @@ from ot.logging import LogEntry, LogSpan
 from ot.logging.redact import redact_secrets
 
 if TYPE_CHECKING:
-    from collections.abc import Coroutine
+    from collections.abc import Coroutine, Iterator
     from concurrent.futures import Future
+
+    from mcp.server.session import ServerSession
 
     from ot.config.models import McpServerConfig
 
@@ -98,6 +107,82 @@ class ProxyToolInfo:
     input_schema: dict[str, Any]
 
 
+@dataclass
+class ProxyRequestContext:
+    """Expiring ownership binding for proxy work started by one root request."""
+
+    session: ServerSession
+    request_id: types.RequestId
+    _active: bool = True
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+    @property
+    def is_active(self) -> bool:
+        """Return whether the originating root request is still active."""
+        with self._lock:
+            return self._active
+
+    def expire(self) -> None:
+        """Prevent future work from interacting through the root request."""
+        with self._lock:
+            self._active = False
+
+
+@dataclass
+class _ProxyCallContext:
+    """State owned by exactly one serialized call to an upstream server."""
+
+    request: ProxyRequestContext | None
+    _active: bool = True
+    _elicitation_unavailable_reason: str | None = None
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+    @property
+    def is_active(self) -> bool:
+        """Return whether the upstream call can still request interaction."""
+        with self._lock:
+            return self._active
+
+    @property
+    def elicitation_unavailable_reason(self) -> str | None:
+        """Return why interactive input was unavailable for this call."""
+        with self._lock:
+            return self._elicitation_unavailable_reason
+
+    def expire(self) -> None:
+        """Prevent later callbacks from using this completed call."""
+        with self._lock:
+            self._active = False
+
+    def record_elicitation_unavailable(self, reason: str) -> None:
+        """Remember why this call could not provide accepted input."""
+        with self._lock:
+            self._elicitation_unavailable_reason = reason
+
+
+_CURRENT_PROXY_REQUEST: contextvars.ContextVar[ProxyRequestContext | None] = (
+    contextvars.ContextVar("ot_current_proxy_request", default=None)
+)
+
+
+@contextmanager
+def bind_proxy_request_context(context: Context) -> Iterator[ProxyRequestContext]:
+    """Bind one FastMCP request context to proxy work for its active lifetime."""
+    request_context = context.request_context
+    if request_context is None:
+        raise RuntimeError("Proxy request binding requires an active MCP request")
+    binding = ProxyRequestContext(
+        session=request_context.session,
+        request_id=request_context.request_id,
+    )
+    token = _CURRENT_PROXY_REQUEST.set(binding)
+    try:
+        yield binding
+    finally:
+        binding.expire()
+        _CURRENT_PROXY_REQUEST.reset(token)
+
+
 class ProxyManager:
     """Manages connections to external MCP servers using FastMCP Client.
 
@@ -108,6 +193,8 @@ class ProxyManager:
     def __init__(self) -> None:
         """Initialize the proxy manager."""
         self._clients: dict[str, Client] = {}  # type: ignore[type-arg]
+        self._call_locks: dict[str, asyncio.Lock] = {}
+        self._active_calls: dict[str, _ProxyCallContext] = {}
         self._tools_by_server: dict[str, list[types.Tool]] = {}
         self._errors: dict[str, str] = {}  # server name -> last error message
         self._server_timeouts: dict[
@@ -227,6 +314,7 @@ class ProxyManager:
         tool: str,
         arguments: dict[str, Any] | None = None,
         timeout: float = 30.0,
+        request_context: ProxyRequestContext | None = None,
     ) -> str | dict[str, Any] | list[Any]:
         """Call a tool on a proxied MCP server.
 
@@ -235,6 +323,8 @@ class ProxyManager:
             tool: Name of the tool to call.
             arguments: Arguments to pass to the tool.
             timeout: Timeout for the call in seconds.
+            request_context: Captured owner of the active root request. Omit for
+                detached calls that must not forward interactive input.
 
         Returns:
             Parsed result: dict/list for JSON responses, str for text, str for empty.
@@ -256,11 +346,19 @@ class ProxyManager:
         arguments = arguments or {}
 
         with LogSpan(span="proxy.tool.call", server=server, tool=tool) as span:
+            call_context = _ProxyCallContext(request=request_context)
+            call_lock = self._call_locks.setdefault(server, asyncio.Lock())
             try:
-                result = await asyncio.wait_for(
-                    client.call_tool(tool, arguments),
-                    timeout=timeout,
-                )
+                async with call_lock:
+                    self._active_calls[server] = call_context
+                    result = await asyncio.wait_for(
+                        client.call_tool(
+                            tool,
+                            arguments,
+                            raise_on_error=False,
+                        ),
+                        timeout=timeout,
+                    )
             except TimeoutError:
                 logger.error(
                     LogEntry(
@@ -276,6 +374,10 @@ class ProxyManager:
                 raise TimeoutError(
                     f"Tool {server}.{tool} timed out after {timeout}s"
                 ) from None
+            finally:
+                call_context.expire()
+                if self._active_calls.get(server) is call_context:
+                    self._active_calls.pop(server, None)
 
             # Extract and auto-parse text from result
             text_parts: list[str] = []
@@ -326,8 +428,110 @@ class ProxyManager:
                 # Multi-part: concatenate as string
                 result_value = "\n".join(text_parts)
 
+            if getattr(result, "is_error", False) is True:
+                error_text = str(result_value)
+                reason = call_context.elicitation_unavailable_reason
+                if reason:
+                    error_text = (
+                        f"{error_text}\nInteractive input {reason}. "
+                        "Retry with all required tool arguments explicitly."
+                    )
+                raise RuntimeError(error_text)
+
             span.add("resultLength", len(str(result_value)))
             return result_value
+
+    async def _forward_elicitation(
+        self,
+        server: str,
+        message: str,
+        _response_type: type[Any] | None,
+        params: ElicitRequestParams,
+        _context: Any,
+    ) -> ElicitResult[Any]:
+        """Forward one upstream elicitation through its exact active proxy call."""
+        call_context = self._active_calls.get(server)
+        if call_context is None or not call_context.is_active:
+            return ElicitResult(action="cancel")
+        binding = call_context.request
+        if binding is None:
+            return ElicitResult(action="cancel")
+        if not binding.is_active:
+            call_context.record_elicitation_unavailable(
+                "was requested after the originating request completed"
+            )
+            return ElicitResult(action="cancel")
+
+        client_params = binding.session.client_params
+
+        capabilities = client_params.capabilities if client_params is not None else None
+        elicitation = capabilities.elicitation if capabilities is not None else None
+
+        if isinstance(params, types.ElicitRequestFormParams):
+            # The MCP compatibility rule treats an empty elicitation capability
+            # as form support. A URL-only declaration does not imply form support.
+            supported = elicitation is not None and (
+                elicitation.form is not None or elicitation.url is None
+            )
+            mode = "form"
+        else:
+            supported = elicitation is not None and elicitation.url is not None
+            mode = "URL"
+
+        if not supported:
+            call_context.record_elicitation_unavailable(
+                f"could not be forwarded because the client does not support {mode} elicitation"
+            )
+            return ElicitResult(action="cancel")
+
+        try:
+            if isinstance(params, types.ElicitRequestFormParams):
+                result = await binding.session.elicit_form(
+                    message=message,
+                    requestedSchema=params.requestedSchema,
+                    related_request_id=binding.request_id,
+                )
+            else:
+                result = await binding.session.elicit_url(
+                    message=message,
+                    url=str(params.url),
+                    elicitation_id=params.elicitationId,
+                    related_request_id=binding.request_id,
+                )
+        except Exception as exc:
+            call_context.record_elicitation_unavailable(
+                f"could not be forwarded: {type(exc).__name__}: {exc}"
+            )
+            return ElicitResult(action="cancel")
+
+        if result.action != "accept":
+            call_context.record_elicitation_unavailable(
+                f"ended with a {result.action} response"
+            )
+        return ElicitResult(
+            _meta=result.meta,
+            action=result.action,
+            content=result.content,
+        )
+
+    def _elicitation_handler_for(self, server: str) -> ElicitationHandler:
+        """Create a handler permanently associated with one upstream server."""
+
+        async def handler(
+            message: str,
+            response_type: type[Any] | None,
+            params: ElicitRequestParams,
+            context: Any,
+        ) -> ElicitResult[Any]:
+            return await self._forward_elicitation(
+                server,
+                message,
+                response_type,
+                params,
+                context,
+            )
+
+        return handler
 
     def call_tool_sync(
         self,
@@ -362,7 +566,13 @@ class ProxyManager:
 
         if fire_and_forget:
             fut = asyncio.run_coroutine_threadsafe(
-                self.call_tool(server, tool, arguments, timeout),
+                self.call_tool(
+                    server,
+                    tool,
+                    arguments,
+                    timeout,
+                    request_context=None,
+                ),
                 self._loop,
             )
 
@@ -383,8 +593,15 @@ class ProxyManager:
             fut.add_done_callback(log_fire_and_forget_failure)
             return "started"
 
+        request_context = _CURRENT_PROXY_REQUEST.get()
         future = asyncio.run_coroutine_threadsafe(
-            self.call_tool(server, tool, arguments, timeout),
+            self.call_tool(
+                server,
+                tool,
+                arguments,
+                timeout,
+                request_context=request_context,
+            ),
             self._loop,
         )
         try:
@@ -734,7 +951,11 @@ class ProxyManager:
         transport = StreamableHttpTransport(
             url=url, headers=headers if headers else None, auth=auth
         )
-        return Client(transport, timeout=float(config.timeout))
+        return Client(
+            transport,
+            timeout=float(config.timeout),
+            elicitation_handler=self._elicitation_handler_for(name),
+        )
 
     def _create_stdio_client(self, name: str, config: McpServerConfig) -> Client:  # type: ignore[type-arg]
         """Create a stdio client."""
@@ -778,12 +999,18 @@ class ProxyManager:
             env=env,
         )
 
-        return Client(transport, timeout=float(config.timeout))
+        return Client(
+            transport,
+            timeout=float(config.timeout),
+            elicitation_handler=self._elicitation_handler_for(name),
+        )
 
     def _reset_state(self) -> None:
         """Reset all connection state without disconnecting (for cases where loop is unavailable)."""
         with self._mutation_lock:
             self._clients.clear()
+            self._call_locks.clear()
+            self._active_calls.clear()
             self._tools_by_server.clear()
             self._errors.clear()
             self._server_timeouts.clear()
@@ -824,6 +1051,8 @@ class ProxyManager:
 
         with self._mutation_lock:
             self._clients.clear()
+            self._call_locks.clear()
+            self._active_calls.clear()
             self._tools_by_server.clear()
             self._errors.clear()
             self._server_timeouts.clear()
@@ -965,6 +1194,8 @@ class ProxyManager:
             if name not in self._clients:
                 return "not connected"
             client = self._clients.pop(name)
+            self._call_locks.pop(name, None)
+            self._active_calls.pop(name, None)
             self._tools_by_server.pop(name, None)
             self._errors.pop(name, None)
             self._server_instructions.pop(name, None)
@@ -996,6 +1227,8 @@ class ProxyManager:
                 if name not in self._clients:
                     return "not connected"
                 self._clients.pop(name)
+                self._call_locks.pop(name, None)
+                self._active_calls.pop(name, None)
                 self._tools_by_server.pop(name, None)
                 self._errors.pop(name, None)
                 self._server_instructions.pop(name, None)

@@ -434,6 +434,90 @@ The system SHALL correctly convert every downstream MCP content-block type a pro
 - **THEN** the text SHALL be returned unchanged as a string
 - **AND** it SHALL NOT be parsed into `None`, a boolean, a float, or an int
 
+### Requirement: Downstream MCP errors remain errors
+
+The system SHALL preserve an upstream proxied tool result's MCP error status
+through the enclosing OneTool execution and root MCP response. Successful
+result conversion behavior SHALL remain unchanged.
+
+#### Scenario: Upstream error result fails the enclosing execution
+
+- **GIVEN** a proxied MCP tool returns `isError:true` with error content
+- **WHEN** the proxy call completes inside `run`
+- **THEN** the enclosing execution and root MCP result SHALL remain errors
+- **AND** the upstream error content SHALL remain visible to the caller
+
+#### Scenario: Successful proxy content conversion is unchanged
+
+- **GIVEN** a proxied MCP tool returns successful text, structured content,
+  embedded resources, or binary content
+- **WHEN** the proxy call completes
+- **THEN** the result SHALL use the established successful content-conversion
+  behavior
+- **AND** if the enclosing execution otherwise succeeds, the root MCP result
+  SHALL have `isError:false`
+
+### Requirement: Portable proxy elicitation forwarding
+
+During a proxied tool call, the system SHALL forward standard MCP form and URL
+elicitation to the client that owns the active `run` request when that client
+supports the requested mode. The system SHALL preserve standard accept,
+decline, and cancel outcomes and SHALL NOT synthesize user answers.
+
+#### Scenario: Form elicitation is forwarded
+
+- **GIVEN** an active proxied call requests form elicitation
+- **AND** the invoking client supports form elicitation
+- **WHEN** the client responds with accept, decline, or cancel
+- **THEN** the proxied server SHALL receive the same action
+- **AND** accepted form content SHALL be returned unchanged
+
+#### Scenario: URL elicitation is forwarded
+
+- **GIVEN** an active proxied call requests URL elicitation
+- **AND** the invoking client supports URL elicitation
+- **WHEN** OneTool forwards the request
+- **THEN** the client SHALL receive the upstream URL and elicitation identifier
+  unchanged
+- **AND** the proxied server SHALL receive the client's action unchanged
+
+#### Scenario: Unsupported interaction completes promptly
+
+- **GIVEN** the invoking client does not support the requested elicitation mode
+  or cannot interact
+- **WHEN** a proxied server requests elicitation
+- **THEN** the proxied server SHALL receive a standard cancel outcome without
+  indefinite waiting
+- **AND** if the proxied operation cannot continue, the root MCP error SHALL
+  advise retrying with explicit tool arguments
+
+#### Scenario: Concurrent callers remain isolated
+
+- **GIVEN** concurrent `run` requests invoke proxied tools that request
+  elicitation
+- **WHEN** their clients respond
+- **THEN** each request and response SHALL be routed only through its originating
+  client context
+- **AND** no caller SHALL observe another caller's elicitation or response
+
+#### Scenario: Expired request cannot elicit
+
+- **GIVEN** a proxy operation continues after its enclosing `run` request has
+  completed
+- **WHEN** the operation requests elicitation
+- **THEN** OneTool SHALL NOT initiate elicitation through the expired client
+  context
+- **AND** the upstream elicitation request SHALL receive a cancel outcome
+  promptly
+- **AND** the upstream tool MAY stop or continue according to that standard
+  outcome
+
+#### Scenario: Headless explicit arguments remain supported
+
+- **GIVEN** a headless client cannot participate in elicitation
+- **WHEN** it supplies all required proxied tool arguments explicitly
+- **THEN** the proxied workflow SHALL be able to complete without elicitation
+
 ### Requirement: Thread-Safe Tool Listing
 
 The system SHALL allow `list_tools()` to be read concurrently with proxy connection mutations without raising an unhandled concurrency error.
@@ -443,4 +527,3 @@ The system SHALL allow `list_tools()` to be read concurrently with proxy connect
 - **AND** a background connection adds a new server's tools to the internal tool registry concurrently on the event-loop thread
 - **THEN** `list_tools(server=None)` SHALL complete without raising `RuntimeError: dictionary changed size during iteration`
 - **AND** it SHALL return either the pre- or post-connect view of the tool set (either is acceptable; a crash is not)
-

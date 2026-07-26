@@ -45,6 +45,24 @@ context7.resolve_library_id(library_name="next.js")
 The mechanism is `canonicalize_name()` (`src/ot/executor/naming.py`), which strips `-`/`_` and
 lowercases before matching — you never have to remember how the upstream server spelled a tool.
 
+## Interactive input stays optional
+
+If a proxied tool requests standard MCP form or URL elicitation while handling `ot.run`, OneTool
+forwards it to the client that invoked the request. Form answers and URL consent preserve the
+client's accept, decline, or cancel outcome; concurrent callers remain isolated.
+
+This works with interactive clients that advertise the corresponding MCP capability, including
+Codex TUI, the Codex app, and interactive Claude Code. Headless clients such as `codex exec`,
+`claude -p`, and SDK-driven sessions do not need elicitation: pass every required tool argument
+explicitly and the same workflow remains available. If interactive input is required but
+unavailable, the elicitation receives a cancel response promptly instead of hanging; the upstream
+tool then decides whether its operation stops or continues. A failed operation advises retrying
+with explicit arguments.
+
+Elicitation forwarding applies only to proxied calls made during the active `ot.run` request.
+Built-in packs do not elicit, and detached fire-and-forget proxy work cannot reuse an expired
+request context.
+
 ## Runtime control without a restart
 
 The `ot_servers` pack (alias `srv`) turns proxied servers on and off at runtime — no server
@@ -90,7 +108,7 @@ helpers:
 chrome_util.highlight_element(selector="button.buy")   # annotation helper
 chrome_devtools.something(...)                           # the proxied server's own tool
 play_util.guide_user(text="click Save")                 # annotation helper
-playwright.browser_navigate(url="https://example.com")  # the proxied server's own tool
+playwright.browser_navigate(url="https://playwright.dev/")  # the proxied server's own tool
 ```
 
 They are companions to the proxied server, not alternatives to it. For anything outside

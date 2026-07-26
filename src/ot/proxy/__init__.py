@@ -6,7 +6,9 @@ through OneTool's single `run` tool interface.
 
 from ot.proxy.manager import (
     ProxyManager,
+    ProxyRequestContext,
     ProxyToolInfo,
+    bind_proxy_request_context,
     get_proxy_manager,
     reconnect_proxy_manager,
     reset_proxy_manager,
@@ -14,7 +16,9 @@ from ot.proxy.manager import (
 
 __all__ = [
     "ProxyManager",
+    "ProxyRequestContext",
     "ProxyToolInfo",
+    "bind_proxy_request_context",
     "get_proxy_manager",
     "reconnect_proxy_manager",
     "reset_proxy_manager",

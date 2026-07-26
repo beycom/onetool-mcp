@@ -551,30 +551,46 @@ The system SHALL NOT allow command normalization (fence stripping, AST unparse, 
 
 ### Requirement: MCP Error Signaling
 
-The `run` tool SHALL signal execution failure via the MCP `isError` protocol field so that a client or agent branching on `isError` can reliably distinguish success from failure. Because the installed FastMCP version sets `isError` exclusively by raising `fastmcp.exceptions.ToolError` (a returned `ToolResult` always yields `isError:false`), the system SHALL raise `ToolError` for every failure path.
+The `run` tool SHALL signal expected validation and execution failures through
+the MCP `isError` protocol field so that clients can reliably distinguish
+success from failure. Expected failures SHALL be returned as error-bearing tool
+results; unexpected internal exceptions SHALL remain eligible for the
+framework's exception path.
 
 #### Scenario: Validation failure yields isError:true
-- **GIVEN** a command that fails preparation validation (e.g. references an unknown pack)
+
+- **GIVEN** a command that fails preparation validation
 - **WHEN** `run()` processes the command
 - **THEN** the MCP response SHALL have `isError:true`
-- **AND** the response text SHALL contain the actionable validation error message
+- **AND** the response text SHALL contain the actionable validation error
+  message
 
 #### Scenario: User-code exception yields isError:true
-- **GIVEN** a command whose execution raises a runtime exception (e.g. a `KeyError`)
+
+- **GIVEN** a command whose execution raises a runtime exception
 - **WHEN** `run()` executes the command
 - **THEN** the MCP response SHALL have `isError:true`
-- **AND** the response text SHALL contain the error message produced by execution
+- **AND** the response text SHALL contain the execution error
 
 #### Scenario: Successful execution yields isError:false
+
 - **GIVEN** a command that executes successfully and returns a value
 - **WHEN** `run()` executes the command
 - **THEN** the MCP response SHALL have `isError:false`
 - **AND** the response text SHALL contain the serialized result
 
-#### Scenario: Error text is preserved in the raised exception
-- **GIVEN** any failure path (preparation error or execution error)
-- **WHEN** `run()` raises `ToolError`
-- **THEN** the exception message SHALL contain the same actionable error text that would previously have been returned in `ToolResult.content`
+#### Scenario: Expected error text is preserved
+
+- **GIVEN** an expected preparation or execution failure
+- **WHEN** `run()` returns its error-bearing tool result
+- **THEN** the result content SHALL preserve the actionable error text
+
+#### Scenario: Unexpected internal failure uses the framework error path
+
+- **GIVEN** the `run` handler encounters an unexpected internal exception
+- **WHEN** FastMCP processes the failed invocation
+- **THEN** the framework SHALL report the invocation as an MCP error
+- **AND** OneTool SHALL NOT convert the fault into successful output
 
 ### Requirement: Non-Blocking Execution
 

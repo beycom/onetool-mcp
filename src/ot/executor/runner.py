@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import contextvars
 import io
 import re
 from contextlib import redirect_stdout
@@ -754,7 +755,9 @@ async def execute_command(
             # The underlying concurrent future owns its capacity slot until the
             # thread really finishes. Shielding prevents caller timeout or
             # cancellation from releasing that slot while side effects continue.
+            execution_context = contextvars.copy_context()
             execution_future = submit_execution(
+                execution_context.run,
                 execute_python_code,
                 stripped,
                 tool_functions=tool_namespace,

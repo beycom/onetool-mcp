@@ -6,6 +6,8 @@ Covers the isError contract (D2), the load-bearing `output_schema is None` invar
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import ToolResult
@@ -15,6 +17,13 @@ async def _get_run_tool():  # noqa: ANN202
     from ot import server
 
     return await server.mcp.get_tool("run")
+
+
+def _request_context() -> MagicMock:
+    context = MagicMock()
+    context.request_context.session = MagicMock()
+    context.request_context.request_id = "run-request"
+    return context
 
 
 @pytest.mark.unit
@@ -44,24 +53,43 @@ class TestRunToolMcpContract:
 @pytest.mark.unit
 @pytest.mark.serve
 class TestRunToolErrorContract:
-    """D2: failures surface as isError:true (raise); success returns a ToolResult."""
+    """Expected failures and successes return ToolResult with accurate is_error."""
 
-    async def test_preparation_failure_raises_toolerror(self) -> None:
-        """A command failing preparation raises ToolError with the error text."""
+    async def test_preparation_failure_returns_error_toolresult(self) -> None:
+        """A command failing validation returns is_error with text intact."""
         run_tool = await _get_run_tool()
-        with pytest.raises(ToolError) as exc_info:
-            await run_tool.fn(command="", ctx=None)
-        assert "empty" in str(exc_info.value).lower()
+        result = await run_tool.fn(command="", ctx=None)
+        assert isinstance(result, ToolResult)
+        assert result.is_error is True
+        assert "empty" in result.content[0].text.lower()
 
-    async def test_runtime_exception_raises_toolerror(self) -> None:
-        """A command whose execution raises surfaces as ToolError, text intact."""
+    async def test_runtime_exception_returns_error_toolresult(self) -> None:
+        """A command execution failure returns is_error with text intact."""
         run_tool = await _get_run_tool()
-        with pytest.raises(ToolError) as exc_info:
-            await run_tool.fn(command="{}['missing_key']", ctx=None)
-        assert "KeyError" in str(exc_info.value)
+        result = await run_tool.fn(
+            command="{}['missing_key']",
+            ctx=_request_context(),
+        )
+        assert isinstance(result, ToolResult)
+        assert result.is_error is True
+        assert "KeyError" in result.content[0].text
+
+    async def test_unexpected_preparation_exception_uses_framework_path(self) -> None:
+        """Unexpected internal faults continue to raise through FastMCP."""
+        run_tool = await _get_run_tool()
+        with (
+            patch(
+                "ot.server.prepare_command",
+                side_effect=RuntimeError("unexpected preparation fault"),
+            ),
+            pytest.raises(ToolError, match="unexpected preparation fault"),
+        ):
+            await run_tool.fn(command="1 + 1", ctx=None)
 
     async def test_success_returns_toolresult(self) -> None:
         """A successful command returns a ToolResult (isError:false), not a raise."""
         run_tool = await _get_run_tool()
-        result = await run_tool.fn(command="1 + 1", ctx=None)
+        result = await run_tool.fn(command="1 + 1", ctx=_request_context())
         assert isinstance(result, ToolResult)
+        assert result.is_error is False
+        assert result.content[0].text == "2"
