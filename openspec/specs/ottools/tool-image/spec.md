@@ -370,21 +370,35 @@ memory growth.
 
 ### Requirement: Configuration via `tools.image` block
 
-The `ot_image` pack SHALL be configurable via `onetool.yaml` under `tools.ot_image`.
+The `ot_image` pack SHALL be configurable via `onetool.yaml` under
+`tools.ot_image`. Its `llm` selection SHALL control generation for `image.ask()` and
+`image.summary()`, while image processing settings SHALL remain pack-level fields.
 
 #### Scenario: model required for ask and summary
 
-- **WHEN** `tools.ot_image.model` is not set
-- **AND** `image.ask()` or `image.summary()` is called
-- **THEN** it SHALL return an error string (not raise) indicating the setting is missing
+- **WHEN** no model is supplied by the call, `tools.ot_image.llm`, or top-level `llm`
+- **AND** `image.ask()` is called or `image.summary()` requires generation on a cache miss
+- **THEN** it SHALL return an error string, not raise, indicating a generation model is required
 
-#### Scenario: Inherit model and base_url from top-level llm config
+#### Scenario: Inherit generation selection from top-level llm config
 
-- **WHEN** `tools.ot_image.model` is not set
-- **THEN** `image` SHALL use `llm.model` from the top-level `llm:` config block
-- **WHEN** `tools.ot_image.base_url` is not set
-- **THEN** `image` SHALL use `llm.base_url` from the top-level `llm:` config block
-- **AND** the API key is always read from the `OPENAI_API_KEY` secret — there is no `tools.ot_image.api_key` config field
+- **WHEN** a generation field is not set under `tools.ot_image.llm`
+- **THEN** `image` SHALL inherit that field from the top-level `llm` configuration
+- **AND** a CLIProxyAPI route SHALL use its inference client credential without requiring `OPENAI_API_KEY`
+
+#### Scenario: Per-call model and effort override
+
+- **WHEN** `image.ask()` is called, or `image.summary()` requires generation on a cache miss, with `model="terra"` and `effort="high"`
+- **THEN** the operation SHALL resolve `terra` from the shared registry and request high effort
+- **AND** the selected model SHALL be validated for image input before network I/O
+
+#### Scenario: Cached summary does not resolve overrides
+
+- **GIVEN** an image already has a cached summary
+- **WHEN** `image.summary()` is called with any model or effort override
+- **THEN** it SHALL return the cached summary without resolving a generation route
+- **AND** it SHALL NOT make a network request
+- **AND** model or effort changes SHALL NOT implicitly invalidate the cache
 
 #### Scenario: max_edge override
 

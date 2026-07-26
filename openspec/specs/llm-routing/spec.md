@@ -1,11 +1,21 @@
-## ADDED Requirements
+# llm-routing Specification
 
+## Purpose
+
+Defines provider-neutral generation routing through a shared model registry,
+explicit CLIProxyAPI or direct OpenAI-compatible backends, deterministic selection
+precedence, capability checks, independent embeddings, and safe route observability.
+
+## Requirements
 ### Requirement: Shared model registry
 
 OneTool SHALL resolve generation models from one typed top-level `models` registry
 shared by harness launchers and LLM-backed tools. Each entry SHALL identify its
 shortcut, concrete model id, source, supported generation interfaces, modalities,
-supported effort values, and optional default effort.
+supported structured-output modes per interface, supported effort values, and
+optional default effort. Structured-output modes SHALL use verified typed values,
+including `json_object` and `json_schema`, rather than inferred provider or
+model-name behavior.
 
 #### Scenario: Shortcut resolves for a tool
 - **WHEN** a generation-backed tool selects a configured shortcut such as `sol`, `terra`, or `luna`
@@ -23,17 +33,30 @@ supported effort values, and optional default effort.
 - **WHEN** `luma` is supplied but only `luna` is configured
 - **THEN** OneTool SHALL reject `luma` as unknown and SHALL NOT treat it as an alias
 
+#### Scenario: Structured-output metadata is explicit
+- **WHEN** a registry entry declares support for `json_object` or `json_schema`
+- **THEN** it SHALL associate that mode with a verified generation interface
+- **AND** an omitted mode SHALL be treated as unsupported rather than inferred
+
 ### Requirement: Explicit generation backend
 
 Every effective generation route SHALL select either `cliproxy` or
-`openai_compatible`. A CLIProxyAPI route SHALL reuse the endpoint and inference
-client credential supplied by the prerequisite proxy subsystem. An
-OpenAI-compatible route SHALL use its configured base URL and named OneTool secret.
+`openai_compatible` and exactly one verified generation `interface`. The initial
+interface values SHALL be `responses` and `chat_completions`. A CLIProxyAPI route
+SHALL reuse the endpoint and inference client credential supplied by the external
+`code.cliproxy` inference connection. An OpenAI-compatible route SHALL use its
+configured base URL and named OneTool secret.
 
 #### Scenario: CLIProxyAPI route uses subscription gateway
 - **WHEN** the effective generation backend is `cliproxy`
 - **THEN** the request SHALL be sent through the configured CLIProxyAPI inference endpoint with its client credential
 - **AND** no provider API key SHALL be required by the calling tool
+
+#### Scenario: Codex subscription uses Responses
+- **WHEN** a CLIProxyAPI generation route selects a Codex-subscription-backed model
+- **THEN** the complete route SHALL select `interface: responses`
+- **AND** the model registry and verified CLIProxyAPI capability fixture SHALL both
+  declare Responses support
 
 #### Scenario: Direct route uses named secret
 - **WHEN** the effective generation backend is `openai_compatible`
@@ -42,7 +65,46 @@ OpenAI-compatible route SHALL use its configured base URL and named OneTool secr
 #### Scenario: Backend-specific values do not cross routes
 - **WHEN** a narrower selection changes the backend selected by a broader configuration layer
 - **THEN** endpoint and credential fields from the broader backend SHALL NOT be inherited
-- **AND** the narrower backend SHALL satisfy its own required configuration
+- **AND** the narrower backend SHALL provide and satisfy its own required configuration at that layer
+
+#### Scenario: Interface is not inferred
+- **WHEN** a complete backend omits `interface` or selects an interface not declared
+  by the resolved model and backend fixture
+- **THEN** configuration or route resolution SHALL fail before network I/O
+- **AND** OneTool SHALL not infer an endpoint from model name, source, launcher
+  route, SDK default, or error response
+
+### Requirement: Explicit subscription-backed generation
+
+Subscription-backed generation SHALL be used only when an effective generation route
+explicitly selects `cliproxy`. OneTool SHALL describe the intended reduction in
+separate API spending without guaranteeing terms compliance, subscription
+classification, included usage, rate limits, availability, credits, or billing.
+
+#### Scenario: Codex subscription model selected
+- **WHEN** the effective CLIProxyAPI route selects a configured Codex
+  subscription-backed model such as Luna
+- **THEN** the request SHALL use the external proxy inference endpoint without
+  requiring a separate OpenAI API key
+- **AND** available returned usage metadata SHALL be preserved in the normalized
+  result
+
+#### Scenario: Subscription route omitted
+- **WHEN** no effective generation route selects `cliproxy`
+- **THEN** OneTool SHALL not infer subscription access from launcher configuration,
+  installed harness authentication, or model source alone
+
+#### Scenario: No included-usage guarantee
+- **WHEN** a subscription-backed route is documented, inspected, or fails
+- **THEN** OneTool SHALL not claim that the request is covered by included allowance,
+  free of charges, compliant with provider terms, or continuously supported
+
+#### Scenario: No paid fallback
+- **WHEN** subscription authentication, allowance, model availability, capability, or
+  proxy health prevents generation
+- **THEN** the operation SHALL fail through the selected route
+- **AND** it SHALL not switch to OpenRouter, a paid API endpoint, another model, or
+  another transport
 
 ### Requirement: Deterministic generation selection
 
@@ -103,6 +165,10 @@ behavior, and effort support.
 - **WHEN** a model or live proxy route does not support the generation interface required by the operation
 - **THEN** OneTool SHALL fail with an actionable incompatibility error
 
+#### Scenario: Required structured-output mode is unavailable
+- **WHEN** an operation requires `json_object` or `json_schema` and the selected model does not declare that mode for the effective interface
+- **THEN** OneTool SHALL fail before network I/O with an error identifying the unsupported structured-output mode
+
 ### Requirement: Bounded CLIProxyAPI inference
 
 The shared CLIProxyAPI service SHALL expose a bounded generation operation that
@@ -114,14 +180,52 @@ credentials.
 - **WHEN** a CLIProxyAPI route is healthy and its resolved model is available from live discovery
 - **THEN** the service SHALL perform the generation request and return normalized content and available usage metadata
 
+#### Scenario: Generation uses HTTP inference
+- **WHEN** any tool generates through CLIProxyAPI
+- **THEN** OneTool SHALL call the selected verified HTTP inference interface directly
+- **AND** it SHALL not spawn Claude Code, Codex, CLIProxyAPI, or another executable
+- **AND** it SHALL not read harness settings, profiles, auth files, or terminal output
+
+#### Scenario: Discovery is not capability proof
+- **WHEN** a model appears in `/v1/models` but lacks a verified fixture for the
+  required interface, modality, structured-output mode, or effort
+- **THEN** the generation route SHALL remain unavailable for that operation
+- **AND** OneTool SHALL not probe with a potentially billable request implicitly
+
 #### Scenario: Proxy is unavailable
 - **WHEN** a configured CLIProxyAPI route is unhealthy or unreachable during a tool call
-- **THEN** the call SHALL fail with an actionable proxy lifecycle error
-- **AND** OneTool SHALL NOT retry through a direct provider route
+- **THEN** the call SHALL fail with an actionable external-proxy error
+- **AND** OneTool SHALL NOT start the proxy or retry through another provider route
 
 #### Scenario: Tool call does not mutate lifecycle
 - **WHEN** a tool performs generation through CLIProxyAPI
 - **THEN** it SHALL NOT start, stop, restart, or reconfigure the proxy process
+- **AND** it SHALL NOT call the CLIProxyAPI management API
+
+#### Scenario: Server performs bounded readiness
+- **GIVEN** at least one configured generation route uses `cliproxy`
+- **WHEN** the OneTool server starts
+- **THEN** startup SHALL perform a bounded inference-endpoint and model-readiness check
+- **AND** it SHALL NOT mutate proxy lifecycle or configuration
+
+#### Scenario: Bounded request
+- **WHEN** the generation adapter sends an HTTP request
+- **THEN** it SHALL apply configured connection/request timeouts and output bounds
+- **AND** response bodies, error bodies, and retries SHALL have finite adapter-owned
+  limits
+
+#### Scenario: Failed startup readiness preserves unrelated tools
+- **GIVEN** a configured CLIProxyAPI generation route cannot become ready during server startup
+- **WHEN** OneTool finishes startup
+- **THEN** that generation route SHALL be marked unavailable with an actionable diagnostic
+- **AND** unrelated packs SHALL remain available
+
+#### Scenario: External correction required
+- **WHEN** a CLIProxyAPI generation route is unavailable
+- **THEN** it SHALL remain unavailable until the user or CLIProxyAPI corrects the
+  external state
+- **AND** OneTool SHALL not offer management or lifecycle mutation as part of the
+  generation call
 
 ### Requirement: Native grounding isolation
 
@@ -147,3 +251,9 @@ credentials and user content.
 #### Scenario: Generation failure is redacted
 - **WHEN** an upstream generation request fails
 - **THEN** logs and tool errors SHALL omit proxy keys, named secret values, OAuth state, account identities, headers, prompts, responses, and raw upstream bodies
+
+#### Scenario: Responsibility boundary is reported
+- **WHEN** effective route details or subscription guidance are shown
+- **THEN** OneTool SHALL identify itself as the configuration and request adapter
+- **AND** it SHALL identify the user as responsible for route choice and CLIProxyAPI
+  as responsible for proxy authentication and provider routing

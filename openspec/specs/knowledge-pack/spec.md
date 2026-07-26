@@ -337,10 +337,16 @@ Repeated query embeddings within a session SHALL be served from a short-lived in
 ---
 
 ### Requirement: Config schema — tools.knowledge
-The `onetool.yaml` `tools.knowledge` block SHALL support: `kb` (map of project name → `KBProjectConfig`), `model` (embedding model), `base_url`, `enrich_model`, `enrich_prompt`, `enrich_batch_size`, `enrich_min_chars`, `enrich_max_chars`, `min_chunk_chars`, `dimensions`, `search_limit`, `search_extract`.
+The `onetool.yaml` `tools.knowledge` block SHALL support `kb` (map of project name
+to `KBProjectConfig`), `llm` (optional pack-level generation selection), `ask`
+(optional ask-operation generation selection), `rerank` (optional rerank-operation
+generation selection), `enrich` (optional enrichment generation selection),
+`enrich_prompt`, `enrich_batch_size`, `enrich_min_chars`, `enrich_max_chars`,
+`min_chunk_chars`, `search_limit`, and `search_extract`. Embedding provider, model,
+endpoint, credentials, dimensions, batching, and token limits SHALL come from the
+independent top-level `embeddings` configuration.
 
 Enrichment keys:
-- `enrich_model` (default `""`) — chat model for `kb.ask` rerank/synthesis and `kb enrich` summarisation; empty falls back to top-level `llm.model`
 - `enrich_prompt` (default `""`) — custom summarisation instruction for `kb enrich`; empty uses the built-in default
 - `enrich_batch_size` (default 20, 1–500) — summaries per DB commit during `kb enrich`
 - `enrich_min_chars` (default 400, ≥0) — chunks with shorter content are skipped by enrichment (0 disables skipping)
@@ -356,9 +362,15 @@ defaults with `url_prefix`, `depth`, `max_pages`, `check_robots_txt`, delay,
 user-agent, wait, timeout, iframe, filter, crawl strategy, score, selector,
 JavaScript, image, flat-file, category, and tag settings.
 
-`topic_roots` entries accept a full URL or bare path prefix. During indexing, the first matching root is stripped from each chunk's canonical topic to derive the stored topic.
+`topic_roots` entries accept a full URL or bare path prefix. During indexing, the
+first matching root is stripped from each chunk's canonical topic to derive the
+stored topic.
 
-Unknown fields in `tools.knowledge` and nested knowledge config models SHALL raise validation errors. Removed top-level keys such as `databases:` and `scrape:` SHALL be treated as unknown fields, with no compatibility migration path.
+Unknown fields in `tools.knowledge` and nested knowledge config models SHALL raise
+validation errors. Removed top-level keys such as `databases:`, `scrape:`,
+embedding `model:`, embedding `base_url:`, embedding `dimensions:`,
+`max_embedding_tokens:`, and `enrich_model:` SHALL be treated as unknown fields,
+with no compatibility migration path.
 
 #### Scenario: KB project config resolves db path
 - **WHEN** `tools.knowledge.kb.rhino.db.path: scratch/rhino-db/rhino.db` is configured
@@ -369,7 +381,7 @@ Unknown fields in `tools.knowledge` and nested knowledge config models SHALL rai
 - **THEN** `kb scrape rhino` crawls the configured sources into `output_base_dir/source_name/`
 
 #### Scenario: topic_roots applied during indexing
-- **WHEN** `tools.knowledge.kb.rhino.index.topic_roots` contains `https://docs.mcneel.com/rhino/8mac/help/en-us/`
+- **WHEN** `tools.knowledge.kb.rhino.index.topic_roots` contains a configured documentation URL prefix
 - **THEN** chunks from that URL prefix are stored with the prefix stripped from their canonical topic
 
 #### Scenario: ignore_patterns applied during indexing
@@ -380,36 +392,37 @@ Unknown fields in `tools.knowledge` and nested knowledge config models SHALL rai
 - **WHEN** `tools.knowledge.kb` is configured with a named project
 - **THEN** each project entry SHALL accept:
   - `db:` (required) — `path` (required, resolved relative to `.onetool/`), `description`, `embeddings_enabled` (default `true`)
-  - `scrape:` (optional) — scrape project config with `output_base_dir` (required, must be absolute), `depth` (default 3), `max_pages` (default 100), `check_robots_txt` (default true), `delay_min` (default 0.5), `delay_max` (default 2.0), `user_agent` (default ""), `category` (optional, one of `reference`/`rule`/`note`/`mistake`, default null), `tags` (default `[]`), and `sources` (map of source name → source config)
+  - `scrape:` (optional) — scrape project config with `output_base_dir` (required, must be absolute), `depth` (default 3), `max_pages` (default 100), `check_robots_txt` (default true), `delay_min` (default 0.5), `delay_max` (default 2.0), `user_agent` (default `""`), `category` (optional, one of `reference`/`rule`/`note`/`mistake`, default null), `tags` (default `[]`), and `sources` (map of source name to source config)
   - `index:` (optional) — `ignore_patterns` (list of gitignore-style patterns, default `[]`), `topic_roots` (list of URL or path prefixes to strip from canonical topics, default `[]`)
-- **AND** each source entry SHALL accept: `url` (required), `url_prefix` (default ""), optional overrides for `depth`, `max_pages`, `check_robots_txt`, `delay_min`, `delay_max`, `user_agent` (all default to `null` = inherit from project), optional `category` (null = inherit from project) and `tags` (null = inherit from project; source tags are merged with project tags, deduplicating)
-- **AND** the `source` column in `chunks` SHALL be populated on INSERT from `chunk.meta["source"]` (set by the sidecar loader)
+- **AND** each source entry SHALL accept `url` (required), `url_prefix` (default `""`), optional overrides for `depth`, `max_pages`, `check_robots_txt`, `delay_min`, `delay_max`, `user_agent`, `category`, and `tags`
+- **AND** the `source` column in `chunks` SHALL be populated on INSERT from `chunk.meta["source"]`
 - **AND** the output directory for each source SHALL be derived as `output_base_dir / source_name`
 - **AND** unknown fields in project or source configs SHALL raise a validation error
 
 #### Scenario: Missing kb key returns empty list from kb.dbs()
 - **WHEN** `tools.knowledge` has no `kb` key
-- **THEN** `kb.dbs()` returns an empty list (not an error)
+- **THEN** `kb.dbs()` returns an empty list and not an error
 
 #### Scenario: Removed databases/scrape keys raise validation error
-- **WHEN** `tools.knowledge.databases` or `tools.knowledge.scrape` is set at the top level
-- **THEN** a validation error is raised for extra inputs
+- **WHEN** `tools.knowledge.databases`, `tools.knowledge.scrape`, `tools.knowledge.model`, `tools.knowledge.base_url`, `tools.knowledge.dimensions`, `tools.knowledge.max_embedding_tokens`, or `tools.knowledge.enrich_model` is set
+- **THEN** a validation error SHALL identify the extra input
 
-#### Scenario: model and base_url fall back to top-level llm config
-- **WHEN** `tools.knowledge.model` is not set
-- **THEN** the embedding model is inherited from `llm.embedding_model` in the top-level `llm:` config block
-- **WHEN** `tools.knowledge.base_url` is not set
-- **THEN** the API base URL is inherited from `llm.base_url` in the top-level `llm:` config block
-- **WHEN** `tools.knowledge.enrich_model` is not set
-- **THEN** the synthesis model for `kb.ask()` and the summarisation model for `kb enrich` are inherited from `llm.model` in the top-level `llm:` config block
+#### Scenario: Embeddings use independent configuration
+- **WHEN** a knowledge project has `embeddings_enabled: true`
+- **THEN** embedding operations SHALL use only the top-level `embeddings` route
+- **AND** they SHALL NOT inherit from top-level `llm` or a knowledge generation selection
+
+#### Scenario: Generation selections fall through by scope
+- **WHEN** an ask, rerank, or enrich generation field is omitted at operation scope
+- **THEN** it SHALL fall through to `tools.knowledge.llm`, then top-level `llm`
 
 #### Scenario: enrich_prompt overrides the built-in instruction
 - **WHEN** `tools.knowledge.enrich_prompt` is set to a custom instruction
 - **THEN** `kb enrich` uses it as the summarisation instruction while keeping the untrusted-context boundary in the system message
 
 #### Scenario: Enrichment config keys are validated
-- **WHEN** `tools.knowledge.enrich_batch_size: 0` (below minimum) or an unknown key such as `tools.knowledge.enrich_foo` is configured
-- **THEN** config validation raises an error
+- **WHEN** `tools.knowledge.enrich_batch_size: 0` or an unknown key such as `tools.knowledge.enrich_foo` is configured
+- **THEN** config validation SHALL raise an error
 
 ### Requirement: Error handling — missing sqlite-vec
 If `sqlite-vec` is not installed, all `knowledge` tools that require vector search SHALL raise a clear error with install instructions.
@@ -701,7 +714,6 @@ retrieved context in a single `user` message with no instruction to disregard em
 - **THEN** a text answer is still returned alongside a list of source citations (topic + url), exactly
   as before this change — the system message is additive and does not alter the response contract
 
-
 ---
 
 ### Requirement: Search lane failures surface instead of silently degrading
@@ -722,14 +734,20 @@ Failures in the FTS or vector search lanes SHALL be logged and surfaced rather t
 
 ### Requirement: AI enrichment — kb enrich summary generation
 
-The CLI command `onetool kb enrich <db>` SHALL generate short document summaries via an OpenAI-compatible chat LLM and write them to `chunks.summary`. Enrichment SHALL be CLI-only (no `kb.enrich()` pack tool, matching `kb index` / `kb reindex`) and SHALL never run implicitly from pack tool calls.
+The CLI command `onetool kb enrich <db>` SHALL generate short document summaries
+through the effective shared generation route and write them to `chunks.summary`.
+Enrichment SHALL be CLI-only (no `kb.enrich()` pack tool, matching `kb index` /
+`kb reindex`) and SHALL never run implicitly from pack tool calls.
 
 Selection semantics (making every run a backfill):
 - Default: only chunks with `summary IS NULL OR summary = ''`, excluding the reserved `_meta` topic.
 - `--force`: all chunks, regenerating existing summaries.
 - `--limit N`: cap the number of chunks processed in this run.
 
-Model and client resolution SHALL follow the existing knowledge-pack LLM conventions: model = `tools.knowledge.enrich_model`, falling back to top-level `llm.model`; API key = `OPENAI_API_KEY` from secrets; base URL = `tools.knowledge.base_url`, falling back to `llm.base_url`.
+Generation resolution SHALL use call-level `--model` and `--effort` overrides,
+then `tools.knowledge.enrich.llm`, `tools.knowledge.llm`, and top-level `llm`.
+The selected backend SHALL use only its own endpoint and named secret. Enrichment
+SHALL NOT read from or fall back to the independent embedding route.
 
 Each summarisation request SHALL include a system message combining the untrusted-context boundary (as used by `kb.ask` rerank/synthesis) with the summarisation instruction, so indexed content cannot inject instructions. The instruction SHALL be overridable via `tools.knowledge.enrich_prompt` (empty = built-in default: 1–2 plain sentences, ~50 words max, no markdown).
 
@@ -752,13 +770,17 @@ Each summarisation request SHALL include a system message combining the untruste
 - **THEN** no LLM call is made for it, `summary` is set to `''` (deliberately-not-summarised marker), and it is counted as skipped
 - **AND** subsequent non-force runs do not reselect it
 
-#### Scenario: Missing API key fails loudly
-- **WHEN** `onetool kb enrich docs` is run without `OPENAI_API_KEY` configured
-- **THEN** the command exits with an actionable error naming the missing secret, and no chunk is modified
+#### Scenario: Missing named generation secret fails loudly
+- **WHEN** `onetool kb enrich docs` is run without the effective route's named secret
+- **THEN** the command reports an actionable error naming the missing secret, and no chunk is modified
 
-#### Scenario: Model falls back to top-level llm config
-- **WHEN** `tools.knowledge.enrich_model` is not set
-- **THEN** enrichment uses `llm.model` from the top-level `llm:` config block
+#### Scenario: Generation selection follows operation precedence
+- **WHEN** no call-level model or effort is supplied
+- **THEN** enrichment resolves `tools.knowledge.enrich.llm`, then `tools.knowledge.llm`, then top-level `llm`
+
+#### Scenario: CLI generation overrides
+- **WHEN** `onetool kb enrich docs --model sol --effort high` is run
+- **THEN** enrichment resolves `sol` from the shared registry and requests high effort for that invocation
 
 #### Scenario: System message carries the untrusted-context boundary
 - **WHEN** an enrichment LLM request is built
@@ -768,7 +790,11 @@ Each summarisation request SHALL include a system message combining the untruste
 
 ### Requirement: AI enrichment — batching, failure handling, and durability
 
-Enrichment SHALL make one chat-completion call per chunk (no multi-chunk batch parsing) with the chunk's content truncated to `tools.knowledge.enrich_max_chars` characters (default 6000). Progress SHALL be committed every `tools.knowledge.enrich_batch_size` summaries (default 20) so an interrupted run keeps completed work.
+Enrichment SHALL make one generation call per chunk (no multi-chunk batch
+parsing) with the chunk's content truncated to
+`tools.knowledge.enrich_max_chars` characters (default 6000). Progress SHALL be
+committed every `tools.knowledge.enrich_batch_size` summaries (default 20) so an
+interrupted run keeps completed work.
 
 Failure policy:
 - Transient HTTP 429/500/503 responses SHALL be retried up to 3 attempts with exponential backoff.
@@ -880,3 +906,27 @@ Existing databases indexed by earlier versions on little-endian platforms SHALL 
 #### Scenario: Reindex regenerates canonical vectors
 - **WHEN** `kb reindex` runs against any database
 - **THEN** all regenerated vectors SHALL be stored in the canonical little-endian encoding
+
+### Requirement: Knowledge generation routing and controls
+
+Knowledge enrichment, reranking, and answer synthesis SHALL use their effective
+shared generation selections. Network-backed knowledge operations SHALL accept
+optional model and effort overrides at their public call boundary where the caller
+controls generation.
+
+#### Scenario: Ask uses operation routes
+- **WHEN** `kb.ask()` performs reranking and synthesis
+- **THEN** each stage SHALL use its configured operation selection or the documented fallback scope
+
+#### Scenario: Ask model and effort override
+- **WHEN** `kb.ask()` is called with `model="sol"` and `effort="high"`
+- **THEN** both reranking and synthesis SHALL resolve `sol` and request high effort
+- **AND** those per-call values SHALL override configured rerank and ask operation selections for that call
+
+#### Scenario: Enrichment uses CLIProxyAPI
+- **WHEN** the effective enrichment backend is `cliproxy`
+- **THEN** `kb enrich` SHALL use the shared CLIProxyAPI service without requiring a provider API key
+
+#### Scenario: Embedding route is not reused for generation
+- **WHEN** embeddings and knowledge generation use different backends
+- **THEN** reranking, synthesis, and enrichment SHALL NOT use the embedding endpoint or credential

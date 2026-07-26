@@ -2,7 +2,9 @@
 
 ## Purpose
 
-Defines the LLM-powered transformation tools: `transform()` for in-memory data and `transform_file()` for file-based transformations. Both take a prompt and use an LLM to process/transform data into a desired format. Requires `OPENAI_API_KEY` in secrets.yaml and configuration in onetool.yaml.
+Defines the provider-neutral LLM transformation tools: `transform()` for
+in-memory data and `transform_file()` for file-based transformations. Both use
+the effective shared generation route.
 
 ## Requirements
 
@@ -63,52 +65,64 @@ The transform() function SHALL support structured JSON output.
 
 ### Requirement: API Configuration
 
-The transform() function SHALL use OpenAI-compatible API configuration.
+The transform() function SHALL use the effective shared generation route.
 
-#### Scenario: Secrets configuration
-- **GIVEN** `OPENAI_API_KEY` in secrets.yaml
+#### Scenario: CLIProxyAPI configuration
+- **GIVEN** the effective backend is `cliproxy`
 - **WHEN** transform() is called
-- **THEN** it SHALL use that API key
+- **THEN** it SHALL use the prerequisite CLIProxyAPI endpoint and inference client credential
+- **AND** it SHALL NOT require `OPENAI_API_KEY`
 
-#### Scenario: Missing API key
-- **GIVEN** no API key in secrets.yaml
+#### Scenario: Direct API configuration
+- **GIVEN** the effective backend is `openai_compatible`
 - **WHEN** transform() is called
-- **THEN** it SHALL return "Error: Transform tool not available. Set OPENAI_API_KEY in secrets.yaml."
+- **THEN** it SHALL use that route's base URL and named secret
 
-#### Scenario: Missing base URL
-- **GIVEN** no llm.base_url in config
+#### Scenario: Missing generation route
+- **GIVEN** no valid pack-level or top-level generation route
 - **WHEN** transform() is called
-- **THEN** it SHALL return "Error: Transform tool not available. Set llm.base_url in config."
+- **THEN** it SHALL return an actionable tool-unavailable error
 
 #### Scenario: Timeout configuration
-- **GIVEN** llm.timeout in config (default: 30 seconds)
-- **WHEN** OpenAI client is created
-- **THEN** it SHALL use the configured timeout
+- **GIVEN** an effective generation timeout with a default of 30 seconds
+- **WHEN** the generation client is created
+- **THEN** it SHALL use the effective timeout
 
 #### Scenario: Max tokens configuration
-- **GIVEN** llm.max_tokens in config
+- **GIVEN** an effective generation output limit
 - **WHEN** transform() is called
-- **THEN** it SHALL pass max_tokens to the API call
-- **NOTE** If None (default), max_tokens is not sent
+- **THEN** it SHALL pass the limit to the selected backend
+- **AND** an omitted limit SHALL NOT be sent
 
 ### Requirement: Model Selection
 
-The transform() function SHALL support model selection.
+The transform() and transform_file() functions SHALL support model and reasoning
+effort selection through the shared generation router.
 
 #### Scenario: Default model
 - **GIVEN** no model parameter
 - **WHEN** transform() is called
-- **THEN** it SHALL use the default model from llm.model config
+- **THEN** it SHALL resolve the model from `tools.ot_llm.llm`, then top-level `llm`
 
 #### Scenario: Model override
-- **GIVEN** model parameter specified
-- **WHEN** `transform(data=my_data, prompt=prompt, model="openai/gpt-4o")` is called
-- **THEN** it SHALL use the specified model
+- **GIVEN** a model parameter is specified
+- **WHEN** `transform(data=my_data, prompt=prompt, model="sol")` is called
+- **THEN** it SHALL use the shared registry entry for `sol` for that call
+
+#### Scenario: Effort override
+- **GIVEN** a supported effort parameter is specified
+- **WHEN** transform() or transform_file() is called with `effort="medium"`
+- **THEN** it SHALL use medium reasoning effort for that call
 
 #### Scenario: Missing model
-- **GIVEN** no model parameter and no llm.model config
+- **GIVEN** no model parameter and no effective configured model
 - **WHEN** transform() is called
-- **THEN** it SHALL return "Error: Transform tool not available. Set llm.model in config."
+- **THEN** it SHALL return an actionable error indicating that a generation model is required
+
+#### Scenario: Unsupported model or effort
+- **GIVEN** the resolved model lacks the required transform capability or requested effort
+- **WHEN** transform() or transform_file() is called
+- **THEN** it SHALL return an actionable validation error before network I/O
 
 ### Requirement: System Prompt
 
@@ -132,7 +146,7 @@ The transform() function SHALL handle errors gracefully.
 #### Scenario: Sensitive error sanitization
 - **GIVEN** an error message containing API keys or "sk-" prefix
 - **WHEN** the error is returned
-- **THEN** it SHALL replace the message with "Authentication error - check OPENAI_API_KEY in secrets.yaml"
+- **THEN** it SHALL return a safe generation error without upstream response bodies or credentials
 - **AND** it SHALL NOT expose the actual API key
 
 ### Requirement: Composability

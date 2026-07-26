@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines the `ctx` pack providing a smart-context store backed by flat files. The pack enables agents to store, navigate, and query large content blobs without filling the context window. Content is stored with a TTL, format-detected on write, and accessible through a set of focused read/search/navigation/query tools.
-
 ## Requirements
-
 ### Requirement: Write Content to Context Store
 
 The `ctx.write()` function SHALL store content synchronously, detect its format,
@@ -268,7 +266,9 @@ content of a `json` or `yaml` handle and return the matched value.
 
 ### Requirement: Multi-question LLM Query
 
-The `ctx.ask()` function SHALL accept one or more questions about stored content, send them to the configured LLM service in a single call, and return structured question/answer pairs — mirroring the `img.ask` interface for text content.
+The `ctx.ask()` function SHALL accept one or more questions about stored content,
+send them to the effective shared generation route in a single call, and return
+structured question/answer pairs mirroring the image ask interface.
 
 #### Scenario: Single question string
 
@@ -278,20 +278,30 @@ The `ctx.ask()` function SHALL accept one or more questions about stored content
 #### Scenario: Batch questions list
 
 - **WHEN** `ctx.ask(h, q=["What is the recommended entry point?", "What are common mistakes?"])` is called
-- **THEN** it SHALL send both questions in a single LLM service call
+- **THEN** it SHALL send both questions in a single generation call
 - **AND** return `{"handle": h, "result": [{"question": "...", "answer": "..."}, {"question": "...", "answer": "..."}]}`
 - **AND** the order of results SHALL match the order of questions provided
 
 #### Scenario: Model override
 
-- **WHEN** `ctx.ask(h, q="...", model="haiku")` is called
-- **THEN** it SHALL pass the specified model to the LLM service
-- **AND** fall back to the LLM service configured default if `model=None`
+- **WHEN** `ctx.ask(h, q="...", model="sol")` is called
+- **THEN** it SHALL resolve `sol` from the shared model registry for that call
+- **AND** fall back through `tools.ot_context.llm` to top-level `llm` if `model=None`
+
+#### Scenario: Effort override
+
+- **WHEN** `ctx.ask(h, q="...", effort="low")` is called
+- **THEN** it SHALL request low reasoning effort for that call
+
+#### Scenario: CLIProxyAPI route
+
+- **WHEN** the effective generation backend is `cliproxy`
+- **THEN** `ctx.ask()` SHALL use the shared CLIProxyAPI service without requiring a provider API key
 
 #### Scenario: LLM service not configured
 
-- **WHEN** `ctx.ask(h, q="...")` is called and no LLM service is configured
-- **THEN** it SHALL return `{"handle": h, "error": "<message explaining an LLM service must be configured>"}`
+- **WHEN** `ctx.ask(h, q="...")` is called and no valid generation route is configured
+- **THEN** it SHALL return `{"handle": h, "error": "<message explaining a generation route must be configured>"}`
 - **AND** it SHALL NOT raise an unhandled exception
 
 #### Scenario: Unknown handle
@@ -306,8 +316,6 @@ The `ctx.ask()` function SHALL accept one or more questions about stored content
 - **THEN** it SHALL send the first `ask_max_bytes` bytes of content to the model
 - **AND** the response SHALL include a `truncated: true` field
 - **AND** the response MAY include a `hint` suggesting `ctx.slice` to narrow scope before re-querying
-
----
 
 ### Requirement: Append Content
 
@@ -453,18 +461,18 @@ The `ctx.purge()` function SHALL bulk-delete handles matching age, source, or st
 The `ctx` pack SHALL support optional configuration via `onetool.yaml`.
 
 #### Scenario: Default configuration
-- **GIVEN** no `tools.ctx` block in `onetool.yaml`
+- **GIVEN** no `tools.ot_context` block in `onetool.yaml`
 - **WHEN** the ctx pack is used
 - **THEN** TTL SHALL default to 3600 seconds (1 hour)
 - **AND** `max_line_chars` SHALL default to 500
 - **AND** `ask_max_bytes` SHALL default to 204800 (200KB)
 
 #### Scenario: Custom TTL
-- **GIVEN** `tools.ctx.ttl: 7200` in config
+- **GIVEN** `tools.ot_context.ttl: 7200` in config
 - **WHEN** a handle is written
 - **THEN** its TTL SHALL be 7200 seconds
 
 #### Scenario: Custom max_line_chars
-- **GIVEN** `tools.ctx.max_line_chars: 200` in config
+- **GIVEN** `tools.ot_context.max_line_chars: 200` in config
 - **WHEN** `ctx.read()` or `ctx.grep()` returns a long line
 - **THEN** lines SHALL be truncated at 200 characters

@@ -417,3 +417,90 @@ The `onetool init mcp-config` command SHALL print ready-to-paste MCP client conf
 - **WHEN** `onetool init --help` is run
 - **THEN** `mcp-config` SHALL be listed as an available `init` subcommand alongside `validate`
 
+### Requirement: Harness commands in the OneTool CLI
+The `onetool` CLI SHALL expose Claude Code and Codex launcher commands.
+
+#### Scenario: Commands in help
+- **WHEN** `onetool --help` is executed
+- **THEN** `claude` and `codex` SHALL appear in a labelled code-harness panel
+
+#### Scenario: Harness help
+- **WHEN** either harness command help is displayed
+- **THEN** it SHALL describe model, route, permission, config, presentation, dry-run,
+  and `--` passthrough options
+- **AND** it SHALL point to setup documentation containing Codex, Claude Code, and
+  CLIProxyAPI configuration references
+
+### Requirement: Code helper group
+The CLI SHALL provide a small `code` group for route selection and diagnostics.
+
+#### Scenario: Interactive picker
+- **WHEN** `onetool code` runs in a terminal without a subcommand
+- **THEN** it SHALL select harness, compatible model, route, and permission mode
+- **AND** it SHALL use the same resolver as explicit harness commands
+
+#### Scenario: Helper commands
+- **WHEN** `onetool code --help` is executed
+- **THEN** it SHALL list setup, models, status, doctor, config, and supported login
+  delegation commands
+- **AND** it SHALL not list proxy start, stop, restart, logs, account, activity, or
+  management operations
+
+#### Scenario: Non-interactive picker
+- **WHEN** the picker is invoked without a terminal
+- **THEN** it SHALL fail with the equivalent explicit command syntax
+
+### Requirement: Launcher configuration resolution
+Code commands SHALL resolve configuration deterministically without changing
+`onetool serve` behavior.
+
+#### Scenario: Resolution order
+- **WHEN** a code command has no explicit config
+- **THEN** it SHALL check the current project configuration before the standard user
+  configuration
+
+#### Scenario: Explicit config
+- **WHEN** `--config` is supplied
+- **THEN** only that checked path SHALL be used
+
+#### Scenario: Missing config
+- **WHEN** no configuration can be resolved
+- **THEN** the command SHALL report checked paths and an actionable setup command
+
+#### Scenario: Serve remains unchanged
+- **WHEN** `onetool serve` is executed
+- **THEN** its existing explicit runtime configuration contract SHALL remain
+  unchanged
+
+### Requirement: Redacted diagnostics and delegation
+Status, doctor, config, and login helpers SHALL remain within the thin-launcher
+boundary.
+
+#### Scenario: Status
+- **WHEN** `onetool code status` is executed
+- **THEN** it SHALL report configured routes, harness binaries, profile/catalog
+  presence, inference endpoint readiness, and named-secret presence without values
+
+#### Scenario: Doctor
+- **WHEN** `onetool code doctor` is executed
+- **THEN** it SHALL verify typed configuration, binaries, adapter compatibility,
+  endpoint discovery, model availability, and safe environment construction
+- **AND** it SHALL not call CLIProxyAPI management APIs
+- **AND** it SHALL report installed versions, required route capabilities, and any
+  evidence-based minimums without exposing credentials or implying an exact pin
+
+#### Scenario: Config display
+- **WHEN** effective launcher configuration is shown
+- **THEN** secret values and generated private adapter content SHALL be omitted
+
+#### Scenario: Login delegation
+- **WHEN** a supported route login helper is selected
+- **THEN** OneTool SHALL execute only the capability-verified upstream login command
+  with inherited terminal access and preserve its exit outcome
+- **AND** it SHALL not inspect, relocate, or refresh resulting credentials
+
+#### Scenario: External command failure
+- **WHEN** a delegated command fails
+- **THEN** OneTool SHALL preserve a non-zero outcome and show a bounded redacted
+  diagnostic
+
