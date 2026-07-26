@@ -2,68 +2,57 @@
 
 ## Purpose
 
-Defines how OneTool distributes skills as standard Agent Skills at the repository root (`skills/ot-ref/SKILL.md`), discoverable and installable by third-party skill installers (e.g. vercel-labs/skills, `npx skills add`). OneTool does not serve, retrieve, or install skill content at runtime; there is no `ot.skills()` tool. Host agents load skill content through their own skill-loading mechanism once a skill is installed by an external installer.
+Defines OneTool's curated, repository-distributed Agent Skills catalog. Skills are installed and
+loaded by host agents; OneTool does not serve or install them at runtime.
 
 ## Requirements
 
-### Requirement: Top-Level Skill Layout
+### Requirement: Curated catalog coverage
 
-OneTool SHALL distribute skills as standard Agent Skills at the repository root, not as a server-served or per-agent-installed resource.
+Every built-in documented pack SHALL have exactly one operating-guidance owner in the 20-skill
+catalog, and catalog profiles SHALL resolve from that reviewed ownership metadata.
 
-#### Scenario: SKILL.md exists at the standard path
-- **WHEN** the repository is inspected at its root
-- **THEN** `skills/ot-ref/SKILL.md` SHALL exist
-- **AND** it SHALL be the only copy of the `ot-ref` skill content in the repository (no duplicate under `src/ot/config/global_templates/skills/`)
+#### Scenario: Catalog consistency is checked
+- **WHEN** the read-only skill catalog validation runs
+- **THEN** ownership SHALL cover every built-in pack exactly once
+- **AND** derived profile membership SHALL match the documented profile contract
 
-#### Scenario: No runtime-serving copy remains
-- **WHEN** the repository source tree is searched for `global_templates/skills/`
-- **THEN** no `.md` skill files SHALL exist under that path
-- **AND** no code path SHALL read skill content from `global_templates/skills/` at runtime
+### Requirement: Role-appropriate invocation
 
-### Requirement: SKILL.md Frontmatter Contract
+Model-invoked skills SHALL rely on Codex's default implicit invocation unless they need optional
+Codex-specific metadata, and SHALL remain outside the user command menu. `ot-ask` SHALL be
+user-invoked and SHALL use a Codex sidecar to prohibit implicit model invocation.
 
-`skills/ot-ref/SKILL.md` SHALL use standard YAML frontmatter compatible with Claude/Agent Skills and the vercel-labs/skills installer.
+#### Scenario: Skill metadata is inspected
+- **WHEN** a skill's frontmatter and any present Codex sidecar are parsed
+- **THEN** the effective policy SHALL agree with that skill's invocation role
+- **AND** absence of a model-invoked skill sidecar SHALL use the default implicit policy
 
-#### Scenario: Frontmatter has name and description
-- **WHEN** `skills/ot-ref/SKILL.md` is parsed
-- **THEN** its YAML frontmatter SHALL contain a `name` field with value `ot-ref`
-- **AND** SHALL contain a `description` field
+### Requirement: Advisory capability guidance
 
-### Requirement: Codex Sidecar Metadata
+Capability skills SHALL provide distinct operating guidance without copying shared call mechanics.
+Conditional capabilities SHALL check live availability and advise on missing requirements without
+installing, configuring, starting services, or adding credentials automatically.
 
-`skills/ot-ref/` SHALL include an OpenAI Codex Skills sidecar file providing invocation policy metadata.
+#### Scenario: A prerequisite is unavailable
+- **WHEN** a capability preflight or first operation identifies a missing prerequisite
+- **THEN** the skill SHALL stop, state what is missing, and offer installation or configuration guidance
 
-#### Scenario: openai.yaml exists with implicit invocation allowed
-- **WHEN** `skills/ot-ref/agents/openai.yaml` is inspected
-- **THEN** the file SHALL exist
-- **AND** it SHALL set `policy.allow_implicit_invocation` to `true`
-- **AND** it SHALL NOT set `policy.allow_implicit_invocation` to `false` (a proactive tools-leverage skill wants implicit invocation on; this reverses the source issue's proposed `false` value per maintainer ruling)
+### Requirement: Catalog router
 
-### Requirement: External Installer Discovery
+`ot-ask` SHALL route user situations to every current guidance owner or the `ot-ref` fallback
+without naming unknown skills or duplicating capability workflows.
 
-Skills SHALL be discoverable and installable by standard third-party skill installers without any OneTool-specific tooling.
+#### Scenario: The router is validated
+- **WHEN** catalog consistency checking reads `ot-ask`
+- **THEN** every guidance owner SHALL be reachable
+- **AND** every named OneTool skill SHALL exist in the curated catalog
 
-#### Scenario: vercel-labs/skills discovers the skill
-- **WHEN** `npx skills add <repo> --list` is run against the OneTool repository
-- **THEN** `ot-ref` SHALL be listed as an installable skill
+### Requirement: External distribution boundary
 
-#### Scenario: vercel-labs/skills installs the skill for an agent
-- **WHEN** `npx skills add <repo> --skill ot-ref --agent <agent>` is run
-- **THEN** the installer SHALL place `ot-ref`'s `SKILL.md` (and, for Codex, `agents/openai.yaml`) at that agent's standard skill path
-- **AND** OneTool SHALL NOT need to run any code to make this succeed (no server-side installer, no MCP tool call)
+Skills SHALL live under the repository-root `skills/` directory for standard third-party
+installers. OneTool SHALL expose no MCP skill-content or skill-installer tool.
 
-### Requirement: No OneTool-Owned Runtime Serving or Installer
-
-OneTool SHALL NOT expose an MCP tool that lists, retrieves, or installs skill content.
-
-#### Scenario: No ot.skills tool
-- **WHEN** the OneTool MCP tool registry is inspected (e.g. `ot.tools()`)
-- **THEN** no tool named `ot.skills` SHALL be present
-
-#### Scenario: No ot_forge.install_skills tool
-- **WHEN** the OneTool MCP tool registry is inspected (e.g. `ot.tools()`)
-- **THEN** no tool named `ot_forge.install_skills` SHALL be present
-
-#### Scenario: No installer machinery remains
-- **WHEN** the repository source tree is searched for `install_skills`, `skill_stub`, `ot\.skills`, or `ottools.skills`
-- **THEN** no matches SHALL be found outside the new `skills/` distribution content itself
+#### Scenario: Runtime tools are inspected
+- **WHEN** the OneTool registry is listed
+- **THEN** no runtime tool SHALL list, retrieve, or install skill content

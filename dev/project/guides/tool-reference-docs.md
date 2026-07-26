@@ -2,6 +2,10 @@
 
 Standard format for `docs/reference/tools/<pack>.md` files. Follow this structure exactly so all tool docs are consistent.
 
+Tool reference pages own user-facing API detail. Agent operating guidance belongs in the curated
+catalog described by [Skill Development](skill-development.md); do not copy signatures between
+the two.
+
 ---
 
 ## File Location

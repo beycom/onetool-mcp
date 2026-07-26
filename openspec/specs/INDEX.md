@@ -46,8 +46,8 @@ details belong under `openspec/changes/`, not in this index.
 | [serve-mcp-proxy](serve-mcp-proxy/spec.md) | External MCP server proxying |
 | [serve-output-sanitization](serve-output-sanitization/spec.md) | Output sanitization boundaries |
 | [serve-server-management](serve-server-management/spec.md) | Runtime server enable/disable/restart APIs |
-| [serve-skills](serve-skills/spec.md) | Runtime skill listing and content retrieval |
-| [skill-ot-ref](skill-ot-ref/spec.md) | The ot-ref skill: trigger, layout, and command-index delivery |
+| [serve-skills](serve-skills/spec.md) | Curated Agent Skills catalog distribution, ownership, and routing |
+| [skill-ot-ref](skill-ot-ref/spec.md) | Shared OneTool mechanics and central command-index delivery |
 | [serve-stats](serve-stats/spec.md) | Runtime statistics reporting |
 | [serve-telemetry](serve-telemetry/spec.md) | Anonymous startup telemetry |
 | [console-outbox](console-outbox/spec.md) | Console outbox protocol contract (v1, server implementation post-V3) |

@@ -2,6 +2,9 @@
 
 Guide for creating tools bundled with OneTool or optional extras.
 
+When a pack needs distinct agent operating guidance, use the
+[Skill Development](skill-development.md) ownership and authoring rules.
+
 ---
 
 ## File Location

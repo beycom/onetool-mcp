@@ -6,7 +6,7 @@ Short alias: `xls`
 
 ## Highlights
 
-- 25 functions covering all spreadsheet operations
+- 24 functions covering all spreadsheet operations
 - Table operations with dictionary-based data access
 - Pure cell range functions (no file I/O required)
 - JSON-formatted output for LLM consumption
@@ -195,4 +195,3 @@ Create a test spreadsheet with `excel.create()` and `excel.write()` to explore c
 
 This tool is based on [excel-mcp-server](https://github.com/haris-musa/excel-mcp-server)
 by Haris Musa, licensed under MIT.
-

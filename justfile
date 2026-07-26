@@ -74,8 +74,8 @@ worktree-new branch base="main":
     printf 'Created worktree: %s\n' "$worktree_path"
     printf 'Enter it with: cd %q\n' "$worktree_path"
 
-# Run all quality checks (lint, typecheck, test)
-check: lint typecheck test
+# Run all quality checks (lint, typecheck, skill catalog, test)
+check: lint typecheck skills-check test
 
 # Run the MCP server in development mode (uses dev config)
 dev *args:
@@ -170,6 +170,10 @@ docs-sync:
     uv run python scripts/list_tool_inventory.py --tool-descriptions
     uv run python scripts/sync_skill_pack_map.py
     uv run python scripts/check_docs_registry.py
+
+# Validate the curated skill catalog without changing files
+skills-check:
+    uv run python scripts/check_skills.py
 
 # Stop the documentation server
 docs-serve-stop:

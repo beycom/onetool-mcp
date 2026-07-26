@@ -103,9 +103,6 @@ servers:
     `onetool init` writes an `onetool.yaml` that already includes all of them, so this only
     matters if you write your own config from scratch.
 
-    Packaged skills are discovered from bundled resources at runtime; they are not loaded from
-    copied files under the OneTool config directory.
-
 ## Pack Configuration
 
 Pack settings go under `tools.<pack_name>` in `onetool.yaml`.

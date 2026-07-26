@@ -28,6 +28,12 @@ OneTool configuration system.
 | [File Layout](onetool-file-layout.md) | Canonical ownership rules for config, runtime, data, state, artifacts, and templates |
 | [Tool Configuration](tool-configuration.md) | Tool-specific config patterns |
 
+## Skills
+
+| Guide | Topic |
+|-------|-------|
+| [Skill Development](skill-development.md) | Creating and maintaining the curated OneTool skill catalog |
+
 ---
 
 ## Operations
@@ -49,6 +55,7 @@ Project-specific commands and release workflows.
 | Add configuration to my tool | [Tool Configuration](tool-configuration.md) |
 | Choose where a file should live | [File Layout](onetool-file-layout.md) |
 | Write a reference doc for my tool | [Tool Reference Documentation](tool-reference-docs.md) |
+| Create or update an agent skill | [Skill Development](skill-development.md) |
 | Handle third-party code licenses | [Attribution](attribution.md) |
 | Configure OneTool | [Configuration](onetool-configuration.md) |
 | Run project commands | [Dev Commands](dev-commands.md) |

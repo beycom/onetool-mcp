@@ -1,13 +1,21 @@
 ---
 name: ot-ref
 description: Use when calling any OneTool pack tool via __onetool/__ot triggers or the MCP run tool — pack map with aliases, call syntax, kwarg-prefix and alias forgiveness, discovery, a greppable index of every command, recovery from disconnected servers, and large-result handling.
-tags: [reference, tools]
+user-invocable: false
 ---
 
 # OneTool Reference
 
 Load this whenever you work with OneTool tools — ideally before your first call.
 OneTool exposes 240+ tools across ~28 packs through one MCP tool: `run(command='pack.tool(arg=value)')`.
+
+## Live discovery
+
+If this skill's index is unavailable or runtime state may differ, use the smallest live lookup:
+`__ot ot.packs(pattern='<pack>', info='min')`, then
+`__ot ot.tool_info(name='<pack>.<tool>')` only when a current signature is needed. Stop and
+explain a missing pack or prerequisite; offer installation or configuration guidance without
+changing the environment unless the user separately asks.
 
 ## Call conventions
 

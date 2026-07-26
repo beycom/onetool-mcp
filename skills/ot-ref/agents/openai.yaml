@@ -1,5 +1,0 @@
-# Codex sidecar metadata for the ot-ref skill.
-# Implicit invocation stays enabled: this skill must load before the agent's
-# first OneTool call, not only when explicitly requested.
-policy:
-  allow_implicit_invocation: true
