@@ -43,10 +43,18 @@ Short alias: `g`
 | `technology` | str | Filter for docs search |
 | `subreddit` | str | Filter for reddit search |
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-- `GEMINI_API_KEY` in secrets.yaml
-- `onetool-mcp[util]` extra (provides `google-genai`)
+Pack distribution: OneTool `[util]`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `lib` | `google-genai` (import `google.genai`, OneTool `[util]`) | Run Gemini grounding and URL-context requests | Required |
+| `secret` | `GEMINI_API_KEY` | Authenticate Gemini grounding requests | Required |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Configuration
 

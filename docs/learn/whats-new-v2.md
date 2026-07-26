@@ -265,7 +265,7 @@ In v1, all tools shipped in a single install. v2 splits heavy-dependency packs i
 | -------- | ---------------------------------------------------------------------------------- |
 | `[util]` | brave, convert, excel, file, ground, mem                                           |
 | `[dev]`  | context7, db, diagram, package, ripgrep, webfetch, whiteboard, and browser utils |
-| `[all]`  | Everything                                                                         |
+| `[all]`  | Core plus `[util,dev]`; separately opt-in `[scrape]` is excluded                  |
 
 ---
 
@@ -278,7 +278,7 @@ uv tool upgrade onetool-mcp
 Or with optional tool packs:
 
 ```bash
-uv tool install 'onetool-mcp[all]'     # everything
+uv tool install 'onetool-mcp[all]'     # core + util + dev
 uv tool install 'onetool-mcp[util]'    # file, convert, excel, brave, ground, mem
 uv tool install 'onetool-mcp[dev]'     # ripgrep, db, webfetch, diagram, ...
 ```
@@ -364,7 +364,9 @@ Custom skill files are no longer supported. Built-in skills like `ot-ref` are di
 
 **Moved to `[dev]`:** `sqlalchemy`, `trafilatura`, `filelock`, `tabulate`
 
-The base `onetool-mcp` install is significantly lighter. Install `[all]` to get everything back.
+The base `onetool-mcp` install is significantly lighter. Install `[all]` for
+core plus `[util,dev]`; add `[scrape]` separately when Knowledge web ingestion
+is required.
 
 ---
 

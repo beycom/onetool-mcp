@@ -415,11 +415,21 @@ The `toc()` function checks if the source file has changed since storage and war
 - `"Requirements"` - heading path (case-insensitive substring match)
 - `[1, "Requirements", "200:300"]` - mixed list
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-- `OPENAI_API_KEY` in secrets.yaml (only when `embeddings_enabled: true`)
-- SQLite (Python stdlib `sqlite3`)
-- tiktoken (bundled with OneTool)
+Pack distribution: OneTool `[util]`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `lib` | `PyYAML` (import `yaml`, OneTool `core`) | Serialize and restore memory exports | Required |
+| `lib` | `jmespath` (import `jmespath`, OneTool `core`) | Run structured memory queries | Required |
+| `lib` | `openai` (import `openai`, OneTool `core`) | Generate optional semantic embeddings | Conditional: `embeddings_enabled` is enabled |
+| `lib` | `tiktoken` (import `tiktoken`, OneTool `core`) | Bound optional embedding input by model token limits | Conditional: `embeddings_enabled` is enabled |
+| `secret` | `OPENAI_API_KEY` | Authenticate optional embedding requests | Conditional: `embeddings_enabled` is enabled |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Embedding Large Content
 

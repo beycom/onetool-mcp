@@ -5,7 +5,7 @@ Canonical guide for OneTool skills under `skills/`.
 ## Roles
 
 - **Shared reference (`ot-ref`)** owns generic call mechanics, discovery, aliases, recovery, the
-  generated pack map, and the complete greppable tool index.
+  generated stable-pack map, and the complete greppable stable-pack tool index.
 - **Capability guide** owns operating judgment for one capability: selection, sequencing,
   availability, safety, verification, and pack-specific recovery.
 - **Cross-pack selection guide** chooses among overlapping packs without duplicating their tool
@@ -49,28 +49,43 @@ Descriptions should identify a positive trigger and the nearest competing capabi
 explicit-pack and outcome-oriented prompts in scope while excluding native-host work and another
 OneTool capability when those are better fits.
 
-## Ownership
+## Ownership and profiles
 
-`src/otdev/docsgen/metadata.py` is the reviewed catalog source:
+Typed records in `src/ot/catalog.py` are the reviewed source for pack ownership,
+skill roles, invocation, stability, help topics, and selectable installation
+profiles. Runtime registry data is joined to those authored records; neither
+docs generators nor validators maintain another inventory.
 
-- `PackDocs.skill_owner` assigns every built-in pack exactly one guidance owner.
-- `CURATED_SKILLS` defines the 20 distributed skills.
-- `PROFILE_SKILLS` is the acceptance oracle for public profile membership.
+Every stable built-in pack has exactly one guidance owner. Cross-catalog skills
+such as setup, runtime operations, and the router may own a workflow without
+owning a pack. Dynamically proxied MCP servers are discovered live and are
+outside static pack ownership.
 
-Do not create another pack-owner mapping. Additions, renames, and removals must update the skill
-directory, metadata, router, tests, and affected specs together. Dynamically proxied MCP packs are
-outside static ownership.
+Profiles are derived from catalog roles and pack extras:
 
-## Lean capability body
+- **Foundation** — call/reference, router, and setup.
+- **Core** — Foundation plus core-pack owners and runtime operations.
+- **Core + `[util]`** and **Core + `[dev]`** — Core plus owners for the selected
+  Python extra.
+- **`[all]`** — every distributed OneTool skill.
 
-Aim for the shortest useful operating guide, normally 15–40 lines:
+The Python package extra named `[all]` is a separate concept: it expands to
+`[util,dev]` and deliberately excludes separately opt-in `[scrape]`.
 
-1. capability boundary;
-2. availability preflight when runtime support is conditional;
-3. shortest safe workflow;
-4. verification where success is not obvious;
-5. material mutation, cost, privacy, or secret guardrails; and
-6. pack-specific recovery not already in `ot-ref`.
+## Capability body
+
+Write enough operating guidance for a less-capable model to use the whole pack
+without guessing. Every skill must have these exact semantic sections:
+
+1. `## Capability boundary`
+2. `## Workflow`
+3. `## Safety and side effects`
+4. `## Verification and recovery`
+
+Within them, cover meaningful modes, selection and sequencing, availability,
+completion evidence, material mutation/cost/privacy/secret concerns, and
+pack-specific recovery. A generous validation ceiling prevents reference-doc
+duplication without rewarding shallow prose.
 
 Do not copy signatures, aliases, generic call syntax, or user reference documentation. Do not add
 a generated tool index per skill. A local reference is justified only for genuinely pack-specific
@@ -78,15 +93,17 @@ material that cannot stay lean in the body.
 
 ## Availability and advisory behavior
 
-Use the smallest relevant live lookup:
+Use topic-scoped help as the first pack-specific lookup:
 
 ```python
-__ot ot.packs(pattern="<pack>", info="min")
+ot.help(query="<pack>", topic="workflow")
+ot.help(query="<pack>", topic="setup")
 ```
 
-After confirming a pack, use `ot.pack_info`, `ot.status`, a server status call, or
-`ot.tool_info(name="<pack>.<tool>")` only when the next decision needs it. Selectively installed
-skills must work without a physical `ot-ref` directory.
+Use `ot.tool_info(name="<pack>.<tool>")` or
+`ot.tools(pattern="<pack>.", info="signatures")` when the next decision needs an
+exact callable contract. Selectively installed skills must work without a
+physical `ot-ref` directory or repository checkout.
 
 When a pack, extra, credential, executable, server, connection, or renderer is unavailable:
 
@@ -100,10 +117,18 @@ blindly.
 
 ## Authored and generated content
 
-Humans author skill bodies, optional sidecars, and genuine pack-specific references.
-`just docs-sync` regenerates the `ot-ref` pack map and central index. The runtime registry is canonical; the
-`docs/reference/tools/tool-index.md` and `skills/ot-ref/reference/tool-index.md` copies must remain
-byte-identical.
+Humans author skill bodies, optional sidecars, and genuine pack-specific
+references. `just docs-sync` updates only named managed blocks or generated
+files:
+
+- every skill's `CATALOG_COVERAGE` block;
+- packaged workflow projections under `src/ot/help_resources/workflows/`;
+- the stable-only `ot-ref` pack map and tool index;
+- public runtime/tool projections and pack summaries.
+
+Never edit between generated markers. Public and skill tool indexes may differ:
+the public reference includes documented beta packs, while all skill artifacts
+exclude beta packs that have no owner.
 
 Installed skill paths vary, so capability guides refer to `ot-ref` by name and fall back to live
 discovery. Do not use repository-root links, sibling traversal, or symlinks to its index.
@@ -111,8 +136,9 @@ discovery. Do not use repository-root links, sibling traversal, or symlinks to i
 ## Router maintenance
 
 `ot-ask` routes by user situation, names every guidance owner, distinguishes missing runtime packs
-from missing skill guides, and offers short ordered sequences only when order matters. It must not
-name stale skills or duplicate capability workflows.
+from missing skill guides, and offers short ordered sequences only when order matters. Route missing
+requirements/config to `ot-setup`, runtime operations to `ot-runtime`, and outbound MCP lifecycle
+work to `ot-mcp-proxy`. It must not name stale skills or duplicate capability workflows.
 
 ## Review checklist
 
@@ -120,9 +146,10 @@ name stale skills or duplicate capability workflows.
   exclusions.
 - Frontmatter and any present `agents/openai.yaml` agree with the invocation role.
 - Every affected pack still has exactly one owner.
-- Capability body is lean, advisory, and avoids shared mechanics.
+- All semantic sections contain enough pack-specific operating judgment.
 - Runtime mutations, cost, privacy, and secrets have proportionate guardrails.
-- Router, metadata, tests, specs, and docs stay aligned.
+- Authored prose stays outside generated markers.
+- Router, typed catalog, tests, specs, and docs stay aligned.
 
 Run:
 

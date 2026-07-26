@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 from ot.config.loader import get_config
-from ot.executor.tool_loader import load_tool_registry
+from ot.executor.tool_loader import LoadedTools, load_tool_registry
 from ot.executor.worker_proxy import WorkerPackProxy
 from otdev.docsgen.metadata import PACK_BY_DISPLAY_NAME
 
@@ -38,8 +38,7 @@ def parse_table(text: str) -> dict[str, int]:
 
 def runtime_tool_counts() -> dict[str, int]:
     """Load runtime tool counts using the all-packs test config."""
-    get_config(CFG, secrets_path=None)
-    reg = load_tool_registry()
+    reg = runtime_registry()
 
     actual_counts: dict[str, int] = {}
     for pack, funcs in reg.packs.items():
@@ -48,6 +47,13 @@ def runtime_tool_counts() -> dict[str, int]:
         else:
             actual_counts[pack] = len(funcs)
     return actual_counts
+
+
+def runtime_registry() -> LoadedTools:
+    """Load the all-packs registry used by docs and catalog checks."""
+
+    get_config(CFG, secrets_path=None)
+    return load_tool_registry()
 
 
 def validate_registry_text(text: str, actual_counts: dict[str, int]) -> list[str]:
@@ -97,25 +103,21 @@ def validate_registry_doc(path: Path = DOC) -> list[str]:
     return validate_registry_text(path.read_text(encoding="utf-8"), runtime_tool_counts())
 
 
-def _check_skill_index_in_sync() -> list[str]:
-    """The ot-ref skill's tool-index copy must be byte-identical to the docs copy."""
+def _check_tool_indexes_exist() -> list[str]:
+    """Both public and stable-only skill tool indexes must exist."""
     docs_index = ROOT / "docs" / "reference" / "tools" / "tool-index.md"
     skill_index = ROOT / "skills" / "ot-ref" / "reference" / "tool-index.md"
     if not skill_index.exists():
         return [f"missing {skill_index} — run `just docs-sync`"]
     if not docs_index.exists():
         return [f"missing {docs_index} — run `just docs-sync`"]
-    if docs_index.read_text(encoding="utf-8") != skill_index.read_text(encoding="utf-8"):
-        return [
-            f"{skill_index} differs from {docs_index} — run `just docs-sync` and commit"
-        ]
     return []
 
 
 def main() -> int:
     """Run the docs registry check."""
     failures = validate_registry_doc()
-    failures += _check_skill_index_in_sync()
+    failures += _check_tool_indexes_exist()
     if failures:
         print("docs registry check failed:")
         for failure in failures:
@@ -124,4 +126,3 @@ def main() -> int:
 
     print("docs registry check passed")
     return 0
-

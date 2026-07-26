@@ -86,6 +86,19 @@ Short alias: `f`
 | `select` | int\|str\|list | Slice selector: section number, heading substring, line range, or list |
 | `items` | list[dict] | List of `{path, select}` dicts for slice_batch (max 20) |
 
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
+
+Pack distribution: OneTool `[util]`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `lib` | `pathspec` (import `pathspec`, OneTool `[util]`) | Apply gitignore-style path exclusion rules | Required |
+| `lib` | `Send2Trash` (import `send2trash`, OneTool `[util]`) | Perform recoverable file deletion | Required |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
+
 ## Configuration
 
 ### Required

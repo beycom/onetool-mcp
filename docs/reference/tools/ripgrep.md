@@ -38,9 +38,17 @@ Short alias: `rg`
 | `smart_case` | bool | Smart-case matching (case-insensitive unless pattern has uppercase) |
 | `filenames_only` | bool | Return only file names that contain matches |
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-- `rg` binary — install from [github.com/BurntSushi/ripgrep](https://github.com/BurntSushi/ripgrep) (macOS: `brew install ripgrep`, Linux: `apt install ripgrep`)
+Pack distribution: OneTool `[dev]`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `cli` | [ripgrep](https://github.com/BurntSushi/ripgrep) (executable `rg`) | Run fast recursive text and regular-expression searches | Required |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Configuration
 

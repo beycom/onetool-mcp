@@ -43,10 +43,21 @@ Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis.
 | `direction` | str | For `knowledge.related()`: `"out"` (links from topic), `"in"` (links to topic), `"both"` |
 | `depth` | int | For `knowledge.related()`: traversal depth (default: 1) |
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-- `OPENAI_API_KEY` in `secrets.yaml` (for embeddings and AI synthesis)
-- `onetool-mcp[util]` extra (provides `sqlite-vec` and `python-frontmatter`)
+Pack distribution: OneTool `[util]`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `lib` | `openai` (import `openai`, OneTool `core`) | Generate embeddings and grounded answers | Required |
+| `lib` | `sqlite-vec` (import `sqlite_vec`, OneTool `[util]`) | Store and search knowledge-base vectors in SQLite | Required |
+| `lib` | `python-frontmatter` (import `frontmatter`, OneTool `[util]`) | Parse Markdown document metadata | Required |
+| `lib` | `crawl4ai` (import `crawl4ai`, OneTool `[scrape]`) | Build knowledge sources by crawling websites | Optional |
+| `secret` | `OPENAI_API_KEY` | Authenticate embedding and answer-generation requests | Required |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Configuration
 

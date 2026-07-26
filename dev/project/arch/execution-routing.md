@@ -7,7 +7,7 @@ Tools are routed to one of three executors based on their type.
 | Executor | When | Example |
 |----------|------|---------|
 | **SimpleExecutor** | Bundled/extension tools with no heavy deps | `brave.search`, `file.read` |
-| **WorkerPool** | Tools with PEP 723 inline script metadata | `db.query` (needs sqlalchemy) |
+| **WorkerPool** | User extension tools with PEP 723 inline script metadata | A standalone extension declaring its own dependencies |
 | **ProxyManager** | External MCP servers defined in config | `github.get_file_contents` |
 
 ## Sequence Diagram
@@ -29,8 +29,8 @@ sequenceDiagram
     L->>L: Detect PEP 723 metadata
     L-->>R: LoadedTools
 
-    alt Bundled / Extension Tool
-        Note over R,T: No heavy dependencies
+    alt Bundled / in-process Extension Tool
+        Note over R,T: Trusted code loaded into the MCP process
         R->>S: execute(code, namespace)
         S->>T: Direct function call
         T-->>S: Result

@@ -59,12 +59,15 @@ The namespace passed to `exec()` contains only:
 |-----|------|---------|
 | `brave`, `file`, ... | `PackProxy` | Tool pack dot-notation access |
 | `github`, ... | `McpProxyPack` | External MCP server proxy |
-| `db`, ... | `WorkerPackProxy` | Subprocess-isolated tools |
+| PEP 723 extension packs | `WorkerPackProxy` | User extensions with inline dependencies, executed in worker subprocesses |
 | `__format__` | magic var | Output format control |
 | `__sanitize__` | magic var | Output sanitisation toggle |
-| `str`, `int`, `len`, ... | builtins | Allowlisted safe builtins |
+| `__builtins__` | Python builtin namespace | Full runtime builtins; AST policy restricts ordinary submitted calls |
 
-Nothing else is in scope - no `__import__`, no `exec`, no filesystem access except through tool packs.
+The validator's builtin allowlist controls accepted command syntax; it does not
+replace the runtime builtin namespace. Execution is not a sandbox: trusted
+in-process pack code and determined Python escape techniques retain the process
+user's authority. See [Security Model](security-model.md).
 
 ## Output Formatting
 

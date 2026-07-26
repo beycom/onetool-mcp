@@ -52,10 +52,17 @@ Source of truth: `src/otdev/tools/excalidraw.py` (`__all__` + function docstring
 | `whiteboard.zoom(*, level: float) -> str` | Set zoom level. Pass 0 to fit all elements in view. |
 <!-- END GENERATED:WB_HELP_SUMMARY -->
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-- Chrome or Chromium installed on the host
-- `onetool-mcp[util]` extra (provides `pydoll-python`; included in `[all]`)
+Pack distribution: OneTool `[util]`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `lib` | `pydoll-python` (import `pydoll`, OneTool `[util]`) | Control the headed Chrome/Chromium whiteboard session | Optional |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Configuration
 

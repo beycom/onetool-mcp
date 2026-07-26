@@ -1,6 +1,6 @@
 # Tool Reference
 
-**28 Packs. 253 Tools.**
+**28 Packs. 257 Tools.**
 
 Complete reference of all built-in tool packs and functions.
 
@@ -16,11 +16,11 @@ Tools are split into optional install extras. Install only what you need:
 | *(core, always included)* | `console`, `ctx`, `ot`, `ot_forge`, `ot_llm`, `ot_secrets`, `ot_servers`, `ot_timer` |
 | `[util]` | `brave`, `convert`, `excel`, `file`, `ground`, `knowledge`, `mem`, `tavily`, `whiteboard` |
 | `[dev]` | `arch`, `chrome_util`, `context7`, `db`, `diagram`, `localhist`, `package`, `play_util`, `ripgrep`, `webfetch` |
-| `[all]` | All of the above |
+| `[all]` | Core plus `[util,dev]`; excludes separately opt-in `[scrape]` |
 
 ```bash
-uv tool install 'onetool-mcp[all]'       # everything
-uv tool install 'onetool-mcp[util,dev]'  # most tools
+uv tool install 'onetool-mcp[all]'       # core + util + dev
+uv tool install 'onetool-mcp[scrape]'    # optional Knowledge web ingestion
 ```
 
 ## Tool Packs
@@ -42,13 +42,13 @@ uv tool install 'onetool-mcp[util,dev]'  # most tools
 | [**Localhist**](localhist.md) | `[dev]` | OneTool Local History snapshots backed by Git. | 15 | MIT | `add_exclude`, `add_force_include`, `autosave_list`, `autosave_start`, `autosave_stop`, `diff`, `history`, `info`, `init`, `log`, `prune`, `restore`, `save`, `show`, `status` |
 | [**Mem**](mem.md) | `[util]` | Persistent AI agent memory with semantic search. | 31 | MIT | `append`, `ask`, `context`, `count`, `decay`, `delete`, `dump`, `flush`, `grep`, `history`, `inspect`, `load`, `list`, `query`, `read`, `read_batch`, `refresh`, `reindex`, `restore`, `rollback`, `search`, `slice`, `slice_batch`, `snapshot`, `stale`, `stats`, `toc`, `update`, `update_batch`, `write`, `write_batch` |
 | [**OT Context**](ot_context.md) | core | TTL-expiring, BM25-indexed storage for large tool outputs. | 13 | MIT | `append`, `ask`, `delete`, `grep`, `inspect`, `list`, `purge`, `query`, `read`, `slice`, `stats`, `toc`, `write` |
-| [**OT Core**](ot_core.md) | core | Introspection and management tools. | 18 | MIT | `aliases`, `config`, `debug`, `help`, `pack_info`, `packs`, `reload`, `result`, `security`, `server`, `servers`, `snippet_info`, `snippets`, `stats`, `status`, `tool_info`, `tools`, `version` |
+| [**OT Core**](ot_core.md) | core | Introspection and management tools. | 22 | MIT | `aliases`, `config`, `debug`, `help`, `pack_info`, `packs`, `prompt`, `prompts`, `reload`, `resource`, `resources`, `result`, `security`, `server`, `servers`, `snippet_info`, `snippets`, `stats`, `status`, `tool_info`, `tools`, `version` |
 | [**OT Forge**](ot_forge.md) | core | Create and validate extension tools. | 2 | MIT | `create_ext`, `validate_ext` |
 | [**OT Image**](ot_image.md) | core | Load images and ask vision questions via OpenAI-compatible API. | 9 | MIT | `ask`, `clip_ask`, `clip_view`, `delete`, `list`, `load`, `load_batch`, `purge`, `summary` |
 | [**OT LLM**](ot_llm.md) | core | AI-powered data transformation. | 2 | MIT | `transform`, `transform_file` |
 | [**OT Secrets**](ot_secrets.md) | core | Age-encrypted secrets management. | 8 | MIT | `audit`, `encrypt`, `get`, `init`, `rotate`, `set`, `status`, `unset` |
 | [**OT Servers**](ot_servers.md) | core | Runtime proxy server state changes (enable, disable, restart, status). | 4 | MIT | `disable`, `enable`, `restart`, `status` |
-| [**Package**](package.md) | `[dev]` | Package version lookup and security audits. | 5 | MIT | `audit`, `models`, `npm`, `pypi`, `version` |
+| [**Package**](package.md) | `[dev]` | Manifest and registry version staleness plus available AI models. | 5 | MIT | `audit`, `models`, `npm`, `pypi`, `version` |
 | [**Playwright Util**](play-util.md) | `[dev]` | Visual element annotation for a Playwright-compatible MCP server. | 6 | MIT | `clear_annotations`, `enable_auto_inject`, `guide_user`, `highlight_element`, `inject_annotations`, `scan_annotations` |
 | [**Ripgrep**](ripgrep.md) | `[dev]` | Fast regex file search. | 4 | [ripgrep](https://github.com/BurntSushi/ripgrep) (MIT) | `count`, `files`, `search`, `types` |
 | [**Tavily**](tavily.md) | `[util]` | AI-powered web search and URL content extraction. | 5 | [Tavily](https://tavily.com/) (MIT) | `extract`, `extract_batch`, `research`, `search`, `search_batch` |

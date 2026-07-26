@@ -61,9 +61,17 @@ Short alias: `tav`
 | `model` | str | `"mini"` (5 credits), `"pro"` (20 credits), `"auto"` (default) |
 | `timeout_seconds` | int | Max seconds to wait for completion (10-1800, default: 300) |
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-- `TAVILY_API_KEY` in secrets.yaml
+Pack distribution: OneTool `[util]`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `secret` | `TAVILY_API_KEY` | Authenticate Tavily search, extract, crawl, and research requests | Required |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Configuration
 

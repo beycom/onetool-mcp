@@ -34,10 +34,17 @@ Short alias: `play`
 | `steps` | list[dict] | List of `{selector, label, color}` dicts for `guide_user` |
 | `server` | str | Playwright-compatible MCP server name. Defaults to `playwright`. |
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-- A Playwright-compatible MCP server must be enabled. By default this pack uses `playwright`; pass `server="..."` to target a compatible server configured under another name.
-- When you configure your own external `playwright` MCP server that drives a real Chrome, launch it with `--disable-features=OptimizationGuideOnDeviceModel,OnDeviceModelBackgroundDownload`, `--disable-component-update`, and `--disable-background-networking` — this avoids an unexpected ~4GB on-device Gemini Nano model download and background networking the first time Chrome is driven over CDP.
+Pack distribution: OneTool `[dev]`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `server` | `playwright` | Provide the browser evaluation tool used by annotations | Required |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Relationship to the Proxied Server
 
@@ -65,14 +72,16 @@ underlying server's own tools directly under its proxy name — by default
 ### Defaults
 
 - OneTool uses the built-in defaults for annotation behavior.
-- Requires the `playwright` MCP server. Enable it in `servers.yaml` (persistent):
+- Requires a compatible MCP server. Verify the current publisher docs, add the
+  persistent entry disabled, validate it, then enable it after approval:
 
 ```yaml
 playwright:
-  enabled: true
+  enabled: false
 ```
 
-Or enable for the current session only: `ot_servers.enable(name="playwright")`
+After validation, enable for the current session with
+`ot_servers.enable(name="playwright")`.
 
 ## Examples
 

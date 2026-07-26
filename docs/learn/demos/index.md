@@ -55,7 +55,7 @@ exist as runnable scripts in this directory but are not part of the V3 release g
 | 4 (optional) | `04-fewer-schemas.sh` | One tool, hundreds fewer schemas: `ot.packs()`, first call, `ot.stats()` token count | — |
 | 5 (optional) | `05-self-healing-browser.sh` | Proxied `playwright.*` + `play_util` annotation; kill the server mid-demo; recover via `ot_servers.status()`/`restart()` | a configured `playwright` proxy server |
 | 6 (optional) | `06-context-handle.sh` | A large `webfetch.fetch(...)` returns a ctx handle; `ctx.toc`/`ctx.ask` navigation; `mem.write` to persist | `[util]` extra (ctx) |
-| 7 (optional) | `07-five-packs-one-block.sh` | Five packs in one Python glue block: `convert` → `excel` pivot → `db.query` → `whiteboard` chart | `[util]` + `[dev]` extras |
+| 7 (optional) | `07-five-packs-one-block.sh` | Five packs in one Python glue block: `convert` → Excel table inspection → `db.query` → `whiteboard` chart | `[util]` + `[dev]` extras |
 
 Demos 6 and 7 use a placeholder handle / sample inputs — substitute the real handle printed by the
 fetch (demo 6) and a real PDF/db_url (demo 7) when running them live.

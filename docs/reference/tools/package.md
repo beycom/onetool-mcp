@@ -31,9 +31,13 @@ Short alias: `pkg`
 | `query` | str | Search query for model name/id (case-insensitive) |
 | `provider` | str | Filter models by provider (e.g., "anthropic", "openai") |
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-No API key required.
+Pack distribution: OneTool `[dev]`.
+
+No additional runtime requirements are declared.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Configuration
 
@@ -74,7 +78,14 @@ package.models(query="claude-sonnet-4.*", provider="anthropic")
 
 # Unified version check
 package.version(registry="npm", packages=["express", "fastify"])
+
+# Compare manifest constraints with current registry releases
+package.audit(path=".", registry="pypi")
 ```
+
+`package.audit` parses a manifest and compares declared constraints with current
+registry versions. It does not inspect a lockfile, installed environment, CVE
+database, or vulnerability feed.
 
 ## Based on
 

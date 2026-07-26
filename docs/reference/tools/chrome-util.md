@@ -33,10 +33,17 @@ Short alias: `chrome`
 | `steps` | list[dict] | List of `{selector, label, color}` dicts for `guide_user` |
 | `server` | str | Chrome DevTools-compatible MCP server name. Defaults to `chrome_devtools`. |
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-- A Chrome DevTools-compatible MCP server must be enabled. By default this pack uses `chrome_devtools`; pass `server="..."` to target a compatible server configured under another name.
-- When you configure your own external `chrome-devtools` MCP server that drives a real Chrome, launch Chrome with `--disable-features=OptimizationGuideOnDeviceModel,OnDeviceModelBackgroundDownload`, `--disable-component-update`, and `--disable-background-networking` — this avoids an unexpected ~4GB on-device Gemini Nano model download and background networking the first time Chrome is driven over CDP.
+Pack distribution: OneTool `[dev]`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `server` | `chrome_devtools` | Provide the Chrome evaluation tool used by annotations | Required |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Relationship to the Proxied Server
 
@@ -65,14 +72,16 @@ under `servers:` in `onetool.yaml` and pass as `server=` to
 ### Defaults
 
 - OneTool uses the built-in defaults for annotation behavior.
-- Requires the `chrome_devtools` MCP server. Enable it in `servers.yaml` (persistent):
+- Requires a compatible MCP server. Verify the current publisher docs, add the
+  persistent entry disabled, validate it, then enable it after approval:
 
 ```yaml
 chrome_devtools:
-  enabled: true
+  enabled: false
 ```
 
-Or enable for the current session only: `ot_servers.enable(name="chrome_devtools")`
+After validation, enable for the current session with
+`ot_servers.enable(name="chrome_devtools")`.
 
 ## Examples
 

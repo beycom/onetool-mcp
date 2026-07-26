@@ -39,9 +39,17 @@ Short alias: `c7`
 
 When a shorthand is given, Context7 resolves it via a search call. A note is prepended to the result if resolution occurred: `[Resolved 'nextjs' → '/vercel/next.js']`.
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-- `CONTEXT7_API_KEY` in secrets.yaml
+Pack distribution: OneTool `[dev]`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `secret` | `CONTEXT7_API_KEY` | Authenticate Context7 documentation API requests | Required |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Configuration
 

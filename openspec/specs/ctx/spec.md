@@ -42,7 +42,7 @@ normalise it, generate a TOC, and return a compact handle dict immediately.
 - **THEN** `format` SHALL be `"text"`
 
 #### Scenario: Write with source label
-- **WHEN** `ctx.write(content, source="webfetch:docs.example.com")` is called
+- **WHEN** `ctx.write(content, source="webfetch:docs.python.org")` is called
 - **THEN** `source` SHALL appear in the returned dict and be retrievable via `ctx.list`
 
 #### Scenario: Verbose mode

@@ -29,6 +29,14 @@ Short alias: `diag`
 | `diagram.batch_render(sources)` | Render multiple diagrams concurrently |
 | `diagram.render_directory(directory)` | Render all source files in a directory |
 
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
+
+Pack distribution: OneTool `[dev]`.
+
+No additional runtime requirements are declared.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
+
 ## Configuration Tools
 
 | Function | Description |

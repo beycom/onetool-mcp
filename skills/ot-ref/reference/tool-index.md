@@ -1,6 +1,6 @@
 # OneTool MCP Tool Index
 
-packs=28 tools=253
+packs=27 tools=252
 
 ## arch
 ```python
@@ -27,15 +27,6 @@ chrome_util.guide_user(task: str, steps: list[dict[str, str]], server: str='chro
 chrome_util.highlight_element(selector: str, label: str, color: str='orange', element_id: str | None=None, server: str='chrome_devtools')  # Highlight elements matching a CSS selector with an annotation overlay.
 chrome_util.inject_annotations(server: str='chrome_devtools')  # Inject the annotation script into the current browser page.
 chrome_util.scan_annotations(server: str='chrome_devtools')  # Read all current annotations from the page.
-```
-
-## console
-```python
-console.clear()  # Clear all retained Console messages for the current instance.
-console.display(content: Any=None, /, path: str | None=None, old_path: str | None=None, new_path: str | None=None, kind: ConsoleKind | None=None, title: str | None=None, metadata: dict[str, str] | None=None)  # Publish tool output or a file to the Console; return a one-line receipt.
-console.list(limit: int=100, offset: int=0, kind: ConsoleKind | None=None, source: str | None=None)  # List retained Console message metadata, oldest-first, paginated.
-console.read(id: str)  # Read one retained Console message's full payload by ID.
-console.show(kind: ConsoleKind, content: str | dict[str, Any] | List[Any], metadata: dict[str, str] | None=None)  # Create one inline Console message and publish it to the outbox.
 ```
 
 ## context7, c7
@@ -211,10 +202,14 @@ mem.write_batch(topic: str, glob_pattern: str, category: str='note', tags: list[
 ot.aliases(pattern: str='', info: InfoLevel='default')  # List aliases with optional filtering.
 ot.config()  # Show key configuration values.
 ot.debug(verbose: bool=False, env_vars: bool=False, dependencies: bool=False, prompts: bool=False)  # Get comprehensive debug information about this OneTool installation.
-ot.help(query: str='', info: HelpInfoLevel='default', ask: str='')  # Get help on OneTool commands, tools, packs, snippets, or aliases.
+ot.help(query: str='', topic: str='', info: HelpInfoLevel='default', ask: str='', answer_only: bool=False)  # Get help on OneTool commands, tools, packs, snippets, or aliases.
 ot.pack_info(name: str='', info: InfoLevel='default')  # Get detailed info for a single pack.
 ot.packs(pattern: str='', info: InfoLevel='default')  # List all packs with optional filtering.
+ot.prompt(server: str, name: str, arguments: dict[str, Any] | None=None)  # Render one prompt through a connected MCP server.
+ot.prompts(server: str)  # List prompt metadata exposed by one connected MCP server.
 ot.reload()  # Force reload of all configuration.
+ot.resource(server: str, uri: str)  # Read one resource from a connected MCP server.
+ot.resources(server: str)  # List resource metadata exposed by one connected MCP server.
 ot.result(handle: str, offset: int=1, limit: int=100, search: str='', fuzzy: bool=False, tail: int=0, context: int=0)  # Query stored large output results with pagination and filtering.
 ot.security(check: str='')  # Check security rules for code validation.
 ot.server(status: str | None=None)  # List or inspect runtime proxy server state.

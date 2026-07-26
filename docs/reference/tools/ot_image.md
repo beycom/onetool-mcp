@@ -37,10 +37,18 @@ Short alias: `img`
 | `all` | bool | `purge(all=True)` deletes all images regardless of age |
 | `minutes` | int | `purge(minutes=N)` deletes images older than N minutes. Default: `15` |
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-- A vision model: set `tools.ot_image.model` or the top-level `llm.model` for `ask()`, `summary()`, `clip_ask()`, and `clip_view()`.
-- `OPENAI_API_KEY` in `secrets.yaml` for vision model calls.
+Pack distribution: OneTool `core`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `lib` | `Pillow` (import `PIL`, OneTool `core`) | Load, inspect, resize, and encode images | Required |
+| `secret` | `OPENAI_API_KEY` | Authenticate optional vision-model operations | Optional |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Configuration
 

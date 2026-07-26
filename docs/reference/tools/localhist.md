@@ -26,6 +26,7 @@ OneTool Local History snapshots backed by Git.
 | `localhist.history(path, ...)` | List snapshots that touched a project-relative path |
 | `localhist.diff(ref, against, path)` | Return a patch for a snapshot, ref comparison, or worktree comparison |
 | `localhist.show(ref, path, offset, limit, tail)` | Return full or partial file content from a snapshot |
+| `localhist.prune(older_than_days, gc, dry_run)` | Preview or apply retention by squashing older snapshots into one baseline |
 | `localhist.restore(ref, paths, ...)` | Restore selected paths from a snapshot |
 
 ## Key Parameters
@@ -43,10 +44,20 @@ OneTool Local History snapshots backed by Git.
 | `limit` | int \| None | Maximum status entries, log/history entries, or lines returned by `show()` |
 | `tail` | int \| None | Return the last N lines from `show()` |
 | `dry_run` | bool | Restore preview mode. Defaults to `true`. |
+| `older_than_days` | int | Retention cutoff for `prune()` (default: `30`) |
+| `gc` | bool | Run immediate Git garbage collection after an applied prune (default: `true`) |
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-- `git` available on `PATH`.
+Pack distribution: OneTool `[dev]`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `cli` | [Git](https://git-scm.com/downloads) (executable `git`) | Store and inspect local project snapshots | Required |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Configuration
 
@@ -139,5 +150,7 @@ localhist.show(ref="HEAD", path="src/parser.py", offset=1, limit=80)
 localhist.restore(ref="HEAD~1", paths=["src/parser.py"])
 localhist.restore(ref="HEAD~1", paths=["src/parser.py"], dry_run=False)
 
-# To remove local-history state, delete the configured localhist Git directory.
+# Preview and apply 90-day retention
+localhist.prune(older_than_days=90)
+localhist.prune(older_than_days=90, dry_run=False)
 ```

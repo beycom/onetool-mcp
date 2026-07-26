@@ -322,11 +322,11 @@ The `onetool kb` subcommand group SHALL include a `scrape` command that crawls a
 - **THEN** files are written to `/tmp/out` regardless of the configured `output_dir`
 
 #### Scenario: Ad-hoc URL requires --output
-- **WHEN** `onetool kb scrape https://docs.example.com` is run without `--output`
+- **WHEN** `onetool kb scrape https://docs.python.org/3/` is run without `--output`
 - **THEN** the command SHALL exit with an error: `"--output is required for ad-hoc URL scrapes"`
 
 #### Scenario: Ad-hoc URL with --output
-- **WHEN** `onetool kb scrape https://docs.example.com --output /tmp/out` is run
+- **WHEN** `onetool kb scrape https://docs.python.org/3/ --output /tmp/out` is run
 - **THEN** pages are crawled and files written to `/tmp/out`
 
 #### Scenario: Unknown named source raises error
@@ -416,4 +416,3 @@ The `onetool init mcp-config` command SHALL print ready-to-paste MCP client conf
 #### Scenario: mcp-config appears in init help
 - **WHEN** `onetool init --help` is run
 - **THEN** `mcp-config` SHALL be listed as an available `init` subcommand alongside `validate`
-

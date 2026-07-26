@@ -77,10 +77,22 @@ To read a section efficiently:
 
 Images are named using content hashes (`img_abc123.png`) for stable diffs across regenerations.
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-- `onetool-mcp[util]` extra (provides `pymupdf`, `python-docx`, `python-pptx`, `openpyxl`)
-- For formula evaluation (`compute_formulas=True`): also included in `onetool-mcp[util]` (`formulas`)
+Pack distribution: OneTool `[util]`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `lib` | `PyMuPDF` (import `fitz`, OneTool `[util]`) | Extract text and images from PDF documents | Required |
+| `lib` | `python-docx` (import `docx`, OneTool `[util]`) | Extract content from Word documents | Required |
+| `lib` | `python-pptx` (import `pptx`, OneTool `[util]`) | Extract content from PowerPoint presentations | Required |
+| `lib` | `openpyxl` (import `openpyxl`, OneTool `[util]`) | Extract content and formulas from Excel workbooks | Required |
+| `lib` | `Pillow` (import `PIL`, OneTool `[util]`) | Process images embedded in converted documents | Required |
+| `lib` | `formulas` (import `formulas`, OneTool `[util]`) | Optionally evaluate Excel formulas during conversion | Optional |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Configuration
 

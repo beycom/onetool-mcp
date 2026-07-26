@@ -25,34 +25,34 @@ Source of truth: `src/ot/config/global_templates/prompts.yaml` (`prompts.packs`)
 <!-- BEGIN GENERATED:PACK_SUMMARY -->
 | Pack | Extra | Description |
 |---|---|---|
-| `ot` | `core` | ** Discover tools, packs. Get the help you need to call them correctly. The BEST PLACE to start. ** |
-| `arch` | `[dev]` | Architecture workflows for Excel ingest, validation, generation, round-trip, and bundling |
-| `brave` | `[util]` | Search the web, news, and images — fast, private, with batch support |
-| `chrome_util` | `[dev]` | Annotate and highlight page elements via Chrome DevTools |
-| `console` | `core` | Publish inline text, markdown, code, diffs, and more to a connected onetool-console app |
-| `context7` | `[dev]` | Pull up-to-date docs for any library — React, FastAPI, etc. |
-| `convert` | `[util]` | Turn PDF, Word, Excel, and PowerPoint files into clean markdown |
-| `db` | `[dev]` | Explore and query databases — list tables, inspect schema, run SQL |
-| `diagram` | `[dev]` | Create diagrams — Mermaid, Graphviz, PlantUML, D2, Excalidraw [experimental] |
-| `excel` | `[util]` | Work with Excel files — read, write, search, pivot, and set formulas |
-| `file` | `[util]` | Read, write, edit, copy, move, and delete files; browse directory trees |
-| `ground` | `[util]` | Research any topic with Google AI-grounded search and source citations |
-| `knowledge` | `[util]` | Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis |
-| `localhist` | `[dev]` | Project-local snapshot history — save, list, diff, and restore file versions |
-| `mem` | `[util]` | Persistent topic-based memory — write, search, grep, slice, and organise |
-| `ot_context` | `core` | Smart context store — ask, read, search, grep large tool responses without filling context window; format-aware toc/slice/query for json, yaml, and markdown |
-| `ot_forge` | `core` | Scaffold and generate code from templates |
-| `ot_image` | `core` | Vision analysis via dedicated model — load images, ask questions, get summaries; zero tokens to host session |
-| `ot_llm` | `core` | Run any text through an LLM — summarise, extract, reformat, translate |
-| `ot_servers` | `core` | Runtime proxy server controls — enable, disable, restart, and inspect one server |
-| `ot_secrets` | `core` | Store and retrieve API keys and secrets for OneTool services |
-| `ot_timer` | `core` | Time tool calls and report performance |
-| `package` | `[dev]` | Look up PyPI and npm packages, audit deps, find the latest AI models |
-| `play_util` | `[dev]` | Annotate and highlight page elements via Playwright |
-| `ripgrep` | `[dev]` | Search code and text at speed — regex, globs, file types, context lines |
-| `tavily` | `[util]` | Search the web with Tavily AI — clean results, answer summaries, URL extraction |
-| `webfetch` | `[dev]` | Fetch any URL and extract clean, readable content |
-| `whiteboard` | `[util]` | Live whiteboard using Excalidraw — you can **draw** diagrams with a powerful DSL, assisted by AI |
+| `ot` | `core` | Discover, inspect, operate, and troubleshoot OneTool |
+| `arch` | `[dev]` | Validate and generate architecture models, round trips, and bundles |
+| `ot_context` | `core` | Store and query large structured results without filling context |
+| `ot_forge` | `core` | Create and statically validate OneTool extension packs |
+| `ot_image` | `core` | Load, inspect, compare, and manage images through durable handles |
+| `ot_llm` | `core` | Transform text or files with a configured language model |
+| `ot_secrets` | `core` | Initialize, audit, store, retrieve, rotate, and remove secrets |
+| `ot_servers` | `core` | Inspect and control configured outbound MCP proxy servers |
+| `ot_timer` | `core` | Measure named operation spans and inspect recorded timings |
+| `brave` | `[util]` | Search the web, news, images, and videos with batch support |
+| `convert` | `[util]` | Convert PDF and office documents into useful text formats |
+| `excel` | `[util]` | Inspect and mutate Excel workbook content and structure |
+| `file` | `[util]` | Resolve, read, search, edit, move, copy, and delete files |
+| `ground` | `[util]` | Research web, developer, documentation, and Reddit sources with citations |
+| `knowledge` | `[util]` | Build and query portable hybrid-search knowledge bases |
+| `mem` | `[util]` | Maintain persistent topic memory with search, history, and recovery |
+| `tavily` | `[util]` | Search, extract, and run deeper web research with Tavily |
+| `chrome_util` | `[dev]` | Annotate and highlight pages through a Chrome DevTools MCP proxy |
+| `console` | `core` | Publish inline artifacts to a connected beta OneTool Console app |
+| `context7` | `[dev]` | Retrieve current documentation for named software libraries |
+| `db` | `[dev]` | Inspect schemas, sample tables, and run explicit database queries |
+| `diagram` | `[dev]` | Select providers and render validated diagram source |
+| `localhist` | `[dev]` | Save, inspect, restore, and prune project-local snapshot history |
+| `package` | `[dev]` | Inspect manifest and registry versions plus available AI models |
+| `play_util` | `[dev]` | Annotate and highlight pages through a Playwright MCP proxy |
+| `ripgrep` | `[dev]` | Search code and text with regular expressions, globs, and context |
+| `whiteboard` | `[util]` | Create and operate live Excalidraw whiteboards with an additive DSL |
+| `webfetch` | `[dev]` | Fetch URLs and extract bounded readable content |
 <!-- END GENERATED:PACK_SUMMARY -->
 
 ## Documentation

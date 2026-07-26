@@ -36,6 +36,14 @@ Publish messages from tool calls to a connected onetool-console app via the sign
 | `source` | str | `None` | `list()` filter matching the `source` metadata key |
 | `id` | str | — | Stable Console message ID returned by `console.show`/receipts |
 
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
+
+Pack distribution: OneTool `core`.
+
+No additional runtime requirements are declared.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
+
 ## Configuration
 
 ### Required
@@ -61,7 +69,7 @@ Publish messages from tool calls to a connected onetool-console app via the sign
 ### Route verbose output to the Console instead of context
 
 ```python
-console.display(ground.search(q="mcp features 2026", count=20))
+console.display(ground.search(query="mcp features 2026", max_sources=20))
 # -> 'console[a3f2c19e04d1] table: 20 items (title, url, snippet) — top: "..."'
 console.display(ot.servers())
 ```
@@ -72,7 +80,7 @@ result). Read the full payload back later with `console.read(id)`.
 ### Display-then-slice: human sees everything, context pays for a fragment
 
 ```python
-r = webfetch.fetch("https://example.com/changelog")
+r = webfetch.fetch(url="https://www.python.org/downloads/")
 console.display(r, kind="markdown", title="changelog")
 r[:500]  # keep only the lead in context
 ```

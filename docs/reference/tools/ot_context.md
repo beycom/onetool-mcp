@@ -91,6 +91,14 @@ Returns `{handle, expr, result}` on success, or an error payload when format/exp
 
 With no arguments, deletes handles older than 15 minutes, then compacts the DB.
 
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
+
+Pack distribution: OneTool `core`.
+
+No additional runtime requirements are declared.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
+
 ## Configuration
 
 ### Required

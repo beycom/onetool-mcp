@@ -23,7 +23,8 @@ Start with the smallest file that answers the question:
 | Immediate agent context | [agents/hints.md](agents/hints.md) | One-page commands, rules, structure, and common paths |
 | Full source/test layout | [agents/project-map.md](agents/project-map.md) | Directory map and ownership boundaries |
 | Architecture or execution flow | [project/arch/index.md](project/arch/index.md) | Entry point to request pipeline, routing, registry, proxy, security, and config architecture |
-| Creating or changing tools | [project/guides/index.md](project/guides/index.md) | Routes to creating tools, tool config, reference docs, attribution, and review guidance |
+| Creating or changing packs | [project/guides/pack-guidance.md](project/guides/pack-guidance.md) | Canonical runtime, requirements, help, skill, docs, generation, and validation workflow |
+| Connecting an MCP server | [project/guides/proxy-server-integration.md](project/guides/proxy-server-integration.md) | Documentation-led arbitrary proxy setup, safety, discovery, and tests |
 | Creating or changing skills | [project/guides/skill-development.md](project/guides/skill-development.md) | Canonical roles, metadata, ownership, availability, and validation guidance |
 | Deciding file locations | [project/guides/onetool-file-layout.md](project/guides/onetool-file-layout.md) | Canonical ownership rules for config, runtime, data, state, artifacts, and templates |
 | Generic development practice | [practices/index.md](practices/index.md) | Routes to reusable testing, Python style, git, logging, CLI, docs, and spec practices |

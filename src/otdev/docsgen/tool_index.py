@@ -11,7 +11,7 @@ from ot.meta._signatures import short_description, signature_args
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_OUTPUT = ROOT / "docs" / "reference" / "tools" / "tool-index.md"
-# Layer 3: the skill ships a byte-identical copy of the index so agents can grep it.
+# Layer 3: the skill ships a stable-only projection so agents can grep it.
 SKILL_OUTPUT = ROOT / "skills" / "ot-ref" / "reference" / "tool-index.md"
 
 __all__ = ["short_description", "signature_args"]
@@ -125,6 +125,20 @@ def format_text(
     return "\n".join(lines)
 
 
+def stable_skill_inventory(
+    inventory: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Exclude cataloged beta packs from the distributed skill projection."""
+    from ot.catalog import PACK_CATALOG, PackStability
+
+    excluded = {
+        entry.pack
+        for entry in PACK_CATALOG
+        if entry.stability is not PackStability.STABLE
+    }
+    return [row for row in inventory if str(row.get("pack")) not in excluded]
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the Tool Index CLI parser."""
     parser = argparse.ArgumentParser(
@@ -197,8 +211,13 @@ def main(argv: list[str] | None = None) -> int:
     else:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(output + "\n", encoding="utf-8")
-        # Also mirror the text index into the ot-ref skill (single source of truth).
+        # Render the skill index from the same inventory with its stable-only filter.
         if args.format != "json":
             SKILL_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-            SKILL_OUTPUT.write_text(output + "\n", encoding="utf-8")
+            skill_output = format_text(
+                stable_skill_inventory(inventory),
+                include_tool_descriptions=args.tool_descriptions,
+                include_descriptions=args.descriptions,
+            )
+            SKILL_OUTPUT.write_text(skill_output + "\n", encoding="utf-8")
     return 0

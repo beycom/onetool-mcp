@@ -13,7 +13,7 @@ say() { run "narrator.speak(text=$1)"; }
 say "'A proxied browser, and what happens when it falls over.'"
 
 say "'Navigate via the proxied playwright server directly.'"
-run "playwright.browser_navigate(url='https://example.com')"
+run "playwright.browser_navigate(url='https://www.python.org')"
 
 say "'Annotate the page with the play_util companion.'"
 run "play_util.guide_user(text='This is the example domain')"

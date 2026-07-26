@@ -3,7 +3,7 @@
 Guide for creating tools bundled with OneTool or optional extras.
 
 When a pack needs distinct agent operating guidance, use the
-[Skill Development](skill-development.md) ownership and authoring rules.
+[Pack Guidance and Agent Skills](pack-guidance.md) workflow.
 
 ---
 
@@ -267,15 +267,35 @@ return f"Error: {e}"
 
 ### External Dependencies
 
-Declare external dependencies with install hints:
+Declare requirements as normalized records. The registry rejects tuple, string,
+kind-keyed, and other legacy shapes:
 
 ```python
-__ot_requires__ = {
-    "cli": [("rg", "brew install ripgrep")],         # External binaries
-    "lib": [("openpyxl", "pip install openpyxl")],    # Python packages
-    "secrets": [("BRAVE_API_KEY", "Get from brave.com")],  # API keys
-}
+__ot_requires__ = [
+    {
+        "kind": "cli",
+        "name": "ripgrep",
+        "executable": "rg",
+        "purpose": "Fast recursive content search",
+        "install_extra": "[dev]",
+    },
+    {
+        "kind": "lib",
+        "name": "openpyxl",
+        "import_name": "openpyxl",
+        "purpose": "Excel workbook support",
+        "install_extra": "[util]",
+    },
+    {
+        "kind": "secret",
+        "name": "BRAVE_API_KEY",
+        "purpose": "Authenticate with Brave Search",
+    },
+]
 ```
+
+See [Tool Configuration](tool-configuration.md) for the complete requirement
+contract, conditional requirements, and explicit config hooks.
 
 ### Accessing Secrets
 
@@ -549,7 +569,14 @@ Do **not** use `@functools.lru_cache` or `lazy_client()` for OpenAI clients.
 Use tiktoken. Declare it as a hard dependency in `__ot_requires__` (no word-count fallback):
 
 ```python
-__ot_requires__ = {"lib": [("tiktoken", "pip install tiktoken")]}
+__ot_requires__ = [
+    {
+        "kind": "lib",
+        "name": "tiktoken",
+        "import_name": "tiktoken",
+        "purpose": "Count model tokens accurately",
+    },
+]
 
 def _count_tokens(text: str) -> int:
     import tiktoken
@@ -622,7 +649,15 @@ pack = "mem"
 # Only public functions go here – these become MCP tools.
 __all__ = ["write", "read", "search", ...]
 
-__ot_requires__ = {"lib": [("openai", "pip install openai")]}
+__ot_requires__ = [
+    {
+        "kind": "lib",
+        "name": "openai",
+        "import_name": "openai",
+        "purpose": "Generate memory embeddings",
+        "install_extra": "[util]",
+    },
+]
 
 # Import public API (and any private symbols needed by tests / type checkers)
 from otutil.tools._mem import (
@@ -654,7 +689,7 @@ from otutil.tools._mem import Config, _close_connection
 
 ## Checklist
 
-- [ ] Checked `ot.utils` for existing shared utilities before implementing HTTP clients, caching, truncation, batch ops, or path helpers
+- [ ] Checked `otpack` for existing shared utilities before implementing HTTP clients, caching, truncation, batch ops, or path helpers
 - [ ] File at `src/ottools/<name>.py`
 - [ ] Module docstring with description
 - [ ] `pack = "..."` before imports
@@ -669,7 +704,7 @@ from otutil.tools._mem import Config, _close_connection
 - [ ] Lazy imports for optional dependencies
 - [ ] Secrets accessed via `get_secret()` from `otpack`
 - [ ] Path resolution using `resolve_cwd_path()` (from `otpack`) or `resolve_ot_path()` (from `ot.meta`)
-- [ ] `Config` class if tool has settings
+- [ ] `Config` class and explicit `config_model = "Config"` if the pack has settings
 - [ ] If calling an LLM: `_get_config()` with `llm.*` fallback + `logger.warning` on exception (not `pass`)
 - [ ] If calling an LLM: `_client_cache` dict for OpenAI client — not `@lru_cache` or new client per call
 - [ ] If counting tokens: use `tiktoken`, declare as hard dep in `__ot_requires__`

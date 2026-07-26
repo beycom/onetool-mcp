@@ -34,11 +34,23 @@ Short alias: `wf`
 | `favor_recall` | bool | Prefer completeness over accuracy |
 | `fast` | bool | Skip fallback extraction for speed |
 | `target_language` | str | Filter by ISO 639-1 language code |
-| `max_length` | int | Truncate output to this length |
+| `max_length` | int | Truncate extracted output to this many characters; this is not the download-size limit |
 | `timeout` | float | Request timeout in seconds (defaults to config) |
 | `use_cache` | bool | Use cached pages (default: True) |
 
 Note: `favor_precision` and `favor_recall` are mutually exclusive.
+
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
+
+Pack distribution: OneTool `[dev]`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `lib` | `trafilatura` (import `trafilatura`, OneTool `[dev]`) | Download and extract useful content from web pages | Required |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Configuration
 
@@ -52,17 +64,23 @@ Note: `favor_precision` and `favor_recall` are mutually exclusive.
 |-----|------|---------|-------------|
 | `tools.webfetch.timeout` | float | `30.0` | Request timeout in seconds. Range: `1.0-120.0`. |
 | `tools.webfetch.max_length` | int | `50000` | Max extracted content length in characters. Range: `1000-500000`. |
+| `tools.webfetch.max_download_bytes` | int | `20000000` | Reject larger responses before extraction. Minimum: `100000`. |
+| `tools.webfetch.block_private_urls` | bool | `false` | Best-effort refusal of private, loopback, link-local, and reserved destinations. |
 
 ```yaml
 tools:
   webfetch:
     timeout: 30.0
     max_length: 50000
+    max_download_bytes: 20000000
+    block_private_urls: false
 ```
 
 ### Defaults
 
-- If `tools.webfetch` is omitted, web fetch uses the built-in timeout and max length shown above.
+- If `tools.webfetch` is omitted, web fetch uses all four defaults shown above.
+- `max_download_bytes` is enforced before extraction; `max_length` truncates the
+  extracted result afterward.
 
 ## Examples
 

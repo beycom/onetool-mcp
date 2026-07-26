@@ -4,7 +4,8 @@ How to add settings, secrets, and path resolution to a tool pack. For the overal
 
 ## Defining a Config Class
 
-Use a Pydantic `Config` class in your tool module. The registry auto-discovers it:
+Use a Pydantic model and expose it through the pack's explicit
+`config_model` hook. The model may be local, imported, or subclassed:
 
 ```python
 from pydantic import BaseModel, Field
@@ -20,6 +21,9 @@ class Config(BaseModel):
 
 def _get_config() -> Config:
     return get_tool_config("mytool", Config)
+
+
+config_model = "Config"
 ```
 
 Users set values in `onetool.yaml`:
@@ -35,6 +39,34 @@ Keep pack defaults in the tool's Pydantic `Config` class. Shared LLM defaults li
 
 Unknown fields in a typed `tools.<pack>` config raise configuration errors, unless that config schema explicitly allows extra fields. Recognised fields with invalid values also raise configuration errors instead of silently falling back to defaults. Remove or rename invalid fields instead of accepting legacy aliases.
 
+The explicit hook powers redacted runtime introspection and setup help. Registry
+validation fails when a configurable pack omits it.
+
+## Declaring requirements
+
+`__ot_requires__` is a list of normalized records. Every record has `kind`,
+`name` and `purpose`. `optional` and `activation` apply when needed;
+kind-specific identity/install fields are:
+
+| Kind | Required identity | Meaning |
+|---|---|---|
+| `lib` | `import_name`, `install_extra` | Importable Python library and its supported OneTool install route |
+| `cli` | `executable` | External executable on `PATH` |
+| `secret` | `name` | OneTool secret name; value is never exposed |
+| `server` | `name` | Configured MCP proxy server |
+| `config` | `name` | Required pack config field |
+
+Use `optional: true` when a pack remains useful without a workflow dependency.
+Add an `activation` condition when current config determines whether that
+workflow is active, such as embeddings or a selected renderer. An optional
+on-demand workflow such as scraping or formula evaluation need not invent a
+config condition. Do not represent conditional dependencies as always-missing
+hard requirements.
+
+Setup/config help is read-only. It may diagnose and propose exact existing
+CLI/config/secrets operations, but it never installs packages, writes config,
+sets credentials, starts services, or connects servers.
+
 ## Accessing Secrets
 
 ```python
@@ -43,7 +75,9 @@ from ot.config import get_secret
 api_key = get_secret("BRAVE_API_KEY")
 ```
 
-Secrets live in `{OT_DIR}/secrets.yaml`.
+Secrets are loaded only from the explicit `--secrets <file>` path. CLI-generated
+setups commonly place that file beside `onetool.yaml`, but runtime code does not
+search a default location.
 
 ## Path Resolution
 

@@ -54,15 +54,18 @@ Architecture workflows for Excel ingestion, validation, generation, round-trip c
 | `directory` | str | Solution directory passed to `bundle_solution` |
 | `include` | str | Optional file, directory, or glob pattern of extra files to add under `data/` in bundle ZIP |
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-- `openpyxl` (Excel ingest and round-trip)
-- `markdown` (rich markdown-to-HTML rendering in solution tables/pages)
-- `beautifulsoup4` and `lxml` (SVG inlining for `bundle_solution`)
-- `d2` CLI on `PATH` for default `system_engine` and `diagram_engine` rendering
-- Install D2 from <https://github.com/terrastruct/d2> (for example, `brew install d2` on macOS)
-- **Minimum verified `d2` version: 0.7.1** — required for D2 class arrays (`class: [A; B]`, used for change-type/interaction-type styling) and node `link` attributes (used for clickable diagram nodes). Class arrays are documented as available in D2 from around v0.6; `link` support was verified working on 0.7.1. An older `d2` may silently drop `link` values or reject class arrays — if diagram generation fails or clicking nodes does nothing, upgrade `d2` first.
-- all included in `onetool-mcp[dev]`
+Pack distribution: OneTool `[dev]`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `lib` | `openpyxl` (import `openpyxl`, OneTool `[dev]`) | Read and write architecture workbooks | Required |
+| `cli` | [D2](https://d2lang.com/tour/install) (executable `d2`) | Render generated architecture diagrams | Optional |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Configuration
 

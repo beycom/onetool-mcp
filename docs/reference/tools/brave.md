@@ -33,9 +33,17 @@ Short alias: `br`
 | `retries` | int | Batch mode only. Retry count for transient failures (non-negative, default: 0) |
 | `retry_delay_ms` | int | Batch mode only. Base backoff delay in milliseconds (0-10000, default: 250) |
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-- `BRAVE_API_KEY` in secrets.yaml
+Pack distribution: OneTool `[util]`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `secret` | `BRAVE_API_KEY` | Authenticate Brave Search API requests | Required |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Configuration
 

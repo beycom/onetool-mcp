@@ -17,6 +17,7 @@ Short alias: `tmr`
 |----------|-------------|
 | `ot_timer.start(name)` | Start or restart a named timer |
 | `ot_timer.elapsed(name, store_as)` | Get elapsed time (lap behavior) |
+| `ot_timer.stop(name, store_as)` | Stop a timer and optionally store its final result |
 | `ot_timer.list()` | Show all stored results and active timers |
 | `ot_timer.clear(results)` | Clear running timers; optionally clear stored results |
 
@@ -27,6 +28,14 @@ Short alias: `tmr`
 | `name` | str | `"_default"` | Timer name for identifying multiple timers |
 | `store_as` | str | `None` | Optional key to store elapsed result for later retrieval |
 | `results` | bool | `False` | If True, `clear()` also removes stored results |
+
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
+
+Pack distribution: OneTool `core`.
+
+No additional runtime requirements are declared.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Configuration
 
@@ -60,6 +69,7 @@ ot_timer.start(name="workflow")
 ot_timer.elapsed(name="workflow", store_as="step1")
 # ... more work ...
 ot_timer.elapsed(name="workflow", store_as="step2")
+ot_timer.stop(name="workflow", store_as="total")
 ot_timer.list()  # shows stored results + active timers
 ```
 
@@ -68,5 +78,6 @@ ot_timer.list()  # shows stored results + active timers
 - Timers persist across tool calls (useful for multi-step workflows)
 - Uses `perf_counter()` for accurate elapsed time
 - `elapsed()` keeps timer running (lap behavior)
+- `stop()` returns the final elapsed time and removes the active timer
 - `clear()` removes timers but preserves stored results by default
 - Results stored via `store_as` remain until session ends

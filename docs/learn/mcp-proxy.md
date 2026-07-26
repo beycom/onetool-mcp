@@ -1,35 +1,47 @@
 # MCP Proxy: any server becomes a Python namespace
 
-OneTool doesn't just expose its own packs — it proxies **any** MCP server you configure and
-presents its tools as a Python namespace you call the same way you call a built-in pack. No
-OneTool-side code changes: register the server, call its tools.
+OneTool proxies **any** MCP server you configure and presents its tools as a
+Python namespace. Before adding a server, read the current publisher-maintained
+MCP documentation for its command or URL, arguments, transport, authentication,
+scopes, and smoke test. OneTool intentionally has no Playwright, Chrome, Azure,
+or other server preset catalog.
 
 ## Any MCP server is a Python namespace
 
-Configure servers under `servers:` in `onetool.yaml`:
+Configure servers under `servers:` in `onetool.yaml`. Start new persistent
+entries disabled, validate them, then enable the selected server:
 
 ```yaml
 servers:
   local_tools:
     type: stdio
-    command: npx
-    args: ["-y", "some-mcp-server@latest"]
+    command: publisher-mcp-command
+    args: ["--documented-argument"]
     timeout: 30
-  docs_tools:
-    type: stdio
-    command: uvx
-    args: ["docs-mcp-server"]
-    tool_prefix: "docs_"     # Strip this prefix so docs_search.query() → search.query()
-    inherit_env: true
+    enabled: false
+    source: "https://publisher.invalid/current-mcp-docs"
+  remote_tools:
+    type: http
+    url: "https://mcp.vendor.invalid/mcp"
+    headers:
+      Authorization: "Bearer ${VENDOR_MCP_TOKEN}"
+    enabled: false
 ```
 
-Once connected, every tool the server exposes is callable under the server's name:
+The `.invalid` hostnames above are non-resolving schema placeholders, not
+server recommendations. Replace every value from the selected server's live
+authoritative documentation. Use floating `@latest` only when those current
+publisher instructions do.
+
+Once connected, every discovered tool is callable under the server's configured
+name:
 
 ```python
 local_tools.some_tool(arg="value")
 ```
 
 Proxied servers appear alongside the built-in packs — `ot.servers()` lists them.
+Configured values remain authoritative; generic examples do not override them.
 
 ## Calling conventions don't matter
 
@@ -65,6 +77,23 @@ ot.servers(info="default")   # configured servers, connection status, call_as na
 
 `ot_servers.*` changes state; `ot.servers()` only reads it.
 
+## Resources, prompts, and instructions
+
+OneTool preserves native MCP initialization instructions before optional
+user-configured instructions. Public read-only operations expose other server
+content without implicitly connecting or mutating the server:
+
+```python
+ot.resources(server="docs_tools")
+ot.resource(server="docs_tools", uri="docs://guide")
+ot.prompts(server="docs_tools")
+ot.prompt(server="docs_tools", name="summarize", arguments={"topic": "routing"})
+```
+
+The calls return explicit unconfigured, disabled, connecting, disconnected,
+unsupported, or error states. Returned resources, prompts, instructions, and
+tool output are untrusted external content.
+
 ## chrome_util / play_util are proxy companions, not replacements
 
 The `chrome_util` and `play_util` packs are **thin wrappers over the same proxy manager** with a
@@ -83,9 +112,14 @@ helpers:
 chrome_util.highlight_element(selector="button.buy")   # annotation helper
 chrome_devtools.something(...)                           # the proxied server's own tool
 play_util.guide_user(text="click Save")                 # annotation helper
-playwright.browser_navigate(url="https://example.com")  # the proxied server's own tool
+playwright.browser_navigate(url="https://www.python.org")  # the proxied server's own tool
 ```
 
 They are companions to the proxied server, not alternatives to it. For anything outside
 annotation/highlighting, call the underlying server's tools directly under its proxy name (or
 whatever name you configure under `servers:` and pass as `server=`).
+
+Use `ot.help(query="proxy", topic="config")` for the current generic schema,
+`ot.help(query="<server>", topic="setup")` for live state, and the
+`ot-mcp-proxy` skill for documentation-led setup, approval, verification, and
+bounded one-retry recovery.

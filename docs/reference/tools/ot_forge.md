@@ -36,9 +36,13 @@ Short alias: `forge`
 |-----------|------|-------------|
 | `path` | str | Full path to the extension file |
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-No API key required.
+Pack distribution: OneTool `core`.
+
+No additional runtime requirements are declared.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Workflow
 

@@ -57,6 +57,18 @@ Any SQLAlchemy-compatible database:
 - PostgreSQL: `postgresql://user:pass@host/db`
 - MySQL: `mysql://user:pass@host/db`
 
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
+
+Pack distribution: OneTool `[dev]`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `lib` | `SQLAlchemy` (import `sqlalchemy`, OneTool `[dev]`) | Connect to and query supported SQL databases | Required |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
+
 ## Configuration
 
 ### Required
@@ -114,6 +126,14 @@ db.query(
 - Pass `read_only=True` to reject non-SELECT/EXPLAIN/PRAGMA statements
 - Use parameterized queries for user input
 - Configure `max_chars` to prevent excessive output
+
+## Return shape
+
+- Row-returning SQL returns
+  `{"rows": [<column-value dicts>], "row_count": N, "truncated": bool}`.
+- Non-row SQL returns
+  `{"success": true, "rows_affected": N, "message": "..."}`.
+- Validation, connection, and execution failures return an error string.
 
 ## Based on
 

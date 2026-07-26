@@ -234,7 +234,7 @@ When creating or updating a tool reference doc:
 - [ ] `## Highlights` — 3–4 bullets
 - [ ] `## Functions` — table covers all public functions in `__all__`
 - [ ] `## Key Parameters` — covers the most useful params
-- [ ] `## Requires` — secrets from `__ot_requires__["secrets"]`; Python extras from `pyproject.toml` optional-dependencies
+- [ ] `## Requires` — normalized `__ot_requires__` records and Python extras match code
 - [ ] `## Configuration` — `### Required`, `### Optional`, yaml block, `### Defaults`
 - [ ] Optional table keys match fields in the pack's `Config` class
 - [ ] `## Examples` — at least 3 realistic examples, comments on each
@@ -246,3 +246,4 @@ When creating or updating a tool reference doc:
 **Related:**
 - [Creating Tools](tool-development.md) — full tool creation guide
 - [Tool Configuration](tool-configuration.md) — adding config to tools
+- [Pack Guidance and Agent Skills](pack-guidance.md) — help, skill, catalog, and generation workflow

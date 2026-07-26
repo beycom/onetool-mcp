@@ -1,12 +1,11 @@
 # Configuration Architecture
 
-## Resolution Order
+## Explicit configuration
 
-Explicit config-file model:
-
-1. `ONETOOL_CONFIG` env var
-2. `--config` CLI argument
-3. User-selected default such as `~/.onetool/onetool.yaml`
+Root startup requires an explicit `--config <file>`. The loaded path is cached
+for `ot.reload()`; runtime code does not search environment variables or
+fallback locations for a first config. `--secrets <file>` is also explicit;
+omitting it loads no secrets.
 
 ## Config Files
 
@@ -29,7 +28,7 @@ Prompt guidance is split by priority:
 |---------|----------------|
 | `tools.run.description` | Authoritative invocation contract for first-call behavior: run code, execute snippet, natural language to code, discovery fallback, keyword-only repair |
 | `instructions` | Short MCP handshake orientation that points agents to the run description and core safety/discovery guidance |
-| `global_templates/skills/ot-ref.md` | Optional advanced reference loaded on demand via `ot.skills(name="ot-ref")` |
+| installed `ot-ref` Agent Skill | Optional advanced call/discovery reference loaded by the host agent |
 
 Keep critical first-call behavior in `tools.run.description`; keep advanced recovery/detail in `ot-ref`; keep server instructions concise.
 
@@ -38,7 +37,7 @@ Keep critical first-call behavior in `tools.run.description`; keep advanced reco
 Main config can include other files:
 
 ```yaml
-version: 1
+version: 2
 include:
   - prompts.yaml
   - security.yaml

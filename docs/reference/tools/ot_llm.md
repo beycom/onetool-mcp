@@ -28,12 +28,19 @@ Short alias: `llm`
 | `model` | str | AI model to use (uses `ot_llm.model` from config) |
 | `json_mode` | bool | If True, request JSON output format (default: False) |
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-Configuration (tool not available until all are set):
-- `OPENAI_API_KEY` in secrets.yaml
-- `base_url` — set via top-level `llm.base_url` or `tools.ot_llm.base_url`
-- `model` — set via top-level `llm.model` or `tools.ot_llm.model`
+Pack distribution: OneTool `core`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `lib` | `openai` (import `openai`, OneTool `core`) | Call OpenAI-compatible language model APIs | Required |
+| `secret` | `OPENAI_API_KEY` | Authenticate model requests | Required |
+| `config` | `model` | Select the language model used by transform | Required |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Examples
 

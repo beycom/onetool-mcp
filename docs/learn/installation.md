@@ -73,14 +73,15 @@ Tools are split into optional extras for leaner installs:
 |-------|-------|---------|
 | `[util]` | `brave`, `convert`, `excel`, `file`, `ground`, `knowledge`, `mem`, `tavily`, `whiteboard` | `uv tool install 'onetool-mcp[util]'` |
 | `[dev]` | `chrome_util`, `context7`, `db`, `diagram`, `package`, `play_util`, `ripgrep`, `webfetch` | `uv tool install 'onetool-mcp[dev]'` |
-| `[all]` | Everything | `uv tool install 'onetool-mcp[all]'` |
+| `[all]` | Core plus `[util,dev]`; not `[scrape]` | `uv tool install 'onetool-mcp[all]'` |
+| `[scrape]` | Optional Knowledge web ingestion | `uv tool install 'onetool-mcp[scrape]'` |
 
 ```bash
-# Install with all tools
+# Install core, util, and dev packs
 uv tool install 'onetool-mcp[all]'
 
-# Install with specific extras
-uv tool install 'onetool-mcp[util,dev]'
+# Add Knowledge web ingestion too
+uv tool install 'onetool-mcp[all,scrape]'
 ```
 
 **Optional:** For safe file deletion (moves to trash instead of permanent delete), add `send2trash`:
@@ -216,16 +217,66 @@ VS Code uses a top-level `servers` key with `"type": "stdio"` per entry. Merge i
 
 ## Install the OneTool Skills
 
-OneTool ships the `ot-ref` skill in the standard Agent Skills layout at `skills/ot-ref/SKILL.md`.
-Install it into your agent with [vercel-labs/skills](https://github.com/vercel-labs/skills):
+OneTool ships a curated set of standard Agent Skills. Use the
+[Skills CLI](https://www.skills.sh/docs/cli) to list the current catalog:
 
 ```bash
-npx skills add https://github.com/beycom/onetool-mcp --skill ot-ref --agent claude
+npx skills@latest add https://github.com/beycom/onetool-mcp --list
 ```
 
-`--agent` also accepts `codex`, `opencode`, and others. Run `npx skills add https://github.com/beycom/onetool-mcp --list`
-to discover every installable skill. If you don't use vercel-labs/skills, APM or a manual copy of
-`skills/ot-ref/SKILL.md` into your agent's skills directory are supported alternatives.
+Install only the guidance matching your Python extras and work. Each recipe
+below expands to ordinary repeated `--skill` flags so it works with the current
+CLI; OneTool does not claim that the installer understands named profiles.
+
+<!-- BEGIN GENERATED:SKILL_INSTALLATION_PROFILES -->
+| Recipe | Skills |
+|---|---|
+| **Foundation** | `ot-ask`, `ot-ref`, `ot-setup` |
+| **Core** | `ot-ask`, `ot-context`, `ot-forge`, `ot-image`, `ot-llm`, `ot-mcp-proxy`, `ot-ref`, `ot-runtime`, `ot-secrets`, `ot-setup` |
+| **Core + [util]** | `ot-ask`, `ot-context`, `ot-convert`, `ot-excel`, `ot-file`, `ot-forge`, `ot-image`, `ot-knowledge`, `ot-llm`, `ot-mcp-proxy`, `ot-mem`, `ot-ref`, `ot-research`, `ot-runtime`, `ot-secrets`, `ot-setup`, `ot-whiteboard` |
+| **Core + [dev]** | `ot-arch`, `ot-ask`, `ot-browser-guidance`, `ot-context`, `ot-db`, `ot-diagram`, `ot-file`, `ot-forge`, `ot-image`, `ot-llm`, `ot-localhist`, `ot-mcp-proxy`, `ot-ref`, `ot-research`, `ot-runtime`, `ot-secrets`, `ot-setup` |
+| **[all]** | `ot-arch`, `ot-ask`, `ot-browser-guidance`, `ot-context`, `ot-convert`, `ot-db`, `ot-diagram`, `ot-excel`, `ot-file`, `ot-forge`, `ot-image`, `ot-knowledge`, `ot-llm`, `ot-localhist`, `ot-mcp-proxy`, `ot-mem`, `ot-ref`, `ot-research`, `ot-runtime`, `ot-secrets`, `ot-setup`, `ot-whiteboard` |
+
+These are documentation recipes, not native installer profile names. Replace `<agent>` with a supported agent such as `codex` or `claude-code`.
+
+**Foundation**
+
+```bash
+npx skills@latest add https://github.com/beycom/onetool-mcp --agent <agent> --skill ot-ask --skill ot-ref --skill ot-setup
+```
+
+**Core**
+
+```bash
+npx skills@latest add https://github.com/beycom/onetool-mcp --agent <agent> --skill ot-ask --skill ot-context --skill ot-forge --skill ot-image --skill ot-llm --skill ot-mcp-proxy --skill ot-ref --skill ot-runtime --skill ot-secrets --skill ot-setup
+```
+
+**Core + [util]**
+
+```bash
+npx skills@latest add https://github.com/beycom/onetool-mcp --agent <agent> --skill ot-ask --skill ot-context --skill ot-convert --skill ot-excel --skill ot-file --skill ot-forge --skill ot-image --skill ot-knowledge --skill ot-llm --skill ot-mcp-proxy --skill ot-mem --skill ot-ref --skill ot-research --skill ot-runtime --skill ot-secrets --skill ot-setup --skill ot-whiteboard
+```
+
+**Core + [dev]**
+
+```bash
+npx skills@latest add https://github.com/beycom/onetool-mcp --agent <agent> --skill ot-arch --skill ot-ask --skill ot-browser-guidance --skill ot-context --skill ot-db --skill ot-diagram --skill ot-file --skill ot-forge --skill ot-image --skill ot-llm --skill ot-localhist --skill ot-mcp-proxy --skill ot-ref --skill ot-research --skill ot-runtime --skill ot-secrets --skill ot-setup
+```
+
+**[all]**
+
+```bash
+npx skills@latest add https://github.com/beycom/onetool-mcp --agent <agent> --skill ot-arch --skill ot-ask --skill ot-browser-guidance --skill ot-context --skill ot-convert --skill ot-db --skill ot-diagram --skill ot-excel --skill ot-file --skill ot-forge --skill ot-image --skill ot-knowledge --skill ot-llm --skill ot-localhist --skill ot-mcp-proxy --skill ot-mem --skill ot-ref --skill ot-research --skill ot-runtime --skill ot-secrets --skill ot-setup --skill ot-whiteboard
+```
+<!-- END GENERATED:SKILL_INSTALLATION_PROFILES -->
+
+Skill `[all]` means every distributed OneTool guidance skill. It is not the
+Python `onetool-mcp[all]` extra, which installs core plus `[util,dev]` and still
+excludes `[scrape]`.
+
+Use `npx skills@latest list`, `update`, and `remove` to inspect and maintain
+installed skills. If you do not use the Skills CLI, copy selected `skills/<name>`
+directories into the location documented by your agent.
 
 ## External Tools
 

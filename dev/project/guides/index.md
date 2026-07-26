@@ -10,9 +10,11 @@ How to build tool packs for OneTool.
 
 | Guide | Topic |
 |-------|-------|
+| [Pack Guidance and Agent Skills](pack-guidance.md) | End-to-end pack, runtime help, owning skill, generation, and validation workflow |
 | [Tool Development](tool-development.md) | Complete guide to building tool packs |
 | [Tool Configuration](tool-configuration.md) | Adding tool-specific configuration |
 | [Tool Reference Documentation](tool-reference-docs.md) | Standard format for `docs/reference/tools/` pages |
+| [Proxy Server Integration](proxy-server-integration.md) | Documentation-led setup and use of arbitrary MCP servers |
 | [Attribution](attribution.md) | License handling for derived tools |
 | [Upstream Tool Review](upstream-tool-review.md) | Periodic checks for upstream tool API changes |
 
@@ -52,6 +54,8 @@ Project-specific commands and release workflows.
 | I want to... | See |
 |--------------|-----|
 | Create a new tool pack | [Tool Development](tool-development.md) |
+| Connect or document an MCP server | [Proxy Server Integration](proxy-server-integration.md) |
+| Add pack help and an owning skill | [Pack Guidance and Agent Skills](pack-guidance.md) |
 | Add configuration to my tool | [Tool Configuration](tool-configuration.md) |
 | Choose where a file should live | [File Layout](onetool-file-layout.md) |
 | Write a reference doc for my tool | [Tool Reference Documentation](tool-reference-docs.md) |

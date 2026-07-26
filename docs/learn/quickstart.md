@@ -20,6 +20,9 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 uv tool install 'onetool-mcp[all]'
 ```
 
+`[all]` means core plus `[util,dev]`. Install `[scrape]` separately when
+Knowledge web ingestion is required.
+
 ## 3. Initialize
 
 ```bash

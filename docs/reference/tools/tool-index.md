@@ -1,6 +1,6 @@
 # OneTool MCP Tool Index
 
-packs=28 tools=253
+packs=28 tools=257
 
 ## arch
 ```python
@@ -211,10 +211,14 @@ mem.write_batch(topic: str, glob_pattern: str, category: str='note', tags: list[
 ot.aliases(pattern: str='', info: InfoLevel='default')  # List aliases with optional filtering.
 ot.config()  # Show key configuration values.
 ot.debug(verbose: bool=False, env_vars: bool=False, dependencies: bool=False, prompts: bool=False)  # Get comprehensive debug information about this OneTool installation.
-ot.help(query: str='', info: HelpInfoLevel='default', ask: str='')  # Get help on OneTool commands, tools, packs, snippets, or aliases.
+ot.help(query: str='', topic: str='', info: HelpInfoLevel='default', ask: str='', answer_only: bool=False)  # Get help on OneTool commands, tools, packs, snippets, or aliases.
 ot.pack_info(name: str='', info: InfoLevel='default')  # Get detailed info for a single pack.
 ot.packs(pattern: str='', info: InfoLevel='default')  # List all packs with optional filtering.
+ot.prompt(server: str, name: str, arguments: dict[str, Any] | None=None)  # Render one prompt through a connected MCP server.
+ot.prompts(server: str)  # List prompt metadata exposed by one connected MCP server.
 ot.reload()  # Force reload of all configuration.
+ot.resource(server: str, uri: str)  # Read one resource from a connected MCP server.
+ot.resources(server: str)  # List resource metadata exposed by one connected MCP server.
 ot.result(handle: str, offset: int=1, limit: int=100, search: str='', fuzzy: bool=False, tail: int=0, context: int=0)  # Query stored large output results with pagination and filtering.
 ot.security(check: str='')  # Check security rules for code validation.
 ot.server(status: str | None=None)  # List or inspect runtime proxy server state.

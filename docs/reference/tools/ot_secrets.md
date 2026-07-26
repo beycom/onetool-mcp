@@ -18,6 +18,7 @@ Short alias: `sec`
 | `ot_secrets.init(label, force)` | Create/store keypair in OS keychain |
 | `ot_secrets.set(key, value, file)` | Encrypt and store a single value in place (round-trip verified) |
 | `ot_secrets.get(key, file, out_file)` | Report a key's existence/encryption; write the value to a `0600` `out_file` only (never returned) |
+| `ot_secrets.unset(key, file)` | Remove one secret from the YAML file |
 | `ot_secrets.encrypt(file, backup)` | Encrypt plaintext values in a secrets YAML file |
 | `ot_secrets.status(file)` | Show identity status and encrypted/plain counts |
 | `ot_secrets.rotate(file, backup)` | Generate new keypair and re-encrypt encrypted values |
@@ -34,10 +35,18 @@ Short alias: `sec`
 | `backup` | bool | Create a plaintext `.bak` backup (mode `0600`) before modifying file (default: `False`) |
 | `force` | bool | Overwrite existing keychain identity when initializing |
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-- OS keychain support (macOS Keychain, Windows Credential Locker, or compatible Linux keyring)
-- Python packages: `pyrage` (age encryption) and `keyring` (OS keychain access) — both are core dependencies, no extra required
+Pack distribution: OneTool `core`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `lib` | `pyrage` (import `pyrage`, OneTool `core`) | Encrypt and decrypt the OneTool secrets file | Required |
+| `lib` | `keyring` (import `keyring`, OneTool `core`) | Store the age identity in the operating-system keyring | Required |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Configuration
 
@@ -70,6 +79,9 @@ ot_secrets.rotate(file="~/.onetool/secrets.yaml")
 
 # 5) Audit a file for plaintext values
 ot_secrets.audit(file="~/.onetool/secrets.yaml")
+
+# 6) Remove a secret
+ot_secrets.unset(key="OLD_API_KEY", file="~/.onetool/secrets.yaml")
 ```
 
 ## Notes

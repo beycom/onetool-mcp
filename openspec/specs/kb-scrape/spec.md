@@ -67,7 +67,7 @@ The `.meta.yaml` sidecar written per crawled page SHALL contain exactly the fiel
 
 #### Scenario: Sidecar fields for ad-hoc URL
 - **WHEN** a page is crawled from an ad-hoc URL with no named source
-- **THEN** `source` SHALL be the hostname of the entry-point URL (e.g. `docs.example.com`)
+- **THEN** `source` SHALL be the hostname of the entry-point URL (e.g. `docs.python.org`)
 
 ---
 

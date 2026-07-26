@@ -6,6 +6,8 @@
 ## Summary
 
 - OneTool security is defense-in-depth, not absolute isolation.
+- Root Streamable HTTP has no OneTool authentication. A non-loopback bind must
+  be protected by a trusted network boundary or authenticated reverse proxy.
 - Default policy is allowlist-based: unsafe code is rejected unless explicitly allowed.
 - Use `ot.security()` to inspect active rules and check patterns.
 - Keep secrets in `secrets.yaml` and enable output sanitization.
@@ -180,14 +182,13 @@ __onetool ot_secrets.encrypt(file="~/.onetool/secrets.yaml")  # Encrypt values i
 
 Once encrypted, `secrets.yaml` is safe to inspect and commit — values cannot be recovered without the OS keychain key. See [Encrypting Secrets at Rest](../reference/cli/onetool-config.md#encrypting-secrets-at-rest) for full setup and usage.
 
-### 8. Worker Process Isolation
+### 8. Selective Worker Process Isolation
 
-Tools run in isolated worker processes:
-
-- Separate memory space from main server
-- Controlled execution environment (no arbitrary imports)
-- Timeout enforcement per tool
-- Clean process state between calls
+Bundled packs and ordinary extensions run in the OneTool process and are
+trusted code. Only user extension files with PEP 723 inline dependency metadata
+route through worker subprocesses, giving those extensions dependency and
+process separation. Worker routing is not a general sandbox for built-in packs
+or arbitrary command code.
 
 ### 9. Output Sanitization (Prompt Injection Protection)
 

@@ -76,9 +76,17 @@ Short alias: `xls`
 | `pattern` | str | Search pattern (wildcards or regex) |
 | `table_name` | str | Name for table operations |
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-- `onetool-mcp[util]` extra (provides `openpyxl`)
+Pack distribution: OneTool `[util]`.
+
+| Kind | Requirement | Purpose | Availability |
+|---|---|---|---|
+| `lib` | `openpyxl` (import `openpyxl`, OneTool `[util]`) | Read, write, inspect, and format Excel workbooks | Required |
+
+Use `ot.help(query='<pack>', topic='setup')` for current readiness and non-mutating setup guidance.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Configuration
 

@@ -94,6 +94,15 @@ Use `stdio` for normal local MCP client configuration. Use `http` when the MCP
 client needs a URL instead of a command it can spawn. Direct API is private
 process access for `direct`; it is not an MCP HTTP transport.
 
+The root Streamable HTTP transport has no OneTool authentication layer. Keep
+the default loopback bind unless a trusted network boundary, container ingress,
+or authenticated reverse proxy protects the endpoint. Binding `--host 0.0.0.0`
+or another non-loopback address gives reachable clients the full
+destructive-capable `run` surface.
+
+`onetool direct` exposes one CLI operation, `onetool direct run`; it does not
+provide direct `start`, `server`, or `repl` subcommands.
+
 ## Configuration
 
 Config is specified via `--config`. All relative paths inside the config file resolve from the config file's parent directory.

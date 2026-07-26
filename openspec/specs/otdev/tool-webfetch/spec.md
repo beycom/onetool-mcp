@@ -168,7 +168,7 @@ The `webfetch.fetch()` function SHALL validate inputs before processing.
 - **THEN** it SHALL return an error string containing "URL cannot be empty"
 
 #### Scenario: Malformed URL
-- **GIVEN** a URL without scheme or netloc (e.g., "example.com")
+- **GIVEN** a URL without scheme or netloc (e.g., "python.org")
 - **WHEN** `webfetch.fetch(url=url)` is called
 - **THEN** it SHALL return an error string containing "Invalid URL format: {url}"
 

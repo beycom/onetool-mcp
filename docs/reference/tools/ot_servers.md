@@ -15,10 +15,13 @@ Short alias: `srv`
 | `ot_servers.restart(name)` | Reconnect a proxy server with its current on-disk config |
 | `ot_servers.status(name)` | Show detailed status for one proxy server |
 
-## Requires
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
 
-- No required `tools.ot_servers` settings.
-- Servers must exist in `servers.yaml`.
+Pack distribution: OneTool `core`.
+
+No additional runtime requirements are declared.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Examples
 

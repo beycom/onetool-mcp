@@ -8,19 +8,26 @@ Core tools for OneTool introspection and management.
 - Check runtime status, API connectivity, and security rules
 - Query stored large outputs with pagination and search
 - Unified `ot.help()` entry point for discovery across all resource types
-- `ot.help(ask="...")` answers a natural-language question using only the deterministic help text narrowed by `query`
+- Topic-scoped deterministic help for pack workflows, setup, config, policy,
+  templates, and packaged resources
+- Read-only access to connected MCP server resources and prompts
+- `ot.help(ask="...")` answers from only the selected deterministic topic
 
 ## Functions
 
 | Function | Description |
 |----------|-------------|
-| `ot.help(query, info, ask)` | Unified help - search tools, packs, servers, snippets, aliases; optional ask mode |
+| `ot.help(query, topic, info, ask, answer_only)` | Resolve a subject/topic, search discovery data, or answer from narrowed deterministic help |
 | `ot.tools(pattern, info)` | List tools, filter by pattern |
 | `ot.tool_info(name, pattern, info)` | Get detailed info (signature, args) for one or more tools |
 | `ot.packs(pattern, info)` | List packs (local + MCP), filter by pattern |
 | `ot.pack_info(name, info)` | Get detailed info for a specific pack |
 | `ot.servers(pattern, info)` | List MCP proxy servers, filter by pattern |
 | `ot.server(status)` | Read-only runtime proxy server view |
+| `ot.resources(server)` | List resource metadata from a connected MCP server |
+| `ot.resource(server, uri)` | Read one MCP server resource |
+| `ot.prompts(server)` | List prompt metadata from a connected MCP server |
+| `ot.prompt(server, name, arguments)` | Render one MCP server prompt |
 | `ot_servers.enable(name)` | Enable and connect one proxy server |
 | `ot_servers.disable(name)` | Disable and disconnect one proxy server |
 | `ot_servers.restart(name)` | Reconnect one proxy server |
@@ -36,6 +43,14 @@ Core tools for OneTool introspection and management.
 | `ot.result(handle, ...)` | Query stored large output with pagination and search |
 | `ot.reload()` | Force configuration reload |
 | `ot.security(check)` | Check security rules and allowlists |
+
+<!-- BEGIN GENERATED:PACK_REQUIREMENTS -->
+## Runtime requirements
+
+Pack distribution: OneTool `core`.
+
+No additional runtime requirements are declared.
+<!-- END GENERATED:PACK_REQUIREMENTS -->
 
 ## Configuration
 
@@ -84,6 +99,11 @@ ot.help(query="brave.search")
 # Exact pack lookup
 ot.help(query="brave")
 
+# Pack operating and live setup topics
+ot.help(query="brave", topic="workflow")
+ot.help(query="brave", topic="setup")
+ot.help(query="brave", topic="config")
+
 # Exact server lookup (MCP proxy servers)
 ot.help(query="chrome_devtools")
 ot.help(query="github")
@@ -97,12 +117,20 @@ ot.help(query="ws")
 # Fuzzy search across all types
 ot.help(query="web fetch")
 ot.help(query="search", info="min")
+
+# Answer only from the selected deterministic topic
+ot.help(
+    query="whiteboard",
+    topic="dsl",
+    ask="How do I group and style these nodes?",
+    answer_only=True,
+)
 ```
 
 **Behaviour:**
 
 - No query: Returns general help overview with discovery commands and examples
-- Exact server match: Returns server help with status, source, instructions, and tool list
+- Exact server match: Returns server help with status, source, native then configured instructions, and tool list
 - Exact tool match (contains `.`): Returns detailed tool help with signature, args, returns, example
 - Exact pack match: Returns pack help with instructions and tool list
 - Snippet match (starts with `:`): Returns snippet definition with params and body
@@ -110,7 +138,16 @@ ot.help(query="search", info="min")
 - Fuzzy matches: Groups results by type (Tools, Packs, Snippets, Aliases, Servers) and matches name + description intent
 - No matches: Suggests `ot.tools()`, `ot.packs()`, `ot.servers()`, etc. to browse; server/proxy intent also includes `ot_servers.enable(name="...")` recovery
 
-The `info` parameter controls detail level for all search results. `ask` optionally answers a question using the narrowed deterministic help text; it does not call an LLM when `ask` is empty.
+Exact subject resolution happens before topic lookup and fuzzy discovery.
+Standard built-in-pack topics are `overview`, `workflow`, `setup`, and `config`;
+configured servers also offer `resources` and `prompts`. Unknown topics list the
+valid choices.
+
+The `info` parameter controls detail level for search results. `ask` optionally
+answers using only the selected deterministic topic; it does not call an LLM
+when `ask` is empty. `answer_only=True` requires a non-empty `ask`. If synthesis
+fails, the result includes the explicit LLM error and narrowed deterministic
+help so the caller can proceed without a second call.
 
 **Documentation URLs:**
 
@@ -201,6 +238,28 @@ Returns server information (operational view):
 
 With `info="full"`, returns structured dicts also including `source` and `tools` list.
 For guidance, instructions, and examples, use `ot.help(query="<server_name>")` instead.
+
+## MCP resources and prompts
+
+These calls are public, read-only views of a connected server. They never
+implicitly add, enable, restart, or connect one:
+
+```python
+ot.resources(server="docs")
+ot.resource(server="docs", uri="docs://guide")
+ot.prompts(server="docs")
+ot.prompt(server="docs", name="summarize", arguments={"topic": "routing"})
+```
+
+Results identify external content as untrusted. Unconfigured, disabled,
+connecting, disconnected, unsupported, and downstream-error states are
+explicit. Use `ot-mcp-proxy` guidance and an approved `ot_servers` operation for
+lifecycle changes.
+
+List operations return stable envelopes containing `ok`, `status`, `server`,
+and `resources` or `prompts`; bounded failures, including unsupported list
+capabilities, include an empty collection. Read/render operations return
+`content` only on success.
 
 ## ot.server()
 

@@ -87,7 +87,7 @@ irm https://onetool.beycom.online/install.ps1 | iex               # Windows (Pow
 Or install manually with [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install 'onetool-mcp[all]'   # everything
+uv tool install 'onetool-mcp[all]'   # core + util + dev; excludes [scrape]
 onetool init --config ~/.onetool
 ```
 
@@ -102,10 +102,10 @@ That's it. All 250+ tools work out of the box.
 
 Verify: `onetool init validate --config ~/.onetool/onetool.yaml`
 
-Install the `ot-ref` skill into your agent with [vercel-labs/skills](https://github.com/vercel-labs/skills) - it teaches the call conventions and ships a greppable index of every tool signature:
+Install the `ot-ref` skill into your agent with [vercel-labs/skills](https://github.com/vercel-labs/skills) - it teaches the call conventions and ships a greppable index of every stable built-in tool signature:
 
 ```bash
-npx skills add https://github.com/beycom/onetool-mcp --skill ot-ref --agent claude
+npx skills@latest add https://github.com/beycom/onetool-mcp --skill ot-ref --agent claude-code
 ```
 
 [📖 Full installation guide](https://onetool.beycom.online/learn/installation/)

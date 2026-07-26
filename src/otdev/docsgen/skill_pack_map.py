@@ -11,6 +11,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from ot.catalog import PACK_CATALOG, PackStability
+
 ROOT = Path(__file__).resolve().parents[3]
 SKILL_MD = ROOT / "skills" / "ot-ref" / "SKILL.md"
 
@@ -21,23 +23,19 @@ _END = "<!-- packmap:end -->"
 def build_pack_map() -> str:
     """Render the pack map as ``- **pack** (alias) — description`` lines."""
     from ot.executor.tool_loader import load_tool_registry
-    from ot.meta._discovery import packs as _packs
 
     registry = load_tool_registry()
     aliases = getattr(registry, "pack_aliases", {})
 
     lines: list[str] = []
-    for pack in _packs(info="default"):
-        if not isinstance(pack, dict):
+    for pack in PACK_CATALOG:
+        if pack.stability is not PackStability.STABLE:
             continue
-        name = str(pack.get("name", ""))
-        desc = str(pack.get("description", "") or "")
+        name = pack.pack
+        desc = pack.default_summary
         alias_tuple = tuple(aliases.get(name, ()) or ())
         alias_str = f" ({', '.join(alias_tuple)})" if alias_tuple else ""
-        if desc and desc != "(no description)":
-            lines.append(f"- **{name}**{alias_str} — {desc}")
-        else:
-            lines.append(f"- **{name}**{alias_str}")
+        lines.append(f"- **{name}**{alias_str} — {desc}")
     return "\n".join(lines)
 
 
