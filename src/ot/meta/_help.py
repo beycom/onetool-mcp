@@ -87,43 +87,25 @@ def _with_ask_answer(base_help: str, ask: str) -> str:
         return base_help
 
     try:
-        from openai import OpenAI
+        from ot.config import get_config, get_secret
+        from ot.generation import GenerationRequest, generate, resolve_generation
 
-        from ot.config import get_llm_config, get_secret
-
-        llm = get_llm_config()
-        api_key = get_secret("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY is not configured")
-        if not llm.base_url:
-            raise ValueError("llm.base_url is not configured")
-        if not llm.model:
-            raise ValueError("llm.model is not configured")
-
-        client = OpenAI(api_key=api_key, base_url=llm.base_url, timeout=30)
-        response = client.chat.completions.create(
-            model=llm.model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Answer the user's OneTool help question using only the "
-                        "provided help text. Be concise. If the help text does "
-                        "not contain the answer, say what is missing."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"Question:\n{ask}\n\n"
-                        f"Help text:\n{base_help}"
-                    ),
-                },
-            ],
-            temperature=0.1,
-            max_tokens=llm.max_tokens,
+        config = get_config()
+        route = resolve_generation(config=config)
+        response = generate(
+            route=route,
+            request=GenerationRequest(
+                system=(
+                    "Answer the user's OneTool help question using only the "
+                    "provided help text. Be concise. If the help text does not "
+                    "contain the answer, say what is missing."
+                ),
+                prompt=f"Question:\n{ask}\n\nHelp text:\n{base_help}",
+            ),
+            secret_resolver=get_secret,
+            proxy_config=config.code.cliproxy if config.code is not None else None,
         )
-        answer = response.choices[0].message.content or ""
+        answer = response.content
         if not answer.strip():
             raise ValueError("LLM returned an empty answer")
         return f"{base_help}\n\n## Ask Answer\n\n{answer.strip()}"

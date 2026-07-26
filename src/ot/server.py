@@ -307,6 +307,24 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
         from ot.executor.tool_loader import load_tool_registry
         load_tool_registry()
 
+        # Proxy generation readiness is inference-only and bounded. A failure
+        # degrades that route without preventing unrelated packs from loading.
+        from ot.generation import check_generation_readiness
+
+        generation_readiness = check_generation_readiness(_config)
+        if generation_readiness.configured:
+            start_span.add(
+                "generationReady",
+                generation_readiness.available,
+            )
+            if not generation_readiness.available:
+                logger.warning(
+                    LogEntry(
+                        event="generation.readiness.degraded",
+                        diagnostic=generation_readiness.diagnostic,
+                    )
+                )
+
         # Direct API mode: bind one local HTTP listener owned by this MCP process.
         direct_status = "disabled"
         if _config.direct.host.enabled:

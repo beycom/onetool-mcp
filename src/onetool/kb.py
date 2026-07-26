@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
+from ot.config.routing import ReasoningEffort
+
 if TYPE_CHECKING:
     from otutil.tools._knowledge.enrichment import EnrichResult
 from rich.console import Console
@@ -88,6 +90,14 @@ def cmd_index(
     path: Annotated[str | None, typer.Option("--path", help="Directory to index (overrides project's output_base_dir).")] = None,
     overwrite: Annotated[str, typer.Option("--overwrite", help="'skip' (default) or 'update'.")] = "skip",
     enrich: Annotated[bool, typer.Option("--enrich", help="Generate LLM summaries for chunks indexed this run.")] = False,
+    enrich_model: Annotated[
+        str | None,
+        typer.Option("--enrich-model", help="Generation model override for --enrich."),
+    ] = None,
+    enrich_effort: Annotated[
+        ReasoningEffort | None,
+        typer.Option("--enrich-effort", help="Generation effort for --enrich."),
+    ] = None,
 ) -> None:
     """Index a project's scraped content into the knowledge database."""
     if overwrite not in ("skip", "update"):
@@ -160,7 +170,12 @@ def cmd_index(
         from otutil.tools._knowledge.enrichment import enrich_db
 
         try:
-            enrich_result = enrich_db(db_name=db, ids=result.chunk_ids)
+            enrich_result = enrich_db(
+                db_name=db,
+                ids=result.chunk_ids,
+                model=enrich_model,
+                effort=enrich_effort,
+            )
         except ValueError as exc:
             console.print(f"[red]{exc}[/red]")
             raise typer.Exit(1) from exc
@@ -172,6 +187,14 @@ def cmd_enrich(
     db: Annotated[str, _DB_ARG],
     limit: Annotated[int | None, typer.Option("--limit", help="Max chunks to enrich this run.")] = None,
     force: Annotated[bool, typer.Option("--force", help="Re-summarise all chunks, not just those missing summaries.")] = False,
+    model: Annotated[
+        str | None,
+        typer.Option("--model", help="Generation model override."),
+    ] = None,
+    effort: Annotated[
+        ReasoningEffort | None,
+        typer.Option("--effort", help="Generation effort."),
+    ] = None,
 ) -> None:
     """Generate LLM summaries for chunks missing them (backfill)."""
     from otutil.tools._knowledge.enrichment import enrich_db
@@ -190,7 +213,14 @@ def cmd_enrich(
             progress.update(enrich_task, completed=done, total=total)
 
         try:
-            result = enrich_db(db_name=db, limit=limit, force=force, on_progress=on_progress)
+            result = enrich_db(
+                db_name=db,
+                limit=limit,
+                force=force,
+                on_progress=on_progress,
+                model=model,
+                effort=effort,
+            )
         except ValueError as exc:
             console.print(f"[red]{exc}[/red]")
             raise typer.Exit(1) from exc

@@ -1,0 +1,156 @@
+# Code harness routing
+#
+# OneTool configures and launches the selected route. It does not guarantee
+# provider compatibility, terms compliance, model availability, subscription
+# classification, included usage, rate limits, or billing treatment.
+models:
+  sonnet:
+    shortcut: sonnet
+    id: claude-sonnet-4-6
+    label: Claude Sonnet 4.6
+    source: claude_subscription
+    context_window: 1000000
+    modalities: [text]
+    harnesses: [claude]
+  sol:
+    shortcut: sol
+    id: gpt-5.6-sol
+    label: GPT-5.6 Sol
+    source: codex_subscription
+    proxy_alias: gpt-5.6-sol
+    context_window: 1050000
+    modalities: [text]
+    harnesses: [claude, codex]
+    interfaces: [responses]
+    structured_outputs:
+      responses: [json_object, json_schema]
+    efforts: [low, medium, high]
+    default_effort: medium
+  luna:
+    shortcut: luna
+    id: gpt-5.6-luna
+    label: GPT-5.6 Luna
+    source: codex_subscription
+    proxy_alias: gpt-5.6-luna
+    context_window: 1050000
+    modalities: [text]
+    harnesses: [claude, codex]
+    interfaces: [responses]
+    structured_outputs:
+      responses: [json_object, json_schema]
+    efforts: [low, medium, high]
+    default_effort: low
+  terra:
+    shortcut: terra
+    id: gpt-5.6-terra
+    label: GPT-5.6 Terra
+    source: codex_subscription
+    proxy_alias: gpt-5.6-terra
+    context_window: 1050000
+    modalities: [text, image]
+    harnesses: [claude, codex]
+    interfaces: [responses]
+    structured_outputs:
+      responses: [json_object, json_schema]
+    efforts: [low, medium, high]
+    default_effort: medium
+  glm52:
+    shortcut: glm52
+    id: z-ai/glm-5.2
+    label: GLM 5.2
+    source: openrouter
+    proxy_alias: glm52
+    context_window: 1048576
+    modalities: [text]
+    harnesses: [claude, codex]
+
+code:
+  clients:
+    claude:
+      executable: claude
+    codex:
+      executable: codex
+    # Optional, used only for delegated login/version commands.
+    cliproxy:
+      executable: cliproxyapi
+      config_path: /opt/homebrew/etc/cliproxyapi.conf
+
+  # External inference access only. CLIProxyAPI lifecycle and management remain
+  # outside OneTool. Put the named value in secrets.yaml.
+  cliproxy:
+    base_url: http://127.0.0.1:8317
+    secret_name: CLIPROXY_INFERENCE_KEY
+    connect_timeout: 2
+    request_timeout: 5
+    model_cache_ttl: 30
+
+  defaults:
+    claude_route: claude-native
+    codex_route: codex-native
+    permission: safe
+
+  routes:
+    claude-native:
+      harness: claude
+      source: claude_subscription
+      transport: direct
+      model: sonnet
+
+    codex-native:
+      harness: codex
+      source: codex_subscription
+      transport: direct
+      model: sol
+
+    claude-sol-proxy:
+      harness: claude
+      source: codex_subscription
+      transport: cliproxy
+      model: sol
+      enabled: false
+
+    codex-sol-proxy:
+      harness: codex
+      source: codex_subscription
+      transport: cliproxy
+      model: sol
+      provider_id: onetool_proxy
+      enabled: false
+
+    codex-glm52-openrouter:
+      harness: codex
+      source: openrouter
+      transport: direct
+      model: glm52
+      base_url: https://openrouter.ai/api/v1
+      secret_name: OPENROUTER_API_KEY
+      provider_id: onetool_openrouter
+      enabled: false
+
+  # Proxying a Claude consumer subscription through CLIProxyAPI is not an
+  # approved Anthropic subscription path and may breach Anthropic's terms,
+  # result in account restrictions, or change billing treatment.
+  claude_subscription_proxy_enabled: false
+
+# Explicit subscription-backed tool generation. This may consume capacity also
+# used by interactive Codex sessions. OneTool does not guarantee classification,
+# included allowance, provider terms, availability, limits, credits, or billing.
+llm:
+  backend: cliproxy
+  interface: responses
+  model: luna
+  effort: low
+  timeout: 30
+  max_output_tokens: 4096
+
+# Embeddings are independent and never use CLIProxyAPI generation credentials.
+# Put the named value in secrets.yaml before enabling embedding-backed tools.
+embeddings:
+  backend: openai_compatible
+  model: text-embedding-3-small
+  base_url: https://api.openai.com/v1
+  secret_name: OPENAI_API_KEY
+  dimensions: 1536
+  timeout: 60
+  batch_size: 200
+  max_tokens: 8191

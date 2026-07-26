@@ -11,16 +11,25 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from ot.config import get_config
+from ot.generation import (
+    GenerationError,
+    GenerationRequest,
+    generate,
+    resolve_generation,
+)
 from ot.logging import LogEntry
-from otpack import LogSpan
+from otpack import LogSpan, get_secret
 
 from .config import _get_config
 from .db import get_connection
-from .retrieval import _UNTRUSTED_CONTEXT_SYSTEM, _get_llm_client
+from .retrieval import _UNTRUSTED_CONTEXT_SYSTEM
 
 if TYPE_CHECKING:
     import sqlite3
     from collections.abc import Callable
+
+    from ot.config.routing import ReasoningEffort
 
 _DEFAULT_ENRICH_PROMPT = (
     "Summarise the following documentation chunk in 1-2 plain sentences "
@@ -37,8 +46,6 @@ _ENRICH_MAX_ATTEMPTS = 3
 _CONSECUTIVE_ABORT_AFTER = 5
 # SQLite host-parameter safety: chunk `id IN (...)` selections.
 _IDS_CHUNK_SIZE = 500
-_MAX_SUMMARY_TOKENS = 120
-
 
 @dataclass
 class EnrichResult:
@@ -77,21 +84,34 @@ def _select_chunks(
     return conn.execute(sql, params).fetchall()
 
 
-def _summarise_with_retry(client: Any, *, model: str, system: str, user: str) -> str:
+def _summarise_with_retry(
+    *,
+    system: str,
+    user: str,
+    model: str | None,
+    effort: ReasoningEffort | None,
+) -> str:
     """One chat completion with retry on transient HTTP errors (design D4)."""
     for attempt in range(_ENRICH_MAX_ATTEMPTS):
         try:
-            resp = client.chat.completions.create(
+            root = get_config()
+            config = _get_config()
+            route = resolve_generation(
+                config=root,
+                pack=config.llm,
+                operation=config.enrich.llm,
                 model=model,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-                max_tokens=_MAX_SUMMARY_TOKENS,
+                effort=effort,
             )
-            return (resp.choices[0].message.content or "").strip()
-        except Exception as e:
-            status = getattr(e, "status_code", None)
+            response = generate(
+                route=route,
+                request=GenerationRequest(system=system, prompt=user),
+                secret_resolver=get_secret,
+                proxy_config=root.code.cliproxy if root.code is not None else None,
+            )
+            return response.content.strip()
+        except GenerationError as e:
+            status = e.status_code
             if status not in _RETRYABLE_HTTP_STATUS or attempt == _ENRICH_MAX_ATTEMPTS - 1:
                 raise
             wait = 2.0**attempt
@@ -117,6 +137,8 @@ def enrich_db(
     force: bool = False,
     ids: list[str] | None = None,
     on_progress: Callable[[int, int], None] | None = None,
+    model: str | None = None,
+    effort: ReasoningEffort | None = None,
 ) -> EnrichResult:
     """Generate LLM summaries for chunks missing them.
 
@@ -130,19 +152,11 @@ def enrich_db(
     Returns:
         EnrichResult with counts and error details.
 
-    Raises:
-        ValueError: When no LLM client is available (missing OPENAI_API_KEY) —
-            a maintenance command must fail loudly.
+    Generation failures are returned in ``EnrichResult.errors`` and trigger the
+    bounded consecutive-failure abort policy.
     """
     result = EnrichResult()
     config = _get_config()
-    client = _get_llm_client()
-    if client is None:
-        raise ValueError("OPENAI_API_KEY not configured in secrets.yaml (required for kb enrich)")
-
-    from ot.config import get_llm_config
-
-    model = config.enrich_model or get_llm_config().model or "gpt-4o-mini"
     prompt = config.enrich_prompt or _DEFAULT_ENRICH_PROMPT
     # Indexed content is untrusted data: keep the boundary in the system message.
     system = f"{_UNTRUSTED_CONTEXT_SYSTEM}\n\n{prompt}"
@@ -165,7 +179,12 @@ def enrich_db(
             else:
                 user = f"Topic: {topic}\n\n{content[: config.enrich_max_chars]}"
                 try:
-                    summary = _summarise_with_retry(client, model=model, system=system, user=user)
+                    summary = _summarise_with_retry(
+                        model=model,
+                        effort=effort,
+                        system=system,
+                        user=user,
+                    )
                     if not summary:
                         raise ValueError("empty LLM response")
                     conn.execute("UPDATE chunks SET summary = ? WHERE id = ?", [summary, chunk_id])

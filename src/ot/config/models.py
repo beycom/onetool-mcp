@@ -9,7 +9,22 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
+
+from ot.config.routing import (
+    CodeConfig,
+    EmbeddingsConfig,
+    LlmConfig,
+    ModelEntryConfig,
+    validate_code_registry,
+)
 
 # ==================== Snippet Models ====================
 
@@ -36,23 +51,6 @@ class SnippetDef(BaseModel):
     body: str = Field(
         ..., description="Jinja2 template body that expands to Python code"
     )
-
-
-# ==================== LLM Configuration ====================
-
-
-class LlmConfig(BaseModel):
-    """Top-level shared LLM configuration.
-
-    All tool packs (ot_llm, ot_image, mem, knowledge, ctx) fall back to these
-    values when their own ``base_url`` / ``model`` settings are not set.
-    Configure once here instead of repeating in every tool section.
-    """
-
-    model: str = Field(default="gpt-5.4-nano", description="Default completion model")
-    embedding_model: str = Field(default="text-embedding-3-small", description="Default embedding model")
-    base_url: str = Field(default="https://api.openai.com/v1", description="OpenAI-compatible API base URL")
-    max_tokens: int = Field(default=4096, description="Max output tokens")
 
 
 # ==================== Security Configuration ====================
@@ -596,8 +594,22 @@ class OneToolConfig(BaseModel):
         description="Shared environment variables for all MCP servers",
     )
 
-    llm: LlmConfig = Field(
-        default_factory=LlmConfig, description="llm tool configuration"
+    models: dict[str, ModelEntryConfig] = Field(
+        default_factory=dict,
+        description="Shared model registry for launcher and inference routing",
+    )
+
+    code: CodeConfig | None = Field(
+        default=None,
+        description="Typed Claude Code and Codex launcher configuration",
+    )
+
+    llm: LlmConfig | None = Field(
+        default=None, description="Explicit shared generation configuration"
+    )
+
+    embeddings: EmbeddingsConfig | None = Field(
+        default=None, description="Independent embedding configuration"
     )
 
     alias: dict[str, str] = Field(
@@ -688,6 +700,12 @@ class OneToolConfig(BaseModel):
         """
         return {} if v is None else v
 
+    @model_validator(mode="after")
+    def validate_routing_references(self) -> OneToolConfig:
+        """Validate model and launcher route cross-references."""
+        validate_code_registry(models=self.models, code=self.code)
+        return self
+
     def get_tool_files(self) -> list[Path]:
         """Get list of tool files matching configured glob patterns.
 
@@ -709,7 +727,9 @@ class OneToolConfig(BaseModel):
         try:
             ot_dir = self._config_dir
         except AttributeError as err:
-            raise RuntimeError("_config_dir not set — was load_config() called?") from err
+            raise RuntimeError(
+                "_config_dir not set — was load_config() called?"
+            ) from err
 
         for pattern in self.tools_dir:
             # Expand ~ first
@@ -761,7 +781,9 @@ class OneToolConfig(BaseModel):
         try:
             return (self._config_dir / path).resolve()
         except AttributeError as err:
-            raise RuntimeError("_config_dir not set — was load_config() called?") from err
+            raise RuntimeError(
+                "_config_dir not set — was load_config() called?"
+            ) from err
 
     def get_log_dir_path(self) -> Path:
         """Get the resolved path to the log directory.

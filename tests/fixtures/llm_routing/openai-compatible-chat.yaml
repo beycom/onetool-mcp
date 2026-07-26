@@ -1,0 +1,18 @@
+# Sanitized direct-provider fixture used to prove endpoint and secret isolation.
+interface:
+  name: "chat_completions"
+  method: "POST"
+  path: "/api/v1/chat/completions"
+request:
+  model: "z-ai/glm-5.2"
+  messages:
+    - role: "user"
+      content: "sanitized prompt"
+response:
+  choices:
+    - message:
+        content: "sanitized direct result"
+  usage:
+    prompt_tokens: 2
+    completion_tokens: 1
+    total_tokens: 3

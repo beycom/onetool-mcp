@@ -1,6 +1,6 @@
 # OT Image
 
-Load images and ask vision questions via an OpenAI-compatible API.
+Load images and ask vision questions through the shared generation route.
 
 Short alias: `img`
 
@@ -34,43 +34,54 @@ Short alias: `img`
 | `q` | str \| list[str] | Question(s) to ask. Multiple questions are batched into one model call |
 | `img` (in `ask()`) | str \| list[str] | Image reference or list of references (max 8) — a list sends all images in one call for comparison questions; response carries `handles` instead of `handle` |
 | `max_edge` | int | Max longest edge in pixels for in-memory model resize. Default: `1568` |
+| `model` | str \| null | Per-call shortcut or full model id for generation-backed functions |
+| `effort` | str \| null | Per-call `low`, `medium`, or `high` effort |
 | `all` | bool | `purge(all=True)` deletes all images regardless of age |
 | `minutes` | int | `purge(minutes=N)` deletes images older than N minutes. Default: `15` |
 
 ## Requires
 
-- A vision model: set `tools.ot_image.model` or the top-level `llm.model` for `ask()`, `summary()`, `clip_ask()`, and `clip_view()`.
-- `OPENAI_API_KEY` in `secrets.yaml` for vision model calls.
+- An effective generation route whose selected model declares image input support
+- The named secret required by that route; CLIProxyAPI routes use the configured
+  inference-client secret
 
 ## Configuration
+
+### Required
+
+- Generation-backed functions require a complete top-level `llm`, or a complete
+  `tools.ot_image.llm`.
 
 ### Optional
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `tools.ot_image.model` | str | `""` | Vision model for `ask()` and `summary()`. Falls back to `llm.model` |
-| `tools.ot_image.base_url` | str | `""` | OpenAI-compatible base URL. Falls back to `llm.base_url` |
+| `tools.ot_image.llm` | generation selection \| null | `null` | Pack model/effort/timeout/output overrides, or a complete backend switch |
 | `tools.ot_image.max_edge` | int | `1568` | Maximum longest edge (pixels) for model-upload resize |
 | `tools.ot_image.session_cache_size` | int | `10` | In-memory LRU cache cap (number of images) |
 
 ```yaml
-# Minimal — inherits model and base_url from top-level llm: block
 llm:
-  base_url: https://openrouter.ai/api/v1
-  model: google/gemini-2-flash-preview
+  backend: cliproxy
+  interface: responses
+  model: luna
 
-# Override just for ot_image (optional)
 tools:
   ot_image:
-    model: openai/gpt-4o-mini   # overrides llm.model for vision calls only
+    llm:
+      model: terra
     max_edge: 1568
     session_cache_size: 10
 ```
 
 ### Defaults
 
-- If `tools.ot_image` is omitted, `load()` and `list()` work without config. `ask()` and `summary()` require a model via `tools.ot_image.model` or `llm.model`.
-- `model` and `base_url` fall back to the top-level `llm:` config block. API key is always read from the `OPENAI_API_KEY` secret.
+- If `tools.ot_image` is omitted, non-generation functions still work.
+- Generation selection precedence is call, pack, top-level, then model default.
+- A cached `summary()` returns without route or secret resolution; model and effort
+  changes do not invalidate it.
+- The selected model must advertise image capability and any required structured
+  output mode before network I/O.
 
 ## Examples
 

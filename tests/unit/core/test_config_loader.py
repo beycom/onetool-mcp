@@ -5,9 +5,24 @@ from __future__ import annotations
 import os
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import yaml
+
+
+@pytest.mark.unit
+@pytest.mark.core
+@pytest.mark.parametrize("helper", ["get_llm_config", "get_embeddings_config"])
+def test_route_config_helpers_propagate_unloaded_config_errors(helper: str) -> None:
+    """Routing helpers do not disguise missing invocation configuration."""
+    from ot.config import loader
+
+    with (
+        patch.object(loader, "get_config", side_effect=RuntimeError("not loaded")),
+        pytest.raises(RuntimeError, match="not loaded"),
+    ):
+        getattr(loader, helper)()
 
 
 @pytest.mark.unit
@@ -23,9 +38,8 @@ def test_load_config_defaults() -> None:
     assert config.log_level == "INFO"
     assert config.security.validate_code is True
     assert config.tools_dir == ["tools/*.py"]
-    assert config.llm.base_url == "https://api.openai.com/v1"
-    assert config.llm.model == "gpt-5.4-nano"
-    assert config.llm.embedding_model == "text-embedding-3-small"
+    assert config.llm is None
+    assert config.embeddings is None
 
 
 @pytest.mark.unit

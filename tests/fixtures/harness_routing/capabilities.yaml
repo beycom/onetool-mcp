@@ -1,0 +1,138 @@
+# Sanitized capability provenance for deterministic adapter tests.
+# Exact versions are observations, not runtime pins.
+verified_at: "2026-07-26"
+platform: "macOS arm64"
+
+clients:
+  claude:
+    version: "2.1.211"
+    executable: "claude"
+    capabilities:
+      model_flag: "--model"
+      settings_flag: "--settings"
+      permission_flag: "--permission-mode"
+      bypass_flag: "--dangerously-skip-permissions"
+      proxy_environment:
+        - "ANTHROPIC_BASE_URL"
+        - "ANTHROPIC_AUTH_TOKEN"
+        - "ANTHROPIC_DEFAULT_OPUS_MODEL"
+        - "ANTHROPIC_DEFAULT_SONNET_MODEL"
+        - "ANTHROPIC_DEFAULT_HAIKU_MODEL"
+  codex:
+    version: "0.145.0"
+    executable: "codex"
+    capabilities:
+      model_flag: "--model"
+      profile_flag: "--profile"
+      config_flag: "--config"
+      bypass_flag: "--dangerously-bypass-approvals-and-sandbox"
+      profile_layout: "$CODEX_HOME/<profile>.config.toml"
+      custom_provider:
+        wire_api: "responses"
+        credential: "env_key"
+  cliproxyapi:
+    version: "7.2.95"
+    commit: "Homebrew"
+    built_at: "2026-07-22T14:46:10Z"
+    executable: "cliproxyapi"
+    inference:
+      models_path: "/v1/models"
+      auth: "Authorization: Bearer <inference-client-secret>"
+      response_shape: '{"data":[{"id":"<model-id>"}]}'
+    delegated_login:
+      config_flag: "-config"
+      codex_login_flag: "-codex-login"
+
+live_model_discovery:
+  # Observed through the existing user launcher, which redacts the client key.
+  endpoint: "http://127.0.0.1:8317/v1/models"
+  ids:
+    - "codex-auto-review"
+    - "ds4"
+    - "glm52"
+    - "gpt-5.3-codex-spark"
+    - "gpt-5.4"
+    - "gpt-5.4-mini"
+    - "gpt-5.5"
+    - "gpt-5.6-luna"
+    - "gpt-5.6-sol"
+    - "gpt-5.6-terra"
+    - "gpt-image-1.5"
+    - "gpt-image-2"
+    - "k3"
+    - "m27"
+    - "opus48"
+
+launcher_baseline:
+  source: "/Users/gavin/my-scripts/ai-code.sh"
+  shortcuts:
+    sol:
+      id: "gpt-5.6-sol"
+      source: "codex_subscription"
+      context_window: 1050000
+      modalities: [text]
+      harnesses: [claude, codex]
+      proxy_identity: "gpt-5.6-sol"
+    terra:
+      id: "gpt-5.6-terra"
+      source: "codex_subscription"
+      context_window: 1050000
+      modalities: [text]
+      harnesses: [claude, codex]
+      proxy_identity: "gpt-5.6-terra"
+    luna:
+      id: "gpt-5.6-luna"
+      source: "codex_subscription"
+      context_window: 1050000
+      modalities: [text]
+      harnesses: [claude, codex]
+      proxy_identity: "gpt-5.6-luna"
+    glm52:
+      id: "z-ai/glm-5.2"
+      source: "openrouter"
+      context_window: 1048576
+      modalities: [text]
+      harnesses: [claude, codex]
+      proxy_identity: "glm52"
+    m27:
+      id: "minimax/minimax-m2.7"
+      source: "openrouter"
+      context_window: 196608
+      modalities: [text]
+      harnesses: [claude, codex]
+      proxy_identity: "m27"
+    k3:
+      id: "moonshotai/kimi-k3"
+      source: "openrouter"
+      context_window: 1048576
+      modalities: [text]
+      harnesses: [claude, codex]
+      proxy_identity: "k3"
+    opus48:
+      id: "anthropic/claude-opus-4.8"
+      source: "openrouter"
+      context_window: 1000000
+      modalities: [text]
+      harnesses: [claude, codex]
+      proxy_identity: "opus48"
+    ds4:
+      id: "deepseek/deepseek-v4-pro"
+      source: "openrouter"
+      context_window: 1048576
+      modalities: [text]
+      harnesses: [claude, codex]
+      proxy_identity: "ds4"
+
+sources:
+  codex_configuration: "https://developers.openai.com/codex/config-basic/"
+  codex_advanced_configuration: "https://developers.openai.com/codex/config-advanced/"
+  codex_configuration_reference: "https://developers.openai.com/codex/config-reference/"
+  codex_cli_reference: "https://developers.openai.com/codex/cli/reference/"
+  claude_settings: "https://code.claude.com/docs/en/settings"
+  claude_cli: "https://code.claude.com/docs/en/cli-usage"
+  claude_models: "https://code.claude.com/docs/en/model-config"
+  claude_gateway: "https://code.claude.com/docs/en/llm-gateway"
+  cliproxy_options: "https://help.router-for.me/configuration/options"
+  cliproxy_example: "https://github.com/router-for-me/CLIProxyAPI/blob/main/config.example.yaml"
+  cliproxy_codex: "https://help.router-for.me/agent-client/codex"
+  cliproxy_claude: "https://help.router-for.me/agent-client/claude-code"

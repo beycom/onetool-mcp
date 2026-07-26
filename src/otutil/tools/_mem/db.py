@@ -238,10 +238,16 @@ def _ensure_tables(conn: sqlite3.Connection) -> None:
         _FTS_AVAILABLE = False
 
     # vec0 KNN index — derived from memories.embedding; only when sqlite-vec loaded.
-    if _check_vec_available():
-        dims = int(_get_config().dimensions)
-        if dims <= 0:
-            raise ValueError(f"mem dimensions must be > 0, got {dims}")
+    if _check_vec_available() and _get_config().embeddings_enabled:
+        from ot.config import get_embeddings_config
+
+        embedding = get_embeddings_config()
+        if embedding is None:
+            raise ValueError(
+                "Top-level embeddings configuration is required when memory "
+                "embeddings are enabled"
+            )
+        dims = embedding.dimensions
         conn.execute(f"""
             CREATE VIRTUAL TABLE IF NOT EXISTS memories_vec USING vec0(
                 memory_id TEXT PRIMARY KEY,
@@ -271,7 +277,12 @@ def _backfill_vec_index(conn: sqlite3.Connection) -> None:
     whose dimensions do not match config are counted and logged with a
     mem.reindex pointer.
     """
-    dims = int(_get_config().dimensions)
+    from ot.config import get_embeddings_config
+
+    embedding = get_embeddings_config()
+    if embedding is None:
+        return
+    dims = embedding.dimensions
     missing = conn.execute(
         """
         SELECT m.id, m.embedding FROM memories m
@@ -318,8 +329,16 @@ def _migrate_tables(conn: sqlite3.Connection, *, fts_existed: bool = True) -> No
             conn.execute("INSERT INTO memories_fts(memories_fts) VALUES('rebuild')")
 
     # v3: vec index — recreate on dimension change, then backfill missing rows
-    if _check_vec_available():
-        dims = int(_get_config().dimensions)
+    if _check_vec_available() and _get_config().embeddings_enabled:
+        from ot.config import get_embeddings_config
+
+        embedding = get_embeddings_config()
+        if embedding is None:
+            raise ValueError(
+                "Top-level embeddings configuration is required when memory "
+                "embeddings are enabled"
+            )
+        dims = embedding.dimensions
         existing_dims = _vec_table_dims(conn)
         if existing_dims is not None and existing_dims != dims:
             conn.execute("DROP TABLE memories_vec")
@@ -358,7 +377,12 @@ def _sync_vec_index(conn: sqlite3.Connection, memory_id: str, vec: list[float] |
     conn.execute("DELETE FROM memories_vec WHERE memory_id = ?", [memory_id])
     if vec is None:
         return
-    dims = int(_get_config().dimensions)
+    from ot.config import get_embeddings_config
+
+    embedding = get_embeddings_config()
+    if embedding is None:
+        return
+    dims = embedding.dimensions
     if len(vec) != dims:
         logger.debug(
             LogEntry(

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 from ot.utils.sqlite_pool import SqlitePool
 from otpack import deserialize_embedding, serialize_embedding
 
-from .config import _get_config, _get_kb_project
+from .config import _get_kb_project
 
 if TYPE_CHECKING:
     import sqlite3
@@ -166,10 +166,13 @@ def _kb_setup(conn: sqlite3.Connection) -> None:
         conn.enable_load_extension(True)
         sqlite_vec.load(conn)
         conn.enable_load_extension(False)
-        config = _get_config()
-        dims = int(config.dimensions)
-        if dims <= 0:
-            raise ValueError(f"knowledge dimensions must be > 0, got {dims}")
+        from ot.config import get_embeddings_config
+
+        embedding = get_embeddings_config()
+        if embedding is None:
+            conn.commit()
+            return
+        dims = embedding.dimensions
         conn.execute(f"""
             CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vec USING vec0(
                 chunk_id TEXT PRIMARY KEY,

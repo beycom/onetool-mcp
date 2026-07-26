@@ -1,40 +1,28 @@
-"""Vision model calls for the image pack.
+"""Provider-neutral shared generation calls for the image pack.
 
-Uses the OpenAI-compatible messages API with base64 image content blocks.
 Supports single questions, JSON-contract batched questions (with per-question
-fallback), multi-image calls, and structured summary extraction.
+recovery), multi-image calls, and structured summary extraction.
 """
 
 from __future__ import annotations
 
-import base64
 import json
 import re
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
-from openai import OpenAI
-
-from otpack import LogSpan
-
-from .config import get_image_api_key
+from ot.config import get_config
+from ot.generation import (
+    GenerationError,
+    GenerationRequest,
+    generate,
+    resolve_generation,
+)
+from otpack import LogSpan, get_secret
 
 if TYPE_CHECKING:
+    from ot.config.routing import ReasoningEffort, StructuredOutputMode
+
     from .config import Config
-
-# Cached client — recreated only when api_key or base_url changes
-_client: OpenAI | None = None
-_client_key: tuple[str, str] = ("", "")
-
-
-def _get_client(config: Config) -> OpenAI:
-    global _client, _client_key
-    api_key = get_image_api_key() or ""
-    key = (api_key, config.base_url)
-    if _client is None or _client_key != key:
-        _client = OpenAI(api_key=api_key, base_url=config.base_url or None)
-        _client_key = key
-    return _client
-
 
 _SUMMARY_PROMPT = """\
 You are an OCR and image analysis engine. Return ONLY valid JSON with exactly these keys:
@@ -57,15 +45,15 @@ Rules for the 'content' field:
 - Skip purely decorative elements (icons without labels, background imagery)."""
 
 
-def _image_block(model_bytes: bytes) -> dict[str, Any]:
-    b64 = base64.b64encode(model_bytes).decode()
-    return {
-        "type": "image_url",
-        "image_url": {"url": f"data:image/png;base64,{b64}"},
-    }
-
-
-def call_vision(images: list[bytes], prompt: str, config: Config) -> str:
+def call_vision(
+    images: list[bytes],
+    prompt: str,
+    config: Config,
+    *,
+    model: str | None = None,
+    effort: ReasoningEffort | None = None,
+    structured_output: StructuredOutputMode | None = None,
+) -> str:
     """Send one or more images and a text prompt to the configured vision model.
 
     Multi-image calls interleave a text label before each image block
@@ -75,45 +63,41 @@ def call_vision(images: list[bytes], prompt: str, config: Config) -> str:
     Args:
         images: PNG byte payloads ready for upload (already resized).
         prompt: Text prompt to accompany the image(s).
-        config: Image pack config (must have ``model``).
+        config: Image pack config containing any pack-level route override.
 
     Returns:
         Model response text, or an error string starting with ``"Error:"`` if
         the model is not configured or the API call fails.
     """
-    if not config.model:
-        return (
-            "Error: ot_image.model not configured — "
-            "set tools.ot_image.model in onetool.yaml"
-        )
-    if not get_image_api_key():
-        return (
-            "Error: image API key not configured — "
-            "set OPENAI_API_KEY in secrets.yaml"
-        )
-
-    content: list[dict[str, Any]] = []
-    if len(images) > 1:
-        for i, model_bytes in enumerate(images, start=1):
-            content.append({"type": "text", "text": f"Image {i}:"})
-            content.append(_image_block(model_bytes))
-    else:
-        content.append(_image_block(images[0]))
-    content.append({"type": "text", "text": prompt})
-
+    root = get_config()
     try:
-        client = _get_client(config)
-        response = client.chat.completions.create(
-            model=config.model,
-            messages=cast("Any", [{"role": "user", "content": content}]),
-            temperature=0.1,
+        route = resolve_generation(
+            config=root,
+            pack=config.llm,
+            model=model,
+            effort=effort,
+            required_modalities=frozenset({"text", "image"}),
+            structured_output=structured_output,
         )
-        return response.choices[0].message.content or ""
-    except Exception as e:
-        error_msg = str(e)
-        if "api_key" in error_msg.lower() or "sk-" in error_msg:
-            error_msg = "Authentication error — check OPENAI_API_KEY in secrets.yaml"
-        return f"Error: {error_msg}"
+        labelled_prompt = prompt
+        if len(images) > 1:
+            labelled_prompt = (
+                "Images are attached in numeric order as image 1, image 2, and so on.\n\n"
+                f"{prompt}"
+            )
+        result = generate(
+            route=route,
+            request=GenerationRequest(
+                prompt=labelled_prompt,
+                images=tuple(images),
+                structured_output=structured_output,
+            ),
+            secret_resolver=get_secret,
+            proxy_config=root.code.cliproxy if root.code is not None else None,
+        )
+        return result.content
+    except GenerationError as exc:
+        return f"Error: {exc}"
 
 
 def parse_json_payload(text: str) -> dict[str, Any] | None:
@@ -138,7 +122,14 @@ def parse_json_payload(text: str) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
-def ask_questions(images: list[bytes], questions: list[str], config: Config) -> list[str]:
+def ask_questions(
+    images: list[bytes],
+    questions: list[str],
+    config: Config,
+    *,
+    model: str | None = None,
+    effort: ReasoningEffort | None = None,
+) -> list[str]:
     """Send one or more questions to the vision model in a single call.
 
     Multi-question batches use a JSON answer contract (return only
@@ -158,7 +149,13 @@ def ask_questions(images: list[bytes], questions: list[str], config: Config) -> 
     """
     if len(questions) == 1:
         # Single question stays plain text — no JSON round-trip
-        result = call_vision(images, questions[0], config)
+        result = call_vision(
+            images,
+            questions[0],
+            config,
+            model=model,
+            effort=effort,
+        )
         if result.startswith("Error:"):
             return [result]
         return [result.strip()]
@@ -173,7 +170,14 @@ def ask_questions(images: list[bytes], questions: list[str], config: Config) -> 
     )
 
     with LogSpan(span="ot_image.ask_questions", questionCount=len(questions)) as s:
-        result = call_vision(images, prompt, config)
+        result = call_vision(
+            images,
+            prompt,
+            config,
+            model=model,
+            effort=effort,
+            structured_output="json_object",
+        )
         if result.startswith("Error:"):
             # Fallback would fail identically — short-circuit
             s.add(error=result)
@@ -187,11 +191,24 @@ def ask_questions(images: list[bytes], questions: list[str], config: Config) -> 
         # Batched contract violated — recover losslessly, one call per question
         s.add(fallback="per_question")
         return [
-            call_vision(images, question, config).strip() for question in questions
+            call_vision(
+                images,
+                question,
+                config,
+                model=model,
+                effort=effort,
+            ).strip()
+            for question in questions
         ]
 
 
-def extract_summary(model_bytes: bytes, config: Config) -> dict[str, object] | str:
+def extract_summary(
+    model_bytes: bytes,
+    config: Config,
+    *,
+    model: str | None = None,
+    effort: ReasoningEffort | None = None,
+) -> dict[str, object] | str:
     """Extract a structured summary of the image via the vision model.
 
     Calls the vision model with a structured extraction prompt and parses the
@@ -207,7 +224,14 @@ def extract_summary(model_bytes: bytes, config: Config) -> dict[str, object] | s
         Returns an error string if the model is not configured or the response
         cannot be parsed.
     """
-    result = call_vision([model_bytes], _SUMMARY_PROMPT, config)
+    result = call_vision(
+        [model_bytes],
+        _SUMMARY_PROMPT,
+        config,
+        model=model,
+        effort=effort,
+        structured_output="json_object",
+    )
     if result.startswith("Error:"):
         return result
 

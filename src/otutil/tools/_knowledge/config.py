@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ot.config.routing import GenerationSelection  # noqa: TC001 - Pydantic resolves it
 from otpack import get_tool_config
 
 VALID_CATEGORIES = {"reference", "rule", "note", "mistake"}
@@ -188,6 +189,14 @@ class KBProjectConfig(BaseModel):
     index: IndexProjectConfig = Field(default_factory=IndexProjectConfig, description="Index configuration")
 
 
+class GenerationOperationConfig(BaseModel):
+    """Strict operation-scoped generation selection."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    llm: GenerationSelection | None = None
+
+
 class Config(BaseModel):
     """Pack configuration - discovered by registry."""
 
@@ -197,28 +206,21 @@ class Config(BaseModel):
         default_factory=dict,
         description="Named KB projects. Each key is a project name; each value bundles db:, scrape:, and index: config.",
     )
-    model: str = Field(
-        default="text-embedding-3-small",
-        description="OpenAI embedding model",
+    llm: GenerationSelection | None = Field(
+        default=None,
+        description="Pack-level shared generation overrides",
     )
-    base_url: str = Field(
-        default="",
-        description="OpenAI-compatible API base URL for embeddings (empty = inherit from ot_llm config)",
+    ask: GenerationOperationConfig = Field(
+        default_factory=GenerationOperationConfig,
+        description="Answer synthesis generation overrides",
     )
-    dimensions: int = Field(
-        default=1536,
-        description="Embedding dimensions (must match model)",
+    rerank: GenerationOperationConfig = Field(
+        default_factory=GenerationOperationConfig,
+        description="Reranking generation overrides",
     )
-    max_embedding_tokens: int = Field(
-        default=8191,
-        ge=1,
-        description="Max tokens for embedding input",
-    )
-    embedding_batch_size: int = Field(
-        default=200,
-        ge=1,
-        le=2048,
-        description="Number of texts per embeddings API call",
+    enrich: GenerationOperationConfig = Field(
+        default_factory=GenerationOperationConfig,
+        description="Enrichment generation overrides",
     )
     search_limit: int = Field(
         default=10,
@@ -230,10 +232,6 @@ class Config(BaseModel):
         default=300,
         ge=0,
         description="Character limit for content extract in search results (0 = full)",
-    )
-    enrich_model: str = Field(
-        default="",
-        description="LLM model for enrichment (falls back to ot_llm default if empty)",
     )
     enrich_prompt: str = Field(
         default="",

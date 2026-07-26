@@ -68,6 +68,52 @@ snippets: {}                  # Reusable code templates
 prompts: {}                   # Inline prompts (overrides included)
 ```
 
+## Generation and Embedding Routes
+
+Top-level `models` is the authoritative model registry. Top-level `llm` selects
+generation only; top-level `embeddings` selects embeddings only.
+
+```yaml
+models:
+  luna:
+    shortcut: luna
+    id: gpt-5.6-luna
+    label: GPT-5.6 Luna
+    source: codex_subscription
+    proxy_alias: gpt-5.6-luna
+    context_window: 1050000
+    modalities: [text]
+    harnesses: [claude, codex]
+    interfaces: [responses]
+    structured_outputs:
+      responses: [json_object, json_schema]
+    efforts: [low, medium, high]
+    default_effort: low
+
+llm:
+  backend: cliproxy
+  interface: responses
+  model: luna
+  effort: low
+  timeout: 30
+  max_output_tokens: 4096
+
+embeddings:
+  backend: openai_compatible
+  model: text-embedding-3-small
+  base_url: https://api.openai.com/v1
+  secret_name: OPENAI_API_KEY
+  dimensions: 1536
+  timeout: 60
+  batch_size: 200
+  max_tokens: 8191
+```
+
+An `openai_compatible` generation backend additionally requires `base_url` and
+`secret_name`. A `cliproxy` backend reuses the external `code.cliproxy` inference
+connection. See [LLM routing](../../learn/llm-routing.md) for schemas, precedence,
+capability validation, and the no-fallback boundary.
+
 ## Config Includes
 
 Compose configuration from multiple files:
@@ -181,10 +227,8 @@ No pack-specific `tools.excel` settings.
 
 | Field | Type | Default | Range | Description |
 |------|------|---------|-------|-------------|
+| `llm` | generation selection | `null` | - | Generation overrides for `mem.ask()` |
 | `db_path` | string | `data/mem/default.db` | - | SQLite path for memory store |
-| `model` | string | `text-embedding-3-small` | - | Embedding model |
-| `base_url` | string | `https://openrouter.ai/api/v1` | - | OpenAI-compatible embedding API base |
-| `dimensions` | int | `1536` | - | Embedding dimensions |
 | `search_limit` | int | `10` | `1-100` | Default max search results |
 | `search_extract` | int | `200` | `>=0` | Extract length per result (`0` = full) |
 | `redaction_enabled` | bool | `true` | - | Enable redaction on write |
@@ -193,9 +237,6 @@ No pack-specific `tools.excel` settings.
 | `decay_half_life_days` | int | `30` | `>=1` | Importance decay half-life |
 | `allowed_file_dirs` | string[] | `[]` | - | Allowed dirs for mem file I/O |
 | `exclude_file_patterns` | string[] | built-in defaults | - | Excluded paths for mem file I/O |
-| `max_embedding_tokens` | int | `8191` | `>=1` | Max tokens per embedding input |
-| `read_cache_max_size` | int | `128` | `>=0` | Read cache size (`0` = off) |
-| `read_cache_ttl_seconds` | int | `300` | `>=0` | Read cache TTL (`0` = no expiry) |
 | `embeddings_enabled` | bool | `false` | - | Enable semantic embeddings |
 | `embeddings_async` | bool | `true` | - | Generate embeddings async |
 
@@ -211,10 +252,7 @@ No pack-specific `tools.ot_forge` settings.
 
 | Field | Type | Default | Range | Description |
 |------|------|---------|-------|-------------|
-| `base_url` | string | `""` | - | OpenAI-compatible API base URL |
-| `model` | string | `""` | - | Default model for transforms |
-| `timeout` | int | `30` | - | API timeout in seconds |
-| `max_tokens` | int \| null | `null` | - | Max response tokens (`null` = no limit) |
+| `llm` | generation selection | `null` | - | Pack generation overrides or complete backend switch |
 
 ### ot_secrets
 
@@ -506,18 +544,27 @@ ot.stats(output="stats_report.html") # HTML report
 
 ## Transform Configuration
 
-Configure the `ot_llm.transform()` tool for LLM-powered text transformations. Add under `tools:`:
+Configure `ot_llm.transform()` with the shared route and optional pack overrides:
 
 ```yaml
+llm:
+  backend: cliproxy
+  interface: responses
+  model: luna
+  effort: low
+  timeout: 30
+  max_output_tokens: 4096
+
 tools:
   ot_llm:
-    model: "openai/gpt-5-mini"                  # Model for transformations
-    base_url: "https://openrouter.ai/api/v1"    # OpenAI-compatible API endpoint
-    max_tokens: 4096                            # Max output tokens (optional)
-    timeout: 30                                 # API timeout in seconds
+    llm:
+      model: sol
+      effort: medium
 ```
 
-Requires `OPENAI_API_KEY` in secrets.yaml (or compatible provider key).
+The route's named secret must exist in `secrets.yaml`. CLIProxyAPI generation uses
+the `code.cliproxy` named secret and does not unconditionally require
+`OPENAI_API_KEY`.
 
 ## Output Configuration
 
@@ -653,9 +700,6 @@ security:
   validate_code: true
 
 tools:
-  ot_llm:
-    model: "openai/gpt-5-mini"
-    base_url: "https://openrouter.ai/api/v1"
   brave:
     timeout: 120.0
   context7:

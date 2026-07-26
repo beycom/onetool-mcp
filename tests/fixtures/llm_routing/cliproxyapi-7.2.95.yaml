@@ -1,0 +1,74 @@
+# Sanitized generation protocol fixture. The observed release is provenance,
+# not a runtime pin. No prompt, response, credential, or account data is real.
+verified_at: "2026-07-26"
+release:
+  product: "CLIProxyAPI"
+  version: "7.2.95"
+  built_at: "2026-07-22T14:46:10Z"
+interface:
+  name: "responses"
+  method: "POST"
+  path: "/v1/responses"
+  authentication: "Authorization: Bearer <inference-client-secret>"
+model_discovery:
+  method: "GET"
+  path: "/v1/models"
+  response:
+    data:
+      - id: "gpt-5.6-sol"
+models:
+  gpt-5.6-sol:
+    proxy_alias: "gpt-5.6-sol"
+    modalities: [text]
+    interfaces: [responses]
+    structured_outputs:
+      responses: [json_object, json_schema]
+    efforts: [low, medium, high]
+    default_effort: medium
+  gpt-5.6-luna:
+    proxy_alias: "gpt-5.6-luna"
+    modalities: [text]
+    interfaces: [responses]
+    structured_outputs:
+      responses: [json_object, json_schema]
+    efforts: [low, medium, high]
+    default_effort: low
+  gpt-5.6-terra:
+    proxy_alias: "gpt-5.6-terra"
+    modalities: [text, image]
+    interfaces: [responses]
+    structured_outputs:
+      responses: [json_object, json_schema]
+    efforts: [low, medium, high]
+    default_effort: medium
+request:
+  model: "gpt-5.6-sol"
+  input:
+    - role: "user"
+      content:
+        - type: "input_text"
+          text: "sanitized prompt"
+  instructions: "sanitized system instruction"
+  reasoning:
+    effort: "high"
+  max_output_tokens: 4096
+response:
+  output:
+    - type: "message"
+      role: "assistant"
+      content:
+        - type: "output_text"
+          text: "sanitized result"
+          annotations: []
+  usage:
+    input_tokens: 11
+    output_tokens: 3
+    total_tokens: 14
+error:
+  status: 401
+  body: "<redacted upstream body>"
+sources:
+  cliproxy_options: "https://help.router-for.me/configuration/options"
+  cliproxy_example: "https://github.com/router-for-me/CLIProxyAPI/blob/main/config.example.yaml"
+  cliproxy_codex: "https://help.router-for.me/agent-client/codex"
+  openai_responses: "https://platform.openai.com/docs/api-reference/responses"

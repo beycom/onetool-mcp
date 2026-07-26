@@ -131,7 +131,9 @@ API keys are stored in `secrets.yaml` (gitignored) and passed to the server via 
 
 | Key | Service | Used By |
 |-----|---------|---------|
-| `OPENAI_API_KEY` | OpenAI-compatible providers (including OpenRouter) | `ot_llm.transform` |
+| `OPENAI_API_KEY` | OpenAI API | Explicit direct generation or embedding routes |
+| `OPENROUTER_API_KEY` | OpenRouter | Explicit direct generation routes |
+| `CLIPROXY_INFERENCE_KEY` | User-managed CLIProxyAPI | Explicit proxy generation routes |
 | `BRAVE_API_KEY` | [Brave Search](https://brave.com/search/api/) | `brave.*` tools |
 | `CONTEXT7_API_KEY` | [Context7](https://context7.com) | `context7.*` tools |
 
@@ -155,16 +157,46 @@ Pass it to the server via `--secrets /path/to/secrets.yaml`. If omitted, no secr
 
 ### LLM Configuration
 
-Configure `base_url` and `model` once at the top level — all LLM-using tools (`ot_llm`, `ot_image`, `mem`, `knowledge`, `ctx`) inherit from it:
+Register model capabilities and select one explicit generation backend:
 
 ```yaml
+models:
+  glm52:
+    shortcut: glm52
+    id: z-ai/glm-5.2
+    label: GLM 5.2
+    source: openrouter
+    context_window: 1048576
+    modalities: [text]
+    harnesses: [claude, codex]
+    interfaces: [chat_completions]
+    structured_outputs:
+      chat_completions: [json_object, json_schema]
+    efforts: [low, medium, high]
+
 llm:
-  base_url: "https://openrouter.ai/api/v1"    # Required
-  model: "google/gemini-2-flash-preview"       # Required for transform/vision
-  embedding_model: "text-embedding-3-small"    # Required for mem/knowledge embeddings
+  backend: openai_compatible
+  interface: chat_completions
+  model: glm52
+  base_url: https://openrouter.ai/api/v1
+  secret_name: OPENROUTER_API_KEY
+  timeout: 30
+  max_output_tokens: 4096
+
+embeddings:
+  backend: openai_compatible
+  model: text-embedding-3-small
+  base_url: https://api.openai.com/v1
+  secret_name: OPENAI_API_KEY
+  dimensions: 1536
+  timeout: 60
+  batch_size: 200
+  max_tokens: 8191
 ```
 
-The transform tool is not available until `base_url` and `model` are configured (via `llm:` or `tools.ot_llm.*`), plus `OPENAI_API_KEY` in secrets.
+Generation and embeddings are independent; configure only the routes you use. A
+CLIProxyAPI generation route instead reuses `code.cliproxy` and its named secret.
+See [LLM routing](llm-routing.md).
 
 ## MCP Configuration
 

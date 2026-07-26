@@ -15,6 +15,7 @@ All under the active OneTool config directory (`{OT_DIR}`):
 | File | Purpose |
 |------|---------|
 | `onetool.yaml` | Main config (version, includes, root settings such as `llm`, `stats`, `env`) |
+| `code-routing.yaml` | Optional generated fragment for the model registry, harness routes, generation, and embeddings |
 | `security.yaml` | Validation allowlists (builtins, imports, calls) |
 | `prompts.yaml` | MCP prompt surfaces: `tools.run.description`, server `instructions`, templates, and pack descriptions |
 | `snippets.yaml` | Snippet template definitions |
@@ -38,7 +39,7 @@ Do not duplicate long guidance across all three. If a rule affects whether the f
 Main config can include other files:
 
 ```yaml
-version: 1
+version: 2
 include:
   - prompts.yaml
   - security.yaml
@@ -46,6 +47,11 @@ include:
 ```
 
 Maximum include depth: 5 levels.
+
+`onetool code setup --config .onetool/onetool.yaml` creates an optional
+`code-routing.yaml` fragment beside the selected config. Review it, then add
+`code-routing.yaml` to the `include` list explicitly; setup never edits
+`onetool.yaml` or overwrites an existing fragment.
 
 ## Variable Expansion
 
@@ -82,7 +88,10 @@ tools:
 
 Pack config belongs under `tools.<pack>`. Unknown typed pack keys fail visibly when the pack reads its config, unless that config schema explicitly allows extra fields. Recognised keys with invalid values also fail visibly. Do not keep legacy config aliases or compatibility mappings.
 
-The root template stays minimal: scalar shared defaults such as `llm.model`, `llm.embedding_model`, and `llm.base_url` are allowed; broad commented examples for every pack are not.
+The root template stays minimal. Shared generation belongs in the strict
+discriminated `llm` backend, shared model capabilities belong in `models`, and
+embedding settings belong only in the independent `embeddings` backend. Broad
+commented examples for every pack are not.
 
 ## Path Resolution
 

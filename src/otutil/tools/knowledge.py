@@ -3,7 +3,8 @@
 Indexes directories of Markdown files into SQLite with FTS5 BM25 keyword search,
 sqlite-vec KNN vector search, link graph from markdown hyperlinks, and AI enrichment.
 
-Requires OPENAI_API_KEY in secrets.yaml when embeddings are enabled.
+Embedding-enabled projects require the independent embedding route's named secret.
+Generation-backed operations require their effective generation route's named secret.
 Requires `pip install onetool-mcp[util]` for sqlite-vec and python-frontmatter.
 """
 from __future__ import annotations

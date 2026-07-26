@@ -12,12 +12,20 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _stub_console_storage_lifecycle(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep general lifespan tests focused and free of real Console state I/O."""
+    """Keep direct-runtime tests isolated from unrelated startup services."""
     monkeypatch.setattr(
         "ot.console.storage.initialize_console_storage", lambda **_kwargs: None
     )
     monkeypatch.setattr(
         "ot.console.storage.cleanup_console_instance", lambda **_kwargs: None
+    )
+    monkeypatch.setattr(
+        "ot.generation.check_generation_readiness",
+        lambda _config: SimpleNamespace(
+            configured=False,
+            available=False,
+            diagnostic="No proxy generation route configured",
+        ),
     )
 
 

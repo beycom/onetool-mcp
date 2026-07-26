@@ -13,10 +13,8 @@ include:
 # Example: ["tools/*.py"] loads all Python files in .onetool/tools/
 tools_dir: []
 
-llm:
-  base_url: https://api.openai.com/v1
-  model: gpt-5.4-nano
-  embedding_model: text-embedding-3-small
+# Generation and embeddings are opt-in, independent routes. See
+# global_templates/code-routing.yaml and the LLM routing guide.
 
 # log_level: INFO
 

@@ -1,4 +1,4 @@
-"""OpenAI embedding generation and background worker.
+"""OpenAI-compatible embedding generation and background worker.
 
 Generation is a thin adapter over :class:`otpack.EmbeddingClient`
 (``long_text="mean"``: over-limit texts are window-embedded and averaged).
@@ -9,11 +9,10 @@ from __future__ import annotations
 import queue
 import threading
 import time
-from typing import Any
 
 from loguru import logger
 
-from ot.config import get_llm_config
+from ot.config import get_embeddings_config
 from ot.logging import LogEntry
 from otpack import EmbeddingClient, get_secret
 
@@ -31,36 +30,40 @@ _embedding_dropped: int = 0  # Count dropped jobs when queue is saturated
 
 # Module-cached client keyed on the resolved inputs so config reloads rebuild it.
 _client: EmbeddingClient | None = None
-_client_key: tuple[str, str, str, int] | None = None
+_client_key: tuple[str, str, str, int, int, float] | None = None
 _client_lock = threading.Lock()
-
-
-def _get_embedding_model(config: Any) -> str:
-    """Resolve the embedding model, falling back to top-level llm config."""
-    if config.model:
-        return str(config.model)
-    return get_llm_config().embedding_model or "text-embedding-3-small"
 
 
 def _get_embedding_client() -> EmbeddingClient:
     """Get (or build) the shared EmbeddingClient from resolved config values."""
     global _client, _client_key
-    api_key = get_secret("OPENAI_API_KEY") or ""
+    embedding = get_embeddings_config()
+    if embedding is None:
+        raise ValueError(
+            "Top-level embeddings configuration is required for memory embeddings"
+        )
+    api_key = get_secret(embedding.secret_name) or ""
     if not api_key:
         raise ValueError(
-            "OPENAI_API_KEY not configured in secrets.yaml (required for memory embeddings)"
+            f"Named embedding secret {embedding.secret_name!r} is not configured"
         )
-    config = _get_config()
-    model = _get_embedding_model(config)
-    base_url = config.base_url or get_llm_config().base_url or ""
-    key = (api_key, model, base_url, int(config.max_embedding_tokens))
+    key = (
+        api_key,
+        embedding.model,
+        embedding.base_url,
+        embedding.dimensions,
+        embedding.max_tokens,
+        embedding.timeout,
+    )
     with _client_lock:
         if _client is None or _client_key != key:
             _client = EmbeddingClient(
                 api_key=api_key,
-                model=model,
-                base_url=base_url or None,
-                max_tokens=int(config.max_embedding_tokens),
+                model=embedding.model,
+                base_url=embedding.base_url,
+                dimensions=embedding.dimensions,
+                max_tokens=embedding.max_tokens,
+                timeout=embedding.timeout,
                 log_prefix="mem",
             )
             _client_key = key
@@ -133,7 +136,7 @@ def _process_embedding_job(memory_id: str) -> None:
 
     Re-reads content from DB (not from queue) to avoid holding large strings
     in memory and to pick up any content changes between enqueue and processing.
-    The OpenAI call runs without the DB lock held so embedding round-trips
+    The provider call runs without the DB lock held so embedding round-trips
     never block other DB operations; the write-back is guarded on content so
     a concurrent update is never clobbered with a stale vector.
     Retries up to 3 times with exponential backoff on failure.
@@ -179,7 +182,7 @@ def _process_embedding_job(memory_id: str) -> None:
 def _embed_now(content: str) -> list[float] | None:
     """Generate an embedding synchronously if sync embeddings are enabled.
 
-    Call this BEFORE acquiring the DB lock: the OpenAI round-trip must not
+    Call this BEFORE acquiring the DB lock: the provider round-trip must not
     block other DB operations. Returns None when embeddings are disabled or
     async; async callers enqueue via _enqueue_after_commit once the row is
     committed.
@@ -215,6 +218,5 @@ __all__ = [
     "_generate_embedding",
     "_generate_query_embedding",
     "_get_embedding_client",
-    "_get_embedding_model",
     "_process_embedding_job",
 ]

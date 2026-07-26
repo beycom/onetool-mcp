@@ -45,27 +45,26 @@ Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis.
 
 ## Requires
 
-- `OPENAI_API_KEY` in `secrets.yaml` (for embeddings and AI synthesis)
+- An effective generation route for `knowledge.ask()` and `kb enrich`
+- The independent top-level `embeddings` route for projects with embeddings enabled
 - `onetool-mcp[util]` extra (provides `sqlite-vec` and `python-frontmatter`)
 
 ## Configuration
 
 ### Required
 
-- `OPENAI_API_KEY` must be set in `secrets.yaml` for embeddings and `knowledge.ask()`.
+- Configure each enabled network operation's route and named secret.
 
 ### Optional
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `tools.knowledge.model` | string | `""` | OpenAI embedding model. Falls back to `llm.embedding_model`; built-in default: `text-embedding-3-small`. |
-| `tools.knowledge.base_url` | string | `""` | OpenAI-compatible API base URL. Empty = inherit from top-level `llm.base_url`. |
-| `tools.knowledge.dimensions` | int | `1536` | Embedding dimensions. Must match the configured model. |
-| `tools.knowledge.max_embedding_tokens` | int | `8191` | Max tokens per embedding input. |
-| `tools.knowledge.embedding_batch_size` | int | `200` | Texts per embeddings API call. Range: `1-2048`. |
+| `tools.knowledge.llm` | generation selection \| null | `null` | Pack generation overrides |
+| `tools.knowledge.ask.llm` | generation selection \| null | `null` | Answer synthesis overrides |
+| `tools.knowledge.rerank.llm` | generation selection \| null | `null` | Reranking overrides |
+| `tools.knowledge.enrich.llm` | generation selection \| null | `null` | Enrichment overrides |
 | `tools.knowledge.search_limit` | int | `10` | Default max search results. Range: `1-100`. |
 | `tools.knowledge.search_extract` | int | `300` | Character limit for content extract in search results (`0` = full). |
-| `tools.knowledge.enrich_model` | string | `""` | LLM model for `knowledge.ask()` synthesis and `kb enrich` summaries. Empty = falls back to top-level `llm.model`. |
 | `tools.knowledge.enrich_prompt` | string | `""` | Custom summarisation instruction for `kb enrich`. Empty = built-in default. |
 | `tools.knowledge.enrich_batch_size` | int | `20` | Summaries written per database commit during `kb enrich`. Range: `1-500`. |
 | `tools.knowledge.enrich_min_chars` | int | `400` | Chunks with content shorter than this are skipped by `kb enrich` (`summary=''`). `0` disables skipping. |
@@ -75,14 +74,31 @@ Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis.
 Project registry (under `tools.knowledge.kb`):
 
 ```yaml
+embeddings:
+  backend: openai_compatible
+  model: text-embedding-3-small
+  base_url: https://api.openai.com/v1
+  secret_name: OPENAI_API_KEY
+  dimensions: 1536
+  timeout: 60
+  batch_size: 200
+  max_tokens: 8191
+
 tools:
   knowledge:
-    model: text-embedding-3-small
-    base_url: ""
-    dimensions: 1536
+    llm:
+      model: luna
+    rerank:
+      llm:
+        effort: low
+    ask:
+      llm:
+        effort: medium
+    enrich:
+      llm:
+        model: sol
     search_limit: 10
     search_extract: 300
-    enrich_model: ""
     min_chunk_chars: 200
     kb:
       docs:
@@ -100,9 +116,11 @@ tools:
 
 ### Defaults
 
-- If `tools.knowledge.base_url` is empty, it inherits from the top-level `llm.base_url`.
-- If `tools.knowledge.model` is empty, it inherits from `llm.embedding_model`.
-- If `tools.knowledge.enrich_model` is empty, it falls back to `llm.model`.
+- Generation precedence is call, operation, pack, top-level, then model default.
+- `knowledge.ask()` call-level model and effort values override both reranking and
+  synthesis.
+- Embedding settings come only from top-level `embeddings`; they never inherit from
+  generation.
 
 ## Examples
 
@@ -181,17 +199,22 @@ onetool kb index <project> [OPTIONS]
 | `--path PATH` | Directory to index (overrides project's `output_base_dir`) |
 | `--overwrite TEXT` | `skip` (default) or `update` |
 | `--enrich` | Generate LLM summaries for the chunks indexed this run |
+| `--enrich-model TEXT` | Per-run generation model override for `--enrich` |
+| `--enrich-effort TEXT` | Per-run `low`, `medium`, or `high` effort for `--enrich` |
 
 ```bash
 onetool kb index docs
 onetool kb index docs --overwrite update
 onetool kb index docs --path /tmp/scraped
-onetool kb index docs --overwrite update --enrich
+onetool kb index docs --overwrite update --enrich --enrich-model sol --enrich-effort high
 ```
 
 ### onetool kb enrich
 
-Generate short LLM summaries for chunks missing them (backfill). Summaries are shown in `knowledge.search()` results and matched by keyword search. Requires `OPENAI_API_KEY`. Content changes (re-index, `kb.update`, `kb.append`) clear the affected summaries so the next run regenerates them.
+Generate short LLM summaries for chunks missing them (backfill). Summaries are shown
+in `knowledge.search()` results and matched by keyword search. The operation uses the
+effective `tools.knowledge.enrich.llm` route. Content changes (re-index, `kb.update`,
+`kb.append`) clear affected summaries so the next run regenerates them.
 
 ```bash
 onetool kb enrich <db> [OPTIONS]
@@ -201,11 +224,13 @@ onetool kb enrich <db> [OPTIONS]
 |--------|-------------|
 | `--limit INT` | Max chunks to enrich this run (incremental backfill) |
 | `--force` | Re-summarise all chunks, not just those missing summaries |
+| `--model TEXT` | Per-run generation model override |
+| `--effort TEXT` | Per-run `low`, `medium`, or `high` effort |
 
 ```bash
 onetool kb enrich docs
 onetool kb enrich docs --limit 100
-onetool kb enrich docs --force
+onetool kb enrich docs --force --model sol --effort high
 ```
 
 ### onetool kb reindex

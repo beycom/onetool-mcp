@@ -24,6 +24,7 @@ dependencies = [
     "httpx>=0.28.1",
     "loguru>=0.7.3",
     "mcp>=1.28.1",
+    "packaging>=24.2",
     "pydantic>=2.13.3",
     "pydantic-settings>=2.14.0",
     "jmespath>=1.1.0",

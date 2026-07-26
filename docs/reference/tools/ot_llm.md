@@ -1,109 +1,100 @@
 # OT LLM
 
-LLM-powered data transformation tools. Takes input data and a prompt, uses an LLM to process/transform it.
+Provider-neutral LLM-powered data transformation through the shared generation route.
 
 Short alias: `llm`
 
 ## Highlights
 
-- Single function for any data transformation
-- Configurable model via OpenRouter or OpenAI-compatible API
-- Chain with other tools for structured output extraction
+- Transform arbitrary values or UTF-8 files
+- Select a configured model and `low`, `medium`, or `high` reasoning effort
+- Request capability-checked JSON output
+- Use explicit CLIProxyAPI or direct OpenAI-compatible generation
 
 ## Functions
 
 | Function | Description |
 |----------|-------------|
 | `ot_llm.transform(data, prompt, ...)` | Transform data using LLM instructions |
-| `ot_llm.transform_file(prompt, in_file, out_file, ...)` | Transform file content and write to output |
+| `ot_llm.transform_file(prompt, in_file, out_file, ...)` | Transform file content and write the output |
 
 ## Key Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `data` | any | Data to transform (converted to string) |
-| `prompt` | str | Instructions for transformation |
-| `in_file` | str | Input file path (for transform_file) |
-| `out_file` | str | Output file path (for transform_file) |
-| `model` | str | AI model to use (uses `ot_llm.model` from config) |
-| `json_mode` | bool | If True, request JSON output format (default: False) |
+| `data` | any | Data to transform; converted to text |
+| `prompt` | str | Transformation instructions |
+| `in_file` | str | UTF-8 input path for `transform_file()` |
+| `out_file` | str | Output path for `transform_file()` |
+| `model` | str \| null | Per-call shortcut or full model id |
+| `effort` | str \| null | `low`, `medium`, or `high` |
+| `json_mode` | bool | Require the selected route to support `json_object` |
 
 ## Requires
 
-Configuration (tool not available until all are set):
-- `OPENAI_API_KEY` in secrets.yaml
-- `base_url` — set via top-level `llm.base_url` or `tools.ot_llm.base_url`
-- `model` — set via top-level `llm.model` or `tools.ot_llm.model`
-
-## Examples
-
-```python
-# Extract structured data from search results
-ot_llm.transform(
-    data=brave.search(query="gold price today"),
-    prompt="Extract the current gold price in USD/oz as a single number"
-)
-
-# Convert to YAML format
-ot_llm.transform(
-    data=some_data,
-    prompt="Return ONLY valid YAML with fields: name, price, url"
-)
-
-# Summarize content
-ot_llm.transform(
-    data=webfetch.fetch(url="https://docs.python.org/3/library/json.html"),
-    prompt="Summarize the main points in 3 bullet points"
-)
-
-# Get JSON output with json_mode
-ot_llm.transform(
-    data=raw_data,
-    prompt="Extract name and email fields",
-    json_mode=True
-)
-
-# Transform a file
-ot_llm.transform_file(
-    prompt="Convert this markdown to reStructuredText format",
-    in_file="README.md",
-    out_file="README.rst"
-)
-```
+- An effective top-level or `tools.ot_llm.llm` generation route
+- The named secret required by that route; CLIProxyAPI routes use the
+  `code.cliproxy` inference-client secret and do not require `OPENAI_API_KEY`
 
 ## Configuration
 
 ### Required
 
-- `OPENAI_API_KEY` must be set in `secrets.yaml`.
-- `base_url` and `model` must be configured via top-level `llm:` or `tools.ot_llm.*`.
+- Configure a complete top-level `llm`, or a complete `tools.ot_llm.llm`.
 
 ### Optional
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `tools.ot_llm.base_url` | string | `""` | Overrides `llm.base_url` for this tool only. |
-| `tools.ot_llm.model` | string | `""` | Overrides `llm.model` for this tool only. |
-| `tools.ot_llm.timeout` | int | `30` | API timeout in seconds. |
-| `tools.ot_llm.max_tokens` | int \| null | `null` | Max response tokens. `null` means no limit. |
-
-Configure `base_url` and `model` once at the top level for all LLM-using tools (`ot_llm`, `ot_image`, `mem`, `knowledge`, `ctx`):
+| `tools.ot_llm.llm` | generation selection \| null | `null` | Pack model/effort/timeout/output overrides, or a complete backend switch |
 
 ```yaml
 llm:
-  base_url: https://openrouter.ai/api/v1
-  model: google/gemini-2-flash-preview
-  embedding_model: text-embedding-3-small  # for mem and knowledge
+  backend: cliproxy
+  interface: responses
+  model: luna
+  effort: low
+  timeout: 30
+  max_output_tokens: 4096
 
-# Per-tool override (optional)
 tools:
   ot_llm:
-    timeout: 30
-    max_tokens: null
+    llm:
+      model: sol
+      effort: medium
 ```
 
 ### Defaults
 
-- `timeout` defaults to `30`.
-- `max_tokens` defaults to `null`.
-- `base_url` and `model` fall back to the top-level `llm:` block; the tool is not usable if neither is set.
+- Selection precedence is call, pack, top-level, then model default.
+- A complete pack backend switch must include every backend-specific field.
+- There is no provider or paid-route fallback.
+
+See [LLM routing](../../learn/llm-routing.md) for model metadata, backend schemas,
+embedding separation, and responsibility boundaries.
+
+## Examples
+
+```python
+# Extract structured data through a JSON-capable route
+ot_llm.transform(
+    data=raw_data,
+    prompt="Extract name and email",
+    json_mode=True,
+)
+
+# Use a configured model and effort for one call
+ot_llm.transform(
+    data=report,
+    prompt="Summarise in three bullets",
+    model="sol",
+    effort="medium",
+)
+
+# Transform a UTF-8 file
+ot_llm.transform_file(
+    prompt="Convert this Markdown to reStructuredText",
+    in_file="README.md",
+    out_file="README.rst",
+)
+```

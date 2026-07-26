@@ -1,14 +1,23 @@
 """Configuration for the ctx pack."""
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ot.config import get_tool_config
+from ot.config.routing import (  # noqa: TC001 - Pydantic resolves GenerationSelection
+    GenerationSelection,
+)
 
 
 class Config(BaseModel):
     """Pack configuration - discovered by registry."""
 
+    model_config = ConfigDict(extra="forbid")
+
+    llm: GenerationSelection | None = Field(
+        default=None,
+        description="Pack-level shared generation overrides",
+    )
     ttl: int = Field(
         default=3600,
         ge=0,

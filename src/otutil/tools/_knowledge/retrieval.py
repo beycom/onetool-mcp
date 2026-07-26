@@ -2,44 +2,21 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from ot.config import get_config
+from ot.generation import GenerationRequest, generate, resolve_generation
 from ot.logging import LogEntry
-from ot.utils.factory import lazy_client
-from otpack import LogSpan
+from otpack import LogSpan, get_secret
 
 from .config import _get_config
 from .db import deserialize_meta, deserialize_tags, get_connection, use_connection
 from .search import apply_metadata_filters, search_fts, search_hybrid, search_vec
 
 if TYPE_CHECKING:
-    from openai import OpenAI
-
-
-_CLIENT_TIMEOUT_S = 60.0
-
-
-def _create_llm_client() -> OpenAI | None:
-    """Create OpenAI client for LLM reranking and synthesis."""
-    try:
-        from openai import OpenAI
-
-        from ot.config import get_llm_config
-        from otpack import get_secret
-
-        api_key = get_secret("OPENAI_API_KEY") or ""
-        if not api_key:
-            return None
-        config = _get_config()
-        base_url = config.base_url or get_llm_config().base_url or None
-        return OpenAI(api_key=api_key, base_url=base_url, timeout=_CLIENT_TIMEOUT_S)
-    except Exception:
-        return None
-
-
-_get_llm_client = lazy_client(_create_llm_client)
+    from ot.config.routing import ReasoningEffort
 
 # Untrusted-context boundary for the retrieval-augmented LLM calls (kb.ask): the
 # retrieved passages are data, not instructions.
@@ -51,12 +28,7 @@ _UNTRUSTED_CONTEXT_SYSTEM = (
 
 
 def reset_runtime_cache() -> None:
-    """Reset module-level runtime caches.
-
-    Called by ot.reload() so rotated credentials/base URLs are picked up
-    without requiring a process restart.
-    """
-    cast("Any", _get_llm_client).reset()
+    """Generation clients are invocation-owned; no local cache remains."""
 
 
 def search(
@@ -188,6 +160,8 @@ def ask(
     k: int = 10,
     rerank: bool = True,
     expand: bool = False,
+    model: str | None = None,
+    effort: ReasoningEffort | None = None,
 ) -> str:
     """Retrieve relevant chunks and synthesise an answer with citations.
 
@@ -199,6 +173,8 @@ def ask(
         k: Number of candidate chunks to retrieve (default 10)
         rerank: Re-rank candidates via batched LLM scoring (default True)
         expand: Include 1-hop graph neighbours of top chunks (default False)
+        model: Model shortcut, concrete ID, or proxy alias override
+        effort: Reasoning effort override: ``low``, ``medium``, or ``high``
 
     Returns:
         Synthesised answer with source citations.
@@ -236,7 +212,12 @@ def ask(
 
             # 3. Optional: rerank
             if rerank and results:
-                results = _llm_rerank(query, results)
+                results = _llm_rerank(
+                    query,
+                    results,
+                    model=model,
+                    effort=effort,
+                )
 
             # 4. Synthesise (results is already bounded to k, or 2k when expanded)
             context_parts = []
@@ -248,7 +229,12 @@ def ask(
                 citations.append({"num": i, "topic": r["topic"], "url": url})
 
             context = "\n\n---\n\n".join(context_parts)
-            answer = _synthesise(query, context)
+            answer = _synthesise(
+                query,
+                context,
+                model=model,
+                effort=effort,
+            )
 
             s.add("chunkCount", len(results))
 
@@ -386,71 +372,90 @@ def _graph_expand(conn: Any, results: list[dict[str, Any]], limit: int) -> list[
     return combined[:limit]
 
 
-def _llm_rerank(query: str, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _llm_rerank(
+    query: str,
+    results: list[dict[str, Any]],
+    *,
+    model: str | None = None,
+    effort: ReasoningEffort | None = None,
+) -> list[dict[str, Any]]:
     """Re-rank results via a single batched LLM scoring call."""
-    try:
-        client = _get_llm_client()
-        if client is None:
-            return results
-
-        config = _get_config()
-        from ot.config import get_llm_config
-        model = config.enrich_model or get_llm_config().model or "gpt-4o-mini"
-
-        snippets = "\n\n".join(
-            f"[{i}] {r['topic']}\n{r['content'][:500]}"
-            for i, r in enumerate(results, 1)
+    config = _get_config()
+    root = get_config()
+    route = resolve_generation(
+        config=root,
+        pack=config.llm,
+        operation=config.rerank.llm,
+        model=model,
+        effort=effort,
+    )
+    snippets = "\n\n".join(
+        f"[{i}] {r['topic']}\n{r['content'][:500]}"
+        for i, r in enumerate(results, 1)
+    )
+    prompt = (
+        f"Query: {query}\n\n"
+        "Rate each passage for relevance to the query on a scale of 1-10.\n"
+        "Respond with only a comma-separated list of scores, one per passage.\n\n"
+        f"{snippets}"
+    )
+    response = generate(
+        route=route,
+        request=GenerationRequest(
+            system=_UNTRUSTED_CONTEXT_SYSTEM,
+            prompt=prompt,
+        ),
+        secret_resolver=get_secret,
+        proxy_config=root.code.cliproxy if root.code is not None else None,
+    )
+    scores = [
+        float(value.strip())
+        for value in response.content.split(",")
+        if value.strip().replace(".", "").isdigit()
+    ]
+    if len(scores) != len(results):
+        raise ValueError("Reranking returned an invalid score count")
+    return [
+        result
+        for _, result in sorted(
+            zip(scores, results, strict=True),
+            key=lambda pair: pair[0],
+            reverse=True,
         )
-        prompt = (
-            f"Query: {query}\n\n"
-            f"Rate each passage for relevance to the query on a scale of 1-10.\n"
-            f"Respond with only a comma-separated list of scores, one per passage.\n\n"
-            f"{snippets}"
-        )
-        resp = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": _UNTRUSTED_CONTEXT_SYSTEM},
-                {"role": "user", "content": prompt},
-            ],
-            max_tokens=100,
-        )
-        scores_str = resp.choices[0].message.content or ""
-        scores = [float(x.strip()) for x in scores_str.split(",") if x.strip().replace(".", "").isdigit()]
-        if len(scores) == len(results):
-            return [r for _, r in sorted(zip(scores, results, strict=True), key=lambda x: x[0], reverse=True)]
-    except Exception:
-        pass
-    return results
+    ]
 
 
-def _synthesise(query: str, context: str) -> str:
+def _synthesise(
+    query: str,
+    context: str,
+    *,
+    model: str | None = None,
+    effort: ReasoningEffort | None = None,
+) -> str:
     """Synthesise an answer from retrieved context using an LLM."""
-    try:
-        client = _get_llm_client()
-        if client is None:
-            return "(LLM synthesis requires OPENAI_API_KEY — here are the retrieved chunks:)\n\n" + context[:2000]
-
-        config = _get_config()
-        from ot.config import get_llm_config
-        model = config.enrich_model or get_llm_config().model or "gpt-4o-mini"
-        prompt = (
-            f"Answer the following question based on the provided context. "
-            f"Be concise and cite sources by their [N] numbers.\n\n"
-            f"Question: {query}\n\n"
-            f"Context:\n{context}"
-        )
-        resp = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": _UNTRUSTED_CONTEXT_SYSTEM},
-                {"role": "user", "content": prompt},
-            ],
-            max_tokens=1000,
-        )
-        return resp.choices[0].message.content or ""
-    except Exception as e:
-        return f"(Synthesis failed: {e})\n\nRetrieved context:\n{context[:2000]}"
+    config = _get_config()
+    root = get_config()
+    route = resolve_generation(
+        config=root,
+        pack=config.llm,
+        operation=config.ask.llm,
+        model=model,
+        effort=effort,
+    )
+    prompt = (
+        "Answer the following question based on the provided context. "
+        "Be concise and cite sources by their [N] numbers.\n\n"
+        f"Question: {query}\n\nContext:\n{context}"
+    )
+    return generate(
+        route=route,
+        request=GenerationRequest(
+            system=_UNTRUSTED_CONTEXT_SYSTEM,
+            prompt=prompt,
+        ),
+        secret_resolver=get_secret,
+        proxy_config=root.code.cliproxy if root.code is not None else None,
+    ).content
 
 
 def _increment_hit_counts(db_name: str, chunk_ids: list[str]) -> None:
@@ -465,8 +470,13 @@ def _increment_hit_counts(db_name: str, chunk_ids: list[str]) -> None:
                 chunk_ids,
             )
             conn.commit()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(
+            LogEntry(
+                event="knowledge.hit_count_update_failed",
+                errorType=type(exc).__name__,
+            )
+        )
 
 
 __all__ = ["ask", "related", "reset_runtime_cache", "search"]

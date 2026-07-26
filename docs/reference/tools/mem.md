@@ -230,21 +230,28 @@ Re-reads source files for stale memories and updates their content. Preserves hi
 
 Extract sections from multiple memories in a single call.
 
+## Requires
+
+- The independent embedding route's named secret when `embeddings_enabled: true`
+- An effective generation route and its named secret for `mem.ask()`
+- SQLite (Python stdlib `sqlite3`)
+- tiktoken (bundled with OneTool)
+
 ## Configuration
 
 ### Required
 
 - No required `tools.mem` settings.
-- `OPENAI_API_KEY` is only required if you enable embeddings.
+- `mem.ask()` requires an effective generation route.
+- `embeddings_enabled: true` requires the independent top-level `embeddings` route
+  and its named secret.
 
 ### Optional
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| `tools.mem.llm` | generation selection \| null | `null` | Pack generation overrides for `mem.ask()` |
 | `tools.mem.db_path` | string | `data/mem/default.db` | SQLite database path, relative to the OneTool directory. |
-| `tools.mem.model` | string | `""` | Embedding model. Falls back to `llm.embedding_model`; built-in default: `text-embedding-3-small`. |
-| `tools.mem.base_url` | string | `""` | OpenAI-compatible embeddings API base URL. Falls back to `llm.base_url`. |
-| `tools.mem.dimensions` | int | `1536` | Embedding dimensions. Must match the configured model. |
 | `tools.mem.search_limit` | int | `10` | Default max search results. Range: `1-100`. |
 | `tools.mem.search_extract` | int | `200` | Default extract length in chars. `0` means full content. |
 | `tools.mem.redaction_enabled` | bool | `true` | Enable secret/PII redaction on write. |
@@ -253,24 +260,27 @@ Extract sections from multiple memories in a single call.
 | `tools.mem.decay_half_life_days` | int | `30` | Importance decay half-life in days. |
 | `tools.mem.allowed_file_dirs` | string[] | `[]` | Allowed directories for file-backed memory operations. |
 | `tools.mem.exclude_file_patterns` | string[] | `[".git", "node_modules", "__pycache__", ".venv", "venv"]` | Excluded file patterns for file-backed memory operations. |
-| `tools.mem.max_embedding_tokens` | int | `8191` | Max tokens per embedding input. |
-| `tools.mem.read_cache_max_size` | int | `128` | Read cache size. `0` disables the cache. |
-| `tools.mem.read_cache_ttl_seconds` | int | `300` | Read cache TTL. `0` means no expiry. |
 | `tools.mem.embeddings_enabled` | bool | `false` | Enable semantic embeddings and vector search. |
 | `tools.mem.embeddings_async` | bool | `true` | Generate embeddings asynchronously. |
 
 ```yaml
+embeddings:
+  backend: openai_compatible
+  model: text-embedding-3-small
+  base_url: https://api.openai.com/v1
+  secret_name: OPENAI_API_KEY
+  dimensions: 1536
+  timeout: 60
+  batch_size: 200
+  max_tokens: 8191
+
 tools:
   mem:
     db_path: data/mem/default.db
-    model: text-embedding-3-small
-    base_url: https://openrouter.ai/api/v1
-    dimensions: 1536
+    llm:
+      model: luna
     search_limit: 10
     search_extract: 200
-    max_embedding_tokens: 8191
-    read_cache_max_size: 128
-    read_cache_ttl_seconds: 300
     redaction_enabled: true
     redaction_patterns: []
     tags_whitelist: []
@@ -283,7 +293,10 @@ tools:
 
 ### Defaults
 
-- If `tools.mem` is omitted, OneTool uses the built-in storage, redaction, search, cache, and embedding defaults shown above.
+- If `tools.mem` is omitted, storage, redaction, and keyword search use the shown
+  defaults and embeddings remain disabled.
+- Embedding model, endpoint, secret, dimensions, batching, timeout, and token limits
+  come only from top-level `embeddings`; they never inherit from `llm`.
 
 ## Topic Hierarchy
 
@@ -415,40 +428,25 @@ The `toc()` function checks if the source file has changed since storage and war
 - `"Requirements"` - heading path (case-insensitive substring match)
 - `[1, "Requirements", "200:300"]` - mixed list
 
-## Requires
-
-- `OPENAI_API_KEY` in secrets.yaml (only when `embeddings_enabled: true`)
-- SQLite (Python stdlib `sqlite3`)
-- tiktoken (bundled with OneTool)
-
 ## Embedding Large Content
 
 When content exceeds the embedding model's token limit, it is automatically split into chunks, each chunk is embedded, and the vectors are averaged. This preserves semantic coverage of the full document — keyword search (`mode="keyword"`) always searches the complete stored text regardless.
 
 A safety margin of 100 tokens is subtracted from the limit to avoid edge-case overflows.
 
-Configure the token limit via `max_embedding_tokens` in `onetool.yaml`:
+Configure the token limit on the independent embedding route:
 
 ```yaml
-tools:
-  mem:
-    max_embedding_tokens: 8191  # default for text-embedding-3-small
+embeddings:
+  backend: openai_compatible
+  model: text-embedding-3-small
+  base_url: https://api.openai.com/v1
+  secret_name: OPENAI_API_KEY
+  dimensions: 1536
+  max_tokens: 8191
 ```
 
 For unknown models, falls back to the `cl100k_base` tiktoken encoding.
-
-## Read Cache
-
-Repeated reads of the same topic are served from an in-memory cache, avoiding redundant DB queries. The cache is automatically invalidated when content changes (write, update, append, delete). Access counts are still incremented on every read, even cache hits.
-
-```yaml
-tools:
-  mem:
-    read_cache_max_size: 128   # max entries (0 = disabled)
-    read_cache_ttl_seconds: 300  # 5 minutes (0 = no expiry)
-```
-
-Bulk operations (`update_batch`, `load`) clear the entire cache.
 
 ## Embeddings
 

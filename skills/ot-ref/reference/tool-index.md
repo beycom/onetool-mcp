@@ -136,7 +136,7 @@ ground.search_batch(queries: list[tuple[str, str] | str], context: str='', focus
 ## knowledge, kb
 ```python
 knowledge.append(topic: str, content: str, db: str, id: str | None=None)  # Append content to an existing entry.
-knowledge.ask(query: str, db: str, k: int=10, rerank: bool=True, expand: bool=False)  # Retrieve relevant chunks and synthesise an answer with citations.
+knowledge.ask(query: str, db: str, k: int=10, rerank: bool=True, expand: bool=False, model: str | None=None, effort: ReasoningEffort | None=None)  # Retrieve relevant chunks and synthesise an answer with citations.
 knowledge.dbs()  # List all configured knowledge databases.
 knowledge.delete(topic: str | None=None, source_path: str | None=None, id: str | None=None, db: str)  # Remove an entry by topic, id, or all chunks for a source file.
 knowledge.grep(pattern: str, db: str, topic: str | None=None, category: str | None=None, context: int=2, limit: int=50, case_sensitive: bool=True, fixed_strings: bool=False)  # Regex search across knowledge base entries.
@@ -174,7 +174,7 @@ localhist.status(path: str | None=None, status: str | None=None, limit: int | No
 ## mem
 ```python
 mem.append(topic: str, content: str, id: str | None=None, separator: str='\n\n')  # Append content to an existing memory.
-mem.ask(topic: str, q: str | list[str], id: str | None=None, model: str | None=None)  # Ask one or more questions about a stored memory using an LLM.
+mem.ask(topic: str, q: str | list[str], id: str | None=None, model: str | None=None, effort: ReasoningEffort | None=None)  # Ask one or more questions about a stored memory using an LLM.
 mem.context(topic: str | None=None, limit: int=5)  # Load most-accessed memories for quick context injection.
 mem.count(topic: str | None=None, category: str | None=None)  # Count memories with optional filtering.
 mem.decay(dry_run: bool=True)  # Apply importance decay to all memories based on age and access patterns.
@@ -231,7 +231,7 @@ ot.version()  # Return OneTool version string.
 ## ot_context, ctx
 ```python
 ot_context.append(handle: str, content: str, store: HandleStore | None=None)  # Append content to an existing handle.
-ot_context.ask(handle: str, q: str | list[str], model: str | None=None, store: HandleStore | None=None)  # Send one or more questions about stored content to an LLM.
+ot_context.ask(handle: str, q: str | list[str], model: str | None=None, effort: ReasoningEffort | None=None, store: HandleStore | None=None)  # Send one or more questions about stored content to an LLM.
 ot_context.delete(handle: str, store: HandleStore | None=None)  # Delete a single handle and both associated files.
 ot_context.grep(handle: str, pattern: str, context: int=0, ignore_case: bool=True, limit: int=500, store: HandleStore | None=None, config: Config | None=None)  # Regex line search with optional context lines and long-line truncation.
 ot_context.inspect(handle: str, store: HandleStore | None=None)  # Return detailed metadata for a single handle.
@@ -253,21 +253,21 @@ ot_forge.validate_ext(path: str)  # Validate an extension before reload.
 
 ## ot_image, img
 ```python
-ot_image.ask(img: str | list[str], q: str | list[str], max_edge: int=1568)  # Send one or more questions about one or more images to the vision model.
-ot_image.clip_ask(q: str | list[str], max_edge: int=1568)  # Ask a question about the current clipboard image.
-ot_image.clip_view()  # Extract a structured summary of the current clipboard image.
+ot_image.ask(img: str | list[str], q: str | list[str], max_edge: int=1568, model: str | None=None, effort: ReasoningEffort | None=None)  # Send one or more questions about one or more images to the vision model.
+ot_image.clip_ask(q: str | list[str], max_edge: int=1568, model: str | None=None, effort: ReasoningEffort | None=None)  # Ask a question about the current clipboard image.
+ot_image.clip_view(model: str | None=None, effort: ReasoningEffort | None=None)  # Extract a structured summary of the current clipboard image.
 ot_image.delete(handle: str)  # Delete a loaded image and remove it from the session cache.
 ot_image.list()  # List all images in ``.onetool/images/``.
 ot_image.load(img: str, handle: str | None=None, max_edge: int=1568)  # Load a single image into session storage and return a stable handle.
 ot_image.load_batch(img: str | list[str], max_edge: int=1568)  # Load multiple images and return a list of result dicts.
 ot_image.purge(all: bool=False, minutes: int=15)  # Delete images from ``.onetool/images/``, optionally filtered by age.
-ot_image.summary(img: str)  # Extract and cache a structured summary of an image.
+ot_image.summary(img: str, model: str | None=None, effort: ReasoningEffort | None=None)  # Extract and cache a structured summary of an image.
 ```
 
 ## ot_llm, llm
 ```python
-ot_llm.transform(data: Any, prompt: str, model: str | None=None, json_mode: bool=False)  # Transform data using an LLM.
-ot_llm.transform_file(prompt: str, in_file: str, out_file: str, model: str | None=None, json_mode: bool=False)  # Transform a file's content using an LLM and write to output file.
+ot_llm.transform(data: Any, prompt: str, model: str | None=None, effort: ReasoningEffort | None=None, json_mode: bool=False)  # Transform data through the effective shared generation route.
+ot_llm.transform_file(prompt: str, in_file: str, out_file: str, model: str | None=None, effort: ReasoningEffort | None=None, json_mode: bool=False)  # Transform a UTF-8 file and write the generated result.
 ```
 
 ## ot_secrets, sec

@@ -1,8 +1,8 @@
-"""Persistent memory for AI agents with SQLite storage and optional OpenAI embeddings.
+"""Persistent memory for AI agents with SQLite storage and optional embeddings.
 
 Provides topic-based memory storage with semantic search, content dedup,
-secret redaction, and importance decay. Requires OPENAI_API_KEY in secrets.yaml
-when embeddings are enabled.
+secret redaction, and importance decay. Embeddings use the independent top-level
+``embeddings`` route when enabled.
 
 Thread safety: Uses a shared SQLite connection with WAL mode. Concurrent calls
 from multiple threads should use _use_connection() to hold the lock for the

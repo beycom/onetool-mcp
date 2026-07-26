@@ -33,6 +33,7 @@ Usage:
 
 from ot.config.loader import (
     get_config,
+    get_embeddings_config,
     get_llm_config,
     get_tool_config,
     is_log_verbose,
@@ -42,12 +43,23 @@ from ot.config.loader import (
     reset as reset_config,
 )
 from ot.config.models import (
-    LlmConfig,
     McpServerConfig,
     OneToolConfig,
     SecurityConfig,
     SnippetDef,
     SnippetParam,
+)
+from ot.config.routing import (
+    CLIProxyConnectionConfig,
+    CLIProxyGenerationConfig,
+    CodeConfig,
+    CodeRouteConfig,
+    EmbeddingsConfig,
+    GenerationSelection,
+    LlmConfig,
+    ModelEntryConfig,
+    OpenAICompatibleGenerationConfig,
+    PartialGenerationConfig,
 )
 from ot.config.secrets import (
     expand_secrets,
@@ -72,15 +84,25 @@ def reset() -> None:
 
 
 __all__ = [
+    "CLIProxyConnectionConfig",
+    "CLIProxyGenerationConfig",
+    "CodeConfig",
+    "CodeRouteConfig",
+    "EmbeddingsConfig",
+    "GenerationSelection",
     "LlmConfig",
     "McpServerConfig",
+    "ModelEntryConfig",
     "OneToolConfig",
+    "OpenAICompatibleGenerationConfig",
+    "PartialGenerationConfig",
     "SecurityConfig",
     "SnippetDef",
     "SnippetParam",
     "expand_secrets",
     "expand_vars",
     "get_config",
+    "get_embeddings_config",
     "get_llm_config",
     "get_secret",
     "get_secrets",

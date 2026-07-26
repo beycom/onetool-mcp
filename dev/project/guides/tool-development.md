@@ -430,7 +430,7 @@ Used by brave, tavily, ground, file — use the same pattern for consistency.
 | `resolve_ot_path(x); x.mkdir(...)` | Same — just always pair them |
 | Duration strings (`"30m"`, `"2h"`) | `ot.utils.duration.parse_duration()` (if available) |
 | `len(text.split())` as token count | `tiktoken` — see Token counting above |
-| New `OpenAI()` per call | `_client_cache` dict — see OpenAI-compatible client cache above |
+| Provider SDK client inside a generating pack | Shared `resolve_generation()` + `generate()` routing |
 | `except Exception: pass` in `_get_config` | `except Exception as e: logger.warning(...)` |
 
 ---
@@ -478,68 +478,70 @@ def search(*, query: str, timeout: float | None = None) -> str:
 
 See [Tool Configuration](tool-configuration.md) for detailed configuration patterns.
 
-### LLM config fallback pattern
+### Shared generation routing
 
-For tools that call an LLM, support pack-level override with fallback to the top-level
-`llm.*` config. Follow the `ot_image` pattern exactly:
+Tools that generate text or inspect images use the shared, provider-neutral
+generation router. A pack may expose a strict `llm` selection for partial
+model/effort/timeout overrides or a complete backend switch:
 
 ```python
-from loguru import logger
+from pydantic import BaseModel, ConfigDict
+
+from ot.config import get_config
+from ot.config.routing import GenerationSelection, ReasoningEffort
+from ot.generation import (
+    GenerationError,
+    GenerationRequest,
+    generate,
+    resolve_generation,
+)
 from otpack import get_secret, get_tool_config
-from pydantic import BaseModel, Field
+
 
 class Config(BaseModel):
-    model: str = Field(default="", description="Model (empty = inherit from llm.model)")
-    base_url: str = Field(default="", description="API base URL (empty = inherit from llm.base_url)")
-    timeout: int = Field(default=30)
+    model_config = ConfigDict(extra="forbid")
+
+    llm: GenerationSelection | None = None
+
 
 def _get_config() -> Config:
-    from ot.config import get_llm_config
-    config = get_tool_config("mytool", Config)
+    return get_tool_config("mytool", Config)
+
+
+def ask(
+    *,
+    prompt: str,
+    model: str | None = None,
+    effort: ReasoningEffort | None = None,
+) -> str:
     try:
-        llm = get_llm_config()
-        updates: dict[str, str] = {}
-        if not config.base_url and llm.base_url:
-            updates["base_url"] = llm.base_url
-        if not config.model and llm.model:
-            updates["model"] = llm.model
-        if updates:
-            config = config.model_copy(update=updates)
-    except Exception as e:
-        logger.warning("Failed to load top-level llm config for mytool fallbacks: {}", e)
-    return config
-```
-
-Do not use silent `except Exception: pass` — always log a warning so misconfiguration is visible.
-
-### OpenAI-compatible client cache
-
-Cache clients by `(api_key, base_url, timeout)` to avoid a new connection pool per call:
-
-```python
-from openai import OpenAI
-
-_client_cache: dict[tuple[str, str, int], OpenAI] = {}
-
-def _get_client(config: Config) -> tuple[OpenAI, str] | tuple[None, str]:
-    """Return (client, model) or (None, error_string)."""
-    api_key = get_secret("OPENAI_API_KEY") or get_secret("OT_LLM_API_KEY")
-    if not api_key:
-        return None, "Error: mytool not configured. Set OPENAI_API_KEY in secrets.yaml."
-    if not config.base_url:
-        return None, "Error: mytool not configured. Set llm.base_url in onetool.yaml."
-    if not config.model:
-        return None, "Error: mytool not configured. Set llm.model in onetool.yaml."
-    cache_key = (api_key, config.base_url, config.timeout)
-    if cache_key not in _client_cache:
-        _client_cache[cache_key] = OpenAI(
-            api_key=api_key, base_url=config.base_url, timeout=config.timeout
+        root = get_config()
+        route = resolve_generation(
+            config=root,
+            pack=_get_config().llm,
+            model=model,
+            effort=effort,
         )
-    return _client_cache[cache_key], config.model
+        result = generate(
+            route=route,
+            request=GenerationRequest(prompt=prompt),
+            secret_resolver=get_secret,
+            proxy_config=root.code.cliproxy if root.code is not None else None,
+        )
+        return result.content
+    except GenerationError as exc:
+        return f"Error: {exc}"
 ```
 
-Return three separate error strings — one for each missing field — with an actionable fix in each.
-Do **not** use `@functools.lru_cache` or `lazy_client()` for OpenAI clients.
+Selection precedence is per-call, operation, pack, top-level `llm`, then the
+selected model's default effort. Partial selections inherit the broader backend;
+a backend switch must provide a complete discriminated backend. The shared
+router validates model identity, interface, modality, structured-output, and
+effort capabilities before network I/O.
+
+Do not add per-pack `model`, `base_url`, API-key fallback, client caches, or
+OpenAI SDK clients. Pack code supplies the effective selections and lets
+`resolve_generation()` and `generate()` own routing, secrets, and transport.
 
 ### Token counting
 
@@ -667,8 +669,8 @@ from otutil.tools._mem import Config, _close_connection
 - [ ] Secrets accessed via `get_secret()` from `otpack`
 - [ ] Path resolution using `resolve_cwd_path()` (from `otpack`) or `resolve_ot_path()` (from `ot.meta`)
 - [ ] `Config` class if tool has settings
-- [ ] If calling an LLM: `_get_config()` with `llm.*` fallback + `logger.warning` on exception (not `pass`)
-- [ ] If calling an LLM: `_client_cache` dict for OpenAI client — not `@lru_cache` or new client per call
+- [ ] If generating content: strict `GenerationSelection` config passed to `resolve_generation()`
+- [ ] If generating content: `generate()` owns secrets and transport; no per-pack provider client or cache
 - [ ] If counting tokens: use `tiktoken`, declare as hard dep in `__ot_requires__`
 - [ ] Unit tests with `@pytest.mark.unit` + `@pytest.mark.tools`
 - [ ] Integration tests if external APIs involved
