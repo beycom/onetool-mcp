@@ -12,6 +12,45 @@ from __future__ import annotations
 pack = "knowledge"
 pack_aliases = ("kb",)
 
+__ot_requires__ = [
+    {
+        "kind": "lib",
+        "name": "openai",
+        "import_name": "openai",
+        "install_extra": "core",
+        "purpose": "Generate embeddings and grounded answers",
+    },
+    {
+        "kind": "lib",
+        "name": "sqlite-vec",
+        "import_name": "sqlite_vec",
+        "install_extra": "[util]",
+        "purpose": "Store and search knowledge-base vectors in SQLite",
+    },
+    {
+        "kind": "lib",
+        "name": "python-frontmatter",
+        "import_name": "frontmatter",
+        "install_extra": "[util]",
+        "purpose": "Parse Markdown document metadata",
+    },
+    {
+        "kind": "lib",
+        "name": "crawl4ai",
+        "import_name": "crawl4ai",
+        "install_extra": "[scrape]",
+        "purpose": "Build knowledge sources by crawling websites",
+        "optional": True,
+    },
+    {
+        "kind": "secret",
+        "name": "OPENAI_API_KEY",
+        "purpose": "Authenticate embedding and answer-generation requests",
+    },
+]
+
+config_model = "Config"
+
 __all__ = [
     "append",
     "ask",
@@ -37,15 +76,6 @@ def register_services(registry: object) -> None:
 
     registry.register_reload_hook(reset_runtime_cache)  # type: ignore[attr-defined]
 
-# Dependency declarations for CLI validation
-__ot_requires__ = {
-    "lib": [
-        ("openai", "pip install openai"),
-        ("sqlite_vec", "pip install sqlite-vec  (or: pip install onetool-mcp[util])"),
-        ("frontmatter", "pip install python-frontmatter  (or: pip install onetool-mcp[util])"),
-    ],
-}
-
 from otutil.tools._knowledge import (
     append,
     ask,
@@ -63,3 +93,6 @@ from otutil.tools._knowledge import (
     update,
     write,
 )
+from otutil.tools._knowledge.config import Config as _Config
+
+Config = _Config

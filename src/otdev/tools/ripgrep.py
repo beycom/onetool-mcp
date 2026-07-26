@@ -16,9 +16,15 @@ pack_aliases = ("rg",)
 __all__ = ["count", "files", "search", "types"]
 
 # Dependency declarations for CLI validation
-__ot_requires__ = {
-    "cli": [("rg", "brew install ripgrep")],
-}
+__ot_requires__ = [
+    {
+        "kind": "cli",
+        "name": "ripgrep",
+        "executable": "rg",
+        "purpose": "Run fast recursive text and regular-expression searches",
+        "authoritative_url": "https://github.com/BurntSushi/ripgrep",
+    },
+]
 
 import contextlib
 import re
@@ -59,6 +65,9 @@ class Config(BaseModel):
         ge=1_000,
         description="Truncate search output beyond this many characters",
     )
+
+
+config_model = "Config"
 
 
 def _resolve_path(path: str) -> Path:

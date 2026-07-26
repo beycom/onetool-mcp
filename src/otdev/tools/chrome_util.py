@@ -11,6 +11,14 @@ from __future__ import annotations
 pack = "chrome_util"
 pack_aliases = ("chrome",)
 
+__ot_requires__ = [
+    {
+        "kind": "server",
+        "name": "chrome_devtools",
+        "purpose": "Provide the Chrome evaluation tool used by annotations",
+    },
+]
+
 __all__ = [
     "clear_annotations",
     "guide_user",

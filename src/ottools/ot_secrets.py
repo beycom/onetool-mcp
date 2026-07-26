@@ -37,12 +37,22 @@ pack_aliases = ("sec",)
 
 __all__ = ["audit", "encrypt", "get", "init", "rotate", "set", "status", "unset"]
 
-__ot_requires__ = {
-    "lib": [
-        ("pyrage", "pip install pyrage"),
-        ("keyring", "pip install keyring"),
-    ]
-}
+__ot_requires__ = [
+    {
+        "kind": "lib",
+        "name": "pyrage",
+        "import_name": "pyrage",
+        "install_extra": "core",
+        "purpose": "Encrypt and decrypt the OneTool secrets file",
+    },
+    {
+        "kind": "lib",
+        "name": "keyring",
+        "import_name": "keyring",
+        "install_extra": "core",
+        "purpose": "Store the age identity in the operating-system keyring",
+    },
+]
 
 _SERVICE = "onetool"
 _KEY_IDENTITY = "age_identity"

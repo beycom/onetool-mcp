@@ -1,22 +1,37 @@
 """Dependency validation utilities for OneTool.
 
-Provides decorators and functions for declaring and checking tool dependencies.
-Supports both CLI tools (external binaries) and Python libraries.
+Provides decorators and functions for declaring and checking normalized tool
+requirements.
 
 Example:
     # Decorator usage
     from ot.utils import requires_cli, requires_lib
 
-    @requires_cli("rg", install="brew install ripgrep")
-    @requires_lib("sqlalchemy", install="pip install sqlalchemy")
+    @requires_cli(
+        "rg",
+        purpose="Search files",
+        authoritative_url="https://github.com/BurntSushi/ripgrep",
+    )
+    from ot.catalog import InstallExtra
+
+    @requires_lib(
+        "sqlalchemy",
+        purpose="Database access",
+        install_extra=InstallExtra.DEV,
+    )
     def query(sql: str) -> str:
         ...
 
     # Module-level declaration (for AST scanning)
-    __ot_requires__ = {
-        "cli": [("rg", "brew install ripgrep")],
-        "lib": [("sqlalchemy", "pip install sqlalchemy")],
-    }
+    __ot_requires__ = [
+        {
+            "kind": "cli",
+            "name": "ripgrep",
+            "executable": "rg",
+            "purpose": "Search files",
+            "authoritative_url": "https://github.com/BurntSushi/ripgrep",
+        },
+    ]
 """
 
 from __future__ import annotations
@@ -26,6 +41,8 @@ import shutil
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, TypeVar
+
+from ot.catalog import InstallExtra, PackRequirement, RequirementKind
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -51,7 +68,8 @@ class Dependency:
     """Represents a single dependency."""
 
     name: str
-    kind: str  # "cli" or "lib"
+    kind: RequirementKind
+    purpose: str = ""
     install: str = ""
     version: str = ""
     available: bool = False
@@ -79,8 +97,9 @@ class DepsCheckResult:
 def requires_cli(
     name: str,
     *,
-    install: str = "",
-    version_flag: str = "--version",
+    purpose: str,
+    authoritative_url: str | None = None,
+    optional: bool = False,
 ) -> Callable[[F], F]:
     """Decorator to declare a CLI tool dependency.
 
@@ -89,25 +108,35 @@ def requires_cli(
 
     Args:
         name: CLI command name (e.g., "rg", "ffmpeg", "pandoc")
-        install: Installation instructions shown when missing
-        version_flag: Flag to check version (default: "--version")
+        purpose: Why the executable is needed.
+        authoritative_url: Publisher documentation for platform-specific setup.
+        optional: Whether the whole pack can operate without this workflow.
 
     Returns:
         Decorator that adds dependency metadata to the function
 
     Example:
-        @requires_cli("rg", install="brew install ripgrep")
+        @requires_cli(
+            "rg",
+            purpose="Search files",
+            authoritative_url="https://github.com/BurntSushi/ripgrep",
+        )
         def search_with_ripgrep(pattern: str) -> str:
             ...
     """
 
     def decorator(func: F) -> F:
-        # Initialize or extend __ot_requires__ attribute
         if not hasattr(func, "__ot_requires__"):
-            func.__ot_requires__ = {"cli": [], "lib": []}  # type: ignore[attr-defined]
-
-        func.__ot_requires__["cli"].append(  # type: ignore[attr-defined]
-            {"name": name, "install": install, "version_flag": version_flag}
+            func.__ot_requires__ = []  # type: ignore[attr-defined]
+        func.__ot_requires__.append(  # type: ignore[attr-defined]
+            PackRequirement(
+                kind=RequirementKind.CLI,
+                name=name,
+                executable=name,
+                purpose=purpose,
+                authoritative_url=authoritative_url,
+                optional=optional,
+            )
         )
         return func
 
@@ -117,8 +146,10 @@ def requires_cli(
 def requires_lib(
     name: str,
     *,
-    install: str = "",
-    import_name: str = "",
+    purpose: str,
+    install_extra: InstallExtra,
+    import_name: str | None = None,
+    optional: bool = False,
 ) -> Callable[[F], F]:
     """Decorator to declare a Python library dependency.
 
@@ -127,32 +158,45 @@ def requires_lib(
 
     Args:
         name: Package name (e.g., "sqlalchemy", "openai")
-        install: Installation instructions (default: "pip install {name}")
+        purpose: Why the library is needed.
+        install_extra: Supported OneTool installation extra.
         import_name: Import name if different from package name
+        optional: Whether the whole pack can operate without this workflow.
 
     Returns:
         Decorator that adds dependency metadata to the function
 
     Example:
-        @requires_lib("sqlalchemy", install="pip install sqlalchemy")
+        @requires_lib(
+            "sqlalchemy",
+            purpose="Database access",
+            install_extra=InstallExtra.DEV,
+        )
         def query_database(sql: str) -> str:
             ...
 
-        @requires_lib("google-genai", import_name="google.genai")
+        @requires_lib(
+            "google-genai",
+            purpose="Run Gemini requests",
+            install_extra=InstallExtra.UTIL,
+            import_name="google.genai",
+        )
         def search_with_gemini(query: str) -> str:
             ...
     """
 
     def decorator(func: F) -> F:
         if not hasattr(func, "__ot_requires__"):
-            func.__ot_requires__ = {"cli": [], "lib": []}  # type: ignore[attr-defined]
-
-        func.__ot_requires__["lib"].append(  # type: ignore[attr-defined]
-            {
-                "name": name,
-                "install": install or f"pip install {name}",
-                "import_name": import_name or name,
-            }
+            func.__ot_requires__ = []  # type: ignore[attr-defined]
+        func.__ot_requires__.append(  # type: ignore[attr-defined]
+            PackRequirement(
+                kind=RequirementKind.LIB,
+                name=name,
+                purpose=purpose,
+                install_extra=install_extra,
+                import_name=import_name or name,
+                optional=optional,
+            )
         )
         return func
 
@@ -168,7 +212,7 @@ def check_cli(name: str) -> Dependency:
     Returns:
         Dependency object with availability status
     """
-    dep = Dependency(name=name, kind="cli")
+    dep = Dependency(name=name, kind=RequirementKind.CLI)
     path = shutil.which(name)
     if path:
         dep.available = True
@@ -187,7 +231,7 @@ def check_lib(name: str, import_name: str = "") -> Dependency:
     Returns:
         Dependency object with availability status
     """
-    dep = Dependency(name=name, kind="lib")
+    dep = Dependency(name=name, kind=RequirementKind.LIB)
     module_name = import_name or name
 
     spec = importlib.util.find_spec(module_name)
@@ -210,7 +254,7 @@ def check_secret(name: str) -> Dependency:
     """
     from ot.config.secrets import get_secret
 
-    dep = Dependency(name=name, kind="secret")
+    dep = Dependency(name=name, kind=RequirementKind.SECRET)
     value = get_secret(name)
     if value:
         dep.available = True
@@ -284,41 +328,23 @@ def check_deps(
 
         tool_result = DepsCheckResult(tool=pack_id)
 
-        # Check CLI dependencies
-        for cli_dep in tool.requires.get("cli", []):
-            # Handle tuple format (name, install), dict format, or string
-            if isinstance(cli_dep, tuple):
-                name, install = cli_dep[0], cli_dep[1] if len(cli_dep) > 1 else ""
-            elif isinstance(cli_dep, dict):
-                name = cli_dep.get("name", "")
-                install = cli_dep.get("install", "")
+        for requirement in tool.requires:
+            if requirement.kind is RequirementKind.CLI:
+                dep = check_cli(requirement.executable or requirement.name)
+                dep.install = requirement.authoritative_url or ""
+            elif requirement.kind is RequirementKind.LIB:
+                dep = check_lib(
+                    requirement.name,
+                    requirement.import_name or requirement.name,
+                )
+                if requirement.install_extra:
+                    dep.install = f"pip install onetool-mcp{requirement.install_extra}"
+            elif requirement.kind is RequirementKind.SECRET:
+                dep = check_secret(requirement.name)
+                dep.install = "Configure the named secret through OneTool"
             else:
-                name, install = str(cli_dep), ""
-            dep = check_cli(name)
-            dep.install = install
-            tool_result.dependencies.append(dep)
-
-        # Check library dependencies
-        for lib_dep in tool.requires.get("lib", []):
-            # Handle tuple format (name, install), dict format, or string
-            if isinstance(lib_dep, tuple):
-                name, install = lib_dep[0], lib_dep[1] if len(lib_dep) > 1 else ""
-                import_name = ""
-            elif isinstance(lib_dep, dict):
-                name = lib_dep.get("name", "")
-                install = lib_dep.get("install", f"pip install {name}")
-                import_name = lib_dep.get("import_name", "")
-            else:
-                name, install, import_name = str(lib_dep), "", ""
-            dep = check_lib(name, import_name)
-            dep.install = install or f"pip install {name}"
-            tool_result.dependencies.append(dep)
-
-        # Check secret dependencies (secrets are always strings)
-        for secret_item in tool.requires.get("secrets", []):
-            secret_name = str(secret_item) if not isinstance(secret_item, str) else secret_item
-            dep = check_secret(secret_name)
-            dep.install = "Add to secrets.yaml"
+                continue
+            dep.purpose = requirement.purpose
             tool_result.dependencies.append(dep)
 
         if tool_result.dependencies:

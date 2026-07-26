@@ -11,6 +11,14 @@ from __future__ import annotations
 pack = "play_util"
 pack_aliases = ("play",)
 
+__ot_requires__ = [
+    {
+        "kind": "server",
+        "name": "playwright",
+        "purpose": "Provide the browser evaluation tool used by annotations",
+    },
+]
+
 __all__ = [
     "clear_annotations",
     "enable_auto_inject",

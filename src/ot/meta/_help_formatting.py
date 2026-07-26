@@ -22,12 +22,18 @@ def _get_doc_url(pack: str) -> str:
     Returns:
         Documentation URL for the pack
     """
-    try:
-        from ot.executor.tool_loader import load_tool_registry
+    from ot.catalog import pack_by_name
 
-        slug = load_tool_registry().doc_slugs.get(pack, pack)
-    except Exception:
-        slug = pack
+    entry = pack_by_name().get(pack)
+    if entry is not None:
+        slug = entry.doc_slug
+    else:
+        try:
+            from ot.executor.tool_loader import load_tool_registry
+
+            slug = load_tool_registry().doc_slugs.get(pack, pack)
+        except RuntimeError:
+            slug = pack
     return f"{DOC_BASE_URL}{slug}/"
 
 

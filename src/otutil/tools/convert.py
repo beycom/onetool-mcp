@@ -16,16 +16,51 @@ __all__ = ["auto", "excel", "pdf", "powerpoint", "word"]
 
 # Dependency declarations for CLI validation
 # Use dict format for packages where import_name differs from package name
-__ot_requires__ = {
-    "lib": [
-        {"name": "pymupdf", "import_name": "fitz", "install": "pip install pymupdf"},
-        {"name": "python-docx", "import_name": "docx", "install": "pip install python-docx"},
-        {"name": "python-pptx", "import_name": "pptx", "install": "pip install python-pptx"},
-        ("openpyxl", "pip install openpyxl"),
-        {"name": "Pillow", "import_name": "PIL", "install": "pip install Pillow"},
-        {"name": "formulas", "import_name": "formulas", "install": "pip install formulas", "optional": True},
-    ],
-}
+__ot_requires__ = [
+    {
+        "kind": "lib",
+        "name": "PyMuPDF",
+        "import_name": "fitz",
+        "install_extra": "[util]",
+        "purpose": "Extract text and images from PDF documents",
+    },
+    {
+        "kind": "lib",
+        "name": "python-docx",
+        "import_name": "docx",
+        "install_extra": "[util]",
+        "purpose": "Extract content from Word documents",
+    },
+    {
+        "kind": "lib",
+        "name": "python-pptx",
+        "import_name": "pptx",
+        "install_extra": "[util]",
+        "purpose": "Extract content from PowerPoint presentations",
+    },
+    {
+        "kind": "lib",
+        "name": "openpyxl",
+        "import_name": "openpyxl",
+        "install_extra": "[util]",
+        "purpose": "Extract content and formulas from Excel workbooks",
+    },
+    {
+        "kind": "lib",
+        "name": "Pillow",
+        "import_name": "PIL",
+        "install_extra": "[util]",
+        "purpose": "Process images embedded in converted documents",
+    },
+    {
+        "kind": "lib",
+        "name": "formulas",
+        "import_name": "formulas",
+        "install_extra": "[util]",
+        "purpose": "Optionally evaluate Excel formulas during conversion",
+        "optional": True,
+    },
+]
 
 import asyncio
 import atexit

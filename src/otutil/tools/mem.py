@@ -10,12 +10,49 @@ from __future__ import annotations
 # Pack for dot notation: mem.write(), mem.search(), etc.
 pack = "mem"
 
-__ot_requires__ = {
-    "lib": [
-        ("yaml", "pip install pyyaml"),
-        ("jmespath", "pip install jmespath"),
-    ],
-}
+__ot_requires__ = [
+    {
+        "kind": "lib",
+        "name": "PyYAML",
+        "import_name": "yaml",
+        "install_extra": "core",
+        "purpose": "Serialize and restore memory exports",
+    },
+    {
+        "kind": "lib",
+        "name": "jmespath",
+        "import_name": "jmespath",
+        "install_extra": "core",
+        "purpose": "Run structured memory queries",
+    },
+    {
+        "kind": "lib",
+        "name": "openai",
+        "import_name": "openai",
+        "install_extra": "core",
+        "purpose": "Generate optional semantic embeddings",
+        "optional": True,
+        "activation": {"field": "embeddings_enabled", "equals": True},
+    },
+    {
+        "kind": "lib",
+        "name": "tiktoken",
+        "import_name": "tiktoken",
+        "install_extra": "core",
+        "purpose": "Bound optional embedding input by model token limits",
+        "optional": True,
+        "activation": {"field": "embeddings_enabled", "equals": True},
+    },
+    {
+        "kind": "secret",
+        "name": "OPENAI_API_KEY",
+        "purpose": "Authenticate optional embedding requests",
+        "optional": True,
+        "activation": {"field": "embeddings_enabled", "equals": True},
+    },
+]
+
+config_model = "Config"
 
 # Only public functions are exposed as MCP tools.
 __all__ = [
@@ -52,15 +89,6 @@ __all__ = [
     "write_batch",
 ]
 
-# Dependency declarations for CLI validation
-__ot_requires__ = {
-    "lib": [
-        ("openai", "pip install openai"),
-        ("tiktoken", "pip install tiktoken"),
-    ],
-    # API key checked at runtime when embeddings enabled (not pack-level requirement)
-}
-
 from otutil.tools._mem import (
     append,
     ask,
@@ -94,3 +122,6 @@ from otutil.tools._mem import (
     write,
     write_batch,
 )
+from otutil.tools._mem.config import Config as _Config
+
+Config = _Config

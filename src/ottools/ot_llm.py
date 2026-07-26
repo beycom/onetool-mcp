@@ -27,10 +27,25 @@ pack_aliases = ("llm",)
 __all__ = ["transform", "transform_file"]
 
 # Dependency declarations for CLI validation
-__ot_requires__ = {
-    "lib": [("openai", "pip install openai")],
-    "secrets": ["OPENAI_API_KEY"],
-}
+__ot_requires__ = [
+    {
+        "kind": "lib",
+        "name": "openai",
+        "import_name": "openai",
+        "install_extra": "core",
+        "purpose": "Call OpenAI-compatible language model APIs",
+    },
+    {
+        "kind": "secret",
+        "name": "OPENAI_API_KEY",
+        "purpose": "Authenticate model requests",
+    },
+    {
+        "kind": "config",
+        "name": "model",
+        "purpose": "Select the language model used by transform",
+    },
+]
 
 from typing import Any
 
@@ -69,6 +84,9 @@ class Config(BaseModel):
         default=None,
         description="Maximum tokens in response (None=no limit)",
     )
+
+
+config_model = "Config"
 
 
 def _get_config() -> Config:

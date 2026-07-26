@@ -277,10 +277,10 @@ def normalize_items(
 
         # Labeled list
         normalize_items([
-            ("https://example.com", "Example"),
+            ("https://www.python.org", "Python"),
             ("https://docs.python.org", "Python Docs"),
         ])
-        # Returns: [("https://example.com", "Example"), ...]
+        # Returns: [("https://www.python.org", "Python"), ...]
     """
     normalized: list[tuple[str, str]] = []
     for item in items:

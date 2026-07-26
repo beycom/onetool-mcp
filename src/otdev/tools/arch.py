@@ -4,9 +4,25 @@ from __future__ import annotations
 
 pack = "arch"
 
-__ot_requires__ = {
-    "cli": [("d2", "brew install d2")],
-}
+__ot_requires__ = [
+    {
+        "kind": "lib",
+        "name": "openpyxl",
+        "import_name": "openpyxl",
+        "install_extra": "[dev]",
+        "purpose": "Read and write architecture workbooks",
+    },
+    {
+        "kind": "cli",
+        "name": "D2",
+        "executable": "d2",
+        "purpose": "Render generated architecture diagrams",
+        "authoritative_url": "https://d2lang.com/tour/install",
+        "optional": True,
+    },
+]
+
+config_model = "ArchConfig"
 
 __all__ = ["bundle_solution", "export_yaml", "generate", "import_yaml", "validate"]
 
@@ -16,6 +32,9 @@ from typing import Any
 import yaml
 
 from otdev.tools._arch.bundle import BundleError, bundle_solution_directory
+from otdev.tools._arch.config import (
+    ArchConfig as _ArchConfig,
+)
 from otdev.tools._arch.config import (
     ArchProfileConfig,
     ConfigResolutionError,
@@ -45,6 +64,8 @@ from otdev.tools._arch.roundtrip import (
 )
 from otdev.tools._arch.validate import validate_entities
 from otpack import LogSpan, resolve_cwd_path
+
+ArchConfig = _ArchConfig
 
 
 def _resolve_drawio_export_toggle(profile_data: dict[str, Any]) -> bool:

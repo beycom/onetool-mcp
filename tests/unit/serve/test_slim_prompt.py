@@ -121,7 +121,9 @@ def test_ot_ref_skill_carries_pack_map_and_index_pointer() -> None:
     assert "## Pack map" in text
     assert "<!-- packmap:begin" in text and "<!-- packmap:end -->" in text
     assert "reference/tool-index.md" in text
-    assert "The engine is forgiving" in text
+    assert "### Forgiveness boundaries" in text
+    assert "Kwarg prefixes" in text
+    assert "ambiguous or colliding prefix errors" in text
     assert "info='signatures'" in text
     assert "ot.skills" not in text
 
@@ -183,12 +185,14 @@ def test_run_examples_are_zero_config() -> None:
 
 @pytest.mark.unit
 @pytest.mark.serve
-def test_packs_include_localhist() -> None:
-    """prompts.yaml pack descriptions include localhist (p21 §A)."""
+def test_catalog_provides_localhist_default_without_prompt_duplication() -> None:
+    """The typed catalog owns defaults; prompt packs remain user overrides."""
+    from ot.catalog import pack_by_name
     from ot.prompts import load_prompts
 
     prompts = load_prompts()
-    assert "localhist" in prompts.packs
+    assert "localhist" in pack_by_name()
+    assert prompts.packs == {}
 
 
 @pytest.mark.unit

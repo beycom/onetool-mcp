@@ -37,6 +37,17 @@ from otpack.config import (
     get_tool_config,
     is_log_verbose,
 )
+from otpack.deps import (
+    Dependency,
+    DepsCheckResult,
+    check_cli,
+    check_lib,
+    check_secret,
+    ensure_cli,
+    ensure_lib,
+    requires_cli,
+    requires_lib,
+)
 from otpack.embedding import (
     MODEL_NATIVE_DIMS,
     TOKEN_SAFETY_MARGIN,
@@ -48,17 +59,6 @@ from otpack.embedding import (
     get_tiktoken_encoding,
     rrf_merge,
     serialize_embedding,
-)
-from otpack.deps import (
-    Dependency,
-    DepsCheckResult,
-    check_cli,
-    check_lib,
-    check_secret,
-    ensure_cli,
-    ensure_lib,
-    requires_cli,
-    requires_lib,
 )
 from otpack.factory import LazyClient, lazy_client
 from otpack.http import (

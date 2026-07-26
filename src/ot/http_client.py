@@ -12,11 +12,11 @@ Usage:
     from ot.http_client import http_get
 
     # Basic GET
-    success, result = http_get("https://api.example.com/data")
+    success, result = http_get("https://api.service.invalid/data")
 
     # With headers and params
     success, result = http_get(
-        "https://api.example.com/search",
+        "https://api.service.invalid/search",
         params={"q": "test"},
         headers={"Authorization": "Bearer token"},
     )

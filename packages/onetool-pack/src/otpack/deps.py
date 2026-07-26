@@ -1,14 +1,22 @@
 """Dependency validation utilities for OneTool packs.
 
-Provides decorators and functions for declaring and checking tool dependencies.
-Supports both CLI tools (external binaries) and Python libraries.
+Provides decorators and functions for declaring and checking normalized tool
+requirements. Supports both CLI tools (external binaries) and Python libraries.
 
 Example:
     # Decorator usage
     from otpack import requires_cli, requires_lib
 
-    @requires_cli("rg", install="brew install ripgrep")
-    @requires_lib("sqlalchemy", install="pip install sqlalchemy")
+    @requires_cli(
+        "rg",
+        purpose="Search files",
+        authoritative_url="https://github.com/BurntSushi/ripgrep",
+    )
+    @requires_lib(
+        "sqlalchemy",
+        purpose="Database access",
+        install_extra="[dev]",
+    )
     def query(sql: str) -> str:
         ...
 """
@@ -34,6 +42,7 @@ __all__ = [
 ]
 
 F = TypeVar("F", bound=Callable[..., Any])
+_INSTALL_EXTRAS = frozenset({"core", "[util]", "[dev]", "[scrape]"})
 
 
 @dataclass
@@ -69,8 +78,9 @@ class DepsCheckResult:
 def requires_cli(
     name: str,
     *,
-    install: str = "",
-    version_flag: str = "--version",
+    purpose: str,
+    authoritative_url: str | None = None,
+    optional: bool = False,
 ) -> Callable[[F], F]:
     """Decorator to declare a CLI tool dependency.
 
@@ -79,8 +89,9 @@ def requires_cli(
 
     Args:
         name: CLI command name (e.g., "rg", "ffmpeg", "pandoc")
-        install: Installation instructions shown when missing
-        version_flag: Flag to check version (default: "--version")
+        purpose: Why the executable is needed.
+        authoritative_url: Publisher documentation for platform-specific setup.
+        optional: Whether the whole pack can operate without this workflow.
 
     Returns:
         Decorator that adds dependency metadata to the function
@@ -88,10 +99,16 @@ def requires_cli(
 
     def decorator(func: F) -> F:
         if not hasattr(func, "__ot_requires__"):
-            func.__ot_requires__ = {"cli": [], "lib": []}  # type: ignore[attr-defined]
-
-        func.__ot_requires__["cli"].append(  # type: ignore[attr-defined]
-            {"name": name, "install": install, "version_flag": version_flag}
+            func.__ot_requires__ = []  # type: ignore[attr-defined]
+        func.__ot_requires__.append(  # type: ignore[attr-defined]
+            {
+                "kind": "cli",
+                "name": name,
+                "executable": name,
+                "purpose": purpose,
+                "authoritative_url": authoritative_url,
+                "optional": optional,
+            }
         )
         return func
 
@@ -101,8 +118,10 @@ def requires_cli(
 def requires_lib(
     name: str,
     *,
-    install: str = "",
-    import_name: str = "",
+    purpose: str,
+    install_extra: str,
+    import_name: str | None = None,
+    optional: bool = False,
 ) -> Callable[[F], F]:
     """Decorator to declare a Python library dependency.
 
@@ -111,22 +130,31 @@ def requires_lib(
 
     Args:
         name: Package name (e.g., "sqlalchemy", "openai")
-        install: Installation instructions (default: "pip install {name}")
+        purpose: Why the library is needed.
+        install_extra: Supported OneTool installation extra.
         import_name: Import name if different from package name
+        optional: Whether the whole pack can operate without this workflow.
 
     Returns:
         Decorator that adds dependency metadata to the function
     """
+    if install_extra not in _INSTALL_EXTRAS:
+        valid = ", ".join(sorted(_INSTALL_EXTRAS))
+        raise ValueError(
+            f"install_extra={install_extra!r} is invalid. Use one of: {valid}"
+        )
 
     def decorator(func: F) -> F:
         if not hasattr(func, "__ot_requires__"):
-            func.__ot_requires__ = {"cli": [], "lib": []}  # type: ignore[attr-defined]
-
-        func.__ot_requires__["lib"].append(  # type: ignore[attr-defined]
+            func.__ot_requires__ = []  # type: ignore[attr-defined]
+        func.__ot_requires__.append(  # type: ignore[attr-defined]
             {
+                "kind": "lib",
                 "name": name,
-                "install": install or f"pip install {name}",
+                "purpose": purpose,
+                "install_extra": install_extra,
                 "import_name": import_name or name,
+                "optional": optional,
             }
         )
         return func

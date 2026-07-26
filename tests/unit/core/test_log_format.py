@@ -96,7 +96,7 @@ class TestSanitizeForOutput:
 
     def test_http_url_creds_masked(self):
         """Plain http URLs still get the ***:*** credential mask (not full redaction)."""
-        result = sanitize_for_output("https://user:pass@example.com/x", "api_url")
+        result = sanitize_for_output("https://user:pass@service.invalid/x", "api_url")
         assert "***:***@" in result
         assert "user:pass" not in result
 

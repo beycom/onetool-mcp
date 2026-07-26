@@ -40,9 +40,15 @@ __all__ = [
 ]
 
 # Dependency declarations for CLI validation
-__ot_requires__ = {
-    "lib": [("openpyxl", "pip install openpyxl")],
-}
+__ot_requires__ = [
+    {
+        "kind": "lib",
+        "name": "openpyxl",
+        "import_name": "openpyxl",
+        "install_extra": "[util]",
+        "purpose": "Read, write, inspect, and format Excel workbooks",
+    },
+]
 
 import fnmatch
 import re

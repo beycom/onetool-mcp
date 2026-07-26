@@ -5,10 +5,11 @@ from __future__ import annotations
 import ast
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from ot.catalog import ConfigHook, PackRequirement, parse_pack_requirements
 from ot.logging import LogEntry
 
 from .parser import parse_function
@@ -219,8 +220,7 @@ class ToolRegistry:
 
                 tool = parse_function(node, module_name, pack=pack)
                 # Attach module-level requires to tool
-                if requires:
-                    tool.requires = requires
+                tool.requires = requires
                 tools.append(tool)
 
         return tools
@@ -276,33 +276,32 @@ class ToolRegistry:
                         return names
         return None
 
-    def _extract_requires(
-        self, tree: ast.Module
-    ) -> dict[str, list[tuple[str, ...] | dict[str, str] | str]] | None:
-        """Extract __ot_requires__ dict from module AST.
+    def _extract_requires(self, tree: ast.Module) -> tuple[PackRequirement, ...]:
+        """Extract and strictly validate ``__ot_requires__`` from module AST.
 
-        Looks for module-level assignment: __ot_requires__ = {"cli": [...], "lib": [...]}
+        The supported declaration is a list of normalized requirement mappings.
 
         Args:
             tree: Parsed AST module.
 
         Returns:
-            Dict with 'cli' and 'lib' dependency lists if found, None otherwise.
+            Validated requirements, or an empty tuple when not declared.
         """
         for node in tree.body:
             if isinstance(node, ast.Assign):
                 for target in node.targets:
                     if isinstance(target, ast.Name) and target.id == "__ot_requires__":
                         try:
-                            # Safely evaluate the dict literal
-                            result = ast.literal_eval(ast.unparse(node.value))
-                            return cast(
-                                "dict[str, list[tuple[str, ...] | dict[str, str] | str]]",
+                            result = ast.literal_eval(node.value)
+                            return parse_pack_requirements(
                                 result,
+                                source="registry metadata",
                             )
-                        except (ValueError, TypeError):
-                            return None
-        return None
+                        except (ValueError, TypeError) as exc:
+                            raise ValueError(
+                                f"registry metadata: invalid __ot_requires__: {exc}"
+                            ) from exc
+        return ()
 
     def _extract_pack_metadata(
         self, path: Path, *, tree: ast.Module | None = None
@@ -324,6 +323,7 @@ class ToolRegistry:
 
         aliases: tuple[str, ...] = ()
         doc_slug: str | None = None
+        config_hook: ConfigHook | None = None
         for node in tree.body:
             if not isinstance(node, ast.Assign):
                 continue
@@ -344,8 +344,26 @@ class ToolRegistry:
                         value = None
                     if value is not None:
                         doc_slug = str(value)
+                elif target.id == "config_model":
+                    try:
+                        value = ast.literal_eval(node.value)
+                    except (ValueError, TypeError) as exc:
+                        raise ValueError(
+                            "registry metadata: config_model must be a string literal"
+                        ) from exc
+                    if not isinstance(value, str) or not value:
+                        raise ValueError(
+                            "registry metadata: config_model must be a non-empty string"
+                        )
+                    config_hook = ConfigHook(model=value)
 
-        return {"pack": pack, "aliases": aliases, "doc_slug": doc_slug}
+        return {
+            "pack": pack,
+            "aliases": aliases,
+            "doc_slug": doc_slug,
+            "requirements": self._extract_requires(tree),
+            "config_hook": config_hook,
+        }
 
     def format_json(self) -> str:
         """Format registry as JSON for LLM context.

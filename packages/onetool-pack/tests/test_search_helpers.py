@@ -62,9 +62,9 @@ class TestFormatSources:
 class TestCreateJsonHttpClient:
     def test_base_url_and_headers(self):
         client = create_json_http_client(
-            "https://api.example.com", timeout=12.0, headers={"X-Test": "1"}
+            "https://api.service.invalid", timeout=12.0, headers={"X-Test": "1"}
         )
-        assert str(client.base_url) == "https://api.example.com"
+        assert str(client.base_url) == "https://api.service.invalid"
         assert client.headers["X-Test"] == "1"
         assert client.headers["Accept"] == "application/json"
         client.close()

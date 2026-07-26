@@ -689,7 +689,7 @@ class TestSearchBatchModel:
 class TestStructuredExtraction:
     def test_extract_structured_data_required_and_optional(self):
         result = _extract_structured_data(
-            text="name: Alice\nemail: alice@example.com",
+            text="name: Alice\nemail: alice@demo.invalid",
             sources=[{"title": "src", "url": "https://example.invalid"}],
             extract_schema={
                 "fields": [

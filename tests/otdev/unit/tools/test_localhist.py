@@ -50,7 +50,15 @@ def test_pack_metadata_and_public_signatures() -> None:
         "show",
         "status",
     ]
-    assert localhist.__ot_requires__ == {"cli": [("git", "brew install git")]}
+    assert localhist.__ot_requires__ == [
+        {
+            "kind": "cli",
+            "name": "Git",
+            "executable": "git",
+            "purpose": "Store and inspect local project snapshots",
+            "authoritative_url": "https://git-scm.com/downloads",
+        },
+    ]
     for name in localhist.__all__:
         signature = inspect.signature(getattr(localhist, name))
         for param in signature.parameters.values():

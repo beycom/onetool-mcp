@@ -16,9 +16,13 @@ pack_aliases = ("c7",)
 __all__ = ["doc", "search"]
 
 # Dependency declarations for CLI validation
-__ot_requires__ = {
-    "secrets": ["CONTEXT7_API_KEY"],
-}
+__ot_requires__ = [
+    {
+        "kind": "secret",
+        "name": "CONTEXT7_API_KEY",
+        "purpose": "Authenticate Context7 documentation API requests",
+    },
+]
 
 import re
 from typing import Any
@@ -45,6 +49,9 @@ class Config(BaseModel):
         le=120.0,
         description="Request timeout in seconds",
     )
+
+
+config_model = "Config"
 
 
 # Context7 REST API configuration

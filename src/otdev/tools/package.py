@@ -46,6 +46,10 @@ class Config(BaseModel):
         description="Request timeout in seconds",
     )
 
+
+config_model = "Config"
+
+
 NPM_REGISTRY = "https://registry.npmjs.org"
 PYPI_API = "https://pypi.org/pypi"
 OPENROUTER_API = "https://openrouter.ai/api/v1/models"

@@ -24,12 +24,22 @@ from typing import List  # noqa: UP035
 pack = "file"
 pack_aliases = ("f",)
 
-__ot_requires__ = {
-    "lib": [
-        ("pathspec", "pip install pathspec"),
-        ("send2trash", "pip install send2trash"),
-    ],
-}
+__ot_requires__ = [
+    {
+        "kind": "lib",
+        "name": "pathspec",
+        "import_name": "pathspec",
+        "install_extra": "[util]",
+        "purpose": "Apply gitignore-style path exclusion rules",
+    },
+    {
+        "kind": "lib",
+        "name": "Send2Trash",
+        "import_name": "send2trash",
+        "install_extra": "[util]",
+        "purpose": "Perform recoverable file deletion",
+    },
+]
 
 __all__ = [
     "copy",
@@ -118,6 +128,9 @@ class Config(BaseModel):
         default=True,
         description="Output relative paths instead of absolute paths",
     )
+
+
+config_model = "Config"
 
 
 try:

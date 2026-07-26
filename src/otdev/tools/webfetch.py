@@ -13,6 +13,16 @@ pack = "webfetch"
 pack_aliases = ("wf",)
 doc_slug = "webfetch"
 
+__ot_requires__ = [
+    {
+        "kind": "lib",
+        "name": "trafilatura",
+        "import_name": "trafilatura",
+        "install_extra": "[dev]",
+        "purpose": "Download and extract useful content from web pages",
+    },
+]
+
 __all__ = ["fetch", "fetch_batch"]
 
 import json
@@ -76,6 +86,9 @@ class Config(BaseModel):
             "link-local, or reserved address (best-effort SSRF guard)"
         ),
     )
+
+
+config_model = "Config"
 
 
 def _get_config() -> Config:

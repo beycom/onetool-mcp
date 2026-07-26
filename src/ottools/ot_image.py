@@ -22,15 +22,30 @@ from __future__ import annotations
 pack = "ot_image"
 pack_aliases = ("img",)
 
-__ot_requires__ = {
-    "lib": [
-        ("PIL", "pip install Pillow"),
-    ],
-}
+__ot_requires__ = [
+    {
+        "kind": "lib",
+        "name": "Pillow",
+        "import_name": "PIL",
+        "install_extra": "core",
+        "purpose": "Load, inspect, resize, and encode images",
+    },
+    {
+        "kind": "secret",
+        "name": "OPENAI_API_KEY",
+        "purpose": "Authenticate optional vision-model operations",
+        "optional": True,
+    },
+]
+
+config_model = "Config"
 
 __all__ = ["ask", "clip_ask", "clip_view", "delete", "list", "load", "load_batch", "purge", "summary"]
 
+from ottools._image.config import Config as _Config
 from ottools._image.lifecycle import delete_image as delete
 from ottools._image.lifecycle import list_images as list
 from ottools._image.lifecycle import purge_images as purge
 from ottools._image.tools import ask, clip_ask, clip_view, load, load_batch, summary
+
+Config = _Config

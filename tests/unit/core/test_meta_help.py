@@ -38,7 +38,7 @@ class TestHelp:
         assert "# ot.tools" in result
         assert "## Signature" in result
         assert "## Docs" in result
-        assert "https://onetool.beycom.online/reference/tools/ot/" in result
+        assert "https://onetool.beycom.online/reference/tools/ot_core/" in result
 
     def test_pack_lookup_exact(self) -> None:
         """Exact pack name returns pack help."""
@@ -49,7 +49,7 @@ class TestHelp:
         assert "# ot pack" in result
         assert "## Tools" in result
         assert "## Docs" in result
-        assert "https://onetool.beycom.online/reference/tools/ot/" in result
+        assert "https://onetool.beycom.online/reference/tools/ot_core/" in result
 
     def test_fuzzy_search_returns_search_results(self) -> None:
         """Fuzzy search always returns search results format."""
@@ -173,15 +173,33 @@ class TestGetDocUrl:
 
         assert result == "https://onetool.beycom.online/reference/tools/file/"
 
-    def test_misaligned_pack_uses_mapping(self) -> None:
-        """Misaligned packs use DOC_SLUGS mapping."""
+    def test_catalog_doc_slugs_are_used(self) -> None:
+        """Catalog slugs match the current MkDocs reference filenames."""
         from ot.meta import _get_doc_url
 
-        assert _get_doc_url("brave") == "https://onetool.beycom.online/reference/tools/brave-search/"
+        assert _get_doc_url("brave") == "https://onetool.beycom.online/reference/tools/brave/"
         assert _get_doc_url("db") == "https://onetool.beycom.online/reference/tools/db/"
-        assert _get_doc_url("ground") == "https://onetool.beycom.online/reference/tools/grounding-search/"
+        assert _get_doc_url("ground") == "https://onetool.beycom.online/reference/tools/ground/"
         assert _get_doc_url("ot_llm") == "https://onetool.beycom.online/reference/tools/ot_llm/"
         assert _get_doc_url("webfetch") == "https://onetool.beycom.online/reference/tools/webfetch/"
+
+    def test_extension_doc_slug_uses_loaded_registry_metadata(self) -> None:
+        """Non-catalog packs retain their declared runtime documentation slug."""
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        from ot.meta import _get_doc_url
+
+        registry = SimpleNamespace(doc_slugs={"custom_pack": "custom-reference"})
+        with patch(
+            "ot.executor.tool_loader.load_tool_registry",
+            return_value=registry,
+        ):
+            result = _get_doc_url("custom_pack")
+
+        assert result == (
+            "https://onetool.beycom.online/reference/tools/custom-reference/"
+        )
 
 
 @pytest.mark.unit
@@ -266,7 +284,7 @@ class TestFormatHelpers:
 
         assert "# brave.search" in result
         assert "## Docs" in result
-        assert "brave-search" in result  # Uses mapped slug
+        assert "reference/tools/brave/" in result
 
     def test_format_search_results_grouped(self) -> None:
         """Search results are grouped by type."""

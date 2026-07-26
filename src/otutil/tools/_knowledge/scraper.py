@@ -71,7 +71,7 @@ def url_to_slug(url: str, base_path: str = "") -> str:
 
     When `base_path` is provided, that prefix is stripped from the URL path.
     `base_path` may be a full URL or a bare path prefix:
-      base_path='https://docs.example.com/guide', URL '.../guide/api/ref.html' → 'api/ref'
+      base_path='https://docs.python.org/3', URL '.../3/library/pathlib.html' → 'library/pathlib'
       base_path='/guide',                          URL '.../guide/api/ref.html' → 'api/ref'
     """
     url_path = urlparse(url).path.rstrip("/")

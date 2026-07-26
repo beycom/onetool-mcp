@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from ot.catalog import ConfigHook, PackRequirement  # noqa: TC001
+
 
 class ArgInfo(BaseModel):
     """Information about a function argument."""
@@ -51,9 +53,9 @@ class ToolInfo(BaseModel):
         default=None,
         description="Config class source code extracted via AST (class Config(BaseModel))",
     )
-    requires: dict[str, list[tuple[str, ...] | dict[str, str] | str]] | None = Field(
-        default=None,
-        description="Dependencies from __ot_requires__ (cli and lib lists)",
+    requires: tuple[PackRequirement, ...] = Field(
+        default_factory=tuple,
+        description="Normalized dependencies from __ot_requires__",
     )
 
 
@@ -63,3 +65,5 @@ class PackMetadata(BaseModel):
     pack: str
     aliases: tuple[str, ...] = Field(default_factory=tuple)
     doc_slug: str | None = None
+    requirements: tuple[PackRequirement, ...] = Field(default_factory=tuple)
+    config_hook: ConfigHook | None = None

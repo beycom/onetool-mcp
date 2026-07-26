@@ -26,6 +26,16 @@ from __future__ import annotations
 pack = "db"
 doc_slug = "db"
 
+__ot_requires__ = [
+    {
+        "kind": "lib",
+        "name": "SQLAlchemy",
+        "import_name": "sqlalchemy",
+        "install_extra": "[dev]",
+        "purpose": "Connect to and query supported SQL databases",
+    },
+]
+
 __all__ = ["query", "sample", "schema", "tables"]
 
 import contextlib
@@ -50,6 +60,9 @@ class Config(BaseModel):
         le=100000,
         description="Maximum characters in query result output",
     )
+
+
+config_model = "Config"
 
 
 def _get_config() -> Config:

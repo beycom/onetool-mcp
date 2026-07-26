@@ -21,7 +21,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
+from pydantic import BaseModel
 
+from ot.catalog import ConfigHook, PackRequirement, parse_pack_requirements
 from ot.executor.pep723 import ToolFileInfo, categorize_tools
 from ot.executor.worker_proxy import create_worker_proxy
 from ot.logging import LogEntry
@@ -82,6 +84,9 @@ class LoadedTools:
     )  # User extension tools (non-internal inprocess)
     pack_aliases: dict[str, tuple[str, ...]] = field(default_factory=dict)
     doc_slugs: dict[str, str] = field(default_factory=dict)
+    requirements: dict[str, tuple[PackRequirement, ...]] = field(default_factory=dict)
+    config_hooks: dict[str, ConfigHook] = field(default_factory=dict)
+    config_models: dict[str, type[BaseModel]] = field(default_factory=dict)
 
 
 # Module cache: stores (LoadedTools, mtime_dict, last_validated) for each tools_dir
@@ -285,7 +290,14 @@ def _load_inprocess_tools(
     inprocess_tools: list[ToolFileInfo],
     packs: dict[str, dict[str, Any]],
     mtimes: dict[str, float],
-) -> tuple[dict[str, Any], dict[str, tuple[str, ...]], dict[str, str]]:
+) -> tuple[
+    dict[str, Any],
+    dict[str, tuple[str, ...]],
+    dict[str, str],
+    dict[str, tuple[PackRequirement, ...]],
+    dict[str, ConfigHook],
+    dict[str, type[BaseModel]],
+]:
     """Load regular Python tools via importlib.
 
     Args:
@@ -299,6 +311,9 @@ def _load_inprocess_tools(
     functions: dict[str, Any] = {}
     pack_aliases: dict[str, tuple[str, ...]] = {}
     doc_slugs: dict[str, str] = {}
+    requirements: dict[str, tuple[PackRequirement, ...]] = {}
+    config_hooks: dict[str, ConfigHook] = {}
+    config_models: dict[str, type[BaseModel]] = {}
 
     for tool_info in inprocess_tools:
         py_file = tool_info.path
@@ -332,6 +347,28 @@ def _load_inprocess_tools(
             doc_slug = getattr(module, "doc_slug", None)
             if pack and doc_slug:
                 doc_slugs[pack] = str(doc_slug)
+            declaration = getattr(module, "__ot_requires__", None)
+            if declaration is not None:
+                requirements[pack] = parse_pack_requirements(
+                    declaration,
+                    source=f"{py_file}:__ot_requires__",
+                )
+            config_model = getattr(module, "config_model", None)
+            if config_model is not None:
+                if not isinstance(config_model, str) or not config_model:
+                    raise ValueError(
+                        f"{py_file}: config_model must be a non-empty string"
+                    )
+                config_hooks[pack] = ConfigHook(model=config_model)
+                model_class = getattr(module, config_model, None)
+                if not isinstance(model_class, type) or not issubclass(
+                    model_class, BaseModel
+                ):
+                    raise ValueError(
+                        f"{py_file}: config_model {config_model!r} does not name "
+                        "a Pydantic BaseModel subclass"
+                    )
+                config_models[pack] = model_class
 
             register_services = getattr(module, "register_services", None)
             if callable(register_services):
@@ -369,7 +406,14 @@ def _load_inprocess_tools(
                 ).failure(e)
             )
 
-    return functions, pack_aliases, doc_slugs
+    return (
+        functions,
+        pack_aliases,
+        doc_slugs,
+        requirements,
+        config_hooks,
+        config_models,
+    )
 
 
 def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
@@ -431,9 +475,14 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
     worker_funcs, worker_tools_list = _load_worker_tools(
         worker_tools, config_dict, secrets, packs, mtimes
     )
-    inprocess_funcs, pack_aliases, doc_slugs = _load_inprocess_tools(
-        inprocess_tools, packs, mtimes
-    )
+    (
+        inprocess_funcs,
+        pack_aliases,
+        doc_slugs,
+        requirements,
+        config_hooks,
+        config_models,
+    ) = _load_inprocess_tools(inprocess_tools, packs, mtimes)
 
     functions = {**worker_funcs, **inprocess_funcs}
 
@@ -448,6 +497,9 @@ def load_tool_registry(tools_dir: Path | None = None) -> LoadedTools:
         extension_tools=[t for t in inprocess_tools if not t.is_internal],
         pack_aliases=pack_aliases,
         doc_slugs=doc_slugs,
+        requirements=requirements,
+        config_hooks=config_hooks,
+        config_models=config_models,
     )
     _cache_set(cache_key, (registry, mtimes, time.time()))
 

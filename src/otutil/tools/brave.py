@@ -12,14 +12,18 @@ from __future__ import annotations
 # Pack for dot notation: brave.search(), brave.news(), etc.
 pack = "brave"
 pack_aliases = ("br",)
-doc_slug = "brave-search"
+doc_slug = "brave"
 
 __all__ = ["image", "news", "search", "search_batch", "video"]
 
 # Dependency declarations for CLI validation
-__ot_requires__ = {
-    "secrets": ["BRAVE_API_KEY"],
-}
+__ot_requires__ = [
+    {
+        "kind": "secret",
+        "name": "BRAVE_API_KEY",
+        "purpose": "Authenticate Brave Search API requests",
+    },
+]
 
 import re
 from typing import Any, Literal
@@ -55,6 +59,9 @@ class Config(BaseModel):
         le=300.0,
         description="Request timeout in seconds",
     )
+
+
+config_model = "Config"
 
 BRAVE_API_BASE = "https://api.search.brave.com/res/v1"
 

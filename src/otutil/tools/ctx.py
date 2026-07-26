@@ -25,8 +25,6 @@ pack = "ot_context"
 pack_aliases = ("ctx",)
 
 # No external dependencies beyond stdlib + jmespath (already a core dep)
-__ot_requires__: dict[str, str] = {}
-
 __all__ = [
     "append", "ask", "delete", "grep", "inspect", "list", "purge", "query",
     "read", "slice", "stats", "toc", "write",

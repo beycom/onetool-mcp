@@ -22,9 +22,13 @@ pack_aliases = ("tav",)
 __all__ = ["extract", "extract_batch", "research", "search", "search_batch"]
 
 # Dependency declarations for CLI validation
-__ot_requires__ = {
-    "secrets": ["TAVILY_API_KEY"],
-}
+__ot_requires__ = [
+    {
+        "kind": "secret",
+        "name": "TAVILY_API_KEY",
+        "purpose": "Authenticate Tavily search, extract, crawl, and research requests",
+    },
+]
 
 import time
 from typing import Any, Literal
@@ -61,6 +65,9 @@ class Config(BaseModel):
         le=300.0,
         description="Request timeout in seconds",
     )
+
+
+config_model = "Config"
 
 
 TAVILY_API_BASE = "https://api.tavily.com"
@@ -488,8 +495,8 @@ def extract(
         tavily.extract(urls=["https://docs.python.org/3/library/asyncio.html"])
 
         tavily.extract(urls=[
-            "https://example.com/article-1",
-            "https://example.com/article-2",
+            "https://www.python.org/about/",
+            "https://www.python.org/downloads/",
         ], format="text", extract_depth="advanced")
     """
     if error := _validate_urls(urls):

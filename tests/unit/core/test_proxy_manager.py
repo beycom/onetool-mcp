@@ -8,7 +8,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ot.proxy.manager import ProxyManager, get_proxy_manager, reset_proxy_manager
+from ot.proxy.manager import (
+    ProxyCapabilityUnsupported,
+    ProxyManager,
+    get_proxy_manager,
+    reset_proxy_manager,
+)
 
 
 @pytest.mark.unit
@@ -580,6 +585,34 @@ class TestProxyManagerResources:
 
         assert content == "Resource content"
 
+    @pytest.mark.asyncio
+    async def test_read_resource_distinguishes_unsupported_from_missing_item(
+        self,
+    ) -> None:
+        manager = ProxyManager()
+        client = MagicMock()
+        manager._clients = {"test_server": client}
+
+        client.read_resource = AsyncMock(
+            side_effect=RuntimeError("method not supported")
+        )
+        with pytest.raises(ProxyCapabilityUnsupported):
+            await manager.read_resource("test_server", "docs://guide")
+
+        client.read_resource = AsyncMock(
+            side_effect=RuntimeError("resource not found")
+        )
+        with pytest.raises(RuntimeError, match="resource not found"):
+            await manager.read_resource("test_server", "docs://missing")
+
+    def test_resource_sync_operations_require_running_event_loop(self) -> None:
+        manager = ProxyManager()
+
+        with pytest.raises(RuntimeError, match="event loop is not running"):
+            manager.list_resources_sync("test_server")
+        with pytest.raises(RuntimeError, match="event loop is not running"):
+            manager.read_resource_sync("test_server", "docs://guide")
+
 
 @pytest.mark.unit
 @pytest.mark.core
@@ -640,6 +673,26 @@ class TestProxyManagerPrompts:
         content = await manager.get_prompt("test_server", "summarize", {"text": "test"})
 
         assert content == "Summarize this text"
+
+    @pytest.mark.asyncio
+    async def test_get_prompt_maps_missing_capability_to_unsupported(self) -> None:
+        manager = ProxyManager()
+        client = MagicMock()
+        client.get_prompt = AsyncMock(
+            side_effect=RuntimeError("method not implemented")
+        )
+        manager._clients = {"test_server": client}
+
+        with pytest.raises(ProxyCapabilityUnsupported):
+            await manager.get_prompt("test_server", "summarize")
+
+    def test_prompt_sync_operations_require_running_event_loop(self) -> None:
+        manager = ProxyManager()
+
+        with pytest.raises(RuntimeError, match="event loop is not running"):
+            manager.list_prompts_sync("test_server")
+        with pytest.raises(RuntimeError, match="event loop is not running"):
+            manager.get_prompt_sync("test_server", "summarize")
 
 
 @pytest.mark.unit

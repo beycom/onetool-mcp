@@ -567,12 +567,12 @@ class TestSearch:
 
     def test_search_extract_schema_with_provenance(self):
         response_data = {
-            "answer": "name: Alice email: alice@example.com",
+            "answer": "name: Alice email: alice@demo.invalid",
             "results": [
                 {
                     "title": "Profile",
                     "url": "https://people.invalid/alice",
-                    "content": "name: Alice email: alice@example.com",
+                    "content": "name: Alice email: alice@demo.invalid",
                     "score": 0.87,
                 }
             ],
@@ -596,7 +596,7 @@ class TestSearch:
             )
 
         assert result["mode"] == "structured_extraction"
-        assert result["data"]["email"] == "alice@example.com"
+        assert result["data"]["email"] == "alice@demo.invalid"
         assert result["provenance"]["email"]["source_url"] == "https://people.invalid/alice"
 
     def test_search_extract_schema_required_field_missing(self):

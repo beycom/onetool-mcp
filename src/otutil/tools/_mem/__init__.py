@@ -50,15 +50,6 @@ __all__ = [
     "write_batch",
 ]
 
-# Dependency declarations for CLI validation
-__ot_requires__ = {
-    "lib": [
-        ("openai", "pip install openai"),
-        ("tiktoken", "pip install tiktoken"),
-    ],
-    # API key checked at runtime when embeddings enabled (not pack-level requirement)
-}
-
 from .ask import ask
 from .config import VALID_CATEGORIES, Config
 from .db import _close_connection, _get_connection  # noqa: F401

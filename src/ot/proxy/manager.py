@@ -14,7 +14,7 @@ import os
 import re
 import threading
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from fastmcp import Client
 from fastmcp.client.auth import BearerAuth, OAuth
@@ -27,10 +27,12 @@ from ot.logging import LogEntry, LogSpan
 from ot.logging.redact import redact_secrets
 
 if TYPE_CHECKING:
-    from collections.abc import Coroutine
+    from collections.abc import Callable, Coroutine
     from concurrent.futures import Future
 
     from ot.config.models import McpServerConfig
+
+T = TypeVar("T")
 
 
 _CONNECT_SECRET_RE = re.compile(
@@ -86,6 +88,22 @@ def _strip_ctx_from_schema(tool: types.Tool) -> types.Tool:
         new_schema["properties"] = {k: v for k, v in properties.items() if k != "ctx"}
 
     return tool.model_copy(update={"inputSchema": new_schema})
+
+
+class ProxyCapabilityUnsupported(RuntimeError):
+    """The selected MCP server does not implement a requested capability."""
+
+
+def _capability_is_unsupported(exc: Exception) -> bool:
+    """Return whether an MCP failure indicates a missing protocol capability."""
+
+    if isinstance(exc, (AttributeError, NotImplementedError)):
+        return True
+    message = str(exc).lower()
+    return any(
+        hint in message
+        for hint in ("method not found", "not supported", "not implemented")
+    )
 
 
 @dataclass
@@ -382,10 +400,18 @@ class ProxyManager:
         Returns:
             List of resource metadata dicts, or empty list if not connected.
         """
-        if self._loop is None or not self._loop.is_running():
-            return []
-        future = asyncio.run_coroutine_threadsafe(self.list_resources(server), self._loop)
-        return future.result(timeout=timeout)
+        return self._run_content_sync(
+            lambda: self.list_resources(server),
+            timeout=timeout,
+        )
+
+    def read_resource_sync(self, server: str, uri: str, timeout: float = 5.0) -> str:
+        """Synchronously read one resource without changing proxy state."""
+
+        return self._run_content_sync(
+            lambda: self.read_resource(server, uri),
+            timeout=timeout,
+        )
 
     def list_prompts_sync(self, server: str, timeout: float = 5.0) -> list[dict[str, Any]]:
         """Synchronously list prompts from a proxied MCP server.
@@ -399,10 +425,41 @@ class ProxyManager:
         Returns:
             List of prompt metadata dicts, or empty list if not connected.
         """
+        return self._run_content_sync(
+            lambda: self.list_prompts(server),
+            timeout=timeout,
+        )
+
+    def get_prompt_sync(
+        self,
+        server: str,
+        name: str,
+        arguments: dict[str, Any] | None = None,
+        timeout: float = 5.0,
+    ) -> str:
+        """Synchronously render one prompt without changing proxy state."""
+
+        return self._run_content_sync(
+            lambda: self.get_prompt(server, name, arguments),
+            timeout=timeout,
+        )
+
+    def _run_content_sync(
+        self,
+        operation: Callable[[], Coroutine[Any, Any, T]],
+        *,
+        timeout: float,
+    ) -> T:
+        """Run one read-only MCP content operation with timeout cancellation."""
+
         if self._loop is None or not self._loop.is_running():
-            return []
-        future = asyncio.run_coroutine_threadsafe(self.list_prompts(server), self._loop)
-        return future.result(timeout=timeout)
+            raise RuntimeError("Proxy event loop is not running")
+        future = asyncio.run_coroutine_threadsafe(operation(), self._loop)
+        try:
+            return future.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            future.cancel()
+            raise
 
     async def list_resources(self, server: str) -> list[dict[str, Any]]:
         """List resources from a proxied MCP server.
@@ -423,14 +480,11 @@ class ProxyManager:
         try:
             resources = await client.list_resources()
             return [{"uri": r.uri, "name": r.name, "description": r.description or ""} for r in resources]
-        except (AttributeError, NotImplementedError):
-            # Server doesn't support resources
-            return []
         except Exception as e:
-            # Check if error indicates unsupported feature
-            error_msg = str(e).lower()
-            if any(x in error_msg for x in ["not found", "not supported", "not implemented"]):
-                return []
+            if _capability_is_unsupported(e):
+                raise ProxyCapabilityUnsupported(
+                    f"Server '{server}' does not support resources"
+                ) from e
             raise
 
     async def read_resource(self, server: str, uri: str) -> str:
@@ -450,7 +504,14 @@ class ProxyManager:
         if not client:
             raise ValueError(f"Server '{server}' not connected")
 
-        result = await client.read_resource(uri)
+        try:
+            result = await client.read_resource(uri)
+        except Exception as exc:
+            if _capability_is_unsupported(exc):
+                raise ProxyCapabilityUnsupported(
+                    f"Server '{server}' does not support resources"
+                ) from exc
+            raise
         # Extract text from resource contents (ReadResourceResult.contents)
         text_parts = []
         for content in result.contents:  # type: ignore[attr-defined]
@@ -477,14 +538,11 @@ class ProxyManager:
         try:
             prompts = await client.list_prompts()
             return [{"name": p.name, "description": p.description or ""} for p in prompts]
-        except (AttributeError, NotImplementedError):
-            # Server doesn't support prompts
-            return []
         except Exception as e:
-            # Check if error indicates unsupported feature
-            error_msg = str(e).lower()
-            if any(x in error_msg for x in ["not found", "not supported", "not implemented"]):
-                return []
+            if _capability_is_unsupported(e):
+                raise ProxyCapabilityUnsupported(
+                    f"Server '{server}' does not support prompts"
+                ) from e
             raise
 
     async def get_prompt(self, server: str, name: str, arguments: dict[str, Any] | None = None) -> str:
@@ -505,7 +563,14 @@ class ProxyManager:
         if not client:
             raise ValueError(f"Server '{server}' not connected")
 
-        result = await client.get_prompt(name, arguments or {})
+        try:
+            result = await client.get_prompt(name, arguments or {})
+        except Exception as exc:
+            if _capability_is_unsupported(exc):
+                raise ProxyCapabilityUnsupported(
+                    f"Server '{server}' does not support prompts"
+                ) from exc
+            raise
         # Extract text from prompt messages
         text_parts = []
         for message in result.messages:

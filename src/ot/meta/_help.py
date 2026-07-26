@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from ot.config import get_config
 from ot.logging import LogSpan
+from ot.logging.redact import redact_secrets
 from ot.meta._discovery import _resolve_pack_alias, packs, servers, tools
 from ot.meta._help_formatting import (
     _format_alias_help,
@@ -80,7 +81,12 @@ def _rank_named_items(
     return [name for name, _ in scored]
 
 
-def _with_ask_answer(base_help: str, ask: str) -> str:
+def _with_ask_answer(
+    base_help: str,
+    ask: str,
+    *,
+    answer_only: bool = False,
+) -> str:
     """Answer a question using only the deterministic help text as context."""
     ask = ask.strip()
     if not ask:
@@ -126,16 +132,35 @@ def _with_ask_answer(base_help: str, ask: str) -> str:
         answer = response.choices[0].message.content or ""
         if not answer.strip():
             raise ValueError("LLM returned an empty answer")
+        if answer_only:
+            return answer.strip()
         return f"{base_help}\n\n## Ask Answer\n\n{answer.strip()}"
     except Exception as e:
+        failure = redact_secrets(
+            f"Could not answer ask={ask!r} with an LLM: {e}"
+        )
+        if answer_only:
+            return (
+                "## Ask Unavailable\n\n"
+                f"{failure}\n\n"
+                "## Narrowed Deterministic Help\n\n"
+                f"{base_help}"
+            )
         return (
             f"{base_help}\n\n"
             "## Ask Unavailable\n\n"
-            f"Could not answer ask={ask!r} with an LLM: {e}"
+            f"{failure}"
         )
 
 
-def help(*, query: str = "", info: HelpInfoLevel = "default", ask: str = "") -> str:
+def help(
+    *,
+    query: str = "",
+    topic: str = "",
+    info: HelpInfoLevel = "default",
+    ask: str = "",
+    answer_only: bool = False,
+) -> str:
     """Get help on OneTool commands, tools, packs, snippets, or aliases.
 
     Provides a unified entry point for discovering and getting help on
@@ -144,11 +169,13 @@ def help(*, query: str = "", info: HelpInfoLevel = "default", ask: str = "") -> 
 
     Args:
         query: Tool name, pack name, snippet, alias, or search term.
+        topic: Named help subresource for the exact subject.
                Empty string shows general help overview.
         info: Detail level - "min" (names only), "default" (name + description,
               default), "full" (everything).
         ask: Optional natural-language question to answer using only the
              deterministic help text narrowed by query.
+        answer_only: Return only the grounded answer on success. Requires ask.
 
     Returns:
         Formatted help text
@@ -157,24 +184,64 @@ def help(*, query: str = "", info: HelpInfoLevel = "default", ask: str = "") -> 
         ot.help()
         ot.help(query="brave.search")
         ot.help(query="brave")
+        ot.help(query="whiteboard", topic="dsl")
         ot.help(query=":b_q")
         ot.help(query="web fetch", info="min")
         ot.help(query="brave", ask="Which search function should I call?")
     """
     if info not in _VALID_HELP_INFO:
         raise ValueError(f"info={info!r} is not valid. Use 'min', 'default', or 'full'.")
+    topic = topic.strip()
+    if answer_only and not ask.strip():
+        raise ValueError("answer_only=True requires a non-empty ask")
 
-    with log(span="ot.help", query=query or None, info=info, ask=bool(ask)) as s:
+    with log(
+        span="ot.help",
+        query=query or None,
+        topic=topic or None,
+        info=info,
+        ask=bool(ask),
+        answerOnly=answer_only,
+    ) as s:
         # No query - show general help
         if not query:
+            if topic:
+                raise ValueError("topic requires a non-empty query subject")
             s.add("type", "general")
-            return _with_ask_answer(_format_general_help(), ask)
+            return _with_ask_answer(
+                _format_general_help(),
+                ask,
+                answer_only=answer_only,
+            )
 
         cfg = get_config()
 
         if _is_direct_run_query(query):
+            if topic:
+                raise ValueError(
+                    "Direct invocation help does not register named topics"
+                )
             s.add("type", "direct_run")
-            return _with_ask_answer(_format_direct_run_help(), ask)
+            return _with_ask_answer(
+                _format_direct_run_help(),
+                ask,
+                answer_only=answer_only,
+            )
+
+        if topic and query.lower().strip() in {
+            "mcp",
+            "mcp-proxy",
+            "ot-mcp-proxy",
+            "proxy",
+        }:
+            from ot.meta._help_topics import render_generic_proxy_topic
+
+            s.add("type", "generic_proxy")
+            return _with_ask_answer(
+                render_generic_proxy_topic(topic),
+                ask,
+                answer_only=answer_only,
+            )
 
         # Check for exact tool match (contains "."); resolve short alias prefix
         if "." in query:
@@ -190,7 +257,15 @@ def help(*, query: str = "", info: HelpInfoLevel = "default", ask: str = "") -> 
                 pack = resolved_tool_query.split(".")[0]
                 s.add("type", "tool")
                 s.add("match", resolved_tool_query)
-                return _with_ask_answer(_format_tool_help(detail, pack), ask)
+                if topic:
+                    raise ValueError(
+                        f"Tool {resolved_tool_query!r} does not register named topics"
+                    )
+                return _with_ask_answer(
+                    _format_tool_help(detail, pack),
+                    ask,
+                    answer_only=answer_only,
+                )
 
         # Check for exact server match (MCP proxy servers).
         # Try exact, then normalize hyphens→underscores (canonical form),
@@ -205,16 +280,41 @@ def help(*, query: str = "", info: HelpInfoLevel = "default", ask: str = "") -> 
             _proxy = _get_proxy_mgr()
             server_cfg = cfg.servers[query_as_server]
             conn = _proxy.get_connection(query_as_server)
-            status = "connected" if conn else "disconnected"
+            if conn:
+                status = "connected"
+            elif not server_cfg.enabled:
+                status = "disabled"
+            elif _proxy.get_error(query_as_server) is None and _proxy.is_connecting:
+                status = "connecting"
+            else:
+                status = "disconnected"
             proxy_tools = _proxy.list_tools(server=query_as_server) if conn else []
             native_instructions = _proxy.get_server_instructions(query_as_server)
             s.add("type", "server")
             s.add("match", query_as_server)
+            if topic:
+                from ot.meta._help_topics import render_server_topic
+
+                narrowed = render_server_topic(
+                    query_as_server,
+                    topic,
+                    server_config=server_cfg,
+                    status=status,
+                    tools=proxy_tools,
+                    native_instructions=native_instructions,
+                )
+            else:
+                narrowed = _format_server_help(
+                    query_as_server,
+                    server_cfg,
+                    status,
+                    proxy_tools,
+                    native_instructions,
+                )
             return _with_ask_answer(
-                _format_server_help(
-                    query_as_server, server_cfg, status, proxy_tools, native_instructions
-                ),
+                narrowed,
                 ask,
+                answer_only=answer_only,
             )
 
         # Check for exact pack match (also resolves short aliases like "img" → "ot_image")
@@ -229,7 +329,21 @@ def help(*, query: str = "", info: HelpInfoLevel = "default", ask: str = "") -> 
             if pi and "error" not in pi:
                 s.add("type", "pack")
                 s.add("match", resolved_query)
-                return _with_ask_answer(_format_pack_help(resolved_query, pi), ask)
+                if topic:
+                    from ot.meta._help_topics import render_pack_topic
+
+                    narrowed = render_pack_topic(
+                        resolved_query,
+                        topic,
+                        pack_info=pi,
+                    )
+                else:
+                    narrowed = _format_pack_help(resolved_query, pi)
+                return _with_ask_answer(
+                    narrowed,
+                    ask,
+                    answer_only=answer_only,
+                )
 
         # Check for snippet match (starts with ":")
         if query.startswith(":"):
@@ -240,14 +354,30 @@ def help(*, query: str = "", info: HelpInfoLevel = "default", ask: str = "") -> 
                 assert isinstance(si, dict)
                 s.add("type", "snippet")
                 s.add("match", query)
-                return _with_ask_answer(_format_snippet_help(si), ask)
+                if topic:
+                    raise ValueError(
+                        f"Snippet {query!r} does not register named topics"
+                    )
+                return _with_ask_answer(
+                    _format_snippet_help(si),
+                    ask,
+                    answer_only=answer_only,
+                )
 
         # Check for exact alias match
         if cfg.alias and query in cfg.alias:
             target = cfg.alias[query]
             s.add("type", "alias")
             s.add("match", query)
-            return _with_ask_answer(_format_alias_help(query, target), ask)
+            if topic:
+                raise ValueError(
+                    f"Alias {query!r} does not register named topics"
+                )
+            return _with_ask_answer(
+                _format_alias_help(query, target),
+                ask,
+                answer_only=answer_only,
+            )
 
         # Fuzzy search across all types
         s.add("type", "search")
@@ -262,9 +392,48 @@ def help(*, query: str = "", info: HelpInfoLevel = "default", ask: str = "") -> 
         # Fuzzy match across types (name + description where available)
         matched_tools = _rank_named_items(query, all_tools)
         matched_packs = _rank_named_items(query, all_packs)
+        from ot.catalog import PACK_CATALOG
+
+        topic_pack_matches = {
+            item.pack
+            for item in PACK_CATALOG
+            if any(
+                _score_named_result(
+                    query,
+                    f"{item.pack} {registered.name}",
+                    registered.description,
+                )
+                >= 0.6
+                for registered in item.topics
+            )
+        }
+        matched_packs = list(
+            dict.fromkeys([*matched_packs, *sorted(topic_pack_matches)])
+        )
         matched_snippets = _rank_named_items(query, all_snippets)
         matched_aliases = _rank_named_items(query, all_aliases, desc_key="target")
         matched_servers = _fuzzy_match(query, all_server_names)
+
+        if topic:
+            from ot.meta._discovery import pack_info as _pack_info
+            from ot.meta._help_topics import pack_topic_names, render_pack_topic
+
+            topic_pack_candidates = [
+                name for name in matched_packs if topic in pack_topic_names(name)
+            ]
+            if len(topic_pack_candidates) == 1 and not matched_servers:
+                matched_pack = topic_pack_candidates[0]
+                detail = _pack_info(name=matched_pack, info="default")
+                if detail and "error" not in detail:
+                    return _with_ask_answer(
+                        render_pack_topic(
+                            matched_pack,
+                            topic,
+                            pack_info=detail,
+                        ),
+                        ask,
+                        answer_only=answer_only,
+                    )
 
         total_matches = (
             len(matched_tools) + len(matched_packs) + len(matched_snippets)
@@ -290,4 +459,5 @@ def help(*, query: str = "", info: HelpInfoLevel = "default", ask: str = "") -> 
                 servers_results=servers_results,
             ),
             ask,
+            answer_only=answer_only,
         )

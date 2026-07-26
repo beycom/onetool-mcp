@@ -192,6 +192,9 @@ class Config(BaseModel):
     )
 
 
+config_model = "Config"
+
+
 def _get_config() -> Config:
     """Get diagram pack configuration."""
     return get_tool_config("diagram", Config)

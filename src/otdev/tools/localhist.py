@@ -23,9 +23,15 @@ __all__ = [
     "status",
 ]
 
-__ot_requires__: dict[str, list[tuple[str, str]]] = {
-    "cli": [("git", "brew install git")],
-}
+__ot_requires__ = [
+    {
+        "kind": "cli",
+        "name": "Git",
+        "executable": "git",
+        "purpose": "Store and inspect local project snapshots",
+        "authoritative_url": "https://git-scm.com/downloads",
+    },
+]
 
 from otdev.tools._localhist.autosave import (
     autosave_list_project,
@@ -54,6 +60,9 @@ SnapshotKind = str
 
 class Config(_Config):
     """Pack configuration discovered by the registry."""
+
+
+config_model = "Config"
 
 
 def init() -> dict[str, object]:

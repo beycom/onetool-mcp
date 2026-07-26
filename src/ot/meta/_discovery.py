@@ -424,6 +424,11 @@ def pack_info(
 
         description = packs_descriptions.get(name, "")
         if not description and is_local:
+            from ot.catalog import pack_by_name
+
+            catalog_entry = pack_by_name().get(name)
+            description = catalog_entry.default_summary if catalog_entry else ""
+        if not description and is_local:
             description = _get_pack_module_description(runner_registry, name)
 
         return {

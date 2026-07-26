@@ -115,7 +115,11 @@ def test_all_exports() -> None:
 def test_ot_requires() -> None:
     from ottools.ot_secrets import __ot_requires__
 
-    lib_names = [name for name, _ in __ot_requires__["lib"]]
+    lib_names = [
+        requirement["name"]
+        for requirement in __ot_requires__
+        if requirement["kind"] == "lib"
+    ]
     assert "pyrage" in lib_names
     assert "keyring" in lib_names
 

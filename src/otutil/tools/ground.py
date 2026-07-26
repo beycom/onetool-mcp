@@ -10,7 +10,7 @@ from __future__ import annotations
 # Pack for dot notation: ground.search(), ground.dev(), etc.
 pack = "ground"
 pack_aliases = ("g",)
-doc_slug = "grounding-search"
+doc_slug = "ground"
 
 __all__ = ["dev", "docs", "reddit", "search", "search_batch"]
 
@@ -35,10 +35,20 @@ from otpack import (
 )
 
 # Dependency declarations for CLI validation
-__ot_requires__ = {
-    "lib": [{"name": "google-genai", "import_name": "google.genai", "install": "pip install google-genai"}],
-    "secrets": ["GEMINI_API_KEY"],
-}
+__ot_requires__ = [
+    {
+        "kind": "lib",
+        "name": "google-genai",
+        "import_name": "google.genai",
+        "install_extra": "[util]",
+        "purpose": "Run Gemini grounding and URL-context requests",
+    },
+    {
+        "kind": "secret",
+        "name": "GEMINI_API_KEY",
+        "purpose": "Authenticate Gemini grounding requests",
+    },
+]
 
 
 class Config(BaseModel):
@@ -54,6 +64,9 @@ class Config(BaseModel):
         le=300.0,
         description="Default Gemini request timeout in seconds",
     )
+
+
+config_model = "Config"
 
 
 _SUPPORTED_EXTRACT_TYPES = frozenset({"string", "number", "boolean"})

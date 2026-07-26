@@ -20,6 +20,17 @@ from __future__ import annotations
 pack = "whiteboard"
 pack_aliases = ("wb", "excalidraw")
 
+__ot_requires__ = [
+    {
+        "kind": "lib",
+        "name": "pydoll-python",
+        "import_name": "pydoll",
+        "install_extra": "[util]",
+        "purpose": "Control the headed Chrome/Chromium whiteboard session",
+        "optional": True,
+    },
+]
+
 __all__ = [
     "align",
     "boards",

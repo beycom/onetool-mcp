@@ -265,6 +265,15 @@ _FIXTURE_TOOL_SOURCE = '''\
 pack = "fixture_pack"
 pack_aliases = ("fx",)
 doc_slug = "fixture-pack"
+config_model = "Config"
+
+__ot_requires__ = [
+    {
+        "kind": "server",
+        "name": "fixture_server",
+        "purpose": "Provide fixture operations",
+    },
+]
 
 __all__ = ["do_thing"]
 
@@ -306,6 +315,8 @@ def test_scan_files_extracts_expected_pack_and_tool_metadata(tmp_path) -> None:
     assert metadata["pack"] == "fixture_pack"
     assert metadata["aliases"] == ("fx",)
     assert metadata["doc_slug"] == "fixture-pack"
+    assert metadata["config_hook"].model == "Config"
+    assert metadata["requirements"][0].kind.value == "server"
 
     # Tool metadata (from the first parse pass). Tool keys are pack-qualified
     # since `pack` is set on this fixture module.
@@ -315,9 +326,28 @@ def test_scan_files_extracts_expected_pack_and_tool_metadata(tmp_path) -> None:
     assert tool.module == "tools.fixture_tool"
     assert "name: str" in tool.signature
     assert "Do the fixture thing" in tool.description
+    assert tool.requires[0].name == "fixture_server"
 
     # __all__ excludes the private helper and any non-exported function.
     assert not any(name.endswith("_private_helper") for name in registry.tools)
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+def test_registry_rejects_legacy_requirement_declarations(tmp_path) -> None:
+    from ot.registry.registry import ToolRegistry
+
+    tool_file = tmp_path / "legacy.py"
+    tool_file.write_text(
+        'pack = "legacy"\n'
+        '__ot_requires__ = {"lib": [("openpyxl", "pip install openpyxl")]}\n'
+        "def run() -> None:\n"
+        "    pass\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="invalid __ot_requires__"):
+        ToolRegistry(tmp_path).parse_file(tool_file)
 
 
 @pytest.mark.unit

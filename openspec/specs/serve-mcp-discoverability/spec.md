@@ -10,24 +10,26 @@ The server SHALL expose a browsable resource listing all available tools.
 
 #### Scenario: List all tools
 - **GIVEN** an MCP client connected to OneTool
-- **WHEN** the client requests resource `onetool://tools`
+- **WHEN** the client requests resource `ot://tools`
 - **THEN** it SHALL return a JSON array of tool objects
 - **AND** each object SHALL contain `name` and `signature` fields
 
 #### Scenario: Empty registry
 - **GIVEN** no tools are registered
-- **WHEN** the client requests resource `onetool://tools`
+- **WHEN** the client requests resource `ot://tools`
 - **THEN** it SHALL return an empty array `[]`
 
 ---
 
 ### Requirement: Individual Tool Resource
 
-The server SHALL expose a resource template for individual tool details.
+The server SHALL expose a resource template for individual local tool details.
+Proxy tool detail remains discoverable through OneTool's runtime discovery
+functions because proxy schemas and connectivity are live state.
 
 #### Scenario: Get tool details
-- **GIVEN** a tool named `brave_web_search` exists in the registry
-- **WHEN** the client requests resource `onetool://tool/brave_web_search`
+- **GIVEN** a local tool named `brave.search` exists in the registry
+- **WHEN** the client requests resource `ot://tool/brave.search`
 - **THEN** it SHALL return a JSON object with:
   - `name`: Tool name
   - `signature`: Full function signature
@@ -37,7 +39,7 @@ The server SHALL expose a resource template for individual tool details.
 
 #### Scenario: Tool not found
 - **GIVEN** no tool named `nonexistent` exists
-- **WHEN** the client requests resource `onetool://tool/nonexistent`
+- **WHEN** the client requests resource `ot://tool/nonexistent`
 - **THEN** it SHALL return an error indicating the tool was not found
 
 ---
@@ -82,11 +84,10 @@ The `run()` tool SHALL include behavioral annotations for LLM decision-making.
 - **WHEN** the client reads the tool annotations
 - **THEN** `openWorldHint` SHALL be `true`
 - **AND** `readOnlyHint` SHALL be `false`
-- **AND** `destructiveHint` SHALL be `false`
+- **AND** `destructiveHint` SHALL be `true`
 
 #### Scenario: Client uses annotations
 - **GIVEN** an MCP client with permission controls
 - **WHEN** it sees `openWorldHint: true`
 - **THEN** it MAY prompt the user before executing
 - **AND** it MAY cache the decision for future calls
-

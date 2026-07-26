@@ -39,6 +39,7 @@ from ot.meta._help_formatting import (
     _get_doc_url,
 )
 from ot.meta._introspection import aliases, snippet_info, snippets
+from ot.meta._proxy_content import prompt, prompts, resource, resources
 from ot.meta._server_mgmt import security, server
 from ot.meta._stats import result, stats
 from ot.meta._tool_discovery import (
@@ -72,8 +73,12 @@ __all__ = [
     "help",
     "pack_info",
     "packs",
+    "prompt",
+    "prompts",
     "reload",
     "resolve_ot_path",
+    "resource",
+    "resources",
     "result",
     "security",
     "server",
@@ -119,6 +124,10 @@ def get_ot_pack_functions() -> dict[str, Any]:
         "config": config,
         "debug": debug,
         "help": help,
+        "resources": resources,
+        "resource": resource,
+        "prompts": prompts,
+        "prompt": prompt,
         "result": result,
         "security": security,
         "stats": stats,
