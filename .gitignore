@@ -100,7 +100,7 @@ diagrams/
 .localhist/
 msg/
 plan/
-wip/
+/wip
 openspec/changes/archive/
 openspec/consult/
 global/
