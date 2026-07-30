@@ -23,7 +23,7 @@ from ot.config.routing import (
     EmbeddingsConfig,
     LlmConfig,
     ModelEntryConfig,
-    validate_code_registry,
+    validate_model_registry,
 )
 
 # ==================== Snippet Models ====================
@@ -596,7 +596,7 @@ class OneToolConfig(BaseModel):
 
     models: dict[str, ModelEntryConfig] = Field(
         default_factory=dict,
-        description="Shared model registry for launcher and inference routing",
+        description="Generation-only model registry",
     )
 
     code: CodeConfig | None = Field(
@@ -702,8 +702,14 @@ class OneToolConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_routing_references(self) -> OneToolConfig:
-        """Validate model and launcher route cross-references."""
-        validate_code_registry(models=self.models, code=self.code)
+        """Validate generation model identities."""
+        validate_model_registry(models=self.models)
+        if (
+            self.llm is not None
+            and self.llm.backend == "cliproxy"
+            and (self.code is None or self.code.proxy is None)
+        ):
+            raise ValueError("llm.backend 'cliproxy' requires code.proxy")
         return self
 
     def get_tool_files(self) -> list[Path]:

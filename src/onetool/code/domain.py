@@ -5,16 +5,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from ot.logging.redact import redact_secrets
 
 if TYPE_CHECKING:
     from ot.config.routing import (
         Harness,
-        ModelSource,
         PermissionMode,
-        Transport,
     )
 
 _MAX_DISPLAY_ARGV = 128
@@ -36,31 +34,21 @@ def _redacted_argv(argv: tuple[str, ...]) -> list[str]:
 
 @dataclass(frozen=True, slots=True)
 class ResolvedModel:
-    """One unambiguous shared-registry model."""
+    """One unambiguous launcher model."""
 
-    shortcut: str
     id: str
-    label: str
-    source: ModelSource
-    proxy_alias: str | None
-    context_window: int
-    modalities: frozenset[str]
-    harnesses: frozenset[str]
-
-    @property
-    def proxy_identity(self) -> str:
-        """Return the configured discovery identity for a proxy route."""
-        return self.proxy_alias or self.id
+    label: str | None = None
+    claude_context: Literal["standard", "1m"] | None = None
+    auto_compact_window: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class ResolvedRoute:
-    """Resolved route and model with no provider fallback."""
+class ResolvedTarget:
+    """Resolved exact proxy route or direct profile and model."""
 
+    kind: Literal["route", "profile"]
     name: str
     harness: Harness
-    source: ModelSource
-    transport: Transport
     model: ResolvedModel
     permission: PermissionMode
     warning: str | None = None
@@ -102,9 +90,9 @@ class EnvironmentDelta:
 
 @dataclass(frozen=True, slots=True)
 class LaunchInvocation:
-    """Validated child process invocation."""
+    """Validated process-replacement invocation."""
 
-    route: ResolvedRoute
+    target: ResolvedTarget
     executable: str
     argv: tuple[str, ...]
     environment: EnvironmentDelta
@@ -113,12 +101,10 @@ class LaunchInvocation:
     def redacted(self) -> dict[str, object]:
         """Return a bounded display-safe invocation."""
         return {
-            "route": self.route.name,
-            "harness": self.route.harness,
-            "model": self.route.model.id,
-            "source": self.route.source,
-            "transport": self.route.transport,
-            "permission": self.route.permission,
+            "target": {"kind": self.target.kind, "name": self.target.name},
+            "harness": self.target.harness,
+            "model": self.target.model.id,
+            "permission": self.target.permission,
             "argv": _redacted_argv(self.argv),
             "environment": self.environment.redacted(),
             "working_directory": self.working_directory,
@@ -132,18 +118,10 @@ CLAUDE_PROXY_WARNING = (
     "your own risk."
 )
 
-RESPONSIBILITY_NOTICE = (
-    "OneTool does not guarantee provider compatibility, terms compliance, model "
-    "availability, subscription classification, included usage, rate limits, or "
-    "billing treatment. The user is responsible for the selected configuration; "
-    "CLIProxyAPI owns proxy authentication and provider routing."
-)
-
 __all__ = [
     "CLAUDE_PROXY_WARNING",
-    "RESPONSIBILITY_NOTICE",
     "EnvironmentDelta",
     "LaunchInvocation",
     "ResolvedModel",
-    "ResolvedRoute",
+    "ResolvedTarget",
 ]

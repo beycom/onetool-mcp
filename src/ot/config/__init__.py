@@ -50,10 +50,13 @@ from ot.config.models import (
     SnippetParam,
 )
 from ot.config.routing import (
-    CLIProxyConnectionConfig,
+    ClaudeContextConfig,
     CLIProxyGenerationConfig,
     CodeConfig,
-    CodeRouteConfig,
+    CodeDirectConfig,
+    CodeModelConfig,
+    CodeProxyConfig,
+    DirectCodexConfig,
     EmbeddingsConfig,
     GenerationSelection,
     LlmConfig,
@@ -84,10 +87,13 @@ def reset() -> None:
 
 
 __all__ = [
-    "CLIProxyConnectionConfig",
     "CLIProxyGenerationConfig",
+    "ClaudeContextConfig",
     "CodeConfig",
-    "CodeRouteConfig",
+    "CodeDirectConfig",
+    "CodeModelConfig",
+    "CodeProxyConfig",
+    "DirectCodexConfig",
     "EmbeddingsConfig",
     "GenerationSelection",
     "LlmConfig",

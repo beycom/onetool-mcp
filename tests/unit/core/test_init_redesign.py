@@ -53,6 +53,29 @@ def test_copy_file_security(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 @pytest.mark.core
+def test_copy_file_code_routing(tmp_path: Path) -> None:
+    """The standard init copier materializes the code-routing extension."""
+    from onetool.cli import _copy_file
+    from ot.config.loader import load_config
+
+    ot_dir = tmp_path / ".onetool"
+    ot_dir.mkdir()
+
+    assert _copy_file(ot_dir, "code-routing.yaml") is True
+    config = load_config(ot_dir / "code-routing.yaml")
+    assert config.code is not None
+    assert config.code.default is not None
+    assert config.code.default.model == "gpt-5.6-sol"
+    assert config.code.default.route == "codex_subscription"
+    assert config.code.direct is not None
+    assert (
+        config.code.direct.codex.profiles["openrouter"][0].id
+        == "z-ai/glm-5.2"
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.core
 def test_copy_diagram_copies_yaml_and_templates(tmp_path: Path) -> None:
     """_copy_diagram copies diagram.yaml and templates/diagram/ directory."""
     from onetool.cli import _copy_diagram

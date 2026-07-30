@@ -13,7 +13,12 @@ from ot.config.routing import (
 )
 from ot.generation import GenerationRequest, generate, resolve_generation
 
-pytestmark = [pytest.mark.integration, pytest.mark.serve]
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.core,
+    pytest.mark.network,
+    pytest.mark.api,
+]
 
 
 def _generate_once() -> str:
@@ -26,7 +31,6 @@ def _generate_once() -> str:
             prompt="Return exactly: onetool-live-ok",
         ),
         secret_resolver=get_secret,
-        proxy_config=config.code.cliproxy if config.code is not None else None,
     )
     return result.content
 

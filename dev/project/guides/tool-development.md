@@ -526,7 +526,6 @@ def ask(
             route=route,
             request=GenerationRequest(prompt=prompt),
             secret_resolver=get_secret,
-            proxy_config=root.code.cliproxy if root.code is not None else None,
         )
         return result.content
     except GenerationError as exc:

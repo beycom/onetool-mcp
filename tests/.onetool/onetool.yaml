@@ -37,11 +37,8 @@ models:
   test-gemini:
     shortcut: test-gemini
     id: google/gemini-3-flash-preview
-    label: Test Gemini
     source: openrouter
-    context_window: 1048576
     modalities: [text, image]
-    harnesses: [codex]
     interfaces: [chat_completions]
     structured_outputs:
       chat_completions: [json_object, json_schema]

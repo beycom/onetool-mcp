@@ -23,7 +23,7 @@ class ResolvedGeneration:
     interface: GenerationInterface
     shortcut: str
     model_id: str
-    proxy_identity: str
+    request_model_id: str
     source: ModelSource
     effort: ReasoningEffort | None
     timeout: float

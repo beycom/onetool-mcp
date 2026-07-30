@@ -2,92 +2,94 @@
 
 ## Purpose
 
-Defines OneTool's inference-only connection to an externally managed CLIProxyAPI,
-including bounded model discovery, named-secret handling, capability validation,
-and the boundary that excludes proxy lifecycle and management ownership.
+Defines OneTool's inference-only connection to an independently installed,
+configured, authenticated, and running CLIProxyAPI service.
 
 ## Requirements
-### Requirement: External CLIProxyAPI inference connection
-OneTool SHALL connect only to an independently installed and configured CLIProxyAPI
-inference endpoint.
 
-#### Scenario: Connection configured
-- **WHEN** a route uses CLIProxyAPI
-- **THEN** OneTool SHALL require a base URL and named inference-client secret
-- **AND** it SHALL use configured bounded connection and request timeouts
+### Requirement: External inference connection
+
+OneTool SHALL configure only the HTTP inference boundary: base URL, named
+inference-client secret, and bounded timeouts.
+
+#### Scenario: Connection defaults
+- **WHEN** optional connection fields are omitted
+- **THEN** OneTool SHALL use the documented loopback URL, secret name, and bounded
+  timeout defaults
 
 #### Scenario: No management ownership
-- **WHEN** the CLIProxyAPI connection is used
-- **THEN** OneTool SHALL not require or call a management endpoint
-- **AND** it SHALL not read or mutate proxy configuration, processes, PID state,
-  accounts, OAuth files, logs, retries, failover, or session affinity
+- **WHEN** the connection is used
+- **THEN** OneTool SHALL NOT require or call management APIs
+- **AND** it SHALL NOT install, configure, start, stop, restart, authenticate, or
+  administer CLIProxyAPI
 
-#### Scenario: Proxy unavailable
-- **WHEN** the configured inference endpoint is unavailable
-- **THEN** the selected route SHALL fail with an actionable redacted error
-- **AND** OneTool SHALL not start the proxy or fall back to another provider
+#### Scenario: No CLIProxyAPI file dependency
+- **WHEN** OneTool loads or launches code routing
+- **THEN** it SHALL NOT require a CLIProxyAPI config path
+- **AND** it SHALL NOT read or mutate proxy YAML, OAuth files, accounts, logs,
+  retries, routing policy, or process state
 
-### Requirement: Bounded model discovery
-OneTool SHALL validate proxied routes through authenticated live model discovery.
+### Requirement: Launch and discovery are separate
 
-#### Scenario: Selected model available
-- **WHEN** `/v1/models` returns a valid bounded response containing the configured
-  alias or model id
-- **THEN** the route SHALL be eligible for launch
+Normal launch, dry run, status, model listing, and generation SHALL not require
+live model discovery.
 
-#### Scenario: Selected model absent
-- **WHEN** discovery omits both the configured alias and model id
-- **THEN** launch SHALL fail before starting the harness
+#### Scenario: Normal launch
+- **WHEN** a configured launcher model is selected
+- **THEN** OneTool SHALL pass its exact effective id to the process without calling
+  `GET /v1/models`
 
-#### Scenario: Invalid response
-- **WHEN** model discovery times out or returns an invalid shape
-- **THEN** OneTool SHALL report a bounded redacted diagnostic
+#### Scenario: Generation request
+- **WHEN** a configured generation model selects CLIProxyAPI
+- **THEN** OneTool SHALL send its configured proxy wire identity without calling
+  `GET /v1/models`
 
-#### Scenario: Discovery cache
-- **WHEN** a valid discovery result is cached
-- **THEN** it MAY be reused only within the configured finite TTL
-- **AND** stale discovery SHALL not authorize a launch
+#### Scenario: Explicit doctor
+- **WHEN** `onetool code doctor` runs with configured proxy routes and secret
+- **THEN** it SHALL call `GET /v1/models` exactly once
+- **AND** it SHALL compare each configured proxy launcher id exactly against that
+  one bounded inventory
+
+#### Scenario: Direct-only doctor
+- **WHEN** `onetool code doctor` runs without configured proxy routes
+- **THEN** it SHALL not resolve a proxy secret or call `GET /v1/models`
+
+#### Scenario: Diagnostic mismatch
+- **WHEN** the inventory omits an id or advertises it more than once
+- **THEN** doctor SHALL fail that record with an actionable redacted result
+- **AND** it SHALL NOT translate, substitute, or rewrite the id
+
+#### Scenario: Invalid diagnostic response
+- **WHEN** discovery times out, exceeds its body limit, or returns an invalid shape
+- **THEN** doctor SHALL report a bounded redacted failure
 
 ### Requirement: Inference credential safety
-CLIProxyAPI inference credentials SHALL remain within OneTool's named-secret
-boundary.
 
-#### Scenario: Secret resolved
-- **WHEN** discovery or a child adapter requires the inference client key
-- **THEN** only the configured secret SHALL be resolved
-- **AND** its value SHALL never appear in terminal summaries, dry runs, logs, errors,
-  caches, or generated adapter files
+The configured inference key SHALL remain within OneTool's named-secret boundary.
 
-#### Scenario: User-owned config path
-- **WHEN** an optional upstream login helper requires a CLIProxyAPI config path
-- **THEN** OneTool SHALL pass the configured user-owned path without parsing secrets
-  from it or rewriting it
+#### Scenario: Secret use
+- **WHEN** a proxy child invocation, generation call, or doctor requires the secret
+- **THEN** only the configured secret name SHALL be resolved
+- **AND** its value SHALL never appear in summaries, dry runs, logs, errors, or
+  generated files
 
-### Requirement: Upstream capability verification
-OneTool SHALL reject unsupported CLIProxyAPI behavior rather than guessing.
+### Requirement: Shared generation connection
 
-#### Scenario: Missing proxy capability
-- **WHEN** the installed or observed proxy lacks a required inference protocol,
-  model-discovery shape, or delegated-command flag
-- **THEN** the affected route, check, or delegated command SHALL report the missing
-  capability and any evidence-based minimum version
-- **AND** OneTool SHALL not require an exact development-fixture version
+Generation routes that explicitly select the `cliproxy` backend SHALL reuse the
+optional `code.proxy` connection fields without coupling launcher models to the
+top-level generation registry.
 
-#### Scenario: No raw request surface
-- **WHEN** CLI commands and configuration are inspected
-- **THEN** no arbitrary method, path, header, body, or raw YAML passthrough SHALL be
-  available
+#### Scenario: Generation alias remains generation-only
+- **WHEN** a top-level generation model defines `proxy_alias`
+- **THEN** generation SHALL use that exact configured value as the proxy-facing
+  wire identity
+- **AND** the code launcher SHALL ignore the top-level record completely
 
-#### Scenario: Ambiguous proxy alias
-- **WHEN** live discovery returns duplicate or otherwise ambiguous entries for a
-  configured proxy alias
-- **THEN** the route SHALL fail before launch with guidance to assign unique
-  CLIProxyAPI aliases
-- **AND** OneTool SHALL not inspect or rewrite `oauth-model-alias` configuration
+#### Scenario: Missing proxy connection
+- **WHEN** top-level `llm.backend` uses `cliproxy` without `code.proxy`
+- **THEN** strict configuration validation SHALL reject the configuration
 
-#### Scenario: CLIProxyAPI documentation boundary
-- **WHEN** OneTool documents external proxy setup
-- **THEN** it SHALL link to the upstream configuration options, canonical example
-  YAML, and relevant Codex and Claude Code client guides
-- **AND** it SHALL not copy an inline inference credential into generated OneTool,
-  Codex, or Claude configuration
+#### Scenario: Nested route lacks proxy connection
+- **WHEN** a complete nested pack or operation selection uses `cliproxy` without
+  `code.proxy`
+- **THEN** effective-route resolution SHALL fail before network I/O

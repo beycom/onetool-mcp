@@ -120,16 +120,17 @@ def resolve_generation(
 
     timeout = _first_value("timeout", layers)
     output_limit = _first_value("max_output_tokens", layers)
-    proxy_identity = entry.proxy_alias or entry.id
     if backend.backend == "cliproxy":
-        if config.code is None or config.code.cliproxy is None:
+        request_model_id = entry.proxy_alias or entry.id
+        if config.code is None or config.code.proxy is None:
             raise GenerationError(
-                "llm.backend 'cliproxy' requires the external code.cliproxy "
+                "llm.backend 'cliproxy' requires the external code.proxy "
                 "inference connection"
             )
-        base_url = config.code.cliproxy.base_url
-        secret_name = config.code.cliproxy.secret_name
+        base_url = config.code.proxy.base_url
+        secret_name = config.code.proxy.secret_name
     else:
+        request_model_id = entry.id
         base_url = backend.base_url
         secret_name = backend.secret_name
 
@@ -138,7 +139,7 @@ def resolve_generation(
         interface=interface,
         shortcut=entry.shortcut,
         model_id=entry.id,
-        proxy_identity=proxy_identity,
+        request_model_id=request_model_id,
         source=entry.source,
         effort=selected_effort,
         timeout=timeout if isinstance(timeout, int | float) else 30.0,

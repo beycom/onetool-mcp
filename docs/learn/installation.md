@@ -133,7 +133,7 @@ API keys are stored in `secrets.yaml` (gitignored) and passed to the server via 
 |-----|---------|---------|
 | `OPENAI_API_KEY` | OpenAI API | Explicit direct generation or embedding routes |
 | `OPENROUTER_API_KEY` | OpenRouter | Explicit direct generation routes |
-| `CLIPROXY_INFERENCE_KEY` | User-managed CLIProxyAPI | Explicit proxy generation routes |
+| `CLIPROXY_INFERENCE_KEY` | User-managed CLIProxyAPI | Proxy code-harness launches and generation routes |
 | `BRAVE_API_KEY` | [Brave Search](https://brave.com/search/api/) | `brave.*` tools |
 | `CONTEXT7_API_KEY` | [Context7](https://context7.com) | `context7.*` tools |
 
@@ -164,11 +164,8 @@ models:
   glm52:
     shortcut: glm52
     id: z-ai/glm-5.2
-    label: GLM 5.2
     source: openrouter
-    context_window: 1048576
     modalities: [text]
-    harnesses: [claude, codex]
     interfaces: [chat_completions]
     structured_outputs:
       chat_completions: [json_object, json_schema]
@@ -195,7 +192,7 @@ embeddings:
 ```
 
 Generation and embeddings are independent; configure only the routes you use. A
-CLIProxyAPI generation route instead reuses `code.cliproxy` and its named secret.
+CLIProxyAPI generation route instead reuses `code.proxy` and its named secret.
 See [LLM routing](llm-routing.md).
 
 ## MCP Configuration

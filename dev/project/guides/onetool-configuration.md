@@ -15,7 +15,7 @@ All under the active OneTool config directory (`{OT_DIR}`):
 | File | Purpose |
 |------|---------|
 | `onetool.yaml` | Main config (version, includes, root settings such as `llm`, `stats`, `env`) |
-| `code-routing.yaml` | Optional generated fragment for the model registry, harness routes, generation, and embeddings |
+| `code-routing.yaml` | Optional generated fragment for the shared CLIProxyAPI connection, exact proxy launcher routes, and direct Codex profiles |
 | `security.yaml` | Validation allowlists (builtins, imports, calls) |
 | `prompts.yaml` | MCP prompt surfaces: `tools.run.description`, server `instructions`, templates, and pack descriptions |
 | `snippets.yaml` | Snippet template definitions |
@@ -48,10 +48,9 @@ include:
 
 Maximum include depth: 5 levels.
 
-`onetool code setup --config .onetool/onetool.yaml` creates an optional
-`code-routing.yaml` fragment beside the selected config. Review it, then add
-`code-routing.yaml` to the `include` list explicitly; setup never edits
-`onetool.yaml` or overwrites an existing fragment.
+Interactive `onetool init` offers the optional `code-routing.yaml` fragment through
+the standard extension workflow. It uses the same copy, backup, and `include`
+handling as other extension templates.
 
 ## Variable Expansion
 

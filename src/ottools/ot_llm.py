@@ -87,7 +87,6 @@ def _transform_impl(
                     structured_output="json_object" if json_mode else None,
                 ),
                 secret_resolver=get_secret,
-                proxy_config=root.code.cliproxy if root.code is not None else None,
             )
         except GenerationError as exc:
             span.add(errorType=type(exc).__name__)

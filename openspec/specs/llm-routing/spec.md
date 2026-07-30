@@ -10,7 +10,7 @@ precedence, capability checks, independent embeddings, and safe route observabil
 ### Requirement: Shared model registry
 
 OneTool SHALL resolve generation models from one typed top-level `models` registry
-shared by harness launchers and LLM-backed tools. Each entry SHALL identify its
+used by LLM-backed tools and ignored by the code launcher. Each entry SHALL identify its
 shortcut, concrete model id, source, supported generation interfaces, modalities,
 supported structured-output modes per interface, supported effort values, and
 optional default effort. Structured-output modes SHALL use verified typed values,
@@ -44,7 +44,7 @@ Every effective generation route SHALL select either `cliproxy` or
 `openai_compatible` and exactly one verified generation `interface`. The initial
 interface values SHALL be `responses` and `chat_completions`. A CLIProxyAPI route
 SHALL reuse the endpoint and inference client credential supplied by the external
-`code.cliproxy` inference connection. An OpenAI-compatible route SHALL use its
+`code.proxy` inference connection. An OpenAI-compatible route SHALL use its
 configured base URL and named OneTool secret.
 
 #### Scenario: CLIProxyAPI route uses subscription gateway
@@ -155,15 +155,17 @@ the effective backend without changing the resolved model id.
 
 Before a generation request, OneTool SHALL validate the selected model against the
 operation's required generation interface, input modalities, structured-output
-behavior, and effort support.
+behavior, and effort support using configured capability metadata.
 
 #### Scenario: Vision requires image capability
 - **WHEN** an image operation selects a text-only model
 - **THEN** OneTool SHALL fail before network I/O with an error identifying the missing image capability
 
 #### Scenario: Required interface is unavailable
-- **WHEN** a model or live proxy route does not support the generation interface required by the operation
-- **THEN** OneTool SHALL fail with an actionable incompatibility error
+- **WHEN** a configured model does not support the generation interface required by
+  the operation
+- **THEN** OneTool SHALL fail before network I/O with an actionable incompatibility
+  error
 
 #### Scenario: Required structured-output mode is unavailable
 - **WHEN** an operation requires `json_object` or `json_schema` and the selected model does not declare that mode for the effective interface
@@ -171,25 +173,28 @@ behavior, and effort support.
 
 ### Requirement: Bounded CLIProxyAPI inference
 
-The shared CLIProxyAPI service SHALL expose a bounded generation operation that
-accepts resolved model and generation options and returns normalized response and
-usage data. Tool callers SHALL NOT supply arbitrary paths, methods, headers, or
-credentials.
+OneTool's generation adapter SHALL send bounded requests to the configured
+CLIProxyAPI inference interface and normalize response and usage data. Tool callers
+SHALL NOT supply arbitrary paths, methods, headers, or credentials.
 
-#### Scenario: Healthy discovered model generates
-- **WHEN** a CLIProxyAPI route is healthy and its resolved model is available from live discovery
-- **THEN** the service SHALL perform the generation request and return normalized content and available usage metadata
+#### Scenario: Configured model generates
+- **WHEN** a CLIProxyAPI generation route resolves to a configured wire model
+  identity
+- **THEN** OneTool SHALL send that identity directly and normalize returned content
+  and available usage metadata
+- **AND** it SHALL not require live model discovery
 
 #### Scenario: Generation uses HTTP inference
 - **WHEN** any tool generates through CLIProxyAPI
-- **THEN** OneTool SHALL call the selected verified HTTP inference interface directly
+- **THEN** OneTool SHALL call the selected configured HTTP inference interface
+  directly
 - **AND** it SHALL not spawn Claude Code, Codex, CLIProxyAPI, or another executable
 - **AND** it SHALL not read harness settings, profiles, auth files, or terminal output
 
-#### Scenario: Discovery is not capability proof
-- **WHEN** a model appears in `/v1/models` but lacks a verified fixture for the
-  required interface, modality, structured-output mode, or effort
-- **THEN** the generation route SHALL remain unavailable for that operation
+#### Scenario: Configured metadata is capability proof
+- **WHEN** generation resolves a model
+- **THEN** its configured interfaces, modalities, structured-output modes, and
+  efforts SHALL determine operation compatibility
 - **AND** OneTool SHALL not probe with a potentially billable request implicitly
 
 #### Scenario: Proxy is unavailable
@@ -202,30 +207,29 @@ credentials.
 - **THEN** it SHALL NOT start, stop, restart, or reconfigure the proxy process
 - **AND** it SHALL NOT call the CLIProxyAPI management API
 
-#### Scenario: Server performs bounded readiness
-- **GIVEN** at least one configured generation route uses `cliproxy`
-- **WHEN** the OneTool server starts
-- **THEN** startup SHALL perform a bounded inference-endpoint and model-readiness check
-- **AND** it SHALL NOT mutate proxy lifecycle or configuration
+#### Scenario: Server startup is discovery-free
+- **WHEN** the OneTool server starts with a CLIProxyAPI generation route
+- **THEN** startup SHALL not probe the inference endpoint or model inventory
+- **AND** unrelated tools SHALL not depend on external proxy readiness
 
 #### Scenario: Bounded request
 - **WHEN** the generation adapter sends an HTTP request
-- **THEN** it SHALL apply configured connection/request timeouts and output bounds
-- **AND** response bodies, error bodies, and retries SHALL have finite adapter-owned
-  limits
-
-#### Scenario: Failed startup readiness preserves unrelated tools
-- **GIVEN** a configured CLIProxyAPI generation route cannot become ready during server startup
-- **WHEN** OneTool finishes startup
-- **THEN** that generation route SHALL be marked unavailable with an actionable diagnostic
-- **AND** unrelated packs SHALL remain available
+- **THEN** it SHALL apply the effective generation-route timeout and finite request
+  and response byte limits
+- **AND** it SHALL perform no adapter retry
 
 #### Scenario: External correction required
 - **WHEN** a CLIProxyAPI generation route is unavailable
-- **THEN** it SHALL remain unavailable until the user or CLIProxyAPI corrects the
+- **THEN** the request SHALL fail until the user or CLIProxyAPI corrects the
   external state
 - **AND** OneTool SHALL not offer management or lifecycle mutation as part of the
   generation call
+
+#### Scenario: Persistent generation client
+- **WHEN** multiple generation requests use the shared generation adapter
+- **THEN** OneTool SHALL reuse a lazily-created HTTP client and its connection pool
+- **AND** resetting owned runtime state or shutting down the server SHALL close and
+  discard that owned client
 
 ### Requirement: Native grounding isolation
 
@@ -238,19 +242,25 @@ shared generation router or CLIProxyAPI.
 - **THEN** the operation SHALL use its native Gemini configuration and `GEMINI_API_KEY`
 - **AND** no request SHALL be sent to CLIProxyAPI
 
-#### Scenario: Ground rejects proxy model shortcuts
-- **WHEN** a `ground` operation is configured with a non-Gemini shared shortcut such as `sol`, `terra`, or `luna`
-- **THEN** configuration or tool validation SHALL reject the selection
+#### Scenario: Ground model remains native
+- **WHEN** a `ground` operation is configured with a string that also resembles a
+  shared model shortcut
+- **THEN** OneTool SHALL pass that string only to the native Google client as its
+  model selector
+- **AND** it SHALL not resolve the string through top-level `models` or route the
+  operation to CLIProxyAPI
 
 ### Requirement: Safe route observability
 
-Generation route diagnostics SHALL limit exposed request metadata to backend,
-shortcut, resolved model, source, effort, latency, and token counts and SHALL redact
-credentials and user content.
+Successful generation logs SHALL expose only backend, interface, shortcut, source,
+effort, latency, output size, returned token counts, and status. They SHALL omit
+full model ids, proxy wire identities, credentials, and user content.
 
 #### Scenario: Generation failure is redacted
 - **WHEN** an upstream generation request fails
-- **THEN** logs and tool errors SHALL omit proxy keys, named secret values, OAuth state, account identities, headers, prompts, responses, and raw upstream bodies
+- **THEN** actionable errors MAY identify the configured endpoint and HTTP status
+- **AND** logs and tool errors SHALL omit proxy keys, named secret values, OAuth
+  state, account identities, headers, prompts, responses, and raw upstream bodies
 
 #### Scenario: Responsibility boundary is reported
 - **WHEN** effective route details or subscription guidance are shown

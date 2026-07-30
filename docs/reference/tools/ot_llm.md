@@ -26,21 +26,24 @@ Short alias: `llm`
 | `prompt` | str | Transformation instructions |
 | `in_file` | str | UTF-8 input path for `transform_file()` |
 | `out_file` | str | Output path for `transform_file()` |
-| `model` | str \| null | Per-call shortcut or full model id |
+| `model` | str \| null | Exact per-call shortcut, full model id, or unique proxy alias |
 | `effort` | str \| null | `low`, `medium`, or `high` |
 | `json_mode` | bool | Require the selected route to support `json_object` |
 
 ## Requires
 
 - An effective top-level or `tools.ot_llm.llm` generation route
+- A matching entry in the top-level generation `models` registry
 - The named secret required by that route; CLIProxyAPI routes use the
-  `code.cliproxy` inference-client secret and do not require `OPENAI_API_KEY`
+  `code.proxy` inference-client secret and do not require `OPENAI_API_KEY`
 
 ## Configuration
 
 ### Required
 
+- Configure the selected model in top-level `models`.
 - Configure a complete top-level `llm`, or a complete `tools.ot_llm.llm`.
+- For CLIProxyAPI, configure `code.proxy` and its named secret.
 
 ### Optional
 
@@ -49,6 +52,25 @@ Short alias: `llm`
 | `tools.ot_llm.llm` | generation selection \| null | `null` | Pack model/effort/timeout/output overrides, or a complete backend switch |
 
 ```yaml
+models:
+  luna:
+    shortcut: luna
+    id: gpt-5.6-luna
+    source: codex_subscription
+    proxy_alias: gpt-5.6-luna
+    modalities: [text]
+    interfaces: [responses]
+    structured_outputs:
+      responses: [json_object, json_schema]
+    efforts: [low, medium, high]
+    default_effort: low
+
+code:
+  proxy:
+    routes:
+      codex_subscription:
+        - id: gpt-5.6-luna
+
 llm:
   backend: cliproxy
   interface: responses
@@ -60,9 +82,12 @@ llm:
 tools:
   ot_llm:
     llm:
-      model: sol
+      model: luna
       effort: medium
 ```
+
+Put the matching `CLIPROXY_INFERENCE_KEY` value in `secrets.yaml`. Model identity
+matching is exact; ambiguous shortcuts, ids, or proxy aliases are rejected.
 
 ### Defaults
 

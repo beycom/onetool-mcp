@@ -134,8 +134,8 @@ Config files SHALL support reusable include files merged before validation.
 
 ### Requirement: Path Resolution
 
-Configuration paths SHALL resolve relative to the `.onetool` directory that
-contains the loaded config file unless a path is absolute.
+Configuration paths SHALL resolve relative to the directory containing the loaded
+config file—the active OneTool config directory—unless a path is absolute.
 
 #### Scenario: Tool discovery path
 - **GIVEN** `tools_dir: ["tools/*.py"]` in `/project/.onetool/onetool.yaml`
@@ -223,254 +223,159 @@ overrides.
 - **WHEN** compact log formatting asks for the maximum value length
 - **THEN** OneTool SHALL use the environment value instead of `compact_max_length`
 
-### Requirement: Shared model registry
-OneTool configuration SHALL support a strict top-level `models` mapping shared by
-launcher and inference consumers.
+### Requirement: Generation model registry
 
-#### Scenario: Model entry
-- **WHEN** a model entry is loaded
-- **THEN** it SHALL validate shortcut, concrete id, label, source, optional proxy
-  alias, context metadata, modalities, and verified harness compatibility
+The strict top-level `models` mapping SHALL belong only to generation consumers.
+The code launcher SHALL not read it.
 
-#### Scenario: Unique identity
-- **WHEN** shortcuts, model ids, or aliases are ambiguous
-- **THEN** configuration validation SHALL reject the registry
+#### Scenario: Generation model entry
+- **WHEN** a top-level model entry is loaded
+- **THEN** it SHALL validate exact shortcut, concrete id, source, optional
+  generation proxy alias, modalities, interfaces, structured-output modes,
+  efforts, and default effort
+- **AND** it SHALL reject launcher-only or unused label, context-window, and harness
+  metadata
 
-#### Scenario: No hidden fallback
-- **WHEN** a selected model is absent from configuration
-- **THEN** runtime code SHALL not supply a hidden model definition or alias
+#### Scenario: Launcher independence
+- **WHEN** top-level models are absent, changed, or use generation-only aliases
+- **THEN** code launcher resolution SHALL remain determined solely by the `code`
+  target records
 
 ### Requirement: Typed code-launch configuration
-OneTool configuration SHALL support a strict optional top-level `code` section.
 
-#### Scenario: Code section omitted
-- **WHEN** `code` is absent
-- **THEN** normal MCP server behavior SHALL remain unchanged
-- **AND** launcher commands SHALL report that setup is required
+The optional strict `code` section SHALL contain at least one proxy route or direct
+Codex profile, plus optional default, permission, client overrides, and
+presentation settings.
 
-#### Scenario: Route entry
-- **WHEN** a named route is loaded
-- **THEN** it SHALL validate harness, source, transport, model compatibility, adapter
-  settings, and enabled state
+#### Scenario: Minimal proxy configuration
+- **WHEN** configuration contains `code.proxy.routes` with one or more model
+  records
+- **THEN** it SHALL be valid
+- **AND** connection, client, permission, and presentation defaults SHALL apply
 
-#### Scenario: Valid defaults
-- **WHEN** a default route or permission mode is configured
-- **THEN** it SHALL reference an existing compatible route and accept only supported
-  permission values
+#### Scenario: Minimal direct configuration
+- **WHEN** configuration contains one or more `code.direct.codex.profiles` records
+  without `code.proxy`
+- **THEN** it SHALL be valid
+- **AND** no proxy connection or credential SHALL be required
 
-#### Scenario: Unknown field
-- **WHEN** `code`, `models`, or any nested entry contains an unknown field
-- **THEN** strict validation SHALL reject it without aliases or legacy handling
+#### Scenario: Missing targets
+- **WHEN** `code` contains neither a proxy route nor a direct Codex profile
+- **THEN** strict validation SHALL reject it
 
-### Requirement: Configurable external clients
-The `code.clients` section SHALL provide typed configuration for every external
-client that OneTool may execute. Claude and Codex client entries SHALL support an
-executable, optional user version constraint, optional working directory, and
-ordered additional argument list. The CLIProxyAPI client entry SHALL be optional and
-used only by supported delegated version or login commands.
+#### Scenario: Proxy route mapping
+- **WHEN** `code.proxy.routes` is loaded
+- **THEN** its keys SHALL be exact `claude_subscription`, `codex_subscription`, or
+  `openrouter` identifiers
+- **AND** each configured value SHALL be a non-empty list of model records
 
-#### Scenario: Executable name
-- **WHEN** a client executable is a command name
-- **THEN** OneTool SHALL resolve it from the child process `PATH`
-- **AND** it SHALL verify that the resolved file is executable before route network
-  checks or launch
+#### Scenario: Direct Codex profile mapping
+- **WHEN** `code.direct.codex.profiles` is loaded
+- **THEN** each key SHALL be an exact profile name
+- **AND** each value SHALL contain one or more model records
 
-#### Scenario: Absolute executable
-- **WHEN** a client executable is an absolute path
-- **THEN** OneTool SHALL check that exact path is an executable regular file
-- **AND** it SHALL not interpret the value as a shell command
+#### Scenario: Launcher model fields
+- **WHEN** a launcher model record is loaded
+- **THEN** only `id` SHALL be required
+- **AND** the record MAY additionally contain a globally unique `shortcut`, a
+  presentation-only non-empty `label`, and Claude context policy where applicable
 
-#### Scenario: Invalid executable form
-- **WHEN** an executable is relative with path separators, is not executable, or
-  contains a command plus arguments
-- **THEN** configuration or pre-launch validation SHALL reject it actionably
-- **AND** OneTool SHALL not invoke a shell to interpret it
+#### Scenario: Claude context policy
+- **WHEN** a launcher model contains `claude`
+- **THEN** `context` SHALL accept only `standard` or `1m`
+- **AND** optional `auto_compact_window` SHALL be a positive integer below
+  1,000,000 and require `context: 1m`
 
-#### Scenario: Explicit version constraint
-- **WHEN** a client has a configured version constraint
-- **THEN** OneTool SHALL parse the installed client's machine-readable or bounded
-  version output and require it to satisfy that constraint
-- **AND** an unparseable or non-matching version SHALL fail before launch
+#### Scenario: Duplicate within one target
+- **WHEN** one route or profile contains the same exact model id more than once
+- **THEN** strict validation SHALL reject it
 
-#### Scenario: No exact runtime pin
-- **WHEN** no user version constraint is configured
-- **THEN** OneTool SHALL not require an exact version used by development fixtures
-- **AND** a newer release SHALL remain eligible unless it is known incompatible or
-  lacks a safely verifiable capability required by the selected route
+#### Scenario: Same model across targets
+- **WHEN** the same exact id appears in multiple routes or profiles
+- **THEN** configuration SHALL be valid
+- **AND** selecting it SHALL require an exact target
 
-#### Scenario: Feature-specific minimum
-- **WHEN** a selected route uses a feature that upstream added in a known release
-- **THEN** OneTool SHALL enforce only that evidence-based minimum for that feature
-- **AND** routes that do not use the feature SHALL not inherit its minimum
+#### Scenario: Launcher identity collision
+- **WHEN** any two launcher records use the same shortcut
+- **OR** one record's shortcut equals a different record's model id
+- **THEN** strict validation SHALL reject it
 
-#### Scenario: Version cannot establish a required capability
-- **WHEN** a required capability cannot be established from a parsed version or a
-  safe non-billable check
-- **THEN** the affected route SHALL fail with the missing capability and remediation
-- **AND** unrelated routes SHALL remain eligible
+#### Scenario: Optional default
+- **WHEN** `code.default` is configured
+- **THEN** it SHALL contain a model id and at most one route or profile
+- **AND** when neither target selector is supplied, the model id SHALL identify
+  exactly one compatible configured target
+
+#### Scenario: Permission
+- **WHEN** `code.permission` is configured
+- **THEN** it SHALL accept only `normal` or `bypass`
+- **AND** omission SHALL default to `normal`
+
+#### Scenario: Unknown or removed field
+- **WHEN** launcher configuration contains an unknown field, removed model
+  metadata, old route layout, transport, source, proxy alias, or proxy id
+- **THEN** strict validation SHALL reject it without compatibility handling
+
+### Requirement: Configurable harness clients
+
+`code.clients` SHALL optionally override Claude and Codex executables, working
+directories, and ordered additional argument lists. Codex MAY additionally define
+`home_path`.
+
+#### Scenario: Clients omitted
+- **WHEN** `code.clients` or either client record is omitted
+- **THEN** Claude SHALL default to executable `claude`
+- **AND** Codex SHALL default to executable `codex`
+
+#### Scenario: Executable
+- **WHEN** an executable is a command name or absolute path
+- **THEN** OneTool SHALL resolve and verify an executable file without a shell
+
+#### Scenario: Invalid executable
+- **WHEN** an executable is a relative path with separators, contains arguments, or
+  is not executable
+- **THEN** configuration or launch SHALL fail actionably
 
 #### Scenario: Working directory
-- **WHEN** a client working directory is configured
-- **THEN** OneTool SHALL resolve and validate the checked directory before launch
-- **AND** it SHALL change only the child process working directory
+- **WHEN** a working directory is configured
+- **THEN** OneTool SHALL resolve and validate it and change to it immediately before
+  process replacement
 
-#### Scenario: Ordered additional arguments
-- **WHEN** a client has configured additional arguments
-- **THEN** OneTool SHALL append the validated string-list values in documented order
-  without shell parsing
-- **AND** route-owned or secret-bearing arguments SHALL be rejected
-
-#### Scenario: Missing client entry
-- **WHEN** a selected harness has no client entry
-- **THEN** launch SHALL fail with the exact missing configuration path
-- **AND** it SHALL not fall back to a hard-coded executable or another client
-
-### Requirement: Claude client configuration
-Claude route entries SHALL support an optional checked, user-owned `settings_path`
-and explicit proxy model-slot aliases when all three current slots have been
-verified.
-
-#### Scenario: Claude settings path
-- **WHEN** `code.routes.<name>.settings_path` is configured for a Claude route
-- **THEN** OneTool SHALL pass the checked path once using the current `--settings`
-  flag
-- **AND** it SHALL not parse, generate, merge, or rewrite the settings file
-
-#### Scenario: Claude settings omitted
-- **WHEN** `settings_path` is omitted
-- **THEN** Claude Code SHALL retain its normal user/project settings resolution
-- **AND** invocation-scoped route and permission arguments SHALL still take
-  precedence for values owned by OneTool
-
-#### Scenario: Claude model policy remains user-owned
-- **WHEN** a Claude route is constructed
-- **THEN** OneTool SHALL not generate an inline `availableModels` policy or alter
-  user, project, local, or managed settings
-- **AND** it SHALL use the selected route model and complete model-slot mapping
-  instead of treating an allowlist as provider configuration
-
-#### Scenario: Claude proxy slots omitted
-- **WHEN** a proxied Claude route does not configure distinct verified model slots
-- **THEN** the selected proxy alias SHALL populate the Opus, Sonnet, and Haiku slot
-  variables for the child
-
-#### Scenario: Claude proxy slots configured
-- **WHEN** a proxied Claude route configures model-slot aliases
-- **THEN** Opus, Sonnet, and Haiku values SHALL all be required
-- **AND** every alias SHALL be present in the shared model registry and live proxy
-  discovery before launch
-
-#### Scenario: Legacy Claude model variables
-- **WHEN** configuration supplies legacy Claude Code 1.x model environment fields
-- **THEN** strict validation SHALL reject them without aliases or compatibility
-  translation
-
-### Requirement: Codex client configuration
-The Codex client entry SHALL support an optional checked `home_path`. Codex route
-entries SHALL support optional `profile` and checked `model_catalog_path` settings
-and only typed provider capabilities verified against the installed client's
-capabilities.
-
-#### Scenario: Codex home path
+#### Scenario: Codex home
 - **WHEN** `code.clients.codex.home_path` is configured
-- **THEN** OneTool SHALL set it for the Codex child only using the current supported
-  Codex home mechanism
-- **AND** it SHALL validate required user-owned auth/config state without reading,
-  copying, or modifying that state
+- **THEN** OneTool SHALL validate it and set `CODEX_HOME` only for the child
 
-#### Scenario: Current Codex profile
-- **WHEN** `code.routes.<name>.profile` is configured for a Codex route
-- **THEN** OneTool SHALL select that profile once with `--profile`
-- **AND** it SHALL validate the current separate
-  `<codex-home>/<profile>.config.toml` form before launch
+#### Scenario: Additional arguments
+- **WHEN** configured additional arguments do not contain a OneTool-owned long
+  option, long option with `=`, separated short option, or attached short option
+- **THEN** their token boundaries and order SHALL be preserved
+- **AND** OneTool SHALL not interpret upstream commands or option values
 
-#### Scenario: Removed Codex profile form
-- **WHEN** launcher configuration attempts to define or rely on
-  `[profiles.<name>]` in the main Codex config
-- **THEN** OneTool SHALL reject the unsupported form
-- **AND** it SHALL not generate a compatibility profile
-
-#### Scenario: Codex model catalog
-- **WHEN** `code.routes.<name>.model_catalog_path` is configured for a compatible
-  Codex route
-- **THEN** OneTool SHALL pass the checked user-owned path with an
-  invocation-scoped Codex configuration override
-- **AND** it SHALL not generate or rewrite the catalog
-
-#### Scenario: Codex provider capability
-- **WHEN** a non-native route configures a capability such as WebSocket support
-- **THEN** the value SHALL be represented by a typed route field and accepted only
-  when verified for the installed Codex, endpoint, and wire protocol
-
-### Requirement: Client argument ownership
-OneTool SHALL own model, provider, transport, settings/profile, permission, auth, and
-other route-determining arguments for each launched client.
-
-#### Scenario: Configured argument conflicts
-- **WHEN** configured additional arguments contain a route-owned flag, its short
-  form, an inline assignment, or a positional subcommand that changes launch mode
-- **THEN** validation SHALL reject the conflict and identify the typed OneTool field
-  that must be used instead
-
-#### Scenario: Passthrough argument conflicts
-- **WHEN** arguments after `--` contain a route-owned flag or launch-mode subcommand
-- **THEN** pre-launch validation SHALL reject the conflict
-- **AND** it SHALL not use first-flag-wins or last-flag-wins behavior
-
-#### Scenario: Non-conflicting arguments
-- **WHEN** additional or passthrough arguments do not conflict with route ownership
-- **THEN** their token boundaries and order SHALL be preserved exactly
+#### Scenario: Removed client fields
+- **WHEN** configuration supplies a client version constraint, CLIProxyAPI client,
+  typed settings/profile/catalog path, or delegated login configuration
+- **THEN** strict validation SHALL reject it
 
 ### Requirement: CLIProxyAPI connection configuration
-The `code` section SHALL describe only inference access to an external CLIProxyAPI
-instance.
 
-#### Scenario: Inference fields
-- **WHEN** any configured route uses CLIProxyAPI
-- **THEN** base URL, named inference secret, timeout, and finite model-cache TTL SHALL
-  be required and validated
+Optional `code.proxy` SHALL contain one or more launcher route lists plus optional
+`base_url`, `secret_name`, `connect_timeout`, and `request_timeout`.
 
-#### Scenario: Optional upstream config path
-- **WHEN** a user-owned CLIProxyAPI config path is configured
-- **THEN** it SHALL be used only for display or verified delegated commands
-- **AND** OneTool SHALL not parse credentials from or rewrite the file
+#### Scenario: Proxy omitted
+- **WHEN** code configuration uses only direct Codex profiles
+- **THEN** no CLIProxyAPI connection fields SHALL be required
+
+#### Scenario: No proxy file path
+- **WHEN** code configuration is loaded
+- **THEN** it SHALL expose no CLIProxyAPI config path or management key field
+
+#### Scenario: No model cache setting
+- **WHEN** code configuration is loaded
+- **THEN** it SHALL expose no public `model_cache_ttl`
 
 #### Scenario: Management fields rejected
-- **WHEN** configuration contains management credentials, generated proxy config,
-  managed lifecycle, auto-start, PID, proxy log, remote administration, account, or
-  raw payload settings
-- **THEN** strict validation SHALL reject them
-
-### Requirement: Adapter configuration
-Code routes SHALL expose stable user intent while volatile upstream details remain
-internal.
-
-#### Scenario: Codex OpenRouter adapter
-- **WHEN** a Codex OpenRouter route is configured
-- **THEN** it SHALL reference a named OpenRouter secret and validated invocation
-  profile/catalog inputs
-
-#### Scenario: Codex provider credential
-- **WHEN** a non-native Codex provider requires a client key
-- **THEN** the route SHALL reference a named OneTool secret
-- **AND** the adapter SHALL expose it to Codex through an `env_key` that names a
-  private child-only environment variable
-- **AND** it SHALL not accept an inline bearer-token value
-
-#### Scenario: Claude subscription proxy default
-- **WHEN** Claude subscription proxy enablement is omitted
-- **THEN** it SHALL default to disabled
-
-#### Scenario: Claude subscription proxy enabled
-- **WHEN** the enablement switch is true
-- **THEN** compatible configured Claude subscription proxy routes MAY be selected
-- **AND** configuration guidance SHALL contain the required terms/account/billing
-  warning
-
-#### Scenario: Raw adapter settings rejected
-- **WHEN** configuration supplies raw CLIProxyAPI YAML, arbitrary request data,
-  arbitrary environment variables, generated Claude model policy, or arbitrary
-  command templates
+- **WHEN** configuration contains management credentials, lifecycle, process, log,
+  account, OAuth, or raw proxy payload settings
 - **THEN** strict validation SHALL reject them
 
 ### Requirement: Typed tool generation selections
@@ -479,7 +384,7 @@ Generation-capable tool configuration SHALL accept reusable typed `llm` selectio
 at pack or operation scope. A partial selection that omits `backend` MAY contain
 provider-neutral model, effort, timeout, and output-limit overrides. A selection
 that specifies `backend` SHALL be a complete discriminated backend selection:
-`cliproxy` SHALL use the external `code.cliproxy` inference connection, and
+`cliproxy` SHALL use the external `code.proxy` inference connection, and
 `openai_compatible` SHALL contain its own base URL and named secret. Every complete backend selection
 SHALL include `interface: responses` or `interface: chat_completions`.
 Backend-specific fields, including `interface`, SHALL NOT be accepted in a partial

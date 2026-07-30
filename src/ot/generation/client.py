@@ -5,12 +5,11 @@ from __future__ import annotations
 import base64
 import json
 import time
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from loguru import logger
 
-from onetool.code.proxy import ModelDiscovery, ProxyDiscoveryError
 from ot.generation.domain import (
     GenerationError,
     GenerationRequest,
@@ -19,26 +18,34 @@ from ot.generation.domain import (
     ResolvedGeneration,
 )
 from ot.logging import LogEntry
+from ot.utils.factory import lazy_client
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-    from ot.config.routing import CLIProxyConnectionConfig
 
 _MAX_REQUEST_BYTES = 16 * 1_048_576
 _MAX_RESPONSE_BYTES = 8 * 1_048_576
 
 
-class DiscoveryFactory(Protocol):
-    """Factory for the p11 inference-only model discovery service."""
+def _create_http_client() -> httpx.Client:
+    """Create the shared generation connection pool."""
+    global _http_client
+    _http_client = httpx.Client()
+    return _http_client
 
-    def __call__(
-        self,
-        *,
-        config: CLIProxyConnectionConfig,
-        secret: str,
-        client: httpx.Client | None = None,
-    ) -> ModelDiscovery: ...
+
+_http_client: httpx.Client | None = None
+_get_http_client = lazy_client(_create_http_client)
+
+
+def reset_http_client() -> None:
+    """Close and reset the shared generation client."""
+    global _http_client
+    client = _http_client
+    _http_client = None
+    _get_http_client.reset()  # type: ignore[attr-defined]
+    if client is not None:
+        client.close()
 
 
 def _data_url(payload: bytes) -> str:
@@ -179,10 +186,10 @@ def _request(
             return response.status_code, _read_bounded(response)
 
     try:
-        if client is not None:
-            return send(client)
-        with httpx.Client(timeout=timeout) as owned:
-            return send(owned)
+        active_client = client or _get_http_client()
+        if active_client is None:
+            raise GenerationError("Generation HTTP client could not be initialized")
+        return send(active_client)
     except GenerationError:
         raise
     except httpx.HTTPError as exc:
@@ -253,8 +260,6 @@ def generate(
     request: GenerationRequest,
     secret_resolver: Callable[[str], str | None],
     client: httpx.Client | None = None,
-    discovery_factory: DiscoveryFactory = ModelDiscovery,
-    proxy_config: CLIProxyConnectionConfig | None = None,
 ) -> GenerationResult:
     """Generate once through the selected route with no retry or fallback."""
     secret = secret_resolver(route.secret_name)
@@ -262,27 +267,10 @@ def generate(
         raise GenerationError(
             f"Named generation secret {route.secret_name!r} is not configured"
         )
-    model = route.model_id
-    if route.backend == "cliproxy":
-        if proxy_config is None:
-            raise GenerationError("CLIProxyAPI generation requires code.cliproxy")
-        discovery = discovery_factory(
-            config=proxy_config,
-            secret=secret,
-            client=client,
-        )
-        try:
-            model = discovery.validate(route.proxy_identity, route.model_id)
-        except ProxyDiscoveryError as exc:
-            raise GenerationError(
-                f"CLIProxyAPI generation route is unavailable at {route.base_url}; "
-                "check the external service and model alias"
-            ) from exc
-
     payload = (
-        _responses_payload(route, request, model)
+        _responses_payload(route, request, route.request_model_id)
         if route.interface == "responses"
-        else _chat_payload(route, request, model)
+        else _chat_payload(route, request, route.request_model_id)
     )
     started = time.monotonic()
     status, body = _request(

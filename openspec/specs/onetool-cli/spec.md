@@ -418,39 +418,44 @@ The `onetool init mcp-config` command SHALL print ready-to-paste MCP client conf
 - **THEN** `mcp-config` SHALL be listed as an available `init` subcommand alongside `validate`
 
 ### Requirement: Harness commands in the OneTool CLI
+
 The `onetool` CLI SHALL expose Claude Code and Codex launcher commands.
 
 #### Scenario: Commands in help
 - **WHEN** `onetool --help` is executed
 - **THEN** `claude` and `codex` SHALL appear in a labelled code-harness panel
 
-#### Scenario: Harness help
-- **WHEN** either harness command help is displayed
-- **THEN** it SHALL describe model, route, permission, config, presentation, dry-run,
-  and `--` passthrough options
-- **AND** it SHALL point to setup documentation containing Codex, Claude Code, and
-  CLIProxyAPI configuration references
+#### Scenario: Claude harness help
+- **WHEN** Claude command help is displayed
+- **THEN** it SHALL describe exact model/shortcut, route, permission, config,
+  presentation, dry-run, and `--` passthrough options
+
+#### Scenario: Codex harness help
+- **WHEN** Codex command help is displayed
+- **THEN** it SHALL additionally describe an exact direct `--profile`/`-p` selector
+- **AND** route and profile SHALL be mutually exclusive
 
 ### Requirement: Code helper group
-The CLI SHALL provide a small `code` group for route selection and diagnostics.
+
+The CLI SHALL provide a small `code` group for target selection and diagnostics.
 
 #### Scenario: Interactive picker
 - **WHEN** `onetool code` runs in a terminal without a subcommand
-- **THEN** it SHALL select harness, compatible model, route, and permission mode
+- **THEN** it SHALL select a configured harness, target, model, and permission mode
 - **AND** it SHALL use the same resolver as explicit harness commands
 
 #### Scenario: Helper commands
 - **WHEN** `onetool code --help` is executed
-- **THEN** it SHALL list setup, models, status, doctor, config, and supported login
-  delegation commands
-- **AND** it SHALL not list proxy start, stop, restart, logs, account, activity, or
-  management operations
+- **THEN** it SHALL list models, status, doctor, and config
+- **AND** it SHALL not list setup, proxy lifecycle, management, authentication, or
+  login operations
 
 #### Scenario: Non-interactive picker
 - **WHEN** the picker is invoked without a terminal
 - **THEN** it SHALL fail with the equivalent explicit command syntax
 
 ### Requirement: Launcher configuration resolution
+
 Code commands SHALL resolve configuration deterministically without changing
 `onetool serve` behavior.
 
@@ -461,46 +466,65 @@ Code commands SHALL resolve configuration deterministically without changing
 
 #### Scenario: Explicit config
 - **WHEN** `--config` is supplied
-- **THEN** only that checked path SHALL be used
+- **THEN** it SHALL resolve to an existing regular file and only that checked path
+  SHALL be used
+- **AND** no directory expansion or fallback discovery SHALL occur
+
+#### Scenario: Launcher secrets resolution
+- **WHEN** a code command loads its resolved configuration
+- **THEN** an explicit `--secrets` path SHALL take precedence
+- **AND** otherwise an adjacent `secrets.yaml` SHALL be loaded when present
+- **AND** absence of that adjacent file SHALL load no launcher secrets
 
 #### Scenario: Missing config
 - **WHEN** no configuration can be resolved
-- **THEN** the command SHALL report checked paths and an actionable setup command
+- **THEN** the command SHALL report checked paths and identify `onetool init` as the
+  template installation workflow
 
 #### Scenario: Serve remains unchanged
 - **WHEN** `onetool serve` is executed
 - **THEN** its existing explicit runtime configuration contract SHALL remain
   unchanged
 
-### Requirement: Redacted diagnostics and delegation
-Status, doctor, config, and login helpers SHALL remain within the thin-launcher
-boundary.
+### Requirement: Redacted local status and explicit diagnostics
+
+Status, doctor, and config helpers SHALL remain within the thin-launcher boundary.
 
 #### Scenario: Status
 - **WHEN** `onetool code status` is executed
-- **THEN** it SHALL report configured routes, harness binaries, profile/catalog
-  presence, inference endpoint readiness, and named-secret presence without values
+- **THEN** it SHALL report configured proxy routes and direct profiles, configured
+  harness binaries, and proxy endpoint and named-secret presence when applicable
+- **AND** it SHALL perform no HTTP request or version/help subprocess
 
 #### Scenario: Doctor
 - **WHEN** `onetool code doctor` is executed
-- **THEN** it SHALL verify typed configuration, binaries, adapter compatibility,
-  endpoint discovery, model availability, and safe environment construction
-- **AND** it SHALL not call CLIProxyAPI management APIs
-- **AND** it SHALL report installed versions, required route capabilities, and any
-  evidence-based minimums without exposing credentials or implying an exact pin
+- **THEN** it SHALL probe each configured harness executable once for required
+  adapter capabilities
+- **AND** it SHALL call `/v1/models` exactly once only when proxy routes are
+  configured and their named secret is available
+- **AND** a missing named proxy secret SHALL be reported without making that request
+- **AND** it SHALL compare configured proxy launcher ids exactly against that
+  inventory without exposing credentials
 
 #### Scenario: Config display
 - **WHEN** effective launcher configuration is shown
-- **THEN** secret values and generated private adapter content SHALL be omitted
+- **THEN** it SHALL show only the effective `code` section and resolved OneTool config
+  path
+- **AND** it SHALL omit secret values, top-level generation models, and generated
+  private adapter content
 
-#### Scenario: Login delegation
-- **WHEN** a supported route login helper is selected
-- **THEN** OneTool SHALL execute only the capability-verified upstream login command
-  with inherited terminal access and preserve its exit outcome
-- **AND** it SHALL not inspect, relocate, or refresh resulting credentials
+#### Scenario: Models display
+- **WHEN** `onetool code models` is executed
+- **THEN** it SHALL enumerate configured proxy-route and direct-profile records and
+  harness compatibility
+- **AND** it SHALL not use or display top-level generation model records
 
-#### Scenario: External command failure
-- **WHEN** a delegated command fails
-- **THEN** OneTool SHALL preserve a non-zero outcome and show a bounded redacted
-  diagnostic
+### Requirement: Code routing template initialization
 
+Interactive `onetool init` SHALL offer the code-routing extension template through
+the standard extension installation workflow.
+
+#### Scenario: Code routing selected
+- **WHEN** a user selects `code-routing.yaml` during interactive initialization
+- **THEN** OneTool SHALL copy the bundled template, back up a conflicting target,
+  and add the extension include using the standard initialization behavior

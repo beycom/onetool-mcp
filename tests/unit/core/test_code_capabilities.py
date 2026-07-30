@@ -1,108 +1,76 @@
-"""Tests for bounded installed-client capability checks."""
+"""Tests for bounded diagnostic-only harness capability probes."""
 
 from __future__ import annotations
 
 import sys
-import time
 from unittest.mock import patch
 
 import pytest
 
 from onetool.code import adapters
-from ot.config import OneToolConfig
-from tests.unit.core.routing_fixtures import valid_routing_config
+from onetool.code.adapters import (
+    check_client_capabilities,
+    run_capability_command,
+)
 
 pytestmark = [pytest.mark.unit, pytest.mark.core]
 
 
-def test_capability_timeout_terminates_child_after_stdout_closes() -> None:
-    """A client cannot evade the deadline by closing output before hanging."""
-    started = time.monotonic()
-    with (
-        patch("onetool.code.adapters._CAPABILITY_TIMEOUT", 0.05),
-        pytest.raises(ValueError, match="timed out"),
-    ):
-        adapters.run_capability_command(
-            (
-                sys.executable,
-                "-c",
-                "import os, time; os.close(1); time.sleep(10)",
-            )
-        )
-
-    assert time.monotonic() - started < 2
-
-
-@pytest.mark.parametrize(
-    ("output", "constraint", "expected"),
-    [
-        ("2.1.211 (Claude Code)", ">=2.1.0", "2.1.211"),
-        ("codex-cli 0.200.0", ">=0.145.0", "0.200.0"),
-        ("codex-cli 1.0.0", None, "1.0.0"),
-    ],
-)
-def test_configured_version_accepts_matching_and_newer_clients(
-    output: str,
-    constraint: str | None,
-    expected: str,
-) -> None:
-    """Fixture versions are provenance, not exact runtime pins."""
+def test_capability_probe_uses_one_bounded_subprocess_run() -> None:
+    output = "--model --profile --config --dangerously-bypass-approvals-and-sandbox"
     with patch(
         "onetool.code.adapters.run_capability_command",
         return_value=output,
-    ):
-        installed = adapters._check_configured_version(
-            executable="/installed/client",
-            configured=constraint,
-        )
-    assert str(installed) == expected
-
-
-def test_configured_version_rejects_nonmatching_client() -> None:
-    """An explicit user constraint fails before launch when unsatisfied."""
-    with (
-        patch(
-            "onetool.code.adapters.run_capability_command",
-            return_value="codex-cli 0.100.0",
-        ),
-        pytest.raises(ValueError, match="does not satisfy"),
-    ):
-        adapters._check_configured_version(
-            executable="/installed/codex",
-            configured=">=0.145.0",
+    ) as run_capability:
+        capabilities = check_client_capabilities(
+            executable="/usr/bin/codex",
+            harness="codex",
+            permission="bypass",
+            require_proxy=True,
+            require_profile=True,
         )
 
+    assert capabilities == (
+        "--config",
+        "--dangerously-bypass-approvals-and-sandbox",
+        "--model",
+        "--profile",
+    )
+    run_capability.assert_called_once_with(("/usr/bin/codex", "--help"))
 
-def test_unparseable_version_is_rejected() -> None:
-    """Unknown installed version output does not establish a capability."""
-    with (
-        patch(
-            "onetool.code.adapters.run_capability_command",
-            return_value="development build",
-        ),
-        pytest.raises(ValueError, match="Could not parse"),
-    ):
-        adapters._check_configured_version(
-            executable="/installed/client",
-            configured=None,
+
+def test_capability_command_enforces_output_and_time_bounds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(adapters, "_MAX_CAPABILITY_OUTPUT", 32)
+    with pytest.raises(ValueError, match="exceeded 32 bytes"):
+        run_capability_command(
+            (
+                sys.executable,
+                "-c",
+                "import sys; sys.stdout.buffer.write(b'x' * 33)",
+            )
+        )
+
+    monkeypatch.setattr(adapters, "_CAPABILITY_TIMEOUT", 0.05)
+    with pytest.raises(ValueError, match="timed out"):
+        run_capability_command(
+            (sys.executable, "-c", "import time; time.sleep(1)")
         )
 
 
-def test_selected_help_capability_is_required() -> None:
-    """A route fails when the installed harness lacks its exact adapter flag."""
-    config = OneToolConfig.model_validate(valid_routing_config())
-    assert config.code is not None
-    route = config.code.routes["claude-sol"]
-    with (
-        patch(
-            "onetool.code.adapters.run_capability_command",
-            return_value="Usage: claude --model MODEL",
-        ),
-        pytest.raises(ValueError, match="--settings"),
-    ):
-        adapters._check_help_capabilities(
-            executable="/installed/claude",
-            harness="claude",
-            route=route,
-            permission="safe",
+def test_capability_probe_reports_nonzero_and_missing_flag() -> None:
+    with pytest.raises(ValueError, match="exit code 2"):
+        run_capability_command((sys.executable, "-c", "raise SystemExit(2)"))
+
+    with patch(
+        "onetool.code.adapters.run_capability_command",
+        return_value="--model",
+    ), pytest.raises(ValueError, match="--profile"):
+        check_client_capabilities(
+            executable="/usr/bin/codex",
+            harness="codex",
+            permission="normal",
+            require_proxy=False,
+            require_profile=True,
         )

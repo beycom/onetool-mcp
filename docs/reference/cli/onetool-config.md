@@ -12,14 +12,20 @@ Complete reference for `onetool.yaml` configuration.
 
 ## CLI Flags
 
-Configuration is specified via CLI flags — there is no automatic global or project config discovery.
+Server and initialization commands use explicit configuration paths. Code-launcher
+commands are the exception: without `--config`, `onetool claude`, `onetool codex`,
+and `onetool code` check `.onetool/onetool.yaml` in the current project and then
+`~/.onetool/onetool.yaml`.
 
 | Flag | Short | Required | Description |
 |------|-------|----------|-------------|
-| `--config PATH` | `-c` | Yes (server) | Path to `onetool.yaml` config file or directory |
-| `--secrets PATH` | `-s` | No | Path to `secrets.yaml`. If omitted, no secrets are loaded |
+| `--config PATH` | `-c` | Yes (server) | Server config file; `init` also accepts a directory; launchers accept an optional exact file |
+| `--secrets PATH` | `-s` | No | Path to `secrets.yaml`; launchers otherwise load an adjacent file when present |
 
-**Config path resolution:** If `PATH` ends in `.yaml`/`.yml` it is used as the config file directly; otherwise `onetool.yaml` is appended to the directory path.
+**Config path resolution:** `onetool init` treats `.yaml`/`.yml` paths as files and
+appends `onetool.yaml` to directory paths. Server commands take an explicit config
+file. Code-launcher commands require an explicitly supplied path to be a file and
+otherwise use the discovery order above.
 
 **Include path resolution:** All relative paths in `include:`, `tools_dir:`, etc. resolve from the **parent directory of the config file** (i.e., the directory containing `onetool.yaml`).
 
@@ -70,20 +76,18 @@ prompts: {}                   # Inline prompts (overrides included)
 
 ## Generation and Embedding Routes
 
-Top-level `models` is the authoritative model registry. Top-level `llm` selects
-generation only; top-level `embeddings` selects embeddings only.
+Top-level `models` is the authoritative generation model registry. Top-level `llm`
+selects generation only; top-level `embeddings` selects embeddings only. Code
+harness launching ignores this registry.
 
 ```yaml
 models:
   luna:
     shortcut: luna
     id: gpt-5.6-luna
-    label: GPT-5.6 Luna
     source: codex_subscription
     proxy_alias: gpt-5.6-luna
-    context_window: 1050000
     modalities: [text]
-    harnesses: [claude, codex]
     interfaces: [responses]
     structured_outputs:
       responses: [json_object, json_schema]
@@ -110,9 +114,56 @@ embeddings:
 ```
 
 An `openai_compatible` generation backend additionally requires `base_url` and
-`secret_name`. A `cliproxy` backend reuses the external `code.cliproxy` inference
+`secret_name`. A `cliproxy` backend reuses the external `code.proxy` inference
 connection. See [LLM routing](../../learn/llm-routing.md) for schemas, precedence,
 capability validation, and the no-fallback boundary.
+
+## Code Harness Targets
+
+The launcher has independent proxy routes and direct Codex profiles. A `code`
+section requires at least one of them:
+
+```yaml
+code:
+  proxy:
+    routes:
+      codex_subscription:
+        - id: gpt-5.6-sol
+          shortcut: sol
+      openrouter:
+        - id: z-ai/glm-5.2
+          shortcut: glm
+          claude:
+            context: 1m
+            auto_compact_window: 900000
+
+  direct:
+    codex:
+      profiles:
+        openrouter:
+          - id: z-ai/glm-5.2
+            shortcut: direct-glm
+```
+
+Optional launcher fields are:
+
+- `code.default.model` and one optional exact `code.default.route` or
+  `code.default.profile`
+- `code.permission`: `normal` or `bypass`
+- `code.clients.claude`: `executable`, `working_directory`,
+  `additional_arguments`
+- `code.clients.codex`: the same fields plus `home_path`
+- `code.proxy`: `base_url`, `secret_name`, `connect_timeout`, `request_timeout`,
+  and exact route records
+- `code.direct.codex.profiles`: exact profile names and model records
+- model fields: required `id`, optional globally unique `shortcut`, optional
+  presentation `label`, and optional operational `claude` context policy
+- `code.presentation.quiet` and `code.presentation.verbose`
+
+Ids and shortcuts resolve only by exact match. Proxy ids are sent to CLIProxyAPI;
+direct profile ids are passed to Codex with `--profile`. There is no launcher
+`proxy_alias`, `proxy_id`, transport, harness, CLIProxyAPI config path, or
+management key. See [Code harness routing](../../learn/code-routing.md).
 
 ## Config Includes
 
@@ -303,7 +354,8 @@ tools:
     timeout: 120
     relative_paths: true
   ot_llm:
-    model: openai/gpt-4o-mini
+    llm:
+      model: glm52
 ```
 
 ## Secrets Configuration
@@ -323,7 +375,9 @@ GEMINI_API_KEY: "your-gemini-key"
 DATABASE_URL: "postgresql://user:pass@localhost/db"
 ```
 
-If `--secrets` is omitted, no secrets file is loaded. Tools that require API keys will report a configuration error when called.
+For the server, omitting `--secrets` loads no secrets file, so tools that require
+API keys report a configuration error when called. Code-launcher commands instead
+load `secrets.yaml` beside the resolved launcher config when that file exists.
 
 ### Accessing Secrets in Tools
 
@@ -558,12 +612,12 @@ llm:
 tools:
   ot_llm:
     llm:
-      model: sol
+      model: luna
       effort: medium
 ```
 
 The route's named secret must exist in `secrets.yaml`. CLIProxyAPI generation uses
-the `code.cliproxy` named secret and does not unconditionally require
+the `code.proxy` named secret and does not unconditionally require
 `OPENAI_API_KEY`.
 
 ## Output Configuration

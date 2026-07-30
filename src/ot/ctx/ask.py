@@ -138,7 +138,6 @@ def ctx_ask(
                     prompt=f"Content:\n{content}\n\nQuestion:\n{prompt}",
                 ),
                 secret_resolver=get_secret,
-                proxy_config=root.code.cliproxy if root.code is not None else None,
             )
             raw = generation.content
         except GenerationError as exc:

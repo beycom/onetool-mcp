@@ -14,6 +14,7 @@ from pathlib import Path
 import typer
 
 from onetool.cli_commands.code_app import (
+    HarnessPassthroughCommand,
     claude_command,
     code_app,
     codex_command,
@@ -187,12 +188,12 @@ app.add_typer(code_app, name="code", rich_help_panel="Code Harnesses")
 app.command(
     "claude",
     rich_help_panel="Code Harnesses",
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    cls=HarnessPassthroughCommand,
 )(claude_command)
 app.command(
     "codex",
     rich_help_panel="Code Harnesses",
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    cls=HarnessPassthroughCommand,
 )(codex_command)
 
 # Init subcommand group - manage OneTool configuration directory
@@ -594,6 +595,7 @@ def init_callback(
             ("security.yaml", "custom security rules"),
             ("diagram.yaml", "diagram tool config"),
             ("snippets.yaml", "code snippets"),
+            ("code-routing.yaml", "Claude Code and Codex routing"),
             ("secrets.yaml", "API keys / credentials (optionally encrypted)"),
         ]
         choices = [

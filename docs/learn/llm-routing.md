@@ -12,28 +12,60 @@ the selected route; CLIProxyAPI owns proxy authentication and provider routing.
 
 ## Model registry
 
-Every selectable model has a shortcut, full id, source, context window, modalities,
-harness support, and generation capabilities. Generation-capable entries also
-declare:
+Every selectable model has a shortcut, full id, source, modalities, and explicit
+generation capabilities:
 
 - `interfaces`: `responses` and/or `chat_completions`
 - `structured_outputs`: verified `json_object` and `json_schema` support per interface
 - `efforts`: any supported values from `low`, `medium`, and `high`
 - `default_effort`: the effort used only when no narrower layer selects one
 
+For example, this registry supports both backend examples below:
+
+```yaml
+models:
+  luna:
+    shortcut: luna
+    id: gpt-5.6-luna
+    source: codex_subscription
+    proxy_alias: gpt-5.6-luna
+    modalities: [text]
+    interfaces: [responses]
+    structured_outputs:
+      responses: [json_object, json_schema]
+    efforts: [low, medium, high]
+    default_effort: low
+
+  glm52:
+    shortcut: glm52
+    id: z-ai/glm-5.2
+    source: openrouter
+    modalities: [text]
+    interfaces: [chat_completions]
+    structured_outputs:
+      chat_completions: [json_object, json_schema]
+    efforts: [low, medium, high]
+```
+
 A shortcut, full id, or unique proxy alias resolves to the same entry. Unknown or
 ambiguous identities fail before network I/O. OneTool does not infer interfaces,
 modalities, structured output, or effort from a model name.
 
-The supplied routing template uses Luna with low effort as the efficient default.
-Sol and Terra remain explicit alternatives; Terra declares image input. These
-choices affect capacity also used by interactive Codex sessions.
+Generation defaults are configured explicitly in the top-level `llm` selection.
+They are not inferred from code launcher routes. The optional `code-routing.yaml`
+launcher template does not install this generation registry.
 
 ## Backends
 
 ### CLIProxyAPI
 
 ```yaml
+code:
+  proxy:
+    routes:
+      codex_subscription:
+        - id: gpt-5.6-luna
+
 llm:
   backend: cliproxy
   interface: responses
@@ -43,7 +75,9 @@ llm:
   max_output_tokens: 4096
 ```
 
-This backend reuses `code.cliproxy.base_url` and its named inference-client secret.
+This backend reuses `code.proxy.base_url` and its named inference-client secret.
+The top-level `models` registry and any generation-only `proxy_alias` remain
+independent from launcher records in `code.proxy.routes`.
 Codex-subscription models require the verified Responses interface. OneTool sends
 direct bounded HTTP requests; it does not run Codex, Claude Code, or CLIProxyAPI,
 read their auth/config files, manage the proxy, or call management endpoints.
@@ -114,14 +148,15 @@ reranking and synthesis.
 
 Strict configuration validation reports removed keys, incomplete backend switches,
 unknown models, and unsupported interface/capability combinations at load or before
-network I/O. Server startup performs model discovery for a configured CLIProxyAPI
-generation route; failure records a `generation.readiness.degraded` diagnostic while
-unrelated packs continue loading.
+network I/O. Server startup does not probe CLIProxyAPI or scan nested pack routes.
+Each generation call sends its configured wire model identity directly and reports
+an external-route failure only to that call.
 
 After a successful call, the structured `generation.completed` log entry is the
 effective-route record. It contains only backend, interface, shortcut, source,
 effort, latency, output size, and returned token counts. It omits endpoints, named
-secret values, credentials, identities, headers, prompts, responses, and raw bodies.
+secret values, credentials, full model ids, proxy wire identities, headers, prompts,
+responses, and raw bodies.
 
 Use finite `timeout` and `max_output_tokens` values. The adapter also caps encoded
 requests at 16 MiB and streamed responses at 8 MiB and performs no retries or

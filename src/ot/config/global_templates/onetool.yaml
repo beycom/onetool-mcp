@@ -13,8 +13,9 @@ include:
 # Example: ["tools/*.py"] loads all Python files in .onetool/tools/
 tools_dir: []
 
-# Generation and embeddings are opt-in, independent routes. See
-# global_templates/code-routing.yaml and the LLM routing guide.
+# Generation and embeddings are opt-in, independent routes. See the LLM routing
+# guide. The optional code-routing.yaml template adds exact proxy routes and direct
+# Codex profiles for code-harness launching.
 
 # log_level: INFO
 

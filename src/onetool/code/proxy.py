@@ -2,32 +2,27 @@
 
 from __future__ import annotations
 
-import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import httpx
 
 if TYPE_CHECKING:
-    from ot.config.routing import CLIProxyConnectionConfig
+    from ot.config.routing import CodeProxyConfig
 
 _MAX_DISCOVERY_BYTES = 1_048_576
 _MAX_MODELS = 10_000
-
-
 class ProxyDiscoveryError(RuntimeError):
     """A bounded, redacted external inference discovery failure."""
 
 
 @dataclass(slots=True)
 class ModelDiscovery:
-    """Authenticated model discovery with finite in-memory freshness."""
+    """Authenticated bounded discovery for explicit diagnostics."""
 
-    config: CLIProxyConnectionConfig
+    config: CodeProxyConfig
     secret: str
     client: httpx.Client | None = None
-    _cached_at: float | None = field(default=None, init=False)
-    _cached_ids: tuple[str, ...] = field(default=(), init=False)
 
     def _read_response(
         self,
@@ -79,16 +74,8 @@ class ModelDiscovery:
                 f"{self.config.base_url}; check the external service and route"
             ) from exc
 
-    def models(self, *, force: bool = False) -> tuple[str, ...]:
-        """Return a fresh bounded model id list."""
-        now = time.monotonic()
-        if (
-            not force
-            and self._cached_at is not None
-            and now - self._cached_at <= self.config.model_cache_ttl
-        ):
-            return self._cached_ids
-
+    def models(self) -> tuple[str, ...]:
+        """Return one fresh bounded model id list for explicit diagnostics."""
         status_code, content = self._request()
         if status_code != 200:
             raise ProxyDiscoveryError(
@@ -124,27 +111,6 @@ class ModelDiscovery:
                 )
             ids.append(item["id"])
 
-        self._cached_ids = tuple(ids)
-        self._cached_at = now
-        return self._cached_ids
-
-    def validate(self, *identities: str) -> str:
-        """Return the unique advertised identity or fail without fallback."""
-        available = self.models()
-        for identity in identities:
-            count = available.count(identity)
-            if count > 1:
-                raise ProxyDiscoveryError(
-                    f"CLIProxyAPI advertises ambiguous model identity {identity!r}; "
-                    "configure unique proxy aliases"
-                )
-            if count == 1:
-                return identity
-        wanted = " or ".join(repr(identity) for identity in identities)
-        raise ProxyDiscoveryError(
-            f"CLIProxyAPI at {self.config.base_url} does not advertise {wanted}; "
-            "check the external model alias configuration"
-        )
-
+        return tuple(ids)
 
 __all__ = ["ModelDiscovery", "ProxyDiscoveryError"]

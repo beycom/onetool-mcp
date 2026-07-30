@@ -107,7 +107,6 @@ def _summarise_with_retry(
                 route=route,
                 request=GenerationRequest(system=system, prompt=user),
                 secret_resolver=get_secret,
-                proxy_config=root.code.cliproxy if root.code is not None else None,
             )
             return response.content.strip()
         except GenerationError as e:

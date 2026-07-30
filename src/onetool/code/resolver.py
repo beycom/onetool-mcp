@@ -1,133 +1,218 @@
-"""Deterministic shared model and launcher-route resolution."""
+"""Exact launcher model and target resolution."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, cast
 
 from onetool.code.domain import (
     CLAUDE_PROXY_WARNING,
     ResolvedModel,
-    ResolvedRoute,
+    ResolvedTarget,
 )
+from ot.config.routing import CodeModelConfig
 
 if TYPE_CHECKING:
     from ot.config.models import OneToolConfig
-    from ot.config.routing import Harness, PermissionMode
+    from ot.config.routing import Harness, ModelSource, PermissionMode
+
+type TargetKind = Literal["route", "profile"]
+type ModelCandidate = tuple[TargetKind, str, CodeModelConfig]
+
+_COMPATIBLE_ROUTES: dict[Harness, frozenset[ModelSource]] = {
+    "claude": frozenset(
+        {"claude_subscription", "codex_subscription", "openrouter"}
+    ),
+    "codex": frozenset({"codex_subscription", "openrouter"}),
+}
 
 
-def _identity_index(config: OneToolConfig) -> dict[str, str]:
-    """Return identity-to-shortcut mappings from validated configuration."""
-    identities: dict[str, str] = {}
-    for shortcut, model in config.models.items():
-        for identity in (shortcut, model.id, model.proxy_alias):
-            if identity is not None:
-                identities[identity] = shortcut
-    return identities
+def compatible_routes(harness: Harness) -> frozenset[ModelSource]:
+    """Return the verified canonical proxy routes for one harness."""
+    return _COMPATIBLE_ROUTES[harness]
 
 
-def resolve_model(config: OneToolConfig, selection: str) -> ResolvedModel:
-    """Resolve one shortcut, concrete id, or proxy alias without substitution."""
-    shortcut = _identity_index(config).get(selection)
-    if shortcut is None:
-        suggestions = ", ".join(sorted(config.models)) or "none configured"
+def compatible_models(
+    *,
+    config: OneToolConfig,
+    harness: Harness,
+    route: ModelSource | None = None,
+    profile: str | None = None,
+) -> tuple[ModelCandidate, ...]:
+    """Enumerate models within one exact compatible target scope."""
+    code = config.code
+    if code is None:
         raise ValueError(
-            f"Unknown model {selection!r}. Configured shortcuts: {suggestions}"
+            "Code routing is not configured. Use `onetool init` or add a "
+            "`code` section to onetool.yaml."
         )
-    model = config.models[shortcut]
-    return ResolvedModel(
-        shortcut=model.shortcut,
-        id=model.id,
-        label=model.label,
-        source=model.source,
-        proxy_alias=model.proxy_alias,
-        context_window=model.context_window,
-        modalities=frozenset(model.modalities),
-        harnesses=frozenset(model.harnesses),
+    if route is not None and profile is not None:
+        raise ValueError("--route and --profile are mutually exclusive")
+    if profile is not None:
+        if harness != "codex":
+            raise ValueError("Direct profiles are supported only by Codex")
+        profiles = (
+            code.direct.codex.profiles if code.direct is not None else {}
+        )
+        models = profiles.get(profile)
+        if models is None:
+            configured = ", ".join(sorted(profiles)) or "none"
+            raise ValueError(
+                f"Profile {profile!r} is not configured. "
+                f"Configured profiles: {configured}"
+            )
+        return tuple(("profile", profile, model) for model in models)
+
+    proxy_routes = code.proxy.routes if code.proxy is not None else {}
+    if route is not None:
+        if route not in compatible_routes(harness):
+            raise ValueError(f"Route {route!r} is not supported by {harness}")
+        models = proxy_routes.get(route)
+        if models is None:
+            configured = ", ".join(sorted(proxy_routes)) or "none"
+            raise ValueError(
+                f"Route {route!r} is not configured. Configured routes: {configured}"
+            )
+        return tuple(("route", route, model) for model in models)
+
+    candidates: list[ModelCandidate] = [
+        ("route", candidate_route, model)
+        for candidate_route, models in proxy_routes.items()
+        if candidate_route in compatible_routes(harness)
+        for model in models
+    ]
+    if harness == "codex" and code.direct is not None:
+        candidates.extend(
+            ("profile", candidate_profile, model)
+            for candidate_profile, models in code.direct.codex.profiles.items()
+            for model in models
+        )
+    return tuple(candidates)
+
+
+def configured_harnesses(config: OneToolConfig) -> tuple[Harness, ...]:
+    """Return harnesses that have at least one compatible configured target."""
+    harnesses = cast("tuple[Harness, ...]", ("claude", "codex"))
+    return tuple(
+        harness
+        for harness in harnesses
+        if compatible_models(config=config, harness=harness)
     )
 
 
-def resolve_route(
+def _format_candidates(candidates: tuple[ModelCandidate, ...]) -> str:
+    """Format exact ids, shortcuts, and targets for actionable errors."""
+    values = []
+    for kind, target, model in candidates:
+        shortcut = f", shortcut={model.shortcut}" if model.shortcut else ""
+        values.append(f"{model.id} ({kind}={target}{shortcut})")
+    return ", ".join(values) or "none"
+
+
+def _select_model(
+    *,
+    selection: str,
+    candidates: tuple[ModelCandidate, ...],
+) -> ModelCandidate:
+    """Resolve one exact model id or shortcut."""
+    matches = tuple(
+        candidate
+        for candidate in candidates
+        if candidate[2].id == selection or candidate[2].shortcut == selection
+    )
+    if not matches:
+        raise ValueError(
+            f"Unknown model {selection!r}. Compatible configured models: "
+            f"{_format_candidates(candidates)}"
+        )
+    if len(matches) > 1:
+        raise ValueError(
+            f"Model {selection!r} is configured under multiple targets; pass exact "
+            f"--route or --profile. Matches: {_format_candidates(matches)}"
+        )
+    return matches[0]
+
+
+def resolve_target(
     *,
     config: OneToolConfig,
     harness: Harness,
     model: str | None,
-    route: str | None,
+    route: ModelSource | None,
+    profile: str | None = None,
     permission: PermissionMode | None,
-) -> ResolvedRoute:
-    """Resolve the selected harness route deterministically."""
+) -> ResolvedTarget:
+    """Resolve one harness, exact target, model, and permission."""
     code = config.code
     if code is None:
         raise ValueError(
-            "Code routing is not configured. Run `onetool code setup` or add "
-            "`models` and `code` to onetool.yaml."
+            "Code routing is not configured. Use `onetool init` or add a "
+            "`code` section to onetool.yaml."
         )
+    if route is not None and profile is not None:
+        raise ValueError("--route and --profile are mutually exclusive")
 
-    route_name = route
-    if route_name is None:
-        route_name = (
-            code.defaults.claude_route
-            if harness == "claude"
-            else code.defaults.codex_route
-        )
-    if route_name is None:
-        raise ValueError(
-            f"No default {harness} route is configured. Pass --route explicitly."
-        )
-
-    selected_route = code.routes.get(route_name)
-    if selected_route is None:
-        compatible = sorted(
-            name
-            for name, candidate in code.routes.items()
-            if candidate.harness == harness and candidate.enabled
-        )
-        raise ValueError(
-            f"Unknown route {route_name!r}. Compatible routes: "
-            f"{', '.join(compatible) or 'none'}"
-        )
-    if selected_route.harness != harness:
-        raise ValueError(
-            f"Route {route_name!r} is for {selected_route.harness}, not {harness}"
-        )
-    if not selected_route.enabled:
-        raise ValueError(f"Route {route_name!r} is disabled")
-
-    resolved_model = resolve_model(
-        config,
-        model if model is not None else selected_route.model,
-    )
-    if resolved_model.source != selected_route.source:
-        raise ValueError(
-            f"Model {resolved_model.shortcut!r} uses {resolved_model.source}, "
-            f"but route {route_name!r} uses {selected_route.source}"
-        )
-    if harness not in resolved_model.harnesses:
-        raise ValueError(
-            f"Model {resolved_model.shortcut!r} is not verified for {harness}"
-        )
-
-    warning = None
-    if (
-        harness == "claude"
-        and selected_route.source == "claude_subscription"
-        and selected_route.transport == "cliproxy"
-    ):
-        if not code.claude_subscription_proxy_enabled:
-            raise ValueError(
-                "Claude subscription proxying is disabled. Set "
-                "code.claude_subscription_proxy_enabled: true to select this route."
+    selection = model
+    route_scope = route
+    profile_scope = profile
+    if selection is None:
+        if code.default is None:
+            candidates = compatible_models(
+                config=config,
+                harness=harness,
+                route=route_scope,
+                profile=profile_scope,
             )
-        warning = CLAUDE_PROXY_WARNING
+            raise ValueError(
+                f"No default model is configured for {harness}. Pass a model or "
+                f"choose from: {_format_candidates(candidates)}"
+            )
+        selection = code.default.model
+        if route_scope is None and profile_scope is None:
+            route_scope = code.default.route
+            profile_scope = code.default.profile
 
-    return ResolvedRoute(
-        name=route_name,
+    candidates = compatible_models(
+        config=config,
         harness=harness,
-        source=selected_route.source,
-        transport=selected_route.transport,
-        model=resolved_model,
-        permission=permission or code.defaults.permission,
+        route=route_scope,
+        profile=profile_scope,
+    )
+    kind, target_name, selected_model = _select_model(
+        selection=selection,
+        candidates=candidates,
+    )
+    warning = (
+        CLAUDE_PROXY_WARNING
+        if harness == "claude"
+        and kind == "route"
+        and target_name == "claude_subscription"
+        else None
+    )
+    claude_policy = selected_model.claude
+    return ResolvedTarget(
+        kind=kind,
+        name=target_name,
+        harness=harness,
+        model=ResolvedModel(
+            id=selected_model.id,
+            label=selected_model.label,
+            claude_context=(
+                claude_policy.context if claude_policy is not None else None
+            ),
+            auto_compact_window=(
+                claude_policy.auto_compact_window
+                if claude_policy is not None
+                else None
+            ),
+        ),
+        permission=permission or code.permission,
         warning=warning,
     )
 
 
-__all__ = ["resolve_model", "resolve_route"]
+__all__ = [
+    "compatible_models",
+    "compatible_routes",
+    "configured_harnesses",
+    "resolve_target",
+]

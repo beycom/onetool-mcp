@@ -1,185 +1,163 @@
-"""Tests for strict model and code-launch routing configuration."""
+"""Tests for strict generation and code-routing configuration."""
 
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import TYPE_CHECKING
 
 import pytest
-import yaml
 from pydantic import ValidationError
 
 from ot.config import OneToolConfig
-from ot.config.loader import load_config
-from tests.unit.core.routing_fixtures import valid_routing_config
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from tests.unit.core.routing_fixtures import (
+    direct_codex_config,
+    generation_config,
+    proxy_launcher_config,
+)
 
 pytestmark = [pytest.mark.unit, pytest.mark.core]
 
 
-def test_valid_direct_and_proxy_routes() -> None:
-    """A complete verified route matrix validates."""
-    config = OneToolConfig.model_validate(valid_routing_config())
+def test_minimal_proxy_and_direct_launchers_are_independently_valid() -> None:
+    proxy = OneToolConfig.model_validate(proxy_launcher_config())
+    direct = OneToolConfig.model_validate(direct_codex_config())
 
-    assert config.code is not None
-    assert config.code.defaults.claude_route == "claude-native"
-    assert config.code.routes["codex-openrouter"].secret_name == "OPENROUTER_API_KEY"
+    assert proxy.code is not None and proxy.code.proxy is not None
+    assert proxy.code.proxy.base_url == "http://127.0.0.1:8317"
+    assert direct.code is not None and direct.code.proxy is None
+    assert direct.code.direct is not None
+    assert direct.code.direct.codex.profiles["openrouter"][0].id == "z-ai/glm-5.2"
 
 
-def test_code_configuration_is_optional() -> None:
-    """Normal server configuration remains valid without launcher setup."""
-    config = OneToolConfig.model_validate({"version": 2})
-
-    assert config.models == {}
-    assert config.code is None
+def test_code_requires_at_least_one_runtime_target() -> None:
+    with pytest.raises(ValidationError, match="at least one proxy route"):
+        OneToolConfig.model_validate({"version": 2, "code": {}})
 
 
 @pytest.mark.parametrize(
-    ("path", "value"),
+    "policy",
     [
-        (("code", "unexpected"), True),
-        (("code", "routes", "claude-native", "command"), "claude --model sol"),
-        (("models", "sol", "legacy_alias"), "gpt"),
+        {"context": "standard", "auto_compact_window": 100},
+        {"context": "1m", "auto_compact_window": 1_000_000},
+        {"context": "large"},
     ],
 )
-def test_strict_routing_fields_are_rejected(
-    tmp_path: Path,
-    path: tuple[str, ...],
-    value: object,
-) -> None:
-    """Unknown typed routing fields fail through normal validation."""
-    data = valid_routing_config()
-    target = data
-    for part in path[:-1]:
-        target = target[part]
-    target[path[-1]] = value
-    config_path = tmp_path / "onetool.yaml"
-    config_path.write_text(yaml.safe_dump(data))
+def test_invalid_claude_context_policy_is_rejected(policy: object) -> None:
+    data = proxy_launcher_config()
+    data["code"]["proxy"]["routes"]["openrouter"][0]["claude"] = policy
 
-    with pytest.raises(ValueError, match="extra_forbidden"):
-        load_config(config_path)
-
-
-def test_duplicate_model_identity_is_rejected() -> None:
-    """Shortcuts, ids, and aliases are globally unambiguous."""
-    data = valid_routing_config()
-    data["models"]["glm52"]["proxy_alias"] = "sol"
-
-    with pytest.raises(ValidationError, match="ambiguous"):
+    with pytest.raises(ValidationError):
         OneToolConfig.model_validate(data)
 
 
-def test_unknown_route_model_is_rejected() -> None:
-    """Routes cannot rely on a hidden runtime registry."""
-    data = valid_routing_config()
-    data["code"]["routes"]["claude-sol"]["model"] = "missing"
+def test_claude_policy_is_rejected_for_direct_codex_model() -> None:
+    data = direct_codex_config()
+    model = data["code"]["direct"]["codex"]["profiles"]["openrouter"][0]
+    model["claude"] = {"context": "1m"}
 
-    with pytest.raises(ValidationError, match="unknown model"):
+    with pytest.raises(ValidationError, match="direct Codex"):
         OneToolConfig.model_validate(data)
 
 
-def test_route_source_must_match_model() -> None:
-    """Route selection cannot substitute the configured provider source."""
-    data = valid_routing_config()
-    data["code"]["routes"]["claude-sol"]["source"] = "openrouter"
+def test_shortcuts_are_globally_unique_and_collision_safe() -> None:
+    duplicate = proxy_launcher_config()
+    duplicate["code"]["proxy"]["routes"]["openrouter"][0]["shortcut"] = "sol"
+    with pytest.raises(ValidationError, match="shortcut"):
+        OneToolConfig.model_validate(duplicate)
 
-    with pytest.raises(ValidationError, match="does not match model source"):
+    collision = proxy_launcher_config()
+    collision["code"]["proxy"]["routes"]["openrouter"][0]["id"] = "sol"
+    with pytest.raises(ValidationError, match="identity"):
+        OneToolConfig.model_validate(collision)
+
+
+def test_duplicate_model_id_within_target_is_rejected() -> None:
+    data = direct_codex_config()
+    models = data["code"]["direct"]["codex"]["profiles"]["openrouter"]
+    models.append({"id": "z-ai/glm-5.2"})
+
+    with pytest.raises(ValidationError, match="duplicate model ids"):
         OneToolConfig.model_validate(data)
 
 
-def test_unsupported_route_combination_is_rejected() -> None:
-    """Only the verified harness/source/transport matrix is accepted."""
-    data = valid_routing_config()
-    data["code"]["routes"]["codex-openrouter"]["transport"] = "cliproxy"
-    data["code"]["routes"]["codex-openrouter"].pop("base_url")
-    data["code"]["routes"]["codex-openrouter"].pop("secret_name")
+def test_ambiguous_default_requires_exact_target() -> None:
+    data = proxy_launcher_config()
+    data["code"]["direct"] = {
+        "codex": {
+            "profiles": {
+                "work": [{"id": "gpt-5.6-sol"}],
+            }
+        }
+    }
+    data["code"]["default"] = {"model": "gpt-5.6-sol"}
 
-    with pytest.raises(ValidationError, match="unsupported"):
+    with pytest.raises(ValidationError, match="multiple targets"):
+        OneToolConfig.model_validate(data)
+
+    data["code"]["default"]["profile"] = "work"
+    OneToolConfig.model_validate(data)
+
+
+def test_route_and_profile_default_are_mutually_exclusive() -> None:
+    data = proxy_launcher_config()
+    data["code"]["direct"] = direct_codex_config()["code"]["direct"]
+    data["code"]["default"]["profile"] = "openrouter"
+
+    with pytest.raises(ValidationError, match="mutually exclusive"):
         OneToolConfig.model_validate(data)
 
 
-def test_proxy_route_requires_external_connection() -> None:
-    """A proxied route requires explicit bounded inference connection data."""
-    data = valid_routing_config()
-    data["code"].pop("cliproxy")
+def test_removed_launcher_and_generation_metadata_fail_strictly() -> None:
+    launcher = proxy_launcher_config()
+    launcher["code"]["proxy"]["routes"]["openrouter"][0]["modalities"] = ["text"]
+    with pytest.raises(ValidationError, match="extra_forbidden"):
+        OneToolConfig.model_validate(launcher)
 
-    with pytest.raises(ValidationError, match=r"code\.cliproxy is required"):
+    generation = generation_config()
+    generation["models"]["sol"]["context_window"] = 1_000_000
+    with pytest.raises(ValidationError, match="extra_forbidden"):
+        OneToolConfig.model_validate(generation)
+
+
+def test_cliproxy_generation_requires_proxy_connection() -> None:
+    data = generation_config()
+    data["code"] = direct_codex_config()["code"]
+
+    with pytest.raises(ValidationError, match=r"requires code\.proxy"):
         OneToolConfig.model_validate(data)
 
 
-def test_claude_subscription_proxy_requires_opt_in() -> None:
-    """Claude consumer-subscription proxying is disabled by default."""
-    data = valid_routing_config()
-    data["code"]["routes"]["claude-subscription-proxy"] = {
-        "harness": "claude",
-        "source": "claude_subscription",
-        "transport": "cliproxy",
-        "model": "sonnet",
+@pytest.mark.parametrize(
+    "argument",
+    [
+        "--profile=work",
+        "-p",
+        "-pwork",
+        "--model=other",
+        "-mother",
+        "-cmodel_provider='other'",
+    ],
+)
+def test_configured_owned_arguments_are_rejected(argument: str) -> None:
+    data = deepcopy(direct_codex_config())
+    data["code"]["clients"] = {
+        "codex": {"additional_arguments": [argument]},
     }
 
-    with pytest.raises(ValidationError, match="proxy_enabled"):
-        OneToolConfig.model_validate(data)
-
-    data["code"]["claude_subscription_proxy_enabled"] = True
-    config = OneToolConfig.model_validate(data)
-    assert config.code is not None
-    assert config.code.routes["claude-subscription-proxy"].enabled
-
-
-@pytest.mark.parametrize(
-    "executable",
-    ["claude --model sol", "bin/claude", "./claude", " claude"],
-)
-def test_invalid_executable_forms_are_rejected(executable: str) -> None:
-    """Executable values never become shell command templates."""
-    data = valid_routing_config()
-    data["code"]["clients"]["claude"]["executable"] = executable
-
-    with pytest.raises(ValidationError, match="executable"):
+    with pytest.raises(ValidationError, match="launcher-owned"):
         OneToolConfig.model_validate(data)
 
 
-def test_absolute_executable_path_may_contain_spaces() -> None:
-    """An absolute path remains one subprocess token even when it has spaces."""
-    data = valid_routing_config()
-    executable = "/Applications/Claude Code/claude"
-    data["code"]["clients"]["claude"]["executable"] = executable
-
-    config = OneToolConfig.model_validate(data)
-
-    assert config.code is not None
-    assert config.code.clients.claude is not None
-    assert config.code.clients.claude.executable == executable
-
-
 @pytest.mark.parametrize(
-    ("client", "argument"),
+    "base_url",
     [
-        ("claude", "--model=sol"),
-        ("claude", "--settings"),
-        ("codex", "-m"),
-        ("codex", "exec"),
-        ("codex", "--config=model_provider='other'"),
+        "http://proxy.local/path\nnext",
+        "http://proxy.local/path\x01next",
+        "http://proxy.local/path\x7fnext",
     ],
 )
-def test_configured_route_owned_arguments_are_rejected(
-    client: str,
-    argument: str,
-) -> None:
-    """Configured arguments cannot make route precedence order-dependent."""
-    data = valid_routing_config()
-    data["code"]["clients"][client]["additional_arguments"] = [argument]
+def test_proxy_base_url_rejects_control_characters(base_url: str) -> None:
+    data = proxy_launcher_config()
+    data["code"]["proxy"]["base_url"] = base_url
 
-    with pytest.raises(ValidationError, match=r"launcher-owned|launch-mode"):
-        OneToolConfig.model_validate(data)
-
-
-def test_invalid_default_route_is_rejected() -> None:
-    """Defaults must name an enabled route for the requested harness."""
-    data = deepcopy(valid_routing_config())
-    data["code"]["defaults"]["codex_route"] = "claude-native"
-
-    with pytest.raises(ValidationError, match="enabled codex route"):
+    with pytest.raises(ValidationError, match="control characters"):
         OneToolConfig.model_validate(data)

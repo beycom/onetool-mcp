@@ -406,7 +406,6 @@ def _llm_rerank(
             prompt=prompt,
         ),
         secret_resolver=get_secret,
-        proxy_config=root.code.cliproxy if root.code is not None else None,
     )
     scores = [
         float(value.strip())
@@ -454,7 +453,6 @@ def _synthesise(
             prompt=prompt,
         ),
         secret_resolver=get_secret,
-        proxy_config=root.code.cliproxy if root.code is not None else None,
     ).content
 
 

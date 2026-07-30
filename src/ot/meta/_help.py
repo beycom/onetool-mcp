@@ -103,7 +103,6 @@ def _with_ask_answer(base_help: str, ask: str) -> str:
                 prompt=f"Question:\n{ask}\n\nHelp text:\n{base_help}",
             ),
             secret_resolver=get_secret,
-            proxy_config=config.code.cliproxy if config.code is not None else None,
         )
         answer = response.content
         if not answer.strip():
