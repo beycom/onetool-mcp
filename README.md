@@ -1,3 +1,5 @@
+[![MCP Toplist](https://mcptoplist.com/badge/io.github.beycom%2Fonetool-mcp.svg)](https://mcptoplist.com/server/io.github.beycom%2Fonetool-mcp)
+
 <p align="center">
   <!-- mcp-name: io.github.beycom/onetool-mcp -->
   <a href="https://github.com/beycom/onetool-mcp">
