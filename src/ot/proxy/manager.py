@@ -42,10 +42,15 @@ if TYPE_CHECKING:
     from ot.config.models import McpServerConfig
 
 
-_CONNECT_SECRET_RE = re.compile(
-    # Redact everything after a credential keyword to end-of-line — the value may be
-    # a scheme + token ("Bearer sk-…"), so a single-token capture would leak the rest.
-    r"(authorization|bearer|basic|token|api[-_ ]?key)\b[:=]?\s*\S[^\n]*",
+_CONNECT_AUTH_RE = re.compile(
+    r"(?P<label>\bauthorization\s*[:=]\s*(?:(?:bearer|basic)\s+)?"
+    r"|\b(?:bearer|basic)\s+)(?P<secret>[^\s,;}\]]+)",
+    re.IGNORECASE,
+)
+_CONNECT_SECRET_FIELD_RE = re.compile(
+    r"(?P<label>[\"']?(?:access_token|refresh_token|id_token|client_secret|token|"
+    r"api[-_ ]?key)[\"']?\s*[:=]\s*)(?P<quote>[\"']?)"
+    r"(?P<secret>[^\"'\s,;}\]]+)(?P=quote)",
     re.IGNORECASE,
 )
 
@@ -57,17 +62,20 @@ def _sanitize_connect_error(msg: str) -> str:
     failure echoes it, this keeps it out of ot.servers()/status output and logs while
     preserving enough context (exception type, non-credential text) to diagnose.
 
-    Two layers, applied in order:
-    1. ``redact_secrets()`` — the canonical, shape-based redactor (single source of
+    Three layers, applied in order:
+    1. Credential header/scheme redaction removes only the credential value, retaining
+       safe error details that follow it.
+    2. Credential field redaction handles JSON, form, and key/value token fields without
+       treating diagnostic phrases such as ``Token exchange failed`` as credentials.
+    3. ``redact_secrets()`` — the canonical, shape-based redactor (single source of
        truth, shared with logging/mem redaction) that catches raw secret literals
        (``sk-...``, ``ghp_...``, ``AKIA...``, connection strings, ...) regardless of
        whether a credential keyword precedes them.
-    2. ``_CONNECT_SECRET_RE`` — a keyword-gated pass that truncates anything trailing
-       a credential keyword (authorization/bearer/basic/token/api-key) to end-of-line,
-       catching keyword-prefixed opaque tokens whose shape the first pass can't know.
     """
+    msg = _CONNECT_AUTH_RE.sub(r"\g<label>[redacted]", msg)
+    msg = _CONNECT_SECRET_FIELD_RE.sub(r"\g<label>[redacted]", msg)
     msg = redact_secrets(msg)
-    return _CONNECT_SECRET_RE.sub(r"\1 [redacted]", msg)
+    return msg
 
 
 def _strip_ctx_from_schema(tool: types.Tool) -> types.Tool:
@@ -935,10 +943,14 @@ class ProxyManager:
         auth: OAuth | BearerAuth | None = None
         if config.auth:
             if config.auth.type == "oauth":
+                from ot.proxy.oauth import create_oauth_token_storage
+
                 auth = OAuth(
                     mcp_url=url,
                     scopes=config.auth.scopes or [],
                     client_name="OneTool",
+                    token_storage=create_oauth_token_storage(),
+                    additional_client_metadata={"token_endpoint_auth_method": "none"},
                 )
                 logger.debug(
                     f"Configured OAuth for {name} with scopes: {config.auth.scopes}"

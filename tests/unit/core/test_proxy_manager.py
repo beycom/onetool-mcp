@@ -318,9 +318,11 @@ class TestProxyManagerAuth:
     @patch("ot.proxy.manager.OAuth")
     @patch("ot.proxy.manager.StreamableHttpTransport")
     @patch("ot.proxy.manager.Client")
+    @patch("ot.proxy.oauth.create_oauth_token_storage")
     def test_http_client_oauth(
         self,
-        mock_client: MagicMock,
+        mock_create_storage: MagicMock,
+        _mock_client: MagicMock,
         mock_transport: MagicMock,
         mock_oauth: MagicMock,
     ) -> None:
@@ -341,6 +343,8 @@ class TestProxyManagerAuth:
             mcp_url="https://test.invalid/mcp",
             scopes=["tools:read", "tools:write"],
             client_name="OneTool",
+            token_storage=mock_create_storage.return_value,
+            additional_client_metadata={"token_endpoint_auth_method": "none"},
         )
 
         # Verify transport created with OAuth

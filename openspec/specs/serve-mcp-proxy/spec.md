@@ -35,14 +35,13 @@ sanitize connect-error strings before they are stored or surfaced to the agent o
 
 #### Scenario: Connect-error strings sanitized before surfacing
 - **GIVEN** an MCP server connection attempt fails with an exception whose string representation
-  could contain an `Authorization`/`Bearer`/`Basic`-style credential fragment (e.g. built from a
-  decrypted secret used as a bearer token for an HTTP-transport server)
-- **WHEN** the error is stored in `self._errors[name]` (`src/ot/proxy/manager.py:489,733`) for
-  later surfacing via `ot.servers()`/status output
-- **THEN** the stored string SHALL have any `Authorization:`/`Bearer `/`Basic `-prefixed credential
-  fragments stripped or redacted before storage
-- **AND** the sanitized string SHALL still identify the failure reason (e.g. connection
-  refused/timeout/DNS failure) so the error remains diagnosable
+  could contain an `Authorization`/`Bearer`/`Basic` credential or an OAuth token field
+- **WHEN** the error is stored for later surfacing via `ot.servers()`/status output
+- **THEN** credential values SHALL be redacted before storage
+- **AND** safe structured OAuth details such as HTTP status, error code, and error description
+  SHALL remain visible
+- **AND** the sanitizer SHALL NOT treat diagnostic phrases such as `Token exchange failed` as
+  credential values
 
 ### Requirement: Pack Tool Access
 
@@ -287,6 +286,38 @@ The system SHALL support HTTP/SSE transport for remote MCP servers.
 - **GIVEN** HTTP MCP config with http:// URL
 - **WHEN** connecting
 - **THEN** it SHALL upgrade to https:// automatically
+
+### Requirement: HTTP OAuth Public Clients
+
+The system SHALL authenticate interactive localhost PKCE proxy clients as public OAuth clients
+and SHALL persist their credentials securely without additional configuration.
+
+#### Scenario: Dynamic public-client registration
+- **GIVEN** an HTTP MCP server configured with `auth.type: oauth`
+- **WHEN** OneTool dynamically registers its localhost PKCE client
+- **THEN** the registration metadata SHALL include `token_endpoint_auth_method: none`
+- **AND** authorization-code and refresh-token requests SHALL include `client_id` in the form body
+- **AND** those token requests SHALL NOT include HTTP Basic authentication or a client secret
+
+#### Scenario: Secure credential persistence
+- **GIVEN** an OAuth proxy stores dynamically registered client information and issued tokens
+- **WHEN** the FastMCP client is recreated or OneTool restarts
+- **THEN** OneTool SHALL load the stored client information, access token, refresh token, and expiry
+  information from a secure OS-keychain backend
+- **AND** storage SHALL be isolated by OneTool configuration directory and MCP endpoint URL
+- **AND** an unavailable or insecure keyring backend SHALL fail closed rather than store OAuth
+  credentials in memory or plaintext
+
+#### Scenario: Valid credential reuse
+- **GIVEN** valid OAuth client information and tokens exist in persistent storage
+- **WHEN** the proxy reconnects to the same MCP endpoint
+- **THEN** it SHALL reuse the stored credentials without opening browser authorization
+
+#### Scenario: Refresh token rotation
+- **GIVEN** a stored access token has expired and a refresh token is available
+- **WHEN** the OAuth server returns a refreshed access token and rotated refresh token
+- **THEN** OneTool SHALL persist the replacement token set and updated expiry information
+- **AND** a later proxy recreation SHALL use the replacement refresh token
 
 ### Requirement: Stdio Transport Support
 

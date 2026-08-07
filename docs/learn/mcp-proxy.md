@@ -31,6 +31,23 @@ local_tools.some_tool(arg="value")
 
 Proxied servers appear alongside the built-in packs — `ot.servers()` lists them.
 
+## OAuth authorization survives restarts
+
+HTTP servers configured with `auth.type: oauth` use a public OAuth client with PKCE. OneTool
+registers the client with `token_endpoint_auth_method: none`, keeping `client_id` in token-request
+forms without also sending HTTP Basic credentials. This supports public PKCE MCP providers such as
+Notion without provider-specific configuration.
+
+OAuth client registration, access and refresh tokens, and expiry metadata are persisted in the OS
+keychain. Storage is isolated by the OneTool configuration directory and exact MCP endpoint URL, so
+restarting OneTool or reconnecting a server reuses valid authorization while separate projects and
+endpoints remain isolated. Refresh-token rotation replaces the stored token set automatically.
+
+OneTool refuses OAuth persistence when the active keyring is unavailable or insecure; it does not
+fall back to in-memory or plaintext token storage. Connection status keeps safe OAuth diagnostics
+such as HTTP status, error code, and description while redacting authorization headers and token
+values.
+
 ## Calling conventions don't matter
 
 OneTool fuzzy-matches proxied tool names across naming conventions (snake_case, kebab-case,

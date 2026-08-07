@@ -421,7 +421,14 @@ servers:
 
 - **None (default)**: No authentication required
 - **bearer**: Static token authentication (use `${VAR}` for secrets)
-- **oauth**: OAuth 2.1 with PKCE flow (browser-based authorization)
+- **oauth**: OAuth 2.1 public-client flow with PKCE (browser-based authorization)
+
+OAuth proxy clients automatically register with `token_endpoint_auth_method: none`, so the
+authorization-code and refresh exchanges do not send a client secret or HTTP Basic credentials.
+Registered client information, access and refresh tokens, and expiry metadata are stored in the
+OS keychain. Entries are isolated by the OneTool configuration directory and exact MCP endpoint,
+allowing reconnects and restarts to reuse valid authorization. OneTool fails closed if the active
+keyring backend is unavailable or is not an approved secure OS-keychain provider.
 
 ## Aliases
 

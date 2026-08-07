@@ -187,3 +187,30 @@ class TestConnectErrorSanitization:
         out = _sanitize_connect_error(msg)
         assert "xyz" not in out
         assert "connection failed" in out
+
+    def test_oauth_error_details_are_preserved(self) -> None:
+        """OAuth status and structured error details are safe diagnostics."""
+        from ot.proxy.manager import _sanitize_connect_error
+
+        msg = (
+            'Token exchange failed (400): {"error":"invalid_request",'
+            '"error_description":"Client must not use multiple authentication methods"}'
+        )
+
+        assert _sanitize_connect_error(msg) == msg
+
+    def test_structured_oauth_tokens_are_redacted_without_hiding_error(self) -> None:
+        """Token values are removed while neighboring OAuth metadata remains."""
+        from ot.proxy.manager import _sanitize_connect_error
+
+        msg = (
+            'OAuth failed: access_token="opaque-access", refresh_token="opaque-refresh", '
+            'status=401, error="invalid_token"'
+        )
+
+        out = _sanitize_connect_error(msg)
+
+        assert "opaque-access" not in out
+        assert "opaque-refresh" not in out
+        assert "status=401" in out
+        assert 'error="invalid_token"' in out
