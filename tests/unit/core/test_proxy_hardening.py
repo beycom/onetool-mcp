@@ -7,12 +7,16 @@ sync-call timeout path (D-c1).
 
 from __future__ import annotations
 
+import asyncio
 import concurrent.futures
 import threading
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import anyio
+import httpx
 import pytest
 from mcp import types
+from mcp.shared.exceptions import McpError
 
 from ot.proxy.manager import ProxyManager
 
@@ -306,3 +310,127 @@ class TestConnectErrorSanitization:
         assert sentinel not in (manager.get_error("secure") or "")
         assert sentinel not in str(warning.call_args.args[0])
         assert sentinel not in str(span_logger.opt.return_value.error.call_args.args[0])
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestTerminalConnectionRetirement:
+    """Terminal call failures retire only their exact connection generation."""
+
+    @staticmethod
+    def _manager_with_client(error: BaseException) -> tuple[ProxyManager, MagicMock]:
+        manager = ProxyManager()
+        client = MagicMock()
+        client.call_tool = AsyncMock(side_effect=error)
+        client.__aexit__ = AsyncMock(return_value=None)
+        client.transport = MagicMock()
+        client.transport.close = AsyncMock(return_value=None)
+        manager._clients["srv"] = client
+        manager._tools_by_server["srv"] = [_tool_mock()]
+        manager._server_generations["srv"] = 1
+        return manager, client
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "error",
+        [
+            anyio.ClosedResourceError(),
+            EOFError("stdio ended"),
+            httpx.RemoteProtocolError("peer closed connection"),
+            RuntimeError("Server session was closed unexpectedly"),
+            ExceptionGroup(
+                "transport closed",
+                [anyio.BrokenResourceError(), anyio.EndOfStream()],
+            ),
+        ],
+    )
+    async def test_terminal_failure_retires_once_without_retry(
+        self, error: BaseException
+    ) -> None:
+        manager, client = self._manager_with_client(error)
+
+        with (
+            patch.object(manager, "_evict_proxy_caches") as evict,
+            pytest.raises(type(error)),
+        ):
+            await manager.call_tool("srv", "tool")
+
+        assert manager.get_connection("srv") is None
+        assert manager.list_tools(server="srv") == []
+        assert manager.get_error("srv")
+        client.call_tool.assert_awaited_once()
+        client.__aexit__.assert_awaited_once_with(None, None, None)
+        client.transport.close.assert_awaited_once_with()
+        evict.assert_called_once_with("srv")
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "error",
+        [
+            RuntimeError("remote application failed"),
+            McpError(types.ErrorData(code=-32000, message="application failed")),
+            ExceptionGroup(
+                "mixed",
+                [anyio.ClosedResourceError(), ValueError("application failed")],
+            ),
+        ],
+    )
+    async def test_application_failure_keeps_connection(
+        self, error: BaseException
+    ) -> None:
+        manager, client = self._manager_with_client(error)
+
+        with pytest.raises(type(error)):
+            await manager.call_tool("srv", "tool")
+
+        assert manager.get_connection("srv") is client
+        assert manager.get_error("srv") is None
+        client.call_tool.assert_awaited_once()
+        client.__aexit__.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_error_result_keeps_connection(self) -> None:
+        manager, client = self._manager_with_client(RuntimeError("unused"))
+        result = MagicMock()
+        result.content = [_text_content("application failed")]
+        result.is_error = True
+        client.call_tool.side_effect = None
+        client.call_tool.return_value = result
+
+        with pytest.raises(RuntimeError, match="application failed"):
+            await manager.call_tool("srv", "tool")
+
+        assert manager.get_connection("srv") is client
+        client.call_tool.assert_awaited_once()
+        client.__aexit__.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_stale_terminal_failure_cannot_retire_replacement(self) -> None:
+        manager = ProxyManager()
+        started = asyncio.Event()
+        release = asyncio.Event()
+        old_client = MagicMock()
+
+        async def fail_after_replacement(*_args: object, **_kwargs: object) -> None:
+            started.set()
+            await release.wait()
+            raise anyio.ClosedResourceError
+
+        old_client.call_tool = AsyncMock(side_effect=fail_after_replacement)
+        old_client.__aexit__ = AsyncMock(return_value=None)
+        old_client.transport = None
+        new_client = MagicMock()
+        manager._clients["srv"] = old_client
+        manager._server_generations["srv"] = 1
+
+        call = asyncio.create_task(manager.call_tool("srv", "tool"))
+        await started.wait()
+        manager._clients["srv"] = new_client
+        manager._server_generations["srv"] = 2
+        release.set()
+
+        with pytest.raises(anyio.ClosedResourceError):
+            await call
+        assert manager.get_connection("srv") is new_client
+        assert manager.get_error("srv") is None
+        old_client.__aexit__.assert_not_awaited()

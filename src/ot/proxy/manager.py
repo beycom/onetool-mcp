@@ -18,6 +18,8 @@ from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+import anyio
+import httpx
 from fastmcp import Client, Context
 from fastmcp.client.auth import BearerAuth, OAuth
 from fastmcp.client.elicitation import (
@@ -28,6 +30,7 @@ from fastmcp.client.elicitation import (
 from fastmcp.client.transports import StdioTransport, StreamableHttpTransport
 from loguru import logger
 from mcp import types
+from mcp.shared.exceptions import McpError
 
 from ot.config import expand_vars
 from ot.logging import LogEntry, LogSpan
@@ -61,6 +64,46 @@ _CONNECT_SECRET_FIELD_RE = re.compile(
     r"|[^\s,;&}\]\"']+)",
     re.IGNORECASE,
 )
+
+_TERMINAL_RUNTIME_MESSAGES = {
+    "Client is not connected. Use the 'async with client:' context manager first.",
+    "Server session was closed unexpectedly",
+    "Session task completed unexpectedly",
+}
+_TERMINAL_CONNECTION_ERRORS = (
+    anyio.BrokenResourceError,
+    anyio.ClosedResourceError,
+    anyio.EndOfStream,
+    ConnectionError,
+    EOFError,
+    httpx.CloseError,
+    httpx.ConnectError,
+    httpx.ReadError,
+    httpx.RemoteProtocolError,
+    httpx.WriteError,
+)
+
+
+def _is_terminal_connection_error(exc: BaseException) -> bool:
+    """Return whether an exception proves the downstream session is unusable."""
+    if isinstance(exc, McpError):
+        return False
+    if isinstance(exc, BaseExceptionGroup):
+        leaves: list[BaseException] = []
+        pending = list(exc.exceptions)
+        while pending:
+            leaf = pending.pop()
+            if isinstance(leaf, BaseExceptionGroup):
+                pending.extend(leaf.exceptions)
+            else:
+                leaves.append(leaf)
+        return bool(leaves) and all(_is_terminal_connection_error(leaf) for leaf in leaves)
+    if isinstance(exc, _TERMINAL_CONNECTION_ERRORS):
+        return True
+    if isinstance(exc, RuntimeError) and str(exc) in _TERMINAL_RUNTIME_MESSAGES:
+        return True
+    cause = exc.__cause__ or exc.__context__
+    return cause is not None and _is_terminal_connection_error(cause)
 
 
 def _sanitize_connect_error(msg: str) -> str:
@@ -384,6 +427,32 @@ class ProxyManager:
             for srv, t in items
         ]
 
+    async def _retire_failed_connection(
+        self,
+        server: str,
+        client: Client,  # type: ignore[type-arg]
+        generation: int | None,
+        error: BaseException,
+    ) -> None:
+        """Retire and close only the live generation that raised a terminal error."""
+        safe_error = _sanitize_connect_error(str(error) or type(error).__name__)
+        with self._mutation_lock:
+            if (
+                self._clients.get(server) is not client
+                or self._server_generations.get(server) != generation
+            ):
+                return
+            self._next_generation += 1
+            self._server_generations[server] = self._next_generation
+            self._clients.pop(server, None)
+            self._call_locks.pop(server, None)
+            self._tools_by_server.pop(server, None)
+            self._server_timeouts.pop(server, None)
+            self._server_instructions.pop(server, None)
+            self._errors[server] = safe_error
+        self._evict_proxy_caches(server)
+        await self._close_client(server, client)
+
     async def call_tool(
         self,
         server: str,
@@ -410,7 +479,9 @@ class ProxyManager:
             RuntimeError: If the tool returns an error.
             TimeoutError: If the call times out.
         """
-        client = self._clients.get(server)
+        with self._mutation_lock:
+            client = self._clients.get(server)
+            generation = self._server_generations.get(server)
         if not client:
             if self.is_connecting:
                 raise ValueError(
@@ -450,6 +521,12 @@ class ProxyManager:
                 raise TimeoutError(
                     f"Tool {server}.{tool} timed out after {timeout}s"
                 ) from None
+            except Exception as e:
+                if _is_terminal_connection_error(e):
+                    await self._retire_failed_connection(
+                        server, client, generation, e
+                    )
+                raise
             finally:
                 call_context.expire()
                 if self._active_calls.get(server) is call_context:

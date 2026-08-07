@@ -33,6 +33,14 @@ sanitize connect-error strings before they are stored or surfaced to the agent o
 - **THEN** connections SHALL be established independently so one slow server does not delay unrelated servers
 - **AND** failures SHALL be recorded per server without failing unrelated connections
 
+#### Scenario: Terminal connection failure during a tool call
+- **GIVEN** a connected proxy server generation
+- **WHEN** its transport or MCP session terminates during a tool call
+- **THEN** the system SHALL retire only that failed generation and report the server as failed
+- **AND** it SHALL remove stale tool schemas and derived resolution caches
+- **AND** it SHALL return the original call failure without retrying the downstream tool
+- **AND** a stale failure SHALL NOT retire a newer replacement generation
+
 #### Scenario: Connect-error strings sanitized before surfacing
 - **GIVEN** an MCP server connection attempt fails with an exception whose string representation
   could contain an `Authorization`/`Bearer`/`Basic` credential or an OAuth token field
