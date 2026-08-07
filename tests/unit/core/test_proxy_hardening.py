@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import json
 import threading
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -88,6 +89,55 @@ class TestProxyResultConversion:
         result.content = [content]
         assert await _call(ProxyManager(), result) == "[Binary content: MagicMock]"
 
+    async def test_resource_link_preserves_json_safe_protocol_fields(self) -> None:
+        link = types.ResourceLink(
+            type="resource_link",
+            uri="file:///reports/quarterly.pdf",
+            name="Quarterly report",
+            title="Q3 report",
+            description="Finance summary",
+            mimeType="application/pdf",
+            size=2048,
+            icons=[types.Icon(src="data:image/png;base64,AA==", sizes=["16x16"])],
+            annotations=types.Annotations(audience=["user"], priority=0.8),
+            _meta={"source": "finance"},
+        )
+        result = MagicMock()
+        result.content = [link]
+
+        converted = await _call(ProxyManager(), result)
+
+        assert converted == {
+            "name": "Quarterly report",
+            "title": "Q3 report",
+            "uri": "file:///reports/quarterly.pdf",
+            "description": "Finance summary",
+            "mimeType": "application/pdf",
+            "size": 2048,
+            "icons": [{"src": "data:image/png;base64,AA==", "sizes": ["16x16"]}],
+            "annotations": {"audience": ["user"], "priority": 0.8},
+            "_meta": {"source": "finance"},
+            "type": "resource_link",
+        }
+        json.dumps(converted)
+
+    async def test_mixed_text_and_resource_links_preserve_order(self) -> None:
+        link = types.ResourceLink(
+            type="resource_link", uri="file:///docs/guide.md", name="Guide"
+        )
+        result = MagicMock()
+        result.content = [_text_content("before"), link, _text_content("after")]
+
+        assert await _call(ProxyManager(), result) == [
+            "before",
+            {
+                "name": "Guide",
+                "uri": "file:///docs/guide.md",
+                "type": "resource_link",
+            },
+            "after",
+        ]
+
     async def test_upstream_error_raises_with_text_intact(self) -> None:
         result = MagicMock()
         result.content = [_text_content("missing required account_id")]
@@ -158,7 +208,9 @@ class TestCallToolSyncCancel:
 
         mock_future.cancel.assert_called_once()
 
-    @pytest.mark.parametrize("operation", ["resources", "prompts"])
+    @pytest.mark.parametrize(
+        "operation", ["resources", "read_resource", "prompts", "get_prompt"]
+    )
     def test_discovery_future_cancelled_on_timeout(self, operation: str) -> None:
         manager = ProxyManager()
         manager._loop = MagicMock()
@@ -174,8 +226,12 @@ class TestCallToolSyncCancel:
             with pytest.raises(concurrent.futures.TimeoutError):
                 if operation == "resources":
                     manager.list_resources_sync("srv", timeout=1.0)
-                else:
+                elif operation == "read_resource":
+                    manager.read_resource_sync("srv", "file:///doc", timeout=1.0)
+                elif operation == "prompts":
                     manager.list_prompts_sync("srv", timeout=1.0)
+                else:
+                    manager.get_prompt_sync("srv", "summary", timeout=1.0)
 
         mock_future.cancel.assert_called_once()
 

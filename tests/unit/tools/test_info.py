@@ -1245,6 +1245,66 @@ def test_servers_full_returns_dict(mock_proxy_manager: MagicMock) -> None:
     assert entry["tools"] == []
     assert "call_as" not in entry  # no hyphens → no call_as
     assert "instructions" not in entry  # instructions live in ot.help(), not servers()
+    mock_proxy_manager.list_resources_sync.assert_not_called()
+    mock_proxy_manager.list_prompts_sync.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.serve
+@pytest.mark.parametrize(
+    ("info", "manager_method", "items_key", "count_key", "items"),
+    [
+        (
+            "resources",
+            "list_resources_sync",
+            "resources",
+            "resource_count",
+            [{"uri": "file:///guide.md", "name": "Guide", "description": ""}],
+        ),
+        (
+            "prompts",
+            "list_prompts_sync",
+            "prompts",
+            "prompt_count",
+            [{"name": "summary", "description": "Summarize"}],
+        ),
+    ],
+)
+def test_servers_optional_discovery_modes_remain_separate(
+    mock_proxy_manager: MagicMock,
+    info: str,
+    manager_method: str,
+    items_key: str,
+    count_key: str,
+    items: list[dict[str, str]],
+) -> None:
+    from unittest.mock import MagicMock as MM
+    from unittest.mock import patch
+
+    from ot.meta import servers
+
+    server_cfg = MM(enabled=True)
+    config = MM(servers={"docs": server_cfg})
+    mock_proxy_manager.get_connection.return_value = object()
+    getattr(mock_proxy_manager, manager_method).return_value = items
+
+    with (
+        patch("ot.meta._discovery.get_proxy_manager", return_value=mock_proxy_manager),
+        patch("ot.meta._discovery.get_config", return_value=config),
+    ):
+        result = servers(info=info)  # type: ignore[arg-type]
+
+    assert result == [
+        {
+            "server": "docs",
+            "status": "connected",
+            count_key: 1,
+            items_key: items,
+        }
+    ]
+    getattr(mock_proxy_manager, manager_method).assert_called_once_with(
+        "docs", timeout=10.0
+    )
 
 
 @pytest.mark.unit

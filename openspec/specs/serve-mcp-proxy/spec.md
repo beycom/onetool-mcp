@@ -426,10 +426,10 @@ The system SHALL support listing and reading resources from proxied MCP servers.
   - `resource_count`: Number of resources (if connected)
   - `resources`: List of resource metadata (if connected)
 
-#### Scenario: Resource count in full server info
+#### Scenario: Full server info avoids resource discovery
 - **GIVEN** code `ot.servers(info="full")`
 - **WHEN** run() executes it for a connected server
-- **THEN** it SHALL include `Resources: N` in the output
+- **THEN** it SHALL NOT request resources or include a resource count
 
 ### Requirement: Prompts Proxying
 
@@ -461,14 +461,33 @@ The system SHALL support listing and getting prompts from proxied MCP servers.
   - `prompt_count`: Number of prompts (if connected)
   - `prompts`: List of prompt metadata (if connected)
 
-#### Scenario: Prompt count in full server info
+#### Scenario: Optional capability is absent
+- **GIVEN** negotiated server capabilities explicitly omit resources or prompts
+- **WHEN** the corresponding list operation is requested
+- **THEN** OneTool SHALL return an empty list without sending that request
+
+#### Scenario: Optional method is not implemented
+- **GIVEN** a resource or prompt list request returns MCP `METHOD_NOT_FOUND (-32601)`
+- **WHEN** OneTool handles the protocol error
+- **THEN** it SHALL return an empty list
+- **AND** authorization, routing, timeout, provider, and malformed-response failures SHALL propagate
+
+#### Scenario: Full server info avoids prompt discovery
 - **GIVEN** code `ot.servers(info="full")`
 - **WHEN** run() executes it for a connected server
-- **THEN** it SHALL include `Prompts: N` in the output
+- **THEN** it SHALL NOT request prompts or include a prompt count
 
 ### Requirement: Downstream Result Conversion
 
 The system SHALL correctly convert every downstream MCP content-block type a proxied tool can return, and SHALL NOT force-coerce plain text results into a different type.
+
+#### Scenario: ResourceLink content is preserved
+- **GIVEN** a proxied MCP tool returns one or more `types.ResourceLink` blocks
+- **WHEN** the proxy call completes
+- **THEN** each link SHALL be returned as a JSON-safe dictionary using MCP field names
+- **AND** present URI, name, title, description, MIME type, size, icons, annotations, and metadata SHALL be preserved
+- **AND** mixed text and links SHALL retain their original order
+- **AND** structured content SHALL be used only when no content block produced a value
 
 #### Scenario: EmbeddedResource content is surfaced, not dropped
 - **GIVEN** a proxied MCP tool returns a result whose content includes a `types.EmbeddedResource` block (payload under `.resource`)

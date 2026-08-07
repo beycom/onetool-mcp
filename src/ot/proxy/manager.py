@@ -168,6 +168,17 @@ def _strip_ctx_from_schema(tool: types.Tool) -> types.Tool:
     return tool.model_copy(update={"inputSchema": new_schema})
 
 
+def _explicitly_omits_capability(client: Client, capability: str) -> bool:  # type: ignore[type-arg]
+    """Return whether negotiated server capabilities explicitly omit a feature."""
+    initialize_result = getattr(client, "initialize_result", None)
+    if initialize_result is None:
+        return False
+    capabilities = getattr(initialize_result, "capabilities", None)
+    if capabilities is None:
+        return False
+    return getattr(capabilities, capability, None) is None
+
+
 @dataclass
 class ProxyToolInfo:
     """Information about a proxied tool."""
@@ -547,10 +558,10 @@ class ProxyManager:
                     self._active_calls.pop(server, None)
 
             # Extract and auto-parse text from result
-            text_parts: list[str] = []
+            content_values: list[Any] = []
             for content in result.content:
                 if isinstance(content, types.TextContent):
-                    text_parts.append(content.text)
+                    content_values.append(content.text)
                 elif isinstance(content, types.EmbeddedResource):
                     # D12: surface embedded-resource payloads (common for
                     # document/file-oriented servers) instead of silently dropping
@@ -558,17 +569,25 @@ class ProxyManager:
                     resource = content.resource
                     resource_text = getattr(resource, "text", None)
                     if resource_text is not None:
-                        text_parts.append(resource_text)
+                        content_values.append(resource_text)
                     else:
                         marker = (
                             getattr(resource, "uri", None) or type(resource).__name__
                         )
-                        text_parts.append(f"[Binary resource: {marker}]")
+                        content_values.append(f"[Binary resource: {marker}]")
+                elif isinstance(content, types.ResourceLink):
+                    content_values.append(
+                        content.model_dump(
+                            mode="json", by_alias=True, exclude_none=True
+                        )
+                    )
                 elif hasattr(content, "data"):
-                    text_parts.append(f"[Binary content: {type(content).__name__}]")
+                    content_values.append(
+                        f"[Binary content: {type(content).__name__}]"
+                    )
 
             result_value: str | dict[str, Any] | list[Any]
-            if not text_parts:
+            if not content_values:
                 # D12: fall back to a structured payload before declaring the
                 # response empty.
                 structured = getattr(result, "structured_content", None)
@@ -579,11 +598,11 @@ class ProxyManager:
                     if structured is not None
                     else "Tool returned empty response."
                 )
-            elif len(text_parts) == 1:
+            elif len(content_values) == 1 and isinstance(content_values[0], str):
                 # D13: only coerce text that structurally looks like JSON (an object
                 # or array). A plain-string answer such as "007" or "true" must pass
                 # through unchanged rather than being force-parsed to a different type.
-                single = text_parts[0]
+                single = content_values[0]
                 if single.strip()[:1] in ("{", "["):
                     try:
                         result_value = json.loads(single)
@@ -591,9 +610,12 @@ class ProxyManager:
                         result_value = single
                 else:
                     result_value = single
+            elif all(isinstance(value, str) for value in content_values):
+                result_value = "\n".join(content_values)
+            elif len(content_values) == 1:
+                result_value = content_values[0]
             else:
-                # Multi-part: concatenate as string
-                result_value = "\n".join(text_parts)
+                result_value = content_values
 
             if getattr(result, "is_error", False) is True:
                 error_text = str(result_value)
@@ -808,6 +830,30 @@ class ProxyManager:
             return []
         return self._submit_and_wait(self.list_prompts(server), timeout=timeout)
 
+    def read_resource_sync(
+        self, server: str, uri: str, timeout: float = 5.0
+    ) -> str:
+        """Synchronously read one resource from a proxied MCP server."""
+        if self._loop is None or not self._loop.is_running():
+            raise RuntimeError("Proxy manager not initialized - no event loop available")
+        return self._submit_and_wait(
+            self.read_resource(server, uri), timeout=timeout
+        )
+
+    def get_prompt_sync(
+        self,
+        server: str,
+        name: str,
+        arguments: dict[str, Any] | None = None,
+        timeout: float = 5.0,
+    ) -> str:
+        """Synchronously render one prompt from a proxied MCP server."""
+        if self._loop is None or not self._loop.is_running():
+            raise RuntimeError("Proxy manager not initialized - no event loop available")
+        return self._submit_and_wait(
+            self.get_prompt(server, name, arguments), timeout=timeout
+        )
+
     async def list_resources(self, server: str) -> list[dict[str, Any]]:
         """List resources from a proxied MCP server.
 
@@ -824,22 +870,21 @@ class ProxyManager:
         if not client:
             raise ValueError(f"Server '{server}' not connected")
 
+        if _explicitly_omits_capability(client, "resources"):
+            return []
+
         try:
             resources = await client.list_resources()
             return [
-                {"uri": r.uri, "name": r.name, "description": r.description or ""}
+                {
+                    "uri": str(r.uri),
+                    "name": r.name,
+                    "description": r.description or "",
+                }
                 for r in resources
             ]
-        except (AttributeError, NotImplementedError):
-            # Server doesn't support resources
-            return []
-        except Exception as e:
-            # Check if error indicates unsupported feature
-            error_msg = str(e).lower()
-            if any(
-                x in error_msg
-                for x in ["not found", "not supported", "not implemented"]
-            ):
+        except McpError as error:
+            if error.error.code == types.METHOD_NOT_FOUND:
                 return []
             raise
 
@@ -884,21 +929,16 @@ class ProxyManager:
         if not client:
             raise ValueError(f"Server '{server}' not connected")
 
+        if _explicitly_omits_capability(client, "prompts"):
+            return []
+
         try:
             prompts = await client.list_prompts()
             return [
                 {"name": p.name, "description": p.description or ""} for p in prompts
             ]
-        except (AttributeError, NotImplementedError):
-            # Server doesn't support prompts
-            return []
-        except Exception as e:
-            # Check if error indicates unsupported feature
-            error_msg = str(e).lower()
-            if any(
-                x in error_msg
-                for x in ["not found", "not supported", "not implemented"]
-            ):
+        except McpError as error:
+            if error.error.code == types.METHOD_NOT_FOUND:
                 return []
             raise
 

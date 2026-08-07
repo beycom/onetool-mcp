@@ -216,6 +216,10 @@ def _create_proxy_introspection_pack() -> Any:
     Provides:
     - proxy.list_servers() - List all configured MCP servers with status
     - proxy.list_tools(server="name") - List tools available on a server
+    - proxy.list_resources(server="name") - List resources on a server
+    - proxy.read_resource(server="name", uri="...") - Read resource text
+    - proxy.list_prompts(server="name") - List prompts on a server
+    - proxy.get_prompt(server="name", name="...") - Render a prompt
 
     Returns:
         Object with introspection methods.
@@ -268,6 +272,51 @@ def _create_proxy_introspection_pack() -> Any:
 
             tools = proxy.list_tools(server)
             return [{"name": t.name, "description": t.description} for t in tools]
+
+        def list_resources(self, *, server: str) -> list[dict[str, Any]]:
+            """List resources exposed by a proxied MCP server."""
+            proxy = get_proxy_manager()
+            if proxy.get_connection(server) is None:
+                raise ValueError(f"Server '{server}' not connected")
+            return proxy.list_resources_sync(
+                server, timeout=proxy.get_server_timeout(server)
+            )
+
+        def read_resource(self, *, server: str, uri: str) -> str:
+            """Read text content from a proxied MCP resource."""
+            proxy = get_proxy_manager()
+            if proxy.get_connection(server) is None:
+                raise ValueError(f"Server '{server}' not connected")
+            return proxy.read_resource_sync(
+                server, uri, timeout=proxy.get_server_timeout(server)
+            )
+
+        def list_prompts(self, *, server: str) -> list[dict[str, Any]]:
+            """List prompts exposed by a proxied MCP server."""
+            proxy = get_proxy_manager()
+            if proxy.get_connection(server) is None:
+                raise ValueError(f"Server '{server}' not connected")
+            return proxy.list_prompts_sync(
+                server, timeout=proxy.get_server_timeout(server)
+            )
+
+        def get_prompt(
+            self,
+            *,
+            server: str,
+            name: str,
+            arguments: dict[str, Any] | None = None,
+        ) -> str:
+            """Render a prompt exposed by a proxied MCP server."""
+            proxy = get_proxy_manager()
+            if proxy.get_connection(server) is None:
+                raise ValueError(f"Server '{server}' not connected")
+            return proxy.get_prompt_sync(
+                server,
+                name,
+                arguments,
+                timeout=proxy.get_server_timeout(server),
+            )
 
     return ProxyIntrospectionPack()
 

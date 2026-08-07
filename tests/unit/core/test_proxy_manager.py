@@ -568,6 +568,78 @@ class TestProxyManagerResources:
         assert resources[0]["description"] == "A test file"
 
     @pytest.mark.asyncio
+    async def test_absent_resource_capability_skips_request(self) -> None:
+        from types import SimpleNamespace
+
+        from mcp import types
+
+        manager = ProxyManager()
+        client = MagicMock()
+        client.initialize_result = SimpleNamespace(
+            capabilities=types.ServerCapabilities(resources=None)
+        )
+        client.list_resources = AsyncMock()
+        manager._clients = {"test_server": client}
+
+        assert await manager.list_resources("test_server") == []
+        client.list_resources.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_resource_method_not_found_is_unsupported(self) -> None:
+        from mcp import types
+        from mcp.shared.exceptions import McpError
+
+        manager = ProxyManager()
+        client = MagicMock()
+        client.initialize_result = None
+        client.list_resources = AsyncMock(
+            side_effect=McpError(
+                types.ErrorData(code=types.METHOD_NOT_FOUND, message="missing method")
+            )
+        )
+        manager._clients = {"test_server": client}
+
+        assert await manager.list_resources("test_server") == []
+
+    @pytest.mark.asyncio
+    async def test_resource_other_mcp_error_propagates(self) -> None:
+        from mcp import types
+        from mcp.shared.exceptions import McpError
+
+        manager = ProxyManager()
+        client = MagicMock()
+        client.initialize_result = None
+        error = McpError(types.ErrorData(code=-32000, message="resource not found"))
+        client.list_resources = AsyncMock(side_effect=error)
+        manager._clients = {"test_server": client}
+
+        with pytest.raises(McpError) as raised:
+            await manager.list_resources("test_server")
+        assert raised.value is error
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "error",
+        [
+            RuntimeError("repository not found"),
+            NotImplementedError("provider not implemented"),
+            PermissionError("authorization not supported"),
+            TimeoutError("request timed out"),
+        ],
+    )
+    async def test_resource_non_protocol_errors_propagate(
+        self, error: Exception
+    ) -> None:
+        manager = ProxyManager()
+        client = MagicMock()
+        client.initialize_result = None
+        client.list_resources = AsyncMock(side_effect=error)
+        manager._clients = {"test_server": client}
+
+        with pytest.raises(type(error), match=str(error)):
+            await manager.list_resources("test_server")
+
+    @pytest.mark.asyncio
     async def test_read_resource_no_connection(self) -> None:
         """Should raise ValueError when server not connected."""
         manager = ProxyManager()
@@ -629,6 +701,78 @@ class TestProxyManagerPrompts:
         assert len(prompts) == 1
         assert prompts[0]["name"] == "summarize"
         assert prompts[0]["description"] == "Summarize text"
+
+    @pytest.mark.asyncio
+    async def test_absent_prompt_capability_skips_request(self) -> None:
+        from types import SimpleNamespace
+
+        from mcp import types
+
+        manager = ProxyManager()
+        client = MagicMock()
+        client.initialize_result = SimpleNamespace(
+            capabilities=types.ServerCapabilities(prompts=None)
+        )
+        client.list_prompts = AsyncMock()
+        manager._clients = {"test_server": client}
+
+        assert await manager.list_prompts("test_server") == []
+        client.list_prompts.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_prompt_method_not_found_is_unsupported(self) -> None:
+        from mcp import types
+        from mcp.shared.exceptions import McpError
+
+        manager = ProxyManager()
+        client = MagicMock()
+        client.initialize_result = None
+        client.list_prompts = AsyncMock(
+            side_effect=McpError(
+                types.ErrorData(code=types.METHOD_NOT_FOUND, message="missing method")
+            )
+        )
+        manager._clients = {"test_server": client}
+
+        assert await manager.list_prompts("test_server") == []
+
+    @pytest.mark.asyncio
+    async def test_prompt_other_mcp_error_propagates(self) -> None:
+        from mcp import types
+        from mcp.shared.exceptions import McpError
+
+        manager = ProxyManager()
+        client = MagicMock()
+        client.initialize_result = None
+        error = McpError(types.ErrorData(code=-32000, message="prompt not supported"))
+        client.list_prompts = AsyncMock(side_effect=error)
+        manager._clients = {"test_server": client}
+
+        with pytest.raises(McpError) as raised:
+            await manager.list_prompts("test_server")
+        assert raised.value is error
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "error",
+        [
+            RuntimeError("repository not found"),
+            NotImplementedError("provider not implemented"),
+            PermissionError("authorization not supported"),
+            TimeoutError("request timed out"),
+        ],
+    )
+    async def test_prompt_non_protocol_errors_propagate(
+        self, error: Exception
+    ) -> None:
+        manager = ProxyManager()
+        client = MagicMock()
+        client.initialize_result = None
+        client.list_prompts = AsyncMock(side_effect=error)
+        manager._clients = {"test_server": client}
+
+        with pytest.raises(type(error), match=str(error)):
+            await manager.list_prompts("test_server")
 
     @pytest.mark.asyncio
     async def test_get_prompt_no_connection(self) -> None:

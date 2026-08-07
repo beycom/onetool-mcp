@@ -2,9 +2,103 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestProxyProtocolExecution:
+    """Resource and prompt APIs execute through the real runner namespace."""
+
+    @pytest.mark.asyncio
+    async def test_resource_and_prompt_calls_execute_through_runner(self) -> None:
+        from ot.config import OneToolConfig
+        from ot.executor.pack_proxy import reset
+        from ot.executor.runner import execute_command
+
+        reset()
+        manager = MagicMock()
+        manager.servers = ["srv"]
+        manager.get_connection.return_value = object()
+        manager.get_server_timeout.return_value = 12.0
+        manager.list_resources_sync.return_value = [
+            {"uri": "file:///guide.md", "name": "Guide", "description": "Docs"}
+        ]
+        manager.read_resource_sync.return_value = "guide text"
+        manager.list_prompts_sync.return_value = [
+            {"name": "summary", "description": "Summarize"}
+        ]
+        manager.get_prompt_sync.return_value = "rendered prompt"
+        registry = MagicMock(packs={}, pack_aliases={})
+        config = OneToolConfig()
+        services = SimpleNamespace(
+            output_policy_for=lambda _tool: SimpleNamespace(
+                allow_sanitize=True, allow_deflect=False
+            )
+        )
+        calls = {
+            "proxy.list_resources(server='srv')": manager.list_resources_sync.return_value,
+            "proxy.read_resource(server='srv', uri='file:///guide.md')": "guide text",
+            "proxy.list_prompts(server='srv')": manager.list_prompts_sync.return_value,
+            "proxy.get_prompt(server='srv', name='summary', arguments={'text': 'x'})": "rendered prompt",
+        }
+
+        with (
+            patch("ot.proxy.get_proxy_manager", return_value=manager),
+            patch("ot.executor.pack_proxy.get_config", return_value=config),
+            patch("ot.executor.runner.get_config", return_value=config),
+            patch("ot.executor.runner.load_tool_registry", return_value=registry),
+            patch("ot.services.get_services", return_value=services),
+        ):
+            for command, expected in calls.items():
+                result = await execute_command(
+                    command,
+                    skip_validation=True,
+                    prepared_code=command,
+                )
+                assert result.success, result.result
+                assert result.raw == expected
+
+        manager.list_resources_sync.assert_called_once_with("srv", timeout=12.0)
+        manager.read_resource_sync.assert_called_once_with(
+            "srv", "file:///guide.md", timeout=12.0
+        )
+        manager.list_prompts_sync.assert_called_once_with("srv", timeout=12.0)
+        manager.get_prompt_sync.assert_called_once_with(
+            "srv", "summary", {"text": "x"}, timeout=12.0
+        )
+
+    @pytest.mark.asyncio
+    async def test_disconnected_server_error_surfaces_through_runner(self) -> None:
+        from ot.config import OneToolConfig
+        from ot.executor.pack_proxy import reset
+        from ot.executor.runner import execute_command
+
+        reset()
+        manager = MagicMock()
+        manager.servers = []
+        manager.get_connection.return_value = None
+        registry = MagicMock(packs={}, pack_aliases={})
+        config = OneToolConfig()
+
+        with (
+            patch("ot.proxy.get_proxy_manager", return_value=manager),
+            patch("ot.executor.pack_proxy.get_config", return_value=config),
+            patch("ot.executor.runner.get_config", return_value=config),
+            patch("ot.executor.runner.load_tool_registry", return_value=registry),
+        ):
+            command = "proxy.list_resources(server='missing')"
+            result = await execute_command(
+                command, skip_validation=True, prepared_code=command
+            )
+
+        assert result.success is False
+        assert result.error_type == "ValueError"
+        assert "Server 'missing' not connected" in result.result
+        manager.list_resources_sync.assert_not_called()
 
 
 @pytest.mark.unit
