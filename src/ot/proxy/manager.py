@@ -14,7 +14,7 @@ import json
 import os
 import re
 import threading
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -34,7 +34,7 @@ from ot.logging import LogEntry, LogSpan
 from ot.logging.redact import redact_secrets
 
 if TYPE_CHECKING:
-    from collections.abc import Coroutine, Iterator
+    from collections.abc import AsyncIterator, Coroutine, Iterator
     from concurrent.futures import Future
 
     from mcp.server.session import ServerSession
@@ -225,7 +225,55 @@ class ProxyManager:
         self._connect_task: asyncio.Task[None] | None = None
         self._lifecycle_task: asyncio.Task[None] | None = None
         self._lifecycle_lock = asyncio.Lock()
+        self._transition_condition = asyncio.Condition()
+        self._global_transition_active = False
+        self._active_server_transitions = 0
+        self._server_transition_locks: dict[str, asyncio.Lock] = {}
+        self._server_generations: dict[str, int] = {}
+        self._next_generation = 0
         self._mutation_lock = threading.RLock()
+
+    @asynccontextmanager
+    async def _global_transition(self) -> AsyncIterator[None]:
+        """Block new per-server transitions and wait for active ones to finish."""
+        async with self._lifecycle_lock:
+            async with self._transition_condition:
+                self._global_transition_active = True
+            try:
+                async with self._transition_condition:
+                    await self._transition_condition.wait_for(
+                        lambda: self._active_server_transitions == 0
+                    )
+                yield
+            finally:
+                async with self._transition_condition:
+                    self._global_transition_active = False
+                    self._transition_condition.notify_all()
+
+    @asynccontextmanager
+    async def _server_transition(self, name: str) -> AsyncIterator[None]:
+        """Run one named transition while allowing other names to progress."""
+        async with self._transition_condition:
+            await self._transition_condition.wait_for(
+                lambda: not self._global_transition_active
+            )
+            self._active_server_transitions += 1
+        try:
+            lock = self._server_transition_locks.setdefault(name, asyncio.Lock())
+            async with lock:
+                yield
+        finally:
+            async with self._transition_condition:
+                self._active_server_transitions -= 1
+                self._transition_condition.notify_all()
+
+    def _advance_generation(self, name: str) -> int:
+        """Make and record a new connection generation for one server."""
+        with self._mutation_lock:
+            self._next_generation += 1
+            generation = self._next_generation
+            self._server_generations[name] = generation
+            return generation
 
     def bind_runtime_loop(self) -> None:
         """Bind lifecycle operations to the current running event loop."""
@@ -817,10 +865,16 @@ class ProxyManager:
         Args:
             configs: Dictionary of server name -> configuration.
         """
+        self.bind_runtime_loop()
+        async with self._global_transition():
+            await self._connect_unlocked(configs)
+
+    async def _connect_unlocked(
+        self, configs: dict[str, McpServerConfig]
+    ) -> None:
+        """Connect while the caller owns the exclusive lifecycle transition."""
         if self._initialized:
             return
-
-        self.bind_runtime_loop()
 
         enabled_configs = {name: cfg for name, cfg in configs.items() if cfg.enabled}
 
@@ -835,6 +889,7 @@ class ProxyManager:
                 failed = 0
 
                 async def connect_one(name: str, config: McpServerConfig) -> bool:
+                    self._advance_generation(name)
                     try:
                         await self._connect_server(name, config)
                         self._errors.pop(name, None)  # Clear any previous error
@@ -895,47 +950,62 @@ class ProxyManager:
         self._connect_task = asyncio.create_task(self.connect(configs))
         return self._connect_task
 
-    async def _connect_server(self, name: str, config: McpServerConfig) -> None:
-        """Connect to a single MCP server using FastMCP Client."""
+    async def _connect_server(
+        self,
+        name: str,
+        config: McpServerConfig,
+        generation: int | None = None,
+    ) -> None:
+        """Construct and atomically publish one server connection generation."""
+        if generation is None:
+            with self._mutation_lock:
+                generation = self._server_generations.get(name)
+            if generation is None:
+                generation = self._advance_generation(name)
         with LogSpan(span="proxy.connect", server=name, type=config.type) as span:
+            client: Client | None = None  # type: ignore[type-arg]
+            entered = False
+            published = False
             try:
                 client = self._create_client(name, config)
 
                 # Enter the client context manager for persistent connection
                 await client.__aenter__()  # type: ignore[no-untyped-call]
+                entered = True
 
-                try:
-                    # List tools to verify connection and cache tool info
-                    tools = await client.list_tools()
-                    tools = [_strip_ctx_from_schema(t) for t in tools]
+                # List tools to verify connection and prepare all published state.
+                tools = [_strip_ctx_from_schema(t) for t in await client.list_tools()]
+                init_result = getattr(client, "initialize_result", None)
+                instructions = (init_result.instructions or "") if init_result else ""
 
-                    # Capture native instructions from InitializeResult (MCP standard)
-                    init_result = getattr(client, "initialize_result", None)
-                    with self._mutation_lock:
-                        self._clients[name] = client
-                        self._tools_by_server[name] = tools
-                        self._server_timeouts[name] = float(config.timeout)
-                        self._server_instructions[name] = (
-                            (init_result.instructions or "") if init_result else ""
+                with self._mutation_lock:
+                    if self._server_generations.get(name) != generation:
+                        raise RuntimeError(
+                            f"Connection attempt for '{name}' was superseded"
                         )
+                    self._clients[name] = client
+                    self._tools_by_server[name] = tools
+                    self._server_timeouts[name] = float(config.timeout)
+                    self._server_instructions[name] = instructions
+                    published = True
 
-                    span.add("toolCount", len(tools))
-                    logger.info(
-                        LogEntry(
-                            event="proxy.connect.ready",
-                            server=name,
-                            serverType=config.type,
-                            toolCount=len(tools),
-                        ).success()
-                    )
+                span.add("toolCount", len(tools))
+                logger.info(
+                    LogEntry(
+                        event="proxy.connect.ready",
+                        server=name,
+                        serverType=config.type,
+                        toolCount=len(tools),
+                    ).success()
+                )
 
-                except BaseException:
-                    # Clean up on failure — catches CancelledError too
-                    await client.__aexit__(None, None, None)  # type: ignore[no-untyped-call]
-                    raise
             except asyncio.CancelledError:
+                if client is not None and entered and not published:
+                    await self._close_client(name, client)
                 raise
             except Exception as e:
+                if client is not None and entered and not published:
+                    await self._close_client(name, client)
                 # LogSpan sees only this sanitized replacement, never the raw provider
                 # exception that may contain authorization credentials.
                 raise RuntimeError(_sanitize_connect_error(str(e))) from None
@@ -1052,34 +1122,32 @@ class ProxyManager:
         if transport is not None and hasattr(transport, "close"):
             await transport.close()
 
+    async def _close_client(self, name: str, client: Client) -> None:  # type: ignore[type-arg]
+        """Exit a client and close its transport exactly once, best-effort."""
+        try:
+            await client.__aexit__(None, None, None)  # type: ignore[no-untyped-call]
+        except (Exception, asyncio.CancelledError) as e:
+            logger.debug(
+                "Error exiting client for '{}': {}", name, _sanitize_connect_error(str(e))
+            )
+        try:
+            await self._close_client_transport(client)
+            logger.debug(f"Disconnected from MCP server '{name}'")
+        except (Exception, asyncio.CancelledError) as e:
+            logger.debug(
+                "Error closing transport for '{}': {}",
+                name,
+                _sanitize_connect_error(str(e)),
+            )
+
     async def _shutdown_unlocked(self) -> None:
         """Disconnect after the caller serializes the lifecycle transition."""
-        # Cancel background connect task if still running
         connect_task = self._connect_task
-        if connect_task is not None and not connect_task.done():
-            connect_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await connect_task
         if self._connect_task is connect_task:
             self._connect_task = None
 
-        clients = list(self._clients.items())
-        if clients:
-            with LogSpan(span="proxy.shutdown", serverCount=len(clients)):
-                for name, client in clients:
-                    try:
-                        await client.__aexit__(None, None, None)  # type: ignore[no-untyped-call]
-                    except (Exception, asyncio.CancelledError) as e:
-                        logger.debug(f"Error exiting client for '{name}': {e}")
-                    try:
-                        # transport.close() terminates stdio subprocesses left alive
-                        # by FastMCP keep_alive after __aexit__ exits the session.
-                        await self._close_client_transport(client)
-                        logger.debug(f"Disconnected from MCP server '{name}'")
-                    except (Exception, asyncio.CancelledError) as e:
-                        logger.debug(f"Error closing transport for '{name}': {e}")
-
         with self._mutation_lock:
+            clients = list(self._clients.items())
             self._clients.clear()
             self._call_locks.clear()
             self._active_calls.clear()
@@ -1087,11 +1155,31 @@ class ProxyManager:
             self._errors.clear()
             self._server_timeouts.clear()
             self._server_instructions.clear()
+            self._server_generations.clear()
+            self._server_transition_locks.clear()
             self._initialized = False
+
+        if clients:
+            with LogSpan(span="proxy.shutdown", serverCount=len(clients)):
+                for name, client in clients:
+                    await self._close_client(name, client)
+
+    async def _cancel_background_connect(self) -> None:
+        """Cancel and settle an active startup generation before a global transition."""
+        connect_task = self._connect_task
+        if (
+            connect_task is not None
+            and connect_task is not asyncio.current_task()
+            and not connect_task.done()
+        ):
+            connect_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await connect_task
 
     async def shutdown(self) -> None:
         """Serialize shutdown and leave every connection state reconnectable."""
-        async with self._lifecycle_lock:
+        await self._cancel_background_connect()
+        async with self._global_transition():
             await self._shutdown_unlocked()
 
     def _finish_lifecycle_task(self, task: asyncio.Task[None]) -> None:
@@ -1137,9 +1225,10 @@ class ProxyManager:
 
     async def reconnect(self, configs: dict[str, McpServerConfig]) -> None:
         """Serialize full cleanup before connecting a fresh configuration."""
-        async with self._lifecycle_lock:
+        await self._cancel_background_connect()
+        async with self._global_transition():
             await self._shutdown_unlocked()
-            await self.connect(configs)
+            await self._connect_unlocked(configs)
             # D14: schemas may have changed across the restart — drop all cached
             # proxy resolutions so later calls bind against the fresh tool lists.
             self._evict_proxy_caches(None)
@@ -1154,30 +1243,31 @@ class ProxyManager:
         Returns:
             Status string: "ok (N tools)", "already connected", "disabled", or "failed: <reason>".
         """
-        with self._mutation_lock:
-            if name in self._clients:
-                return "already connected"
-            if not config.enabled:
-                return "disabled"
-        try:
-            await self._connect_server(name, config)
+        async with self._server_transition(name):
             with self._mutation_lock:
-                self._errors.pop(name, None)
-                tool_count = len(self._tools_by_server.get(name, []))
-            # D14: drop any stale cached resolutions for this server name (e.g. from a
-            # prior connection whose schema differed) so calls bind to the new tools.
-            self._evict_proxy_caches(name)
-            return f"ok ({tool_count} tools)"
-        except Exception as e:
-            safe_error = _sanitize_connect_error(str(e))
-            with self._mutation_lock:
-                self._errors[name] = safe_error
-            logger.warning(
-                LogEntry(event="proxy.connect.failed", server=name).failure(
-                    error_type=type(e).__name__, error_message=safe_error
+                if name in self._clients:
+                    return "already connected"
+                if not config.enabled:
+                    return "disabled"
+            generation = self._advance_generation(name)
+            try:
+                await self._connect_server(name, config)
+                with self._mutation_lock:
+                    self._errors.pop(name, None)
+                    tool_count = len(self._tools_by_server.get(name, []))
+                self._evict_proxy_caches(name)
+                return f"ok ({tool_count} tools)"
+            except Exception as e:
+                safe_error = _sanitize_connect_error(str(e))
+                with self._mutation_lock:
+                    if self._server_generations.get(name) == generation:
+                        self._errors[name] = safe_error
+                logger.warning(
+                    LogEntry(event="proxy.connect.failed", server=name).failure(
+                        error_type=type(e).__name__, error_message=safe_error
+                    )
                 )
-            )
-            return f"failed: {safe_error}"
+                return f"failed: {safe_error}"
 
     def _schedule_or_wait(self, coro: Coroutine[Any, Any, str], timeout: float) -> str:
         """Run ``coro`` on the manager's loop, guarding against a same-loop deadlock.
@@ -1223,26 +1313,21 @@ class ProxyManager:
         Returns:
             Status string: "disconnected" or "not connected".
         """
-        with self._mutation_lock:
-            if name not in self._clients:
-                return "not connected"
-            client = self._clients.pop(name)
-            self._call_locks.pop(name, None)
-            self._active_calls.pop(name, None)
-            self._tools_by_server.pop(name, None)
-            self._errors.pop(name, None)
-            self._server_instructions.pop(name, None)
-            self._server_timeouts.pop(name, None)
-        # D14: drop cached proxy/param resolutions for this server so a later reconnect
-        # of the same name cannot serve stale pre-disconnect tool/param bindings.
-        self._evict_proxy_caches(name)
-        try:
-            await client.__aexit__(None, None, None)  # type: ignore[no-untyped-call]
-            await self._close_client_transport(client)
-            logger.debug(f"Disconnected from MCP server '{name}'")
-        except Exception as e:
-            logger.debug(f"Error disconnecting from '{name}': {e}")
-        return "disconnected"
+        async with self._server_transition(name):
+            self._advance_generation(name)
+            with self._mutation_lock:
+                if name not in self._clients:
+                    return "not connected"
+                client = self._clients.pop(name)
+                self._call_locks.pop(name, None)
+                self._active_calls.pop(name, None)
+                self._tools_by_server.pop(name, None)
+                self._errors.pop(name, None)
+                self._server_instructions.pop(name, None)
+                self._server_timeouts.pop(name, None)
+            self._evict_proxy_caches(name)
+            await self._close_client(name, client)
+            return "disconnected"
 
     def disconnect_server_sync(self, name: str) -> str:
         """Synchronously disconnect a single server without affecting other connections.

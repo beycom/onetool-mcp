@@ -144,7 +144,9 @@ class TestProxyManagerReconnectSync:
         }
         with (
             patch("asyncio.run_coroutine_threadsafe") as mock_threadsafe,
-            patch.object(manager, "connect", side_effect=fake_connect) as mock_connect,
+            patch.object(
+                manager, "_connect_unlocked", side_effect=fake_connect
+            ) as mock_connect,
         ):
             manager.reconnect_sync(configs)
             lifecycle_task = manager._lifecycle_task
@@ -1274,6 +1276,219 @@ class TestProxyManagerIncrementalConnect:
 
         result = manager.disconnect_server_sync("nonexistent")
         assert result == "not connected"
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestProxyManagerLifecycleSerialization:
+    """Concurrent lifecycle transitions publish and close one generation."""
+
+    @staticmethod
+    def _client(*, list_tools: AsyncMock | None = None) -> MagicMock:
+        client = MagicMock()
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=None)
+        client.list_tools = list_tools or AsyncMock(return_value=[])
+        client.initialize_result = None
+        client.transport = MagicMock()
+        client.transport.close = AsyncMock(return_value=None)
+        return client
+
+    @pytest.mark.asyncio
+    async def test_simultaneous_enables_construct_one_client(self) -> None:
+        from ot.config.models import McpServerConfig
+
+        manager = ProxyManager()
+        started = asyncio.Event()
+        release = asyncio.Event()
+        client = self._client()
+
+        async def enter() -> MagicMock:
+            started.set()
+            await release.wait()
+            return client
+
+        client.__aenter__.side_effect = enter
+        config = McpServerConfig(type="stdio", command="uvx")
+
+        with patch.object(manager, "_create_client", return_value=client) as create:
+            first = asyncio.create_task(manager.connect_additional("srv", config))
+            await started.wait()
+            second = asyncio.create_task(manager.connect_additional("srv", config))
+            await asyncio.sleep(0)
+            release.set()
+            results = await asyncio.gather(first, second)
+
+        assert results == ["ok (0 tools)", "already connected"]
+        create.assert_called_once_with("srv", config)
+        assert manager.get_connection("srv") is client
+
+    @pytest.mark.asyncio
+    async def test_enable_then_disable_closes_published_client_once(self) -> None:
+        from ot.config.models import McpServerConfig
+
+        manager = ProxyManager()
+        listing = asyncio.Event()
+        release = asyncio.Event()
+
+        async def list_tools() -> list[object]:
+            listing.set()
+            await release.wait()
+            return []
+
+        client = self._client(list_tools=AsyncMock(side_effect=list_tools))
+        config = McpServerConfig(type="stdio", command="uvx")
+
+        with patch.object(manager, "_create_client", return_value=client):
+            enabling = asyncio.create_task(manager.connect_additional("srv", config))
+            await listing.wait()
+            disabling = asyncio.create_task(manager.disconnect_server("srv"))
+            release.set()
+            assert await enabling == "ok (0 tools)"
+            assert await disabling == "disconnected"
+
+        assert manager.get_connection("srv") is None
+        client.__aexit__.assert_awaited_once_with(None, None, None)
+        client.transport.close.assert_awaited_once_with()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("global_operation", ["reconnect", "shutdown"])
+    async def test_global_transition_waits_then_retires_enable(
+        self, global_operation: str
+    ) -> None:
+        from ot.config.models import McpServerConfig
+
+        manager = ProxyManager()
+        listing = asyncio.Event()
+        release = asyncio.Event()
+
+        async def list_tools() -> list[object]:
+            listing.set()
+            await release.wait()
+            return []
+
+        client = self._client(list_tools=AsyncMock(side_effect=list_tools))
+        config = McpServerConfig(type="stdio", command="uvx")
+
+        with patch.object(manager, "_create_client", return_value=client):
+            enabling = asyncio.create_task(manager.connect_additional("srv", config))
+            await listing.wait()
+            if global_operation == "reconnect":
+                global_task = asyncio.create_task(manager.reconnect({}))
+            else:
+                global_task = asyncio.create_task(manager.shutdown())
+            await asyncio.sleep(0)
+            assert not global_task.done()
+            release.set()
+            assert await enabling == "ok (0 tools)"
+            await global_task
+
+        assert manager.get_connection("srv") is None
+        client.__aexit__.assert_awaited_once_with(None, None, None)
+        client.transport.close.assert_awaited_once_with()
+
+    @pytest.mark.asyncio
+    async def test_cancelled_connection_closes_unpublished_client_once(self) -> None:
+        from ot.config.models import McpServerConfig
+
+        manager = ProxyManager()
+        listing = asyncio.Event()
+
+        async def list_tools() -> list[object]:
+            listing.set()
+            await asyncio.Event().wait()
+            return []
+
+        client = self._client(list_tools=AsyncMock(side_effect=list_tools))
+        config = McpServerConfig(type="stdio", command="uvx")
+
+        with patch.object(manager, "_create_client", return_value=client):
+            task = asyncio.create_task(manager.connect_additional("srv", config))
+            await listing.wait()
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+        assert manager.get_connection("srv") is None
+        client.__aexit__.assert_awaited_once_with(None, None, None)
+        client.transport.close.assert_awaited_once_with()
+
+    @pytest.mark.asyncio
+    async def test_stale_generation_cannot_publish(self) -> None:
+        from ot.config.models import McpServerConfig
+
+        manager = ProxyManager()
+        stale_generation = manager._advance_generation("srv")
+        manager._advance_generation("srv")
+        client = self._client()
+        config = McpServerConfig(type="stdio", command="uvx")
+
+        with (
+            patch.object(manager, "_create_client", return_value=client),
+            pytest.raises(RuntimeError, match="superseded"),
+        ):
+            await manager._connect_server("srv", config, stale_generation)
+
+        assert manager.get_connection("srv") is None
+        client.__aexit__.assert_awaited_once_with(None, None, None)
+        client.transport.close.assert_awaited_once_with()
+
+    @pytest.mark.asyncio
+    async def test_different_servers_transition_independently(self) -> None:
+        from ot.config.models import McpServerConfig
+
+        manager = ProxyManager()
+        first_listing = asyncio.Event()
+        release_first = asyncio.Event()
+
+        async def blocked_list() -> list[object]:
+            first_listing.set()
+            await release_first.wait()
+            return []
+
+        clients = {
+            "first": self._client(list_tools=AsyncMock(side_effect=blocked_list)),
+            "second": self._client(),
+        }
+        config = McpServerConfig(type="stdio", command="uvx")
+
+        with patch.object(
+            manager, "_create_client", side_effect=lambda name, _cfg: clients[name]
+        ):
+            first = asyncio.create_task(manager.connect_additional("first", config))
+            await first_listing.wait()
+            second = asyncio.create_task(manager.connect_additional("second", config))
+            assert await asyncio.wait_for(second, timeout=1) == "ok (0 tools)"
+            assert not first.done()
+            release_first.set()
+            assert await first == "ok (0 tools)"
+
+    @pytest.mark.asyncio
+    async def test_cancelled_global_wait_reopens_transition_gate(self) -> None:
+        manager = ProxyManager()
+        entered = asyncio.Event()
+        release = asyncio.Event()
+
+        async def hold_server_transition() -> None:
+            async with manager._server_transition("first"):
+                entered.set()
+                await release.wait()
+
+        holder = asyncio.create_task(hold_server_transition())
+        await entered.wait()
+        shutdown = asyncio.create_task(manager.shutdown())
+        await asyncio.sleep(0)
+        assert manager._global_transition_active is True
+
+        shutdown.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await shutdown
+        assert manager._global_transition_active is False
+
+        release.set()
+        await holder
+        async with manager._server_transition("second"):
+            pass
 
 
 @pytest.mark.unit
