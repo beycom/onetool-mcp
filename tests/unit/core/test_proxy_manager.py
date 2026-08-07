@@ -36,6 +36,18 @@ class TestProxyManager:
         assert manager.get_server_timeout("chunkhound") == 300.0
         assert manager.get_server_timeout("github") == 120.0
 
+    @pytest.mark.asyncio
+    async def test_bind_runtime_loop_rejects_rebind_with_live_client(self) -> None:
+        """A stopped prior loop cannot be replaced while it still owns a client."""
+        manager = ProxyManager()
+        old_loop = MagicMock(spec=asyncio.AbstractEventLoop)
+        old_loop.is_running.return_value = False
+        manager._loop = old_loop
+        manager._clients["live"] = MagicMock()
+
+        with pytest.raises(RuntimeError, match="another event loop"):
+            manager.bind_runtime_loop()
+
     def test_get_server_timeout_defaults_to_30(self) -> None:
         """Should return 30.0 for unknown servers."""
         manager = ProxyManager()
@@ -74,20 +86,21 @@ class TestProxyManager:
 class TestProxyManagerReconnectSync:
     """Tests for reconnect_sync method."""
 
-    def test_reconnect_sync_without_loop_resets_state(self) -> None:
-        """Should reset state when no event loop available."""
+    def test_reconnect_sync_without_loop_preserves_state_and_fails(self) -> None:
+        """Should not discard live clients when no owner loop is available."""
         manager = ProxyManager()
-        manager._clients = {"old": MagicMock()}
+        old_client = MagicMock()
+        manager._clients = {"old": old_client}
         manager._tools_by_server = {"old": [MagicMock()]}
         manager._initialized = True
         manager._loop = None
 
-        # Call with empty configs - should reset state
-        manager.reconnect_sync({})
+        with pytest.raises(RuntimeError, match="no running owner event loop"):
+            manager.reconnect_sync({})
 
-        assert manager._clients == {}
-        assert manager._tools_by_server == {}
-        assert manager._initialized is False
+        assert manager._clients == {"old": old_client}
+        assert set(manager._tools_by_server) == {"old"}
+        assert manager._initialized is True
 
     def test_reconnect_sync_with_stored_loop_uses_it(self) -> None:
         """Should use stored loop for reconnection."""
@@ -146,8 +159,8 @@ class TestProxyManagerReconnectSync:
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_reconnect_proxy_manager_skips_reconnect_when_all_servers_disabled() -> None:
-    """Global reconnect should not schedule async reconnect for disabled servers."""
+def test_reconnect_proxy_manager_reconnects_when_all_servers_disabled() -> None:
+    """Global reconnect should close live clients for an empty enabled set."""
     from types import SimpleNamespace
 
     from ot.config.models import McpServerConfig
@@ -171,8 +184,7 @@ def test_reconnect_proxy_manager_skips_reconnect_when_all_servers_disabled() -> 
     ):
         reconnect_proxy_manager()
 
-    proxy.reconnect_sync.assert_not_called()
-    proxy._reset_state.assert_called_once_with()
+    proxy.reconnect_sync.assert_called_once_with({})
 
 
 @pytest.mark.unit
@@ -201,7 +213,6 @@ def test_reconnect_proxy_manager_reconnects_only_enabled_servers() -> None:
         reconnect_proxy_manager()
 
     proxy.reconnect_sync.assert_called_once_with({"enabled": enabled})
-    proxy._reset_state.assert_not_called()
 
 
 @pytest.mark.unit
@@ -823,15 +834,6 @@ class TestProxyManagerBackgroundConnect:
         assert task.cancelled()
         assert manager._connect_task is None
 
-    def test_reset_state_clears_connect_task(self) -> None:
-        """Should clear _connect_task on reset."""
-        manager = ProxyManager()
-        manager._connect_task = MagicMock()  # type: ignore[assignment]
-
-        manager._reset_state()
-
-        assert manager._connect_task is None
-
     @pytest.mark.asyncio
     async def test_connect_runs_servers_concurrently_and_records_failures(self) -> None:
         """Should connect independent proxy servers without waiting sequentially."""
@@ -1024,6 +1026,46 @@ class TestProxyManagerBackgroundConnect:
         assert manager._initialized is False
 
     @pytest.mark.asyncio
+    async def test_empty_reconnect_closes_transport_once_and_evicts_caches(self) -> None:
+        """An empty reload uses normal cleanup and remains idempotent."""
+        manager = ProxyManager()
+        manager.bind_runtime_loop()
+        client = MagicMock()
+        client.__aexit__ = AsyncMock(return_value=None)
+        client.transport = MagicMock()
+        client.transport.close = AsyncMock(return_value=None)
+        manager._clients["old"] = client
+        manager._tools_by_server["old"] = [MagicMock()]
+
+        with patch.object(manager, "_evict_proxy_caches") as evict:
+            await manager.reconnect({})
+            await manager.reconnect({})
+
+        client.__aexit__.assert_awaited_once_with(None, None, None)
+        client.transport.close.assert_awaited_once_with()
+        assert manager._clients == {}
+        assert manager._tools_by_server == {}
+        assert manager._initialized is True
+        assert evict.call_count == 2
+        evict.assert_called_with(None)
+
+    @pytest.mark.asyncio
+    async def test_shutdown_closes_transport_when_client_exit_fails(self) -> None:
+        """Transport cleanup remains best-effort after a client exit failure."""
+        manager = ProxyManager()
+        client = MagicMock()
+        client.__aexit__ = AsyncMock(side_effect=RuntimeError("exit failed"))
+        client.transport = MagicMock()
+        client.transport.close = AsyncMock(return_value=None)
+        manager._clients["old"] = client
+
+        await manager.shutdown()
+
+        client.__aexit__.assert_awaited_once_with(None, None, None)
+        client.transport.close.assert_awaited_once_with()
+        assert manager._clients == {}
+
+    @pytest.mark.asyncio
     async def test_no_server_reconnect_finishes_ready(self) -> None:
         """An empty configuration still completes a real reconnect generation."""
         manager = ProxyManager()
@@ -1214,15 +1256,16 @@ class TestProxyManagerIncrementalConnect:
         assert "failed" in result
 
     def test_disconnect_server_sync_no_loop(self) -> None:
-        """Should remove from clients dict directly when no running loop."""
+        """Should preserve a live client when async cleanup cannot run."""
         manager = ProxyManager()
         manager._loop = None
-        manager._clients = {"billing-service": MagicMock()}
+        client = MagicMock()
+        manager._clients = {"billing-service": client}
         manager._tools_by_server = {"billing-service": []}
 
         result = manager.disconnect_server_sync("billing-service")
-        assert result == "disconnected"
-        assert "billing-service" not in manager._clients
+        assert result == "failed: no running event loop"
+        assert manager._clients == {"billing-service": client}
 
     def test_disconnect_server_sync_no_loop_not_connected(self) -> None:
         """Should return 'not connected' when no loop and server not in clients."""

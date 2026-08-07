@@ -218,6 +218,17 @@ class ProxyManager:
         self._lifecycle_lock = asyncio.Lock()
         self._mutation_lock = threading.RLock()
 
+    def bind_runtime_loop(self) -> None:
+        """Bind lifecycle operations to the current running event loop."""
+        loop = asyncio.get_running_loop()
+        if (
+            self._loop is not None
+            and self._loop is not loop
+            and (self._loop.is_running() or self._clients or self.is_connecting)
+        ):
+            raise RuntimeError("Proxy manager is already bound to another event loop")
+        self._loop = loop
+
     @property
     def servers(self) -> list[str]:
         """List of connected server names."""
@@ -800,7 +811,7 @@ class ProxyManager:
         if self._initialized:
             return
 
-        self._loop = asyncio.get_running_loop()
+        self.bind_runtime_loop()
 
         enabled_configs = {name: cfg for name, cfg in configs.items() if cfg.enabled}
 
@@ -869,7 +880,7 @@ class ProxyManager:
         Returns:
             The asyncio Task driving the connection.
         """
-        self._loop = asyncio.get_running_loop()
+        self.bind_runtime_loop()
         self._connect_task = asyncio.create_task(self.connect(configs))
         return self._connect_task
 
@@ -1017,20 +1028,6 @@ class ProxyManager:
             elicitation_handler=self._elicitation_handler_for(name),
         )
 
-    def _reset_state(self) -> None:
-        """Reset all connection state without disconnecting (for cases where loop is unavailable)."""
-        with self._mutation_lock:
-            self._clients.clear()
-            self._call_locks.clear()
-            self._active_calls.clear()
-            self._tools_by_server.clear()
-            self._errors.clear()
-            self._server_timeouts.clear()
-            self._server_instructions.clear()
-            self._initialized = False
-            self._connect_task = None
-            self._lifecycle_task = None
-
     async def _close_client_transport(self, client: Client) -> None:  # type: ignore[type-arg]
         """Close the underlying transport when FastMCP exposes an async close hook."""
         transport = getattr(client, "transport", None)
@@ -1054,12 +1051,15 @@ class ProxyManager:
                 for name, client in clients:
                     try:
                         await client.__aexit__(None, None, None)  # type: ignore[no-untyped-call]
+                    except (Exception, asyncio.CancelledError) as e:
+                        logger.debug(f"Error exiting client for '{name}': {e}")
+                    try:
                         # transport.close() terminates stdio subprocesses left alive
                         # by FastMCP keep_alive after __aexit__ exits the session.
                         await self._close_client_transport(client)
                         logger.debug(f"Disconnected from MCP server '{name}'")
                     except (Exception, asyncio.CancelledError) as e:
-                        logger.debug(f"Error disconnecting from '{name}': {e}")
+                        logger.debug(f"Error closing transport for '{name}': {e}")
 
         with self._mutation_lock:
             self._clients.clear()
@@ -1238,18 +1238,7 @@ class ProxyManager:
             with self._mutation_lock:
                 if name not in self._clients:
                     return "not connected"
-                self._clients.pop(name)
-                self._call_locks.pop(name, None)
-                self._active_calls.pop(name, None)
-                self._tools_by_server.pop(name, None)
-                self._errors.pop(name, None)
-                self._server_instructions.pop(name, None)
-                self._server_timeouts.pop(name, None)
-                logger.warning(
-                    f"Removed server '{name}' without async cleanup — "
-                    "no running event loop; underlying transport may not be closed."
-                )
-                return "disconnected"
+            return "failed: no running event loop"
         return self._schedule_or_wait(self.disconnect_server(name), timeout=30)
 
     def reconnect_sync(self, configs: dict[str, McpServerConfig]) -> None:
@@ -1263,18 +1252,8 @@ class ProxyManager:
             configs: Dictionary of server name -> configuration.
         """
         loop = self._loop
-
-        # Try to get running loop if we don't have one stored
-        if loop is None:
-            with contextlib.suppress(RuntimeError):
-                loop = asyncio.get_running_loop()
-
-        # Must have a running loop to schedule the coroutine
-        # If loop exists but isn't running, we can't await the coroutine
         if loop is None or not loop.is_running():
-            # No running event loop available - just reset state, connect will happen on next use
-            self._reset_state()
-            return
+            raise RuntimeError("Proxy manager has no running owner event loop")
 
         with contextlib.suppress(RuntimeError):
             running_loop = asyncio.get_running_loop()
@@ -1336,7 +1315,4 @@ def reconnect_proxy_manager() -> None:
         if cfg.servers
         else {}
     )
-    if enabled_servers:
-        proxy.reconnect_sync(enabled_servers)
-    else:
-        proxy._reset_state()
+    proxy.reconnect_sync(enabled_servers)

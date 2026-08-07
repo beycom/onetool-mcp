@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -84,6 +84,7 @@ def test_direct_api_failure_is_degraded_in_lifespan() -> None:
     with (
         patch.object(server, "_config", cfg),
         patch.object(server, "get_proxy_manager", return_value=SimpleNamespace(
+            bind_runtime_loop=lambda: None,
             connect_background=lambda _servers: None,
             servers={},
             is_connecting=False,
@@ -99,14 +100,33 @@ def test_direct_api_failure_is_degraded_in_lifespan() -> None:
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_lifespan_does_not_connect_disabled_proxy_servers() -> None:
-    """MCP startup should not schedule proxy connections for disabled servers."""
+def test_lifespan_binds_runtime_with_only_disabled_proxy_servers() -> None:
+    """MCP startup should bind the proxy loop even with no enabled servers."""
     from ot import server
     from ot.config.models import McpServerConfig
+    from ot.proxy.manager import ProxyManager
 
     async def _run_lifespan() -> None:
         async with server._lifespan(SimpleNamespace()):
-            pass
+            assert proxy._loop is asyncio.get_running_loop()
+            cfg.servers["disabled"].enabled = True
+
+            client = MagicMock()
+            client.__aexit__ = AsyncMock(return_value=None)
+            client.transport = None
+
+            async def fake_connect(name: str, _config: McpServerConfig) -> None:
+                proxy._clients[name] = client
+                proxy._tools_by_server[name] = []
+
+            with patch.object(proxy, "_connect_server", side_effect=fake_connect):
+                result = await asyncio.to_thread(
+                    proxy.connect_additional_sync,
+                    "disabled",
+                    cfg.servers["disabled"],
+                )
+            assert result == "ok (0 tools)"
+            assert proxy.get_connection("disabled") is client
 
     cfg = SimpleNamespace(
         _config_dir=Path("/tmp/onetool/config"),
@@ -125,11 +145,8 @@ def test_lifespan_does_not_connect_disabled_proxy_servers() -> None:
         get_log_dir_path=lambda: Path("/tmp/onetool/logs"),
         get_stats_file_path=lambda: Path("/tmp/onetool/stats.jsonl"),
     )
-    proxy = SimpleNamespace(
-        connect_background=MagicMock(),
-        servers={},
-        is_connecting=False,
-    )
+    proxy = ProxyManager()
+    connect_background = MagicMock(wraps=proxy.connect_background)
 
     with (
         patch.object(server, "_config", cfg),
@@ -139,9 +156,10 @@ def test_lifespan_does_not_connect_disabled_proxy_servers() -> None:
         patch("ot.telemetry.ping"),
         patch.object(server, "logger"),
     ):
-        asyncio.run(_run_lifespan())
+        with patch.object(proxy, "connect_background", connect_background):
+            asyncio.run(_run_lifespan())
 
-    proxy.connect_background.assert_not_called()
+    connect_background.assert_not_called()
 
 
 def _direct_enabled_cfg() -> SimpleNamespace:
@@ -173,6 +191,7 @@ def test_lifespan_writes_discovery_file_on_direct_api_start() -> None:
     with (
         patch.object(server, "_config", _direct_enabled_cfg()),
         patch.object(server, "get_proxy_manager", return_value=SimpleNamespace(
+            bind_runtime_loop=lambda: None,
             connect_background=lambda _servers: None,
             servers={},
             is_connecting=False,
@@ -210,6 +229,7 @@ def test_lifespan_removes_discovery_file_on_clean_shutdown() -> None:
     with (
         patch.object(server, "_config", _direct_enabled_cfg()),
         patch.object(server, "get_proxy_manager", return_value=SimpleNamespace(
+            bind_runtime_loop=lambda: None,
             connect_background=lambda _servers: None,
             servers={},
             is_connecting=False,
@@ -255,6 +275,7 @@ def test_lifespan_disabled_direct_api_never_touches_discovery_files() -> None:
     with (
         patch.object(server, "_config", cfg),
         patch.object(server, "get_proxy_manager", return_value=SimpleNamespace(
+            bind_runtime_loop=lambda: None,
             connect_background=lambda _servers: None,
             servers={},
             is_connecting=False,
@@ -306,6 +327,7 @@ def test_lifespan_initializes_and_cleans_console_storage(
             server,
             "get_proxy_manager",
             return_value=SimpleNamespace(
+                bind_runtime_loop=lambda: None,
                 connect_background=lambda _servers: None,
                 servers={},
                 is_connecting=False,
@@ -402,6 +424,7 @@ def test_http_root_lifespan_logs_transport_and_non_loopback_warning() -> None:
         path="/mcp",
     )
     proxy = SimpleNamespace(
+        bind_runtime_loop=lambda: None,
         connect_background=lambda _servers: None,
         servers={},
         is_connecting=False,

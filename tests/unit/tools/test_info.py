@@ -408,7 +408,8 @@ def test_reload_clears_config() -> None:
     """Verify ot.reload() clears and reloads configuration."""
     from ot.meta import reload
 
-    result = reload()
+    with patch("ot.proxy.reconnect_proxy_manager"):
+        result = reload()
 
     assert "OK" in result
     assert "reloaded" in result.lower()
@@ -421,7 +422,10 @@ def test_reload_resets_runtime_tool_caches() -> None:
     from ot.meta import reload
 
     hook = MagicMock()
-    with patch("ot.executor.tool_loader.load_tool_registry") as mock_load:
+    with (
+        patch("ot.executor.tool_loader.load_tool_registry") as mock_load,
+        patch("ot.proxy.reconnect_proxy_manager"),
+    ):
         from ot.services import get_services
 
         mock_load.side_effect = lambda: get_services().register_reload_hook(hook)
@@ -452,7 +456,8 @@ def test_reload_clears_tool_and_helper_modules() -> None:
     sentinel = ModuleType(unrelated)
     sys.modules[unrelated] = sentinel
 
-    result = reload()
+    with patch("ot.proxy.reconnect_proxy_manager"):
+        result = reload()
 
     assert "OK" in result
     for name in module_names:

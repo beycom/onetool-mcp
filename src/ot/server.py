@@ -305,6 +305,7 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
         # Startup: connect to proxy MCP servers in the background so FastMCP
         # can begin handling MCP protocol messages immediately.
         proxy = get_proxy_manager()
+        proxy.bind_runtime_loop()
         enabled_servers = {
             name: config for name, config in _config.servers.items() if config.enabled
         }
