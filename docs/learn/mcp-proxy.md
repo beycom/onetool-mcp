@@ -44,7 +44,9 @@ restarting OneTool or reconnecting a server reuses valid authorization while sep
 endpoints remain isolated. OneTool reuses credentials only when their canonical scope set and
 public-client identity still match the current configuration. A new random callback port preserves
 usable tokens, but stale dynamic registration is replaced before full reauthorization.
-Refresh-token rotation replaces the stored token set automatically.
+Refresh-token rotation replaces the stored token set automatically. Endpoint-specific runtime locks
+serialize refresh and registration across OneTool processes, while unrelated servers authenticate
+independently; credentials remain exclusively in the OS keychain.
 
 OneTool refuses OAuth persistence when the active keyring is unavailable or insecure; it does not
 fall back to in-memory or plaintext token storage. Connection status keeps safe OAuth diagnostics

@@ -338,6 +338,15 @@ and SHALL persist their credentials securely without additional configuration.
 - **AND** it SHALL discard the incompatible registration before full reauthorization
 - **AND** any replacement registration and authorization SHALL use the current callback URI
 
+#### Scenario: Concurrent OAuth state transitions
+- **GIVEN** multiple OneTool processes share OAuth state for one configuration directory and endpoint
+- **WHEN** credentials require refresh, registration, or replacement
+- **THEN** only one process SHALL perform the complete state transition at a time
+- **AND** a waiting process SHALL reload persisted state after acquiring the lock
+- **AND** unrelated endpoints SHALL use independent locks
+- **AND** lock acquisition SHALL be asynchronous, bounded, and free of endpoint or credential text
+- **AND** OAuth credentials SHALL remain exclusively in the secure keyring
+
 #### Scenario: Refresh token rotation
 - **GIVEN** a stored access token has expired and a refresh token is available
 - **WHEN** the OAuth server returns a refreshed access token and rotated refresh token

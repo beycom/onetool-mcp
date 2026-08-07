@@ -10,6 +10,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 import keyring
 from fastmcp.client.auth import OAuth
+from filelock import AsyncFileLock
+from filelock import Timeout as FileLockTimeout
 from key_value.aio.stores.keyring.store import (
     KeyringStore,
     KeyringV1CollectionSanitizationStrategy,
@@ -17,7 +19,7 @@ from key_value.aio.stores.keyring.store import (
 )
 
 from ot.config.keyring import _assert_secure_keyring_backend
-from ot.paths import get_config_dir
+from ot.paths import RUNTIME_SUBDIR, get_config_dir
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -29,6 +31,7 @@ if TYPE_CHECKING:
 _OAUTH_KEYRING_SERVICE_PREFIX = "onetool-mcp.oauth"
 _OAUTH_IDENTITY_COLLECTION = "onetool-oauth-identity-v1"
 _PUBLIC_CLIENT_AUTH_METHOD = "none"
+_OAUTH_LOCK_TIMEOUT_SECONDS = 30.0
 
 
 def normalize_oauth_endpoint(endpoint: str) -> str:
@@ -51,6 +54,16 @@ def canonical_oauth_scopes(scopes: str | list[str] | None) -> tuple[str, ...]:
     """Return a stable, deduplicated scope identity."""
     values = scopes.split() if isinstance(scopes, str) else (scopes or [])
     return tuple(sorted({scope.strip() for scope in values if scope.strip()}))
+
+
+def oauth_lock_path(endpoint: str, *, config_dir: Path | None = None) -> Path:
+    """Return an endpoint-specific lock path containing no endpoint text."""
+    runtime_dir = (config_dir or get_config_dir()).resolve() / RUNTIME_SUBDIR / "oauth"
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    endpoint_digest = hashlib.sha256(
+        normalize_oauth_endpoint(endpoint).encode()
+    ).hexdigest()
+    return runtime_dir / f"{endpoint_digest}.lock"
 
 
 class SecureOAuthTokenStore(KeyringStore):
@@ -95,10 +108,14 @@ class OneToolOAuth(OAuth):
         scopes: str | list[str] | None,
         token_storage: AsyncKeyValue,
         callback_port: int | None = None,
+        lock_path: Path | None = None,
+        lock_timeout: float = _OAUTH_LOCK_TIMEOUT_SECONDS,
     ) -> None:
         self._identity_store = token_storage
         self._identity_endpoint = normalize_oauth_endpoint(mcp_url)
         self._identity_scopes = canonical_oauth_scopes(scopes)
+        self._state_lock = AsyncFileLock(lock_path or oauth_lock_path(mcp_url))
+        self._lock_timeout = lock_timeout
         super().__init__(
             mcp_url=mcp_url,
             scopes=list(self._identity_scopes),
@@ -158,6 +175,18 @@ class OneToolOAuth(OAuth):
         await self._delete_client_info()
         self.context.client_info = None
 
+    async def _acquire_state_lock(self) -> None:
+        try:
+            await self._state_lock.acquire(timeout=self._lock_timeout)
+        except FileLockTimeout:
+            raise TimeoutError(
+                "Timed out waiting for exclusive OAuth credential update"
+            ) from None
+
+    async def _reload_persisted_state(self) -> None:
+        self._initialized = False
+        await self._initialize()
+
     @override
     async def _initialize(self) -> None:
         stored_identity = await self._identity_store.get(
@@ -181,17 +210,60 @@ class OneToolOAuth(OAuth):
     async def async_auth_flow(
         self, request: httpx.Request
     ) -> AsyncGenerator[httpx.Request, httpx.Response]:
-        """Discard stale redirect registration immediately before reauthorization."""
-        flow = super().async_auth_flow(request)
-        response: httpx.Response | None = None
-        while True:
-            if response is not None and response.status_code == 401:
-                await self._discard_incompatible_registration()
+        """Serialize complete OAuth state transitions across processes."""
+        lock_held = False
+        flow: AsyncGenerator[httpx.Request, httpx.Response] | None = None
+        yielded_request: httpx.Request | None = None
+        try:
+            if not self._initialized or not self.context.is_token_valid():
+                await self._acquire_state_lock()
+                lock_held = True
+                await self._reload_persisted_state()
+                if self.context.is_token_valid():
+                    await self._state_lock.release()
+                    lock_held = False
+
+            flow = super().async_auth_flow(request)
+            response: httpx.Response | None = None
+            while True:
+                if response is not None and response.status_code == 401:
+                    if not lock_held:
+                        failed_access_token = (
+                            self.context.current_tokens.access_token
+                            if self.context.current_tokens is not None
+                            else None
+                        )
+                        await self._acquire_state_lock()
+                        lock_held = True
+                        await self._reload_persisted_state()
+                        current_tokens = self.context.current_tokens
+                        if (
+                            current_tokens is not None
+                            and current_tokens.access_token != failed_access_token
+                            and self.context.is_token_valid()
+                            and yielded_request is not None
+                        ):
+                            self._add_auth_header(yielded_request)
+                            response = yield yielded_request
+                            if response.status_code != 401:
+                                await self._state_lock.release()
+                                lock_held = False
+                                continue
+                    await self._discard_incompatible_registration()
+                try:
+                    yielded_request = await flow.asend(
+                        response  # type: ignore[arg-type]
+                    )
+                except StopAsyncIteration:
+                    return
+                response = yield yielded_request
+        finally:
             try:
-                yielded_request = await flow.asend(response)  # type: ignore[arg-type]
-            except StopAsyncIteration:
-                return
-            response = yield yielded_request
+                if flow is not None:
+                    await flow.aclose()
+            finally:
+                if lock_held:
+                    await self._state_lock.release()
 
 
 def _oauth_keyring_service_name(config_dir: Path | None = None) -> str:

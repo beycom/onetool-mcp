@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
-from collections.abc import AsyncGenerator
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import parse_qs
 
 import httpx
 import pytest
 from fastmcp.client.auth import OAuth
+from filelock import AsyncFileLock
 from key_value.aio.stores.keyring.store import (
     KeyringV1CollectionSanitizationStrategy,
     KeyringV1KeySanitizationStrategy,
@@ -19,6 +21,9 @@ from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 
 from ot.proxy import oauth as proxy_oauth
 from ot.proxy.oauth import OneToolOAuth, SecureOAuthTokenStore
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 MCP_URL = "https://mcp.notion.test/mcp"
 
@@ -73,12 +78,16 @@ def _oauth(
     mcp_url: str = MCP_URL,
     scopes: list[str] | None = None,
     callback_port: int = 43100,
+    lock_path: Path | None = None,
+    lock_timeout: float = 30.0,
 ) -> OneToolOAuth:
     return OneToolOAuth(
         mcp_url=mcp_url,
         scopes=scopes,
         token_storage=store,
         callback_port=callback_port,
+        lock_path=lock_path,
+        lock_timeout=lock_timeout,
     )
 
 
@@ -299,3 +308,228 @@ class TestOAuthAuthorizationIdentity:
 
         assert current.context.current_tokens is None
         assert current.context.client_info is None
+
+
+@pytest.mark.unit
+@pytest.mark.core
+@pytest.mark.usefixtures("fake_keyring")
+class TestOAuthStateLock:
+    """OAuth refresh and registration transactions are process-safe."""
+
+    async def test_concurrent_refresh_reloads_rotated_tokens(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        store = _store()
+        lock_path = tmp_path / "refresh.lock"
+        seed = _oauth(store=store, lock_path=lock_path)
+        await seed._initialize()
+        await seed.token_storage_adapter.set_client_info(_client_info(seed))
+        await seed.token_storage_adapter.set_tokens(
+            OAuthToken(
+                access_token="expired-access",
+                refresh_token="rotating-refresh",
+                expires_in=-1,
+            )
+        )
+        refresh_tokens_used: list[str] = []
+
+        async def refresh_flow(
+            provider: OAuth, request: httpx.Request
+        ) -> AsyncGenerator[httpx.Request, httpx.Response]:
+            if not provider.context.is_token_valid():
+                assert provider.context.current_tokens is not None
+                refresh_tokens_used.append(
+                    provider.context.current_tokens.refresh_token or ""
+                )
+                await asyncio.sleep(0.05)
+                rotated = OAuthToken(
+                    access_token="rotated-access",
+                    refresh_token="rotated-refresh",
+                    expires_in=3600,
+                )
+                await provider.token_storage_adapter.set_tokens(rotated)
+                provider.context.current_tokens = rotated
+                provider.context.update_token_expiry(rotated)
+            yield request
+
+        monkeypatch.setattr(OAuth, "async_auth_flow", refresh_flow)
+        clients = [
+            _oauth(store=store, lock_path=lock_path),
+            _oauth(store=store, lock_path=lock_path),
+        ]
+
+        async def run(client: OneToolOAuth) -> str:
+            request = httpx.Request("GET", MCP_URL)
+            flow = client.async_auth_flow(request)
+            await anext(flow)
+            await flow.aclose()
+            assert client.context.current_tokens is not None
+            return client.context.current_tokens.access_token
+
+        assert await asyncio.gather(*(run(client) for client in clients)) == [
+            "rotated-access",
+            "rotated-access",
+        ]
+        assert refresh_tokens_used == ["rotating-refresh"]
+
+    async def test_concurrent_registration_runs_once(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        store = _store()
+        lock_path = tmp_path / "registration.lock"
+        seed = _oauth(store=store, lock_path=lock_path)
+        await seed._initialize()
+        registrations = 0
+
+        async def registration_flow(
+            provider: OAuth, request: httpx.Request
+        ) -> AsyncGenerator[httpx.Request, httpx.Response]:
+            nonlocal registrations
+            if provider.context.client_info is None:
+                registrations += 1
+                await asyncio.sleep(0.05)
+                await provider.token_storage_adapter.set_client_info(
+                    _client_info(provider)
+                )
+                tokens = OAuthToken(access_token="registered", expires_in=3600)
+                await provider.token_storage_adapter.set_tokens(tokens)
+                provider.context.client_info = _client_info(provider)
+                provider.context.current_tokens = tokens
+                provider.context.update_token_expiry(tokens)
+            yield request
+
+        monkeypatch.setattr(OAuth, "async_auth_flow", registration_flow)
+        clients = [
+            _oauth(store=store, lock_path=lock_path),
+            _oauth(store=store, lock_path=lock_path),
+        ]
+
+        async def run(client: OneToolOAuth) -> None:
+            flow = client.async_auth_flow(httpx.Request("GET", MCP_URL))
+            await anext(flow)
+            await flow.aclose()
+
+        await asyncio.gather(*(run(client) for client in clients))
+        assert registrations == 1
+        assert all(client.context.client_info is not None for client in clients)
+
+    async def test_waiting_and_holding_cancellation_release_lock(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        store = _store()
+        lock_path = tmp_path / "cancellation.lock"
+        seed = _oauth(store=store, lock_path=lock_path)
+        await seed._initialize()
+        holder = _oauth(store=store, lock_path=lock_path)
+        waiter = _oauth(store=store, lock_path=lock_path)
+        successor = _oauth(store=store, lock_path=lock_path)
+        holder_entered = asyncio.Event()
+
+        async def cancellable_flow(
+            provider: OAuth, request: httpx.Request
+        ) -> AsyncGenerator[httpx.Request, httpx.Response]:
+            if provider is holder:
+                holder_entered.set()
+                await asyncio.Event().wait()
+            yield request
+
+        monkeypatch.setattr(OAuth, "async_auth_flow", cancellable_flow)
+        holder_flow = holder.async_auth_flow(httpx.Request("GET", MCP_URL))
+        holder_task = asyncio.create_task(anext(holder_flow))
+        await holder_entered.wait()
+
+        waiter_flow = waiter.async_auth_flow(httpx.Request("GET", MCP_URL))
+        waiter_task = asyncio.create_task(anext(waiter_flow))
+        await asyncio.sleep(0.05)
+        assert not waiter_task.done()
+        waiter_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await waiter_task
+
+        holder_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await holder_task
+
+        successor_flow = successor.async_auth_flow(httpx.Request("GET", MCP_URL))
+        await asyncio.wait_for(anext(successor_flow), timeout=1)
+        await successor_flow.aclose()
+
+    async def test_different_endpoints_do_not_block(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        store = _store()
+        entered = 0
+        both_entered = asyncio.Event()
+        release = asyncio.Event()
+
+        async def concurrent_flow(
+            _provider: OAuth, request: httpx.Request
+        ) -> AsyncGenerator[httpx.Request, httpx.Response]:
+            nonlocal entered
+            entered += 1
+            if entered == 2:
+                both_entered.set()
+            await release.wait()
+            yield request
+
+        monkeypatch.setattr(OAuth, "async_auth_flow", concurrent_flow)
+        clients = [
+            _oauth(
+                store=store,
+                mcp_url="https://first.mcp.test/mcp",
+                lock_path=tmp_path / "first.lock",
+            ),
+            _oauth(
+                store=store,
+                mcp_url="https://second.mcp.test/mcp",
+                lock_path=tmp_path / "second.lock",
+            ),
+        ]
+        flows = [
+            client.async_auth_flow(httpx.Request("GET", client.mcp_url))
+            for client in clients
+        ]
+        tasks = [asyncio.create_task(anext(flow)) for flow in flows]
+        await asyncio.wait_for(both_entered.wait(), timeout=1)
+        release.set()
+        await asyncio.gather(*tasks)
+        await asyncio.gather(*(flow.aclose() for flow in flows))
+
+    async def test_lock_timeout_is_async_and_sanitized(
+        self, tmp_path: Path
+    ) -> None:
+        endpoint = "https://mcp.test/mcp?credential=highly-secret"
+        lock_path = proxy_oauth.oauth_lock_path(endpoint, config_dir=tmp_path)
+        other_lock_path = proxy_oauth.oauth_lock_path(
+            "https://other.mcp.test/mcp", config_dir=tmp_path
+        )
+        assert lock_path != other_lock_path
+        assert "mcp.test" not in lock_path.name
+        assert "highly-secret" not in lock_path.name
+
+        held_lock = AsyncFileLock(lock_path)
+        await held_lock.acquire()
+        client = _oauth(
+            store=_store(),
+            mcp_url=endpoint,
+            lock_path=lock_path,
+            lock_timeout=0.05,
+        )
+        event_loop_progressed = asyncio.Event()
+
+        async def tick() -> None:
+            await asyncio.sleep(0)
+            event_loop_progressed.set()
+
+        tick_task = asyncio.create_task(tick())
+        try:
+            flow = client.async_auth_flow(httpx.Request("GET", endpoint))
+            with pytest.raises(
+                TimeoutError,
+                match="Timed out waiting for exclusive OAuth credential update",
+            ):
+                await anext(flow)
+            assert event_loop_progressed.is_set()
+            await tick_task
+        finally:
+            await held_lock.release()
