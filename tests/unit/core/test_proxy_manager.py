@@ -328,16 +328,14 @@ class TestProxyManagerAuth:
         assert call_kwargs["auth"] is None
         assert callable(mock_client.call_args.kwargs["elicitation_handler"])
 
-    @patch("ot.proxy.manager.OAuth")
     @patch("ot.proxy.manager.StreamableHttpTransport")
     @patch("ot.proxy.manager.Client")
-    @patch("ot.proxy.oauth.create_oauth_token_storage")
+    @patch("ot.proxy.oauth.create_oauth_provider")
     def test_http_client_oauth(
         self,
-        mock_create_storage: MagicMock,
+        mock_create_oauth: MagicMock,
         _mock_client: MagicMock,
         mock_transport: MagicMock,
-        mock_oauth: MagicMock,
     ) -> None:
         """Should create HTTP client with OAuth when configured."""
         from ot.config.models import AuthConfig, McpServerConfig
@@ -351,19 +349,15 @@ class TestProxyManagerAuth:
 
         manager._create_http_client("test", config)
 
-        # Verify OAuth created with correct params
-        mock_oauth.assert_called_once_with(
+        mock_create_oauth.assert_called_once_with(
             mcp_url="https://test.invalid/mcp",
             scopes=["tools:read", "tools:write"],
-            client_name="OneTool",
-            token_storage=mock_create_storage.return_value,
-            additional_client_metadata={"token_endpoint_auth_method": "none"},
         )
 
         # Verify transport created with OAuth
         mock_transport.assert_called_once()
         call_kwargs = mock_transport.call_args[1]
-        assert call_kwargs["auth"] == mock_oauth.return_value
+        assert call_kwargs["auth"] == mock_create_oauth.return_value
 
     @patch("ot.proxy.manager.BearerAuth")
     @patch("ot.proxy.manager.StreamableHttpTransport")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncGenerator
 from pathlib import Path
 from urllib.parse import parse_qs
 
@@ -17,7 +18,7 @@ from mcp.client.auth.utils import create_client_registration_request
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 
 from ot.proxy import oauth as proxy_oauth
-from ot.proxy.oauth import SecureOAuthTokenStore
+from ot.proxy.oauth import OneToolOAuth, SecureOAuthTokenStore
 
 MCP_URL = "https://mcp.notion.test/mcp"
 
@@ -40,6 +41,11 @@ def fake_keyring(monkeypatch: pytest.MonkeyPatch) -> dict[tuple[str, str], str]:
             (service_name, username), password
         ),
     )
+    monkeypatch.setattr(
+        proxy_oauth.keyring,
+        "delete_password",
+        lambda service_name, username: values.pop((service_name, username), None),
+    )
     return values
 
 
@@ -61,12 +67,18 @@ def _client_info(oauth: OAuth) -> OAuthClientInformationFull:
     )
 
 
-def _oauth(*, store: SecureOAuthTokenStore, mcp_url: str = MCP_URL) -> OAuth:
-    return OAuth(
+def _oauth(
+    *,
+    store: SecureOAuthTokenStore,
+    mcp_url: str = MCP_URL,
+    scopes: list[str] | None = None,
+    callback_port: int = 43100,
+) -> OneToolOAuth:
+    return OneToolOAuth(
         mcp_url=mcp_url,
-        client_name="OneTool",
+        scopes=scopes,
         token_storage=store,
-        additional_client_metadata={"token_endpoint_auth_method": "none"},
+        callback_port=callback_port,
     )
 
 
@@ -111,6 +123,7 @@ class TestOAuthTokenPersistence:
 
     async def test_credentials_and_tokens_reused_and_scoped_by_endpoint(self) -> None:
         first = _oauth(store=_store())
+        await first._initialize()
         client_info = _client_info(first)
         initial_tokens = OAuthToken(
             access_token="first-access",
@@ -144,6 +157,7 @@ class TestOAuthTokenPersistence:
 
     async def test_refresh_token_rotation_is_persisted(self) -> None:
         first = _oauth(store=_store())
+        await first._initialize()
         await first.token_storage_adapter.set_client_info(_client_info(first))
         await first.token_storage_adapter.set_tokens(
             OAuthToken(
@@ -187,3 +201,101 @@ class TestOAuthTokenPersistence:
         assert proxy_oauth._oauth_keyring_service_name(
             first_dir
         ) != proxy_oauth._oauth_keyring_service_name(second_dir)
+
+
+@pytest.mark.unit
+@pytest.mark.core
+@pytest.mark.usefixtures("fake_keyring")
+class TestOAuthAuthorizationIdentity:
+    """Stored OAuth state matches endpoint, scopes, and current registration."""
+
+    async def test_callback_change_keeps_tokens_but_discards_registration(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store = _store()
+        first = _oauth(store=store, scopes=["read"], callback_port=43100)
+        await first._initialize()
+        await first.token_storage_adapter.set_client_info(_client_info(first))
+        tokens = OAuthToken(
+            access_token="valid-access",
+            refresh_token="valid-refresh",
+            expires_in=3600,
+        )
+        await first.token_storage_adapter.set_tokens(tokens)
+
+        recreated = _oauth(store=store, scopes=["read"], callback_port=43101)
+        await recreated._initialize()
+
+        assert recreated.context.current_tokens == tokens
+        assert recreated.context.client_info is not None
+
+        async def reauthorization_flow(
+            provider: OAuth, request: httpx.Request
+        ) -> AsyncGenerator[httpx.Request, httpx.Response]:
+            response = yield request
+            assert response.status_code == 401
+            assert provider.context.client_info is None
+            yield request
+
+        monkeypatch.setattr(OAuth, "async_auth_flow", reauthorization_flow)
+        request = httpx.Request("GET", MCP_URL)
+        flow = recreated.async_auth_flow(request)
+        assert await anext(flow) is request
+        assert await flow.asend(httpx.Response(401, request=request)) is request
+        await flow.aclose()
+
+        assert recreated.context.client_info is None
+        assert await recreated.token_storage_adapter.get_client_info() is None
+        assert [
+            str(uri) for uri in recreated.context.client_metadata.redirect_uris or []
+        ] == ["http://localhost:43101/callback"]
+
+    async def test_scope_change_invalidates_tokens_and_registration(self) -> None:
+        store = _store()
+        first = _oauth(store=store, scopes=["read"], callback_port=43100)
+        await first._initialize()
+        await first.token_storage_adapter.set_client_info(_client_info(first))
+        await first.token_storage_adapter.set_tokens(
+            OAuthToken(access_token="old-access", refresh_token="old-refresh")
+        )
+
+        changed = _oauth(store=store, scopes=["write"], callback_port=43100)
+        await changed._initialize()
+
+        assert changed.context.current_tokens is None
+        assert changed.context.client_info is None
+
+    async def test_scope_order_has_one_identity(self) -> None:
+        store = _store()
+        first = _oauth(store=store, scopes=["write", "read"], callback_port=43100)
+        await first._initialize()
+        info = _client_info(first)
+        await first.token_storage_adapter.set_client_info(info)
+        tokens = OAuthToken(access_token="valid-access", refresh_token="refresh")
+        await first.token_storage_adapter.set_tokens(tokens)
+
+        reordered = _oauth(
+            store=store, scopes=["read", "write", "read"], callback_port=43100
+        )
+        await reordered._initialize()
+
+        assert reordered.context.current_tokens == tokens
+        assert reordered.context.client_info is not None
+        assert reordered.context.client_info.model_dump(mode="json") == info.model_dump(
+            mode="json"
+        )
+        assert reordered.context.client_metadata.scope == "read write"
+
+    async def test_state_without_identity_metadata_is_invalidated(self) -> None:
+        store = _store()
+        old_client = _oauth(store=store, scopes=["read"], callback_port=43100)
+        await old_client.token_storage_adapter.set_client_info(_client_info(old_client))
+        await old_client.token_storage_adapter.set_tokens(
+            OAuthToken(access_token="unverified", refresh_token="unverified-refresh")
+        )
+
+        current = _oauth(store=store, scopes=["read"], callback_port=43100)
+        await current._initialize()
+
+        assert current.context.current_tokens is None
+        assert current.context.client_info is None

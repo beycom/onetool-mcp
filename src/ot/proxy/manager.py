@@ -1122,14 +1122,11 @@ class ProxyManager:
         auth: OAuth | BearerAuth | None = None
         if config.auth:
             if config.auth.type == "oauth":
-                from ot.proxy.oauth import create_oauth_token_storage
+                from ot.proxy.oauth import create_oauth_provider
 
-                auth = OAuth(
+                auth = create_oauth_provider(
                     mcp_url=url,
                     scopes=config.auth.scopes or [],
-                    client_name="OneTool",
-                    token_storage=create_oauth_token_storage(),
-                    additional_client_metadata={"token_endpoint_auth_method": "none"},
                 )
                 logger.debug(
                     f"Configured OAuth for {name} with scopes: {config.auth.scopes}"

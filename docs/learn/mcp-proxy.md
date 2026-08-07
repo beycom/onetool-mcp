@@ -41,7 +41,10 @@ Notion without provider-specific configuration.
 OAuth client registration, access and refresh tokens, and expiry metadata are persisted in the OS
 keychain. Storage is isolated by the OneTool configuration directory and exact MCP endpoint URL, so
 restarting OneTool or reconnecting a server reuses valid authorization while separate projects and
-endpoints remain isolated. Refresh-token rotation replaces the stored token set automatically.
+endpoints remain isolated. OneTool reuses credentials only when their canonical scope set and
+public-client identity still match the current configuration. A new random callback port preserves
+usable tokens, but stale dynamic registration is replaced before full reauthorization.
+Refresh-token rotation replaces the stored token set automatically.
 
 OneTool refuses OAuth persistence when the active keyring is unavailable or insecure; it does not
 fall back to in-memory or plaintext token storage. Connection status keeps safe OAuth diagnostics

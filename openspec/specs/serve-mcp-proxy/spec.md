@@ -323,6 +323,21 @@ and SHALL persist their credentials securely without additional configuration.
 - **WHEN** the proxy reconnects to the same MCP endpoint
 - **THEN** it SHALL reuse the stored credentials without opening browser authorization
 
+#### Scenario: Authorization identity changes
+- **GIVEN** stored OAuth credentials include the normalized endpoint, canonical requested scopes,
+  and public-client authentication method that produced them
+- **WHEN** the configured scope set changes
+- **THEN** OneTool SHALL invalidate both the stored tokens and client registration before reconnecting
+- **AND** scope ordering and duplicates SHALL NOT create a different authorization identity
+- **AND** stored credentials without verifiable identity metadata SHALL NOT be reused
+
+#### Scenario: Callback changes across restarts
+- **GIVEN** reusable OAuth tokens and a dynamic registration exist for a previous callback URI
+- **WHEN** OneTool restarts with a different random callback port
+- **THEN** it SHALL retain otherwise usable tokens and refresh-token capability
+- **AND** it SHALL discard the incompatible registration before full reauthorization
+- **AND** any replacement registration and authorization SHALL use the current callback URI
+
 #### Scenario: Refresh token rotation
 - **GIVEN** a stored access token has expired and a refresh token is available
 - **WHEN** the OAuth server returns a refreshed access token and rotated refresh token

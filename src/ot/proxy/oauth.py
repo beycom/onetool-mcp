@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import os
-from typing import TYPE_CHECKING, override
+from collections.abc import AsyncGenerator, Mapping
+from typing import TYPE_CHECKING, Any, override
+from urllib.parse import urlsplit, urlunsplit
 
 import keyring
+from fastmcp.client.auth import OAuth
 from key_value.aio.stores.keyring.store import (
     KeyringStore,
     KeyringV1CollectionSanitizationStrategy,
@@ -19,10 +22,35 @@ from ot.paths import get_config_dir
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import httpx
     from key_value.aio._utils.managed_entry import ManagedEntry
     from key_value.aio.protocols import AsyncKeyValue
 
 _OAUTH_KEYRING_SERVICE_PREFIX = "onetool-mcp.oauth"
+_OAUTH_IDENTITY_COLLECTION = "onetool-oauth-identity-v1"
+_PUBLIC_CLIENT_AUTH_METHOD = "none"
+
+
+def normalize_oauth_endpoint(endpoint: str) -> str:
+    """Normalize an MCP endpoint without incorporating callback identity."""
+    parsed = urlsplit(endpoint.strip())
+    host = (parsed.hostname or "").lower()
+    if ":" in host:
+        host = f"[{host}]"
+    port = parsed.port
+    if port is not None and not (
+        (parsed.scheme.lower() == "http" and port == 80)
+        or (parsed.scheme.lower() == "https" and port == 443)
+    ):
+        host = f"{host}:{port}"
+    path = parsed.path.rstrip("/") or "/"
+    return urlunsplit((parsed.scheme.lower(), host, path, parsed.query, ""))
+
+
+def canonical_oauth_scopes(scopes: str | list[str] | None) -> tuple[str, ...]:
+    """Return a stable, deduplicated scope identity."""
+    values = scopes.split() if isinstance(scopes, str) else (scopes or [])
+    return tuple(sorted({scope.strip() for scope in values if scope.strip()}))
 
 
 class SecureOAuthTokenStore(KeyringStore):
@@ -57,6 +85,115 @@ class SecureOAuthTokenStore(KeyringStore):
         return await super()._delete_managed_entry(key=key, collection=collection)
 
 
+class OneToolOAuth(OAuth):
+    """FastMCP OAuth provider with OneTool-owned authorization identity checks."""
+
+    def __init__(
+        self,
+        *,
+        mcp_url: str,
+        scopes: str | list[str] | None,
+        token_storage: AsyncKeyValue,
+        callback_port: int | None = None,
+    ) -> None:
+        self._identity_store = token_storage
+        self._identity_endpoint = normalize_oauth_endpoint(mcp_url)
+        self._identity_scopes = canonical_oauth_scopes(scopes)
+        super().__init__(
+            mcp_url=mcp_url,
+            scopes=list(self._identity_scopes),
+            client_name="OneTool",
+            token_storage=token_storage,
+            callback_port=callback_port,
+            additional_client_metadata={
+                "token_endpoint_auth_method": _PUBLIC_CLIENT_AUTH_METHOD
+            },
+        )
+
+    def _identity_key(self) -> str:
+        return f"{self._identity_endpoint}/identity"
+
+    def _identity_record(self) -> dict[str, Any]:
+        return {
+            "version": 1,
+            "endpoint": self._identity_endpoint,
+            "scopes": list(self._identity_scopes),
+            "token_endpoint_auth_method": _PUBLIC_CLIENT_AUTH_METHOD,
+            "redirect_uris": [
+                str(uri) for uri in self.context.client_metadata.redirect_uris or []
+            ],
+        }
+
+    async def _delete_client_info(self) -> None:
+        await self._identity_store.delete(
+            key=f"{self.mcp_url}/client_info",
+            collection="mcp-oauth-client-info",
+        )
+
+    def _identity_matches(self, stored_identity: Any) -> bool:
+        if not isinstance(stored_identity, Mapping):
+            return False
+        current_identity = self._identity_record()
+        return (
+            stored_identity.get("version") == current_identity["version"]
+            and stored_identity.get("endpoint") == current_identity["endpoint"]
+            and tuple(stored_identity.get("scopes", ())) == self._identity_scopes
+            and stored_identity.get("token_endpoint_auth_method")
+            == _PUBLIC_CLIENT_AUTH_METHOD
+        )
+
+    def _registration_matches_callback(self) -> bool:
+        stored_client = self.context.client_info
+        if stored_client is None:
+            return True
+        current_redirects = {
+            str(uri) for uri in self.context.client_metadata.redirect_uris or []
+        }
+        stored_redirects = {str(uri) for uri in stored_client.redirect_uris or []}
+        return current_redirects.issubset(stored_redirects)
+
+    async def _discard_incompatible_registration(self) -> None:
+        if self._registration_matches_callback():
+            return
+        await self._delete_client_info()
+        self.context.client_info = None
+
+    @override
+    async def _initialize(self) -> None:
+        stored_identity = await self._identity_store.get(
+            key=self._identity_key(), collection=_OAUTH_IDENTITY_COLLECTION
+        )
+        current_identity = self._identity_record()
+        if not self._identity_matches(stored_identity):
+            await self.token_storage_adapter.clear()
+
+        await self._identity_store.put(
+            key=self._identity_key(),
+            value=current_identity,
+            collection=_OAUTH_IDENTITY_COLLECTION,
+        )
+        await super()._initialize()
+
+        if not self.context.is_token_valid() and not self.context.can_refresh_token():
+            await self._discard_incompatible_registration()
+
+    @override
+    async def async_auth_flow(
+        self, request: httpx.Request
+    ) -> AsyncGenerator[httpx.Request, httpx.Response]:
+        """Discard stale redirect registration immediately before reauthorization."""
+        flow = super().async_auth_flow(request)
+        response: httpx.Response | None = None
+        while True:
+            if response is not None and response.status_code == 401:
+                await self._discard_incompatible_registration()
+            try:
+                yielded_request = await flow.asend(response)  # type: ignore[arg-type]
+            except StopAsyncIteration:
+                return
+            response = yield yielded_request
+
+
 def _oauth_keyring_service_name(config_dir: Path | None = None) -> str:
     """Return a stable, non-identifying keyring service scoped to OneTool dir."""
     resolved_dir = (config_dir or get_config_dir()).resolve()
@@ -71,4 +208,19 @@ def create_oauth_token_storage() -> AsyncKeyValue:
         service_name=_oauth_keyring_service_name(),
         key_sanitization_strategy=KeyringV1KeySanitizationStrategy(),
         collection_sanitization_strategy=KeyringV1CollectionSanitizationStrategy(),
+    )
+
+
+def create_oauth_provider(
+    *,
+    mcp_url: str,
+    scopes: str | list[str] | None,
+    callback_port: int | None = None,
+) -> OneToolOAuth:
+    """Create a public PKCE OAuth provider with persistent identity checks."""
+    return OneToolOAuth(
+        mcp_url=mcp_url,
+        scopes=scopes,
+        token_storage=create_oauth_token_storage(),
+        callback_port=callback_port,
     )
