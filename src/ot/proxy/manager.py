@@ -43,14 +43,22 @@ if TYPE_CHECKING:
 
 
 _CONNECT_AUTH_RE = re.compile(
-    r"(?P<label>\bauthorization\s*[:=]\s*(?:(?:bearer|basic)\s+)?"
-    r"|\b(?:bearer|basic)\s+)(?P<secret>[^\s,;}\]]+)",
+    r"(?P<label>\bauthorization\s*[:=]\s*)"
+    r"(?:(?P<auth_quote>[\"'])(?:(?:bearer|basic)\s+)?[^\"']*(?P=auth_quote)"
+    r"|(?:(?:bearer|basic)\s+)?[^\s,;&}\]\"']+)",
+    re.IGNORECASE,
+)
+_CONNECT_AUTH_SCHEME_RE = re.compile(
+    r"(?P<label>\b(?:bearer|basic)\s+)"
+    r"(?:(?P<scheme_quote>[\"'])[^\"']*(?P=scheme_quote)"
+    r"|[^\s,;&}\]\"']+)",
     re.IGNORECASE,
 )
 _CONNECT_SECRET_FIELD_RE = re.compile(
     r"(?P<label>[\"']?(?:access_token|refresh_token|id_token|client_secret|token|"
-    r"api[-_ ]?key)[\"']?\s*[:=]\s*)(?P<quote>[\"']?)"
-    r"(?P<secret>[^\"'\s,;}\]]+)(?P=quote)",
+    r"(?:x[-_ ]?)?api[-_ ]?key)[\"']?\s*[:=]\s*)"
+    r"(?:(?P<field_quote>[\"'])[^\"']*(?P=field_quote)"
+    r"|[^\s,;&}\]\"']+)",
     re.IGNORECASE,
 )
 
@@ -73,6 +81,7 @@ def _sanitize_connect_error(msg: str) -> str:
        whether a credential keyword precedes them.
     """
     msg = _CONNECT_AUTH_RE.sub(r"\g<label>[redacted]", msg)
+    msg = _CONNECT_AUTH_SCHEME_RE.sub(r"\g<label>[redacted]", msg)
     msg = _CONNECT_SECRET_FIELD_RE.sub(r"\g<label>[redacted]", msg)
     msg = redact_secrets(msg)
     return msg
@@ -834,10 +843,12 @@ class ProxyManager:
                         self._errors[name] = "cancelled"
                         raise
                     except Exception as e:
-                        self._errors[name] = _sanitize_connect_error(str(e))
+                        safe_error = _sanitize_connect_error(str(e))
+                        self._errors[name] = safe_error
                         logger.warning(
                             LogEntry(event="proxy.connect.failed", server=name).failure(
-                                e
+                                error_type=type(e).__name__,
+                                error_message=safe_error,
                             )
                         )
                         return False
@@ -887,40 +898,47 @@ class ProxyManager:
     async def _connect_server(self, name: str, config: McpServerConfig) -> None:
         """Connect to a single MCP server using FastMCP Client."""
         with LogSpan(span="proxy.connect", server=name, type=config.type) as span:
-            client = self._create_client(name, config)
-
-            # Enter the client context manager for persistent connection
-            await client.__aenter__()  # type: ignore[no-untyped-call]
-
             try:
-                # List tools to verify connection and cache tool info
-                tools = await client.list_tools()
-                tools = [_strip_ctx_from_schema(t) for t in tools]
+                client = self._create_client(name, config)
 
-                # Capture native instructions from InitializeResult (MCP standard)
-                init_result = getattr(client, "initialize_result", None)
-                with self._mutation_lock:
-                    self._clients[name] = client
-                    self._tools_by_server[name] = tools
-                    self._server_timeouts[name] = float(config.timeout)
-                    self._server_instructions[name] = (
-                        (init_result.instructions or "") if init_result else ""
+                # Enter the client context manager for persistent connection
+                await client.__aenter__()  # type: ignore[no-untyped-call]
+
+                try:
+                    # List tools to verify connection and cache tool info
+                    tools = await client.list_tools()
+                    tools = [_strip_ctx_from_schema(t) for t in tools]
+
+                    # Capture native instructions from InitializeResult (MCP standard)
+                    init_result = getattr(client, "initialize_result", None)
+                    with self._mutation_lock:
+                        self._clients[name] = client
+                        self._tools_by_server[name] = tools
+                        self._server_timeouts[name] = float(config.timeout)
+                        self._server_instructions[name] = (
+                            (init_result.instructions or "") if init_result else ""
+                        )
+
+                    span.add("toolCount", len(tools))
+                    logger.info(
+                        LogEntry(
+                            event="proxy.connect.ready",
+                            server=name,
+                            serverType=config.type,
+                            toolCount=len(tools),
+                        ).success()
                     )
 
-                span.add("toolCount", len(tools))
-                logger.info(
-                    LogEntry(
-                        event="proxy.connect.ready",
-                        server=name,
-                        serverType=config.type,
-                        toolCount=len(tools),
-                    ).success()
-                )
-
-            except BaseException:
-                # Clean up on failure — catches CancelledError too
-                await client.__aexit__(None, None, None)  # type: ignore[no-untyped-call]
+                except BaseException:
+                    # Clean up on failure — catches CancelledError too
+                    await client.__aexit__(None, None, None)  # type: ignore[no-untyped-call]
+                    raise
+            except asyncio.CancelledError:
                 raise
+            except Exception as e:
+                # LogSpan sees only this sanitized replacement, never the raw provider
+                # exception that may contain authorization credentials.
+                raise RuntimeError(_sanitize_connect_error(str(e))) from None
 
     def _create_client(self, name: str, config: McpServerConfig) -> Client:  # type: ignore[type-arg]
         """Create a FastMCP Client for the given configuration."""
@@ -1151,12 +1169,15 @@ class ProxyManager:
             self._evict_proxy_caches(name)
             return f"ok ({tool_count} tools)"
         except Exception as e:
+            safe_error = _sanitize_connect_error(str(e))
             with self._mutation_lock:
-                self._errors[name] = _sanitize_connect_error(str(e))
+                self._errors[name] = safe_error
             logger.warning(
-                LogEntry(event="proxy.connect.failed", server=name).failure(e)
+                LogEntry(event="proxy.connect.failed", server=name).failure(
+                    error_type=type(e).__name__, error_message=safe_error
+                )
             )
-            return f"failed: {e}"
+            return f"failed: {safe_error}"
 
     def _schedule_or_wait(self, coro: Coroutine[Any, Any, str], timeout: float) -> str:
         """Run ``coro`` on the manager's loop, guarding against a same-loop deadlock.

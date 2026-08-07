@@ -160,6 +160,47 @@ class TestCallToolSyncCancel:
 class TestConnectErrorSanitization:
     """p14: connect-error strings are scrubbed of credential material before storage."""
 
+    @pytest.mark.parametrize(
+        ("message", "sentinels"),
+        [
+            (
+                'request failed: Authorization: "Bearer quoted-auth-sentinel"',
+                ("quoted-auth-sentinel",),
+            ),
+            (
+                "request failed: aUtHoRiZaTiOn='Basic mixed-case-sentinel'",
+                ("mixed-case-sentinel",),
+            ),
+            (
+                "request failed: Bearer bare-bearer-sentinel",
+                ("bare-bearer-sentinel",),
+            ),
+            (
+                'oauth: {"access_token":"access-sentinel",'
+                '"refresh_token":"refresh-sentinel","id_token":"id-sentinel",'
+                '"client_secret":"client-sentinel"}',
+                (
+                    "access-sentinel",
+                    "refresh-sentinel",
+                    "id-sentinel",
+                    "client-sentinel",
+                ),
+            ),
+            (
+                "oauth: token=form-token-sentinel&X-API-Key=api-key-sentinel&status=401",
+                ("form-token-sentinel", "api-key-sentinel"),
+            ),
+        ],
+    )
+    def test_credential_forms_are_redacted(
+        self, message: str, sentinels: tuple[str, ...]
+    ) -> None:
+        from ot.proxy.manager import _sanitize_connect_error
+
+        output = _sanitize_connect_error(message)
+
+        assert all(sentinel not in output for sentinel in sentinels)
+
     def test_bearer_token_redacted(self) -> None:
         from ot.proxy.manager import _sanitize_connect_error
 
@@ -214,3 +255,54 @@ class TestConnectErrorSanitization:
         assert "opaque-refresh" not in out
         assert "status=401" in out
         assert 'error="invalid_token"' in out
+
+    @pytest.mark.asyncio
+    async def test_incremental_connect_uses_one_sanitized_error_everywhere(self) -> None:
+        from ot.config.models import McpServerConfig
+
+        sentinel = "opaque-connect-sentinel"
+        manager = ProxyManager()
+        config = McpServerConfig(type="stdio", command="uvx")
+
+        with (
+            patch.object(
+                manager,
+                "_connect_server",
+                side_effect=RuntimeError(
+                    f'provider rejected Authorization: "Bearer {sentinel}"'
+                ),
+            ),
+            patch("ot.proxy.manager.logger.warning") as warning,
+        ):
+            result = await manager.connect_additional("secure", config)
+
+        stored = manager.get_error("secure")
+        logged = str(warning.call_args.args[0])
+        assert stored is not None
+        assert sentinel not in result
+        assert sentinel not in stored
+        assert sentinel not in logged
+        assert result == f"failed: {stored}"
+
+    @pytest.mark.asyncio
+    async def test_startup_connect_logs_only_sanitized_error(self) -> None:
+        from ot.config.models import McpServerConfig
+
+        sentinel = "startup-token-sentinel"
+        manager = ProxyManager()
+        config = McpServerConfig(type="stdio", command="uvx")
+
+        with (
+            patch.object(
+                manager,
+                "_create_client",
+                side_effect=RuntimeError(f"access_token={sentinel}&status=401"),
+            ),
+            patch("ot.proxy.manager.logger.warning") as warning,
+            patch("ot.logging.span.logger") as span_logger,
+        ):
+            await manager.connect({"secure": config})
+
+        assert sentinel not in (manager.get_error("secure") or "")
+        assert sentinel not in str(warning.call_args.args[0])
+        assert sentinel not in str(span_logger.opt.return_value.error.call_args.args[0])
