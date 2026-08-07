@@ -158,6 +158,116 @@ class TestCallToolSyncCancel:
 
         mock_future.cancel.assert_called_once()
 
+    @pytest.mark.parametrize("operation", ["resources", "prompts"])
+    def test_discovery_future_cancelled_on_timeout(self, operation: str) -> None:
+        manager = ProxyManager()
+        manager._loop = MagicMock()
+        manager._loop.is_running.return_value = True
+        mock_future = MagicMock()
+        mock_future.result.side_effect = concurrent.futures.TimeoutError()
+
+        def _fake_schedule(coro, loop):  # noqa: ANN001, ANN202
+            coro.close()
+            return mock_future
+
+        with patch("asyncio.run_coroutine_threadsafe", side_effect=_fake_schedule):
+            with pytest.raises(concurrent.futures.TimeoutError):
+                if operation == "resources":
+                    manager.list_resources_sync("srv", timeout=1.0)
+                else:
+                    manager.list_prompts_sync("srv", timeout=1.0)
+
+        mock_future.cancel.assert_called_once()
+
+    def test_connect_timeout_invalidates_generation_and_cancels(self) -> None:
+        from ot.config.models import McpServerConfig
+
+        manager = ProxyManager()
+        manager._loop = MagicMock()
+        manager._loop.is_running.return_value = True
+        mock_future = MagicMock()
+        mock_future.result.side_effect = concurrent.futures.TimeoutError()
+
+        def _fake_schedule(coro, loop):  # noqa: ANN001, ANN202
+            coro.close()
+            return mock_future
+
+        config = McpServerConfig(type="stdio", command="uvx")
+        with patch("asyncio.run_coroutine_threadsafe", side_effect=_fake_schedule):
+            with pytest.raises(concurrent.futures.TimeoutError):
+                manager.connect_additional_sync("srv", config)
+
+        assert manager._server_generations["srv"] > 0
+        mock_future.cancel.assert_called_once()
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestCallToolDeadlines:
+    """One tool deadline covers gate waiting and downstream execution."""
+
+    @pytest.mark.asyncio
+    async def test_timeout_while_waiting_for_call_gate(self) -> None:
+        manager = ProxyManager()
+        client = MagicMock()
+        client.call_tool = AsyncMock()
+        manager._clients["srv"] = client
+        lock = asyncio.Lock()
+        await lock.acquire()
+        manager._call_locks["srv"] = lock
+
+        try:
+            with pytest.raises(TimeoutError, match="timed out"):
+                await manager.call_tool("srv", "tool", timeout=0.01)
+        finally:
+            lock.release()
+
+        client.call_tool.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_timeout_cancels_downstream_request(self) -> None:
+        manager = ProxyManager()
+        started = asyncio.Event()
+        cancelled = asyncio.Event()
+        client = MagicMock()
+
+        async def blocked_call(*_args: object, **_kwargs: object) -> None:
+            started.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+
+        client.call_tool = AsyncMock(side_effect=blocked_call)
+        manager._clients["srv"] = client
+
+        with pytest.raises(TimeoutError, match="timed out"):
+            await manager.call_tool("srv", "tool", timeout=0.01)
+
+        assert started.is_set()
+        assert cancelled.is_set()
+        client.call_tool.assert_awaited_once()
+
+    def test_oauth_connect_timeout_includes_callback_and_cleanup(self) -> None:
+        from ot.proxy.manager import (
+            OAUTH_CALLBACK_TIMEOUT_SECONDS,
+            RUNTIME_CONNECT_TIMEOUT_SECONDS,
+            TIMEOUT_CLEANUP_MARGIN_SECONDS,
+        )
+
+        assert OAUTH_CALLBACK_TIMEOUT_SECONDS == 300.0
+        assert RUNTIME_CONNECT_TIMEOUT_SECONDS == (
+            OAUTH_CALLBACK_TIMEOUT_SECONDS + TIMEOUT_CLEANUP_MARGIN_SECONDS
+        )
+
+    @pytest.mark.asyncio
+    async def test_sync_discovery_rejects_owner_loop_without_blocking(self) -> None:
+        manager = ProxyManager()
+        manager._loop = asyncio.get_running_loop()
+
+        with pytest.raises(RuntimeError, match="Cannot synchronously wait"):
+            manager.list_resources_sync("srv", timeout=1.0)
+
 
 @pytest.mark.unit
 @pytest.mark.core

@@ -14,9 +14,10 @@ import json
 import os
 import re
 import threading
+import time
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import anyio
 import httpx
@@ -37,12 +38,14 @@ from ot.logging import LogEntry, LogSpan
 from ot.logging.redact import redact_secrets
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Coroutine, Iterator
+    from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
     from concurrent.futures import Future
 
     from mcp.server.session import ServerSession
 
     from ot.config.models import McpServerConfig
+
+_T = TypeVar("_T")
 
 
 _CONNECT_AUTH_RE = re.compile(
@@ -82,6 +85,14 @@ _TERMINAL_CONNECTION_ERRORS = (
     httpx.RemoteProtocolError,
     httpx.WriteError,
 )
+
+OAUTH_CALLBACK_TIMEOUT_SECONDS = 300.0
+TIMEOUT_CLEANUP_MARGIN_SECONDS = 5.0
+RUNTIME_CONNECT_TIMEOUT_SECONDS = (
+    OAUTH_CALLBACK_TIMEOUT_SECONDS + TIMEOUT_CLEANUP_MARGIN_SECONDS
+)
+RUNTIME_DISCONNECT_TIMEOUT_SECONDS = 30.0
+RUNTIME_RECONNECT_TIMEOUT_SECONDS = RUNTIME_CONNECT_TIMEOUT_SECONDS
 
 
 def _is_terminal_connection_error(exc: BaseException) -> bool:
@@ -318,6 +329,10 @@ class ProxyManager:
             self._server_generations[name] = generation
             return generation
 
+    def _invalidate_generation(self, name: str) -> None:
+        """Prevent the current named connection attempt from publishing."""
+        self._advance_generation(name)
+
     def bind_runtime_loop(self) -> None:
         """Bind lifecycle operations to the current running event loop."""
         loop = asyncio.get_running_loop()
@@ -491,21 +506,20 @@ class ProxyManager:
             raise ValueError(f"Server '{server}' not connected. Available: {available}")
 
         arguments = arguments or {}
+        deadline = asyncio.get_running_loop().time() + timeout
 
         with LogSpan(span="proxy.tool.call", server=server, tool=tool) as span:
             call_context = _ProxyCallContext(request=request_context)
             call_lock = self._call_locks.setdefault(server, asyncio.Lock())
             try:
-                async with call_lock:
-                    self._active_calls[server] = call_context
-                    result = await asyncio.wait_for(
-                        client.call_tool(
+                async with asyncio.timeout_at(deadline):
+                    async with call_lock:
+                        self._active_calls[server] = call_context
+                        result = await client.call_tool(
                             tool,
                             arguments,
                             raise_on_error=False,
-                        ),
-                        timeout=timeout,
-                    )
+                        )
             except TimeoutError:
                 logger.error(
                     LogEntry(
@@ -747,7 +761,7 @@ class ProxyManager:
             return "started"
 
         request_context = _CURRENT_PROXY_REQUEST.get()
-        future = asyncio.run_coroutine_threadsafe(
+        return self._submit_and_wait(
             self.call_tool(
                 server,
                 tool,
@@ -755,15 +769,8 @@ class ProxyManager:
                 timeout,
                 request_context=request_context,
             ),
-            self._loop,
+            timeout=timeout,
         )
-        try:
-            return future.result(timeout=timeout + 5)
-        except concurrent.futures.TimeoutError:
-            # D-c1: cancel the scheduled coroutine so it does not keep running on the
-            # event loop after the caller has already received a timeout (leaked work).
-            future.cancel()
-            raise
 
     def list_resources_sync(
         self, server: str, timeout: float = 5.0
@@ -781,10 +788,7 @@ class ProxyManager:
         """
         if self._loop is None or not self._loop.is_running():
             return []
-        future = asyncio.run_coroutine_threadsafe(
-            self.list_resources(server), self._loop
-        )
-        return future.result(timeout=timeout)
+        return self._submit_and_wait(self.list_resources(server), timeout=timeout)
 
     def list_prompts_sync(
         self, server: str, timeout: float = 5.0
@@ -802,8 +806,7 @@ class ProxyManager:
         """
         if self._loop is None or not self._loop.is_running():
             return []
-        future = asyncio.run_coroutine_threadsafe(self.list_prompts(server), self._loop)
-        return future.result(timeout=timeout)
+        return self._submit_and_wait(self.list_prompts(server), timeout=timeout)
 
     async def list_resources(self, server: str) -> list[dict[str, Any]]:
         """List resources from a proxied MCP server.
@@ -1346,7 +1349,45 @@ class ProxyManager:
                 )
                 return f"failed: {safe_error}"
 
-    def _schedule_or_wait(self, coro: Coroutine[Any, Any, str], timeout: float) -> str:
+    def _submit_and_wait(
+        self,
+        coro: Coroutine[Any, Any, _T],
+        *,
+        timeout: float,
+        on_timeout: Callable[[], None] | None = None,
+    ) -> _T:
+        """Submit to the owner loop and cancel work that exceeds one deadline."""
+        if self._loop is None or not self._loop.is_running():
+            coro.close()
+            raise RuntimeError("Proxy manager has no running owner event loop")
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+        if running_loop is self._loop:
+            coro.close()
+            raise RuntimeError("Cannot synchronously wait on the proxy owner event loop")
+        deadline = time.monotonic() + timeout
+        try:
+            future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+        except BaseException:
+            coro.close()
+            raise
+        try:
+            return future.result(timeout=max(0.0, deadline - time.monotonic()))
+        except concurrent.futures.TimeoutError:
+            if on_timeout is not None:
+                on_timeout()
+            future.cancel()
+            raise
+
+    def _schedule_or_wait(
+        self,
+        coro: Coroutine[Any, Any, str],
+        timeout: float,
+        *,
+        on_timeout: Callable[[], None] | None = None,
+    ) -> str:
         """Run ``coro`` on the manager's loop, guarding against a same-loop deadlock.
 
         D3: if called from code already running on the manager's own loop, a blocking
@@ -1360,8 +1401,11 @@ class ProxyManager:
             if asyncio.get_running_loop() is self._loop:
                 self._loop.create_task(coro)
                 return "scheduled"
-        future = asyncio.run_coroutine_threadsafe(coro, self._loop)  # type: ignore[arg-type]
-        return future.result(timeout=timeout)
+        return self._submit_and_wait(
+            coro,
+            timeout=timeout,
+            on_timeout=on_timeout,
+        )
 
     def connect_additional_sync(self, name: str, config: McpServerConfig) -> str:
         """Synchronously connect a single new server without disrupting existing connections.
@@ -1378,7 +1422,9 @@ class ProxyManager:
         if self._loop is None or not self._loop.is_running():
             return "failed: no running event loop"
         return self._schedule_or_wait(
-            self.connect_additional(name, config), timeout=120
+            self.connect_additional(name, config),
+            timeout=RUNTIME_CONNECT_TIMEOUT_SECONDS,
+            on_timeout=lambda: self._invalidate_generation(name),
         )
 
     async def disconnect_server(self, name: str) -> str:
@@ -1422,7 +1468,9 @@ class ProxyManager:
                 if name not in self._clients:
                     return "not connected"
             return "failed: no running event loop"
-        return self._schedule_or_wait(self.disconnect_server(name), timeout=30)
+        return self._schedule_or_wait(
+            self.disconnect_server(name), timeout=RUNTIME_DISCONNECT_TIMEOUT_SECONDS
+        )
 
     def reconnect_sync(self, configs: dict[str, McpServerConfig]) -> None:
         """Synchronously reconnect to all MCP servers.
@@ -1444,12 +1492,11 @@ class ProxyManager:
                 self._start_background_reconnect(loop, configs)
                 return
 
-        future = asyncio.run_coroutine_threadsafe(
-            self.reconnect(configs),
-            loop,
-        )
         try:
-            future.result(timeout=60)
+            self._submit_and_wait(
+                self.reconnect(configs),
+                timeout=RUNTIME_RECONNECT_TIMEOUT_SECONDS,
+            )
         except Exception as e:
             logger.warning(
                 LogEntry(

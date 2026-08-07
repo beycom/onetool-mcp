@@ -279,7 +279,9 @@ The system SHALL handle async proxy calls within the executor.
 - **GIVEN** a proxied tool call exceeds timeout
 - **WHEN** timeout is reached
 - **THEN** it SHALL return an error with timeout details
+- **AND** the same absolute deadline SHALL include waiting for per-server call capacity
 - **AND** the operation SHALL be cancelled
+- **AND** timed-out lifecycle work SHALL NOT publish connection state later
 
 ### Requirement: HTTP Transport Support
 
