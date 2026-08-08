@@ -1152,6 +1152,7 @@ class TestProxyManagerBackgroundConnect:
         manager._errors = {"bad": "boom"}
         manager._server_timeouts = {"one": 1.0}
         manager._server_instructions = {"one": "instructions"}
+        manager._call_gates = {"one": MagicMock()}
         manager._initialized = True
 
         await manager.shutdown()
@@ -1163,6 +1164,7 @@ class TestProxyManagerBackgroundConnect:
         assert manager._errors == {}
         assert manager._server_timeouts == {}
         assert manager._server_instructions == {}
+        assert manager._call_gates == {}
         assert manager._initialized is False
 
     @pytest.mark.asyncio
@@ -1359,6 +1361,7 @@ class TestProxyManagerIncrementalConnect:
         manager._clients = {"billing-service": mock_client}
         manager._tools_by_server = {"billing-service": [mock_tool]}
         manager._server_timeouts = {"billing-service": 120.0}
+        manager._call_gates = {"billing-service": MagicMock()}
 
         result = await manager.disconnect_server("billing-service")
 
@@ -1366,6 +1369,7 @@ class TestProxyManagerIncrementalConnect:
         assert "billing-service" not in manager._clients
         assert "billing-service" not in manager._tools_by_server
         assert "billing-service" not in manager._server_timeouts
+        assert "billing-service" not in manager._call_gates
         mock_client.__aexit__.assert_awaited_once_with(None, None, None)
         mock_client.transport.close.assert_awaited_once_with()
 

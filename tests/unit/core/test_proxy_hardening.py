@@ -19,7 +19,7 @@ import pytest
 from mcp import types
 from mcp.shared.exceptions import McpError
 
-from ot.proxy.manager import ProxyManager
+from ot.proxy.manager import ProxyManager, _ServerCallGate
 
 
 def _text_content(text: str) -> MagicMock:
@@ -268,15 +268,12 @@ class TestCallToolDeadlines:
         client = MagicMock()
         client.call_tool = AsyncMock()
         manager._clients["srv"] = client
-        lock = asyncio.Lock()
-        await lock.acquire()
-        manager._call_locks["srv"] = lock
+        gate = _ServerCallGate()
+        manager._call_gates["srv"] = gate
 
-        try:
+        async with gate.acquire(exclusive=True):
             with pytest.raises(TimeoutError, match="timed out"):
                 await manager.call_tool("srv", "tool", timeout=0.01)
-        finally:
-            lock.release()
 
         client.call_tool.assert_not_awaited()
 
@@ -303,6 +300,129 @@ class TestCallToolDeadlines:
         assert started.is_set()
         assert cancelled.is_set()
         client.call_tool.assert_awaited_once()
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestProxyCallConcurrency:
+    """Detached calls share bounded capacity; interactive calls own it exclusively."""
+
+    @staticmethod
+    def _result(value: str) -> MagicMock:
+        return MagicMock(
+            content=[types.TextContent(type="text", text=value)],
+            is_error=False,
+        )
+
+    @pytest.mark.asyncio
+    async def test_detached_calls_overlap_and_finish_in_reverse_order(self) -> None:
+        manager = ProxyManager()
+        client = MagicMock()
+        manager._clients["srv"] = client
+        entered = {name: asyncio.Event() for name in ("first", "second")}
+        release = {name: asyncio.Event() for name in ("first", "second")}
+
+        async def call(tool: str, *_args: object, **_kwargs: object) -> MagicMock:
+            entered[tool].set()
+            await release[tool].wait()
+            return self._result(tool)
+
+        client.call_tool = AsyncMock(side_effect=call)
+        first = asyncio.create_task(manager.call_tool("srv", "first"))
+        await asyncio.wait_for(entered["first"].wait(), timeout=1)
+        second = asyncio.create_task(manager.call_tool("srv", "second"))
+        await asyncio.wait_for(entered["second"].wait(), timeout=1)
+
+        release["second"].set()
+        assert await asyncio.wait_for(second, timeout=1) == "second"
+        assert not first.done()
+        release["first"].set()
+        assert await asyncio.wait_for(first, timeout=1) == "first"
+
+    @pytest.mark.asyncio
+    async def test_cancelled_shared_call_releases_only_its_capacity(self) -> None:
+        manager = ProxyManager()
+        manager._call_gates["srv"] = _ServerCallGate(capacity=2)
+        client = MagicMock()
+        manager._clients["srv"] = client
+        entered = {name: asyncio.Event() for name in ("one", "two", "three")}
+        release = {name: asyncio.Event() for name in ("one", "two", "three")}
+
+        async def call(tool: str, *_args: object, **_kwargs: object) -> MagicMock:
+            entered[tool].set()
+            await release[tool].wait()
+            return self._result(tool)
+
+        client.call_tool = AsyncMock(side_effect=call)
+        one = asyncio.create_task(manager.call_tool("srv", "one"))
+        two = asyncio.create_task(manager.call_tool("srv", "two"))
+        await asyncio.wait_for(entered["one"].wait(), timeout=1)
+        await asyncio.wait_for(entered["two"].wait(), timeout=1)
+        three = asyncio.create_task(manager.call_tool("srv", "three"))
+        await asyncio.sleep(0)
+        assert not entered["three"].is_set()
+
+        one.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await one
+        await asyncio.wait_for(entered["three"].wait(), timeout=1)
+        assert not two.done()
+
+        release["two"].set()
+        release["three"].set()
+        assert await asyncio.wait_for(two, timeout=1) == "two"
+        assert await asyncio.wait_for(three, timeout=1) == "three"
+
+    @pytest.mark.asyncio
+    async def test_exclusive_call_blocks_detached_call_and_cleans_ownership(
+        self,
+    ) -> None:
+        manager = ProxyManager()
+        client = MagicMock()
+        manager._clients["srv"] = client
+        interactive_entered = asyncio.Event()
+        release_interactive = asyncio.Event()
+        detached_entered = asyncio.Event()
+
+        async def call(tool: str, *_args: object, **_kwargs: object) -> MagicMock:
+            if tool == "interactive":
+                interactive_entered.set()
+                await release_interactive.wait()
+            else:
+                detached_entered.set()
+                elicitation = await manager._forward_elicitation(
+                    "srv",
+                    "Detached prompt",
+                    None,
+                    types.ElicitRequestFormParams(
+                        message="Detached prompt",
+                        requestedSchema={"type": "object", "properties": {}},
+                    ),
+                    None,
+                )
+                assert elicitation.action == "cancel"
+            return self._result(tool)
+
+        client.call_tool = AsyncMock(side_effect=call)
+        request = MagicMock()
+        request.is_active = True
+        interactive = asyncio.create_task(
+            manager.call_tool(
+                "srv",
+                "interactive",
+                request_context=request,
+            )
+        )
+        await asyncio.wait_for(interactive_entered.wait(), timeout=1)
+        detached = asyncio.create_task(manager.call_tool("srv", "detached"))
+        await asyncio.sleep(0)
+        assert not detached_entered.is_set()
+
+        release_interactive.set()
+        assert await asyncio.wait_for(interactive, timeout=1) == "interactive"
+        await asyncio.wait_for(detached_entered.wait(), timeout=1)
+        assert await asyncio.wait_for(detached, timeout=1) == "detached"
+        assert "srv" not in manager._active_calls
 
     def test_oauth_connect_timeout_includes_callback_and_cleanup(self) -> None:
         from ot.proxy.manager import (

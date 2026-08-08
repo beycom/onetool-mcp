@@ -93,6 +93,7 @@ RUNTIME_CONNECT_TIMEOUT_SECONDS = (
 )
 RUNTIME_DISCONNECT_TIMEOUT_SECONDS = 30.0
 RUNTIME_RECONNECT_TIMEOUT_SECONDS = RUNTIME_CONNECT_TIMEOUT_SECONDS
+PROXY_SHARED_CALL_CAPACITY = 4
 
 
 def _is_terminal_connection_error(exc: BaseException) -> bool:
@@ -261,6 +262,58 @@ class _ProxyCallContext:
             self._elicitation_unavailable_reason = reason
 
 
+class _ServerCallGate:
+    """Bound detached calls while granting interactive calls exclusive ownership."""
+
+    def __init__(self, capacity: int = PROXY_SHARED_CALL_CAPACITY) -> None:
+        if capacity < 1:
+            raise ValueError("call gate capacity must be positive")
+        self._capacity = capacity
+        self._condition = asyncio.Condition()
+        self._active_shared = 0
+        self._exclusive_active = False
+        self._exclusive_waiters = 0
+
+    @asynccontextmanager
+    async def acquire(self, *, exclusive: bool) -> AsyncIterator[None]:
+        """Acquire shared or exclusive capacity and release it on cancellation."""
+        if exclusive:
+            async with self._condition:
+                self._exclusive_waiters += 1
+                try:
+                    await self._condition.wait_for(
+                        lambda: not self._exclusive_active
+                        and self._active_shared == 0
+                    )
+                except BaseException:
+                    self._exclusive_waiters -= 1
+                    self._condition.notify_all()
+                    raise
+                self._exclusive_waiters -= 1
+                self._exclusive_active = True
+            try:
+                yield
+            finally:
+                async with self._condition:
+                    self._exclusive_active = False
+                    self._condition.notify_all()
+            return
+
+        async with self._condition:
+            await self._condition.wait_for(
+                lambda: not self._exclusive_active
+                and self._exclusive_waiters == 0
+                and self._active_shared < self._capacity
+            )
+            self._active_shared += 1
+        try:
+            yield
+        finally:
+            async with self._condition:
+                self._active_shared -= 1
+                self._condition.notify_all()
+
+
 _CURRENT_PROXY_REQUEST: contextvars.ContextVar[ProxyRequestContext | None] = (
     contextvars.ContextVar("ot_current_proxy_request", default=None)
 )
@@ -294,7 +347,7 @@ class ProxyManager:
     def __init__(self) -> None:
         """Initialize the proxy manager."""
         self._clients: dict[str, Client] = {}  # type: ignore[type-arg]
-        self._call_locks: dict[str, asyncio.Lock] = {}
+        self._call_gates: dict[str, _ServerCallGate] = {}
         self._active_calls: dict[str, _ProxyCallContext] = {}
         self._tools_by_server: dict[str, list[types.Tool]] = {}
         self._tool_refresh_tasks: dict[tuple[str, int], asyncio.Task[None]] = {}
@@ -579,7 +632,7 @@ class ProxyManager:
             self._next_generation += 1
             self._server_generations[server] = self._next_generation
             self._clients.pop(server, None)
-            self._call_locks.pop(server, None)
+            self._call_gates.pop(server, None)
             self._tools_by_server.pop(server, None)
             self._server_timeouts.pop(server, None)
             self._server_instructions.pop(server, None)
@@ -631,16 +684,24 @@ class ProxyManager:
 
         with LogSpan(span="proxy.tool.call", server=server, tool=tool) as span:
             call_context = _ProxyCallContext(request=request_context)
-            call_lock = self._call_locks.setdefault(server, asyncio.Lock())
+            call_gate = self._call_gates.setdefault(server, _ServerCallGate())
+            exclusive = request_context is not None
             try:
                 async with asyncio.timeout_at(deadline):
-                    async with call_lock:
-                        self._active_calls[server] = call_context
-                        result = await client.call_tool(
-                            tool,
-                            arguments,
-                            raise_on_error=False,
-                        )
+                    async with call_gate.acquire(exclusive=exclusive):
+                        if exclusive:
+                            self._active_calls[server] = call_context
+                        try:
+                            result = await client.call_tool(
+                                tool,
+                                arguments,
+                                raise_on_error=False,
+                            )
+                        finally:
+                            if exclusive:
+                                call_context.expire()
+                                if self._active_calls.get(server) is call_context:
+                                    self._active_calls.pop(server, None)
             except TimeoutError:
                 logger.error(
                     LogEntry(
@@ -1377,7 +1438,7 @@ class ProxyManager:
         with self._mutation_lock:
             clients = list(self._clients.items())
             self._clients.clear()
-            self._call_locks.clear()
+            self._call_gates.clear()
             self._active_calls.clear()
             self._tools_by_server.clear()
             self._errors.clear()
@@ -1592,7 +1653,7 @@ class ProxyManager:
                 if name not in self._clients:
                     return "not connected"
                 client = self._clients.pop(name)
-                self._call_locks.pop(name, None)
+                self._call_gates.pop(name, None)
                 self._active_calls.pop(name, None)
                 self._tools_by_server.pop(name, None)
                 self._errors.pop(name, None)

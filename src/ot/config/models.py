@@ -8,8 +8,16 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
 
 # ==================== Snippet Models ====================
 
@@ -462,6 +470,32 @@ class AuthConfig(BaseModel):
         description="Bearer token (for type=bearer, supports ${VAR} expansion)",
     )
 
+    @model_validator(mode="after")
+    def validate_auth_fields(self) -> AuthConfig:
+        """Validate and normalize fields owned by each authentication type."""
+        supplied_fields = self.model_fields_set
+        if self.type == "bearer":
+            if self.token is None or not self.token.strip():
+                raise ValueError("bearer auth requires a non-empty token")
+            if "scopes" in supplied_fields:
+                raise ValueError("bearer auth forbids scopes")
+            return self
+
+        if "token" in supplied_fields:
+            raise ValueError("oauth auth forbids token")
+
+        normalized_scopes: list[str] = []
+        seen: set[str] = set()
+        for scope in self.scopes:
+            normalized = scope.strip()
+            if not normalized:
+                raise ValueError("oauth scope entries must be non-empty")
+            if normalized not in seen:
+                normalized_scopes.append(normalized)
+                seen.add(normalized)
+        self.scopes = normalized_scopes
+        return self
+
 
 class McpServerConfig(BaseModel):
     """Configuration for an MCP server connection."""
@@ -483,7 +517,9 @@ class McpServerConfig(BaseModel):
         default=False,
         description="Inherit parent process environment variables (stdio servers)",
     )
-    timeout: int = Field(default=30, description="Connection timeout in seconds")
+    timeout: int = Field(
+        default=30, gt=0, description="Connection timeout in seconds"
+    )
     auth: AuthConfig | None = Field(
         default=None,
         description="Authentication configuration for HTTP servers",
@@ -508,6 +544,31 @@ class McpServerConfig(BaseModel):
             "resolves to the tool docs_search_documentation."
         ),
     )
+
+    @model_validator(mode="after")
+    def validate_transport_fields(self) -> McpServerConfig:
+        """Reject fields that do not belong to the selected transport."""
+        supplied_fields = self.model_fields_set
+        forbidden: tuple[str, ...]
+        if self.type == "http":
+            if self.url is None or not self.url.strip():
+                raise ValueError("http server requires a non-empty url")
+            parsed = urlsplit(self.url.strip())
+            if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+                raise ValueError("http server url must use http:// or https://")
+            self.url = self.url.strip()
+            forbidden = ("command", "args", "env", "inherit_env")
+        else:
+            if self.command is None or not self.command.strip():
+                raise ValueError("stdio server requires a non-empty command")
+            self.command = self.command.strip()
+            forbidden = ("url", "headers", "auth")
+
+        conflicting = [field for field in forbidden if field in supplied_fields]
+        if conflicting:
+            joined = ", ".join(conflicting)
+            raise ValueError(f"{self.type} server forbids fields: {joined}")
+        return self
 
 
 # ==================== Direct Configuration ====================
@@ -692,6 +753,24 @@ class OneToolConfig(BaseModel):
         which YAML parses as None instead of an empty dict.
         """
         return {} if v is None else v
+
+    @model_validator(mode="after")
+    def validate_server_namespaces(self) -> OneToolConfig:
+        """Reject reserved or colliding execution-namespace server names."""
+        safe_names: dict[str, str] = {}
+        for name in self.servers:
+            safe_name = name.replace("-", "_")
+            if safe_name == "proxy":
+                raise ValueError(
+                    f"server name {name!r} conflicts with reserved namespace 'proxy'"
+                )
+            if previous := safe_names.get(safe_name):
+                raise ValueError(
+                    f"server names {previous!r} and {name!r} both map to "
+                    f"execution namespace {safe_name!r}"
+                )
+            safe_names[safe_name] = name
+        return self
 
     def get_tool_files(self) -> list[Path]:
         """Get list of tool files matching configured glob patterns.
