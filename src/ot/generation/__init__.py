@@ -1,4 +1,4 @@
-"""Shared typed generation routing."""
+"""Shared typed backend-aware generation."""
 
 from ot.generation.client import generate
 from ot.generation.domain import (

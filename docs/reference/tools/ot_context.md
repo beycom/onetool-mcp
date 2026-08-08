@@ -88,20 +88,21 @@ With no arguments, deletes handles older than 15 minutes, then compacts the DB.
 ## Requires
 
 - No secrets or external binaries for storage and retrieval
-- An effective generation route and its named secret for `ot_context.ask()`
+- Top-level `llm` and its resolved named secret for `ot_context.ask()`
 
 ## Configuration
 
 ### Required
 
-None for storage and retrieval. `ot_context.ask()` requires an effective
-generation route and its named secret.
+None for storage and retrieval. `ot_context.ask()` requires top-level `llm` and
+the fixed generation secret in `secrets.yaml`.
 
 ### Optional
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `tools.ot_context.llm` | generation selection \| null | `null` | Pack generation overrides for `ot_context.ask()` |
+| `tools.ot_context.model` | str \| null | `null` | Direct model override for `ot_context.ask()` |
+| `tools.ot_context.effort` | str \| null | `null` | Reasoning effort override |
 | `tools.ot_context.ttl` | int | `3600` | Handle TTL in seconds. `0` = no expiry. |
 | `tools.ot_context.max_line_chars` | int | `500` | Lines longer than this are truncated with a `[+N chars]` suffix. |
 | `tools.ot_context.ask_max_bytes` | int | `204800` | Content is truncated before `ot_context.ask()` (bytes). `0` = no limit. |
@@ -109,8 +110,8 @@ generation route and its named secret.
 ```yaml
 tools:
   ot_context:
-    llm:
-      model: luna
+    model: gpt-5.6-luna
+    effort: low
     ttl: 3600
     max_line_chars: 500
     ask_max_bytes: 204800
@@ -145,12 +146,12 @@ ctx.slice(h["handle"], select="10:25")         # by line range
 # Grep with context
 ctx.grep(h["handle"], pattern=r"ERROR|WARN", context=2)
 
-# LLM questions (requires an effective generation route)
+# LLM questions (requires top-level llm)
 ctx.ask(h["handle"], q="What are the API endpoints?")
 ctx.ask(
     h["handle"],
     q=["What errors are possible?", "What is the rate limit?"],
-    model="sol",
+    model="gpt-5.6-luna",
     effort="medium",
 )
 

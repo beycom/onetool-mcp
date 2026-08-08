@@ -360,7 +360,9 @@ class TestGroundedSearch:
     @patch("otutil.tools.ground._require_google_genai")
     @patch("otutil.tools.ground._get_client")
     @patch("otutil.tools.ground.get_tool_config")
-    def test_successful_grounded_search(self, mock_config, mock_get_client, mock_require):
+    def test_successful_grounded_search(
+        self, mock_config, mock_get_client, _mock_require
+    ):
         import sys
         from unittest.mock import MagicMock
 
@@ -389,7 +391,7 @@ class TestGroundedSearch:
         self,
         mock_config,
         mock_get_client,
-        mock_require,
+        _mock_require,
     ):
         import sys
 
@@ -420,7 +422,9 @@ class TestGroundedSearch:
     @patch("otutil.tools.ground._require_google_genai")
     @patch("otutil.tools.ground._get_client")
     @patch("otutil.tools.ground.get_tool_config")
-    def test_grounded_search_uses_configured_timeout(self, mock_config, mock_get_client, mock_require):
+    def test_grounded_search_uses_configured_timeout(
+        self, mock_config, mock_get_client, _mock_require
+    ):
         import sys
         from unittest.mock import MagicMock
 
@@ -446,7 +450,7 @@ class TestGroundedSearch:
     @patch("otutil.tools.ground._require_google_genai")
     @patch("otutil.tools.ground._get_client")
     @patch("otutil.tools.ground.get_tool_config")
-    def test_handles_api_error(self, mock_config, mock_get_client, mock_require):
+    def test_handles_api_error(self, mock_config, mock_get_client, _mock_require):
         import sys
         from unittest.mock import MagicMock
 

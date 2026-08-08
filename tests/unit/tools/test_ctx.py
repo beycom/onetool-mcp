@@ -7,9 +7,8 @@ grep, slice, query, append, management, maintenance, and ask.
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from typing import Any
-from unittest.mock import MagicMock, patch
+from typing import TYPE_CHECKING, Any
+from unittest.mock import patch
 
 import pytest
 
@@ -19,6 +18,9 @@ from ot.ctx.store import (
     _resolve_handle,
     now_ts,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ===========================================================================
 # Helpers
@@ -1122,11 +1124,7 @@ class TestCtxAsk:
         store = _make_store(tmp_path)
         h = _write_handle(store, "The answer is 42.")
 
-        mock_transform = MagicMock(return_value="42")
-        with patch("ot.services.get_services") as mock_services:
-            mock_services.return_value.llm_transform = mock_transform
-            result = ctx_ask(h, q="What is the answer?", store=store)
-        # Either success (if ot_llm is importable) or ot_llm not installed error
+        result = ctx_ask(h, q="What is the answer?", store=store)
         assert "handle" in result
 
     def test_ask_truncation_applied(self, tmp_path: Path) -> None:
@@ -1156,8 +1154,8 @@ class TestCtxAsk:
 
         with patch(
             "ot.ctx.ask.resolve_generation",
-            side_effect=GenerationError("No generation route is configured"),
+            side_effect=GenerationError("No generation connection is configured"),
         ):
             result = ctx_ask(h, q="Question?", store=store)
         assert "error" in result
-        assert "generation route" in result["error"].lower()
+        assert "generation connection" in result["error"].lower()

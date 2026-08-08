@@ -425,20 +425,6 @@ class TestKnowledgeChunker:
 class TestKnowledgeIndexer:
     """Indexer: dedup by hash, overwrite modes, link graph extraction."""
 
-    def _setup_db(self, db_name: str) -> sqlite3.Connection:
-        from otutil.tools._knowledge.db import (
-            _FTS_SQL,
-            _FTS_TRIGGERS_SQL,
-            _SCHEMA_SQL,
-        )
-
-        conn = _make_in_memory_conn()
-        conn.executescript(_SCHEMA_SQL)
-        conn.executescript(_FTS_SQL)
-        conn.executescript(_FTS_TRIGGERS_SQL)
-        conn.commit()
-        return conn
-
     def test_index_directory_new_files(self, tmp_path: Path):
         """New files get indexed."""
         from otutil.tools._knowledge.db import close_connection
@@ -452,12 +438,11 @@ class TestKnowledgeIndexer:
             with patch(
                 "otutil.tools._knowledge.indexer._store_embeddings_batch",
                 return_value=None,
+            ), patch(
+                "otutil.tools._knowledge.db._resolve_db_path",
+                return_value=tmp_path / f"{db_name}.db",
             ):
-                with patch(
-                    "otutil.tools._knowledge.db._resolve_db_path",
-                    return_value=tmp_path / f"{db_name}.db",
-                ):
-                    result = index_directory(path=str(tmp_path), db_name=db_name)
+                result = index_directory(path=str(tmp_path), db_name=db_name)
             assert result.indexed >= 2
             assert result.errors == []
         finally:
@@ -474,13 +459,12 @@ class TestKnowledgeIndexer:
             with patch(
                 "otutil.tools._knowledge.indexer._store_embeddings_batch",
                 return_value=None,
+            ), patch(
+                "otutil.tools._knowledge.db._resolve_db_path",
+                return_value=tmp_path / f"{db_name}.db",
             ):
-                with patch(
-                    "otutil.tools._knowledge.db._resolve_db_path",
-                    return_value=tmp_path / f"{db_name}.db",
-                ):
-                    result1 = index_directory(path=str(tmp_path), db_name=db_name)
-                    result2 = index_directory(path=str(tmp_path), db_name=db_name)
+                result1 = index_directory(path=str(tmp_path), db_name=db_name)
+                result2 = index_directory(path=str(tmp_path), db_name=db_name)
             assert result1.indexed >= 1
             assert result2.skipped >= 1
             assert result2.indexed == 0
@@ -504,18 +488,17 @@ class TestKnowledgeIndexer:
             with patch(
                 "otutil.tools._knowledge.indexer._store_embeddings_batch",
                 return_value=None,
+            ), patch(
+                "otutil.tools._knowledge.db._resolve_db_path",
+                return_value=tmp_path / f"{db_name}.db",
             ):
-                with patch(
-                    "otutil.tools._knowledge.db._resolve_db_path",
-                    return_value=tmp_path / f"{db_name}.db",
-                ):
-                    index_directory(path=str(tmp_path), db_name=db_name)
-                    from otutil.tools._knowledge.db import get_connection
+                index_directory(path=str(tmp_path), db_name=db_name)
+                from otutil.tools._knowledge.db import get_connection
 
-                    conn = get_connection(db_name)
-                    row = conn.execute(
-                        "SELECT source FROM chunks WHERE topic = 'page'"
-                    ).fetchone()
+                conn = get_connection(db_name)
+                row = conn.execute(
+                    "SELECT source FROM chunks WHERE topic = 'page'"
+                ).fetchone()
             assert row is not None
             assert row[0] == "mysite"
         finally:
@@ -1017,7 +1000,7 @@ class TestKnowledgeConfig:
 class TestKnowledgeCRUD:
     """CRUD round-trip tests using a real in-memory SQLite DB."""
 
-    def _patch_db(self, db_name: str = "test"):
+    def _patch_db(self):
         """Patch get_connection to return an in-memory DB."""
         conn = _make_in_memory_conn()
         from otutil.tools._knowledge.db import _FTS_SQL, _FTS_TRIGGERS_SQL, _SCHEMA_SQL
@@ -1032,11 +1015,11 @@ class TestKnowledgeCRUD:
         from otutil.tools._knowledge import crud
 
         conn = self._patch_db()
-        with _patch_crud_conn(conn):
-            with patch("otutil.tools._knowledge.crud._try_embed"):
-                result = crud.write(
-                    topic="test/topic", content="Hello world", db="test"
-                )
+        with (
+            _patch_crud_conn(conn),
+            patch("otutil.tools._knowledge.crud._try_embed"),
+        ):
+            result = crud.write(topic="test/topic", content="Hello world", db="test")
         assert "Written" in result
         row = conn.execute(
             "SELECT topic, content FROM chunks WHERE topic='test/topic'"
@@ -1076,9 +1059,11 @@ class TestKnowledgeCRUD:
 
         conn = self._patch_db()
         _insert_chunk(conn, "c1", "test/topic", "Original")
-        with _patch_crud_conn(conn):
-            with patch("otutil.tools._knowledge.crud._try_embed"):
-                crud.append(topic="test/topic", content="\nAppended", db="test")
+        with (
+            _patch_crud_conn(conn),
+            patch("otutil.tools._knowledge.crud._try_embed"),
+        ):
+            crud.append(topic="test/topic", content="\nAppended", db="test")
         row = conn.execute(
             "SELECT content FROM chunks WHERE topic='test/topic'"
         ).fetchone()
@@ -1090,9 +1075,11 @@ class TestKnowledgeCRUD:
 
         conn = self._patch_db()
         _insert_chunk(conn, "c1", "test/topic", "Old content")
-        with _patch_crud_conn(conn):
-            with patch("otutil.tools._knowledge.crud._try_embed"):
-                crud.update(topic="test/topic", content="New content", db="test")
+        with (
+            _patch_crud_conn(conn),
+            patch("otutil.tools._knowledge.crud._try_embed"),
+        ):
+            crud.update(topic="test/topic", content="New content", db="test")
         row = conn.execute(
             "SELECT content FROM chunks WHERE topic='test/topic'"
         ).fetchone()
@@ -1125,14 +1112,16 @@ class TestKnowledgeCRUD:
         from otutil.tools._knowledge import crud
 
         conn = self._patch_db()
-        with _patch_crud_conn(conn):
-            with patch("otutil.tools._knowledge.crud._try_embed"):
-                crud.write(
-                    topic="a/page",
-                    content="Content",
-                    db="test",
-                    meta={"source": "mysite"},
-                )
+        with (
+            _patch_crud_conn(conn),
+            patch("otutil.tools._knowledge.crud._try_embed"),
+        ):
+            crud.write(
+                topic="a/page",
+                content="Content",
+                db="test",
+                meta={"source": "mysite"},
+            )
         row = conn.execute("SELECT source FROM chunks WHERE topic='a/page'").fetchone()
         assert row is not None
         assert row[0] == "mysite"
@@ -1142,9 +1131,11 @@ class TestKnowledgeCRUD:
         from otutil.tools._knowledge import crud
 
         conn = self._patch_db()
-        with _patch_crud_conn(conn):
-            with patch("otutil.tools._knowledge.crud._try_embed"):
-                crud.write(topic="b/page", content="Content", db="test")
+        with (
+            _patch_crud_conn(conn),
+            patch("otutil.tools._knowledge.crud._try_embed"),
+        ):
+            crud.write(topic="b/page", content="Content", db="test")
         row = conn.execute("SELECT source FROM chunks WHERE topic='b/page'").fetchone()
         assert row is not None
         assert row[0] == ""
@@ -1293,15 +1284,17 @@ class TestKnowledgeCRUDMultiChunk:
             source_path="path/move",
             anchor="options",
         )
-        with _patch_crud_conn(conn):
-            with patch("otutil.tools._knowledge.crud._try_embed"):
-                result = crud.update(
-                    topic="cmd/move",
-                    content="New intro",
-                    db="test",
-                    source_path="path/move",
-                    anchor="intro",
-                )
+        with (
+            _patch_crud_conn(conn),
+            patch("otutil.tools._knowledge.crud._try_embed"),
+        ):
+            result = crud.update(
+                topic="cmd/move",
+                content="New intro",
+                db="test",
+                source_path="path/move",
+                anchor="intro",
+            )
         assert "Updated" in result
         row1 = conn.execute("SELECT content FROM chunks WHERE id = 'c1'").fetchone()
         assert row1[0] == "New intro"
@@ -1332,11 +1325,13 @@ class TestKnowledgeCRUDMultiChunk:
             source_path="path/move",
             anchor="intro",
         )
-        with _patch_crud_conn(conn):
-            with patch("otutil.tools._knowledge.crud._try_embed"):
-                result = crud.update(
-                    id="c1", topic="ignored", content="New content", db="test"
-                )
+        with (
+            _patch_crud_conn(conn),
+            patch("otutil.tools._knowledge.crud._try_embed"),
+        ):
+            result = crud.update(
+                id="c1", topic="ignored", content="New content", db="test"
+            )
         assert "Updated" in result
         row = conn.execute("SELECT content FROM chunks WHERE id = 'c1'").fetchone()
         assert row[0] == "New content"
@@ -1351,11 +1346,13 @@ class TestKnowledgeCRUDMultiChunk:
         self._insert(
             conn, "c1", "cmd/move", "Original", source_path="path/move", anchor=""
         )
-        with _patch_crud_conn(conn):
-            with patch("otutil.tools._knowledge.crud._try_embed"):
-                result = crud.append(
-                    id="c1", topic="ignored", content=" appended", db="test"
-                )
+        with (
+            _patch_crud_conn(conn),
+            patch("otutil.tools._knowledge.crud._try_embed"),
+        ):
+            result = crud.append(
+                id="c1", topic="ignored", content=" appended", db="test"
+            )
         assert "Appended" in result
         row = conn.execute("SELECT content FROM chunks WHERE id = 'c1'").fetchone()
         assert row[0] == "Original appended"
@@ -1612,14 +1609,8 @@ class TestKnowledgeRetrieval:
             result = search(query="test", db="test", mode="invalid")
         assert "Error" in result
 
-    def test_reset_runtime_cache_is_a_noop_for_invocation_owned_clients(self):
-        from otutil.tools._knowledge import retrieval
-
-        assert retrieval.reset_runtime_cache() is None
-
-
 # ===========================================================================
-# 10.1–10.3 — Error handling: missing sqlite-vec and FTS5
+# 10.1-10.3 - Error handling: missing sqlite-vec and FTS5
 # ===========================================================================
 
 
@@ -1678,11 +1669,10 @@ class TestKnowledgeErrorHandling:
         with patch(
             "otutil.tools._knowledge.db._FTS_SQL",
             "CREATE VIRTUAL TABLE bad_fts USING nonexistent_ext(x)",
-        ):
-            with pytest.raises(RuntimeError, match="FTS5 is required"):
-                from otutil.tools._knowledge.db import _kb_setup
+        ), pytest.raises(RuntimeError, match="FTS5 is required"):
+            from otutil.tools._knowledge.db import _kb_setup
 
-                _kb_setup(conn)
+            _kb_setup(conn)
 
 
 @pytest.mark.unit
@@ -1719,7 +1709,7 @@ class TestKnowledgeBatchEmbedding:
         batch2_vecs = [[float(i)] * 2 for i in range(3, 5)]
         call_count = 0
 
-        def fake_create(**kwargs: object) -> MagicMock:
+        def fake_create(**_kwargs: object) -> MagicMock:
             nonlocal call_count
             vecs = batch1_vecs if call_count == 0 else batch2_vecs
             call_count += 1
@@ -1755,7 +1745,7 @@ class TestKnowledgeBatchEmbedding:
         client, create = _make_kb_embedding_client()
         call_count = 0
 
-        def fake_create(**kwargs: object) -> MagicMock:
+        def fake_create(**_kwargs: object) -> MagicMock:
             nonlocal call_count
             call_count += 1
             if call_count < 3:
@@ -1789,9 +1779,11 @@ class TestKnowledgeBatchEmbedding:
         client, create = _make_kb_embedding_client()
         create.side_effect = ValueError("No embedding data received")
 
-        with patch("otpack.embedding.time") as mock_time:
-            with pytest.raises(ValueError, match="No embedding data received"):
-                client.embed_batch(["x"])
+        with (
+            patch("otpack.embedding.time") as mock_time,
+            pytest.raises(ValueError, match="No embedding data received"),
+        ):
+            client.embed_batch(["x"])
 
         assert create.call_count == 1
         mock_time.sleep.assert_not_called()
@@ -1801,9 +1793,11 @@ class TestKnowledgeBatchEmbedding:
         client, create = _make_kb_embedding_client()
         create.return_value = _fake_embed_response([[0.1, 0.2]])
 
-        with patch("otpack.embedding.time"):
-            with pytest.raises(ValueError, match="Expected 2 embeddings, got 1"):
-                client.embed_batch(["a", "b"], max_attempts=1)
+        with (
+            patch("otpack.embedding.time"),
+            pytest.raises(ValueError, match="Expected 2 embeddings, got 1"),
+        ):
+            client.embed_batch(["a", "b"], max_attempts=1)
 
     def test_store_embeddings_batch_partial_failure(self):
         """First sub-batch is stored; second sub-batch fails → fallback embeds items individually."""
@@ -1827,7 +1821,7 @@ class TestKnowledgeBatchEmbedding:
         ]
         call_count = 0
 
-        def fake_embed_batch(texts: list, **kwargs: object) -> list:
+        def fake_embed_batch(texts: list, **_kwargs: object) -> list:
             nonlocal call_count
             call_count += 1
             if call_count == 2 and len(texts) > 1:
@@ -1839,14 +1833,12 @@ class TestKnowledgeBatchEmbedding:
 
         with patch(
             "otutil.tools._knowledge.db._check_vec_available", return_value=True
-        ):
-            with patch(
-                "otutil.tools._knowledge.embedding._get_embedding_client",
-                return_value=mock_client,
-            ):
-                with patch("otutil.tools._knowledge.indexer._get_config") as mock_cfg:
-                    mock_cfg.return_value.model = "text-embedding-3-small"
-                    result = _store_embeddings_batch(conn, pending, batch_size=2)
+        ), patch(
+            "otutil.tools._knowledge.embedding._get_embedding_client",
+            return_value=mock_client,
+        ), patch("otutil.tools._knowledge.indexer._get_config") as mock_cfg:
+            mock_cfg.return_value.model = "text-embedding-3-small"
+            result = _store_embeddings_batch(conn, pending, batch_size=2)
 
         # No errors — fallback per-item calls succeed
         assert result is None
@@ -1869,7 +1861,7 @@ class TestKnowledgeBatchEmbedding:
 
         pending = [("id1", "good"), ("id2", "bad"), ("id3", "good2")]
 
-        def fake_embed_batch(texts: list, **kwargs: object) -> list:
+        def fake_embed_batch(texts: list, **_kwargs: object) -> list:
             # Batch call fails; individual "bad" chunk fails; others succeed
             if len(texts) > 1:
                 raise ValueError("No embedding data received")
@@ -1882,14 +1874,12 @@ class TestKnowledgeBatchEmbedding:
 
         with patch(
             "otutil.tools._knowledge.db._check_vec_available", return_value=True
-        ):
-            with patch(
-                "otutil.tools._knowledge.embedding._get_embedding_client",
-                return_value=mock_client,
-            ):
-                with patch("otutil.tools._knowledge.indexer._get_config") as mock_cfg:
-                    mock_cfg.return_value.model = "text-embedding-3-small"
-                    result = _store_embeddings_batch(conn, pending, batch_size=10)
+        ), patch(
+            "otutil.tools._knowledge.embedding._get_embedding_client",
+            return_value=mock_client,
+        ), patch("otutil.tools._knowledge.indexer._get_config") as mock_cfg:
+            mock_cfg.return_value.model = "text-embedding-3-small"
+            result = _store_embeddings_batch(conn, pending, batch_size=10)
 
         # Error reported for "id2" only
         assert result is not None
@@ -1919,7 +1909,7 @@ class TestKnowledgeBatchEmbedding:
         pending = [(f"id{i}", f"text{i}") for i in range(20)]
         api_call_count = 0
 
-        def fake_embed_batch(texts: list, **kwargs: object) -> list:
+        def fake_embed_batch(_texts: list, **_kwargs: object) -> list:
             nonlocal api_call_count
             api_call_count += 1
             raise ValueError("No embedding data received")
@@ -1929,14 +1919,12 @@ class TestKnowledgeBatchEmbedding:
 
         with patch(
             "otutil.tools._knowledge.db._check_vec_available", return_value=True
-        ):
-            with patch(
-                "otutil.tools._knowledge.embedding._get_embedding_client",
-                return_value=mock_client,
-            ):
-                with patch("otutil.tools._knowledge.indexer._get_config") as mock_cfg:
-                    mock_cfg.return_value.model = "text-embedding-3-small"
-                    result = _store_embeddings_batch(conn, pending, batch_size=20)
+        ), patch(
+            "otutil.tools._knowledge.embedding._get_embedding_client",
+            return_value=mock_client,
+        ), patch("otutil.tools._knowledge.indexer._get_config") as mock_cfg:
+            mock_cfg.return_value.model = "text-embedding-3-small"
+            result = _store_embeddings_batch(conn, pending, batch_size=20)
 
         # Should have aborted after 1 batch call + _FALLBACK_ABORT_AFTER individual calls
         assert api_call_count == 1 + _FALLBACK_ABORT_AFTER
@@ -1949,7 +1937,7 @@ class TestKnowledgeBatchEmbedding:
 class TestKnowledgeReindex:
     """reindex(): per-batch commit, accurate error counts."""
 
-    def test_reindex_partial_failure_stores_successful_batches(self, tmp_path: Path):
+    def test_reindex_partial_failure_stores_successful_batches(self):
         """When the last batch fails, earlier batches are stored and counted correctly."""
         from otutil.tools._knowledge.indexing import reindex
 
@@ -1958,6 +1946,7 @@ class TestKnowledgeReindex:
         def fake_store(
             conn: object, pending: object, on_progress: object = None, **kwargs: object
         ) -> str:
+            _ = pending, on_progress, kwargs
             # Simulate: store 2 chunks, fail 2
             import sqlite3 as _sq
 
@@ -1972,25 +1961,24 @@ class TestKnowledgeReindex:
         with patch(
             "otutil.tools._knowledge.indexing._store_embeddings_batch",
             side_effect=fake_store,
-        ):
-            with patch(
-                "otutil.tools._knowledge.indexing.get_connection"
-            ) as mock_conn_fn:
-                import sqlite3
+        ), patch(
+            "otutil.tools._knowledge.indexing.get_connection"
+        ) as mock_conn_fn:
+            import sqlite3
 
-                conn = sqlite3.connect(":memory:")
-                conn.execute("CREATE TABLE chunks (id TEXT, content TEXT)")
-                conn.execute(
-                    "CREATE TABLE chunks_vec (chunk_id TEXT PRIMARY KEY, embedding BLOB)"
-                )
-                conn.executemany(
-                    "INSERT INTO chunks VALUES (?, ?)",
-                    [("id1", "a"), ("id2", "b"), ("id3", "c"), ("id4", "d")],
-                )
-                conn.commit()
-                mock_conn_fn.return_value = conn
+            conn = sqlite3.connect(":memory:")
+            conn.execute("CREATE TABLE chunks (id TEXT, content TEXT)")
+            conn.execute(
+                "CREATE TABLE chunks_vec (chunk_id TEXT PRIMARY KEY, embedding BLOB)"
+            )
+            conn.executemany(
+                "INSERT INTO chunks VALUES (?, ?)",
+                [("id1", "a"), ("id2", "b"), ("id3", "c"), ("id4", "d")],
+            )
+            conn.commit()
+            mock_conn_fn.return_value = conn
 
-                result = reindex(db="testdb")
+            result = reindex(db="testdb")
 
         assert "2" in result  # 2 stored
         assert "2 error" in result  # 2 failed
@@ -2020,7 +2008,7 @@ class TestKnowledgeReindex:
 class TestKnowledgeCLI:
     """CLI smoke tests using typer.testing.CliRunner."""
 
-    def _make_runner(self) -> typer.testing.CliRunner:
+    def _make_runner(self) -> Any:
         from typer.testing import CliRunner
 
         return CliRunner()
@@ -2049,13 +2037,16 @@ class TestKnowledgeCLI:
             kb={"testdb": KBProjectConfig(db=DBConfig(path="mem/test.db"), scrape=proj)}
         )
 
-        with patch(
-            "otutil.tools._knowledge.indexer.index_directory", return_value=mock_result
-        ) as mock_idx:
-            with patch("otutil.tools._knowledge.config._get_config", return_value=cfg):
-                from typer.testing import CliRunner
+        with (
+            patch(
+                "otutil.tools._knowledge.indexer.index_directory",
+                return_value=mock_result,
+            ) as mock_idx,
+            patch("otutil.tools._knowledge.config._get_config", return_value=cfg),
+        ):
+            from typer.testing import CliRunner
 
-                result = CliRunner().invoke(kb_app, ["index", "testdb"])
+            result = CliRunner().invoke(kb_app, ["index", "testdb"])
 
         assert result.exit_code == 0, result.output
         call_kwargs = mock_idx.call_args.kwargs
@@ -2478,15 +2469,15 @@ class TestResolveSource:
             ScrapeSourceConfig,
         )
 
-        defaults = dict(
-            output_base_dir="/tmp/base",
-            depth=3,
-            max_pages=100,
-            check_robots_txt=True,
-            delay_min=0.5,
-            delay_max=2.0,
-            user_agent="proj-agent",
-        )
+        defaults = {
+            "output_base_dir": "/tmp/base",
+            "depth": 3,
+            "max_pages": 100,
+            "check_robots_txt": True,
+            "delay_min": 0.5,
+            "delay_max": 2.0,
+            "user_agent": "proj-agent",
+        }
         defaults.update(kwargs)
         defaults.setdefault(
             "sources", {"s": ScrapeSourceConfig(url="https://docs.example.test/")}
@@ -2859,15 +2850,15 @@ class TestResolveSourceNewFields:
             ScrapeSourceConfig,
         )
 
-        defaults = dict(
-            output_base_dir="/tmp/base",
-            depth=3,
-            max_pages=100,
-            check_robots_txt=True,
-            delay_min=0.5,
-            delay_max=2.0,
-            user_agent="proj-agent",
-        )
+        defaults = {
+            "output_base_dir": "/tmp/base",
+            "depth": 3,
+            "max_pages": 100,
+            "check_robots_txt": True,
+            "delay_min": 0.5,
+            "delay_max": 2.0,
+            "user_agent": "proj-agent",
+        }
         defaults.update(kwargs)
         defaults.setdefault(
             "sources", {"s": ScrapeSourceConfig(url="https://docs.example.test/")}
@@ -4214,6 +4205,37 @@ class TestRetrievalUntrustedContextBoundary:
         assert request.system is not None
         assert "untrusted" in request.system.lower()
 
+    def test_rerank_failure_keeps_order_warns_and_continues_synthesis(self):
+        from ot.generation import GenerationError
+        from otutil.tools._knowledge import retrieval
+
+        first = _seed_result("c1", "first")
+        second = _seed_result("c2", "second")
+        with (
+            patch.object(retrieval, "get_connection", return_value=MagicMock()),
+            patch.object(
+                retrieval,
+                "search_hybrid",
+                return_value=[first, second],
+            ),
+            patch.object(
+                retrieval,
+                "_llm_rerank",
+                side_effect=GenerationError("proxy unavailable"),
+            ),
+            patch.object(
+                retrieval,
+                "_synthesise",
+                return_value="answer",
+            ) as synthesise,
+        ):
+            result = retrieval.ask(query="q", db="test", k=2, rerank=True)
+
+        assert "warning: reranking was not applied" in result
+        assert result.index("[1] first") < result.index("[2] second")
+        context = synthesise.call_args.args[1]
+        assert context.index("[1] first") < context.index("[2] second")
+
     def test_llm_rerank_includes_untrusted_system_message(self):
         from otutil.tools._knowledge import retrieval
 
@@ -4438,6 +4460,7 @@ class TestReindexCounts:
         def fake_store(
             conn: object, pending: object, on_progress: object = None, **kwargs: object
         ) -> str:
+            _ = pending, on_progress, kwargs
             conn.execute(  # type: ignore[union-attr]
                 "INSERT INTO chunks_vec VALUES ('id2', ?)", [b"\x00" * 8]
             )
@@ -4470,6 +4493,7 @@ class TestReindexCounts:
         def fake_store(
             conn: object, pending: object, on_progress: object = None, **kwargs: object
         ) -> None:
+            _ = pending, on_progress, kwargs
             conn.execute(  # type: ignore[union-attr]
                 "INSERT INTO chunks_vec VALUES ('id1', ?)", [b"\x00" * 8]
             )
@@ -4656,6 +4680,19 @@ class TestIndependentEmbeddingClient:
 
         secret.assert_not_called()
 
+    def test_reset_embedding_client_closes_cached_pool(self):
+        from otutil.tools._knowledge import embedding as emb_mod
+
+        client = MagicMock()
+        emb_mod._client = client
+        emb_mod._client_key = ("key", "model", "url", 1, 2, 3.0)
+
+        emb_mod.reset_embedding_client()
+
+        client.close.assert_called_once_with()
+        assert emb_mod._client is None
+        assert emb_mod._client_key is None
+
 
 @pytest.mark.unit
 @pytest.mark.tools
@@ -4690,36 +4727,36 @@ class TestScrapeResumeState:
     """resume creates/consumes .state.json even when it doesn't pre-exist."""
 
     def _kwargs(self, tmp_path: Path, **overrides: Any) -> dict[str, Any]:
-        kwargs: dict[str, Any] = dict(
-            url="https://docs.example.test/",
-            output_dir=tmp_path,
-            source_name="docs",
-            depth=1,
-            max_pages=10,
-            url_prefix="",
-            check_robots_txt=True,
-            delay_min=0,
-            delay_max=0,
-            user_agent="",
-            wait_for="",
-            page_timeout=30000,
-            cache=False,
-            process_iframes=False,
-            content_filter_threshold=0.48,
-            min_word_threshold=50,
-            crawl_strategy="bfs",
-            seed_urls=[],
-            score={},
-            css_selector="",
-            js_code="",
-            include_images=False,
-            resume=False,
-            flat_files=False,
-            on_page=None,
-            category=None,
-            tags=[],
-            debug=False,
-        )
+        kwargs: dict[str, Any] = {
+            "url": "https://docs.example.test/",
+            "output_dir": tmp_path,
+            "source_name": "docs",
+            "depth": 1,
+            "max_pages": 10,
+            "url_prefix": "",
+            "check_robots_txt": True,
+            "delay_min": 0,
+            "delay_max": 0,
+            "user_agent": "",
+            "wait_for": "",
+            "page_timeout": 30000,
+            "cache": False,
+            "process_iframes": False,
+            "content_filter_threshold": 0.48,
+            "min_word_threshold": 50,
+            "crawl_strategy": "bfs",
+            "seed_urls": [],
+            "score": {},
+            "css_selector": "",
+            "js_code": "",
+            "include_images": False,
+            "resume": False,
+            "flat_files": False,
+            "on_page": None,
+            "category": None,
+            "tags": [],
+            "debug": False,
+        }
         kwargs.update(overrides)
         return kwargs
 
@@ -4822,8 +4859,8 @@ class TestScrapeResumeState:
 
 def _mock_enrich_config(**overrides: Any) -> MagicMock:
     cfg = MagicMock()
-    cfg.llm = None
-    cfg.enrich.llm = None
+    cfg.model = None
+    cfg.effort = None
     cfg.enrich_prompt = ""
     cfg.enrich_batch_size = 20
     cfg.enrich_min_chars = 0
@@ -4868,6 +4905,18 @@ class TestEnrichConfig:
         assert cfg.enrich_batch_size == 20
         assert cfg.enrich_min_chars == 400
         assert cfg.enrich_max_chars == 6000
+
+    def test_flat_generation_overrides_and_removed_routes(self):
+        from pydantic import ValidationError
+
+        from otutil.tools._knowledge.config import Config
+
+        config = Config(model="gpt-5.6-luna", effort="high")
+        assert config.model == "gpt-5.6-luna"
+        assert config.effort == "high"
+        for removed in ("llm", "ask", "rerank", "enrich", "enrich_model"):
+            with pytest.raises(ValidationError):
+                Config.model_validate({removed: {}})
 
     def test_batch_size_bounds_rejected(self):
         from pydantic import ValidationError
@@ -5246,7 +5295,7 @@ class TestSummaryInSearch:
         captured: dict[str, str] = {}
 
         def fake_synthesise(
-            query: str,
+            _query: str,
             context: str,
             **_: Any,
         ) -> str:

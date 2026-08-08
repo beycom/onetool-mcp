@@ -13,19 +13,17 @@ Complete reference for `onetool.yaml` configuration.
 ## CLI Flags
 
 Server and initialization commands use explicit configuration paths. Code-launcher
-commands are the exception: without `--config`, `onetool claude`, `onetool codex`,
-and `onetool code` check `.onetool/onetool.yaml` in the current project and then
-`~/.onetool/onetool.yaml`.
+commands do not accept a configuration path; they use only their arguments and
+`CLIPROXY_BASE_URL`/`CLIPROXY_INFERENCE_KEY` from the process environment.
 
 | Flag | Short | Required | Description |
 |------|-------|----------|-------------|
-| `--config PATH` | `-c` | Yes (server) | Server config file; `init` also accepts a directory; launchers accept an optional exact file |
-| `--secrets PATH` | `-s` | No | Path to `secrets.yaml`; launchers otherwise load an adjacent file when present |
+| `--config PATH` | `-c` | Yes (server) | Server config file; `init` also accepts a directory |
+| `--secrets PATH` | `-s` | No | Path to the server's `secrets.yaml` |
 
 **Config path resolution:** `onetool init` treats `.yaml`/`.yml` paths as files and
 appends `onetool.yaml` to directory paths. Server commands take an explicit config
-file. Code-launcher commands require an explicitly supplied path to be a file and
-otherwise use the discovery order above.
+file. Code-launcher commands never locate or load this configuration.
 
 **Include path resolution:** All relative paths in `include:`, `tools_dir:`, etc. resolve from the **parent directory of the config file** (i.e., the directory containing `onetool.yaml`).
 
@@ -74,33 +72,21 @@ snippets: {}                  # Reusable code templates
 prompts: {}                   # Inline prompts (overrides included)
 ```
 
-## Generation and Embedding Routes
+## Generation and Embedding Connections
 
-Top-level `models` is the authoritative generation model registry. Top-level `llm`
-selects generation only; top-level `embeddings` selects embeddings only. Code
-harness launching ignores this registry.
+Top-level `llm` configures shared backend-aware generation. It defaults to an
+OpenAI-compatible Chat Completions connection; CLIProxyAPI is explicit. Top-level
+`embeddings` independently configures embedding consumers. Code harness launching
+reads neither section.
 
 ```yaml
-models:
-  luna:
-    shortcut: luna
-    id: gpt-5.6-luna
-    source: codex_subscription
-    proxy_alias: gpt-5.6-luna
-    modalities: [text]
-    interfaces: [responses]
-    structured_outputs:
-      responses: [json_object, json_schema]
-    efforts: [low, medium, high]
-    default_effort: low
-
 llm:
   backend: cliproxy
-  interface: responses
-  model: luna
+  base_url: http://127.0.0.1:8317/v1
+  model: gpt-5.6-luna
   effort: low
   timeout: 30
-  max_output_tokens: 4096
+  max_tokens: 4096
 
 embeddings:
   backend: openai_compatible
@@ -113,57 +99,21 @@ embeddings:
   max_tokens: 8191
 ```
 
-An `openai_compatible` generation backend additionally requires `base_url` and
-`secret_name`. A `cliproxy` backend reuses the external `code.proxy` inference
-connection. See [LLM routing](../../learn/llm-routing.md) for schemas, precedence,
-capability validation, and the no-fallback boundary.
+Omitted backend, interface, and secret name resolve to `openai_compatible`,
+`chat_completions`, and `OPENAI_API_KEY`. Explicit `backend: cliproxy` fixes the
+Responses interface and `CLIPROXY_INFERENCE_KEY`; it rejects configurable
+interface and secret fields. See
+[Shared LLM generation](../../learn/llm-routing.md) for the complete contract.
 
-## Code Harness Targets
+## Code Harness Launchers
 
-The launcher has independent proxy routes and direct Codex profiles. A `code`
-section requires at least one of them:
-
-```yaml
-code:
-  proxy:
-    routes:
-      codex_subscription:
-        - id: gpt-5.6-sol
-          shortcut: sol
-      openrouter:
-        - id: z-ai/glm-5.2
-          shortcut: glm
-          claude:
-            context: 1m
-            auto_compact_window: 900000
-
-  direct:
-    codex:
-      profiles:
-        openrouter:
-          - id: z-ai/glm-5.2
-            shortcut: direct-glm
-```
-
-Optional launcher fields are:
-
-- `code.default.model` and one optional exact `code.default.route` or
-  `code.default.profile`
-- `code.permission`: `normal` or `bypass`
-- `code.clients.claude`: `executable`, `working_directory`,
-  `additional_arguments`
-- `code.clients.codex`: the same fields plus `home_path`
-- `code.proxy`: `base_url`, `secret_name`, `connect_timeout`, `request_timeout`,
-  and exact route records
-- `code.direct.codex.profiles`: exact profile names and model records
-- model fields: required `id`, optional globally unique `shortcut`, optional
-  presentation `label`, and optional operational `claude` context policy
-- `code.presentation.quiet` and `code.presentation.verbose`
-
-Ids and shortcuts resolve only by exact match. Proxy ids are sent to CLIProxyAPI;
-direct profile ids are passed to Codex with `--profile`. There is no launcher
-`proxy_alias`, `proxy_id`, transport, harness, CLIProxyAPI config path, or
-management key. See [Code harness routing](../../learn/code-routing.md).
+Coding-harness launch behaviour is not part of `onetool.yaml`. Set
+`CLIPROXY_BASE_URL` and `CLIPROXY_INFERENCE_KEY` in the launcher's process
+environment, then pass a live model query to `onetool code claude` or
+`onetool code codex`, or run bare `onetool code` for interactive live selection.
+Launcher queries are resolved only against CLIProxyAPI's current inventory, and
+`--context` must precede the model. See
+[Code harness launchers](../../learn/code-routing.md).
 
 ## Config Includes
 
@@ -303,7 +253,8 @@ No pack-specific `tools.ot_forge` settings.
 
 | Field | Type | Default | Range | Description |
 |------|------|---------|-------|-------------|
-| `llm` | generation selection | `null` | - | Pack generation overrides or complete backend switch |
+| `model` | string or null | `null` | non-empty | Direct model override |
+| `effort` | string or null | `null` | `low`, `medium`, `high` | Reasoning effort override |
 
 ### ot_secrets
 
@@ -598,27 +549,25 @@ ot.stats(output="stats_report.html") # HTML report
 
 ## Transform Configuration
 
-Configure `ot_llm.transform()` with the shared route and optional pack overrides:
+Configure `ot_llm.transform()` with the shared connection and optional pack overrides:
 
 ```yaml
 llm:
   backend: cliproxy
-  interface: responses
-  model: luna
+  base_url: http://127.0.0.1:8317/v1
+  model: gpt-5.6-luna
   effort: low
   timeout: 30
-  max_output_tokens: 4096
+  max_tokens: 4096
 
 tools:
   ot_llm:
-    llm:
-      model: luna
-      effort: medium
+    model: gpt-5.6-luna
+    effort: medium
 ```
 
-The route's named secret must exist in `secrets.yaml`. CLIProxyAPI generation uses
-the `code.proxy` named secret and does not unconditionally require
-`OPENAI_API_KEY`.
+For this explicit CLIProxy route, `CLIPROXY_INFERENCE_KEY` must exist in
+`secrets.yaml`. OpenAI-compatible routes instead resolve their configured secret.
 
 ## Output Configuration
 

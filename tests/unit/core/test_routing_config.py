@@ -1,163 +1,128 @@
-"""Tests for strict generation and code-routing configuration."""
+"""Tests for the lean strict generation configuration."""
 
 from __future__ import annotations
-
-from copy import deepcopy
 
 import pytest
 from pydantic import ValidationError
 
 from ot.config import OneToolConfig
-from tests.unit.core.routing_fixtures import (
-    direct_codex_config,
-    generation_config,
-    proxy_launcher_config,
-)
+from tests.unit.core.routing_fixtures import generation_config
 
 pytestmark = [pytest.mark.unit, pytest.mark.core]
 
 
-def test_minimal_proxy_and_direct_launchers_are_independently_valid() -> None:
-    proxy = OneToolConfig.model_validate(proxy_launcher_config())
-    direct = OneToolConfig.model_validate(direct_codex_config())
+def test_default_generation_connection_matches_main() -> None:
+    config = OneToolConfig.model_validate({"version": 2})
 
-    assert proxy.code is not None and proxy.code.proxy is not None
-    assert proxy.code.proxy.base_url == "http://127.0.0.1:8317"
-    assert direct.code is not None and direct.code.proxy is None
-    assert direct.code.direct is not None
-    assert direct.code.direct.codex.profiles["openrouter"][0].id == "z-ai/glm-5.2"
-
-
-def test_code_requires_at_least_one_runtime_target() -> None:
-    with pytest.raises(ValidationError, match="at least one proxy route"):
-        OneToolConfig.model_validate({"version": 2, "code": {}})
+    assert config.llm.backend == "openai_compatible"
+    assert config.llm.interface == "chat_completions"
+    assert config.llm.base_url == "https://api.openai.com/v1"
+    assert config.llm.model == "gpt-5.4-nano"
+    assert config.llm.secret_name == "OPENAI_API_KEY"
+    assert config.llm.max_tokens == 4096
+    assert config.embeddings is None
 
 
-@pytest.mark.parametrize(
-    "policy",
-    [
-        {"context": "standard", "auto_compact_window": 100},
-        {"context": "1m", "auto_compact_window": 1_000_000},
-        {"context": "large"},
-    ],
-)
-def test_invalid_claude_context_policy_is_rejected(policy: object) -> None:
-    data = proxy_launcher_config()
-    data["code"]["proxy"]["routes"]["openrouter"][0]["claude"] = policy
-
-    with pytest.raises(ValidationError):
-        OneToolConfig.model_validate(data)
-
-
-def test_claude_policy_is_rejected_for_direct_codex_model() -> None:
-    data = direct_codex_config()
-    model = data["code"]["direct"]["codex"]["profiles"]["openrouter"][0]
-    model["claude"] = {"context": "1m"}
-
-    with pytest.raises(ValidationError, match="direct Codex"):
-        OneToolConfig.model_validate(data)
-
-
-def test_shortcuts_are_globally_unique_and_collision_safe() -> None:
-    duplicate = proxy_launcher_config()
-    duplicate["code"]["proxy"]["routes"]["openrouter"][0]["shortcut"] = "sol"
-    with pytest.raises(ValidationError, match="shortcut"):
-        OneToolConfig.model_validate(duplicate)
-
-    collision = proxy_launcher_config()
-    collision["code"]["proxy"]["routes"]["openrouter"][0]["id"] = "sol"
-    with pytest.raises(ValidationError, match="identity"):
-        OneToolConfig.model_validate(collision)
-
-
-def test_duplicate_model_id_within_target_is_rejected() -> None:
-    data = direct_codex_config()
-    models = data["code"]["direct"]["codex"]["profiles"]["openrouter"]
-    models.append({"id": "z-ai/glm-5.2"})
-
-    with pytest.raises(ValidationError, match="duplicate model ids"):
-        OneToolConfig.model_validate(data)
-
-
-def test_ambiguous_default_requires_exact_target() -> None:
-    data = proxy_launcher_config()
-    data["code"]["direct"] = {
-        "codex": {
-            "profiles": {
-                "work": [{"id": "gpt-5.6-sol"}],
-            }
+def test_exact_main_generation_configuration_remains_valid() -> None:
+    config = OneToolConfig.model_validate(
+        {
+            "version": 2,
+            "llm": {
+                "base_url": "https://api.openai.com/v1",
+                "model": "gpt-5.4-nano",
+            },
         }
-    }
-    data["code"]["default"] = {"model": "gpt-5.6-sol"}
+    )
 
-    with pytest.raises(ValidationError, match="multiple targets"):
-        OneToolConfig.model_validate(data)
-
-    data["code"]["default"]["profile"] = "work"
-    OneToolConfig.model_validate(data)
+    assert config.llm.backend == "openai_compatible"
+    assert config.llm.interface == "chat_completions"
+    assert config.llm.secret_name == "OPENAI_API_KEY"
 
 
-def test_route_and_profile_default_are_mutually_exclusive() -> None:
-    data = proxy_launcher_config()
-    data["code"]["direct"] = direct_codex_config()["code"]["direct"]
-    data["code"]["default"]["profile"] = "openrouter"
+def test_explicit_cliproxy_uses_fixed_responses_connection() -> None:
+    config = OneToolConfig.model_validate(generation_config())
 
-    with pytest.raises(ValidationError, match="mutually exclusive"):
-        OneToolConfig.model_validate(data)
-
-
-def test_removed_launcher_and_generation_metadata_fail_strictly() -> None:
-    launcher = proxy_launcher_config()
-    launcher["code"]["proxy"]["routes"]["openrouter"][0]["modalities"] = ["text"]
-    with pytest.raises(ValidationError, match="extra_forbidden"):
-        OneToolConfig.model_validate(launcher)
-
-    generation = generation_config()
-    generation["models"]["sol"]["context_window"] = 1_000_000
-    with pytest.raises(ValidationError, match="extra_forbidden"):
-        OneToolConfig.model_validate(generation)
+    assert config.llm.backend == "cliproxy"
+    assert config.llm.interface == "responses"
+    assert config.llm.secret_name == "CLIPROXY_INFERENCE_KEY"
+    assert config.embeddings is None
 
 
-def test_cliproxy_generation_requires_proxy_connection() -> None:
-    data = generation_config()
-    data["code"] = direct_codex_config()["code"]
+def test_direct_model_id_is_preserved_without_legacy_identifier_grammar() -> None:
+    model = "vendor/model+preview@2026"
+    config = OneToolConfig.model_validate({"version": 2, "llm": {"model": model}})
 
-    with pytest.raises(ValidationError, match=r"requires code\.proxy"):
-        OneToolConfig.model_validate(data)
+    assert config.llm.model == model
+
+
+@pytest.mark.parametrize("model", ["", "   ", "model\nnext"])
+def test_direct_model_id_must_be_nonempty_and_control_safe(model: str) -> None:
+    with pytest.raises(ValidationError):
+        OneToolConfig.model_validate({"version": 2, "llm": {"model": model}})
 
 
 @pytest.mark.parametrize(
-    "argument",
+    "invalid",
     [
-        "--profile=work",
-        "-p",
-        "-pwork",
-        "--model=other",
-        "-mother",
-        "-cmodel_provider='other'",
+        {"models": {}},
+        {"code": {}},
+        {"llm": {"unknown": True}},
+        {"llm": {"max_output_tokens": 4096}},
+        {"llm": {"embedding_model": "text-embedding-3-small"}},
     ],
 )
-def test_configured_owned_arguments_are_rejected(argument: str) -> None:
-    data = deepcopy(direct_codex_config())
-    data["code"]["clients"] = {
-        "codex": {"additional_arguments": [argument]},
-    }
+def test_removed_or_unknown_routing_fields_fail_strict_validation(
+    invalid: dict[str, object],
+) -> None:
+    with pytest.raises(ValidationError, match="extra_forbidden"):
+        OneToolConfig.model_validate({"version": 2, **invalid})
 
-    with pytest.raises(ValidationError, match="launcher-owned"):
+
+@pytest.mark.parametrize("field", ["interface", "secret_name"])
+def test_cliproxy_rejects_configurable_connection_fields(field: str) -> None:
+    value = {
+        "interface": "responses",
+        "secret_name": "OTHER_KEY",
+    }[field]
+    with pytest.raises(ValidationError, match="cliproxy does not accept"):
+        OneToolConfig.model_validate(
+            {"version": 2, "llm": {"backend": "cliproxy", field: value}}
+        )
+
+
+@pytest.mark.parametrize("effort", ["med", "xhigh", "max"])
+def test_noncanonical_effort_is_rejected(effort: str) -> None:
+    data = generation_config()
+    data["llm"]["effort"] = effort
+    with pytest.raises(ValidationError):
         OneToolConfig.model_validate(data)
 
 
 @pytest.mark.parametrize(
     "base_url",
     [
-        "http://proxy.local/path\nnext",
-        "http://proxy.local/path\x01next",
-        "http://proxy.local/path\x7fnext",
+        "http://user:password@proxy.test/v1",
+        "http://proxy.test/v1?key=secret",
+        "http://proxy.test/v1\nnext",
     ],
 )
-def test_proxy_base_url_rejects_control_characters(base_url: str) -> None:
-    data = proxy_launcher_config()
-    data["code"]["proxy"]["base_url"] = base_url
-
-    with pytest.raises(ValidationError, match="control characters"):
+def test_generation_base_url_is_safe(base_url: str) -> None:
+    data = generation_config()
+    data["llm"]["base_url"] = base_url
+    with pytest.raises(ValidationError):
         OneToolConfig.model_validate(data)
+
+
+def test_embeddings_remain_independent() -> None:
+    data = generation_config()
+    data["embeddings"] = {
+        "backend": "openai_compatible",
+        "model": "text-embedding-3-small",
+        "base_url": "https://api.openai.com/v1",
+        "secret_name": "OPENAI_API_KEY",
+        "dimensions": 1536,
+    }
+    config = OneToolConfig.model_validate(data)
+
+    assert config.embeddings is not None
+    assert config.embeddings.secret_name == "OPENAI_API_KEY"

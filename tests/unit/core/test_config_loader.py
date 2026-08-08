@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -38,8 +37,38 @@ def test_load_config_defaults() -> None:
     assert config.log_level == "INFO"
     assert config.security.validate_code is True
     assert config.tools_dir == ["tools/*.py"]
-    assert config.llm is None
+    assert config.llm.backend == "openai_compatible"
+    assert config.llm.model == "gpt-5.4-nano"
     assert config.embeddings is None
+
+
+@pytest.mark.unit
+@pytest.mark.core
+def test_embedding_helper_returns_only_explicit_route() -> None:
+    """Embedding configuration has one explicit source of truth."""
+    from ot.config import OneToolConfig, loader
+
+    main_config = OneToolConfig.model_validate({"version": 2})
+    with patch.object(loader, "get_config", return_value=main_config):
+        assert loader.get_embeddings_config() is None
+
+    explicit_config = OneToolConfig.model_validate(
+        {
+            **main_config.model_dump(),
+            "embeddings": {
+                "backend": "openai_compatible",
+                "model": "embed-v2",
+                "base_url": "https://embeddings.test/v1",
+                "secret_name": "EMBEDDINGS_KEY",
+                "dimensions": 1024,
+            },
+        }
+    )
+    with patch.object(loader, "get_config", return_value=explicit_config):
+        explicit = loader.get_embeddings_config()
+    assert explicit is not None
+    assert explicit.model == "embed-v2"
+    assert explicit.secret_name == "EMBEDDINGS_KEY"
 
 
 @pytest.mark.unit
@@ -218,9 +247,9 @@ def test_tools_config_accepts_any_tool() -> None:
 @pytest.mark.core
 def test_get_tool_config_rejects_invalid_override(tmp_path: Path) -> None:
     """Pack config schema errors are visible instead of falling back to defaults."""
-    import ot.config.loader
     from pydantic import BaseModel
 
+    import ot.config.loader
     from ot.config.loader import get_config, get_tool_config
 
     class SampleConfig(BaseModel):
@@ -234,7 +263,7 @@ def test_get_tool_config_rejects_invalid_override(tmp_path: Path) -> None:
     ot.config.loader._config = None
     try:
         get_config(config_path)
-        with pytest.raises(ValueError, match="Invalid tools.sample configuration"):
+        with pytest.raises(ValueError, match=r"Invalid tools\.sample configuration"):
             get_tool_config("sample", SampleConfig)
     finally:
         ot.config.loader._config = None
@@ -244,9 +273,9 @@ def test_get_tool_config_rejects_invalid_override(tmp_path: Path) -> None:
 @pytest.mark.core
 def test_get_tool_config_rejects_unknown_override(tmp_path: Path) -> None:
     """Unknown typed pack config keys fail loudly instead of being ignored."""
-    import ot.config.loader
     from pydantic import BaseModel
 
+    import ot.config.loader
     from ot.config.loader import get_config, get_tool_config
 
     class SampleConfig(BaseModel):
@@ -260,7 +289,7 @@ def test_get_tool_config_rejects_unknown_override(tmp_path: Path) -> None:
     ot.config.loader._config = None
     try:
         get_config(config_path)
-        with pytest.raises(ValueError, match="Invalid tools.sample configuration"):
+        with pytest.raises(ValueError, match=r"Invalid tools\.sample configuration"):
             get_tool_config("sample", SampleConfig)
     finally:
         ot.config.loader._config = None
@@ -270,9 +299,9 @@ def test_get_tool_config_rejects_unknown_override(tmp_path: Path) -> None:
 @pytest.mark.core
 def test_get_tool_config_rejects_unknown_for_forbid_schema(tmp_path: Path) -> None:
     """Unknown fields remain hard errors for schemas that explicitly forbid extras."""
-    import ot.config.loader
     from pydantic import BaseModel, ConfigDict
 
+    import ot.config.loader
     from ot.config.loader import get_config, get_tool_config
 
     class SampleConfig(BaseModel):
@@ -288,7 +317,7 @@ def test_get_tool_config_rejects_unknown_for_forbid_schema(tmp_path: Path) -> No
     ot.config.loader._config = None
     try:
         get_config(config_path)
-        with pytest.raises(ValueError, match="Invalid tools.sample configuration"):
+        with pytest.raises(ValueError, match=r"Invalid tools\.sample configuration"):
             get_tool_config("sample", SampleConfig)
     finally:
         ot.config.loader._config = None
@@ -299,7 +328,6 @@ def test_get_tool_config_rejects_unknown_for_forbid_schema(tmp_path: Path) -> No
 def test_get_tool_config_rejects_removed_knowledge_keys(tmp_path: Path) -> None:
     """Removed knowledge config keys must not be silently dropped."""
     import ot.config.loader
-
     from ot.config.loader import get_config, get_tool_config
     from otutil.tools._knowledge.config import Config
 
@@ -320,7 +348,9 @@ def test_get_tool_config_rejects_removed_knowledge_keys(tmp_path: Path) -> None:
     ot.config.loader._config = None
     try:
         get_config(config_path)
-        with pytest.raises(ValueError, match="Invalid tools.knowledge configuration"):
+        with pytest.raises(
+            ValueError, match=r"Invalid tools\.knowledge configuration"
+        ):
             get_tool_config("knowledge", Config)
     finally:
         ot.config.loader._config = None

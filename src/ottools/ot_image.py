@@ -8,14 +8,12 @@ structured summaries cached in meta.json.
 
     tools:
       ot_image:
-        llm:
-          model: terra            # partial override of top-level llm
-          effort: low
+        model: gpt-5.6-terra      # direct generation model ID
+        effort: low
         max_edge: 1568            # default resize limit
         session_cache_size: 10   # default LRU cap
 
-Complete direct or proxy backend switches may also be configured under
-``tools.ot_image.llm``. The selected model must advertise image input.
+The configured backend and selected model are authoritative for image support.
 """
 
 from __future__ import annotations
@@ -31,7 +29,17 @@ __ot_requires__ = {
     ],
 }
 
-__all__ = ["ask", "clip_ask", "clip_view", "delete", "list", "load", "load_batch", "purge", "summary"]
+__all__ = [
+    "ask",
+    "clip_ask",
+    "clip_view",
+    "delete",
+    "list",
+    "load",
+    "load_batch",
+    "purge",
+    "summary",
+]
 
 from ottools._image.lifecycle import delete_image as delete
 from ottools._image.lifecycle import list_images as list

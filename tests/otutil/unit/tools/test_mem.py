@@ -6,6 +6,9 @@ with mocked SQLite and OpenAI.
 
 from __future__ import annotations
 
+import hashlib as _hashlib
+import sqlite3 as _sqlite3
+import struct as _struct
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -226,7 +229,7 @@ class TestCosineSimilarity:
 
         a = struct.pack("<3f", 1.0, 2.0, 3.0)
         b = struct.pack("<2f", 1.0, 2.0)
-        with pytest.raises(ValueError, match="dimension mismatch.*3 vs 2.*reindex"):
+        with pytest.raises(ValueError, match=r"dimension mismatch.*3 vs 2.*reindex"):
             _cosine_similarity(a, b)
 
 
@@ -903,10 +906,10 @@ class TestProcessEmbeddingJob:
 
         # Track lock state at embedding time: __enter__/__exit__ pair count
         lock_depth = {"current": 0, "at_embed": None}
-        mock_conn.return_value.__enter__.side_effect = lambda *a: (
+        mock_conn.return_value.__enter__.side_effect = lambda *_args: (
             lock_depth.__setitem__("current", lock_depth["current"] + 1) or conn
         )
-        mock_conn.return_value.__exit__.side_effect = lambda *a: (
+        mock_conn.return_value.__exit__.side_effect = lambda *_args: (
             lock_depth.__setitem__("current", lock_depth["current"] - 1) or False
         )
         mock_embed.side_effect = lambda _content: (
@@ -2597,6 +2600,19 @@ class TestGetEmbeddingClient:
         assert client.model == "text-embedding-3-small"
         self._reset()
 
+    def test_reset_embedding_client_closes_cached_pool(self):
+        import otutil.tools._mem.embedding as emb_mod
+
+        client = MagicMock()
+        emb_mod._client = client
+        emb_mod._client_key = ("key", "model", "url", 1, 2, 3.0)
+
+        emb_mod.reset_embedding_client()
+
+        client.close.assert_called_once_with()
+        assert emb_mod._client is None
+        assert emb_mod._client_key is None
+
 
 @pytest.mark.unit
 @pytest.mark.tools
@@ -2769,7 +2785,7 @@ class TestFilePathSecurity:
         assert "Error" in result
         assert "outside allowed directories" in result
 
-    def test_write_rejects_path_traversal(self, tmp_path):
+    def test_write_rejects_path_traversal(self):
         from otutil.tools.mem import write
 
         result = write(topic="test", file="../../../etc/passwd")
@@ -3019,7 +3035,7 @@ class TestSectionEncoder:
         encoded = _encode_sections(headings)
         decoded = _decode_sections(encoded)
         assert len(decoded) == len(headings)
-        for orig, dec in zip(headings, decoded):
+        for orig, dec in zip(headings, decoded, strict=False):
             assert dec["heading"] == orig["heading"]
             assert dec["start"] == orig["start"]
             assert dec["end"] == orig["end"]
@@ -3236,13 +3252,13 @@ class TestReadMode:
     def test_mode_toc_raises_with_redirect(self):
         from otutil.tools.mem import read
 
-        with pytest.raises(ValueError, match="mem.toc"):
+        with pytest.raises(ValueError, match=r"mem\.toc"):
             read(topic="spec", mode="toc")
 
     def test_mode_meta_raises_with_redirect(self):
         from otutil.tools.mem import read
 
-        with pytest.raises(ValueError, match="mem.inspect"):
+        with pytest.raises(ValueError, match=r"mem\.inspect"):
             read(topic="spec", mode="meta")
 
     def test_mode_all_raises_with_redirect(self):
@@ -3355,11 +3371,11 @@ class TestAsk:
 
         with patch(
             "otutil.tools._mem.ask.resolve_generation",
-            side_effect=GenerationError("No generation route is configured"),
+            side_effect=GenerationError("No generation connection is configured"),
         ):
             result = ask(topic="docs/api", q="What endpoints exist?")
         assert "error" in result
-        assert "generation route" in result["error"].lower()
+        assert "generation connection" in result["error"].lower()
 
     @patch("otutil.tools._mem.ask._get_connection")
     def test_single_question_returns_answer(self, mock_conn):
@@ -4256,11 +4272,6 @@ class TestSliceBatch:
 # ---------------------------------------------------------------------------
 # FTS5 keyword index, vec0 KNN index, history/rollback (mem-search-and-history)
 # ---------------------------------------------------------------------------
-
-import hashlib as _hashlib
-import sqlite3 as _sqlite3
-import struct as _struct
-
 
 def _embedding_config(dims: int = 4) -> EmbeddingsConfig:
     return EmbeddingsConfig(

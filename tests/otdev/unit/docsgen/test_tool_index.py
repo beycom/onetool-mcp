@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from otdev.docsgen.tool_index import (
@@ -8,6 +10,9 @@ from otdev.docsgen.tool_index import (
     short_description,
     signature_args,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 pytestmark = [pytest.mark.unit, pytest.mark.tools]
 
@@ -69,6 +74,23 @@ def test_format_text_renders_descriptions_and_arg_docs() -> None:
             "```",
         ]
     )
+
+
+def test_default_config_ignores_developer_local_configuration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from otdev.docsgen import tool_index
+
+    local = tmp_path / ".onetool" / "onetool.yaml"
+    checked_in = tmp_path / "tests" / ".onetool" / "onetool.yaml"
+    local.parent.mkdir(parents=True)
+    checked_in.parent.mkdir(parents=True)
+    local.touch()
+    checked_in.touch()
+    monkeypatch.setattr(tool_index, "ROOT", tmp_path)
+
+    assert tool_index.default_config() == checked_in
 
 
 

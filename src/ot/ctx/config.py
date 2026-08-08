@@ -1,12 +1,11 @@
 """Configuration for the ctx pack."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from ot.config import get_tool_config
-from ot.config.routing import (  # noqa: TC001 - Pydantic resolves GenerationSelection
-    GenerationSelection,
-)
+from ot.config.routing import DirectModelId, ReasoningEffort  # noqa: TC001
 
 
 class Config(BaseModel):
@@ -14,9 +13,11 @@ class Config(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    llm: GenerationSelection | None = Field(
-        default=None,
-        description="Pack-level shared generation overrides",
+    model: DirectModelId | None = Field(
+        default=None, description="Direct model override"
+    )
+    effort: ReasoningEffort | None = Field(
+        default=None, description="Reasoning effort override"
     )
     ttl: int = Field(
         default=3600,

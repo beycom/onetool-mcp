@@ -1,4 +1,5 @@
 """Multi-question LLM query for the ctx pack."""
+
 from __future__ import annotations
 
 import re
@@ -57,7 +58,7 @@ def ctx_ask(
     Args:
         handle: Context store handle (e.g. ``"3539ec02"``).
         q: Question string or list of question strings.
-        model: LLM model override; falls back to the effective route.
+        model: Direct model override; falls back to pack then root configuration.
         effort: Reasoning effort override: ``low``, ``medium``, or ``high``.
         store: HandleStore instance (uses session default if not provided).
 
@@ -124,7 +125,8 @@ def ctx_ask(
             root = get_config()
             route = resolve_generation(
                 config=root,
-                pack=config.llm,
+                pack_model=config.model,
+                pack_effort=config.effort,
                 model=model,
                 effort=effort,
             )
@@ -141,7 +143,7 @@ def ctx_ask(
             )
             raw = generation.content
         except GenerationError as exc:
-            err = f"Generation route unavailable: {exc}"
+            err = f"Generation unavailable: {exc}"
             s.add(error=err)
             return {"handle": handle, "error": err}
 
@@ -150,7 +152,10 @@ def ctx_ask(
         else:
             answers = _parse_numbered_answers(raw, len(questions))
 
-        pairs = [{"question": qs, "answer": a} for qs, a in zip(questions, answers, strict=False)]
+        pairs = [
+            {"question": qs, "answer": a}
+            for qs, a in zip(questions, answers, strict=False)
+        ]
         result: dict[str, Any] = {"handle": handle, "result": pairs}
 
         if truncated:

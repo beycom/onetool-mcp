@@ -131,9 +131,8 @@ API keys are stored in `secrets.yaml` (gitignored) and passed to the server via 
 
 | Key | Service | Used By |
 |-----|---------|---------|
-| `OPENAI_API_KEY` | OpenAI API | Explicit direct generation or embedding routes |
-| `OPENROUTER_API_KEY` | OpenRouter | Explicit direct generation routes |
-| `CLIPROXY_INFERENCE_KEY` | User-managed CLIProxyAPI | Proxy code-harness launches and generation routes |
+| `OPENAI_API_KEY` | OpenAI API | Default MCP generation and compatible embeddings |
+| `CLIPROXY_INFERENCE_KEY` | User-managed CLIProxyAPI | Explicit CLIProxy MCP generation from `secrets.yaml`; code launchers from their process environment |
 | `BRAVE_API_KEY` | [Brave Search](https://brave.com/search/api/) | `brave.*` tools |
 | `CONTEXT7_API_KEY` | [Context7](https://context7.com) | `context7.*` tools |
 
@@ -143,6 +142,7 @@ API keys are stored in `secrets.yaml` (gitignored) and passed to the server via 
 # secrets.yaml
 BRAVE_API_KEY: "BSA..."
 OPENAI_API_KEY: "sk-..."
+CLIPROXY_INFERENCE_KEY: "your-inference-client-key"
 CONTEXT7_API_KEY: "c7-..."
 ```
 
@@ -155,30 +155,26 @@ Pass it to the server via `--secrets /path/to/secrets.yaml`. If omitted, no secr
 | `OT_LOG_LEVEL` | `INFO`    | Logging verbosity                         |
 | `OT_LOG_DIR`   | `../logs` | Log file directory (relative to config)   |
 
-### LLM Configuration
+### Generation and Embedding Configuration
 
-Register model capabilities and select one explicit generation backend:
+The default generation route uses OpenAI-compatible Chat Completions:
 
 ```yaml
-models:
-  glm52:
-    shortcut: glm52
-    id: z-ai/glm-5.2
-    source: openrouter
-    modalities: [text]
-    interfaces: [chat_completions]
-    structured_outputs:
-      chat_completions: [json_object, json_schema]
-    efforts: [low, medium, high]
-
 llm:
-  backend: openai_compatible
-  interface: chat_completions
-  model: glm52
-  base_url: https://openrouter.ai/api/v1
-  secret_name: OPENROUTER_API_KEY
+  base_url: https://api.openai.com/v1
+  model: gpt-5.4-nano
+```
+
+Select CLIProxyAPI explicitly when desired:
+
+```yaml
+llm:
+  backend: cliproxy
+  base_url: http://127.0.0.1:8317/v1
+  model: z-ai/glm-5.2
+  effort: low
   timeout: 30
-  max_output_tokens: 4096
+  max_tokens: 4096
 
 embeddings:
   backend: openai_compatible
@@ -191,9 +187,12 @@ embeddings:
   max_tokens: 8191
 ```
 
-Generation and embeddings are independent; configure only the routes you use. A
-CLIProxyAPI generation route instead reuses `code.proxy` and its named secret.
-See [LLM routing](llm-routing.md).
+The `embeddings` section is independent from generation and is required by
+embedding-backed tools. CLIProxy generation has no implicit embedding endpoint and resolves only
+`CLIPROXY_INFERENCE_KEY` from `secrets.yaml`.
+Code launchers instead read `CLIPROXY_BASE_URL` and
+`CLIPROXY_INFERENCE_KEY` from their process environment. See
+[Shared LLM generation](llm-routing.md) and [Code harness launchers](code-routing.md).
 
 ## MCP Configuration
 

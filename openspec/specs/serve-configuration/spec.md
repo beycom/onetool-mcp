@@ -50,39 +50,34 @@ Config files SHALL use schema version 2.
 
 ### Requirement: Root Configuration Sections
 
-The root config SHALL support the current top-level sections used by the runtime,
-including independent model-registry, generation, embedding, and code-launch
-sections.
+The root config SHALL support the current runtime sections, including independent
+generation and embedding sections. A generation model registry and coding-harness
+launch behaviour SHALL not be part of MCP configuration.
 
 #### Scenario: Supported root sections
-- **GIVEN** a config containing `include`, `env`, `models`, `llm`, `embeddings`, `code`, `alias`, `snippets`, `servers`, `direct`, `tools`, `security`, `stats`, `telemetry`, `output`, `tools_dir`, `prompts`, `log_level`, `log_dir`, `compact_max_length`, `log_verbose`, or `debug_tracebacks`
+- **GIVEN** a config containing `include`, `env`, `llm`, `embeddings`, `alias`, `snippets`, `servers`, `direct`, `tools`, `security`, `stats`, `telemetry`, `output`, `tools_dir`, `prompts`, `log_level`, `log_dir`, `compact_max_length`, `log_verbose`, or `debug_tracebacks`
 - **WHEN** OneTool loads configuration
 - **THEN** each recognised section SHALL be validated according to its current schema
 
-#### Scenario: Generation configuration is independent
+#### Scenario: Backend-aware generation configuration
 - **GIVEN** a top-level `llm` section
 - **WHEN** OneTool loads configuration
-- **THEN** the section SHALL validate generation backend, explicit interface, model,
-  effort, timeout, and output-limit settings
-- **AND** it SHALL NOT accept embedding model, dimensions, batching, or token-limit settings
+- **THEN** the strict section SHALL accept backend, interface, base URL, direct
+  model, named secret, effort, timeout, and `max_tokens`
+- **AND** omitted backend, interface, and secret name SHALL use OpenAI-compatible defaults
+- **AND** backend-inapplicable or unknown fields SHALL be rejected
 
 #### Scenario: Embedding configuration is independent
 - **GIVEN** a top-level `embeddings` section
 - **WHEN** OneTool loads configuration
 - **THEN** the section SHALL validate an `openai_compatible` backend with its own model, base URL, named secret, dimensions, timeout, batching, and token-limit settings
-- **AND** it SHALL NOT inherit endpoint, model, or credentials from `llm`
+- **AND** no generation field SHALL be used to derive an embedding route
 
 #### Scenario: CLIProxyAPI embeddings are rejected
 - **GIVEN** a top-level `embeddings` section with `backend: cliproxy`
 - **WHEN** OneTool loads configuration
 - **THEN** strict validation SHALL reject the unsupported embedding backend
 - **AND** OneTool SHALL NOT send embedding requests to the CLIProxyAPI generation endpoint
-
-#### Scenario: Removed embedding key is rejected
-- **GIVEN** a config containing `llm.embedding_model`
-- **WHEN** OneTool loads configuration
-- **THEN** strict nested validation SHALL reject the removed key
-- **AND** OneTool SHALL NOT interpret it as an alias for `embeddings.model`
 
 #### Scenario: Unknown root section
 - **GIVEN** a config containing an unrecognised root key
@@ -91,7 +86,7 @@ sections.
 - **AND** OneTool SHALL emit a warning naming the ignored attribute
 
 #### Scenario: Unknown typed nested attribute
-- **GIVEN** a config containing an unrecognised key under a typed section such as `models`, `llm`, `embeddings`, `code`, `direct.host`, `security`, `stats`, `telemetry`, or `output`
+- **GIVEN** a config containing an unrecognised key under a typed section such as `llm`, `embeddings`, `direct.host`, `security`, `stats`, `telemetry`, or `output`
 - **WHEN** OneTool loads configuration
 - **THEN** the unknown nested key SHALL be rejected when that section is strict or otherwise ignored according to its current schema
 - **AND** an ignored key SHALL emit a warning naming the ignored attribute path
@@ -223,197 +218,57 @@ overrides.
 - **WHEN** compact log formatting asks for the maximum value length
 - **THEN** OneTool SHALL use the environment value instead of `compact_max_length`
 
-### Requirement: Generation model registry
+### Requirement: Shared generation connection
 
-The strict top-level `models` mapping SHALL belong only to generation consumers.
-The code launcher SHALL not read it.
+The strict top-level `llm` section SHALL configure the shared backend-aware
+generation client. It SHALL accept direct model selection and the connection
+fields permitted by the selected backend.
 
-#### Scenario: Generation model entry
-- **WHEN** a top-level model entry is loaded
-- **THEN** it SHALL validate exact shortcut, concrete id, source, optional
-  generation proxy alias, modalities, interfaces, structured-output modes,
-  efforts, and default effort
-- **AND** it SHALL reject launcher-only or unused label, context-window, and harness
-  metadata
+#### Scenario: Compatible defaults
+- **WHEN** `llm` or its backend fields are omitted
+- **THEN** published OpenAI-compatible generation model, endpoint, token limit, Chat Completions, and credential defaults SHALL apply
+
+#### Scenario: CLIProxy restrictions
+- **WHEN** `llm.backend` is `cliproxy`
+- **THEN** Responses and `CLIPROXY_INFERENCE_KEY` SHALL be fixed
+- **AND** explicit interface or secret-name fields SHALL be rejected
+
+#### Scenario: Unsupported output-limit field
+- **WHEN** `llm` contains `max_output_tokens` instead of `max_tokens`
+- **THEN** strict validation SHALL reject it
 
 #### Scenario: Launcher independence
-- **WHEN** top-level models are absent, changed, or use generation-only aliases
-- **THEN** code launcher resolution SHALL remain determined solely by the `code`
-  target records
-
-### Requirement: Typed code-launch configuration
-
-The optional strict `code` section SHALL contain at least one proxy route or direct
-Codex profile, plus optional default, permission, client overrides, and
-presentation settings.
-
-#### Scenario: Minimal proxy configuration
-- **WHEN** configuration contains `code.proxy.routes` with one or more model
-  records
-- **THEN** it SHALL be valid
-- **AND** connection, client, permission, and presentation defaults SHALL apply
-
-#### Scenario: Minimal direct configuration
-- **WHEN** configuration contains one or more `code.direct.codex.profiles` records
-  without `code.proxy`
-- **THEN** it SHALL be valid
-- **AND** no proxy connection or credential SHALL be required
-
-#### Scenario: Missing targets
-- **WHEN** `code` contains neither a proxy route nor a direct Codex profile
-- **THEN** strict validation SHALL reject it
-
-#### Scenario: Proxy route mapping
-- **WHEN** `code.proxy.routes` is loaded
-- **THEN** its keys SHALL be exact `claude_subscription`, `codex_subscription`, or
-  `openrouter` identifiers
-- **AND** each configured value SHALL be a non-empty list of model records
-
-#### Scenario: Direct Codex profile mapping
-- **WHEN** `code.direct.codex.profiles` is loaded
-- **THEN** each key SHALL be an exact profile name
-- **AND** each value SHALL contain one or more model records
-
-#### Scenario: Launcher model fields
-- **WHEN** a launcher model record is loaded
-- **THEN** only `id` SHALL be required
-- **AND** the record MAY additionally contain a globally unique `shortcut`, a
-  presentation-only non-empty `label`, and Claude context policy where applicable
-
-#### Scenario: Claude context policy
-- **WHEN** a launcher model contains `claude`
-- **THEN** `context` SHALL accept only `standard` or `1m`
-- **AND** optional `auto_compact_window` SHALL be a positive integer below
-  1,000,000 and require `context: 1m`
-
-#### Scenario: Duplicate within one target
-- **WHEN** one route or profile contains the same exact model id more than once
-- **THEN** strict validation SHALL reject it
-
-#### Scenario: Same model across targets
-- **WHEN** the same exact id appears in multiple routes or profiles
-- **THEN** configuration SHALL be valid
-- **AND** selecting it SHALL require an exact target
-
-#### Scenario: Launcher identity collision
-- **WHEN** any two launcher records use the same shortcut
-- **OR** one record's shortcut equals a different record's model id
-- **THEN** strict validation SHALL reject it
-
-#### Scenario: Optional default
-- **WHEN** `code.default` is configured
-- **THEN** it SHALL contain a model id and at most one route or profile
-- **AND** when neither target selector is supplied, the model id SHALL identify
-  exactly one compatible configured target
-
-#### Scenario: Permission
-- **WHEN** `code.permission` is configured
-- **THEN** it SHALL accept only `normal` or `bypass`
-- **AND** omission SHALL default to `normal`
-
-#### Scenario: Unknown or removed field
-- **WHEN** launcher configuration contains an unknown field, removed model
-  metadata, old route layout, transport, source, proxy alias, or proxy id
-- **THEN** strict validation SHALL reject it without compatibility handling
-
-### Requirement: Configurable harness clients
-
-`code.clients` SHALL optionally override Claude and Codex executables, working
-directories, and ordered additional argument lists. Codex MAY additionally define
-`home_path`.
-
-#### Scenario: Clients omitted
-- **WHEN** `code.clients` or either client record is omitted
-- **THEN** Claude SHALL default to executable `claude`
-- **AND** Codex SHALL default to executable `codex`
-
-#### Scenario: Executable
-- **WHEN** an executable is a command name or absolute path
-- **THEN** OneTool SHALL resolve and verify an executable file without a shell
-
-#### Scenario: Invalid executable
-- **WHEN** an executable is a relative path with separators, contains arguments, or
-  is not executable
-- **THEN** configuration or launch SHALL fail actionably
-
-#### Scenario: Working directory
-- **WHEN** a working directory is configured
-- **THEN** OneTool SHALL resolve and validate it and change to it immediately before
-  process replacement
-
-#### Scenario: Codex home
-- **WHEN** `code.clients.codex.home_path` is configured
-- **THEN** OneTool SHALL validate it and set `CODEX_HOME` only for the child
-
-#### Scenario: Additional arguments
-- **WHEN** configured additional arguments do not contain a OneTool-owned long
-  option, long option with `=`, separated short option, or attached short option
-- **THEN** their token boundaries and order SHALL be preserved
-- **AND** OneTool SHALL not interpret upstream commands or option values
-
-#### Scenario: Removed client fields
-- **WHEN** configuration supplies a client version constraint, CLIProxyAPI client,
-  typed settings/profile/catalog path, or delegated login configuration
-- **THEN** strict validation SHALL reject it
-
-### Requirement: CLIProxyAPI connection configuration
-
-Optional `code.proxy` SHALL contain one or more launcher route lists plus optional
-`base_url`, `secret_name`, `connect_timeout`, and `request_timeout`.
-
-#### Scenario: Proxy omitted
-- **WHEN** code configuration uses only direct Codex profiles
-- **THEN** no CLIProxyAPI connection fields SHALL be required
-
-#### Scenario: No proxy file path
-- **WHEN** code configuration is loaded
-- **THEN** it SHALL expose no CLIProxyAPI config path or management key field
-
-#### Scenario: No model cache setting
-- **WHEN** code configuration is loaded
-- **THEN** it SHALL expose no public `model_cache_ttl`
-
-#### Scenario: Management fields rejected
-- **WHEN** configuration contains management credentials, lifecycle, process, log,
-  account, OAuth, or raw proxy payload settings
-- **THEN** strict validation SHALL reject them
+- **WHEN** MCP configuration is absent, invalid, or changed
+- **THEN** standalone code launcher construction SHALL remain determined only by its arguments and process environment
 
 ### Requirement: Typed tool generation selections
 
-Generation-capable tool configuration SHALL accept reusable typed `llm` selections
-at pack or operation scope. A partial selection that omits `backend` MAY contain
-provider-neutral model, effort, timeout, and output-limit overrides. A selection
-that specifies `backend` SHALL be a complete discriminated backend selection:
-`cliproxy` SHALL use the external `code.proxy` inference connection, and
-`openai_compatible` SHALL contain its own base URL and named secret. Every complete backend selection
-SHALL include `interface: responses` or `interface: chat_completions`.
-Backend-specific fields, including `interface`, SHALL NOT be accepted in a partial
-selection that omits `backend`.
+Each generation-capable pack SHALL accept optional direct `model` and `effort`
+fields at pack scope. Pack configuration SHALL NOT select endpoint, credential,
+backend, interface, timeout, output bound, alias, or operation-specific routes.
 
-#### Scenario: Pack selection validates
-- **WHEN** `tools.ot_image.llm` contains a valid partial generation selection
-- **THEN** OneTool SHALL preserve it as a typed pack-level override
+#### Scenario: Pack model override
+- **WHEN** `tools.ot_image.model` contains a non-empty direct model ID
+- **THEN** OneTool SHALL preserve it as the image pack override
 
-#### Scenario: Operation selection validates
-- **WHEN** `tools.knowledge.ask.llm` or `tools.knowledge.enrich.llm` contains a valid partial generation selection
-- **THEN** OneTool SHALL preserve it as a typed operation-level override
+#### Scenario: Pack effort override
+- **WHEN** `tools.ot_llm.effort` contains `low`, `medium`, or `high`
+- **THEN** OneTool SHALL preserve it as the pack effort override
 
-#### Scenario: Nested direct backend is complete
-- **GIVEN** top-level `llm.backend` is `cliproxy`
-- **WHEN** `tools.ot_llm.llm` selects `backend: openai_compatible`
-- **THEN** that nested selection SHALL require its own base URL and named secret
-- **AND** it SHALL NOT inherit the CLIProxyAPI endpoint or inference credential
+#### Scenario: Knowledge uses one pack selection
+- **WHEN** `tools.knowledge.model` or `tools.knowledge.effort` is configured
+- **THEN** reranking, synthesis, and enrichment SHALL use those values when calls omit overrides
+- **AND** separate ask, rerank, and enrich generation routes SHALL not exist
 
-#### Scenario: Incomplete nested backend is rejected
-- **WHEN** a pack or operation selection specifies `backend: openai_compatible` without its required base URL or named secret
-- **THEN** configuration validation SHALL fail at that selection's path
+#### Scenario: Connection fields remain root-owned
+- **WHEN** a pack omits model or effort
+- **THEN** the corresponding root value SHALL apply
+- **AND** endpoint, credential, timeout, and output bounds SHALL always come from top-level `llm`
 
-#### Scenario: Missing or unsupported interface is rejected
-- **WHEN** a complete generation backend omits `interface` or selects an interface
-  unsupported by its backend or model metadata
-- **THEN** configuration validation SHALL fail at that setting's path
-- **AND** OneTool SHALL not select an SDK default
+#### Scenario: Unsupported pack routing fields
+- **WHEN** a typed generation pack receives nested `llm`, backend, interface, source, endpoint, secret, operation route, or capability fields
+- **THEN** strict configuration validation SHALL reject them
 
-#### Scenario: Invalid effort is rejected
-- **WHEN** any generation selection configures an effort other than `low`, `medium`, or `high`
-- **THEN** configuration validation SHALL fail at that setting's path
+#### Scenario: Invalid effort
+- **WHEN** root or pack configuration supplies a non-canonical effort
+- **THEN** strict validation SHALL reject it

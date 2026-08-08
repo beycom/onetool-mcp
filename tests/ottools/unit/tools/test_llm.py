@@ -31,10 +31,10 @@ def _result(content: str = "transformed") -> SimpleNamespace:
 
 
 def test_config_accepts_typed_selection_and_rejects_removed_keys() -> None:
-    config = Config.model_validate({"llm": {"model": "sol", "effort": "low"}})
-    assert config.llm is not None
-    assert config.llm.model == "sol"
-    for key in ("base_url", "model", "timeout", "max_tokens"):
+    config = Config.model_validate({"model": "gpt-5.6-sol", "effort": "low"})
+    assert config.model == "gpt-5.6-sol"
+    assert config.effort == "low"
+    for key in ("base_url", "llm", "timeout", "max_tokens"):
         with pytest.raises(ValidationError, match="extra_forbidden"):
             Config.model_validate({key: "removed"})
 
@@ -92,11 +92,7 @@ def test_transform_validates_inputs(
 
 
 def test_transform_uses_pack_call_precedence_and_untrusted_framing() -> None:
-    route = SimpleNamespace(
-        backend="cliproxy",
-        shortcut="sol",
-        effort="high",
-    )
+    route = SimpleNamespace(model_id="gpt-5.6-sol", effort="high")
     with (
         patch("ottools.ot_llm.resolve_generation", return_value=route) as resolve,
         patch("ottools.ot_llm.generate", return_value=_result()) as call,
@@ -117,12 +113,8 @@ def test_transform_uses_pack_call_precedence_and_untrusted_framing() -> None:
     assert "untrusted content" in request.system
 
 
-def test_json_mode_requires_explicit_capability_and_wire_mode() -> None:
-    route = SimpleNamespace(
-        backend="openai_compatible",
-        shortcut="glm52",
-        effort=None,
-    )
+def test_json_mode_sets_the_responses_wire_format() -> None:
+    route = SimpleNamespace(model_id="z-ai/glm-5.2", effort=None)
     with (
         patch("ottools.ot_llm.resolve_generation", return_value=route) as resolve,
         patch(
@@ -133,17 +125,17 @@ def test_json_mode_requires_explicit_capability_and_wire_mode() -> None:
         output = transform(data="x", prompt="json", json_mode=True)
 
     assert output == '{"ok":true}'
-    assert resolve.call_args.kwargs["structured_output"] == "json_object"
+    assert "structured_output" not in resolve.call_args.kwargs
     assert call.call_args.kwargs["request"].structured_output == "json_object"
 
 
 def test_generation_error_is_returned_without_content_or_secret_logging() -> None:
     with patch(
         "ottools.ot_llm.resolve_generation",
-        side_effect=GenerationError("No generation route is configured"),
+        side_effect=GenerationError("No generation connection is configured"),
     ):
         output = transform(data="private", prompt="summarize")
-    assert output == "Error: No generation route is configured"
+    assert output == "Error: No generation connection is configured"
     assert "private" not in output
 
 
@@ -206,12 +198,12 @@ def test_transform_file_does_not_write_on_generation_error(tmp_path: Path) -> No
     source.write_text("content")
     with patch(
         "ottools.ot_llm._transform_impl",
-        return_value=(False, "Error: route unavailable"),
+        return_value=(False, "Error: generation unavailable"),
     ):
         output = transform_file(
             prompt="transform",
             in_file=str(source),
             out_file=str(target),
         )
-    assert output == "Error: route unavailable"
+    assert output == "Error: generation unavailable"
     assert not target.exists()

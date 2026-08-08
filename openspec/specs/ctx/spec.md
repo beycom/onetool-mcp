@@ -267,55 +267,43 @@ content of a `json` or `yaml` handle and return the matched value.
 ### Requirement: Multi-question LLM Query
 
 The `ctx.ask()` function SHALL accept one or more questions about stored content,
-send them to the effective shared generation route in a single call, and return
-structured question/answer pairs mirroring the image ask interface.
+send them through the shared generation client in one call, and return
+structured question/answer pairs.
 
-#### Scenario: Single question string
+#### Scenario: Single question
+- **WHEN** `ctx.ask(h, q="What is the entry point?")` is called
+- **THEN** it SHALL return one matching question/answer pair
 
-- **WHEN** `ctx.ask(h, q="What is the recommended entry point?")` is called
-- **THEN** it SHALL return `{"handle": h, "result": [{"question": "What is the recommended entry point?", "answer": "<answer>"}]}`
+#### Scenario: Batch questions
+- **WHEN** `ctx.ask()` receives a list of questions
+- **THEN** it SHALL send them in a single generation call
+- **AND** result order SHALL match question order
 
-#### Scenario: Batch questions list
-
-- **WHEN** `ctx.ask(h, q=["What is the recommended entry point?", "What are common mistakes?"])` is called
-- **THEN** it SHALL send both questions in a single generation call
-- **AND** return `{"handle": h, "result": [{"question": "...", "answer": "..."}, {"question": "...", "answer": "..."}]}`
-- **AND** the order of results SHALL match the order of questions provided
-
-#### Scenario: Model override
-
-- **WHEN** `ctx.ask(h, q="...", model="sol")` is called
-- **THEN** it SHALL resolve `sol` from the shared model registry for that call
-- **AND** fall back through `tools.ot_context.llm` to top-level `llm` if `model=None`
+#### Scenario: Direct model override
+- **WHEN** `model="gpt-5.6-luna"` is supplied
+- **THEN** that direct ID SHALL be sent unchanged
+- **AND** omission SHALL fall through `tools.ot_context.model` to `llm.model`
 
 #### Scenario: Effort override
+- **WHEN** a canonical effort is supplied
+- **THEN** it SHALL override `tools.ot_context.effort` and `llm.effort`
 
-- **WHEN** `ctx.ask(h, q="...", effort="low")` is called
-- **THEN** it SHALL request low reasoning effort for that call
+#### Scenario: Backend-aware generation
+- **WHEN** `ctx.ask()` resolves a configured model
+- **THEN** it SHALL use the configured backend, interface, and named secret
 
-#### Scenario: CLIProxyAPI route
-
-- **WHEN** the effective generation backend is `cliproxy`
-- **THEN** `ctx.ask()` SHALL use the shared CLIProxyAPI service without requiring a provider API key
-
-#### Scenario: LLM service not configured
-
-- **WHEN** `ctx.ask(h, q="...")` is called and no valid generation route is configured
-- **THEN** it SHALL return `{"handle": h, "error": "<message explaining a generation route must be configured>"}`
-- **AND** it SHALL NOT raise an unhandled exception
+#### Scenario: Generation not configured
+- **WHEN** top-level `llm` is absent
+- **THEN** it SHALL return an actionable error object without an unhandled exception
 
 #### Scenario: Unknown handle
-
-- **WHEN** `ctx.ask("badhandle", q="...")` is called
-- **THEN** it SHALL return `{"handle": "badhandle", "error": "Handle not found: badhandle"}`
+- **WHEN** the handle does not exist
+- **THEN** it SHALL return `Handle not found` for that handle
 
 #### Scenario: Large content truncation
-
-- **GIVEN** a handle whose total content exceeds `ask_max_bytes`
-- **WHEN** `ctx.ask(h, q="...")` is called
-- **THEN** it SHALL send the first `ask_max_bytes` bytes of content to the model
-- **AND** the response SHALL include a `truncated: true` field
-- **AND** the response MAY include a `hint` suggesting `ctx.slice` to narrow scope before re-querying
+- **WHEN** stored content exceeds `ask_max_bytes`
+- **THEN** only the bounded prefix SHALL be sent
+- **AND** the result SHALL indicate truncation
 
 ### Requirement: Append Content
 

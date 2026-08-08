@@ -254,6 +254,14 @@ class EmbeddingClient:
             )
         return self._client
 
+    def close(self) -> None:
+        """Close the underlying HTTP client and clear cached vectors."""
+        client = self._client
+        self._client = None
+        self._cache.clear()
+        if client is not None:
+            client.close()
+
     def _effective_limit(self) -> int:
         return max(1, self._max_tokens - self._safety_margin)
 

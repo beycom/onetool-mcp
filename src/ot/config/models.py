@@ -15,16 +15,9 @@ from pydantic import (
     Field,
     PrivateAttr,
     field_validator,
-    model_validator,
 )
 
-from ot.config.routing import (
-    CodeConfig,
-    EmbeddingsConfig,
-    LlmConfig,
-    ModelEntryConfig,
-    validate_model_registry,
-)
+from ot.config.routing import EmbeddingsConfig, LlmConfig
 
 # ==================== Snippet Models ====================
 
@@ -594,18 +587,9 @@ class OneToolConfig(BaseModel):
         description="Shared environment variables for all MCP servers",
     )
 
-    models: dict[str, ModelEntryConfig] = Field(
-        default_factory=dict,
-        description="Generation-only model registry",
-    )
-
-    code: CodeConfig | None = Field(
-        default=None,
-        description="Typed Claude Code and Codex launcher configuration",
-    )
-
-    llm: LlmConfig | None = Field(
-        default=None, description="Explicit shared generation configuration"
+    llm: LlmConfig = Field(
+        default_factory=LlmConfig,
+        description="Shared backend-aware generation connection",
     )
 
     embeddings: EmbeddingsConfig | None = Field(
@@ -699,18 +683,6 @@ class OneToolConfig(BaseModel):
         which YAML parses as None instead of an empty dict.
         """
         return {} if v is None else v
-
-    @model_validator(mode="after")
-    def validate_routing_references(self) -> OneToolConfig:
-        """Validate generation model identities."""
-        validate_model_registry(models=self.models)
-        if (
-            self.llm is not None
-            and self.llm.backend == "cliproxy"
-            and (self.code is None or self.code.proxy is None)
-        ):
-            raise ValueError("llm.backend 'cliproxy' requires code.proxy")
-        return self
 
     def get_tool_files(self) -> list[Path]:
         """Get list of tool files matching configured glob patterns.

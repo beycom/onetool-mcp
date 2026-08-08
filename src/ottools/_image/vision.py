@@ -73,11 +73,10 @@ def call_vision(
     try:
         route = resolve_generation(
             config=root,
-            pack=config.llm,
+            pack_model=config.model,
+            pack_effort=config.effort,
             model=model,
             effort=effort,
-            required_modalities=frozenset({"text", "image"}),
-            structured_output=structured_output,
         )
         labelled_prompt = prompt
         if len(images) > 1:

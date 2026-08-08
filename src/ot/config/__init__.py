@@ -49,21 +49,7 @@ from ot.config.models import (
     SnippetDef,
     SnippetParam,
 )
-from ot.config.routing import (
-    ClaudeContextConfig,
-    CLIProxyGenerationConfig,
-    CodeConfig,
-    CodeDirectConfig,
-    CodeModelConfig,
-    CodeProxyConfig,
-    DirectCodexConfig,
-    EmbeddingsConfig,
-    GenerationSelection,
-    LlmConfig,
-    ModelEntryConfig,
-    OpenAICompatibleGenerationConfig,
-    PartialGenerationConfig,
-)
+from ot.config.routing import DirectModelId, EmbeddingsConfig, LlmConfig
 from ot.config.secrets import (
     expand_secrets,
     expand_vars,
@@ -87,21 +73,11 @@ def reset() -> None:
 
 
 __all__ = [
-    "CLIProxyGenerationConfig",
-    "ClaudeContextConfig",
-    "CodeConfig",
-    "CodeDirectConfig",
-    "CodeModelConfig",
-    "CodeProxyConfig",
-    "DirectCodexConfig",
+    "DirectModelId",
     "EmbeddingsConfig",
-    "GenerationSelection",
     "LlmConfig",
     "McpServerConfig",
-    "ModelEntryConfig",
     "OneToolConfig",
-    "OpenAICompatibleGenerationConfig",
-    "PartialGenerationConfig",
     "SecurityConfig",
     "SnippetDef",
     "SnippetParam",

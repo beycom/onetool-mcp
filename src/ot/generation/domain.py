@@ -1,4 +1,4 @@
-"""Immutable provider-neutral generation domain models."""
+"""Immutable provider-neutral values for shared generation."""
 
 from __future__ import annotations
 
@@ -7,9 +7,8 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ot.config.routing import (
+        GenerationBackend,
         GenerationInterface,
-        ModelModality,
-        ModelSource,
         ReasoningEffort,
         StructuredOutputMode,
     )
@@ -17,35 +16,28 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class ResolvedGeneration:
-    """One fully resolved and capability-checked generation route."""
+    """One fully resolved direct-model generation request target."""
 
-    backend: str
+    backend: GenerationBackend
     interface: GenerationInterface
-    shortcut: str
     model_id: str
-    request_model_id: str
-    source: ModelSource
     effort: ReasoningEffort | None
-    timeout: float
-    max_output_tokens: int | None
     base_url: str
     secret_name: str
+    timeout: float
+    max_output_tokens: int | None
 
 
 @dataclass(frozen=True, slots=True)
 class GenerationRequest:
-    """Narrow request surface accepted by the shared adapters."""
+    """Narrow request surface accepted by the generation adapters."""
 
     prompt: str
     system: str | None = None
     images: tuple[bytes, ...] = ()
     structured_output: StructuredOutputMode | None = None
     json_schema: dict[str, Any] | None = None
-
-    @property
-    def modalities(self) -> frozenset[ModelModality]:
-        """Return the input capabilities required by this request."""
-        return frozenset({"text", "image"} if self.images else {"text"})
+    max_output_tokens: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

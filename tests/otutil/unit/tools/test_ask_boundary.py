@@ -11,7 +11,7 @@ import pytest
 @pytest.mark.unit
 @pytest.mark.tools
 def test_mem_ask_routes_through_shared_generation_boundary() -> None:
-    """mem.ask sends stored content as untrusted data through the shared adapter."""
+    """mem.ask sends stored content as untrusted data through the shared client."""
     import importlib
 
     # The submodule name `ask` is shadowed by the exported `ask` function in the
@@ -22,7 +22,7 @@ def test_mem_ask_routes_through_shared_generation_boundary() -> None:
     mock_conn.execute.return_value.fetchone.return_value = (1, "t", "stored content")
 
     route = SimpleNamespace()
-    root = SimpleNamespace(code=None)
+    root = SimpleNamespace()
     generation = MagicMock(content="answer")
     with (
         patch.object(mem_ask, "_get_connection", return_value=mock_conn),
@@ -30,7 +30,7 @@ def test_mem_ask_routes_through_shared_generation_boundary() -> None:
         patch.object(
             mem_ask,
             "_get_config",
-            return_value=SimpleNamespace(llm=None),
+            return_value=SimpleNamespace(model=None, effort=None),
         ),
         patch.object(mem_ask, "resolve_generation", return_value=route),
         patch.object(mem_ask, "generate", return_value=generation) as generate,

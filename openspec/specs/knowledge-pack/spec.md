@@ -91,7 +91,7 @@ The `knowledge` pack SHALL read named database configurations from `onetool.yaml
 ---
 
 ### Requirement: kb.ask — Retrieval-augmented synthesis
-`kb.ask()` SHALL retrieve relevant chunks via `kb.search`, optionally re-rank them, optionally expand context with 1-hop graph neighbours, then synthesise an answer via `ot_llm` with source citations. The question-text parameter SHALL be named `query` (not `q`).
+`kb.ask()` SHALL retrieve relevant chunks via `kb.search`, optionally re-rank them, optionally expand context with 1-hop graph neighbours, then synthesise an answer through the shared generation client with source citations. The question-text parameter SHALL be named `query` (not `q`).
 
 #### Scenario: Answer is returned with citations
 - **WHEN** `kb.ask(query='How do I nudge objects?', db='docs')` is called
@@ -100,6 +100,12 @@ The `knowledge` pack SHALL read named database configurations from `onetool.yaml
 #### Scenario: Re-ranking is applied by default
 - **WHEN** `kb.ask(query='...', db='docs', rerank=True)` is called
 - **THEN** candidate chunks are re-ordered by relevance via a single batched LLM scoring call before synthesis
+
+#### Scenario: Re-ranking failure preserves retrieval results
+- **WHEN** the optional LLM re-ranking call fails
+- **THEN** `kb.ask()` SHALL retain the original retrieval order
+- **AND** it SHALL return a visible warning and continue through graph expansion and synthesis
+- **AND** it SHALL NOT retry through another interface, backend, model, or credential
 
 #### Scenario: Graph expansion adds neighbours
 - **WHEN** `kb.ask(query='...', db='docs', expand=True)` is called
@@ -338,10 +344,8 @@ Repeated query embeddings within a session SHALL be served from a short-lived in
 
 ### Requirement: Config schema — tools.knowledge
 The `onetool.yaml` `tools.knowledge` block SHALL support `kb` (map of project name
-to `KBProjectConfig`), `llm` (optional pack-level generation selection), `ask`
-(optional ask-operation generation selection), `rerank` (optional rerank-operation
-generation selection), `enrich` (optional enrichment generation selection),
-`enrich_prompt`, `enrich_batch_size`, `enrich_min_chars`, `enrich_max_chars`,
+to `KBProjectConfig`), optional pack-level `model` and `effort` generation
+overrides, `enrich_prompt`, `enrich_batch_size`, `enrich_min_chars`, `enrich_max_chars`,
 `min_chunk_chars`, `search_limit`, and `search_extract`. Embedding provider, model,
 endpoint, credentials, dimensions, batching, and token limits SHALL come from the
 independent top-level `embeddings` configuration.
@@ -367,10 +371,8 @@ first matching root is stripped from each chunk's canonical topic to derive the
 stored topic.
 
 Unknown fields in `tools.knowledge` and nested knowledge config models SHALL raise
-validation errors. Removed top-level keys such as `databases:`, `scrape:`,
-embedding `model:`, embedding `base_url:`, embedding `dimensions:`,
-`max_embedding_tokens:`, and `enrich_model:` SHALL be treated as unknown fields,
-with no compatibility migration path.
+validation errors. Provider connection fields SHALL not be accepted in the pack
+configuration.
 
 #### Scenario: KB project config resolves db path
 - **WHEN** `tools.knowledge.kb.rhino.db.path: scratch/rhino-db/rhino.db` is configured
@@ -403,7 +405,7 @@ with no compatibility migration path.
 - **WHEN** `tools.knowledge` has no `kb` key
 - **THEN** `kb.dbs()` returns an empty list and not an error
 
-#### Scenario: Removed databases/scrape keys raise validation error
+#### Scenario: Unsupported pack fields raise validation error
 - **WHEN** `tools.knowledge.databases`, `tools.knowledge.scrape`, `tools.knowledge.model`, `tools.knowledge.base_url`, `tools.knowledge.dimensions`, `tools.knowledge.max_embedding_tokens`, or `tools.knowledge.enrich_model` is set
 - **THEN** a validation error SHALL identify the extra input
 
@@ -413,8 +415,9 @@ with no compatibility migration path.
 - **AND** they SHALL NOT inherit from top-level `llm` or a knowledge generation selection
 
 #### Scenario: Generation selections fall through by scope
-- **WHEN** an ask, rerank, or enrich generation field is omitted at operation scope
-- **THEN** it SHALL fall through to `tools.knowledge.llm`, then top-level `llm`
+- **WHEN** a knowledge call omits model or effort overrides
+- **THEN** it SHALL fall through to `tools.knowledge.model` or `tools.knowledge.effort`, then top-level `llm`
+- **AND** separate ask, rerank, and enrich generation routes SHALL not exist
 
 #### Scenario: enrich_prompt overrides the built-in instruction
 - **WHEN** `tools.knowledge.enrich_prompt` is set to a custom instruction
@@ -735,7 +738,7 @@ Failures in the FTS or vector search lanes SHALL be logged and surfaced rather t
 ### Requirement: AI enrichment — kb enrich summary generation
 
 The CLI command `onetool kb enrich <db>` SHALL generate short document summaries
-through the effective shared generation route and write them to `chunks.summary`.
+through the shared generation client and write them to `chunks.summary`.
 Enrichment SHALL be CLI-only (no `kb.enrich()` pack tool, matching `kb index` /
 `kb reindex`) and SHALL never run implicitly from pack tool calls.
 
@@ -745,9 +748,10 @@ Selection semantics (making every run a backfill):
 - `--limit N`: cap the number of chunks processed in this run.
 
 Generation resolution SHALL use call-level `--model` and `--effort` overrides,
-then `tools.knowledge.enrich.llm`, `tools.knowledge.llm`, and top-level `llm`.
-The selected backend SHALL use only its own endpoint and named secret. Enrichment
-SHALL NOT read from or fall back to the independent embedding route.
+then `tools.knowledge.model` and `tools.knowledge.effort`, then top-level `llm`.
+The request SHALL use the configured generation backend, interface, and named
+secret. Enrichment SHALL NOT read from or fall back to the independent embedding
+route.
 
 Each summarisation request SHALL include a system message combining the untrusted-context boundary (as used by `kb.ask` rerank/synthesis) with the summarisation instruction, so indexed content cannot inject instructions. The instruction SHALL be overridable via `tools.knowledge.enrich_prompt` (empty = built-in default: 1–2 plain sentences, ~50 words max, no markdown).
 
@@ -770,21 +774,21 @@ Each summarisation request SHALL include a system message combining the untruste
 - **THEN** no LLM call is made for it, `summary` is set to `''` (deliberately-not-summarised marker), and it is counted as skipped
 - **AND** subsequent non-force runs do not reselect it
 
-#### Scenario: Missing named generation secret fails loudly
-- **WHEN** `onetool kb enrich docs` is run without the effective route's named secret
+#### Scenario: Missing generation secret fails loudly
+- **WHEN** `onetool kb enrich docs` is run without the configured generation secret
 - **THEN** the command reports an actionable error naming the missing secret, and no chunk is modified
 
 #### Scenario: Generation selection follows operation precedence
 - **WHEN** no call-level model or effort is supplied
-- **THEN** enrichment resolves `tools.knowledge.enrich.llm`, then `tools.knowledge.llm`, then top-level `llm`
+- **THEN** enrichment resolves `tools.knowledge.model` and `tools.knowledge.effort`, then top-level `llm`
 
 #### Scenario: CLI generation overrides
 - **WHEN** `onetool kb enrich docs --model sol --effort high` is run
-- **THEN** enrichment resolves `sol` from the shared registry and requests high effort for that invocation
+- **THEN** enrichment passes the opaque model ID `sol` unchanged and requests high effort for that invocation
 
 #### Scenario: System message carries the untrusted-context boundary
 - **WHEN** an enrichment LLM request is built
-- **THEN** its `messages` list includes a `system` role message instructing the model to treat the chunk content as untrusted data, not instructions
+- **THEN** its generation request includes system instructions that treat the chunk content as untrusted data, not instructions
 
 ---
 
@@ -891,7 +895,9 @@ Populated summaries SHALL be searchable and visible:
 
 ### Requirement: Canonical embedding vector serialization
 
-All embedding vectors written by the knowledge pack (chunk vectors in the `vec0` table and query vectors passed to sqlite-vec) SHALL be serialized as explicit little-endian float32 (`struct` format `<{n}f`) via the shared otpack serialization helper. No knowledge module SHALL pack vectors with native byte order.
+All embedding vectors written by the knowledge pack (chunk vectors in the `vec0`
+table and query vectors passed to sqlite-vec) SHALL be serialized as explicit
+little-endian float32 (`struct` format `<{n}f`).
 
 Existing databases indexed by earlier versions on little-endian platforms SHALL remain readable without reindexing, because native and little-endian float32 encodings are byte-identical there. For a database written on a big-endian host (unsupported), `kb reindex` SHALL regenerate all vectors in canonical form.
 
@@ -909,24 +915,24 @@ Existing databases indexed by earlier versions on little-endian platforms SHALL 
 
 ### Requirement: Knowledge generation routing and controls
 
-Knowledge enrichment, reranking, and answer synthesis SHALL use their effective
-shared generation selections. Network-backed knowledge operations SHALL accept
+Knowledge enrichment, reranking, and answer synthesis SHALL use the shared
+generation client and the same pack-level generation selection. Network-backed knowledge operations SHALL accept
 optional model and effort overrides at their public call boundary where the caller
 controls generation.
 
-#### Scenario: Ask uses operation routes
+#### Scenario: Ask uses one pack selection
 - **WHEN** `kb.ask()` performs reranking and synthesis
-- **THEN** each stage SHALL use its configured operation selection or the documented fallback scope
+- **THEN** both stages SHALL resolve call overrides, then `tools.knowledge.model` and `tools.knowledge.effort`, then top-level `llm`
 
 #### Scenario: Ask model and effort override
 - **WHEN** `kb.ask()` is called with `model="sol"` and `effort="high"`
 - **THEN** both reranking and synthesis SHALL resolve `sol` and request high effort
-- **AND** those per-call values SHALL override configured rerank and ask operation selections for that call
+- **AND** those per-call values SHALL override the pack selection for that call
 
-#### Scenario: Enrichment uses CLIProxyAPI
-- **WHEN** the effective enrichment backend is `cliproxy`
-- **THEN** `kb enrich` SHALL use the shared CLIProxyAPI service without requiring a provider API key
+#### Scenario: Enrichment uses the configured generation route
+- **WHEN** `kb enrich` generates a summary
+- **THEN** it SHALL use the configured backend, interface, and named credential
 
 #### Scenario: Embedding route is not reused for generation
-- **WHEN** embeddings and knowledge generation use different backends
+- **WHEN** embeddings and knowledge generation are both configured
 - **THEN** reranking, synthesis, and enrichment SHALL NOT use the embedding endpoint or credential

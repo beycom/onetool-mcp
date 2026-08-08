@@ -3,6 +3,7 @@
 Populates `chunks.summary` with short LLM-generated summaries. Select-missing
 semantics make every run a backfill; `force=True` re-summarises everything.
 """
+
 from __future__ import annotations
 
 import time
@@ -41,11 +42,13 @@ _DEFAULT_ENRICH_PROMPT = (
 # helper because _embed_batch_with_retry is embeddings-specific (design D4).
 _RETRYABLE_HTTP_STATUS = {429, 500, 503}
 _ENRICH_MAX_ATTEMPTS = 3
+_MAX_SUMMARY_TOKENS = 120
 # Abort after this many consecutive failures — an outage, not a content
 # problem (same value as indexer._FALLBACK_ABORT_AFTER).
 _CONSECUTIVE_ABORT_AFTER = 5
 # SQLite host-parameter safety: chunk `id IN (...)` selections.
 _IDS_CHUNK_SIZE = 500
+
 
 @dataclass
 class EnrichResult:
@@ -72,7 +75,9 @@ def _select_chunks(
         for i in range(0, len(ids), _IDS_CHUNK_SIZE):
             sub = ids[i : i + _IDS_CHUNK_SIZE]
             placeholders = ", ".join("?" for _ in sub)
-            rows.extend(conn.execute(f"{base} AND id IN ({placeholders})", sub).fetchall())
+            rows.extend(
+                conn.execute(f"{base} AND id IN ({placeholders})", sub).fetchall()
+            )
         rows.sort(key=lambda row: row[1])
         return rows[:limit] if limit is not None else rows
 
@@ -98,20 +103,27 @@ def _summarise_with_retry(
             config = _get_config()
             route = resolve_generation(
                 config=root,
-                pack=config.llm,
-                operation=config.enrich.llm,
+                pack_model=config.model,
+                pack_effort=config.effort,
                 model=model,
                 effort=effort,
             )
             response = generate(
                 route=route,
-                request=GenerationRequest(system=system, prompt=user),
+                request=GenerationRequest(
+                    system=system,
+                    prompt=user,
+                    max_output_tokens=_MAX_SUMMARY_TOKENS,
+                ),
                 secret_resolver=get_secret,
             )
             return response.content.strip()
         except GenerationError as e:
             status = e.status_code
-            if status not in _RETRYABLE_HTTP_STATUS or attempt == _ENRICH_MAX_ATTEMPTS - 1:
+            if (
+                status not in _RETRYABLE_HTTP_STATUS
+                or attempt == _ENRICH_MAX_ATTEMPTS - 1
+            ):
                 raise
             wait = 2.0**attempt
             logger.warning(
@@ -186,7 +198,10 @@ def enrich_db(
                     )
                     if not summary:
                         raise ValueError("empty LLM response")
-                    conn.execute("UPDATE chunks SET summary = ? WHERE id = ?", [summary, chunk_id])
+                    conn.execute(
+                        "UPDATE chunks SET summary = ? WHERE id = ?",
+                        [summary, chunk_id],
+                    )
                     result.enriched += 1
                     uncommitted += 1
                     consecutive_failures = 0

@@ -34,42 +34,40 @@ Short alias: `img`
 | `q` | str \| list[str] | Question(s) to ask. Multiple questions are batched into one model call |
 | `img` (in `ask()`) | str \| list[str] | Image reference or list of references (max 8) — a list sends all images in one call for comparison questions; response carries `handles` instead of `handle` |
 | `max_edge` | int | Max longest edge in pixels for in-memory model resize. Default: `1568` |
-| `model` | str \| null | Per-call shortcut or full model id for generation-backed functions |
+| `model` | str \| null | Direct model ID override |
 | `effort` | str \| null | Per-call `low`, `medium`, or `high` effort |
 | `all` | bool | `purge(all=True)` deletes all images regardless of age |
 | `minutes` | int | `purge(minutes=N)` deletes images older than N minutes. Default: `15` |
 
 ## Requires
 
-- An effective generation route whose selected model declares image input support
-- The named secret required by that route; CLIProxyAPI routes use the configured
-  inference-client secret
+- Top-level backend-aware `llm` generation configuration
+- The resolved connection secret in the server's `secrets.yaml`
 
 ## Configuration
 
 ### Required
 
-- Generation-backed functions require a complete top-level `llm`, or a complete
-  `tools.ot_image.llm`.
+- Generation-backed functions require top-level `llm`.
 
 ### Optional
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `tools.ot_image.llm` | generation selection \| null | `null` | Pack model/effort/timeout/output overrides, or a complete backend switch |
+| `tools.ot_image.model` | str \| null | `null` | Direct model override |
+| `tools.ot_image.effort` | str \| null | `null` | `low`, `medium`, or `high` effort override |
 | `tools.ot_image.max_edge` | int | `1568` | Maximum longest edge (pixels) for model-upload resize |
 | `tools.ot_image.session_cache_size` | int | `10` | In-memory LRU cache cap (number of images) |
 
 ```yaml
 llm:
   backend: cliproxy
-  interface: responses
-  model: luna
+  model: gpt-5.6-luna
 
 tools:
   ot_image:
-    llm:
-      model: terra
+    model: gpt-5.6-terra
+    effort: low
     max_edge: 1568
     session_cache_size: 10
 ```
@@ -77,11 +75,14 @@ tools:
 ### Defaults
 
 - If `tools.ot_image` is omitted, non-generation functions still work.
-- Generation selection precedence is call, pack, top-level, then model default.
+- Model and effort precedence is call, pack, then top-level.
+- Automatic summary generation on `load()` is opt-in through an explicit
+  `tools.ot_image.model`. It runs asynchronously with at most two concurrent
+  requests; additional loads skip automatic summary generation.
 - A cached `summary()` returns without route or secret resolution; model and effort
   changes do not invalidate it.
-- The selected model must advertise image capability and any required structured
-  output mode before network I/O.
+- The configured service or selected model returns the authoritative error if image or
+  structured output is unsupported.
 
 ## Examples
 

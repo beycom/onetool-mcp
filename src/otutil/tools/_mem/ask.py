@@ -1,4 +1,5 @@
 """LLM synthesis over memories."""
+
 from __future__ import annotations
 
 import re
@@ -55,13 +56,13 @@ def ask(
     Multiple questions are batched into a single model call and answers
     are returned in the same order.
 
-    Requires an effective shared generation route.
+    Requires the shared generation connection and an effective model.
 
     Args:
         topic: Exact topic path to read
         q: Question string or list of question strings
         id: Optional memory ID for direct lookup (overrides topic match)
-        model: LLM model override; falls back to the effective route
+        model: Direct model override; falls back to pack then root configuration
         effort: Reasoning effort override: ``low``, ``medium``, or ``high``
 
     Returns:
@@ -117,9 +118,11 @@ def ask(
 
         try:
             root = get_config()
+            pack_config = _get_config()
             route = resolve_generation(
                 config=root,
-                pack=_get_config().llm,
+                pack_model=pack_config.model,
+                pack_effort=pack_config.effort,
                 model=model,
                 effort=effort,
             )
@@ -136,7 +139,7 @@ def ask(
             )
             raw = result.content
         except GenerationError as exc:
-            err = f"Generation route unavailable: {exc}"
+            err = f"Generation unavailable: {exc}"
             s.add(error=err)
             return {"topic": label, "error": err}
 
@@ -145,7 +148,10 @@ def ask(
         else:
             answers = _parse_numbered_answers(raw, len(questions))
 
-        pairs = [{"question": qs, "answer": a} for qs, a in zip(questions, answers, strict=False)]
+        pairs = [
+            {"question": qs, "answer": a}
+            for qs, a in zip(questions, answers, strict=False)
+        ]
         s.add(questionCount=len(questions))
         return {"topic": row[1], "result": pairs}
 

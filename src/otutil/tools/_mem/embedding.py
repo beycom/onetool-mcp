@@ -57,7 +57,8 @@ def _get_embedding_client() -> EmbeddingClient:
     )
     with _client_lock:
         if _client is None or _client_key != key:
-            _client = EmbeddingClient(
+            previous = _client
+            replacement = EmbeddingClient(
                 api_key=api_key,
                 model=embedding.model,
                 base_url=embedding.base_url,
@@ -66,8 +67,22 @@ def _get_embedding_client() -> EmbeddingClient:
                 timeout=embedding.timeout,
                 log_prefix="mem",
             )
+            _client = replacement
             _client_key = key
+            if previous is not None:
+                previous.close()
         return _client
+
+
+def reset_embedding_client() -> None:
+    """Close and forget the process-cached embedding client."""
+    global _client, _client_key
+    with _client_lock:
+        client = _client
+        _client = None
+        _client_key = None
+        if client is not None:
+            client.close()
 
 
 def _generate_embedding(text: str) -> list[float]:
@@ -219,4 +234,5 @@ __all__ = [
     "_generate_query_embedding",
     "_get_embedding_client",
     "_process_embedding_job",
+    "reset_embedding_client",
 ]

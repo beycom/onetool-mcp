@@ -1,4 +1,5 @@
 """Pack configuration and path validation for mem."""
+
 from __future__ import annotations
 
 import builtins
@@ -6,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ot.config.routing import GenerationSelection  # noqa: TC001 - Pydantic resolves it
+from ot.config.routing import DirectModelId, ReasoningEffort  # noqa: TC001
 from ot.logging.redact import SECRET_PATTERNS as _BUILTIN_REDACTION_PATTERNS
 from otpack import DEFAULT_EXCLUDE_PATTERNS, get_tool_config, validate_path
 
@@ -28,9 +29,11 @@ class Config(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    llm: GenerationSelection | None = Field(
-        default=None,
-        description="Pack-level shared generation overrides for mem.ask",
+    model: DirectModelId | None = Field(
+        default=None, description="Direct model override"
+    )
+    effort: ReasoningEffort | None = Field(
+        default=None, description="Reasoning effort override"
     )
     db_path: str = Field(
         default="data/mem/default.db",

@@ -627,19 +627,19 @@ def get_compact_max_length() -> int:
     return 120
 
 
-def get_llm_config() -> LlmConfig | None:
+def get_llm_config() -> LlmConfig:
     """Get the top-level llm: config section.
 
-    Returns the explicit generation route from the root ``llm:`` key.
+    Returns the resolved generation connection from the root ``llm:`` key.
 
     Returns:
-        Configured generation backend, or ``None``.
+        Configured generation connection with OpenAI-compatible defaults.
     """
     return get_config().llm
 
 
 def get_embeddings_config() -> EmbeddingsConfig | None:
-    """Return the independent embedding route, or ``None`` when omitted."""
+    """Return the explicit independent embedding configuration, if present."""
     return get_config().embeddings
 
 

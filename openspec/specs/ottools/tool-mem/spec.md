@@ -565,10 +565,10 @@ from generation or pack-level provider configuration. Pack-level
 - **THEN** it SHALL fail with an actionable embedding-configuration error
 - **AND** it SHALL NOT send an embedding request to CLIProxyAPI or a generation endpoint
 
-#### Scenario: Removed mem embedding provider fields are rejected
+#### Scenario: Pack provider fields are rejected
 - **GIVEN** `tools.mem.model`, `tools.mem.base_url`, `tools.mem.dimensions`, or `tools.mem.max_embedding_tokens` is configured
 - **WHEN** OneTool loads mem configuration
-- **THEN** strict validation SHALL reject each removed field as an extra input
+- **THEN** strict validation SHALL reject each field as an extra input
 - **AND** OneTool SHALL NOT interpret it as an override or alias for top-level `embeddings`
 
 #### Scenario: Embedding calls do not hold the DB lock
@@ -752,13 +752,13 @@ The `mem.slice_batch()` function SHALL extract sections from multiple memories i
 ### Requirement: LLM Q&A (mem.ask)
 
 The `mem.ask()` function SHALL synthesise an answer from a memory's content using
-the effective shared generation route and SHALL accept optional `model` and
+the shared generation client and SHALL accept optional `model` and
 `effort` arguments.
 
 #### Scenario: Single question
 - **GIVEN** a topic that exists
 - **WHEN** `mem.ask(topic="projects/onetool/rules", q="What are the rules?")` is called
-- **THEN** it SHALL retrieve the memory content and pass it to the effective generation route with the question
+- **THEN** it SHALL retrieve the memory content and pass it to the shared generation client with the question
 - **AND** return a synthesised answer
 
 #### Scenario: Multiple questions
@@ -769,7 +769,7 @@ the effective shared generation route and SHALL accept optional `model` and
 #### Scenario: Model and effort override
 - **GIVEN** a topic that exists
 - **WHEN** `mem.ask(topic="...", q="...", model="luna", effort="medium")` is called
-- **THEN** it SHALL resolve `luna` from the shared registry and request medium effort for that call
+- **THEN** it SHALL pass the opaque model ID `luna` unchanged and request medium effort for that call
 
 #### Scenario: Topic does not exist
 - **GIVEN** a topic that does not exist in the database
@@ -777,14 +777,14 @@ the effective shared generation route and SHALL accept optional `model` and
 - **THEN** it SHALL raise with a clear "not found" error
 
 #### Scenario: LLM not configured
-- **GIVEN** no valid generation route or effective model is configured
+- **GIVEN** no generation connection or effective model is configured
 - **WHEN** `mem.ask()` is called
 - **THEN** it SHALL raise with a clear message identifying the missing generation setting
 
-#### Scenario: CLIProxyAPI generation is independent of embeddings
-- **GIVEN** `mem.ask` uses CLIProxyAPI and embeddings are disabled or use a different provider
+#### Scenario: Generation is independent of explicit embeddings
+- **GIVEN** `mem.ask` and embeddings use different configured connections
 - **WHEN** `mem.ask()` is called
-- **THEN** generation SHALL use CLIProxyAPI without reading or changing the embedding route
+- **THEN** generation SHALL use its resolved route without reading or changing the embedding route
 
 ### Requirement: Memory Inspect (mem.inspect)
 
@@ -1086,7 +1086,11 @@ Query embeddings generated for `mem.search()` semantic and hybrid modes SHALL be
 
 ### Requirement: Canonical embedding vector serialization
 
-All embedding vectors stored by the mem pack SHALL be serialized as explicit little-endian float32 (`struct` format `<{n}f`) via the shared otpack serialization helper, and the `cosine_similarity` SQLite function SHALL interpret blobs in the same encoding. Existing stores (already written little-endian) SHALL remain readable without migration; `mem.reindex(dry_run=False)` SHALL regenerate all vectors in canonical form.
+All embedding vectors stored by the mem pack SHALL be serialized as explicit
+little-endian float32 (`struct` format `<{n}f`), and semantic similarity SHALL
+interpret blobs in the same encoding. Existing little-endian stores SHALL remain
+readable; `mem.reindex(dry_run=False)` SHALL regenerate all vectors in canonical
+form.
 
 #### Scenario: Stored vectors are little-endian
 - **WHEN** any operation stores an embedding

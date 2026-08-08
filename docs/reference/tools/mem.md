@@ -233,7 +233,7 @@ Extract sections from multiple memories in a single call.
 ## Requires
 
 - The independent embedding route's named secret when `embeddings_enabled: true`
-- An effective generation route and its named secret for `mem.ask()`
+- Top-level `llm` and its resolved named secret for `mem.ask()`
 - SQLite (Python stdlib `sqlite3`)
 - tiktoken (bundled with OneTool)
 
@@ -242,7 +242,7 @@ Extract sections from multiple memories in a single call.
 ### Required
 
 - No required `tools.mem` settings.
-- `mem.ask()` requires an effective generation route.
+- `mem.ask()` requires top-level `llm` and its resolved named secret.
 - `embeddings_enabled: true` requires the independent top-level `embeddings` route
   and its named secret.
 
@@ -250,7 +250,8 @@ Extract sections from multiple memories in a single call.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `tools.mem.llm` | generation selection \| null | `null` | Pack generation overrides for `mem.ask()` |
+| `tools.mem.model` | str \| null | `null` | Direct model override for `mem.ask()` |
+| `tools.mem.effort` | str \| null | `null` | Reasoning effort override |
 | `tools.mem.db_path` | string | `data/mem/default.db` | SQLite database path, relative to the OneTool directory. |
 | `tools.mem.search_limit` | int | `10` | Default max search results. Range: `1-100`. |
 | `tools.mem.search_extract` | int | `200` | Default extract length in chars. `0` means full content. |
@@ -277,8 +278,8 @@ embeddings:
 tools:
   mem:
     db_path: data/mem/default.db
-    llm:
-      model: luna
+    model: gpt-5.6-luna
+    effort: low
     search_limit: 10
     search_extract: 200
     redaction_enabled: true

@@ -45,7 +45,7 @@ Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis.
 
 ## Requires
 
-- An effective generation route for `knowledge.ask()` and `kb enrich`
+- Top-level `llm` and its resolved named secret for `knowledge.ask()` and `kb enrich`
 - The independent top-level `embeddings` route for projects with embeddings enabled
 - `onetool-mcp[util]` extra (provides `sqlite-vec` and `python-frontmatter`)
 
@@ -53,16 +53,15 @@ Portable SQLite knowledge bases with hybrid FTS5+vector search and AI synthesis.
 
 ### Required
 
-- Configure each enabled network operation's route and named secret.
+- Configure top-level `llm` for generation and top-level `embeddings` only when
+  embedding-backed operations are enabled.
 
 ### Optional
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `tools.knowledge.llm` | generation selection \| null | `null` | Pack generation overrides |
-| `tools.knowledge.ask.llm` | generation selection \| null | `null` | Answer synthesis overrides |
-| `tools.knowledge.rerank.llm` | generation selection \| null | `null` | Reranking overrides |
-| `tools.knowledge.enrich.llm` | generation selection \| null | `null` | Enrichment overrides |
+| `tools.knowledge.model` | str \| null | `null` | Direct model override for reranking, synthesis, and enrichment |
+| `tools.knowledge.effort` | str \| null | `null` | Shared reasoning effort override |
 | `tools.knowledge.search_limit` | int | `10` | Default max search results. Range: `1-100`. |
 | `tools.knowledge.search_extract` | int | `300` | Character limit for content extract in search results (`0` = full). |
 | `tools.knowledge.enrich_prompt` | string | `""` | Custom summarisation instruction for `kb enrich`. Empty = built-in default. |
@@ -86,17 +85,8 @@ embeddings:
 
 tools:
   knowledge:
-    llm:
-      model: luna
-    rerank:
-      llm:
-        effort: low
-    ask:
-      llm:
-        effort: medium
-    enrich:
-      llm:
-        model: sol
+    model: gpt-5.6-luna
+    effort: low
     search_limit: 10
     search_extract: 300
     min_chunk_chars: 200
@@ -116,7 +106,7 @@ tools:
 
 ### Defaults
 
-- Generation precedence is call, operation, pack, top-level, then model default.
+- Model and effort precedence is call, pack, then top-level.
 - `knowledge.ask()` call-level model and effort values override both reranking and
   synthesis.
 - Embedding settings come only from top-level `embeddings`; they never inherit from
@@ -213,7 +203,7 @@ onetool kb index docs --overwrite update --enrich --enrich-model sol --enrich-ef
 
 Generate short LLM summaries for chunks missing them (backfill). Summaries are shown
 in `knowledge.search()` results and matched by keyword search. The operation uses the
-effective `tools.knowledge.enrich.llm` route. Content changes (re-index, `kb.update`,
+effective knowledge pack or top-level generation selection. Content changes (re-index, `kb.update`,
 `kb.append`) clear affected summaries so the next run regenerates them.
 
 ```bash

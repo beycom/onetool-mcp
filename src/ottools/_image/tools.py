@@ -36,15 +36,23 @@ from .vision import ask_questions, extract_summary
 if TYPE_CHECKING:
     from ot.config.routing import ReasoningEffort
 
+    from .config import Config
 
-def _background_summarise(handle_name: str, model_bytes: bytes) -> None:
+_BACKGROUND_SUMMARY_LIMIT = 2
+_background_summary_slots = threading.BoundedSemaphore(_BACKGROUND_SUMMARY_LIMIT)
+
+
+def _background_summarise(
+    handle_name: str,
+    model_bytes: bytes,
+    config: Config,
+) -> None:
     """Run extract_summary() and persist the result — called in a daemon thread.
 
     Silently skips if the vision model is not configured or if the call fails.
     Does not modify load() return value.
     """
     try:
-        config = get_image_config()
         result = extract_summary(model_bytes, config)
         if isinstance(result, dict):
             save_summary(handle_name, result)
@@ -63,6 +71,47 @@ def _background_summarise(handle_name: str, model_bytes: bytes) -> None:
                 errorType=type(exc).__name__,
             )
         )
+
+
+def _run_background_summary(
+    handle_name: str,
+    model_bytes: bytes,
+    config: Config,
+) -> None:
+    """Run one scheduled summary and always return its worker slot."""
+    try:
+        _background_summarise(handle_name, model_bytes, config)
+    finally:
+        _background_summary_slots.release()
+
+
+def _schedule_background_summary(
+    *,
+    handle_name: str,
+    model_bytes: bytes,
+    config: Config,
+) -> None:
+    """Start an explicitly configured summary within the fixed worker bound."""
+    if config.model is None:
+        return
+    if not _background_summary_slots.acquire(blocking=False):
+        logger.debug(
+            LogEntry(
+                event="ot_image.background_summary.saturated",
+                handle=handle_name,
+                workerLimit=_BACKGROUND_SUMMARY_LIMIT,
+            )
+        )
+        return
+    try:
+        threading.Thread(
+            target=_run_background_summary,
+            args=(handle_name, model_bytes, config),
+            daemon=True,
+        ).start()
+    except Exception:
+        _background_summary_slots.release()
+        raise
 
 
 def _sha256(data: bytes) -> str:
@@ -275,13 +324,11 @@ def load(*, img: str, handle: str | None = None, max_edge: int = 1568) -> dict[s
         save_image(raw_bytes, handle_name, image_meta, fmt=detected_format)
         cache_put(handle_name, prep.model_bytes)
 
-        # Spawn background summary — silently skipped if model not set
-        thread = threading.Thread(
-            target=_background_summarise,
-            args=(handle_name, prep.model_bytes),
-            daemon=True,
+        _schedule_background_summary(
+            handle_name=handle_name,
+            model_bytes=prep.model_bytes,
+            config=get_image_config(),
         )
-        thread.start()
 
         s.add(
             handle=handle_name,
@@ -364,7 +411,7 @@ def ask(
             ``"clip"``. Sources not already in session are auto-loaded.
         q: Question string or list of question strings.
         max_edge: Maximum longest edge for resize if an image is loaded fresh.
-        model: Model shortcut, concrete ID, or proxy alias override.
+        model: Direct model ID override.
         effort: Reasoning effort override: ``low``, ``medium``, or ``high``.
 
     Returns:
@@ -458,7 +505,7 @@ def summary(
 
     Args:
         img: Handle reference (``"#name"``), file path, URL, or ``"clip"``.
-        model: Model shortcut, concrete ID, or proxy alias override.
+        model: Direct model ID override.
         effort: Reasoning effort override: ``low``, ``medium``, or ``high``.
 
     Returns:
@@ -536,7 +583,7 @@ def clip_ask(
     Args:
         q: Question string or list of question strings.
         max_edge: Maximum longest edge for resize.
-        model: Model shortcut, concrete ID, or proxy alias override.
+        model: Direct model ID override.
         effort: Reasoning effort override: ``low``, ``medium``, or ``high``.
 
     Returns:
@@ -564,7 +611,7 @@ def clip_view(
     Shorthand for ``summary(img="clip")``.
 
     Args:
-        model: Model shortcut, concrete ID, or proxy alias override.
+        model: Direct model ID override.
         effort: Reasoning effort override: ``low``, ``medium``, or ``high``.
 
     Returns:

@@ -2,94 +2,78 @@
 
 ## Purpose
 
-Defines OneTool's inference-only connection to an independently installed,
-configured, authenticated, and running CLIProxyAPI service.
-
+Defines the separate, inference-only boundaries used by standalone harness
+launchers and MCP generation with an independently managed CLIProxyAPI service.
 ## Requirements
-
 ### Requirement: External inference connection
 
-OneTool SHALL configure only the HTTP inference boundary: base URL, named
-inference-client secret, and bounded timeouts.
+OneTool SHALL use only CLIProxyAPI's public HTTP inference boundary when the
+service is explicitly selected. Standalone launchers SHALL read the proxy origin
+and inference credential only from their process environment. MCP generation
+SHALL read its versioned API base and direct default model from an explicit
+`llm.backend: cliproxy` connection and the fixed credential from `secrets.yaml`.
 
-#### Scenario: Connection defaults
-- **WHEN** optional connection fields are omitted
-- **THEN** OneTool SHALL use the documented loopback URL, secret name, and bounded
-  timeout defaults
+#### Scenario: Launcher defaults
+- **WHEN** `CLIPROXY_BASE_URL` is omitted from a launcher process
+- **THEN** OneTool SHALL use `http://127.0.0.1:8317`
+- **AND** it SHALL require `CLIPROXY_INFERENCE_KEY` from that process environment
 
-#### Scenario: No management ownership
-- **WHEN** the connection is used
-- **THEN** OneTool SHALL NOT require or call management APIs
-- **AND** it SHALL NOT install, configure, start, stop, restart, authenticate, or
-  administer CLIProxyAPI
+#### Scenario: MCP CLIProxy defaults
+- **WHEN** top-level `llm.backend` is `cliproxy` and optional connection fields are omitted
+- **THEN** OneTool SHALL use the documented loopback `/v1` base and bounded defaults
+- **AND** it SHALL resolve only `CLIPROXY_INFERENCE_KEY` from `secrets.yaml`
 
-#### Scenario: No CLIProxyAPI file dependency
-- **WHEN** OneTool loads or launches code routing
-- **THEN** it SHALL NOT require a CLIProxyAPI config path
-- **AND** it SHALL NOT read or mutate proxy YAML, OAuth files, accounts, logs,
-  retries, routing policy, or process state
+#### Scenario: MCP does not select CLIProxy implicitly
+- **WHEN** top-level `llm.backend` is omitted
+- **THEN** MCP generation SHALL use the OpenAI-compatible default
+- **AND** it SHALL not contact CLIProxyAPI
+
+#### Scenario: Configuration boundaries remain separate
+- **WHEN** a standalone launcher runs
+- **THEN** it SHALL not load `onetool.yaml` or `secrets.yaml`
+- **AND** MCP generation SHALL not read the launcher's environment configuration
+
+#### Scenario: No management or file ownership
+- **WHEN** either CLIProxyAPI connection is used
+- **THEN** OneTool SHALL NOT call management APIs or manage the proxy lifecycle
+- **AND** it SHALL NOT read or mutate CLIProxyAPI configuration, OAuth, account, log, or routing files
 
 ### Requirement: Launch and discovery are separate
 
-Normal launch, dry run, status, model listing, and generation SHALL not require
-live model discovery.
+Harness launches and MCP generation SHALL not require model discovery. Discovery
+SHALL occur only through `onetool code models`.
 
-#### Scenario: Normal launch
-- **WHEN** a configured launcher model is selected
-- **THEN** OneTool SHALL pass its exact effective id to the process without calling
-  `GET /v1/models`
+#### Scenario: Direct launch or generation
+- **WHEN** a launcher or generation operation receives a direct model ID
+- **THEN** OneTool SHALL send it unchanged without calling `GET /v1/models`
 
-#### Scenario: Generation request
-- **WHEN** a configured generation model selects CLIProxyAPI
-- **THEN** OneTool SHALL send its configured proxy wire identity without calling
-  `GET /v1/models`
-
-#### Scenario: Explicit doctor
-- **WHEN** `onetool code doctor` runs with configured proxy routes and secret
+#### Scenario: Explicit model listing
+- **WHEN** `onetool code models` runs with a valid environment credential
 - **THEN** it SHALL call `GET /v1/models` exactly once
-- **AND** it SHALL compare each configured proxy launcher id exactly against that
-  one bounded inventory
+- **AND** it SHALL return the direct IDs from that bounded inventory
 
-#### Scenario: Direct-only doctor
-- **WHEN** `onetool code doctor` runs without configured proxy routes
-- **THEN** it SHALL not resolve a proxy secret or call `GET /v1/models`
-
-#### Scenario: Diagnostic mismatch
-- **WHEN** the inventory omits an id or advertises it more than once
-- **THEN** doctor SHALL fail that record with an actionable redacted result
-- **AND** it SHALL NOT translate, substitute, or rewrite the id
-
-#### Scenario: Invalid diagnostic response
+#### Scenario: Invalid discovery response
 - **WHEN** discovery times out, exceeds its body limit, or returns an invalid shape
-- **THEN** doctor SHALL report a bounded redacted failure
+- **THEN** OneTool SHALL report a bounded redacted failure
 
 ### Requirement: Inference credential safety
 
-The configured inference key SHALL remain within OneTool's named-secret boundary.
+Both CLIProxy consumers SHALL use the fixed name `CLIPROXY_INFERENCE_KEY` through
+their separate configuration boundaries.
 
-#### Scenario: Secret use
-- **WHEN** a proxy child invocation, generation call, or doctor requires the secret
-- **THEN** only the configured secret name SHALL be resolved
-- **AND** its value SHALL never appear in summaries, dry runs, logs, errors, or
-  generated files
+#### Scenario: Launcher secret use
+- **WHEN** a launcher or launcher inventory request requires authentication
+- **THEN** only the process environment value SHALL be used
 
-### Requirement: Shared generation connection
+#### Scenario: MCP secret use
+- **WHEN** MCP generation explicitly selects CLIProxyAPI
+- **THEN** only the `secrets.yaml` value SHALL be used
+- **AND** no configurable generation secret name SHALL be accepted
 
-Generation routes that explicitly select the `cliproxy` backend SHALL reuse the
-optional `code.proxy` connection fields without coupling launcher models to the
-top-level generation registry.
+#### Scenario: Secret redaction
+- **WHEN** either consumer uses its credential
+- **THEN** the value SHALL never appear in argv, output, logs, errors, or generated files
 
-#### Scenario: Generation alias remains generation-only
-- **WHEN** a top-level generation model defines `proxy_alias`
-- **THEN** generation SHALL use that exact configured value as the proxy-facing
-  wire identity
-- **AND** the code launcher SHALL ignore the top-level record completely
-
-#### Scenario: Missing proxy connection
-- **WHEN** top-level `llm.backend` uses `cliproxy` without `code.proxy`
-- **THEN** strict configuration validation SHALL reject the configuration
-
-#### Scenario: Nested route lacks proxy connection
-- **WHEN** a complete nested pack or operation selection uses `cliproxy` without
-  `code.proxy`
-- **THEN** effective-route resolution SHALL fail before network I/O
+#### Scenario: Missing secret
+- **WHEN** the applicable credential is absent or empty
+- **THEN** the operation SHALL fail before a child starts or network I/O occurs

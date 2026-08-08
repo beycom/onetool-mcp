@@ -98,21 +98,22 @@ class TestImageConfig:
         config = get_image_config()
         assert config.max_edge == 1568
         assert config.session_cache_size == 10
-        assert config.llm is None
+        assert config.model is None
+        assert config.effort is None
 
     def test_partial_generation_selection(self) -> None:
         from ottools._image.config import Config
 
-        config = Config.model_validate({"llm": {"model": "terra", "effort": "high"}})
-        assert config.llm is not None
-        assert config.llm.model == "terra"
+        config = Config.model_validate({"model": "gpt-5.6-terra", "effort": "high"})
+        assert config.model == "gpt-5.6-terra"
+        assert config.effort == "high"
 
     def test_removed_provider_fields_are_rejected(self) -> None:
         from pydantic import ValidationError
 
         from ottools._image.config import Config
 
-        for key in ("model", "base_url"):
+        for key in ("llm", "base_url"):
             with pytest.raises(ValidationError, match="extra_forbidden"):
                 Config.model_validate({key: "removed"})
 
@@ -604,7 +605,7 @@ class TestVision:
         from ottools._image.config import Config
 
         defaults = {
-            "llm": {"model": "test-gemini"},
+            "model": "test-gemini",
             "max_edge": 1568,
             "session_cache_size": 10,
         }
@@ -614,14 +615,14 @@ class TestVision:
     def test_vision_not_configured_returns_error(self) -> None:
         from ottools._image.vision import call_vision
 
-        config = self._make_config(llm=None)
+        config = self._make_config(model=None)
         with patch(
             "ottools._image.vision.resolve_generation",
-            side_effect=GenerationError("No generation route is configured"),
+            side_effect=GenerationError("No generation connection is configured"),
         ):
             result = call_vision([b"png"], "What is this?", config)
         assert result.startswith("Error:")
-        assert "generation route" in result
+        assert "generation connection" in result
 
     def test_api_key_missing_returns_error(self) -> None:
         from ottools._image.vision import call_vision
@@ -1020,10 +1021,12 @@ class TestLoad:
             patch.object(store, "_images_dir", return_value=tmp_path),
             patch("ottools._image.tools.get_image_config") as mock_cfg,
             patch("ottools._image.tools.threading.Thread") as mock_thread,
+            patch("ottools._image.tools._background_summary_slots") as slots,
         ):
+            slots.acquire.return_value = True
             mock_cfg.return_value = Config(
                 session_cache_size=10,
-                llm={"model": "test-gemini"},
+                model="test-gemini",
             )
             mock_t = MagicMock()
             mock_thread.return_value = mock_t
@@ -1036,20 +1039,52 @@ class TestLoad:
         assert call_kwargs.kwargs.get("daemon") is True
         mock_t.start.assert_called_once()
 
+    def test_background_summary_saturation_does_not_spawn(self) -> None:
+        from ottools._image import tools
+        from ottools._image.config import Config
+
+        with (
+            patch("ottools._image.tools._background_summary_slots") as slots,
+            patch("ottools._image.tools.threading.Thread") as thread,
+        ):
+            slots.acquire.return_value = False
+            tools._schedule_background_summary(
+                handle_name="img_abc12345",
+                model_bytes=b"fake_bytes",
+                config=Config(model="test-gemini"),
+            )
+
+        thread.assert_not_called()
+
     def test_background_summary_worker_uses_shared_route(self) -> None:
         """Worker delegates route validation to the shared generation layer."""
         from ottools._image import tools
         from ottools._image.config import Config
 
         with (
-            patch("ottools._image.tools.get_image_config") as mock_cfg,
             patch("ottools._image.tools.extract_summary") as mock_extract,
         ):
-            mock_cfg.return_value = Config(session_cache_size=10)
-            mock_extract.return_value = "Error: generation route unavailable"
-            tools._background_summarise("img_abc12345", b"fake_bytes")
+            mock_extract.return_value = "Error: generation unavailable"
+            tools._background_summarise(
+                "img_abc12345",
+                b"fake_bytes",
+                Config(model="test-gemini", session_cache_size=10),
+            )
 
         mock_extract.assert_called_once()
+
+    def test_background_summary_is_opt_in(self) -> None:
+        from ottools._image import tools
+        from ottools._image.config import Config
+
+        with patch("ottools._image.tools.threading.Thread") as thread:
+            tools._schedule_background_summary(
+                handle_name="img_abc12345",
+                model_bytes=b"fake_bytes",
+                config=Config(),
+            )
+
+        thread.assert_not_called()
 
 
 @pytest.mark.unit
@@ -1076,7 +1111,7 @@ class TestAsk:
 
         mock_cfg.return_value = Config(
             session_cache_size=10,
-            llm={"model": "test-gemini"},
+            model="test-gemini",
         )
         with patch.object(store, "_images_dir", return_value=tmp_path):
             handle = tools.load(img=str(img_path))["handle"]
@@ -1132,7 +1167,7 @@ class TestAsk:
             patch("ottools._image.tools.get_image_config") as mock_cfg,
             patch(
                 "ottools._image.tools.ask_questions",
-                return_value=["Error: generation route unavailable"],
+                return_value=["Error: generation unavailable"],
             ),
         ):
             mock_cfg.return_value = Config(session_cache_size=10)
@@ -1181,7 +1216,7 @@ class TestAsk:
         ):
             mock_cfg.return_value = Config(
                 session_cache_size=10,
-                llm={"model": "test-gemini"},
+                model="test-gemini",
             )
             first = tools.ask(img="clip", q="q1")
             second = tools.ask(img="clip", q="q2")
@@ -1228,7 +1263,7 @@ class TestSummary:
         ):
             mock_cfg.return_value = Config(
                 session_cache_size=10,
-                llm={"model": "test-gemini"},
+                model="test-gemini",
             )
             handle = tools.load(img=str(img_path))["handle"]
             result = tools.summary(img=handle)
@@ -1261,7 +1296,7 @@ class TestSummary:
         ):
             mock_cfg.return_value = Config(
                 session_cache_size=10,
-                llm={"model": "test-gemini"},
+                model="test-gemini",
             )
             handle = tools.load(img=str(img_path))["handle"]
             tools.summary(img=handle)  # First call
@@ -1297,7 +1332,7 @@ class TestSummary:
         ):
             mock_cfg.return_value = Config(
                 session_cache_size=10,
-                llm={"model": "test-gemini"},
+                model="test-gemini",
                 max_edge=512,
             )
             result = tools.summary(img=str(img_path))  # auto-load path
@@ -1370,7 +1405,7 @@ class TestSummary:
                 "ottools._image.tools.get_image_config",
                 return_value=Config(
                     session_cache_size=10,
-                    llm={"model": "test-gemini"},
+                    model="test-gemini",
                 ),
             ),
             patch(
@@ -1648,7 +1683,7 @@ class TestAskMultiImage:
 
         mock_cfg.return_value = Config(
             session_cache_size=10,
-            llm={"model": "test-gemini"},
+            model="test-gemini",
         )
         (tmp_path / "a.png").write_bytes(_make_png_bytes(20, 20))
         (tmp_path / "b.png").write_bytes(_make_png_bytes(40, 40))

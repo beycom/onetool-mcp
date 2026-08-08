@@ -266,7 +266,7 @@ ot_image.summary(img: str, model: str | None=None, effort: ReasoningEffort | Non
 
 ## ot_llm, llm
 ```python
-ot_llm.transform(data: Any, prompt: str, model: str | None=None, effort: ReasoningEffort | None=None, json_mode: bool=False)  # Transform data through the effective shared generation route.
+ot_llm.transform(data: Any, prompt: str, model: str | None=None, effort: ReasoningEffort | None=None, json_mode: bool=False)  # Transform data through the shared generation connection.
 ot_llm.transform_file(prompt: str, in_file: str, out_file: str, model: str | None=None, effort: ReasoningEffort | None=None, json_mode: bool=False)  # Transform a UTF-8 file and write the generated result.
 ```
 

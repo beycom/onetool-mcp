@@ -392,6 +392,10 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
 
         cleanup_console_instance(instance_id=get_or_create_instance_id())
 
+        from ot.services import get_services
+
+        get_services().run_reload_hooks()
+
         from ot.generation.client import reset_http_client
 
         reset_http_client()

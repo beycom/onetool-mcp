@@ -13,10 +13,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from ot.config import get_config
-from ot.config.routing import (  # noqa: TC001 - Pydantic resolves GenerationSelection
-    GenerationSelection,
-    ReasoningEffort,
-)
+from ot.config.routing import DirectModelId, ReasoningEffort  # noqa: TC001
 from ot.generation import (
     GenerationError,
     GenerationRequest,
@@ -38,12 +35,8 @@ class Config(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    llm: GenerationSelection | None = None
-
-
-def register_services(registry: object) -> None:
-    """Register transform for legacy-neutral internal service dispatch."""
-    registry.register_llm(transform)  # type: ignore[attr-defined]
+    model: DirectModelId | None = None
+    effort: ReasoningEffort | None = None
 
 
 def _get_config() -> Config:
@@ -74,10 +67,10 @@ def _transform_impl(
         try:
             route = resolve_generation(
                 config=root,
-                pack=pack_config.llm,
+                pack_model=pack_config.model,
+                pack_effort=pack_config.effort,
                 model=model,
                 effort=effort,
-                structured_output="json_object" if json_mode else None,
             )
             result = generate(
                 route=route,
@@ -93,8 +86,7 @@ def _transform_impl(
             return False, f"Error: {exc}"
 
         span.add(
-            backend=route.backend,
-            model=route.shortcut,
+            model=route.model_id,
             effort=route.effort,
             outputLen=len(result.content),
             latency=round(result.latency_seconds, 3),
@@ -113,12 +105,12 @@ def transform(
     effort: ReasoningEffort | None = None,
     json_mode: bool = False,
 ) -> str:
-    """Transform data through the effective shared generation route.
+    """Transform data through the shared generation connection.
 
     Args:
         data: Data to transform. It is treated as untrusted content.
         prompt: Instructions describing the requested transformation.
-        model: Model shortcut, concrete ID, or proxy alias override.
+        model: Direct model ID override.
         effort: Reasoning effort override: ``low``, ``medium``, or ``high``.
         json_mode: Require a JSON object response from a capable route.
 
@@ -157,7 +149,7 @@ def transform_file(
         prompt: Instructions describing the requested transformation.
         in_file: UTF-8 input path, resolved from the effective project directory.
         out_file: Output path, resolved from the effective project directory.
-        model: Model shortcut, concrete ID, or proxy alias override.
+        model: Direct model ID override.
         effort: Reasoning effort override: ``low``, ``medium``, or ``high``.
         json_mode: Require a JSON object response from a capable route.
 
