@@ -1,632 +1,346 @@
-"""Claude Code and Codex proxy-launcher CLI commands."""
+"""CLIProxyAPI selection, diagnostics, and official harness launch commands."""
 
 from __future__ import annotations
 
-import json
-import os
-from collections import Counter
-from pathlib import Path
+import sys
 from typing import TYPE_CHECKING, Annotated, cast
 
 import questionary
 import typer
-from questionary import Choice
 from rich.console import Console
-from rich.panel import Panel
 from typer.core import TyperCommand
 
 from onetool.code.adapters import (
+    BASE_URL_ENV,
+    INFERENCE_KEY_ENV,
     build_invocation,
-    check_client_capabilities,
+    connection_from_environment,
     replace_process,
-    resolve_client_executable,
 )
-from onetool.code.domain import LaunchInvocation, ResolvedTarget
+from onetool.code.diagnostics import collect_code_status, open_management_url
+from onetool.code.domain import Harness
 from onetool.code.proxy import ModelDiscovery
-from onetool.code.resolver import (
-    compatible_models,
-    compatible_routes,
-    configured_harnesses,
-    resolve_target,
-)
-from ot.config.loader import load_config
-from ot.config.routing import Harness, ModelSource, PermissionMode
-from ot.config.secrets import get_secret
-from ot.paths import expand_path
+from onetool.code.selection import parse_context, resolve_model_query
 
 if TYPE_CHECKING:
     from typer._click.core import Context as TyperContext
 
-    from ot.config.models import OneToolConfig
-
 console = Console(stderr=True, highlight=False)
 _PASSTHROUGH_META_KEY = "onetool_harness_passthrough"
-_HARNESSES: tuple[Harness, ...] = ("claude", "codex")
 
 
 class HarnessPassthroughCommand(TyperCommand):
-    """Preserve the exact argument tail after the first `--` delimiter."""
+    """Consume launcher options and MODEL, preserving every later token."""
 
     def parse_args(self, ctx: TyperContext, args: list[str]) -> list[str]:
-        """Remove the opaque tail before Click parses the optional model."""
-        if "--" in args:
-            boundary = args.index("--")
-            ctx.meta[_PASSTHROUGH_META_KEY] = tuple(args[boundary + 1 :])
-            args = args[:boundary]
-        else:
-            ctx.meta[_PASSTHROUGH_META_KEY] = ()
+        """Hide the opaque tail from Click while retaining its exact tokens."""
+        model_index = self._model_index(args)
+        ctx.meta[_PASSTHROUGH_META_KEY] = (
+            tuple(args[model_index + 1 :]) if model_index is not None else ()
+        )
+        if model_index is not None:
+            args = args[: model_index + 1]
         return super().parse_args(ctx, args)
+
+    @staticmethod
+    def _model_index(args: list[str]) -> int | None:
+        index = 0
+        while index < len(args):
+            token = args[index]
+            if token in {"--help", "-h"}:
+                return None
+            if token == "--context":
+                index += 2
+                continue
+            if token.startswith("--context="):
+                index += 1
+                continue
+            if token.startswith("-"):
+                return None
+            return index
+        return None
 
 
 code_app = typer.Typer(
     name="code",
-    help="Select, inspect, and diagnose configured code-harness routes.",
-    invoke_without_command=True,
+    help="Launch official coding harnesses through CLIProxyAPI.",
     no_args_is_help=False,
+    invoke_without_command=True,
 )
-
-ConfigOption = Annotated[
-    Path | None,
-    typer.Option("--config", "-c", help="Explicit onetool.yaml path."),
-]
-SecretsOption = Annotated[
-    Path | None,
-    typer.Option("--secrets", "-s", help="Explicit secrets.yaml path."),
-]
-
-
-def _candidate_config_paths() -> tuple[Path, Path]:
-    """Return project then standard user launcher configuration paths."""
-    return (
-        Path.cwd() / ".onetool" / "onetool.yaml",
-        expand_path("~/.onetool/onetool.yaml"),
-    )
-
-
-def resolve_code_config_path(explicit: Path | None) -> Path:
-    """Resolve launcher configuration without changing serve semantics."""
-    if explicit is not None:
-        path = explicit.resolve()
-        if not path.is_file():
-            raise ValueError(f"Explicit launcher config is not a file: {path}")
-        return path
-    candidates = _candidate_config_paths()
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate.resolve()
-    checked = ", ".join(str(path) for path in candidates)
-    raise ValueError(
-        f"No launcher configuration found. Checked: {checked}. "
-        "Run `onetool init` to install the code-routing template."
-    )
-
-
-def _load_launcher_config(
-    config_path: Path | None,
-    secrets_path: Path | None,
-) -> tuple[OneToolConfig, Path]:
-    """Load the resolved launcher config and adjacent secrets when present."""
-    resolved = resolve_code_config_path(config_path)
-    resolved_secrets = secrets_path
-    if resolved_secrets is None:
-        adjacent = resolved.parent / "secrets.yaml"
-        resolved_secrets = adjacent if adjacent.is_file() else None
-    return load_config(resolved, secrets_path=resolved_secrets), resolved
-
-
-def _print_warning(target: ResolvedTarget) -> None:
-    """Print target notices that quiet mode must not suppress."""
-    if target.warning is not None:
-        console.print(f"[bold yellow]Warning:[/bold yellow] {target.warning}")
-
-
-def _start_summary(invocation: LaunchInvocation, *, quiet: bool) -> None:
-    """Render a polished or concise pre-launch summary."""
-    _print_warning(invocation.target)
-    if quiet:
-        return
-    target = invocation.target
-    model = (
-        f"{target.model.label} ({target.model.id})"
-        if target.model.label is not None
-        else target.model.id
-    )
-    lines = [
-        f"Harness: {target.harness}",
-        f"Model: {model}",
-        f"{target.kind.title()}: {target.name}",
-        f"Permission: {target.permission}",
-    ]
-    if console.is_terminal:
-        console.print(
-            Panel(
-                "\n".join(lines),
-                title=f"Starting {target.harness.title()}",
-                border_style="cyan",
-            )
-        )
-    else:
-        console.print(
-            "Starting "
-            + target.harness
-            + ": "
-            + ", ".join(line.lower() for line in lines[1:])
-        )
-
-
-def _choose_model(
-    *,
-    config: OneToolConfig,
-    harness: Harness,
-    route: ModelSource | None,
-    profile: str | None,
-) -> tuple[str, ModelSource | None, str | None] | None:
-    """Interactively select one exact configured target and model."""
-    candidates = compatible_models(
-        config=config,
-        harness=harness,
-        route=route,
-        profile=profile,
-    )
-    selected_index = questionary.select(
-        "Model",
-        choices=[
-            Choice(
-                f"{model.label or model.id} [{kind}: {target}]",
-                value=index,
-            )
-            for index, (kind, target, model) in enumerate(candidates)
-        ],
-    ).ask()
-    if selected_index is None:
-        return None
-    kind, target, selected_model = candidates[selected_index]
-    if kind == "route":
-        return selected_model.id, cast("ModelSource", target), None
-    return selected_model.id, None, target
 
 
 def _launch(
     *,
     harness: Harness,
-    model: str | None,
-    route_name: ModelSource | None,
-    profile_name: str | None,
-    permission: PermissionMode | None,
-    config_path: Path | None,
-    secrets_path: Path | None,
-    quiet: bool,
-    verbose: bool,
-    dry_run: bool,
-    passthrough: tuple[str, ...],
+    model: str,
+    context_window: int | None,
+    arguments: tuple[str, ...],
+    connection: tuple[str, str] | None = None,
+    inventory: tuple[str, ...] | None = None,
 ) -> None:
-    """Resolve, present, and optionally replace with one harness."""
-    try:
-        config, _ = _load_launcher_config(config_path, secrets_path)
-        if (
-            model is None
-            and config.code is not None
-            and config.code.default is None
-            and os.isatty(0)
-        ):
-            selected = _choose_model(
-                config=config,
-                harness=harness,
-                route=route_name,
-                profile=profile_name,
-            )
-            if selected is None:
-                return
-            model, route_name, profile_name = selected
-        resolved = resolve_target(
-            config=config,
-            harness=harness,
-            model=model,
-            route=route_name,
-            profile=profile_name,
-            permission=permission,
-        )
-        invocation = build_invocation(
-            config=config,
-            target=resolved,
-            passthrough=passthrough,
-            secret_resolver=get_secret,
-        )
-    except Exception as exc:
-        console.print(f"[red]Error:[/red] {exc}")
-        raise typer.Exit(2) from exc
-
-    effective_quiet = quiet or bool(config.code and config.code.presentation.quiet)
-    _start_summary(invocation, quiet=effective_quiet)
-    if dry_run or verbose or bool(config.code and config.code.presentation.verbose):
-        console.print(json.dumps(invocation.redacted(), indent=2))
-    if dry_run:
-        return
-
+    """Build and replace the current process with one official harness."""
+    proxy_origin, credential = connection or connection_from_environment()
+    available = inventory
+    if available is None:
+        available = ModelDiscovery(
+            proxy_origin=proxy_origin,
+            credential=credential,
+        ).models()
+    resolved_model = resolve_model_query(query=model, models=available)
+    invocation = build_invocation(
+        harness=harness,
+        model=resolved_model,
+        proxy_origin=proxy_origin,
+        credential=credential,
+        context_window=context_window,
+        arguments=arguments,
+    )
     replace_process(invocation=invocation)
 
 
-def _harness_command(
+def _run_harness(
     *,
     ctx: typer.Context,
     harness: Harness,
-    model: str | None,
-    route: ModelSource | None,
-    profile: str | None,
-    permission: PermissionMode | None,
-    config: Path | None,
-    secrets: Path | None,
-    quiet: bool,
-    verbose: bool,
-    dry_run: bool,
+    model: str,
+    context: str,
 ) -> None:
-    """Shared implementation for top-level harness commands."""
-    passthrough = tuple(ctx.meta.get(_PASSTHROUGH_META_KEY, ()))
-    _launch(
-        harness=harness,
-        model=model,
-        route_name=route,
-        profile_name=profile,
-        permission=permission,
-        config_path=config,
-        secrets_path=secrets,
-        quiet=quiet,
-        verbose=verbose,
-        dry_run=dry_run,
-        passthrough=passthrough,
-    )
-
-
-def claude_command(
-    ctx: typer.Context,
-    model: Annotated[
-        str | None,
-        typer.Argument(help="Exact configured model id or shortcut."),
-    ] = None,
-    route: Annotated[
-        ModelSource | None,
-        typer.Option("--route", help="Exact canonical route."),
-    ] = None,
-    permission: Annotated[
-        PermissionMode | None,
-        typer.Option("--permission", help="Permission mode: normal or bypass."),
-    ] = None,
-    config: ConfigOption = None,
-    secrets: SecretsOption = None,
-    quiet: Annotated[
-        bool,
-        typer.Option("--quiet", help="Suppress decorative lifecycle summaries."),
-    ] = False,
-    verbose: Annotated[
-        bool,
-        typer.Option("--verbose", help="Show the redacted resolved invocation."),
-    ] = False,
-    dry_run: Annotated[
-        bool,
-        typer.Option("--dry-run", help="Validate and display without launching."),
-    ] = False,
-) -> None:
-    """Launch Claude Code; arguments after -- pass through unchanged."""
-    _harness_command(
-        ctx=ctx,
-        harness="claude",
-        model=model,
-        route=route,
-        profile=None,
-        permission=permission,
-        config=config,
-        secrets=secrets,
-        quiet=quiet,
-        verbose=verbose,
-        dry_run=dry_run,
-    )
-
-
-def codex_command(
-    ctx: typer.Context,
-    model: Annotated[
-        str | None,
-        typer.Argument(help="Exact configured model id or shortcut."),
-    ] = None,
-    route: Annotated[
-        ModelSource | None,
-        typer.Option("--route", help="Exact canonical route."),
-    ] = None,
-    profile: Annotated[
-        str | None,
-        typer.Option("--profile", "-p", help="Exact direct Codex profile."),
-    ] = None,
-    permission: Annotated[
-        PermissionMode | None,
-        typer.Option("--permission", help="Permission mode: normal or bypass."),
-    ] = None,
-    config: ConfigOption = None,
-    secrets: SecretsOption = None,
-    quiet: Annotated[
-        bool,
-        typer.Option("--quiet", help="Suppress decorative lifecycle summaries."),
-    ] = False,
-    verbose: Annotated[
-        bool,
-        typer.Option("--verbose", help="Show the redacted resolved invocation."),
-    ] = False,
-    dry_run: Annotated[
-        bool,
-        typer.Option("--dry-run", help="Validate and display without launching."),
-    ] = False,
-) -> None:
-    """Launch Codex; arguments after -- pass through unchanged."""
-    _harness_command(
-        ctx=ctx,
-        harness="codex",
-        model=model,
-        route=route,
-        profile=profile,
-        permission=permission,
-        config=config,
-        secrets=secrets,
-        quiet=quiet,
-        verbose=verbose,
-        dry_run=dry_run,
-    )
-
-
-def _picker(
-    *,
-    config_path: Path | None,
-    secrets_path: Path | None,
-) -> None:
-    """Run the interactive picker through the shared resolver."""
-    if not os.isatty(0):
-        raise ValueError(
-            "Interactive selection requires a terminal. Use "
-            "`onetool claude [MODEL]` or `onetool codex [MODEL]`."
+    """Forward the captured tail or report a safe launcher error."""
+    arguments = tuple(ctx.meta.get(_PASSTHROUGH_META_KEY, ()))
+    try:
+        _launch(
+            harness=harness,
+            model=model,
+            context_window=parse_context(context),
+            arguments=arguments,
         )
-    config, _ = _load_launcher_config(config_path, secrets_path)
-    harness = questionary.select(
-        "Harness",
-        choices=list(configured_harnesses(config)),
-    ).ask()
-    if harness is None:
-        return
-    selected = _choose_model(
-        config=config,
-        harness=harness,
-        route=None,
-        profile=None,
-    )
+    except Exception as exc:
+        console.print(f"Error: {exc}", markup=False)
+        raise typer.Exit(2) from exc
+
+
+def _stdin_is_tty() -> bool:
+    """Return whether interactive selection can safely read stdin."""
+    return sys.stdin.isatty()
+
+
+def _ask_context(*, harness: Harness) -> str | None:
+    choices = [
+        questionary.Choice("Auto", value="auto"),
+        questionary.Choice("200k", value="200k"),
+        questionary.Choice("1m", value="1m"),
+    ]
+    if harness == "codex":
+        choices.append(questionary.Choice("Custom", value="custom"))
+    selected = questionary.select("Context", choices=choices).ask()
     if selected is None:
-        return
-    model, route, profile = selected
-    default_permission = config.code.permission if config.code is not None else "normal"
-    permission = questionary.select(
-        "Permission",
-        choices=["normal", "bypass"],
-        default=default_permission,
+        return None
+    if selected != "custom":
+        return cast("str", selected)
+    return cast(
+        "str | None",
+        questionary.text("Context tokens", validate=lambda value: bool(value)).ask(),
+    )
+
+
+def _interactive_launch() -> None:
+    """Select one harness, live model, and explicit context before launching."""
+    connection = connection_from_environment()
+    inventory = ModelDiscovery(
+        proxy_origin=connection[0],
+        credential=connection[1],
+    ).models()
+    harness_value = questionary.select(
+        "Harness",
+        choices=[
+            questionary.Choice("Claude", value="claude"),
+            questionary.Choice("Codex", value="codex"),
+        ],
     ).ask()
-    if permission is None:
+    if harness_value is None:
+        return
+    harness = cast("Harness", harness_value)
+    model_value = questionary.autocomplete(
+        "Model",
+        choices=list(inventory),
+        ignore_case=True,
+        match_middle=True,
+    ).ask()
+    if model_value is None:
+        return
+    context = _ask_context(harness=harness)
+    if context is None:
         return
     _launch(
         harness=harness,
-        model=model,
-        route_name=route,
-        profile_name=profile,
-        permission=permission,
-        config_path=config_path,
-        secrets_path=secrets_path,
-        quiet=False,
-        verbose=False,
-        dry_run=False,
-        passthrough=(),
+        model=cast("str", model_value),
+        context_window=parse_context(context),
+        arguments=(),
+        connection=connection,
+        inventory=inventory,
     )
 
 
 @code_app.callback()
-def code_callback(
-    ctx: typer.Context,
-    config: ConfigOption = None,
-    secrets: SecretsOption = None,
-) -> None:
-    """Select a code harness route or run a diagnostic subcommand."""
+def code_callback(ctx: typer.Context) -> None:
+    """Select a coding harness interactively when no subcommand is supplied."""
     if ctx.invoked_subcommand is not None:
         return
+    if not _stdin_is_tty():
+        console.print(
+            "Error: bare 'onetool code' requires an interactive terminal",
+            markup=False,
+        )
+        raise typer.Exit(2)
     try:
-        _picker(config_path=config, secrets_path=secrets)
+        _interactive_launch()
     except Exception as exc:
-        console.print(f"[red]Error:[/red] {exc}")
+        console.print(f"Error: {exc}", markup=False)
         raise typer.Exit(2) from exc
+
+
+@code_app.command("claude", cls=HarnessPassthroughCommand)
+def claude_command(
+    ctx: typer.Context,
+    model: Annotated[
+        str,
+        typer.Argument(
+            help=(
+                "CLIProxyAPI model ID or unique partial query. Every later token is forwarded "
+                "verbatim. Connection: CLIPROXY_BASE_URL; credential: "
+                "CLIPROXY_INFERENCE_KEY."
+            )
+        ),
+    ],
+    context: Annotated[
+        str,
+        typer.Option(
+            "--context",
+            help="Explicit context: auto, 200k, or 1m. Must precede MODEL.",
+        ),
+    ] = "auto",
+) -> None:
+    """Launch Claude Code with a live model match and verbatim harness arguments."""
+    _run_harness(ctx=ctx, harness="claude", model=model, context=context)
+
+
+@code_app.command("codex", cls=HarnessPassthroughCommand)
+def codex_command(
+    ctx: typer.Context,
+    model: Annotated[
+        str,
+        typer.Argument(
+            help=(
+                "CLIProxyAPI model ID or unique partial query. Every later token is forwarded "
+                "verbatim. Connection: CLIPROXY_BASE_URL; credential: "
+                "CLIPROXY_INFERENCE_KEY."
+            )
+        ),
+    ],
+    context: Annotated[
+        str,
+        typer.Option(
+            "--context",
+            help="Explicit context: auto, 200k, 1m, or positive tokens. Must precede MODEL.",
+        ),
+    ] = "auto",
+) -> None:
+    """Launch Codex with a live model match and verbatim harness arguments."""
+    _run_harness(ctx=ctx, harness="codex", model=model, context=context)
 
 
 @code_app.command("models")
-def models_command(config: ConfigOption = None) -> None:
-    """List configured launcher model identities and compatibility."""
+def models_command() -> None:
+    """List direct model IDs from one bounded CLIProxyAPI inventory request."""
     try:
-        loaded, _ = _load_launcher_config(config, None)
-        if loaded.code is None:
-            raise ValueError("Code routing is not configured")
+        proxy_origin, credential = connection_from_environment()
+        models = ModelDiscovery(
+            proxy_origin=proxy_origin,
+            credential=credential,
+        ).models()
     except Exception as exc:
-        console.print(f"[red]Error:[/red] {exc}")
+        console.print(f"Error: {exc}", markup=False)
         raise typer.Exit(2) from exc
-    console.print("Configured code models")
-    if loaded.code.proxy is not None:
-        for route, models in loaded.code.proxy.routes.items():
-            harnesses = [
-                harness
-                for harness in _HARNESSES
-                if route in compatible_routes(harness)
-            ]
-            for model in models:
-                policy = model.claude.model_dump(mode="json") if model.claude else None
-                console.print(
-                    "\n".join(
-                        (
-                            model.id,
-                            f"  route: {route}",
-                            f"  harnesses: {', '.join(harnesses)}",
-                            f"  shortcut: {model.shortcut or '—'}",
-                            f"  label: {model.label or '—'}",
-                            f"  claude: {json.dumps(policy) if policy else '—'}",
-                        )
-                    ),
-                    markup=False,
-                )
-    if loaded.code.direct is not None:
-        for profile, models in loaded.code.direct.codex.profiles.items():
-            for model in models:
-                console.print(
-                    "\n".join(
-                        (
-                            model.id,
-                            f"  profile: {profile}",
-                            "  harnesses: codex",
-                            f"  shortcut: {model.shortcut or '—'}",
-                            f"  label: {model.label or '—'}",
-                        )
-                    ),
-                    markup=False,
-                )
-
-
-@code_app.command("config")
-def config_command(config: ConfigOption = None) -> None:
-    """Show effective launcher configuration without generation models."""
-    try:
-        loaded, resolved = _load_launcher_config(config, None)
-    except Exception as exc:
-        console.print(f"[red]Error:[/red] {exc}")
-        raise typer.Exit(2) from exc
-    payload = {
-        "path": str(resolved),
-        "code": loaded.code.model_dump(mode="json") if loaded.code else None,
-    }
-    console.print(json.dumps(payload, indent=2))
+    for model in models:
+        console.print(model, markup=False)
 
 
 @code_app.command("status")
 def status_command(
-    config: ConfigOption = None,
-    secrets: SecretsOption = None,
+    open_page: Annotated[
+        bool,
+        typer.Option(
+            "--open",
+            help="Open the derived CLIProxyAPI management page after diagnostics.",
+        ),
+    ] = False,
 ) -> None:
-    """Report local launcher prerequisites without network requests."""
-    try:
-        loaded, resolved = _load_launcher_config(config, secrets)
-        if loaded.code is None:
-            raise ValueError("Code routing is not configured")
-    except Exception as exc:
-        console.print(f"[red]Error:[/red] {exc}")
-        raise typer.Exit(2) from exc
-    console.print(f"Config: {resolved}")
-    for name in configured_harnesses(loaded):
-        client = getattr(loaded.code.clients, name)
-        try:
-            resolve_client_executable(client.executable)
-        except ValueError:
-            available = False
-        else:
-            available = True
-        console.print(f"{name}: {'available' if available else 'missing'}")
-    proxy = loaded.code.proxy
-    if proxy is not None:
-        console.print(f"CLIProxyAPI inference endpoint: configured ({proxy.base_url})")
+    """Show redacted launcher readiness, models, and management access."""
+    status = collect_code_status()
+    console.print("OneTool code status", style="bold")
+    if status.proxy_origin is None:
+        console.print(f"Proxy origin: ERROR ({status.origin_error})", markup=False)
+    else:
         console.print(
-            f"{proxy.secret_name}: "
-            f"{'configured' if get_secret(proxy.secret_name) else 'missing'}"
+            f"Proxy origin: {status.proxy_origin} ({status.origin_source})",
+            markup=False,
         )
-        for route, models in proxy.routes.items():
-            console.print(f"route {route}: {len(models)} model(s)")
-    if loaded.code.direct is not None:
-        for profile, models in loaded.code.direct.codex.profiles.items():
-            console.print(f"profile {profile}: {len(models)} model(s)")
-
-
-@code_app.command("doctor")
-def doctor_command(
-    config: ConfigOption = None,
-    secrets: SecretsOption = None,
-) -> None:
-    """Check harness capabilities and one live proxy model inventory."""
-    try:
-        loaded, _ = _load_launcher_config(config, secrets)
-        if loaded.code is None:
-            raise ValueError("Code routing is not configured")
-        failures = 0
-        configured = configured_harnesses(loaded)
-        proxy_routes = (
-            loaded.code.proxy.routes if loaded.code.proxy is not None else {}
+    console.print(
+        "Inference credential: set"
+        if status.credential_present
+        else "Inference credential: missing",
+        markup=False,
+    )
+    if status.inventory_error is None:
+        console.print("Inference endpoint: reachable (authenticated)", markup=False)
+        console.print(f"Models: {len(status.models)} available", markup=False)
+        for model in status.models:
+            console.print(f"  {model}", markup=False)
+    else:
+        console.print(
+            f"Inference endpoint: ERROR ({status.inventory_error})",
+            markup=False,
         )
-        for harness in configured:
-            client = getattr(loaded.code.clients, harness)
-            try:
-                executable = resolve_client_executable(client.executable)
-                require_proxy = any(
-                    route in compatible_routes(harness) for route in proxy_routes
-                )
-                require_profile = (
-                    harness == "codex" and loaded.code.direct is not None
-                )
-                capabilities = check_client_capabilities(
-                    executable=executable,
-                    harness=harness,
-                    permission=loaded.code.permission,
-                    require_proxy=require_proxy,
-                    require_profile=require_profile,
-                )
-                console.print(
-                    f"[green]✓[/green] {harness}; capabilities: "
-                    f"{', '.join(capabilities)}"
-                )
-            except Exception as exc:
-                failures += 1
-                console.print(f"[red]✗[/red] {harness}: {exc}")
-
-        proxy = loaded.code.proxy
-        if proxy is not None:
-            secret = get_secret(proxy.secret_name)
-            if not secret:
-                failures += 1
-                console.print(
-                    f"[red]✗[/red] Named inference secret "
-                    f"{proxy.secret_name!r} is not configured"
-                )
-            else:
-                try:
-                    advertised = ModelDiscovery(
-                        config=proxy,
-                        secret=secret,
-                    ).models()
-                    counts = Counter(advertised)
-                    for route, models in proxy.routes.items():
-                        for model in models:
-                            if counts[model.id] == 1:
-                                console.print(
-                                    f"[green]✓[/green] {route}: {model.id}"
-                                )
-                            else:
-                                failures += 1
-                                state = (
-                                    "not advertised"
-                                    if counts[model.id] == 0
-                                    else "duplicate"
-                                )
-                                console.print(
-                                    f"[red]✗[/red] {route}: {model.id} ({state})"
-                                )
-                except Exception as exc:
-                    failures += 1
-                    console.print(f"[red]✗[/red] CLIProxyAPI: {exc}")
-        if failures:
-            raise typer.Exit(1)
-    except typer.Exit:
-        raise
-    except Exception as exc:
-        console.print(f"[red]Error:[/red] {exc}")
-        raise typer.Exit(2) from exc
+        console.print("Models: unavailable", markup=False)
+    if status.management_url is not None:
+        page_state = (
+            "reachable"
+            if status.management_reachable
+            else f"warning: {status.management_error}"
+        )
+        console.print(
+            f"Management: {status.management_url} ({page_state})",
+            markup=False,
+        )
+    else:
+        console.print("Management: unavailable", markup=False)
+    for executable in status.executables:
+        if executable.error is not None:
+            console.print(
+                f"{executable.name}: warning ({executable.error})",
+                markup=False,
+            )
+        else:
+            console.print(
+                f"{executable.name}: {executable.path} ({executable.version})",
+                markup=False,
+            )
+    if open_page and (
+        status.management_url is None or not open_management_url(status.management_url)
+    ):
+        console.print("Management browser: warning (open failed)", markup=False)
+    if not status.ready:
+        raise typer.Exit(2)
 
 
 __all__ = [
+    "BASE_URL_ENV",
+    "INFERENCE_KEY_ENV",
     "HarnessPassthroughCommand",
     "claude_command",
     "code_app",
+    "code_callback",
     "codex_command",
-    "resolve_code_config_path",
+    "models_command",
+    "status_command",
 ]

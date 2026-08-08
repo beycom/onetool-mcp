@@ -228,7 +228,7 @@ The `onetool init validate` command SHALL report the source of each resolved inc
 
 The `onetool kb` subcommand group SHALL provide offline knowledge base management commands.
 
-All commands call the implementation layer directly (not MCP wrappers) so they can emit real-time progress output.
+Commands SHALL emit progress while long-running knowledge operations execute.
 
 Global options on the `kb` callback: `--config`/`-c` (path to onetool.yaml) and `--secrets`/`-s` (path to secrets file). Both auto-detect from CWD if omitted.
 
@@ -419,112 +419,79 @@ The `onetool init mcp-config` command SHALL print ready-to-paste MCP client conf
 
 ### Requirement: Harness commands in the OneTool CLI
 
-The `onetool` CLI SHALL expose Claude Code and Codex launcher commands.
+The `onetool code` group SHALL expose Claude Code and Codex launchers that
+resolve a required live CLIProxyAPI model query and accept an optional explicit
+`--context` value before `MODEL`.
 
 #### Scenario: Commands in help
-- **WHEN** `onetool --help` is executed
-- **THEN** `claude` and `codex` SHALL appear in a labelled code-harness panel
+- **WHEN** `onetool code --help` is executed
+- **THEN** `claude`, `codex`, `models`, and `status` SHALL appear as subcommands
 
 #### Scenario: Claude harness help
-- **WHEN** Claude command help is displayed
-- **THEN** it SHALL describe exact model/shortcut, route, permission, config,
-  presentation, dry-run, and `--` passthrough options
+- **WHEN** `onetool code claude --help` is displayed
+- **THEN** it SHALL describe the required model query, explicit Claude context
+  choices, launcher environment, and verbatim forwarding after `MODEL`
+- **AND** it SHALL not describe routes, profiles, static shortcuts, or config
+  options
 
 #### Scenario: Codex harness help
-- **WHEN** Codex command help is displayed
-- **THEN** it SHALL additionally describe an exact direct `--profile`/`-p` selector
-- **AND** route and profile SHALL be mutually exclusive
+- **WHEN** `onetool code codex --help` is displayed
+- **THEN** it SHALL describe the model query and explicit numeric context input
+- **AND** it SHALL not expose direct-provider profiles
+
+#### Scenario: Harness arguments
+- **WHEN** either harness receives tokens after `MODEL`
+- **THEN** it SHALL forward every token unchanged without requiring `--`
+- **AND** a `--context` token after `MODEL` SHALL remain an upstream harness
+  argument
 
 ### Requirement: Code helper group
 
-The CLI SHALL provide a small `code` group for target selection and diagnostics.
+The CLI SHALL provide a small `code` group containing two proxy launchers,
+interactive selection, live model discovery, and read-only status diagnostics.
 
-#### Scenario: Interactive picker
-- **WHEN** `onetool code` runs in a terminal without a subcommand
-- **THEN** it SHALL select a configured harness, target, model, and permission mode
-- **AND** it SHALL use the same resolver as explicit harness commands
+#### Scenario: Interactive bare code command
+- **WHEN** `onetool code` runs in an interactive terminal without a subcommand
+- **THEN** it SHALL prompt for harness, a searchable live model, and a supported
+  explicit context
+- **AND** it SHALL use the same resolver and invocation builder as the nested
+  commands
+
+#### Scenario: Interactive cancellation
+- **WHEN** any interactive selection is cancelled
+- **THEN** OneTool SHALL return without launching a process
+
+#### Scenario: Non-interactive bare code command
+- **WHEN** `onetool code` runs without a subcommand and stdin is not interactive
+- **THEN** it SHALL fail clearly without waiting for input
 
 #### Scenario: Helper commands
 - **WHEN** `onetool code --help` is executed
-- **THEN** it SHALL list models, status, doctor, and config
-- **AND** it SHALL not list setup, proxy lifecycle, management, authentication, or
-  login operations
+- **THEN** it SHALL list only `claude`, `codex`, `models`, and `status`
+- **AND** it SHALL not list config, doctor, setup, lifecycle, OAuth, or login
+  operations
 
-#### Scenario: Non-interactive picker
-- **WHEN** the picker is invoked without a terminal
-- **THEN** it SHALL fail with the equivalent explicit command syntax
+#### Scenario: Read-only status command
+- **WHEN** `onetool code status` is invoked
+- **THEN** it SHALL display bounded redacted launcher diagnostics and the
+  management URL without opening a browser
 
-### Requirement: Launcher configuration resolution
+#### Scenario: Explicit management opening
+- **WHEN** `onetool code status --open` is invoked
+- **THEN** it SHALL display status and request that the platform browser open
+  the derived management URL
 
-Code commands SHALL resolve configuration deterministically without changing
-`onetool serve` behavior.
+### Requirement: Live CLIProxyAPI model discovery
 
-#### Scenario: Resolution order
-- **WHEN** a code command has no explicit config
-- **THEN** it SHALL check the current project configuration before the standard user
-  configuration
-
-#### Scenario: Explicit config
-- **WHEN** `--config` is supplied
-- **THEN** it SHALL resolve to an existing regular file and only that checked path
-  SHALL be used
-- **AND** no directory expansion or fallback discovery SHALL occur
-
-#### Scenario: Launcher secrets resolution
-- **WHEN** a code command loads its resolved configuration
-- **THEN** an explicit `--secrets` path SHALL take precedence
-- **AND** otherwise an adjacent `secrets.yaml` SHALL be loaded when present
-- **AND** absence of that adjacent file SHALL load no launcher secrets
-
-#### Scenario: Missing config
-- **WHEN** no configuration can be resolved
-- **THEN** the command SHALL report checked paths and identify `onetool init` as the
-  template installation workflow
-
-#### Scenario: Serve remains unchanged
-- **WHEN** `onetool serve` is executed
-- **THEN** its existing explicit runtime configuration contract SHALL remain
-  unchanged
-
-### Requirement: Redacted local status and explicit diagnostics
-
-Status, doctor, and config helpers SHALL remain within the thin-launcher boundary.
-
-#### Scenario: Status
-- **WHEN** `onetool code status` is executed
-- **THEN** it SHALL report configured proxy routes and direct profiles, configured
-  harness binaries, and proxy endpoint and named-secret presence when applicable
-- **AND** it SHALL perform no HTTP request or version/help subprocess
-
-#### Scenario: Doctor
-- **WHEN** `onetool code doctor` is executed
-- **THEN** it SHALL probe each configured harness executable once for required
-  adapter capabilities
-- **AND** it SHALL call `/v1/models` exactly once only when proxy routes are
-  configured and their named secret is available
-- **AND** a missing named proxy secret SHALL be reported without making that request
-- **AND** it SHALL compare configured proxy launcher ids exactly against that
-  inventory without exposing credentials
-
-#### Scenario: Config display
-- **WHEN** effective launcher configuration is shown
-- **THEN** it SHALL show only the effective `code` section and resolved OneTool config
-  path
-- **AND** it SHALL omit secret values, top-level generation models, and generated
-  private adapter content
+The CLI SHALL expose `onetool code models` as a bounded view of direct model IDs
+reported by the environment-configured CLIProxyAPI inference service.
 
 #### Scenario: Models display
-- **WHEN** `onetool code models` is executed
-- **THEN** it SHALL enumerate configured proxy-route and direct-profile records and
-  harness compatibility
-- **AND** it SHALL not use or display top-level generation model records
+- **WHEN** a valid inventory is received
+- **THEN** the command SHALL display only the direct IDs returned by `/v1/models`
+- **AND** it SHALL not add aliases, provider labels, or compatibility classifications
 
-### Requirement: Code routing template initialization
-
-Interactive `onetool init` SHALL offer the code-routing extension template through
-the standard extension installation workflow.
-
-#### Scenario: Code routing selected
-- **WHEN** a user selects `code-routing.yaml` during interactive initialization
-- **THEN** OneTool SHALL copy the bundled template, back up a conflicting target,
-  and add the extension include using the standard initialization behavior
+#### Scenario: Inventory failure
+- **WHEN** discovery is unauthorized, unavailable, too large, malformed, or times out
+- **THEN** the command SHALL fail with a bounded redacted error
+- **AND** it SHALL not expose the credential or raw body

@@ -3,25 +3,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import httpx
 
-if TYPE_CHECKING:
-    from ot.config.routing import CodeProxyConfig
+from onetool.code.adapters import normalize_proxy_origin
 
 _MAX_DISCOVERY_BYTES = 1_048_576
 _MAX_MODELS = 10_000
+_CONNECT_TIMEOUT = 2.0
+_REQUEST_TIMEOUT = 5.0
+
+
 class ProxyDiscoveryError(RuntimeError):
     """A bounded, redacted external inference discovery failure."""
 
 
 @dataclass(slots=True)
 class ModelDiscovery:
-    """Authenticated bounded discovery for explicit diagnostics."""
+    """Authenticated one-request discovery for the explicit models command."""
 
-    config: CodeProxyConfig
-    secret: str
+    proxy_origin: str
+    credential: str
     client: httpx.Client | None = None
 
     def _read_response(
@@ -30,17 +33,17 @@ class ModelDiscovery:
         url: str,
         timeout: httpx.Timeout,
     ) -> tuple[int, bytes]:
-        """Stream one response while enforcing the body limit during download."""
+        """Stream one response while enforcing the body limit."""
         headers = {
-            "Authorization": f"Bearer {self.secret}",
+            "Authorization": f"Bearer {self.credential}",
             "Accept": "application/json",
         }
         with client.stream("GET", url, headers=headers, timeout=timeout) as response:
-            declared_length = response.headers.get("Content-Length")
+            declared = response.headers.get("Content-Length")
             if (
-                declared_length is not None
-                and declared_length.isdigit()
-                and int(declared_length) > _MAX_DISCOVERY_BYTES
+                declared is not None
+                and declared.isdigit()
+                and int(declared) > _MAX_DISCOVERY_BYTES
             ):
                 raise ProxyDiscoveryError(
                     "CLIProxyAPI model discovery response exceeded the 1 MiB limit"
@@ -55,33 +58,36 @@ class ModelDiscovery:
             return response.status_code, bytes(content)
 
     def _request(self) -> tuple[int, bytes]:
-        """Issue and boundedly read the one supported inference request."""
+        """Issue the one supported authenticated inventory request."""
+        origin = normalize_proxy_origin(self.proxy_origin)
         timeout = httpx.Timeout(
-            connect=self.config.connect_timeout,
-            read=self.config.request_timeout,
-            write=self.config.request_timeout,
-            pool=self.config.connect_timeout,
+            connect=_CONNECT_TIMEOUT,
+            read=_REQUEST_TIMEOUT,
+            write=_REQUEST_TIMEOUT,
+            pool=_CONNECT_TIMEOUT,
         )
-        url = f"{self.config.base_url}/v1/models"
         try:
             if self.client is not None:
-                return self._read_response(self.client, url, timeout)
+                return self._read_response(
+                    self.client,
+                    f"{origin}/v1/models",
+                    timeout,
+                )
             with httpx.Client(timeout=timeout) as client:
-                return self._read_response(client, url, timeout)
+                return self._read_response(client, f"{origin}/v1/models", timeout)
+        except ProxyDiscoveryError:
+            raise
         except httpx.HTTPError as exc:
             raise ProxyDiscoveryError(
-                f"CLIProxyAPI inference endpoint is unavailable at "
-                f"{self.config.base_url}; check the external service and route"
+                f"CLIProxyAPI inference endpoint is unavailable at {origin}"
             ) from exc
 
     def models(self) -> tuple[str, ...]:
-        """Return one fresh bounded model id list for explicit diagnostics."""
+        """Return direct model IDs from one fresh bounded inventory."""
         status_code, content = self._request()
         if status_code != 200:
             raise ProxyDiscoveryError(
-                f"CLIProxyAPI model discovery failed with HTTP "
-                f"{status_code} at {self.config.base_url}; check the "
-                "inference client secret and external service"
+                f"CLIProxyAPI model discovery failed with HTTP {status_code}"
             )
         try:
             payload: Any = httpx.Response(200, content=content).json()
@@ -101,16 +107,20 @@ class ModelDiscovery:
 
         ids: list[str] = []
         for index, item in enumerate(data):
+            model_id = item.get("id") if isinstance(item, dict) else None
             if (
-                not isinstance(item, dict)
-                or not isinstance(item.get("id"), str)
-                or not item["id"]
+                not isinstance(model_id, str)
+                or not model_id.strip()
+                or any(
+                    ord(character) < 0x20 or 0x7F <= ord(character) <= 0x9F
+                    for character in model_id
+                )
             ):
                 raise ProxyDiscoveryError(
                     f"CLIProxyAPI model entry {index} has an invalid id"
                 )
-            ids.append(item["id"])
-
+            ids.append(model_id)
         return tuple(ids)
+
 
 __all__ = ["ModelDiscovery", "ProxyDiscoveryError"]

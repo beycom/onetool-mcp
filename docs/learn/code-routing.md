@@ -1,222 +1,114 @@
-# Code harness routing
+# Code Harness Launchers
 
-OneTool launches Claude Code and Codex from exact local routing records. A target
-is either:
+OneTool can replace itself with the official Claude Code or Codex executable and
+route that harness through an independently managed CLIProxyAPI service.
+CLIProxyAPI owns provider accounts, authentication, its live model inventory,
+and upstream routing; OneTool supplies model selection and invocation-scoped
+harness settings.
 
-- a proxy route through an independently managed CLIProxyAPI service; or
-- a direct, user-owned Codex profile.
+## Environment
 
-Normal launch and dry run use only local configuration, executable resolution, and
-the selected target's credential boundary. They do not call `/v1/models`, read
-Claude/Codex settings, or manage CLIProxyAPI.
-
-## Install the template
-
-Run interactive initialization and select `code-routing.yaml`:
+Set the launcher credential in the process environment:
 
 ```bash
-onetool init
+export CLIPROXY_INFERENCE_KEY="your-inference-client-key"
+export CLIPROXY_BASE_URL="http://127.0.0.1:8317"  # optional default
 ```
 
-The standard initializer copies the template, backs up a conflicting file, and
-adds it to `onetool.yaml`'s `include` list. There is no separate `code setup`
-command.
+`CLIPROXY_BASE_URL` is the proxy origin, without `/v1`. The launcher does not
+read `onetool.yaml`, `secrets.yaml`, the current directory, or CLIProxyAPI's
+internal files. In a source checkout, prefix the examples below with `uv run`.
 
-## Proxy routes
-
-```yaml
-code:
-  default:
-    model: gpt-5.6-sol
-    route: codex_subscription
-
-  proxy:
-    base_url: http://127.0.0.1:8317
-    secret_name: CLIPROXY_INFERENCE_KEY
-    connect_timeout: 2
-    request_timeout: 5
-    routes:
-      codex_subscription:
-        - id: gpt-5.6-sol
-          shortcut: sol
-          label: GPT-5.6 Sol
-
-      openrouter:
-        - id: z-ai/glm-5.2
-          shortcut: glm
-          claude:
-            context: 1m
-            auto_compact_window: 900000
-
-      claude_subscription:
-        - id: claude-sonnet-4-6
-          shortcut: sonnet
-          claude:
-            context: standard
-```
-
-Route names are exact. Claude supports `claude_subscription`,
-`codex_subscription`, and `openrouter`; Codex supports `codex_subscription` and
-`openrouter`.
-
-The proxy inference key belongs in `secrets.yaml`:
-
-```yaml
-CLIPROXY_INFERENCE_KEY: your-inference-key
-```
-
-Proxying a Claude consumer subscription is opt-in and may breach Anthropic's terms,
-affect the account, or change billing. OneTool displays that warning on every
-`claude_subscription` launch, including quiet mode.
-
-## Direct Codex profiles
-
-A direct profile delegates provider URL, catalog, and credential handling to Codex:
-
-```yaml
-code:
-  default:
-    model: z-ai/glm-5.2
-    profile: openrouter
-
-  direct:
-    codex:
-      profiles:
-        openrouter:
-          - id: z-ai/glm-5.2
-            shortcut: glm
-
-  clients:
-    codex:
-      additional_arguments: [--search]
-```
-
-Launch it explicitly:
+## Check Readiness
 
 ```bash
-onetool codex glm --profile openrouter
-onetool codex z-ai/glm-5.2 -p openrouter
+onetool code status
 ```
 
-The resulting owned arguments are `codex --profile openrouter --model
-z-ai/glm-5.2`. OneTool does not add its proxy provider, base URL, or inference
-secret. `--profile` and `--route` are mutually exclusive, and direct profiles are
-never offered to Claude.
+Status displays the normalized proxy origin and whether it came from the default
+or environment, credential presence without its value, live model count and IDs,
+the derived management URL and reachability, and detected `cliproxyapi`, `claude`,
+and `codex` executable versions. Required inference failures exit non-zero while
+independent checks continue; missing executables or an unavailable management
+page are warnings.
 
-## Model identity
-
-Launcher records accept:
-
-- required exact `id`;
-- optional exact `shortcut`;
-- optional presentation-only `label`;
-- optional operational Claude policy.
-
-Selection accepts only an exact id or exact shortcut. It is case-sensitive and
-does not normalize separators or perform substring matching. Shortcuts must be
-globally unique. If the same id appears under multiple targets, supply the exact
-`--route` or `--profile`.
-
-The top-level `models` registry is generation-only. Launcher records intentionally
-do not accept generation modalities, interfaces, structured-output modes, efforts,
-or aliases.
-
-## Claude context policy
-
-`claude.context: 1m` changes the effective Claude selector to `<id>[1m]`.
-`auto_compact_window` is optional, positive, and below 1,000,000. It sets
-`CLAUDE_CODE_AUTO_COMPACT_WINDOW` only for the launched process.
-
-`claude.context: standard` keeps the base id and sets
-`CLAUDE_CODE_DISABLE_1M_CONTEXT=1`. When the policy is absent, OneTool keeps the
-base id and clears inherited context overrides.
-
-OneTool also clears conflicting inherited Anthropic gateway, model, model-name,
-model-description, and context variables before applying the selected proxy
-environment. The policy is not inferred from model names or generation metadata.
-
-## Clients and permissions
-
-```yaml
-code:
-  permission: normal  # normal | bypass
-
-  clients:
-    claude:
-      executable: claude
-      working_directory: /path/to/project
-      additional_arguments: [--no-chrome]
-
-    codex:
-      executable: codex
-      working_directory: /path/to/project
-      home_path: /path/to/codex-home
-      additional_arguments: [--search]
-
-  presentation:
-    quiet: false
-    verbose: false
-```
-
-Working directories and `CODEX_HOME` apply only to the launched process. User
-files are never rewritten.
-
-Everything after the first real `--` remains an ordered harness tail:
+To display status and then open the derived management page in the platform
+browser:
 
 ```bash
-onetool codex sol -- exec --json
-onetool claude sonnet -- plugins
+onetool code status --open
 ```
 
-OneTool preserves the tail but rejects launcher-owned conflicts. For Codex these
-include `--model`/`-m`, `--profile`/`-p`, `--config`/`-c`, `--oss`, and the
-permission bypass flag. Long options with `=` and short options in separated or
-attached form, such as `-m value` and `-mvalue`, are rejected consistently.
+Plain `status` never opens a browser. OneTool does not read a management key or
+proxy YAML, call management APIs, perform login or OAuth, manage the proxy
+service, or write user files.
 
-## Process handoff and diagnostics
+## Select Interactively
 
-After validation and optional presentation, OneTool changes to the configured
-working directory and replaces itself with the harness process. The harness
-naturally owns the terminal, signals, and exit status; OneTool does not supervise a
-child or print a post-exit summary.
-
-Dry run returns before process replacement:
+Run the group without a subcommand in an interactive terminal:
 
 ```bash
-onetool codex glm --profile openrouter --dry-run --verbose
+onetool code
 ```
 
-The output identifies target kind/name, exact model, argv shape, and environment
-key changes without values.
+Choose Claude or Codex, search the current CLIProxyAPI model inventory, and then
+select an explicit context policy. Cancellation returns without launching. A
+bare command in a non-interactive environment fails instead of waiting for
+input.
 
-Diagnostic commands are:
+## Launch Directly
+
+Supply a full model ID or an unambiguous shorthand:
+
+```bash
+onetool code claude sol --continue
+onetool code codex --context 200000 glm52 exec --full-auto
+```
+
+Each launch performs one authenticated, bounded `GET /v1/models` request. An
+exact case-sensitive ID wins first, followed by a case-insensitive exact match,
+then a unique case-insensitive token, suffix, or substring match. For example,
+`sol` can select `gpt-5.6-sol` when it is the only match. Ambiguous queries fail
+with the candidate IDs, and missing queries fail without substituting a model.
+There is no static catalog, compatibility alias, route, profile, provider, or
+capability registry.
+
+Every token after `MODEL` is appended unchanged and in order. No `--` separator
+is required, and a literal `--` is preserved. Launcher-owned options must appear
+before `MODEL`; therefore `--context` after `MODEL` is forwarded to the official
+harness unchanged.
+
+## Set Context Explicitly
+
+Context defaults to `auto`. Put `--context` before `MODEL`:
+
+```bash
+onetool code claude --context 1m gpt-5.6-sol
+onetool code claude --context 200k gpt-5.6-sol
+onetool code codex --context 1000000 gpt-5.6-sol
+```
+
+Claude accepts only `auto`, `200k`, and `1m`. `1m` generates the Claude selector
+`<model>[1m]`; `200k` keeps the base ID and sets
+`CLAUDE_CODE_DISABLE_1M_CONTEXT=1` for the child. Codex accepts `auto`, `200k`,
+`1m`, or any positive integer token count. A numeric Codex context generates
+invocation-scoped `model_context_window` and a 90-percent
+`model_auto_compact_token_limit`. No context choice modifies a settings file.
+
+## List Model IDs
 
 ```bash
 onetool code models
-onetool code status
-onetool code doctor
-onetool code config
 ```
 
-`status` is local-only and reports only configured harnesses and targets. `doctor`
-runs one bounded `--help` probe per configured harness. When proxy routes and their
-named secret are available, it also calls `/v1/models` exactly once and compares
-configured proxy ids exactly. A missing proxy secret is reported without making
-that request. Direct-only diagnostics do not resolve a proxy secret or call the
-proxy.
+This command performs one authenticated, bounded inventory request and prints
+only the direct IDs returned by CLIProxyAPI. It does not cache or classify the
+inventory.
 
-## Ownership boundary
+For native or direct-provider use, invoke `claude` or `codex` normally instead of
+using the OneTool launcher.
 
-OneTool never installs, configures, starts, stops, authenticates, or administers
-CLIProxyAPI. It never reads or rewrites CLIProxyAPI, Claude, or Codex configuration,
-profile, catalog, OAuth, or authentication files.
-
-- [Claude model configuration](https://code.claude.com/docs/en/model-config)
-- [Claude environment variables](https://code.claude.com/docs/en/env-vars)
-- [Codex configuration](https://developers.openai.com/codex/config-basic/)
-- [CLIProxyAPI configuration](https://help.router-for.me/configuration/options)
-
-Installed-client capability checks are opt-in and non-billable:
+Installed-client capability checks remain opt-in and non-billable:
 
 ```bash
 ONETOOL_LIVE_CODE_CLIENTS=confirmed \

@@ -2,232 +2,173 @@
 
 ## Purpose
 
-Defines deterministic process-replacement launching of official Claude Code and
-Codex clients through exact proxy routes or direct Codex profiles.
+Defines minimal process-replacement launching of official Claude Code and Codex
+clients through CLIProxyAPI with live model selection, explicit context, opaque
+harness arguments, and read-only diagnostics.
 
 ## Requirements
 
 ### Requirement: Configured harness targets
 
-OneTool SHALL launch official harnesses through an exact configured proxy route or
-an exact configured direct profile supported by that harness.
+OneTool SHALL launch Claude Code or Codex through CLIProxyAPI using one required
+model query resolved from the live inference inventory and an optional explicit
+context policy supplied before the model.
 
 #### Scenario: Claude proxy launch
-- **WHEN** Claude selects a compatible configured proxy model
-- **THEN** OneTool SHALL launch the configured Claude executable through
-  `code.proxy`
-- **AND** it SHALL send the model record's exact effective id
+- **WHEN** `onetool code claude MODEL` resolves `MODEL` to one inventory ID
+- **THEN** OneTool SHALL launch `claude` through the environment-configured proxy
+- **AND** it SHALL use the resolved ID with the explicit Claude context policy
 
 #### Scenario: Codex proxy launch
-- **WHEN** Codex selects a compatible configured proxy model
-- **THEN** OneTool SHALL launch the configured Codex executable with the
-  invocation-scoped `onetool_proxy` provider
-
-#### Scenario: Direct Codex profile
-- **WHEN** Codex selects an exact configured profile and model
-- **THEN** OneTool SHALL pass that profile and exact model directly to Codex
-- **AND** it SHALL not resolve a proxy secret or construct proxy provider settings
+- **WHEN** `onetool code codex MODEL` resolves `MODEL` to one inventory ID
+- **THEN** OneTool SHALL launch `codex` with an invocation-scoped proxy provider
+- **AND** it SHALL use the resolved ID with the explicit Codex context policy
 
 #### Scenario: Model omitted
-- **WHEN** a harness command is invoked without a model
-- **THEN** OneTool SHALL use a compatible configured default
-- **AND** it SHALL fail actionably or offer interactive selection when no default
-  exists
+- **WHEN** a nested harness command is invoked without `MODEL`
+- **THEN** it SHALL fail with the explicit syntax without launching a harness
 
 #### Scenario: Harness binary missing
-- **WHEN** the configured executable is unavailable
-- **THEN** launch SHALL fail before secret resolution, network I/O, or process
-  replacement
-
-### Requirement: Harness and route compatibility
-
-Claude SHALL support `claude_subscription`, `codex_subscription`, and `openrouter`
-proxy routes. Codex SHALL support `codex_subscription` and `openrouter` proxy
-routes plus configured direct Codex profiles.
-
-#### Scenario: Unsupported combination
-- **WHEN** Codex is asked to use `claude_subscription`
-- **THEN** OneTool SHALL reject the route without substituting another route
-
-#### Scenario: Direct profile offered to Claude
-- **WHEN** Claude is asked to use a direct profile
-- **THEN** OneTool SHALL reject it without translating it into a proxy route
-
-#### Scenario: Claude subscription warning
-- **WHEN** Claude selects a configured `claude_subscription` model
-- **THEN** OneTool SHALL always display the Anthropic terms, account, and billing
-  warning, including in quiet mode
+- **WHEN** process replacement cannot resolve the official harness on `PATH`
+- **THEN** launch SHALL fail without trying another executable
 
 ### Requirement: Deterministic model matching
 
-OneTool SHALL resolve launcher models by exact full id or exact configured
-shortcut. Routes and profiles SHALL use exact canonical identifiers.
+OneTool SHALL resolve launch model queries only against one fresh bounded
+CLIProxyAPI inventory and SHALL NOT use a static registry, compatibility alias,
+route, profile, provider, subscription, or capability metadata.
 
-#### Scenario: Exact full id
-- **WHEN** the input exactly equals one compatible configured model id
-- **THEN** that record SHALL be selected
+#### Scenario: Exact match
+- **WHEN** a query exactly matches an advertised model ID
+- **THEN** OneTool SHALL select that ID before considering partial matches
 
-#### Scenario: Exact shortcut
-- **WHEN** the input exactly equals one compatible configured shortcut
-- **THEN** that record SHALL be selected
+#### Scenario: Unique partial match
+- **WHEN** a case-insensitive token, suffix, or substring query identifies
+  exactly one advertised model ID
+- **THEN** OneTool SHALL select that ID
 
-#### Scenario: Unknown selection
-- **WHEN** input is not an exact configured id or shortcut
-- **THEN** launch SHALL fail and list valid exact choices
-- **AND** it SHALL not normalize or partially match the input
+#### Scenario: Ambiguous match
+- **WHEN** a non-exact query matches more than one advertised model ID
+- **THEN** launch SHALL fail and list the candidate IDs without selecting one
 
-#### Scenario: Same id under multiple targets
-- **WHEN** the selected id exists under multiple compatible routes or profiles
-- **THEN** OneTool SHALL require an exact `--route` or `--profile`
-
-#### Scenario: Globally unique shortcut
-- **WHEN** two launcher records configure the same shortcut
-- **THEN** strict configuration validation SHALL reject the configuration
-
-### Requirement: Normal launch is discovery-independent
-
-Normal and dry-run invocation construction SHALL depend only on local
-configuration, executable resolution, and the named inference secret when the
-target is a proxy route.
-
-#### Scenario: No launch-time discovery
-- **WHEN** OneTool constructs a normal or dry-run harness invocation
-- **THEN** it SHALL NOT call `/v1/models`, `--version`, or `--help`
-
-#### Scenario: No CLIProxyAPI config dependency
-- **WHEN** a launcher invocation is constructed
-- **THEN** OneTool SHALL NOT read, locate, parse, or mutate a CLIProxyAPI YAML file
-- **AND** it SHALL NOT require a CLIProxyAPI management key
-
-#### Scenario: Exact proxy wire identity
-- **WHEN** a configured proxy model is launched without a Claude context policy
-- **THEN** its `id` SHALL be passed unchanged as the proxy-facing model identity
-- **AND** OneTool SHALL NOT translate it through aliases or live discovery
+#### Scenario: Missing match
+- **WHEN** a query matches no advertised model ID
+- **THEN** launch SHALL fail without substituting another model
 
 ### Requirement: Invocation-scoped configuration
 
-Proxy, profile, model, and Claude context changes SHALL affect only the launched
-process.
+Proxy, credential, resolved model, and explicit context changes SHALL affect
+only the launched process.
 
-#### Scenario: Claude proxy environment
-- **WHEN** a Claude proxy invocation is constructed
-- **THEN** conflicting inherited Anthropic gateway, model, description, and context
-  variables SHALL be removed
-- **AND** `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, and all three default model
-  slots SHALL use the selected proxy and effective model id
-- **AND** argv SHALL contain exactly one OneTool-owned `--model`
+#### Scenario: Claude automatic context
+- **WHEN** a Claude invocation uses `--context auto` or omits the option
+- **THEN** conflicting inherited context controls SHALL be removed
+- **AND** the resolved model SHALL be used without a context suffix
 
-#### Scenario: Claude one-million-token context
-- **WHEN** the selected record configures Claude context `1m`
-- **THEN** the effective model SHALL use the documented `[1m]` suffix
-- **AND** an optional configured auto-compaction threshold SHALL be set only for
-  the launched process
+#### Scenario: Claude 1M context
+- **WHEN** a Claude invocation uses `--context 1m`
+- **THEN** its generated selector and child model variables SHALL use
+  `<resolved-model>[1m]`
 
 #### Scenario: Claude standard context
-- **WHEN** the selected record configures Claude context `standard`
-- **THEN** the base model id SHALL be used
-- **AND** one-million-token context SHALL be explicitly disabled for the launched
-  process
+- **WHEN** a Claude invocation uses `--context 200k`
+- **THEN** it SHALL use the resolved model without a suffix
+- **AND** the child SHALL set `CLAUDE_CODE_DISABLE_1M_CONTEXT=1`
 
-#### Scenario: Claude policy omitted
-- **WHEN** the selected record has no Claude context policy
-- **THEN** the base model id SHALL be used
-- **AND** inherited OneTool-owned context overrides SHALL be removed
+#### Scenario: Unsupported Claude context
+- **WHEN** a Claude invocation supplies another positive numeric context
+- **THEN** launch SHALL fail without approximating or silently clamping it
 
-#### Scenario: Codex proxy provider
-- **WHEN** a Codex proxy invocation is constructed
-- **THEN** argv SHALL define `onetool_proxy` with the configured base URL,
-  `wire_api = "responses"`, and private `ONETOOL_CODE_PROVIDER_KEY`
-- **AND** the selected exact model id SHALL follow one OneTool-owned `--model`
+#### Scenario: Codex automatic context
+- **WHEN** a Codex invocation uses `--context auto` or omits the option
+- **THEN** it SHALL not generate context-window or auto-compact overrides
 
-#### Scenario: Codex direct profile
-- **WHEN** a Codex direct invocation is constructed
-- **THEN** argv SHALL contain one OneTool-owned `--profile` and one `--model`
-- **AND** no proxy provider, proxy base URL, or proxy credential SHALL be added
-
-#### Scenario: Working directory
-- **WHEN** a client working directory is configured
-- **THEN** OneTool SHALL change to that directory immediately before replacing the
-  process
+#### Scenario: Codex numeric context
+- **WHEN** a Codex invocation supplies a positive numeric context
+- **THEN** argv SHALL define invocation-scoped `model_context_window` and
+  `model_auto_compact_token_limit` values
+- **AND** the compact limit SHALL be 90 percent of the context window
 
 #### Scenario: User files remain unchanged
 - **WHEN** any invocation is constructed or launched
-- **THEN** OneTool SHALL NOT write Claude, Codex, CLIProxyAPI, authentication,
-  profile, catalog, or settings files
+- **THEN** OneTool SHALL NOT write harness, proxy, profile, catalog, or settings
+  files
 
 #### Scenario: Secret isolation
-- **WHEN** an invocation requires the named proxy secret
-- **THEN** its value SHALL appear only in the launched environment
-- **AND** it SHALL not appear in argv, summaries, dry runs, logs, or errors
+- **WHEN** the bootstrap credential is used
+- **THEN** it SHALL appear only in the target-specific child auth variable
+- **AND** the bootstrap variable SHALL be removed from the final child
+  environment
 
-### Requirement: Permission modes
+### Requirement: Bounded launcher status diagnostics
 
-OneTool SHALL support `normal` and `bypass` through one `--permission` option.
+OneTool SHALL provide read-only status diagnostics for the environment-owned
+CLIProxyAPI connection and official harness executables without reading or
+mutating management configuration.
 
-#### Scenario: Normal mode
-- **WHEN** `normal` is selected
-- **THEN** OneTool SHALL add no permission-bypass flag
+#### Scenario: Successful status
+- **WHEN** `onetool code status` runs with a reachable authenticated inference
+  endpoint
+- **THEN** it SHALL display the normalized origin and its environment/default
+  provenance, credential presence, every discovered model ID and count, the
+  derived `/management.html` URL and reachability, and installed harness/proxy
+  executable versions
+- **AND** it SHALL not display any credential value or raw HTTP body
 
-#### Scenario: Bypass mode
-- **WHEN** `bypass` is selected
-- **THEN** OneTool SHALL add only the verified bypass flag for that harness
+#### Scenario: Required readiness failure
+- **WHEN** the inference credential is missing or inventory discovery is
+  unauthorized, unavailable, oversized, malformed, or timed out
+- **THEN** status SHALL continue safe independent checks and exit non-zero with
+  a bounded actionable diagnostic
+
+#### Scenario: Optional diagnostic failure
+- **WHEN** a harness executable, management page, or version probe is unavailable
+- **THEN** status SHALL report a warning without exposing sensitive content
+
+#### Scenario: Open management page
+- **WHEN** `onetool code status --open` is invoked
+- **THEN** OneTool SHALL ask the platform browser to open only the management URL
+  derived from the normalized proxy origin after displaying status
+- **AND** plain `status` SHALL never open a browser
+
+#### Scenario: No administration
+- **WHEN** status runs
+- **THEN** it SHALL NOT read a management key or proxy YAML, call the management
+  API, initiate OAuth, manage service lifecycle, or write user files
 
 ### Requirement: Opaque upstream passthrough
 
-OneTool SHALL preserve every token after the first real `--` delimiter as an
-ordered upstream tail without interpreting upstream commands or option values,
-except to reject syntactic forms of OneTool-owned options.
+After consuming harness, launcher options, and `MODEL`, OneTool SHALL append
+every remaining token unchanged and in order without parsing or validation.
 
-#### Scenario: Model omitted before boundary
-- **WHEN** `onetool codex -- exec` is invoked
-- **THEN** `exec` SHALL remain passthrough and SHALL NOT become the launcher model
+#### Scenario: Separator not required
+- **WHEN** `onetool code claude MODEL --continue` is invoked
+- **THEN** `--continue` SHALL be forwarded unchanged
 
-#### Scenario: Upstream commands and aliases
-- **WHEN** the tail contains Codex `exec`, `e`, `apply`, or `a`, or Claude `plugins`
-  or `upgrade`
-- **THEN** those tokens SHALL pass through unchanged and in order
+#### Scenario: Subcommands and unknown options
+- **WHEN** remaining tokens contain subcommands, short forms, or unknown options
+- **THEN** every token SHALL be forwarded unchanged and the harness SHALL validate
+  them
 
-#### Scenario: Arbitrary option values
-- **WHEN** an upstream option or its value is not a OneTool-owned long or short
-  option form
-- **THEN** OneTool SHALL preserve it without partially reimplementing the upstream
-  parser
+#### Scenario: Conflicting option
+- **WHEN** remaining tokens conflict with generated model, provider, permission,
+  or config arguments
+- **THEN** OneTool SHALL still forward them unchanged
 
-#### Scenario: Owned flag conflict
-- **WHEN** configured arguments or passthrough contain a model, route/profile,
-  Codex provider, or permission-bypass option owned by OneTool
-- **AND** that option uses a long form, a long form with `=`, a separated short
-  form, or an attached short form
-- **THEN** launch SHALL reject the conflict before replacing the process
-
-#### Scenario: Route and profile conflict
-- **WHEN** both `--route` and `--profile` are supplied
-- **THEN** launch SHALL reject the mutually exclusive target selectors
-
-#### Scenario: Argument order
-- **WHEN** an invocation is built
-- **THEN** argv SHALL contain the executable, OneTool-owned arguments, configured
-  additional arguments, then the explicit passthrough tail
+#### Scenario: Literal delimiter
+- **WHEN** remaining tokens include `--`
+- **THEN** that token and every following token SHALL be preserved
 
 ### Requirement: Foreground lifecycle and diagnostics
 
-OneTool SHALL hand terminal ownership directly to the selected harness through
-process replacement and provide bounded, redacted pre-launch presentation.
+OneTool SHALL replace itself with the selected harness without supervising it or
+adding a presentation lifecycle.
 
 #### Scenario: Process replacement
-- **WHEN** a non-dry-run invocation passes all pre-launch validation
-- **THEN** OneTool SHALL replace itself with the configured harness executable and
+- **WHEN** required inputs are present
+- **THEN** OneTool SHALL call process replacement with the ordered argv and child
   environment
-- **AND** it SHALL not supervise a child or emit a post-exit summary
 
-#### Scenario: Dry run
-- **WHEN** `--dry-run` is selected
-- **THEN** OneTool SHALL show the redacted target, argv, and environment delta
-  without replacing the process
-
-#### Scenario: Pre-launch summary
-- **WHEN** lifecycle output is enabled
-- **THEN** it SHALL identify harness, configured model id or label, target, and
-  permission without exposing secrets
-- **AND** any transformed wire selector such as Claude's `[1m]` form SHALL remain
-  visible only in redacted verbose or dry-run argv
+#### Scenario: Harness-owned error
+- **WHEN** the harness rejects a forwarded argument
+- **THEN** its normal error and exit behaviour SHALL be presented directly

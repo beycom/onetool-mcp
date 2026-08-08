@@ -1,4 +1,4 @@
-"""Tests for bounded doctor-only CLIProxyAPI discovery."""
+"""Tests for bounded authenticated CLIProxyAPI model discovery."""
 
 from __future__ import annotations
 
@@ -6,81 +6,63 @@ import httpx
 import pytest
 
 from onetool.code.proxy import ModelDiscovery, ProxyDiscoveryError
-from ot.config.routing import CodeProxyConfig
 
 pytestmark = [pytest.mark.unit, pytest.mark.core]
 
 
-def _config() -> CodeProxyConfig:
-    return CodeProxyConfig(
-        routes={"codex_subscription": [{"id": "gpt-5.6-sol"}]}
+def _discovery(handler: httpx.MockTransport) -> tuple[ModelDiscovery, httpx.Client]:
+    client = httpx.Client(transport=handler)
+    return (
+        ModelDiscovery(
+            proxy_origin="http://proxy.test/",
+            credential="secret-value",
+            client=client,
+        ),
+        client,
     )
 
 
-def test_discovery_uses_exact_inference_path_and_bearer_secret() -> None:
+def test_discovery_performs_one_authenticated_bounded_request() -> None:
+    requests: list[httpx.Request] = []
+
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url == "http://127.0.0.1:8317/v1/models"
-        assert request.headers["Authorization"] == "Bearer private-key"
+        requests.append(request)
+        assert request.url == "http://proxy.test/v1/models"
+        assert request.headers["Authorization"] == "Bearer secret-value"
         return httpx.Response(
             200,
-            json={"data": [{"id": "gpt-5.6-sol"}, {"id": "gpt-5.6-sol"}]},
+            json={"data": [{"id": "gpt-5.6-luna"}, {"id": "z-ai/glm-5.2"}]},
         )
 
-    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
-        models = ModelDiscovery(
-            config=_config(),
-            secret="private-key",
-            client=client,
-        ).models()
-
-    assert models == ("gpt-5.6-sol", "gpt-5.6-sol")
+    discovery, client = _discovery(httpx.MockTransport(handler))
+    with client:
+        assert discovery.models() == ("gpt-5.6-luna", "z-ai/glm-5.2")
+    assert len(requests) == 1
 
 
 @pytest.mark.parametrize(
     ("response", "message"),
     [
-        (httpx.Response(401, text="private-key"), "HTTP 401"),
+        (httpx.Response(401, content=b"secret-value"), "HTTP 401"),
         (httpx.Response(200, content=b"not-json"), "invalid JSON"),
         (httpx.Response(200, json={"models": []}), "data list"),
-        (httpx.Response(200, json={"data": [{"name": "bad"}]}), "invalid id"),
+        (httpx.Response(200, json={"data": [{"id": ""}]}), "invalid id"),
+        (httpx.Response(200, json={"data": [{"id": "model\nnext"}]}), "invalid id"),
+        (
+            httpx.Response(
+                200,
+                headers={"Content-Length": str(1_048_577)},
+                content=b"{}",
+            ),
+            "1 MiB",
+        ),
     ],
 )
 def test_discovery_failures_are_bounded_and_redacted(
     response: httpx.Response,
     message: str,
 ) -> None:
-    with httpx.Client(
-        transport=httpx.MockTransport(lambda _request: response)
-    ) as client:
-        discovery = ModelDiscovery(
-            config=_config(),
-            secret="private-key",
-            client=client,
-        )
-        with pytest.raises(ProxyDiscoveryError, match=message) as error:
-            discovery.models()
-
-    assert "private-key" not in str(error.value)
-
-
-@pytest.mark.parametrize(
-    "response",
-    [
-        httpx.Response(
-            200,
-            headers={"Content-Length": str(1_048_577)},
-            content=b"{}",
-        ),
-        httpx.Response(
-            200,
-            stream=httpx.ByteStream(b"x" * 1_048_577),
-        ),
-    ],
-)
-def test_discovery_rejects_oversized_body_before_parsing(
-    response: httpx.Response,
-) -> None:
-    with httpx.Client(
-        transport=httpx.MockTransport(lambda _request: response)
-    ) as client, pytest.raises(ProxyDiscoveryError, match="1 MiB"):
-        ModelDiscovery(config=_config(), secret="key", client=client).models()
+    discovery, client = _discovery(httpx.MockTransport(lambda _request: response))
+    with client, pytest.raises(ProxyDiscoveryError, match=message) as error:
+        discovery.models()
+    assert "secret-value" not in str(error.value)

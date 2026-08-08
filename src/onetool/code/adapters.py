@@ -1,29 +1,23 @@
-"""Invocation-scoped proxy adapters for Claude Code and Codex."""
+"""Minimal invocation-scoped adapters for Claude Code and Codex."""
 
 from __future__ import annotations
 
 import os
-import shutil
-import subprocess
-import time
-from collections.abc import Callable, Mapping
-from pathlib import Path
-from typing import TYPE_CHECKING, NoReturn
+from collections.abc import Mapping
+from typing import NoReturn
+from urllib.parse import urlsplit
 
-from onetool.code.domain import EnvironmentDelta, LaunchInvocation, ResolvedTarget
-from ot.config.routing import validate_client_arguments
+from onetool.code.domain import EnvironmentDelta, Harness, LaunchInvocation
 
-if TYPE_CHECKING:
-    from ot.config.models import OneToolConfig
-    from ot.config.routing import ExternalClientConfig, Harness
-
-_MAX_CAPABILITY_OUTPUT = 65_536
-_CAPABILITY_TIMEOUT = 5.0
+DEFAULT_PROXY_ORIGIN = "http://127.0.0.1:8317"
+INFERENCE_KEY_ENV = "CLIPROXY_INFERENCE_KEY"
+BASE_URL_ENV = "CLIPROXY_BASE_URL"
 _PRIVATE_PROVIDER_KEY = "ONETOOL_CODE_PROVIDER_KEY"
 _PROVIDER_ID = "onetool_proxy"
 
 _CLAUDE_CLEAN_ENV = frozenset(
     {
+        INFERENCE_KEY_ENV,
         "ANTHROPIC_API_KEY",
         "ANTHROPIC_AUTH_TOKEN",
         "ANTHROPIC_BASE_URL",
@@ -47,137 +41,40 @@ _CLAUDE_CLEAN_ENV = frozenset(
         "ENABLE_TOOL_SEARCH",
     }
 )
-_CODEX_CLEAN_ENV = frozenset({_PRIVATE_PROVIDER_KEY})
+_CODEX_CLEAN_ENV = frozenset({INFERENCE_KEY_ENV, _PRIVATE_PROVIDER_KEY})
 
 
-def resolve_client_executable(value: str) -> str:
-    """Resolve and check one configured executable without a shell."""
-    path = Path(value)
-    resolved = str(path) if path.is_absolute() else shutil.which(value)
-    if resolved is None:
-        raise ValueError(f"Configured executable {value!r} was not found on PATH")
-    resolved_path = Path(resolved).resolve()
-    if not resolved_path.is_file() or not os.access(resolved_path, os.X_OK):
-        raise ValueError(f"Configured executable is not an executable file: {resolved}")
-    return str(resolved_path)
+def normalize_proxy_origin(value: str) -> str:
+    """Validate and remove trailing slashes from the proxy origin."""
+    if any(
+        ord(character) < 0x20 or 0x7F <= ord(character) <= 0x9F for character in value
+    ):
+        raise ValueError(f"{BASE_URL_ENV} must not contain control characters")
+    normalized = value.rstrip("/")
+    parsed = urlsplit(normalized)
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError(f"{BASE_URL_ENV} must be an HTTP(S) origin")
+    return normalized
 
 
-def run_capability_command(argv: tuple[str, ...]) -> str:
-    """Run a non-interactive capability command with strict output/time bounds."""
-    process = subprocess.Popen(
-        argv,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        shell=False,
-    )
-    if process.stdout is None:
-        process.kill()
-        process.wait()
-        raise RuntimeError("Capability command output pipe was not created")
-
-    output = bytearray()
-    deadline = time.monotonic() + _CAPABILITY_TIMEOUT
-    try:
-        os.set_blocking(process.stdout.fileno(), False)
-        while True:
-            if time.monotonic() >= deadline:
-                raise subprocess.TimeoutExpired(argv, _CAPABILITY_TIMEOUT)
-            try:
-                chunk = os.read(
-                    process.stdout.fileno(),
-                    min(8192, _MAX_CAPABILITY_OUTPUT + 1 - len(output)),
-                )
-            except BlockingIOError:
-                chunk = None
-
-            if chunk:
-                output.extend(chunk)
-                if len(output) > _MAX_CAPABILITY_OUTPUT:
-                    raise ValueError(
-                        f"Capability output exceeded {_MAX_CAPABILITY_OUTPUT} bytes"
-                    )
-                continue
-
-            if chunk == b"" and process.poll() is not None:
-                break
-            time.sleep(0.01)
-    except subprocess.TimeoutExpired as exc:
-        raise ValueError(
-            f"Capability command timed out: {Path(argv[0]).name}"
-        ) from exc
-    finally:
-        if process.poll() is None:
-            process.kill()
-        process.wait()
-        process.stdout.close()
-
-    if process.returncode != 0:
-        raise ValueError(
-            f"Capability command failed for {Path(argv[0]).name} "
-            f"with exit code {process.returncode}"
-        )
-    return output.decode("utf-8", errors="replace")
-
-
-def required_route_capabilities(
-    *,
-    harness: Harness,
-    permission: str,
-    require_proxy: bool = True,
-    require_profile: bool = False,
-) -> tuple[str, ...]:
-    """Return stable flags required by configured adapter targets."""
-    required = {"--model"}
-    if harness == "codex" and require_proxy:
-        required.add("--config")
-    if harness == "codex" and require_profile:
-        required.add("--profile")
-    if permission == "bypass":
-        required.add(
-            "--dangerously-skip-permissions"
-            if harness == "claude"
-            else "--dangerously-bypass-approvals-and-sandbox"
-        )
-    return tuple(sorted(required))
-
-
-def check_client_capabilities(
-    *,
-    executable: str,
-    harness: Harness,
-    permission: str,
-    require_proxy: bool = True,
-    require_profile: bool = False,
-) -> tuple[str, ...]:
-    """Verify adapter flags for one resolved executable."""
-    help_output = run_capability_command((executable, "--help"))
-    required = required_route_capabilities(
-        harness=harness,
-        permission=permission,
-        require_proxy=require_proxy,
-        require_profile=require_profile,
-    )
-    missing = [flag for flag in required if flag not in help_output]
-    if missing:
-        raise ValueError(
-            f"{Path(executable).name} lacks required route capabilities: "
-            f"{', '.join(missing)}"
-        )
-    return required
-
-
-def _checked_directory(
-    config: OneToolConfig,
-    value: str,
-    *,
-    setting: str,
-) -> str:
-    """Resolve and require one user-owned directory."""
-    path = config._resolve_onetool_relative_path(value)
-    if not path.is_dir():
-        raise ValueError(f"{setting} is not a directory: {path}")
-    return str(path)
+def connection_from_environment(
+    environment: Mapping[str, str] | None = None,
+) -> tuple[str, str]:
+    """Read the launcher origin and required credential only from the environment."""
+    values = os.environ if environment is None else environment
+    origin = normalize_proxy_origin(values.get(BASE_URL_ENV, DEFAULT_PROXY_ORIGIN))
+    credential = values.get(INFERENCE_KEY_ENV)
+    if not credential:
+        raise ValueError(f"{INFERENCE_KEY_ENV} is required")
+    return origin, credential
 
 
 def _toml_string(value: str) -> str:
@@ -186,216 +83,102 @@ def _toml_string(value: str) -> str:
     return f'"{escaped}"'
 
 
-def _client(
-    *,
-    config: OneToolConfig,
-    target: ResolvedTarget,
-) -> ExternalClientConfig:
-    """Return the configured client for one resolved harness."""
-    if config.code is None:
-        raise ValueError("Code routing is not configured")
-    return (
-        config.code.clients.claude
-        if target.harness == "claude"
-        else config.code.clients.codex
-    )
-
-
-def _secret(
-    *,
-    config: OneToolConfig,
-    secret_resolver: Callable[[str], str | None],
-) -> str:
-    """Resolve the proxy inference secret without exposing its value."""
-    if config.code is None:
-        raise ValueError("Code routing is not configured")
-    if config.code.proxy is None:
-        raise ValueError("Proxy routing is not configured")
-    name = config.code.proxy.secret_name
-    value = secret_resolver(name)
-    if not value:
-        raise ValueError(f"Named inference secret {name!r} is not configured")
-    return value
-
-
-def _user_arguments(
-    *,
-    client: ExternalClientConfig,
-    passthrough: tuple[str, ...],
-    harness: Harness,
-) -> tuple[str, ...]:
-    """Validate and combine configured and explicit opaque arguments."""
-    validate_client_arguments(
-        harness=harness,
-        arguments=client.additional_arguments,
-    )
-    validate_client_arguments(harness=harness, arguments=passthrough)
-    return (*client.additional_arguments, *passthrough)
-
-
 def _claude_invocation(
     *,
-    config: OneToolConfig,
-    target: ResolvedTarget,
-    executable: str,
-    client: ExternalClientConfig,
-    passthrough: tuple[str, ...],
-    secret_resolver: Callable[[str], str | None],
+    model: str,
+    proxy_origin: str,
+    credential: str,
+    context_window: int | None,
+    arguments: tuple[str, ...],
 ) -> LaunchInvocation:
     """Build one proxied Claude Code invocation."""
-    if config.code is None or config.code.proxy is None:
-        raise ValueError("Proxy routing is not configured")
-    if target.kind != "route":
-        raise ValueError("Claude supports proxy routes only")
-    secret = _secret(config=config, secret_resolver=secret_resolver)
-    model_id = target.model.id
-    if target.model.claude_context == "1m":
-        model_id = f"{model_id}[1m]"
-    argv = [executable, "--model", model_id]
-    if target.permission == "bypass":
-        argv.append("--dangerously-skip-permissions")
-    argv.extend(
-        _user_arguments(
-            client=client,
-            passthrough=passthrough,
-            harness="claude",
-        )
-    )
+    if context_window not in {None, 200_000, 1_000_000}:
+        raise ValueError("Claude context must be auto, 200k, or 1m")
+    selected_model = f"{model}[1m]" if context_window == 1_000_000 else model
     set_values = {
-        "ANTHROPIC_BASE_URL": config.code.proxy.base_url,
-        "ANTHROPIC_AUTH_TOKEN": secret,
-        "ANTHROPIC_DEFAULT_OPUS_MODEL": model_id,
-        "ANTHROPIC_DEFAULT_SONNET_MODEL": model_id,
-        "ANTHROPIC_DEFAULT_HAIKU_MODEL": model_id,
+        "ANTHROPIC_BASE_URL": proxy_origin,
+        "ANTHROPIC_AUTH_TOKEN": credential,
+        "ANTHROPIC_MODEL": selected_model,
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": selected_model,
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": selected_model,
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL": selected_model,
+        "CLAUDE_CODE_SUBAGENT_MODEL": selected_model,
     }
-    if target.model.claude_context == "1m":
-        set_values["ANTHROPIC_MODEL"] = model_id
-        if target.model.auto_compact_window is not None:
-            set_values["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = str(
-                target.model.auto_compact_window
-            )
-    elif target.model.claude_context == "standard":
+    if context_window == 200_000:
         set_values["CLAUDE_CODE_DISABLE_1M_CONTEXT"] = "1"
     return LaunchInvocation(
-        target=target,
-        executable=executable,
-        argv=tuple(argv),
+        harness="claude",
+        model=model,
+        proxy_origin=proxy_origin,
+        argv=("claude", "--model", selected_model, *arguments),
         environment=EnvironmentDelta.create(
-            remove=set(_CLAUDE_CLEAN_ENV),
+            remove=_CLAUDE_CLEAN_ENV,
             set_values=set_values,
         ),
-        working_directory=None,
     )
 
 
 def _codex_invocation(
     *,
-    config: OneToolConfig,
-    target: ResolvedTarget,
-    executable: str,
-    client: ExternalClientConfig,
-    passthrough: tuple[str, ...],
-    secret_resolver: Callable[[str], str | None],
+    model: str,
+    proxy_origin: str,
+    credential: str,
+    context_window: int | None,
+    arguments: tuple[str, ...],
 ) -> LaunchInvocation:
-    """Build one proxied or direct-profile Codex invocation."""
-    if config.code is None:
-        raise ValueError("Code routing is not configured")
-    set_values: dict[str, str] = {}
-    client_home = getattr(client, "home_path", None)
-    if client_home is not None:
-        set_values["CODEX_HOME"] = _checked_directory(
-            config,
-            client_home,
-            setting="code.clients.codex.home_path",
+    """Build one invocation-scoped Codex Responses provider."""
+    provider_base = f"{proxy_origin}/v1"
+    overrides: tuple[tuple[str, str], ...] = (
+        ("model_provider", _toml_string(_PROVIDER_ID)),
+        (f"model_providers.{_PROVIDER_ID}.name", _toml_string("OneTool Proxy")),
+        (f"model_providers.{_PROVIDER_ID}.base_url", _toml_string(provider_base)),
+        (
+            f"model_providers.{_PROVIDER_ID}.env_key",
+            _toml_string(_PRIVATE_PROVIDER_KEY),
+        ),
+        (f"model_providers.{_PROVIDER_ID}.wire_api", _toml_string("responses")),
+    )
+    if context_window is not None:
+        overrides += (
+            ("model_context_window", str(context_window)),
+            ("model_auto_compact_token_limit", str(context_window * 9 // 10)),
         )
-
-    argv = [executable]
-    if target.kind == "route":
-        if config.code.proxy is None:
-            raise ValueError("Proxy routing is not configured")
-        secret = _secret(config=config, secret_resolver=secret_resolver)
-        set_values[_PRIVATE_PROVIDER_KEY] = secret
-        overrides = (
-            ("model_provider", _toml_string(_PROVIDER_ID)),
-            (
-                f"model_providers.{_PROVIDER_ID}.name",
-                _toml_string("OneTool Proxy"),
-            ),
-            (
-                f"model_providers.{_PROVIDER_ID}.base_url",
-                _toml_string(config.code.proxy.base_url),
-            ),
-            (
-                f"model_providers.{_PROVIDER_ID}.env_key",
-                _toml_string(_PRIVATE_PROVIDER_KEY),
-            ),
-            (
-                f"model_providers.{_PROVIDER_ID}.wire_api",
-                _toml_string("responses"),
-            ),
-        )
-        for key, value in overrides:
-            argv.extend(("-c", f"{key}={value}"))
-    else:
-        argv.extend(("--profile", target.name))
-    argv.extend(("--model", target.model.id))
-    if target.permission == "bypass":
-        argv.append("--dangerously-bypass-approvals-and-sandbox")
-    argv.extend(
-        _user_arguments(
-            client=client,
-            passthrough=passthrough,
-            harness="codex",
-        )
+    generated = tuple(
+        token for key, value in overrides for token in ("-c", f"{key}={value}")
     )
     return LaunchInvocation(
-        target=target,
-        executable=executable,
-        argv=tuple(argv),
+        harness="codex",
+        model=model,
+        proxy_origin=proxy_origin,
+        argv=("codex", *generated, "--model", model, *arguments),
         environment=EnvironmentDelta.create(
-            remove=set(_CODEX_CLEAN_ENV),
-            set_values=set_values,
+            remove=_CODEX_CLEAN_ENV,
+            set_values={_PRIVATE_PROVIDER_KEY: credential},
         ),
-        working_directory=None,
     )
 
 
 def build_invocation(
     *,
-    config: OneToolConfig,
-    target: ResolvedTarget,
-    passthrough: tuple[str, ...],
-    secret_resolver: Callable[[str], str | None],
+    harness: Harness,
+    model: str,
+    proxy_origin: str,
+    credential: str,
+    context_window: int | None = None,
+    arguments: tuple[str, ...] = (),
 ) -> LaunchInvocation:
-    """Build a local invocation without network or capability subprocesses."""
-    client = _client(config=config, target=target)
-    executable = resolve_client_executable(client.executable)
-    working_directory = (
-        _checked_directory(
-            config,
-            client.working_directory,
-            setting=f"code.clients.{target.harness}.working_directory",
-        )
-        if client.working_directory is not None
-        else None
-    )
-    builder = (
-        _claude_invocation if target.harness == "claude" else _codex_invocation
-    )
-    invocation = builder(
-        config=config,
-        target=target,
-        executable=executable,
-        client=client,
-        passthrough=passthrough,
-        secret_resolver=secret_resolver,
-    )
-    return LaunchInvocation(
-        target=invocation.target,
-        executable=invocation.executable,
-        argv=invocation.argv,
-        environment=invocation.environment,
-        working_directory=working_directory,
+    """Build a harness invocation without config loading, discovery, or I/O."""
+    if not model:
+        raise ValueError("MODEL is required")
+    if context_window is not None and context_window <= 0:
+        raise ValueError("context window must be positive")
+    builder = _claude_invocation if harness == "claude" else _codex_invocation
+    return builder(
+        model=model,
+        proxy_origin=normalize_proxy_origin(proxy_origin),
+        credential=credential,
+        context_window=context_window,
+        arguments=arguments,
     )
 
 
@@ -404,19 +187,18 @@ def replace_process(
     invocation: LaunchInvocation,
     parent_environment: Mapping[str, str] | None = None,
 ) -> NoReturn:
-    """Replace OneTool with the validated harness invocation."""
+    """Replace OneTool with the official harness resolved through PATH."""
     parent = os.environ if parent_environment is None else parent_environment
     environment = invocation.environment.apply(parent)
-    if invocation.working_directory is not None:
-        os.chdir(invocation.working_directory)
     os.execvpe(invocation.executable, invocation.argv, environment)
 
 
 __all__ = [
+    "BASE_URL_ENV",
+    "DEFAULT_PROXY_ORIGIN",
+    "INFERENCE_KEY_ENV",
     "build_invocation",
-    "check_client_capabilities",
+    "connection_from_environment",
+    "normalize_proxy_origin",
     "replace_process",
-    "required_route_capabilities",
-    "resolve_client_executable",
-    "run_capability_command",
 ]

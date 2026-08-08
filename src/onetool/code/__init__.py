@@ -1,16 +1,20 @@
-"""Typed Claude Code and Codex launcher support."""
+"""Minimal CLIProxyAPI launch support for Claude Code and Codex."""
 
-from onetool.code.adapters import build_invocation, replace_process
-from onetool.code.domain import LaunchInvocation, ResolvedModel, ResolvedTarget
+from onetool.code.adapters import (
+    build_invocation,
+    connection_from_environment,
+    replace_process,
+)
+from onetool.code.domain import LaunchInvocation
 from onetool.code.proxy import ModelDiscovery
-from onetool.code.resolver import resolve_target
+from onetool.code.selection import parse_context, resolve_model_query
 
 __all__ = [
     "LaunchInvocation",
     "ModelDiscovery",
-    "ResolvedModel",
-    "ResolvedTarget",
     "build_invocation",
+    "connection_from_environment",
+    "parse_context",
     "replace_process",
-    "resolve_target",
+    "resolve_model_query",
 ]

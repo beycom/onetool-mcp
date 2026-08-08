@@ -1,265 +1,291 @@
-"""CLI acceptance tests for exact code-launch targets and diagnostics."""
+"""CLI acceptance tests for direct-model harness commands."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import pytest
-import yaml
 from typer.testing import CliRunner
 
 from onetool.cli import app
-from ot.config import reset
-from tests.unit.core.routing_fixtures import (
-    direct_codex_config,
-    proxy_launcher_config,
-)
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
-    from pathlib import Path
+from onetool.code.diagnostics import CodeStatus, ExecutableStatus
 
 pytestmark = [pytest.mark.unit, pytest.mark.core]
 
 runner = CliRunner()
 
 
-@pytest.fixture(autouse=True)
-def reset_config_cache() -> Iterator[None]:
-    reset()
-    yield
-    reset()
-
-
-def _write_config(tmp_path: Path, data: object) -> Path:
-    path = tmp_path / "onetool.yaml"
-    path.write_text(yaml.safe_dump(data))
-    return path
-
-
-def test_help_exposes_profile_and_removes_setup() -> None:
+def test_code_surface_contains_launchers_models_and_status_only() -> None:
     root = runner.invoke(app, ["--help"])
-    codex = runner.invoke(app, ["codex", "--help"])
     code = runner.invoke(app, ["code", "--help"])
 
     assert root.exit_code == 0
-    assert "Code Harnesses" in root.stdout
-    assert codex.exit_code == 0
-    assert "--profile" in codex.stdout
-    assert "-p" in codex.stdout
+    assert "code" in root.stdout
+    assert " claude " not in root.stdout
+    assert " codex " not in root.stdout
     assert code.exit_code == 0
-    assert "models" in code.stdout
-    assert "status" in code.stdout
-    assert "doctor" in code.stdout
-    assert "setup" not in code.stdout
+    for command in ("claude", "codex", "models", "status"):
+        assert command in code.stdout
+    for removed in ("config", "doctor", "setup", "service", "login"):
+        assert removed not in code.stdout
 
 
-def test_real_boundary_preserves_opaque_tail_and_profile() -> None:
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ("--continue",),
+        ("exec", "--full-auto"),
+        ("--unknown", "value", "-x"),
+        ("--model", "other"),
+        ("--", "literal", "--tail"),
+    ],
+)
+def test_every_token_after_model_is_forwarded_verbatim(
+    arguments: tuple[str, ...],
+) -> None:
+    with patch("onetool.cli_commands.code_app._launch") as launch:
+        result = runner.invoke(
+            app,
+            ["code", "codex", "z-ai/glm-5.2", *arguments],
+        )
+
+    assert result.exit_code == 0
+    assert launch.call_args.kwargs == {
+        "harness": "codex",
+        "model": "z-ai/glm-5.2",
+        "context_window": None,
+        "arguments": arguments,
+    }
+
+
+def test_context_before_model_is_owned_but_context_after_model_is_opaque() -> None:
     with patch("onetool.cli_commands.code_app._launch") as launch:
         result = runner.invoke(
             app,
             [
+                "code",
                 "codex",
-                "glm",
-                "--profile",
-                "openrouter",
-                "--",
-                "exec",
-                "--json",
+                "--context",
+                "372000",
+                "sol",
+                "--context",
+                "other",
             ],
         )
 
     assert result.exit_code == 0
-    assert launch.call_args.kwargs["model"] == "glm"
-    assert launch.call_args.kwargs["profile_name"] == "openrouter"
-    assert launch.call_args.kwargs["passthrough"] == ("exec", "--json")
+    assert launch.call_args.kwargs == {
+        "harness": "codex",
+        "model": "sol",
+        "context_window": 372_000,
+        "arguments": ("--context", "other"),
+    }
 
 
-def test_direct_dry_run_is_redacted_and_does_not_replace_process(
-    tmp_path: Path,
-) -> None:
-    config = _write_config(tmp_path, direct_codex_config())
-    with (
-        patch(
-            "onetool.code.adapters.resolve_client_executable",
-            return_value="/usr/bin/codex",
-        ),
-        patch("onetool.cli_commands.code_app.replace_process") as replace,
-    ):
-        result = runner.invoke(
-            app,
-            [
-                "codex",
-                "glm",
-                "--profile",
-                "openrouter",
-                "--dry-run",
-                "--config",
-                str(config),
-            ],
-        )
+def test_model_is_required_and_help_documents_environment() -> None:
+    missing = runner.invoke(app, ["code", "claude"])
+    help_result = runner.invoke(app, ["code", "claude", "--help"])
 
-    assert result.exit_code == 0
-    output = result.stdout + result.stderr
-    assert '"kind": "profile"' in output
-    assert '"name": "openrouter"' in output
-    assert '"set": []' in output
-    replace.assert_not_called()
+    assert missing.exit_code == 2
+    assert "MODEL" in (missing.stdout + missing.stderr)
+    assert help_result.exit_code == 0
+    output = help_result.stdout + help_result.stderr
+    assert "CLIPROXY_BASE_URL" in output
+    assert "CLIPROXY_INFERENCE_KEY" in output
+    assert "verbatim" in output
+    assert "--context" in output
 
 
-def test_route_and_profile_conflict_fails_before_launch(tmp_path: Path) -> None:
-    data = proxy_launcher_config()
-    data["code"]["direct"] = direct_codex_config()["code"]["direct"]
-    config = _write_config(tmp_path, data)
-
-    result = runner.invoke(
-        app,
-        [
-            "codex",
-            "glm",
-            "--route",
-            "openrouter",
-            "--profile",
-            "openrouter",
-            "--dry-run",
-            "--config",
-            str(config),
-        ],
-    )
-
-    assert result.exit_code == 2
-    assert "route 'openrouter'" in result.stderr
-    assert "profile 'openrouter'" in result.stderr
-
-
-def test_direct_only_status_and_doctor_ignore_proxy(tmp_path: Path) -> None:
-    config = _write_config(tmp_path, direct_codex_config())
-    capabilities = Mock(return_value=("--model", "--profile"))
-    with (
-        patch(
-            "onetool.cli_commands.code_app.resolve_client_executable",
-            return_value="/usr/bin/codex",
-        ),
-        patch(
-            "onetool.cli_commands.code_app.check_client_capabilities",
-            capabilities,
-        ),
-        patch(
-            "onetool.cli_commands.code_app.ModelDiscovery",
-            side_effect=AssertionError("proxy discovery ran"),
-        ),
-        patch(
-            "onetool.cli_commands.code_app.get_secret",
-            side_effect=AssertionError("proxy secret resolved"),
-        ),
-    ):
-        status = runner.invoke(app, ["code", "status", "--config", str(config)])
-        doctor = runner.invoke(app, ["code", "doctor", "--config", str(config)])
-
-    assert status.exit_code == 0
-    assert "codex: available" in status.stderr
-    assert "claude:" not in status.stderr
-    assert "CLIProxyAPI" not in status.stderr
-    assert doctor.exit_code == 0
-    capabilities.assert_called_once()
-    assert capabilities.call_args.kwargs["require_proxy"] is False
-    assert capabilities.call_args.kwargs["require_profile"] is True
-
-
-@pytest.mark.parametrize(
-    ("advertised", "expected_exit", "expected_diagnostic"),
-    [
-        (
-            ("gpt-5.6-sol", "z-ai/glm-5.2", "claude-sonnet-4-6"),
-            0,
-            "codex_subscription: gpt-5.6-sol",
-        ),
-        (
-            ("z-ai/glm-5.2", "claude-sonnet-4-6"),
-            1,
-            "codex_subscription: gpt-5.6-sol (not advertised)",
-        ),
-        (
-            (
-                "gpt-5.6-sol",
-                "gpt-5.6-sol",
-                "z-ai/glm-5.2",
-                "claude-sonnet-4-6",
-            ),
-            1,
-            "codex_subscription: gpt-5.6-sol (duplicate)",
-        ),
-    ],
-)
-def test_proxy_doctor_fetches_one_inventory_and_compares_exact_ids(
-    tmp_path: Path,
-    advertised: tuple[str, ...],
-    expected_exit: int,
-    expected_diagnostic: str,
-) -> None:
-    config = _write_config(tmp_path, proxy_launcher_config())
-    secrets = tmp_path / "secrets.yaml"
-    secrets.write_text("CLIPROXY_INFERENCE_KEY: test-key\n")
+def test_models_uses_one_live_inventory_without_loading_config() -> None:
     discovery = Mock()
-    discovery.models.return_value = advertised
+    discovery.models.return_value = ("gpt-5.6-luna", "z-ai/glm-5.2")
     with (
         patch(
-            "onetool.cli_commands.code_app.resolve_client_executable",
-            return_value="/usr/bin/harness",
-        ),
-        patch(
-            "onetool.cli_commands.code_app.check_client_capabilities",
-            return_value=("--model",),
+            "onetool.cli_commands.code_app.connection_from_environment",
+            return_value=("http://proxy.test", "secret"),
         ),
         patch(
             "onetool.cli_commands.code_app.ModelDiscovery",
             return_value=discovery,
-        ) as discovery_factory,
+        ) as factory,
     ):
-        result = runner.invoke(
-            app,
-            [
-                "code",
-                "doctor",
-                "--config",
-                str(config),
-                "--secrets",
-                str(secrets),
-            ],
-        )
+        result = runner.invoke(app, ["code", "models"])
 
-    assert result.exit_code == expected_exit
-    assert expected_diagnostic in result.stderr
-    discovery_factory.assert_called_once()
+    assert result.exit_code == 0
+    assert (result.stdout + result.stderr).splitlines() == [
+        "gpt-5.6-luna",
+        "z-ai/glm-5.2",
+    ]
+    factory.assert_called_once_with(
+        proxy_origin="http://proxy.test",
+        credential="secret",
+    )
     discovery.models.assert_called_once_with()
 
 
-def test_claude_subscription_warning_survives_quiet_mode(tmp_path: Path) -> None:
-    config = _write_config(tmp_path, proxy_launcher_config())
-    secrets = tmp_path / "secrets.yaml"
-    secrets.write_text("CLIPROXY_INFERENCE_KEY: test-key\n")
+def test_bare_code_requires_tty_and_interactive_path_is_shared() -> None:
     with patch(
-        "onetool.code.adapters.resolve_client_executable",
-        return_value="/usr/bin/claude",
+        "onetool.cli_commands.code_app._stdin_is_tty",
+        return_value=False,
     ):
-        result = runner.invoke(
-            app,
-            [
-                "claude",
-                "sonnet",
-                "--route",
-                "claude_subscription",
-                "--quiet",
-                "--dry-run",
-                "--config",
-                str(config),
-                "--secrets",
-                str(secrets),
-            ],
-        )
+        non_tty = runner.invoke(app, ["code"])
+    assert non_tty.exit_code == 2
+    assert "interactive terminal" in (non_tty.stdout + non_tty.stderr)
 
-    assert result.exit_code == 0
-    output = " ".join(result.stderr.split())
-    assert "not an approved Anthropic subscription path" in output
-    assert "Starting claude" not in output
+    with (
+        patch(
+            "onetool.cli_commands.code_app._stdin_is_tty",
+            return_value=True,
+        ),
+        patch("onetool.cli_commands.code_app._interactive_launch") as launch,
+    ):
+        interactive = runner.invoke(app, ["code"])
+    assert interactive.exit_code == 0
+    launch.assert_called_once_with()
+
+
+def test_interactive_launch_reuses_inventory_and_explicit_context() -> None:
+    discovery = Mock()
+    discovery.models.return_value = ("gpt-5.6-sol", "gpt-5.6-terra")
+    harness_prompt = Mock()
+    harness_prompt.ask.return_value = "claude"
+    context_prompt = Mock()
+    context_prompt.ask.return_value = "1m"
+    model_prompt = Mock()
+    model_prompt.ask.return_value = "gpt-5.6-sol"
+    with (
+        patch(
+            "onetool.cli_commands.code_app.connection_from_environment",
+            return_value=("http://proxy.test", "secret"),
+        ),
+        patch(
+            "onetool.cli_commands.code_app.ModelDiscovery",
+            return_value=discovery,
+        ),
+        patch(
+            "onetool.cli_commands.code_app.questionary.select",
+            side_effect=[harness_prompt, context_prompt],
+        ) as select,
+        patch(
+            "onetool.cli_commands.code_app.questionary.autocomplete",
+            return_value=model_prompt,
+        ),
+        patch("onetool.cli_commands.code_app._launch") as launch,
+    ):
+        from onetool.cli_commands.code_app import _interactive_launch
+
+        _interactive_launch()
+
+    assert select.call_count == 2
+    assert select.call_args_list[0].args == ("Harness",)
+    assert select.call_args_list[1].args == ("Context",)
+    launch.assert_called_once_with(
+        harness="claude",
+        model="gpt-5.6-sol",
+        context_window=1_000_000,
+        arguments=(),
+        connection=("http://proxy.test", "secret"),
+        inventory=("gpt-5.6-sol", "gpt-5.6-terra"),
+    )
+
+
+def test_interactive_cancellation_does_not_launch() -> None:
+    discovery = Mock()
+    discovery.models.return_value = ("gpt-5.6-sol",)
+    prompt = Mock()
+    prompt.ask.return_value = None
+    with (
+        patch(
+            "onetool.cli_commands.code_app.connection_from_environment",
+            return_value=("http://proxy.test", "secret"),
+        ),
+        patch(
+            "onetool.cli_commands.code_app.ModelDiscovery",
+            return_value=discovery,
+        ),
+        patch(
+            "onetool.cli_commands.code_app.questionary.select",
+            return_value=prompt,
+        ),
+        patch("onetool.cli_commands.code_app._launch") as launch,
+    ):
+        from onetool.cli_commands.code_app import _interactive_launch
+
+        _interactive_launch()
+    launch.assert_not_called()
+
+
+def _ready_status() -> CodeStatus:
+    return CodeStatus(
+        proxy_origin="http://proxy.test",
+        origin_source="environment",
+        origin_error=None,
+        credential_present=True,
+        models=("gpt-5.6-sol", "gpt-5.6-terra"),
+        inventory_error=None,
+        management_url="http://proxy.test/management.html",
+        management_reachable=True,
+        management_error=None,
+        executables=(
+            ExecutableStatus(
+                name="claude",
+                path="/bin/claude",
+                version="Claude 1.0",
+                error=None,
+            ),
+        ),
+    )
+
+
+def test_status_lists_models_and_opens_only_when_requested() -> None:
+    with (
+        patch(
+            "onetool.cli_commands.code_app.collect_code_status",
+            return_value=_ready_status(),
+        ),
+        patch(
+            "onetool.cli_commands.code_app.open_management_url",
+            return_value=True,
+        ) as open_url,
+    ):
+        plain = runner.invoke(app, ["code", "status"])
+        opened = runner.invoke(app, ["code", "status", "--open"])
+
+    assert plain.exit_code == 0
+    assert opened.exit_code == 0
+    for output in (plain.stdout + plain.stderr, opened.stdout + opened.stderr):
+        assert "Inference endpoint: reachable (authenticated)" in output
+        assert "2 available" in output
+        assert "gpt-5.6-sol" in output
+        assert "http://proxy.test/management.html" in output
+    assert open_url.call_args_list == [
+        call("http://proxy.test/management.html"),
+    ]
+
+
+def test_status_required_failure_is_nonzero_and_redacted() -> None:
+    failed = CodeStatus(
+        proxy_origin="http://proxy.test",
+        origin_source="default",
+        origin_error=None,
+        credential_present=True,
+        models=(),
+        inventory_error="CLIProxyAPI model discovery failed with HTTP 401",
+        management_url="http://proxy.test/management.html",
+        management_reachable=False,
+        management_error="management page is unavailable",
+        executables=(),
+    )
+    with patch(
+        "onetool.cli_commands.code_app.collect_code_status",
+        return_value=failed,
+    ):
+        result = runner.invoke(app, ["code", "status"])
+
+    assert result.exit_code == 2
+    output = result.stdout + result.stderr
+    assert "HTTP 401" in output
+    assert "Models: unavailable" in output
+    assert "warning: management page is" in output
+    assert "unavailable" in output
+    assert "secret-value" not in output

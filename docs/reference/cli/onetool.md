@@ -69,6 +69,33 @@ Validates configuration files and displays status including packs, secrets (name
 onetool init validate --config .onetool/onetool.yaml
 ```
 
+### code
+
+Launch an official coding harness through CLIProxyAPI by selecting interactively
+or resolving a required query against the live model inventory.
+
+```bash
+onetool code
+onetool code claude [--context auto|200k|1m] MODEL [HARNESS_ARGS...]
+onetool code codex [--context CONTEXT] MODEL [HARNESS_ARGS...]
+onetool code models
+onetool code status [--open]
+```
+
+`MODEL` may be a full ID or an unambiguous case-insensitive token, suffix, or
+substring. Claude context is `auto`, `200k`, or `1m`; Codex also accepts any
+positive integer token count. Put `--context` before `MODEL`. Every token after
+`MODEL` is forwarded unchanged and in order, including `--context`; a `--`
+separator is neither required nor removed.
+
+Bare `onetool code` prompts for harness, a searchable live model, and context.
+`status` reports redacted connection readiness, model IDs, the management URL,
+and installed proxy/harness versions; `--open` additionally opens the management
+page. The launcher reads only
+`CLIPROXY_BASE_URL` (default `http://127.0.0.1:8317`) and required
+`CLIPROXY_INFERENCE_KEY` from its process environment. It does not load
+`onetool.yaml` or `secrets.yaml`.
+
 ## Examples
 
 ```bash
@@ -113,6 +140,8 @@ onetool init validate --config .onetool/onetool.yaml  # Check for errors
 |----------|-------------|
 | `OT_LOG_LEVEL` | Log level (DEBUG/INFO/WARNING/ERROR) |
 | `OT_LOG_DIR` | Log directory path |
+| `CLIPROXY_BASE_URL` | Code-launcher proxy origin; defaults to `http://127.0.0.1:8317` |
+| `CLIPROXY_INFERENCE_KEY` | Required code-launcher inference credential |
 
 ## How It Works
 

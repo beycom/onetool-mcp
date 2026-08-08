@@ -1,247 +1,173 @@
-"""Behavioral tests for code-harness invocation adapters."""
+"""Behavioral tests for the minimal harness adapters."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
 from onetool.code.adapters import (
     build_invocation,
+    connection_from_environment,
     replace_process,
-    resolve_client_executable,
 )
-from onetool.code.resolver import resolve_target
-from ot.config import OneToolConfig
-from tests.unit.core.routing_fixtures import (
-    direct_codex_config,
-    proxy_launcher_config,
-)
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 pytestmark = [pytest.mark.unit, pytest.mark.core]
 
-_MISSING_CLAUDE_ENV = {
-    "ANTHROPIC_DEFAULT_SONNET_MODEL_NAME",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL_DESCRIPTION",
-}
 
-
-def _build(
-    config: OneToolConfig,
-    *,
-    harness: str,
-    model: str,
-    route: str | None = None,
-    profile: str | None = None,
-    permission: str | None = None,
-    passthrough: tuple[str, ...] = (),
-    secret_resolver: Mock | None = None,
-):
-    resolved = resolve_target(
-        config=config,
-        harness=harness,  # type: ignore[arg-type]
-        model=model,
-        route=route,  # type: ignore[arg-type]
-        profile=profile,
-        permission=permission,  # type: ignore[arg-type]
+def test_environment_bootstrap_uses_default_origin_and_requires_key() -> None:
+    assert connection_from_environment({"CLIPROXY_INFERENCE_KEY": "secret"}) == (
+        "http://127.0.0.1:8317",
+        "secret",
     )
-    resolver = secret_resolver or Mock(return_value="proxy-secret")
-    with patch(
-        "onetool.code.adapters.resolve_client_executable",
-        return_value=f"/usr/bin/{harness}",
-    ):
-        return build_invocation(
-            config=config,
-            target=resolved,
-            passthrough=passthrough,
-            secret_resolver=resolver,
-        )
+
+    with pytest.raises(ValueError, match="CLIPROXY_INFERENCE_KEY"):
+        connection_from_environment({})
+    with pytest.raises(ValueError, match="CLIPROXY_INFERENCE_KEY"):
+        connection_from_environment({"CLIPROXY_INFERENCE_KEY": ""})
 
 
-@pytest.mark.parametrize(
-    ("model", "expected_model", "expected_context"),
-    [
-        ("sol", "gpt-5.6-sol", {}),
-        (
-            "glm",
-            "z-ai/glm-5.2[1m]",
-            {"CLAUDE_CODE_AUTO_COMPACT_WINDOW": "900000"},
-        ),
-        (
-            "sonnet",
-            "claude-sonnet-4-6",
-            {"CLAUDE_CODE_DISABLE_1M_CONTEXT": "1"},
-        ),
-    ],
-)
-def test_claude_context_policy_changes_real_argv_and_environment(
-    model: str,
-    expected_model: str,
-    expected_context: dict[str, str],
-) -> None:
-    config = OneToolConfig.model_validate(proxy_launcher_config())
-    invocation = _build(config, harness="claude", model=model)
-
-    assert invocation.argv[:3] == ("/usr/bin/claude", "--model", expected_model)
-    assert invocation.environment.set_values["ANTHROPIC_DEFAULT_OPUS_MODEL"] == (
-        expected_model
-    )
-    if model == "glm":
-        assert invocation.environment.set_values["ANTHROPIC_MODEL"] == expected_model
-    else:
-        assert "ANTHROPIC_MODEL" not in invocation.environment.set_values
-    for key, value in expected_context.items():
-        assert invocation.environment.set_values[key] == value
-    for key in _MISSING_CLAUDE_ENV:
-        assert key in invocation.environment.remove
-
-    child = invocation.environment.apply(
-        dict.fromkeys(_MISSING_CLAUDE_ENV, "inherited")
-    )
-    assert _MISSING_CLAUDE_ENV.isdisjoint(child)
-
-
-def test_direct_codex_profile_changes_runtime_without_proxy_secret(
-    tmp_path,
-) -> None:
-    data = direct_codex_config()
-    data["code"]["permission"] = "bypass"
-    data["code"]["clients"] = {
-        "codex": {
-            "working_directory": "work",
-            "home_path": "codex-home",
-            "additional_arguments": ["--search"],
-        }
-    }
-    (tmp_path / "work").mkdir()
-    (tmp_path / "codex-home").mkdir()
-    config = OneToolConfig.model_validate(data)
-    config._config_dir = tmp_path
-    secret_resolver = Mock(side_effect=AssertionError("proxy secret was resolved"))
-
-    invocation = _build(
-        config,
-        harness="codex",
-        model="glm",
-        profile="openrouter",
-        passthrough=("exec", "--json"),
-        secret_resolver=secret_resolver,
+def test_claude_uses_exact_model_and_cleans_inherited_environment() -> None:
+    invocation = build_invocation(
+        harness="claude",
+        model="z-ai/glm-5.2",
+        proxy_origin="http://proxy.test:8317/",
+        credential="proxy-secret",
+        arguments=("--continue", "--model", "other", "--"),
     )
 
     assert invocation.argv == (
-        "/usr/bin/codex",
-        "--profile",
-        "openrouter",
+        "claude",
         "--model",
         "z-ai/glm-5.2",
-        "--dangerously-bypass-approvals-and-sandbox",
-        "--search",
-        "exec",
-        "--json",
+        "--continue",
+        "--model",
+        "other",
+        "--",
     )
-    assert invocation.argv.count("--search") == 1
-    assert invocation.working_directory == str(tmp_path / "work")
-    assert invocation.environment.set_values == {
-        "CODEX_HOME": str(tmp_path / "codex-home")
-    }
-    assert "ONETOOL_CODE_PROVIDER_KEY" in invocation.environment.remove
-    secret_resolver.assert_not_called()
-
-
-def test_proxy_codex_keeps_secret_out_of_argv_and_redacted_output() -> None:
-    config = OneToolConfig.model_validate(proxy_launcher_config())
-    invocation = _build(config, harness="codex", model="sol")
-
-    assert "proxy-secret" not in " ".join(invocation.argv)
-    assert invocation.environment.set_values["ONETOOL_CODE_PROVIDER_KEY"] == (
-        "proxy-secret"
+    assert invocation.environment.set_values["ANTHROPIC_BASE_URL"] == (
+        "http://proxy.test:8317"
     )
-    assert "proxy-secret" not in str(invocation.redacted())
-    assert "model_provider=\"onetool_proxy\"" in invocation.argv
+    assert invocation.environment.set_values["ANTHROPIC_MODEL"] == "z-ai/glm-5.2"
+    assert invocation.environment.set_values["CLAUDE_CODE_SUBAGENT_MODEL"] == (
+        "z-ai/glm-5.2"
+    )
+    child = invocation.environment.apply(
+        {
+            "CLIPROXY_INFERENCE_KEY": "bootstrap",
+            "ANTHROPIC_API_KEY": "stale",
+            "PATH": "/bin",
+        }
+    )
+    assert child["ANTHROPIC_AUTH_TOKEN"] == "proxy-secret"
+    assert "CLIPROXY_INFERENCE_KEY" not in child
+    assert "ANTHROPIC_API_KEY" not in child
+    assert child["PATH"] == "/bin"
 
 
-def test_executable_from_relative_path_entry_is_resolved_before_chdir(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    executable = bin_dir / "codex"
-    executable.write_text("#!/bin/sh\n")
-    executable.chmod(executable.stat().st_mode | 0o111)
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("PATH", "bin")
+def test_claude_context_policies_are_explicit_and_child_scoped() -> None:
+    extended = build_invocation(
+        harness="claude",
+        model="gpt-5.6-sol",
+        proxy_origin="http://proxy.test",
+        credential="secret",
+        context_window=1_000_000,
+    )
+    standard = build_invocation(
+        harness="claude",
+        model="gpt-5.6-sol",
+        proxy_origin="http://proxy.test",
+        credential="secret",
+        context_window=200_000,
+    )
 
-    resolved = resolve_client_executable("codex")
+    assert extended.model == "gpt-5.6-sol"
+    assert extended.argv == ("claude", "--model", "gpt-5.6-sol[1m]")
+    assert extended.environment.set_values["ANTHROPIC_MODEL"] == ("gpt-5.6-sol[1m]")
+    assert "CLAUDE_CODE_DISABLE_1M_CONTEXT" not in (extended.environment.set_values)
+    assert standard.argv == ("claude", "--model", "gpt-5.6-sol")
+    assert standard.environment.set_values["CLAUDE_CODE_DISABLE_1M_CONTEXT"] == "1"
 
-    assert resolved == str(executable.resolve())
-
-
-@pytest.mark.parametrize(
-    "passthrough",
-    [
-        ("--model", "other"),
-        ("--profile=work",),
-        ("-p", "work"),
-        ("-pwork",),
-        ("-mother",),
-        ("-cmodel_provider='other'",),
-        ("--config", "model_provider='other'"),
-    ],
-)
-def test_passthrough_cannot_override_launcher_owned_arguments(
-    passthrough: tuple[str, ...],
-) -> None:
-    config = OneToolConfig.model_validate(direct_codex_config())
-
-    with pytest.raises(ValueError, match="launcher-owned"):
-        _build(
-            config,
-            harness="codex",
-            model="glm",
-            profile="openrouter",
-            passthrough=passthrough,
+    with pytest.raises(ValueError, match="Claude context"):
+        build_invocation(
+            harness="claude",
+            model="gpt-5.6-sol",
+            proxy_origin="http://proxy.test",
+            credential="secret",
+            context_window=372_000,
         )
 
 
-def test_replace_process_applies_environment_and_working_directory() -> None:
-    config = OneToolConfig.model_validate(direct_codex_config())
-    invocation = _build(
-        config,
+def test_codex_derives_v1_provider_and_keeps_secret_out_of_argv() -> None:
+    arguments = ("exec", "--full-auto", "-m", "other", "--", "literal")
+    invocation = build_invocation(
         harness="codex",
-        model="glm",
-        profile="openrouter",
-    )
-    invocation = type(invocation)(
-        target=invocation.target,
-        executable=invocation.executable,
-        argv=invocation.argv,
-        environment=invocation.environment,
-        working_directory="/tmp/onetool-code-work",
+        model="gpt-5.6-luna",
+        proxy_origin="https://proxy.test",
+        credential="proxy-secret",
+        arguments=arguments,
     )
 
+    assert invocation.argv[-(len(arguments) + 2) :] == (
+        "--model",
+        "gpt-5.6-luna",
+        *arguments,
+    )
+    assert 'model_providers.onetool_proxy.base_url="https://proxy.test/v1"' in (
+        invocation.argv
+    )
+    assert 'model_providers.onetool_proxy.wire_api="responses"' in invocation.argv
+    assert "proxy-secret" not in "\0".join(invocation.argv)
+    assert invocation.environment.set_values == {
+        "ONETOOL_CODE_PROVIDER_KEY": "proxy-secret"
+    }
+
+
+def test_codex_numeric_context_is_invocation_scoped() -> None:
+    invocation = build_invocation(
+        harness="codex",
+        model="gpt-5.6-sol",
+        proxy_origin="http://proxy.test",
+        credential="secret",
+        context_window=372_000,
+    )
+
+    assert "model_context_window=372000" in invocation.argv
+    assert "model_auto_compact_token_limit=334800" in invocation.argv
+
+    with pytest.raises(ValueError, match="positive"):
+        build_invocation(
+            harness="codex",
+            model="gpt-5.6-sol",
+            proxy_origin="http://proxy.test",
+            credential="secret",
+            context_window=0,
+        )
+
+
+def test_replace_process_uses_path_and_does_not_mutate_parent() -> None:
+    invocation = build_invocation(
+        harness="codex",
+        model="gpt-5.6-luna",
+        proxy_origin="http://127.0.0.1:8317",
+        credential="proxy-secret",
+    )
+    parent = {
+        "PATH": "/usr/bin",
+        "CLIPROXY_INFERENCE_KEY": "bootstrap",
+        "ONETOOL_CODE_PROVIDER_KEY": "stale",
+    }
+
     with (
-        patch("onetool.code.adapters.os.chdir") as chdir,
         patch("onetool.code.adapters.os.execvpe", side_effect=RuntimeError) as execvpe,
         pytest.raises(RuntimeError),
     ):
-        replace_process(
-            invocation=invocation,
-            parent_environment={
-                "PATH": "/usr/bin",
-                "ONETOOL_CODE_PROVIDER_KEY": "stale",
-            },
-        )
+        replace_process(invocation=invocation, parent_environment=parent)
 
-    chdir.assert_called_once_with("/tmp/onetool-code-work")
     executable, argv, environment = execvpe.call_args.args
-    assert executable == "/usr/bin/codex"
+    assert executable == "codex"
     assert argv == invocation.argv
     assert environment["PATH"] == "/usr/bin"
-    assert "ONETOOL_CODE_PROVIDER_KEY" not in environment
+    assert environment["ONETOOL_CODE_PROVIDER_KEY"] == "proxy-secret"
+    assert "CLIPROXY_INFERENCE_KEY" not in environment
+    assert parent["ONETOOL_CODE_PROVIDER_KEY"] == "stale"
