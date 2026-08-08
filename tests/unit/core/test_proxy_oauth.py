@@ -12,6 +12,7 @@ import httpx
 import pytest
 from fastmcp.client.auth import OAuth
 from filelock import AsyncFileLock
+from key_value.aio._utils.managed_entry import ManagedEntry
 from key_value.aio.stores.keyring.store import (
     KeyringV1CollectionSanitizationStrategy,
     KeyringV1KeySanitizationStrategy,
@@ -20,7 +21,11 @@ from mcp.client.auth.utils import create_client_registration_request
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 
 from ot.proxy import oauth as proxy_oauth
-from ot.proxy.oauth import OneToolOAuth, SecureOAuthTokenStore
+from ot.proxy.oauth import (
+    OAuthSecureStorageError,
+    OneToolOAuth,
+    SecureOAuthTokenStore,
+)
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -52,6 +57,23 @@ def fake_keyring(monkeypatch: pytest.MonkeyPatch) -> dict[tuple[str, str], str]:
         lambda service_name, username: values.pop((service_name, username), None),
     )
     return values
+
+
+@pytest.fixture
+def windows_keyring(
+    fake_keyring: dict[tuple[str, str], str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> dict[tuple[str, str], str]:
+    """Simulate the Windows credential-size limit and chunked representation."""
+    monkeypatch.setattr(proxy_oauth, "_use_windows_keyring_chunks", lambda: True)
+
+    def set_password(service_name: str, username: str, password: str) -> None:
+        if len(password.encode("utf-8")) > 2560:
+            raise ValueError("simulated Windows credential limit")
+        fake_keyring[(service_name, username)] = password
+
+    monkeypatch.setattr(proxy_oauth.keyring, "set_password", set_password)
+    return fake_keyring
 
 
 def _store(service_name: str = "onetool-mcp.oauth.test") -> SecureOAuthTokenStore:
@@ -210,6 +232,306 @@ class TestOAuthTokenPersistence:
         assert proxy_oauth._oauth_keyring_service_name(
             first_dir
         ) != proxy_oauth._oauth_keyring_service_name(second_dir)
+
+
+@pytest.mark.unit
+@pytest.mark.core
+class TestWindowsOAuthTokenPersistence:
+    """Windows keyring entries use verified, transactional bounded chunks."""
+
+    @staticmethod
+    def _entry_for_size(
+        store: SecureOAuthTokenStore,
+        target_size: int,
+        *,
+        key: str = "tokens",
+        collection: str = "oauth",
+    ) -> ManagedEntry:
+        empty = ManagedEntry(value={"token": ""})
+        empty_size = len(
+            store._serialization_adapter.dump_json(
+                entry=empty,
+                key=key,
+                collection=collection,
+            ).encode("utf-8")
+        )
+        entry = ManagedEntry(value={"token": "x" * (target_size - empty_size)})
+        serialized = store._serialization_adapter.dump_json(
+            entry=entry,
+            key=key,
+            collection=collection,
+        )
+        assert len(serialized.encode("utf-8")) == target_size
+        return entry
+
+    @staticmethod
+    def _manifest(
+        store: SecureOAuthTokenStore,
+        values: dict[tuple[str, str], str],
+        *,
+        key: str = "tokens",
+        collection: str = "oauth",
+    ) -> tuple[str, dict[str, object]]:
+        username = store._entry_username(key=key, collection=collection)
+        return username, json.loads(values[(store._service_name, username)])
+
+    @pytest.mark.usefixtures("windows_keyring")
+    @pytest.mark.parametrize(
+        ("serialized_size", "key", "collection"),
+        [
+            (2500, "client_info", "mcp-oauth-client-info"),
+            (2560, "tokens", "mcp-oauth-tokens"),
+            (7000, "tokens", "mcp-oauth-tokens"),
+        ],
+    )
+    async def test_entries_round_trip_across_windows_limit(
+        self,
+        serialized_size: int,
+        key: str,
+        collection: str,
+    ) -> None:
+        store = _store()
+        entry = self._entry_for_size(
+            store,
+            serialized_size,
+            key=key,
+            collection=collection,
+        )
+
+        await store._put_managed_entry(
+            key=key,
+            collection=collection,
+            managed_entry=entry,
+        )
+
+        assert await store._get_managed_entry(
+            key=key, collection=collection
+        ) == entry
+
+    async def test_multibyte_record_round_trips_without_oversized_chunk(
+        self,
+        windows_keyring: dict[tuple[str, str], str],
+    ) -> None:
+        store = _store()
+        token = "密钥🔐" * 1000
+
+        await store.put("tokens", {"token": token}, collection="oauth")
+
+        assert await store.get("tokens", collection="oauth") == {"token": token}
+        assert all(
+            len(value.encode("utf-8")) <= 2560
+            for value in windows_keyring.values()
+        )
+        assert all(token not in username for _, username in windows_keyring)
+
+    async def test_failure_before_manifest_switch_preserves_previous_value(
+        self,
+        windows_keyring: dict[tuple[str, str], str],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        store = _store()
+        old_token = "old-secret-" * 400
+        new_token = "new-secret-" * 400
+        await store.put("tokens", {"token": old_token}, collection="oauth")
+        old_entries = windows_keyring.copy()
+        manifest_username, _manifest = self._manifest(store, windows_keyring)
+        original_set_password = proxy_oauth.keyring.set_password
+
+        def fail_manifest_switch(
+            service_name: str, username: str, password: str
+        ) -> None:
+            if username == manifest_username:
+                raise RuntimeError("manifest switch failed")
+            original_set_password(service_name, username, password)
+
+        monkeypatch.setattr(
+            proxy_oauth.keyring,
+            "set_password",
+            fail_manifest_switch,
+        )
+        with pytest.raises(OAuthSecureStorageError) as raised:
+            await store.put("tokens", {"token": new_token}, collection="oauth")
+
+        assert await store.get("tokens", collection="oauth") == {
+            "token": old_token
+        }
+        assert windows_keyring == old_entries
+        assert old_token not in str(raised.value)
+        assert new_token not in str(raised.value)
+
+    async def test_failure_after_manifest_switch_exposes_complete_new_value(
+        self,
+        windows_keyring: dict[tuple[str, str], str],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        store = _store()
+        old_token = "old-value-" * 400
+        new_token = "new-value-" * 400
+        await store.put("tokens", {"token": old_token}, collection="oauth")
+        _username, old_manifest = self._manifest(store, windows_keyring)
+        entry_id = store._entry_id(
+            store._entry_username(key="tokens", collection="oauth")
+        )
+        old_chunk = store._chunk_username(
+            entry_id,
+            str(old_manifest["slot"]),
+            0,
+        )
+        original_delete_password = proxy_oauth.keyring.delete_password
+
+        def fail_old_cleanup(service_name: str, username: str) -> None:
+            if username == old_chunk:
+                raise RuntimeError("old cleanup failed")
+            original_delete_password(service_name, username)
+
+        monkeypatch.setattr(
+            proxy_oauth.keyring,
+            "delete_password",
+            fail_old_cleanup,
+        )
+        with pytest.raises(OAuthSecureStorageError):
+            await store.put("tokens", {"token": new_token}, collection="oauth")
+
+        assert await store.get("tokens", collection="oauth") == {
+            "token": new_token
+        }
+
+    async def test_replacement_removes_superseded_chunks(
+        self,
+        windows_keyring: dict[tuple[str, str], str],
+    ) -> None:
+        store = _store()
+        await store.put("tokens", {"token": "old" * 2000}, collection="oauth")
+        _username, old_manifest = self._manifest(store, windows_keyring)
+        old_slot = str(old_manifest["slot"])
+
+        await store.put("tokens", {"token": "new" * 2000}, collection="oauth")
+
+        assert all(old_slot not in username for _, username in windows_keyring)
+        assert await store.get("tokens", collection="oauth") == {
+            "token": "new" * 2000
+        }
+
+    async def test_reader_retries_new_manifest_if_old_chunks_are_retired(
+        self,
+        windows_keyring: dict[tuple[str, str], str],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        store = _store()
+        await store.put("tokens", {"token": "old" * 2000}, collection="oauth")
+        old_entries = windows_keyring.copy()
+        manifest_username, old_manifest = self._manifest(store, windows_keyring)
+        await store.put("tokens", {"token": "new" * 2000}, collection="oauth")
+        new_entries = windows_keyring.copy()
+        new_manifest = new_entries[(store._service_name, manifest_username)]
+        manifest_key = (store._service_name, manifest_username)
+
+        windows_keyring.clear()
+        windows_keyring.update(old_entries)
+        windows_keyring.update(
+            {key: value for key, value in new_entries.items() if key != manifest_key}
+        )
+        original_get_password = proxy_oauth.keyring.get_password
+        first_manifest_read = True
+
+        def switch_after_old_manifest(service_name: str, username: str) -> str | None:
+            nonlocal first_manifest_read
+            value = original_get_password(service_name, username)
+            if username == manifest_username and first_manifest_read:
+                first_manifest_read = False
+                windows_keyring[manifest_key] = new_manifest
+                old_slot = str(old_manifest["slot"])
+                for keyring_key in list(windows_keyring):
+                    if old_slot in keyring_key[1]:
+                        windows_keyring.pop(keyring_key)
+            return value
+
+        monkeypatch.setattr(
+            proxy_oauth.keyring,
+            "get_password",
+            switch_after_old_manifest,
+        )
+
+        assert await store.get("tokens", collection="oauth") == {
+            "token": "new" * 2000
+        }
+
+    async def test_raw_windows_entry_is_not_accepted_as_legacy_fallback(
+        self,
+        windows_keyring: dict[tuple[str, str], str],
+    ) -> None:
+        store = _store()
+        username = store._entry_username(key="tokens", collection="oauth")
+        raw_entry = store._serialization_adapter.dump_json(
+            entry=ManagedEntry(value={"token": "legacy-secret"}),
+            key="tokens",
+            collection="oauth",
+        )
+        windows_keyring[(store._service_name, username)] = raw_entry
+
+        with pytest.raises(OAuthSecureStorageError, match="incomplete or corrupt"):
+            await store.get("tokens", collection="oauth")
+
+    @pytest.mark.parametrize("damage", ["missing", "reordered", "duplicated", "corrupt"])
+    async def test_corrupt_chunk_sets_fail_explicitly(
+        self,
+        windows_keyring: dict[tuple[str, str], str],
+        damage: str,
+    ) -> None:
+        store = _store()
+        secret = "credential-secret-" * 500
+        await store.put("tokens", {"token": secret}, collection="oauth")
+        manifest_username, manifest = self._manifest(store, windows_keyring)
+        entry_id = store._entry_id(manifest_username)
+        chunk_names = [
+            store._chunk_username(entry_id, str(manifest["slot"]), index)
+            for index in range(int(manifest["chunks"]))
+        ]
+        assert len(chunk_names) >= 3
+        keys = [(store._service_name, name) for name in chunk_names]
+
+        if damage == "missing":
+            windows_keyring.pop(keys[1])
+        elif damage == "reordered":
+            windows_keyring[keys[0]], windows_keyring[keys[-1]] = (
+                windows_keyring[keys[-1]],
+                windows_keyring[keys[0]],
+            )
+        elif damage == "duplicated":
+            windows_keyring[keys[1]] = windows_keyring[keys[0]]
+        else:
+            windows_keyring[keys[1]] = "not-base64!"
+
+        with pytest.raises(OAuthSecureStorageError) as raised:
+            await store.get("tokens", collection="oauth")
+        assert "incomplete or corrupt" in str(raised.value)
+        assert secret not in str(raised.value)
+
+    async def test_delete_removes_manifest_and_all_chunks(
+        self,
+        windows_keyring: dict[tuple[str, str], str],
+    ) -> None:
+        store = _store()
+        await store.put("tokens", {"token": "large" * 1000}, collection="oauth")
+        assert windows_keyring
+
+        assert await store.delete("tokens", collection="oauth") is True
+
+        assert windows_keyring == {}
+        assert await store.get("tokens", collection="oauth") is None
+
+    async def test_non_windows_keeps_upstream_single_entry(
+        self,
+        fake_keyring: dict[tuple[str, str], str],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(proxy_oauth, "_use_windows_keyring_chunks", lambda: False)
+        store = _store()
+
+        await store.put("tokens", {"token": "small"}, collection="oauth")
+
+        assert len(fake_keyring) == 1
+        assert await store.get("tokens", collection="oauth") == {"token": "small"}
 
 
 @pytest.mark.unit

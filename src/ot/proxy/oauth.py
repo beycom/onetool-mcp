@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
+import contextlib
 import hashlib
+import json
 import os
+import re
+import secrets
 from collections.abc import AsyncGenerator, Mapping
 from typing import TYPE_CHECKING, Any, override
 from urllib.parse import urlsplit, urlunsplit
@@ -12,11 +18,13 @@ import keyring
 from fastmcp.client.auth import OAuth
 from filelock import AsyncFileLock
 from filelock import Timeout as FileLockTimeout
+from key_value.aio._utils.compound import compound_key
 from key_value.aio.stores.keyring.store import (
     KeyringStore,
     KeyringV1CollectionSanitizationStrategy,
     KeyringV1KeySanitizationStrategy,
 )
+from keyring.errors import PasswordDeleteError
 
 from ot.config.keyring import _assert_secure_keyring_backend
 from ot.paths import RUNTIME_SUBDIR, get_config_dir
@@ -32,6 +40,20 @@ _OAUTH_KEYRING_SERVICE_PREFIX = "onetool-mcp.oauth"
 _OAUTH_IDENTITY_COLLECTION = "onetool-oauth-identity-v1"
 _PUBLIC_CLIENT_AUTH_METHOD = "none"
 _OAUTH_LOCK_TIMEOUT_SECONDS = 30.0
+_WINDOWS_CHUNK_BYTES = 1800
+_WINDOWS_MANIFEST_KIND = "onetool-oauth-keyring-chunks"
+_WINDOWS_MANIFEST_VERSION = 1
+_WINDOWS_SLOT_PATTERN = re.compile(r"[0-9a-f]{16}")
+_SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
+
+
+class OAuthSecureStorageError(RuntimeError):
+    """A secure OAuth credential entry could not be safely read or updated."""
+
+
+def _use_windows_keyring_chunks() -> bool:
+    """Return whether the keyring requires bounded Windows credential values."""
+    return os.name == "nt"
 
 
 def normalize_oauth_endpoint(endpoint: str) -> str:
@@ -79,6 +101,14 @@ class SecureOAuthTokenStore(KeyringStore):
         self, *, key: str, collection: str
     ) -> ManagedEntry | None:
         _assert_secure_keyring_backend(keyring)
+        if _use_windows_keyring_chunks():
+            serialized = self._get_windows_payload(key=key, collection=collection)
+            if serialized is None:
+                return None
+            try:
+                return self._serialization_adapter.load_json(json_str=serialized)
+            except Exception:
+                raise self._corrupt_entry_error() from None
         return await super()._get_managed_entry(key=key, collection=collection)
 
     @override
@@ -86,6 +116,18 @@ class SecureOAuthTokenStore(KeyringStore):
         self, *, key: str, collection: str, managed_entry: ManagedEntry
     ) -> None:
         _assert_secure_keyring_backend(keyring)
+        if _use_windows_keyring_chunks():
+            serialized = self._serialization_adapter.dump_json(
+                entry=managed_entry,
+                key=key,
+                collection=collection,
+            )
+            self._put_windows_payload(
+                key=key,
+                collection=collection,
+                serialized=serialized,
+            )
+            return
         await super()._put_managed_entry(
             key=key,
             collection=collection,
@@ -95,7 +137,217 @@ class SecureOAuthTokenStore(KeyringStore):
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         _assert_secure_keyring_backend(keyring)
+        if _use_windows_keyring_chunks():
+            return self._delete_windows_payload(key=key, collection=collection)
         return await super()._delete_managed_entry(key=key, collection=collection)
+
+    @staticmethod
+    def _corrupt_entry_error() -> OAuthSecureStorageError:
+        return OAuthSecureStorageError(
+            "Stored OAuth credentials are incomplete or corrupt; remove the "
+            "OneTool OAuth keyring entry and reauthorize"
+        )
+
+    def _entry_username(self, *, key: str, collection: str) -> str:
+        sanitized_collection = self._sanitize_collection(collection=collection)
+        sanitized_key = self._sanitize_key(key=key)
+        return str(compound_key(collection=sanitized_collection, key=sanitized_key))
+
+    @staticmethod
+    def _entry_id(username: str) -> str:
+        return hashlib.sha256(username.encode()).hexdigest()
+
+    @staticmethod
+    def _chunk_username(entry_id: str, slot: str, index: int) -> str:
+        return f"onetool-oauth-chunk::{entry_id}::{slot}::{index:06d}"
+
+    def _get_password(self, username: str) -> str | None:
+        try:
+            return keyring.get_password(
+                service_name=self._service_name,
+                username=username,
+            )
+        except Exception:
+            raise OAuthSecureStorageError(
+                "Could not read OAuth credentials from the secure keyring"
+            ) from None
+
+    def _set_password(self, username: str, value: str) -> None:
+        try:
+            keyring.set_password(
+                service_name=self._service_name,
+                username=username,
+                password=value,
+            )
+        except Exception:
+            raise OAuthSecureStorageError(
+                "Could not update OAuth credentials in the secure keyring"
+            ) from None
+
+    def _delete_password(self, username: str) -> bool:
+        try:
+            keyring.delete_password(
+                service_name=self._service_name,
+                username=username,
+            )
+        except PasswordDeleteError:
+            return False
+        except Exception:
+            raise OAuthSecureStorageError(
+                "Could not delete OAuth credentials from the secure keyring"
+            ) from None
+        return True
+
+    def _parse_manifest(self, serialized: str) -> dict[str, Any]:
+        try:
+            manifest = json.loads(serialized)
+        except (TypeError, ValueError):
+            raise self._corrupt_entry_error() from None
+        if (
+            not isinstance(manifest, dict)
+            or manifest.get("kind") != _WINDOWS_MANIFEST_KIND
+            or manifest.get("version") != _WINDOWS_MANIFEST_VERSION
+            or not isinstance(manifest.get("slot"), str)
+            or _WINDOWS_SLOT_PATTERN.fullmatch(manifest["slot"]) is None
+            or type(manifest.get("chunks")) is not int
+            or manifest["chunks"] < 1
+            or type(manifest.get("length")) is not int
+            or manifest["length"] < 0
+            or not isinstance(manifest.get("sha256"), str)
+            or _SHA256_PATTERN.fullmatch(manifest["sha256"]) is None
+        ):
+            raise self._corrupt_entry_error()
+        return manifest
+
+    def _load_chunked_payload(
+        self,
+        *,
+        entry_id: str,
+        manifest: Mapping[str, Any],
+    ) -> str:
+        payload_parts: list[bytes] = []
+        try:
+            for index in range(manifest["chunks"]):
+                username = self._chunk_username(entry_id, manifest["slot"], index)
+                encoded_chunk = self._get_password(username)
+                if encoded_chunk is None:
+                    raise self._corrupt_entry_error()
+                payload_parts.append(
+                    base64.b64decode(encoded_chunk.encode("ascii"), validate=True)
+                )
+            payload = b"".join(payload_parts)
+        except (UnicodeEncodeError, binascii.Error):
+            raise self._corrupt_entry_error() from None
+
+        if (
+            len(payload) != manifest["length"]
+            or hashlib.sha256(payload).hexdigest() != manifest["sha256"]
+        ):
+            raise self._corrupt_entry_error()
+        try:
+            return payload.decode("utf-8")
+        except UnicodeDecodeError:
+            raise self._corrupt_entry_error() from None
+
+    def _get_windows_payload(self, *, key: str, collection: str) -> str | None:
+        manifest_username = self._entry_username(key=key, collection=collection)
+        serialized_manifest = self._get_password(manifest_username)
+        if serialized_manifest is None:
+            return None
+        manifest = self._parse_manifest(serialized_manifest)
+        entry_id = self._entry_id(manifest_username)
+        try:
+            return self._load_chunked_payload(
+                entry_id=entry_id,
+                manifest=manifest,
+            )
+        except OAuthSecureStorageError:
+            current_serialized_manifest = self._get_password(manifest_username)
+            if current_serialized_manifest is None:
+                return None
+            if current_serialized_manifest == serialized_manifest:
+                raise
+            current_manifest = self._parse_manifest(current_serialized_manifest)
+            return self._load_chunked_payload(
+                entry_id=entry_id,
+                manifest=current_manifest,
+            )
+
+    def _delete_chunks(
+        self,
+        *,
+        entry_id: str,
+        manifest: Mapping[str, Any],
+    ) -> None:
+        for index in range(manifest["chunks"]):
+            self._delete_password(
+                self._chunk_username(entry_id, manifest["slot"], index)
+            )
+
+    def _put_windows_payload(
+        self,
+        *,
+        key: str,
+        collection: str,
+        serialized: str,
+    ) -> None:
+        manifest_username = self._entry_username(key=key, collection=collection)
+        entry_id = self._entry_id(manifest_username)
+        old_serialized_manifest = self._get_password(manifest_username)
+        old_manifest = (
+            self._parse_manifest(old_serialized_manifest)
+            if old_serialized_manifest is not None
+            else None
+        )
+        if old_manifest is not None:
+            self._load_chunked_payload(entry_id=entry_id, manifest=old_manifest)
+
+        payload = serialized.encode("utf-8")
+        raw_chunks = [
+            payload[offset : offset + _WINDOWS_CHUNK_BYTES]
+            for offset in range(0, len(payload), _WINDOWS_CHUNK_BYTES)
+        ] or [b""]
+        slot = secrets.token_hex(8)
+        manifest = {
+            "kind": _WINDOWS_MANIFEST_KIND,
+            "version": _WINDOWS_MANIFEST_VERSION,
+            "slot": slot,
+            "chunks": len(raw_chunks),
+            "length": len(payload),
+            "sha256": hashlib.sha256(payload).hexdigest(),
+        }
+        switched = False
+        try:
+            for index, chunk in enumerate(raw_chunks):
+                self._set_password(
+                    self._chunk_username(entry_id, slot, index),
+                    base64.b64encode(chunk).decode("ascii"),
+                )
+            self._load_chunked_payload(entry_id=entry_id, manifest=manifest)
+            self._set_password(
+                manifest_username,
+                json.dumps(manifest, separators=(",", ":"), sort_keys=True),
+            )
+            switched = True
+            if old_manifest is not None:
+                self._delete_chunks(entry_id=entry_id, manifest=old_manifest)
+        except Exception:
+            if not switched:
+                with contextlib.suppress(OAuthSecureStorageError):
+                    self._delete_chunks(entry_id=entry_id, manifest=manifest)
+            raise
+
+    def _delete_windows_payload(self, *, key: str, collection: str) -> bool:
+        manifest_username = self._entry_username(key=key, collection=collection)
+        serialized_manifest = self._get_password(manifest_username)
+        if serialized_manifest is None:
+            return False
+        manifest = self._parse_manifest(serialized_manifest)
+        entry_id = self._entry_id(manifest_username)
+        self._load_chunked_payload(entry_id=entry_id, manifest=manifest)
+        deleted = self._delete_password(manifest_username)
+        self._delete_chunks(entry_id=entry_id, manifest=manifest)
+        return deleted
 
 
 class OneToolOAuth(OAuth):
