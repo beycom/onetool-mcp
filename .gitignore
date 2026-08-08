@@ -128,6 +128,7 @@ demo/tmp/
 
 # Worktree state files
 .gitworktree.json
+<--- Start Here --->.md
 
 # Local skill installer state
 /skills-lock.json
