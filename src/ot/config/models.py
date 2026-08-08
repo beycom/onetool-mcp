@@ -534,7 +534,10 @@ class McpServerConfig(BaseModel):
     )
     instructions: str | None = Field(
         default=None,
-        description="Agent instructions for using this server's tools (surfaced in MCP instructions)",
+        description=(
+            "Agent guidance for this server, available through an exact server "
+            "lookup with ot.help()"
+        ),
     )
     tool_prefix: str | None = Field(
         default=None,

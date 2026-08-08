@@ -392,20 +392,26 @@ The system SHALL support stdio transport for local MCP servers.
 
 ### Requirement: Server Instructions
 
-The system SHALL support per-server instructions for guiding agent usage.
+The system SHALL expose per-server guidance on demand without expanding the concise
+root MCP handshake or operational server status.
 
-#### Scenario: Server config with instructions
+#### Scenario: Configured instructions are discoverable
 - **GIVEN** an MCP server config with `instructions` field
 - **WHEN** the server is enabled
-- **THEN** instructions SHALL be surfaced in MCP protocol instructions
-- **AND** instructions SHALL be available via `ot.servers(info="full")`
-- **AND** instructions SHALL be available via `ot.help(query="servername")`
+- **AND** `ot.help(query="servername")` performs an exact server lookup
+- **THEN** the configured instructions SHALL appear in the server help response
 
-#### Scenario: Instructions in MCP protocol
+#### Scenario: Root instructions remain concise
 - **GIVEN** enabled servers with instructions configured
 - **WHEN** client connects to OneTool
-- **THEN** MCP protocol instructions SHALL include a "MCP Server Instructions" section
-- **AND** each server's instructions SHALL be under a `## servername` heading
+- **THEN** the root MCP protocol instructions SHALL NOT include per-server instruction dumps
+- **AND** `ot.servers(info="full")` SHALL remain an operational status surface without instructions
+
+#### Scenario: Native and configured guidance are layered in help
+- **GIVEN** a connected server supplies native MCP instructions
+- **AND** its OneTool server config supplies additional instructions
+- **WHEN** `ot.help(query="servername")` performs an exact server lookup
+- **THEN** native MCP instructions SHALL appear before the configured instructions
 
 #### Scenario: Server without instructions
 - **GIVEN** an MCP server config without `instructions` field
