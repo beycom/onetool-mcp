@@ -38,7 +38,7 @@ from ot.logging import LogEntry, LogSpan
 from ot.logging.redact import redact_secrets
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
+    from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine, Iterator
     from concurrent.futures import Future
 
     from mcp.server.session import ServerSession
@@ -179,6 +179,25 @@ def _explicitly_omits_capability(client: Client, capability: str) -> bool:  # ty
     return getattr(capabilities, capability, None) is None
 
 
+class _ProxyMessageHandler:
+    """Compose proxy notifications with FastMCP's default message handler."""
+
+    def __init__(
+        self,
+        default_handler: Callable[..., Awaitable[None]],
+        on_tool_list_changed: Callable[[], None],
+    ) -> None:
+        self._default_handler = default_handler
+        self._on_tool_list_changed = on_tool_list_changed
+
+    async def __call__(self, message: Any) -> None:
+        await self._default_handler(message)
+        if isinstance(message, types.ServerNotification) and isinstance(
+            message.root, types.ToolListChangedNotification
+        ):
+            self._on_tool_list_changed()
+
+
 @dataclass
 class ProxyToolInfo:
     """Information about a proxied tool."""
@@ -278,6 +297,8 @@ class ProxyManager:
         self._call_locks: dict[str, asyncio.Lock] = {}
         self._active_calls: dict[str, _ProxyCallContext] = {}
         self._tools_by_server: dict[str, list[types.Tool]] = {}
+        self._tool_refresh_tasks: dict[tuple[str, int], asyncio.Task[None]] = {}
+        self._tool_refresh_errors: dict[str, str] = {}
         self._errors: dict[str, str] = {}  # server name -> last error message
         self._server_timeouts: dict[
             str, float
@@ -339,6 +360,93 @@ class ProxyManager:
             generation = self._next_generation
             self._server_generations[name] = generation
             return generation
+
+    def _install_message_handler(
+        self, server: str, client: Client, generation: int  # type: ignore[type-arg]
+    ) -> None:
+        """Add tool refresh handling without replacing FastMCP task handling."""
+        session_kwargs = client._session_kwargs
+        default_handler = session_kwargs["message_handler"]
+        if default_handler is None:
+            raise RuntimeError("FastMCP client has no default message handler")
+        session_kwargs["message_handler"] = _ProxyMessageHandler(
+            default_handler,
+            lambda: self._schedule_tool_refresh(server, client, generation),
+        )
+
+    def _schedule_tool_refresh(
+        self, server: str, client: Client, generation: int  # type: ignore[type-arg]
+    ) -> None:
+        """Schedule at most one refresh for a live server generation."""
+        key = (server, generation)
+        with self._mutation_lock:
+            if (
+                self._clients.get(server) is not client
+                or self._server_generations.get(server) != generation
+            ):
+                return
+            existing = self._tool_refresh_tasks.get(key)
+            if existing is not None and not existing.done():
+                return
+            self._tool_refresh_tasks[key] = asyncio.create_task(
+                self._refresh_tools(server, client, generation)
+            )
+
+    async def _refresh_tools(
+        self, server: str, client: Client, generation: int  # type: ignore[type-arg]
+    ) -> None:
+        """Fetch and atomically publish a live generation's complete tool list."""
+        key = (server, generation)
+        try:
+            tools = [_strip_ctx_from_schema(tool) for tool in await client.list_tools()]
+            with self._mutation_lock:
+                if (
+                    self._clients.get(server) is not client
+                    or self._server_generations.get(server) != generation
+                ):
+                    return
+                self._tools_by_server[server] = tools
+                self._tool_refresh_errors.pop(server, None)
+                self._evict_proxy_caches(server)
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            safe_error = _sanitize_connect_error(
+                str(error) or type(error).__name__
+            )
+            with self._mutation_lock:
+                is_live = (
+                    self._clients.get(server) is client
+                    and self._server_generations.get(server) == generation
+                )
+                if is_live:
+                    self._tool_refresh_errors[server] = safe_error
+            if is_live:
+                logger.warning(
+                    LogEntry(
+                        event="proxy.tools.refresh_failed", server=server
+                    ).failure(
+                        error_type=type(error).__name__, error_message=safe_error
+                    )
+                )
+        finally:
+            with self._mutation_lock:
+                if self._tool_refresh_tasks.get(key) is asyncio.current_task():
+                    self._tool_refresh_tasks.pop(key, None)
+
+    async def _cancel_tool_refreshes(self, server: str | None = None) -> None:
+        """Cancel and join refresh work for one server or the whole manager."""
+        with self._mutation_lock:
+            keys = [
+                key
+                for key in self._tool_refresh_tasks
+                if server is None or key[0] == server
+            ]
+            tasks = [self._tool_refresh_tasks.pop(key) for key in keys]
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     def _invalidate_generation(self, name: str) -> None:
         """Prevent the current named connection attempt from publishing."""
@@ -475,8 +583,10 @@ class ProxyManager:
             self._tools_by_server.pop(server, None)
             self._server_timeouts.pop(server, None)
             self._server_instructions.pop(server, None)
+            self._tool_refresh_errors.pop(server, None)
             self._errors[server] = safe_error
         self._evict_proxy_caches(server)
+        await self._cancel_tool_refreshes(server)
         await self._close_client(server, client)
 
     async def call_tool(
@@ -1088,6 +1198,7 @@ class ProxyManager:
             published = False
             try:
                 client = self._create_client(name, config)
+                self._install_message_handler(name, client, generation)
 
                 # Enter the client context manager for persistent connection
                 await client.__aenter__()  # type: ignore[no-untyped-call]
@@ -1272,10 +1383,12 @@ class ProxyManager:
             self._errors.clear()
             self._server_timeouts.clear()
             self._server_instructions.clear()
+            self._tool_refresh_errors.clear()
             self._server_generations.clear()
             self._server_transition_locks.clear()
             self._initialized = False
 
+        await self._cancel_tool_refreshes()
         if clients:
             with LogSpan(span="proxy.shutdown", serverCount=len(clients)):
                 for name, client in clients:
@@ -1483,9 +1596,11 @@ class ProxyManager:
                 self._active_calls.pop(name, None)
                 self._tools_by_server.pop(name, None)
                 self._errors.pop(name, None)
+                self._tool_refresh_errors.pop(name, None)
                 self._server_instructions.pop(name, None)
                 self._server_timeouts.pop(name, None)
             self._evict_proxy_caches(name)
+            await self._cancel_tool_refreshes(name)
             await self._close_client(name, client)
             return "disconnected"
 

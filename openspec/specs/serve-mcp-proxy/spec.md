@@ -160,6 +160,24 @@ Server names with hyphens cannot be used as Python variable names (e.g., `billin
 - **THEN** the existing `iam` local pack SHALL take precedence
 - **AND** `billing-service` SHALL still be accessible via the full hyphenated key for exact server-name access
 
+### Requirement: Live Tool Schema Refresh
+
+The system SHALL refresh proxied tool schemas when a live server reports that its tool list changed.
+
+#### Scenario: Live tool-list change
+- **GIVEN** a connected MCP server sends `ToolListChangedNotification`
+- **WHEN** OneTool fetches the complete replacement tool list successfully
+- **THEN** added, removed, and changed tools SHALL be reflected without reconnecting
+- **AND** namespace, tool-name, and parameter-resolution caches SHALL be evicted
+- **AND** overlapping notifications for the same connection generation SHALL be coalesced
+
+#### Scenario: Tool-list refresh cannot publish
+- **GIVEN** a refresh fails or belongs to a disconnected or superseded client generation
+- **WHEN** the refresh completes
+- **THEN** it SHALL NOT replace the last known good schema
+- **AND** any failure SHALL be recorded and logged with credentials redacted
+- **AND** FastMCP task-status notification handling SHALL remain active
+
 ### Requirement: Tool Prefix Omission
 
 Some MCP servers expose tools whose names carry a prefix that is redundant when accessed via dot notation (e.g., a docs server exposes `docs_search_documentation` but callers write `knowledge.search_documentation()`). The system SHALL support a `tool_prefix` config field on `McpServerConfig` that enables prefix-omission when resolving tool names.
