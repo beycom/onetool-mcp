@@ -69,51 +69,6 @@ Validates configuration files and displays status including packs, secrets (name
 onetool init validate --config .onetool/onetool.yaml
 ```
 
-### code
-
-Launch an official coding harness through CLIProxyAPI by selecting interactively
-or resolving a required query against the live model inventory.
-
-```bash
-onetool code
-onetool code claude [--context auto|200k|1m] [--] MODEL [HARNESS_ARGS...]
-onetool code codex [--context CONTEXT] [--] MODEL [HARNESS_ARGS...]
-onetool code models
-onetool code status [--open]
-```
-
-`MODEL` may be a full ID or an unambiguous case-insensitive token, suffix, or
-substring. Claude context is `auto`, `200k`, or `1m`; Codex also accepts any
-positive integer token count. Put `--context` before `MODEL`. Every token after
-`MODEL` is forwarded unchanged and in order, including `--context`. A separator
-is not required for ordinary IDs; use `--` before a full model ID that starts
-with `-`. A literal `--` after `MODEL` is not removed.
-
-Bare `onetool code` prompts for harness, a case-insensitively alphabetized live
-model list, and context. After valid selections it prints a shell-safe
-`onetool code` command for reuse, then launches the selected harness. `status`
-reports redacted connection readiness, model IDs with provider metadata when
-returned by CLIProxyAPI, the management URL, and installed proxy/harness
-versions; `--open` additionally opens the management page. `models` prints the
-same IDs and providers, sorted case-insensitively by complete ID so configured
-prefixes participate in ordering. The launcher reads only
-`CLIPROXY_BASE_URL` (default `http://127.0.0.1:8317`) and required
-`CLIPROXY_INFERENCE_KEY` from its process environment. It does not load
-`onetool.yaml` or `secrets.yaml`.
-
-Claude launches set the resolved selector through `ANTHROPIC_MODEL`,
-`claude --model`, and `CLAUDE_CODE_SUBAGENT_MODEL`; inherited Opus, Sonnet, and
-Haiku default-model overrides are removed rather than replaced. Codex CLI
-launches display the resolved proxy model before process replacement. Codex
-`/model` continues to show its native catalog, so change proxy models through
-`onetool code`. The proxy provider and model apply to new, resumed, and forked
-sessions in that Codex process; use plain `codex` to preserve a saved session's
-native model. If Codex reports interrupted MCP servers during startup, wait for
-its runtime refresh and use `/mcp` to verify the final server state. Codex App
-remains native-model-only for this integration; use Codex CLI for custom
-CLIProxyAPI models. OneTool does not write model catalogs, profiles, aliases,
-configuration, or settings files.
-
 ## Examples
 
 ```bash
@@ -158,8 +113,6 @@ onetool init validate --config .onetool/onetool.yaml  # Check for errors
 |----------|-------------|
 | `OT_LOG_LEVEL` | Log level (DEBUG/INFO/WARNING/ERROR) |
 | `OT_LOG_DIR` | Log directory path |
-| `CLIPROXY_BASE_URL` | Code-launcher proxy origin; defaults to `http://127.0.0.1:8317` |
-| `CLIPROXY_INFERENCE_KEY` | Required code-launcher inference credential |
 
 ## How It Works
 

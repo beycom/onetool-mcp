@@ -132,7 +132,7 @@ API keys are stored in `secrets.yaml` (gitignored) and passed to the server via 
 | Key | Service | Used By |
 |-----|---------|---------|
 | `OPENAI_API_KEY` | OpenAI API | Default MCP generation and compatible embeddings |
-| `CLIPROXY_INFERENCE_KEY` | User-managed CLIProxyAPI | Explicit CLIProxy MCP generation from `secrets.yaml`; code launchers from their process environment |
+| `CLIPROXY_INFERENCE_KEY` | User-managed CLIProxyAPI | Explicit CLIProxy MCP generation from `secrets.yaml` |
 | `BRAVE_API_KEY` | [Brave Search](https://brave.com/search/api/) | `brave.*` tools |
 | `CONTEXT7_API_KEY` | [Context7](https://context7.com) | `context7.*` tools |
 
@@ -189,10 +189,8 @@ embeddings:
 
 The `embeddings` section is independent from generation and is required by
 embedding-backed tools. CLIProxy generation has no implicit embedding endpoint and resolves only
-`CLIPROXY_INFERENCE_KEY` from `secrets.yaml`.
-Code launchers instead read `CLIPROXY_BASE_URL` and
-`CLIPROXY_INFERENCE_KEY` from their process environment. See
-[Shared LLM generation](llm-routing.md) and [Code harness launchers](code-routing.md).
+`CLIPROXY_INFERENCE_KEY` from `secrets.yaml`. See
+[Shared LLM generation](llm-routing.md).
 
 ## MCP Configuration
 

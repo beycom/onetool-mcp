@@ -15,7 +15,6 @@ All under the active OneTool config directory (`{OT_DIR}`):
 | File | Purpose |
 |------|---------|
 | `onetool.yaml` | Main config (version, includes, root settings such as `llm`, `stats`, `env`) |
-| `code-routing.yaml` | Optional generated fragment for the shared CLIProxyAPI connection, exact proxy launcher routes, and direct Codex profiles |
 | `security.yaml` | Validation allowlists (builtins, imports, calls) |
 | `prompts.yaml` | MCP prompt surfaces: `tools.run.description`, server `instructions`, templates, and pack descriptions |
 | `snippets.yaml` | Snippet template definitions |
@@ -47,10 +46,6 @@ include:
 ```
 
 Maximum include depth: 5 levels.
-
-Interactive `onetool init` offers the optional `code-routing.yaml` fragment through
-the standard extension workflow. It uses the same copy, backup, and `include`
-handling as other extension templates.
 
 ## Variable Expansion
 
@@ -88,9 +83,9 @@ tools:
 Pack config belongs under `tools.<pack>`. Unknown typed pack keys fail visibly when the pack reads its config, unless that config schema explicitly allows extra fields. Recognised keys with invalid values also fail visibly. Do not keep legacy config aliases or compatibility mappings.
 
 The root template stays minimal. Shared generation belongs in the strict
-discriminated `llm` backend, shared model capabilities belong in `models`, and
-embedding settings belong only in the independent `embeddings` backend. Broad
-commented examples for every pack are not.
+discriminated `llm` backend, while embedding settings belong only in the
+independent `embeddings` backend. Broad commented examples for every pack are
+not.
 
 ## Path Resolution
 

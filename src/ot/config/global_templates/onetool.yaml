@@ -15,8 +15,6 @@ tools_dir: []
 
 # Generation uses OpenAI-compatible defaults and may select CLIProxy explicitly.
 # Embeddings can be configured independently. See the LLM routing guide.
-# Code-harness launchers use CLIPROXY_BASE_URL and
-# CLIPROXY_INFERENCE_KEY from their process environment instead.
 
 # llm:
 #   backend: cliproxy

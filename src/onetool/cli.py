@@ -13,7 +13,6 @@ from pathlib import Path
 
 import typer
 
-from onetool.cli_commands.code_app import code_app
 from onetool.cli_commands.direct_app import direct_app
 from onetool.kb import kb_app
 
@@ -179,7 +178,6 @@ def _start_root_runtime(
 
 app.add_typer(direct_app, name="direct", rich_help_panel="Direct")
 app.add_typer(kb_app, name="kb", rich_help_panel="Knowledge Base")
-app.add_typer(code_app, name="code", rich_help_panel="Code Harnesses")
 
 # Init subcommand group - manage OneTool configuration directory
 init_app = typer.Typer(

@@ -56,19 +56,6 @@ def test_copy_file_security(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_copy_file_code_routing(tmp_path: Path) -> None:
-    """The removed launcher configuration template is unavailable."""
-    from onetool.cli import _copy_file
-
-    ot_dir = tmp_path / ".onetool"
-    ot_dir.mkdir()
-
-    assert _copy_file(ot_dir, "code-routing.yaml") is False
-    assert not (ot_dir / "code-routing.yaml").exists()
-
-
-@pytest.mark.unit
-@pytest.mark.core
 def test_copy_diagram_copies_yaml_and_templates(tmp_path: Path) -> None:
     """_copy_diagram copies diagram.yaml and templates/diagram/ directory."""
     from onetool.cli import _copy_diagram

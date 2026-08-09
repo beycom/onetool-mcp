@@ -481,14 +481,14 @@ See [Tool Configuration](tool-configuration.md) for detailed configuration patte
 ### Shared generation routing
 
 Tools that generate text or inspect images use the shared, provider-neutral
-generation router. A pack may expose a strict `llm` selection for partial
-model/effort/timeout overrides or a complete backend switch:
+generation router. A pack may expose strict optional `model` and `effort`
+overrides; connection settings remain owned by top-level `llm`:
 
 ```python
 from pydantic import BaseModel, ConfigDict
 
 from ot.config import get_config
-from ot.config.routing import GenerationSelection, ReasoningEffort
+from ot.config.routing import DirectModelId, ReasoningEffort
 from ot.generation import (
     GenerationError,
     GenerationRequest,
@@ -501,7 +501,8 @@ from otpack import get_secret, get_tool_config
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    llm: GenerationSelection | None = None
+    model: DirectModelId | None = None
+    effort: ReasoningEffort | None = None
 
 
 def _get_config() -> Config:
@@ -516,9 +517,11 @@ def ask(
 ) -> str:
     try:
         root = get_config()
+        pack_config = _get_config()
         route = resolve_generation(
             config=root,
-            pack=_get_config().llm,
+            pack_model=pack_config.model,
+            pack_effort=pack_config.effort,
             model=model,
             effort=effort,
         )
@@ -532,15 +535,15 @@ def ask(
         return f"Error: {exc}"
 ```
 
-Selection precedence is per-call, operation, pack, top-level `llm`, then the
-selected model's default effort. Partial selections inherit the broader backend;
-a backend switch must provide a complete discriminated backend. The shared
-router validates model identity, interface, modality, structured-output, and
-effort capabilities before network I/O.
+Selection precedence is per-call, pack, then top-level `llm`. Model IDs pass
+through unchanged without registry, alias, discovery, or capability lookup. The
+top-level connection owns backend, interface, endpoint, credential, timeout, and
+output bounds.
 
-Do not add per-pack `model`, `base_url`, API-key fallback, client caches, or
-OpenAI SDK clients. Pack code supplies the effective selections and lets
-`resolve_generation()` and `generate()` own routing, secrets, and transport.
+Do not add per-pack `base_url`, backend, interface, API-key fallback, client
+caches, or provider SDK clients. Pack code supplies direct model and effort
+selections and lets `resolve_generation()` and `generate()` own routing, secrets,
+and transport.
 
 ### Token counting
 
@@ -668,7 +671,7 @@ from otutil.tools._mem import Config, _close_connection
 - [ ] Secrets accessed via `get_secret()` from `otpack`
 - [ ] Path resolution using `resolve_cwd_path()` (from `otpack`) or `resolve_ot_path()` (from `ot.meta`)
 - [ ] `Config` class if tool has settings
-- [ ] If generating content: strict `GenerationSelection` config passed to `resolve_generation()`
+- [ ] If generating content: strict optional `model` and `effort` config passed to `resolve_generation()`
 - [ ] If generating content: `generate()` owns secrets and transport; no per-pack provider client or cache
 - [ ] If counting tokens: use `tiktoken`, declare as hard dep in `__ot_requires__`
 - [ ] Unit tests with `@pytest.mark.unit` + `@pytest.mark.tools`

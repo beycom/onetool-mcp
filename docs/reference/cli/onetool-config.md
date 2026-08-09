@@ -12,9 +12,7 @@ Complete reference for `onetool.yaml` configuration.
 
 ## CLI Flags
 
-Server and initialization commands use explicit configuration paths. Code-launcher
-commands do not accept a configuration path; they use only their arguments and
-`CLIPROXY_BASE_URL`/`CLIPROXY_INFERENCE_KEY` from the process environment.
+Server and initialization commands use explicit configuration paths.
 
 | Flag | Short | Required | Description |
 |------|-------|----------|-------------|
@@ -23,7 +21,7 @@ commands do not accept a configuration path; they use only their arguments and
 
 **Config path resolution:** `onetool init` treats `.yaml`/`.yml` paths as files and
 appends `onetool.yaml` to directory paths. Server commands take an explicit config
-file. Code-launcher commands never locate or load this configuration.
+file.
 
 **Include path resolution:** All relative paths in `include:`, `tools_dir:`, etc. resolve from the **parent directory of the config file** (i.e., the directory containing `onetool.yaml`).
 
@@ -76,8 +74,7 @@ prompts: {}                   # Inline prompts (overrides included)
 
 Top-level `llm` configures shared backend-aware generation. It defaults to an
 OpenAI-compatible Chat Completions connection; CLIProxyAPI is explicit. Top-level
-`embeddings` independently configures embedding consumers. Code harness launching
-reads neither section.
+`embeddings` independently configures embedding consumers.
 
 ```yaml
 llm:
@@ -104,16 +101,6 @@ Omitted backend, interface, and secret name resolve to `openai_compatible`,
 Responses interface and `CLIPROXY_INFERENCE_KEY`; it rejects configurable
 interface and secret fields. See
 [Shared LLM generation](../../learn/llm-routing.md) for the complete contract.
-
-## Code Harness Launchers
-
-Coding-harness launch behaviour is not part of `onetool.yaml`. Set
-`CLIPROXY_BASE_URL` and `CLIPROXY_INFERENCE_KEY` in the launcher's process
-environment, then pass a live model query to `onetool code claude` or
-`onetool code codex`, or run bare `onetool code` for interactive live selection.
-Launcher queries are resolved only against CLIProxyAPI's current inventory, and
-`--context` must precede the model. See
-[Code harness launchers](../../learn/code-routing.md).
 
 ## Config Includes
 
@@ -305,8 +292,8 @@ tools:
     timeout: 120
     relative_paths: true
   ot_llm:
-    llm:
-      model: glm52
+    model: gpt-5.6-luna
+    effort: medium
 ```
 
 ## Secrets Configuration
@@ -326,9 +313,8 @@ GEMINI_API_KEY: "your-gemini-key"
 DATABASE_URL: "postgresql://user:pass@localhost/db"
 ```
 
-For the server, omitting `--secrets` loads no secrets file, so tools that require
-API keys report a configuration error when called. Code-launcher commands instead
-load `secrets.yaml` beside the resolved launcher config when that file exists.
+Omitting `--secrets` loads no secrets file, so tools that require API keys report
+a configuration error when called.
 
 ### Accessing Secrets in Tools
 

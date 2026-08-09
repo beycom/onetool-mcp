@@ -51,8 +51,8 @@ Config files SHALL use schema version 2.
 ### Requirement: Root Configuration Sections
 
 The root config SHALL support the current runtime sections, including independent
-generation and embedding sections. A generation model registry and coding-harness
-launch behaviour SHALL not be part of MCP configuration.
+generation and embedding sections. A generation model registry SHALL not be part
+of MCP configuration.
 
 #### Scenario: Supported root sections
 - **GIVEN** a config containing `include`, `env`, `llm`, `embeddings`, `alias`, `snippets`, `servers`, `direct`, `tools`, `security`, `stats`, `telemetry`, `output`, `tools_dir`, `prompts`, `log_level`, `log_dir`, `compact_max_length`, `log_verbose`, or `debug_tracebacks`
@@ -236,10 +236,6 @@ fields permitted by the selected backend.
 #### Scenario: Unsupported output-limit field
 - **WHEN** `llm` contains `max_output_tokens` instead of `max_tokens`
 - **THEN** strict validation SHALL reject it
-
-#### Scenario: Launcher independence
-- **WHEN** MCP configuration is absent, invalid, or changed
-- **THEN** standalone code launcher construction SHALL remain determined only by its arguments and process environment
 
 ### Requirement: Typed tool generation selections
 

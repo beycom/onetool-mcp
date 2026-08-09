@@ -58,9 +58,6 @@ OPENROUTER_API_KEY: your-openrouter-key
 CLIPROXY_INFERENCE_KEY: your-inference-client-key
 ```
 
-The standalone code launcher is separate. It reads CLIProxy settings from its
-process environment and never reads the MCP server's `llm` or `secrets.yaml`.
-
 ## Model and Effort Selection
 
 Model and effort resolve independently in this order:
