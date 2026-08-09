@@ -6,10 +6,11 @@ from onetool.code.adapters import (
     replace_process,
 )
 from onetool.code.domain import LaunchInvocation
-from onetool.code.proxy import ModelDiscovery
+from onetool.code.proxy import DiscoveredModel, ModelDiscovery
 from onetool.code.selection import parse_context, resolve_model_query
 
 __all__ = [
+    "DiscoveredModel",
     "LaunchInvocation",
     "ModelDiscovery",
     "build_invocation",

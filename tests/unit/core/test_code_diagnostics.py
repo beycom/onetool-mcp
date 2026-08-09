@@ -12,6 +12,7 @@ from onetool.code.diagnostics import (
     collect_code_status,
     open_management_url,
 )
+from onetool.code.proxy import DiscoveredModel
 
 pytestmark = [pytest.mark.unit, pytest.mark.core]
 
@@ -23,7 +24,9 @@ def test_executable_probe_bounds_captured_output() -> None:
 
     with (
         patch("onetool.code.diagnostics.shutil.which", return_value="/bin/tool"),
-        patch("onetool.code.diagnostics.subprocess.run", side_effect=write_large_output),
+        patch(
+            "onetool.code.diagnostics.subprocess.run", side_effect=write_large_output
+        ),
     ):
         status = _probe_executable(name="tool", arguments=("--version",))
 
@@ -38,7 +41,17 @@ def test_status_collects_models_management_and_executable_versions() -> None:
         requests.append(request)
         if request.url.path == "/v1/models":
             assert request.headers["Authorization"] == "Bearer secret-value"
-            return httpx.Response(200, json={"data": [{"id": "gpt-5.6-sol"}]})
+            return httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {
+                            "id": "codex-oauth/gpt-5.6-sol",
+                            "owned_by": "openai",
+                        }
+                    ]
+                },
+            )
         assert request.url.path == "/management.html"
         assert "Authorization" not in request.headers
         return httpx.Response(200, content=b"management")
@@ -63,7 +76,9 @@ def test_status_collects_models_management_and_executable_versions() -> None:
     assert status.ready
     assert status.proxy_origin == "http://proxy.test"
     assert status.origin_source == "environment"
-    assert status.models == ("gpt-5.6-sol",)
+    assert status.models == (
+        DiscoveredModel(id="codex-oauth/gpt-5.6-sol", provider="openai"),
+    )
     assert status.management_url == "http://proxy.test/management.html"
     assert status.management_reachable
     assert [request.url.path for request in requests] == [

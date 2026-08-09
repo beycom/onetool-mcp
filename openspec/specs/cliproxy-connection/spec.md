@@ -38,19 +38,29 @@ SHALL read its versioned API base and direct default model from an explicit
 - **THEN** OneTool SHALL NOT call management APIs or manage the proxy lifecycle
 - **AND** it SHALL NOT read or mutate CLIProxyAPI configuration, OAuth, account, log, or routing files
 
-### Requirement: Launch and discovery are separate
+### Requirement: Launcher discovery and generation are separate
 
-Harness launches and MCP generation SHALL not require model discovery. Discovery
-SHALL occur only through `onetool code models`.
+Standalone harness launches SHALL resolve their required model query against one
+fresh bounded inference inventory. MCP generation SHALL use its configured direct
+model ID without discovery.
 
-#### Scenario: Direct launch or generation
-- **WHEN** a launcher or generation operation receives a direct model ID
+#### Scenario: Launcher live selection
+- **WHEN** a standalone harness launch receives a model query
+- **THEN** OneTool SHALL call `GET /v1/models` exactly once using the environment
+  credential
+- **AND** it SHALL fail before starting the child unless the query resolves to one
+  inventory ID
+
+#### Scenario: Direct generation
+- **WHEN** MCP generation receives a configured direct model ID
 - **THEN** OneTool SHALL send it unchanged without calling `GET /v1/models`
 
 #### Scenario: Explicit model listing
 - **WHEN** `onetool code models` runs with a valid environment credential
 - **THEN** it SHALL call `GET /v1/models` exactly once
-- **AND** it SHALL return the direct IDs from that bounded inventory
+- **AND** it SHALL return the direct IDs and optional `owned_by` provider values
+  from that bounded inventory
+- **AND** it SHALL not require a management credential or read CLIProxyAPI files
 
 #### Scenario: Invalid discovery response
 - **WHEN** discovery times out, exceeds its body limit, or returns an invalid shape

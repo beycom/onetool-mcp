@@ -34,7 +34,8 @@ unique across active worktrees.
 WTP applies the repository's `.wtp.yml` hooks before the recipe moves the
 worktree to its flat path and installs its locked `.venv`. Each worktree gets
 its own Codex/Claude configuration and OneTool configuration while sharing
-maintained agent skills, work-in-progress artifacts, and OneTool secrets.
+maintained agent skills, work-in-progress artifacts, runtime secrets, and
+isolated integration-test secrets.
 
 Start a fresh Codex or Claude session from the new worktree when testing MCP
 changes. This ensures the client launches that worktree's

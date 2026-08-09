@@ -56,12 +56,22 @@ def test_claude_uses_exact_model_and_cleans_inherited_environment() -> None:
         {
             "CLIPROXY_INFERENCE_KEY": "bootstrap",
             "ANTHROPIC_API_KEY": "stale",
+            "ANTHROPIC_DEFAULT_OPUS_MODEL": "stale-opus",
+            "ANTHROPIC_DEFAULT_SONNET_MODEL": "stale-sonnet",
+            "ANTHROPIC_DEFAULT_HAIKU_MODEL": "stale-haiku",
             "PATH": "/bin",
         }
     )
     assert child["ANTHROPIC_AUTH_TOKEN"] == "proxy-secret"
     assert "CLIPROXY_INFERENCE_KEY" not in child
     assert "ANTHROPIC_API_KEY" not in child
+    for family_override in (
+        "ANTHROPIC_DEFAULT_OPUS_MODEL",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL",
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+    ):
+        assert family_override not in invocation.environment.set_values
+        assert family_override not in child
     assert child["PATH"] == "/bin"
 
 
@@ -84,6 +94,9 @@ def test_claude_context_policies_are_explicit_and_child_scoped() -> None:
     assert extended.model == "gpt-5.6-sol"
     assert extended.argv == ("claude", "--model", "gpt-5.6-sol[1m]")
     assert extended.environment.set_values["ANTHROPIC_MODEL"] == ("gpt-5.6-sol[1m]")
+    assert extended.environment.set_values["CLAUDE_CODE_SUBAGENT_MODEL"] == (
+        "gpt-5.6-sol[1m]"
+    )
     assert "CLAUDE_CODE_DISABLE_1M_CONTEXT" not in (extended.environment.set_values)
     assert standard.argv == ("claude", "--model", "gpt-5.6-sol")
     assert standard.environment.set_values["CLAUDE_CODE_DISABLE_1M_CONTEXT"] == "1"

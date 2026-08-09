@@ -452,8 +452,8 @@ interactive selection, live model discovery, and read-only status diagnostics.
 
 #### Scenario: Interactive bare code command
 - **WHEN** `onetool code` runs in an interactive terminal without a subcommand
-- **THEN** it SHALL prompt for harness, a searchable live model, and a supported
-  explicit context
+- **THEN** it SHALL prompt for harness, one exact model from a deterministic
+  case-insensitive alphabetical live list, and a supported explicit context
 - **AND** it SHALL use the same resolver and invocation builder as the nested
   commands
 
@@ -484,12 +484,17 @@ interactive selection, live model discovery, and read-only status diagnostics.
 ### Requirement: Live CLIProxyAPI model discovery
 
 The CLI SHALL expose `onetool code models` as a bounded view of direct model IDs
-reported by the environment-configured CLIProxyAPI inference service.
+and optional provider metadata reported by the environment-configured
+CLIProxyAPI inference service.
 
 #### Scenario: Models display
 - **WHEN** a valid inventory is received
-- **THEN** the command SHALL display only the direct IDs returned by `/v1/models`
-- **AND** it SHALL not add aliases, provider labels, or compatibility classifications
+- **THEN** the command SHALL display the direct IDs returned by `/v1/models` in
+  deterministic case-insensitive order using each complete ID, including any prefix
+- **AND** it SHALL display a valid non-empty `owned_by` value as the provider or
+  `-` when provider metadata is unavailable
+- **AND** it SHALL not add aliases, infer provider from an ID or prefix, or add
+  compatibility classifications
 
 #### Scenario: Inventory failure
 - **WHEN** discovery is unauthorized, unavailable, too large, malformed, or times out

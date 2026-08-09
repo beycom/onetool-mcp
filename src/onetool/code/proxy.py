@@ -19,6 +19,21 @@ class ProxyDiscoveryError(RuntimeError):
     """A bounded, redacted external inference discovery failure."""
 
 
+@dataclass(frozen=True, slots=True)
+class DiscoveredModel:
+    """One direct model ID with optional provider metadata."""
+
+    id: str
+    provider: str | None
+
+
+def _contains_control_characters(value: str) -> bool:
+    """Return whether text contains terminal-unsafe control characters."""
+    return any(
+        ord(character) < 0x20 or 0x7F <= ord(character) <= 0x9F for character in value
+    )
+
+
 @dataclass(slots=True)
 class ModelDiscovery:
     """Authenticated one-request discovery for the explicit models command."""
@@ -82,8 +97,8 @@ class ModelDiscovery:
                 f"CLIProxyAPI inference endpoint is unavailable at {origin}"
             ) from exc
 
-    def models(self) -> tuple[str, ...]:
-        """Return direct model IDs from one fresh bounded inventory."""
+    def models(self) -> tuple[DiscoveredModel, ...]:
+        """Return sorted direct models from one fresh bounded inventory."""
         status_code, content = self._request()
         if status_code != 200:
             raise ProxyDiscoveryError(
@@ -105,22 +120,23 @@ class ModelDiscovery:
                 "CLIProxyAPI model discovery returned too many model entries"
             )
 
-        ids: list[str] = []
+        models: list[DiscoveredModel] = []
         for index, item in enumerate(data):
             model_id = item.get("id") if isinstance(item, dict) else None
             if (
                 not isinstance(model_id, str)
                 or not model_id.strip()
-                or any(
-                    ord(character) < 0x20 or 0x7F <= ord(character) <= 0x9F
-                    for character in model_id
-                )
+                or _contains_control_characters(model_id)
             ):
                 raise ProxyDiscoveryError(
                     f"CLIProxyAPI model entry {index} has an invalid id"
                 )
-            ids.append(model_id)
-        return tuple(ids)
+            raw_provider = item.get("owned_by")
+            provider = raw_provider.strip() if isinstance(raw_provider, str) else None
+            if not provider or _contains_control_characters(provider):
+                provider = None
+            models.append(DiscoveredModel(id=model_id, provider=provider))
+        return tuple(sorted(models, key=lambda model: (model.id.casefold(), model.id)))
 
 
-__all__ = ["ModelDiscovery", "ProxyDiscoveryError"]
+__all__ = ["DiscoveredModel", "ModelDiscovery", "ProxyDiscoveryError"]

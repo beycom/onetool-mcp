@@ -18,7 +18,7 @@ from onetool.code.adapters import (
     INFERENCE_KEY_ENV,
     normalize_proxy_origin,
 )
-from onetool.code.proxy import ModelDiscovery, ProxyDiscoveryError
+from onetool.code.proxy import DiscoveredModel, ModelDiscovery, ProxyDiscoveryError
 
 _CONNECT_TIMEOUT = 2.0
 _REQUEST_TIMEOUT = 5.0
@@ -44,7 +44,7 @@ class CodeStatus:
     origin_source: str
     origin_error: str | None
     credential_present: bool
-    models: tuple[str, ...]
+    models: tuple[DiscoveredModel, ...]
     inventory_error: str | None
     management_url: str | None
     management_reachable: bool
@@ -79,7 +79,7 @@ def collect_code_status(
         origin = None
         origin_error = str(exc)
 
-    models: tuple[str, ...] = ()
+    models: tuple[DiscoveredModel, ...] = ()
     if origin is None:
         inventory_error = origin_error
     elif not credential:
@@ -191,7 +191,11 @@ def _probe_executable(
             version=None,
             error="version probe output exceeded the 4 KiB limit",
         )
-    lines = [line.strip() for line in content.decode(errors="replace").splitlines() if line.strip()]
+    lines = [
+        line.strip()
+        for line in content.decode(errors="replace").splitlines()
+        if line.strip()
+    ]
     if not lines:
         return ExecutableStatus(
             name=name,

@@ -9,6 +9,7 @@ from typer.testing import CliRunner
 
 from onetool.cli import app
 from onetool.code.diagnostics import CodeStatus, ExecutableStatus
+from onetool.code.proxy import DiscoveredModel
 
 pytestmark = [pytest.mark.unit, pytest.mark.core]
 
@@ -82,6 +83,77 @@ def test_context_before_model_is_owned_but_context_after_model_is_opaque() -> No
     }
 
 
+def test_option_like_model_is_accepted_after_end_of_options() -> None:
+    with patch("onetool.cli_commands.code_app._launch") as launch:
+        result = runner.invoke(
+            app,
+            [
+                "code",
+                "codex",
+                "--context",
+                "auto",
+                "--",
+                "-vendor/model",
+                "exec",
+                "--full-auto",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert launch.call_args.kwargs == {
+        "harness": "codex",
+        "model": "-vendor/model",
+        "context_window": None,
+        "arguments": ("exec", "--full-auto"),
+    }
+
+
+def test_direct_codex_launch_explains_model_session_and_mcp_scope() -> None:
+    discovery = Mock()
+    discovery.models.return_value = (
+        DiscoveredModel(id="gpt-5.6-sol", provider="openai"),
+    )
+    invocation = Mock()
+    with (
+        patch(
+            "onetool.cli_commands.code_app.connection_from_environment",
+            return_value=("http://proxy.test", "secret"),
+        ),
+        patch(
+            "onetool.cli_commands.code_app.ModelDiscovery",
+            return_value=discovery,
+        ),
+        patch(
+            "onetool.cli_commands.code_app.build_invocation",
+            return_value=invocation,
+        ) as build,
+        patch("onetool.cli_commands.code_app.replace_process") as replace,
+    ):
+        result = runner.invoke(app, ["code", "codex", "sol"])
+
+    assert result.exit_code == 0
+    output = result.stdout + result.stderr
+    normalized_output = " ".join(output.split())
+    assert "Resolved proxy model: gpt-5.6-sol" in output
+    assert "Codex /model shows Codex's native catalog" in output
+    assert "Change proxy models through 'onetool code'" in normalized_output
+    assert "applies to new, resumed, and forked sessions" in normalized_output
+    assert "Use plain 'codex' to preserve a saved session's native model" in (
+        normalized_output
+    )
+    assert "if Codex reports interrupted servers" in normalized_output
+    assert "use '/mcp' to verify the final state" in normalized_output
+    build.assert_called_once_with(
+        harness="codex",
+        model="gpt-5.6-sol",
+        proxy_origin="http://proxy.test",
+        credential="secret",
+        context_window=None,
+        arguments=(),
+    )
+    replace.assert_called_once_with(invocation=invocation)
+
+
 def test_model_is_required_and_help_documents_environment() -> None:
     missing = runner.invoke(app, ["code", "claude"])
     help_result = runner.invoke(app, ["code", "claude", "--help"])
@@ -98,7 +170,10 @@ def test_model_is_required_and_help_documents_environment() -> None:
 
 def test_models_uses_one_live_inventory_without_loading_config() -> None:
     discovery = Mock()
-    discovery.models.return_value = ("gpt-5.6-luna", "z-ai/glm-5.2")
+    discovery.models.return_value = (
+        DiscoveredModel(id="codex-oauth/gpt-5.6-luna", provider="openai"),
+        DiscoveredModel(id="openrouter/z-ai/glm-5.2", provider=None),
+    )
     with (
         patch(
             "onetool.cli_commands.code_app.connection_from_environment",
@@ -113,8 +188,9 @@ def test_models_uses_one_live_inventory_without_loading_config() -> None:
 
     assert result.exit_code == 0
     assert (result.stdout + result.stderr).splitlines() == [
-        "gpt-5.6-luna",
-        "z-ai/glm-5.2",
+        "MODEL                     PROVIDER",
+        "codex-oauth/gpt-5.6-luna  openai",
+        "openrouter/z-ai/glm-5.2   -",
     ]
     factory.assert_called_once_with(
         proxy_origin="http://proxy.test",
@@ -144,15 +220,19 @@ def test_bare_code_requires_tty_and_interactive_path_is_shared() -> None:
     launch.assert_called_once_with()
 
 
-def test_interactive_launch_reuses_inventory_and_explicit_context() -> None:
+def test_interactive_launch_sorts_models_and_prints_reusable_command() -> None:
     discovery = Mock()
-    discovery.models.return_value = ("gpt-5.6-sol", "gpt-5.6-terra")
+    discovery.models.return_value = (
+        DiscoveredModel(id="Z-AI/glm-5.2", provider="openrouter"),
+        DiscoveredModel(id="-vendor/model with space", provider=None),
+        DiscoveredModel(id="gpt-5.6-sol", provider="openai"),
+    )
     harness_prompt = Mock()
-    harness_prompt.ask.return_value = "claude"
+    harness_prompt.ask.return_value = "codex"
     context_prompt = Mock()
     context_prompt.ask.return_value = "1m"
     model_prompt = Mock()
-    model_prompt.ask.return_value = "gpt-5.6-sol"
+    model_prompt.ask.return_value = "-vendor/model with space"
     with (
         patch(
             "onetool.cli_commands.code_app.connection_from_environment",
@@ -164,34 +244,41 @@ def test_interactive_launch_reuses_inventory_and_explicit_context() -> None:
         ),
         patch(
             "onetool.cli_commands.code_app.questionary.select",
-            side_effect=[harness_prompt, context_prompt],
+            side_effect=[harness_prompt, model_prompt, context_prompt],
         ) as select,
-        patch(
-            "onetool.cli_commands.code_app.questionary.autocomplete",
-            return_value=model_prompt,
-        ),
+        patch("onetool.cli_commands.code_app.console.print") as print_output,
         patch("onetool.cli_commands.code_app._launch") as launch,
     ):
         from onetool.cli_commands.code_app import _interactive_launch
 
         _interactive_launch()
 
-    assert select.call_count == 2
+    assert select.call_count == 3
     assert select.call_args_list[0].args == ("Harness",)
-    assert select.call_args_list[1].args == ("Context",)
+    assert select.call_args_list[1] == call(
+        "Model",
+        choices=["-vendor/model with space", "gpt-5.6-sol", "Z-AI/glm-5.2"],
+    )
+    assert select.call_args_list[2].args == ("Context",)
+    print_output.assert_called_once_with(
+        "Next time: onetool code codex --context 1m -- '-vendor/model with space'",
+        markup=False,
+    )
     launch.assert_called_once_with(
-        harness="claude",
-        model="gpt-5.6-sol",
+        harness="codex",
+        model="-vendor/model with space",
         context_window=1_000_000,
         arguments=(),
         connection=("http://proxy.test", "secret"),
-        inventory=("gpt-5.6-sol", "gpt-5.6-terra"),
+        inventory=("Z-AI/glm-5.2", "-vendor/model with space", "gpt-5.6-sol"),
     )
 
 
 def test_interactive_cancellation_does_not_launch() -> None:
     discovery = Mock()
-    discovery.models.return_value = ("gpt-5.6-sol",)
+    discovery.models.return_value = (
+        DiscoveredModel(id="gpt-5.6-sol", provider="openai"),
+    )
     prompt = Mock()
     prompt.ask.return_value = None
     with (
@@ -221,7 +308,10 @@ def _ready_status() -> CodeStatus:
         origin_source="environment",
         origin_error=None,
         credential_present=True,
-        models=("gpt-5.6-sol", "gpt-5.6-terra"),
+        models=(
+            DiscoveredModel(id="codex-oauth/gpt-5.6-sol", provider="openai"),
+            DiscoveredModel(id="openrouter/gpt-5.6-terra", provider="openrouter"),
+        ),
         inventory_error=None,
         management_url="http://proxy.test/management.html",
         management_reachable=True,
@@ -256,7 +346,10 @@ def test_status_lists_models_and_opens_only_when_requested() -> None:
     for output in (plain.stdout + plain.stderr, opened.stdout + opened.stderr):
         assert "Inference endpoint: reachable (authenticated)" in output
         assert "2 available" in output
-        assert "gpt-5.6-sol" in output
+        assert "codex-oauth/gpt-5.6-sol" in output
+        assert "openai" in output
+        assert "openrouter/gpt-5.6-terra" in output
+        assert "openrouter" in output
         assert "http://proxy.test/management.html" in output
     assert open_url.call_args_list == [
         call("http://proxy.test/management.html"),

@@ -5,7 +5,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from onetool.code.proxy import ModelDiscovery, ProxyDiscoveryError
+from onetool.code.proxy import DiscoveredModel, ModelDiscovery, ProxyDiscoveryError
 
 pytestmark = [pytest.mark.unit, pytest.mark.core]
 
@@ -31,13 +31,38 @@ def test_discovery_performs_one_authenticated_bounded_request() -> None:
         assert request.headers["Authorization"] == "Bearer secret-value"
         return httpx.Response(
             200,
-            json={"data": [{"id": "gpt-5.6-luna"}, {"id": "z-ai/glm-5.2"}]},
+            json={
+                "data": [
+                    {"id": "openrouter/z-ai/glm-5.2", "owned_by": "openrouter"},
+                    {"id": "codex-oauth/gpt-5.6-luna", "owned_by": " openai "},
+                ]
+            },
         )
 
     discovery, client = _discovery(httpx.MockTransport(handler))
     with client:
-        assert discovery.models() == ("gpt-5.6-luna", "z-ai/glm-5.2")
+        assert discovery.models() == (
+            DiscoveredModel(id="codex-oauth/gpt-5.6-luna", provider="openai"),
+            DiscoveredModel(
+                id="openrouter/z-ai/glm-5.2",
+                provider="openrouter",
+            ),
+        )
     assert len(requests) == 1
+
+
+@pytest.mark.parametrize("owned_by", [None, "", "   ", 42, "bad\nprovider"])
+def test_discovery_treats_invalid_provider_as_unavailable(owned_by: object) -> None:
+    response = httpx.Response(
+        200,
+        json={"data": [{"id": "gpt-5.6-luna", "owned_by": owned_by}]},
+    )
+    discovery, client = _discovery(httpx.MockTransport(lambda _request: response))
+
+    with client:
+        assert discovery.models() == (
+            DiscoveredModel(id="gpt-5.6-luna", provider=None),
+        )
 
 
 @pytest.mark.parametrize(

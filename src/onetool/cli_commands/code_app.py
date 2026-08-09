@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 import sys
 from typing import TYPE_CHECKING, Annotated, cast
 
@@ -19,7 +20,7 @@ from onetool.code.adapters import (
 )
 from onetool.code.diagnostics import collect_code_status, open_management_url
 from onetool.code.domain import Harness
-from onetool.code.proxy import ModelDiscovery
+from onetool.code.proxy import DiscoveredModel, ModelDiscovery
 from onetool.code.selection import parse_context, resolve_model_query
 
 if TYPE_CHECKING:
@@ -49,6 +50,8 @@ class HarnessPassthroughCommand(TyperCommand):
             token = args[index]
             if token in {"--help", "-h"}:
                 return None
+            if token == "--":
+                return index + 1 if index + 1 < len(args) else None
             if token == "--context":
                 index += 2
                 continue
@@ -82,10 +85,13 @@ def _launch(
     proxy_origin, credential = connection or connection_from_environment()
     available = inventory
     if available is None:
-        available = ModelDiscovery(
-            proxy_origin=proxy_origin,
-            credential=credential,
-        ).models()
+        available = tuple(
+            model.id
+            for model in ModelDiscovery(
+                proxy_origin=proxy_origin,
+                credential=credential,
+            ).models()
+        )
     resolved_model = resolve_model_query(query=model, models=available)
     invocation = build_invocation(
         harness=harness,
@@ -95,6 +101,24 @@ def _launch(
         context_window=context_window,
         arguments=arguments,
     )
+    if harness == "codex":
+        console.print(f"Resolved proxy model: {resolved_model}", markup=False)
+        console.print(
+            "Codex /model shows Codex's native catalog. Change proxy models through "
+            "'onetool code'.",
+            markup=False,
+        )
+        console.print(
+            "Session scope: this proxy model/provider applies to new, resumed, and "
+            "forked sessions in this Codex process. Use plain 'codex' to preserve a "
+            "saved session's native model.",
+            markup=False,
+        )
+        console.print(
+            "MCP startup: if Codex reports interrupted servers, wait for refresh and "
+            "use '/mcp' to verify the final state.",
+            markup=False,
+        )
     replace_process(invocation=invocation)
 
 
@@ -143,13 +167,36 @@ def _ask_context(*, harness: Harness) -> str | None:
     )
 
 
+def _reusable_command(*, harness: Harness, model: str, context: str) -> str:
+    """Return the shell-safe public command for an interactive selection."""
+    return shlex.join(("onetool", "code", harness, "--context", context, "--", model))
+
+
+def _format_model_inventory(models: tuple[DiscoveredModel, ...]) -> tuple[str, ...]:
+    """Return a stable plain-text model and provider table."""
+    model_width = max((len(model.id) for model in models), default=0)
+    model_width = max(model_width, len("MODEL"))
+    rows = [f"{'MODEL':<{model_width}}  PROVIDER"]
+    rows.extend(
+        f"{model.id:<{model_width}}  {model.provider or '-'}" for model in models
+    )
+    return tuple(rows)
+
+
+def _print_model_inventory(models: tuple[DiscoveredModel, ...]) -> None:
+    """Print model inventory without Rich markup interpretation."""
+    for row in _format_model_inventory(models):
+        console.print(row, markup=False)
+
+
 def _interactive_launch() -> None:
     """Select one harness, live model, and explicit context before launching."""
     connection = connection_from_environment()
-    inventory = ModelDiscovery(
+    discovered_models = ModelDiscovery(
         proxy_origin=connection[0],
         credential=connection[1],
     ).models()
+    inventory = tuple(model.id for model in discovered_models)
     harness_value = questionary.select(
         "Harness",
         choices=[
@@ -160,21 +207,27 @@ def _interactive_launch() -> None:
     if harness_value is None:
         return
     harness = cast("Harness", harness_value)
-    model_value = questionary.autocomplete(
+    model_choices: list[str] = sorted(inventory, key=str.casefold)
+    model_value = questionary.select(
         "Model",
-        choices=list(inventory),
-        ignore_case=True,
-        match_middle=True,
+        choices=model_choices,
     ).ask()
     if model_value is None:
         return
     context = _ask_context(harness=harness)
     if context is None:
         return
+    model = cast("str", model_value)
+    context = context.strip()
+    context_window = parse_context(context)
+    console.print(
+        f"Next time: {_reusable_command(harness=harness, model=model, context=context)}",
+        markup=False,
+    )
     _launch(
         harness=harness,
-        model=cast("str", model_value),
-        context_window=parse_context(context),
+        model=model,
+        context_window=context_window,
         arguments=(),
         connection=connection,
         inventory=inventory,
@@ -251,7 +304,7 @@ def codex_command(
 
 @code_app.command("models")
 def models_command() -> None:
-    """List direct model IDs from one bounded CLIProxyAPI inventory request."""
+    """List direct model IDs and providers from one bounded inventory request."""
     try:
         proxy_origin, credential = connection_from_environment()
         models = ModelDiscovery(
@@ -261,8 +314,7 @@ def models_command() -> None:
     except Exception as exc:
         console.print(f"Error: {exc}", markup=False)
         raise typer.Exit(2) from exc
-    for model in models:
-        console.print(model, markup=False)
+    _print_model_inventory(models)
 
 
 @code_app.command("status")
@@ -294,8 +346,7 @@ def status_command(
     if status.inventory_error is None:
         console.print("Inference endpoint: reachable (authenticated)", markup=False)
         console.print(f"Models: {len(status.models)} available", markup=False)
-        for model in status.models:
-            console.print(f"  {model}", markup=False)
+        _print_model_inventory(status.models)
     else:
         console.print(
             f"Inference endpoint: ERROR ({status.inventory_error})",

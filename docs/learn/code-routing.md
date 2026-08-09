@@ -26,11 +26,11 @@ onetool code status
 ```
 
 Status displays the normalized proxy origin and whether it came from the default
-or environment, credential presence without its value, live model count and IDs,
-the derived management URL and reachability, and detected `cliproxyapi`, `claude`,
-and `codex` executable versions. Required inference failures exit non-zero while
-independent checks continue; missing executables or an unavailable management
-page are warnings.
+or environment, credential presence without its value, live model count, IDs,
+and provider values reported by CLIProxyAPI, the derived management URL and
+reachability, and detected `cliproxyapi`, `claude`, and `codex` executable
+versions. Required inference failures exit non-zero while independent checks
+continue; missing executables or an unavailable management page are warnings.
 
 To display status and then open the derived management page in the platform
 browser:
@@ -51,10 +51,13 @@ Run the group without a subcommand in an interactive terminal:
 onetool code
 ```
 
-Choose Claude or Codex, search the current CLIProxyAPI model inventory, and then
-select an explicit context policy. Cancellation returns without launching. A
-bare command in a non-interactive environment fails instead of waiting for
-input.
+Choose Claude or Codex, select an exact model ID from the case-insensitively
+alphabetized current CLIProxyAPI inventory, and then select an explicit context
+policy. After valid selections, OneTool prints a shell-safe command such as
+`onetool code claude --context 1m -- gpt-5.6-sol` for direct reuse before
+launching the harness. The displayed command contains no credentials or internal
+provider overrides. Cancellation returns without launching. A bare command in a
+non-interactive environment fails instead of waiting for input.
 
 ## Launch Directly
 
@@ -73,10 +76,39 @@ with the candidate IDs, and missing queries fail without substituting a model.
 There is no static catalog, compatibility alias, route, profile, provider, or
 capability registry.
 
-Every token after `MODEL` is appended unchanged and in order. No `--` separator
-is required, and a literal `--` is preserved. Launcher-owned options must appear
-before `MODEL`; therefore `--context` after `MODEL` is forwarded to the official
-harness unchanged.
+Every token after `MODEL` is appended unchanged and in order. A separator is not
+required for ordinary model IDs; use `--` immediately before a full ID that
+starts with `-`. A literal `--` after `MODEL` is preserved. Launcher-owned
+options must appear before `MODEL`; therefore `--context` after `MODEL` is
+forwarded to the official harness unchanged.
+
+## Understand Harness Model Selectors
+
+For Claude Code, OneTool supplies the selected proxy model through both
+`ANTHROPIC_MODEL` and `claude --model`, and keeps
+`CLAUDE_CODE_SUBAGENT_MODEL` aligned. Inherited Opus, Sonnet, and Haiku default
+overrides are removed without replacements, so the selected proxy model appears
+as the custom/default model instead of being duplicated across Claude family
+slots.
+
+For Codex CLI, OneTool keeps the proxy provider and resolved `--model` selection
+invocation-scoped. Immediately before launch it displays the resolved proxy model
+and explains that Codex `/model` shows Codex's bundled native catalog. Change the
+proxy model by launching again through `onetool code`; the native catalog does
+not replace OneTool's live pre-launch selection. Invocation-scoped means the proxy
+provider and model apply to every new, resumed, or forked session opened in that
+Codex process. Launch plain `codex` instead when a saved session must retain its
+native model.
+
+Codex can report that MCP startup was interrupted while replacing an initial
+server startup pass with a runtime refresh. Wait for the refresh, then use `/mcp`
+to inspect the final server state. A server missing from that final inventory is
+an actionable failure; the earlier interrupted-pass message alone is not.
+
+Codex App remains native-model-only for this integration. Launch custom
+CLIProxyAPI models through Codex CLI. OneTool does not generate or write model
+catalogs, profiles, aliases, harness configuration, or settings files for either
+client.
 
 ## Set Context Explicitly
 
@@ -101,9 +133,12 @@ invocation-scoped `model_context_window` and a 90-percent
 onetool code models
 ```
 
-This command performs one authenticated, bounded inventory request and prints
-only the direct IDs returned by CLIProxyAPI. It does not cache or classify the
-inventory.
+This command performs one authenticated, bounded inventory request and prints a
+`MODEL` and `PROVIDER` table. Rows are sorted case-insensitively by the complete
+model ID, including any configured prefix. `PROVIDER` uses the response's
+optional `owned_by` value and displays `-` when unavailable; OneTool does not
+infer it from the ID or prefix. The command does not cache or otherwise classify
+the inventory.
 
 For native or direct-provider use, invoke `claude` or `codex` normally instead of
 using the OneTool launcher.

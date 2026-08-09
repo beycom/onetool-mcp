@@ -35,7 +35,7 @@ security:
 
 llm:
   backend: cliproxy
-  model: google/gemini-3-flash-preview
+  model: codex-oauth/gpt-5.6-luna
   base_url: http://127.0.0.1:8317/v1
 
 tools: {}
