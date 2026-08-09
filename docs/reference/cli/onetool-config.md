@@ -12,14 +12,16 @@ Complete reference for `onetool.yaml` configuration.
 
 ## CLI Flags
 
-Configuration is specified via CLI flags — there is no automatic global or project config discovery.
+Server and initialization commands use explicit configuration paths.
 
 | Flag | Short | Required | Description |
 |------|-------|----------|-------------|
-| `--config PATH` | `-c` | Yes (server) | Path to `onetool.yaml` config file or directory |
-| `--secrets PATH` | `-s` | No | Path to `secrets.yaml`. If omitted, no secrets are loaded |
+| `--config PATH` | `-c` | Yes (server) | Server config file; `init` also accepts a directory |
+| `--secrets PATH` | `-s` | No | Path to the server's `secrets.yaml` |
 
-**Config path resolution:** If `PATH` ends in `.yaml`/`.yml` it is used as the config file directly; otherwise `onetool.yaml` is appended to the directory path.
+**Config path resolution:** `onetool init` treats `.yaml`/`.yml` paths as files and
+appends `onetool.yaml` to directory paths. Server commands take an explicit config
+file.
 
 **Include path resolution:** All relative paths in `include:`, `tools_dir:`, etc. resolve from the **parent directory of the config file** (i.e., the directory containing `onetool.yaml`).
 
@@ -67,6 +69,38 @@ alias: {}                     # Function aliases
 snippets: {}                  # Reusable code templates
 prompts: {}                   # Inline prompts (overrides included)
 ```
+
+## Generation and Embedding Connections
+
+Top-level `llm` configures shared backend-aware generation. It defaults to an
+OpenAI-compatible Chat Completions connection; CLIProxyAPI is explicit. Top-level
+`embeddings` independently configures embedding consumers.
+
+```yaml
+llm:
+  backend: cliproxy
+  base_url: http://127.0.0.1:8317/v1
+  model: gpt-5.6-luna
+  effort: low
+  timeout: 30
+  max_tokens: 4096
+
+embeddings:
+  backend: openai_compatible
+  model: text-embedding-3-small
+  base_url: https://api.openai.com/v1
+  secret_name: OPENAI_API_KEY
+  dimensions: 1536
+  timeout: 60
+  batch_size: 200
+  max_tokens: 8191
+```
+
+Omitted backend, interface, and secret name resolve to `openai_compatible`,
+`chat_completions`, and `OPENAI_API_KEY`. Explicit `backend: cliproxy` fixes the
+Responses interface and `CLIPROXY_INFERENCE_KEY`; it rejects configurable
+interface and secret fields. See
+[Shared LLM generation](../../learn/llm-routing.md) for the complete contract.
 
 ## Config Includes
 
@@ -181,10 +215,8 @@ No pack-specific `tools.excel` settings.
 
 | Field | Type | Default | Range | Description |
 |------|------|---------|-------|-------------|
+| `llm` | generation selection | `null` | - | Generation overrides for `mem.ask()` |
 | `db_path` | string | `data/mem/default.db` | - | SQLite path for memory store |
-| `model` | string | `text-embedding-3-small` | - | Embedding model |
-| `base_url` | string | `https://openrouter.ai/api/v1` | - | OpenAI-compatible embedding API base |
-| `dimensions` | int | `1536` | - | Embedding dimensions |
 | `search_limit` | int | `10` | `1-100` | Default max search results |
 | `search_extract` | int | `200` | `>=0` | Extract length per result (`0` = full) |
 | `redaction_enabled` | bool | `true` | - | Enable redaction on write |
@@ -193,9 +225,6 @@ No pack-specific `tools.excel` settings.
 | `decay_half_life_days` | int | `30` | `>=1` | Importance decay half-life |
 | `allowed_file_dirs` | string[] | `[]` | - | Allowed dirs for mem file I/O |
 | `exclude_file_patterns` | string[] | built-in defaults | - | Excluded paths for mem file I/O |
-| `max_embedding_tokens` | int | `8191` | `>=1` | Max tokens per embedding input |
-| `read_cache_max_size` | int | `128` | `>=0` | Read cache size (`0` = off) |
-| `read_cache_ttl_seconds` | int | `300` | `>=0` | Read cache TTL (`0` = no expiry) |
 | `embeddings_enabled` | bool | `false` | - | Enable semantic embeddings |
 | `embeddings_async` | bool | `true` | - | Generate embeddings async |
 
@@ -211,10 +240,8 @@ No pack-specific `tools.ot_forge` settings.
 
 | Field | Type | Default | Range | Description |
 |------|------|---------|-------|-------------|
-| `base_url` | string | `""` | - | OpenAI-compatible API base URL |
-| `model` | string | `""` | - | Default model for transforms |
-| `timeout` | int | `30` | - | API timeout in seconds |
-| `max_tokens` | int \| null | `null` | - | Max response tokens (`null` = no limit) |
+| `model` | string or null | `null` | non-empty | Direct model override |
+| `effort` | string or null | `null` | `low`, `medium`, `high` | Reasoning effort override |
 
 ### ot_secrets
 
@@ -265,7 +292,8 @@ tools:
     timeout: 120
     relative_paths: true
   ot_llm:
-    model: openai/gpt-4o-mini
+    model: gpt-5.6-luna
+    effort: medium
 ```
 
 ## Secrets Configuration
@@ -285,7 +313,8 @@ GEMINI_API_KEY: "your-gemini-key"
 DATABASE_URL: "postgresql://user:pass@localhost/db"
 ```
 
-If `--secrets` is omitted, no secrets file is loaded. Tools that require API keys will report a configuration error when called.
+Omitting `--secrets` loads no secrets file, so tools that require API keys report
+a configuration error when called.
 
 ### Accessing Secrets in Tools
 
@@ -506,18 +535,25 @@ ot.stats(output="stats_report.html") # HTML report
 
 ## Transform Configuration
 
-Configure the `ot_llm.transform()` tool for LLM-powered text transformations. Add under `tools:`:
+Configure `ot_llm.transform()` with the shared connection and optional pack overrides:
 
 ```yaml
+llm:
+  backend: cliproxy
+  base_url: http://127.0.0.1:8317/v1
+  model: gpt-5.6-luna
+  effort: low
+  timeout: 30
+  max_tokens: 4096
+
 tools:
   ot_llm:
-    model: "openai/gpt-5-mini"                  # Model for transformations
-    base_url: "https://openrouter.ai/api/v1"    # OpenAI-compatible API endpoint
-    max_tokens: 4096                            # Max output tokens (optional)
-    timeout: 30                                 # API timeout in seconds
+    model: gpt-5.6-luna
+    effort: medium
 ```
 
-Requires `OPENAI_API_KEY` in secrets.yaml (or compatible provider key).
+For this explicit CLIProxy route, `CLIPROXY_INFERENCE_KEY` must exist in
+`secrets.yaml`. OpenAI-compatible routes instead resolve their configured secret.
 
 ## Output Configuration
 
@@ -653,9 +689,6 @@ security:
   validate_code: true
 
 tools:
-  ot_llm:
-    model: "openai/gpt-5-mini"
-    base_url: "https://openrouter.ai/api/v1"
   brave:
     timeout: 120.0
   context7:

@@ -146,6 +146,7 @@ nav:
       - Quickstart: learn/quickstart.md
       - Installation: learn/installation.md
       - Configuration: learn/configuration.md
+      - LLM Routing: learn/llm-routing.md
       - Direct Usage: learn/direct-usage.md
       - MCP Proxy: learn/mcp-proxy.md
       - Demos: learn/demos/index.md

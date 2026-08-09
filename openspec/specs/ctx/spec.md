@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines the `ctx` pack providing a smart-context store backed by flat files. The pack enables agents to store, navigate, and query large content blobs without filling the context window. Content is stored with a TTL, format-detected on write, and accessible through a set of focused read/search/navigation/query tools.
-
 ## Requirements
-
 ### Requirement: Write Content to Context Store
 
 The `ctx.write()` function SHALL store content synchronously, detect its format,
@@ -268,46 +266,44 @@ content of a `json` or `yaml` handle and return the matched value.
 
 ### Requirement: Multi-question LLM Query
 
-The `ctx.ask()` function SHALL accept one or more questions about stored content, send them to the configured LLM service in a single call, and return structured question/answer pairs — mirroring the `img.ask` interface for text content.
+The `ctx.ask()` function SHALL accept one or more questions about stored content,
+send them through the shared generation client in one call, and return
+structured question/answer pairs.
 
-#### Scenario: Single question string
+#### Scenario: Single question
+- **WHEN** `ctx.ask(h, q="What is the entry point?")` is called
+- **THEN** it SHALL return one matching question/answer pair
 
-- **WHEN** `ctx.ask(h, q="What is the recommended entry point?")` is called
-- **THEN** it SHALL return `{"handle": h, "result": [{"question": "What is the recommended entry point?", "answer": "<answer>"}]}`
+#### Scenario: Batch questions
+- **WHEN** `ctx.ask()` receives a list of questions
+- **THEN** it SHALL send them in a single generation call
+- **AND** result order SHALL match question order
 
-#### Scenario: Batch questions list
+#### Scenario: Direct model override
+- **WHEN** `model="gpt-5.6-luna"` is supplied
+- **THEN** that direct ID SHALL be sent unchanged
+- **AND** omission SHALL fall through `tools.ot_context.model` to `llm.model`
 
-- **WHEN** `ctx.ask(h, q=["What is the recommended entry point?", "What are common mistakes?"])` is called
-- **THEN** it SHALL send both questions in a single LLM service call
-- **AND** return `{"handle": h, "result": [{"question": "...", "answer": "..."}, {"question": "...", "answer": "..."}]}`
-- **AND** the order of results SHALL match the order of questions provided
+#### Scenario: Effort override
+- **WHEN** a canonical effort is supplied
+- **THEN** it SHALL override `tools.ot_context.effort` and `llm.effort`
 
-#### Scenario: Model override
+#### Scenario: Backend-aware generation
+- **WHEN** `ctx.ask()` resolves a configured model
+- **THEN** it SHALL use the configured backend, interface, and named secret
 
-- **WHEN** `ctx.ask(h, q="...", model="haiku")` is called
-- **THEN** it SHALL pass the specified model to the LLM service
-- **AND** fall back to the LLM service configured default if `model=None`
-
-#### Scenario: LLM service not configured
-
-- **WHEN** `ctx.ask(h, q="...")` is called and no LLM service is configured
-- **THEN** it SHALL return `{"handle": h, "error": "<message explaining an LLM service must be configured>"}`
-- **AND** it SHALL NOT raise an unhandled exception
+#### Scenario: Generation not configured
+- **WHEN** top-level `llm` is absent
+- **THEN** it SHALL return an actionable error object without an unhandled exception
 
 #### Scenario: Unknown handle
-
-- **WHEN** `ctx.ask("badhandle", q="...")` is called
-- **THEN** it SHALL return `{"handle": "badhandle", "error": "Handle not found: badhandle"}`
+- **WHEN** the handle does not exist
+- **THEN** it SHALL return `Handle not found` for that handle
 
 #### Scenario: Large content truncation
-
-- **GIVEN** a handle whose total content exceeds `ask_max_bytes`
-- **WHEN** `ctx.ask(h, q="...")` is called
-- **THEN** it SHALL send the first `ask_max_bytes` bytes of content to the model
-- **AND** the response SHALL include a `truncated: true` field
-- **AND** the response MAY include a `hint` suggesting `ctx.slice` to narrow scope before re-querying
-
----
+- **WHEN** stored content exceeds `ask_max_bytes`
+- **THEN** only the bounded prefix SHALL be sent
+- **AND** the result SHALL indicate truncation
 
 ### Requirement: Append Content
 
@@ -453,18 +449,18 @@ The `ctx.purge()` function SHALL bulk-delete handles matching age, source, or st
 The `ctx` pack SHALL support optional configuration via `onetool.yaml`.
 
 #### Scenario: Default configuration
-- **GIVEN** no `tools.ctx` block in `onetool.yaml`
+- **GIVEN** no `tools.ot_context` block in `onetool.yaml`
 - **WHEN** the ctx pack is used
 - **THEN** TTL SHALL default to 3600 seconds (1 hour)
 - **AND** `max_line_chars` SHALL default to 500
 - **AND** `ask_max_bytes` SHALL default to 204800 (200KB)
 
 #### Scenario: Custom TTL
-- **GIVEN** `tools.ctx.ttl: 7200` in config
+- **GIVEN** `tools.ot_context.ttl: 7200` in config
 - **WHEN** a handle is written
 - **THEN** its TTL SHALL be 7200 seconds
 
 #### Scenario: Custom max_line_chars
-- **GIVEN** `tools.ctx.max_line_chars: 200` in config
+- **GIVEN** `tools.ot_context.max_line_chars: 200` in config
 - **WHEN** `ctx.read()` or `ctx.grep()` returns a long line
 - **THEN** lines SHALL be truncated at 200 characters

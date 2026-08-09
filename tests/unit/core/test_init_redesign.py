@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 import yaml
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @pytest.mark.unit
@@ -178,7 +181,9 @@ def test_init_validate_include_source_reporting(tmp_path: Path) -> None:
     # Create user-owned security.yaml
     (ot_dir / "security.yaml").write_text("security:\n  validate_code: true\n")
     # Leave servers.yaml absent (will use package default)
-    config_path.write_text("version: 2\ninclude:\n  - security.yaml\n  - servers.yaml\n")
+    config_path.write_text(
+        "version: 2\ninclude:\n  - security.yaml\n  - servers.yaml\n"
+    )
 
     runner = CliRunner()
     result = runner.invoke(app, ["init", "validate", "--config", str(config_path)])
@@ -205,8 +210,6 @@ def test_init_validate_succeeds_with_config_flag(tmp_path: Path) -> None:
 
     assert "No config loaded" not in result.output
     assert result.exit_code == 0
-
-
 
 
 # =============================================================================
@@ -310,9 +313,11 @@ def test_init_tty_path_confirmation_default_accepted(tmp_path: Path) -> None:
     mock_tui.ask_checkbox.return_value = []
 
     runner = CliRunner()
-    with patch.dict("sys.modules", {"ot._tui": mock_tui, "questionary": MagicMock()}):
-        with patch("onetool.cli._stdin_is_tty", return_value=True):
-            result = runner.invoke(app, ["init", "-c", str(config_path)])
+    with (
+        patch.dict("sys.modules", {"ot._tui": mock_tui, "questionary": MagicMock()}),
+        patch("onetool.cli._stdin_is_tty", return_value=True),
+    ):
+        result = runner.invoke(app, ["init", "-c", str(config_path)])
 
     mock_ask = mock_tui.ask_text_sync
 
@@ -323,23 +328,23 @@ def test_init_tty_path_confirmation_default_accepted(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_init_tty_path_confirmation_cancelled(tmp_path: Path) -> None:
+def test_init_tty_path_confirmation_cancelled() -> None:
     """In TTY mode, Ctrl+C on the path prompt cancels init."""
-    from unittest.mock import patch
+    from unittest.mock import MagicMock, patch
 
     from typer.testing import CliRunner
 
     from onetool.cli import app
 
-    from unittest.mock import MagicMock
-
     mock_tui = MagicMock()
     mock_tui.ask_text_sync.return_value = None
 
     runner = CliRunner()
-    with patch.dict("sys.modules", {"ot._tui": mock_tui, "questionary": MagicMock()}):
-        with patch("onetool.cli._stdin_is_tty", return_value=True):
-            result = runner.invoke(app, ["init"])
+    with (
+        patch.dict("sys.modules", {"ot._tui": mock_tui, "questionary": MagicMock()}),
+        patch("onetool.cli._stdin_is_tty", return_value=True),
+    ):
+        result = runner.invoke(app, ["init"])
 
     assert result.exit_code == 0
     assert "Cancelled" in result.output
@@ -602,12 +607,16 @@ def test_init_secrets_yaml_not_in_include_and_0600(tmp_path: Path) -> None:
     mock_tui.ask_text_sync.return_value = str(config_path)
     mock_tui.ask_checkbox.return_value = ["secrets.yaml"]
     q = MagicMock()
-    q.confirm.return_value.ask.return_value = False  # decline "Set up encrypted secrets?"
+    q.confirm.return_value.ask.return_value = (
+        False  # decline "Set up encrypted secrets?"
+    )
 
     runner = CliRunner()
-    with patch.dict("sys.modules", {"ot._tui": mock_tui, "questionary": q}):
-        with patch("onetool.cli._stdin_is_tty", return_value=True):
-            result = runner.invoke(app, ["init", "-c", str(config_path)])
+    with (
+        patch.dict("sys.modules", {"ot._tui": mock_tui, "questionary": q}),
+        patch("onetool.cli._stdin_is_tty", return_value=True),
+    ):
+        result = runner.invoke(app, ["init", "-c", str(config_path)])
 
     assert result.exit_code == 0, result.output
     secrets = ot_dir / "secrets.yaml"
@@ -650,9 +659,8 @@ def test_init_secrets_yaml_encrypted_step(tmp_path: Path) -> None:
     with patch.dict(
         "sys.modules",
         {"ot._tui": mock_tui, "questionary": q, "ottools": ottools_mod},
-    ):
-        with patch("onetool.cli._stdin_is_tty", return_value=True):
-            result = runner.invoke(app, ["init", "-c", str(config_path)])
+    ), patch("onetool.cli._stdin_is_tty", return_value=True):
+        result = runner.invoke(app, ["init", "-c", str(config_path)])
 
     assert result.exit_code == 0, result.output
     ot_secrets.init.assert_called_once()

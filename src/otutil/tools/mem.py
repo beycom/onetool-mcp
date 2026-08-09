@@ -10,6 +10,13 @@ from __future__ import annotations
 # Pack for dot notation: mem.write(), mem.search(), etc.
 pack = "mem"
 
+
+def register_services(registry: object) -> None:
+    """Register deterministic embedding-client cleanup."""
+    from otutil.tools._mem.embedding import reset_embedding_client
+
+    registry.register_reload_hook(reset_embedding_client)  # type: ignore[attr-defined]
+
 __ot_requires__ = {
     "lib": [
         ("yaml", "pip install pyyaml"),

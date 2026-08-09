@@ -131,7 +131,8 @@ API keys are stored in `secrets.yaml` (gitignored) and passed to the server via 
 
 | Key | Service | Used By |
 |-----|---------|---------|
-| `OPENAI_API_KEY` | OpenAI-compatible providers (including OpenRouter) | `ot_llm.transform` |
+| `OPENAI_API_KEY` | OpenAI API | Default MCP generation and compatible embeddings |
+| `CLIPROXY_INFERENCE_KEY` | User-managed CLIProxyAPI | Explicit CLIProxy MCP generation from `secrets.yaml` |
 | `BRAVE_API_KEY` | [Brave Search](https://brave.com/search/api/) | `brave.*` tools |
 | `CONTEXT7_API_KEY` | [Context7](https://context7.com) | `context7.*` tools |
 
@@ -141,6 +142,7 @@ API keys are stored in `secrets.yaml` (gitignored) and passed to the server via 
 # secrets.yaml
 BRAVE_API_KEY: "BSA..."
 OPENAI_API_KEY: "sk-..."
+CLIPROXY_INFERENCE_KEY: "your-inference-client-key"
 CONTEXT7_API_KEY: "c7-..."
 ```
 
@@ -153,18 +155,42 @@ Pass it to the server via `--secrets /path/to/secrets.yaml`. If omitted, no secr
 | `OT_LOG_LEVEL` | `INFO`    | Logging verbosity                         |
 | `OT_LOG_DIR`   | `../logs` | Log file directory (relative to config)   |
 
-### LLM Configuration
+### Generation and Embedding Configuration
 
-Configure `base_url` and `model` once at the top level — all LLM-using tools (`ot_llm`, `ot_image`, `mem`, `knowledge`, `ctx`) inherit from it:
+The default generation route uses OpenAI-compatible Chat Completions:
 
 ```yaml
 llm:
-  base_url: "https://openrouter.ai/api/v1"    # Required
-  model: "google/gemini-2-flash-preview"       # Required for transform/vision
-  embedding_model: "text-embedding-3-small"    # Required for mem/knowledge embeddings
+  base_url: https://api.openai.com/v1
+  model: gpt-5.4-nano
 ```
 
-The transform tool is not available until `base_url` and `model` are configured (via `llm:` or `tools.ot_llm.*`), plus `OPENAI_API_KEY` in secrets.
+Select CLIProxyAPI explicitly when desired:
+
+```yaml
+llm:
+  backend: cliproxy
+  base_url: http://127.0.0.1:8317/v1
+  model: z-ai/glm-5.2
+  effort: low
+  timeout: 30
+  max_tokens: 4096
+
+embeddings:
+  backend: openai_compatible
+  model: text-embedding-3-small
+  base_url: https://api.openai.com/v1
+  secret_name: OPENAI_API_KEY
+  dimensions: 1536
+  timeout: 60
+  batch_size: 200
+  max_tokens: 8191
+```
+
+The `embeddings` section is independent from generation and is required by
+embedding-backed tools. CLIProxy generation has no implicit embedding endpoint and resolves only
+`CLIPROXY_INFERENCE_KEY` from `secrets.yaml`. See
+[Shared LLM generation](llm-routing.md).
 
 ## MCP Configuration
 

@@ -1,11 +1,13 @@
 """Pack configuration and path validation for mem."""
+
 from __future__ import annotations
 
 import builtins
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
+from ot.config.routing import DirectModelId, ReasoningEffort  # noqa: TC001
 from ot.logging.redact import SECRET_PATTERNS as _BUILTIN_REDACTION_PATTERNS
 from otpack import DEFAULT_EXCLUDE_PATTERNS, get_tool_config, validate_path
 
@@ -25,21 +27,17 @@ VALID_CATEGORIES = {"rule", "context", "decision", "mistake", "discovery", "note
 class Config(BaseModel):
     """Pack configuration - discovered by registry."""
 
+    model_config = ConfigDict(extra="forbid")
+
+    model: DirectModelId | None = Field(
+        default=None, description="Direct model override"
+    )
+    effort: ReasoningEffort | None = Field(
+        default=None, description="Reasoning effort override"
+    )
     db_path: str = Field(
         default="data/mem/default.db",
         description="Path to memory SQLite database (relative to .onetool/)",
-    )
-    model: str = Field(
-        default="text-embedding-3-small",
-        description="OpenAI embedding model",
-    )
-    base_url: str = Field(
-        default="",
-        description="OpenAI-compatible API base URL for embeddings (empty = inherit from top-level llm config)",
-    )
-    dimensions: int = Field(
-        default=1536,
-        description="Embedding dimensions (must match model)",
     )
     search_limit: int = Field(
         default=10,
@@ -77,14 +75,9 @@ class Config(BaseModel):
         default_factory=lambda: DEFAULT_EXCLUDE_PATTERNS.copy(),
         description="Path patterns to exclude from file operations",
     )
-    max_embedding_tokens: int = Field(
-        default=8191,
-        ge=1,
-        description="Max tokens for embedding input (text-embedding-3-small limit: 8191)",
-    )
     embeddings_enabled: bool = Field(
         default=False,
-        description="Enable embedding generation for semantic search (requires OPENAI_API_KEY)",
+        description="Enable generation through the independent embeddings route",
     )
     embeddings_async: bool = Field(
         default=True,

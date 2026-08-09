@@ -13,10 +13,16 @@ include:
 # Example: ["tools/*.py"] loads all Python files in .onetool/tools/
 tools_dir: []
 
-llm:
-  base_url: https://api.openai.com/v1
-  model: gpt-5.4-nano
-  embedding_model: text-embedding-3-small
+# Generation uses OpenAI-compatible defaults and may select CLIProxy explicitly.
+# Embeddings can be configured independently. See the LLM routing guide.
+
+# llm:
+#   backend: cliproxy
+#   model: gpt-5.6-luna
+#   base_url: http://127.0.0.1:8317/v1
+#   effort: low
+#   timeout: 30
+#   max_tokens: 4096
 
 # log_level: INFO
 

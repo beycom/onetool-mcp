@@ -99,7 +99,9 @@ def _validate_http_root_options(*, host: str, port: int, path: str) -> None:
     if not path.startswith("/"):
         raise ValueError("--path must start with '/'")
     if "?" in path or "#" in path or any(ch.isspace() for ch in path):
-        raise ValueError("--path must be a URL path without whitespace, query, or fragment")
+        raise ValueError(
+            "--path must be a URL path without whitespace, query, or fragment"
+        )
 
 
 def _load_runtime_config(config: Path, secrets: Path | None) -> None:
@@ -162,7 +164,9 @@ def _start_root_runtime(
         return
 
     if transport == "http":
-        console.print(f"[cyan]Streamable HTTP root MCP:[/cyan] http://{host}:{port}{path}")
+        console.print(
+            f"[cyan]Streamable HTTP root MCP:[/cyan] http://{host}:{port}{path}"
+        )
         run_root_server(
             transport="streamable-http",
             host=host,
@@ -410,7 +414,9 @@ def _guided_secrets_setup(secrets_path: Path) -> None:
 
     existing.update(pairs)
     secrets_path.write_text(
-        yaml.dump(existing, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        yaml.dump(
+            existing, default_flow_style=False, allow_unicode=True, sort_keys=False
+        )
     )
     secrets_path.chmod(0o600)
 
@@ -827,7 +833,9 @@ def init_validate(
 _MCP_CLIENTS = ("claude-code", "claude-desktop", "cursor", "vscode")
 
 
-def _resolve_mcp_paths(config: Path | None, secrets: Path | None) -> tuple[str, str, str | None]:
+def _resolve_mcp_paths(
+    config: Path | None, secrets: Path | None
+) -> tuple[str, str, str | None]:
     """Resolve absolute onetool/config/secrets paths for mcp-config output."""
     import shutil
 
@@ -858,7 +866,9 @@ def _resolve_mcp_paths(config: Path | None, secrets: Path | None) -> tuple[str, 
     return onetool_path, str(config_path), secrets_arg
 
 
-def _print_mcp_block(client: str, onetool_path: str, config_abs: str, secrets_arg: str | None) -> None:
+def _print_mcp_block(
+    client: str, onetool_path: str, config_abs: str, secrets_arg: str | None
+) -> None:
     """Print the ready-to-paste config block for one MCP client."""
     import json
     import platform
@@ -871,12 +881,20 @@ def _print_mcp_block(client: str, onetool_path: str, config_abs: str, secrets_ar
 
     if client == "vscode":
         # VS Code uses `servers` (not `mcpServers`) and requires "type": "stdio".
-        block = {"servers": {"onetool": {"type": "stdio", "command": onetool_path, "args": args}}}
-        console.print("Target: `.vscode/mcp.json` (project) or the user-profile `mcp.json` (global)")
+        block = {
+            "servers": {
+                "onetool": {"type": "stdio", "command": onetool_path, "args": args}
+            }
+        }
+        console.print(
+            "Target: `.vscode/mcp.json` (project) or the user-profile `mcp.json` (global)"
+        )
     else:
         block = {"mcpServers": {"onetool": {"command": onetool_path, "args": args}}}
         if client == "claude-code":
-            console.print("Target: `~/.claude/mcp.json` (or project `.mcp.json`) — merge into mcpServers")
+            console.print(
+                "Target: `~/.claude/mcp.json` (or project `.mcp.json`) — merge into mcpServers"
+            )
             secrets_cli = f" --secrets {secrets_arg}" if secrets_arg else ""
             console.print(
                 f"Or run: `claude mcp add onetool -- {onetool_path} serve "
@@ -890,7 +908,9 @@ def _print_mcp_block(client: str, onetool_path: str, config_abs: str, secrets_ar
             }.get(system, "~/.config/claude-desktop/claude_desktop_config.json")
             console.print(f"Target: `{target}` — merge into its existing mcpServers")
         elif client == "cursor":
-            console.print("Target: `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (global)")
+            console.print(
+                "Target: `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (global)"
+            )
 
     # Plain print (not Rich) so the JSON is emitted verbatim/pasteable — Rich would
     # soft-wrap long resolved paths mid-string and corrupt the block.
@@ -908,7 +928,10 @@ def init_mcp_config(
         None, "--config", "-c", help="onetool.yaml path (default: ./onetool.yaml)."
     ),
     secrets: Path | None = typer.Option(
-        None, "--secrets", "-s", help="Secrets file path (default: <config-dir>/secrets.yaml)."
+        None,
+        "--secrets",
+        "-s",
+        help="Secrets file path (default: <config-dir>/secrets.yaml).",
     ),
 ) -> None:
     """Print ready-to-paste MCP client config with resolved absolute paths."""
@@ -991,6 +1014,7 @@ def root_callback(
 
     # Remove loguru's default stderr handler before any logging occurs
     import ot.logging  # noqa: F401
+
     _load_runtime_config(config, secrets)
     _setup_signal_handlers()
     _print_startup_banner()

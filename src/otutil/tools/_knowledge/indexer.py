@@ -268,7 +268,7 @@ def _store_embeddings_batch(
 ) -> str | None:
     """Generate and store embeddings for a list of (chunk_id, content) pairs.
 
-    Processes in sub-batches (default: config.embedding_batch_size) with retry.
+    Processes in sub-batches from the independent embedding route with retry.
     Each successful sub-batch is committed immediately so progress is durable
     even if a later batch fails. Failed sub-batches are collected as errors.
 
@@ -282,9 +282,13 @@ def _store_embeddings_batch(
 
     from .embedding import _get_embedding_client
 
-    config = _get_config()
     if batch_size is None:
-        batch_size = config.embedding_batch_size
+        from ot.config import get_embeddings_config
+
+        embedding = get_embeddings_config()
+        if embedding is None:
+            return "top-level embeddings configuration is required"
+        batch_size = embedding.batch_size
     client = _get_embedding_client()
     total = len(pending)
     errors: list[str] = []

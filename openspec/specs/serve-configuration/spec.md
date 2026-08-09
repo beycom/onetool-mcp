@@ -7,9 +7,7 @@ runtime. This spec covers schema shape, include handling, unknown-field behavior
 path resolution, and runtime variable expansion. Feature-specific behavior for
 proxy servers, stats, output handling, direct execution, telemetry, prompts, and
 secrets is covered by the dedicated specs for those capabilities.
-
 ## Requirements
-
 ### Requirement: Explicit YAML Configuration
 
 OneTool SHALL load runtime configuration from an explicit YAML file path supplied
@@ -52,12 +50,34 @@ Config files SHALL use schema version 2.
 
 ### Requirement: Root Configuration Sections
 
-The root config SHALL support the current top-level sections used by the runtime.
+The root config SHALL support the current runtime sections, including independent
+generation and embedding sections. A generation model registry SHALL not be part
+of MCP configuration.
 
 #### Scenario: Supported root sections
-- **GIVEN** a config containing `include`, `env`, `llm`, `alias`, `snippets`, `servers`, `direct`, `tools`, `security`, `stats`, `telemetry`, `output`, `tools_dir`, `prompts`, `log_level`, `log_dir`, `compact_max_length`, `log_verbose`, or `debug_tracebacks`
+- **GIVEN** a config containing `include`, `env`, `llm`, `embeddings`, `alias`, `snippets`, `servers`, `direct`, `tools`, `security`, `stats`, `telemetry`, `output`, `tools_dir`, `prompts`, `log_level`, `log_dir`, `compact_max_length`, `log_verbose`, or `debug_tracebacks`
 - **WHEN** OneTool loads configuration
 - **THEN** each recognised section SHALL be validated according to its current schema
+
+#### Scenario: Backend-aware generation configuration
+- **GIVEN** a top-level `llm` section
+- **WHEN** OneTool loads configuration
+- **THEN** the strict section SHALL accept backend, interface, base URL, direct
+  model, named secret, effort, timeout, and `max_tokens`
+- **AND** omitted backend, interface, and secret name SHALL use OpenAI-compatible defaults
+- **AND** backend-inapplicable or unknown fields SHALL be rejected
+
+#### Scenario: Embedding configuration is independent
+- **GIVEN** a top-level `embeddings` section
+- **WHEN** OneTool loads configuration
+- **THEN** the section SHALL validate an `openai_compatible` backend with its own model, base URL, named secret, dimensions, timeout, batching, and token-limit settings
+- **AND** no generation field SHALL be used to derive an embedding route
+
+#### Scenario: CLIProxyAPI embeddings are rejected
+- **GIVEN** a top-level `embeddings` section with `backend: cliproxy`
+- **WHEN** OneTool loads configuration
+- **THEN** strict validation SHALL reject the unsupported embedding backend
+- **AND** OneTool SHALL NOT send embedding requests to the CLIProxyAPI generation endpoint
 
 #### Scenario: Unknown root section
 - **GIVEN** a config containing an unrecognised root key
@@ -66,10 +86,10 @@ The root config SHALL support the current top-level sections used by the runtime
 - **AND** OneTool SHALL emit a warning naming the ignored attribute
 
 #### Scenario: Unknown typed nested attribute
-- **GIVEN** a config containing an unrecognised key under a typed section such as `direct.host`, `security`, `stats`, `telemetry`, or `output`
+- **GIVEN** a config containing an unrecognised key under a typed section such as `llm`, `embeddings`, `direct.host`, `security`, `stats`, `telemetry`, or `output`
 - **WHEN** OneTool loads configuration
-- **THEN** the unknown nested key SHALL be ignored
-- **AND** OneTool SHALL emit a warning naming the ignored attribute path
+- **THEN** the unknown nested key SHALL be rejected when that section is strict or otherwise ignored according to its current schema
+- **AND** an ignored key SHALL emit a warning naming the ignored attribute path
 
 #### Scenario: Tool-specific config sections
 - **GIVEN** a config containing extra pack names under `tools`
@@ -109,8 +129,8 @@ Config files SHALL support reusable include files merged before validation.
 
 ### Requirement: Path Resolution
 
-Configuration paths SHALL resolve relative to the `.onetool` directory that
-contains the loaded config file unless a path is absolute.
+Configuration paths SHALL resolve relative to the directory containing the loaded
+config file—the active OneTool config directory—unless a path is absolute.
 
 #### Scenario: Tool discovery path
 - **GIVEN** `tools_dir: ["tools/*.py"]` in `/project/.onetool/onetool.yaml`
@@ -197,3 +217,54 @@ overrides.
 - **GIVEN** `OT_COMPACT_MAX_LENGTH` is set to an integer
 - **WHEN** compact log formatting asks for the maximum value length
 - **THEN** OneTool SHALL use the environment value instead of `compact_max_length`
+
+### Requirement: Shared generation connection
+
+The strict top-level `llm` section SHALL configure the shared backend-aware
+generation client. It SHALL accept direct model selection and the connection
+fields permitted by the selected backend.
+
+#### Scenario: Compatible defaults
+- **WHEN** `llm` or its backend fields are omitted
+- **THEN** published OpenAI-compatible generation model, endpoint, token limit, Chat Completions, and credential defaults SHALL apply
+
+#### Scenario: CLIProxy restrictions
+- **WHEN** `llm.backend` is `cliproxy`
+- **THEN** Responses and `CLIPROXY_INFERENCE_KEY` SHALL be fixed
+- **AND** explicit interface or secret-name fields SHALL be rejected
+
+#### Scenario: Unsupported output-limit field
+- **WHEN** `llm` contains `max_output_tokens` instead of `max_tokens`
+- **THEN** strict validation SHALL reject it
+
+### Requirement: Typed tool generation selections
+
+Each generation-capable pack SHALL accept optional direct `model` and `effort`
+fields at pack scope. Pack configuration SHALL NOT select endpoint, credential,
+backend, interface, timeout, output bound, alias, or operation-specific routes.
+
+#### Scenario: Pack model override
+- **WHEN** `tools.ot_image.model` contains a non-empty direct model ID
+- **THEN** OneTool SHALL preserve it as the image pack override
+
+#### Scenario: Pack effort override
+- **WHEN** `tools.ot_llm.effort` contains `low`, `medium`, or `high`
+- **THEN** OneTool SHALL preserve it as the pack effort override
+
+#### Scenario: Knowledge uses one pack selection
+- **WHEN** `tools.knowledge.model` or `tools.knowledge.effort` is configured
+- **THEN** reranking, synthesis, and enrichment SHALL use those values when calls omit overrides
+- **AND** separate ask, rerank, and enrich generation routes SHALL not exist
+
+#### Scenario: Connection fields remain root-owned
+- **WHEN** a pack omits model or effort
+- **THEN** the corresponding root value SHALL apply
+- **AND** endpoint, credential, timeout, and output bounds SHALL always come from top-level `llm`
+
+#### Scenario: Unsupported pack routing fields
+- **WHEN** a typed generation pack receives nested `llm`, backend, interface, source, endpoint, secret, operation route, or capability fields
+- **THEN** strict configuration validation SHALL reject them
+
+#### Scenario: Invalid effort
+- **WHEN** root or pack configuration supplies a non-canonical effort
+- **THEN** strict validation SHALL reject it

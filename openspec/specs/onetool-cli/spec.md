@@ -228,7 +228,7 @@ The `onetool init validate` command SHALL report the source of each resolved inc
 
 The `onetool kb` subcommand group SHALL provide offline knowledge base management commands.
 
-All commands call the implementation layer directly (not MCP wrappers) so they can emit real-time progress output.
+Commands SHALL emit progress while long-running knowledge operations execute.
 
 Global options on the `kb` callback: `--config`/`-c` (path to onetool.yaml) and `--secrets`/`-s` (path to secrets file). Both auto-detect from CWD if omitted.
 
@@ -416,4 +416,3 @@ The `onetool init mcp-config` command SHALL print ready-to-paste MCP client conf
 #### Scenario: mcp-config appears in init help
 - **WHEN** `onetool init --help` is run
 - **THEN** `mcp-config` SHALL be listed as an available `init` subcommand alongside `validate`
-

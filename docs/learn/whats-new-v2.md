@@ -234,13 +234,21 @@ onetool serve --config ~/.onetool/onetool.yaml --secrets ~/.onetool/secrets.yaml
 
 ### Top-level `llm:` config
 
-Configure `base_url`, `model`, and `embedding_model` once at the top level — all LLM-using tools (`ot_llm`, `ot_image`, `mem`, `knowledge`, `ctx`) inherit from it. Individual packs can still override with `tools.<pack>.model` etc.
+Configure shared generation under `llm` and embedding consumers under the
+independent `embeddings` connection. Generation-capable packs can override direct
+model selection with `tools.<pack>.model`.
 
 ```yaml
 llm:
   base_url: https://openrouter.ai/api/v1
   model: google/gemini-2-flash-preview
-  embedding_model: text-embedding-3-small
+
+embeddings:
+  backend: openai_compatible
+  model: text-embedding-3-small
+  base_url: https://api.openai.com/v1
+  secret_name: OPENAI_API_KEY
+  dimensions: 1536
 ```
 
 ### Slim prompts

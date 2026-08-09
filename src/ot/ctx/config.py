@@ -1,14 +1,24 @@
 """Configuration for the ctx pack."""
+
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ot.config import get_tool_config
+from ot.config.routing import DirectModelId, ReasoningEffort  # noqa: TC001
 
 
 class Config(BaseModel):
     """Pack configuration - discovered by registry."""
 
+    model_config = ConfigDict(extra="forbid")
+
+    model: DirectModelId | None = Field(
+        default=None, description="Direct model override"
+    )
+    effort: ReasoningEffort | None = Field(
+        default=None, description="Reasoning effort override"
+    )
     ttl: int = Field(
         default=3600,
         ge=0,

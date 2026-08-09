@@ -34,7 +34,8 @@ security:
     enabled: false
 
 llm:
-  model: google/gemini-3-flash-preview
-  base_url: https://openrouter.ai/api/v1
+  backend: cliproxy
+  model: codex-oauth/gpt-5.6-luna
+  base_url: http://127.0.0.1:8317/v1
 
 tools: {}

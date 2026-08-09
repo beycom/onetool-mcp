@@ -2,7 +2,11 @@
 
 ## Purpose
 
-Persistent memory for AI agents with SQLite storage and optional OpenAI embeddings. Provides topic-based memory storage with semantic search, content dedup, secret redaction, and importance decay. Embeddings are opt-in via `embeddings_enabled` config (requires `OPENAI_API_KEY` in secrets.yaml when enabled).
+Persistent memory for AI agents with SQLite storage and optional
+OpenAI-compatible embeddings. Provides topic-based memory storage with semantic
+search, content dedup, secret redaction, and importance decay. Embeddings are
+opt-in via `embeddings_enabled` and use the independent top-level `embeddings`
+route when enabled.
 ## Requirements
 ### Requirement: Memory Storage
 
@@ -531,7 +535,12 @@ Repeated reads of the same topic or ID SHALL be served from an in-memory cache t
 
 ### Requirement: Optional Embeddings
 
-Embeddings SHALL be opt-in, disabled by default. The mem pack SHALL load and function without `OPENAI_API_KEY` when embeddings are disabled.
+Embeddings SHALL be opt-in and disabled by default. The mem pack SHALL load and
+function without embedding credentials when embeddings are disabled. When enabled,
+it SHALL use only the independent effective `embeddings` configuration and SHALL
+NOT inherit a model, endpoint, credential, dimensions, batching, or token limit
+from generation or pack-level provider configuration. Pack-level
+`embeddings_enabled` and `embeddings_async` SHALL remain behavior controls only.
 
 #### Scenario: Embeddings disabled (default)
 - **GIVEN** `embeddings_enabled: false` (default)
@@ -540,26 +549,38 @@ Embeddings SHALL be opt-in, disabled by default. The mem pack SHALL load and fun
 - **AND** `mem.read()`, `mem.list()`, and pattern search SHALL work normally
 
 #### Scenario: Embeddings enabled sync
-- **GIVEN** `embeddings_enabled: true` and `embeddings_async: false`
+- **GIVEN** `embeddings_enabled: true`, `embeddings_async: false`, and a valid independent embedding route
 - **WHEN** `mem.write()` is called
 - **THEN** it SHALL generate the embedding before returning
 
 #### Scenario: Embeddings enabled async
-- **GIVEN** `embeddings_enabled: true` and `embeddings_async: true` (default when enabled)
+- **GIVEN** `embeddings_enabled: true`, `embeddings_async: true`, and a valid independent embedding route
 - **WHEN** `mem.write()` is called
 - **THEN** it SHALL return immediately with NULL embedding
 - **AND** a background worker SHALL generate the embedding and update the row
 
+#### Scenario: Embedding route does not inherit generation configuration
+- **GIVEN** generation uses CLIProxyAPI and no independent embedding route is configured
+- **WHEN** an embedding-backed mem operation is requested
+- **THEN** it SHALL fail with an actionable embedding-configuration error
+- **AND** it SHALL NOT send an embedding request to CLIProxyAPI or a generation endpoint
+
+#### Scenario: Pack provider fields are rejected
+- **GIVEN** `tools.mem.model`, `tools.mem.base_url`, `tools.mem.dimensions`, or `tools.mem.max_embedding_tokens` is configured
+- **WHEN** OneTool loads mem configuration
+- **THEN** strict validation SHALL reject each field as an extra input
+- **AND** OneTool SHALL NOT interpret it as an override or alias for top-level `embeddings`
+
 #### Scenario: Embedding calls do not hold the DB lock
 - **GIVEN** any operation that generates an embedding (write, update, append, batch update, refresh, import, restore, reindex, or the background worker)
-- **WHEN** the OpenAI embedding call is made
+- **WHEN** the embedding API call is made
 - **THEN** the global SQLite connection lock SHALL NOT be held during the API round-trip
 - **AND** the background worker's write-back SHALL be guarded on unchanged content so a concurrent update is never overwritten with a stale vector
 
 #### Scenario: Embedding dimension mismatch
 - **GIVEN** stored embeddings whose dimensions differ from the query embedding
 - **WHEN** cosine similarity is computed during semantic search
-- **THEN** it SHALL raise a clear error naming both dimensions and pointing to `mem.reindex(dry_run=False)` (never silently truncate)
+- **THEN** it SHALL raise a clear error naming both dimensions and pointing to `mem.reindex(dry_run=False)` and SHALL never silently truncate
 
 #### Scenario: Semantic search when disabled
 - **GIVEN** `embeddings_enabled: false`
@@ -730,12 +751,14 @@ The `mem.slice_batch()` function SHALL extract sections from multiple memories i
 
 ### Requirement: LLM Q&A (mem.ask)
 
-The `mem.ask()` function SHALL synthesise an answer from a memory's content using an LLM.
+The `mem.ask()` function SHALL synthesise an answer from a memory's content using
+the shared generation client and SHALL accept optional `model` and
+`effort` arguments.
 
 #### Scenario: Single question
 - **GIVEN** a topic that exists
 - **WHEN** `mem.ask(topic="projects/onetool/rules", q="What are the rules?")` is called
-- **THEN** it SHALL retrieve the memory content and pass it to the LLM with the question
+- **THEN** it SHALL retrieve the memory content and pass it to the shared generation client with the question
 - **AND** return a synthesised answer
 
 #### Scenario: Multiple questions
@@ -743,15 +766,25 @@ The `mem.ask()` function SHALL synthesise an answer from a memory's content usin
 - **WHEN** `mem.ask(topic="...", q=["Q1", "Q2"])` is called
 - **THEN** it SHALL answer each question in sequence using the same memory content
 
+#### Scenario: Model and effort override
+- **GIVEN** a topic that exists
+- **WHEN** `mem.ask(topic="...", q="...", model="luna", effort="medium")` is called
+- **THEN** it SHALL pass the opaque model ID `luna` unchanged and request medium effort for that call
+
 #### Scenario: Topic does not exist
 - **GIVEN** a topic that does not exist in the database
 - **WHEN** `mem.ask(topic="nonexistent", q="...")` is called
 - **THEN** it SHALL raise with a clear "not found" error
 
 #### Scenario: LLM not configured
-- **GIVEN** `ot_llm` is not configured (`base_url` and `model` are absent)
+- **GIVEN** no generation connection or effective model is configured
 - **WHEN** `mem.ask()` is called
-- **THEN** it SHALL raise with a clear message indicating `base_url` and `model` are required
+- **THEN** it SHALL raise with a clear message identifying the missing generation setting
+
+#### Scenario: Generation is independent of explicit embeddings
+- **GIVEN** `mem.ask` and embeddings use different configured connections
+- **WHEN** `mem.ask()` is called
+- **THEN** generation SHALL use its resolved route without reading or changing the embedding route
 
 ### Requirement: Memory Inspect (mem.inspect)
 
@@ -865,12 +898,8 @@ Parameters: `pattern` (str, required), `topic` (str|None), `category` (str|None)
 tools:
   mem:
     db_path: data/mem/default.db  # relative to .onetool/
-    model: ""      # inherits from llm.embedding_model; default: text-embedding-3-small
-    base_url: ""   # inherits from top-level llm.base_url
-    dimensions: 1536
     search_limit: 10
     search_extract: 200
-    max_embedding_tokens: 8191
     read_cache_max_size: 128
     read_cache_ttl_seconds: 300
     redaction_enabled: true
@@ -1057,7 +1086,11 @@ Query embeddings generated for `mem.search()` semantic and hybrid modes SHALL be
 
 ### Requirement: Canonical embedding vector serialization
 
-All embedding vectors stored by the mem pack SHALL be serialized as explicit little-endian float32 (`struct` format `<{n}f`) via the shared otpack serialization helper, and the `cosine_similarity` SQLite function SHALL interpret blobs in the same encoding. Existing stores (already written little-endian) SHALL remain readable without migration; `mem.reindex(dry_run=False)` SHALL regenerate all vectors in canonical form.
+All embedding vectors stored by the mem pack SHALL be serialized as explicit
+little-endian float32 (`struct` format `<{n}f`), and semantic similarity SHALL
+interpret blobs in the same encoding. Existing little-endian stores SHALL remain
+readable; `mem.reindex(dry_run=False)` SHALL regenerate all vectors in canonical
+form.
 
 #### Scenario: Stored vectors are little-endian
 - **WHEN** any operation stores an embedding

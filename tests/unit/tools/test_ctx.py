@@ -3,19 +3,24 @@
 Covers: format detection/normalisation/TOC, HandleStore, write, read, toc,
 grep, slice, query, append, management, maintenance, and ask.
 """
+
 from __future__ import annotations
 
 import json
-import time
-from pathlib import Path
-from typing import Any
-from unittest.mock import MagicMock, patch
+from typing import TYPE_CHECKING, Any
+from unittest.mock import patch
 
 import pytest
 
 from ot.ctx.format import build_toc, detect_format, normalize_content
-from ot.ctx.store import HandleStore, _resolve_handle, expires_at_ts, is_expired, now_ts, ttl_remaining
+from ot.ctx.store import (
+    HandleStore,
+    _resolve_handle,
+    now_ts,
+)
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ===========================================================================
 # Helpers
@@ -34,8 +39,8 @@ def _write_handle(
     ttl: int = 3600,
 ) -> str:
     """Write a handle using ctx_write and return the handle string."""
-    from ot.ctx.write import ctx_write
     from ot.ctx.config import Config
+    from ot.ctx.write import ctx_write
 
     config = Config(ttl=ttl)
     result = ctx_write(content, source=source, store=store, config=config)
@@ -54,7 +59,7 @@ class TestDetectFormat:
         assert detect_format('{"key": "value"}') == "json"
 
     def test_json_array(self) -> None:
-        assert detect_format('[1, 2, 3]') == "json"
+        assert detect_format("[1, 2, 3]") == "json"
 
     def test_json_compact(self) -> None:
         assert detect_format('{"a":1,"b":2}') == "json"
@@ -272,8 +277,8 @@ class TestResolveHandle:
 @pytest.mark.tools
 class TestCtxWrite:
     def test_write_returns_handle_and_format(self, tmp_path: Path) -> None:
-        from ot.ctx.write import ctx_write
         from ot.ctx.config import Config
+        from ot.ctx.write import ctx_write
 
         store = _make_store(tmp_path)
         result = ctx_write("# Hello\nSome text.", store=store, config=Config())
@@ -282,8 +287,8 @@ class TestCtxWrite:
         assert result["status"] == "ready"
 
     def test_write_json_pretty_printed(self, tmp_path: Path) -> None:
-        from ot.ctx.write import ctx_write
         from ot.ctx.config import Config
+        from ot.ctx.write import ctx_write
 
         store = _make_store(tmp_path)
         compact = '{"a":1,"b":2}'
@@ -297,42 +302,48 @@ class TestCtxWrite:
         assert result["total_lines"] > 1
 
     def test_write_toc_stored_in_meta(self, tmp_path: Path) -> None:
-        from ot.ctx.write import ctx_write
         from ot.ctx.config import Config
+        from ot.ctx.write import ctx_write
 
         store = _make_store(tmp_path)
-        result = ctx_write("# Intro\nText\n## Section\nMore", store=store, config=Config())
+        result = ctx_write(
+            "# Intro\nText\n## Section\nMore", store=store, config=Config()
+        )
         meta = store.read_meta(result["handle"])
         assert "toc" in meta
         assert len(meta["toc"]) == 2
 
     def test_write_status_ready_immediately(self, tmp_path: Path) -> None:
-        from ot.ctx.write import ctx_write
         from ot.ctx.config import Config
+        from ot.ctx.write import ctx_write
 
         store = _make_store(tmp_path)
         result = ctx_write("some content", store=store, config=Config())
         assert result["status"] == "ready"
 
     def test_write_verbose_adds_preview(self, tmp_path: Path) -> None:
-        from ot.ctx.write import ctx_write
         from ot.ctx.config import Config
+        from ot.ctx.write import ctx_write
 
         store = _make_store(tmp_path)
-        result = ctx_write("line one\nline two", verbose=True, store=store, config=Config())
+        result = ctx_write(
+            "line one\nline two", verbose=True, store=store, config=Config()
+        )
         assert "preview" in result
 
     def test_write_verbose_false_no_preview(self, tmp_path: Path) -> None:
-        from ot.ctx.write import ctx_write
         from ot.ctx.config import Config
+        from ot.ctx.write import ctx_write
 
         store = _make_store(tmp_path)
-        result = ctx_write("line one\nline two", verbose=False, store=store, config=Config())
+        result = ctx_write(
+            "line one\nline two", verbose=False, store=store, config=Config()
+        )
         assert "preview" not in result
 
     def test_write_handle_dict_dereference(self, tmp_path: Path) -> None:
-        from ot.ctx.write import ctx_write
         from ot.ctx.config import Config
+        from ot.ctx.write import ctx_write
 
         store = _make_store(tmp_path)
         config = Config()
@@ -347,8 +358,8 @@ class TestCtxWrite:
         assert content == "original content"
 
     def test_write_handle_dict_missing_returns_error(self, tmp_path: Path) -> None:
-        from ot.ctx.write import ctx_write
         from ot.ctx.config import Config
+        from ot.ctx.write import ctx_write
 
         store = _make_store(tmp_path)
         result = ctx_write({"handle": "deadbeef"}, store=store, config=Config())
@@ -364,8 +375,8 @@ class TestCtxWrite:
 @pytest.mark.tools
 class TestCtxRead:
     def test_read_basic_pagination(self, tmp_path: Path) -> None:
-        from ot.ctx.read import ctx_read
         from ot.ctx.config import Config
+        from ot.ctx.read import ctx_read
 
         store = _make_store(tmp_path)
         lines = "\n".join(f"line {i}" for i in range(1, 201))
@@ -377,8 +388,8 @@ class TestCtxRead:
         assert "line 1" in result["content"]
 
     def test_read_tail(self, tmp_path: Path) -> None:
-        from ot.ctx.read import ctx_read
         from ot.ctx.config import Config
+        from ot.ctx.read import ctx_read
 
         store = _make_store(tmp_path)
         handle = _write_handle(store, "\n".join(f"line {i}" for i in range(1, 51)))
@@ -388,8 +399,8 @@ class TestCtxRead:
         assert "line 50" in result["content"]
 
     def test_read_long_line_truncation(self, tmp_path: Path) -> None:
-        from ot.ctx.read import ctx_read
         from ot.ctx.config import Config
+        from ot.ctx.read import ctx_read
 
         store = _make_store(tmp_path)
         long_line = "x" * 600
@@ -403,8 +414,8 @@ class TestCtxRead:
         assert line.endswith("  [+100 chars]")
 
     def test_read_expired_handle(self, tmp_path: Path) -> None:
-        from ot.ctx.read import ctx_read
         from ot.ctx.config import Config
+        from ot.ctx.read import ctx_read
 
         store = _make_store(tmp_path)
         handle = _write_handle(store, "content", ttl=1)
@@ -418,16 +429,16 @@ class TestCtxRead:
         assert "expired" in result["error"]
 
     def test_read_unknown_handle(self, tmp_path: Path) -> None:
-        from ot.ctx.read import ctx_read
         from ot.ctx.config import Config
+        from ot.ctx.read import ctx_read
 
         store = _make_store(tmp_path)
         result = ctx_read("deadbeef", store=store, config=Config())
         assert "error" in result
 
     def test_read_mode_toc(self, tmp_path: Path) -> None:
-        from ot.ctx.read import ctx_read
         from ot.ctx.config import Config
+        from ot.ctx.read import ctx_read
 
         store = _make_store(tmp_path)
         handle = _write_handle(store, "# Title\nText\n## Sub\nMore")
@@ -435,8 +446,8 @@ class TestCtxRead:
         assert "toc" in result or "sections" in result
 
     def test_read_mode_meta(self, tmp_path: Path) -> None:
-        from ot.ctx.read import ctx_read
         from ot.ctx.config import Config
+        from ot.ctx.read import ctx_read
 
         store = _make_store(tmp_path)
         handle = _write_handle(store, "some content", source="test-source")
@@ -446,8 +457,8 @@ class TestCtxRead:
         assert "size_bytes" in result
 
     def test_read_accepts_handle_dict(self, tmp_path: Path) -> None:
-        from ot.ctx.read import ctx_read
         from ot.ctx.config import Config
+        from ot.ctx.read import ctx_read
 
         store = _make_store(tmp_path)
         handle_str = _write_handle(store, "line one\nline two")
@@ -457,8 +468,8 @@ class TestCtxRead:
         assert "line one" in result["content"]
 
     def test_read_bad_handle_type_returns_error(self, tmp_path: Path) -> None:
-        from ot.ctx.read import ctx_read
         from ot.ctx.config import Config
+        from ot.ctx.read import ctx_read
 
         store = _make_store(tmp_path)
         result = ctx_read(["not", "a", "handle"], store=store, config=Config())  # type: ignore[arg-type]
@@ -478,7 +489,9 @@ class TestCtxToc:
         from ot.ctx.toc import ctx_toc
 
         store = _make_store(tmp_path)
-        handle = _write_handle(store, "# Intro\nText.\n## Background\nMore.\n### Details\nDetails.")
+        handle = _write_handle(
+            store, "# Intro\nText.\n## Background\nMore.\n### Details\nDetails."
+        )
         result = ctx_toc(handle, store=store)
         assert result["format"] == "markdown"
         assert result["sections"] == 3
@@ -498,7 +511,7 @@ class TestCtxToc:
         from ot.ctx.toc import ctx_toc
 
         store = _make_store(tmp_path)
-        handle = _write_handle(store, '[1, 2, 3]')
+        handle = _write_handle(store, "[1, 2, 3]")
         result = ctx_toc(handle, store=store)
         assert "[array]" in result["display"]
 
@@ -555,18 +568,20 @@ class TestCtxToc:
 @pytest.mark.tools
 class TestCtxGrep:
     def test_basic_grep(self, tmp_path: Path) -> None:
-        from ot.ctx.grep import ctx_grep
         from ot.ctx.config import Config
+        from ot.ctx.grep import ctx_grep
 
         store = _make_store(tmp_path)
-        handle = _write_handle(store, "apple pie\nbanana split\napricot jam\ncherry tart")
+        handle = _write_handle(
+            store, "apple pie\nbanana split\napricot jam\ncherry tart"
+        )
         result = ctx_grep(handle, "ap", store=store, config=Config())
         assert result["returned"] >= 2
         assert "apple" in result["content"]
 
     def test_grep_context_lines(self, tmp_path: Path) -> None:
-        from ot.ctx.grep import ctx_grep
         from ot.ctx.config import Config
+        from ot.ctx.grep import ctx_grep
 
         store = _make_store(tmp_path)
         content = "a\nb\nTARGET\nd\ne"
@@ -576,8 +591,8 @@ class TestCtxGrep:
         assert "d" in result["content"]
 
     def test_grep_context_separator(self, tmp_path: Path) -> None:
-        from ot.ctx.grep import ctx_grep
         from ot.ctx.config import Config
+        from ot.ctx.grep import ctx_grep
 
         store = _make_store(tmp_path)
         content = "TARGET1\nb\nc\nd\ne\nTARGET2\ng"
@@ -586,8 +601,8 @@ class TestCtxGrep:
         assert result["returned"] == 2
 
     def test_grep_long_line_truncation(self, tmp_path: Path) -> None:
-        from ot.ctx.grep import ctx_grep
         from ot.ctx.config import Config
+        from ot.ctx.grep import ctx_grep
 
         store = _make_store(tmp_path)
         long_line = "MATCH" + "x" * 600
@@ -598,8 +613,8 @@ class TestCtxGrep:
         assert "[+" in result["content"]
 
     def test_grep_noncontiguous_separator(self, tmp_path: Path) -> None:
-        from ot.ctx.grep import ctx_grep
         from ot.ctx.config import Config
+        from ot.ctx.grep import ctx_grep
 
         store = _make_store(tmp_path)
         # Two matches separated by 5 lines
@@ -609,8 +624,8 @@ class TestCtxGrep:
         assert "---" in result["content"]
 
     def test_grep_accepts_handle_dict(self, tmp_path: Path) -> None:
-        from ot.ctx.grep import ctx_grep
         from ot.ctx.config import Config
+        from ot.ctx.grep import ctx_grep
 
         store = _make_store(tmp_path)
         handle_str = _write_handle(store, "apple\nbanana")
@@ -619,8 +634,8 @@ class TestCtxGrep:
         assert result["returned"] == 1
 
     def test_grep_bad_handle_type_returns_error(self, tmp_path: Path) -> None:
-        from ot.ctx.grep import ctx_grep
         from ot.ctx.config import Config
+        from ot.ctx.grep import ctx_grep
 
         store = _make_store(tmp_path)
         result = ctx_grep(12345, "apple", store=store, config=Config())  # type: ignore[arg-type]
@@ -736,7 +751,9 @@ class TestCtxQuery:
         from ot.ctx.query import ctx_query
 
         store = _make_store(tmp_path)
-        handle = _write_handle(store, "metadata:\n  name: myapp\nspec:\n  replicas: 3\n")
+        handle = _write_handle(
+            store, "metadata:\n  name: myapp\nspec:\n  replicas: 3\n"
+        )
         result = ctx_query(handle, "metadata.name", store=store)
         assert "error" not in result
         assert result["result"] == "myapp"
@@ -754,7 +771,12 @@ class TestCtxQuery:
         from ot.ctx.query import ctx_query
 
         store = _make_store(tmp_path)
-        data = {"items": [{"status": "active", "name": "a"}, {"status": "inactive", "name": "b"}]}
+        data = {
+            "items": [
+                {"status": "active", "name": "a"},
+                {"status": "inactive", "name": "b"},
+            ]
+        }
         handle = _write_handle(store, json.dumps(data))
         result = ctx_query(handle, "items[?status == 'active'].name", store=store)
         assert "error" not in result
@@ -832,8 +854,8 @@ class TestCtxQuery:
 class TestCtxAppend:
     def test_append_combined_content(self, tmp_path: Path) -> None:
         from ot.ctx.append import ctx_append
-        from ot.ctx.read import ctx_read
         from ot.ctx.config import Config
+        from ot.ctx.read import ctx_read
 
         store = _make_store(tmp_path)
         handle = _write_handle(store, "first line")
@@ -1102,16 +1124,11 @@ class TestCtxAsk:
         store = _make_store(tmp_path)
         h = _write_handle(store, "The answer is 42.")
 
-        mock_transform = MagicMock(return_value="42")
-        with patch("ot.services.get_services") as mock_services:
-            mock_services.return_value.llm_transform = mock_transform
-            result = ctx_ask(h, q="What is the answer?", store=store)
-        # Either success (if ot_llm is importable) or ot_llm not installed error
+        result = ctx_ask(h, q="What is the answer?", store=store)
         assert "handle" in result
 
     def test_ask_truncation_applied(self, tmp_path: Path) -> None:
         from ot.ctx.ask import ctx_ask
-        from ot.ctx.config import Config
 
         store = _make_store(tmp_path)
         big_content = "word " * 100000  # ~500KB
@@ -1128,17 +1145,17 @@ class TestCtxAsk:
         result = ctx_ask("badhandle", q="Question?", store=store)
         assert "error" in result
 
-    def test_ask_ot_llm_not_installed(self, tmp_path: Path) -> None:
+    def test_ask_missing_generation_route(self, tmp_path: Path) -> None:
         from ot.ctx.ask import ctx_ask
-        import sys
+        from ot.generation import GenerationError
 
         store = _make_store(tmp_path)
         h = _write_handle(store, "Some content.")
 
-        with patch("ot.services.get_services") as mock_services:
-            mock_services.return_value.llm_transform.side_effect = RuntimeError(
-                "No LLM service registered"
-            )
+        with patch(
+            "ot.ctx.ask.resolve_generation",
+            side_effect=GenerationError("No generation connection is configured"),
+        ):
             result = ctx_ask(h, q="Question?", store=store)
         assert "error" in result
-        assert "llm service" in result["error"].lower()
+        assert "generation connection" in result["error"].lower()

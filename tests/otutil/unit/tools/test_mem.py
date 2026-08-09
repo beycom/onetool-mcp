@@ -6,6 +6,9 @@ with mocked SQLite and OpenAI.
 
 from __future__ import annotations
 
+import hashlib as _hashlib
+import sqlite3 as _sqlite3
+import struct as _struct
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -13,6 +16,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from ot.config.routing import EmbeddingsConfig
+from ot.generation import GenerationError
 from otutil.tools._mem import VALID_CATEGORIES, Config
 from otutil.tools._mem.content import (
     _build_toc,
@@ -148,16 +153,24 @@ class TestRedact:
 class TestValidateTags:
     """Test _validate_tags whitelist validation."""
 
-    @patch("otutil.tools._mem.content._get_config", return_value=Config(tags_whitelist=[]))
+    @patch(
+        "otutil.tools._mem.content._get_config", return_value=Config(tags_whitelist=[])
+    )
     def test_empty_whitelist_allows_all(self, _mock_config):
         assert _validate_tags(["any", "tag"]) == ["any", "tag"]
 
-    @patch("otutil.tools._mem.content._get_config", return_value=Config(tags_whitelist=["allowed"]))
+    @patch(
+        "otutil.tools._mem.content._get_config",
+        return_value=Config(tags_whitelist=["allowed"]),
+    )
     def test_whitelist_rejects_unknown(self, _mock_config):
         with pytest.raises(ValueError, match="not in whitelist"):
             _validate_tags(["forbidden"])
 
-    @patch("otutil.tools._mem.content._get_config", return_value=Config(tags_whitelist=["project/*"]))
+    @patch(
+        "otutil.tools._mem.content._get_config",
+        return_value=Config(tags_whitelist=["project/*"]),
+    )
     def test_whitelist_wildcard_prefix(self, _mock_config):
         assert _validate_tags(["project/onetool"]) == ["project/onetool"]
 
@@ -216,7 +229,7 @@ class TestCosineSimilarity:
 
         a = struct.pack("<3f", 1.0, 2.0, 3.0)
         b = struct.pack("<2f", 1.0, 2.0)
-        with pytest.raises(ValueError, match="dimension mismatch.*3 vs 2.*reindex"):
+        with pytest.raises(ValueError, match=r"dimension mismatch.*3 vs 2.*reindex"):
             _cosine_similarity(a, b)
 
 
@@ -328,8 +341,16 @@ class TestRead:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
-            "id-123", "test/topic", "memory content", "note",
-            '["tag1"]', 5, 3, datetime.now().isoformat(), datetime.now().isoformat(), '{}',
+            "id-123",
+            "test/topic",
+            "memory content",
+            "note",
+            '["tag1"]',
+            5,
+            3,
+            datetime.now().isoformat(),
+            datetime.now().isoformat(),
+            "{}",
         )
 
         result = read(topic="test/topic")
@@ -343,8 +364,16 @@ class TestRead:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
-            "id-123", "test/topic", "memory content", "note",
-            '["tag1"]', 5, 3, datetime.now().isoformat(), datetime.now().isoformat(), '{}',
+            "id-123",
+            "test/topic",
+            "memory content",
+            "note",
+            '["tag1"]',
+            5,
+            3,
+            datetime.now().isoformat(),
+            datetime.now().isoformat(),
+            "{}",
         )
 
         result = read(topic="test/topic", meta=True)
@@ -362,8 +391,16 @@ class TestRead:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
-            "id-123", "test/topic", "content", "rule",
-            '[]', 7, 1, datetime.now().isoformat(), datetime.now().isoformat(), '{}',
+            "id-123",
+            "test/topic",
+            "content",
+            "rule",
+            "[]",
+            7,
+            1,
+            datetime.now().isoformat(),
+            datetime.now().isoformat(),
+            "{}",
         )
 
         result = read(topic="ignored", id="id-123")
@@ -390,8 +427,16 @@ class TestRead:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
-            "id-456", "projects/onetool/rules", "rule content", "rule",
-            '[]', 8, 1, datetime.now().isoformat(), datetime.now().isoformat(), '{}',
+            "id-456",
+            "projects/onetool/rules",
+            "rule content",
+            "rule",
+            "[]",
+            8,
+            1,
+            datetime.now().isoformat(),
+            datetime.now().isoformat(),
+            "{}",
         )
 
         result = read(topic="projects/*/rules")
@@ -408,8 +453,16 @@ class TestRead:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
-            "id-789", "test/topic", "latest content", "note",
-            '[]', 5, 0, datetime.now().isoformat(), datetime.now().isoformat(), '{}',
+            "id-789",
+            "test/topic",
+            "latest content",
+            "note",
+            "[]",
+            5,
+            0,
+            datetime.now().isoformat(),
+            datetime.now().isoformat(),
+            "{}",
         )
 
         read(topic="test/topic")
@@ -431,8 +484,30 @@ class TestReadBatch:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "proj/a", "content a", "note", '["tag1"]', 5, 2, datetime.now().isoformat(), datetime.now().isoformat(), '{}'),
-            ("id-2", "proj/b", "content b", "rule", '[]', 8, 0, datetime.now().isoformat(), datetime.now().isoformat(), '{}'),
+            (
+                "id-1",
+                "proj/a",
+                "content a",
+                "note",
+                '["tag1"]',
+                5,
+                2,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
+            (
+                "id-2",
+                "proj/b",
+                "content b",
+                "rule",
+                "[]",
+                8,
+                0,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
         ]
 
         result = read_batch(topic="proj/")
@@ -448,7 +523,18 @@ class TestReadBatch:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "proj/a", "content a", "note", '[]', 5, 1, datetime.now().isoformat(), datetime.now().isoformat(), '{}'),
+            (
+                "id-1",
+                "proj/a",
+                "content a",
+                "note",
+                "[]",
+                5,
+                1,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
         ]
 
         result = read_batch(ids=["id-1"])
@@ -463,7 +549,18 @@ class TestReadBatch:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "proj/a", "content a", "note", '["tag1"]', 5, 3, datetime.now().isoformat(), datetime.now().isoformat(), '{}'),
+            (
+                "id-1",
+                "proj/a",
+                "content a",
+                "note",
+                '["tag1"]',
+                5,
+                3,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
         ]
 
         result = read_batch(topic="proj/", meta=True)
@@ -524,7 +621,18 @@ class TestReadBatch:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "proj/a", "rule content", "rule", '[]', 5, 1, datetime.now().isoformat(), datetime.now().isoformat(), '{}'),
+            (
+                "id-1",
+                "proj/a",
+                "rule content",
+                "rule",
+                "[]",
+                5,
+                1,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
         ]
 
         result = read_batch(category="rule")
@@ -542,7 +650,18 @@ class TestReadBatch:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "proj/a", "tagged content", "note", '["tag1"]', 5, 1, datetime.now().isoformat(), datetime.now().isoformat(), '{}'),
+            (
+                "id-1",
+                "proj/a",
+                "tagged content",
+                "note",
+                '["tag1"]',
+                5,
+                1,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
         ]
 
         result = read_batch(tags=["tag1"])
@@ -559,7 +678,18 @@ class TestReadBatch:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "proj/a", "combined content", "rule", '[]', 5, 1, datetime.now().isoformat(), datetime.now().isoformat(), '{}'),
+            (
+                "id-1",
+                "proj/a",
+                "combined content",
+                "rule",
+                "[]",
+                5,
+                1,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
         ]
 
         result = read_batch(topic="proj/", category="rule")
@@ -576,7 +706,10 @@ class TestSearch:
     """Test mem.search() with mocked database and embeddings."""
 
     @patch("otutil.tools._mem.search._check_vec_available", return_value=False)
-    @patch("otutil.tools._mem.search._get_config", return_value=Config(embeddings_enabled=True))
+    @patch(
+        "otutil.tools._mem.search._get_config",
+        return_value=Config(embeddings_enabled=True),
+    )
     @patch("otutil.tools._mem.search._generate_query_embedding")
     @patch("otutil.tools._mem.search._get_connection")
     def test_semantic_search(self, mock_conn, mock_embed, _mock_config, _mock_vec):
@@ -605,7 +738,7 @@ class TestSearch:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "topic/one", "matching content", "note", '[]', 5, 1),
+            ("id-1", "topic/one", "matching content", "note", "[]", 5, 1),
         ]
 
         result = search(query="matching", mode="keyword")
@@ -619,7 +752,10 @@ class TestSearch:
         assert "Error" in result
         assert "Invalid mode" in result
 
-    @patch("otutil.tools._mem.search._get_config", return_value=Config(embeddings_enabled=True))
+    @patch(
+        "otutil.tools._mem.search._get_config",
+        return_value=Config(embeddings_enabled=True),
+    )
     @patch("otutil.tools._mem.search._generate_query_embedding")
     @patch("otutil.tools._mem.search._get_connection")
     def test_no_results(self, mock_conn, mock_embed, _mock_config):
@@ -635,7 +771,10 @@ class TestSearch:
 
         assert "No memories found" in result
 
-    @patch("otutil.tools._mem.search._get_config", return_value=Config(embeddings_enabled=True))
+    @patch(
+        "otutil.tools._mem.search._get_config",
+        return_value=Config(embeddings_enabled=True),
+    )
     @patch("otutil.tools._mem.search._generate_query_embedding")
     @patch("otutil.tools._mem.search._get_connection")
     def test_search_custom_extract(self, mock_conn, mock_embed, _mock_config):
@@ -648,7 +787,7 @@ class TestSearch:
         mock_conn.return_value = conn
         conn.execute.return_value.fetchone.return_value = (1,)
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "topic/one", long_content, "note", '[]', 5, 1, 0.9),
+            ("id-1", "topic/one", long_content, "note", "[]", 5, 1, 0.9),
         ]
 
         result = search(query="test", extract=50)
@@ -658,10 +797,15 @@ class TestSearch:
         assert "a" * 51 not in result
         assert "..." in result
 
-    @patch("otutil.tools._mem.search._get_config", return_value=Config(embeddings_enabled=True))
+    @patch(
+        "otutil.tools._mem.search._get_config",
+        return_value=Config(embeddings_enabled=True),
+    )
     @patch("otutil.tools._mem.search._generate_query_embedding")
     @patch("otutil.tools._mem.search._get_connection")
-    def test_search_extract_zero_returns_full(self, mock_conn, mock_embed, _mock_config):
+    def test_search_extract_zero_returns_full(
+        self, mock_conn, mock_embed, _mock_config
+    ):
         from otutil.tools.mem import search
 
         mock_embed.return_value = [0.1] * 1536
@@ -671,7 +815,7 @@ class TestSearch:
         mock_conn.return_value = conn
         conn.execute.return_value.fetchone.return_value = (1,)
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "topic/one", long_content, "note", '[]', 5, 1, 0.9),
+            ("id-1", "topic/one", long_content, "note", "[]", 5, 1, 0.9),
         ]
 
         result = search(query="test", extract=0)
@@ -690,22 +834,33 @@ class TestSearch:
 class TestEmbedHelpers:
     """Test _embed_now/_enqueue_after_commit helpers with different config states."""
 
-    @patch("otutil.tools._mem.embedding._get_config", return_value=Config(embeddings_enabled=False))
+    @patch(
+        "otutil.tools._mem.embedding._get_config",
+        return_value=Config(embeddings_enabled=False),
+    )
     def test_disabled_returns_none(self, _mock_config):
         from otutil.tools._mem.embedding import _embed_now
 
         result = _embed_now("some content")
         assert result is None
 
-    @patch("otutil.tools._mem.embedding._generate_embedding", return_value=[0.1, 0.2, 0.3])
-    @patch("otutil.tools._mem.embedding._get_config", return_value=Config(embeddings_enabled=True, embeddings_async=False))
+    @patch(
+        "otutil.tools._mem.embedding._generate_embedding", return_value=[0.1, 0.2, 0.3]
+    )
+    @patch(
+        "otutil.tools._mem.embedding._get_config",
+        return_value=Config(embeddings_enabled=True, embeddings_async=False),
+    )
     def test_sync_returns_vector(self, _mock_config, _mock_embed):
         from otutil.tools._mem.embedding import _embed_now
 
         result = _embed_now("some content")
         assert result == [0.1, 0.2, 0.3]
 
-    @patch("otutil.tools._mem.embedding._get_config", return_value=Config(embeddings_enabled=True, embeddings_async=True))
+    @patch(
+        "otutil.tools._mem.embedding._get_config",
+        return_value=Config(embeddings_enabled=True, embeddings_async=True),
+    )
     def test_async_returns_none_without_enqueue(self, _mock_config):
         from otutil.tools._mem.embedding import _embed_now
 
@@ -713,7 +868,10 @@ class TestEmbedHelpers:
         assert result is None
 
     @patch("otutil.tools._mem.embedding._enqueue_embedding")
-    @patch("otutil.tools._mem.embedding._get_config", return_value=Config(embeddings_enabled=True, embeddings_async=True))
+    @patch(
+        "otutil.tools._mem.embedding._get_config",
+        return_value=Config(embeddings_enabled=True, embeddings_async=True),
+    )
     def test_enqueue_after_commit_async(self, _mock_config, mock_enqueue):
         from otutil.tools._mem.embedding import _enqueue_after_commit
 
@@ -721,7 +879,10 @@ class TestEmbedHelpers:
         mock_enqueue.assert_called_once_with("mem-id")
 
     @patch("otutil.tools._mem.embedding._enqueue_embedding")
-    @patch("otutil.tools._mem.embedding._get_config", return_value=Config(embeddings_enabled=False))
+    @patch(
+        "otutil.tools._mem.embedding._get_config",
+        return_value=Config(embeddings_enabled=False),
+    )
     def test_enqueue_after_commit_disabled_noop(self, _mock_config, mock_enqueue):
         from otutil.tools._mem.embedding import _enqueue_after_commit
 
@@ -745,10 +906,10 @@ class TestProcessEmbeddingJob:
 
         # Track lock state at embedding time: __enter__/__exit__ pair count
         lock_depth = {"current": 0, "at_embed": None}
-        mock_conn.return_value.__enter__.side_effect = lambda *a: (
+        mock_conn.return_value.__enter__.side_effect = lambda *_args: (
             lock_depth.__setitem__("current", lock_depth["current"] + 1) or conn
         )
-        mock_conn.return_value.__exit__.side_effect = lambda *a: (
+        mock_conn.return_value.__exit__.side_effect = lambda *_args: (
             lock_depth.__setitem__("current", lock_depth["current"] - 1) or False
         )
         mock_embed.side_effect = lambda _content: (
@@ -784,21 +945,30 @@ class TestProcessEmbeddingJob:
 class TestSearchEmbeddingsDisabled:
     """Test search returns helpful messages when embeddings disabled."""
 
-    @patch("otutil.tools._mem.search._get_config", return_value=Config(embeddings_enabled=False))
+    @patch(
+        "otutil.tools._mem.search._get_config",
+        return_value=Config(embeddings_enabled=False),
+    )
     def test_semantic_search_returns_message(self, _mock_config):
         from otutil.tools.mem import search
 
         result = search(query="test query")
         assert "embeddings_enabled" in result
 
-    @patch("otutil.tools._mem.search._get_config", return_value=Config(embeddings_enabled=False))
+    @patch(
+        "otutil.tools._mem.search._get_config",
+        return_value=Config(embeddings_enabled=False),
+    )
     def test_hybrid_search_returns_message(self, _mock_config):
         from otutil.tools.mem import search
 
         result = search(query="test query", mode="hybrid")
         assert "embeddings_enabled" in result
 
-    @patch("otutil.tools._mem.search._get_config", return_value=Config(embeddings_enabled=False))
+    @patch(
+        "otutil.tools._mem.search._get_config",
+        return_value=Config(embeddings_enabled=False),
+    )
     @patch("otutil.tools._mem.search._get_connection")
     def test_pattern_search_works_when_disabled(self, mock_conn, _mock_config):
         from otutil.tools.mem import search
@@ -806,7 +976,7 @@ class TestSearchEmbeddingsDisabled:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "topic/one", "matching content", "note", '[]', 5, 1),
+            ("id-1", "topic/one", "matching content", "note", "[]", 5, 1),
         ]
 
         result = search(query="matching", mode="keyword")
@@ -818,7 +988,10 @@ class TestSearchEmbeddingsDisabled:
 class TestSearchNoEmbeddings:
     """Test search returns guidance when enabled but no embeddings exist."""
 
-    @patch("otutil.tools._mem.search._get_config", return_value=Config(embeddings_enabled=True))
+    @patch(
+        "otutil.tools._mem.search._get_config",
+        return_value=Config(embeddings_enabled=True),
+    )
     @patch("otutil.tools._mem.search._get_connection")
     def test_semantic_no_embeddings_returns_guidance(self, mock_conn, _mock_config):
         from otutil.tools.mem import search
@@ -860,14 +1033,20 @@ class TestWriteWithoutEmbeddings:
 class TestReindex:
     """Test mem.reindex() backfill function."""
 
-    @patch("otutil.tools._mem.lifecycle._get_config", return_value=Config(embeddings_enabled=False))
+    @patch(
+        "otutil.tools._mem.lifecycle._get_config",
+        return_value=Config(embeddings_enabled=False),
+    )
     def test_disabled_returns_message(self, _mock_config):
         from otutil.tools.mem import reindex
 
         result = reindex()
         assert "disabled" in result.lower()
 
-    @patch("otutil.tools._mem.lifecycle._get_config", return_value=Config(embeddings_enabled=True))
+    @patch(
+        "otutil.tools._mem.lifecycle._get_config",
+        return_value=Config(embeddings_enabled=True),
+    )
     @patch("otutil.tools._mem.lifecycle._get_connection")
     def test_dry_run_shows_count(self, mock_conn, _mock_config):
         from otutil.tools.mem import reindex
@@ -884,7 +1063,10 @@ class TestReindex:
 
     @patch("otutil.tools._mem.lifecycle._use_connection")
     @patch("otutil.tools._mem.lifecycle._generate_embedding", return_value=[0.1] * 1536)
-    @patch("otutil.tools._mem.lifecycle._get_config", return_value=Config(embeddings_enabled=True))
+    @patch(
+        "otutil.tools._mem.lifecycle._get_config",
+        return_value=Config(embeddings_enabled=True),
+    )
     @patch("otutil.tools._mem.lifecycle._get_connection")
     def test_generates_embeddings(self, mock_conn, _mock_config, _mock_embed, mock_use):
         from otutil.tools.mem import reindex
@@ -901,9 +1083,14 @@ class TestReindex:
 
     @patch("otutil.tools._mem.lifecycle._use_connection")
     @patch("otutil.tools._mem.lifecycle._generate_embedding")
-    @patch("otutil.tools._mem.lifecycle._get_config", return_value=Config(embeddings_enabled=True))
+    @patch(
+        "otutil.tools._mem.lifecycle._get_config",
+        return_value=Config(embeddings_enabled=True),
+    )
     @patch("otutil.tools._mem.lifecycle._get_connection")
-    def test_partial_failure_keeps_progress(self, mock_conn, _mock_config, mock_embed, mock_use):
+    def test_partial_failure_keeps_progress(
+        self, mock_conn, _mock_config, mock_embed, mock_use
+    ):
         """One failed embedding must not lose progress: commit is per item."""
         from otutil.tools.mem import reindex
 
@@ -926,7 +1113,10 @@ class TestReindex:
         # One commit per successful item
         assert write_conn.commit.call_count == 2
 
-    @patch("otutil.tools._mem.lifecycle._get_config", return_value=Config(embeddings_enabled=True))
+    @patch(
+        "otutil.tools._mem.lifecycle._get_config",
+        return_value=Config(embeddings_enabled=True),
+    )
     @patch("otutil.tools._mem.lifecycle._get_connection")
     def test_all_embedded_returns_message(self, mock_conn, _mock_config):
         from otutil.tools.mem import reindex
@@ -951,10 +1141,18 @@ class TestFlush:
 
         from otutil.tools._mem import embedding as emb
 
-        saved = (emb._embedding_worker_started, emb._embedding_worker_thread, emb._embedding_queue)
+        saved = (
+            emb._embedding_worker_started,
+            emb._embedding_worker_thread,
+            emb._embedding_queue,
+        )
         emb._embedding_queue = queue_mod.Queue(maxsize=10)
         yield emb
-        (emb._embedding_worker_started, emb._embedding_worker_thread, emb._embedding_queue) = saved
+        (
+            emb._embedding_worker_started,
+            emb._embedding_worker_thread,
+            emb._embedding_queue,
+        ) = saved
 
     def test_no_worker_returns_immediately(self):
         from otutil.tools.mem import flush
@@ -1001,8 +1199,28 @@ class TestListMemories:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1abcd", "topic/one", "note", '["tag1"]', 5, 2, datetime.now().isoformat(), 100, None),
-            ("id-2efgh", "topic/two", "rule", '[]', 8, 0, datetime.now().isoformat(), 200, None),
+            (
+                "id-1abcd",
+                "topic/one",
+                "note",
+                '["tag1"]',
+                5,
+                2,
+                datetime.now().isoformat(),
+                100,
+                None,
+            ),
+            (
+                "id-2efgh",
+                "topic/two",
+                "rule",
+                "[]",
+                8,
+                0,
+                datetime.now().isoformat(),
+                200,
+                None,
+            ),
         ]
 
         result = list()
@@ -1024,7 +1242,17 @@ class TestListMemories:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1abcd", "topic/tagged", "note", '["a", "b"]', 5, 0, datetime.now().isoformat(), 50, None),
+            (
+                "id-1abcd",
+                "topic/tagged",
+                "note",
+                '["a", "b"]',
+                5,
+                0,
+                datetime.now().isoformat(),
+                50,
+                None,
+            ),
         ]
 
         result = list()
@@ -1038,7 +1266,17 @@ class TestListMemories:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1abcd", "topic/notags", "note", '[]', 5, 0, datetime.now().isoformat(), 50, None),
+            (
+                "id-1abcd",
+                "topic/notags",
+                "note",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                50,
+                None,
+            ),
         ]
 
         result = list()
@@ -1052,7 +1290,17 @@ class TestListMemories:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1abcd", "topic/default", "note", '[]', 5, 0, datetime.now().isoformat(), 50, None),
+            (
+                "id-1abcd",
+                "topic/default",
+                "note",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                50,
+                None,
+            ),
         ]
 
         result = list()
@@ -1066,7 +1314,17 @@ class TestListMemories:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1abcd", "topic/high", "note", '[]', 8, 0, datetime.now().isoformat(), 50, None),
+            (
+                "id-1abcd",
+                "topic/high",
+                "note",
+                "[]",
+                8,
+                0,
+                datetime.now().isoformat(),
+                50,
+                None,
+            ),
         ]
 
         result = list()
@@ -1080,8 +1338,17 @@ class TestListMemories:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1abcd", "topic/sections", "context", '[]', 5, 0, datetime.now().isoformat(), 500,
-             '{"section_count": "3"}'),
+            (
+                "id-1abcd",
+                "topic/sections",
+                "context",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                500,
+                '{"section_count": "3"}',
+            ),
         ]
 
         result = list()
@@ -1095,7 +1362,17 @@ class TestListMemories:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1abcd", "topic/nosec", "note", '[]', 5, 0, datetime.now().isoformat(), 50, None),
+            (
+                "id-1abcd",
+                "topic/nosec",
+                "note",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                50,
+                None,
+            ),
         ]
 
         result = list()
@@ -1184,7 +1461,7 @@ class TestUpdate:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-123", "old content", '{}'),
+            ("id-123", "old content", "{}"),
         ]
 
         result = update(topic="test/topic", content="new content")
@@ -1198,8 +1475,8 @@ class TestUpdate:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "content 1", '{}'),
-            ("id-2", "content 2", '{}'),
+            ("id-1", "content 1", "{}"),
+            ("id-2", "content 2", "{}"),
         ]
 
         result = update(topic="ambiguous/topic", content="new")
@@ -1224,63 +1501,84 @@ class TestUpdate:
 class TestUpdateEmbeddingHandling:
     """Updates must not destroy stored embeddings when embeddings are disabled."""
 
-    @patch("otutil.tools._mem.mutations._get_config", return_value=Config(embeddings_enabled=False))
+    @patch(
+        "otutil.tools._mem.mutations._get_config",
+        return_value=Config(embeddings_enabled=False),
+    )
     @patch("otutil.tools._mem.mutations._embed_now", return_value=None)
     @patch("otutil.tools._mem.mutations._use_connection")
-    def test_update_preserves_embedding_when_disabled(self, mock_conn, _mock_embed, _mock_config):
+    def test_update_preserves_embedding_when_disabled(
+        self, mock_conn, _mock_embed, _mock_config
+    ):
         from otutil.tools.mem import update
 
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-123", "old content", '{}'),
+            ("id-123", "old content", "{}"),
         ]
 
         result = update(topic="test/topic", content="new content")
 
         assert "Updated memory" in result
-        update_calls = [c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)]
+        update_calls = [
+            c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)
+        ]
         assert len(update_calls) == 1
         # The embedding column must not be touched
         assert "embedding" not in update_calls[0][0][0]
 
-    @patch("otutil.tools._mem.mutations._get_config", return_value=Config(embeddings_enabled=True, embeddings_async=False))
+    @patch(
+        "otutil.tools._mem.mutations._get_config",
+        return_value=Config(embeddings_enabled=True, embeddings_async=False),
+    )
     @patch("otutil.tools._mem.mutations._embed_now", return_value=[0.5, 0.5])
     @patch("otutil.tools._mem.mutations._use_connection")
-    def test_update_writes_embedding_when_enabled(self, mock_conn, _mock_embed, _mock_config):
+    def test_update_writes_embedding_when_enabled(
+        self, mock_conn, _mock_embed, _mock_config
+    ):
         from otutil.tools._mem.db import _serialize_embedding
         from otutil.tools.mem import update
 
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-123", "old content", '{}'),
+            ("id-123", "old content", "{}"),
         ]
 
         result = update(topic="test/topic", content="new content")
 
         assert "Updated memory" in result
-        update_calls = [c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)]
+        update_calls = [
+            c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)
+        ]
         assert len(update_calls) == 1
         assert "embedding" in update_calls[0][0][0]
         assert update_calls[0][0][1][2] == _serialize_embedding([0.5, 0.5])
 
-    @patch("otutil.tools._mem.mutations._get_config", return_value=Config(embeddings_enabled=False))
+    @patch(
+        "otutil.tools._mem.mutations._get_config",
+        return_value=Config(embeddings_enabled=False),
+    )
     @patch("otutil.tools._mem.mutations._embed_now", return_value=None)
     @patch("otutil.tools._mem.mutations._use_connection")
-    def test_append_preserves_embedding_when_disabled(self, mock_conn, _mock_embed, _mock_config):
+    def test_append_preserves_embedding_when_disabled(
+        self, mock_conn, _mock_embed, _mock_config
+    ):
         from otutil.tools.mem import append
 
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-123", "original content", '{}'),
+            ("id-123", "original content", "{}"),
         ]
 
         result = append(topic="test/topic", content="more")
 
         assert "Appended to memory" in result
-        update_calls = [c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)]
+        update_calls = [
+            c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)
+        ]
         assert len(update_calls) == 1
         assert "embedding" not in update_calls[0][0][0]
 
@@ -1301,7 +1599,7 @@ class TestAppend:
 
         # Mock for single match via fetchall (id, content, meta)
         conn.execute.return_value.fetchall.return_value = [
-            ("id-123", "original content", '{}'),
+            ("id-123", "original content", "{}"),
         ]
 
         result = append(topic="test/topic", content="appended text")
@@ -1326,7 +1624,15 @@ class TestContext:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "hot/topic", "frequently accessed content", "rule", ["tag"], 8, 100),
+            (
+                "id-1",
+                "hot/topic",
+                "frequently accessed content",
+                "rule",
+                ["tag"],
+                8,
+                100,
+            ),
         ]
 
         result = context()
@@ -1435,15 +1741,15 @@ class TestStats:
 
         # Mock different queries in sequence
         conn.execute.return_value.fetchone.side_effect = [
-            (10,),           # total count
+            (10,),  # total count
             (5000, 500, 2000),  # size stats
-            (3,),            # history count
-            (2,),            # without embeddings count
-            (7,),            # memories_vec row count (vec index status)
+            (3,),  # history count
+            (2,),  # without embeddings count
+            (7,),  # memories_vec row count (vec index status)
         ]
         conn.execute.return_value.fetchall.side_effect = [
             [("note", 5), ("rule", 3), ("decision", 2)],  # categories
-            [("projects", 7), ("learnings", 3)],           # topics
+            [("projects", 7), ("learnings", 3)],  # topics
         ]
 
         result = stats()
@@ -1478,7 +1784,18 @@ class TestDump:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "topic/one", "content one", "note", '["tag1"]', 5, 2, datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
+            (
+                "id-1",
+                "topic/one",
+                "content one",
+                "note",
+                '["tag1"]',
+                5,
+                2,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
         ]
 
         result = dump()
@@ -1495,7 +1812,18 @@ class TestDump:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "topic/one", "content", "note", '[]', 5, 0, datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
+            (
+                "id-1",
+                "topic/one",
+                "content",
+                "note",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
         ]
 
         out_file = tmp_path / "export.yaml"
@@ -1543,12 +1871,12 @@ class TestLoad:
 
         yaml_file = tmp_path / "memories.yaml"
         yaml_file.write_text(
-            'memories:\n'
+            "memories:\n"
             '  - topic: "test/topic"\n'
             '    content: "imported content"\n'
             '    category: "note"\n'
             '    tags: ["imported"]\n'
-            '    relevance: 7\n'
+            "    relevance: 7\n"
         )
 
         result = load(file=str(yaml_file))
@@ -1573,7 +1901,7 @@ class TestLoadInvariants:
 
         yaml_file = tmp_path / "memories.yaml"
         yaml_file.write_text(
-            'memories:\n'
+            "memories:\n"
             '  - topic: "test/leaky"\n'
             '    content: "key: sk-abc123def456ghi789jkl0123"\n'
             '    category: "note"\n'
@@ -1600,7 +1928,7 @@ class TestLoadInvariants:
 
         yaml_file = tmp_path / "memories.yaml"
         yaml_file.write_text(
-            'memories:\n'
+            "memories:\n"
             '  - topic: "test/bad"\n'
             '    content: "content"\n'
             '    category: "not-a-category"\n'
@@ -1633,7 +1961,9 @@ class TestLoadDump:
     @pytest.mark.usefixtures("_mock_cwd")
     @patch("otutil.tools._mem.io._embed_now")
     @patch("otutil.tools._mem.io._use_connection")
-    def test_load_imports_export_yaml_and_restores_meta(self, mock_conn, mock_embed, tmp_path):
+    def test_load_imports_export_yaml_and_restores_meta(
+        self, mock_conn, mock_embed, tmp_path
+    ):
         from otutil.tools.mem import load
 
         mock_embed.return_value = None
@@ -1643,15 +1973,15 @@ class TestLoadDump:
 
         yaml_file = tmp_path / "memories.yaml"
         yaml_file.write_text(
-            'memories:\n'
+            "memories:\n"
             '  - id: "mem-1"\n'
             '    topic: "test/topic"\n'
-            '    content: |-\n'
-            '      imported content\n'
+            "    content: |-\n"
+            "      imported content\n"
             '    category: "note"\n'
             '    tags: ["imported"]\n'
-            '    relevance: 7\n'
-            '    access_count: 2\n'
+            "    relevance: 7\n"
+            "    access_count: 2\n"
             '    created_at: "2026-05-13 00:00:00"\n'
             '    updated_at: "2026-05-13 00:00:00"\n'
             '    meta: \'{"sections": "Intro:1-2"}\'\n'
@@ -1683,7 +2013,7 @@ class TestLoadDump:
 
         yaml_file = tmp_path / "memories.yaml"
         yaml_file.write_text(
-            'memories:\n'
+            "memories:\n"
             '  - topic: "test/topic"\n'
             '    content: "imported content"\n'
             '    category: "note"\n'
@@ -1709,8 +2039,18 @@ class TestSnapshot:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "docs/readme", "# README content", "note", '["tag1"]', 5, 2,
-             datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
+            (
+                "id-1",
+                "docs/readme",
+                "# README content",
+                "note",
+                '["tag1"]',
+                5,
+                2,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
         ]
 
         out_dir = tmp_path / "backup"
@@ -1731,10 +2071,30 @@ class TestSnapshot:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "consult/ask", "ask content", "note", '[]', 5, 0,
-             datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
-            ("id-2", "consult/mem-tool", "mem content", "discovery", '[]', 7, 1,
-             datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
+            (
+                "id-1",
+                "consult/ask",
+                "ask content",
+                "note",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
+            (
+                "id-2",
+                "consult/mem-tool",
+                "mem content",
+                "discovery",
+                "[]",
+                7,
+                1,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
         ]
 
         out_dir = tmp_path / "snap"
@@ -1753,8 +2113,18 @@ class TestSnapshot:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "notes/a", "content a", "note", '[]', 5, 0,
-             datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
+            (
+                "id-1",
+                "notes/a",
+                "content a",
+                "note",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
         ]
 
         out_dir = tmp_path / "snap"
@@ -1775,8 +2145,18 @@ class TestSnapshot:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "notes/a", "new content", "note", '[]', 5, 0,
-             datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
+            (
+                "id-1",
+                "notes/a",
+                "new content",
+                "note",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
         ]
 
         out_dir = tmp_path / "snap"
@@ -1797,8 +2177,18 @@ class TestSnapshot:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "consult/sub/deep", "deep content", "rule", '["important"]', 9, 0,
-             datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
+            (
+                "id-1",
+                "consult/sub/deep",
+                "deep content",
+                "rule",
+                '["important"]',
+                9,
+                0,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
         ]
 
         out_dir = tmp_path / "snap"
@@ -1820,8 +2210,18 @@ class TestSnapshot:
         mock_conn.return_value = conn
         meta_json = '{"sections": "Attack Summary:277-290|What It Doesn\'t Do:291-302|Recs:303"}'
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "tmp/security", "content", "note", '[]', 5, 0,
-             datetime.now().isoformat(), datetime.now().isoformat(), meta_json),
+            (
+                "id-1",
+                "tmp/security",
+                "content",
+                "note",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                meta_json,
+            ),
         ]
 
         out_dir = tmp_path / "snap"
@@ -1858,15 +2258,15 @@ class TestRestore:
         snap_dir.mkdir()
         (snap_dir / "ask.md").write_text("ask content")
         (snap_dir / "index.yaml").write_text(
-            'snapshot:\n'
+            "snapshot:\n"
             '  topic_filter: "consult/"\n'
-            '  count: 1\n'
-            'memories:\n'
+            "  count: 1\n"
+            "memories:\n"
             '  - topic: "consult/ask"\n'
             '    file: "ask.md"\n'
             '    category: "note"\n'
             '    tags: ["research"]\n'
-            '    relevance: 7\n'
+            "    relevance: 7\n"
         )
 
         result = restore(input=str(snap_dir))
@@ -1890,18 +2290,20 @@ class TestRestore:
         mock_embed.return_value = None
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
-        conn.execute.return_value.fetchone.return_value = ("existing-id",)  # Already exists
+        conn.execute.return_value.fetchone.return_value = (
+            "existing-id",
+        )  # Already exists
 
         snap_dir = tmp_path / "snap"
         snap_dir.mkdir()
         (snap_dir / "a.md").write_text("content")
         (snap_dir / "index.yaml").write_text(
-            'memories:\n'
+            "memories:\n"
             '  - topic: "test/a"\n'
             '    file: "a.md"\n'
             '    category: "note"\n'
-            '    tags: []\n'
-            '    relevance: 5\n'
+            "    tags: []\n"
+            "    relevance: 5\n"
         )
 
         result = restore(input=str(snap_dir))
@@ -1923,12 +2325,12 @@ class TestRestore:
         snap_dir.mkdir()
         (snap_dir / "a.md").write_text("new content")
         (snap_dir / "index.yaml").write_text(
-            'memories:\n'
+            "memories:\n"
             '  - topic: "test/a"\n'
             '    file: "a.md"\n'
             '    category: "note"\n'
-            '    tags: []\n'
-            '    relevance: 5\n'
+            "    tags: []\n"
+            "    relevance: 5\n"
         )
 
         result = restore(input=str(snap_dir), overwrite=True)
@@ -1966,12 +2368,12 @@ class TestRestore:
         snap_dir = tmp_path / "snap"
         snap_dir.mkdir()
         (snap_dir / "index.yaml").write_text(
-            'memories:\n'
+            "memories:\n"
             '  - topic: "test/a"\n'
             '    file: "missing.md"\n'
             '    category: "note"\n'
-            '    tags: []\n'
-            '    relevance: 5\n'
+            "    tags: []\n"
+            "    relevance: 5\n"
         )
 
         result = restore(input=str(snap_dir))
@@ -1993,14 +2395,14 @@ class TestRestore:
         snap_dir.mkdir()
         (snap_dir / "ask.md").write_text("content")
         (snap_dir / "index.yaml").write_text(
-            'snapshot:\n'
+            "snapshot:\n"
             '  topic_filter: "consult/"\n'
-            'memories:\n'
+            "memories:\n"
             '  - topic: "consult/ask"\n'
             '    file: "ask.md"\n'
             '    category: "note"\n'
-            '    tags: []\n'
-            '    relevance: 5\n'
+            "    tags: []\n"
+            "    relevance: 5\n"
         )
 
         result = restore(input=str(snap_dir), topic="new-base")
@@ -2024,10 +2426,30 @@ class TestSnapshotRestorePathSafety:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "../evil", "escape attempt", "note", '[]', 5, 0,
-             datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
-            ("id-2", "safe/topic", "safe content", "note", '[]', 5, 0,
-             datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
+            (
+                "id-1",
+                "../evil",
+                "escape attempt",
+                "note",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
+            (
+                "id-2",
+                "safe/topic",
+                "safe content",
+                "note",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
         ]
 
         out_dir = tmp_path / "backup"
@@ -2046,8 +2468,18 @@ class TestSnapshotRestorePathSafety:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "/etc/passwd-clone", "escape attempt", "note", '[]', 5, 0,
-             datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
+            (
+                "id-1",
+                "/etc/passwd-clone",
+                "escape attempt",
+                "note",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
         ]
 
         result = snapshot(output=str(tmp_path / "backup"))
@@ -2069,12 +2501,12 @@ class TestSnapshotRestorePathSafety:
         snap_dir = tmp_path / "snap"
         snap_dir.mkdir()
         (snap_dir / "index.yaml").write_text(
-            'memories:\n'
+            "memories:\n"
             '  - topic: "test/a"\n'
             '    file: "../secret.txt"\n'
             '    category: "note"\n'
-            '    tags: []\n'
-            '    relevance: 5\n'
+            "    tags: []\n"
+            "    relevance: 5\n"
         )
 
         result = restore(input=str(snap_dir))
@@ -2104,17 +2536,17 @@ class TestRestoreInvariants:
         (snap_dir / "leaky.md").write_text("key: sk-abc123def456ghi789jkl0123")
         (snap_dir / "bad.md").write_text("content")
         (snap_dir / "index.yaml").write_text(
-            'memories:\n'
+            "memories:\n"
             '  - topic: "test/leaky"\n'
             '    file: "leaky.md"\n'
             '    category: "note"\n'
-            '    tags: []\n'
-            '    relevance: 5\n'
+            "    tags: []\n"
+            "    relevance: 5\n"
             '  - topic: "test/bad"\n'
             '    file: "bad.md"\n'
             '    category: "not-a-category"\n'
-            '    tags: []\n'
-            '    relevance: 5\n'
+            "    tags: []\n"
+            "    relevance: 5\n"
         )
 
         result = restore(input=str(snap_dir))
@@ -2140,30 +2572,26 @@ class TestGetEmbeddingClient:
 
     def _reset(self):
         import otutil.tools._mem.embedding as emb_mod
+
         emb_mod._client = None
         emb_mod._client_key = None
 
-    @patch("otutil.tools._mem.embedding.get_secret")
-    def test_raises_without_api_key(self, mock_secret):
+    @patch("otutil.tools._mem.embedding.get_embeddings_config", return_value=None)
+    def test_raises_without_embedding_route(self, _mock_config):
         from otutil.tools._mem.embedding import _get_embedding_client
 
-        mock_secret.return_value = ""
         self._reset()
 
-        with pytest.raises(ValueError, match="OPENAI_API_KEY"):
+        with pytest.raises(ValueError, match="Top-level embeddings"):
             _get_embedding_client()
 
-    @patch("otutil.tools._mem.embedding.get_llm_config")
-    @patch("otutil.tools._mem.embedding._get_config")
+    @patch("otutil.tools._mem.embedding.get_embeddings_config")
     @patch("otutil.tools._mem.embedding.get_secret")
-    def test_builds_client_with_mem_prefix(self, mock_secret, mock_cfg, mock_llm):
+    def test_builds_client_from_independent_route(self, mock_secret, mock_embeddings):
         from otutil.tools._mem.embedding import _get_embedding_client
 
         mock_secret.return_value = "sk-test"
-        mock_cfg.return_value.model = "text-embedding-3-small"
-        mock_cfg.return_value.base_url = ""
-        mock_cfg.return_value.max_embedding_tokens = 8191
-        mock_llm.return_value.base_url = ""
+        mock_embeddings.return_value = _embedding_config()
         self._reset()
 
         client = _get_embedding_client()
@@ -2171,6 +2599,19 @@ class TestGetEmbeddingClient:
         assert client._log_prefix == "mem"
         assert client.model == "text-embedding-3-small"
         self._reset()
+
+    def test_reset_embedding_client_closes_cached_pool(self):
+        import otutil.tools._mem.embedding as emb_mod
+
+        client = MagicMock()
+        emb_mod._client = client
+        emb_mod._client_key = ("key", "model", "url", 1, 2, 3.0)
+
+        emb_mod.reset_embedding_client()
+
+        client.close.assert_called_once_with()
+        assert emb_mod._client is None
+        assert emb_mod._client_key is None
 
 
 @pytest.mark.unit
@@ -2236,7 +2677,11 @@ class TestGenerateEmbedding:
     def _make_client(self, **kwargs):
         from otpack import EmbeddingClient
 
-        defaults = {"api_key": "sk-test", "model": "text-embedding-3-small", "log_prefix": "mem"}
+        defaults = {
+            "api_key": "sk-test",
+            "model": "text-embedding-3-small",
+            "log_prefix": "mem",
+        }
         defaults.update(kwargs)
         client = EmbeddingClient(**defaults)
         mock_openai = MagicMock()
@@ -2260,7 +2705,9 @@ class TestGenerateEmbedding:
 
         client, create = self._make_client()
         create.return_value = self._resp([[0.1, 0.2, 0.3]])
-        with patch("otutil.tools._mem.embedding._get_embedding_client", return_value=client):
+        with patch(
+            "otutil.tools._mem.embedding._get_embedding_client", return_value=client
+        ):
             result = _generate_embedding("test text")
 
         assert result == [0.1, 0.2, 0.3]
@@ -2275,7 +2722,9 @@ class TestGenerateEmbedding:
             [[float(i), 1.0] for i in range(len(kw["input"]))]
         )
         long_text = "word " * 25  # > 10 tokens → multiple windows
-        with patch("otutil.tools._mem.embedding._get_embedding_client", return_value=client):
+        with patch(
+            "otutil.tools._mem.embedding._get_embedding_client", return_value=client
+        ):
             result = _generate_embedding(long_text)
 
         sent = create.call_args.kwargs["input"]
@@ -2292,7 +2741,9 @@ class TestGenerateEmbedding:
         err = type("APIStatusError", (Exception,), {"status_code": 429})("rate limited")
         create.side_effect = [err, self._resp([[0.7]])]
         with (
-            patch("otutil.tools._mem.embedding._get_embedding_client", return_value=client),
+            patch(
+                "otutil.tools._mem.embedding._get_embedding_client", return_value=client
+            ),
             patch("otpack.embedding.time"),
         ):
             result = _generate_embedding("test text")
@@ -2306,7 +2757,9 @@ class TestGenerateEmbedding:
 
         client, create = self._make_client()
         create.return_value = self._resp([[0.9]])
-        with patch("otutil.tools._mem.embedding._get_embedding_client", return_value=client):
+        with patch(
+            "otutil.tools._mem.embedding._get_embedding_client", return_value=client
+        ):
             _generate_query_embedding("same query")
             _generate_query_embedding("same query")
 
@@ -2332,7 +2785,7 @@ class TestFilePathSecurity:
         assert "Error" in result
         assert "outside allowed directories" in result
 
-    def test_write_rejects_path_traversal(self, tmp_path):
+    def test_write_rejects_path_traversal(self):
         from otutil.tools.mem import write
 
         result = write(topic="test", file="../../../etc/passwd")
@@ -2356,7 +2809,18 @@ class TestFilePathSecurity:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "topic/one", "content", "note", '[]', 5, 0, datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
+            (
+                "id-1",
+                "topic/one",
+                "content",
+                "note",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
         ]
 
         result = dump(output="/tmp/evil_export.yaml")
@@ -2444,7 +2908,18 @@ class TestDumpYaml:
         from otutil.tools._mem.io import _export_yaml
 
         rows = [
-            ("id-1", "topic/one", "line one\nline two\nline three", "note", '["tag"]', 5, 2, datetime.now().isoformat(), datetime.now().isoformat(), "{}"),
+            (
+                "id-1",
+                "topic/one",
+                "line one\nline two\nline three",
+                "note",
+                '["tag"]',
+                5,
+                2,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "{}",
+            ),
         ]
 
         result = _export_yaml(rows)
@@ -2464,8 +2939,18 @@ class TestDumpYaml:
         content = 'He said "hello" and \'bye\'\nsecond "quoted" line'
         topic = 'topic/with "quotes"'
         rows = [
-            ("id-1", topic, content, "note", '["ta\\"g"]', 5, 0,
-             "2026-01-01 00:00:00", "2026-01-01 00:00:00", '{"key": "va\\"lue"}'),
+            (
+                "id-1",
+                topic,
+                content,
+                "note",
+                '["ta\\"g"]',
+                5,
+                0,
+                "2026-01-01 00:00:00",
+                "2026-01-01 00:00:00",
+                '{"key": "va\\"lue"}',
+            ),
         ]
 
         result = _export_yaml(rows)
@@ -2508,7 +2993,12 @@ class TestParseHeadings:
     def test_parses_h1_h2_h3(self):
         headings = _parse_headings(SAMPLE_MD)
         names = [h["heading"] for h in headings]
-        assert names == ["Introduction", "Requirements", "Requirement: Search", "Configuration"]
+        assert names == [
+            "Introduction",
+            "Requirements",
+            "Requirement: Search",
+            "Configuration",
+        ]
 
     def test_respects_max_depth(self):
         headings = _parse_headings(SAMPLE_MD, max_depth=2)
@@ -2545,7 +3035,7 @@ class TestSectionEncoder:
         encoded = _encode_sections(headings)
         decoded = _decode_sections(encoded)
         assert len(decoded) == len(headings)
-        for orig, dec in zip(headings, decoded):
+        for orig, dec in zip(headings, decoded, strict=False):
             assert dec["heading"] == orig["heading"]
             assert dec["start"] == orig["start"]
             assert dec["end"] == orig["end"]
@@ -2607,8 +3097,15 @@ class TestTocFunction:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
-            "id-1", "spec", SAMPLE_MD, "note", '[]', 5, 0,
-            datetime.now().isoformat(), datetime.now().isoformat(),
+            "id-1",
+            "spec",
+            SAMPLE_MD,
+            "note",
+            "[]",
+            5,
+            0,
+            datetime.now().isoformat(),
+            datetime.now().isoformat(),
             _serialize_meta({"sections": sections_str, "section_count": "4"}),
         )
 
@@ -2634,14 +3131,29 @@ class TestTocFunction:
 
         source_file = tmp_path / "spec.md"
         source_file.write_text(SAMPLE_MD)
-        old_mtime = str(source_file.stat().st_mtime - 100)  # pretend stored mtime is older
+        old_mtime = str(
+            source_file.stat().st_mtime - 100
+        )  # pretend stored mtime is older
 
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
-            "id-1", "spec", SAMPLE_MD, "note", '[]', 5, 0,
-            datetime.now().isoformat(), datetime.now().isoformat(),
-            _serialize_meta({"sections": "Intro:1-3", "source": str(source_file), "source_mtime": old_mtime}),
+            "id-1",
+            "spec",
+            SAMPLE_MD,
+            "note",
+            "[]",
+            5,
+            0,
+            datetime.now().isoformat(),
+            datetime.now().isoformat(),
+            _serialize_meta(
+                {
+                    "sections": "Intro:1-3",
+                    "source": str(source_file),
+                    "source_mtime": old_mtime,
+                }
+            ),
         )
 
         result = toc(topic="spec")
@@ -2658,8 +3170,15 @@ class TestSliceFunction:
         """Set up a mock connection returning SAMPLE_MD with sections."""
         sections_str = _encode_sections(_parse_headings(SAMPLE_MD))
         row = (
-            "id-1", "spec", SAMPLE_MD, "note", '[]', 5, 0,
-            datetime.now().isoformat(), datetime.now().isoformat(),
+            "id-1",
+            "spec",
+            SAMPLE_MD,
+            "note",
+            "[]",
+            5,
+            0,
+            datetime.now().isoformat(),
+            datetime.now().isoformat(),
             _serialize_meta({"sections": sections_str, "section_count": "4"}),
         )
         with patch("otutil.tools._mem.slicing._use_connection") as mock_conn:
@@ -2733,13 +3252,13 @@ class TestReadMode:
     def test_mode_toc_raises_with_redirect(self):
         from otutil.tools.mem import read
 
-        with pytest.raises(ValueError, match="mem.toc"):
+        with pytest.raises(ValueError, match=r"mem\.toc"):
             read(topic="spec", mode="toc")
 
     def test_mode_meta_raises_with_redirect(self):
         from otutil.tools.mem import read
 
-        with pytest.raises(ValueError, match="mem.inspect"):
+        with pytest.raises(ValueError, match=r"mem\.inspect"):
             read(topic="spec", mode="meta")
 
     def test_mode_all_raises_with_redirect(self):
@@ -2768,8 +3287,14 @@ class TestInspect:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
-            "id-1", "spec", "rule", '["tag1"]', 7, 3,
-            datetime.now().isoformat(), datetime.now().isoformat(),
+            "id-1",
+            "spec",
+            "rule",
+            '["tag1"]',
+            7,
+            3,
+            datetime.now().isoformat(),
+            datetime.now().isoformat(),
             _serialize_meta({"sections": sections_str, "section_count": "4"}),
         )
 
@@ -2801,8 +3326,14 @@ class TestInspect:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
-            "id-1", "plain", "note", '[]', 5, 0,
-            datetime.now().isoformat(), datetime.now().isoformat(),
+            "id-1",
+            "plain",
+            "note",
+            "[]",
+            5,
+            0,
+            datetime.now().isoformat(),
+            datetime.now().isoformat(),
             _serialize_meta({}),
         )
 
@@ -2827,37 +3358,41 @@ class TestAsk:
         assert "error" in result
 
     @patch("otutil.tools._mem.ask._get_connection")
-    def test_ot_llm_not_installed_returns_error(self, mock_conn):
-        import sys
-
+    def test_missing_generation_route_returns_error(self, mock_conn):
         from otutil.tools.mem import ask
 
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
-            "id-1", "docs/api", "API documentation content",
+            "id-1",
+            "docs/api",
+            "API documentation content",
         )
 
-        with patch.dict(sys.modules, {"ottools.ot_llm": None}):
+        with patch(
+            "otutil.tools._mem.ask.resolve_generation",
+            side_effect=GenerationError("No generation connection is configured"),
+        ):
             result = ask(topic="docs/api", q="What endpoints exist?")
         assert "error" in result
-        assert "ot_llm" in result["error"]
+        assert "generation connection" in result["error"].lower()
 
     @patch("otutil.tools._mem.ask._get_connection")
     def test_single_question_returns_answer(self, mock_conn):
-        import types
-
         from otutil.tools.mem import ask
 
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
-            "id-1", "docs/api", "The main endpoint is /health.",
+            "id-1",
+            "docs/api",
+            "The main endpoint is /health.",
         )
 
-        fake_llm_mod = types.ModuleType("ottools.ot_llm")
-        fake_llm_mod.transform = MagicMock(return_value="The /health endpoint.")  # type: ignore[attr-defined]
-        with patch.dict("sys.modules", {"ottools": MagicMock(), "ottools.ot_llm": fake_llm_mod}):
+        with patch(
+            "otutil.tools._mem.ask.generate",
+            return_value=MagicMock(content="The /health endpoint."),
+        ):
             result = ask(topic="docs/api", q="What is the main endpoint?")
 
         assert "result" in result
@@ -2890,7 +3425,8 @@ class TestQuery:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
-            "id-1", "config/servers",
+            "id-1",
+            "config/servers",
             json.dumps({"servers": [{"host": "alpha"}, {"host": "beta"}]}),
         )
 
@@ -2904,7 +3440,8 @@ class TestQuery:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
-            "id-1", "plain/text",
+            "id-1",
+            "plain/text",
             "This is just plain text content.",
         )
 
@@ -2921,7 +3458,9 @@ class TestQuery:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchone.return_value = (
-            "id-1", "config/data", json.dumps({"name": "onetool"}),
+            "id-1",
+            "config/data",
+            json.dumps({"name": "onetool"}),
         )
 
         result = query(topic="config/data", expr="nonexistent.path")
@@ -2953,7 +3492,9 @@ class TestWriteWithToc:
         insert_calls = [c for c in conn.execute.call_args_list if "INSERT" in str(c)]
         assert len(insert_calls) == 1
         insert_params = insert_calls[0][0][1]
-        meta = _deserialize_meta(insert_params[8])  # meta is 9th parameter (JSON string)
+        meta = _deserialize_meta(
+            insert_params[8]
+        )  # meta is 9th parameter (JSON string)
         assert "sections" in meta
         assert "section_count" in meta
         assert meta["section_count"] == "4"
@@ -2992,7 +3533,11 @@ class TestUpdateRecomputesToc:
 
         old_sections = _encode_sections([{"heading": "Old", "start": 1, "end": 5}])
         conn.execute.return_value.fetchall.return_value = [
-            ("id-123", "old content", _serialize_meta({"sections": old_sections, "section_count": "1"})),
+            (
+                "id-123",
+                "old content",
+                _serialize_meta({"sections": old_sections, "section_count": "1"}),
+            ),
         ]
 
         new_content = "# New Heading\n\nNew content\n\n## Second\n\nMore"
@@ -3002,7 +3547,9 @@ class TestUpdateRecomputesToc:
         # Verify UPDATE was called with recomputed meta (serialised as JSON).
         # Embeddings are disabled by default, so the UPDATE omits the
         # embedding column: params are [content, hash, meta, id].
-        update_calls = [c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)]
+        update_calls = [
+            c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)
+        ]
         assert len(update_calls) >= 1
         update_params = update_calls[0][0][1]
         meta = _deserialize_meta(update_params[2])
@@ -3018,13 +3565,15 @@ class TestUpdateRecomputesToc:
         conn = MagicMock()
         mock_conn.return_value.__enter__.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-123", "old content", '{}'),
+            ("id-123", "old content", "{}"),
         ]
 
         result = update(topic="test/topic", content="# New\n\nContent")
 
         assert "Updated memory" in result
-        update_calls = [c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)]
+        update_calls = [
+            c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)
+        ]
         update_params = update_calls[0][0][1]
         meta = _deserialize_meta(update_params[2])
         assert "sections" not in meta
@@ -3046,14 +3595,20 @@ class TestAppendRecomputesToc:
 
         old_sections = _encode_sections([{"heading": "Old", "start": 1, "end": 3}])
         conn.execute.return_value.fetchall.return_value = [
-            ("id-123", "# Old\n\nOld content", _serialize_meta({"sections": old_sections, "section_count": "1"})),
+            (
+                "id-123",
+                "# Old\n\nOld content",
+                _serialize_meta({"sections": old_sections, "section_count": "1"}),
+            ),
         ]
 
         result = append(topic="test/topic", content="# New Section\n\nAppended")
 
         assert "Appended to memory" in result
         # Embeddings disabled by default: params are [content, hash, meta, id]
-        update_calls = [c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)]
+        update_calls = [
+            c for c in conn.execute.call_args_list if "UPDATE memories" in str(c)
+        ]
         assert len(update_calls) >= 1
         update_params = update_calls[0][0][1]
         meta = _deserialize_meta(update_params[2])
@@ -3209,15 +3764,24 @@ class TestStale:
         # Fresh file
         fresh_file = tmp_path / "fresh.md"
         fresh_file.write_text("fresh content")
-        fresh_meta = json.dumps({"source": str(fresh_file), "source_mtime": str(fresh_file.stat().st_mtime)})
+        fresh_meta = json.dumps(
+            {"source": str(fresh_file), "source_mtime": str(fresh_file.stat().st_mtime)}
+        )
 
         # Stale file
         stale_file = tmp_path / "stale.md"
         stale_file.write_text("new content")
-        stale_meta = json.dumps({"source": str(stale_file), "source_mtime": str(stale_file.stat().st_mtime - 100)})
+        stale_meta = json.dumps(
+            {
+                "source": str(stale_file),
+                "source_mtime": str(stale_file.stat().st_mtime - 100),
+            }
+        )
 
         # Missing file
-        missing_meta = json.dumps({"source": str(tmp_path / "gone.md"), "source_mtime": "100"})
+        missing_meta = json.dumps(
+            {"source": str(tmp_path / "gone.md"), "source_mtime": "100"}
+        )
 
         rows = [
             ("docs/fresh.md", fresh_meta),
@@ -3282,9 +3846,39 @@ class TestListTreeFormat:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "proj/docs/arch/index.md", "context", "[]", 5, 0, datetime.now().isoformat(), 1534, None),
-            ("id-2", "proj/docs/arch/core.md", "context", "[]", 5, 0, datetime.now().isoformat(), 2202, None),
-            ("id-3", "proj/docs/code/testing.md", "context", "[]", 5, 0, datetime.now().isoformat(), 2761, None),
+            (
+                "id-1",
+                "proj/docs/arch/index.md",
+                "context",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                1534,
+                None,
+            ),
+            (
+                "id-2",
+                "proj/docs/arch/core.md",
+                "context",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                2202,
+                None,
+            ),
+            (
+                "id-3",
+                "proj/docs/code/testing.md",
+                "context",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                2761,
+                None,
+            ),
         ]
         result = list(format="tree", topic="proj/docs/")
 
@@ -3302,9 +3896,39 @@ class TestListTreeFormat:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "proj/docs/arch/index.md", "context", "[]", 5, 0, datetime.now().isoformat(), 1534, None),
-            ("id-2", "proj/docs/arch/core.md", "context", "[]", 5, 0, datetime.now().isoformat(), 2202, None),
-            ("id-3", "proj/docs/code/testing.md", "context", "[]", 5, 0, datetime.now().isoformat(), 2761, None),
+            (
+                "id-1",
+                "proj/docs/arch/index.md",
+                "context",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                1534,
+                None,
+            ),
+            (
+                "id-2",
+                "proj/docs/arch/core.md",
+                "context",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                2202,
+                None,
+            ),
+            (
+                "id-3",
+                "proj/docs/code/testing.md",
+                "context",
+                "[]",
+                5,
+                0,
+                datetime.now().isoformat(),
+                2761,
+                None,
+            ),
         ]
         result = list(format="tree", topic="proj/docs/", depth=1)
 
@@ -3321,7 +3945,17 @@ class TestListTreeFormat:
         conn = MagicMock()
         mock_conn.return_value = conn
         conn.execute.return_value.fetchall.return_value = [
-            ("id-1", "tagged", "note", '["a", "b"]', 5, 0, datetime.now().isoformat(), 50, None),
+            (
+                "id-1",
+                "tagged",
+                "note",
+                '["a", "b"]',
+                5,
+                0,
+                datetime.now().isoformat(),
+                50,
+                None,
+            ),
         ]
         result = list(format="tree")
 
@@ -3346,7 +3980,12 @@ class TestRefresh:
 
         stale_file = tmp_path / "stale.md"
         stale_file.write_text("new content here")
-        meta = json.dumps({"source": str(stale_file), "source_mtime": str(stale_file.stat().st_mtime - 100)})
+        meta = json.dumps(
+            {
+                "source": str(stale_file),
+                "source_mtime": str(stale_file.stat().st_mtime - 100),
+            }
+        )
 
         rows = [("mem-1", "docs/stale.md", "old content", meta)]
         ctx = MagicMock()
@@ -3357,7 +3996,11 @@ class TestRefresh:
         assert "1 stale" in result
         assert "would update" in result
         # DB should NOT have been written to (no INSERT/UPDATE calls beyond the SELECT)
-        update_calls = [c for c in ctx.execute.call_args_list if "UPDATE" in str(c) or "INSERT" in str(c)]
+        update_calls = [
+            c
+            for c in ctx.execute.call_args_list
+            if "UPDATE" in str(c) or "INSERT" in str(c)
+        ]
         assert len(update_calls) == 0
 
     @patch("otutil.tools._mem.content._get_config", return_value=Config())
@@ -3368,7 +4011,12 @@ class TestRefresh:
 
         stale_file = tmp_path / "stale.md"
         stale_file.write_text("updated content")
-        meta = json.dumps({"source": str(stale_file), "source_mtime": str(stale_file.stat().st_mtime - 100)})
+        meta = json.dumps(
+            {
+                "source": str(stale_file),
+                "source_mtime": str(stale_file.stat().st_mtime - 100),
+            }
+        )
 
         rows = [("mem-1", "docs/stale.md", "old content", meta)]
 
@@ -3410,7 +4058,9 @@ class TestRefresh:
 
         fresh_file = tmp_path / "fresh.md"
         fresh_file.write_text("content")
-        meta = json.dumps({"source": str(fresh_file), "source_mtime": str(fresh_file.stat().st_mtime)})
+        meta = json.dumps(
+            {"source": str(fresh_file), "source_mtime": str(fresh_file.stat().st_mtime)}
+        )
 
         rows = [("mem-1", "docs/fresh.md", "content", meta)]
         with _mock_use_conn(rows):
@@ -3427,12 +4077,14 @@ class TestRefresh:
 
         stale_file = tmp_path / "stale.md"
         stale_file.write_text("# New Heading\n\nNew content\n")
-        meta = json.dumps({
-            "source": str(stale_file),
-            "source_mtime": str(stale_file.stat().st_mtime - 100),
-            "sections": "Old Heading:1-3",
-            "section_count": "1",
-        })
+        meta = json.dumps(
+            {
+                "source": str(stale_file),
+                "source_mtime": str(stale_file.stat().st_mtime - 100),
+                "sections": "Old Heading:1-3",
+                "section_count": "1",
+            }
+        )
 
         rows = [("mem-1", "docs/stale.md", "# Old Heading\n\nOld content\n", meta)]
 
@@ -3445,7 +4097,9 @@ class TestRefresh:
 
         assert "1 stale" in result
         # Verify the meta was updated with new sections by checking the UPDATE call
-        update_calls = [c for c in conn_mock.execute.call_args_list if "UPDATE" in str(c)]
+        update_calls = [
+            c for c in conn_mock.execute.call_args_list if "UPDATE" in str(c)
+        ]
         assert len(update_calls) > 0
         # Embeddings disabled by default: params are [content, hash, meta, id]
         update_args = update_calls[0]
@@ -3472,7 +4126,18 @@ def _make_read_row(
     meta: str = '{"sections": "H1:1-3|H2:5-7", "section_count": "2"}',
 ) -> tuple:
     """Build a fake row matching _READ_COLUMNS order."""
-    return (id, topic, content, category, tags, relevance, access_count, created_at, updated_at, meta)
+    return (
+        id,
+        topic,
+        content,
+        category,
+        tags,
+        relevance,
+        access_count,
+        created_at,
+        updated_at,
+        meta,
+    )
 
 
 @pytest.mark.unit
@@ -3483,20 +4148,30 @@ class TestSliceBatch:
     def test_multiple_topics(self):
         from otutil.tools.mem import slice_batch
 
-        row_a = _make_read_row(id="1", topic="docs/a.md", content="# Intro\n\nHello\n\n# Details\n\nWorld",
-                               meta='{"sections": "Intro:1-3|Details:5-7", "section_count": "2"}')
-        row_b = _make_read_row(id="2", topic="docs/b.md", content="# Setup\n\nStep 1\n\n# Run\n\nStep 2",
-                               meta='{"sections": "Setup:1-3|Run:5-7", "section_count": "2"}')
+        row_a = _make_read_row(
+            id="1",
+            topic="docs/a.md",
+            content="# Intro\n\nHello\n\n# Details\n\nWorld",
+            meta='{"sections": "Intro:1-3|Details:5-7", "section_count": "2"}',
+        )
+        row_b = _make_read_row(
+            id="2",
+            topic="docs/b.md",
+            content="# Setup\n\nStep 1\n\n# Run\n\nStep 2",
+            meta='{"sections": "Setup:1-3|Run:5-7", "section_count": "2"}',
+        )
         rows = [row_a, row_b]
 
         with patch("otutil.tools._mem.slicing._use_connection") as mock_conn:
             conn = MagicMock()
             mock_conn.return_value.__enter__.return_value = conn
             conn.execute.return_value.fetchall.return_value = rows
-            result = slice_batch(items=[
-                {"topic": "docs/a.md", "select": "Intro"},
-                {"topic": "docs/b.md", "select": "Run"},
-            ])
+            result = slice_batch(
+                items=[
+                    {"topic": "docs/a.md", "select": "Intro"},
+                    {"topic": "docs/b.md", "select": "Run"},
+                ]
+            )
 
         assert "Sliced 2 memories" in result
         assert "docs/a.md [Intro]" in result
@@ -3505,16 +4180,20 @@ class TestSliceBatch:
     def test_mixed_selectors(self):
         from otutil.tools.mem import slice_batch
 
-        row = _make_read_row(id="1", topic="docs/a.md", content="# H1\n\nLine2\n\n# H2\n\nLine6\nLine7")
+        row = _make_read_row(
+            id="1", topic="docs/a.md", content="# H1\n\nLine2\n\n# H2\n\nLine6\nLine7"
+        )
         with patch("otutil.tools._mem.slicing._use_connection") as mock_conn:
             conn = MagicMock()
             mock_conn.return_value.__enter__.return_value = conn
             conn.execute.return_value.fetchall.return_value = [row]
-            result = slice_batch(items=[
-                {"topic": "docs/a.md", "select": 1},
-                {"topic": "docs/a.md", "select": "H2"},
-                {"topic": "docs/a.md", "select": ":3"},
-            ])
+            result = slice_batch(
+                items=[
+                    {"topic": "docs/a.md", "select": 1},
+                    {"topic": "docs/a.md", "select": "H2"},
+                    {"topic": "docs/a.md", "select": ":3"},
+                ]
+            )
 
         assert "Sliced 3 memories" in result
         assert "[Section 1]" in result
@@ -3529,10 +4208,12 @@ class TestSliceBatch:
             conn = MagicMock()
             mock_conn.return_value.__enter__.return_value = conn
             conn.execute.return_value.fetchall.return_value = [row]
-            result = slice_batch(items=[
-                {"topic": "docs/a.md", "select": "H1"},
-                {"topic": "docs/missing.md", "select": "Intro"},
-            ])
+            result = slice_batch(
+                items=[
+                    {"topic": "docs/a.md", "select": "H1"},
+                    {"topic": "docs/missing.md", "select": "Intro"},
+                ]
+            )
 
         assert "docs/a.md" in result
         assert "No memory found" in result
@@ -3546,9 +4227,11 @@ class TestSliceBatch:
             conn = MagicMock()
             mock_conn.return_value.__enter__.return_value = conn
             conn.execute.return_value.fetchall.return_value = [row]
-            result = slice_batch(items=[
-                {"topic": "docs/a.md", "select": "NonExistentHeading"},
-            ])
+            result = slice_batch(
+                items=[
+                    {"topic": "docs/a.md", "select": "NonExistentHeading"},
+                ]
+            )
 
         assert "No matching content" in result
 
@@ -3575,10 +4258,12 @@ class TestSliceBatch:
             conn = MagicMock()
             mock_conn.return_value.__enter__.return_value = conn
             conn.execute.return_value.fetchall.return_value = [row]
-            result = slice_batch(items=[
-                {"topic": "docs/a.md"},
-                {"topic": "docs/a.md", "select": "H1"},
-            ])
+            result = slice_batch(
+                items=[
+                    {"topic": "docs/a.md"},
+                    {"topic": "docs/a.md", "select": "H1"},
+                ]
+            )
 
         assert "'select' is required" in result
         assert "docs/a.md [H1]" in result
@@ -3588,9 +4273,26 @@ class TestSliceBatch:
 # FTS5 keyword index, vec0 KNN index, history/rollback (mem-search-and-history)
 # ---------------------------------------------------------------------------
 
-import hashlib as _hashlib
-import sqlite3 as _sqlite3
-import struct as _struct
+def _embedding_config(dims: int = 4) -> EmbeddingsConfig:
+    return EmbeddingsConfig(
+        backend="openai_compatible",
+        model="text-embedding-3-small",
+        base_url="https://api.openai.com/v1",
+        secret_name="OPENAI_API_KEY",
+        dimensions=dims,
+    )
+
+
+@contextmanager
+def _mem_db_config(dims: int = 4):
+    with (
+        patch(
+            "otutil.tools._mem.db._get_config",
+            return_value=Config(embeddings_enabled=True),
+        ),
+        patch("ot.config.get_embeddings_config", return_value=_embedding_config(dims)),
+    ):
+        yield
 
 
 def _real_mem_conn(dims: int = 4) -> _sqlite3.Connection:
@@ -3598,7 +4300,7 @@ def _real_mem_conn(dims: int = 4) -> _sqlite3.Connection:
     from otutil.tools._mem import db as mem_db
 
     conn = _sqlite3.connect(":memory:", check_same_thread=False)
-    with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=dims)):
+    with _mem_db_config(dims):
         mem_db._mem_setup(conn)
     conn.commit()
     return conn
@@ -3618,8 +4320,16 @@ def _insert_memory(
     conn.execute(
         "INSERT INTO memories (id, topic, content, content_hash, category, tags, embedding, meta) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        [memory_id, topic, content, _hashlib.sha256(content.encode()).hexdigest(),
-         category, tags, embedding, meta],
+        [
+            memory_id,
+            topic,
+            content,
+            _hashlib.sha256(content.encode()).hexdigest(),
+            category,
+            tags,
+            embedding,
+            meta,
+        ],
     )
     conn.commit()
 
@@ -3637,8 +4347,18 @@ class TestMemKeywordFTS:
         from otutil.tools._mem.search import _search_keyword
 
         conn = _real_mem_conn()
-        _insert_memory(conn, "weak", "a/weak", "authentication mentioned once among many other words " + "filler " * 50)
-        _insert_memory(conn, "strong", "a/strong", "authentication guide: authentication flows and authentication tokens")
+        _insert_memory(
+            conn,
+            "weak",
+            "a/weak",
+            "authentication mentioned once among many other words " + "filler " * 50,
+        )
+        _insert_memory(
+            conn,
+            "strong",
+            "a/strong",
+            "authentication guide: authentication flows and authentication tokens",
+        )
 
         results = _search_keyword(conn, "authentication", None, None, None, 10)
 
@@ -3651,7 +4371,9 @@ class TestMemKeywordFTS:
         conn = _real_mem_conn()
         _insert_memory(conn, "m1", "a/one", "some searchable content")
 
-        results = _search_keyword(conn, 'what is "content:(-x)^*"?', None, None, None, 10)
+        results = _search_keyword(
+            conn, 'what is "content:(-x)^*"?', None, None, None, 10
+        )
         assert isinstance(results, list)
 
     def test_prefix_fallback_finds_partial_terms(self):
@@ -3667,8 +4389,22 @@ class TestMemKeywordFTS:
         from otutil.tools._mem.search import _search_keyword
 
         conn = _real_mem_conn()
-        _insert_memory(conn, "m1", "projects/a", "shared token content", category="rule", tags='["x"]')
-        _insert_memory(conn, "m2", "notes/b", "shared token content two", category="note", tags='["y"]')
+        _insert_memory(
+            conn,
+            "m1",
+            "projects/a",
+            "shared token content",
+            category="rule",
+            tags='["x"]',
+        )
+        _insert_memory(
+            conn,
+            "m2",
+            "notes/b",
+            "shared token content two",
+            category="note",
+            tags='["y"]',
+        )
 
         by_topic = _search_keyword(conn, "shared token", "projects/", None, None, 10)
         assert [r["id"] for r in by_topic] == ["m1"]
@@ -3685,9 +4421,11 @@ class TestMemKeywordFTS:
         conn = _real_mem_conn()
         _insert_memory(conn, "m1", "a/one", "fallback searchable content")
 
-        with patch("otutil.tools._mem.search._check_fts_available", return_value=False), \
-             patch.object(mem_search, "_like_fallback_warned", False), \
-             patch("otutil.tools._mem.search.logger") as mock_logger:
+        with (
+            patch("otutil.tools._mem.search._check_fts_available", return_value=False),
+            patch.object(mem_search, "_like_fallback_warned", False),
+            patch("otutil.tools._mem.search.logger") as mock_logger,
+        ):
             results = mem_search._search_keyword(conn, "fallback", None, None, None, 10)
 
         assert [r["id"] for r in results] == ["m1"]
@@ -3711,7 +4449,7 @@ class TestMemKeywordFTS:
         )
         conn.commit()
 
-        with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+        with _mem_db_config():
             mem_db._mem_setup(conn)
 
         count = conn.execute(
@@ -3736,27 +4474,37 @@ class TestMemVecIndex:
         from otutil.tools._mem.db import _sync_vec_index
 
         conn = _real_mem_conn()
-        _insert_memory(conn, "m1", "a/one", "content", embedding=_pack_vec([3.0, 0.0, 4.0, 0.0]))
-        with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+        _insert_memory(
+            conn, "m1", "a/one", "content", embedding=_pack_vec([3.0, 0.0, 4.0, 0.0])
+        )
+        with _mem_db_config():
             _sync_vec_index(conn, "m1", [3.0, 0.0, 4.0, 0.0])
         conn.commit()
 
         assert abs(self._vec_norm(conn, "m1") - 1.0) < 1e-6
 
     def test_knn_matches_scan_scores(self):
-        from otutil.tools._mem.search import _search_semantic_knn, _search_semantic_scan
         from otutil.tools._mem.db import _sync_vec_index
+        from otutil.tools._mem.search import _search_semantic_knn, _search_semantic_scan
 
         conn = _real_mem_conn()
-        vectors = {"m1": [1.0, 0.0, 0.0, 0.0], "m2": [0.6, 0.8, 0.0, 0.0], "m3": [0.0, 0.0, 1.0, 0.0]}
+        vectors = {
+            "m1": [1.0, 0.0, 0.0, 0.0],
+            "m2": [0.6, 0.8, 0.0, 0.0],
+            "m3": [0.0, 0.0, 1.0, 0.0],
+        }
         for mid, vec in vectors.items():
-            _insert_memory(conn, mid, f"t/{mid}", f"content {mid}", embedding=_pack_vec(vec))
-            with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+            _insert_memory(
+                conn, mid, f"t/{mid}", f"content {mid}", embedding=_pack_vec(vec)
+            )
+            with _mem_db_config():
                 _sync_vec_index(conn, mid, vec)
         conn.commit()
 
         query_vec = [1.0, 0.0, 0.0, 0.0]
-        with patch("otutil.tools._mem.search._generate_query_embedding", return_value=query_vec):
+        with patch(
+            "otutil.tools._mem.search._generate_query_embedding", return_value=query_vec
+        ):
             knn = _search_semantic_knn(conn, "q", None, None, None, 3)
             scan = _search_semantic_scan(conn, "q", None, None, None, 3)
 
@@ -3765,19 +4513,24 @@ class TestMemVecIndex:
             assert abs(k["score"] - sc["score"]) < 1e-3
 
     def test_filtered_knn_overfetches_and_respects_limit(self):
-        from otutil.tools._mem.search import _search_semantic_knn
         from otutil.tools._mem.db import _sync_vec_index
+        from otutil.tools._mem.search import _search_semantic_knn
 
         conn = _real_mem_conn()
         for i in range(6):
             vec = [1.0, float(i) * 0.1, 0.0, 0.0]
             topic = f"projects/p{i}" if i < 3 else f"notes/n{i}"
-            _insert_memory(conn, f"m{i}", topic, f"content {i}", embedding=_pack_vec(vec))
-            with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+            _insert_memory(
+                conn, f"m{i}", topic, f"content {i}", embedding=_pack_vec(vec)
+            )
+            with _mem_db_config():
                 _sync_vec_index(conn, f"m{i}", vec)
         conn.commit()
 
-        with patch("otutil.tools._mem.search._generate_query_embedding", return_value=[1.0, 0.0, 0.0, 0.0]):
+        with patch(
+            "otutil.tools._mem.search._generate_query_embedding",
+            return_value=[1.0, 0.0, 0.0, 0.0],
+        ):
             results = _search_semantic_knn(conn, "q", "projects/", None, None, 2)
 
         assert len(results) == 2
@@ -3787,8 +4540,10 @@ class TestMemVecIndex:
         from otutil.tools._mem.db import _sync_vec_index
 
         conn = _real_mem_conn()
-        _insert_memory(conn, "m1", "a/one", "content", embedding=_pack_vec([1.0, 0.0, 0.0, 0.0]))
-        with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+        _insert_memory(
+            conn, "m1", "a/one", "content", embedding=_pack_vec([1.0, 0.0, 0.0, 0.0])
+        )
+        with _mem_db_config():
             _sync_vec_index(conn, "m1", [1.0, 0.0, 0.0, 0.0])
         conn.execute("DELETE FROM memories WHERE id = 'm1'")
         conn.commit()
@@ -3800,30 +4555,49 @@ class TestMemVecIndex:
         from otutil.tools._mem.mutations import _apply_memory_update
 
         conn = _real_mem_conn()
-        _insert_memory(conn, "m1", "a/one", "content", embedding=_pack_vec([1.0, 0.0, 0.0, 0.0]))
-        with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+        _insert_memory(
+            conn, "m1", "a/one", "content", embedding=_pack_vec([1.0, 0.0, 0.0, 0.0])
+        )
+        with _mem_db_config():
             _sync_vec_index(conn, "m1", [1.0, 0.0, 0.0, 0.0])
             _sync_vec_index(conn, "m1", [0.0, 1.0, 0.0, 0.0])
         conn.commit()
-        blob = conn.execute("SELECT embedding FROM memories_vec WHERE memory_id='m1'").fetchone()[0]
+        blob = conn.execute(
+            "SELECT embedding FROM memories_vec WHERE memory_id='m1'"
+        ).fetchone()[0]
         assert _struct.unpack("<4f", blob)[1] == pytest.approx(1.0)
 
         # Embeddings-disabled update path preserves BLOB and vec row untouched
-        with patch("otutil.tools._mem.mutations._get_config", return_value=Config(embeddings_enabled=False)):
+        with patch(
+            "otutil.tools._mem.mutations._get_config",
+            return_value=Config(embeddings_enabled=False),
+        ):
             _apply_memory_update(
-                conn, memory_id="m1", old_content="content", new_content="new content",
-                meta={}, embedding=None,
+                conn,
+                memory_id="m1",
+                old_content="content",
+                new_content="new content",
+                meta={},
+                embedding=None,
             )
         conn.commit()
-        assert conn.execute("SELECT COUNT(*) FROM memories_vec WHERE memory_id='m1'").fetchone()[0] == 1
-        assert conn.execute("SELECT embedding FROM memories WHERE id='m1'").fetchone()[0] is not None
+        assert (
+            conn.execute(
+                "SELECT COUNT(*) FROM memories_vec WHERE memory_id='m1'"
+            ).fetchone()[0]
+            == 1
+        )
+        assert (
+            conn.execute("SELECT embedding FROM memories WHERE id='m1'").fetchone()[0]
+            is not None
+        )
 
     def test_dim_mismatch_skips_vec_upsert(self):
         from otutil.tools._mem.db import _sync_vec_index
 
         conn = _real_mem_conn()
         _insert_memory(conn, "m1", "a/one", "content")
-        with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+        with _mem_db_config():
             _sync_vec_index(conn, "m1", [1.0, 0.0])
         conn.commit()
         assert conn.execute("SELECT COUNT(*) FROM memories_vec").fetchone()[0] == 0
@@ -3841,30 +4615,36 @@ class TestMemVecIndex:
         )
         conn.execute(
             "INSERT INTO memories (id, topic, content, content_hash, embedding) VALUES "
-            "('good', 't/a', 'c', 'h1', ?)", [_pack_vec([1.0, 2.0, 2.0, 0.0])]
+            "('good', 't/a', 'c', 'h1', ?)",
+            [_pack_vec([1.0, 2.0, 2.0, 0.0])],
         )
         conn.execute(
             "INSERT INTO memories (id, topic, content, content_hash, embedding) VALUES "
-            "('bad', 't/b', 'c', 'h2', ?)", [_pack_vec([1.0, 2.0])]
+            "('bad', 't/b', 'c', 'h2', ?)",
+            [_pack_vec([1.0, 2.0])],
         )
         conn.commit()
 
-        with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+        with _mem_db_config():
             mem_db._mem_setup(conn)
 
-        ids = [r[0] for r in conn.execute("SELECT memory_id FROM memories_vec").fetchall()]
+        ids = [
+            r[0] for r in conn.execute("SELECT memory_id FROM memories_vec").fetchall()
+        ]
         assert ids == ["good"]
 
     def test_dimension_change_recreates_vec_table(self):
         from otutil.tools._mem import db as mem_db
 
         conn = _real_mem_conn(dims=4)
-        _insert_memory(conn, "m1", "a/one", "content", embedding=_pack_vec([1.0, 0.0, 0.0, 0.0]))
-        with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=4)):
+        _insert_memory(
+            conn, "m1", "a/one", "content", embedding=_pack_vec([1.0, 0.0, 0.0, 0.0])
+        )
+        with _mem_db_config():
             mem_db._sync_vec_index(conn, "m1", [1.0, 0.0, 0.0, 0.0])
         conn.commit()
 
-        with patch("otutil.tools._mem.db._get_config", return_value=Config(dimensions=8)):
+        with _mem_db_config(8):
             mem_db._ensure_tables(conn)
 
         assert mem_db._vec_table_dims(conn) == 8
@@ -3877,11 +4657,18 @@ class TestMemVecIndex:
         mem_search = importlib.import_module("otutil.tools._mem.search")
 
         conn = _real_mem_conn()
-        _insert_memory(conn, "m1", "a/one", "content", embedding=_pack_vec([1.0, 0.0, 0.0, 0.0]))
+        _insert_memory(
+            conn, "m1", "a/one", "content", embedding=_pack_vec([1.0, 0.0, 0.0, 0.0])
+        )
         conn.commit()
 
-        with patch("otutil.tools._mem.search._check_vec_available", return_value=False), \
-             patch("otutil.tools._mem.search._generate_query_embedding", return_value=[1.0, 0.0, 0.0, 0.0]):
+        with (
+            patch("otutil.tools._mem.search._check_vec_available", return_value=False),
+            patch(
+                "otutil.tools._mem.search._generate_query_embedding",
+                return_value=[1.0, 0.0, 0.0, 0.0],
+            ),
+        ):
             results = mem_search._search_semantic(conn, "q", None, None, None, 5)
 
         assert [r["id"] for r in results] == ["m1"]
@@ -3894,13 +4681,22 @@ def _history_env(conn: _sqlite3.Connection):
     from contextlib import nullcontext
 
     with (
-        patch("otutil.tools._mem.history._use_connection", side_effect=lambda: nullcontext(conn)),
+        patch(
+            "otutil.tools._mem.history._use_connection",
+            side_effect=lambda: nullcontext(conn),
+        ),
         patch("otutil.tools._mem.history._embed_now", return_value=None),
         patch("otutil.tools._mem.history._enqueue_after_commit"),
-        patch("otutil.tools._mem.mutations._use_connection", side_effect=lambda: nullcontext(conn)),
+        patch(
+            "otutil.tools._mem.mutations._use_connection",
+            side_effect=lambda: nullcontext(conn),
+        ),
         patch("otutil.tools._mem.mutations._embed_now", return_value=None),
         patch("otutil.tools._mem.mutations._enqueue_after_commit"),
-        patch("otutil.tools._mem.mutations._get_config", return_value=Config(embeddings_enabled=False)),
+        patch(
+            "otutil.tools._mem.mutations._get_config",
+            return_value=Config(embeddings_enabled=False),
+        ),
     ):
         yield
 
@@ -3961,10 +4757,16 @@ class TestMemRollback:
             update(topic="a/one", content="changed")
             out = rollback(topic="a/one")
             assert "Rolled back" in out
-            assert conn.execute("SELECT content FROM memories WHERE id='m1'").fetchone()[0] == "original"
+            assert (
+                conn.execute("SELECT content FROM memories WHERE id='m1'").fetchone()[0]
+                == "original"
+            )
             # Rollback of the rollback returns the pre-rollback content
             rollback(topic="a/one")
-            assert conn.execute("SELECT content FROM memories WHERE id='m1'").fetchone()[0] == "changed"
+            assert (
+                conn.execute("SELECT content FROM memories WHERE id='m1'").fetchone()[0]
+                == "changed"
+            )
 
     def test_version_out_of_range_names_valid_range(self):
         from otutil.tools._mem.history import rollback
@@ -3995,29 +4797,43 @@ class TestMemRollback:
 
         with _history_env(conn):
             assert "ambiguous" in rollback(topic="a/one", history_id="aa")
-            assert "No history entry matches" in rollback(topic="a/one", history_id="zz")
+            assert "No history entry matches" in rollback(
+                topic="a/one", history_id="zz"
+            )
             out = rollback(topic="a/one", history_id="aa111")
         assert "Rolled back" in out
-        assert conn.execute("SELECT content FROM memories WHERE id='m1'").fetchone()[0] == "older"
+        assert (
+            conn.execute("SELECT content FROM memories WHERE id='m1'").fetchone()[0]
+            == "older"
+        )
 
     def test_rollback_recomputes_toc_sections(self):
         from otutil.tools._mem.history import rollback
 
         conn = _real_mem_conn()
         _insert_memory(
-            conn, "m1", "a/one", "# New\n\ncurrent body",
+            conn,
+            "m1",
+            "a/one",
+            "# New\n\ncurrent body",
             meta='{"sections": "New:1", "section_count": "1"}',
         )
         conn.execute(
             "INSERT INTO memory_history (id, memory_id, content) VALUES (?, ?, ?)",
-            ["bb111111-0000-0000-0000-000000000000", "m1", "# Old A\n\nx\n\n# Old B\n\ny"],
+            [
+                "bb111111-0000-0000-0000-000000000000",
+                "m1",
+                "# Old A\n\nx\n\n# Old B\n\ny",
+            ],
         )
         conn.commit()
 
         with _history_env(conn):
             rollback(topic="a/one")
 
-        meta = _deserialize_meta(conn.execute("SELECT meta FROM memories WHERE id='m1'").fetchone()[0])
+        meta = _deserialize_meta(
+            conn.execute("SELECT meta FROM memories WHERE id='m1'").fetchone()[0]
+        )
         assert meta["section_count"] == "2"
 
 
@@ -4031,10 +4847,15 @@ class TestMemStatsIndexes:
 
         conn = MagicMock()
         conn.execute.return_value.fetchone.side_effect = [
-            (10,), (5000, 500, 2000), (3,), (2,), (7,),
+            (10,),
+            (5000, 500, 2000),
+            (3,),
+            (2,),
+            (7,),
         ]
         conn.execute.return_value.fetchall.side_effect = [
-            [("note", 5)], [("projects", 7)],
+            [("note", 5)],
+            [("projects", 7)],
         ]
         with (
             patch("otutil.tools._mem.lifecycle._get_connection", return_value=conn),

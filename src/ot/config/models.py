@@ -9,7 +9,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_validator,
+)
+
+from ot.config.routing import EmbeddingsConfig, LlmConfig
 
 # ==================== Snippet Models ====================
 
@@ -36,23 +44,6 @@ class SnippetDef(BaseModel):
     body: str = Field(
         ..., description="Jinja2 template body that expands to Python code"
     )
-
-
-# ==================== LLM Configuration ====================
-
-
-class LlmConfig(BaseModel):
-    """Top-level shared LLM configuration.
-
-    All tool packs (ot_llm, ot_image, mem, knowledge, ctx) fall back to these
-    values when their own ``base_url`` / ``model`` settings are not set.
-    Configure once here instead of repeating in every tool section.
-    """
-
-    model: str = Field(default="gpt-5.4-nano", description="Default completion model")
-    embedding_model: str = Field(default="text-embedding-3-small", description="Default embedding model")
-    base_url: str = Field(default="https://api.openai.com/v1", description="OpenAI-compatible API base URL")
-    max_tokens: int = Field(default=4096, description="Max output tokens")
 
 
 # ==================== Security Configuration ====================
@@ -597,7 +588,12 @@ class OneToolConfig(BaseModel):
     )
 
     llm: LlmConfig = Field(
-        default_factory=LlmConfig, description="llm tool configuration"
+        default_factory=LlmConfig,
+        description="Shared backend-aware generation connection",
+    )
+
+    embeddings: EmbeddingsConfig | None = Field(
+        default=None, description="Independent embedding configuration"
     )
 
     alias: dict[str, str] = Field(
@@ -709,7 +705,9 @@ class OneToolConfig(BaseModel):
         try:
             ot_dir = self._config_dir
         except AttributeError as err:
-            raise RuntimeError("_config_dir not set — was load_config() called?") from err
+            raise RuntimeError(
+                "_config_dir not set — was load_config() called?"
+            ) from err
 
         for pattern in self.tools_dir:
             # Expand ~ first
@@ -761,7 +759,9 @@ class OneToolConfig(BaseModel):
         try:
             return (self._config_dir / path).resolve()
         except AttributeError as err:
-            raise RuntimeError("_config_dir not set — was load_config() called?") from err
+            raise RuntimeError(
+                "_config_dir not set — was load_config() called?"
+            ) from err
 
     def get_log_dir_path(self) -> Path:
         """Get the resolved path to the log directory.

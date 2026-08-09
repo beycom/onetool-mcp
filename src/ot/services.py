@@ -10,7 +10,9 @@ from typing import Any, Protocol
 class ResultStoreBackend(Protocol):
     """Backend interface for storing and querying large execution results."""
 
-    def store(self, content: str, *, tool: str = "", preview_lines: int | None = None) -> Any:
+    def store(
+        self, content: str, *, tool: str = "", preview_lines: int | None = None
+    ) -> Any:
         """Store content and return backend-specific stored-result metadata."""
         ...
 
@@ -46,7 +48,6 @@ class OutputPolicy:
 
 
 OutputPolicyHook = Callable[[str], OutputPolicy | None]
-LlmService = Callable[..., str]
 ReloadHook = Callable[[], None]
 
 
@@ -56,7 +57,6 @@ class ServiceRegistry:
 
     output_policy_hooks: list[OutputPolicyHook] = field(default_factory=list)
     result_store_backend: ResultStoreBackend | None = None
-    llm_service: LlmService | None = None
     reload_hooks: list[ReloadHook] = field(default_factory=list)
 
     def register_output_policy(self, hook: OutputPolicyHook) -> None:
@@ -77,16 +77,6 @@ class ServiceRegistry:
         """Register the active large-output result store backend."""
         self.result_store_backend = backend
 
-    def register_llm(self, service: LlmService) -> None:
-        """Register the active LLM transform service."""
-        self.llm_service = service
-
-    def llm_transform(self, **kwargs: Any) -> str:
-        """Transform text through the registered LLM service."""
-        if self.llm_service is None:
-            raise RuntimeError("No LLM service registered")
-        return self.llm_service(**kwargs)
-
     def register_reload_hook(self, hook: ReloadHook) -> None:
         """Register a pack-owned runtime cache reload hook."""
         self.reload_hooks.append(hook)
@@ -100,7 +90,6 @@ class ServiceRegistry:
         """Clear all registered runtime hooks."""
         self.output_policy_hooks.clear()
         self.result_store_backend = None
-        self.llm_service = None
         self.reload_hooks.clear()
 
 

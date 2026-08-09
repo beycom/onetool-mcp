@@ -9,8 +9,11 @@ from __future__ import annotations
 import hashlib
 import threading
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from loguru import logger
+
+from ot.logging import LogEntry
 from otpack import LogSpan
 
 from .config import get_image_config
@@ -30,22 +33,85 @@ from .store import (
 )
 from .vision import ask_questions, extract_summary
 
+if TYPE_CHECKING:
+    from ot.config.routing import ReasoningEffort
 
-def _background_summarise(handle_name: str, model_bytes: bytes) -> None:
+    from .config import Config
+
+_BACKGROUND_SUMMARY_LIMIT = 2
+_background_summary_slots = threading.BoundedSemaphore(_BACKGROUND_SUMMARY_LIMIT)
+
+
+def _background_summarise(
+    handle_name: str,
+    model_bytes: bytes,
+    config: Config,
+) -> None:
     """Run extract_summary() and persist the result — called in a daemon thread.
 
     Silently skips if the vision model is not configured or if the call fails.
     Does not modify load() return value.
     """
     try:
-        config = get_image_config()
-        if not config.model:
-            return
         result = extract_summary(model_bytes, config)
         if isinstance(result, dict):
             save_summary(handle_name, result)
+        else:
+            logger.debug(
+                LogEntry(
+                    event="ot_image.background_summary.unavailable",
+                    handle=handle_name,
+                )
+            )
+    except Exception as exc:
+        logger.warning(
+            LogEntry(
+                event="ot_image.background_summary.failed",
+                handle=handle_name,
+                errorType=type(exc).__name__,
+            )
+        )
+
+
+def _run_background_summary(
+    handle_name: str,
+    model_bytes: bytes,
+    config: Config,
+) -> None:
+    """Run one scheduled summary and always return its worker slot."""
+    try:
+        _background_summarise(handle_name, model_bytes, config)
+    finally:
+        _background_summary_slots.release()
+
+
+def _schedule_background_summary(
+    *,
+    handle_name: str,
+    model_bytes: bytes,
+    config: Config,
+) -> None:
+    """Start an explicitly configured summary within the fixed worker bound."""
+    if config.model is None:
+        return
+    if not _background_summary_slots.acquire(blocking=False):
+        logger.debug(
+            LogEntry(
+                event="ot_image.background_summary.saturated",
+                handle=handle_name,
+                workerLimit=_BACKGROUND_SUMMARY_LIMIT,
+            )
+        )
+        return
+    try:
+        threading.Thread(
+            target=_run_background_summary,
+            args=(handle_name, model_bytes, config),
+            daemon=True,
+        ).start()
     except Exception:
-        pass  # background thread — never propagate
+        _background_summary_slots.release()
+        raise
 
 
 def _sha256(data: bytes) -> str:
@@ -258,13 +324,11 @@ def load(*, img: str, handle: str | None = None, max_edge: int = 1568) -> dict[s
         save_image(raw_bytes, handle_name, image_meta, fmt=detected_format)
         cache_put(handle_name, prep.model_bytes)
 
-        # Spawn background summary — silently skipped if model not set
-        thread = threading.Thread(
-            target=_background_summarise,
-            args=(handle_name, prep.model_bytes),
-            daemon=True,
+        _schedule_background_summary(
+            handle_name=handle_name,
+            model_bytes=prep.model_bytes,
+            config=get_image_config(),
         )
-        thread.start()
 
         s.add(
             handle=handle_name,
@@ -331,6 +395,8 @@ def ask(
     img: str | list[str],
     q: str | list[str],
     max_edge: int = 1568,
+    model: str | None = None,
+    effort: ReasoningEffort | None = None,
 ) -> dict[str, Any]:
     """Send one or more questions about one or more images to the vision model.
 
@@ -345,6 +411,8 @@ def ask(
             ``"clip"``. Sources not already in session are auto-loaded.
         q: Question string or list of question strings.
         max_edge: Maximum longest edge for resize if an image is loaded fresh.
+        model: Direct model ID override.
+        effort: Reasoning effort override: ``low``, ``medium``, or ``high``.
 
     Returns:
         For string ``img``: ``{"result": pairs, "handle": "#name"}``.
@@ -405,7 +473,13 @@ def ask(
                 return {"error": err_msg, "handle": f"#{handle_name}"}
             images.append(model_bytes)
 
-        answers = ask_questions(images, questions, config)
+        answers = ask_questions(
+            images,
+            questions,
+            config,
+            model=model,
+            effort=effort,
+        )
 
         if len(answers) == 1 and answers[0].startswith("Error:"):
             s.add(error=answers[0])
@@ -417,7 +491,12 @@ def ask(
         return {"result": pairs, "handle": f"#{handle_names[0]}"}
 
 
-def summary(*, img: str) -> dict[str, Any]:
+def summary(
+    *,
+    img: str,
+    model: str | None = None,
+    effort: ReasoningEffort | None = None,
+) -> dict[str, Any]:
     """Extract and cache a structured summary of an image.
 
     Runs a generic extraction prompt (text, mode, type, colours, shapes,
@@ -426,6 +505,8 @@ def summary(*, img: str) -> dict[str, Any]:
 
     Args:
         img: Handle reference (``"#name"``), file path, URL, or ``"clip"``.
+        model: Direct model ID override.
+        effort: Reasoning effort override: ``low``, ``medium``, or ``high``.
 
     Returns:
         ``{"summary": dict, "handle": str, "cached": bool}`` on success, or
@@ -467,7 +548,12 @@ def summary(*, img: str) -> dict[str, Any]:
             s.add(error=err_msg)
             return {"error": err_msg, "handle": f"#{handle_name}"}
 
-        result_data = extract_summary(model_bytes, config)
+        result_data = extract_summary(
+            model_bytes,
+            config,
+            model=model,
+            effort=effort,
+        )
         if isinstance(result_data, str):
             # Error string
             s.add(error=result_data)
@@ -483,7 +569,13 @@ def summary(*, img: str) -> dict[str, Any]:
         }
 
 
-def clip_ask(*, q: str | list[str], max_edge: int = 1568) -> dict[str, Any]:
+def clip_ask(
+    *,
+    q: str | list[str],
+    max_edge: int = 1568,
+    model: str | None = None,
+    effort: ReasoningEffort | None = None,
+) -> dict[str, Any]:
     """Ask a question about the current clipboard image.
 
     Shorthand for ``ask(img="clip", q=q, max_edge=max_edge)``.
@@ -491,19 +583,41 @@ def clip_ask(*, q: str | list[str], max_edge: int = 1568) -> dict[str, Any]:
     Args:
         q: Question string or list of question strings.
         max_edge: Maximum longest edge for resize.
+        model: Direct model ID override.
+        effort: Reasoning effort override: ``low``, ``medium``, or ``high``.
 
     Returns:
         Same as ``ask()``.
+
+    Example:
+        image.clip_ask(q="Extract the visible error message.")
     """
-    return ask(img="clip", q=q, max_edge=max_edge)
+    return ask(
+        img="clip",
+        q=q,
+        max_edge=max_edge,
+        model=model,
+        effort=effort,
+    )
 
 
-def clip_view() -> dict[str, Any]:
+def clip_view(
+    *,
+    model: str | None = None,
+    effort: ReasoningEffort | None = None,
+) -> dict[str, Any]:
     """Extract a structured summary of the current clipboard image.
 
     Shorthand for ``summary(img="clip")``.
 
+    Args:
+        model: Direct model ID override.
+        effort: Reasoning effort override: ``low``, ``medium``, or ``high``.
+
     Returns:
         Same as ``summary()``.
+
+    Example:
+        image.clip_view(model="terra", effort="medium")
     """
-    return summary(img="clip")
+    return summary(img="clip", model=model, effort=effort)

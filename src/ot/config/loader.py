@@ -35,7 +35,8 @@ import yaml
 from loguru import logger
 from pydantic import BaseModel
 
-from ot.config.models import LlmConfig, OneToolConfig
+from ot.config.models import OneToolConfig
+from ot.config.routing import EmbeddingsConfig, LlmConfig, StrictRoutingModel
 from ot.config.secrets import expand_vars, get_secrets
 
 # Current config schema version
@@ -89,6 +90,10 @@ def _strip_unknown_fields(
 
     extra_mode = model_type.model_config.get("extra")
     if extra_mode == "allow":
+        return data, []
+    if path and issubclass(model_type, StrictRoutingModel):
+        # Routing contracts are intentionally strict. Other established config
+        # models retain the root loader's warning-and-ignore behavior.
         return data, []
 
     cleaned: dict[str, Any] = {}
@@ -463,7 +468,9 @@ def load_config(
 # Thread-safety: Protected by _config_lock for safe concurrent access.
 _config: OneToolConfig | None = None
 _config_path: Path | None = None  # Last-loaded config file path (used by reload)
-_secrets_path: Path | str | None = None  # Last-loaded secrets file path (used by reload)
+_secrets_path: Path | str | None = (
+    None  # Last-loaded secrets file path (used by reload)
+)
 _config_lock = threading.Lock()
 
 
@@ -623,18 +630,17 @@ def get_compact_max_length() -> int:
 def get_llm_config() -> LlmConfig:
     """Get the top-level llm: config section.
 
-    Returns the shared LLM configuration from the root ``llm:`` key in
-    onetool.yaml.  All tool packs should fall back to these values when their
-    own ``base_url`` / ``model`` settings are empty, so users only need to
-    configure the API endpoint and default model once.
+    Returns the resolved generation connection from the root ``llm:`` key.
 
     Returns:
-        LlmConfig instance (with empty-string defaults if not configured)
+        Configured generation connection with OpenAI-compatible defaults.
     """
-    try:
-        return get_config().llm
-    except Exception:
-        return LlmConfig()
+    return get_config().llm
+
+
+def get_embeddings_config() -> EmbeddingsConfig | None:
+    """Return the explicit independent embedding configuration, if present."""
+    return get_config().embeddings
 
 
 @overload

@@ -1,109 +1,76 @@
 # OT LLM
 
-LLM-powered data transformation tools. Takes input data and a prompt, uses an LLM to process/transform it.
+LLM-powered data transformation through the shared backend-aware generation client.
 
 Short alias: `llm`
-
-## Highlights
-
-- Single function for any data transformation
-- Configurable model via OpenRouter or OpenAI-compatible API
-- Chain with other tools for structured output extraction
 
 ## Functions
 
 | Function | Description |
 |----------|-------------|
 | `ot_llm.transform(data, prompt, ...)` | Transform data using LLM instructions |
-| `ot_llm.transform_file(prompt, in_file, out_file, ...)` | Transform file content and write to output |
+| `ot_llm.transform_file(prompt, in_file, out_file, ...)` | Transform UTF-8 file content and write the output |
 
 ## Key Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `data` | any | Data to transform (converted to string) |
-| `prompt` | str | Instructions for transformation |
-| `in_file` | str | Input file path (for transform_file) |
-| `out_file` | str | Output file path (for transform_file) |
-| `model` | str | AI model to use (uses `ot_llm.model` from config) |
-| `json_mode` | bool | If True, request JSON output format (default: False) |
+| `data` | any | Data to transform; converted to text and treated as untrusted content |
+| `prompt` | str | Transformation instructions |
+| `in_file` | str | UTF-8 input path for `transform_file()` |
+| `out_file` | str | Output path for `transform_file()` |
+| `model` | str \| null | Direct model ID override |
+| `effort` | str \| null | `low`, `medium`, or `high` |
+| `json_mode` | bool | Request a JSON object through the selected interface |
 
 ## Requires
 
-Configuration (tool not available until all are set):
-- `OPENAI_API_KEY` in secrets.yaml
-- `base_url` — set via top-level `llm.base_url` or `tools.ot_llm.base_url`
-- `model` — set via top-level `llm.model` or `tools.ot_llm.model`
+- Top-level `llm` defaults or overrides in `onetool.yaml`
+- The resolved connection secret in the server's `secrets.yaml`
+
+## Configuration
+
+```yaml
+llm:
+  backend: cliproxy
+  base_url: http://127.0.0.1:8317/v1
+  model: gpt-5.6-luna
+  effort: low
+  timeout: 30
+  max_tokens: 4096
+
+tools:
+  ot_llm:
+    model: gpt-5.6-luna
+    effort: medium
+```
+
+The model and effort precedence is call, pack, then root. Model IDs are sent
+unchanged, without aliases or capability lookup. The configured service or model
+returns the authoritative error for unsupported structured output or effort.
+There is no model, endpoint, provider, interface, or paid-route fallback.
+
+See [Shared LLM generation](../../learn/llm-routing.md).
 
 ## Examples
 
 ```python
-# Extract structured data from search results
-ot_llm.transform(
-    data=brave.search(query="gold price today"),
-    prompt="Extract the current gold price in USD/oz as a single number"
-)
-
-# Convert to YAML format
-ot_llm.transform(
-    data=some_data,
-    prompt="Return ONLY valid YAML with fields: name, price, url"
-)
-
-# Summarize content
-ot_llm.transform(
-    data=webfetch.fetch(url="https://docs.python.org/3/library/json.html"),
-    prompt="Summarize the main points in 3 bullet points"
-)
-
-# Get JSON output with json_mode
 ot_llm.transform(
     data=raw_data,
-    prompt="Extract name and email fields",
-    json_mode=True
+    prompt="Extract name and email",
+    json_mode=True,
 )
 
-# Transform a file
+ot_llm.transform(
+    data=report,
+    prompt="Summarise in three bullets",
+    model="gpt-5.6-luna",
+    effort="medium",
+)
+
 ot_llm.transform_file(
-    prompt="Convert this markdown to reStructuredText format",
+    prompt="Convert this Markdown to reStructuredText",
     in_file="README.md",
-    out_file="README.rst"
+    out_file="README.rst",
 )
 ```
-
-## Configuration
-
-### Required
-
-- `OPENAI_API_KEY` must be set in `secrets.yaml`.
-- `base_url` and `model` must be configured via top-level `llm:` or `tools.ot_llm.*`.
-
-### Optional
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `tools.ot_llm.base_url` | string | `""` | Overrides `llm.base_url` for this tool only. |
-| `tools.ot_llm.model` | string | `""` | Overrides `llm.model` for this tool only. |
-| `tools.ot_llm.timeout` | int | `30` | API timeout in seconds. |
-| `tools.ot_llm.max_tokens` | int \| null | `null` | Max response tokens. `null` means no limit. |
-
-Configure `base_url` and `model` once at the top level for all LLM-using tools (`ot_llm`, `ot_image`, `mem`, `knowledge`, `ctx`):
-
-```yaml
-llm:
-  base_url: https://openrouter.ai/api/v1
-  model: google/gemini-2-flash-preview
-  embedding_model: text-embedding-3-small  # for mem and knowledge
-
-# Per-tool override (optional)
-tools:
-  ot_llm:
-    timeout: 30
-    max_tokens: null
-```
-
-### Defaults
-
-- `timeout` defaults to `30`.
-- `max_tokens` defaults to `null`.
-- `base_url` and `model` fall back to the top-level `llm:` block; the tool is not usable if neither is set.

@@ -18,9 +18,8 @@ __all__ = ["short_description", "signature_args"]
 
 
 def default_config() -> Path:
-    """Return the first available repo-local OneTool config."""
+    """Return a deterministic checked-in config for documentation generation."""
     candidates = [
-        ROOT / ".onetool" / "onetool.yaml",
         ROOT / "tests" / ".onetool" / "onetool.yaml",
         ROOT / "src" / "ot" / "config" / "global_templates" / "onetool.yaml",
     ]

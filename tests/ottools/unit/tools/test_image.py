@@ -10,15 +10,21 @@ import base64
 import io
 import json
 import sys
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from typing import Any
+from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from ot.generation import GenerationError
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
 try:
     import cairosvg  # noqa: F401
+
     _CAIROSVG_AVAILABLE = True
 except (ImportError, OSError):
     _CAIROSVG_AVAILABLE = False
@@ -37,6 +43,10 @@ def _make_png_bytes(width: int = 100, height: int = 100) -> bytes:
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
+
+
+def _generation_result(content: str) -> SimpleNamespace:
+    return SimpleNamespace(content=content)
 
 
 def _make_jpeg_bytes(width: int = 50, height: int = 50) -> bytes:
@@ -65,7 +75,7 @@ def _make_meta(
         "resized": False,
         "max_edge": 1568,
         "original_format": "PNG",
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "summary": None,
     }
 
@@ -81,41 +91,31 @@ class TestImageConfig:
     """Tests for get_image_config()."""
 
     @patch("ottools._image.config.get_tool_config")
-    @patch("ottools._image.config.get_secret")
-    @patch("ot.config.get_llm_config", side_effect=Exception("no llm config"))
-    def test_defaults(self, _mock_llm: MagicMock, mock_secret: MagicMock, mock_gtc: MagicMock) -> None:
+    def test_defaults(self, mock_gtc: MagicMock) -> None:
         from ottools._image.config import Config, get_image_config
 
         mock_gtc.return_value = Config()
-        mock_secret.return_value = None
         config = get_image_config()
         assert config.max_edge == 1568
         assert config.session_cache_size == 10
-        assert config.model == ""
+        assert config.model is None
+        assert config.effort is None
 
-    @patch("ottools._image.config.get_secret")
-    def test_api_key_from_secret(self, mock_secret: MagicMock) -> None:
-        from ottools._image.config import get_image_api_key
+    def test_partial_generation_selection(self) -> None:
+        from ottools._image.config import Config
 
-        mock_secret.return_value = "sk-test-key"
-        assert get_image_api_key() == "sk-test-key"
+        config = Config.model_validate({"model": "gpt-5.6-terra", "effort": "high"})
+        assert config.model == "gpt-5.6-terra"
+        assert config.effort == "high"
 
-    @patch("ottools._image.config.get_tool_config")
-    @patch("ot.config.get_llm_config")
-    def test_base_url_and_model_fallback_from_llm_config(
-        self, mock_glc: MagicMock, mock_gtc: MagicMock
-    ) -> None:
-        from ottools._image.config import Config, get_image_config
-        from ot.config.models import LlmConfig
+    def test_removed_provider_fields_are_rejected(self) -> None:
+        from pydantic import ValidationError
 
-        mock_gtc.return_value = Config()
-        mock_glc.return_value = LlmConfig(
-            base_url="https://openrouter.ai/api/v1",
-            model="google/gemini-3-flash-preview",
-        )
-        config = get_image_config()
-        assert config.base_url == "https://openrouter.ai/api/v1"
-        assert config.model == "google/gemini-3-flash-preview"
+        from ottools._image.config import Config
+
+        for key in ("llm", "base_url"):
+            with pytest.raises(ValidationError, match="extra_forbidden"):
+                Config.model_validate({key: "removed"})
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +181,9 @@ class TestValidateImageBytes:
     def test_valid_svg(self) -> None:
         from ottools._image.sources import validate_image_bytes
 
-        fmt = validate_image_bytes(b"<svg xmlns='http://www.w3.org/2000/svg'>", "icon.svg")
+        fmt = validate_image_bytes(
+            b"<svg xmlns='http://www.w3.org/2000/svg'>", "icon.svg"
+        )
         assert fmt == "SVG"
 
     def test_valid_svg_xml_declaration(self) -> None:
@@ -199,7 +201,9 @@ class TestValidateImageBytes:
     def test_valid_svg_uppercase(self) -> None:
         from ottools._image.sources import validate_image_bytes
 
-        fmt = validate_image_bytes(b"<SVG xmlns='http://www.w3.org/2000/svg'>", "icon.svg")
+        fmt = validate_image_bytes(
+            b"<SVG xmlns='http://www.w3.org/2000/svg'>", "icon.svg"
+        )
         assert fmt == "SVG"
 
     def test_invalid_format_raises(self) -> None:
@@ -281,7 +285,9 @@ class TestResolveSource:
         with pytest.raises(NotImplementedError, match="Linux"):
             _grab_clipboard()
 
-    @pytest.mark.skipif(sys.platform == "linux", reason="clipboard not supported on Linux")
+    @pytest.mark.skipif(
+        sys.platform == "linux", reason="clipboard not supported on Linux"
+    )
     def test_clipboard_file_reference_loads_first_path(self, tmp_path: Path) -> None:
         """list return from ImageGrab.grabclipboard() resolves to first path."""
         from ottools._image.sources import _grab_clipboard
@@ -295,13 +301,17 @@ class TestResolveSource:
 
         assert result == png
 
-    @pytest.mark.skipif(sys.platform == "linux", reason="clipboard not supported on Linux")
+    @pytest.mark.skipif(
+        sys.platform == "linux", reason="clipboard not supported on Linux"
+    )
     def test_clipboard_empty_list_raises(self) -> None:
         from ottools._image.sources import _grab_clipboard
 
-        with patch("PIL.ImageGrab.grabclipboard", return_value=[]):
-            with pytest.raises(ValueError, match="No image found in clipboard"):
-                _grab_clipboard()
+        with (
+            patch("PIL.ImageGrab.grabclipboard", return_value=[]),
+            pytest.raises(ValueError, match="No image found in clipboard"),
+        ):
+            _grab_clipboard()
 
 
 # ---------------------------------------------------------------------------
@@ -360,7 +370,7 @@ class TestPrepareForModel:
         assert result.model_bytes[:4] == b"\x89PNG"
 
     def test_heic_registers_pillow_heif(self) -> None:
-        from unittest.mock import MagicMock, call, patch
+        from unittest.mock import MagicMock, patch
 
         from ottools._image.resize import prepare_for_model
 
@@ -374,11 +384,15 @@ class TestPrepareForModel:
         mock_img.height = 50
         mock_img.mode = "RGB"
 
-        with patch.dict("sys.modules", {"pillow_heif": mock_heif}):
-            with patch("PIL.Image.open", return_value=mock_img) as mock_open:
-                mock_img.resize.return_value = mock_img
-                mock_img.save = MagicMock(side_effect=lambda buf, format: buf.write(b"\x89PNG\r\n\x1a\n"))
-                prepare_for_model(heic_bytes, max_edge=1568)
+        with (
+            patch.dict("sys.modules", {"pillow_heif": mock_heif}),
+            patch("PIL.Image.open", return_value=mock_img),
+        ):
+            mock_img.resize.return_value = mock_img
+            mock_img.save = MagicMock(
+                side_effect=lambda buf, **_: buf.write(b"\x89PNG\r\n\x1a\n")
+            )
+            prepare_for_model(heic_bytes, max_edge=1568)
 
         mock_heif.register_heif_opener.assert_called_once()
 
@@ -392,14 +406,18 @@ class TestPrepareForModel:
         # Remove pillow_heif from sys.modules and block its import
         original = sys.modules.pop("pillow_heif", None)
         try:
-            with patch.dict("sys.modules", {"pillow_heif": None}):
-                with pytest.raises(ImportError, match="pillow-heif"):
-                    prepare_for_model(heic_bytes, max_edge=1568)
+            with (
+                patch.dict("sys.modules", {"pillow_heif": None}),
+                pytest.raises(ImportError, match="pillow-heif"),
+            ):
+                prepare_for_model(heic_bytes, max_edge=1568)
         finally:
             if original is not None:
                 sys.modules["pillow_heif"] = original
 
-    @pytest.mark.skipif(not _CAIROSVG_AVAILABLE, reason="cairosvg/libcairo not available")
+    @pytest.mark.skipif(
+        not _CAIROSVG_AVAILABLE, reason="cairosvg/libcairo not available"
+    )
     def test_svg_rasterized_to_png(self) -> None:
         from ottools._image.resize import prepare_for_model
 
@@ -412,9 +430,11 @@ class TestPrepareForModel:
         from ottools._image.resize import prepare_for_model
 
         svg_bytes = b"<svg xmlns='http://www.w3.org/2000/svg'><rect/></svg>"
-        with patch.dict("sys.modules", {"resvg_py": None}):
-            with pytest.raises(ImportError, match="resvg-py"):
-                prepare_for_model(svg_bytes, max_edge=1568)
+        with (
+            patch.dict("sys.modules", {"resvg_py": None}),
+            pytest.raises(ImportError, match="resvg-py"),
+        ):
+            prepare_for_model(svg_bytes, max_edge=1568)
 
 
 # ---------------------------------------------------------------------------
@@ -431,7 +451,9 @@ class TestStore:
         from ottools._image import store
 
         with patch.object(store, "_images_dir", return_value=tmp_path):
-            store.save_image(_make_png_bytes(), "img_abc12345", _make_meta("img_abc12345"))
+            store.save_image(
+                _make_png_bytes(), "img_abc12345", _make_meta("img_abc12345")
+            )
             loaded = store.load_meta("img_abc12345")
             assert loaded is not None
             assert loaded["handle"] == "img_abc12345"
@@ -447,7 +469,9 @@ class TestStore:
         from ottools._image import store
 
         with patch.object(store, "_images_dir", return_value=tmp_path):
-            store.save_image(_make_png_bytes(), "img_test1", _make_meta("img_test1", dims=[50, 50]))
+            store.save_image(
+                _make_png_bytes(), "img_test1", _make_meta("img_test1", dims=[50, 50])
+            )
             store.save_summary("img_test1", {"text": "hello", "mode": "light"})
             loaded = store.load_meta("img_test1")
             assert loaded is not None
@@ -461,7 +485,9 @@ class TestStore:
             store.save_summary("img_atomic", {"type": "ui"})
 
         assert not list(tmp_path.glob("*.tmp"))
-        loaded = json.loads((tmp_path / "img_atomic.meta.json").read_text(encoding="utf-8"))
+        loaded = json.loads(
+            (tmp_path / "img_atomic.meta.json").read_text(encoding="utf-8")
+        )
         assert loaded["summary"] == {"type": "ui"}
 
     def test_save_summary_concurrent_writes_stay_valid(self, tmp_path: Path) -> None:
@@ -493,7 +519,11 @@ class TestStore:
 
         with patch.object(store, "_images_dir", return_value=tmp_path):
             sha = "a" * 64
-            store.save_image(_make_png_bytes(10, 10), "img_aaaaaaaa", _make_meta("img_aaaaaaaa", dims=[10, 10], sha=sha))
+            store.save_image(
+                _make_png_bytes(10, 10),
+                "img_aaaaaaaa",
+                _make_meta("img_aaaaaaaa", dims=[10, 10], sha=sha),
+            )
             found = store.find_by_hash(sha)
             assert found == "img_aaaaaaaa"
 
@@ -504,7 +534,6 @@ class TestStore:
             assert store.find_by_hash("b" * 64) is None
 
     def test_lru_eviction_at_limit(self) -> None:
-        from ottools._image import store
         from ot.utils.cache import Cache
 
         # Use a small temp cache to test eviction (session_cache is sized at import)
@@ -572,24 +601,11 @@ class TestStore:
 class TestVision:
     """Tests for vision model integration (mocked)."""
 
-    def setup_method(self) -> None:
-        import ottools._image.vision as _v
-        _v._client = None
-        _v._client_key = ("", "")
-        self._api_key_patch = patch(
-            "ottools._image.vision.get_image_api_key", return_value="sk-test"
-        )
-        self._api_key_patch.start()
-
-    def teardown_method(self) -> None:
-        self._api_key_patch.stop()
-
     def _make_config(self, **kwargs: Any) -> Any:
         from ottools._image.config import Config
 
         defaults = {
-            "model": "openai/gpt-4o-mini",
-            "base_url": "https://openrouter.ai/api/v1",
+            "model": "test-gemini",
             "max_edge": 1568,
             "session_cache_size": 10,
         }
@@ -599,31 +615,37 @@ class TestVision:
     def test_vision_not_configured_returns_error(self) -> None:
         from ottools._image.vision import call_vision
 
-        config = self._make_config(model="")
-        result = call_vision([b"png"], "What is this?", config)
+        config = self._make_config(model=None)
+        with patch(
+            "ottools._image.vision.resolve_generation",
+            side_effect=GenerationError("No generation connection is configured"),
+        ):
+            result = call_vision([b"png"], "What is this?", config)
         assert result.startswith("Error:")
-        assert "model" in result or "ot_image" in result
+        assert "generation connection" in result
 
     def test_api_key_missing_returns_error(self) -> None:
         from ottools._image.vision import call_vision
 
         config = self._make_config()
-        self._api_key_patch.stop()
-        with patch("ottools._image.vision.get_image_api_key", return_value=None):
+        with patch(
+            "ottools._image.vision.generate",
+            side_effect=GenerationError("Named generation secret is not configured"),
+        ):
             result = call_vision([b"png"], "What is this?", config)
-        self._api_key_patch.start()
         assert result.startswith("Error:")
 
     def test_single_question_call(self) -> None:
         from ottools._image.vision import ask_questions
 
         config = self._make_config()
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = "It is a cat."
-
-        with patch("ottools._image.vision.OpenAI") as MockOpenAI:
-            MockOpenAI.return_value.chat.completions.create.return_value = mock_response
-            answers = ask_questions([_make_png_bytes()], ["What is in the image?"], config)
+        with patch(
+            "ottools._image.vision.generate",
+            return_value=_generation_result("It is a cat."),
+        ):
+            answers = ask_questions(
+                [_make_png_bytes()], ["What is in the image?"], config
+            )
 
         assert answers == ["It is a cat."]
 
@@ -632,14 +654,13 @@ class TestVision:
         from ottools._image.vision import ask_questions
 
         config = self._make_config()
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = json.dumps(
+        response = json.dumps(
             {"answers": ["A screenshot of a terminal.", "Yes, it is dark mode."]}
         )
-
-        with patch("ottools._image.vision.OpenAI") as MockOpenAI:
-            create = MockOpenAI.return_value.chat.completions.create
-            create.return_value = mock_response
+        with patch(
+            "ottools._image.vision.generate",
+            return_value=_generation_result(response),
+        ) as create:
             answers = ask_questions(
                 [_make_png_bytes()],
                 ["What is shown?", "Is it dark mode?"],
@@ -662,11 +683,10 @@ class TestVision:
                 "content": "## Form\n\nHello world\n\n**[Submit]**",
             }
         )
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = summary_json
-
-        with patch("ottools._image.vision.OpenAI") as MockOpenAI:
-            MockOpenAI.return_value.chat.completions.create.return_value = mock_response
+        with patch(
+            "ottools._image.vision.generate",
+            return_value=_generation_result(summary_json),
+        ):
             result = extract_summary(_make_png_bytes(), config)
 
         assert isinstance(result, dict)
@@ -679,11 +699,10 @@ class TestVision:
 
         config = self._make_config()
         # Only partial JSON from model
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = '{"description": "A thing."}'
-
-        with patch("ottools._image.vision.OpenAI") as MockOpenAI:
-            MockOpenAI.return_value.chat.completions.create.return_value = mock_response
+        with patch(
+            "ottools._image.vision.generate",
+            return_value=_generation_result('{"description": "A thing."}'),
+        ):
             result = extract_summary(_make_png_bytes(), config)
 
         assert isinstance(result, dict)
@@ -696,10 +715,10 @@ class TestVision:
 
         config = self._make_config()
 
-        with patch("ottools._image.vision.OpenAI") as MockOpenAI:
-            MockOpenAI.return_value.chat.completions.create.side_effect = RuntimeError(
-                "Connection refused"
-            )
+        with patch(
+            "ottools._image.vision.generate",
+            side_effect=GenerationError("Generation endpoint is unavailable"),
+        ):
             result = call_vision([_make_png_bytes()], "test", config)
 
         assert result.startswith("Error:")
@@ -709,14 +728,13 @@ class TestVision:
         from ottools._image.vision import ask_questions
 
         config = self._make_config()
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = (
+        response = (
             'Here you go:\n```json\n{"answers": ["A terminal.", "Dark mode."]}\n```'
         )
-
-        with patch("ottools._image.vision.OpenAI") as MockOpenAI:
-            create = MockOpenAI.return_value.chat.completions.create
-            create.return_value = mock_response
+        with patch(
+            "ottools._image.vision.generate",
+            return_value=_generation_result(response),
+        ) as create:
             answers = ask_questions(
                 [_make_png_bytes()],
                 ["What is shown?", "Is it dark mode?"],
@@ -732,17 +750,11 @@ class TestVision:
 
         config = self._make_config()
 
-        def _resp(text: str) -> MagicMock:
-            m = MagicMock()
-            m.choices[0].message.content = text
-            return m
-
-        with patch("ottools._image.vision.OpenAI") as MockOpenAI:
-            create = MockOpenAI.return_value.chat.completions.create
+        with patch("ottools._image.vision.generate") as create:
             create.side_effect = [
-                _resp("**1.** Python code editor.\n**2.** Light mode."),  # bad batch
-                _resp("Python code editor."),
-                _resp("Light mode."),
+                _generation_result("**1.** Python code editor.\n**2.** Light mode."),
+                _generation_result("Python code editor."),
+                _generation_result("Light mode."),
             ]
             answers = ask_questions(
                 [_make_png_bytes()],
@@ -759,17 +771,11 @@ class TestVision:
 
         config = self._make_config()
 
-        def _resp(text: str) -> MagicMock:
-            m = MagicMock()
-            m.choices[0].message.content = text
-            return m
-
-        with patch("ottools._image.vision.OpenAI") as MockOpenAI:
-            create = MockOpenAI.return_value.chat.completions.create
+        with patch("ottools._image.vision.generate") as create:
             create.side_effect = [
-                _resp(json.dumps({"answers": ["only one"]})),
-                _resp("Answer one."),
-                _resp("Answer two."),
+                _generation_result(json.dumps({"answers": ["only one"]})),
+                _generation_result("Answer one."),
+                _generation_result("Answer two."),
             ]
             answers = ask_questions(
                 [_make_png_bytes()],
@@ -786,9 +792,10 @@ class TestVision:
 
         config = self._make_config()
 
-        with patch("ottools._image.vision.OpenAI") as MockOpenAI:
-            create = MockOpenAI.return_value.chat.completions.create
-            create.side_effect = RuntimeError("Connection refused")
+        with patch(
+            "ottools._image.vision.generate",
+            side_effect=GenerationError("Generation endpoint is unavailable"),
+        ) as create:
             answers = ask_questions(
                 [_make_png_bytes()],
                 ["Q1?", "Q2?"],
@@ -804,34 +811,31 @@ class TestVision:
         from ottools._image.vision import call_vision
 
         config = self._make_config()
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = "They differ in colour."
-
-        with patch("ottools._image.vision.OpenAI") as MockOpenAI:
-            create = MockOpenAI.return_value.chat.completions.create
-            create.return_value = mock_response
+        with patch(
+            "ottools._image.vision.generate",
+            return_value=_generation_result("They differ in colour."),
+        ) as create:
             result = call_vision([b"img-one", b"img-two"], "what differs?", config)
 
         assert result == "They differ in colour."
-        content = create.call_args.kwargs["messages"][0]["content"]
-        kinds = [block["type"] for block in content]
-        assert kinds == ["text", "image_url", "text", "image_url", "text"]
-        assert content[0]["text"] == "Image 1:"
-        assert content[2]["text"] == "Image 2:"
+        request = create.call_args.kwargs["request"]
+        assert request.images == (b"img-one", b"img-two")
+        assert "numeric order" in request.prompt
 
     def test_extract_summary_uses_shared_json_helper(self) -> None:
         """extract_summary() parses via parse_json_payload (fenced JSON works)."""
         from ottools._image.vision import extract_summary
 
         config = self._make_config()
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = (
+        response = (
             '```json\n{"type": "photo", "mode": "light", "colours": ["red"], '
             '"description": "d", "content": "c"}\n```'
         )
 
-        with patch("ottools._image.vision.OpenAI") as MockOpenAI:
-            MockOpenAI.return_value.chat.completions.create.return_value = mock_response
+        with patch(
+            "ottools._image.vision.generate",
+            return_value=_generation_result(response),
+        ):
             result = extract_summary(_make_png_bytes(), config)
 
         assert isinstance(result, dict)
@@ -1017,10 +1021,12 @@ class TestLoad:
             patch.object(store, "_images_dir", return_value=tmp_path),
             patch("ottools._image.tools.get_image_config") as mock_cfg,
             patch("ottools._image.tools.threading.Thread") as mock_thread,
+            patch("ottools._image.tools._background_summary_slots") as slots,
         ):
+            slots.acquire.return_value = True
             mock_cfg.return_value = Config(
                 session_cache_size=10,
-                model="openai/gpt-4o-mini",
+                model="test-gemini",
             )
             mock_t = MagicMock()
             mock_thread.return_value = mock_t
@@ -1033,17 +1039,52 @@ class TestLoad:
         assert call_kwargs.kwargs.get("daemon") is True
         mock_t.start.assert_called_once()
 
-    def test_background_summary_worker_skips_when_no_model(self, tmp_path: Path) -> None:
-        """Worker exits early when model is not configured; no API call made."""
+    def test_background_summary_saturation_does_not_spawn(self) -> None:
         from ottools._image import tools
         from ottools._image.config import Config
 
-        with patch("ottools._image.tools.get_image_config") as mock_cfg, \
-             patch("ottools._image.tools.extract_summary") as mock_extract:
-            mock_cfg.return_value = Config(session_cache_size=10, model="")
-            tools._background_summarise("img_abc12345", b"fake_bytes")
+        with (
+            patch("ottools._image.tools._background_summary_slots") as slots,
+            patch("ottools._image.tools.threading.Thread") as thread,
+        ):
+            slots.acquire.return_value = False
+            tools._schedule_background_summary(
+                handle_name="img_abc12345",
+                model_bytes=b"fake_bytes",
+                config=Config(model="test-gemini"),
+            )
 
-        mock_extract.assert_not_called()
+        thread.assert_not_called()
+
+    def test_background_summary_worker_uses_shared_route(self) -> None:
+        """Worker delegates route validation to the shared generation layer."""
+        from ottools._image import tools
+        from ottools._image.config import Config
+
+        with (
+            patch("ottools._image.tools.extract_summary") as mock_extract,
+        ):
+            mock_extract.return_value = "Error: generation unavailable"
+            tools._background_summarise(
+                "img_abc12345",
+                b"fake_bytes",
+                Config(model="test-gemini", session_cache_size=10),
+            )
+
+        mock_extract.assert_called_once()
+
+    def test_background_summary_is_opt_in(self) -> None:
+        from ottools._image import tools
+        from ottools._image.config import Config
+
+        with patch("ottools._image.tools.threading.Thread") as thread:
+            tools._schedule_background_summary(
+                handle_name="img_abc12345",
+                model_bytes=b"fake_bytes",
+                config=Config(),
+            )
+
+        thread.assert_not_called()
 
 
 @pytest.mark.unit
@@ -1052,20 +1093,12 @@ class TestAsk:
     """Tests for ask()."""
 
     def setup_method(self) -> None:
-        import ottools._image.vision as _v
-        _v._client = None
-        _v._client_key = ("", "")
         self._thread_patcher = patch("ottools._image.tools.threading.Thread")
         self._mock_thread_cls = self._thread_patcher.start()
         self._mock_thread_cls.return_value = MagicMock()
-        self._api_key_patch = patch(
-            "ottools._image.vision.get_image_api_key", return_value="sk-test"
-        )
-        self._api_key_patch.start()
 
     def teardown_method(self) -> None:
         self._thread_patcher.stop()
-        self._api_key_patch.stop()
 
     def _setup(self, tmp_path: Path, mock_cfg: MagicMock) -> str:
         """Load a test image and return its handle name."""
@@ -1078,7 +1111,7 @@ class TestAsk:
 
         mock_cfg.return_value = Config(
             session_cache_size=10,
-            model="openai/gpt-4o-mini",
+            model="test-gemini",
         )
         with patch.object(store, "_images_dir", return_value=tmp_path):
             handle = tools.load(img=str(img_path))["handle"]
@@ -1093,15 +1126,16 @@ class TestAsk:
         ):
             handle = self._setup(tmp_path, mock_cfg)
 
-            mock_resp = MagicMock()
-            mock_resp.choices[0].message.content = "A red square."
-
-            with patch("ottools._image.vision.OpenAI") as MockOAI:
-                MockOAI.return_value.chat.completions.create.return_value = mock_resp
+            with patch(
+                "ottools._image.tools.ask_questions",
+                return_value=["A red square."],
+            ):
                 result = tools.ask(img=handle, q="Describe the image.")
 
         assert "result" in result
-        assert result["result"] == [{"question": "Describe the image.", "answer": "A red square."}]
+        assert result["result"] == [
+            {"question": "Describe the image.", "answer": "A red square."}
+        ]
         assert result["handle"] == handle
 
     def test_unknown_handle_returns_error(self, tmp_path: Path) -> None:
@@ -1131,8 +1165,12 @@ class TestAsk:
         with (
             patch.object(store, "_images_dir", return_value=tmp_path),
             patch("ottools._image.tools.get_image_config") as mock_cfg,
+            patch(
+                "ottools._image.tools.ask_questions",
+                return_value=["Error: generation unavailable"],
+            ),
         ):
-            mock_cfg.return_value = Config(session_cache_size=10, model="")
+            mock_cfg.return_value = Config(session_cache_size=10)
             handle = tools.load(img=str(img_path))["handle"]
             result = tools.ask(img=handle, q="test")
 
@@ -1150,15 +1188,16 @@ class TestAsk:
             handle = self._setup(tmp_path, mock_cfg)
             bare = handle.lstrip("#")  # strip the "#" prefix
 
-            mock_resp = MagicMock()
-            mock_resp.choices[0].message.content = "A red square."
-
-            with patch("ottools._image.vision.OpenAI") as MockOAI:
-                MockOAI.return_value.chat.completions.create.return_value = mock_resp
+            with patch(
+                "ottools._image.tools.ask_questions",
+                return_value=["A red square."],
+            ):
                 result = tools.ask(img=bare, q="Describe the image.")
 
         assert "result" in result
-        assert result["result"] == [{"question": "Describe the image.", "answer": "A red square."}]
+        assert result["result"] == [
+            {"question": "Describe the image.", "answer": "A red square."}
+        ]
 
     def test_clip_ask_refreshes_clipboard_each_call(self, tmp_path: Path) -> None:
         from ottools._image import store, tools
@@ -1171,9 +1210,14 @@ class TestAsk:
             patch.object(store, "_images_dir", return_value=tmp_path),
             patch("ottools._image.tools.get_image_config") as mock_cfg,
             patch("ottools._image.tools.ask_questions", return_value=["ok"]),
-            patch("ottools._image.sources._grab_clipboard", side_effect=[img_a, img_b]) as mock_clip,
+            patch(
+                "ottools._image.sources._grab_clipboard", side_effect=[img_a, img_b]
+            ) as mock_clip,
         ):
-            mock_cfg.return_value = Config(session_cache_size=10, model="openai/gpt-4o-mini")
+            mock_cfg.return_value = Config(
+                session_cache_size=10,
+                model="test-gemini",
+            )
             first = tools.ask(img="clip", q="q1")
             second = tools.ask(img="clip", q="q2")
 
@@ -1187,20 +1231,12 @@ class TestSummary:
     """Tests for summary()."""
 
     def setup_method(self) -> None:
-        import ottools._image.vision as _v
-        _v._client = None
-        _v._client_key = ("", "")
         self._thread_patcher = patch("ottools._image.tools.threading.Thread")
         self._mock_thread_cls = self._thread_patcher.start()
         self._mock_thread_cls.return_value = MagicMock()
-        self._api_key_patch = patch(
-            "ottools._image.vision.get_image_api_key", return_value="sk-test"
-        )
-        self._api_key_patch.start()
 
     def teardown_method(self) -> None:
         self._thread_patcher.stop()
-        self._api_key_patch.stop()
 
     def test_first_call_calls_model(self, tmp_path: Path) -> None:
         from ottools._image import store, tools
@@ -1217,19 +1253,18 @@ class TestSummary:
             "description": "A red square.",
             "content": "A red square image.",
         }
-        mock_resp = MagicMock()
-        mock_resp.choices[0].message.content = json.dumps(summary_data)
-
         with (
             patch.object(store, "_images_dir", return_value=tmp_path),
             patch("ottools._image.tools.get_image_config") as mock_cfg,
-            patch("ottools._image.vision.OpenAI") as MockOAI,
+            patch(
+                "ottools._image.tools.extract_summary",
+                return_value=summary_data,
+            ),
         ):
             mock_cfg.return_value = Config(
                 session_cache_size=10,
-                model="openai/gpt-4o-mini",
+                model="test-gemini",
             )
-            MockOAI.return_value.chat.completions.create.return_value = mock_resp
             handle = tools.load(img=str(img_path))["handle"]
             result = tools.summary(img=handle)
 
@@ -1251,26 +1286,25 @@ class TestSummary:
             "description": "Cached.",
             "content": "Cached content.",
         }
-        mock_resp = MagicMock()
-        mock_resp.choices[0].message.content = json.dumps(summary_data)
-
         with (
             patch.object(store, "_images_dir", return_value=tmp_path),
             patch("ottools._image.tools.get_image_config") as mock_cfg,
-            patch("ottools._image.vision.OpenAI") as MockOAI,
+            patch(
+                "ottools._image.tools.extract_summary",
+                return_value=summary_data,
+            ) as extract,
         ):
             mock_cfg.return_value = Config(
                 session_cache_size=10,
-                model="openai/gpt-4o-mini",
+                model="test-gemini",
             )
-            MockOAI.return_value.chat.completions.create.return_value = mock_resp
             handle = tools.load(img=str(img_path))["handle"]
             tools.summary(img=handle)  # First call
             result = tools.summary(img=handle)  # Second call — should be cached
 
         assert result["cached"] is True
         # Model should only have been called once
-        assert MockOAI.return_value.chat.completions.create.call_count == 1
+        assert extract.call_count == 1
 
     def test_auto_load_uses_configured_max_edge(self, tmp_path: Path) -> None:
         """summary() auto-load passes config.max_edge through to load()."""
@@ -1288,50 +1322,68 @@ class TestSummary:
             "description": "d",
             "content": "c",
         }
-        mock_resp = MagicMock()
-        mock_resp.choices[0].message.content = json.dumps(summary_data)
-
         with (
             patch.object(store, "_images_dir", return_value=tmp_path),
             patch("ottools._image.tools.get_image_config") as mock_cfg,
-            patch("ottools._image.vision.OpenAI") as MockOAI,
+            patch(
+                "ottools._image.tools.extract_summary",
+                return_value=summary_data,
+            ),
         ):
             mock_cfg.return_value = Config(
                 session_cache_size=10,
-                model="openai/gpt-4o-mini",
+                model="test-gemini",
                 max_edge=512,
             )
-            MockOAI.return_value.chat.completions.create.return_value = mock_resp
-
             result = tools.summary(img=str(img_path))  # auto-load path
             meta = store.load_meta(result["handle"].lstrip("#"))
 
         assert meta is not None
         assert meta["max_edge"] == 512
 
-    def test_clip_ask_delegates_to_ask(self, tmp_path: Path) -> None:
+    def test_clip_ask_delegates_to_ask(self) -> None:
         from ottools._image import tools
 
-        with patch.object(tools, "ask", return_value={"result": [], "handle": "#h"}) as mock_ask:
+        with patch.object(
+            tools, "ask", return_value={"result": [], "handle": "#h"}
+        ) as mock_ask:
             tools.clip_ask(q="What is this?")
 
-        mock_ask.assert_called_once_with(img="clip", q="What is this?", max_edge=1568)
+        mock_ask.assert_called_once_with(
+            img="clip",
+            q="What is this?",
+            max_edge=1568,
+            model=None,
+            effort=None,
+        )
 
-    def test_clip_ask_custom_max_edge(self, tmp_path: Path) -> None:
+    def test_clip_ask_custom_max_edge(self) -> None:
         from ottools._image import tools
 
-        with patch.object(tools, "ask", return_value={"result": [], "handle": "#h"}) as mock_ask:
+        with patch.object(
+            tools, "ask", return_value={"result": [], "handle": "#h"}
+        ) as mock_ask:
             tools.clip_ask(q="Describe", max_edge=800)
 
-        mock_ask.assert_called_once_with(img="clip", q="Describe", max_edge=800)
+        mock_ask.assert_called_once_with(
+            img="clip",
+            q="Describe",
+            max_edge=800,
+            model=None,
+            effort=None,
+        )
 
-    def test_clip_view_delegates_to_summary(self, tmp_path: Path) -> None:
+    def test_clip_view_delegates_to_summary(self) -> None:
         from ottools._image import tools
 
-        with patch.object(tools, "summary", return_value={"summary": {}, "handle": "#h", "cached": False}) as mock_summary:
+        with patch.object(
+            tools,
+            "summary",
+            return_value={"summary": {}, "handle": "#h", "cached": False},
+        ) as mock_summary:
             tools.clip_view()
 
-        mock_summary.assert_called_once_with(img="clip")
+        mock_summary.assert_called_once_with(img="clip", model=None, effort=None)
 
     def test_clip_summary_refreshes_clipboard_each_call(self, tmp_path: Path) -> None:
         from ottools._image import store, tools
@@ -1347,17 +1399,24 @@ class TestSummary:
             "description": "desc",
             "content": "content",
         }
-        mock_resp = MagicMock()
-        mock_resp.choices[0].message.content = json.dumps(summary_payload)
-
         with (
             patch.object(store, "_images_dir", return_value=tmp_path),
-            patch("ottools._image.tools.get_image_config", return_value=Config(session_cache_size=10, model="openai/gpt-4o-mini")),
-            patch("ottools._image.sources._grab_clipboard", side_effect=[img_a, img_b]) as mock_clip,
-            patch("ottools._image.vision.OpenAI") as MockOAI,
+            patch(
+                "ottools._image.tools.get_image_config",
+                return_value=Config(
+                    session_cache_size=10,
+                    model="test-gemini",
+                ),
+            ),
+            patch(
+                "ottools._image.sources._grab_clipboard", side_effect=[img_a, img_b]
+            ) as mock_clip,
+            patch(
+                "ottools._image.tools.extract_summary",
+                return_value=summary_payload,
+            ),
             patch("ottools._image.tools.threading.Thread"),
         ):
-            MockOAI.return_value.chat.completions.create.return_value = mock_resp
             first = tools.summary(img="clip")
             second = tools.summary(img="clip")
 
@@ -1386,7 +1445,7 @@ class TestLifecycle:
             "resized": False,
             "max_edge": 1568,
             "original_format": "PNG",
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "summary": None,
         }
         meta.update(overrides)
@@ -1462,8 +1521,8 @@ class TestLifecycle:
         from ottools._image import store
         from ottools._image.lifecycle import purge_images
 
-        old_ts = (datetime.now(timezone.utc) - timedelta(hours=3)).isoformat()
-        new_ts = datetime.now(timezone.utc).isoformat()
+        old_ts = (datetime.now(UTC) - timedelta(hours=3)).isoformat()
+        new_ts = datetime.now(UTC).isoformat()
 
         self._write_meta(tmp_path, "img_old", created_at=old_ts)
         self._write_meta(tmp_path, "img_new", created_at=new_ts)
@@ -1596,8 +1655,10 @@ class TestStoreExtensions:
         from ottools._image import lifecycle, store
 
         handle = self._load(tmp_path, _make_jpeg_bytes(), "photo.jpeg")
-        with patch.object(store, "_images_dir", return_value=tmp_path), \
-             patch("ottools._image.lifecycle._images_dir", return_value=tmp_path):
+        with (
+            patch.object(store, "_images_dir", return_value=tmp_path),
+            patch("ottools._image.lifecycle._images_dir", return_value=tmp_path),
+        ):
             result = lifecycle.purge_images(all=True)
         assert result["purged"] >= 1
         assert result["bytes_freed"] > 0
@@ -1610,25 +1671,20 @@ class TestAskMultiImage:
     """ask() with a list of image references (design D1)."""
 
     def setup_method(self) -> None:
-        import ottools._image.vision as _v
-        _v._client = None
-        _v._client_key = ("", "")
         self._thread_patcher = patch("ottools._image.tools.threading.Thread")
         self._thread_patcher.start().return_value = MagicMock()
-        self._api_key_patch = patch(
-            "ottools._image.vision.get_image_api_key", return_value="sk-test"
-        )
-        self._api_key_patch.start()
 
     def teardown_method(self) -> None:
         self._thread_patcher.stop()
-        self._api_key_patch.stop()
 
     def _load_two(self, tmp_path: Path, mock_cfg: MagicMock) -> tuple[str, str]:
         from ottools._image import store, tools
         from ottools._image.config import Config
 
-        mock_cfg.return_value = Config(session_cache_size=10, model="openai/gpt-4o-mini")
+        mock_cfg.return_value = Config(
+            session_cache_size=10,
+            model="test-gemini",
+        )
         (tmp_path / "a.png").write_bytes(_make_png_bytes(20, 20))
         (tmp_path / "b.png").write_bytes(_make_png_bytes(40, 40))
         with patch.object(store, "_images_dir", return_value=tmp_path):
@@ -1636,7 +1692,9 @@ class TestAskMultiImage:
             h2 = tools.load(img=str(tmp_path / "b.png"))["handle"]
         return h1, h2
 
-    def test_two_handles_return_handles_list_and_ordered_payloads(self, tmp_path: Path) -> None:
+    def test_two_handles_return_handles_list_and_ordered_payloads(
+        self, tmp_path: Path
+    ) -> None:
         from ottools._image import store, tools
 
         with (
@@ -1647,7 +1705,12 @@ class TestAskMultiImage:
 
             captured: dict[str, Any] = {}
 
-            def fake_ask(images: list[bytes], questions: list[str], config: Any) -> list[str]:
+            def fake_ask(
+                images: list[bytes],
+                _questions: list[str],
+                _config: Any,
+                **_: Any,
+            ) -> list[str]:
                 captured["images"] = images
                 return ["they differ"]
 
@@ -1705,7 +1768,9 @@ class TestAskMultiImage:
         assert "8" in over["error"]
         mock_ask.assert_not_called()
 
-    def test_unresolvable_entry_fails_fast_naming_reference(self, tmp_path: Path) -> None:
+    def test_unresolvable_entry_fails_fast_naming_reference(
+        self, tmp_path: Path
+    ) -> None:
         from ottools._image import store, tools
 
         with (

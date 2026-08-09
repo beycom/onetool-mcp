@@ -38,7 +38,7 @@ Do not duplicate long guidance across all three. If a rule affects whether the f
 Main config can include other files:
 
 ```yaml
-version: 1
+version: 2
 include:
   - prompts.yaml
   - security.yaml
@@ -82,7 +82,10 @@ tools:
 
 Pack config belongs under `tools.<pack>`. Unknown typed pack keys fail visibly when the pack reads its config, unless that config schema explicitly allows extra fields. Recognised keys with invalid values also fail visibly. Do not keep legacy config aliases or compatibility mappings.
 
-The root template stays minimal: scalar shared defaults such as `llm.model`, `llm.embedding_model`, and `llm.base_url` are allowed; broad commented examples for every pack are not.
+The root template stays minimal. Shared generation belongs in the strict
+discriminated `llm` backend, while embedding settings belong only in the
+independent `embeddings` backend. Broad commented examples for every pack are
+not.
 
 ## Path Resolution
 

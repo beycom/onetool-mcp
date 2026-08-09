@@ -33,6 +33,7 @@ Usage:
 
 from ot.config.loader import (
     get_config,
+    get_embeddings_config,
     get_llm_config,
     get_tool_config,
     is_log_verbose,
@@ -42,13 +43,13 @@ from ot.config.loader import (
     reset as reset_config,
 )
 from ot.config.models import (
-    LlmConfig,
     McpServerConfig,
     OneToolConfig,
     SecurityConfig,
     SnippetDef,
     SnippetParam,
 )
+from ot.config.routing import DirectModelId, EmbeddingsConfig, LlmConfig
 from ot.config.secrets import (
     expand_secrets,
     expand_vars,
@@ -72,6 +73,8 @@ def reset() -> None:
 
 
 __all__ = [
+    "DirectModelId",
+    "EmbeddingsConfig",
     "LlmConfig",
     "McpServerConfig",
     "OneToolConfig",
@@ -81,6 +84,7 @@ __all__ = [
     "expand_secrets",
     "expand_vars",
     "get_config",
+    "get_embeddings_config",
     "get_llm_config",
     "get_secret",
     "get_secrets",

@@ -3,6 +3,7 @@
 Populates `chunks.summary` with short LLM-generated summaries. Select-missing
 semantics make every run a backfill; `force=True` re-summarises everything.
 """
+
 from __future__ import annotations
 
 import time
@@ -11,16 +12,25 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from ot.config import get_config
+from ot.generation import (
+    GenerationError,
+    GenerationRequest,
+    generate,
+    resolve_generation,
+)
 from ot.logging import LogEntry
-from otpack import LogSpan
+from otpack import LogSpan, get_secret
 
 from .config import _get_config
 from .db import get_connection
-from .retrieval import _UNTRUSTED_CONTEXT_SYSTEM, _get_llm_client
+from .retrieval import _UNTRUSTED_CONTEXT_SYSTEM
 
 if TYPE_CHECKING:
     import sqlite3
     from collections.abc import Callable
+
+    from ot.config.routing import ReasoningEffort
 
 _DEFAULT_ENRICH_PROMPT = (
     "Summarise the following documentation chunk in 1-2 plain sentences "
@@ -32,12 +42,12 @@ _DEFAULT_ENRICH_PROMPT = (
 # helper because _embed_batch_with_retry is embeddings-specific (design D4).
 _RETRYABLE_HTTP_STATUS = {429, 500, 503}
 _ENRICH_MAX_ATTEMPTS = 3
+_MAX_SUMMARY_TOKENS = 120
 # Abort after this many consecutive failures — an outage, not a content
 # problem (same value as indexer._FALLBACK_ABORT_AFTER).
 _CONSECUTIVE_ABORT_AFTER = 5
 # SQLite host-parameter safety: chunk `id IN (...)` selections.
 _IDS_CHUNK_SIZE = 500
-_MAX_SUMMARY_TOKENS = 120
 
 
 @dataclass
@@ -65,7 +75,9 @@ def _select_chunks(
         for i in range(0, len(ids), _IDS_CHUNK_SIZE):
             sub = ids[i : i + _IDS_CHUNK_SIZE]
             placeholders = ", ".join("?" for _ in sub)
-            rows.extend(conn.execute(f"{base} AND id IN ({placeholders})", sub).fetchall())
+            rows.extend(
+                conn.execute(f"{base} AND id IN ({placeholders})", sub).fetchall()
+            )
         rows.sort(key=lambda row: row[1])
         return rows[:limit] if limit is not None else rows
 
@@ -77,22 +89,41 @@ def _select_chunks(
     return conn.execute(sql, params).fetchall()
 
 
-def _summarise_with_retry(client: Any, *, model: str, system: str, user: str) -> str:
+def _summarise_with_retry(
+    *,
+    system: str,
+    user: str,
+    model: str | None,
+    effort: ReasoningEffort | None,
+) -> str:
     """One chat completion with retry on transient HTTP errors (design D4)."""
     for attempt in range(_ENRICH_MAX_ATTEMPTS):
         try:
-            resp = client.chat.completions.create(
+            root = get_config()
+            config = _get_config()
+            route = resolve_generation(
+                config=root,
+                pack_model=config.model,
+                pack_effort=config.effort,
                 model=model,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-                max_tokens=_MAX_SUMMARY_TOKENS,
+                effort=effort,
             )
-            return (resp.choices[0].message.content or "").strip()
-        except Exception as e:
-            status = getattr(e, "status_code", None)
-            if status not in _RETRYABLE_HTTP_STATUS or attempt == _ENRICH_MAX_ATTEMPTS - 1:
+            response = generate(
+                route=route,
+                request=GenerationRequest(
+                    system=system,
+                    prompt=user,
+                    max_output_tokens=_MAX_SUMMARY_TOKENS,
+                ),
+                secret_resolver=get_secret,
+            )
+            return response.content.strip()
+        except GenerationError as e:
+            status = e.status_code
+            if (
+                status not in _RETRYABLE_HTTP_STATUS
+                or attempt == _ENRICH_MAX_ATTEMPTS - 1
+            ):
                 raise
             wait = 2.0**attempt
             logger.warning(
@@ -117,6 +148,8 @@ def enrich_db(
     force: bool = False,
     ids: list[str] | None = None,
     on_progress: Callable[[int, int], None] | None = None,
+    model: str | None = None,
+    effort: ReasoningEffort | None = None,
 ) -> EnrichResult:
     """Generate LLM summaries for chunks missing them.
 
@@ -130,19 +163,11 @@ def enrich_db(
     Returns:
         EnrichResult with counts and error details.
 
-    Raises:
-        ValueError: When no LLM client is available (missing OPENAI_API_KEY) —
-            a maintenance command must fail loudly.
+    Generation failures are returned in ``EnrichResult.errors`` and trigger the
+    bounded consecutive-failure abort policy.
     """
     result = EnrichResult()
     config = _get_config()
-    client = _get_llm_client()
-    if client is None:
-        raise ValueError("OPENAI_API_KEY not configured in secrets.yaml (required for kb enrich)")
-
-    from ot.config import get_llm_config
-
-    model = config.enrich_model or get_llm_config().model or "gpt-4o-mini"
     prompt = config.enrich_prompt or _DEFAULT_ENRICH_PROMPT
     # Indexed content is untrusted data: keep the boundary in the system message.
     system = f"{_UNTRUSTED_CONTEXT_SYSTEM}\n\n{prompt}"
@@ -165,10 +190,18 @@ def enrich_db(
             else:
                 user = f"Topic: {topic}\n\n{content[: config.enrich_max_chars]}"
                 try:
-                    summary = _summarise_with_retry(client, model=model, system=system, user=user)
+                    summary = _summarise_with_retry(
+                        model=model,
+                        effort=effort,
+                        system=system,
+                        user=user,
+                    )
                     if not summary:
                         raise ValueError("empty LLM response")
-                    conn.execute("UPDATE chunks SET summary = ? WHERE id = ?", [summary, chunk_id])
+                    conn.execute(
+                        "UPDATE chunks SET summary = ? WHERE id = ?",
+                        [summary, chunk_id],
+                    )
                     result.enriched += 1
                     uncommitted += 1
                     consecutive_failures = 0

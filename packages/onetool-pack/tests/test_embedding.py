@@ -190,6 +190,18 @@ class TestEmbeddingClientCache:
         keys = {c._cache_key("same text") for c in (c1, c2, c3)}
         assert len(keys) == 3
 
+    def test_close_releases_http_client_and_cache(self) -> None:
+        client = _make_client()
+        http_client = MagicMock()
+        client._client = http_client
+        client._cache_put(client._cache_key("query"), [0.1])
+
+        client.close()
+
+        http_client.close.assert_called_once_with()
+        assert client._client is None
+        assert not client._cache
+
 
 @pytest.mark.unit
 @pytest.mark.pkg
@@ -289,13 +301,17 @@ class TestEmbedStrategies:
 class TestMissingDependency:
     def test_missing_openai_hint(self) -> None:
         client = _make_client()
-        with patch.dict("sys.modules", {"openai": None}):
-            with pytest.raises(ImportError, match=r"onetool-pack\[embedding\]"):
-                client._get_client()
+        with (
+            patch.dict("sys.modules", {"openai": None}),
+            pytest.raises(ImportError, match=r"onetool-pack\[embedding\]"),
+        ):
+            client._get_client()
 
     def test_missing_tiktoken_hint(self) -> None:
         from otpack.embedding import get_tiktoken_encoding
 
-        with patch.dict("sys.modules", {"tiktoken": None}):
-            with pytest.raises(ImportError, match=r"onetool-pack\[embedding\]"):
-                get_tiktoken_encoding("text-embedding-3-small")
+        with (
+            patch.dict("sys.modules", {"tiktoken": None}),
+            pytest.raises(ImportError, match=r"onetool-pack\[embedding\]"),
+        ):
+            get_tiktoken_encoding("text-embedding-3-small")

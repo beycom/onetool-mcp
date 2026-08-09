@@ -12,7 +12,7 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _stub_console_storage_lifecycle(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep general lifespan tests focused and free of real Console state I/O."""
+    """Keep direct-runtime tests isolated from unrelated startup services."""
     monkeypatch.setattr(
         "ot.console.storage.initialize_console_storage", lambda **_kwargs: None
     )
@@ -275,10 +275,10 @@ def test_lifespan_disabled_direct_api_never_touches_discovery_files() -> None:
 
 @pytest.mark.unit
 @pytest.mark.core
-def test_lifespan_initializes_and_cleans_console_storage(
+def test_lifespan_cleans_owned_runtime_resources(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """MCP lifespan sweeps at startup and removes its instance at shutdown."""
+    """MCP lifespan cleans registered services and owned connection pools."""
     from ot import server
 
     async def _run_lifespan() -> None:
@@ -297,6 +297,7 @@ def test_lifespan_initializes_and_cleans_console_storage(
     )
     initialize = MagicMock()
     cleanup = MagicMock()
+    services = MagicMock()
     monkeypatch.setattr("ot.console.storage.initialize_console_storage", initialize)
     monkeypatch.setattr("ot.console.storage.cleanup_console_instance", cleanup)
 
@@ -314,6 +315,8 @@ def test_lifespan_initializes_and_cleans_console_storage(
         patch.object(server, "get_registry", return_value=SimpleNamespace(tools={})),
         patch("ot.executor.tool_loader.load_tool_registry"),
         patch("ot.telemetry.ping"),
+        patch("ot.generation.client.reset_http_client") as reset_http_client,
+        patch("ot.services.get_services", return_value=services),
         patch("ot.runtime_meta.get_or_create_instance_id", return_value="mcp-fixedid"),
         patch.object(server, "logger"),
     ):
@@ -321,6 +324,8 @@ def test_lifespan_initializes_and_cleans_console_storage(
 
     initialize.assert_called_once_with(instance_id="mcp-fixedid")
     cleanup.assert_called_once_with(instance_id="mcp-fixedid")
+    services.run_reload_hooks.assert_called_once_with()
+    reset_http_client.assert_called_once_with()
 
 
 @pytest.mark.unit

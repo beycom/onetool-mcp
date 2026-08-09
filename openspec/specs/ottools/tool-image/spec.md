@@ -40,9 +40,8 @@ and image metadata.
   `original_dims`, `model_dims`, `resized`, `max_edge`, `original_format`,
   `file` (the stored content filename, e.g. `"img_<hash>.jpg"`),
   `created_at`, and `summary: null`
-- **AND** if `model` is configured, a background daemon thread SHALL be spawned
-  to call `extract_summary()` and persist the result via `save_summary()` — the
-  `load()` call SHALL NOT block on this
+- **AND** if `tools.ot_image.model` is explicitly configured, automatic summary
+  generation SHALL begin without blocking `load()` and its result SHALL be cached
 
 #### Scenario: Stored extension matches detected format
 
@@ -58,8 +57,15 @@ and image metadata.
 - **THEN** the content file SHALL be resolved by extension-insensitive lookup and the operation SHALL succeed
 
 #### Scenario: Background summary skipped when no vision model
-- **WHEN** `image.load()` is called and `model` is not configured (empty string)
-- **THEN** no background thread SHALL be spawned for auto-summary
+- **WHEN** `image.load()` is called and `tools.ot_image.model` is omitted
+- **THEN** no automatic summary request SHALL be made, even if top-level
+  `llm.model` is configured
+
+#### Scenario: Background summary concurrency is bounded
+- **GIVEN** two automatic summaries are already running
+- **WHEN** another image is loaded before either completes
+- **THEN** `image.load()` SHALL return without waiting
+- **AND** it SHALL skip automatic summary generation for that image
 
 #### Scenario: Load from clipboard
 
@@ -370,21 +376,36 @@ memory growth.
 
 ### Requirement: Configuration via `tools.image` block
 
-The `ot_image` pack SHALL be configurable via `onetool.yaml` under `tools.ot_image`.
+The `ot_image` pack SHALL be configurable via `onetool.yaml` under
+`tools.ot_image`. Its optional `model` and `effort` fields SHALL control generation
+for `image.ask()` and `image.summary()`, while image processing settings SHALL
+remain pack-level fields.
 
 #### Scenario: model required for ask and summary
 
-- **WHEN** `tools.ot_image.model` is not set
-- **AND** `image.ask()` or `image.summary()` is called
-- **THEN** it SHALL return an error string (not raise) indicating the setting is missing
+- **WHEN** no model is supplied by the call, `tools.ot_image.model`, or top-level `llm.model`
+- **AND** `image.ask()` is called or `image.summary()` requires generation on a cache miss
+- **THEN** it SHALL return an error string, not raise, indicating a generation model is required
 
-#### Scenario: Inherit model and base_url from top-level llm config
+#### Scenario: Inherit generation selection from top-level llm config
 
-- **WHEN** `tools.ot_image.model` is not set
-- **THEN** `image` SHALL use `llm.model` from the top-level `llm:` config block
-- **WHEN** `tools.ot_image.base_url` is not set
-- **THEN** `image` SHALL use `llm.base_url` from the top-level `llm:` config block
-- **AND** the API key is always read from the `OPENAI_API_KEY` secret — there is no `tools.ot_image.api_key` config field
+- **WHEN** a generation field is not set under `tools.ot_image`
+- **THEN** `image` SHALL inherit that field from the top-level `llm` configuration
+- **AND** generation SHALL use the top-level backend, interface, and named credential
+
+#### Scenario: Per-call model and effort override
+
+- **WHEN** `image.ask()` is called, or `image.summary()` requires generation on a cache miss, with `model="terra"` and `effort="high"`
+- **THEN** the operation SHALL pass the opaque model ID `terra` unchanged and request high effort
+- **AND** it SHALL NOT perform registry or capability lookup before network I/O
+
+#### Scenario: Cached summary does not resolve overrides
+
+- **GIVEN** an image already has a cached summary
+- **WHEN** `image.summary()` is called with any model or effort override
+- **THEN** it SHALL return the cached summary without resolving generation configuration
+- **AND** it SHALL NOT make a network request
+- **AND** model or effort changes SHALL NOT implicitly invalidate the cache
 
 #### Scenario: max_edge override
 

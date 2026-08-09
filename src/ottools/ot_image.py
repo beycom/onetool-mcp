@@ -8,11 +8,12 @@ structured summaries cached in meta.json.
 
     tools:
       ot_image:
-        model: openai/gpt-4o-mini   # overrides llm.model for vision calls
-        max_edge: 1568              # default resize limit
-        session_cache_size: 10     # default LRU cap
+        model: gpt-5.6-terra      # direct generation model ID
+        effort: low
+        max_edge: 1568            # default resize limit
+        session_cache_size: 10   # default LRU cap
 
-API key, base URL, and model are inherited from the top-level ``llm:`` config if not set.
+The configured backend and selected model are authoritative for image support.
 """
 
 from __future__ import annotations
@@ -28,7 +29,17 @@ __ot_requires__ = {
     ],
 }
 
-__all__ = ["ask", "clip_ask", "clip_view", "delete", "list", "load", "load_batch", "purge", "summary"]
+__all__ = [
+    "ask",
+    "clip_ask",
+    "clip_view",
+    "delete",
+    "list",
+    "load",
+    "load_batch",
+    "purge",
+    "summary",
+]
 
 from ottools._image.lifecycle import delete_image as delete
 from ottools._image.lifecycle import list_images as list
