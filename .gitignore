@@ -23,6 +23,7 @@ Thumbs.db
 
 # Dependencies
 node_modules/
+.npm-cache/
 bower_components/
 vendor/
 jspm_packages/
@@ -100,7 +101,7 @@ diagrams/
 .localhist/
 msg/
 plan/
-wip/
+/wip
 openspec/changes/archive/
 openspec/consult/
 global/
