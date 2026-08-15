@@ -75,11 +75,11 @@ which changes should be prepared and integrated; it is not a severity label.
 The requested `dd-worker-warm-runtime` name is treated as a typo and corrected
 to `add-worker-warm-runtime`.
 
-| Wave | Priority | OpenSpec change ID | Depends on | Initial status | Outcome |
+| Wave | Priority | OpenSpec change ID | Depends on | Current status | Outcome |
 |---:|---:|---|---|---|---|
-| 1 | 1 | `p11-update-episodic-worker-foundation` | Existing implementation | Planned | Replace session continuation with the named-Context channel foundation |
-| 2 | 1 | `p21-add-worker-autonomous-continuation` | `p11` | Planned | Permit bounded same-thread turns without user input |
-| 2 | 2 | `p22-add-worker-artifact-store` | `p11` | Planned | Add named-Context-owned non-project artifacts with explicit access |
+| 1 | 1 | `p11-update-episodic-worker-foundation` | Existing implementation | Complete and archived | Replace session continuation with the named-Context channel foundation |
+| 2 | 1 | `p21-add-worker-autonomous-continuation` | `p11` | Complete and archived | Permit bounded same-thread turns without user input |
+| 2 | 2 | `p22-add-worker-artifact-store` | `p11` | Implemented; ready to sync and archive | Add named-Context-owned non-project artifacts with explicit access |
 | 2 | 3 | `p23-add-worker-warm-runtime` | `p11` | Planned | Reuse process/transport infrastructure without reusing a worker thread |
 | 2 | 4 | `p24-add-worker-advanced-telemetry` | `p11` | Planned | Add privacy-bounded measurements separate from History |
 | 3 | 1 | `p31-add-worker-context-compaction` | `p11`, `p24` | Planned | Add evaluated, explicit semantic Context compaction |

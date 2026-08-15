@@ -4,7 +4,17 @@ from __future__ import annotations
 
 pack = "worker"
 
-__all__ = ["archive_context", "list_contexts", "run", "select", "update_context"]
+__all__ = [
+    "archive_context",
+    "artifact_create",
+    "artifact_delete",
+    "artifact_list",
+    "artifact_open",
+    "list_contexts",
+    "run",
+    "select",
+    "update_context",
+]
 
 import os
 import threading
@@ -19,6 +29,7 @@ from ot.config import get_tool_config
 from ot.logging import LogSpan
 from ot.paths import get_effective_cwd
 from ottools._worker.app_server import AdapterOutcome, AppServerAdapter
+from ottools._worker.artifacts import ArtifactError, ArtifactStore, encode_content
 from ottools._worker.context import ContextError, ContextStore
 from ottools._worker.lifecycle import (
     ConsoleObserver,
@@ -133,6 +144,10 @@ def _failure_classification(outcome: AdapterOutcome) -> str | None:
 
 def _store() -> ContextStore:
     return ContextStore(context_max_kb=_get_config().context_max_kb)
+
+
+def _artifact_store() -> ArtifactStore:
+    return ArtifactStore(context_store=_store())
 
 
 def _recursive_error() -> dict[str, object] | None:
@@ -250,6 +265,142 @@ def archive_context(*, context: str) -> dict[str, object]:
         except (ContextError, ValidationError, ValueError, OSError) as exc:
             span.add(error=type(exc).__name__)
             return _operation_error(status="context_archive_failed", error=str(exc))
+
+
+def artifact_create(
+    *,
+    context: str,
+    content: str,
+    kind: Literal["text", "binary"],
+    media_type: str,
+    label: str,
+) -> dict[str, object]:
+    """Create one immutable artifact owned by an active named Context.
+
+    Args:
+        context: Existing active Context slug.
+        content: UTF-8 text, or strict base64 when ``kind`` is ``binary``.
+        kind: Content encoding kind: ``text`` or ``binary``.
+        media_type: Lowercase media type without parameters.
+        label: Bounded nonblank human-readable label.
+
+    Returns:
+        Bounded artifact metadata without the artifact body.
+    """
+    with LogSpan(span="worker.artifact_create") as span:
+        try:
+            metadata, warnings = _artifact_store().create(
+                context=context,
+                content=content,
+                kind=kind,
+                media_type=media_type,
+                label=label,
+            )
+            return {
+                "ok": True,
+                "context": context,
+                "artifact": metadata.model_dump(mode="json"),
+                "warnings": warnings,
+            }
+        except (ArtifactError, ContextError, ValidationError, ValueError, OSError) as exc:
+            span.add(error=type(exc).__name__)
+            return _operation_error(status="artifact_create_failed", error=str(exc))
+
+
+def artifact_open(*, context: str, artifact_id: str) -> dict[str, object]:
+    """Open one validated artifact explicitly by Context and opaque ID.
+
+    Args:
+        context: Existing active or archived Context slug.
+        artifact_id: Opaque artifact ID returned by create or list.
+
+    Returns:
+        Strict metadata and UTF-8 text or base64 binary content.
+    """
+    with LogSpan(span="worker.artifact_open") as span:
+        try:
+            artifact, warnings = _artifact_store().open(
+                context=context,
+                artifact_id=artifact_id,
+            )
+            return {
+                "ok": True,
+                "context": context,
+                "artifact": artifact.metadata.model_dump(mode="json"),
+                "content": encode_content(artifact),
+                "warnings": warnings,
+            }
+        except (ArtifactError, ContextError, ValidationError, ValueError, OSError) as exc:
+            span.add(error=type(exc).__name__)
+            return _operation_error(status="artifact_open_failed", error=str(exc))
+
+
+def artifact_list(
+    *,
+    context: str,
+    limit: int = 20,
+    offset: int = 0,
+) -> dict[str, object]:
+    """List bounded artifact metadata for one active or archived Context.
+
+    Args:
+        context: Existing active or archived Context slug.
+        limit: Oldest-first page size from 1 through 64.
+        offset: Zero-based oldest-first page offset.
+
+    Returns:
+        Metadata-only page and bounded orphan warnings.
+    """
+    with LogSpan(span="worker.artifact_list") as span:
+        try:
+            page = _artifact_store().list_artifacts(
+                context=context,
+                limit=limit,
+                offset=offset,
+            )
+            return {
+                "ok": True,
+                "context": context,
+                "artifacts": [
+                    item.model_dump(mode="json") for item in page.items
+                ],
+                "total": page.total,
+                "limit": page.limit,
+                "offset": page.offset,
+                "has_more": page.has_more,
+                "warnings": page.warnings,
+            }
+        except (ArtifactError, ContextError, ValidationError, ValueError, OSError) as exc:
+            span.add(error=type(exc).__name__)
+            return _operation_error(status="artifact_list_failed", error=str(exc))
+
+
+def artifact_delete(*, context: str, artifact_id: str) -> dict[str, object]:
+    """Delete one existing artifact explicitly from its owning Context.
+
+    Args:
+        context: Existing active or archived Context slug.
+        artifact_id: Opaque artifact ID returned by create or list.
+
+    Returns:
+        Bounded deletion receipt without artifact metadata or body.
+    """
+    with LogSpan(span="worker.artifact_delete") as span:
+        try:
+            warnings = _artifact_store().delete(
+                context=context,
+                artifact_id=artifact_id,
+            )
+            return {
+                "ok": True,
+                "context": context,
+                "artifact_id": artifact_id,
+                "deleted": True,
+                "warnings": warnings,
+            }
+        except (ArtifactError, ContextError, ValidationError, ValueError, OSError) as exc:
+            span.add(error=type(exc).__name__)
+            return _operation_error(status="artifact_delete_failed", error=str(exc))
 
 
 def run(

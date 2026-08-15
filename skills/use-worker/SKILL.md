@@ -42,6 +42,18 @@ Codex loads the same project instructions, skills, tools, plugins, and configure
 MCP servers from the current working directory and installed configuration. Do
 not remove or replace those capabilities for the worker.
 
+## Use artifacts explicitly
+
+Use `worker.artifact_create`, `worker.artifact_open`, `worker.artifact_list`, and
+`worker.artifact_delete` only with an explicit Context name. Create requires an
+active owner; open, list, and delete also work after archival. Text content is
+UTF-8 and binary content is strict base64.
+
+Artifact metadata and bodies are never automatic Chat, Context, Console, Status,
+History, or worker input. Do not open an artifact merely because its ID appears
+in Context. Keep project deliverables as normal project files, and never inspect
+or modify the artifact state directory directly.
+
 ## Handle the result
 
 - `completed`: Relay only the bounded Status receipt and stop. Substantial output
@@ -53,7 +65,8 @@ not remove or replace those capabilities for the worker.
 
 Treat the result as exactly `context`, `status`, and `message`. Do not read,
 search, write, format, validate, repair, or summarize files under
-`.onetool/state/worker`; those operations belong to the MCP.
+`.onetool/state/worker`; explicit artifact operations are the only artifact
+access path.
 
 `continue` is not a public result status. If a call fails with `turn_limit` or
 `episode_timeout` classification in its bounded message, relay that failure and

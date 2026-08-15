@@ -8,7 +8,7 @@ control Status.
 - One fresh Codex thread per synchronous episode, with up to 3 turns by default
   and no recursion or fan-out
 - Complete current state in strict `.onetool/state/worker/contexts/<name>.md` files
-- Five operations for running, selecting, listing, updating, and archiving Contexts
+- Nine operations for episodes, Context management, and explicit artifact access
 - Substantial output through Console; exact bounded `context`, `status`, and
   `message` results from `worker.run`
 - Current project, instructions, capabilities, and enforced authority inherited
@@ -23,6 +23,10 @@ control Status.
 | `worker.list_contexts(status?)` | List body-free Context metadata in name order |
 | `worker.update_context(context, description?, tags?)` | Create a Context or replace supplied metadata |
 | `worker.archive_context(context)` | Archive an active non-default Context |
+| `worker.artifact_create(context, content, kind, media_type, label)` | Create an immutable artifact for an active Context |
+| `worker.artifact_open(context, artifact_id)` | Open and validate one artifact explicitly |
+| `worker.artifact_list(context, limit?, offset?)` | List bounded metadata oldest-first |
+| `worker.artifact_delete(context, artifact_id)` | Delete one existing artifact explicitly |
 
 ## Key Parameters
 
@@ -35,6 +39,12 @@ control Status.
 | `status` | `active`, `archived`, or null | Optional `list_contexts` filter |
 | `description` | str or omitted | Complete replacement description; empty clears it |
 | `tags` | list[str] or omitted | Complete ordered replacement tag list; empty clears it |
+| `content` | str | UTF-8 text, or strict base64 for binary artifacts |
+| `kind` | `text` or `binary` | Artifact content encoding kind |
+| `media_type` | str | Lowercase `type/subtype` without parameters |
+| `label` | str | Nonblank artifact label of at most 256 UTF-8 bytes |
+| `artifact_id` | str | Opaque ID returned by artifact create or list |
+| `limit`, `offset` | int | Artifact page size 1–64 and zero-based offset |
 
 Context names use lowercase letters, digits, and single hyphens. A missing valid
 name used by `run`, `select`, or `update_context` is created atomically. Archived
@@ -76,6 +86,30 @@ are never replayed or claimed as rolled back. History records the actual number
 of turns started without storing continuation instructions, actions, or thread
 messages. `needs_input` deletes the thread; the answer starts a fresh episode and
 thread with the same named Context.
+
+## Context-owned artifacts
+
+Artifacts hold evidence or intermediate files that should survive an episode but
+are neither semantic Context nor project deliverables. They live under
+`.onetool/state/worker/artifacts/<context>/<artifact-id>/` as one immutable body
+and one strict metadata object. IDs are opaque and collision checked.
+
+Creation requires an existing active Context and returns metadata without the
+body. Open, list, and delete require the owning Context explicitly and remain
+available after archival. Open validates metadata, byte length, SHA-256 digest,
+media type, and text encoding before returning content. List returns metadata
+only in stable oldest-first pages. Unknown IDs fail; deletion is not idempotent.
+
+Each decoded body is limited to 8 MiB. One Context may retain at most 64 ready
+artifacts and 64 MiB of ready body bytes. Creation uses synced staging and atomic
+rename. Later access removes stale staging and excludes inconsistent finals with
+bounded orphan warnings. Path escape and symlinked state components are rejected.
+
+Artifact bodies and metadata are never automatic worker input and never copied
+into Context, Console, Status, History, telemetry, or project Local Changes.
+Workers and explicit inspectors use the four artifact operations; they never
+read or modify the state directory directly. Project deliverables remain normal
+project files.
 
 ## Context files
 
@@ -175,6 +209,19 @@ worker.run(
 # Discover and archive completed Contexts.
 worker.list_contexts(status="active")
 worker.archive_context(context="review-feature-x")
+
+# Preserve evidence outside Context and project deliverables.
+created = worker.artifact_create(
+    context="feature-x",
+    content="Focused test output",
+    kind="text",
+    media_type="text/plain",
+    label="Focused tests",
+)
+worker.artifact_open(
+    context="feature-x",
+    artifact_id=created["artifact"]["id"],
+)
 ```
 
 For coordinator-only behavior, explicitly invoke `$use-worker`. The

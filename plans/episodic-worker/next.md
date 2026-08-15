@@ -14,41 +14,6 @@ current Chat request and committed Context may enter a fresh worker
 automatically. Console bodies, mechanical History, prior worker messages, and
 tool observations must never become implicit worker or main-agent context.
 
-## Named-Context Artifact Store
-
-### Opportunity
-
-Workers may produce research notes, captured evidence, generated reports, or
-large intermediate results that should outlive one episode but do not belong in
-the small context file or as normal project deliverables.
-
-### Possible Design
-
-- Add `.onetool/state/worker/artifacts/<context>/` under the effective project.
-- Give artifact metadata a small stable identifier, relative path, media type or
-  kind, status, summary, and relevance to current work.
-- Require artifact paths to remain within the owning Context artifact root and use
-  atomic writes for MCP-created metadata.
-- Keep artifact content out of worker startup. Context would carry only compact
-  metadata, and workers would open a referenced artifact deliberately.
-- Keep normal project deliverables in the Local Changes channel. An artifact
-  store must not copy or replace files that already belong in the project tree.
-- Define retention and cleanup independently from context revisioning so deleting
-  an old artifact cannot silently corrupt current state.
-
-### Why Deferred
-
-V1 can reference ordinary existing project files. A managed artifact lifecycle
-adds storage ownership, cleanup, naming, path-security, and orphan-handling rules
-before there is evidence that normal files are inadequate.
-
-### Adoption Criteria
-
-- Repeated tasks create useful non-deliverable files that users do not want in
-  the project tree.
-- The lifecycle, security boundary, retention behavior, and recovery story can be
-  specified without expanding the core context schema substantially.
-
 ## Durable Console Retention and Replay
 
 ### Opportunity

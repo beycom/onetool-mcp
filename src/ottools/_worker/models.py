@@ -20,6 +20,7 @@ NEXT_ACTION_MAX_BYTES = 1024
 CONTEXT_DESCRIPTION_MAX_BYTES = 512
 CONTEXT_TAG_MAX_BYTES = 64
 CONTEXT_TAGS_MAX_ITEMS = 16
+ARTIFACT_LABEL_MAX_BYTES = 256
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -78,6 +79,10 @@ ContextTag = Annotated[
     NonBlank,
     AfterValidator(_bounded_utf8(label="tag", maximum=CONTEXT_TAG_MAX_BYTES)),
 ]
+ArtifactLabel = Annotated[
+    NonBlank,
+    AfterValidator(_bounded_utf8(label="label", maximum=ARTIFACT_LABEL_MAX_BYTES)),
+]
 
 
 class StrictModel(BaseModel):
@@ -100,6 +105,23 @@ class ContextListItem(ContextMetadata):
     """Body-free metadata returned by ``worker.list_contexts``."""
 
     name: NonBlank
+
+
+class ArtifactMetadata(StrictModel):
+    """Strict metadata for one immutable Context-owned artifact."""
+
+    schema_version: Literal[1] = 1
+    id: Annotated[
+        str,
+        StringConstraints(pattern=r"^artifact-[0-9a-f]{32}$"),
+    ]
+    label: ArtifactLabel
+    kind: Literal["text", "binary"]
+    media_type: Annotated[str, StringConstraints(min_length=3, max_length=255)]
+    byte_length: Annotated[StrictInt, Field(ge=0, le=8 * 1024 * 1024)]
+    sha256: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+    created_at: datetime
+    status: Literal["ready"] = "ready"
 
 
 class InternalCompletedOutput(StrictModel):
@@ -176,12 +198,15 @@ class HistoryRecord(StrictModel):
 
 
 __all__ = [
+    "ARTIFACT_LABEL_MAX_BYTES",
     "CONTEXT_DESCRIPTION_MAX_BYTES",
     "CONTEXT_TAGS_MAX_ITEMS",
     "CONTEXT_TAG_MAX_BYTES",
     "INTERNAL_TERMINAL_OUTPUT_ADAPTER",
     "NEXT_ACTION_MAX_BYTES",
     "STATUS_MAX_BYTES",
+    "ArtifactLabel",
+    "ArtifactMetadata",
     "ConsoleRecord",
     "ContextDescription",
     "ContextListItem",

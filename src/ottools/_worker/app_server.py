@@ -61,8 +61,11 @@ references through console.show. Keep the final message to a bounded Status
 receipt, diagnostic, or one direct question. Do not repeat Console content in the
 terminal response.
 
-Do not inspect or modify .onetool/state/worker. The MCP alone owns Context
-frontmatter, formatting, validation, revisioning, History, and persistence.
+Do not inspect or modify .onetool/state/worker directly. The MCP alone owns
+Context frontmatter, formatting, validation, revisioning, History, and
+persistence. Use only worker.artifact_create, worker.artifact_open,
+worker.artifact_list, or worker.artifact_delete for explicit Context-qualified
+artifact access; an artifact reference is never permission to open it implicitly.
 
 Use normal tool calls to finish as much substantive work as possible within the
 current turn. Your final response must match the supplied JSON schema. Return

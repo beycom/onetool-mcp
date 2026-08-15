@@ -36,6 +36,7 @@ and an explicit run name can override the selection for one episode.
 | `use-worker` skill | Defaults selection, resolves overrides, and delegates work |
 | Worker pack | Runs episodes and selects, lists, updates, or archives Contexts |
 | Context store | Validates and atomically commits named Markdown files |
+| Artifact store | Persists explicit bounded evidence under one named Context |
 | Console publisher | Delivers substantial worker output without returning its body |
 | Change observer | Classifies project-file effects without storing contents or diffs |
 | History journal | Appends project-scoped mechanical episode facts |
@@ -49,6 +50,10 @@ worker.select(context)
 worker.list_contexts(status?)
 worker.update_context(context, description?, tags?)
 worker.archive_context(context)
+worker.artifact_create(context, content, kind, media_type, label)
+worker.artifact_open(context, artifact_id)
+worker.artifact_list(context, limit?, offset?)
+worker.artifact_delete(context, artifact_id)
 ```
 
 Missing active names used by run, select, or update are created automatically.
@@ -69,11 +74,37 @@ never process-global or project-global state.
 | Local Changes | Worker file tools | Project and later workers | Project filesystem | Normal file access only |
 | Status | Worker and runtime | Main agent and user | Bounded operation result | Never |
 | History | MCP runtime | Explicit inspectors | Project `history.jsonl` | Never |
+| Artifacts | Worker or explicit inspector through MCP | Explicit opener | `artifacts/<context>/<artifact-id>/` | Never |
 
 Context name, description, tags, status, and revision are discoverable metadata.
 The semantic Markdown body is not returned to the main agent or copied across
 channels. Tool observations, source text, reasoning, internal continuation
 actions, and same-thread messages remain ephemeral.
+
+## Context-owned artifacts
+
+Artifacts preserve non-project evidence or intermediate files without turning
+them into semantic Context or Local Changes. Each immutable body and strict JSON
+metadata object lives under:
+
+```text
+.onetool/state/worker/artifacts/<context>/<artifact-id>/
+├── body
+└── metadata.json
+```
+
+Create accepts UTF-8 text or strict base64 binary content for an existing active
+Context and returns metadata only. Open validates owner, metadata, byte length,
+SHA-256 digest, media type, and encoding before returning content. List returns
+stable oldest-first metadata pages, and delete requires an existing ID. Archived
+Contexts reject new artifacts but preserve explicit open, list, and delete.
+
+One body is limited to 8 MiB; one Context is limited to 64 ready artifacts and
+64 MiB of ready body bytes. Creation writes and syncs a private staging
+directory, then atomically renames it. Later access removes stale staging and
+quarantines inconsistent final directories behind bounded orphan warnings.
+Paths and symlinked state components are rejected. Context archival never
+deletes artifacts, and artifacts never expire automatically.
 
 ## One episode
 
@@ -180,13 +211,18 @@ must fail before startup if it cannot ensure the child cannot broaden authority.
 
 The child loads the same project instructions, skills, tools, plugins, and
 configured MCP servers. One call may be active, and the marked child cannot call
-worker operations recursively.
+`worker.run` or Context-management operations recursively. It may use only the
+four explicit Context-qualified artifact operations from the worker pack.
 
 ## Failure behavior
 
 - Invalid Context name/frontmatter/body prevents startup or commit as applicable.
 - Revision or digest conflict preserves the manual or competing edit.
 - Archived names fail rather than reactivate or create replacements.
+- Invalid owners, IDs, encodings, media types, labels, limits, paths, or symlinks
+  fail without publishing an artifact.
+- Interrupted staging is removed on later access; inconsistent final artifacts
+  are excluded from list and open with bounded orphan warnings.
 - Invalid or oversized replacement preserves the prior file.
 - Continuation at the configured turn limit fails with `turn_limit`; expiry of
   the one monotonic episode deadline fails with `episode_timeout`.

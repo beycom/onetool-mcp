@@ -519,6 +519,10 @@ def test_final_scan_and_history_failures_warn_without_changing_known_outcome(
 def test_public_surface_has_no_session_or_execution_compatibility() -> None:
     assert worker_module.__all__ == [
         "archive_context",
+        "artifact_create",
+        "artifact_delete",
+        "artifact_list",
+        "artifact_open",
         "list_contexts",
         "run",
         "select",
