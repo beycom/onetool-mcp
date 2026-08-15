@@ -254,12 +254,21 @@ def test_configured_routing_and_per_call_precedence(
 
 def test_continuation_config_defaults_and_valid_limits() -> None:
     defaults = Config()
-    configured = Config(max_turns=10, episode_timeout_seconds=3600)
+    configured = Config(
+        max_turns=10,
+        episode_timeout_seconds=3600,
+        warm_runtime_enabled=True,
+        warm_runtime_idle_seconds=1,
+    )
 
     assert defaults.max_turns == 3
     assert defaults.episode_timeout_seconds == 900
+    assert defaults.warm_runtime_enabled is True
+    assert defaults.warm_runtime_idle_seconds == 300
     assert configured.max_turns == 10
     assert configured.episode_timeout_seconds == 3600
+    assert configured.warm_runtime_enabled is True
+    assert configured.warm_runtime_idle_seconds == 1
 
 
 @pytest.mark.parametrize(
@@ -275,6 +284,13 @@ def test_continuation_config_defaults_and_valid_limits() -> None:
         ("episode_timeout_seconds", "900"),
         ("episode_timeout_seconds", 0),
         ("episode_timeout_seconds", 3601),
+        ("warm_runtime_enabled", 1),
+        ("warm_runtime_enabled", "true"),
+        ("warm_runtime_idle_seconds", True),
+        ("warm_runtime_idle_seconds", 1.0),
+        ("warm_runtime_idle_seconds", "300"),
+        ("warm_runtime_idle_seconds", 0),
+        ("warm_runtime_idle_seconds", 3601),
     ],
 )
 def test_continuation_config_rejects_non_strict_or_out_of_range_values(

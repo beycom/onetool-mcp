@@ -198,32 +198,6 @@ the core context system.
 - Transport-only failures are frequent enough to harm usability.
 - The runtime can prove that a retry cannot duplicate project or external state.
 
-## Warm Runtime and Connection Reuse
-
-### Opportunity
-
-Keeping the Codex app-server process and MCP connections warm between episodes
-could reduce startup time while still creating a fresh thread each time.
-
-### Possible Design
-
-- Reuse only process and transport infrastructure; never reuse thread messages or
-  worker-local conversational state.
-- Add health checks, idle expiry, clean shutdown, and reconnection behavior.
-- Ensure cached credentials and MCP sessions do not broaden authority between
-  workers or projects.
-- Measure cold and warm startup separately.
-
-### Why Deferred
-
-Process lifetime optimization is independent of the context contract and can
-hide lifecycle bugs during the initial proof.
-
-### Adoption Criteria
-
-- Cold startup is a measured, material share of episode latency.
-- Reuse preserves thread isolation and project security boundaries under tests.
-
 ## Advanced Telemetry
 
 ### Opportunity

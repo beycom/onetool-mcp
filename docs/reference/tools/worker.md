@@ -13,6 +13,7 @@ control Status.
   `message` results from `worker.run`
 - Current project, instructions, capabilities, and enforced authority inherited
   without a public execution-policy parameter
+- Optional exact-keyed app-server reuse with a fresh deleted thread every episode
 
 ## Functions
 
@@ -87,6 +88,19 @@ of turns started without storing continuation instructions, actions, or thread
 messages. `needs_input` deletes the thread; the answer starts a fresh episode and
 thread with the same named Context.
 
+Warm runtime is enabled by default. The worker reuses at most one
+healthy initialized app-server process for the exact same project, inherited
+execution boundary, environment, and Codex/MCP credential configuration identity.
+A bounded protocol health check precedes reuse, idle processes expire, and server
+shutdown closes owned resources. Every episode still creates and deletes a fresh
+thread. A pre-turn health failure may create one cold replacement; work is never
+replayed after a turn starts.
+
+Operational logging distinguishes cold and warm startup and records initialization,
+first-event, thread-start, and total pre-turn duration without prompts, Context,
+Console bodies, file contents, tool results, or secrets. See the
+[repeatable benchmark and baseline](../../../dev/benchmarks/worker-warm-runtime.md).
+
 ## Context-owned artifacts
 
 Artifacts hold evidence or intermediate files that should survive an episode but
@@ -145,8 +159,8 @@ revision.
 ## Requires
 
 - An installed `codex` CLI whose app-server schema supports `thread/start`,
-  `turn/start`, `turn/interrupt`, structured output, inherited external sandboxing,
-  and `thread/delete`
+  `thread/list`, `turn/start`, `turn/interrupt`, structured output, inherited
+  external sandboxing, and `thread/delete`
 
 ## Configuration
 
@@ -163,6 +177,8 @@ None - no secrets or pack-specific settings are required.
 | `tools.worker.context_max_kb` | int | `16` | Positive maximum complete UTF-8 Context file size in KB |
 | `tools.worker.max_turns` | int | `3` | Strict maximum episode turn count, from 1 through 10 |
 | `tools.worker.episode_timeout_seconds` | int | `900` | Strict total episode deadline in seconds, from 1 through 3600 |
+| `tools.worker.warm_runtime_enabled` | bool | `true` | Reuse one healthy exact-keyed app-server process between serialized episodes |
+| `tools.worker.warm_runtime_idle_seconds` | int | `300` | Close an idle warm runtime after 1 through 3600 seconds |
 
 ```yaml
 tools:
@@ -172,6 +188,8 @@ tools:
     context_max_kb: 16
     max_turns: 3
     episode_timeout_seconds: 900
+    warm_runtime_enabled: true
+    warm_runtime_idle_seconds: 300
 ```
 
 ### Defaults
@@ -181,6 +199,8 @@ tools:
 - If `context_max_kb` is omitted, complete Context files may be at most 16 KB.
 - The turn count and deadline defaults are 3 turns and 900 total seconds. The
   deadline is monotonic and does not reset between turns.
+- Warm reuse defaults on with a 300-second monotonic idle expiry. Set
+  `warm_runtime_enabled: false` for explicit cold/debug operation.
 
 ## Examples
 

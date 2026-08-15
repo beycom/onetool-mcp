@@ -1,4 +1,12 @@
-## ADDED Requirements
+# worker-warm-runtime Specification
+
+## Purpose
+
+Defines safe, measured reuse of episodic-worker app-server process and eligible
+transport infrastructure while preserving a fresh deleted thread for every
+episode.
+
+## Requirements
 
 ### Requirement: Warm reuse requires measured benefit
 

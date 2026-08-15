@@ -396,6 +396,11 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
 
         get_services().run_reload_hooks()
 
+        from ottools._worker.app_server import shutdown_warm_runtimes
+
+        shutdown_warm_runtimes()
+        stop_span.add("workerWarmRuntimeStopped", True)
+
         from ot.generation.client import reset_http_client
 
         reset_http_client()

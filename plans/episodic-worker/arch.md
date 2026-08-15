@@ -41,6 +41,7 @@ and an explicit run name can override the selection for one episode.
 | Change observer | Classifies project-file effects without storing contents or diffs |
 | History journal | Appends project-scoped mechanical episode facts |
 | App-server adapter | Runs bounded same-thread turns, then deletes the fresh episode thread |
+| Warm-runtime manager | Reuses one healthy exact-keyed app-server process without retaining a thread |
 
 ## Worker surface
 
@@ -113,31 +114,63 @@ deletes artifacts, and artifacts never expire automatically.
    complete file, revision, and digest.
 3. The runtime captures a project-tree baseline with state/cache exclusions.
 4. The adapter proves the child cannot broaden the effective authority.
-5. The adapter starts a fresh thread in the effective project.
-6. The worker receives the current request and selected semantic body as
+5. The runtime manager either starts one cold app-server process or leases the
+   healthy idle process whose complete isolation key matches.
+6. The adapter starts a fresh thread in the effective project.
+7. The worker receives the current request and selected semantic body as
    explicitly delimited untrusted state.
-7. The worker performs work; substantial output goes to Console and project
+8. The worker performs work; substantial output goes to Console and project
    deliverables go through normal file operations.
-8. The worker returns `completed` or `needs_input`, or internally requests
+9. The worker returns `completed` or `needs_input`, or internally requests
    `continue` with one concrete bounded action. `continue` carries no Context,
    question, public Status message, or authority change.
-9. When continuation is accepted, the adapter starts another turn on the same
+10. When continuation is accepted, the adapter starts another turn on the same
    thread with the same effective authority. That turn receives only a fixed
    continuation instruction and the preceding action; Chat and Context are not
    supplied again.
-10. Steps 7–9 repeat within strict configured turn and total-deadline bounds.
+11. Steps 8–10 repeat within strict configured turn and total-deadline bounds.
     The internal continuation outcome is never returned by `worker.run`.
-11. At final `completed` or `needs_input`, OneTool validates and atomically
+12. At final `completed` or `needs_input`, OneTool validates and atomically
     commits or preserves the complete Context once, then deletes the thread.
     Failure, interruption, turn-limit, or deadline outcomes do not commit it.
-12. The runtime observes final Local Changes and appends project History with
+13. A healthy matching process may return to idle after thread deletion; cold,
+    unhealthy, expired, mismatched, or shutdown runtimes close their owned process.
+14. The runtime observes final Local Changes and appends project History with
     the actual number of turns started.
-13. `worker.run` returns exactly Context name, public status, and bounded message.
+15. `worker.run` returns exactly Context name, public status, and bounded message.
 
 Every later episode repeats this sequence with another fresh thread. Selecting
 the same name carries current semantic state; selecting a newly created review
 name carries no state from the implementation Context while still seeing the
 same project files and instructions.
+
+## Warm runtime
+
+Warm reuse is enabled by default after clearing its measured benefit and
+isolation gates. Explicit disabled mode starts and closes one app-server process
+per episode. Enabled mode caches at most one initialized process because
+`worker.run` remains serialized. The manager moves it through `starting`,
+`ready`, `leased`, `idle`, `unhealthy`, and `closed` states and performs a bounded
+protocol health check before every warm lease.
+
+The isolation key is a secret-free digest over the canonical project, inherited
+execution boundary, exact environment identity, and effective Codex/MCP and
+credential configuration identities. A key change retires the old process. Only
+the app-server process and its thread-independent transports are reusable;
+thread IDs, messages, Chat, Context, developer input, tool results, and reasoning
+are never cached.
+
+Idle runtimes close after the configured monotonic duration. Failed health,
+process exit, protocol desynchronization, or stale ownership closes the runtime;
+one cold replacement is permitted only before a worker turn starts. Failures
+after turn start follow the ordinary episode failure path and are never replayed.
+Server shutdown closes the resolved owned child process with bounded graceful and
+targeted force termination.
+
+Operational logs classify each episode as cold or warm and report initialization,
+first-event, thread-start, and total pre-turn durations without channel bodies,
+file contents, tool results, paths, or secrets. The measured baseline and
+repeatable no-model harness live in `dev/benchmarks/worker-warm-runtime.md`.
 
 ## Context files
 
@@ -230,6 +263,8 @@ four explicit Context-qualified artifact operations from the worker pack.
   without replaying or claiming to roll them back, while leaving Context at its
   pre-episode revision.
 - Failed and interrupted episodes are never replayed.
+- Warm-runtime health failure may replace a process before turn start, but active
+  work is never retried or replayed.
 - Cleanup, final-scan, or History failures add bounded warnings without reversing
   known worker, Console, Context, or filesystem effects.
 - A completed worker thread is never resumed.

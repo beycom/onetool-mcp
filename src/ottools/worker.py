@@ -23,7 +23,14 @@ from datetime import UTC, datetime
 from secrets import token_hex
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    ValidationError,
+)
 
 from ot.config import get_tool_config
 from ot.logging import LogSpan
@@ -62,6 +69,8 @@ class Config(BaseModel):
     context_max_kb: Annotated[StrictInt, Field(gt=0)] = 16
     max_turns: Annotated[StrictInt, Field(ge=1, le=10)] = 3
     episode_timeout_seconds: Annotated[StrictInt, Field(ge=1, le=3600)] = 900
+    warm_runtime_enabled: StrictBool = True
+    warm_runtime_idle_seconds: Annotated[StrictInt, Field(ge=1, le=3600)] = 300
 
 
 def _get_config() -> Config:
@@ -476,6 +485,8 @@ def run(
                 before_close=console_observer.capture_current,
                 max_turns=config.max_turns,
                 deadline=episode_deadline,
+                warm_runtime_enabled=config.warm_runtime_enabled,
+                warm_runtime_idle_seconds=config.warm_runtime_idle_seconds,
             )
             warnings = list(outcome.warnings)
             console_observer.capture_current()
@@ -523,6 +534,16 @@ def run(
                     warnings.append("history_append_failed")
 
             span.add(status=outcome.status)
+            if outcome.startup is not None:
+                span.add(
+                    runtimeStartup=outcome.startup.classification,
+                    initializationSeconds=round(
+                        outcome.startup.initialization_seconds, 6
+                    ),
+                    firstEventSeconds=round(outcome.startup.first_event_seconds, 6),
+                    threadStartSeconds=round(outcome.startup.thread_start_seconds, 6),
+                    preTurnSeconds=round(outcome.startup.pre_turn_seconds, 6),
+                )
             return _public_result(
                 context=loaded.name,
                 status=outcome.status,

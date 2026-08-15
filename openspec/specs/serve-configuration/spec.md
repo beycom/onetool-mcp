@@ -272,7 +272,8 @@ backend, interface, timeout, output bound, alias, or operation-specific routes.
 ### Requirement: Strict worker configuration
 
 The `tools.worker` configuration SHALL accept only optional `model`, `effort`,
-`context_max_kb`, `max_turns`, and `episode_timeout_seconds` fields. `model` and
+`context_max_kb`, `max_turns`, `episode_timeout_seconds`,
+`warm_runtime_enabled`, and `warm_runtime_idle_seconds` fields. `model` and
 `effort` SHALL be nonblank when set. `context_max_kb` SHALL be a strict positive
 integer and SHALL default to `16`.
 
@@ -280,6 +281,7 @@ integer and SHALL default to `16`.
 - **WHEN** `tools.worker` is absent or omits the context and continuation limit fields
 - **THEN** the worker context limit SHALL default to 16 KB
 - **AND** the continuation limits SHALL default to 3 turns and 900 seconds
+- **AND** warm runtime SHALL default to enabled with a 300-second idle limit
 
 #### Scenario: Valid worker configuration
 - **WHEN** `tools.worker` contains a nonblank model, nonblank effort, positive integer `context_max_kb`, and valid integer continuation limits
@@ -323,3 +325,27 @@ explicit values unchanged.
 #### Scenario: Selection is rejected by installed Codex
 - **WHEN** the installed app-server rejects the effective model or effort
 - **THEN** `worker.run` SHALL return `failed`
+
+### Requirement: Strict warm-runtime configuration
+
+`tools.worker.warm_runtime_enabled` SHALL be a strict boolean and SHALL default
+to `true`. `tools.worker.warm_runtime_idle_seconds` SHALL be a strict integer
+from 1 through 3600 and SHALL default to `300`. Unknown or invalid values SHALL
+be rejected by configuration validation.
+
+#### Scenario: Warm runtime settings are omitted
+- **WHEN** worker configuration omits warm-runtime fields
+- **THEN** eligible serialized episodes SHALL reuse a healthy matching runtime
+- **AND** the idle limit SHALL be 300 seconds
+
+#### Scenario: Warm runtime is enabled
+- **WHEN** `warm_runtime_enabled` is `true` with a valid idle duration
+- **THEN** eligible serialized episodes SHALL reuse a healthy matching runtime
+
+#### Scenario: Warm runtime is disabled
+- **WHEN** `warm_runtime_enabled` is `false`
+- **THEN** each episode SHALL start and close a cold process
+
+#### Scenario: Idle duration is invalid
+- **WHEN** the value is a boolean, non-integer, less than 1, or greater than 3600
+- **THEN** configuration validation SHALL fail

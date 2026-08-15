@@ -4,13 +4,19 @@ from __future__ import annotations
 
 import json
 import stat
+import time
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
 
 import ottools.worker as worker_module
-from ottools._worker.app_server import AppServerAdapter, _sandbox_policy
+from ottools._worker.app_server import (
+    AppServerAdapter,
+    RuntimeState,
+    WarmRuntimeManager,
+    _sandbox_policy,
+)
 from ottools._worker.lifecycle import HistoryStore
 from ottools._worker.models import InternalContinueOutput
 from ottools.worker import Config, run
@@ -33,6 +39,7 @@ sequence = os.environ.get("FAKE_APP_SEQUENCE", "").split(",")
 sequence = [item for item in sequence if item]
 trace = Path(os.environ["FAKE_APP_TRACE"])
 turn_number = 0
+thread_number = 0
 
 if len(sys.argv) > 1:
     output = Path(sys.argv[-1])
@@ -69,8 +76,14 @@ for line in sys.stdin:
     request_id = message["id"]
     if method == "initialize":
         emit({"id": request_id, "result": {}})
+    elif method == "thread/list":
+        if mode == "health_failure":
+            emit({"id": request_id, "error": {"message": "unhealthy"}})
+        else:
+            emit({"id": request_id, "result": {"data": []}})
     elif method == "thread/start":
-        thread_id = f"thread-{os.getpid()}"
+        thread_number += 1
+        thread_id = f"thread-{os.getpid()}-{thread_number}"
         record({"event": "thread", "id": thread_id})
         emit({"id": request_id, "result": {"thread": {"id": thread_id}}})
     elif method == "turn/start":
@@ -245,6 +258,130 @@ def test_completed_episode_deletes_after_context_and_before_close_callback(
     assert "Implement the approved change." in worker_input
     assert "# Current state" in worker_input
     assert 'untrusted="true"' in worker_input
+
+
+def test_warm_runtime_reuses_process_with_fresh_deleted_threads(
+    fake_app_server: tuple[Path, Path],
+    tmp_path: Path,
+) -> None:
+    server, trace = fake_app_server
+    manager = WarmRuntimeManager()
+    adapter = AppServerAdapter(
+        command=(str(server),),
+        verify_protocol=False,
+        runtime_manager=manager,
+    )
+
+    first = adapter.run_episode(
+        prompt="First.",
+        context="",
+        cwd=str(tmp_path),
+        model=None,
+        effort=None,
+        on_terminal=lambda _terminal: None,
+        warm_runtime_enabled=True,
+    )
+    second = adapter.run_episode(
+        prompt="Second.",
+        context="",
+        cwd=str(tmp_path),
+        model=None,
+        effort=None,
+        on_terminal=lambda _terminal: None,
+        warm_runtime_enabled=True,
+    )
+
+    assert first.startup is not None and first.startup.classification == "cold"
+    assert second.startup is not None and second.startup.classification == "warm"
+    assert second.startup.initialization_seconds == 0.0
+    assert manager.state is RuntimeState.IDLE
+    events = _events(trace)
+    methods = [event.get("method") for event in events if event["event"] == "request"]
+    assert methods.count("initialize") == 1
+    assert methods.count("thread/list") == 1
+    assert methods.count("thread/start") == methods.count("thread/delete") == 2
+    thread_ids = [event["id"] for event in events if event["event"] == "thread"]
+    assert len(thread_ids) == len(set(thread_ids)) == 2
+    first_delete = methods.index("thread/delete")
+    assert first_delete < methods.index("thread/list")
+    manager.shutdown()
+    assert manager.state is None
+    rejected = adapter.run_episode(
+        prompt="After shutdown.",
+        context="",
+        cwd=str(tmp_path),
+        model=None,
+        effort=None,
+        on_terminal=lambda _terminal: None,
+        warm_runtime_enabled=True,
+    )
+    assert rejected.status == "failed"
+    assert "manager is shut down" in rejected.message
+
+
+def test_failed_warm_health_check_gets_one_cold_pre_execution_replacement(
+    fake_app_server: tuple[Path, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    server, trace = fake_app_server
+    monkeypatch.setenv("FAKE_APP_MODE", "health_failure")
+    manager = WarmRuntimeManager()
+    adapter = AppServerAdapter(
+        command=(str(server),),
+        verify_protocol=False,
+        runtime_manager=manager,
+    )
+    kwargs = {
+        "context": "",
+        "cwd": str(tmp_path),
+        "model": None,
+        "effort": None,
+        "on_terminal": lambda _terminal: None,
+        "warm_runtime_enabled": True,
+    }
+
+    first = adapter.run_episode(prompt="First.", **kwargs)
+    second = adapter.run_episode(prompt="Second.", **kwargs)
+
+    assert first.status == second.status == "completed"
+    assert second.startup is not None and second.startup.classification == "cold"
+    methods = [
+        event.get("method") for event in _events(trace) if event["event"] == "request"
+    ]
+    assert methods.count("thread/list") == 1
+    assert methods.count("initialize") == 2
+    assert methods.count("turn/start") == 2
+    manager.shutdown()
+
+
+def test_idle_warm_runtime_expires_and_closes_owned_process(
+    fake_app_server: tuple[Path, Path],
+    tmp_path: Path,
+) -> None:
+    server, _ = fake_app_server
+    manager = WarmRuntimeManager()
+    result = AppServerAdapter(
+        command=(str(server),),
+        verify_protocol=False,
+        runtime_manager=manager,
+    ).run_episode(
+        prompt="Complete.",
+        context="",
+        cwd=str(tmp_path),
+        model=None,
+        effort=None,
+        on_terminal=lambda _terminal: None,
+        warm_runtime_enabled=True,
+        warm_runtime_idle_seconds=1,
+    )
+
+    assert result.status == "completed"
+    assert manager.state is RuntimeState.IDLE
+    deadline = time.monotonic() + 2
+    while manager.state is not None and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert manager.state is None
 
 
 def test_continuation_reuses_thread_authority_with_ephemeral_input(
@@ -536,17 +673,22 @@ def test_two_public_episodes_use_fresh_threads_and_complete_named_context(
 ) -> None:
     server, trace = fake_app_server
     monkeypatch.setenv("OT_CWD", str(tmp_path))
-    real_adapter = AppServerAdapter(command=(str(server),))
+    manager = WarmRuntimeManager()
+    real_adapter = AppServerAdapter(command=(str(server),), runtime_manager=manager)
     with (
         patch.object(worker_module, "_get_config", return_value=Config()),
         patch.object(worker_module, "AppServerAdapter", return_value=real_adapter),
     ):
         first = run(prompt="Implement the first slice.", context="feature-x")
         second = run(prompt="Continue with the next slice.", context="feature-x")
+    manager.shutdown()
 
     assert first["context"] == second["context"] == "feature-x"
     assert first["status"] == second["status"] == "completed"
     events = _events(trace)
+    methods = [event.get("method") for event in events if event["event"] == "request"]
+    assert methods.count("initialize") == 1
+    assert methods.count("thread/list") == 1
     thread_ids = [event["id"] for event in events if event["event"] == "thread"]
     assert len(thread_ids) == len(set(thread_ids)) == 2
     turns = [event["params"] for event in events if event.get("method") == "turn/start"]
@@ -566,12 +708,14 @@ def test_public_continuation_commits_only_final_context_and_records_turns(
     server, trace = fake_app_server
     monkeypatch.setenv("OT_CWD", str(tmp_path))
     monkeypatch.setenv("FAKE_APP_SEQUENCE", "continue_effect,completed")
-    real_adapter = AppServerAdapter(command=(str(server),))
+    manager = WarmRuntimeManager()
+    real_adapter = AppServerAdapter(command=(str(server),), runtime_manager=manager)
     with (
         patch.object(worker_module, "_get_config", return_value=Config()),
         patch.object(worker_module, "AppServerAdapter", return_value=real_adapter),
     ):
         result = run(prompt="Implement and verify.", context="feature-x")
+    manager.shutdown()
 
     assert result == {
         "context": "feature-x",
@@ -607,7 +751,8 @@ def test_public_turn_limit_preserves_pre_episode_context(
     server, _ = fake_app_server
     monkeypatch.setenv("OT_CWD", str(tmp_path))
     monkeypatch.setenv("FAKE_APP_MODE", "continue")
-    real_adapter = AppServerAdapter(command=(str(server),))
+    manager = WarmRuntimeManager()
+    real_adapter = AppServerAdapter(command=(str(server),), runtime_manager=manager)
     with (
         patch.object(
             worker_module,
@@ -617,6 +762,7 @@ def test_public_turn_limit_preserves_pre_episode_context(
         patch.object(worker_module, "AppServerAdapter", return_value=real_adapter),
     ):
         result = run(prompt="Keep working.", context="feature-x")
+    manager.shutdown()
 
     assert result["status"] == "failed"
     assert result["message"].startswith("turn_limit:")
@@ -638,12 +784,14 @@ def test_later_failure_preserves_effects_without_context_commit_or_replay(
     server, trace = fake_app_server
     monkeypatch.setenv("OT_CWD", str(tmp_path))
     monkeypatch.setenv("FAKE_APP_SEQUENCE", "continue_effect,malformed")
-    real_adapter = AppServerAdapter(command=(str(server),))
+    manager = WarmRuntimeManager()
+    real_adapter = AppServerAdapter(command=(str(server),), runtime_manager=manager)
     with (
         patch.object(worker_module, "_get_config", return_value=Config()),
         patch.object(worker_module, "AppServerAdapter", return_value=real_adapter),
     ):
         result = run(prompt="Implement and verify.", context="feature-x")
+    manager.shutdown()
 
     assert result["status"] == "failed"
     assert (tmp_path / "worker-output.txt").read_text(encoding="utf-8") == "deliverable"
@@ -665,15 +813,16 @@ def test_continued_needs_input_is_deleted_and_answer_uses_fresh_thread(
 ) -> None:
     server, trace = fake_app_server
     monkeypatch.setenv("OT_CWD", str(tmp_path))
-    monkeypatch.setenv("FAKE_APP_SEQUENCE", "continue,needs_input_context")
-    real_adapter = AppServerAdapter(command=(str(server),))
+    monkeypatch.setenv("FAKE_APP_SEQUENCE", "continue,needs_input_context,completed")
+    manager = WarmRuntimeManager()
+    real_adapter = AppServerAdapter(command=(str(server),), runtime_manager=manager)
     with (
         patch.object(worker_module, "_get_config", return_value=Config()),
         patch.object(worker_module, "AppServerAdapter", return_value=real_adapter),
     ):
         first = run(prompt="Implement.", context="feature-x")
-        monkeypatch.setenv("FAKE_APP_SEQUENCE", "completed")
         second = run(prompt="Use target A.", context="feature-x")
+    manager.shutdown()
 
     assert first["status"] == "needs_input"
     assert second["status"] == "completed"
@@ -704,8 +853,9 @@ def test_public_episode_integrates_default_review_console_changes_and_history(
 ) -> None:
     server, trace = fake_app_server
     monkeypatch.setenv("OT_CWD", str(tmp_path))
-    monkeypatch.setenv("FAKE_APP_MODE", "channels")
-    real_adapter = AppServerAdapter(command=(str(server),))
+    monkeypatch.setenv("FAKE_APP_SEQUENCE", "channels,channels,needs_input")
+    manager = WarmRuntimeManager()
+    real_adapter = AppServerAdapter(command=(str(server),), runtime_manager=manager)
     with (
         patch.object(worker_module, "_get_config", return_value=Config()),
         patch.object(worker_module, "AppServerAdapter", return_value=real_adapter),
@@ -715,11 +865,11 @@ def test_public_episode_integrates_default_review_console_changes_and_history(
             prompt="Review independently.",
             context="review-feature-x",
         )
-        monkeypatch.setenv("FAKE_APP_MODE", "needs_input")
         input_result = run(
             prompt="Continue the review.",
             context="review-feature-x",
         )
+    manager.shutdown()
 
     assert default_result["context"] == "default"
     assert review_result["context"] == input_result["context"] == "review-feature-x"
