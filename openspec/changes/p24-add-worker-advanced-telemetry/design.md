@@ -82,8 +82,9 @@ malformed store and returns a diagnostic rather than fabricating aggregates.
 
 ## Risks / Trade-offs
 
-- **Metrics can become identifying** → Use low-cardinality dimensions, no session
-  IDs or paths, opt-in collection, and bounded local retention.
+- **Metrics can become identifying** → Use low-cardinality dimensions, no Context
+  names, descriptions, tags, paths, or reconstructable identities, opt-in
+  collection, and bounded local retention.
 - **Provider token fields differ** → Record provenance and availability; never
   infer measured tokens from Context bytes.
 - **Append storage can grow** → Enforce age and count bounds during collection and
@@ -94,9 +95,10 @@ malformed store and returns a diagnostic rather than fabricating aggregates.
 ## Migration Plan
 
 Add disabled-by-default configuration, catalog models, collection hooks, bounded
-storage, query/clear operations, and privacy tests. Update `arch.md` and remove
-only `Advanced Telemetry` from `next.md` after verification. The resulting
-catalog and queries become the required evidence source for `p31`.
+storage, query/clear operations, and privacy tests. Update
+`plans/episodic-worker/arch.md` and remove only `Advanced Telemetry` from
+`plans/episodic-worker/next.md` after verification. The resulting catalog and
+queries become the required evidence source for `p31`.
 
 ## Open Questions
 

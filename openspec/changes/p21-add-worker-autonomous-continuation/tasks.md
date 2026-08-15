@@ -17,7 +17,7 @@
 
 ## 3. Add the Bounded Turn Loop
 
-- [ ] 3.1 Reuse the same worker thread and exact execution policy for later turns,
+- [ ] 3.1 Reuse the same worker thread and exact effective authority for later turns,
   supplying only the fixed continuation instruction and `next_action` after turn 1.
 - [ ] 3.2 Enforce the configured maximum count and one monotonic total deadline,
   mapping limit exhaustion to bounded failure without Context commit or replay.
@@ -33,14 +33,14 @@
 - [ ] 4.2 Test Context commit timing, preserved side effects without replay, exact
   authority reuse, and absence of repeated Chat or Context input.
 - [ ] 4.3 Prove `needs_input` deletes the continued thread and the user's answer
-  starts a fresh episode and thread with the same committed Context.
+  starts a fresh episode and thread with the same named committed Context.
 
 ## 5. Promote and Validate
 
 - [ ] 5.1 Verify implementation against the proposal, design, and delta specs.
-- [ ] 5.2 Update the program `arch.md` with verified continuation lifecycle and
+- [ ] 5.2 Update `plans/episodic-worker/arch.md` with verified continuation lifecycle and
   channel routing, then remove only `Bounded Autonomous Same-Thread Continuation`
-  and its supporting-only text from the program `next.md`.
+  and its supporting-only text from `plans/episodic-worker/next.md`.
 - [ ] 5.3 Update worker skill/reference documentation and the delivery plan status
   if an execution record or status field has been added.
 - [ ] 5.4 Run focused tests, strict OpenSpec validation, and `just check`; resolve

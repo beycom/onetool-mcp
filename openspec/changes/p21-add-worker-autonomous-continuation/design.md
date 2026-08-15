@@ -6,7 +6,7 @@ continuation is reserved for cases where the worker reaches the end of a turn,
 requires no user input, and can name concrete remaining work.
 
 This change depends on the synced `p11` channel contract. It must not change
-public terminal statuses, automatic-input rules, execution authority, or the
+public terminal statuses, selected-Context rules, effective authority, or the
 fresh episode required after user input.
 
 ## Goals / Non-Goals
@@ -41,15 +41,15 @@ Rejected because that would make orchestration stateful and expose thread reuse.
 
 ### 2. Reuse one thread only within the current episode
 
-The first turn receives the current Chat request and committed Context. Each
-later turn uses the same thread and execution policy and receives one fixed
+The first turn receives the current Chat request and complete selected Context.
+Each later turn uses the same thread and effective authority and receives one fixed
 developer-controlled continuation instruction plus `next_action`. Chat and
 Context are not repeated. Same-thread messages remain ephemeral and disappear
 when the thread is deleted.
 
 `needs_input` is always terminal: commit valid Context, delete the thread, finish
 observation and History, and return the question. Its answer starts a fresh
-episode and fresh thread.
+episode and fresh thread using the same Context name.
 
 ### 3. Apply one count limit and one total deadline
 
@@ -92,8 +92,9 @@ rolled back.
 
 Add configuration with defaults matching the bounded behavior, extend the
 internal schema and adapter loop, then update tests, skill guidance, History turn
-count coverage, `arch.md`, and reference documentation. Remove only `Bounded
-Autonomous Same-Thread Continuation` from `next.md` after verification.
+count coverage, `plans/episodic-worker/arch.md`, and reference documentation.
+Remove only `Bounded Autonomous Same-Thread Continuation` from
+`plans/episodic-worker/next.md` after verification.
 
 ## Open Questions
 

@@ -1,35 +1,37 @@
 ## Why
 
 Workers sometimes create evidence or intermediate files that should survive an
-episode but are neither small continuation Context nor project deliverables. A
-session-owned artifact store gives that material an explicit, isolated lifecycle.
+episode without becoming project deliverables, semantic Context, or automatic
+model input. The named-Context foundation needs an explicit artifact namespace
+whose lifecycle remains separate from the editable Context file.
 
 ## What Changes
 
-- Add a project-scoped `artifacts/` root beside each session's Context and
-  History, with opaque stable IDs and bounded typed metadata.
-- Add explicit create, open, list, and delete operations; artifacts are never
-  injected automatically into worker startup.
-- Enforce containment, symlink safety, atomic metadata updates, media/kind and
-  size validation, collision handling, retention, cleanup, and orphan recovery.
-- Keep artifact bodies and summaries out of Context, History, Console, and
-  Status; Context may hold only an operationally necessary compact reference.
-- Keep project deliverables in Local Changes and user-facing content in Console.
+- Add a project-local artifact namespace owned by each named Context.
+- Add explicit create, open, list, and delete operations requiring a Context name.
+- Keep artifact bodies out of automatic worker startup, Context files, Console,
+  Status, and mechanical History.
+- Enforce bounded metadata, byte/count limits, containment, digest validation,
+  staged atomic creation, and conservative orphan recovery.
+- Permit creation only for active Contexts while preserving artifact inspection
+  and explicit deletion after Context archival.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `worker-artifact-store`: Explicit session-scoped artifact creation, access,
-  metadata, retention, recovery, deletion, and channel isolation.
+- `worker-artifact-store`: Named-Context-owned artifact creation, access,
+  retention, recovery, and channel isolation.
 
 ### Modified Capabilities
 
+None.
 
 ## Impact
 
-- Depends on the synced `p11-update-episodic-worker-foundation` contract.
-- Affects session-state storage, worker-facing tool discovery, path validation,
-  cleanup, tests, skill guidance, and reference documentation.
-- Does not copy project files into managed storage, create automatic memory,
-  retain Console output, or provide semantic indexing or cross-session storage.
+- Depends on the synced named-Context contract from
+  `p11-update-episodic-worker-foundation`.
+- Affects project-local worker state, worker-facing tool discovery, path
+  validation, archival retention, tests, skill guidance, and documentation.
+- Does not copy project files, inject artifacts automatically, create semantic
+  memory, retain Console output, or provide cross-Context search.

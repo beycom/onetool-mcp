@@ -16,8 +16,8 @@ episode and one worker.
 - Enforce a strict maximum turn count and one total episode deadline.
 - Commit Context only on terminal `completed` or `needs_input`, record the final
   turn count mechanically, and never replay earlier turns after failure.
-- Preserve the fresh-episode boundary after `needs_input`, serialization,
-  non-recursion, and the original execution authority.
+- Preserve the fresh-episode boundary after `needs_input`, the same named Context,
+  serialization, non-recursion, and the original effective authority.
 
 ## Capabilities
 

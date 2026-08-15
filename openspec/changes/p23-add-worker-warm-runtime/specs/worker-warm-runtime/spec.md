@@ -39,7 +39,7 @@ messages, Chat, Context, developer input, tool results, or worker reasoning.
 - **AND** the first thread SHALL be deleted before the runtime becomes idle
 
 #### Scenario: User answers needs_input
-- **WHEN** an answer starts the next episode in the same session
+- **WHEN** an answer starts the next episode with the same named Context
 - **THEN** any eligible process reuse SHALL still start a fresh thread
 
 ### Requirement: Runtime health and idle expiry are explicit
@@ -56,7 +56,7 @@ duration.
 
 #### Scenario: Runtime expires while idle
 - **WHEN** idle duration reaches the configured expiry
-- **THEN** transports and the child process SHALL be closed without affecting committed session state
+- **THEN** transports and the child process SHALL be closed without affecting any committed Context file
 
 ### Requirement: Active work is never replayed on warm-runtime failure
 

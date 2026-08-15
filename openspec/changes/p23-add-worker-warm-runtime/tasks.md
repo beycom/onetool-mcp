@@ -1,7 +1,7 @@
 ## 1. Confirm Foundation and Measure Cold Startup
 
-- [ ] 1.1 Confirm the verified `p11` specs are synced before integrating runtime
-  reuse and preserve serialized fresh-thread behavior.
+- [ ] 1.1 Confirm the verified named-Context `p11` specs are synced before
+  integrating runtime reuse and preserve serialized fresh-thread behavior.
 - [ ] 1.2 Build a repeatable cold-start benchmark separating initialization,
   first protocol event, thread start, and total pre-turn duration.
 - [ ] 1.3 Record the representative baseline, target material improvement, and
@@ -40,9 +40,9 @@
 
 - [ ] 5.1 Verify implementation and measured material benefit against the
   proposal, design, delta specs, and cold baseline.
-- [ ] 5.2 Update program `arch.md` with verified reusable-state boundaries, then
+- [ ] 5.2 Update `plans/episodic-worker/arch.md` with verified reusable-state boundaries, then
   remove only `Warm Runtime and Connection Reuse` and supporting-only text from
-  program `next.md`.
+  `plans/episodic-worker/next.md`.
 - [ ] 5.3 Update worker/reference documentation and the delivery plan status if an
   execution record or status field has been added.
 - [ ] 5.4 Run focused lifecycle/benchmark tests, strict OpenSpec validation, and

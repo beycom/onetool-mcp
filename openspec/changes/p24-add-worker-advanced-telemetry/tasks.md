@@ -1,6 +1,6 @@
 ## 1. Confirm Foundation and Freeze the Metric Catalog
 
-- [ ] 1.1 Confirm verified `p11` specs are synced and identify which optional
+- [ ] 1.1 Confirm verified named-Context `p11` specs are synced and identify which optional
   `p21` turn and `p23` runtime measurements are available without depending on them.
 - [ ] 1.2 Define every v1 metric's name, unit, source, scope, availability,
   aggregation, consumer, retention, and privacy classification in typed models.
@@ -13,9 +13,9 @@
   measured, estimated, or unavailable provenance and no fabricated zeros.
 - [ ] 2.2 Capture whole-episode latency, first event, status, turn count, runtime
   mode, and Context byte/revision/validation measurements with correct units.
-- [ ] 2.3 Enforce a strict schema excluding sessions, prompts, messages, paths,
-  error text, Context/Console/file/tool bodies, credentials, secrets, and
-  unapproved high-cardinality labels.
+- [ ] 2.3 Enforce a strict schema excluding Context names, descriptions, tags,
+  prompts, messages, paths, error text, Context/Console/file/tool bodies,
+  credentials, secrets, and unapproved high-cardinality labels.
 - [ ] 2.4 Keep telemetry collection after known episode outcomes and isolate its
   failures from worker, Console, Context, Local Changes, Status, and History.
 
@@ -41,8 +41,9 @@
 
 - [ ] 5.1 Verify metric semantics, privacy, retention, unavailable-data behavior,
   and `p31` evidence sufficiency against all artifacts.
-- [ ] 5.2 Update program `arch.md` with verified telemetry behavior, then remove
-  only `Advanced Telemetry` and supporting-only text from program `next.md`.
+- [ ] 5.2 Update `plans/episodic-worker/arch.md` with verified telemetry behavior,
+  then remove only `Advanced Telemetry` and supporting-only text from
+  `plans/episodic-worker/next.md`.
 - [ ] 5.3 Update worker/reference documentation and the delivery plan status if an
   execution record or status field has been added.
 - [ ] 5.4 Run focused telemetry/privacy tests, strict OpenSpec validation, and

@@ -1,120 +1,111 @@
 ## Context
 
-The foundation intentionally stores one small, complete Context snapshot and
-asks each worker to author current truth. Semantic compaction is warranted only
-if `p24` telemetry shows representative sessions repeatedly approach the byte
-limit despite concise replacements and an evaluation can detect loss of
-continuation-critical state.
+The named-Context foundation stores one small complete Markdown body for each
+project-local workstream and asks workers to author current truth. Semantic
+compaction is warranted only if privacy-bounded `p24` telemetry shows
+representative Contexts repeatedly approach the byte limit despite concise
+replacements and an evaluation detects loss of continuation-critical state.
 
 This change depends on synced `p11` and implemented `p24`. Creating these
-artifacts does not satisfy the evidence gate or authorize implementation without
-the required dataset and measurements.
+artifacts does not satisfy the evidence gate or authorize implementation.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Make compaction an explicit, evaluated semantic operation.
-- Preserve every normal Context validation, revision, and atomic-commit boundary.
-- Require approval for material removals without exposing Context to the main
-  agent or History.
-- Preserve the last valid revision on every failure.
+- Make compaction an explicit evaluated operation for one active Context name.
+- Preserve frontmatter metadata and normal revision, digest, validation, and
+  atomic-commit boundaries.
+- Require approval for material removals without exposing semantic bodies.
+- Preserve the last valid file on every failure.
 - Measure continuation retention as well as bytes.
 
 **Non-Goals:**
 
 - Automatic truncation, deterministic repair, embeddings, retrieval,
-  cross-session memory, transcript summarization, indexed History, or implicit
-  reinjection of removed content.
+  cross-Context memory, transcript summarization, indexed History, archived-
+  Context compaction, or implicit reinjection of removed content.
 
 ## Decisions
 
 ### 1. Enforce an evidence and evaluation entry gate
 
-Implementation cannot proceed until an approved evidence manifest identifies
-representative sessions where canonical Context reaches at least 75% of its limit
-despite concise worker-authored replacements. The manifest references a
-versioned evaluation set with expected goals, success criteria, constraints,
-decisions, blockers, unresolved questions, and essential file references.
+Implementation cannot proceed until an approved manifest identifies
+representative active Context files where the complete encoded file reaches at
+least 75% of its limit despite concise worker-authored bodies. The manifest
+references a versioned evaluation set with expected goals, criteria, constraints,
+decisions, blockers, questions, and essential project-contained references.
 
 Acceptance requires 100% retention of marked essential items, no invented facts
-or references, valid complete Context in every passing case, and at least 20%
-median byte reduction across eligible cases. If evidence or evaluation cannot
-meet the gate, the change remains deferred and Context behavior is unchanged.
-
-Alternative: compact whenever validation sees an oversized object. Rejected
-because semantic judgment is not validation or deterministic repair.
+or references, valid bounded Markdown in every passing case, and at least 20%
+median byte reduction across eligible cases. Context names, descriptions, and
+tags remain excluded from telemetry and the evidence manifest.
 
 ### 2. Expose one explicit two-phase operation
 
-The worker pack adds
-`context_compact(session_id, approval_token=None)`. Without a token, it loads the
-last valid revision, invokes a tool-free compaction model with only that Context
-and fixed instructions, validates the complete proposal, compares it with the
-base revision, and runs the evaluation checks.
+The worker pack adds `context_compact(context, approval_token=None)`. Without a
+token, it requires an existing active Context, loads its last valid revision and
+digest, invokes a tool-free model with only the semantic body and fixed
+instructions, validates one complete proposal body, compares it with the base,
+and runs the evaluation.
 
-The bounded result contains session ID, status (`compacted`,
-`approval_required`, `unchanged`, or `failed`), bounded message, before/proposed
-byte counts, before/after revision, removal categories and counts, and an opaque
-approval token only when required. It never contains Context text or removed
-content.
-
-Alternative: let ordinary startup compact automatically. Rejected because it
-silently changes trusted continuation state and makes failures hard to attribute.
+The bounded result contains Context name, status (`compacted`,
+`approval_required`, `unchanged`, or `failed`), message, before/proposed bytes,
+before/after revision, removal category counts, and an opaque approval token only
+when required. It never contains body text, frontmatter description or tags, or
+removed content.
 
 ### 3. Require approval for material removal
 
-Removing or materially weakening a goal, success criterion, active constraint,
-decision, blocker, unresolved question, or essential reference requires a second
-call with an approval token. The token is single-use, expires after 30 minutes,
-and binds session, base revision, canonical proposal digest, removal metadata,
-and evaluation version. It grants no broader authority.
+Removing or weakening a goal, criterion, active constraint, decision, blocker,
+question, or essential reference requires a second call with a single-use token.
+The token expires after 30 minutes and binds Context name, base revision, base
+digest, proposal digest, removal metadata, and evaluation version. It grants no
+broader authority.
 
-Non-material deduplication or removal of explicitly resolved/obsolete work may
-commit on the first explicit call if every evaluation passes. If no meaningful
-reduction exists, return `unchanged` without incrementing revision.
+Non-material deduplication or removal of explicitly resolved work may commit on
+the first explicit call if every evaluation passes. No meaningful reduction
+returns `unchanged` without revision increment.
 
-### 4. Reuse complete Context validation and atomic commit
+### 4. Reuse named-Context validation and atomic commit
 
-The proposal passes the existing strict schema, reference containment, canonical
-rendering, size limit, expected-revision check, and beside-file atomic replacement.
-Approval rechecks the current base revision and proposal digest before commit.
-Any timeout, model/protocol error, invalid or oversized proposal, hallucinated or
-missing essential item, expired token, stale revision, failed evaluation, or
-write failure leaves the last valid Context unchanged.
+The proposal passes UTF-8, Markdown, reference containment, canonical frontmatter,
+complete-file size, expected revision/digest, and beside-file atomic replacement.
+Description, tags, name, and active status are preserved unchanged. Approval
+rechecks current status, revision, base digest, and proposal digest before commit.
+
+Timeout, model/protocol error, invalid or oversized body, lost or invented item,
+archival, expired token, stale revision/digest, failed evaluation, or write
+failure leaves the last valid file unchanged.
 
 The compactor has no project-write tools, Console publisher, artifact access, or
-external side-effect tools. It cannot mutate project files or other channels.
+external side-effect tools.
 
 ### 5. Keep audit metadata bounded and separate
 
-History may record that explicit compaction was requested, its outcome, base and
-result revisions, before/after bytes, evaluation version, and removal categories
-and counts. It never records Context, proposal, removed text, model reasoning, or
-approval-token material. Telemetry may aggregate size reduction, latency,
-evaluation pass/fail, and retention score under its existing privacy contract.
+History may record Context name, request/outcome, revisions, bytes,
+evaluation version, and removal category counts. It never records the semantic
+body, description, tags, proposal, removed text, reasoning, or token material.
+Telemetry may aggregate reduction, latency, evaluation outcome, and retention
+score without Context identity under the `p24` privacy contract.
 
 ## Risks / Trade-offs
 
-- **A model removes essential state** → Require a versioned evaluation, strict
-  category checks, and approval for material removals.
-- **Approval metadata leaks Context** → Expose only category/count metadata and an
-  opaque bound token, never excerpts.
-- **Evaluation overfits examples** → Require representative manifests and retain
-  a holdout set before default adoption changes.
-- **Compaction races with a worker commit** → Bind to the loaded revision and
-  reject stale approval or commit.
-- **Size improves while continuation worsens** → Gate on perfect essential-item
-  retention and hallucination checks before measuring reduction.
+- **A model removes essential state** → Require evaluation and approval.
+- **Approval metadata leaks state** → Expose categories/counts and opaque token only.
+- **Evidence identifies Contexts** → Exclude names and frontmatter metadata.
+- **Compaction races with worker or manual edit** → Bind revision and digest.
+- **Context is archived during approval** → Recheck active status before commit.
+- **Bytes improve while continuation worsens** → Require perfect essential retention first.
 
 ## Migration Plan
 
-First collect and approve the evidence manifest and evaluation set. Then add the
-tool-free proposer, comparison, approval tokens, validation/commit integration,
-audit metadata, telemetry, and failure tests. Update `arch.md` and remove only
-`Semantic Compaction or Summarization` from `next.md` after the exit gate passes.
+Collect and approve evidence and evaluation, then add the tool-free proposer,
+comparison, approval tokens, named-Context validation/commit integration, audit
+metadata, telemetry, and failure tests. Update `plans/episodic-worker/arch.md`
+and remove only the compaction section from `plans/episodic-worker/next.md`
+after the exit gate passes.
 
 ## Open Questions
 
-None. If the entry thresholds are not met, the prescribed outcome is to defer
-implementation rather than weaken them silently.
+None. If thresholds are not met, implementation remains deferred.

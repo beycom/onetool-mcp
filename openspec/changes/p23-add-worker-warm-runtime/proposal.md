@@ -31,7 +31,8 @@ without weakening the episodic boundary.
 
 ## Impact
 
-- Depends on the synced `p11-update-episodic-worker-foundation` contract.
+- Depends on the synced named-Context contract from
+  `p11-update-episodic-worker-foundation`.
 - Affects the app-server adapter lifecycle, transport ownership, worker
   configuration, shutdown handling, instrumentation, tests, and documentation.
 - Does not pool or resume worker threads, preload shared Context, enable

@@ -95,7 +95,8 @@ prompts, Context, Console, paths beyond the project partition digest, and secret
 Land the benchmark first, add the disabled-by-default manager and configuration,
 then verify project/policy switching, expiry, crash, reconnect, cleanup, and
 shutdown. Enable only after the measured benefit and isolation gate pass. Update
-`arch.md` and remove only `Warm Runtime and Connection Reuse` from `next.md`.
+`plans/episodic-worker/arch.md` and remove only `Warm Runtime and Connection
+Reuse` from `plans/episodic-worker/next.md`.
 
 ## Open Questions
 

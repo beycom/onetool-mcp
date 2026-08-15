@@ -1,101 +1,103 @@
 ## Context
 
-The foundation distinguishes small semantic Context, user-facing Console, normal
-project Local Changes, bounded Status, and mechanical History. None is suitable
-for session-scoped evidence or intermediate files that should outlive one episode
-without becoming a project deliverable or automatic model input.
+The foundation separates small semantic Context, Console, Local Changes, Status,
+and project-scoped mechanical History. None is suitable for bounded evidence or
+intermediate files that should outlive an episode without entering the project or
+automatic model input.
 
-This change depends on the synced `p11` storage and channel boundaries.
+Named Context replaces the earlier opaque session as the durable workstream
+identity. Artifact ownership must follow that identity without turning the
+Context Markdown file into a manifest or making Context archival destructive.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Give each episodic session an explicit, bounded artifact namespace.
-- Support safe create, open, list, and delete operations with stable IDs.
-- Define crash recovery, retention, cleanup, and channel isolation.
+- Give each named Context an explicit bounded artifact namespace.
+- Support safe create, open, list, and delete with stable opaque artifact IDs.
+- Define crash recovery, limits, archival retention, and channel isolation.
 
 **Non-Goals:**
 
-- Copying project files, automatic memory, semantic indexing, cross-session
-  sharing, durable Console replay, or storing bodies in Context or History.
-- Replacing normal project deliverables or the Console data plane.
+- Copying project files, automatic memory, semantic indexing, cross-Context
+  search, durable Console replay, or storing artifact bodies in Context or History.
+- Context deletion, cascading cleanup, automatic expiry, or project deliverables.
 
 ## Decisions
 
-### 1. Store artifacts beside session Context
+### 1. Store artifacts under named Context ownership
 
-Artifacts live under
-`episodic-context/<session-id>/artifacts/<artifact-id>/` in the same
-project-scoped state root. Each directory contains one immutable body and one
-atomically written strict metadata JSON object. IDs are opaque and collision
-checked. Metadata contains schema version, ID, nonblank label, kind (`text` or
-`binary`), validated media type, byte length, SHA-256 digest, creation timestamp,
-and status (`ready`). Unknown fields are rejected.
+Artifacts live at
+`.onetool/state/worker/artifacts/<context>/<artifact-id>/`. Each directory
+contains one immutable body and one atomically written strict metadata JSON
+object. The owning Context file must exist. Artifact IDs are opaque and collision
+checked; the Context name is validated through the foundation contract.
 
-The initial limits are 8 MiB per body, 64 artifacts, and 64 MiB total per
-session. Limits apply to decoded bytes and are checked before durable promotion.
+Metadata contains schema version, ID, nonblank label, kind (`text` or `binary`),
+validated media type, byte length, SHA-256 digest, creation timestamp, and status
+`ready`. Unknown fields are rejected.
 
-Alternative: place artifacts in the project. Rejected because non-deliverable
-state would pollute Local Changes and project ownership.
+Initial limits are 8 MiB per body, 64 artifacts, and 64 MiB total per Context.
 
-### 2. Add explicit worker artifact operations
+Alternative: place artifacts beside project deliverables. Rejected because
+non-deliverable evidence would pollute Local Changes and project ownership.
+
+### 2. Add explicit Context-qualified operations
 
 The worker pack adds `artifact_create`, `artifact_open`, `artifact_list`, and
-`artifact_delete`. Every call requires an existing project-scoped `session_id`.
-Create accepts content, kind, media type, and label; it returns metadata without
-echoing the body. Open requires an artifact ID and returns its validated body and
-metadata. List is metadata-only with stable oldest-first pagination. Delete is
-idempotent only for an existing artifact ID; an unknown ID fails through current
-validation rather than pretending success.
+`artifact_delete`. Every operation requires an existing Context name. Create also
+requires that Context to be active. Open, list, and delete remain available for an
+archived Context so users can inspect or clean retained evidence.
+
+Create accepts content, kind, media type, and label and returns metadata without
+echoing the body. Open requires an artifact ID and returns validated body and
+metadata. List is metadata-only with stable oldest-first pagination. Delete
+requires an existing artifact and never treats an unknown ID as success.
 
 Artifacts are never injected at worker startup. A worker or explicit inspector
-must call open. Context may carry a compact artifact ID and purpose in an existing
-reference field only when needed for continuation; it never carries metadata or
-body copies.
-
-Alternative: expose the artifact directory as ordinary file paths. Rejected
-because it bypasses containment, metadata, size, and lifecycle enforcement.
+must open one deliberately. The Context body may carry a compact artifact ID and
+purpose when needed, but never an artifact body or copied metadata.
 
 ### 3. Use staged atomic creation and conservative recovery
 
-Create writes to a unique staging directory inside the session artifact root,
-flushes and `fsync`s the body, writes and syncs metadata, then atomically renames
-the directory to its final ID. It never follows caller-controlled symlinks.
+Create writes to a unique staging directory inside the owning Context artifact
+root, flushes and `fsync`s the body, writes and syncs metadata, then atomically
+renames the directory to its final ID. It never follows caller-controlled
+symlinks.
 
-On store access, stale staging directories are removed. A final directory missing
-valid metadata or whose body digest/size does not match is quarantined from list
-and open and reported as an orphan warning. Recovery never guesses metadata or
-returns unvalidated content.
+On store access, stale staging directories are removed. A final directory with
+missing or invalid metadata or mismatched body digest/size is quarantined from
+list and open and reported as an orphan warning. Recovery never guesses metadata.
 
-### 4. Tie retention to the episodic session
+### 4. Preserve artifacts when a Context is archived
 
-Artifacts persist until explicit artifact deletion or session cleanup. Deleting
-an artifact removes metadata and body as one store operation; failure returns an
-error and never reports success. Session cleanup removes all artifacts only when
-the owning session is explicitly removed. V1 has no time-based expiry.
+Context archival changes semantic lifecycle, not artifact retention. Existing
+artifacts remain listable, openable, and deletable. New artifact creation fails
+while the owner is archived. No context-archive operation recursively deletes
+artifact bodies or metadata.
 
-History may record only artifact IDs and mechanical operation kinds when useful;
-it never records labels, media types, summaries, paths, or bodies. Artifact
-metadata and bodies are never automatic input to any agent.
+Artifacts persist until explicit artifact deletion. Because the foundation has
+no Context delete operation, this change adds no cascading Context cleanup or
+time-based expiry.
+
+History may record only owning Context name, artifact ID, and mechanical operation
+kind. It never records labels, media types, summaries, paths, or bodies.
 
 ## Risks / Trade-offs
 
-- **Binary content can consume storage** → Enforce decoded per-artifact, count,
-  and total-session limits before promotion.
-- **Crashes split body and metadata writes** → Stage inside the target filesystem,
-  atomically rename, and quarantine inconsistent final directories.
-- **IDs in Context become stale after deletion** → Open fails clearly; the store
-  does not mutate semantic Context behind the worker's back.
-- **Explicit open adds a tool call** → Preserve that friction because automatic
-  injection would turn artifacts into hidden memory.
+- **Binary content consumes storage** → Enforce per-body, count, and total-Context limits.
+- **Crashes split body and metadata** → Stage, sync, atomically rename, and quarantine inconsistencies.
+- **Archived Contexts retain bytes** → Allow explicit inspection and deletion; do not make archive destructive.
+- **Artifact IDs in Context become stale** → Open fails clearly and never rewrites semantic Context.
+- **Explicit open adds a tool call** → Preserve the friction because automatic injection becomes hidden memory.
 
 ## Migration Plan
 
-Add the store and operations behind the existing worker pack, then test limits,
-containment, symlinks, collisions, pagination, deletion, session cleanup, and
-crash recovery. After verification, document the channel, update `arch.md`, and
-remove only `Session Artifact Store` from `next.md`.
+Add the Context-qualified store and operations after the named-Context foundation
+is synced. Test active and archived ownership, limits, containment, symlinks,
+collisions, pagination, deletion, and recovery. After verification, update
+`plans/episodic-worker/arch.md`, references, and remove only the artifact-store
+section from `plans/episodic-worker/next.md`.
 
 ## Open Questions
 

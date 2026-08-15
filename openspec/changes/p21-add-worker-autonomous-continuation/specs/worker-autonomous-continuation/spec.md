@@ -5,7 +5,7 @@
 An internal `continue` outcome SHALL be valid only when the worker needs no user
 input and has concrete remaining work. The outcome SHALL contain one bounded
 `next_action` and SHALL NOT contain Context, a Console body, a public Status
-message, or an execution-policy change. `worker.run` SHALL NOT expose `continue`
+message, or an authority change. `worker.run` SHALL NOT expose `continue`
 as a public status.
 
 #### Scenario: Worker can continue autonomously
@@ -19,15 +19,15 @@ as a public status.
 
 ### Requirement: Later turns receive only fixed ephemeral continuation input
 
-The first turn SHALL receive the current Chat request and complete committed
+The first turn SHALL receive the current Chat request and complete selected
 Context. A later turn SHALL receive only the fixed continuation instruction and
 the preceding `next_action` through the same thread. The runtime SHALL preserve
-the original execution policy and SHALL NOT reinject Chat, Context, History,
+the original effective authority and SHALL NOT reinject Chat, Context, History,
 Console, Local Changes observations, or Status.
 
 #### Scenario: Second turn begins
 - **WHEN** the first turn returns valid `continue`
-- **THEN** the second turn SHALL use the same thread and execution policy
+- **THEN** the second turn SHALL use the same thread and effective authority
 - **AND** Chat and committed Context SHALL NOT be supplied again
 
 ### Requirement: Continuation obeys a turn limit and total deadline
@@ -48,9 +48,9 @@ between turns.
 
 ### Requirement: Context commits only at terminal outcomes
 
-The runtime SHALL commit optional complete Context only from final `completed` or
-`needs_input`. It SHALL NOT checkpoint Context from `continue` or preserve a
-partial later-turn submission.
+The runtime SHALL commit an optional complete replacement for the selected
+Context only from final `completed` or `needs_input`. It SHALL NOT checkpoint
+Context from `continue` or preserve a partial later-turn submission.
 
 #### Scenario: Multiple turns complete
 - **WHEN** one or more `continue` turns are followed by valid `completed` with Context
@@ -65,7 +65,7 @@ partial later-turn submission.
 
 `needs_input` SHALL terminate continuation, delete the current thread, and finish
 the episode. The user's answer SHALL start a distinct episode and thread with the
-same session ID and committed Context.
+same named committed Context.
 
 #### Scenario: Continued worker requests input
 - **WHEN** any turn returns valid `needs_input`

@@ -35,10 +35,11 @@ event values as though they were episode duration.
 
 ### Requirement: Telemetry excludes sensitive and high-cardinality content
 
-Telemetry SHALL NOT store session IDs, prompts, agent messages, paths, labels,
-error text, Context bodies, Console identifiers or bodies, file contents, diffs,
-tool results, credentials, secrets, or other unapproved high-cardinality values.
-Observation IDs SHALL be opaque and SHALL not permit session reconstruction.
+Telemetry SHALL NOT store Context names, descriptions, tags, prompts, agent
+messages, paths, labels, error text, Context bodies, Console identifiers or
+bodies, file contents, diffs, tool results, credentials, secrets, or other
+unapproved high-cardinality values. Observation IDs SHALL be opaque and SHALL not
+permit reconstruction of named Context activity.
 
 #### Scenario: Episode handles sensitive content
 - **WHEN** a worker prompt, Console message, file, or error contains sensitive text

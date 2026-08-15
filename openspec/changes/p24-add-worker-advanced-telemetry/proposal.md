@@ -34,7 +34,8 @@ compaction.
 
 ## Impact
 
-- Depends on the synced `p11-update-episodic-worker-foundation` contract and
+- Depends on the synced named-Context contract from
+  `p11-update-episodic-worker-foundation` and
   provides the evidence contract required by `p31`.
 - Affects worker lifecycle instrumentation, telemetry storage/query surfaces,
   privacy controls, tests, and documentation.
