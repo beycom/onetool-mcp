@@ -5,8 +5,14 @@ of these features is required by the current proposal, design, or future delta
 specifications unless promoted through a separate OpenSpec change.
 
 The adoption rule is evidence first. A feature should move into scope only after
-real episodic-worker use demonstrates that the simple whole-context design is
-insufficient and the added behavior can be specified and tested independently.
+real episodic-worker use demonstrates that the current serialized channel design
+is insufficient and the added behavior can be specified and tested
+independently.
+
+Every extension must preserve the channel boundary defined in `arch.md`. Only the
+current Chat request and committed Context may enter a fresh worker
+automatically. Console bodies, mechanical History, prior worker messages, and
+tool observations must never become implicit worker or main-agent context.
 
 ## Session Artifact Store
 
@@ -25,6 +31,8 @@ the small context file or as normal project deliverables.
   atomic writes for MCP-created metadata.
 - Keep artifact content out of worker startup. Context would carry only compact
   metadata, and workers would open a referenced artifact deliberately.
+- Keep normal project deliverables in the Local Changes channel. An artifact
+  store must not copy or replace files that already belong in the project tree.
 - Define retention and cleanup independently from context revisioning so deleting
   an old artifact cannot silently corrupt current state.
 
@@ -41,37 +49,71 @@ before there is evidence that normal files are inadequate.
 - The lifecycle, security boundary, retention behavior, and recovery story can be
   specified without expanding the core context schema substantially.
 
-## Human-Facing Console Outbox
+## Durable Console Retention and Replay
 
 ### Opportunity
 
-A worker may generate progress details, warnings, evidence, and user-facing
-results that are too large for the main agent's bounded terminal relay but still
-need to be inspectable.
+The existing Console outbox keeps user-facing worker content out of the main
+agent's conversational history, but its message bodies are scoped to one runtime
+instance. Users may eventually need to reconnect, replay, or retain selected
+Console results across runtime restarts.
 
 ### Possible Design
 
-- Add an append-oriented `console.md` or structured event log beside the context.
-- Separate durable user output from worker context; never inject the console into
-  later workers automatically.
-- Record episode and revision identifiers so users can correlate messages with a
-  worker result.
-- Define whether writes stream during execution or publish atomically at the end.
-  If streaming is allowed, incomplete-episode markers and crash recovery are
-  required.
-- Expose bounded terminal metadata telling the main agent where detailed output
-  is available.
+- Extend the existing Console protocol and body store rather than adding a
+  `console.md`, event log, or second Console transport.
+- Associate retained messages with session and episode identifiers using
+  runtime-owned metadata; keep bodies out of `history.jsonl`.
+- Add explicit retention, deletion, reconnect, and replay controls for users.
+- Preserve bounded receipts for agents and never inject a retained Console body
+  into later workers or the main agent automatically.
+- If streaming is added, define incomplete-message markers and crash recovery
+  without changing terminal Status semantics.
 
 ### Why Deferred
 
-The worker's normal terminal result is sufficient to prove the episode model.
-An outbox creates another persistence contract and must not become hidden context
-or an unbounded transcript by another name.
+The existing Console channel is sufficient for live user delivery. Persistence
+across runtime instances adds ownership, retention, deletion, replay, and stale
+reference rules that are independent of the initial channel boundary.
 
 ### Adoption Criteria
 
-- Real terminal results are routinely truncated or too large to relay usefully.
-- Users need durable episode output independent of project deliverables.
+- Users demonstrably need Console results after their producing runtime exits.
+- Retention and deletion can be specified without turning Console into History,
+  Context, or long-term memory.
+
+## Indexed History and Rich Queries
+
+### Opportunity
+
+The MCP-owned `history.jsonl` journal is sufficient for serialized append and
+bounded inspection. Large numbers of sessions or user-facing filtering may
+eventually require indexed queries by episode, status, time, Console message, or
+changed path.
+
+### Possible Design
+
+- Introduce a purpose-built project-scoped relational store or derived index for
+  the strict mechanical History schema. Do not reuse the agent-facing `mem`
+  schema, semantic retrieval, embeddings, relevance, or mutable-memory history.
+- Keep the MCP as the sole writer and preserve append-oriented episode records.
+- Index only bounded mechanical fields. Never store prompts, Console bodies,
+  tool results, file contents, diffs, or agent-authored narrative.
+- Keep Local Changes observation VCS-independent and do not depend on Localhist.
+- Define pagination, retention, deletion, corruption recovery, and schema
+  evolution before replacing or indexing the structured journal.
+
+### Why Deferred
+
+One serialized writer and one compact JSON record per episode do not initially
+need a database, migration system, query planner, or secondary indexes.
+
+### Adoption Criteria
+
+- Measurements show JSONL inspection or filtering is a material usability or
+  performance problem.
+- Required queries and retention behavior are stable enough to justify a
+  purpose-built schema without weakening channel isolation.
 
 ## Selective Context Reads and Deterministic Search
 
@@ -108,9 +150,8 @@ to grow beyond its purpose.
 
 ### Opportunity
 
-Whole-object replacement may become inefficient if context grows, multiple
-writers are introduced, or independent components need to update state without
-resubmitting unrelated fields.
+Whole-object replacement may become inefficient if context grows or independent
+sections need to be updated without resubmitting unrelated fields.
 
 ### Possible Design
 
@@ -119,18 +160,16 @@ resubmitting unrelated fields.
 - Support typed whole-item `upsert` and `remove`; continue rejecting arbitrary
   YAML paths and partial unvalidated objects.
 - Require an expected base revision and apply a batch atomically.
-- Define conflicts explicitly rather than silently merging concurrent updates.
 - Keep runtime-managed schema and revision fields unavailable to callers.
 
 ### Why Deferred
 
-V1 has one worker and one small file. IDs, patch ordering, conflict rules, and
-merge semantics solve a concurrency and scale problem that does not yet exist.
+V1 has one worker and one small file. IDs, patch ordering, and item-level
+mutation solve a scale problem that does not yet exist.
 
 ### Adoption Criteria
 
-- Whole-context submissions cause measured latency or repeated omission errors,
-  or a separately approved change introduces concurrent writers.
+- Whole-context submissions cause measured latency or repeated omission errors.
 - Mutation semantics can remain smaller and clearer than replacing the file.
 
 ## Semantic Compaction or Summarization
@@ -166,33 +205,52 @@ truth and lets the MCP perform only deterministic mechanical repair.
 - An evaluation set can detect loss of goals, constraints, decisions, blockers,
   and essential references after compaction.
 
-## Scheduling, Concurrency, and Worker Trees
+## Bounded Autonomous Same-Thread Continuation
 
 ### Opportunity
 
-Independent subtasks could run concurrently, and some episodes might benefit
-from delegated research or background execution.
+A Codex app-server turn already permits multiple sequential tool calls before the
+worker returns its terminal result. Some tasks may nevertheless benefit from an
+additional model turn on the same worker thread when work can continue without
+user input.
 
 ### Possible Design
 
-- Add a bounded queue with explicit task ownership and terminal states.
-- Give concurrent work isolated context branches or an explicit merge protocol;
-  never let workers race on one YAML file.
-- Preserve inherited sandbox and approval policy for every child.
-- Reject unbounded recursion and enforce depth, fan-out, and resource limits.
-- Require user-visible cancellation and status semantics for background jobs.
+- Keep one `worker.run` call as one synchronous episode with one worker thread,
+  but allow that thread to execute a bounded number of sequential turns.
+- Add an internal worker-authored `continue` outcome indicating that another turn
+  can proceed without user input. Never expose `continue` as a public
+  `worker.run` status.
+- Supply the request and complete episodic context only to the first turn. Start
+  later turns with a fixed continuation instruction and the ephemeral
+  same-thread conversation.
+- Prefer completing tool use within the current turn. Continuation is not a
+  replacement for ordinary tool calls.
+- Apply one total episode deadline and a strict maximum turn count so the worker
+  cannot continue indefinitely.
+- Preserve the same execution policy for every turn and never introduce an
+  approval or authority-escalation bridge.
+- Commit context only on the final `completed` or `needs_input` outcome.
+- Treat `needs_input` as a mandatory episode boundary: commit any valid returned
+  context, delete the worker thread, and return the question to the main agent.
+  The user's answer starts a fresh episode and fresh thread with the same session
+  ID and committed context, never by resuming the prior worker thread.
+- If a later turn fails or is interrupted, do not replay earlier turns or assume
+  their project or external side effects can be reversed.
 
 ### Why Deferred
 
-Concurrency changes the context model from a single current truth into branchable
-state and introduces conflict resolution, scheduling, cancellation, and resource
-governance. It should not be hidden inside the initial context proof.
+The current single-turn worker already supports multi-step tool execution.
+Additional turns introduce a continuation signal, loop limits, cumulative timeout
+rules, later-turn failure handling, and ambiguity about when context becomes
+committed.
 
 ### Adoption Criteria
 
-- Serialized episodes are a demonstrated throughput bottleneck.
-- A separate proposal defines branch ownership, merge behavior, resource limits,
-  approvals, and failure recovery.
+- Representative workers demonstrably stop before completing work even though no
+  user input is required and ordinary within-turn tool use is available.
+- Evaluations show bounded continuation improves completion without increasing
+  repeated work, uncontrolled loops, or unclear side-effect recovery.
 
 ## Retry and Recovery Policies
 
@@ -262,6 +320,8 @@ cost and context drift and identify where latency occurs.
   and worker-produced output where the runtime can measure them accurately.
 - Track time to first event, total duration, terminal status, context revisions,
   validation failures, and rejected file sizes.
+- Keep telemetry distinct from the bounded mechanical History journal; neither
+  channel may become implicit agent input.
 - Avoid claims that the context file size equals total model input.
 - Define retention and privacy rules before storing prompts, paths, or errors.
 
@@ -287,6 +347,8 @@ or reuse knowledge across orchestrator sessions.
 
 - Build transcript storage, full-text search, semantic retrieval, or durable
   cross-session memory as separate capabilities with explicit user controls.
+- Treat transcripts as conversation records, not as the MCP-authored mechanical
+  History journal, and never derive one by copying the other.
 - Keep retrieved history distinct from trusted current context and label its
   source and age.
 - Define retention, deletion, privacy, prompt-injection handling, and project

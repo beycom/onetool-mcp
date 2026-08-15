@@ -147,3 +147,58 @@ SHALL preserve the committed file.
 #### Scenario: Episode does not complete successfully
 - **WHEN** an episode fails or is interrupted
 - **THEN** the committed context and revision SHALL remain unchanged
+
+### Requirement: Context remains private to workers in its session
+
+Committed Context SHALL be supplied automatically only to fresh workers in the
+same session. The MCP SHALL NOT return the Context body through `worker.run`,
+Status, Console, History, or the main conversation.
+
+#### Scenario: Episode returns to the main agent
+- **WHEN** an episode reaches any terminal status
+- **THEN** the public result SHALL NOT contain Context or a Context summary
+- **AND** a later fresh worker in the same session SHALL still receive the complete committed Context
+
+### Requirement: Each episode appends mechanical History
+
+After terminal handling and Local Changes observation, the MCP SHALL append one
+canonical versioned JSON record to
+`episodic-context/<session-id>/history.jsonl`. The MCP SHALL be the sole History
+writer. Each record SHALL contain only the episode ID, UTC timestamps, terminal
+status, turn count, Context revisions before and after, Console message IDs and
+kinds, Local Changes observation state and changed path classifications, optional
+bounded failure classification, and bounded warning codes.
+
+History SHALL NOT contain Chat text, agent-authored narrative, Context bodies,
+Console bodies, file contents, diffs, tool results, or intermediate reasoning.
+
+#### Scenario: Terminal episode is recorded
+- **WHEN** terminal processing and the final project scan complete
+- **THEN** the MCP SHALL append exactly one History record for that episode
+- **AND** it SHALL flush and `fsync` the journal before returning Status
+
+#### Scenario: Episode has Console output and Local Changes
+- **WHEN** the worker publishes Console messages and changes project files
+- **THEN** History SHALL contain only the Console message IDs and kinds plus sorted project-relative path classifications
+- **AND** History SHALL contain none of the corresponding bodies, contents, or diffs
+
+#### Scenario: History append fails
+- **WHEN** the MCP cannot append or durably flush the History record
+- **THEN** the known worker, Console, Context, and Local Changes outcomes SHALL remain unchanged
+- **AND** Status SHALL include a bounded History warning
+
+### Requirement: History readers preserve a valid journal prefix
+
+History records SHALL use a strict schema version and reject unknown fields.
+A reader SHALL preserve every complete valid earlier record when an interrupted
+append leaves one malformed final line, but SHALL reject malformed non-final
+records.
+
+#### Scenario: Final append is interrupted
+- **WHEN** `history.jsonl` ends with one malformed partial line after valid records
+- **THEN** an explicit History read SHALL return the valid prefix
+- **AND** it SHALL identify the ignored final line as incomplete
+
+#### Scenario: Interior record is malformed
+- **WHEN** a malformed History record is followed by another line
+- **THEN** the explicit History read SHALL fail rather than silently skip the record

@@ -29,8 +29,10 @@
   installed Codex version, including initialization, `thread/delete` capability
   preflight, one fresh thread, one turn, and strict worker terminal output.
 - [x] 3.2 Validate and map explicit current-project `cwd`, `approval_policy: never`,
-  disabled network, and read-only or workspace-write sandboxing; test failure
-  before thread startup for invalid or unrepresentable policies.
+  and the main agent's effective read-only, workspace-write, danger-full-access,
+  or external sandbox, including network access, writable roots, and temporary
+  directory exclusions; test exact forwarding and failure before thread startup
+  for invalid or unrepresentable policies.
 - [x] 3.3 Normalize completion, required-input, protocol failure, timeout, malformed
   output, process exit, and caller interruption into the four specified statuses;
   test that every result contains only `session_id`, `status`, and `message`.
@@ -51,7 +53,8 @@
 
 - [x] 5.1 Add `skills/episodic-orchestrator/SKILL.md` with the coordinator-only
   workflow: first-call session creation, same-session follow-ups, terminal relay,
-  and `needs_input` handling without substantive main-agent project work.
+  `needs_input` handling, and exact effective-permission propagation without
+  substantive main-agent project work.
 - [x] 5.2 Add `skills/episodic-orchestrator/agents/openai.yaml` with implicit
   invocation disabled; test standard skill discovery, frontmatter, sidecar policy,
   and the absence of OneTool-owned skill installation or serving.
@@ -65,7 +68,63 @@
   read, search, selector, patch, compaction, queue, scheduler, retry,
   artifact-store, or compatibility surface.
 - [x] 6.3 Document the worker tool calls, exact result statuses, context schema,
-  16 KB default, configuration precedence, and explicit skill invocation without
-  presenting deferred `next.md` ideas as implemented behavior.
+  16 KB default, configuration precedence, same-capability extension model, and
+  explicit skill invocation without presenting deferred `next.md` ideas as
+  implemented behavior.
 - [x] 6.4 Run the focused worker and context tests, strict OpenSpec validation, and
   `just check`; resolve all failures before marking the change implemented.
+
+## 7. Reconcile the Foundation Contracts
+
+- [ ] 7.1 Update the proposal, design, delta specs, skill, and worker instructions
+  so Chat, Context, Console, Local Changes, Status, and History have one explicit
+  writer, reader, storage, and automatic-input contract.
+- [ ] 7.2 Enforce a 1024-byte bounded Status and require substantial completed
+  output to use the existing Console publisher without returning Console bodies
+  to the main agent.
+- [ ] 7.3 Preserve exact effective instructions, capabilities, execution policy,
+  serialization, recursion rejection, non-replay, and fresh-thread semantics in
+  the reconciled contract and tests.
+
+## 8. Add Mechanical Episode Observation
+
+- [ ] 8.1 Implement VCS-independent pre/post project-tree fingerprints with the
+  specified exclusions, containment rules, stable ordering, and created,
+  modified, and deleted path classifications.
+- [ ] 8.2 Implement the strict versioned `history.jsonl` schema, canonical append,
+  flush and `fsync`, valid-prefix reading, and body/content exclusion rules.
+- [ ] 8.3 Mechanically associate Console message IDs and kinds with an episode
+  without copying Console bodies or trusting agents to author History.
+
+## 9. Complete Terminal Lifecycle Semantics
+
+- [ ] 9.1 Implement the required ordering for terminal validation, Context commit
+  or preservation, thread deletion, final change observation, History append, and
+  bounded Status return.
+- [ ] 9.2 Add bounded warning codes for cleanup, final-scan, and History failures
+  without reversing known Console, Context, worker, or filesystem outcomes.
+- [ ] 9.3 Prove that `needs_input` commits valid Context, deletes its thread, and
+  starts a distinct fresh episode after the user's answer.
+
+## 10. Verify Channel Isolation
+
+- [ ] 10.1 Add unit tests for Status limits, Console receipt/body separation,
+  History schema and recovery, project-tree comparison, exclusions, and warning
+  behavior.
+- [ ] 10.2 Add integration tests proving that only Chat and committed Context are
+  automatic worker input and that the main agent never receives Context or
+  Console bodies.
+- [ ] 10.3 Reconcile existing worker, Context, Console, permission, failure, and
+  reference-documentation tests with the six-channel contract.
+
+## 11. Promote and Validate the Foundation
+
+- [ ] 11.1 Verify implementation against the proposal, design, and every delta
+  requirement; resolve any contract or ordering mismatch.
+- [ ] 11.2 Update `arch.md` to describe only verified foundation behavior and
+  leave every deferred extension section in `next.md` intact.
+- [ ] 11.3 Update worker reference documentation, run focused worker and Console
+  tests, strict OpenSpec validation, and `just check`.
+- [ ] 11.4 Sync the verified `p11` delta specs into `openspec/specs/` for dependent
+  changes, but keep `p11` open as program-document owner until all follow-ons are
+  complete.

@@ -22,10 +22,13 @@ For an invoked workflow, the main agent SHALL omit `session_id` on its first
 `worker.run` call, retain the returned ID as its only episodic session state, and
 supply that same ID on later calls in the same main conversation.
 
-The main agent SHALL use `approval_policy: never`, disable worker network access,
-and select `read-only` or current-project `workspace-write` without exceeding its
-own authority. If it cannot represent the current environment safely, it SHALL
-report that the workflow is unsupported rather than invoking the worker.
+The main agent SHALL use `approval_policy: never` and reproduce its effective
+read-only, workspace-write, danger-full-access, or external sandbox in the typed
+`sandbox` object, including network access, writable roots, and temporary-directory
+exclusions where applicable. The worker SHALL use the same project instructions,
+skills, tools, plugins, and configured MCPs as the main agent. If the main agent
+cannot represent its current environment exactly, it SHALL report that the
+workflow is unsupported rather than invoking the worker with different authority.
 
 #### Scenario: First delegated episode
 - **WHEN** the orchestrator delegates the first request in its current workflow
@@ -36,17 +39,21 @@ report that the workflow is unsupported rather than invoking the worker.
 - **THEN** the orchestrator SHALL call `worker.run` with the retained session ID
 - **AND** it SHALL NOT discover or infer a different session
 
-### Requirement: The orchestrator relays terminal results
+### Requirement: The orchestrator relays only bounded Status
 
-The main agent SHALL relay a worker's completed result, failure, or interruption
-to the user. For `needs_input`, it SHALL ask the worker's single question and use
-the user's answer as the next prompt in the same session.
+The main agent SHALL relay only the bounded `worker.run` Status receipt,
+diagnostic, or question. It SHALL NOT request, read, reproduce, or summarize
+Context or Console bodies. Substantial completed output SHALL reach the user
+through Console. For `needs_input`, the main agent SHALL ask the single returned
+question and use the user's answer as the next Chat prompt in the same session.
 
 #### Scenario: Worker reaches a terminal outcome
 - **WHEN** `worker.run` returns `completed`, `failed`, or `interrupted`
-- **THEN** the main agent SHALL report its message to the user
+- **THEN** the main agent SHALL report its bounded Status message
+- **AND** it SHALL NOT copy Console or Context into the main conversation
 
 #### Scenario: Worker requires user input
 - **WHEN** `worker.run` returns `needs_input`
 - **THEN** the main agent SHALL present its question to the user
 - **AND** the user's answer SHALL become the next `worker.run` prompt for the same session
+- **AND** that call SHALL start a fresh worker episode rather than resume the prior thread

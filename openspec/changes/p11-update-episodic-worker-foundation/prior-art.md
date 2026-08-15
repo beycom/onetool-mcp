@@ -121,9 +121,7 @@ The following archived features are possible follow-ons, not v1 requirements:
 | Result Markdown files and raw event logs | `next.md` session artifact store and console outbox. |
 | Local JSONL result index | `next.md` session artifact store. |
 | Index substring search | `next.md` selective reads and deterministic search. |
-| Multiple workers and queue depth | `next.md` scheduling, concurrency, and worker trees. |
 | Submission deduplication | `next.md` retry and recovery policies if a real duplicate-execution problem emerges. |
-| Polling and background completion | `next.md` scheduling and console outbox. |
 | Age-based artifact cleanup | `next.md` session artifact lifecycle. |
 | Warm app-server readiness caching | `next.md` warm runtime and connection reuse. |
 | Raw token and timing capture | `next.md` advanced telemetry. |
