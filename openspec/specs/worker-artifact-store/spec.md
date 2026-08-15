@@ -1,4 +1,12 @@
-## ADDED Requirements
+# Worker Artifact Store Specification
+
+## Purpose
+
+Defines explicit named-Context-owned artifact creation, access, retention,
+recovery, bounds, and channel isolation for worker-generated evidence and
+intermediate files that are not project deliverables or semantic Context.
+
+## Requirements
 
 ### Requirement: Artifacts are owned by a named Context
 
