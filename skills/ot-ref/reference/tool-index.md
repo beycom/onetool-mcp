@@ -1,6 +1,6 @@
 # OneTool MCP Tool Index
 
-packs=28 tools=253
+packs=29 tools=254
 
 ## arch
 ```python
@@ -365,4 +365,9 @@ whiteboard.share(board: str | None=None)  # Generate a shareable Excalidraw link
 whiteboard.style(ids: list[str], style: str, board: str | None=None)  # Apply visual style properties to existing canvas elements in bulk.
 whiteboard.sync(board: str | None=None)  # Sync Python DSL state from the ``__otDSL`` canvas element.
 whiteboard.zoom(level: float)  # Set zoom level. Pass 0 to fit all elements in view.
+```
+
+## worker
+```python
+worker.run(prompt: str, execution: dict[str, Any], session_id: str | None=None, model: str | None=None, effort: str | None=None)  # Run one fresh non-interactive Codex worker episode.
 ```

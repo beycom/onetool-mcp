@@ -60,6 +60,7 @@ Rules:
 - **tavily** (tav) — Search the web with Tavily AI — clean results, answer summaries, URL extraction
 - **webfetch** (wf) — Fetch any URL and extract clean, readable content
 - **whiteboard** (wb, excalidraw) — Live whiteboard using Excalidraw — you can **draw** diagrams with a powerful DSL, assisted by AI
+- **worker** — Run one fresh Codex worker episode with small validated continuation state.
 <!-- packmap:end -->
 
 Proxied MCP servers appear as additional packs — `ot.servers()` lists them.

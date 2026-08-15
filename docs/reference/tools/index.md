@@ -1,6 +1,6 @@
 # Tool Reference
 
-**28 Packs. 253 Tools.**
+**29 Packs. 254 Tools.**
 
 Complete reference of all built-in tool packs and functions.
 
@@ -55,3 +55,4 @@ uv tool install 'onetool-mcp[util,dev]'  # most tools
 | [**OT Timer**](ot_timer.md) | core | Named stopwatch timers for performance measurement. | 5 | MIT | `clear`, `elapsed`, `list`, `start`, `stop` |
 | [**WB (Whiteboard)**](whiteboard.md) | `[util]` | Live diagram drawing on excalidraw.com via Playwright. | 22 | MIT | `align`, `boards`, `clear`, `close`, `draw`, `embed_dsl`, `erase`, `fit`, `hard_reset`, `help`, `layout`, `load`, `note`, `open`, `read_scene`, `save`, `screenshot`, `scroll`, `share`, `style`, `sync`, `zoom` |
 | [**Webfetch**](webfetch.md) | `[dev]` | Fetch and extract web content. | 2 | [trafilatura](https://github.com/adbar/trafilatura) (Apache 2.0) | `fetch`, `fetch_batch` |
+| [**Worker**](worker.md) | core | Fresh Codex worker episodes with small MCP-owned continuation context. | 1 | MIT | `run` |
