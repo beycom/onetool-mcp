@@ -10,7 +10,11 @@ from unittest.mock import patch
 import pytest
 
 import ottools.worker as worker_module
-from ottools._worker.app_server import AppServerAdapter, _sandbox_policy
+from ottools._worker.app_server import (
+    AppServerAdapter,
+    _sandbox_policy,
+    _thread_sandbox,
+)
 from ottools._worker.models import ExecutionPolicy, InternalTerminalOutput
 from ottools.worker import Config, run
 
@@ -34,7 +38,7 @@ if len(sys.argv) > 1:
     delete_method = "thread/remove" if mode == "bad_schema" else "thread/delete"
     (output / "ClientRequest.json").write_text(delete_method, encoding="utf-8")
     policy_capabilities = [] if mode == "bad_policy" else [
-        "never", "read-only", "workspace-write"
+        "never", "read-only", "workspace-write", "danger-full-access"
     ]
     (output / "v2" / "ThreadStartParams.json").write_text(json.dumps({
         "properties": {"approvalPolicy": {}, "cwd": {}, "sandbox": {}},
@@ -44,7 +48,11 @@ if len(sys.argv) > 1:
         "properties": {name: {} for name in (
             "approvalPolicy", "cwd", "input", "outputSchema", "sandboxPolicy", "threadId"
         )},
-        "capabilities": ["networkAccess", "readOnly", "workspaceWrite", "writableRoots"],
+        "capabilities": [
+            "dangerFullAccess", "enabled", "excludeSlashTmp", "excludeTmpdirEnvVar",
+            "externalSandbox", "networkAccess", "readOnly", "restricted",
+            "workspaceWrite", "writableRoots"
+        ],
     }), encoding="utf-8")
     raise SystemExit(0)
 
@@ -137,14 +145,66 @@ def _events(trace: Path) -> list[dict]:
 
 def _execution(tmp_path: Path) -> ExecutionPolicy:
     return ExecutionPolicy(
-        cwd=str(tmp_path), approval_policy="never", sandbox="workspace-write"
+        cwd=str(tmp_path),
+        approval_policy="never",
+        sandbox={
+            "type": "workspace-write",
+            "writable_roots": [str(tmp_path), str(tmp_path.parent / "shared")],
+            "network_access": True,
+            "exclude_slash_tmp": True,
+            "exclude_tmpdir_env_var": False,
+        },
     )
 
 
-def test_read_only_policy_is_exact_and_disables_network(tmp_path: Path) -> None:
-    assert _sandbox_policy(
-        ExecutionPolicy(cwd=str(tmp_path), approval_policy="never", sandbox="read-only")
-    ) == {"type": "readOnly", "networkAccess": False}
+@pytest.mark.parametrize(
+    ("sandbox", "thread_mode", "turn_policy"),
+    [
+        (
+            {"type": "read-only", "network_access": True},
+            "read-only",
+            {"type": "readOnly", "networkAccess": True},
+        ),
+        (
+            {
+                "type": "workspace-write",
+                "writable_roots": ["/project", "/shared"],
+                "network_access": True,
+                "exclude_slash_tmp": True,
+                "exclude_tmpdir_env_var": False,
+            },
+            "workspace-write",
+            {
+                "type": "workspaceWrite",
+                "writableRoots": ["/project", "/shared"],
+                "networkAccess": True,
+                "excludeSlashTmp": True,
+                "excludeTmpdirEnvVar": False,
+            },
+        ),
+        (
+            {"type": "danger-full-access"},
+            "danger-full-access",
+            {"type": "dangerFullAccess"},
+        ),
+        (
+            {"type": "external-sandbox", "network_access": "enabled"},
+            None,
+            {"type": "externalSandbox", "networkAccess": "enabled"},
+        ),
+    ],
+)
+def test_parent_sandbox_policies_are_forwarded_exactly(
+    tmp_path: Path,
+    sandbox: dict[str, object],
+    thread_mode: str | None,
+    turn_policy: dict[str, object],
+) -> None:
+    execution = ExecutionPolicy.model_validate(
+        {"cwd": str(tmp_path), "approval_policy": "never", "sandbox": sandbox}
+    )
+    assert _thread_sandbox(execution) == thread_mode
+    assert _sandbox_policy(execution) == turn_policy
 
 
 def test_completed_episode_uses_explicit_policy_and_deletes_after_context(
@@ -185,15 +245,19 @@ def test_completed_episode_uses_explicit_policy_and_deletes_after_context(
     assert thread_params["approvalPolicy"] == "never"
     assert thread_params["sandbox"] == "workspace-write"
     assert thread_params["model"] == "gpt-5.6-sol"
+    assert "fresh-context extension of the main agent" in thread_params[
+        "developerInstructions"
+    ]
+    assert "tools, skills" in thread_params["developerInstructions"]
     turn_params = next(
         event["params"] for event in events if event.get("method") == "turn/start"
     )
     assert turn_params["approvalPolicy"] == "never"
     assert turn_params["sandboxPolicy"] == {
         "type": "workspaceWrite",
-        "writableRoots": [str(tmp_path)],
-        "networkAccess": False,
-        "excludeSlashTmp": False,
+        "writableRoots": [str(tmp_path), str(tmp_path.parent / "shared")],
+        "networkAccess": True,
+        "excludeSlashTmp": True,
         "excludeTmpdirEnvVar": False,
     }
     assert turn_params["model"] == "gpt-5.6-sol"
@@ -346,7 +410,13 @@ def test_two_public_episodes_use_fresh_threads_and_whole_context(
             execution={
                 "cwd": str(tmp_path),
                 "approval_policy": "never",
-                "sandbox": "workspace-write",
+                "sandbox": {
+                    "type": "workspace-write",
+                    "writable_roots": [str(tmp_path)],
+                    "network_access": False,
+                    "exclude_slash_tmp": False,
+                    "exclude_tmpdir_env_var": False,
+                },
             },
         )
         second = run(
@@ -354,7 +424,13 @@ def test_two_public_episodes_use_fresh_threads_and_whole_context(
             execution={
                 "cwd": str(tmp_path),
                 "approval_policy": "never",
-                "sandbox": "workspace-write",
+                "sandbox": {
+                    "type": "workspace-write",
+                    "writable_roots": [str(tmp_path)],
+                    "network_access": False,
+                    "exclude_slash_tmp": False,
+                    "exclude_tmpdir_env_var": False,
+                },
             },
             session_id=first["session_id"],
         )

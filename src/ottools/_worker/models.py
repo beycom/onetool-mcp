@@ -10,6 +10,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    StrictBool,
     StrictInt,
     StringConstraints,
     field_validator,
@@ -100,12 +101,51 @@ class CommittedContext(WorkerContext):
     revision: Annotated[StrictInt, Field(ge=1)]
 
 
+class ReadOnlySandboxPolicy(StrictModel):
+    """Read-only filesystem access with the parent's network boundary."""
+
+    type: Literal["read-only"]
+    network_access: StrictBool
+
+
+class WorkspaceWriteSandboxPolicy(StrictModel):
+    """Workspace writes using the parent's exact roots and network boundary."""
+
+    type: Literal["workspace-write"]
+    writable_roots: list[NonBlank]
+    network_access: StrictBool
+    exclude_slash_tmp: StrictBool
+    exclude_tmpdir_env_var: StrictBool
+
+
+class DangerFullAccessSandboxPolicy(StrictModel):
+    """Unrestricted execution matching an unrestricted parent."""
+
+    type: Literal["danger-full-access"]
+
+
+class ExternalSandboxPolicy(StrictModel):
+    """Execution already confined by the parent's external sandbox."""
+
+    type: Literal["external-sandbox"]
+    network_access: Literal["restricted", "enabled"]
+
+
+SandboxPolicy = Annotated[
+    ReadOnlySandboxPolicy
+    | WorkspaceWriteSandboxPolicy
+    | DangerFullAccessSandboxPolicy
+    | ExternalSandboxPolicy,
+    Field(discriminator="type"),
+]
+
+
 class ExecutionPolicy(StrictModel):
-    """Small non-interactive worker execution policy."""
+    """Parent-derived non-interactive worker execution policy."""
 
     cwd: NonBlank
     approval_policy: Literal["never"]
-    sandbox: Literal["read-only", "workspace-write"]
+    sandbox: SandboxPolicy
 
 
 class InternalTerminalOutput(StrictModel):
@@ -126,13 +166,18 @@ class PublicWorkerResult(StrictModel):
 
 __all__ = [
     "CommittedContext",
+    "DangerFullAccessSandboxPolicy",
     "ExecutionPolicy",
+    "ExternalSandboxPolicy",
     "Goal",
     "InternalTerminalOutput",
     "KnowledgeEntry",
     "ModelId",
     "PublicWorkerResult",
+    "ReadOnlySandboxPolicy",
     "Reference",
+    "SandboxPolicy",
     "Work",
     "WorkerContext",
+    "WorkspaceWriteSandboxPolicy",
 ]

@@ -24,6 +24,7 @@ from ottools._worker.models import (
     ModelId,
     NonBlank,
     PublicWorkerResult,
+    WorkspaceWriteSandboxPolicy,
 )
 
 _WORKER_ENV = "OT_EPISODIC_WORKER"
@@ -86,7 +87,16 @@ def _validate_execution(value: dict[str, Any]) -> ExecutionPolicy:
         raise ValueError(
             f"execution.cwd must equal the current project directory: {effective}"
         )
-    return execution.model_copy(update={"cwd": str(effective)})
+    sandbox = execution.sandbox
+    if isinstance(sandbox, WorkspaceWriteSandboxPolicy):
+        writable_roots: list[str] = []
+        for raw_root in sandbox.writable_roots:
+            root = Path(raw_root)
+            if not root.is_absolute():
+                raise ValueError("execution.sandbox.writable_roots must be absolute")
+            writable_roots.append(str(root.resolve()))
+        sandbox = sandbox.model_copy(update={"writable_roots": writable_roots})
+    return execution.model_copy(update={"cwd": str(effective), "sandbox": sandbox})
 
 
 def run(
@@ -102,8 +112,8 @@ def run(
     Args:
         prompt: Current user request or answer for the worker.
         execution: Exact object containing absolute current-project ``cwd``,
-            ``approval_policy='never'``, and ``sandbox`` set to ``read-only`` or
-            ``workspace-write``. Network access is always disabled.
+            ``approval_policy='never'``, and the main agent's effective sandbox,
+            network, and writable-root policy.
         session_id: Omit for the first episode; reuse the returned ID for follow-ups.
         model: Optional direct Codex model override.
         effort: Optional installed Codex reasoning-effort override.
@@ -118,7 +128,7 @@ def run(
             execution={
                 "cwd": "/project",
                 "approval_policy": "never",
-                "sandbox": "workspace-write",
+                "sandbox": {"type": "danger-full-access"},
             },
         )
     """

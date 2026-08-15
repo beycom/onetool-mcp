@@ -1,12 +1,13 @@
 # Worker
 
-Run one fresh Codex worker episode with small MCP-owned continuation context.
+Run one fresh Codex worker episode as a same-capability extension of the main agent
+with small MCP-owned continuation context.
 
 ## Highlights
 
 - One synchronous tool and one fresh Codex thread per call
 - Whole-context continuation through an opaque project-local session ID
-- Explicit non-interactive sandbox policy with network access disabled
+- Main-agent permissions, instructions, skills, tools, plugins, and MCPs preserved
 - Deterministic context formatting, validation, repair, and persistence by OneTool
 
 ## Functions
@@ -26,8 +27,19 @@ Run one fresh Codex worker episode with small MCP-owned continuation context.
 | `effort` | str | Optional reasoning-effort override for this call |
 
 `execution.cwd` must be the absolute current project directory.
-`execution.approval_policy` must be `"never"`. `execution.sandbox` must be
-`"read-only"` or `"workspace-write"`. Network access is always disabled.
+`execution.approval_policy` must be `"never"`. `execution.sandbox` is a strict
+object that reproduces the main agent's effective permissions:
+
+| Sandbox type | Additional fields |
+|--------------|-------------------|
+| `read-only` | `network_access` boolean |
+| `workspace-write` | Absolute `writable_roots`, `network_access`, `exclude_slash_tmp`, and `exclude_tmpdir_env_var` |
+| `danger-full-access` | None |
+| `external-sandbox` | `network_access`: `restricted` or `enabled` |
+
+The worker must receive neither broader nor narrower authority than the main
+agent. It loads the same project instructions, skills, tools, plugins, and
+configured MCP servers; only its conversation is fresh.
 
 Every result contains exactly:
 
@@ -96,29 +108,42 @@ worker.run(
     execution={
         "cwd": "/workspace/onetool-mcp",
         "approval_policy": "never",
-        "sandbox": "read-only",
+        "sandbox": {"type": "read-only", "network_access": False},
     },
 )
 
-# Implement an approved change in the current project
+# Preserve workspace-write roots and network access from the main agent
+execution = {
+    "cwd": "/workspace/onetool-mcp",
+    "approval_policy": "never",
+    "sandbox": {
+        "type": "workspace-write",
+        "writable_roots": ["/workspace/onetool-mcp", "/workspace/shared"],
+        "network_access": True,
+        "exclude_slash_tmp": False,
+        "exclude_tmpdir_env_var": False,
+    },
+}
 first = worker.run(
     prompt="Implement the approved OpenSpec change and run focused tests.",
-    execution={
-        "cwd": "/workspace/onetool-mcp",
-        "approval_policy": "never",
-        "sandbox": "workspace-write",
-    },
+    execution=execution,
 )
 
 # Answer a required-input result in a fresh episode with the same context
 worker.run(
     prompt="Use the existing registry convention.",
+    execution=execution,
+    session_id=first["session_id"],
+)
+
+# Match an unrestricted main agent
+worker.run(
+    prompt="Run the full implementation and verification workflow.",
     execution={
         "cwd": "/workspace/onetool-mcp",
         "approval_policy": "never",
-        "sandbox": "workspace-write",
+        "sandbox": {"type": "danger-full-access"},
     },
-    session_id=first["session_id"],
 )
 ```
 

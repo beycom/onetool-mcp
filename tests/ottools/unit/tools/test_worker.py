@@ -56,11 +56,17 @@ class _FakeAdapter:
         return self._outcome
 
 
-def _execution(tmp_path: Path, *, sandbox: str = "workspace-write") -> dict[str, str]:
+def _execution(tmp_path: Path) -> dict[str, Any]:
     return {
         "cwd": str(tmp_path),
         "approval_policy": "never",
-        "sandbox": sandbox,
+        "sandbox": {
+            "type": "workspace-write",
+            "writable_roots": [str(tmp_path)],
+            "network_access": False,
+            "exclude_slash_tmp": False,
+            "exclude_tmpdir_env_var": False,
+        },
     }
 
 
@@ -148,6 +154,37 @@ def test_configured_routing_and_per_call_precedence(
     ]
 
 
+def test_execution_policy_is_forwarded_without_narrowing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    shared_root = tmp_path.parent / "shared"
+    shared_root.mkdir()
+    calls: list[dict[str, Any]] = []
+    adapter = _FakeAdapter(calls, outcome=AdapterOutcome("completed", "Done."))
+    execution = {
+        "cwd": str(tmp_path),
+        "approval_policy": "never",
+        "sandbox": {
+            "type": "workspace-write",
+            "writable_roots": [str(tmp_path), str(shared_root)],
+            "network_access": True,
+            "exclude_slash_tmp": True,
+            "exclude_tmpdir_env_var": True,
+        },
+    }
+    with (
+        patch.object(worker_module, "_get_config", return_value=Config()),
+        patch.object(worker_module, "AppServerAdapter", return_value=adapter),
+    ):
+        result = run(prompt="Use the inherited permissions.", execution=execution)
+
+    assert result["status"] == "completed"
+    policy = calls[0]["execution"]
+    assert policy.model_dump(mode="python") == execution
+
+
 @pytest.mark.parametrize("status", ["completed", "needs_input", "failed", "interrupted"])
 def test_absent_terminal_context_preserves_last_revision(
     tmp_path: Path,
@@ -214,7 +251,23 @@ def test_invalid_policy_fails_before_worker_start(
             prompt="Start.",
             execution={**_execution(tmp_path), "cwd": str(tmp_path.parent)},
         )
+        relative_root = run(
+            prompt="Start.",
+            execution={
+                **_execution(tmp_path),
+                "sandbox": {
+                    **_execution(tmp_path)["sandbox"],
+                    "writable_roots": ["relative/path"],
+                },
+            },
+        )
+        legacy_sandbox = run(
+            prompt="Start.",
+            execution={**_execution(tmp_path), "sandbox": "workspace-write"},
+        )
     assert wrong_cwd["status"] == "failed"
+    assert relative_root["status"] == "failed"
+    assert legacy_sandbox["status"] == "failed"
     assert calls == []
 
 

@@ -75,9 +75,47 @@ def test_strict_models_reject_unknown_blank_and_invalid_values() -> None:
 
 def test_execution_terminal_result_and_config_shapes_are_strict() -> None:
     policy = ExecutionPolicy.model_validate(
-        {"cwd": "/project", "approval_policy": "never", "sandbox": "read-only"}
+        {
+            "cwd": "/project",
+            "approval_policy": "never",
+            "sandbox": {"type": "read-only", "network_access": True},
+        }
     )
     assert policy.approval_policy == "never"
+    for sandbox in (
+        {
+            "type": "workspace-write",
+            "writable_roots": ["/project", "/shared"],
+            "network_access": True,
+            "exclude_slash_tmp": False,
+            "exclude_tmpdir_env_var": True,
+        },
+        {"type": "danger-full-access"},
+        {"type": "external-sandbox", "network_access": "enabled"},
+    ):
+        assert ExecutionPolicy.model_validate(
+            {"cwd": "/project", "approval_policy": "never", "sandbox": sandbox}
+        ).sandbox.type == sandbox["type"]
+    for invalid_execution in (
+        {"cwd": "/project", "approval_policy": "never", "sandbox": "read-only"},
+        {
+            "cwd": "/project",
+            "approval_policy": "on-request",
+            "sandbox": {"type": "danger-full-access"},
+        },
+        {
+            "cwd": "/project",
+            "approval_policy": "never",
+            "sandbox": {"type": "read-only", "network_access": "enabled"},
+        },
+        {
+            "cwd": "/project",
+            "approval_policy": "never",
+            "sandbox": {"type": "danger-full-access", "network_access": True},
+        },
+    ):
+        with pytest.raises(ValidationError):
+            ExecutionPolicy.model_validate(invalid_execution)
     terminal = InternalTerminalOutput.model_validate(
         {"status": "completed", "message": "done", "context": _context()}
     )
