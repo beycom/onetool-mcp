@@ -14,7 +14,7 @@ current Chat request and committed Context may enter a fresh worker
 automatically. Console bodies, mechanical History, prior worker messages, and
 tool observations must never become implicit worker or main-agent context.
 
-## Session Artifact Store
+## Named-Context Artifact Store
 
 ### Opportunity
 
@@ -24,10 +24,10 @@ the small context file or as normal project deliverables.
 
 ### Possible Design
 
-- Add `episodic-context/<session-id>/artifacts/` beside `context.yaml`.
+- Add `.onetool/state/worker/artifacts/<context>/` under the effective project.
 - Give artifact metadata a small stable identifier, relative path, media type or
   kind, status, summary, and relevance to current work.
-- Require artifact paths to remain within the session artifact root and use
+- Require artifact paths to remain within the owning Context artifact root and use
   atomic writes for MCP-created metadata.
 - Keep artifact content out of worker startup. Context would carry only compact
   metadata, and workers would open a referenced artifact deliberately.
@@ -62,7 +62,7 @@ Console results across runtime restarts.
 
 - Extend the existing Console protocol and body store rather than adding a
   `console.md`, event log, or second Console transport.
-- Associate retained messages with session and episode identifiers using
+- Associate retained messages with Context and episode identifiers using
   runtime-owned metadata; keep bodies out of `history.jsonl`.
 - Add explicit retention, deletion, reconnect, and replay controls for users.
 - Preserve bounded receipts for agents and never inject a retained Console body
@@ -87,7 +87,7 @@ reference rules that are independent of the initial channel boundary.
 ### Opportunity
 
 The MCP-owned `history.jsonl` journal is sufficient for serialized append and
-bounded inspection. Large numbers of sessions or user-facing filtering may
+bounded inspection. Large numbers of Contexts or user-facing filtering may
 eventually require indexed queries by episode, status, time, Console message, or
 changed path.
 
@@ -176,7 +176,7 @@ mutation solve a scale problem that does not yet exist.
 
 ### Opportunity
 
-Over long sessions, workers may repeatedly preserve facts that are valid but no
+Over long-lived Contexts, workers may repeatedly preserve facts that are valid but no
 longer useful. Mechanical MCP normalization cannot determine relevance,
 supersession, or the smallest adequate explanation.
 
@@ -200,7 +200,7 @@ truth and lets the MCP perform only deterministic mechanical repair.
 
 ### Adoption Criteria
 
-- Representative long sessions hit the KB limit despite concise worker
+- Representative long-lived Contexts hit the KB limit despite concise worker
   submissions.
 - An evaluation set can detect loss of goals, constraints, decisions, blockers,
   and essential references after compaction.
@@ -233,8 +233,8 @@ user input.
 - Commit context only on the final `completed` or `needs_input` outcome.
 - Treat `needs_input` as a mandatory episode boundary: commit any valid returned
   context, delete the worker thread, and return the question to the main agent.
-  The user's answer starts a fresh episode and fresh thread with the same session
-  ID and committed context, never by resuming the prior worker thread.
+  The user's answer starts a fresh episode and fresh thread with the same named
+  Context, never by resuming the prior worker thread.
 - If a later turn fails or is interrupted, do not replay earlier turns or assume
   their project or external side effects can be reversed.
 
@@ -341,12 +341,12 @@ a second deliverable and may record sensitive task details.
 ### Opportunity
 
 Users may eventually want to recover discarded discussion, search prior episodes,
-or reuse knowledge across orchestrator sessions.
+or reuse knowledge across named Contexts or projects.
 
 ### Possible Design
 
 - Build transcript storage, full-text search, semantic retrieval, or durable
-  cross-session memory as separate capabilities with explicit user controls.
+  cross-Context memory as a separate capability with explicit user controls.
 - Treat transcripts as conversation records, not as the MCP-authored mechanical
   History journal, and never derive one by copying the other.
 - Keep retrieved history distinct from trusted current context and label its
@@ -364,6 +364,6 @@ requirements and would blur the central experiment.
 
 ### Adoption Criteria
 
-- Users demonstrably need discarded or cross-session information that cannot be
+- Users demonstrably need discarded or cross-Context information that cannot be
   represented as current knowledge or a project-file reference.
 - A separate proposal defines ownership, retrieval, security, and deletion.

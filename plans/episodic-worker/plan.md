@@ -39,8 +39,9 @@ Every change in this plan must preserve all of these constraints:
 2. A worker has the main agent's effective project instructions, skills, tools,
    configured MCP servers, and execution permissions.
 3. Only Chat and committed Context are supplied automatically to a fresh worker.
-4. Context is shared between successive workers in a session but is not exposed
-   to the main agent.
+4. Context is selected by project-local name for each episode. Its semantic body
+   is shared only between workers using that name and is not exposed to the main
+   agent; bounded frontmatter metadata is explicitly discoverable.
 5. Console is user-facing output. Console bodies do not enter Context, History,
    worker startup, Status, or the main conversation.
 6. Status is a bounded control result for the main agent and user; it does not
@@ -54,7 +55,7 @@ Every change in this plan must preserve all of these constraints:
    ephemeral working state unless explicitly written to an appropriate channel.
 10. `needs_input` always terminates the current episode and deletes its worker
     thread. The user's answer starts a fresh episode and fresh worker thread with
-    the same session ID and committed Context.
+    the same named Context.
 11. Autonomous continuation may reuse a thread only when no user input is
     required and only within the same bounded `worker.run` episode.
 12. No change may add backward-compatibility aliases, legacy modes, or transitional
@@ -76,9 +77,9 @@ to `add-worker-warm-runtime`.
 
 | Wave | Priority | OpenSpec change ID | Depends on | Initial status | Outcome |
 |---:|---:|---|---|---|---|
-| 1 | 1 | `p11-update-episodic-worker-foundation` | Existing implementation | Planned | Reconcile the implementation and normative artifacts with the channel architecture |
+| 1 | 1 | `p11-update-episodic-worker-foundation` | Existing implementation | Planned | Replace session continuation with the named-Context channel foundation |
 | 2 | 1 | `p21-add-worker-autonomous-continuation` | `p11` | Planned | Permit bounded same-thread turns without user input |
-| 2 | 2 | `p22-add-worker-artifact-store` | `p11` | Planned | Add session-owned non-project artifacts with explicit access |
+| 2 | 2 | `p22-add-worker-artifact-store` | `p11` | Planned | Add named-Context-owned non-project artifacts with explicit access |
 | 2 | 3 | `p23-add-worker-warm-runtime` | `p11` | Planned | Reuse process/transport infrastructure without reusing a worker thread |
 | 2 | 4 | `p24-add-worker-advanced-telemetry` | `p11` | Planned | Add privacy-bounded measurements separate from History |
 | 3 | 1 | `p31-add-worker-context-compaction` | `p11`, `p24` | Planned | Add evaluated, explicit semantic Context compaction |
@@ -88,7 +89,7 @@ Dependency shape:
 ```text
                               +-> p21 autonomous continuation
                               +-> p22 artifact store
-p11 foundation --------------+-> p23 warm runtime
+p11 named-Context foundation +-> p23 warm runtime
                               +-> p24 advanced telemetry -> p31 context compaction
 ```
 
@@ -112,11 +113,14 @@ At the start of the new session:
    tasks, tests, code, `arch.md`, and `next.md`.
 5. After `p11` is implemented and verified, sync its delta specs to the main
    specs so later changes have a normative baseline.
-6. Keep `p11` open as the program-document owner until all five follow-on
-   changes are complete. Archive it last, after the final documentation sweep.
+6. Keep `p11` open as the foundation and spec-sync owner until all five
+   follow-on changes are complete. Archive it last, after the final
+   documentation sweep.
 
-This avoids two active changes defining the same base contract and keeps one
-stable location for `arch.md`, `next.md`, and this plan during the program.
+This avoids two active changes defining the same base contract. The tracked
+`plans/episodic-worker/` directory provides a stable shared location for
+`arch.md`, `next.md`, `prior-art.md`, and this plan independently of change
+archival.
 
 ## Documentation promotion rule
 
@@ -144,7 +148,7 @@ The section-to-change mapping is exact:
 |---|---|
 | `p11-update-episodic-worker-foundation` | None; reconcile the current channel foundation and leave deferred sections intact |
 | `p21-add-worker-autonomous-continuation` | `Bounded Autonomous Same-Thread Continuation` |
-| `p22-add-worker-artifact-store` | `Session Artifact Store` |
+| `p22-add-worker-artifact-store` | `Named-Context Artifact Store` |
 | `p23-add-worker-warm-runtime` | `Warm Runtime and Connection Reuse` |
 | `p24-add-worker-advanced-telemetry` | `Advanced Telemetry` |
 | `p31-add-worker-context-compaction` | `Semantic Compaction or Summarization` |
@@ -153,8 +157,9 @@ The section-to-change mapping is exact:
 
 ### `p11-update-episodic-worker-foundation`
 
-**Goal:** Make the existing implementation, normative OpenSpec artifacts, tests,
-and architecture agree on the channel model before adding extensions.
+**Goal:** Replace the precursor session contract with named project-local Context
+files and make implementation, normative artifacts, tests, and architecture agree
+on the channel model before adding extensions.
 
 **Required scope:**
 
@@ -163,8 +168,12 @@ and architecture agree on the channel model before adding extensions.
 - Keep worker working state ephemeral and out of durable channels by default.
 - Route substantial user-facing worker output through the existing Console
   mechanism and return only a bounded receipt/control Status.
-- Keep Context private to successive workers in a session and commit only a
-  validated complete replacement.
+- Start each invoked Chat on `default`, keep its selected Context name in the
+  orchestrator, and permit explicit one-episode named overrides.
+- Store each named Context as one bounded project-local Markdown file with strict
+  discoverable frontmatter and a private complete semantic body.
+- Add select, metadata listing/upsert, and archive operations; remove session IDs,
+  contextless operation, project selection, and the public execution object.
 - Append MCP-owned History as versioned JSONL after terminal handling and the
   post-episode file scan.
 - Observe Local Changes mechanically with project-root pre/post comparison,
@@ -221,24 +230,25 @@ validate, and run relevant checks.
 
 ### `p22-add-worker-artifact-store`
 
-**Goal:** Preserve worker-created, session-scoped evidence or intermediate files
-that should outlive an episode but are neither Context nor project deliverables.
+**Goal:** Preserve worker-created, named-Context-scoped evidence or intermediate
+files that should outlive an episode but are neither semantic Context nor project
+deliverables.
 
 **Required scope:**
 
-- Add a project-scoped session artifact root beside Context with stable IDs and
+- Add a project-scoped artifact root owned by a named Context with stable IDs and
   bounded typed metadata.
 - Define explicit create/open/list or equivalent access; artifacts are never
   injected automatically into worker startup.
 - Enforce path containment, symlink safety, atomic metadata updates, media/kind
   validation, size limits, and collision behavior.
-- Define retention, deletion, orphan recovery, and session cleanup.
+- Define retention, deletion, orphan recovery, and Context archival behavior.
 - Keep compact references in Context only when operationally needed.
 - Keep project deliverables in Local Changes and user-facing bodies in Console.
 - Keep artifact contents and summaries out of mechanical History.
 
 **Out of scope:** copying project files into the artifact store, using artifacts
-as automatic memory, semantic indexing, long-term cross-session storage, durable
+as automatic memory, semantic indexing, long-term cross-Context storage, durable
 Console replay, and storing artifact bodies in Context or History.
 
 **Exit gate:** Lifecycle, containment, cleanup, crash recovery, and channel
@@ -305,8 +315,9 @@ contract must be sufficient for `p31` evaluations.
 
 ### `p31-add-worker-context-compaction`
 
-**Goal:** Explicitly compact Context when evidence shows long sessions cannot
-remain within the bounded whole-state model without losing continuation quality.
+**Goal:** Explicitly compact Context when evidence shows long-lived named
+Contexts cannot remain within the bounded whole-state model without losing
+continuation quality.
 
 **Entry gate:** Do not create or implement this change merely because `p24` is
 complete. First collect representative evidence that concise worker-authored
@@ -323,18 +334,18 @@ unresolved questions, and essential file references.
 - Compare proposed compact Context with the last valid revision and expose
   important removals through bounded audit metadata without copying Context into
   History or Status.
-- Validate the complete compacted object through the existing Context schema and
-  atomic commit path.
+- Validate the complete compacted Markdown body through the named-Context
+  revision/digest and atomic-commit path while preserving frontmatter metadata.
 - Preserve the last valid Context on timeout, model failure, invalid output,
   oversize output, or failed evaluation.
 - Measure continuation quality as well as bytes and tokens.
 
 **Out of scope:** automatic truncation, embeddings, semantic retrieval,
-cross-session memory, transcript summarization, indexed History, and injecting
+cross-Context memory, transcript summarization, indexed History, and injecting
 removed material into future workers.
 
 **Exit gate:** The evaluation demonstrates acceptable retention and a measured
-benefit on representative long sessions; all failure paths preserve the last
+benefit on representative long-lived Contexts; all failure paths preserve the last
 valid Context; channel isolation remains intact. Update `arch.md`, remove the
 mapped `next.md` section, validate, and run relevant checks.
 

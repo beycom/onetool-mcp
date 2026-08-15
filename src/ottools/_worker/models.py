@@ -1,26 +1,42 @@
-"""Strict data contracts for episodic worker execution."""
+"""Strict data contracts for named-Context worker execution."""
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Annotated, Literal
+from datetime import datetime  # noqa: TC003 - Pydantic resolves this runtime type.
+from typing import TYPE_CHECKING, Annotated, Literal
 
 from pydantic import (
     AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
-    StrictBool,
     StrictInt,
     StringConstraints,
-    field_validator,
 )
+
+STATUS_MAX_BYTES = 1024
+CONTEXT_DESCRIPTION_MAX_BYTES = 512
+CONTEXT_TAG_MAX_BYTES = 64
+CONTEXT_TAGS_MAX_ITEMS = 16
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def _require_nonblank(value: str) -> str:
     if not value.strip():
         raise ValueError("value must not be blank")
     return value
+
+
+def _bounded_utf8(*, label: str, maximum: int) -> Callable[[str], str]:
+    def validate(value: str) -> str:
+        size = len(value.encode("utf-8"))
+        if size > maximum:
+            raise ValueError(f"{label} must not exceed {maximum} UTF-8 bytes")
+        return value
+
+    return validate
 
 
 NonBlank = Annotated[
@@ -33,6 +49,20 @@ ModelId = Annotated[
     StringConstraints(strip_whitespace=False, min_length=1, max_length=512),
     AfterValidator(_require_nonblank),
 ]
+StatusMessage = Annotated[
+    NonBlank,
+    AfterValidator(_bounded_utf8(label="message", maximum=STATUS_MAX_BYTES)),
+]
+ContextDescription = Annotated[
+    str,
+    AfterValidator(
+        _bounded_utf8(label="description", maximum=CONTEXT_DESCRIPTION_MAX_BYTES)
+    ),
+]
+ContextTag = Annotated[
+    NonBlank,
+    AfterValidator(_bounded_utf8(label="tag", maximum=CONTEXT_TAG_MAX_BYTES)),
+]
 
 
 class StrictModel(BaseModel):
@@ -41,143 +71,85 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
 
-class Goal(StrictModel):
-    """Current objective and independently testable completion conditions."""
-
-    status: Literal["active", "blocked", "complete"]
-    objective: NonBlank
-    success_criteria: list[NonBlank]
-
-
-class Work(StrictModel):
-    """Current progress and useful next actions."""
-
-    summary: NonBlank
-    next_actions: list[NonBlank]
-    blockers: list[NonBlank]
-
-
-class KnowledgeEntry(StrictModel):
-    """One durable continuation fact, decision, or constraint."""
-
-    kind: Literal["fact", "decision", "constraint"]
-    text: NonBlank
-
-
-class Reference(StrictModel):
-    """A project-relative file reference with its continuation purpose."""
-
-    path: NonBlank
-    purpose: NonBlank
-
-    @field_validator("path")
-    @classmethod
-    def validate_relative_path(cls, value: str) -> str:
-        """Reject absolute and parent-traversing lexical paths."""
-        path = Path(value)
-        if path.is_absolute() or value.startswith(('/', '\\')):
-            raise ValueError("reference path must be project-relative")
-        if len(value) >= 2 and value[1] == ":":
-            raise ValueError("reference path must be project-relative")
-        if ".." in path.parts:
-            raise ValueError("reference path must not escape the project")
-        return value
-
-
-class WorkerContext(StrictModel):
-    """Complete context authored by one worker for the next episode."""
-
-    goal: Goal
-    work: Work
-    knowledge: list[KnowledgeEntry]
-    questions: list[NonBlank]
-    references: list[Reference]
-
-
-class CommittedContext(WorkerContext):
-    """Canonical stored context with MCP-owned version and revision."""
+class ContextMetadata(StrictModel):
+    """Strict discoverable frontmatter for one named Context."""
 
     schema_version: Literal[1] = 1
     revision: Annotated[StrictInt, Field(ge=1)]
+    status: Literal["active", "archived"]
+    description: ContextDescription
+    tags: Annotated[list[ContextTag], Field(max_length=CONTEXT_TAGS_MAX_ITEMS)]
 
 
-class ReadOnlySandboxPolicy(StrictModel):
-    """Read-only filesystem access with the parent's network boundary."""
+class ContextListItem(ContextMetadata):
+    """Body-free metadata returned by ``worker.list_contexts``."""
 
-    type: Literal["read-only"]
-    network_access: StrictBool
-
-
-class WorkspaceWriteSandboxPolicy(StrictModel):
-    """Workspace writes using the parent's exact roots and network boundary."""
-
-    type: Literal["workspace-write"]
-    writable_roots: list[NonBlank]
-    network_access: StrictBool
-    exclude_slash_tmp: StrictBool
-    exclude_tmpdir_env_var: StrictBool
-
-
-class DangerFullAccessSandboxPolicy(StrictModel):
-    """Unrestricted execution matching an unrestricted parent."""
-
-    type: Literal["danger-full-access"]
-
-
-class ExternalSandboxPolicy(StrictModel):
-    """Execution already confined by the parent's external sandbox."""
-
-    type: Literal["external-sandbox"]
-    network_access: Literal["restricted", "enabled"]
-
-
-SandboxPolicy = Annotated[
-    ReadOnlySandboxPolicy
-    | WorkspaceWriteSandboxPolicy
-    | DangerFullAccessSandboxPolicy
-    | ExternalSandboxPolicy,
-    Field(discriminator="type"),
-]
-
-
-class ExecutionPolicy(StrictModel):
-    """Parent-derived non-interactive worker execution policy."""
-
-    cwd: NonBlank
-    approval_policy: Literal["never"]
-    sandbox: SandboxPolicy
+    name: NonBlank
 
 
 class InternalTerminalOutput(StrictModel):
-    """Strict app-server output before the MCP processes context."""
+    """Strict app-server output before the MCP processes Context state."""
 
     status: Literal["completed", "needs_input"]
-    message: NonBlank
-    context: WorkerContext | None = None
+    message: StatusMessage
+    context: str | None = None
 
 
 class PublicWorkerResult(StrictModel):
-    """The exact public result returned by worker.run."""
+    """The exact public result returned by ``worker.run``."""
 
-    session_id: NonBlank
+    context: NonBlank
     status: Literal["completed", "needs_input", "failed", "interrupted"]
-    message: NonBlank
+    message: StatusMessage
+
+
+class ConsoleRecord(StrictModel):
+    """Body-free Console publication recorded in worker History."""
+
+    id: NonBlank
+    kind: NonBlank
+
+
+class LocalChange(StrictModel):
+    """One mechanically observed project path classification."""
+
+    path: NonBlank
+    classification: Literal["created", "modified", "deleted"]
+
+
+class HistoryRecord(StrictModel):
+    """One project-scoped mechanical worker episode record."""
+
+    schema_version: Literal[1] = 1
+    episode_id: NonBlank
+    context: NonBlank
+    started_at: datetime
+    finished_at: datetime
+    status: Literal["completed", "needs_input", "failed", "interrupted"]
+    turn_count: Annotated[StrictInt, Field(ge=0)]
+    context_revision_before: Annotated[StrictInt, Field(ge=1)]
+    context_revision_after: Annotated[StrictInt, Field(ge=1)]
+    console: list[ConsoleRecord]
+    local_changes: list[LocalChange]
+    failure: NonBlank | None = None
+    warnings: list[NonBlank]
 
 
 __all__ = [
-    "CommittedContext",
-    "DangerFullAccessSandboxPolicy",
-    "ExecutionPolicy",
-    "ExternalSandboxPolicy",
-    "Goal",
+    "CONTEXT_DESCRIPTION_MAX_BYTES",
+    "CONTEXT_TAGS_MAX_ITEMS",
+    "CONTEXT_TAG_MAX_BYTES",
+    "STATUS_MAX_BYTES",
+    "ConsoleRecord",
+    "ContextDescription",
+    "ContextListItem",
+    "ContextMetadata",
+    "ContextTag",
+    "HistoryRecord",
     "InternalTerminalOutput",
-    "KnowledgeEntry",
+    "LocalChange",
     "ModelId",
+    "NonBlank",
     "PublicWorkerResult",
-    "ReadOnlySandboxPolicy",
-    "Reference",
-    "SandboxPolicy",
-    "Work",
-    "WorkerContext",
-    "WorkspaceWriteSandboxPolicy",
+    "StatusMessage",
 ]

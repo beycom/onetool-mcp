@@ -10,20 +10,18 @@ from unittest.mock import patch
 import pytest
 
 import ottools.worker as worker_module
-from ottools._worker.app_server import (
-    AppServerAdapter,
-    _sandbox_policy,
-    _thread_sandbox,
-)
-from ottools._worker.models import ExecutionPolicy, InternalTerminalOutput
+from ottools._worker.app_server import AppServerAdapter, _sandbox_policy
+from ottools._worker.lifecycle import HistoryStore
 from ottools.worker import Config, run
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from ottools._worker.models import InternalTerminalOutput
+
 pytestmark = [pytest.mark.integration, pytest.mark.tools]
 
-_FAKE_SERVER = r'''#!/usr/bin/env python3
+_FAKE_SERVER = r"""#!/usr/bin/env python3
 import json
 import os
 import sys
@@ -37,22 +35,17 @@ if len(sys.argv) > 1:
     (output / "v2").mkdir(parents=True)
     delete_method = "thread/remove" if mode == "bad_schema" else "thread/delete"
     (output / "ClientRequest.json").write_text(delete_method, encoding="utf-8")
-    policy_capabilities = [] if mode == "bad_policy" else [
-        "never", "read-only", "workspace-write", "danger-full-access"
+    capabilities = [] if mode == "bad_policy" else [
+        "externalSandbox", "networkAccess", "enabled"
     ]
     (output / "v2" / "ThreadStartParams.json").write_text(json.dumps({
         "properties": {"approvalPolicy": {}, "cwd": {}, "sandbox": {}},
-        "capabilities": policy_capabilities,
     }), encoding="utf-8")
     (output / "v2" / "TurnStartParams.json").write_text(json.dumps({
         "properties": {name: {} for name in (
             "approvalPolicy", "cwd", "input", "outputSchema", "sandboxPolicy", "threadId"
         )},
-        "capabilities": [
-            "dangerFullAccess", "enabled", "excludeSlashTmp", "excludeTmpdirEnvVar",
-            "externalSandbox", "networkAccess", "readOnly", "restricted",
-            "workspaceWrite", "writableRoots"
-        ],
+        "capabilities": capabilities,
     }), encoding="utf-8")
     raise SystemExit(0)
 
@@ -62,22 +55,6 @@ def record(event):
 
 def emit(message):
     print(json.dumps(message, separators=(",", ":")), flush=True)
-
-context = {
-    "goal": {
-        "status": "active",
-        "objective": "Finish the worker",
-        "success_criteria": ["Tests pass"],
-    },
-    "work": {
-        "summary": "Adapter implemented",
-        "next_actions": ["Run checks"],
-        "blockers": [],
-    },
-    "knowledge": [{"kind": "decision", "text": "Use one public tool"}],
-    "questions": [],
-    "references": [],
-}
 
 for line in sys.stdin:
     message = json.loads(line)
@@ -96,6 +73,16 @@ for line in sys.stdin:
         if mode == "exit":
             raise SystemExit(3)
         emit({"id": request_id, "result": {"turn": {"id": "turn-1"}}})
+        if mode == "channels":
+            Path("worker-output.txt").write_text("deliverable", encoding="utf-8")
+            console_path = (
+                Path(".onetool/state/console/instances/worker/messages/message-1.json")
+            )
+            console_path.parent.mkdir(parents=True, exist_ok=True)
+            console_path.write_text(json.dumps({
+                "metadata": {"id": "message-1", "kind": "markdown"},
+                "inline_payload": "PRIVATE CONSOLE BODY",
+            }), encoding="utf-8")
         if mode == "timeout":
             continue
         if mode == "server_request":
@@ -108,11 +95,15 @@ for line in sys.stdin:
         else:
             if mode == "malformed":
                 text = "not-json"
+            elif mode == "oversized_status":
+                text = json.dumps({"status": "completed", "message": "x" * 1025})
             elif mode == "needs_input":
                 text = json.dumps({"status": "needs_input", "message": "Which target?"})
             else:
                 text = json.dumps({
-                    "status": "completed", "message": "Implemented.", "context": context
+                    "status": "completed",
+                    "message": "Published result to Console.",
+                    "context": "# Goal\n\nAdapter implemented",
                 })
             item = {"id": "message-1", "type": "agentMessage", "text": text}
             emit({"method": "item/completed", "params": {"item": item}})
@@ -125,11 +116,13 @@ for line in sys.stdin:
             emit({"id": request_id, "error": {"message": "delete rejected"}})
         else:
             emit({"id": request_id, "result": {}})
-'''
+"""
 
 
 @pytest.fixture
-def fake_app_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+def fake_app_server(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Path, Path]:
     """Create an executable stdio app-server with protocol tracing."""
     server = tmp_path / "fake_app_server.py"
     trace = tmp_path / "trace.jsonl"
@@ -139,75 +132,30 @@ def fake_app_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Pa
     return server, trace
 
 
-def _events(trace: Path) -> list[dict]:
+def _events(trace: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in trace.read_text(encoding="utf-8").splitlines()]
 
 
-def _execution(tmp_path: Path) -> ExecutionPolicy:
-    return ExecutionPolicy(
+def _run_adapter(server: Path, tmp_path: Path, **kwargs: object):
+    return AppServerAdapter(command=(str(server),), verify_protocol=False).run_episode(
+        prompt="Continue.",
+        context="Current Context",
         cwd=str(tmp_path),
-        approval_policy="never",
-        sandbox={
-            "type": "workspace-write",
-            "writable_roots": [str(tmp_path), str(tmp_path.parent / "shared")],
-            "network_access": True,
-            "exclude_slash_tmp": True,
-            "exclude_tmpdir_env_var": False,
-        },
+        model=None,
+        effort=None,
+        on_terminal=lambda _terminal: None,
+        **kwargs,
     )
 
 
-@pytest.mark.parametrize(
-    ("sandbox", "thread_mode", "turn_policy"),
-    [
-        (
-            {"type": "read-only", "network_access": True},
-            "read-only",
-            {"type": "readOnly", "networkAccess": True},
-        ),
-        (
-            {
-                "type": "workspace-write",
-                "writable_roots": ["/project", "/shared"],
-                "network_access": True,
-                "exclude_slash_tmp": True,
-                "exclude_tmpdir_env_var": False,
-            },
-            "workspace-write",
-            {
-                "type": "workspaceWrite",
-                "writableRoots": ["/project", "/shared"],
-                "networkAccess": True,
-                "excludeSlashTmp": True,
-                "excludeTmpdirEnvVar": False,
-            },
-        ),
-        (
-            {"type": "danger-full-access"},
-            "danger-full-access",
-            {"type": "dangerFullAccess"},
-        ),
-        (
-            {"type": "external-sandbox", "network_access": "enabled"},
-            None,
-            {"type": "externalSandbox", "networkAccess": "enabled"},
-        ),
-    ],
-)
-def test_parent_sandbox_policies_are_forwarded_exactly(
-    tmp_path: Path,
-    sandbox: dict[str, object],
-    thread_mode: str | None,
-    turn_policy: dict[str, object],
-) -> None:
-    execution = ExecutionPolicy.model_validate(
-        {"cwd": str(tmp_path), "approval_policy": "never", "sandbox": sandbox}
-    )
-    assert _thread_sandbox(execution) == thread_mode
-    assert _sandbox_policy(execution) == turn_policy
+def test_child_uses_inherited_external_sandbox() -> None:
+    assert _sandbox_policy() == {
+        "type": "externalSandbox",
+        "networkAccess": "enabled",
+    }
 
 
-def test_completed_episode_uses_explicit_policy_and_deletes_after_context(
+def test_completed_episode_deletes_after_context_and_before_close_callback(
     fake_app_server: tuple[Path, Path],
     tmp_path: Path,
 ) -> None:
@@ -215,19 +163,28 @@ def test_completed_episode_uses_explicit_policy_and_deletes_after_context(
 
     def commit(terminal: InternalTerminalOutput) -> None:
         with trace.open("a", encoding="utf-8") as stream:
-            stream.write(json.dumps({"event": "context", "status": terminal.status}) + "\n")
+            stream.write(
+                json.dumps({"event": "context", "status": terminal.status}) + "\n"
+            )
+
+    def before_close() -> None:
+        with trace.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps({"event": "before_close"}) + "\n")
 
     result = AppServerAdapter(command=(str(server),)).run_episode(
         prompt="Implement the approved change.",
-        context={"schema_version": 1, "revision": 0, "context": None},
-        execution=_execution(tmp_path),
+        context="# Current state",
+        cwd=str(tmp_path),
         model="gpt-5.6-sol",
         effort="high",
         on_terminal=commit,
+        before_close=before_close,
     )
 
     assert result.status == "completed"
-    assert result.message == "Implemented."
+    assert result.message == "Published result to Console."
+    assert result.started is True
+    assert result.turn_count == 1
     events = _events(trace)
     methods = [event.get("method") for event in events if event["event"] == "request"]
     assert methods == [
@@ -237,33 +194,31 @@ def test_completed_episode_uses_explicit_policy_and_deletes_after_context(
         "turn/start",
         "thread/delete",
     ]
-    assert [event["event"] for event in events[-2:]] == ["context", "request"]
+    assert [event["event"] for event in events[-3:]] == [
+        "context",
+        "request",
+        "before_close",
+    ]
 
     thread_params = next(
         event["params"] for event in events if event.get("method") == "thread/start"
     )
     assert thread_params["approvalPolicy"] == "never"
-    assert thread_params["sandbox"] == "workspace-write"
+    assert "sandbox" not in thread_params
     assert thread_params["model"] == "gpt-5.6-sol"
-    assert "fresh-context extension of the main agent" in thread_params[
-        "developerInstructions"
-    ]
-    assert "tools, skills" in thread_params["developerInstructions"]
+    assert "console.show" in thread_params["developerInstructions"]
+    assert ".onetool/state/worker" in thread_params["developerInstructions"]
     turn_params = next(
         event["params"] for event in events if event.get("method") == "turn/start"
     )
     assert turn_params["approvalPolicy"] == "never"
-    assert turn_params["sandboxPolicy"] == {
-        "type": "workspaceWrite",
-        "writableRoots": [str(tmp_path), str(tmp_path.parent / "shared")],
-        "networkAccess": True,
-        "excludeSlashTmp": True,
-        "excludeTmpdirEnvVar": False,
-    }
+    assert turn_params["sandboxPolicy"] == _sandbox_policy()
     assert turn_params["model"] == "gpt-5.6-sol"
     assert turn_params["effort"] == "high"
-    assert len(turn_params["input"]) == 1
-    assert "Implement the approved change." in turn_params["input"][0]["text"]
+    worker_input = turn_params["input"][0]["text"]
+    assert "Implement the approved change." in worker_input
+    assert "# Current state" in worker_input
+    assert 'untrusted="true"' in worker_input
 
 
 @pytest.mark.parametrize(
@@ -273,6 +228,7 @@ def test_completed_episode_uses_explicit_policy_and_deletes_after_context(
         ("failed", "failed", "boom"),
         ("interrupted", "interrupted", "interrupted"),
         ("malformed", "failed", "invalid worker terminal output"),
+        ("oversized_status", "failed", "1024 UTF-8 bytes"),
         ("exit", "failed", "exited unexpectedly"),
         ("server_request", "failed", "unexpected app-server request"),
     ],
@@ -287,14 +243,7 @@ def test_terminal_conditions_have_stable_statuses(
 ) -> None:
     server, _ = fake_app_server
     monkeypatch.setenv("FAKE_APP_MODE", mode)
-    result = AppServerAdapter(command=(str(server),), verify_protocol=False).run_episode(
-        prompt="Continue.",
-        context={},
-        execution=_execution(tmp_path),
-        model=None,
-        effort=None,
-        on_terminal=lambda _terminal: None,
-    )
+    result = _run_adapter(server, tmp_path)
     assert result.status == status
     assert message in result.message
 
@@ -310,8 +259,8 @@ def test_timeout_is_interrupted_and_thread_is_deleted(
         command=(str(server),), verify_protocol=False, timeout_seconds=0.5
     ).run_episode(
         prompt="Continue.",
-        context={},
-        execution=_execution(tmp_path),
+        context="",
+        cwd=str(tmp_path),
         model=None,
         effort=None,
         on_terminal=lambda _terminal: None,
@@ -322,7 +271,7 @@ def test_timeout_is_interrupted_and_thread_is_deleted(
     assert methods[-2:] == ["turn/interrupt", "thread/delete"]
 
 
-def test_cleanup_failure_is_a_warning_without_losing_success(
+def test_cleanup_failure_adds_warning_without_losing_success(
     fake_app_server: tuple[Path, Path],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -330,17 +279,19 @@ def test_cleanup_failure_is_a_warning_without_losing_success(
     server, _ = fake_app_server
     monkeypatch.setenv("FAKE_APP_MODE", "cleanup_failure")
     terminal_statuses: list[str] = []
-    result = AppServerAdapter(command=(str(server),), verify_protocol=False).run_episode(
+    result = AppServerAdapter(
+        command=(str(server),), verify_protocol=False
+    ).run_episode(
         prompt="Continue.",
-        context={},
-        execution=_execution(tmp_path),
+        context="",
+        cwd=str(tmp_path),
         model=None,
         effort=None,
         on_terminal=lambda terminal: terminal_statuses.append(terminal.status),
     )
     assert result.status == "completed"
     assert terminal_statuses == ["completed"]
-    assert "warning: worker thread cleanup failed" in result.message
+    assert result.warnings == ("thread_cleanup_failed",)
 
 
 def test_caller_interruption_interrupts_and_deletes_the_thread(
@@ -354,22 +305,17 @@ def test_caller_interruption_interrupts_and_deletes_the_thread(
         raise KeyboardInterrupt
 
     monkeypatch.setattr(AppServerAdapter, "_wait_for_terminal", interrupt_wait)
-    result = AppServerAdapter(command=(str(server),), verify_protocol=False).run_episode(
-        prompt="Continue.",
-        context={},
-        execution=_execution(tmp_path),
-        model=None,
-        effort=None,
-        on_terminal=lambda _terminal: None,
-    )
-    assert result == type(result)("interrupted", "Worker interrupted by caller.")
+    result = _run_adapter(server, tmp_path)
+    assert result.status == "interrupted"
+    assert result.started is True
+    assert result.turn_count == 1
     methods = [event.get("method") for event in _events(trace)]
     assert methods[-2:] == ["turn/interrupt", "thread/delete"]
 
 
 @pytest.mark.parametrize(
     ("mode", "message"),
-    [("bad_schema", "thread/delete"), ("bad_policy", "policy values")],
+    [("bad_schema", "thread/delete"), ("bad_policy", "inherit worker restrictions")],
 )
 def test_missing_protocol_capability_fails_before_startup(
     fake_app_server: tuple[Path, Path],
@@ -382,18 +328,19 @@ def test_missing_protocol_capability_fails_before_startup(
     monkeypatch.setenv("FAKE_APP_MODE", mode)
     result = AppServerAdapter(command=(str(server),)).run_episode(
         prompt="Continue.",
-        context={},
-        execution=_execution(tmp_path),
+        context="",
+        cwd=str(tmp_path),
         model=None,
         effort=None,
         on_terminal=lambda _terminal: None,
     )
     assert result.status == "failed"
+    assert result.started is False
     assert message in result.message
     assert not trace.exists()
 
 
-def test_two_public_episodes_use_fresh_threads_and_whole_context(
+def test_two_public_episodes_use_fresh_threads_and_complete_named_context(
     fake_app_server: tuple[Path, Path],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -405,54 +352,74 @@ def test_two_public_episodes_use_fresh_threads_and_whole_context(
         patch.object(worker_module, "_get_config", return_value=Config()),
         patch.object(worker_module, "AppServerAdapter", return_value=real_adapter),
     ):
-        first = run(
-            prompt="Implement the first slice.",
-            execution={
-                "cwd": str(tmp_path),
-                "approval_policy": "never",
-                "sandbox": {
-                    "type": "workspace-write",
-                    "writable_roots": [str(tmp_path)],
-                    "network_access": False,
-                    "exclude_slash_tmp": False,
-                    "exclude_tmpdir_env_var": False,
-                },
-            },
-        )
-        second = run(
-            prompt="Continue with the next slice.",
-            execution={
-                "cwd": str(tmp_path),
-                "approval_policy": "never",
-                "sandbox": {
-                    "type": "workspace-write",
-                    "writable_roots": [str(tmp_path)],
-                    "network_access": False,
-                    "exclude_slash_tmp": False,
-                    "exclude_tmpdir_env_var": False,
-                },
-            },
-            session_id=first["session_id"],
-        )
+        first = run(prompt="Implement the first slice.", context="feature-x")
+        second = run(prompt="Continue with the next slice.", context="feature-x")
 
+    assert first["context"] == second["context"] == "feature-x"
     assert first["status"] == second["status"] == "completed"
     events = _events(trace)
     thread_ids = [event["id"] for event in events if event["event"] == "thread"]
     assert len(thread_ids) == len(set(thread_ids)) == 2
-    turns = [
-        event["params"] for event in events if event.get("method") == "turn/start"
-    ]
+    turns = [event["params"] for event in events if event.get("method") == "turn/start"]
     assert len(turns) == 2
     assert all(len(turn["input"]) == 1 for turn in turns)
-    assert '"revision":1' in turns[1]["input"][0]["text"]
-    assert '"knowledge"' in turns[1]["input"][0]["text"]
-    assert "Implemented." not in turns[1]["input"][0]["text"]
-    context_path = (
-        tmp_path
-        / ".onetool"
-        / "state"
-        / "episodic-context"
-        / first["session_id"]
-        / "context.yaml"
+    assert "Adapter implemented" in turns[1]["input"][0]["text"]
+    assert "Published result to Console." not in turns[1]["input"][0]["text"]
+    path = tmp_path / ".onetool" / "state" / "worker" / "contexts" / "feature-x.md"
+    assert "revision: 3\n" in path.read_text(encoding="utf-8")
+
+
+def test_public_episode_integrates_default_review_console_changes_and_history(
+    fake_app_server: tuple[Path, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    server, trace = fake_app_server
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    monkeypatch.setenv("FAKE_APP_MODE", "channels")
+    real_adapter = AppServerAdapter(command=(str(server),))
+    with (
+        patch.object(worker_module, "_get_config", return_value=Config()),
+        patch.object(worker_module, "AppServerAdapter", return_value=real_adapter),
+    ):
+        default_result = run(prompt="Implement and publish.")
+        review_result = run(
+            prompt="Review independently.",
+            context="review-feature-x",
+        )
+        monkeypatch.setenv("FAKE_APP_MODE", "needs_input")
+        input_result = run(
+            prompt="Continue the review.",
+            context="review-feature-x",
+        )
+
+    assert default_result["context"] == "default"
+    assert review_result["context"] == input_result["context"] == "review-feature-x"
+    assert input_result["status"] == "needs_input"
+    turns = [
+        event["params"]
+        for event in _events(trace)
+        if event.get("method") == "turn/start"
+    ]
+    assert "Adapter implemented" not in turns[1]["input"][0]["text"]
+    assert "Adapter implemented" in turns[2]["input"][0]["text"]
+
+    history = HistoryStore(state_root=tmp_path / ".onetool" / "state" / "worker").read()
+    assert [record.context for record in history] == [
+        "default",
+        "review-feature-x",
+        "review-feature-x",
+    ]
+    assert any(
+        item.id == "message-1" and item.kind == "markdown"
+        for item in history[0].console
     )
-    assert "revision: 2\n" in context_path.read_text(encoding="utf-8")
+    assert any(
+        item.path == "worker-output.txt" and item.classification == "created"
+        for item in history[0].local_changes
+    )
+    history_text = (
+        tmp_path / ".onetool" / "state" / "worker" / "history.jsonl"
+    ).read_text(encoding="utf-8")
+    assert "PRIVATE CONSOLE BODY" not in history_text
+    assert "Implement and publish" not in history_text

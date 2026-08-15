@@ -1,6 +1,0 @@
-interface:
-  display_name: "Episodic Orchestrator"
-  short_description: "Coordinate work through fresh worker episodes"
-  default_prompt: "Use $episodic-orchestrator to coordinate this task through fresh worker episodes."
-policy:
-  allow_implicit_invocation: false

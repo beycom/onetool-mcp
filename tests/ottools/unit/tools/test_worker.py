@@ -1,40 +1,33 @@
-"""Tests for the sole public episodic worker tool."""
+"""Tests for the named-Context worker tool surface."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import inspect
+from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
 
 import ottools.worker as worker_module
 from ottools._worker.app_server import AdapterOutcome
-from ottools._worker.context import normalize_context, render_context
-from ottools._worker.models import CommittedContext, InternalTerminalOutput
-from ottools.worker import Config, run
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from ottools._worker.lifecycle import (
+    HistoryError,
+    HistoryStore,
+    ObservationError,
+    project_fingerprint,
+)
+from ottools._worker.models import InternalTerminalOutput
+from ottools.worker import (
+    Config,
+    archive_context,
+    list_contexts,
+    run,
+    select,
+    update_context,
+)
 
 pytestmark = [pytest.mark.unit, pytest.mark.tools]
-
-
-def _context(summary: str) -> dict[str, Any]:
-    return {
-        "goal": {
-            "status": "active",
-            "objective": "Finish the worker",
-            "success_criteria": ["Checks pass"],
-        },
-        "work": {
-            "summary": summary,
-            "next_actions": ["Continue"],
-            "blockers": [],
-        },
-        "knowledge": [{"kind": "decision", "text": "Keep the surface small"}],
-        "questions": [],
-        "references": [],
-    }
 
 
 class _FakeAdapter:
@@ -50,27 +43,69 @@ class _FakeAdapter:
         self._terminal = terminal
 
     def run_episode(self, **kwargs: Any) -> AdapterOutcome:
-        self._calls.append({key: value for key, value in kwargs.items() if key != "on_terminal"})
+        self._calls.append(
+            {
+                key: value
+                for key, value in kwargs.items()
+                if key not in {"on_terminal", "before_close"}
+            }
+        )
         if self._terminal is not None:
             kwargs["on_terminal"](self._terminal)
+        if kwargs.get("before_close") is not None:
+            kwargs["before_close"]()
         return self._outcome
 
 
-def _execution(tmp_path: Path) -> dict[str, Any]:
-    return {
-        "cwd": str(tmp_path),
-        "approval_policy": "never",
-        "sandbox": {
-            "type": "workspace-write",
-            "writable_roots": [str(tmp_path)],
-            "network_access": False,
-            "exclude_slash_tmp": False,
-            "exclude_tmpdir_env_var": False,
-        },
-    }
+class _LifecycleAdapter:
+    """Exercise the complete runtime-owned terminal lifecycle."""
+
+    def run_episode(self, **kwargs: Any) -> AdapterOutcome:
+        project_root = Path(kwargs["cwd"])
+        (project_root / "created-by-worker.txt").write_text(
+            "deliverable",
+            encoding="utf-8",
+        )
+        message_path = (
+            project_root
+            / ".onetool"
+            / "state"
+            / "console"
+            / "instances"
+            / "child"
+            / "messages"
+            / "message-1.json"
+        )
+        message_path.parent.mkdir(parents=True, exist_ok=True)
+        message_path.write_text(
+            '{"metadata":{"id":"message-1","kind":"markdown"},'
+            '"inline_payload":"PRIVATE CONSOLE BODY"}',
+            encoding="utf-8",
+        )
+        kwargs["on_terminal"](
+            InternalTerminalOutput(
+                status="completed",
+                message="Published result to Console.",
+                context="# Current state",
+            )
+        )
+        kwargs["before_close"]()
+        return AdapterOutcome(
+            "completed",
+            "Published result to Console.",
+            started=True,
+            turn_count=1,
+        )
 
 
-def test_two_episodes_reuse_only_complete_context(
+def _configure(adapter: _FakeAdapter, config: Config | None = None):
+    return (
+        patch.object(worker_module, "_get_config", return_value=config or Config()),
+        patch.object(worker_module, "AppServerAdapter", return_value=adapter),
+    )
+
+
+def test_default_context_and_complete_body_continue_in_fresh_episode(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -79,16 +114,19 @@ def test_two_episodes_reuse_only_complete_context(
     adapters = [
         _FakeAdapter(
             calls,
-            outcome=AdapterOutcome("completed", "First done."),
+            outcome=AdapterOutcome("completed", "Published result to Console."),
             terminal=InternalTerminalOutput(
-                status="completed", message="First done.", context=_context("First episode")
+                status="completed",
+                message="Published result to Console.",
+                context="# Goal\n\nFinish the worker",
             ),
         ),
         _FakeAdapter(
             calls,
             outcome=AdapterOutcome("needs_input", "Which target?"),
             terminal=InternalTerminalOutput(
-                status="needs_input", message="Which target?", context=None
+                status="needs_input",
+                message="Which target?",
             ),
         ),
     ]
@@ -96,34 +134,84 @@ def test_two_episodes_reuse_only_complete_context(
         patch.object(worker_module, "_get_config", return_value=Config()),
         patch.object(worker_module, "AppServerAdapter", side_effect=adapters),
     ):
-        first = run(
-            prompt="Implement it.",
-            execution=_execution(tmp_path),
-            model="gpt-5.6-sol",
-            effort="high",
-        )
-        second = run(
-            prompt="Use package A.",
-            execution=_execution(tmp_path),
-            session_id=first["session_id"],
-        )
+        first = run(prompt="Implement it.", model="gpt-5.6-sol", effort="high")
+        second = run(prompt="Use package A.")
 
-    assert set(first) == {"session_id", "status", "message"}
-    assert first["status"] == "completed"
+    assert first == {
+        "context": "default",
+        "status": "completed",
+        "message": "Published result to Console.",
+    }
     assert second == {
-        "session_id": first["session_id"],
+        "context": "default",
         "status": "needs_input",
         "message": "Which target?",
     }
-    assert calls[0]["context"] == {
-        "schema_version": 1,
-        "revision": 0,
-        "context": None,
-    }
+    assert calls[0]["context"] == ""
     assert calls[0]["model"] == "gpt-5.6-sol"
     assert calls[0]["effort"] == "high"
-    assert calls[1]["context"]["revision"] == 1
-    assert calls[1]["context"]["work"]["summary"] == "First episode"
+    assert calls[1]["context"] == "# Goal\n\nFinish the worker"
+    assert calls[0]["cwd"] == calls[1]["cwd"] == str(tmp_path)
+
+
+def test_explicit_context_is_one_episode_choice_without_global_selection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    calls: list[dict[str, Any]] = []
+    adapter = _FakeAdapter(
+        calls,
+        outcome=AdapterOutcome("completed", "Done."),
+    )
+    config_patch, adapter_patch = _configure(adapter)
+    with config_patch, adapter_patch:
+        run(prompt="Implement.", context="feature-x")
+        run(prompt="Review.", context="review-feature-x")
+        run(prompt="Direct default call.")
+
+    assert [call["context"] for call in calls] == ["", "", ""]
+    result = list_contexts()
+    assert [item["name"] for item in result["contexts"]] == [
+        "default",
+        "feature-x",
+        "review-feature-x",
+    ]
+
+
+def test_fresh_review_context_does_not_receive_implementation_context(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    project_file = tmp_path / "implementation.py"
+    project_file.write_text("IMPLEMENTED = True\n", encoding="utf-8")
+    calls: list[dict[str, Any]] = []
+    adapters = [
+        _FakeAdapter(
+            calls,
+            outcome=AdapterOutcome("completed", "Done."),
+            terminal=InternalTerminalOutput(
+                status="completed",
+                message="Done.",
+                context="PRIVATE IMPLEMENTATION CONTEXT",
+            ),
+        ),
+        _FakeAdapter(calls, outcome=AdapterOutcome("completed", "Reviewed.")),
+        _FakeAdapter(calls, outcome=AdapterOutcome("completed", "Continued.")),
+    ]
+    with (
+        patch.object(worker_module, "_get_config", return_value=Config()),
+        patch.object(worker_module, "AppServerAdapter", side_effect=adapters),
+    ):
+        run(prompt="Implement.", context="feature-x")
+        run(prompt="Review project files.", context="review-feature-x")
+        run(prompt="Continue.", context="feature-x")
+
+    assert project_file.is_file()
+    assert calls[1]["cwd"] == str(tmp_path)
+    assert calls[1]["context"] == ""
+    assert calls[2]["context"] == "PRIVATE IMPLEMENTATION CONTEXT"
 
 
 def test_configured_routing_and_per_call_precedence(
@@ -133,200 +221,81 @@ def test_configured_routing_and_per_call_precedence(
     monkeypatch.setenv("OT_CWD", str(tmp_path))
     calls: list[dict[str, Any]] = []
     adapter = _FakeAdapter(calls, outcome=AdapterOutcome("completed", "Done."))
-    with (
-        patch.object(
-            worker_module,
-            "_get_config",
-            return_value=Config(model="configured-model", effort="medium"),
-        ),
-        patch.object(worker_module, "AppServerAdapter", return_value=adapter),
-    ):
-        run(prompt="First.", execution=_execution(tmp_path))
-        run(
-            prompt="Second.",
-            execution=_execution(tmp_path),
-            model="call-model",
-            effort="high",
-        )
+    config = Config(model="configured-model", effort="medium")
+    config_patch, adapter_patch = _configure(adapter, config)
+    with config_patch, adapter_patch:
+        run(prompt="First.")
+        run(prompt="Second.", model="call-model", effort="high")
+
     assert [(call["model"], call["effort"]) for call in calls] == [
         ("configured-model", "medium"),
         ("call-model", "high"),
     ]
 
 
-def test_execution_policy_is_forwarded_without_narrowing(
+def test_context_operations_are_body_free_and_preserve_explicit_semantics(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OT_CWD", str(tmp_path))
-    shared_root = tmp_path.parent / "shared"
-    shared_root.mkdir()
-    calls: list[dict[str, Any]] = []
-    adapter = _FakeAdapter(calls, outcome=AdapterOutcome("completed", "Done."))
-    execution = {
-        "cwd": str(tmp_path),
-        "approval_policy": "never",
-        "sandbox": {
-            "type": "workspace-write",
-            "writable_roots": [str(tmp_path), str(shared_root)],
-            "network_access": True,
-            "exclude_slash_tmp": True,
-            "exclude_tmpdir_env_var": True,
-        },
+
+    selected = select(context="feature-x")
+    updated = update_context(
+        context="feature-x",
+        description="Implement feature X",
+        tags=["feature", "active"],
+    )
+    cleared = update_context(context="feature-x", tags=[])
+    listed = list_contexts(status="active")
+    archived = archive_context(context="feature-x")
+
+    assert selected == {"ok": True, "context": "feature-x", "created": True}
+    assert updated == {
+        "ok": True,
+        "context": "feature-x",
+        "created": False,
+        "description": "Implement feature X",
+        "tags": ["feature", "active"],
+        "status": "active",
+        "revision": 2,
     }
-    with (
-        patch.object(worker_module, "_get_config", return_value=Config()),
-        patch.object(worker_module, "AppServerAdapter", return_value=adapter),
-    ):
-        result = run(prompt="Use the inherited permissions.", execution=execution)
-
-    assert result["status"] == "completed"
-    policy = calls[0]["execution"]
-    assert policy.model_dump(mode="python") == execution
+    assert cleared["description"] == "Implement feature X"
+    assert cleared["tags"] == []
+    assert set(listed) == {"ok", "contexts"}
+    assert "body" not in repr(listed)
+    assert archived == {"ok": True, "context": "feature-x", "status": "archived"}
+    assert select(context="feature-x")["status"] == "context_select_failed"
 
 
-@pytest.mark.parametrize("status", ["completed", "needs_input", "failed", "interrupted"])
-def test_absent_terminal_context_preserves_last_revision(
+def test_update_can_create_and_empty_values_clear_metadata(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    status: str,
 ) -> None:
     monkeypatch.setenv("OT_CWD", str(tmp_path))
-    calls: list[dict[str, Any]] = []
-    commit_adapter = _FakeAdapter(
-        calls,
-        outcome=AdapterOutcome("completed", "Saved."),
-        terminal=InternalTerminalOutput(
-            status="completed", message="Saved.", context=_context("Saved context")
-        ),
-    )
-    preserve_adapter = _FakeAdapter(
-        calls,
-        outcome=AdapterOutcome(status, "Terminal."),
-        terminal=(
-            InternalTerminalOutput(status=status, message="Terminal.", context=None)
-            if status in {"completed", "needs_input"}
-            else None
-        ),
-    )
-    with (
-        patch.object(worker_module, "_get_config", return_value=Config()),
-        patch.object(
-            worker_module,
-            "AppServerAdapter",
-            side_effect=[commit_adapter, preserve_adapter],
-        ),
-    ):
-        first = run(prompt="Save.", execution=_execution(tmp_path))
-        result = run(
-            prompt="Continue.",
-            execution=_execution(tmp_path),
-            session_id=first["session_id"],
-        )
-    assert result["status"] == status
-    assert calls[-1]["context"]["revision"] == 1
-    context_path = (
-        tmp_path
-        / ".onetool"
-        / "state"
-        / "episodic-context"
-        / first["session_id"]
-        / "context.yaml"
-    )
-    assert "revision: 1\n" in context_path.read_text(encoding="utf-8")
+    created = update_context(context="topic", description="", tags=[])
+    missing_fields = update_context(context="other")
+
+    assert created["created"] is True
+    assert created["description"] == ""
+    assert created["tags"] == []
+    assert missing_fields["status"] == "context_update_failed"
 
 
-def test_invalid_policy_fails_before_worker_start(
+def test_invalid_context_fails_before_worker_start(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OT_CWD", str(tmp_path))
     calls: list[dict[str, Any]] = []
     adapter = _FakeAdapter(calls, outcome=AdapterOutcome("completed", "Done."))
-    with (
-        patch.object(worker_module, "_get_config", return_value=Config()),
-        patch.object(worker_module, "AppServerAdapter", return_value=adapter),
-    ):
-        wrong_cwd = run(
-            prompt="Start.",
-            execution={**_execution(tmp_path), "cwd": str(tmp_path.parent)},
-        )
-        relative_root = run(
-            prompt="Start.",
-            execution={
-                **_execution(tmp_path),
-                "sandbox": {
-                    **_execution(tmp_path)["sandbox"],
-                    "writable_roots": ["relative/path"],
-                },
-            },
-        )
-        legacy_sandbox = run(
-            prompt="Start.",
-            execution={**_execution(tmp_path), "sandbox": "workspace-write"},
-        )
-    assert wrong_cwd["status"] == "failed"
-    assert relative_root["status"] == "failed"
-    assert legacy_sandbox["status"] == "failed"
+    config_patch, adapter_patch = _configure(adapter)
+    with config_patch, adapter_patch:
+        result = run(prompt="Start.", context="../escape")
+        blank = run(prompt="Start.", context="")
+
+    assert result["status"] == blank["status"] == "failed"
     assert calls == []
-
-
-@pytest.mark.parametrize(
-    ("invalid_kind", "message"),
-    [
-        ("corrupt", "invalid YAML"),
-        ("oversized", "limit is 16 KB"),
-        ("missing_reference", "existing regular file"),
-    ],
-)
-def test_every_invalid_stored_context_fails_before_worker_start(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    invalid_kind: str,
-    message: str,
-) -> None:
-    monkeypatch.setenv("OT_CWD", str(tmp_path))
-    calls: list[dict[str, Any]] = []
-    adapter = _FakeAdapter(calls, outcome=AdapterOutcome("completed", "Done."))
-    with (
-        patch.object(worker_module, "_get_config", return_value=Config()),
-        patch.object(worker_module, "AppServerAdapter", return_value=adapter),
-    ):
-        created = run(prompt="Create.", execution=_execution(tmp_path))
-        context_path = (
-            tmp_path
-            / ".onetool"
-            / "state"
-            / "episodic-context"
-            / created["session_id"]
-            / "context.yaml"
-        )
-        if invalid_kind == "corrupt":
-            content = "not: [valid"
-        else:
-            raw = _context("x" * 20_000 if invalid_kind == "oversized" else "Current")
-            if invalid_kind == "missing_reference":
-                raw["references"] = [
-                    {"path": "missing.md", "purpose": "Required evidence"}
-                ]
-            normalized = normalize_context(raw)
-            content = render_context(
-                CommittedContext(
-                    schema_version=1,
-                    revision=1,
-                    **normalized.model_dump(mode="python"),
-                )
-            )
-        context_path.write_text(content, encoding="utf-8")
-        result = run(
-            prompt="Continue.",
-            execution=_execution(tmp_path),
-            session_id=created["session_id"],
-        )
-    assert result["status"] == "failed"
-    assert message in result["message"]
-    assert context_path.read_text(encoding="utf-8") == content
-    assert len(calls) == 1
+    assert not (tmp_path / ".onetool").exists()
 
 
 def test_recursive_concurrent_and_failed_calls_are_not_retried(
@@ -336,38 +305,138 @@ def test_recursive_concurrent_and_failed_calls_are_not_retried(
     monkeypatch.setenv("OT_CWD", str(tmp_path))
     calls: list[dict[str, Any]] = []
     adapter = _FakeAdapter(calls, outcome=AdapterOutcome("failed", "Protocol failed."))
-    with (
-        patch.object(worker_module, "_get_config", return_value=Config()),
-        patch.object(worker_module, "AppServerAdapter", return_value=adapter),
-    ):
+    config_patch, adapter_patch = _configure(adapter)
+    with config_patch, adapter_patch:
         monkeypatch.setenv("OT_EPISODIC_WORKER", "1")
-        recursive = run(prompt="Delegate.", execution=_execution(tmp_path))
+        recursive = run(prompt="Delegate.")
+        recursive_select = select(context="topic")
         monkeypatch.delenv("OT_EPISODIC_WORKER")
         assert worker_module._ACTIVE_LOCK.acquire(blocking=False)
         try:
-            concurrent = run(prompt="Delegate.", execution=_execution(tmp_path))
+            concurrent = run(prompt="Delegate.")
         finally:
             worker_module._ACTIVE_LOCK.release()
-        failed = run(prompt="Delegate.", execution=_execution(tmp_path))
+        failed = run(prompt="Delegate.")
+
     assert recursive["status"] == "failed"
     assert "cannot be called" in recursive["message"]
+    assert recursive_select["status"] == "recursive_worker_operation"
     assert concurrent["status"] == "failed"
     assert "already active" in concurrent["message"]
     assert failed["status"] == "failed"
     assert len(calls) == 1
 
 
-def test_public_module_exposes_only_worker_run() -> None:
-    assert worker_module.__all__ == ["run"]
-    for deferred_name in (
-        "save_context",
-        "read_context",
-        "search_context",
-        "select_context",
-        "patch_context",
-        "compact_context",
-        "queue",
-        "schedule",
-        "retry",
+def test_status_is_bounded_after_runtime_warnings(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    calls: list[dict[str, Any]] = []
+    adapter = _FakeAdapter(
+        calls,
+        outcome=AdapterOutcome(
+            "failed",
+            "é" * 2_000,
+            warnings=("thread_cleanup_failed",),
+        ),
+    )
+    config_patch, adapter_patch = _configure(adapter)
+    with config_patch, adapter_patch:
+        result = run(prompt="Start.")
+
+    assert set(result) == {"context", "status", "message"}
+    assert len(result["message"].encode("utf-8")) <= 1024
+
+
+def test_completed_episode_records_console_context_and_local_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    with (
+        patch.object(worker_module, "_get_config", return_value=Config()),
+        patch.object(
+            worker_module, "AppServerAdapter", return_value=_LifecycleAdapter()
+        ),
     ):
-        assert not hasattr(worker_module, deferred_name)
+        result = run(prompt="Produce the deliverable.", context="feature-x")
+
+    records = HistoryStore(state_root=tmp_path / ".onetool" / "state" / "worker").read()
+    assert result == {
+        "context": "feature-x",
+        "status": "completed",
+        "message": "Published result to Console.",
+    }
+    assert len(records) == 1
+    record = records[0]
+    assert record.context == "feature-x"
+    assert record.context_revision_before == 1
+    assert record.context_revision_after == 2
+    assert [item.model_dump(mode="python") for item in record.console] == [
+        {"id": "message-1", "kind": "markdown"}
+    ]
+    assert [item.model_dump(mode="python") for item in record.local_changes] == [
+        {"path": "created-by-worker.txt", "classification": "created"}
+    ]
+    history_text = (
+        tmp_path / ".onetool" / "state" / "worker" / "history.jsonl"
+    ).read_text(encoding="utf-8")
+    assert "PRIVATE CONSOLE BODY" not in history_text
+    assert "# Current state" not in history_text
+    assert "Produce the deliverable" not in history_text
+
+
+def test_final_scan_and_history_failures_warn_without_changing_known_outcome(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OT_CWD", str(tmp_path))
+    baseline = project_fingerprint(tmp_path)
+    scans = iter([baseline, ObservationError("final scan failed")])
+
+    def fingerprint(_root: Path):
+        value = next(scans)
+        if isinstance(value, BaseException):
+            raise value
+        return value
+
+    with (
+        patch.object(worker_module, "_get_config", return_value=Config()),
+        patch.object(
+            worker_module,
+            "AppServerAdapter",
+            return_value=_FakeAdapter(
+                [],
+                outcome=AdapterOutcome(
+                    "completed",
+                    "Done.",
+                    started=True,
+                    turn_count=1,
+                ),
+            ),
+        ),
+        patch.object(worker_module, "project_fingerprint", side_effect=fingerprint),
+        patch.object(
+            worker_module.HistoryStore,
+            "append",
+            side_effect=HistoryError("append failed"),
+        ),
+    ):
+        result = run(prompt="Finish.")
+
+    assert result["status"] == "completed"
+    assert "local_changes_observation_failed" in result["message"]
+    assert "history_append_failed" in result["message"]
+
+
+def test_public_surface_has_no_session_or_execution_compatibility() -> None:
+    assert worker_module.__all__ == [
+        "archive_context",
+        "list_contexts",
+        "run",
+        "select",
+        "update_context",
+    ]
+    parameters = inspect.signature(run).parameters
+    assert set(parameters) == {"prompt", "context", "model", "effort"}

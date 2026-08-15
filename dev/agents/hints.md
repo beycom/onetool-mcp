@@ -33,6 +33,7 @@ tests/          All tests (smoke, unit, integration)
 dev/            Developer documentation (THIS folder)
 docs/           User-facing documentation
 openspec/       Specifications and proposals
+plans/          Shared feature and program plans
 ```
 
 ---

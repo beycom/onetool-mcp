@@ -46,13 +46,16 @@ details belong under `openspec/changes/`, not in this index.
 | [serve-mcp-proxy](serve-mcp-proxy/spec.md) | External MCP server proxying |
 | [serve-output-sanitization](serve-output-sanitization/spec.md) | Output sanitization boundaries |
 | [serve-server-management](serve-server-management/spec.md) | Runtime server enable/disable/restart APIs |
-| [serve-skills](serve-skills/spec.md) | Runtime skill listing and content retrieval |
+| [serve-skills](serve-skills/spec.md) | Standard Agent Skill distribution boundaries |
+| [skill-use-worker](skill-use-worker/spec.md) | Explicit coordination through fresh worker episodes |
 | [skill-ot-ref](skill-ot-ref/spec.md) | The ot-ref skill: trigger, layout, and command-index delivery |
 | [serve-stats](serve-stats/spec.md) | Runtime statistics reporting |
 | [serve-telemetry](serve-telemetry/spec.md) | Anonymous startup telemetry |
 | [console-outbox](console-outbox/spec.md) | Console outbox protocol contract (v1, server implementation post-V3) |
 | [tool-execution](tool-execution/spec.md) | Extension tool execution worker behavior |
 | [tool-ot](tool-ot/spec.md) | Internal `ot.*` runtime helper pack |
+| [tool-worker](tool-worker/spec.md) | Named-Context episodic worker operations |
+| [worker-contexts](worker-contexts/spec.md) | Project-local worker Context persistence and History |
 | [batch-retry-envelope](batch-retry-envelope/spec.md) | Structured batch retry envelopes |
 | [field-level-provenance](field-level-provenance/spec.md) | Field-level provenance output contracts |
 | [force-context-dunder](force-context-dunder/spec.md) | `__force_context__` output behavior |

@@ -1,175 +1,184 @@
 ## Context
 
-The existing implementation already provides serialized `worker.run` execution,
-fresh Codex threads, strict whole-state Context, and a three-field public result.
-Its artifacts and runtime do not yet agree on channel ownership: completed output
-is relayed through `message`, and Console publication, VCS-independent Local
-Changes observation, and mechanical History are not enforced as one lifecycle.
+The current implementation already serializes `worker.run`, starts a fresh Codex
+thread, persists one compact Context, and returns a small result. Its session
+identity is overloaded: it selects semantic Context, groups History and future
+artifacts, and is retained for the whole main Chat. Unrelated implementation,
+review, research, and staging episodes therefore inherit the same semantic state.
 
-The foundation remains one main conversation delegating to one worker. Only Chat
-and committed Context may enter a fresh worker automatically. Context and Console
-bodies must remain unavailable to the main agent, and no design may introduce
-fan-out, recursion, or a second active worker.
+The revised foundation treats the effective CWD as the project, a named Context
+as durable workstream state, an episode as one `worker.run`, and a thread as
+ephemeral model conversation. No project registry or public session exists.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Establish one enforceable six-channel contract.
-- Route substantial user-facing output through the existing Console outbox while
-  keeping public Status bounded.
-- Record mechanical episode facts and changed paths without creating memory or a
-  transcript.
-- Make terminal ordering and partial-failure behavior deterministic.
-- Preserve fresh-thread isolation, exact authority propagation, atomic Context,
+- Let a Chat move quickly between named Contexts while every episode keeps a
+  fresh worker thread.
+- Make `default` the initial Context and make new named Contexts cheap to create.
+- Keep Contexts as simple editable project-local files with bounded public
+  metadata and private semantic bodies.
+- Preserve exact authority, channel isolation, atomic Context commits,
   serialization, and non-replay.
+- Establish one deterministic Console, Local Changes, History, cleanup, and
+  Status lifecycle.
 
 **Non-Goals:**
 
-- Autonomous additional turns, managed artifacts, warm runtime, advanced
-  telemetry, or semantic compaction.
-- Indexed History, durable Console replay, selective Context queries, partial
-  Context updates, retries, transcripts, or long-term memory.
-- Compatibility aliases for the original output semantics or change name.
+- A project registry, project parameter, contextless mode, transcripts, resumed
+  worker threads, parallel workers, recursion, queues, retries, or long-term
+  cross-project memory.
+- Context deletion, rename, restore, search, partial semantic-body updates,
+  automatic compaction, or compatibility with session IDs.
+- Automatic artifact injection, durable Console replay, or rich History queries.
 
 ## Decisions
 
-### 1. Treat channels as ownership boundaries
+### 1. Scope named Contexts to the effective project
 
-The runtime and agent instructions use this fixed routing table:
+The effective CWD and its loaded project instructions define the project. Context
+files live at `.onetool/state/worker/contexts/<context>.md`; no project registry,
+project argument, or cross-project lookup is added.
+
+Context names use a strict lowercase filesystem-safe slug. `default` is reserved
+as the initial Chat selection but otherwise uses the same file and lifecycle.
+Unknown active names supplied to `run`, `select`, or `update_context` are created
+atomically. An archived name remains reserved and is never recreated implicitly.
+
+Alternative: retain opaque session IDs. Rejected because they couple Context to a
+Chat lifecycle and make topic selection undiscoverable.
+
+### 2. Keep selection in the orchestrating Chat
+
+Every newly invoked orchestrator starts with selected Context `default`. The main
+agent retains only the selected name. `worker.select(context=...)` validates or
+creates the named Context and returns a bounded receipt; the orchestrator then
+supplies that name on later `worker.run` calls. Selection is not project-global or
+process-global state.
+
+An explicit Context on `worker.run` is a one-episode override and does not change
+the Chat selection. There is no `None` or temporary mode: a fresh perspective is
+a newly named Context such as `review-feature-x`.
+
+This coordinator-owned selection avoids one Chat mutating another while keeping
+the runtime interface deterministic for direct callers.
+
+### 3. Store metadata and semantic state in one Markdown file
+
+Each Context is one UTF-8 Markdown file with YAML frontmatter. Runtime-owned
+frontmatter fields are `schema_version`, `revision`, and `status`; user-visible
+metadata fields are `description` and `tags`. The filename is the Context
+identity. The Markdown body is the complete current semantic state, not a
+transcript or instruction source.
+
+`list_contexts` reads only validated frontmatter and returns names, descriptions,
+tags, statuses, and revisions in stable name order. `update_context` upserts only
+description and tags. Omitted fields preserve their values; explicit empty values
+clear them; supplied tags replace the complete list.
+
+Workers receive the complete active body as explicitly delimited untrusted state
+and may return one complete replacement body. The runtime owns parsing,
+normalization, frontmatter rendering, revisioning, reference validation, size
+measurement, and beside-file atomic replacement. It binds a commit to the loaded
+revision and file digest so manual edits during an episode are never overwritten.
+
+Alternative: make Context a Chat transcript. Rejected because transcripts grow,
+anchor reviewers, and defeat fresh-thread isolation.
+
+### 4. Archive without deleting or reusing identity
+
+`archive_context` requires an existing active Context, changes only its status to
+`archived`, increments its revision, and preserves metadata and body. `default`
+cannot be archived. Archived Contexts remain visible to `list_contexts`, cannot be
+selected or used for a run, and block implicit recreation under the same name.
+
+Restore, delete, and rename operations are deferred. Direct manual recovery
+remains possible because the representation is an editable file, but the runtime
+never silently reactivates archived state.
+
+### 5. Treat channels as ownership boundaries
+
+The runtime and agent instructions use this routing table:
 
 | Channel | Writer | Reader | Durable form | Automatic worker input |
 |---|---|---|---|---|
-| Chat | User and main agent | Current worker | Main conversation | Current request only |
-| Context | Worker proposes; MCP commits | Later workers in session | `context.yaml` | Complete snapshot |
-| Console | Worker through `console.show` | User | Existing runtime body store/outbox | Never |
-| Local Changes | Worker file tools | Workspace and later workers | Project filesystem | Normal file access only |
+| Chat | User and main agent | Current worker | Current request | Current request only |
+| Context | Worker proposes; MCP commits | Workers using that name | Named Markdown file | Complete selected body |
+| Console | Worker through `console.show` | User | Existing outbox | Never |
+| Local Changes | Worker file tools | Project and later workers | Project filesystem | Normal file access only |
 | Status | Worker and MCP | Main agent and user | `worker.run` result | Never |
-| History | MCP only | Explicit inspectors | `history.jsonl` | Never |
+| History | MCP only | Explicit inspectors | Project `history.jsonl` | Never |
 
-Source text, tool results, intermediate reasoning, and same-thread messages are
-ephemeral. A reference across channels never copies the referenced body.
+Context metadata is intentionally discoverable, but Context bodies remain absent
+from list results, Status, Console, History, and the main conversation. Source
+text, tool results, reasoning, and same-thread messages remain ephemeral.
 
-Alternative: return all worker output to the main agent. Rejected because it
-recreates the conversation growth and Context leakage the architecture removes.
+### 6. Publish substantial output through Console
 
-### 2. Publish user-facing bodies through the existing Console
+Workers use the existing Console publisher for answers, reports, evidence,
+previews, and file references. Public `worker.run` returns exactly `context`,
+`status`, and a bounded `message`; it never returns a Context or Console body.
 
-Workers use the existing `console.show` operations for substantial answers,
-reports, evidence, previews, and file references. The worker terminal output does
-not contain a Console body. The runtime mechanically observes Console message IDs
-created during the episode and may retain only their ID and kind in History.
+### 7. Store History at project scope
 
-The public result remains exactly `session_id`, `status`, and `message`.
-`message` is limited to 1024 UTF-8 bytes after runtime warnings are added. For
-`completed`, it is a control receipt; for `needs_input`, it is one direct question;
-for failures and interruption, it is a bounded diagnostic. Oversized or
-substantial completed terminal text is invalid rather than silently truncated.
+History lives at `.onetool/state/worker/history.jsonl` rather than inside a
+Context directory. Each strict MCP-authored record includes the episode ID,
+selected Context name, timestamps, terminal status, turn count, Context revision
+transition, Console message identifiers, Local Changes classifications, bounded
+failure classification, and warning codes.
 
-Alternative: add worker-specific Console storage. Rejected because the existing
-outbox already supplies the user-facing data plane and a second store would blur
-ownership.
+History never stores prompts, descriptions, tags, Context bodies, Console bodies,
+file contents, diffs, tool results, or agent-authored summaries.
 
-### 3. Observe Local Changes with project-tree fingerprints
+### 8. Preserve authority without a public execution object
 
-Immediately before worker startup, the MCP walks the project root and records a
-bounded fingerprint for regular files. It excludes `.git`, OneTool runtime state,
-configured cache roots, and symlink targets outside the project. The final walk
-uses the same rules. Comparing the two maps yields sorted project-relative
-`created`, `modified`, and `deleted` paths, including further changes to files
-that were already dirty before the episode.
+The worker starts in the effective project and inherits the parent process's
+enforced filesystem and network boundary. The adapter sets non-interactive
+approval and must prove it cannot broaden the effective authority before starting
+a thread. An unrepresentable boundary fails before worker startup.
 
-The observer does not read file bodies into History, retain snapshots, compute or
-store diffs, invoke Git, depend on Localhist, roll back work, or treat symlink
-targets outside the project as project files.
+Project instructions, skills, tools, plugins, and configured MCP servers are
+loaded normally for that CWD. Only one call may be active, and a marked worker
+cannot recurse.
 
-Alternative: use `git diff`. Rejected because untracked projects, ignored files,
-and pre-existing dirty files make VCS state an incomplete episode boundary.
+### 9. Use one deterministic terminal sequence
 
-### 4. Append one strict mechanical History record
-
-Each terminal episode owns an opaque episode ID. After terminal processing,
-thread cleanup, and the final file scan, the MCP appends one canonical JSON object
-plus LF to `episodic-context/<session-id>/history.jsonl`, flushes, and calls
-`fsync`. Serialization gives the journal one writer.
-
-Schema version 1 contains only runtime-observed fields: episode ID, UTC start and
-finish timestamps, public terminal status, turn count, Context revisions before
-and after, Console message ID/kind pairs, whether Local Changes observation
-succeeded, sorted changed path/classification pairs, an optional bounded failure
-classification, and bounded warning codes. Unknown fields are rejected by an
-explicit reader. Prompts, agent prose, Context bodies, Console bodies, file
-contents, diffs, tool results, and narrative summaries are prohibited.
-
-Readers accept complete valid lines in order and ignore only one malformed final
-line, preserving earlier records after an interrupted append. They reject a
-malformed non-final record.
-
-Alternative: reuse Context or telemetry. Rejected because History is a
-mechanical audit, not current semantic state or performance evidence.
-
-### 5. Use one deterministic terminal sequence
-
-After the worker produces a terminal payload, the runtime performs:
-
-1. validate terminal Status and optional complete Context;
-2. commit valid Context for `completed` or `needs_input`, otherwise preserve it;
-3. delete the worker thread;
-4. perform the final Local Changes scan;
-5. append History;
-6. return bounded Status.
-
-Console publication and Local Changes can occur during the worker turn and are
-not reversible. A Context failure changes the terminal outcome to `failed` and
-preserves the last valid revision. Cleanup, final-scan, or History failures add a
-bounded warning code without reversing a known worker result, Console delivery,
-Context commit, or filesystem effect. A History failure cannot record itself.
-
-`needs_input` follows the same sequence and always deletes its thread before the
-question returns. The user's answer starts a new `worker.run` episode with the
-same session ID and committed Context.
-
-### 6. Preserve exact worker authority and isolation
-
-The main agent supplies absolute current-project `cwd`, `approval_policy: never`,
-and a typed read-only, workspace-write, danger-full-access, or external-sandbox
-policy. Network mode, writable roots, and temporary-directory exclusions are
-preserved exactly. Unsupported envelopes fail before thread startup.
-
-The fresh worker loads the same project instructions, skills, tools, plugins,
-and configured MCP servers. The child is marked so `worker.run` rejects recursive
-calls, and a process-wide non-blocking lock rejects concurrent calls.
+After terminal output, the runtime validates and commits or preserves the selected
+Context, deletes the worker thread, performs the final Local Changes scan, appends
+History, and returns bounded Status. Context failure changes the outcome to
+`failed` and preserves the last valid revision. Cleanup, scan, or History failure
+adds a bounded warning without reversing known effects. Failed or interrupted
+episodes are never replayed.
 
 ## Risks / Trade-offs
 
-- **Console is process-scoped** → Keep durable replay explicitly deferred; History
-  stores only body-free identifiers.
-- **Tree scans add episode latency** → Exclude runtime/cache roots, fingerprint
-  mechanically, and keep serialized execution so no merge protocol is needed.
-- **A crash can leave one partial History line** → Flush and `fsync`; readers
-  preserve valid prefix records and ignore only a malformed final line.
-- **Bounded Status can be too small for a deliverable** → Require Console for
-  substantial output and reserve Status for receipts, questions, and diagnostics.
-- **Post-terminal failures cannot undo side effects** → Return explicit warning
-  codes and preserve the known outcomes instead of claiming rollback.
+- **A misspelled name creates a Context** → Return the effective name, keep files
+  discoverable, and never recreate an archived identity.
+- **Manual edits race with a worker commit** → Bind commits to revision and digest.
+- **Chat selection could leak across callers** → Keep it in orchestrator state,
+  never process-global state.
+- **Free-form Markdown is less mechanically semantic than the original object** →
+  Keep a complete bounded replacement and validate the metadata, references,
+  encoding, and storage boundary mechanically.
+- **Archived Contexts accumulate** → Preserve them deliberately; deletion and
+  retention require a separate explicit contract.
+- **Project History mixes Contexts** → Record only the bounded Context name and
+  support deterministic filtering without copying metadata or bodies.
 
 ## Migration Plan
 
-1. Rename the existing active change without retaining an alias.
-2. Update artifacts and tests to the six-channel contract while preserving the
-   checked original-v1 task evidence.
-3. Implement and verify Console routing, Local Changes observation, History, and
-   bounded Status as one lifecycle.
-4. Promote only verified behavior to `arch.md`, keep unrelated deferred material
-   in `next.md`, and update reference documentation.
-5. Run strict OpenSpec validation and project checks, then sync the delta specs
-   into the main spec set before dependent implementations are integrated.
+1. Replace the active `p11` session delta specs before they are synced.
+2. Remove session IDs, session directories, the public execution object, and the
+   sole-tool assertion without aliases or fallbacks.
+3. Implement named Context files and the five-operation worker surface.
+4. Reconcile Console, History, Local Changes, and terminal lifecycle behavior.
+5. Update every unimplemented dependent change to the named-Context foundation.
+6. Verify and sync only the final named-Context contract to main specs.
 
-Rollback before spec sync is a normal code revert that preserves the last valid
-Context and project files. History and Console bodies are observational records;
-rollback does not fabricate or delete episode evidence.
+Rollback before spec sync is a normal code and artifact revert. No migration or
+legacy session reader is retained.
 
 ## Open Questions
 
-None. The foundation choices are fixed by the delivery plan; extensions remain
-separate OpenSpec changes.
+None. Restore, delete, rename, and retention are explicitly deferred.

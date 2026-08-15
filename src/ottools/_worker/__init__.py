@@ -1,18 +1,18 @@
-"""Internal implementation for the episodic worker pack."""
+"""Internal implementation for the named-Context worker pack."""
 
 from ottools._worker.context import ContextStore, LoadedContext
 from ottools._worker.models import (
-    ExecutionPolicy,
+    ContextListItem,
+    ContextMetadata,
     InternalTerminalOutput,
     PublicWorkerResult,
-    WorkerContext,
 )
 
 __all__ = [
+    "ContextListItem",
+    "ContextMetadata",
     "ContextStore",
-    "ExecutionPolicy",
     "InternalTerminalOutput",
     "LoadedContext",
     "PublicWorkerResult",
-    "WorkerContext",
 ]

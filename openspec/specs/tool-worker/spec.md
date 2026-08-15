@@ -1,4 +1,11 @@
-## ADDED Requirements
+# tool-worker Specification
+
+## Purpose
+
+Defines the named-Context worker tool surface, fresh-thread execution boundary,
+channel routing, project change observation, cleanup, and terminal results.
+
+## Requirements
 
 ### Requirement: The worker pack exposes named-Context operations
 

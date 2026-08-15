@@ -123,6 +123,7 @@ A test for `src/otdev/tools/webfetch.py` → `tests/otdev/unit/tools/test_webfet
 | `dev/` | Developer documentation | Contributors, AI agents |
 | `docs/` | User-facing docs | End users |
 | `openspec/` | Specifications | Contributors |
+| `plans/` | Shared feature and program plans | Contributors |
 
 ---
 

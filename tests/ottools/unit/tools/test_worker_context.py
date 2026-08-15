@@ -1,28 +1,19 @@
-"""Tests for deterministic episodic worker context contracts and storage."""
+"""Tests for strict project-local named Context storage."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import patch
 
 import pytest
-import yaml
-from pydantic import ValidationError
 
 from ottools._worker.context import (
     ContextError,
     ContextStore,
-    normalize_context,
+    normalize_body,
     render_context,
+    validate_context_name,
 )
-from ottools._worker.models import (
-    CommittedContext,
-    ExecutionPolicy,
-    InternalTerminalOutput,
-    PublicWorkerResult,
-    WorkerContext,
-)
-from ottools.worker import Config
+from ottools._worker.models import ContextMetadata
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -30,276 +21,320 @@ if TYPE_CHECKING:
 pytestmark = [pytest.mark.unit, pytest.mark.tools]
 
 
-def _context(*, reference: str | None = None, summary: str = "Current work") -> dict:
-    references = []
-    if reference is not None:
-        references.append({"path": reference, "purpose": "Useful evidence"})
-    return {
-        "goal": {
-            "status": "active",
-            "objective": "Finish the worker",
-            "success_criteria": ["Tests pass"],
-        },
-        "work": {
-            "summary": summary,
-            "next_actions": ["Implement the adapter"],
-            "blockers": [],
-        },
-        "knowledge": [{"kind": "decision", "text": "Use one result"}],
-        "questions": [],
-        "references": references,
-    }
+def _store(tmp_path: Path, *, max_kb: int = 16) -> ContextStore:
+    return ContextStore(
+        context_max_kb=max_kb,
+        state_root=tmp_path / ".onetool" / "state" / "worker",
+        project_root=tmp_path,
+    )
 
 
-def test_strict_models_reject_unknown_blank_and_invalid_values() -> None:
-    context = WorkerContext.model_validate(_context())
-    assert context.goal.status == "active"
-    for mutation in (
-        {**_context(), "unknown": True},
-        {**_context(), "questions": ["  "]},
-        {**_context(), "goal": {**_context()["goal"], "status": "paused"}},
-    ):
-        with pytest.raises(ValidationError):
-            WorkerContext.model_validate(mutation)
+class TestContextNames:
+    """Validate filesystem-safe unambiguous names and containment."""
 
-    with pytest.raises(ValidationError):
-        PublicWorkerResult.model_validate(
-            {
-                "session_id": "ep-1",
-                "status": "completed",
-                "message": "done",
-                "context": {},
-            }
+    @pytest.mark.parametrize(
+        "name",
+        ["default", "feature-x", "review-feature-x", "x1", "123"],
+    )
+    def test_accepts_lowercase_slugs(self, name: str) -> None:
+        assert validate_context_name(name) == name
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "",
+            "Feature-X",
+            "feature_x",
+            "feature.x",
+            "feature--x",
+            "-feature",
+            "feature-",
+            "../feature",
+            "feature/x",
+            "feature\\x",
+            " feature",
+            "feature ",
+            "x" * 65,
+        ],
+    )
+    def test_rejects_invalid_or_ambiguous_names(self, name: str) -> None:
+        with pytest.raises(ContextError, match="lowercase slug"):
+            validate_context_name(name)
+
+    def test_context_file_is_contained_in_project_state(self, tmp_path: Path) -> None:
+        store = _store(tmp_path)
+        loaded, created = store.load("feature-x", create=True)
+
+        path = tmp_path / ".onetool" / "state" / "worker" / "contexts" / "feature-x.md"
+        assert created is True
+        assert path.is_file()
+        assert loaded.name == "feature-x"
+
+
+class TestContextFiles:
+    """Validate canonical Markdown files and strict frontmatter parsing."""
+
+    def test_missing_context_is_created_atomically_with_canonical_frontmatter(
+        self, tmp_path: Path
+    ) -> None:
+        store = _store(tmp_path)
+        first, first_created = store.load("default", create=True)
+        second, second_created = store.load("default", create=True)
+
+        assert first_created is True
+        assert second_created is False
+        assert first == second
+        assert first.metadata == ContextMetadata(
+            schema_version=1,
+            revision=1,
+            status="active",
+            description="",
+            tags=[],
+        )
+        path = tmp_path / ".onetool" / "state" / "worker" / "contexts" / "default.md"
+        assert path.read_text(encoding="utf-8") == render_context(first.metadata, "")
+
+    def test_listing_is_stable_and_body_free(self, tmp_path: Path) -> None:
+        store = _store(tmp_path)
+        for name in ("zeta", "default", "alpha"):
+            loaded, _ = store.load(name, create=True)
+            if name == "alpha":
+                store.commit_body(loaded=loaded, body="PRIVATE CONTEXT BODY")
+
+        result = [item.model_dump(mode="python") for item in store.list_contexts()]
+
+        assert [item["name"] for item in result] == ["alpha", "default", "zeta"]
+        assert all("body" not in item for item in result)
+        assert "PRIVATE CONTEXT BODY" not in repr(result)
+
+    @pytest.mark.parametrize(
+        ("content", "message"),
+        [
+            ("not frontmatter\n", "strict YAML frontmatter"),
+            ("---\ntags: [\n---\n", "invalid Context frontmatter YAML"),
+            (
+                "---\nschema_version: 1\nrevision: 1\nstatus: active\n"
+                "description: &description secret\ntags: [*description]\n---\n",
+                "aliases are not allowed",
+            ),
+            (
+                "---\nschema_version: 1\nrevision: 1\nrevision: 2\nstatus: active\n"
+                "description: ''\ntags: []\n---\n",
+                "duplicate YAML key",
+            ),
+            (
+                "---\nschema_version: 1\nrevision: 1\nstatus: active\n"
+                "description: ''\ntags: []\nunknown: value\n---\n",
+                "Extra inputs are not permitted",
+            ),
+            (
+                "---\nschema_version: 2\nrevision: 1\nstatus: active\n"
+                "description: ''\ntags: []\n---\n",
+                "Input should be 1",
+            ),
+        ],
+    )
+    def test_rejects_invalid_frontmatter(
+        self,
+        tmp_path: Path,
+        content: str,
+        message: str,
+    ) -> None:
+        path = tmp_path / ".onetool" / "state" / "worker" / "contexts" / "default.md"
+        path.parent.mkdir(parents=True)
+        path.write_text(content, encoding="utf-8")
+
+        with pytest.raises(ContextError, match=message):
+            _store(tmp_path).load("default", create=False)
+        assert path.read_text(encoding="utf-8") == content
+
+    def test_rejects_invalid_utf8_without_rewriting(self, tmp_path: Path) -> None:
+        path = tmp_path / ".onetool" / "state" / "worker" / "contexts" / "default.md"
+        path.parent.mkdir(parents=True)
+        original = b"---\n\xff\n---\n"
+        path.write_bytes(original)
+
+        with pytest.raises(ContextError, match="could not read Context"):
+            _store(tmp_path).load("default", create=False)
+        assert path.read_bytes() == original
+
+    def test_rejects_oversized_complete_file(self, tmp_path: Path) -> None:
+        store = _store(tmp_path, max_kb=1)
+        loaded, _ = store.load("default", create=True)
+
+        with pytest.raises(ContextError, match="limit is 1 KB"):
+            store.commit_body(loaded=loaded, body="x" * 2_000)
+        current, _ = store.load("default", create=False)
+        assert current.metadata.revision == 1
+        assert current.body == ""
+
+    def test_normalizes_body_line_endings_and_trailing_whitespace(self) -> None:
+        assert normalize_body("\r\n# Goal  \r\n\r\nWork\t\r\n") == "# Goal\n\nWork"
+
+
+class TestContextMetadata:
+    """Verify explicit upsert semantics and archival behavior."""
+
+    def test_update_creates_missing_context_with_supplied_metadata(
+        self, tmp_path: Path
+    ) -> None:
+        loaded, created = _store(tmp_path).update_metadata(
+            "feature-x",
+            description="Implement feature X",
+            tags=["feature", "active"],
         )
 
+        assert created is True
+        assert loaded.metadata.revision == 1
+        assert loaded.metadata.description == "Implement feature X"
+        assert loaded.metadata.tags == ["feature", "active"]
+        assert loaded.body == ""
 
-def test_execution_terminal_result_and_config_shapes_are_strict() -> None:
-    policy = ExecutionPolicy.model_validate(
-        {
-            "cwd": "/project",
-            "approval_policy": "never",
-            "sandbox": {"type": "read-only", "network_access": True},
-        }
-    )
-    assert policy.approval_policy == "never"
-    for sandbox in (
-        {
-            "type": "workspace-write",
-            "writable_roots": ["/project", "/shared"],
-            "network_access": True,
-            "exclude_slash_tmp": False,
-            "exclude_tmpdir_env_var": True,
-        },
-        {"type": "danger-full-access"},
-        {"type": "external-sandbox", "network_access": "enabled"},
-    ):
-        assert ExecutionPolicy.model_validate(
-            {"cwd": "/project", "approval_policy": "never", "sandbox": sandbox}
-        ).sandbox.type == sandbox["type"]
-    for invalid_execution in (
-        {"cwd": "/project", "approval_policy": "never", "sandbox": "read-only"},
-        {
-            "cwd": "/project",
-            "approval_policy": "on-request",
-            "sandbox": {"type": "danger-full-access"},
-        },
-        {
-            "cwd": "/project",
-            "approval_policy": "never",
-            "sandbox": {"type": "read-only", "network_access": "enabled"},
-        },
-        {
-            "cwd": "/project",
-            "approval_policy": "never",
-            "sandbox": {"type": "danger-full-access", "network_access": True},
-        },
-    ):
-        with pytest.raises(ValidationError):
-            ExecutionPolicy.model_validate(invalid_execution)
-    terminal = InternalTerminalOutput.model_validate(
-        {"status": "completed", "message": "done", "context": _context()}
-    )
-    assert terminal.context is not None
-    public = PublicWorkerResult.model_validate(
-        {"session_id": "ep-1", "status": "completed", "message": "done"}
-    )
-    assert set(public.model_dump()) == {"session_id", "status", "message"}
-
-    assert Config().context_max_kb == 16
-    assert Config(model="gpt-5.6-sol", effort="xhigh", context_max_kb=8).effort == "xhigh"
-    for invalid in (
-        {"context_max_kb": 0},
-        {"context_max_kb": 1.5},
-        {"model": " "},
-        {"effort": " "},
-        {"timeout": 30},
-    ):
-        with pytest.raises(ValidationError):
-            Config.model_validate(invalid)
-
-
-def test_normalization_and_canonical_rendering_are_deterministic() -> None:
-    raw = _context(reference=r"docs\.\guide.md", summary="\r\n  current  \t\r\n")
-    raw["goal"]["success_criteria"] = ["Tests pass ", "", "Tests pass"]
-    raw["knowledge"] *= 2
-    raw["references"] *= 2
-    normalized = normalize_context(raw)
-    assert normalized.work.summary == "  current"
-    assert normalized.goal.success_criteria == ["Tests pass"]
-    assert len(normalized.knowledge) == 1
-    assert normalized.references[0].path == "docs/guide.md"
-
-    committed = CommittedContext(
-        schema_version=1,
-        revision=3,
-        **normalized.model_dump(mode="python"),
-    )
-    rendered = render_context(committed)
-    assert rendered.startswith("schema_version: 1\nrevision: 3\n")
-    assert rendered.endswith("\n") and not rendered.endswith("\n\n")
-    assert "&id" not in rendered and "*id" not in rendered
-    assert yaml.safe_load(rendered)["work"]["summary"] == "  current"
-
-
-def test_store_creates_project_scoped_session_and_commits_atomically(
-    tmp_path: Path,
-) -> None:
-    project = tmp_path / "project"
-    state = project / ".onetool" / "state" / "episodic-context"
-    project.mkdir()
-    (project / "notes.md").write_text("evidence", encoding="utf-8")
-    store = ContextStore(context_max_kb=16, state_root=state, project_root=project)
-
-    session_id = store.create_session()
-    loaded = store.preflight(session_id)
-    assert loaded.value == {"schema_version": 1, "revision": 0, "context": None}
-
-    committed = store.commit(
-        session_id=session_id,
-        loaded_revision=0,
-        context=normalize_context(_context(reference="notes.md")),
-    )
-    assert committed.revision == 1
-    context_file = state / session_id / "context.yaml"
-    assert context_file.read_text(encoding="utf-8") == render_context(committed)
-    assert list(context_file.parent.glob(".context-*")) == []
-
-    loaded_again = store.preflight(session_id)
-    assert loaded_again.revision == 1
-    assert loaded_again.value["goal"]["objective"] == "Finish the worker"
-
-
-def test_store_rejects_sessions_references_stale_revisions_and_oversize(
-    tmp_path: Path,
-) -> None:
-    project = tmp_path / "project"
-    state = project / ".onetool" / "state" / "episodic-context"
-    project.mkdir()
-    store = ContextStore(context_max_kb=1, state_root=state, project_root=project)
-    session_id = store.create_session()
-
-    other_project = tmp_path / "other-project"
-    other_project.mkdir()
-    other_store = ContextStore(
-        context_max_kb=1,
-        state_root=other_project / ".onetool" / "state" / "episodic-context",
-        project_root=other_project,
-    )
-    with pytest.raises(ContextError, match="session_id"):
-        other_store.preflight(session_id)
-
-    with pytest.raises(ContextError, match="session_id"):
-        store.preflight("ep-00000000000000000000000000000000")
-    with pytest.raises(ContextError, match="existing regular file"):
-        store.commit(
-            session_id=session_id,
-            loaded_revision=0,
-            context=normalize_context(_context(reference="missing.md")),
-        )
-    directory = project / "folder"
-    directory.mkdir()
-    for reference in ("/tmp/outside.md", "../outside.md", "folder"):
-        with pytest.raises((ContextError, ValidationError)):
-            store.commit(
-                session_id=session_id,
-                loaded_revision=0,
-                context=normalize_context(_context(reference=reference)),
-            )
-    with pytest.raises(ContextError, match="bytes"):
-        store.commit(
-            session_id=session_id,
-            loaded_revision=0,
-            context=normalize_context(_context(summary="x" * 2000)),
+    def test_update_distinguishes_omitted_and_empty_values(
+        self, tmp_path: Path
+    ) -> None:
+        store = _store(tmp_path)
+        store.update_metadata(
+            "feature-x",
+            description="Existing",
+            tags=["one", "two"],
         )
 
-    first = store.commit(
-        session_id=session_id,
-        loaded_revision=0,
-        context=normalize_context(_context()),
-    )
-    with pytest.raises(ContextError, match="revision changed"):
-        store.commit(
-            session_id=session_id,
-            loaded_revision=0,
-            context=normalize_context(_context()),
+        tags_only, created = store.update_metadata(
+            "feature-x",
+            description=None,
+            tags=[],
         )
-    assert store.preflight(session_id).revision == first.revision
-
-    context_path = state / session_id / "context.yaml"
-    before = context_path.read_text(encoding="utf-8")
-    with (
-        patch("pathlib.Path.replace", side_effect=OSError("interrupted")),
-        pytest.raises(OSError, match="interrupted"),
-    ):
-        store.commit(
-            session_id=session_id,
-            loaded_revision=1,
-            context=normalize_context(_context(summary="new")),
+        cleared, _ = store.update_metadata(
+            "feature-x",
+            description="",
+            tags=None,
         )
-    assert context_path.read_text(encoding="utf-8") == before
-    assert list(context_path.parent.glob(".context-*")) == []
+
+        assert created is False
+        assert tags_only.metadata.description == "Existing"
+        assert tags_only.metadata.tags == []
+        assert cleared.metadata.description == ""
+        assert cleared.metadata.tags == []
+        assert cleared.metadata.revision == 3
+
+    def test_update_replaces_tags_and_preserves_body(self, tmp_path: Path) -> None:
+        store = _store(tmp_path)
+        loaded, _ = store.load("feature-x", create=True)
+        committed = store.commit_body(loaded=loaded, body="# State\n\nKeep me")
+
+        updated, _ = store.update_metadata(
+            "feature-x",
+            description="Updated",
+            tags=["replacement"],
+        )
+
+        assert updated.body == committed.body
+        assert updated.metadata.tags == ["replacement"]
+        assert updated.metadata.revision == 3
+
+    def test_rejects_missing_update_fields_and_invalid_tags(
+        self, tmp_path: Path
+    ) -> None:
+        store = _store(tmp_path)
+        with pytest.raises(ContextError, match="description or tags is required"):
+            store.update_metadata("feature-x", description=None, tags=None)
+        with pytest.raises(ContextError, match="tags must be unique"):
+            store.update_metadata("feature-x", description=None, tags=["one", "one"])
+        with pytest.raises(ContextError, match="at least 1 character"):
+            store.update_metadata("feature-x", description=None, tags=[" "])
+
+    def test_archive_preserves_content_and_reserves_identity(
+        self, tmp_path: Path
+    ) -> None:
+        store = _store(tmp_path)
+        loaded, _ = store.update_metadata(
+            "feature-x",
+            description="Feature",
+            tags=["active"],
+        )
+        committed = store.commit_body(loaded=loaded, body="# Private state")
+        archived = store.archive("feature-x")
+
+        assert archived.metadata.status == "archived"
+        assert archived.metadata.revision == committed.metadata.revision + 1
+        assert archived.metadata.description == "Feature"
+        assert archived.metadata.tags == ["active"]
+        assert archived.body == "# Private state"
+        assert [item.name for item in store.list_contexts(status="archived")] == [
+            "feature-x"
+        ]
+        assert [item.name for item in store.list_contexts(status="active")] == []
+        with pytest.raises(ContextError, match="archived"):
+            store.load("feature-x", create=True)
+        with pytest.raises(ContextError, match="archived"):
+            store.update_metadata("feature-x", description="Again", tags=None)
+
+    def test_archive_rejects_default_unknown_and_already_archived(
+        self, tmp_path: Path
+    ) -> None:
+        store = _store(tmp_path)
+        store.load("default", create=True)
+        store.load("feature-x", create=True)
+        store.archive("feature-x")
+
+        with pytest.raises(ContextError, match="cannot be archived"):
+            store.archive("default")
+        with pytest.raises(ContextError, match="does not exist"):
+            store.archive("unknown")
+        with pytest.raises(ContextError, match="already archived"):
+            store.archive("feature-x")
 
 
-def test_preflight_rewrites_safe_noncanonical_yaml(tmp_path: Path) -> None:
-    project = tmp_path / "project"
-    state = project / ".onetool" / "state" / "episodic-context"
-    project.mkdir()
-    store = ContextStore(context_max_kb=16, state_root=state, project_root=project)
-    session_id = store.create_session()
-    committed = store.commit(
-        session_id=session_id,
-        loaded_revision=0,
-        context=normalize_context(_context()),
-    )
-    path = state / session_id / "context.yaml"
-    path.write_text(render_context(committed).replace("\n", "\r\n") + "\r\n")
+class TestContextCommit:
+    """Verify bounded atomic complete-body replacement and conflict checks."""
 
-    loaded = store.preflight(session_id)
+    def test_commit_increments_revision_once(self, tmp_path: Path) -> None:
+        store = _store(tmp_path)
+        loaded, _ = store.load("default", create=True)
 
-    assert loaded.revision == 1
-    assert path.read_text(encoding="utf-8") == render_context(committed)
+        committed = store.commit_body(loaded=loaded, body="# Goal\n\nCurrent state")
 
+        assert committed.metadata.revision == 2
+        assert committed.body == "# Goal\n\nCurrent state"
 
-@pytest.mark.parametrize(
-    "content",
-    [
-        "not: [valid",
-        "!!python/object:builtins.object {}",
-        "shared: &value [x]\nalias: *value\n",
-    ],
-)
-def test_preflight_rejects_unsafe_or_invalid_yaml_without_rewrite(
-    tmp_path: Path,
-    content: str,
-) -> None:
-    project = tmp_path / "project"
-    state = project / ".onetool" / "state" / "episodic-context"
-    project.mkdir()
-    store = ContextStore(context_max_kb=16, state_root=state, project_root=project)
-    session_id = store.create_session()
-    path = state / session_id / "context.yaml"
-    path.write_text(content, encoding="utf-8")
+    def test_revision_or_digest_conflict_preserves_manual_edit(
+        self, tmp_path: Path
+    ) -> None:
+        store = _store(tmp_path)
+        loaded, _ = store.load("default", create=True)
+        path = tmp_path / ".onetool" / "state" / "worker" / "contexts" / "default.md"
+        manual = path.read_text(encoding="utf-8").replace(
+            "description: ''", "description: manual"
+        )
+        path.write_text(manual, encoding="utf-8")
 
-    with pytest.raises(ContextError):
-        store.preflight(session_id)
-    assert path.read_text(encoding="utf-8") == content
+        with pytest.raises(ContextError, match="changed during operation"):
+            store.commit_body(loaded=loaded, body="worker replacement")
+        assert path.read_text(encoding="utf-8") == manual
+
+    def test_rejects_escaping_or_missing_local_markdown_references(
+        self, tmp_path: Path
+    ) -> None:
+        store = _store(tmp_path)
+        loaded, _ = store.load("default", create=True)
+
+        with pytest.raises(ContextError, match="escapes project"):
+            store.commit_body(loaded=loaded, body="[outside](../secret.md)")
+        with pytest.raises(ContextError, match="existing regular file"):
+            store.commit_body(loaded=loaded, body="[missing](docs/missing.md)")
+
+    def test_accepts_existing_project_and_external_references(
+        self, tmp_path: Path
+    ) -> None:
+        target = tmp_path / "docs" / "guide.md"
+        target.parent.mkdir()
+        target.write_text("guide", encoding="utf-8")
+        store = _store(tmp_path)
+        loaded, _ = store.load("default", create=True)
+
+        committed = store.commit_body(
+            loaded=loaded,
+            body="[guide](docs/guide.md) [web](https://www.wikipedia.org/)",
+        )
+        assert "docs/guide.md" in committed.body
