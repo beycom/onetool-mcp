@@ -97,7 +97,7 @@ Wave 2 changes are contractually separate. They may be prepared in isolation,
 but their priority order is the default integration order. This independence is
 about change management and never permits runtime multi-worker behavior.
 
-## Foundation change ownership
+## Foundation change archival
 
 `p11-update-episodic-worker-foundation` is an update of the existing active
 `add-episodic-worker-orchestrator` change, not a second competing foundation.
@@ -113,14 +113,15 @@ At the start of the new session:
    tasks, tests, code, `arch.md`, and `next.md`.
 5. After `p11` is implemented and verified, sync its delta specs to the main
    specs so later changes have a normative baseline.
-6. Keep `p11` open as the foundation and spec-sync owner until all five
-   follow-on changes are complete. Archive it last, after the final
-   documentation sweep.
+6. Archive `p11` after its exit gate passes and its delta specs are synced.
+   Follow-on changes depend on the main normative specs, not an active foundation
+   change directory.
 
-This avoids two active changes defining the same base contract. The tracked
-`plans/episodic-worker/` directory provides a stable shared location for
-`arch.md`, `next.md`, `prior-art.md`, and this plan independently of change
-archival.
+The program documents originally lived inside the foundation change. Moving
+them to the tracked `plans/episodic-worker/` directory makes that directory the
+stable program owner and lets each completed OpenSpec change follow the normal
+sync-and-archive lifecycle. It also avoids two active changes defining the same
+base contract.
 
 ## Documentation promotion rule
 
@@ -387,5 +388,4 @@ The program is complete when:
   telemetry, artifacts, and ephemeral working state from becoming implicit agent
   context;
 - the final strict OpenSpec validation and relevant project checks pass; and
-- `p11-update-episodic-worker-foundation` is archived last with the completed
-  program documents.
+- every completed change has synced its delta specs and been archived.
