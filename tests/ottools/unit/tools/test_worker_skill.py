@@ -33,6 +33,10 @@ def test_use_worker_skill_is_standard_explicit_and_coordinator_only() -> None:
     assert "Do not construct or pass an execution-policy object" in body
     assert "Never read, request, reproduce, or summarize a Context body" in body
     assert "Treat the result as exactly `context`, `status`, and `message`" in body
+    assert "bounded internal continuation turns" in body
+    assert "`continue` is not a public result status" in body
+    assert "`turn_limit` or" in body
+    assert "`episode_timeout` classification" in body
 
     sidecar = yaml.safe_load(
         (skill_dir / "agents" / "openai.yaml").read_text(encoding="utf-8")

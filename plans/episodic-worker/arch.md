@@ -22,7 +22,7 @@ carries one explicitly selected project-local Context into that episode.
 | Chat | The user/main-agent conversation and its selected Context name |
 | Context | Durable current semantic state for one named project workstream |
 | Episode | One synchronous `worker.run` invocation |
-| Thread | Fresh ephemeral Codex conversation used by an episode |
+| Thread | Fresh ephemeral Codex conversation used for bounded turns in an episode |
 
 There is no project registry, public worker session, or contextless episode.
 Every newly invoked orchestrator selects `default`. A Chat can switch Contexts,
@@ -39,7 +39,7 @@ and an explicit run name can override the selection for one episode.
 | Console publisher | Delivers substantial worker output without returning its body |
 | Change observer | Classifies project-file effects without storing contents or diffs |
 | History journal | Appends project-scoped mechanical episode facts |
-| App-server adapter | Starts and deletes one fresh Codex thread per episode |
+| App-server adapter | Runs bounded same-thread turns, then deletes the fresh episode thread |
 
 ## Worker surface
 
@@ -63,8 +63,8 @@ never process-global or project-global state.
 
 | Channel | Writer | Reader | Storage/delivery | Automatic worker input |
 |---|---|---|---|---|
-| Chat | User and main agent | Current worker | Current request | Current request only |
-| Context | Worker proposes; MCP commits | Workers using that name | `contexts/<name>.md` | Complete selected body |
+| Chat | User and main agent | First episode turn | Current request | First turn only |
+| Context | Worker proposes; MCP commits | First episode turn and later episodes using that name | `contexts/<name>.md` | Complete selected body on the first turn only |
 | Console | Worker publisher | User | Existing outbox/body store | Never |
 | Local Changes | Worker file tools | Project and later workers | Project filesystem | Normal file access only |
 | Status | Worker and runtime | Main agent and user | Bounded operation result | Never |
@@ -72,8 +72,8 @@ never process-global or project-global state.
 
 Context name, description, tags, status, and revision are discoverable metadata.
 The semantic Markdown body is not returned to the main agent or copied across
-channels. Tool observations, source text, reasoning, and thread messages remain
-ephemeral.
+channels. Tool observations, source text, reasoning, internal continuation
+actions, and same-thread messages remain ephemeral.
 
 ## One episode
 
@@ -87,12 +87,21 @@ ephemeral.
    explicitly delimited untrusted state.
 7. The worker performs work; substantial output goes to Console and project
    deliverables go through normal file operations.
-8. The worker returns terminal Status and optionally one complete replacement
-   semantic body.
-9. OneTool validates and atomically commits or preserves the Context, then
-   deletes the thread.
-10. The runtime observes final Local Changes and appends project History.
-11. `worker.run` returns exactly Context name, status, and bounded message.
+8. The worker returns `completed` or `needs_input`, or internally requests
+   `continue` with one concrete bounded action. `continue` carries no Context,
+   question, public Status message, or authority change.
+9. When continuation is accepted, the adapter starts another turn on the same
+   thread with the same effective authority. That turn receives only a fixed
+   continuation instruction and the preceding action; Chat and Context are not
+   supplied again.
+10. Steps 7–9 repeat within strict configured turn and total-deadline bounds.
+    The internal continuation outcome is never returned by `worker.run`.
+11. At final `completed` or `needs_input`, OneTool validates and atomically
+    commits or preserves the complete Context once, then deletes the thread.
+    Failure, interruption, turn-limit, or deadline outcomes do not commit it.
+12. The runtime observes final Local Changes and appends project History with
+    the actual number of turns started.
+13. `worker.run` returns exactly Context name, public status, and bounded message.
 
 Every later episode repeats this sequence with another fresh thread. Selecting
 the same name carries current semantic state; selecting a newly created review
@@ -144,10 +153,11 @@ Project History lives at:
 ```
 
 Each record may contain episode ID, Context name, timestamps, terminal status,
-turn count, Context revisions, Console identifiers, failure classification,
-warnings, and sorted created/modified/deleted paths. It contains no prompts,
-Context description, tags or body, Console body, file content, diff, tool result,
-or semantic summary.
+actual turn count, Context revisions, Console identifiers, failure
+classification, warnings, and sorted created/modified/deleted paths. It contains
+no prompts, continuation instructions or actions, same-thread messages, Context
+description, tags or body, Console body, file content, diff, tool result, or
+semantic summary.
 
 The project filesystem remains the source of truth for Local Changes. Pre/post
 comparison detects further edits to already dirty files without invoking Git or
@@ -159,8 +169,8 @@ Console is the user-facing data plane for answers, reports, evidence, previews,
 and file references. Status is the bounded control plane. Chat carries the
 current request or answer and coordinator selection only.
 
-A `needs_input` result ends the episode and deletes its thread. The answer starts
-a fresh episode using the same effective Context name.
+A `needs_input` result ends all continuation and deletes its thread. The answer
+starts a fresh episode and fresh thread using the same effective Context name.
 
 ## Authority and isolation
 
@@ -178,11 +188,16 @@ worker operations recursively.
 - Revision or digest conflict preserves the manual or competing edit.
 - Archived names fail rather than reactivate or create replacements.
 - Invalid or oversized replacement preserves the prior file.
+- Continuation at the configured turn limit fails with `turn_limit`; expiry of
+  the one monotonic episode deadline fails with `episode_timeout`.
+- A later-turn failure preserves earlier project, Console, and external effects
+  without replaying or claiming to roll them back, while leaving Context at its
+  pre-episode revision.
 - Failed and interrupted episodes are never replayed.
 - Cleanup, final-scan, or History failures add bounded warnings without reversing
   known worker, Console, Context, or filesystem effects.
 - A completed worker thread is never resumed.
 
 The result is a small model: one project, one Chat-selected named Context per
-episode, one fresh thread, and explicit non-polluting channels for output,
-filesystem effects, and control flow.
+episode, one fresh thread with bounded autonomous turns, and explicit
+non-polluting channels for output, filesystem effects, and control flow.

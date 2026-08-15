@@ -1,4 +1,12 @@
-## ADDED Requirements
+# Worker Autonomous Continuation Specification
+
+## Purpose
+
+Defines bounded internal same-thread continuation within one synchronous worker
+episode, including later-turn input, total limits, terminal Context handling,
+fresh episodes after user input, and mechanical turn-count recording.
+
+## Requirements
 
 ### Requirement: Continuation is internal to one worker episode
 

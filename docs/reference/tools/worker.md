@@ -5,7 +5,8 @@ control Status.
 
 ## Highlights
 
-- One fresh Codex thread per synchronous episode, with no recursion or fan-out
+- One fresh Codex thread per synchronous episode, with up to 3 turns by default
+  and no recursion or fan-out
 - Complete current state in strict `.onetool/state/worker/contexts/<name>.md` files
 - Five operations for running, selecting, listing, updating, and archiving Contexts
 - Substantial output through Console; exact bounded `context`, `status`, and
@@ -61,6 +62,21 @@ receipts or frontmatter metadata only. Selection is caller-owned: a coordinator
 retains the selected name for its current Chat and passes it explicitly to later
 runs. No process-global or project-global selection is stored.
 
+Within one `worker.run`, a worker may internally request another turn by naming
+one concrete autonomous action. OneTool consumes that outcome; `continue` is
+never a public status. The same thread, model, effort, project, approval policy,
+and sandbox authority are reused. The first turn alone receives Chat and the
+complete selected Context; later turns receive only a fixed continuation
+instruction and the preceding action.
+
+Context is committed once, only from final `completed` or `needs_input`. A turn
+limit, episode deadline, interruption, or later failure leaves it at the
+pre-episode revision. Earlier project, Console, and external effects remain and
+are never replayed or claimed as rolled back. History records the actual number
+of turns started without storing continuation instructions, actions, or thread
+messages. `needs_input` deletes the thread; the answer starts a fresh episode and
+thread with the same named Context.
+
 ## Context files
 
 Each Context is one bounded UTF-8 Markdown file:
@@ -111,6 +127,8 @@ None - no secrets or pack-specific settings are required.
 | `tools.worker.model` | str or null | `null` | Default Codex model; a per-call value takes precedence |
 | `tools.worker.effort` | str or null | `null` | Default reasoning effort; a per-call value takes precedence |
 | `tools.worker.context_max_kb` | int | `16` | Positive maximum complete UTF-8 Context file size in KB |
+| `tools.worker.max_turns` | int | `3` | Strict maximum episode turn count, from 1 through 10 |
+| `tools.worker.episode_timeout_seconds` | int | `900` | Strict total episode deadline in seconds, from 1 through 3600 |
 
 ```yaml
 tools:
@@ -118,6 +136,8 @@ tools:
     model: null
     effort: null
     context_max_kb: 16
+    max_turns: 3
+    episode_timeout_seconds: 900
 ```
 
 ### Defaults
@@ -125,6 +145,8 @@ tools:
 - If `model` or `effort` is absent both per call and in configuration, the
   installed Codex default applies.
 - If `context_max_kb` is omitted, complete Context files may be at most 16 KB.
+- The turn count and deadline defaults are 3 turns and 900 total seconds. The
+  deadline is monotonic and does not reset between turns.
 
 ## Examples
 

@@ -17,7 +17,12 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import ValidationError
 
-from ottools._worker.models import InternalTerminalOutput
+from ottools._worker.models import (
+    INTERNAL_TERMINAL_OUTPUT_ADAPTER,
+    InternalContinueOutput,
+    InternalPublicTerminalOutput,
+    InternalTerminalOutput,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -33,6 +38,12 @@ _REQUIRED_TURN_FIELDS = {
     "sandboxPolicy",
     "threadId",
 }
+_CONTINUATION_INSTRUCTION = """Continue the current task autonomously in this same episode.
+Use normal tool calls within this turn. Do not ask for user input unless it is
+actually required. Complete the concrete remaining action below, then return the
+strict terminal JSON shape. Return continue only if concrete autonomous work
+still remains after this turn.
+"""
 
 _DEVELOPER_INSTRUCTIONS = """You are one fresh episodic worker.
 
@@ -53,13 +64,18 @@ terminal response.
 Do not inspect or modify .onetool/state/worker. The MCP alone owns Context
 frontmatter, formatting, validation, revisioning, History, and persistence.
 
-Your final response must match the supplied JSON schema. Return status completed
-when the request is handled, or needs_input with one direct question when user
-input is required. Include a complete replacement Markdown Context body only when
-it improves continuation; omit context to preserve the current revision. Context
-is complete current semantic state, not a transcript, prompt log, tool-result log,
-Console copy, History copy, or source-file copy. Do not include frontmatter and do
-not ask another agent to format or repair it.
+Use normal tool calls to finish as much substantive work as possible within the
+current turn. Your final response must match the supplied JSON schema. Return
+status completed when the request is handled, needs_input with one direct question
+when user input is required, or continue with one concrete next_action only when
+autonomous work remains after this turn. Continue is internal: it cannot include a
+message, question, Context, Console body, authority change, or any other field.
+
+Completed and needs_input may include a complete replacement Markdown Context
+body only when it improves continuation; omit context to preserve the current
+revision. Context is complete current semantic state, not a transcript, prompt
+log, tool-result log, Console copy, History copy, or source-file copy. Do not
+include frontmatter and do not ask another agent to format or repair it.
 """
 
 
@@ -82,15 +98,20 @@ class AdapterOutcome:
     warnings: tuple[str, ...] = ()
 
 
-def _validate_protocol_schema(codex_binary: str) -> None:
+def _validate_protocol_schema(codex_binary: str, *, deadline: float) -> None:
     """Fail unless the installed app-server schema supports the v1 contract."""
     with tempfile.TemporaryDirectory(prefix="onetool-codex-schema-") as temp_dir:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise AppServerTimeout(
+                "episode_timeout: worker episode deadline expired"
+            )
         completed = subprocess.run(
             [codex_binary, "app-server", "generate-json-schema", "--out", temp_dir],
             check=False,
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=min(30.0, remaining),
         )
         if completed.returncode != 0:
             detail = completed.stderr.strip() or completed.stdout.strip()
@@ -309,6 +330,38 @@ def _worker_input(prompt: str, context: str) -> str:
     )
 
 
+def _continuation_input(next_action: str) -> str:
+    return (
+        f"{_CONTINUATION_INSTRUCTION}\n"
+        "<next-action>\n"
+        f"{next_action}\n"
+        "</next-action>"
+    )
+
+
+def _turn_params(
+    *,
+    thread_id: str,
+    input_text: str,
+    cwd: str,
+    model: str | None,
+    effort: str | None,
+) -> dict[str, Any]:
+    params: dict[str, Any] = {
+        "threadId": thread_id,
+        "input": [{"type": "text", "text": input_text}],
+        "cwd": cwd,
+        "approvalPolicy": "never",
+        "sandboxPolicy": _sandbox_policy(),
+        "outputSchema": INTERNAL_TERMINAL_OUTPUT_ADAPTER.json_schema(),
+    }
+    if model is not None:
+        params["model"] = model
+    if effort is not None:
+        params["effort"] = effort
+    return params
+
+
 class AppServerAdapter:
     """Run one fresh Codex thread and delete it after context handling."""
 
@@ -331,10 +384,27 @@ class AppServerAdapter:
         cwd: str,
         model: str | None,
         effort: str | None,
-        on_terminal: Callable[[InternalTerminalOutput], None],
+        on_terminal: Callable[[InternalPublicTerminalOutput], None],
         before_close: Callable[[], None] | None = None,
+        max_turns: int = 1,
+        deadline: float | None = None,
     ) -> AdapterOutcome:
-        """Run one episode and process terminal context before thread deletion."""
+        """Run one bounded episode and process terminal Context before deletion."""
+        episode_deadline = (
+            deadline
+            if deadline is not None
+            else time.monotonic() + self._timeout_seconds
+        )
+        if (
+            isinstance(max_turns, bool)
+            or not isinstance(max_turns, int)
+            or not 1 <= max_turns <= 10
+        ):
+            return AdapterOutcome("failed", "max_turns must be an integer from 1 to 10")
+        if time.monotonic() >= episode_deadline:
+            return AdapterOutcome(
+                "failed", "episode_timeout: worker episode deadline expired"
+            )
         binary = shutil.which(self._command[0])
         if binary is None:
             return AdapterOutcome(
@@ -342,17 +412,21 @@ class AppServerAdapter:
             )
         if self._verify_protocol:
             try:
-                _validate_protocol_schema(binary)
-            except (AppServerError, subprocess.TimeoutExpired) as exc:
+                _validate_protocol_schema(binary, deadline=episode_deadline)
+            except (AppServerTimeout, subprocess.TimeoutExpired):
+                return AdapterOutcome(
+                    "failed", "episode_timeout: worker episode deadline expired"
+                )
+            except AppServerError as exc:
                 return AdapterOutcome("failed", str(exc))
 
         process: _JsonRpcProcess | None = None
         thread_id: str | None = None
         turn_id: str | None = None
+        turn_count = 0
         outcome = AdapterOutcome("failed", "worker did not start")
         try:
             process = _JsonRpcProcess((binary, *self._command[1:]), cwd=cwd)
-            deadline = time.monotonic() + self._timeout_seconds
             process.request(
                 "initialize",
                 {
@@ -362,7 +436,7 @@ class AppServerAdapter:
                         "version": "1.0.0",
                     }
                 },
-                deadline=deadline,
+                deadline=episode_deadline,
             )
             process.notify("initialized", {})
 
@@ -375,48 +449,71 @@ class AppServerAdapter:
             if model is not None:
                 thread_params["model"] = model
             thread_result = process.request(
-                "thread/start", thread_params, deadline=deadline
+                "thread/start", thread_params, deadline=episode_deadline
             )
             thread = thread_result.get("thread")
             if not isinstance(thread, dict) or not isinstance(thread.get("id"), str):
                 raise AppServerError("thread/start response is missing thread.id")
             thread_id = thread["id"]
 
-            turn_params: dict[str, Any] = {
-                "threadId": thread_id,
-                "input": [{"type": "text", "text": _worker_input(prompt, context)}],
-                "cwd": cwd,
-                "approvalPolicy": "never",
-                "sandboxPolicy": _sandbox_policy(),
-                "outputSchema": InternalTerminalOutput.model_json_schema(),
-            }
-            if model is not None:
-                turn_params["model"] = model
-            if effort is not None:
-                turn_params["effort"] = effort
-            turn_result = process.request("turn/start", turn_params, deadline=deadline)
-            turn = turn_result.get("turn")
-            if not isinstance(turn, dict) or not isinstance(turn.get("id"), str):
-                raise AppServerError("turn/start response is missing turn.id")
-            turn_id = turn["id"]
-            terminal = self._wait_for_terminal(
-                process, turn_id=turn_id, deadline=deadline
-            )
-            if isinstance(terminal, AdapterOutcome):
-                outcome = AdapterOutcome(
-                    terminal.status,
-                    terminal.message,
-                    started=True,
-                    turn_count=1,
+            input_text = _worker_input(prompt, context)
+            while True:
+                if time.monotonic() >= episode_deadline:
+                    raise AppServerTimeout(
+                        "episode_timeout: worker episode deadline expired"
+                    )
+                turn_result = process.request(
+                    "turn/start",
+                    _turn_params(
+                        thread_id=thread_id,
+                        input_text=input_text,
+                        cwd=cwd,
+                        model=model,
+                        effort=effort,
+                    ),
+                    deadline=episode_deadline,
                 )
-            else:
+                turn = turn_result.get("turn")
+                if not isinstance(turn, dict) or not isinstance(turn.get("id"), str):
+                    raise AppServerError("turn/start response is missing turn.id")
+                turn_id = turn["id"]
+                turn_count += 1
+                terminal = self._wait_for_terminal(
+                    process,
+                    turn_id=turn_id,
+                    deadline=episode_deadline,
+                )
+                if isinstance(terminal, AdapterOutcome):
+                    outcome = AdapterOutcome(
+                        terminal.status,
+                        terminal.message,
+                        started=True,
+                        turn_count=turn_count,
+                    )
+                    break
+                if isinstance(terminal, InternalContinueOutput):
+                    if turn_count >= max_turns:
+                        outcome = AdapterOutcome(
+                            "failed",
+                            "turn_limit: worker requested continuation after the maximum turn count",
+                            started=True,
+                            turn_count=turn_count,
+                        )
+                        break
+                    if time.monotonic() >= episode_deadline:
+                        raise AppServerTimeout(
+                            "episode_timeout: worker episode deadline expired"
+                        )
+                    input_text = _continuation_input(terminal.next_action)
+                    continue
                 on_terminal(terminal)
                 outcome = AdapterOutcome(
                     terminal.status,
                     terminal.message,
                     started=True,
-                    turn_count=1,
+                    turn_count=turn_count,
                 )
+                break
         except KeyboardInterrupt:
             if process is not None and thread_id is not None and turn_id is not None:
                 self._interrupt(process, thread_id=thread_id, turn_id=turn_id)
@@ -424,23 +521,27 @@ class AppServerAdapter:
                 "interrupted",
                 "Worker interrupted by caller.",
                 started=thread_id is not None,
-                turn_count=int(turn_id is not None),
+                turn_count=turn_count,
             )
         except AppServerTimeout as exc:
             if process is not None and thread_id is not None and turn_id is not None:
                 self._interrupt(process, thread_id=thread_id, turn_id=turn_id)
             outcome = AdapterOutcome(
                 "failed",
-                str(exc),
+                (
+                    str(exc)
+                    if str(exc).startswith("episode_timeout:")
+                    else "episode_timeout: worker episode deadline expired"
+                ),
                 started=thread_id is not None,
-                turn_count=int(turn_id is not None),
+                turn_count=turn_count,
             )
         except (AppServerError, ValidationError, ValueError, OSError) as exc:
             outcome = AdapterOutcome(
                 "failed",
                 str(exc),
                 started=thread_id is not None,
-                turn_count=int(turn_id is not None),
+                turn_count=turn_count,
             )
         finally:
             warnings = list(outcome.warnings)
@@ -528,7 +629,7 @@ class AppServerAdapter:
                 raw_terminal = json.loads(final_text)
                 if not isinstance(raw_terminal, dict):
                     raise AppServerError("worker terminal output must be an object")
-                return InternalTerminalOutput.model_validate(raw_terminal)
+                return INTERNAL_TERMINAL_OUTPUT_ADAPTER.validate_python(raw_terminal)
             except (json.JSONDecodeError, ValidationError, ValueError) as exc:
                 raise AppServerError(f"invalid worker terminal output: {exc}") from exc
 

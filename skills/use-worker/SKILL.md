@@ -33,6 +33,11 @@ metadata, not the semantic body.
 3. Do not call another episode concurrently and do not retry a failed or
    interrupted episode automatically.
 
+One `worker.run` may consume bounded internal continuation turns synchronously.
+Do not request, relay, or simulate intermediate continuation. The same worker
+thread and authority remain private to that call; only its final public result is
+returned.
+
 Codex loads the same project instructions, skills, tools, plugins, and configured
 MCP servers from the current working directory and installed configuration. Do
 not remove or replace those capabilities for the worker.
@@ -49,3 +54,8 @@ not remove or replace those capabilities for the worker.
 Treat the result as exactly `context`, `status`, and `message`. Do not read,
 search, write, format, validate, repair, or summarize files under
 `.onetool/state/worker`; those operations belong to the MCP.
+
+`continue` is not a public result status. If a call fails with `turn_limit` or
+`episode_timeout` classification in its bounded message, relay that failure and
+stop; do not replay the episode. A `needs_input` answer always starts a fresh
+episode and thread with the same effective Context name.

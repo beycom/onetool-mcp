@@ -272,20 +272,37 @@ backend, interface, timeout, output bound, alias, or operation-specific routes.
 ### Requirement: Strict worker configuration
 
 The `tools.worker` configuration SHALL accept only optional `model`, `effort`,
-and `context_max_kb` fields. `model` and `effort` SHALL be nonblank when set.
-`context_max_kb` SHALL be a strict positive integer and SHALL default to `16`.
+`context_max_kb`, `max_turns`, and `episode_timeout_seconds` fields. `model` and
+`effort` SHALL be nonblank when set. `context_max_kb` SHALL be a strict positive
+integer and SHALL default to `16`.
 
 #### Scenario: Worker configuration is omitted
-- **WHEN** `tools.worker` is absent or omits `context_max_kb`
+- **WHEN** `tools.worker` is absent or omits the context and continuation limit fields
 - **THEN** the worker context limit SHALL default to 16 KB
+- **AND** the continuation limits SHALL default to 3 turns and 900 seconds
 
 #### Scenario: Valid worker configuration
-- **WHEN** `tools.worker` contains a nonblank model, nonblank effort, and positive integer `context_max_kb`
+- **WHEN** `tools.worker` contains a nonblank model, nonblank effort, positive integer `context_max_kb`, and valid integer continuation limits
 - **THEN** OneTool SHALL preserve those values for worker execution
 
 #### Scenario: Invalid worker configuration
 - **WHEN** `tools.worker` contains an unknown field or invalid configured value
 - **THEN** strict tool configuration validation SHALL reject it
+
+### Requirement: Strict autonomous continuation limits
+
+`tools.worker.max_turns` SHALL be a strict integer from 1 through 10 and SHALL
+default to `3`. `tools.worker.episode_timeout_seconds` SHALL be a strict integer
+from 1 through 3600 and SHALL default to `900`. Unknown or out-of-range values
+SHALL be rejected by configuration validation.
+
+#### Scenario: Continuation settings are omitted
+- **WHEN** worker configuration omits both continuation fields
+- **THEN** an episode SHALL allow at most 3 turns and 900 seconds
+
+#### Scenario: Continuation settings are invalid
+- **WHEN** either setting is a boolean, non-integer, or outside its permitted range
+- **THEN** configuration validation SHALL fail before a worker starts
 
 ### Requirement: Per-call worker routing overrides configuration
 

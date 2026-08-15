@@ -205,53 +205,6 @@ truth and lets the MCP perform only deterministic mechanical repair.
 - An evaluation set can detect loss of goals, constraints, decisions, blockers,
   and essential references after compaction.
 
-## Bounded Autonomous Same-Thread Continuation
-
-### Opportunity
-
-A Codex app-server turn already permits multiple sequential tool calls before the
-worker returns its terminal result. Some tasks may nevertheless benefit from an
-additional model turn on the same worker thread when work can continue without
-user input.
-
-### Possible Design
-
-- Keep one `worker.run` call as one synchronous episode with one worker thread,
-  but allow that thread to execute a bounded number of sequential turns.
-- Add an internal worker-authored `continue` outcome indicating that another turn
-  can proceed without user input. Never expose `continue` as a public
-  `worker.run` status.
-- Supply the request and complete episodic context only to the first turn. Start
-  later turns with a fixed continuation instruction and the ephemeral
-  same-thread conversation.
-- Prefer completing tool use within the current turn. Continuation is not a
-  replacement for ordinary tool calls.
-- Apply one total episode deadline and a strict maximum turn count so the worker
-  cannot continue indefinitely.
-- Preserve the same execution policy for every turn and never introduce an
-  approval or authority-escalation bridge.
-- Commit context only on the final `completed` or `needs_input` outcome.
-- Treat `needs_input` as a mandatory episode boundary: commit any valid returned
-  context, delete the worker thread, and return the question to the main agent.
-  The user's answer starts a fresh episode and fresh thread with the same named
-  Context, never by resuming the prior worker thread.
-- If a later turn fails or is interrupted, do not replay earlier turns or assume
-  their project or external side effects can be reversed.
-
-### Why Deferred
-
-The current single-turn worker already supports multi-step tool execution.
-Additional turns introduce a continuation signal, loop limits, cumulative timeout
-rules, later-turn failure handling, and ambiguity about when context becomes
-committed.
-
-### Adoption Criteria
-
-- Representative workers demonstrably stop before completing work even though no
-  user input is required and ordinary within-turn tool use is available.
-- Evaluations show bounded continuation improves completion without increasing
-  repeated work, uncontrolled loops, or unclear side-effect recovery.
-
 ## Retry and Recovery Policies
 
 ### Opportunity

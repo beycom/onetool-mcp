@@ -12,9 +12,11 @@ from pydantic import (
     Field,
     StrictInt,
     StringConstraints,
+    TypeAdapter,
 )
 
 STATUS_MAX_BYTES = 1024
+NEXT_ACTION_MAX_BYTES = 1024
 CONTEXT_DESCRIPTION_MAX_BYTES = 512
 CONTEXT_TAG_MAX_BYTES = 64
 CONTEXT_TAGS_MAX_ITEMS = 16
@@ -39,6 +41,12 @@ def _bounded_utf8(*, label: str, maximum: int) -> Callable[[str], str]:
     return validate
 
 
+def _require_non_question_action(value: str) -> str:
+    if value.rstrip().endswith("?"):
+        raise ValueError("next_action must be autonomous work, not a user question")
+    return value
+
+
 NonBlank = Annotated[
     str,
     StringConstraints(strip_whitespace=False, min_length=1),
@@ -52,6 +60,13 @@ ModelId = Annotated[
 StatusMessage = Annotated[
     NonBlank,
     AfterValidator(_bounded_utf8(label="message", maximum=STATUS_MAX_BYTES)),
+]
+NextAction = Annotated[
+    NonBlank,
+    AfterValidator(
+        _bounded_utf8(label="next_action", maximum=NEXT_ACTION_MAX_BYTES)
+    ),
+    AfterValidator(_require_non_question_action),
 ]
 ContextDescription = Annotated[
     str,
@@ -87,12 +102,37 @@ class ContextListItem(ContextMetadata):
     name: NonBlank
 
 
-class InternalTerminalOutput(StrictModel):
-    """Strict app-server output before the MCP processes Context state."""
+class InternalCompletedOutput(StrictModel):
+    """Strict successful app-server output before Context processing."""
 
-    status: Literal["completed", "needs_input"]
+    status: Literal["completed"]
     message: StatusMessage
     context: str | None = None
+
+
+class InternalNeedsInputOutput(StrictModel):
+    """Strict required-input app-server output before Context processing."""
+
+    status: Literal["needs_input"]
+    message: StatusMessage
+    context: str | None = None
+
+
+class InternalContinueOutput(StrictModel):
+    """Strict internal-only request for another turn in the same episode."""
+
+    status: Literal["continue"]
+    next_action: NextAction
+
+
+InternalPublicTerminalOutput = InternalCompletedOutput | InternalNeedsInputOutput
+InternalTerminalOutput = Annotated[
+    InternalCompletedOutput | InternalNeedsInputOutput | InternalContinueOutput,
+    Field(discriminator="status"),
+]
+INTERNAL_TERMINAL_OUTPUT_ADAPTER: TypeAdapter[InternalTerminalOutput] = TypeAdapter(
+    InternalTerminalOutput
+)
 
 
 class PublicWorkerResult(StrictModel):
@@ -139,6 +179,8 @@ __all__ = [
     "CONTEXT_DESCRIPTION_MAX_BYTES",
     "CONTEXT_TAGS_MAX_ITEMS",
     "CONTEXT_TAG_MAX_BYTES",
+    "INTERNAL_TERMINAL_OUTPUT_ADAPTER",
+    "NEXT_ACTION_MAX_BYTES",
     "STATUS_MAX_BYTES",
     "ConsoleRecord",
     "ContextDescription",
@@ -146,9 +188,14 @@ __all__ = [
     "ContextMetadata",
     "ContextTag",
     "HistoryRecord",
+    "InternalCompletedOutput",
+    "InternalContinueOutput",
+    "InternalNeedsInputOutput",
+    "InternalPublicTerminalOutput",
     "InternalTerminalOutput",
     "LocalChange",
     "ModelId",
+    "NextAction",
     "NonBlank",
     "PublicWorkerResult",
     "StatusMessage",

@@ -8,6 +8,7 @@ __all__ = ["archive_context", "list_contexts", "run", "select", "update_context"
 
 import os
 import threading
+import time
 from datetime import UTC, datetime
 from secrets import token_hex
 from typing import Annotated, Literal
@@ -30,7 +31,7 @@ from ottools._worker.lifecycle import (
 from ottools._worker.models import (
     STATUS_MAX_BYTES,
     HistoryRecord,
-    InternalTerminalOutput,
+    InternalPublicTerminalOutput,
     ModelId,
     NonBlank,
     PublicWorkerResult,
@@ -41,13 +42,15 @@ _ACTIVE_LOCK = threading.Lock()
 
 
 class Config(BaseModel):
-    """Strict worker model, effort, and Context-size configuration."""
+    """Strict worker routing, Context, and episode-limit configuration."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
     model: ModelId | None = None
     effort: NonBlank | None = None
     context_max_kb: Annotated[StrictInt, Field(gt=0)] = 16
+    max_turns: Annotated[StrictInt, Field(ge=1, le=10)] = 3
+    episode_timeout_seconds: Annotated[StrictInt, Field(ge=1, le=3600)] = 900
 
 
 def _get_config() -> Config:
@@ -117,6 +120,15 @@ def _operation_error(*, status: str, error: str) -> dict[str, object]:
         "status": status,
         "error": _clip_utf8(error, STATUS_MAX_BYTES),
     }
+
+
+def _failure_classification(outcome: AdapterOutcome) -> str | None:
+    if outcome.status != "failed":
+        return None
+    for classification in ("turn_limit", "episode_timeout"):
+        if outcome.message.startswith(f"{classification}:"):
+            return classification
+    return "episode_failed"
 
 
 def _store() -> ContextStore:
@@ -281,6 +293,7 @@ def run(
             if not prompt.strip():
                 raise ValueError("prompt must not be blank")
             config = _get_config()
+            episode_deadline = time.monotonic() + config.episode_timeout_seconds
             selected_model = _selection(model, config.model, name="model")
             selected_effort = _selection(effort, config.effort, name="effort")
             project_root = get_effective_cwd().resolve()
@@ -297,7 +310,7 @@ def run(
             episode_id = f"episode-{token_hex(16)}"
             started_at = datetime.now(UTC)
 
-            def commit_terminal(terminal: InternalTerminalOutput) -> None:
+            def commit_terminal(terminal: InternalPublicTerminalOutput) -> None:
                 nonlocal loaded
                 if terminal.context is not None:
                     loaded = store.commit_body(loaded=loaded, body=terminal.context)
@@ -310,6 +323,8 @@ def run(
                 effort=selected_effort,
                 on_terminal=commit_terminal,
                 before_close=console_observer.capture_current,
+                max_turns=config.max_turns,
+                deadline=episode_deadline,
             )
             warnings = list(outcome.warnings)
             console_observer.capture_current()
@@ -348,7 +363,7 @@ def run(
                     context_revision_after=revision_after,
                     console=console_observer.created(),
                     local_changes=local_changes,
-                    failure="episode_failed" if outcome.status == "failed" else None,
+                    failure=_failure_classification(outcome),
                     warnings=warnings,
                 )
                 try:

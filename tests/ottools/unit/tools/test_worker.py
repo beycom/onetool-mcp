@@ -8,6 +8,7 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 
 import ottools.worker as worker_module
 from ottools._worker.app_server import AdapterOutcome
@@ -17,7 +18,14 @@ from ottools._worker.lifecycle import (
     ObservationError,
     project_fingerprint,
 )
-from ottools._worker.models import InternalTerminalOutput
+from ottools._worker.models import (
+    INTERNAL_TERMINAL_OUTPUT_ADAPTER,
+    NEXT_ACTION_MAX_BYTES,
+    InternalCompletedOutput,
+    InternalContinueOutput,
+    InternalNeedsInputOutput,
+    InternalTerminalOutput,
+)
 from ottools.worker import (
     Config,
     archive_context,
@@ -83,7 +91,7 @@ class _LifecycleAdapter:
             encoding="utf-8",
         )
         kwargs["on_terminal"](
-            InternalTerminalOutput(
+            InternalCompletedOutput(
                 status="completed",
                 message="Published result to Console.",
                 context="# Current state",
@@ -115,7 +123,7 @@ def test_default_context_and_complete_body_continue_in_fresh_episode(
         _FakeAdapter(
             calls,
             outcome=AdapterOutcome("completed", "Published result to Console."),
-            terminal=InternalTerminalOutput(
+            terminal=InternalCompletedOutput(
                 status="completed",
                 message="Published result to Console.",
                 context="# Goal\n\nFinish the worker",
@@ -124,7 +132,7 @@ def test_default_context_and_complete_body_continue_in_fresh_episode(
         _FakeAdapter(
             calls,
             outcome=AdapterOutcome("needs_input", "Which target?"),
-            terminal=InternalTerminalOutput(
+            terminal=InternalNeedsInputOutput(
                 status="needs_input",
                 message="Which target?",
             ),
@@ -191,7 +199,7 @@ def test_fresh_review_context_does_not_receive_implementation_context(
         _FakeAdapter(
             calls,
             outcome=AdapterOutcome("completed", "Done."),
-            terminal=InternalTerminalOutput(
+            terminal=InternalCompletedOutput(
                 status="completed",
                 message="Done.",
                 context="PRIVATE IMPLEMENTATION CONTEXT",
@@ -221,9 +229,18 @@ def test_configured_routing_and_per_call_precedence(
     monkeypatch.setenv("OT_CWD", str(tmp_path))
     calls: list[dict[str, Any]] = []
     adapter = _FakeAdapter(calls, outcome=AdapterOutcome("completed", "Done."))
-    config = Config(model="configured-model", effort="medium")
+    config = Config(
+        model="configured-model",
+        effort="medium",
+        max_turns=4,
+        episode_timeout_seconds=120,
+    )
     config_patch, adapter_patch = _configure(adapter, config)
-    with config_patch, adapter_patch:
+    with (
+        config_patch,
+        adapter_patch,
+        patch.object(worker_module.time, "monotonic", return_value=1_000.0),
+    ):
         run(prompt="First.")
         run(prompt="Second.", model="call-model", effort="high")
 
@@ -231,6 +248,75 @@ def test_configured_routing_and_per_call_precedence(
         ("configured-model", "medium"),
         ("call-model", "high"),
     ]
+    assert [call["max_turns"] for call in calls] == [4, 4]
+    assert [call["deadline"] for call in calls] == [1_120.0, 1_120.0]
+
+
+def test_continuation_config_defaults_and_valid_limits() -> None:
+    defaults = Config()
+    configured = Config(max_turns=10, episode_timeout_seconds=3600)
+
+    assert defaults.max_turns == 3
+    assert defaults.episode_timeout_seconds == 900
+    assert configured.max_turns == 10
+    assert configured.episode_timeout_seconds == 3600
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("max_turns", True),
+        ("max_turns", 1.0),
+        ("max_turns", "3"),
+        ("max_turns", 0),
+        ("max_turns", 11),
+        ("episode_timeout_seconds", False),
+        ("episode_timeout_seconds", 1.0),
+        ("episode_timeout_seconds", "900"),
+        ("episode_timeout_seconds", 0),
+        ("episode_timeout_seconds", 3601),
+    ],
+)
+def test_continuation_config_rejects_non_strict_or_out_of_range_values(
+    field: str,
+    value: object,
+) -> None:
+    with pytest.raises(ValidationError):
+        Config.model_validate({field: value})
+
+
+def test_worker_config_rejects_unknown_fields() -> None:
+    with pytest.raises(ValidationError):
+        Config.model_validate({"unknown": 1})
+
+
+def test_internal_terminal_output_is_a_strict_discriminated_union() -> None:
+    continuation = INTERNAL_TERMINAL_OUTPUT_ADAPTER.validate_python(
+        {"status": "continue", "next_action": "Run the focused tests."}
+    )
+    assert continuation == InternalContinueOutput(
+        status="continue",
+        next_action="Run the focused tests.",
+    )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"status": "continue", "next_action": "Finish.", "context": "state"},
+        {"status": "continue", "next_action": "Finish.", "message": "Working"},
+        {"status": "continue", "next_action": "Which target?"},
+        {"status": "continue", "next_action": "Finish.", "permissions": "more"},
+        {"status": "continue", "next_action": "Finish.", "unknown": 1},
+        {"status": "continue", "next_action": "   "},
+        {"status": "continue", "next_action": "x" * (NEXT_ACTION_MAX_BYTES + 1)},
+    ],
+)
+def test_internal_continuation_rejects_terminal_and_unknown_fields(
+    payload: dict[str, object],
+) -> None:
+    with pytest.raises(ValidationError):
+        INTERNAL_TERMINAL_OUTPUT_ADAPTER.validate_python(payload)
 
 
 def test_context_operations_are_body_free_and_preserve_explicit_semantics(
