@@ -9,13 +9,18 @@ channel routing, project change observation, cleanup, and terminal results.
 
 ### Requirement: The worker pack exposes named-Context operations
 
-The `worker` tool pack SHALL expose exactly `run`, `select`, `list_contexts`,
-`update_context`, and `archive_context`.
+The `worker` tool pack SHALL expose exactly `run`, `ctx_select`, `ctx_list`,
+`ctx_update`, `ctx_archive`, `asset_create`, `asset_open`, `asset_list`, and
+`asset_delete`.
 
 `worker.run` SHALL require nonblank `prompt`, MAY accept a Context name and direct
 model or effort override, and SHALL NOT accept project, session, thread, or public
 execution-policy parameters. An omitted Context SHALL resolve to `default` for a
 direct call; the orchestrator SHALL supply its selected Context explicitly.
+
+The removed names `select`, `list_contexts`, `update_context`, `archive_context`,
+`artifact_create`, `artifact_open`, `artifact_list`, and `artifact_delete` SHALL
+NOT be exported, aliased, or resolved as worker tools.
 
 #### Scenario: Direct run omits Context
 - **WHEN** `worker.run` is invoked without an orchestrator selection or explicit Context
@@ -27,28 +32,45 @@ direct call; the orchestrator SHALL supply its selected Context explicitly.
 - **THEN** that episode SHALL use `review-feature-x`
 - **AND** the orchestrator selection SHALL remain `feature-x`
 
+#### Scenario: Removed operation name is requested
+- **WHEN** a caller requests any removed Context or artifact operation name
+- **THEN** normal tool discovery or attribute lookup SHALL reject the name
+- **AND** the runtime SHALL NOT forward it to a renamed operation
+
 ### Requirement: Context operation results are bounded metadata
 
-`worker.select` SHALL return Context name and whether it created the file.
-`worker.list_contexts` SHALL return bounded validated frontmatter metadata and MAY
-filter by active or archived status. `worker.update_context` SHALL return name,
+`worker.ctx_select` SHALL return Context name and whether it created the file.
+`worker.ctx_list` SHALL return bounded validated frontmatter metadata and MAY
+filter by active or archived status. `worker.ctx_update` SHALL return name,
 creation indicator, description, tags, status, and revision.
-`worker.archive_context` SHALL return name and archived status.
+`worker.ctx_archive` SHALL return name and archived status.
 
-`worker.select` SHALL NOT persist a project-global or process-global selection.
-The orchestrator SHALL retain the returned name as Chat-local coordinator state;
-a direct caller SHALL pass that name explicitly on later runs.
+`worker.ctx_select` SHALL NOT persist a project-global or process-global
+selection. The orchestrator SHALL retain the returned name as Chat-local
+coordinator state; a direct caller SHALL pass that name explicitly on later runs.
 
 No Context operation SHALL return a semantic body, infer tags or description from
 a prompt, or silently substitute another Context.
 
 #### Scenario: Missing Context is selected
-- **WHEN** select names a valid missing Context
+- **WHEN** `ctx_select` names a valid missing Context
 - **THEN** it SHALL create it and return `created: true`
 
 #### Scenario: Contexts are listed
-- **WHEN** list is called without a status filter
+- **WHEN** `ctx_list` is called without a status filter
 - **THEN** it SHALL return active and archived Context metadata in stable name order
+
+### Requirement: Management operation diagnostics follow public names
+
+Worker management operation log spans SHALL use `worker.ctx_*` or
+`worker.asset_*` names. A failed management operation SHALL return the matching
+`ctx_*_failed` or `asset_*_failed` status classifier while preserving the
+operation's existing bounded error shape.
+
+#### Scenario: Asset open fails validation
+- **WHEN** `worker.asset_open` receives an invalid artifact identifier
+- **THEN** it SHALL return status `asset_open_failed`
+- **AND** its log span SHALL identify `worker.asset_open`
 
 ### Requirement: Every episode uses a fresh worker thread
 

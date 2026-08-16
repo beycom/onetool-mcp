@@ -1,6 +1,6 @@
 # OneTool MCP Tool Index
 
-packs=29 tools=254
+packs=29 tools=262
 
 ## arch
 ```python
@@ -369,5 +369,13 @@ whiteboard.zoom(level: float)  # Set zoom level. Pass 0 to fit all elements in v
 
 ## worker
 ```python
-worker.run(prompt: str, execution: dict[str, Any], session_id: str | None=None, model: str | None=None, effort: str | None=None)  # Run one fresh non-interactive Codex worker episode.
+worker.asset_create(context: str, content: str, kind: Literal['text', 'binary'], media_type: str, label: str)  # Create one immutable artifact owned by an active named Context.
+worker.asset_delete(context: str, artifact_id: str)  # Delete one existing artifact explicitly from its owning Context.
+worker.asset_list(context: str, limit: int=20, offset: int=0)  # List bounded artifact metadata for one active or archived Context.
+worker.asset_open(context: str, artifact_id: str)  # Open one validated artifact explicitly by Context and opaque ID.
+worker.ctx_archive(context: str)  # Archive one active non-default Context without deleting or moving it.
+worker.ctx_list(status: Literal['active', 'archived'] | None=None)  # List validated Context frontmatter without semantic bodies.
+worker.ctx_select(context: str)  # Create or validate a named active Context for caller-owned selection.
+worker.ctx_update(context: str, description: str | None=None, tags: list[str] | None=None)  # Create a Context or replace only its supplied discoverable metadata.
+worker.run(prompt: str, context: str | None=None, model: str | None=None, effort: str | None=None)  # Run one fresh non-interactive worker episode with a named Context.
 ```

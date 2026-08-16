@@ -35,7 +35,18 @@ def test_use_worker_skill_is_standard_explicit_and_coordinator_only() -> None:
     assert "Treat the result as exactly `context`, `status`, and `message`" in body
     assert "bounded internal continuation turns" in body
     assert "Use artifacts explicitly" in body
-    assert "worker.artifact_create" in body
+    assert "worker.asset_create" in body
+    for removed_name in (
+        "worker.select",
+        "worker.list_contexts",
+        "worker.update_context",
+        "worker.archive_context",
+        "worker.artifact_create",
+        "worker.artifact_open",
+        "worker.artifact_list",
+        "worker.artifact_delete",
+    ):
+        assert removed_name not in body
     assert "never automatic Chat, Context, Console, Status" in body
     assert "never inspect" in body
     assert "`continue` is not a public result status" in body

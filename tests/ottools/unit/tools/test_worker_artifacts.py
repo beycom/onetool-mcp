@@ -19,11 +19,11 @@ from ottools._worker.artifacts import (
 from ottools._worker.context import ContextStore
 from ottools._worker.lifecycle import HistoryStore, project_fingerprint
 from ottools.worker import (
-    artifact_create,
-    artifact_delete,
-    artifact_list,
-    artifact_open,
-    select,
+    asset_create,
+    asset_delete,
+    asset_list,
+    asset_open,
+    ctx_select,
 )
 
 if TYPE_CHECKING:
@@ -343,7 +343,7 @@ def test_public_operations_are_explicit_body_safe_and_channel_isolated(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OT_CWD", str(tmp_path))
-    assert select(context="feature-x")["ok"] is True
+    assert ctx_select(context="feature-x")["ok"] is True
     context_path = (
         tmp_path
         / ".onetool"
@@ -356,7 +356,7 @@ def test_public_operations_are_explicit_body_safe_and_channel_isolated(
     fingerprint_before = project_fingerprint(tmp_path)
 
     monkeypatch.setenv("OT_EPISODIC_WORKER", "1")
-    created = artifact_create(
+    created = asset_create(
         context="feature-x",
         content="PRIVATE ARTIFACT BODY",
         kind="text",
@@ -364,15 +364,17 @@ def test_public_operations_are_explicit_body_safe_and_channel_isolated(
         label="Private evidence",
     )
     artifact_id = created["artifact"]["id"]  # type: ignore[index]
-    listed = artifact_list(context="feature-x")
-    opened = artifact_open(context="feature-x", artifact_id=str(artifact_id))
-    deleted = artifact_delete(context="feature-x", artifact_id=str(artifact_id))
+    listed = asset_list(context="feature-x")
+    opened = asset_open(context="feature-x", artifact_id=str(artifact_id))
+    deleted = asset_delete(context="feature-x", artifact_id=str(artifact_id))
+    missing = asset_open(context="feature-x", artifact_id=str(artifact_id))
 
     assert created["ok"] is True
     assert "PRIVATE ARTIFACT BODY" not in repr(created)
     assert "content" not in repr(listed)
     assert opened["content"] == "PRIVATE ARTIFACT BODY"
     assert deleted["deleted"] is True
+    assert missing["status"] == "asset_open_failed"
     assert context_path.read_bytes() == context_before
     assert project_fingerprint(tmp_path) == fingerprint_before
     assert HistoryStore(

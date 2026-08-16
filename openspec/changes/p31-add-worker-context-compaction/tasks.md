@@ -38,9 +38,8 @@
 ## 5. Promote and Validate
 
 - [ ] 5.1 Verify implementation and evaluation thresholds against all artifacts.
-- [ ] 5.2 Update `plans/episodic-worker/arch.md`, remove only the compaction
-  section from `plans/episodic-worker/next.md`, and update plan status after
-  verification.
+- [ ] 5.2 Update `plans/episodic-worker/epic-worker-arch.md` and remove
+  `plans/episodic-worker/next/context-compaction.md` after verification.
 - [ ] 5.3 Update worker skill/reference documentation for named selection.
 - [ ] 5.4 Run focused tests, strict OpenSpec validation, and `just check` before
   syncing or archiving.

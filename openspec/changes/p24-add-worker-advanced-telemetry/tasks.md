@@ -41,10 +41,10 @@
 
 - [ ] 5.1 Verify metric semantics, privacy, retention, unavailable-data behavior,
   and `p31` evidence sufficiency against all artifacts.
-- [ ] 5.2 Update `plans/episodic-worker/arch.md` with verified telemetry behavior,
-  then remove only `Advanced Telemetry` and supporting-only text from
-  `plans/episodic-worker/next.md`.
-- [ ] 5.3 Update worker/reference documentation and the delivery plan status if an
-  execution record or status field has been added.
+- [ ] 5.2 Update `plans/episodic-worker/epic-worker-arch.md` with verified
+  telemetry behavior, then remove
+  `plans/episodic-worker/next/advanced-telemetry.md`.
+- [ ] 5.3 Update worker/reference documentation if an execution record or status
+  field has been added.
 - [ ] 5.4 Run focused telemetry/privacy tests, strict OpenSpec validation, and
   `just check`; resolve every failure before syncing or archiving the change.

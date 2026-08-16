@@ -13,7 +13,7 @@ to `worker.run`; do not duplicate it in the main conversation.
 1. At the start of every invocation, set the selected Context name to `default`.
    Keep only that name as Chat-local coordinator state. Do not persist a
    process-global or project-global selection.
-2. When the user or coordinator calls `worker.select(context=...)`, retain the
+2. When the user or coordinator calls `worker.ctx_select(context=...)`, retain the
    returned Context name only after the call succeeds. A failed selection leaves
    the current Chat selection unchanged.
 3. An explicit Context on `worker.run` is a one-episode override. It does not
@@ -44,8 +44,8 @@ not remove or replace those capabilities for the worker.
 
 ## Use artifacts explicitly
 
-Use `worker.artifact_create`, `worker.artifact_open`, `worker.artifact_list`, and
-`worker.artifact_delete` only with an explicit Context name. Create requires an
+Use `worker.asset_create`, `worker.asset_open`, `worker.asset_list`, and
+`worker.asset_delete` only with an explicit Context name. Create requires an
 active owner; open, list, and delete also work after archival. Text content is
 UTF-8 and binary content is strict base64.
 

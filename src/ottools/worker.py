@@ -5,15 +5,15 @@ from __future__ import annotations
 pack = "worker"
 
 __all__ = [
-    "archive_context",
-    "artifact_create",
-    "artifact_delete",
-    "artifact_list",
-    "artifact_open",
-    "list_contexts",
+    "asset_create",
+    "asset_delete",
+    "asset_list",
+    "asset_open",
+    "ctx_archive",
+    "ctx_list",
+    "ctx_select",
+    "ctx_update",
     "run",
-    "select",
-    "update_context",
 ]
 
 import os
@@ -168,7 +168,7 @@ def _recursive_error() -> dict[str, object] | None:
     )
 
 
-def select(*, context: str) -> dict[str, object]:
+def ctx_select(*, context: str) -> dict[str, object]:
     """Create or validate a named active Context for caller-owned selection.
 
     Args:
@@ -177,7 +177,7 @@ def select(*, context: str) -> dict[str, object]:
     Returns:
         A bounded receipt containing the Context name and creation indicator.
     """
-    with LogSpan(span="worker.select", context=context) as span:
+    with LogSpan(span="worker.ctx_select", context=context) as span:
         if error := _recursive_error():
             return error
         try:
@@ -186,10 +186,10 @@ def select(*, context: str) -> dict[str, object]:
             return {"ok": True, "context": loaded.name, "created": created}
         except (ContextError, ValidationError, ValueError, OSError) as exc:
             span.add(error=type(exc).__name__)
-            return _operation_error(status="context_select_failed", error=str(exc))
+            return _operation_error(status="ctx_select_failed", error=str(exc))
 
 
-def list_contexts(
+def ctx_list(
     *, status: Literal["active", "archived"] | None = None
 ) -> dict[str, object]:
     """List validated Context frontmatter without semantic bodies.
@@ -200,7 +200,7 @@ def list_contexts(
     Returns:
         Stable body-free Context metadata.
     """
-    with LogSpan(span="worker.list_contexts", status=status) as span:
+    with LogSpan(span="worker.ctx_list", status=status) as span:
         if error := _recursive_error():
             return error
         try:
@@ -212,10 +212,10 @@ def list_contexts(
             return {"ok": True, "contexts": items}
         except (ContextError, ValidationError, ValueError, OSError) as exc:
             span.add(error=type(exc).__name__)
-            return _operation_error(status="context_list_failed", error=str(exc))
+            return _operation_error(status="ctx_list_failed", error=str(exc))
 
 
-def update_context(
+def ctx_update(
     *,
     context: str,
     description: str | None = None,
@@ -231,7 +231,7 @@ def update_context(
     Returns:
         Updated body-free metadata and creation indicator.
     """
-    with LogSpan(span="worker.update_context", context=context) as span:
+    with LogSpan(span="worker.ctx_update", context=context) as span:
         if error := _recursive_error():
             return error
         try:
@@ -252,10 +252,10 @@ def update_context(
             }
         except (ContextError, ValidationError, ValueError, OSError) as exc:
             span.add(error=type(exc).__name__)
-            return _operation_error(status="context_update_failed", error=str(exc))
+            return _operation_error(status="ctx_update_failed", error=str(exc))
 
 
-def archive_context(*, context: str) -> dict[str, object]:
+def ctx_archive(*, context: str) -> dict[str, object]:
     """Archive one active non-default Context without deleting or moving it.
 
     Args:
@@ -264,7 +264,7 @@ def archive_context(*, context: str) -> dict[str, object]:
     Returns:
         A bounded receipt containing the Context name and archived status.
     """
-    with LogSpan(span="worker.archive_context", context=context) as span:
+    with LogSpan(span="worker.ctx_archive", context=context) as span:
         if error := _recursive_error():
             return error
         try:
@@ -273,10 +273,10 @@ def archive_context(*, context: str) -> dict[str, object]:
             return {"ok": True, "context": loaded.name, "status": "archived"}
         except (ContextError, ValidationError, ValueError, OSError) as exc:
             span.add(error=type(exc).__name__)
-            return _operation_error(status="context_archive_failed", error=str(exc))
+            return _operation_error(status="ctx_archive_failed", error=str(exc))
 
 
-def artifact_create(
+def asset_create(
     *,
     context: str,
     content: str,
@@ -296,7 +296,7 @@ def artifact_create(
     Returns:
         Bounded artifact metadata without the artifact body.
     """
-    with LogSpan(span="worker.artifact_create") as span:
+    with LogSpan(span="worker.asset_create") as span:
         try:
             metadata, warnings = _artifact_store().create(
                 context=context,
@@ -313,10 +313,10 @@ def artifact_create(
             }
         except (ArtifactError, ContextError, ValidationError, ValueError, OSError) as exc:
             span.add(error=type(exc).__name__)
-            return _operation_error(status="artifact_create_failed", error=str(exc))
+            return _operation_error(status="asset_create_failed", error=str(exc))
 
 
-def artifact_open(*, context: str, artifact_id: str) -> dict[str, object]:
+def asset_open(*, context: str, artifact_id: str) -> dict[str, object]:
     """Open one validated artifact explicitly by Context and opaque ID.
 
     Args:
@@ -326,7 +326,7 @@ def artifact_open(*, context: str, artifact_id: str) -> dict[str, object]:
     Returns:
         Strict metadata and UTF-8 text or base64 binary content.
     """
-    with LogSpan(span="worker.artifact_open") as span:
+    with LogSpan(span="worker.asset_open") as span:
         try:
             artifact, warnings = _artifact_store().open(
                 context=context,
@@ -341,10 +341,10 @@ def artifact_open(*, context: str, artifact_id: str) -> dict[str, object]:
             }
         except (ArtifactError, ContextError, ValidationError, ValueError, OSError) as exc:
             span.add(error=type(exc).__name__)
-            return _operation_error(status="artifact_open_failed", error=str(exc))
+            return _operation_error(status="asset_open_failed", error=str(exc))
 
 
-def artifact_list(
+def asset_list(
     *,
     context: str,
     limit: int = 20,
@@ -360,7 +360,7 @@ def artifact_list(
     Returns:
         Metadata-only page and bounded orphan warnings.
     """
-    with LogSpan(span="worker.artifact_list") as span:
+    with LogSpan(span="worker.asset_list") as span:
         try:
             page = _artifact_store().list_artifacts(
                 context=context,
@@ -381,10 +381,10 @@ def artifact_list(
             }
         except (ArtifactError, ContextError, ValidationError, ValueError, OSError) as exc:
             span.add(error=type(exc).__name__)
-            return _operation_error(status="artifact_list_failed", error=str(exc))
+            return _operation_error(status="asset_list_failed", error=str(exc))
 
 
-def artifact_delete(*, context: str, artifact_id: str) -> dict[str, object]:
+def asset_delete(*, context: str, artifact_id: str) -> dict[str, object]:
     """Delete one existing artifact explicitly from its owning Context.
 
     Args:
@@ -394,7 +394,7 @@ def artifact_delete(*, context: str, artifact_id: str) -> dict[str, object]:
     Returns:
         Bounded deletion receipt without artifact metadata or body.
     """
-    with LogSpan(span="worker.artifact_delete") as span:
+    with LogSpan(span="worker.asset_delete") as span:
         try:
             warnings = _artifact_store().delete(
                 context=context,
@@ -409,7 +409,7 @@ def artifact_delete(*, context: str, artifact_id: str) -> dict[str, object]:
             }
         except (ArtifactError, ContextError, ValidationError, ValueError, OSError) as exc:
             span.add(error=type(exc).__name__)
-            return _operation_error(status="artifact_delete_failed", error=str(exc))
+            return _operation_error(status="asset_delete_failed", error=str(exc))
 
 
 def run(

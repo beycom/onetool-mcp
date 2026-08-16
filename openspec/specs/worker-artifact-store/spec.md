@@ -30,22 +30,27 @@ media type, byte length, SHA-256 digest, creation timestamp, and ready status.
 
 ### Requirement: Artifact operations are explicit and Context-qualified
 
-The worker pack SHALL expose `artifact_create`, `artifact_open`, `artifact_list`,
-and `artifact_delete`, each requiring `context`. Create SHALL require content,
-kind, media type, and label. Open and delete SHALL also require an artifact ID.
-List SHALL support bounded stable oldest-first pagination and SHALL return only
+The worker pack SHALL expose `asset_create`, `asset_open`, `asset_list`, and
+`asset_delete`, each requiring `context`. Create SHALL require content, kind,
+media type, and label. Open and delete SHALL also require an artifact ID. List
+SHALL support bounded stable oldest-first pagination and SHALL return only
 metadata.
 
 No artifact SHALL become automatic worker input. A caller SHALL explicitly open
-an artifact to receive its validated body.
+an artifact through `asset_open` to receive its validated body. The removed
+`artifact_*` operation names SHALL NOT remain available as aliases.
 
 #### Scenario: Artifact is explicitly opened
-- **WHEN** open receives a ready artifact ID and its owning Context
+- **WHEN** `asset_open` receives a ready artifact ID and its owning Context
 - **THEN** it SHALL validate metadata, digest, and size before returning the body
 
 #### Scenario: Artifact is merely referenced by Context
 - **WHEN** a worker starts with a Context body containing an artifact ID
 - **THEN** the runtime SHALL NOT inject or open the artifact automatically
+
+#### Scenario: Removed artifact operation is requested
+- **WHEN** a caller requests an `artifact_*` worker operation
+- **THEN** normal tool discovery or attribute lookup SHALL reject the name
 
 ### Requirement: Artifact storage is bounded
 

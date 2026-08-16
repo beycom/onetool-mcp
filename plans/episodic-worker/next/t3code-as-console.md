@@ -36,7 +36,7 @@ the orchestration event store, or sent to a model automatically.
 
 ## Architectural constraints
 
-This integration must preserve the channel boundary in `../arch.md`:
+This integration must preserve the channel boundary in `../epic-worker-arch.md`:
 
 | Channel | T3Code treatment |
 |---|---|

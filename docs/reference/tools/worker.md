@@ -20,14 +20,14 @@ control Status.
 | Function | Description |
 |----------|-------------|
 | `worker.run(prompt, context?, model?, effort?)` | Run one fresh worker episode |
-| `worker.select(context)` | Create or validate an active Context for caller-owned selection |
-| `worker.list_contexts(status?)` | List body-free Context metadata in name order |
-| `worker.update_context(context, description?, tags?)` | Create a Context or replace supplied metadata |
-| `worker.archive_context(context)` | Archive an active non-default Context |
-| `worker.artifact_create(context, content, kind, media_type, label)` | Create an immutable artifact for an active Context |
-| `worker.artifact_open(context, artifact_id)` | Open and validate one artifact explicitly |
-| `worker.artifact_list(context, limit?, offset?)` | List bounded metadata oldest-first |
-| `worker.artifact_delete(context, artifact_id)` | Delete one existing artifact explicitly |
+| `worker.ctx_select(context)` | Create or validate an active Context for caller-owned selection |
+| `worker.ctx_list(status?)` | List body-free Context metadata in name order |
+| `worker.ctx_update(context, description?, tags?)` | Create a Context or replace supplied metadata |
+| `worker.ctx_archive(context)` | Archive an active non-default Context |
+| `worker.asset_create(context, content, kind, media_type, label)` | Create an immutable artifact for an active Context |
+| `worker.asset_open(context, artifact_id)` | Open and validate one artifact explicitly |
+| `worker.asset_list(context, limit?, offset?)` | List bounded metadata oldest-first |
+| `worker.asset_delete(context, artifact_id)` | Delete one existing artifact explicitly |
 
 ## Key Parameters
 
@@ -37,7 +37,7 @@ control Status.
 | `context` | str | Lowercase Context slug; `run` defaults to `default` |
 | `model` | str | Optional direct Codex model override for this call |
 | `effort` | str | Optional installed Codex reasoning-effort override |
-| `status` | `active`, `archived`, or null | Optional `list_contexts` filter |
+| `status` | `active`, `archived`, or null | Optional `ctx_list` filter |
 | `description` | str or omitted | Complete replacement description; empty clears it |
 | `tags` | list[str] or omitted | Complete ordered replacement tag list; empty clears it |
 | `content` | str | UTF-8 text, or strict base64 for binary artifacts |
@@ -48,7 +48,7 @@ control Status.
 | `limit`, `offset` | int | Artifact page size 1–64 and zero-based offset |
 
 Context names use lowercase letters, digits, and single hyphens. A missing valid
-name used by `run`, `select`, or `update_context` is created atomically. Archived
+name used by `run`, `ctx_select`, or `ctx_update` is created atomically. Archived
 names remain reserved and cannot be run, selected, updated, or recreated.
 `default` cannot be archived.
 
@@ -68,7 +68,7 @@ return a Context body. Project deliverables remain normal project files. Mechani
 episode facts and created, modified, or deleted paths go to project History at
 `.onetool/state/worker/history.jsonl` without file content or diffs.
 
-`select`, `list_contexts`, `update_context`, and `archive_context` return bounded
+`ctx_select`, `ctx_list`, `ctx_update`, and `ctx_archive` return bounded
 receipts or frontmatter metadata only. Selection is caller-owned: a coordinator
 retains the selected name for its current Chat and passes it explicitly to later
 runs. No process-global or project-global selection is stored.
@@ -209,7 +209,7 @@ tools:
 worker.run(prompt="Inspect the routing implementation and publish a review.")
 
 # Create metadata, then run in a named implementation Context.
-worker.update_context(
+worker.ctx_update(
     context="feature-x",
     description="Implement feature X",
     tags=["feature", "active"],
@@ -227,18 +227,18 @@ worker.run(
 )
 
 # Discover and archive completed Contexts.
-worker.list_contexts(status="active")
-worker.archive_context(context="review-feature-x")
+worker.ctx_list(status="active")
+worker.ctx_archive(context="review-feature-x")
 
 # Preserve evidence outside Context and project deliverables.
-created = worker.artifact_create(
+created = worker.asset_create(
     context="feature-x",
     content="Focused test output",
     kind="text",
     media_type="text/plain",
     label="Focused tests",
 )
-worker.artifact_open(
+worker.asset_open(
     context="feature-x",
     artifact_id=created["artifact"]["id"],
 )

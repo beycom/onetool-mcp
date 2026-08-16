@@ -65,8 +65,8 @@ terminal response.
 
 Do not inspect or modify .onetool/state/worker directly. The MCP alone owns
 Context frontmatter, formatting, validation, revisioning, History, and
-persistence. Use only worker.artifact_create, worker.artifact_open,
-worker.artifact_list, or worker.artifact_delete for explicit Context-qualified
+persistence. Use only worker.asset_create, worker.asset_open,
+worker.asset_list, or worker.asset_delete for explicit Context-qualified
 artifact access; an artifact reference is never permission to open it implicitly.
 
 Use normal tool calls to finish as much substantive work as possible within the

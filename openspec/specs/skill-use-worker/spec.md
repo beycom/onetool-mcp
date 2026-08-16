@@ -37,20 +37,20 @@ Context body to the main agent.
 - **WHEN** a new `use-worker` invocation starts
 - **THEN** the new Chat SHALL select `default` rather than inherit `feature-x`
 
-### Requirement: worker.select changes only the current Chat selection
+### Requirement: worker.ctx_select changes only the current Chat selection
 
-When the user or coordinator invokes `worker.select`, `use-worker` SHALL
+When the user or coordinator invokes `worker.ctx_select`, `use-worker` SHALL
 retain the returned active Context name for later runs in that Chat. Selecting a
 missing name MAY create its Context. Selecting an archived or invalid name SHALL
 fail without changing the retained selection.
 
 #### Scenario: User changes topics
 - **GIVEN** the selected Context is `feature-x`
-- **WHEN** select succeeds for `feature-y`
+- **WHEN** `ctx_select` succeeds for `feature-y`
 - **THEN** later runs without overrides SHALL use `feature-y`
 
 #### Scenario: Selection fails
-- **WHEN** select rejects an invalid or archived Context
+- **WHEN** `ctx_select` rejects an invalid or archived Context
 - **THEN** the previously selected Context SHALL remain active for the Chat
 
 ### Requirement: Explicit run Context is a one-episode override

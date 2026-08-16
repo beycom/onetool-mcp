@@ -1,18 +1,61 @@
-# Named-Context Worker Architecture
+# Epic Worker Architecture
 
-This feature keeps one main Chat with the user while moving substantive work into
+Epic Worker keeps one main Chat with the user while moving substantive work into
 short-lived Codex workers. Each worker starts with the active project and one
 small named Context instead of inheriting the main Chat or an earlier worker
 transcript.
 
-This file is an architectural overview. Normative behavior remains in the change
-design and delta specifications; implementation tasks promote only verified
-behavior here.
+This document describes the implemented feature: its core idea, components,
+public surface, channel model, episode lifecycle, persistence, isolation, and
+failure behavior. Normative behavior lives in the synced OpenSpec specifications
+for `tool-worker`, `worker-contexts`, `skill-use-worker`,
+`worker-autonomous-continuation`, `worker-artifact-store`, and
+`worker-warm-runtime`.
 
 ## The idea in one sentence
 
 The main agent coordinates, a fresh worker handles one episode, and OneTool
 carries one explicitly selected project-local Context into that episode.
+
+## Implemented capabilities
+
+- Named project-local Contexts carry current semantic state between otherwise
+  fresh worker episodes.
+- Bounded same-thread continuation lets a worker finish a concrete episode
+  without turning the thread into a durable session.
+- Context-owned artifacts preserve explicit evidence outside semantic Context
+  and project deliverables.
+- A warm app-server runtime reduces startup cost while retaining a fresh,
+  deleted thread and an exact isolation boundary for every episode.
+- Console, Status, History, Local Changes, and artifacts remain distinct
+  channels with no implicit replay into later workers.
+
+## Episode sequence
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant M as Main Chat
+    participant R as OneTool runtime
+    participant C as Context store
+    participant W as Fresh worker thread
+    participant O as Console and project
+
+    U->>M: Request
+    M->>R: worker.run(prompt, context)
+    R->>C: Load selected Context
+    C-->>R: Current semantic state
+    R->>W: Start episode with request and Context
+    W-->>O: Publish output and make Local Changes
+    opt Bounded continuation requested
+        W-->>R: continue(action)
+        R->>W: Continue the same thread
+    end
+    W-->>R: completed or needs_input
+    R->>C: Commit proposed Context
+    R-->>M: Context, status, and bounded message
+    M-->>U: Coordinate the next step
+```
 
 ## Identity model
 
@@ -47,21 +90,21 @@ and an explicit run name can override the selection for one episode.
 
 ```text
 worker.run(prompt, context?, model?, effort?)
-worker.select(context)
-worker.list_contexts(status?)
-worker.update_context(context, description?, tags?)
-worker.archive_context(context)
-worker.artifact_create(context, content, kind, media_type, label)
-worker.artifact_open(context, artifact_id)
-worker.artifact_list(context, limit?, offset?)
-worker.artifact_delete(context, artifact_id)
+worker.ctx_select(context)
+worker.ctx_list(status?)
+worker.ctx_update(context, description?, tags?)
+worker.ctx_archive(context)
+worker.asset_create(context, content, kind, media_type, label)
+worker.asset_open(context, artifact_id)
+worker.asset_list(context, limit?, offset?)
+worker.asset_delete(context, artifact_id)
 ```
 
-Missing active names used by run, select, or update are created automatically.
-Archive preserves a file but prevents later run, select, update, or implicit
+Missing active names used by run, ctx_select, or ctx_update are created automatically.
+Archive preserves a file but prevents later run, ctx_select, ctx_update, or implicit
 recreation. `default` cannot be archived.
 
-The orchestrator owns Chat selection. `worker.select` returns a bounded receipt,
+The orchestrator owns Chat selection. `worker.ctx_select` returns a bounded receipt,
 and the main agent retains that name and supplies it on later calls. Selection is
 never process-global or project-global state.
 
@@ -204,8 +247,8 @@ size; manages revision; and replaces files atomically. A worker replacement is
 bound to the loaded revision and digest, so a manual edit during an episode is
 never overwritten.
 
-`update_context` changes only description and tags. Omitted values preserve;
-explicit empty values clear; supplied tags replace the list. `archive_context`
+`ctx_update` changes only description and tags. Omitted values preserve;
+explicit empty values clear; supplied tags replace the list. `ctx_archive`
 changes only status and revision and preserves all other content.
 
 ## History and Local Changes

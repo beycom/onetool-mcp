@@ -102,9 +102,9 @@ score without Context identity under the `p24` privacy contract.
 
 Collect and approve evidence and evaluation, then add the tool-free proposer,
 comparison, approval tokens, named-Context validation/commit integration, audit
-metadata, telemetry, and failure tests. Update `plans/episodic-worker/arch.md`
-and remove only the compaction section from `plans/episodic-worker/next.md`
-after the exit gate passes.
+metadata, telemetry, and failure tests. Update
+`plans/episodic-worker/epic-worker-arch.md` and remove
+`plans/episodic-worker/next/context-compaction.md` after the exit gate passes.
 
 ## Open Questions
 

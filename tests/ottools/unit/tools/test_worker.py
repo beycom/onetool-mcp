@@ -28,11 +28,11 @@ from ottools._worker.models import (
 )
 from ottools.worker import (
     Config,
-    archive_context,
-    list_contexts,
+    ctx_archive,
+    ctx_list,
+    ctx_select,
+    ctx_update,
     run,
-    select,
-    update_context,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.tools]
@@ -179,7 +179,7 @@ def test_explicit_context_is_one_episode_choice_without_global_selection(
         run(prompt="Direct default call.")
 
     assert [call["context"] for call in calls] == ["", "", ""]
-    result = list_contexts()
+    result = ctx_list()
     assert [item["name"] for item in result["contexts"]] == [
         "default",
         "feature-x",
@@ -341,15 +341,15 @@ def test_context_operations_are_body_free_and_preserve_explicit_semantics(
 ) -> None:
     monkeypatch.setenv("OT_CWD", str(tmp_path))
 
-    selected = select(context="feature-x")
-    updated = update_context(
+    selected = ctx_select(context="feature-x")
+    updated = ctx_update(
         context="feature-x",
         description="Implement feature X",
         tags=["feature", "active"],
     )
-    cleared = update_context(context="feature-x", tags=[])
-    listed = list_contexts(status="active")
-    archived = archive_context(context="feature-x")
+    cleared = ctx_update(context="feature-x", tags=[])
+    listed = ctx_list(status="active")
+    archived = ctx_archive(context="feature-x")
 
     assert selected == {"ok": True, "context": "feature-x", "created": True}
     assert updated == {
@@ -366,7 +366,7 @@ def test_context_operations_are_body_free_and_preserve_explicit_semantics(
     assert set(listed) == {"ok", "contexts"}
     assert "body" not in repr(listed)
     assert archived == {"ok": True, "context": "feature-x", "status": "archived"}
-    assert select(context="feature-x")["status"] == "context_select_failed"
+    assert ctx_select(context="feature-x")["status"] == "ctx_select_failed"
 
 
 def test_update_can_create_and_empty_values_clear_metadata(
@@ -374,13 +374,13 @@ def test_update_can_create_and_empty_values_clear_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OT_CWD", str(tmp_path))
-    created = update_context(context="topic", description="", tags=[])
-    missing_fields = update_context(context="other")
+    created = ctx_update(context="topic", description="", tags=[])
+    missing_fields = ctx_update(context="other")
 
     assert created["created"] is True
     assert created["description"] == ""
     assert created["tags"] == []
-    assert missing_fields["status"] == "context_update_failed"
+    assert missing_fields["status"] == "ctx_update_failed"
 
 
 def test_invalid_context_fails_before_worker_start(
@@ -411,7 +411,7 @@ def test_recursive_concurrent_and_failed_calls_are_not_retried(
     with config_patch, adapter_patch:
         monkeypatch.setenv("OT_EPISODIC_WORKER", "1")
         recursive = run(prompt="Delegate.")
-        recursive_select = select(context="topic")
+        recursive_select = ctx_select(context="topic")
         monkeypatch.delenv("OT_EPISODIC_WORKER")
         assert worker_module._ACTIVE_LOCK.acquire(blocking=False)
         try:
@@ -534,15 +534,26 @@ def test_final_scan_and_history_failures_warn_without_changing_known_outcome(
 
 def test_public_surface_has_no_session_or_execution_compatibility() -> None:
     assert worker_module.__all__ == [
+        "asset_create",
+        "asset_delete",
+        "asset_list",
+        "asset_open",
+        "ctx_archive",
+        "ctx_list",
+        "ctx_select",
+        "ctx_update",
+        "run",
+    ]
+    for removed_name in (
         "archive_context",
         "artifact_create",
         "artifact_delete",
         "artifact_list",
         "artifact_open",
         "list_contexts",
-        "run",
         "select",
         "update_context",
-    ]
+    ):
+        assert not hasattr(worker_module, removed_name)
     parameters = inspect.signature(run).parameters
     assert set(parameters) == {"prompt", "context", "model", "effort"}

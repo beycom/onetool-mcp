@@ -96,9 +96,9 @@ malformed store and returns a diagnostic rather than fabricating aggregates.
 
 Add disabled-by-default configuration, catalog models, collection hooks, bounded
 storage, query/clear operations, and privacy tests. Update
-`plans/episodic-worker/arch.md` and remove only `Advanced Telemetry` from
-`plans/episodic-worker/next.md` after verification. The resulting catalog and
-queries become the required evidence source for `p31`.
+`plans/episodic-worker/epic-worker-arch.md` and remove
+`plans/episodic-worker/next/advanced-telemetry.md` after verification. The
+resulting catalog and queries become the required evidence source for `p31`.
 
 ## Open Questions
 

@@ -102,7 +102,7 @@ class ContextMetadata(StrictModel):
 
 
 class ContextListItem(ContextMetadata):
-    """Body-free metadata returned by ``worker.list_contexts``."""
+    """Body-free metadata returned by ``worker.ctx_list``."""
 
     name: NonBlank
 

@@ -17,7 +17,7 @@ characters, or ambiguous normalized forms.
 
 The name `default` SHALL identify the initial Context for every newly invoked
 orchestrator. The runtime SHALL create a missing active Context atomically when
-`worker.run`, `worker.select`, or `worker.update_context` first names it. It SHALL
+`worker.run`, `worker.ctx_select`, or `worker.ctx_update` first names it. It SHALL
 NOT expose a contextless worker mode or create a project registry.
 
 #### Scenario: First worker call uses the default Context
@@ -48,7 +48,7 @@ invalid values, and oversized files SHALL fail preflight without repair by an
 agent.
 
 #### Scenario: Context metadata is listed
-- **WHEN** `worker.list_contexts` is called
+- **WHEN** `worker.ctx_list` is called
 - **THEN** it SHALL return validated Context name, description, tags, status, and revision in stable name order
 - **AND** it SHALL NOT return the Markdown body
 
@@ -106,7 +106,7 @@ file.
 
 ### Requirement: Context metadata updates use explicit upsert semantics
 
-`worker.update_context` SHALL require a Context name and at least one of
+`worker.ctx_update` SHALL require a Context name and at least one of
 `description` or `tags`. It SHALL create a missing active Context and update only
 the supplied metadata. Omitted fields SHALL preserve current values; an explicit
 empty description or empty tag list SHALL clear that field; supplied tags SHALL
@@ -116,46 +116,46 @@ Metadata update SHALL preserve the semantic body, increment revision exactly
 once, and use the same digest check and atomic replacement as a worker commit.
 
 #### Scenario: Metadata creates a Context
-- **WHEN** update names a missing valid Context with description or tags
+- **WHEN** `ctx_update` names a missing valid Context with description or tags
 - **THEN** it SHALL create an active Context with an empty semantic body
 - **AND** it SHALL report that creation occurred
 
 #### Scenario: Tags are replaced
 - **GIVEN** an active Context has existing tags
-- **WHEN** update supplies a different complete tag list
+- **WHEN** `ctx_update` supplies a different complete tag list
 - **THEN** the stored tags SHALL exactly equal the supplied normalized list
 - **AND** description and semantic body SHALL remain unchanged
 
 ### Requirement: Archival preserves Context identity and content
 
-`worker.archive_context` SHALL require an existing active non-default Context. It
+`worker.ctx_archive` SHALL require an existing active non-default Context. It
 SHALL atomically set status to `archived`, increment revision, and preserve the
 description, tags, and semantic body. It SHALL NOT delete or move the file.
 
 Archived Contexts SHALL remain visible through listing but SHALL fail `run` and
-`select`. Their names SHALL remain reserved, so automatic creation SHALL NOT
+`ctx_select`. Their names SHALL remain reserved, so automatic creation SHALL NOT
 replace or reactivate them. Archiving `default`, an unknown name, or an already
 archived Context SHALL fail without changing files.
 
 #### Scenario: Active Context is archived
-- **WHEN** archive targets an existing active Context other than `default`
-- **THEN** listing SHALL report it as archived with its metadata intact
-- **AND** later run or select operations SHALL reject it
+- **WHEN** `ctx_archive` targets an existing active Context other than `default`
+- **THEN** `ctx_list` SHALL report it as archived with its metadata intact
+- **AND** later `run` or `ctx_select` operations SHALL reject it
 
 #### Scenario: Archived name is used again
-- **WHEN** run, select, or update names an archived Context
+- **WHEN** `run`, `ctx_select`, or `ctx_update` names an archived Context
 - **THEN** the operation SHALL fail rather than create or reactivate that name
 
 ### Requirement: Context bodies remain private across channels
 
 The runtime SHALL NOT return or copy a Context body through `worker.run`,
-`worker.select`, `worker.list_contexts`, `worker.update_context`,
-`worker.archive_context`, Status, Console, History, telemetry, or the main
+`worker.ctx_select`, `worker.ctx_list`, `worker.ctx_update`,
+`worker.ctx_archive`, Status, Console, History, telemetry, or the main
 conversation. Description, tags, status, revision, and name are metadata and MAY
 be returned only by the specified Context operations.
 
 #### Scenario: Main agent lists Contexts
-- **WHEN** the main agent calls `worker.list_contexts`
+- **WHEN** the main agent calls `worker.ctx_list`
 - **THEN** it SHALL receive bounded frontmatter metadata
 - **AND** it SHALL receive no semantic body or body summary
 
