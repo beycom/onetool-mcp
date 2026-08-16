@@ -244,6 +244,6 @@ worker.asset_open(
 )
 ```
 
-For coordinator-only behavior, explicitly invoke `$use-worker`. The
+For coordinator-only behavior, explicitly invoke `$ot-use-worker`. The
 skill starts each invoked Chat with `default`, retains one selected name, and
 treats an explicit run Context as a one-episode override.

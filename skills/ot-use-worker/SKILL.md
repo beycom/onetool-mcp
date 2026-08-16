@@ -1,9 +1,9 @@
 ---
-name: use-worker
-description: Coordinate a user task through fresh Codex worker episodes backed by named project-local Contexts. Use only when the user explicitly invokes $use-worker and wants the main agent to coordinate rather than perform substantive project work itself.
+name: ot-use-worker
+description: Coordinate a user task through fresh Codex worker episodes backed by named project-local Contexts. Use only when the user explicitly invokes $ot-use-worker and wants the main agent to coordinate rather than perform substantive project work itself.
 ---
 
-# Use Worker
+# OT Use Worker
 
 Act only as the coordinator. Delegate substantive project investigation and work
 to `worker.run`; do not duplicate it in the main conversation.

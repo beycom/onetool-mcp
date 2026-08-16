@@ -1,4 +1,4 @@
-# skill-use-worker Specification
+# skill-ot-use-worker Specification
 
 ## Purpose
 
@@ -7,20 +7,20 @@ Chat-selected named Context, and strict Status and Console channel isolation.
 
 ## Requirements
 
-### Requirement: The use-worker skill is an explicit coordinator
+### Requirement: The ot-use-worker skill is an explicit coordinator
 
-The `use-worker` skill SHALL activate only when explicitly invoked. While active,
+The `ot-use-worker` skill SHALL activate only when explicitly invoked. While active,
 the main agent SHALL coordinate the user conversation and delegate
 substantive inspection, planning, editing, execution, and verification through
 `worker.run` rather than performing that work itself.
 
 #### Scenario: Skill is invoked
-- **WHEN** the user explicitly invokes `use-worker`
+- **WHEN** the user explicitly invokes `ot-use-worker`
 - **THEN** the main agent SHALL delegate substantive project work through fresh worker episodes
 
 ### Requirement: Every Chat starts with selected Context default
 
-For each invocation, `use-worker` SHALL retain exactly one selected Context
+For each invocation, `ot-use-worker` SHALL retain exactly one selected Context
 name as coordinator state and SHALL initialize it to `default`. It SHALL supply
 that selected name explicitly to every run that lacks a one-episode override.
 
@@ -34,12 +34,12 @@ Context body to the main agent.
 
 #### Scenario: Another Chat starts
 - **GIVEN** an earlier Chat selected `feature-x`
-- **WHEN** a new `use-worker` invocation starts
+- **WHEN** a new `ot-use-worker` invocation starts
 - **THEN** the new Chat SHALL select `default` rather than inherit `feature-x`
 
 ### Requirement: worker.ctx_select changes only the current Chat selection
 
-When the user or coordinator invokes `worker.ctx_select`, `use-worker` SHALL
+When the user or coordinator invokes `worker.ctx_select`, `ot-use-worker` SHALL
 retain the returned active Context name for later runs in that Chat. Selecting a
 missing name MAY create its Context. Selecting an archived or invalid name SHALL
 fail without changing the retained selection.
@@ -55,7 +55,7 @@ fail without changing the retained selection.
 
 ### Requirement: Explicit run Context is a one-episode override
 
-When a run explicitly names a Context, `use-worker` SHALL use that Context
+When a run explicitly names a Context, `ot-use-worker` SHALL use that Context
 only for the current episode and SHALL preserve the Chat selection.
 
 #### Scenario: Fresh review uses another Context
@@ -64,7 +64,7 @@ only for the current episode and SHALL preserve the Chat selection.
 - **THEN** the review SHALL receive no `feature-x` semantic body
 - **AND** the next run without an override SHALL use `feature-x`
 
-### Requirement: The use-worker skill relays only bounded Status
+### Requirement: The ot-use-worker skill relays only bounded Status
 
 The main agent SHALL relay only the bounded worker Status receipt, diagnostic, or
 question. It SHALL NOT request, read, reproduce, or summarize Context or Console

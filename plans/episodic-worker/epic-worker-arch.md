@@ -8,7 +8,7 @@ transcript.
 This document describes the implemented feature: its core idea, components,
 public surface, channel model, episode lifecycle, persistence, isolation, and
 failure behavior. Normative behavior lives in the synced OpenSpec specifications
-for `tool-worker`, `worker-contexts`, `skill-use-worker`,
+for `tool-worker`, `worker-contexts`, `skill-ot-use-worker`,
 `worker-autonomous-continuation`, `worker-artifact-store`, and
 `worker-warm-runtime`.
 
@@ -76,7 +76,7 @@ and an explicit run name can override the selection for one episode.
 | Component | Responsibility |
 |---|---|
 | Main Chat | Talks with the user and retains one selected Context name |
-| `use-worker` skill | Defaults selection, resolves overrides, and delegates work |
+| `ot-use-worker` skill | Defaults selection, resolves overrides, and delegates work |
 | Worker pack | Runs episodes and selects, lists, updates, or archives Contexts |
 | Context store | Validates and atomically commits named Markdown files |
 | Artifact store | Persists explicit bounded evidence under one named Context |

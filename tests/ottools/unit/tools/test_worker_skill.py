@@ -1,4 +1,4 @@
-"""Contract tests for the explicit use-worker skill."""
+"""Contract tests for the explicit ot-use-worker skill."""
 
 from pathlib import Path
 
@@ -8,9 +8,9 @@ import yaml
 pytestmark = [pytest.mark.unit, pytest.mark.tools]
 
 
-def test_use_worker_skill_is_standard_explicit_and_coordinator_only() -> None:
+def test_ot_use_worker_skill_is_standard_explicit_and_coordinator_only() -> None:
     root = Path(__file__).resolve().parents[4]
-    skill_dir = root / "skills" / "use-worker"
+    skill_dir = root / "skills" / "ot-use-worker"
     assert not (root / "skills" / "episodic-orchestrator").exists()
     assert sorted(
         path.relative_to(skill_dir).as_posix()
@@ -22,10 +22,10 @@ def test_use_worker_skill_is_standard_explicit_and_coordinator_only() -> None:
     _, frontmatter, body = skill_text.split("---", 2)
     metadata = yaml.safe_load(frontmatter)
     assert metadata == {
-        "name": "use-worker",
+        "name": "ot-use-worker",
         "description": metadata["description"],
     }
-    assert "explicitly invokes $use-worker" in metadata["description"]
+    assert "explicitly invokes $ot-use-worker" in metadata["description"]
     assert "Act only as the coordinator" in body
     assert "set the selected Context name to `default`" in body
     assert "one-episode override" in body
@@ -57,9 +57,9 @@ def test_use_worker_skill_is_standard_explicit_and_coordinator_only() -> None:
         (skill_dir / "agents" / "openai.yaml").read_text(encoding="utf-8")
     )
     assert sidecar["policy"] == {"allow_implicit_invocation": False}
-    assert "$use-worker" in sidecar["interface"]["default_prompt"]
+    assert "$ot-use-worker" in sidecar["interface"]["default_prompt"]
 
     worker_source = (root / "src" / "ottools" / "worker.py").read_text(encoding="utf-8")
-    assert "use-worker" not in worker_source
+    assert "ot-use-worker" not in worker_source
     assert "install_skill" not in worker_source
     assert "serve_skill" not in worker_source

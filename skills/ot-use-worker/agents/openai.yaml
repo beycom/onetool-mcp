@@ -1,0 +1,6 @@
+interface:
+  display_name: "OT Use Worker"
+  short_description: "Coordinate work through fresh worker episodes"
+  default_prompt: "Use $ot-use-worker to coordinate this task through fresh worker episodes."
+policy:
+  allow_implicit_invocation: false

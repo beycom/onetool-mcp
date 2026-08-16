@@ -47,7 +47,7 @@ details belong under `openspec/changes/`, not in this index.
 | [serve-output-sanitization](serve-output-sanitization/spec.md) | Output sanitization boundaries |
 | [serve-server-management](serve-server-management/spec.md) | Runtime server enable/disable/restart APIs |
 | [serve-skills](serve-skills/spec.md) | Standard Agent Skill distribution boundaries |
-| [skill-use-worker](skill-use-worker/spec.md) | Explicit coordination through fresh worker episodes |
+| [skill-ot-use-worker](skill-ot-use-worker/spec.md) | Explicit coordination through fresh worker episodes |
 | [skill-ot-ref](skill-ot-ref/spec.md) | The ot-ref skill: trigger, layout, and command-index delivery |
 | [serve-stats](serve-stats/spec.md) | Runtime statistics reporting |
 | [serve-telemetry](serve-telemetry/spec.md) | Anonymous startup telemetry |
