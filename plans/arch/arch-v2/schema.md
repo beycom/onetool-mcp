@@ -76,8 +76,29 @@ System
   Subsystem. Other Subsystems connect to them through Interfaces.
 - Users sit outside the software containment tree.
 
-Every entity has a stable unique ID. Parent references and connection endpoints
-must resolve at the selected State.
+Every entity has a stable unique ID. ID matching ignores case while preserving
+the declaration's spelling. Parent references and connection endpoints must
+resolve at the selected State.
+
+### Common fields
+
+System, Subsystem, Component, User, Interface, and Relationship share:
+
+- required `id`;
+- optional `description`;
+- optional ordered `tags`;
+- optional flat `properties`.
+
+System, Subsystem, Component, User, and Interface require `name`. Relationship
+uses required `action` instead of `name`.
+
+Property values are nonblank strings or ordered lists of nonblank strings.
+Properties do not contain nested maps or nested lists. Common architecture facts
+such as technology, Interface type, and User kind belong in `properties` until
+a schema rule or resolver behaviour needs a dedicated field.
+
+Generic `group`, `notes`, `icon`, and `style` fields are excluded. Report-owned
+presentation does not belong on Architecture entities.
 
 ### System
 
@@ -205,8 +226,24 @@ Roadmap position.
 
 ### Field clearing
 
-`unset: [field]` explicitly clears optional fields. Omission means unchanged.
-The resolver rejects attempts to unset IDs or required fields.
+The scalar marker `unset` explicitly clears a supported field in a `changed`
+patch. Omission means unchanged:
+
+```yaml
+description: unset
+tags: unset
+properties:
+  owner: unset
+```
+
+It removes an optional description, empties tags, or removes one property.
+Supplied property values replace those values while omitted property keys remain
+unchanged. The `properties` map itself cannot be unset.
+
+The resolver rejects `unset` in Current State, additions, removals, IDs,
+required names, parents, endpoints, Relationship actions, and Interface
+direction fields. Authors set a direction to `unspecified` explicitly. YAML
+null and empty strings are invalid.
 
 The `expected` previous-value map is removed. It duplicated Current State data
 for little value. Internal normalised operations may still carry structural
@@ -249,6 +286,10 @@ roadmaps:
 - Different possible targets use separate Roadmaps from the same Current State.
 - Change order exists only in Roadmap. Do not add a second implicit top-level
   order.
+- A Roadmap contains at least one Change.
+- One Change cannot appear twice in the same Roadmap.
+- A Change may remain unreferenced while an architect prepares it for a later
+  scenario.
 
 Named checkpoint States and Roadmap-item labels are deferred.
 
@@ -298,48 +339,48 @@ Roadmap positions and generated resolved-State IDs remain internal.
 The question of selecting a comparison origin belongs to Report and is not part
 of the settled Architecture schema.
 
-## Illustrative YAML shape
+## Canonical YAML shape
 
-This example shows the domain shape rather than a final file-format contract:
+The exact authoring rules and Excel mapping live in
+[Architecture file formats](file-formats.md).
 
 ```yaml
 schema_version: 2
 
-states:
-  - id: current
-    systems:
-      - id: payments
-        name: Payments
-      - id: legacy-clearing
-        name: Legacy Clearing
-    subsystems:
-      - id: payments-api
-        name: Payments API
-        system: payments
-      - id: clearing-api
-        name: Clearing API
-        system: legacy-clearing
-    components:
-      - id: payments-db
-        name: Payments Database
-        subsystem: payments-api
-    interfaces:
-      - id: payments-to-clearing
-        name: Submit clearing request
-        provider: clearing-api
-        consumer: payments-api
-        call_direction: consumer_to_provider
-        data_flow: consumer_to_provider
-    users:
-      - id: customer
-        name: Customer
-      - id: payments-team
-        name: Payments Team
-    relationships:
-      - id: payments-owned-by-team
-        source: payments-team
-        action: owns
-        target: payments
+current_state:
+  systems:
+    - id: payments
+      name: Payments
+    - id: legacy-clearing
+      name: Legacy Clearing
+  subsystems:
+    - id: payments-api
+      name: Payments API
+      system: payments
+    - id: clearing-api
+      name: Clearing API
+      system: legacy-clearing
+  components:
+    - id: payments-db
+      name: Payments Database
+      subsystem: payments-api
+  users:
+    - id: customer
+      name: Customer
+    - id: payments-team
+      name: Payments Team
+  interfaces:
+    - id: payments-to-clearing
+      name: Submit clearing request
+      provider: clearing-api
+      consumer: payments-api
+      call_direction: consumer_to_provider
+      data_flow: consumer_to_provider
+  relationships:
+    - id: payments-owned-by-team
+      source: payments-team
+      action: owns
+      target: payments
 
 changes:
   - id: replace-clearing
@@ -366,10 +407,14 @@ The current schema-v2 implementation is the starting point, not the final
 contract. The agreed design requires these clean changes:
 
 - rename Application to Subsystem and remove Application without an alias;
+- replace the `states` list with one ID-less `current_state` mapping;
 - make `change_type` required rather than inferred;
 - reject no-op `changed` patches;
 - remove authored `expected` values;
 - reduce Change metadata to the starter fields;
+- replace the `unset` field list with per-field `unset` values;
+- restrict properties to flat string and string-list values with sparse
+  per-property patches;
 - replace `RoadmapItem {change, order}` with an ordered `changes` list;
 - remove Roadmap `base` because one Current State is shared;
 - replace Interface `direction` with `call_direction` and `data_flow`;
@@ -380,12 +425,12 @@ contract. The agreed design requires these clean changes:
 No backward-compatible aliases or transition fields should remain when this
 contract is implemented.
 
-## Remaining schema questions
+## Implementation readiness
 
-- Final top-level representation and name for the single authored Current State.
-- Exact common metadata shared by System, Subsystem, Component, User, Interface,
-  and Relationship.
-- Whether an empty Roadmap is invalid and whether one Change may appear twice in
-  the same Roadmap.
-- Exact YAML and Excel mappings, covered separately in
-  [File formats](file-formats.md).
+The schema decisions needed for implementation are settled. The canonical YAML
+and Excel mappings, string and ID rules, clearing syntax, and round-trip
+guarantees are defined in [Architecture file formats](file-formats.md).
+
+Report Definition, comparison-origin selection, and generated-output contracts
+remain deferred to the Report grill. They do not block Architecture schema
+implementation.

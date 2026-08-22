@@ -1,7 +1,7 @@
 # Architecture schema grill
 
-Status: Architecture schema interview complete; File Formats grill active;
-Report deferred to a separate session. Started 2026-08-22.
+Status: Architecture schema and File Formats interviews complete. Report remains
+deferred to a separate session. Started 2026-08-22.
 
 This record separates confirmed decisions from ideas and unanswered questions.
 It does not change the Architecture Pack contract.
@@ -10,10 +10,10 @@ It does not change the Architecture Pack contract.
 
 The consolidated planning direction now lives in separate documents:
 
-- [Architecture Pack v2 index](arch-v2/index.md)
-- [Architecture schema](arch-v2/schema.md)
-- [Report handoff](arch-v2/report.md)
-- [File formats](arch-v2/file-formats.md)
+- [Architecture Pack v2 index](../index.md)
+- [Architecture schema](../schema.md)
+- [Report handoff](../report.md)
+- [File formats](../file-formats.md)
 
 This file remains the decision trail, including pressure tests and rejected
 alternatives. When a later statement here conflicts with an earlier one, the
@@ -442,7 +442,7 @@ parent, changed endpoints, or `unset`. The resolver:
 
 - checks that `added` IDs are absent;
 - checks that `changed` and `removed` IDs exist;
-- checks parents, endpoints, required fields, and optional `expected` values;
+- checks parents, endpoints, and required fields;
 - rejects or diagnoses ineffective and conflicting patches;
 - expands removal cascades;
 - materialises the derived State and its tombstones.
@@ -475,10 +475,19 @@ simpler contract.
 
 ### Explicit field clearing uses unset
 
-`unset: [field]` is the one authoring mechanism for clearing optional fields.
-Omitting a field means unchanged. A blank Excel cell also means unchanged.
-Using `unset` avoids giving YAML `null` and an Excel blank different meanings,
-and the resolver rejects attempts to clear IDs or required fields.
+The later File Formats grill changed the physical spelling while retaining this
+schema decision. `unset` now appears as the value being cleared:
+
+```yaml
+description: unset
+tags: unset
+properties:
+  owner: unset
+```
+
+Omitting a YAML field or leaving an Excel patch cell blank means unchanged. The
+resolver rejects attempts to clear IDs or other required fields. YAML null is
+not a clearing instruction.
 
 ### Minimal Change metadata
 
@@ -496,7 +505,6 @@ base. YAML represents it directly:
 ```yaml
 roadmaps:
   - id: preferred
-    base: current
     changes: [phase-1, phase-2]
 ```
 
@@ -504,10 +512,8 @@ This removes the `RoadmapItem` object, repeated `order` values, and validation
 for gaps or duplicate orders. List position is the order. Report selection can
 still use a Change ID or zero-based base endpoint.
 
-Excel may use one row per Roadmap Change with an explicit sequence column as a
-format-specific representation, then normalise it to the same ordered list.
-The file formats do not need identical physical layouts to share one domain
-model.
+Excel uses one row per Roadmap Change. Row order defines Change order, matching
+YAML list order. Each Roadmap occupies one contiguous block of rows.
 
 The public `RoadmapItem {change, order}` structure is removed. Numeric order is
 derived from list position when needed for resolution or reporting.
