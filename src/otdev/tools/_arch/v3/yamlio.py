@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
+from weakref import ReferenceType, ref
 
 import yaml
 from pydantic import ValidationError
@@ -15,6 +16,9 @@ from .model import Architecture
 
 DataPath = tuple[str | int, ...]
 SourceMark = tuple[int, int]
+SourceDocument = tuple[ReferenceType[Architecture], Path, dict[DataPath, SourceMark]]
+
+_SOURCE_DOCUMENTS: dict[int, SourceDocument] = {}
 
 _ROOT_KEYS = (
     "schema_version",
@@ -92,7 +96,7 @@ def _mark(node: Node) -> SourceMark:
     return node.start_mark.line + 1, node.start_mark.column + 1
 
 
-def _format_path(path: DataPath) -> str:
+def format_data_path(path: DataPath) -> str:
     rendered = ""
     for part in path:
         rendered += (
@@ -173,6 +177,30 @@ def _source_mark(loc: DataPath, marks: dict[DataPath, SourceMark]) -> SourceMark
     return 1, 1
 
 
+def _remember_source(
+    architecture: Architecture, path: Path, marks: dict[DataPath, SourceMark]
+) -> None:
+    identity = id(architecture)
+
+    def forget(dead: ReferenceType[Architecture]) -> None:
+        stored = _SOURCE_DOCUMENTS.get(identity)
+        if stored is not None and stored[0] is dead:
+            _SOURCE_DOCUMENTS.pop(identity, None)
+
+    reference = ref(architecture, forget)
+    _SOURCE_DOCUMENTS[identity] = reference, path, marks
+
+
+def source_location(
+    architecture: Architecture, data_path: DataPath
+) -> tuple[Path | None, SourceMark | None]:
+    """Return the loaded file and nearest YAML mark for a model path."""
+    source = _SOURCE_DOCUMENTS.get(id(architecture))
+    if source is None or source[0]() is not architecture:
+        return None, None
+    return source[1], _source_mark(data_path, source[2])
+
+
 def _validation_message(
     *, path: Path, error: ValidationError, marks: dict[DataPath, SourceMark]
 ) -> str:
@@ -181,7 +209,7 @@ def _validation_message(
         loc = tuple(part for part in detail["loc"] if isinstance(part, (str, int)))
         mark = _source_mark(loc, marks)
         lines.append(
-            f"{path}:{mark[0]}:{mark[1]}: {_format_path(loc)}: {detail['msg']}"
+            f"{path}:{mark[0]}:{mark[1]}: {format_data_path(loc)}: {detail['msg']}"
         )
     return "\n".join(lines)
 
@@ -200,11 +228,13 @@ def load_architecture(path: Path) -> Architecture:
             path, marks.get((), (1, 1)), "YAML document must contain a mapping"
         )
     try:
-        return Architecture.model_validate(raw)
+        architecture = Architecture.model_validate(raw)
     except ValidationError as exc:
         raise ArchitectureLoadError(
             _validation_message(path=path, error=exc, marks=marks)
         ) from exc
+    _remember_source(architecture, path, marks)
+    return architecture
 
 
 def _ordered_row(row: dict[str, Any], *, collection: str) -> dict[str, Any]:

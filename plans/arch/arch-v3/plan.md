@@ -151,13 +151,13 @@ Owner doc: schema.md.
       consequences, diff (added/removed/changed field-by-field),
       `advance(through=…)` deterministic rewrite. `→ D3` (to architect's
       tests)
-- [ ] Validation: structural errors + advisory warnings with locations
+- [x] Validation: structural errors + advisory warnings with locations
       (implemented in full; only its test breadth is deferred). `→ D4`
-- [ ] Dev CLI (`__main__.py`): validate / resolve / diff / advance
+- [x] Dev CLI (`__main__.py`): validate / resolve / diff / advance
       subcommands — the fast iteration loop, no MCP needed. `→ D4`
-- [ ] Tools: `arch.init`, `arch.validate`, `arch.resolve`, `arch.diff`,
+- [x] Tools: `arch.init`, `arch.validate`, `arch.resolve`, `arch.diff`,
       `arch.advance` (thin facade over the same functions). `→ D4`
-- [ ] **Gate (architect):** acme fixture validates; diffs between its
+- [x] **Gate (architect):** acme fixture validates; diffs between its
       milestones are correct by inspection. Record line count vs budget in
       the log.
 - [ ] Cut over `arch.py` to v3; delete v1 modules; update any specs/docs
@@ -233,6 +233,35 @@ None yet. Format: `branch-name — question being explored — outcome`.
    sparse early states (risk table; decide only with the acme report open).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-23** — Phase-1 gate PASSED (architect review). 61 arch tests
+  green, `just lint` clean. Acme validates: 0 errors, 24 warnings (clipping
+  advisories). All six adjacent-state diffs correct by inspection: edge
+  foundation adds the strangler edge/BFF/eventing tree and retires direct
+  customer→monolith interfaces; each domain phase adds its services while
+  legacy modules turn into facades (name/description revisions); transaction
+  core severs every monolith external integration; complete cutover retires
+  the whole legacy-commerce tree; last-milestone→end diff is empty. Line
+  counts: phase-1 source 1,564 / 1,800 budget (D4: 496 / 500). Code review:
+  validate.py finding pipeline, weakref source-mark registry in yamlio.py,
+  and CLI/facade wiring all sound. Architect committed D4 (rule 8). Next
+  action: cutover step — delete v1 `_arch` modules, update specs/docs
+  referencing v1 (arch.py facade already replaced in D4).
+
+- **2026-08-23** — D4 complete. Added location-aware structural validation
+  and advisory warnings, shared file operations, standalone CLI commands, and
+  the v3-only `arch` facade. Source: `validate.py` 320 lines, `api.py` 98,
+  `arch.py` 78 = 496 / 500 D4 budget; `__main__.py` 109 and `yamlio.py` 287;
+  phase-1 source is 1,564 / 1,800. Verification: 61 arch tests passed (12 new),
+  540 deselected; `just lint` clean; acme validates with 0 errors and 24
+  advisory clipping warnings; CLI JSON parses and standalone import loads no
+  runtime modules. Assumptions: stable finding codes are category-level;
+  adjacent revisions follow authored order; "live on no timeline" means
+  effectively live after clipping; timeline membership does not count as a
+  row reference for the unused-milestone warning; in-memory models use
+  `<memory>:1:1` when no YAML source mark exists; `diff` accepts independent
+  `at_a`/`at_b` selectors and optional timelines; `init` refuses to overwrite
+  an existing file. No open questions. Next action: architect phase-1 gate.
 
 - **2026-08-23** — D3 complete, gate PASSED (architect review). Executor
   implemented timeline/state selection, revision grouping and governing-row
