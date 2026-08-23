@@ -207,6 +207,10 @@ build:
 build-inject:
     cd src/ot/assets && npm run build
 
+# Build the self-contained architecture report template
+build-arch-report:
+    cd frontend/arch-report && npm run build
+
 # Clean build artifacts and caches
 clean:
     rm -rf dist/ build/ *.egg-info tmp/

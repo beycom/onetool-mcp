@@ -1,0 +1,26 @@
+{
+  "name": "@onetool/arch-report",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "dev": "vite --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@xyflow/react": "12.11.2",
+    "ag-grid-community": "35.1.0",
+    "elkjs": "0.11.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "@vitejs/plugin-react": "5.1.1",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vite-plugin-singlefile": "2.3.0"
+  }
+}

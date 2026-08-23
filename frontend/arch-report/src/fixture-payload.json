@@ -1,0 +1,4546 @@
+{
+  "payload": "arch-report/v1",
+  "schema_version": 3,
+  "source": "acme.yaml",
+  "milestones": [
+    {
+      "id": "acme-2027-edge-foundation",
+      "name": "Edge Foundation",
+      "tags": [
+        "year",
+        "ecom",
+        "code"
+      ]
+    },
+    {
+      "id": "acme-2028-catalog-search",
+      "name": "Catalog and Search",
+      "tags": [
+        "year",
+        "ecom"
+      ]
+    },
+    {
+      "id": "acme-2029-customer-cart-pricing",
+      "name": "Customer, Cart and Pricing",
+      "tags": [
+        "year",
+        "ecom"
+      ]
+    },
+    {
+      "id": "acme-2030-transaction-core",
+      "name": "Transaction Core",
+      "tags": [
+        "year",
+        "ecom",
+        "code"
+      ]
+    },
+    {
+      "id": "acme-2031-complete-cutover",
+      "name": "Complete Cutover",
+      "tags": [
+        "year",
+        "ecom",
+        "migrate"
+      ]
+    }
+  ],
+  "timelines": [
+    {
+      "id": "program",
+      "milestones": [
+        "acme-2027-edge-foundation",
+        "acme-2028-catalog-search",
+        "acme-2029-customer-cart-pricing",
+        "acme-2030-transaction-core",
+        "acme-2031-complete-cutover"
+      ]
+    }
+  ],
+  "rows": {
+    "systems": [
+      {
+        "id": "legacy-commerce",
+        "name": "Legacy Commerce Platform",
+        "description": "Customer storefront, back-office administration, and all commerce domains in one deployable estate.",
+        "tags": [
+          "legacy",
+          "ecommerce",
+          "strangler-source"
+        ],
+        "properties": {
+          "availability_target": "99.9%",
+          "criticality": "tier-1",
+          "lifecycle": "migrate"
+        },
+        "until": "acme-2031-complete-cutover",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                5
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "enterprise-fulfilment",
+        "name": "Enterprise Fulfilment",
+        "description": "Existing ERP and warehouse management capabilities.",
+        "tags": [
+          "enterprise",
+          "fulfilment"
+        ],
+        "properties": {
+          "criticality": "tier-1",
+          "lifecycle": "retain"
+        },
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "enterprise-order-management",
+        "name": "Enterprise Order Management",
+        "description": "Internal enterprise OMS coordinating downstream fulfilment, exceptions, and cross-channel order visibility.",
+        "tags": [
+          "internal",
+          "orders",
+          "system-of-record"
+        ],
+        "properties": {
+          "criticality": "tier-1",
+          "group": "sor",
+          "lifecycle": "retain",
+          "ownership_boundary": "enterprise-fulfilment-order"
+        },
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "enterprise-finance",
+        "name": "Enterprise Finance",
+        "description": "Internal finance ledger, settlement, reconciliation, and revenue accounting platform.",
+        "tags": [
+          "internal",
+          "finance",
+          "system-of-record"
+        ],
+        "properties": {
+          "criticality": "tier-1",
+          "group": "sor",
+          "lifecycle": "retain"
+        },
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "payment-provider",
+        "name": "Payment Service Provider",
+        "description": "External payment authorization, capture, refund, and token vault services.",
+        "tags": [
+          "external",
+          "payments",
+          "pci"
+        ],
+        "properties": {
+          "data_classification": "pci",
+          "lifecycle": "retain"
+        },
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "customer-engagement",
+        "name": "Customer Engagement Provider",
+        "description": "External email and SMS delivery platform.",
+        "tags": [
+          "external",
+          "communications"
+        ],
+        "properties": {
+          "lifecycle": "retain"
+        },
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "enterprise-identity",
+        "name": "Enterprise Identity",
+        "description": "Customer and workforce authentication provider.",
+        "tags": [
+          "enterprise",
+          "identity"
+        ],
+        "properties": {
+          "criticality": "tier-1",
+          "lifecycle": "retain"
+        },
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "analytics-provider",
+        "name": "Digital Analytics Provider",
+        "description": "External SaaS for consented web and product analytics.",
+        "tags": [
+          "external",
+          "analytics",
+          "saas"
+        ],
+        "properties": {
+          "data_classification": "pseudonymous",
+          "lifecycle": "retain"
+        },
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "tax-provider",
+        "name": "Tax Calculation Provider",
+        "description": "External tax jurisdiction, calculation, and audit API.",
+        "tags": [
+          "external",
+          "tax",
+          "saas"
+        ],
+        "properties": {
+          "criticality": "tier-1",
+          "lifecycle": "retain"
+        },
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "fraud-provider",
+        "name": "Fraud Decision Provider",
+        "description": "External real-time payment and account fraud scoring service.",
+        "tags": [
+          "external",
+          "fraud",
+          "saas"
+        ],
+        "properties": {
+          "criticality": "tier-1",
+          "lifecycle": "retain"
+        },
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "commerce-platform",
+        "name": "Digital Commerce Platform",
+        "description": "Target cloud-native commerce platform introduced alongside the legacy system.",
+        "tags": [
+          "target",
+          "ecommerce",
+          "microservices"
+        ],
+        "properties": {
+          "availability_target": "99.95%",
+          "criticality": "tier-1",
+          "lifecycle": "strategic"
+        },
+        "from": "acme-2027-edge-foundation",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      }
+    ],
+    "subsystems": [
+      {
+        "id": "commerce-monolith",
+        "name": "Commerce Monolith",
+        "description": "Single Java deployment containing storefront, administration, catalog, cart, checkout, customer, and order logic.",
+        "tags": [
+          "legacy",
+          "monolith",
+          "stateful"
+        ],
+        "properties": {
+          "criticality": "tier-1",
+          "deployment": "virtual-machines",
+          "owner": "Commerce Core Team",
+          "release_cadence": "monthly",
+          "technology": "Java / Spring MVC"
+        },
+        "system": "legacy-commerce",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                1
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "commerce-monolith",
+        "name": "Commerce Monolith",
+        "description": "Legacy commerce deployment reachable only behind strangler-controlled routes and adapters.",
+        "tags": [
+          "legacy",
+          "monolith",
+          "stateful"
+        ],
+        "properties": {
+          "criticality": "tier-1",
+          "deployment": "virtual-machines",
+          "owner": "Commerce Core Team",
+          "release_cadence": "monthly",
+          "technology": "Java / Spring MVC"
+        },
+        "from": "acme-2027-edge-foundation",
+        "system": "legacy-commerce",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-commerce"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "erp-wms",
+        "name": "ERP and WMS",
+        "description": "Inventory master, warehouse execution, and fulfilment planning.",
+        "tags": [
+          "system-of-record",
+          "fulfilment"
+        ],
+        "properties": {
+          "owner": "Supply Chain Technology",
+          "technology": "Commercial ERP"
+        },
+        "system": "enterprise-fulfilment",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "enterprise-oms",
+        "name": "Enterprise OMS",
+        "description": "Enterprise order routing, exception handling, and downstream fulfilment coordination.",
+        "tags": [
+          "internal",
+          "orders",
+          "system-of-record"
+        ],
+        "properties": {
+          "owner": "Order Operations Technology",
+          "technology": "Commercial OMS"
+        },
+        "system": "enterprise-order-management",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "finance-ledger",
+        "name": "Finance Ledger and Reconciliation",
+        "description": "Enterprise settlement, reconciliation, and accounting integration.",
+        "tags": [
+          "internal",
+          "finance",
+          "system-of-record"
+        ],
+        "properties": {
+          "owner": "Finance Technology",
+          "technology": "Finance ERP"
+        },
+        "system": "enterprise-finance",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "payment-gateway",
+        "name": "Payment Gateway API",
+        "description": "Tokenized payment API hosted by the external provider.",
+        "tags": [
+          "external-api",
+          "pci"
+        ],
+        "properties": {
+          "owner": "Payment Provider",
+          "technology": "REST API"
+        },
+        "system": "payment-provider",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "messaging-provider",
+        "name": "Messaging Provider API",
+        "description": "Email and SMS delivery API.",
+        "tags": [
+          "external-api"
+        ],
+        "properties": {
+          "owner": "Engagement Provider",
+          "technology": "REST API"
+        },
+        "system": "customer-engagement",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "identity-provider",
+        "name": "Identity Provider",
+        "description": "OAuth 2.0 and OpenID Connect identity service.",
+        "tags": [
+          "identity",
+          "security"
+        ],
+        "properties": {
+          "owner": "Identity Platform Team",
+          "technology": "OIDC"
+        },
+        "system": "enterprise-identity",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "digital-analytics-api",
+        "name": "Digital Analytics API",
+        "description": "External analytics event collection and reporting API.",
+        "tags": [
+          "external-api",
+          "analytics"
+        ],
+        "properties": {
+          "owner": "Analytics Provider",
+          "technology": "HTTPS collection API"
+        },
+        "system": "analytics-provider",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "tax-api",
+        "name": "Tax Calculation API",
+        "description": "External tax quote, commit, void, and audit API.",
+        "tags": [
+          "external-api",
+          "tax"
+        ],
+        "properties": {
+          "owner": "Tax Provider",
+          "technology": "REST API"
+        },
+        "system": "tax-provider",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "fraud-api",
+        "name": "Fraud Decision API",
+        "description": "External fraud score and decision API.",
+        "tags": [
+          "external-api",
+          "fraud"
+        ],
+        "properties": {
+          "owner": "Fraud Provider",
+          "technology": "REST API"
+        },
+        "system": "fraud-provider",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "commerce-edge",
+        "name": "Commerce Edge",
+        "description": "CDN, WAF, TLS termination, and route-based strangler control plane.",
+        "tags": [
+          "edge",
+          "security",
+          "strangler"
+        ],
+        "properties": {
+          "deployment": "managed-cloud",
+          "owner": "Platform Edge Team",
+          "technology": "Managed CDN / WAF / API gateway"
+        },
+        "from": "acme-2027-edge-foundation",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "storefront-bff",
+        "name": "Storefront BFF",
+        "description": "Channel-oriented API composition layer for the web storefront.",
+        "tags": [
+          "bff",
+          "stateless"
+        ],
+        "properties": {
+          "deployment": "kubernetes",
+          "owner": "Storefront Team",
+          "scaling": "horizontal",
+          "technology": "TypeScript / Node.js"
+        },
+        "from": "acme-2027-edge-foundation",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "event-backbone",
+        "name": "Commerce Event Backbone",
+        "description": "Durable domain-event transport with schema governance and replay.",
+        "tags": [
+          "eventing",
+          "platform"
+        ],
+        "properties": {
+          "delivery_semantics": "at-least-once",
+          "owner": "Platform Messaging Team",
+          "technology": "Managed Kafka"
+        },
+        "from": "acme-2027-edge-foundation",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "observability-platform",
+        "name": "Commerce Observability Platform",
+        "description": "Central metrics, logs, traces, alerting, and service-level objectives.",
+        "tags": [
+          "observability",
+          "platform"
+        ],
+        "properties": {
+          "owner": "Site Reliability Engineering",
+          "technology": "OpenTelemetry / managed observability"
+        },
+        "from": "acme-2027-edge-foundation",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "legacy-integration-adapter",
+        "name": "Legacy Anti-corruption Layer",
+        "description": "Stable adapters translating legacy concepts and contracts into target-domain APIs and events.",
+        "tags": [
+          "anti-corruption-layer",
+          "temporary",
+          "strangler"
+        ],
+        "properties": {
+          "lifecycle": "retire-in-year-5",
+          "owner": "Migration Enablement Team",
+          "technology": "Java / integration runtime"
+        },
+        "from": "acme-2027-edge-foundation",
+        "until": "acme-2031-complete-cutover",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                5
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "analytics-event-adapter",
+        "name": "Analytics Event Adapter",
+        "description": "Consent-aware, schema-controlled adapter for external digital analytics.",
+        "tags": [
+          "analytics",
+          "privacy",
+          "anti-corruption-layer"
+        ],
+        "properties": {
+          "owner": "Digital Analytics Team",
+          "pii": "prohibited",
+          "technology": "TypeScript / streaming runtime"
+        },
+        "from": "acme-2027-edge-foundation",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "catalog-service",
+        "name": "Catalog Service",
+        "description": "System of record for products, categories, assortment, and sellability.",
+        "tags": [
+          "microservice",
+          "bounded-context-catalog"
+        ],
+        "properties": {
+          "criticality": "tier-1",
+          "deployment": "kubernetes",
+          "owner": "Catalog Team",
+          "technology": "Kotlin / Spring Boot"
+        },
+        "from": "acme-2028-catalog-search",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "search-service",
+        "name": "Search Service",
+        "description": "Product search, faceting, ranking, and query suggestions from event-fed projections.",
+        "tags": [
+          "microservice",
+          "bounded-context-search",
+          "cqrs-read-model"
+        ],
+        "properties": {
+          "deployment": "kubernetes",
+          "owner": "Search Team",
+          "technology": "Java / OpenSearch"
+        },
+        "from": "acme-2028-catalog-search",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "catalog-sync-adapter",
+        "name": "Catalog Migration Adapter",
+        "description": "Temporary idempotent translation and reconciliation between legacy merchandising and Catalog Service.",
+        "tags": [
+          "migration-adapter",
+          "temporary"
+        ],
+        "properties": {
+          "lifecycle": "retire-in-year-5",
+          "owner": "Migration Enablement Team",
+          "technology": "Java / Kafka Connect"
+        },
+        "from": "acme-2028-catalog-search",
+        "until": "acme-2031-complete-cutover",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                5
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "customer-service",
+        "name": "Customer Service",
+        "description": "Customer profile, addresses, preferences, and identity linkage.",
+        "tags": [
+          "microservice",
+          "bounded-context-customer"
+        ],
+        "properties": {
+          "data_classification": "confidential",
+          "owner": "Customer Accounts Team",
+          "technology": "Kotlin / Spring Boot"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "cart-service",
+        "name": "Cart Service",
+        "description": "Durable shopping carts with optimistic concurrency and expiry policies.",
+        "tags": [
+          "microservice",
+          "bounded-context-cart"
+        ],
+        "properties": {
+          "criticality": "tier-1",
+          "owner": "Cart Team",
+          "technology": "Go"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "pricing-service",
+        "name": "Pricing Service",
+        "description": "Effective prices, promotions, eligibility, and explainable calculation results.",
+        "tags": [
+          "microservice",
+          "bounded-context-pricing"
+        ],
+        "properties": {
+          "owner": "Pricing Team",
+          "technology": "Java / Spring Boot"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "notification-service",
+        "name": "Notification Service",
+        "description": "Template, preference, deduplication, and delivery orchestration for customer communications.",
+        "tags": [
+          "microservice",
+          "bounded-context-notification",
+          "event-driven"
+        ],
+        "properties": {
+          "owner": "Customer Communications Team",
+          "technology": "TypeScript / Node.js"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "checkout-service",
+        "name": "Checkout Orchestrator",
+        "description": "Explicit saga coordinating validation, reservation, payment, order creation, and compensations.",
+        "tags": [
+          "microservice",
+          "bounded-context-checkout",
+          "saga-orchestrator"
+        ],
+        "properties": {
+          "criticality": "tier-1",
+          "idempotency": "required",
+          "owner": "Checkout Team",
+          "technology": "Java / workflow engine"
+        },
+        "from": "acme-2030-transaction-core",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "order-service",
+        "name": "Order Service",
+        "description": "System of record for accepted orders and order lifecycle state.",
+        "tags": [
+          "microservice",
+          "bounded-context-order"
+        ],
+        "properties": {
+          "criticality": "tier-1",
+          "owner": "Order Team",
+          "technology": "Kotlin / Spring Boot"
+        },
+        "from": "acme-2030-transaction-core",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "payment-service",
+        "name": "Payment Service",
+        "description": "PCI-minimized payment intents, authorization, capture, refund, and reconciliation.",
+        "tags": [
+          "microservice",
+          "bounded-context-payment",
+          "pci-scope-minimized"
+        ],
+        "properties": {
+          "criticality": "tier-1",
+          "owner": "Payments Team",
+          "technology": "Java / Spring Boot"
+        },
+        "from": "acme-2030-transaction-core",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "inventory-service",
+        "name": "Inventory Service",
+        "description": "Commerce availability projection and time-bound stock reservations synchronized with ERP/WMS.",
+        "tags": [
+          "microservice",
+          "bounded-context-inventory"
+        ],
+        "properties": {
+          "criticality": "tier-1",
+          "owner": "Inventory Team",
+          "technology": "Go"
+        },
+        "from": "acme-2030-transaction-core",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "admin-portal",
+        "name": "Commerce Administration Portal",
+        "description": "Role-based customer service and merchandising experience composed over target-domain APIs.",
+        "tags": [
+          "frontend",
+          "internal",
+          "micro-frontend-ready"
+        ],
+        "properties": {
+          "authentication": "enterprise-identity",
+          "owner": "Commerce Operations Experience Team",
+          "technology": "React / TypeScript"
+        },
+        "from": "acme-2031-complete-cutover",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                5,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "reporting-service",
+        "name": "Commerce Reporting Service",
+        "description": "Operational reporting over event-fed read models; never queries service databases directly.",
+        "tags": [
+          "microservice",
+          "reporting",
+          "cqrs-read-model"
+        ],
+        "properties": {
+          "owner": "Commerce Data Products Team",
+          "technology": "Python / SQL"
+        },
+        "from": "acme-2031-complete-cutover",
+        "system": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                5,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      }
+    ],
+    "components": [
+      {
+        "id": "legacy-web-ui",
+        "name": "Server-rendered Storefront",
+        "description": "Customer web experience rendered inside the monolith.",
+        "tags": [
+          "legacy",
+          "frontend"
+        ],
+        "properties": {
+          "technology": "JSP / JavaScript"
+        },
+        "subsystem": "commerce-monolith",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-commerce"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "legacy-catalog-module",
+        "name": "Catalog and Merchandising Module",
+        "description": "Product, category, assortment, and merchandising logic.",
+        "tags": [
+          "legacy",
+          "bounded-context-catalog"
+        ],
+        "properties": {
+          "technology": "Java module"
+        },
+        "subsystem": "commerce-monolith",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                2
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "legacy-catalog-module",
+        "name": "Legacy Catalog Compatibility Facade",
+        "description": "Read-only compatibility facade delegating canonical product changes through the migration adapter.",
+        "tags": [
+          "legacy",
+          "bounded-context-catalog"
+        ],
+        "properties": {
+          "technology": "Java module"
+        },
+        "from": "acme-2028-catalog-search",
+        "subsystem": "commerce-monolith",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-commerce"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "legacy-search-index",
+        "name": "Embedded Search Index",
+        "description": "Locally managed product search index refreshed by batch jobs.",
+        "tags": [
+          "legacy",
+          "search"
+        ],
+        "properties": {
+          "technology": "Embedded search engine"
+        },
+        "until": "acme-2028-catalog-search",
+        "subsystem": "commerce-monolith",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                2
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "legacy-cart-module",
+        "name": "Cart and Pricing Module",
+        "description": "Session cart, promotions, and price calculation.",
+        "tags": [
+          "legacy",
+          "bounded-context-cart"
+        ],
+        "properties": {
+          "technology": "Java module"
+        },
+        "subsystem": "commerce-monolith",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                3
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "legacy-cart-module",
+        "name": "Legacy Cart and Pricing Compatibility Facade",
+        "description": "Temporary facade delegating cart and price calculations to target services.",
+        "tags": [
+          "legacy",
+          "bounded-context-cart"
+        ],
+        "properties": {
+          "technology": "Java module"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "subsystem": "commerce-monolith",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-commerce"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "legacy-customer-module",
+        "name": "Customer Account Module",
+        "description": "Customer profile, addresses, preferences, and authentication integration.",
+        "tags": [
+          "legacy",
+          "bounded-context-customer"
+        ],
+        "properties": {
+          "technology": "Java module"
+        },
+        "subsystem": "commerce-monolith",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                3
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "legacy-customer-module",
+        "name": "Legacy Customer Compatibility Facade",
+        "description": "Temporary facade delegating profile operations to Customer Service.",
+        "tags": [
+          "legacy",
+          "bounded-context-customer"
+        ],
+        "properties": {
+          "technology": "Java module"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "subsystem": "commerce-monolith",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-commerce"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "legacy-checkout-module",
+        "name": "Checkout and Payment Module",
+        "description": "Synchronous checkout transaction coordinating payment and order creation.",
+        "tags": [
+          "legacy",
+          "bounded-context-checkout"
+        ],
+        "properties": {
+          "technology": "Java module"
+        },
+        "subsystem": "commerce-monolith",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                4
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "legacy-checkout-module",
+        "name": "Legacy Checkout Compatibility Facade",
+        "description": "Non-public compatibility facade delegating checkout to the target orchestrator.",
+        "tags": [
+          "legacy",
+          "bounded-context-checkout"
+        ],
+        "properties": {
+          "technology": "Java module"
+        },
+        "from": "acme-2030-transaction-core",
+        "subsystem": "commerce-monolith",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-commerce"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "legacy-order-module",
+        "name": "Order and Fulfilment Module",
+        "description": "Order lifecycle and point-to-point ERP integration.",
+        "tags": [
+          "legacy",
+          "bounded-context-order"
+        ],
+        "properties": {
+          "technology": "Java module"
+        },
+        "subsystem": "commerce-monolith",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                4
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "legacy-order-module",
+        "name": "Legacy Order Compatibility Facade",
+        "description": "Temporary back-office facade reading and updating orders through Order Service.",
+        "tags": [
+          "legacy",
+          "bounded-context-order"
+        ],
+        "properties": {
+          "technology": "Java module"
+        },
+        "from": "acme-2030-transaction-core",
+        "subsystem": "commerce-monolith",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-commerce"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "legacy-admin-module",
+        "name": "Back-office Administration Module",
+        "description": "Customer service and merchandising administration screens.",
+        "tags": [
+          "legacy",
+          "admin"
+        ],
+        "properties": {
+          "technology": "Java module"
+        },
+        "subsystem": "commerce-monolith",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-commerce"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "legacy-commerce-db",
+        "name": "Shared Commerce Database",
+        "description": "Shared relational schema used by every commerce domain.",
+        "tags": [
+          "legacy",
+          "database",
+          "shared-database"
+        ],
+        "properties": {
+          "backup": "point-in-time-recovery",
+          "data_classification": "confidential",
+          "migration_rule": "no-new-service-direct-access",
+          "technology": "PostgreSQL"
+        },
+        "subsystem": "commerce-monolith",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-commerce"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "legacy-session-cache",
+        "name": "Shared Session Cache",
+        "description": "Distributed web session and coarse application cache.",
+        "tags": [
+          "legacy",
+          "cache"
+        ],
+        "properties": {
+          "technology": "Redis"
+        },
+        "subsystem": "commerce-monolith",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-commerce"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "legacy-batch-jobs",
+        "name": "Commerce Batch Jobs",
+        "description": "Scheduled catalog, search, order, and integration processing.",
+        "tags": [
+          "legacy",
+          "batch"
+        ],
+        "properties": {
+          "technology": "Java scheduler"
+        },
+        "subsystem": "commerce-monolith",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-commerce"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "erp-database",
+        "name": "ERP Operational Database",
+        "description": "Enterprise inventory and fulfilment system of record.",
+        "tags": [
+          "database",
+          "system-of-record"
+        ],
+        "properties": {
+          "technology": "Relational database"
+        },
+        "subsystem": "erp-wms",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "oms-database",
+        "name": "OMS Operational Database",
+        "description": "Enterprise order routing and fulfilment state.",
+        "tags": [
+          "database",
+          "system-of-record"
+        ],
+        "properties": {
+          "technology": "Relational database"
+        },
+        "subsystem": "enterprise-oms",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "finance-ledger-db",
+        "name": "Finance Ledger Database",
+        "description": "Enterprise accounting, settlement, and reconciliation records.",
+        "tags": [
+          "database",
+          "system-of-record"
+        ],
+        "properties": {
+          "technology": "Relational database"
+        },
+        "subsystem": "finance-ledger",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "psp-token-vault",
+        "name": "Provider Token Vault",
+        "description": "Provider-managed PCI token vault; ACME does not store cardholder data.",
+        "tags": [
+          "pci",
+          "managed"
+        ],
+        "properties": {
+          "technology": "Managed vault"
+        },
+        "subsystem": "payment-gateway",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "identity-directory",
+        "name": "Identity Directory",
+        "description": "Managed customer and workforce identity directory.",
+        "tags": [
+          "identity",
+          "managed"
+        ],
+        "properties": {
+          "technology": "Managed directory"
+        },
+        "subsystem": "identity-provider",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "analytics-event-store",
+        "name": "Provider Analytics Event Store",
+        "description": "Provider-managed pseudonymous analytics event storage.",
+        "tags": [
+          "managed",
+          "analytics"
+        ],
+        "properties": {
+          "technology": "Managed analytics storage"
+        },
+        "subsystem": "digital-analytics-api",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "provider-tax-rules",
+        "name": "Provider Tax Rules",
+        "description": "Provider-managed jurisdiction and tax-rule data.",
+        "tags": [
+          "managed",
+          "tax"
+        ],
+        "properties": {
+          "technology": "Managed rules engine"
+        },
+        "subsystem": "tax-api",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "provider-fraud-models",
+        "name": "Provider Fraud Models",
+        "description": "Provider-managed fraud features and decision models.",
+        "tags": [
+          "managed",
+          "fraud"
+        ],
+        "properties": {
+          "technology": "Managed ML platform"
+        },
+        "subsystem": "fraud-api",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "edge-waf-cdn",
+        "name": "WAF and CDN",
+        "description": "Managed perimeter protection, caching, bot control, and DDoS mitigation.",
+        "tags": [
+          "security",
+          "infrastructure"
+        ],
+        "properties": {
+          "technology": "Managed edge service"
+        },
+        "from": "acme-2027-edge-foundation",
+        "subsystem": "commerce-edge",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "strangler-route-config",
+        "name": "Strangler Route Configuration",
+        "description": "Version-controlled routing rules that move capabilities from legacy to target services.",
+        "tags": [
+          "configuration",
+          "strangler"
+        ],
+        "properties": {
+          "technology": "Gateway configuration"
+        },
+        "from": "acme-2027-edge-foundation",
+        "subsystem": "commerce-edge",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "bff-response-cache",
+        "name": "BFF Response Cache",
+        "description": "Short-lived cache for safe catalog and navigation responses.",
+        "tags": [
+          "cache",
+          "infrastructure"
+        ],
+        "properties": {
+          "technology": "Redis"
+        },
+        "from": "acme-2027-edge-foundation",
+        "subsystem": "storefront-bff",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "event-stream-cluster",
+        "name": "Event Stream Cluster",
+        "description": "Multi-zone durable event log with retention and replay.",
+        "tags": [
+          "event-store",
+          "infrastructure"
+        ],
+        "properties": {
+          "technology": "Managed Kafka"
+        },
+        "from": "acme-2027-edge-foundation",
+        "subsystem": "event-backbone",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "event-schema-registry",
+        "name": "Event Schema Registry",
+        "description": "Versioned compatibility checks for domain event contracts.",
+        "tags": [
+          "governance",
+          "infrastructure"
+        ],
+        "properties": {
+          "technology": "Schema registry"
+        },
+        "from": "acme-2027-edge-foundation",
+        "subsystem": "event-backbone",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "telemetry-store",
+        "name": "Telemetry Store",
+        "description": "Managed metrics, logs, and traces with production retention policies.",
+        "tags": [
+          "observability",
+          "infrastructure"
+        ],
+        "properties": {
+          "technology": "Managed observability storage"
+        },
+        "from": "acme-2027-edge-foundation",
+        "subsystem": "observability-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "anti-corruption-runtime",
+        "name": "Anti-corruption Adapter Runtime",
+        "description": "Translation, retry, circuit-breaker, and contract-isolation runtime.",
+        "tags": [
+          "adapter",
+          "resilience"
+        ],
+        "properties": {
+          "technology": "Integration service"
+        },
+        "from": "acme-2027-edge-foundation",
+        "subsystem": "legacy-integration-adapter",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-integration-adapter"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "analytics-consent-filter",
+        "name": "Analytics Consent and Data Filter",
+        "description": "Enforces consent, allowlisted fields, pseudonymous identifiers, and analytics contract versions.",
+        "tags": [
+          "privacy",
+          "analytics",
+          "infrastructure"
+        ],
+        "properties": {
+          "default_policy": "deny",
+          "technology": "Stream processor"
+        },
+        "from": "acme-2027-edge-foundation",
+        "subsystem": "analytics-event-adapter",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "legacy-outbox",
+        "name": "Legacy Transactional Outbox",
+        "description": "Append-only outbox table used to publish changes without dual writes.",
+        "tags": [
+          "outbox",
+          "migration"
+        ],
+        "properties": {
+          "data_owner": "commerce-monolith",
+          "delivery_semantics": "at-least-once",
+          "technology": "PostgreSQL table / relay"
+        },
+        "from": "acme-2027-edge-foundation",
+        "subsystem": "commerce-monolith",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-commerce"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "catalog-db",
+        "name": "Catalog Database",
+        "description": "Catalog-owned relational store; no other service has direct access.",
+        "tags": [
+          "database",
+          "database-per-service"
+        ],
+        "properties": {
+          "backup": "point-in-time-recovery",
+          "data_owner": "catalog-service",
+          "technology": "Managed PostgreSQL"
+        },
+        "from": "acme-2028-catalog-search",
+        "subsystem": "catalog-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "catalog-cache",
+        "name": "Catalog Cache",
+        "description": "Read-through cache for hot product and category data.",
+        "tags": [
+          "cache",
+          "infrastructure"
+        ],
+        "properties": {
+          "technology": "Redis"
+        },
+        "from": "acme-2028-catalog-search",
+        "subsystem": "catalog-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "catalog-outbox",
+        "name": "Catalog Transactional Outbox",
+        "description": "Atomically records catalog events for reliable publication.",
+        "tags": [
+          "outbox",
+          "eventing"
+        ],
+        "properties": {
+          "technology": "PostgreSQL outbox table"
+        },
+        "from": "acme-2028-catalog-search",
+        "subsystem": "catalog-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "product-search-index",
+        "name": "Product Search Index",
+        "description": "Rebuildable search projection populated only from versioned catalog events.",
+        "tags": [
+          "search-index",
+          "cqrs-read-model"
+        ],
+        "properties": {
+          "rebuildable": "true",
+          "source_of_truth": "catalog-service",
+          "technology": "Managed OpenSearch"
+        },
+        "from": "acme-2028-catalog-search",
+        "subsystem": "search-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "search-query-cache",
+        "name": "Search Query Cache",
+        "description": "Short-lived cache for popular query and facet results.",
+        "tags": [
+          "cache",
+          "infrastructure"
+        ],
+        "properties": {
+          "technology": "Redis"
+        },
+        "from": "acme-2028-catalog-search",
+        "subsystem": "search-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "catalog-reconciliation-store",
+        "name": "Catalog Reconciliation Store",
+        "description": "Temporary checkpoints and idempotency keys for migration reconciliation.",
+        "tags": [
+          "migration",
+          "database",
+          "temporary"
+        ],
+        "properties": {
+          "technology": "Managed PostgreSQL"
+        },
+        "from": "acme-2028-catalog-search",
+        "subsystem": "catalog-sync-adapter",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "catalog-sync-adapter"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "customer-db",
+        "name": "Customer Database",
+        "description": "Customer-owned relational data with encrypted sensitive fields.",
+        "tags": [
+          "database",
+          "database-per-service"
+        ],
+        "properties": {
+          "data_owner": "customer-service",
+          "encryption": "field-and-storage",
+          "technology": "Managed PostgreSQL"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "subsystem": "customer-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "customer-outbox",
+        "name": "Customer Transactional Outbox",
+        "description": "Reliable customer-profile event publication.",
+        "tags": [
+          "outbox",
+          "eventing"
+        ],
+        "properties": {
+          "technology": "PostgreSQL outbox table"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "subsystem": "customer-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "cart-store",
+        "name": "Durable Cart Store",
+        "description": "Partitioned durable key-value storage for carts and idempotency records.",
+        "tags": [
+          "database",
+          "database-per-service"
+        ],
+        "properties": {
+          "consistency": "optimistic",
+          "data_owner": "cart-service",
+          "technology": "Managed key-value database"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "subsystem": "cart-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "cart-cache",
+        "name": "Cart Hot Cache",
+        "description": "Optional acceleration layer; the durable cart store remains authoritative.",
+        "tags": [
+          "cache",
+          "infrastructure"
+        ],
+        "properties": {
+          "technology": "Redis"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "subsystem": "cart-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "pricing-db",
+        "name": "Pricing Database",
+        "description": "Pricing-owned rules, price lists, promotions, and audit history.",
+        "tags": [
+          "database",
+          "database-per-service"
+        ],
+        "properties": {
+          "data_owner": "pricing-service",
+          "technology": "Managed PostgreSQL"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "subsystem": "pricing-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "pricing-cache",
+        "name": "Pricing Evaluation Cache",
+        "description": "Version-keyed cache that cannot outlive the owning price-rule version.",
+        "tags": [
+          "cache",
+          "infrastructure"
+        ],
+        "properties": {
+          "technology": "Redis"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "subsystem": "pricing-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "notification-db",
+        "name": "Notification Database",
+        "description": "Templates, preferences, delivery attempts, and deduplication keys.",
+        "tags": [
+          "database",
+          "database-per-service"
+        ],
+        "properties": {
+          "data_owner": "notification-service",
+          "technology": "Managed PostgreSQL"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "subsystem": "notification-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "checkout-workflow-store",
+        "name": "Checkout Workflow Store",
+        "description": "Durable saga state, idempotency keys, and compensation progress.",
+        "tags": [
+          "database",
+          "database-per-service",
+          "workflow-state"
+        ],
+        "properties": {
+          "data_owner": "checkout-service",
+          "technology": "Managed PostgreSQL"
+        },
+        "from": "acme-2030-transaction-core",
+        "subsystem": "checkout-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "order-db",
+        "name": "Order Database",
+        "description": "Order-owned append-audited relational data.",
+        "tags": [
+          "database",
+          "database-per-service"
+        ],
+        "properties": {
+          "data_owner": "order-service",
+          "technology": "Managed PostgreSQL"
+        },
+        "from": "acme-2030-transaction-core",
+        "subsystem": "order-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "order-outbox",
+        "name": "Order Transactional Outbox",
+        "description": "Reliable order-event publication without dual writes.",
+        "tags": [
+          "outbox",
+          "eventing"
+        ],
+        "properties": {
+          "technology": "PostgreSQL outbox table"
+        },
+        "from": "acme-2030-transaction-core",
+        "subsystem": "order-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "payment-db",
+        "name": "Payment Database",
+        "description": "Payment intents, provider tokens, idempotency keys, and reconciliation state; no PAN storage.",
+        "tags": [
+          "database",
+          "database-per-service",
+          "pci-scope-minimized"
+        ],
+        "properties": {
+          "cardholder_data": "prohibited",
+          "data_owner": "payment-service",
+          "technology": "Managed PostgreSQL"
+        },
+        "from": "acme-2030-transaction-core",
+        "subsystem": "payment-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "payment-outbox",
+        "name": "Payment Transactional Outbox",
+        "description": "Reliable payment-state event publication.",
+        "tags": [
+          "outbox",
+          "eventing"
+        ],
+        "properties": {
+          "technology": "PostgreSQL outbox table"
+        },
+        "from": "acme-2030-transaction-core",
+        "subsystem": "payment-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "inventory-db",
+        "name": "Inventory Projection Database",
+        "description": "Rebuildable availability projection plus authoritative commerce reservation state.",
+        "tags": [
+          "database",
+          "database-per-service",
+          "cqrs-read-model"
+        ],
+        "properties": {
+          "data_owner": "inventory-service",
+          "technology": "Managed PostgreSQL",
+          "upstream_system_of_record": "erp-wms"
+        },
+        "from": "acme-2030-transaction-core",
+        "subsystem": "inventory-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "admin-static-assets",
+        "name": "Administration Static Assets",
+        "description": "Versioned immutable portal assets served through the managed edge.",
+        "tags": [
+          "infrastructure",
+          "immutable"
+        ],
+        "properties": {
+          "technology": "Object storage / CDN"
+        },
+        "from": "acme-2031-complete-cutover",
+        "subsystem": "admin-portal",
+        "intervals": [
+          {
+            "live": [
+              [
+                5,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "reporting-read-model",
+        "name": "Reporting Read Model",
+        "description": "Rebuildable cross-domain operational projection populated from events.",
+        "tags": [
+          "database",
+          "cqrs-read-model",
+          "rebuildable"
+        ],
+        "properties": {
+          "data_owner": "reporting-service",
+          "direct_service_db_access": "prohibited",
+          "technology": "Managed analytical PostgreSQL"
+        },
+        "from": "acme-2031-complete-cutover",
+        "subsystem": "reporting-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                5,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "reporting-object-store",
+        "name": "Reporting Object Store",
+        "description": "Retained extracts and archived operational reports with lifecycle policies.",
+        "tags": [
+          "object-storage",
+          "infrastructure"
+        ],
+        "properties": {
+          "technology": "Managed object storage"
+        },
+        "from": "acme-2031-complete-cutover",
+        "subsystem": "reporting-service",
+        "intervals": [
+          {
+            "live": [
+              [
+                5,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      }
+    ],
+    "users": [
+      {
+        "id": "customer",
+        "name": "Customer",
+        "description": "Shopper browsing, purchasing, and managing an account.",
+        "tags": [
+          "external"
+        ],
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "customer-service-agent",
+        "name": "Customer Service Agent",
+        "description": "Internal user assisting customers and orders.",
+        "tags": [
+          "internal"
+        ],
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "merchandiser",
+        "name": "Merchandiser",
+        "description": "Internal user managing catalog, assortment, and pricing.",
+        "tags": [
+          "internal"
+        ],
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "warehouse-operator",
+        "name": "Warehouse Operator",
+        "description": "Internal user executing fulfilment work in the retained WMS.",
+        "tags": [
+          "internal"
+        ],
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      }
+    ],
+    "interfaces": [
+      {
+        "id": "customer-to-monolith",
+        "name": "Customer storefront traffic",
+        "tags": [
+          "synchronous",
+          "public"
+        ],
+        "properties": {
+          "contract": "html",
+          "security": "tls",
+          "technology": "HTTPS",
+          "type": "web"
+        },
+        "until": "acme-2027-edge-foundation",
+        "provider": "customer",
+        "consumer": "commerce-monolith",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                1
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "agent-to-monolith",
+        "name": "Customer service administration",
+        "tags": [
+          "synchronous",
+          "internal"
+        ],
+        "properties": {
+          "technology": "HTTPS",
+          "type": "web"
+        },
+        "provider": "customer-service-agent",
+        "consumer": "commerce-monolith",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-commerce"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "merchandiser-to-monolith",
+        "name": "Merchandising administration",
+        "tags": [
+          "synchronous",
+          "internal"
+        ],
+        "properties": {
+          "technology": "HTTPS",
+          "type": "web"
+        },
+        "provider": "merchandiser",
+        "consumer": "commerce-monolith",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-commerce"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "monolith-to-identity",
+        "name": "Authenticate customer",
+        "tags": [
+          "synchronous",
+          "security"
+        ],
+        "properties": {
+          "technology": "OIDC",
+          "type": "api"
+        },
+        "provider": "commerce-monolith",
+        "consumer": "identity-provider",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-commerce"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "monolith-to-payment",
+        "name": "Authorize and capture payment",
+        "tags": [
+          "synchronous",
+          "pci",
+          "critical"
+        ],
+        "properties": {
+          "idempotency": "legacy-order-id",
+          "technology": "REST / JSON",
+          "timeout_seconds": "5",
+          "type": "api"
+        },
+        "until": "acme-2030-transaction-core",
+        "provider": "commerce-monolith",
+        "consumer": "payment-gateway",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                4
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "monolith-to-erp",
+        "name": "Query inventory and fulfilment status",
+        "tags": [
+          "legacy",
+          "point-to-point"
+        ],
+        "properties": {
+          "technology": "SOAP / SFTP",
+          "type": "integration"
+        },
+        "until": "acme-2030-transaction-core",
+        "provider": "commerce-monolith",
+        "consumer": "erp-wms",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                4
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "monolith-to-oms",
+        "name": "Submit accepted order to enterprise OMS",
+        "tags": [
+          "legacy",
+          "point-to-point",
+          "orders"
+        ],
+        "properties": {
+          "technology": "SOAP / JMS",
+          "type": "integration"
+        },
+        "until": "acme-2030-transaction-core",
+        "provider": "commerce-monolith",
+        "consumer": "enterprise-oms",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                4
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "oms-to-erp",
+        "name": "Coordinate warehouse fulfilment",
+        "tags": [
+          "internal",
+          "retained"
+        ],
+        "properties": {
+          "technology": "Enterprise integration bus",
+          "type": "integration"
+        },
+        "provider": "enterprise-oms",
+        "consumer": "erp-wms",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "monolith-to-finance",
+        "name": "Submit settlement and reconciliation batch",
+        "tags": [
+          "legacy",
+          "finance",
+          "batch"
+        ],
+        "properties": {
+          "technology": "SFTP batch",
+          "type": "integration"
+        },
+        "until": "acme-2030-transaction-core",
+        "provider": "commerce-monolith",
+        "consumer": "finance-ledger",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                4
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "monolith-to-analytics",
+        "name": "Send web and commerce analytics",
+        "tags": [
+          "external",
+          "analytics",
+          "legacy"
+        ],
+        "properties": {
+          "consent_required": "true",
+          "pii": "prohibited",
+          "technology": "HTTPS collection",
+          "type": "event"
+        },
+        "until": "acme-2027-edge-foundation",
+        "provider": "commerce-monolith",
+        "consumer": "digital-analytics-api",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                1
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "monolith-to-tax",
+        "name": "Calculate checkout tax",
+        "tags": [
+          "synchronous",
+          "external",
+          "critical"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "until": "acme-2030-transaction-core",
+        "provider": "commerce-monolith",
+        "consumer": "tax-api",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                4
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "monolith-to-fraud",
+        "name": "Score payment fraud risk",
+        "tags": [
+          "synchronous",
+          "external",
+          "critical"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "until": "acme-2030-transaction-core",
+        "provider": "commerce-monolith",
+        "consumer": "fraud-api",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                4
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "monolith-to-messaging",
+        "name": "Send customer communications",
+        "tags": [
+          "synchronous"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "until": "acme-2029-customer-cart-pricing",
+        "provider": "commerce-monolith",
+        "consumer": "messaging-provider",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                3
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "warehouse-to-erp",
+        "name": "Warehouse operations",
+        "tags": [
+          "internal"
+        ],
+        "properties": {
+          "technology": "HTTPS",
+          "type": "user-interface"
+        },
+        "provider": "warehouse-operator",
+        "consumer": "erp-wms",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "customer-to-edge",
+        "name": "Customer traffic through commerce edge",
+        "tags": [
+          "public",
+          "synchronous"
+        ],
+        "properties": {
+          "security": "tls-waf-bot-control",
+          "technology": "HTTPS",
+          "type": "web"
+        },
+        "from": "acme-2027-edge-foundation",
+        "provider": "customer",
+        "consumer": "commerce-edge",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "edge-to-bff",
+        "name": "Route target storefront requests",
+        "tags": [
+          "synchronous",
+          "strangler-target"
+        ],
+        "properties": {
+          "technology": "HTTPS / JSON",
+          "type": "api"
+        },
+        "from": "acme-2027-edge-foundation",
+        "provider": "commerce-edge",
+        "consumer": "storefront-bff",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "edge-to-monolith",
+        "name": "Route unmigrated customer journeys",
+        "tags": [
+          "synchronous",
+          "strangler-fallback",
+          "temporary"
+        ],
+        "properties": {
+          "technology": "HTTPS",
+          "type": "web"
+        },
+        "from": "acme-2027-edge-foundation",
+        "until": "acme-2030-transaction-core",
+        "provider": "commerce-edge",
+        "consumer": "commerce-monolith",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                4
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "bff-to-monolith",
+        "name": "Compose unmigrated commerce capabilities",
+        "tags": [
+          "synchronous",
+          "strangler-fallback",
+          "temporary"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2027-edge-foundation",
+        "until": "acme-2030-transaction-core",
+        "provider": "storefront-bff",
+        "consumer": "commerce-monolith",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                4
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "monolith-to-legacy-adapter",
+        "name": "Publish and translate legacy domain changes",
+        "tags": [
+          "migration",
+          "anti-corruption-layer"
+        ],
+        "properties": {
+          "technology": "Outbox / REST",
+          "type": "integration"
+        },
+        "from": "acme-2027-edge-foundation",
+        "provider": "commerce-monolith",
+        "consumer": "legacy-integration-adapter",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-commerce"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "edge-to-analytics-adapter",
+        "name": "Send consented digital interaction events",
+        "tags": [
+          "asynchronous",
+          "privacy-filtered"
+        ],
+        "properties": {
+          "technology": "HTTPS / JSON",
+          "type": "event"
+        },
+        "from": "acme-2027-edge-foundation",
+        "provider": "commerce-edge",
+        "consumer": "analytics-event-adapter",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "analytics-adapter-to-provider",
+        "name": "Forward allowlisted analytics events",
+        "tags": [
+          "external",
+          "analytics",
+          "privacy-filtered"
+        ],
+        "properties": {
+          "consent_required": "true",
+          "pii": "prohibited",
+          "technology": "HTTPS collection",
+          "type": "event"
+        },
+        "from": "acme-2027-edge-foundation",
+        "provider": "analytics-event-adapter",
+        "consumer": "digital-analytics-api",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "bff-to-catalog",
+        "name": "Read product and navigation data",
+        "tags": [
+          "synchronous",
+          "versioned-contract"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2028-catalog-search",
+        "provider": "storefront-bff",
+        "consumer": "catalog-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "bff-to-search",
+        "name": "Search and browse products",
+        "tags": [
+          "synchronous",
+          "versioned-contract"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2028-catalog-search",
+        "provider": "storefront-bff",
+        "consumer": "search-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "catalog-to-events",
+        "name": "Publish catalog domain events",
+        "tags": [
+          "asynchronous",
+          "outbox",
+          "versioned-contract"
+        ],
+        "properties": {
+          "technology": "Kafka / Avro",
+          "type": "event"
+        },
+        "from": "acme-2028-catalog-search",
+        "provider": "catalog-service",
+        "consumer": "event-backbone",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "events-to-search",
+        "name": "Project catalog events into search",
+        "tags": [
+          "asynchronous",
+          "idempotent-consumer"
+        ],
+        "properties": {
+          "technology": "Kafka / Avro",
+          "type": "event"
+        },
+        "from": "acme-2028-catalog-search",
+        "provider": "event-backbone",
+        "consumer": "search-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "events-to-analytics-adapter",
+        "name": "Consume allowlisted commerce domain events for analytics",
+        "tags": [
+          "asynchronous",
+          "analytics",
+          "privacy-filtered",
+          "versioned-contract"
+        ],
+        "properties": {
+          "technology": "Kafka / Avro",
+          "type": "event"
+        },
+        "from": "acme-2028-catalog-search",
+        "provider": "event-backbone",
+        "consumer": "analytics-event-adapter",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "legacy-adapter-to-catalog-sync",
+        "name": "Translate legacy catalog updates",
+        "tags": [
+          "migration",
+          "anti-corruption-layer",
+          "temporary"
+        ],
+        "properties": {
+          "technology": "Kafka / REST",
+          "type": "integration"
+        },
+        "from": "acme-2028-catalog-search",
+        "provider": "legacy-integration-adapter",
+        "consumer": "catalog-sync-adapter",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-integration-adapter"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "catalog-sync-to-catalog",
+        "name": "Apply reconciled catalog commands",
+        "tags": [
+          "migration",
+          "idempotent",
+          "temporary"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2028-catalog-search",
+        "provider": "catalog-sync-adapter",
+        "consumer": "catalog-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "catalog-sync-adapter"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "bff-to-customer",
+        "name": "Read and update customer profile",
+        "tags": [
+          "synchronous",
+          "versioned-contract"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "provider": "storefront-bff",
+        "consumer": "customer-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "customer-to-identity",
+        "name": "Resolve identity subject and account linkage",
+        "tags": [
+          "synchronous",
+          "security"
+        ],
+        "properties": {
+          "technology": "OIDC / SCIM",
+          "type": "api"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "provider": "customer-service",
+        "consumer": "identity-provider",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "bff-to-cart",
+        "name": "Manage shopping cart",
+        "tags": [
+          "synchronous",
+          "versioned-contract"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "provider": "storefront-bff",
+        "consumer": "cart-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "cart-to-pricing",
+        "name": "Price cart contents",
+        "tags": [
+          "synchronous",
+          "bounded-timeout"
+        ],
+        "properties": {
+          "technology": "gRPC",
+          "type": "api"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "provider": "cart-service",
+        "consumer": "pricing-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "bff-to-pricing",
+        "name": "Display prices and promotions",
+        "tags": [
+          "synchronous",
+          "versioned-contract"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "provider": "storefront-bff",
+        "consumer": "pricing-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "customer-to-events",
+        "name": "Publish customer domain events",
+        "tags": [
+          "asynchronous",
+          "outbox",
+          "versioned-contract"
+        ],
+        "properties": {
+          "technology": "Kafka / Avro",
+          "type": "event"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "provider": "customer-service",
+        "consumer": "event-backbone",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "events-to-notification",
+        "name": "Consume communication-triggering domain events",
+        "tags": [
+          "asynchronous",
+          "idempotent-consumer"
+        ],
+        "properties": {
+          "technology": "Kafka / Avro",
+          "type": "event"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "provider": "event-backbone",
+        "consumer": "notification-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "notification-to-provider",
+        "name": "Deliver email and SMS",
+        "tags": [
+          "synchronous",
+          "retry-with-backoff"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "provider": "notification-service",
+        "consumer": "messaging-provider",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "legacy-adapter-to-customer",
+        "name": "Translate legacy customer operations",
+        "tags": [
+          "migration",
+          "temporary"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "provider": "legacy-integration-adapter",
+        "consumer": "customer-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-integration-adapter"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "legacy-adapter-to-cart",
+        "name": "Translate legacy cart operations",
+        "tags": [
+          "migration",
+          "temporary"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "provider": "legacy-integration-adapter",
+        "consumer": "cart-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-integration-adapter"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "legacy-adapter-to-pricing",
+        "name": "Translate legacy pricing operations",
+        "tags": [
+          "migration",
+          "temporary"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2029-customer-cart-pricing",
+        "provider": "legacy-integration-adapter",
+        "consumer": "pricing-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-integration-adapter"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "bff-to-checkout",
+        "name": "Submit idempotent checkout command",
+        "tags": [
+          "synchronous",
+          "idempotent",
+          "versioned-contract"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2030-transaction-core",
+        "provider": "storefront-bff",
+        "consumer": "checkout-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "checkout-to-cart",
+        "name": "Lock and consume cart snapshot",
+        "tags": [
+          "synchronous",
+          "bounded-timeout"
+        ],
+        "properties": {
+          "technology": "gRPC",
+          "type": "api"
+        },
+        "from": "acme-2030-transaction-core",
+        "provider": "checkout-service",
+        "consumer": "cart-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "checkout-to-pricing",
+        "name": "Validate authoritative price",
+        "tags": [
+          "synchronous",
+          "bounded-timeout"
+        ],
+        "properties": {
+          "technology": "gRPC",
+          "type": "api"
+        },
+        "from": "acme-2030-transaction-core",
+        "provider": "checkout-service",
+        "consumer": "pricing-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "checkout-to-inventory",
+        "name": "Reserve or release inventory",
+        "tags": [
+          "synchronous",
+          "idempotent",
+          "compensatable"
+        ],
+        "properties": {
+          "technology": "gRPC",
+          "type": "api"
+        },
+        "from": "acme-2030-transaction-core",
+        "provider": "checkout-service",
+        "consumer": "inventory-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "checkout-to-payment",
+        "name": "Authorize or compensate payment",
+        "tags": [
+          "synchronous",
+          "idempotent",
+          "compensatable"
+        ],
+        "properties": {
+          "technology": "gRPC",
+          "type": "api"
+        },
+        "from": "acme-2030-transaction-core",
+        "provider": "checkout-service",
+        "consumer": "payment-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "checkout-to-order",
+        "name": "Create accepted order",
+        "tags": [
+          "synchronous",
+          "idempotent"
+        ],
+        "properties": {
+          "technology": "gRPC",
+          "type": "api"
+        },
+        "from": "acme-2030-transaction-core",
+        "provider": "checkout-service",
+        "consumer": "order-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "payment-to-provider",
+        "name": "Execute tokenized payment operation",
+        "tags": [
+          "synchronous",
+          "pci",
+          "idempotent"
+        ],
+        "properties": {
+          "circuit_breaker": "required",
+          "technology": "REST / JSON",
+          "timeout_seconds": "5",
+          "type": "api"
+        },
+        "from": "acme-2030-transaction-core",
+        "provider": "payment-service",
+        "consumer": "payment-gateway",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "checkout-to-tax",
+        "name": "Calculate and commit checkout tax",
+        "tags": [
+          "synchronous",
+          "external",
+          "idempotent",
+          "critical"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2030-transaction-core",
+        "provider": "checkout-service",
+        "consumer": "tax-api",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "payment-to-fraud",
+        "name": "Request payment fraud decision",
+        "tags": [
+          "synchronous",
+          "external",
+          "bounded-timeout",
+          "critical"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2030-transaction-core",
+        "provider": "payment-service",
+        "consumer": "fraud-api",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "payment-to-finance",
+        "name": "Submit settlement and reconciliation records",
+        "tags": [
+          "asynchronous-preferred",
+          "finance",
+          "idempotent"
+        ],
+        "properties": {
+          "technology": "Managed integration API",
+          "type": "integration"
+        },
+        "from": "acme-2030-transaction-core",
+        "provider": "payment-service",
+        "consumer": "finance-ledger",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "order-to-oms",
+        "name": "Submit accepted order to enterprise OMS",
+        "tags": [
+          "asynchronous-preferred",
+          "anti-corruption-layer",
+          "orders"
+        ],
+        "properties": {
+          "technology": "Managed integration API",
+          "type": "integration"
+        },
+        "from": "acme-2030-transaction-core",
+        "provider": "order-service",
+        "consumer": "enterprise-oms",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "inventory-to-erp",
+        "name": "Synchronize availability and reservation outcomes",
+        "tags": [
+          "asynchronous-preferred",
+          "anti-corruption-layer",
+          "inventory"
+        ],
+        "properties": {
+          "technology": "Managed integration API",
+          "type": "integration"
+        },
+        "from": "acme-2030-transaction-core",
+        "provider": "inventory-service",
+        "consumer": "erp-wms",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "order-to-events",
+        "name": "Publish order domain events",
+        "tags": [
+          "asynchronous",
+          "outbox",
+          "versioned-contract"
+        ],
+        "properties": {
+          "technology": "Kafka / Avro",
+          "type": "event"
+        },
+        "from": "acme-2030-transaction-core",
+        "provider": "order-service",
+        "consumer": "event-backbone",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "payment-to-events",
+        "name": "Publish payment domain events",
+        "tags": [
+          "asynchronous",
+          "outbox",
+          "versioned-contract"
+        ],
+        "properties": {
+          "technology": "Kafka / Avro",
+          "type": "event"
+        },
+        "from": "acme-2030-transaction-core",
+        "provider": "payment-service",
+        "consumer": "event-backbone",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "inventory-to-events",
+        "name": "Publish inventory and reservation events",
+        "tags": [
+          "asynchronous",
+          "versioned-contract"
+        ],
+        "properties": {
+          "technology": "Kafka / Avro",
+          "type": "event"
+        },
+        "from": "acme-2030-transaction-core",
+        "provider": "inventory-service",
+        "consumer": "event-backbone",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "legacy-adapter-to-order",
+        "name": "Translate legacy order administration",
+        "tags": [
+          "migration",
+          "temporary"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2030-transaction-core",
+        "provider": "legacy-integration-adapter",
+        "consumer": "order-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                5
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-integration-adapter"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "agent-to-admin",
+        "name": "Customer service administration",
+        "tags": [
+          "internal",
+          "synchronous"
+        ],
+        "properties": {
+          "technology": "HTTPS",
+          "type": "web"
+        },
+        "from": "acme-2031-complete-cutover",
+        "provider": "customer-service-agent",
+        "consumer": "admin-portal",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                5,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "merchandiser-to-admin",
+        "name": "Merchandising administration",
+        "tags": [
+          "internal",
+          "synchronous"
+        ],
+        "properties": {
+          "technology": "HTTPS",
+          "type": "web"
+        },
+        "from": "acme-2031-complete-cutover",
+        "provider": "merchandiser",
+        "consumer": "admin-portal",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                5,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "admin-to-catalog",
+        "name": "Manage catalog and assortment",
+        "tags": [
+          "synchronous",
+          "role-authorized"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2031-complete-cutover",
+        "provider": "admin-portal",
+        "consumer": "catalog-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                5,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "admin-to-customer",
+        "name": "Support customer accounts",
+        "tags": [
+          "synchronous",
+          "role-authorized",
+          "audited"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2031-complete-cutover",
+        "provider": "admin-portal",
+        "consumer": "customer-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                5,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "admin-to-order",
+        "name": "Support order lifecycle",
+        "tags": [
+          "synchronous",
+          "role-authorized",
+          "audited"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2031-complete-cutover",
+        "provider": "admin-portal",
+        "consumer": "order-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                5,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "admin-to-pricing",
+        "name": "Manage pricing and promotions",
+        "tags": [
+          "synchronous",
+          "role-authorized",
+          "audited"
+        ],
+        "properties": {
+          "technology": "REST / JSON",
+          "type": "api"
+        },
+        "from": "acme-2031-complete-cutover",
+        "provider": "admin-portal",
+        "consumer": "pricing-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                5,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "events-to-reporting",
+        "name": "Build operational reporting projections",
+        "tags": [
+          "asynchronous",
+          "idempotent-consumer",
+          "replayable"
+        ],
+        "properties": {
+          "technology": "Kafka / Avro",
+          "type": "event"
+        },
+        "from": "acme-2031-complete-cutover",
+        "provider": "event-backbone",
+        "consumer": "reporting-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                5,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "agent-to-reporting",
+        "name": "View operational reports",
+        "tags": [
+          "internal",
+          "read-only"
+        ],
+        "properties": {
+          "technology": "HTTPS",
+          "type": "web"
+        },
+        "from": "acme-2031-complete-cutover",
+        "provider": "customer-service-agent",
+        "consumer": "reporting-service",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                5,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      }
+    ],
+    "relationships": [
+      {
+        "id": "warehouse-operator-runs-fulfilment",
+        "action": "operates",
+        "source": "warehouse-operator",
+        "target": "enterprise-fulfilment",
+        "description": "Executes pick, pack, and ship work in the retained WMS.",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "merchandiser-curates-catalog",
+        "action": "curates",
+        "source": "merchandiser",
+        "target": "catalog-service",
+        "from": "acme-2028-catalog-search",
+        "description": "Manages assortment and product data in the target catalog once it is authoritative.",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -191,7 +191,7 @@ Owner doc: report.md. POC is the interaction donor.
 - [x] **Architect:** payload JSON spec (rows with pre-resolved integer
       positions + derived consequences) — unblocks D6. (report.md "Payload
       contract (v1)"; D6 prompt issued in delegation.md.)
-- [ ] Bundle scaffolding: React Flow v12 + elkjs worker + AG Grid, vite
+- [x] Bundle scaffolding: React Flow v12 + elkjs worker + AG Grid, vite
       single-file build at **pack build time**; wheel-packaged artifact;
       Archify styling + panels ported from POC; `arch.generate` template
       injection (~400 py). `→ D6` (parallel with D5)
@@ -243,6 +243,45 @@ None yet. Format: `branch-name — question being explored — outcome`.
    sparse early states (risk table; decide only with the acme report open).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-23** — D6 gate PASSED (architect review); committed by architect
+  (rule 8). Re-verified: 65 arch tests, `just lint` clean, standalone
+  `generate_report` loads zero runtime modules, template holds exactly one
+  payload token with no external `src`/`href` refs, `just build-arch-report`
+  rebuild is byte-identical (sha256 match), checked-in
+  `fixture-payload.json` equals `payload_file(acme)`. Code review: payload
+  compiler follows the contract's normative algorithm (per-position
+  `resolve()` sweep, `governing_row` identity, no reimplemented interval
+  semantics); segments coalesced, in-domain, `null`-unbounded; clip runs
+  split on cause change; `_serialize` drops per contract. report.py
+  validates-then-refuses like export, `</`-escapes, atomic replace. Both
+  D6 assumptions accepted (position mapping matches the contract verbatim;
+  direct-connections-only rendering is D7's job). Noted for D7: revision
+  rows sharing an id produce duplicate React Flow/ELK edge ids in the
+  scaffold's `connectionEdges` — harmless now (acme console clean), but D7's
+  roll-up must key edges properly. Next action: run D7 (prompt READY in
+  delegation.md).
+
+- **2026-08-23** — D6 complete. Added the deterministic payload compiler,
+  atomic report generator, `generate` / `payload` CLI commands,
+  `arch.generate`, the React Flow single-file bundle, checked-in acme dev
+  payload, and the report build recipe. Source: Python 224 / 400 lines;
+  TS/TSX 291 / 2,500 lines. Tests: 2 new payload/report controls; 65 arch
+  tests pass, 540 deselected; 27 smoke tests pass, 3,196 deselected;
+  `just lint` and `npm run build` are clean. The build emits one 1.93 MB
+  HTML template with one payload token and no external assets; a wheel-only
+  build contains that template and rebuilding it is byte-identical. Manual
+  `file://` check at 1440x900 and 390x844: 10 current systems render after
+  ELK union layout, selecting `legacy-commerce` opens its passport, light /
+  dark switching works, the console is clean, and the only network request
+  is the local HTML file. Assumptions: payload position 0 maps to resolver
+  `current`, and payload position i+1 maps to milestone i; D6 renders only
+  direct system-ended connections because endpoint roll-up belongs to D7;
+  elkjs's bundled embedded worker satisfies the inline-worker requirement;
+  the user's final "Do not commit" instruction and delegation rule 8
+  override the earlier request wording that mentioned a commit. No open
+  questions. Next action: architect D6 gate review; changes deliberately
+  left uncommitted.
 
 - **2026-08-23** — Client projection contract v1 committed (architect,
   authored in parallel with the user's executor running D6; no D6-owned

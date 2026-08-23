@@ -12,6 +12,7 @@ from rich.console import Console
 
 from .api import advance_file, diff_file, init_file, resolve_file, validate_file
 from .excel import export_workbook, generate_template, import_workbook
+from .report import generate_report, payload_file
 from .resolver import ResolverError, StateSelector
 from .yamlio import ArchitectureLoadError, dump_architecture, load_architecture
 
@@ -60,6 +61,12 @@ def _parser() -> argparse.ArgumentParser:
     excel_export.add_argument("workbook", type=Path)
     template = _command(commands, "template", "generate an empty Excel template")
     template.add_argument("workbook", type=Path)
+    generate = _command(commands, "generate", "generate an offline HTML report")
+    generate.add_argument("file", type=Path)
+    generate.add_argument("html", type=Path)
+    report_payload = _command(commands, "payload", "compile a report payload")
+    report_payload.add_argument("file", type=Path)
+    report_payload.add_argument("output", type=Path, nargs="?")
     return parser
 
 
@@ -113,9 +120,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             payload = import_workbook(args.workbook, args.file)
         elif args.command == "export":
             payload = export_workbook(args.file, args.workbook)
-        else:
+        elif args.command == "template":
             generate_template(args.workbook)
             payload = {"ok": True, "path": str(args.workbook)}
+        elif args.command == "generate":
+            payload = generate_report(args.file, args.html)
+        else:
+            report_payload = payload_file(args.file)
+            rendered = json.dumps(report_payload, ensure_ascii=False, indent=2) + "\n"
+            if args.output is None:
+                sys.stdout.write(rendered)
+                return 0
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(rendered, encoding="utf-8")
+            payload = {"ok": True, "input_path": str(args.file), "path": str(args.output)}
     except (ArchitectureLoadError, ResolverError, OSError, ValueError) as exc:
         payload = {"ok": False, "error": str(exc)}
     if args.json:

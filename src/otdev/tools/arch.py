@@ -9,6 +9,7 @@ __all__ = [
     "convert",
     "diff",
     "export",
+    "generate",
     "import_excel",
     "init",
     "resolve",
@@ -25,6 +26,7 @@ from otdev.tools._arch.v3.api import (
     validate_file,
 )
 from otdev.tools._arch.v3.excel import export_workbook, import_workbook
+from otdev.tools._arch.v3.report import generate_report
 from otdev.tools._arch.v3.resolver import StateSelector
 from otpack import LogSpan, resolve_cwd_path
 
@@ -110,5 +112,13 @@ def export(*, input_path: str, output_path: str) -> dict[str, Any]:
     """Export canonical schema-v3 YAML to an Excel workbook."""
     with LogSpan(span="arch.export", inputPath=input_path, outputPath=output_path):
         return export_workbook(
+            resolve_cwd_path(input_path), resolve_cwd_path(output_path)
+        )
+
+
+def generate(*, input_path: str, output_path: str) -> dict[str, Any]:
+    """Generate a self-contained architecture HTML report."""
+    with LogSpan(span="arch.generate", inputPath=input_path, outputPath=output_path):
+        return generate_report(
             resolve_cwd_path(input_path), resolve_cwd_path(output_path)
         )
