@@ -142,7 +142,7 @@ Owner doc: schema.md.
       `→ D2`
 - [x] YAML read/write, deterministic output (harvest v2 `write.py` patterns).
       `→ D2`
-- [ ] **Architect:** resolver signatures + authoritative semantics test
+- [x] **Architect:** resolver signatures + authoritative semantics test
       suite (interval edge cases: gap reintroduction, milestone not on
       timeline, from==until rejection, clipping chains, revision diffs,
       advance rewrites). This is the phase's design core — not delegated.
@@ -233,6 +233,22 @@ None yet. Format: `branch-name — question being explored — outcome`.
    sparse early states (risk table; decide only with the acme report open).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-23** — D2 gate PASSED (architect review: tests/lint green, acme
+  fixture round-trips with model equality + idempotent dump, CLI runs with
+  zero runtime modules loaded; executor's `components: []` schema.md example
+  fix accepted). D3 spec committed by architect: `resolver.py` signatures +
+  docstrings (selector, timeline view, revision grouping, clipping with
+  root-cause `clipped_by`, diff, advance) and the 42-test authoritative
+  suite `test_arch_v3_resolver.py` (all failing NotImplementedError, as
+  intended). Design decisions encoded: sole declared timeline is the default
+  selector target (schema.md updated); `end` == `current` at zero
+  milestones; clip causes name the authored root (provider-before-consumer,
+  source-before-target tie-break); diff excludes id/from/until, properties
+  diffed per-key; advance drops emptied timelines. Process change: executors
+  no longer commit — they leave the worktree dirty and the architect commits
+  after the gate review (delegation.md rule 8). D3 flipped to READY. Next
+  action: run D3.
 
 - **2026-08-23** - D2 complete. Added schema-v3 Pydantic models, strict
   location-aware YAML loading, deterministic YAML writing, and the seed

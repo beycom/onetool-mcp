@@ -268,8 +268,10 @@ at: end
 ```
 
 `current`, a milestone id, or `end` (the last milestone of the timeline —
-v2's Target State). `timeline` may be omitted when only the implicit timeline
-exists. An optional `compare` key takes the same grammar and selects the diff
+v2's Target State; with zero milestones, `end` equals `current`). `timeline`
+may be omitted when only the implicit timeline exists or when exactly one
+timeline is declared (that one is then selected); with several declared
+timelines it is required. An optional `compare` key takes the same grammar and selects the diff
 origin — resolving v2's open comparison-origin question with the same
 selector rather than a new concept.
 

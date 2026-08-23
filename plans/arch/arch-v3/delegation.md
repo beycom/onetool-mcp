@@ -18,7 +18,7 @@ below is the template it will be issued from.
 | --- | --- | --- | --- |
 | D1 | Phase 0: skeleton + fixture source dump | READY | now |
 | D2 | Phase 1a: models + YAML I/O | READY | D1 |
-| D3 | Phase 1b: resolver (filter/clip/diff/advance) | GATED on architect test suite | D2 |
+| D3 | Phase 1b: resolver (filter/clip/diff/advance) | READY (spec committed) | D2 |
 | D4 | Phase 1c: validation + pack tools | READY | D3 |
 | D5 | Phase 2: Excel adapter | READY | phase-1 gate |
 | D6 | Phase 3a: report bundle scaffold + POC port | GATED on payload spec | phase-1 gate (parallel with D5) |
@@ -66,8 +66,9 @@ on branch feature/arch-v3. Rules:
    deliberately deferred (see "Speed mode" in plan.md).
 8. When done: append a dated entry to the progress log in
    plans/arch/arch-v3/plan.md (what landed, source line count vs budget, test
-   count, open questions), then commit all work on feature/arch-v3 with a
-   conventional-commit message. Do not push.
+   count, open questions). Do NOT commit and do NOT push — leave the worktree
+   dirty; the architect commits after the gate review. Never run
+   git add/commit/stash/restore/checkout on files you did not create.
 ```
 
 ## D1 — Phase 0: skeleton + fixture source dump (READY)
