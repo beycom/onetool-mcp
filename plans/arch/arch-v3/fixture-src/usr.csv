@@ -1,0 +1,5 @@
+id,name,change,description,tags,properties,kind
+customer,Customer,,"Shopper browsing, purchasing, and managing an account.",[external],,actor
+customer-service-agent,Customer Service Agent,,Internal user assisting customers and orders.,[internal],,actor
+merchandiser,Merchandiser,,"Internal user managing catalog, assortment, and pricing.",[internal],,actor
+warehouse-operator,Warehouse Operator,,Internal user executing fulfilment work in the retained WMS.,[internal],,actor

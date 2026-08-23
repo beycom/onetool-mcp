@@ -26,8 +26,15 @@ lands; a fresh session should be able to resume from this file alone.
 | v1 implementation (to be replaced) | `src/otdev/tools/arch.py` + `src/otdev/tools/_arch/` (models, ingest, validate, generate, exporters, roundtrip, …) |
 | v2 donor code (do NOT build on; harvest only) | worktree `[STUCK]arch-v2`, branch `feature/arch-v2`, pushed to origin, clean. `src/otdev/tools/_arch/v2/` — 8,761 lines |
 | Report interaction reference | `plans/arch/react-flow-poc/` (vite app: `ArchitectureCanvas.tsx`, styles, panels) |
-| Real dataset for the phase-1 port | `plans/arch/wip/acme-arch-v2.xlsx` |
+| Real dataset for the phase-1 port | `plans/arch/wip/acme-arch-v2.xlsx` (dumped to `plans/arch/arch-v3/fixture-src/`) |
+| Canonical v3 fixture | `tests/unit/tools/fixtures/arch/acme.yaml` |
 | v2 design history (reference only) | `plans/arch/arch-v2/` incl. `grill/` |
+
+**Tooling hints (interactive/architect work):** use the OneTool `excel` pack
+(`__ot excel`) to read/inspect workbooks and the `convert` pack (`__ot
+convert`) for format conversions — don't hand-roll openpyxl scripts for
+inspection. (In-pack _arch/v3 code still uses openpyxl directly, per the
+design docs.)
 
 **Donor shortlist from v2** (delivery.md rule 5 — harvest, don't refactor):
 Excel cell parsing / header normalization (`normalize.py`, `load.py`),
@@ -118,12 +125,12 @@ it. Three rules keep iteration fast:
 
 ## Phase 0 — Setup (small)
 
-- [ ] Confirm layout decision above (or record the alternative here).
-- [ ] Skeleton `_arch/v3/` package + dump acme workbook sheets to CSV for
-      fixture design. `→ D1`
-- [ ] **Architect:** design the canonical v3 acme fixture
-      (`tests/.../fixtures/acme.yaml`) from the dump — at least one
-      milestone, one revision row, one `until` retirement — the living
+- [x] Confirm layout decision above (or record the alternative here).
+- [x] Skeleton `_arch/v3/` package + dump acme workbook sheets to CSV for
+      fixture design. `→ D1` (done inline by architect — trivial)
+- [x] **Architect:** design the canonical v3 acme fixture
+      (`tests/unit/tools/fixtures/arch/acme.yaml`) from the dump — at least
+      one milestone, one revision row, one `until` retirement — the living
       fixture for every gate.
 
 ## Phase 1 — Model, resolver, YAML (budget: 1,800 py lines)
@@ -226,6 +233,27 @@ None yet. Format: `branch-name — question being explored — outcome`.
    sparse early states (risk table; decide only with the acme report open).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-23** — Phase 0 complete. Layout confirmed as the recommended
+  default. D1 executed inline by the architect (skeleton
+  `src/otdev/tools/_arch/v3/__init__.py`; all 7 sheets dumped to
+  `fixture-src/` + README). Canonical fixture designed and generated at
+  `tests/unit/tools/fixtures/arch/acme.yaml` (1,920 lines): 5 milestones
+  (2027–2031 strangler migration), 1 explicit timeline `program`, 11 systems /
+  30 subsystems / 55 components / 4 users / 63 interfaces / 2 relationships;
+  7 revision rows across 6 ids, 15 authored `until` retirements, and the
+  legacy-commerce `until` exercising computed clipping of the whole monolith
+  tree. Conversion decisions: v2 sparse `changed` patches materialized into
+  complete revision rows; sparse `removed` rows folded into `until` on the
+  newest revision; `technology`/`type`/`group` columns → properties; bool/int
+  property values stringified; `change_note`/`kind`/`direction`(→
+  `call_direction`) mapped or dropped; milestone names authored by the
+  architect; the 2 relationships are architect-invented (source workbook had
+  none) — veto at the phase-1 gate if unwanted. Fixture proto-validated
+  (refs, revision rules, no nulls, property types, timeline order). Converter
+  was throwaway scratchpad tooling. Tooling hint added: use `__ot excel` /
+  `__ot convert` for interactive workbook reading and conversions. Next
+  action: run D2 (models + YAML I/O).
 
 - **2026-08-23** — Out-of-pack changes permitted when they're the better
   fix (e.g. extend an otpack utility rather than work around it):

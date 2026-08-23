@@ -1,0 +1,13 @@
+id,change,name,description,tags,group,properties,change_type,change_note
+legacy-commerce,,Legacy Commerce Platform,"Customer storefront, back-office administration, and all commerce domains in one deployable estate.",[legacy;ecommerce;strangler-source],,"{""availability_target"":""99.9%"",""criticality"":""tier-1"",""lifecycle"":""migrate""}",,
+enterprise-fulfilment,,Enterprise Fulfilment,Existing ERP and warehouse management capabilities.,[enterprise;fulfilment],,"{""criticality"":""tier-1"",""lifecycle"":""retain""}",,
+enterprise-order-management,,Enterprise Order Management,"Internal enterprise OMS coordinating downstream fulfilment, exceptions, and cross-channel order visibility.",[internal;orders;system-of-record],[sor],"{""criticality"":""tier-1"",""lifecycle"":""retain"",""ownership_boundary"":""enterprise-fulfilment-order""}",,
+enterprise-finance,,Enterprise Finance,"Internal finance ledger, settlement, reconciliation, and revenue accounting platform.",[internal;finance;system-of-record],[sor],"{""criticality"":""tier-1"",""lifecycle"":""retain""}",,
+payment-provider,,Payment Service Provider,"External payment authorization, capture, refund, and token vault services.",[external;payments;pci],,"{""data_classification"":""pci"",""lifecycle"":""retain""}",,
+customer-engagement,,Customer Engagement Provider,External email and SMS delivery platform.,[external;communications],,"{""lifecycle"":""retain""}",,
+enterprise-identity,,Enterprise Identity,Customer and workforce authentication provider.,[enterprise;identity],,"{""criticality"":""tier-1"",""lifecycle"":""retain""}",,
+analytics-provider,,Digital Analytics Provider,External SaaS for consented web and product analytics.,[external;analytics;saas],,"{""data_classification"":""pseudonymous"",""lifecycle"":""retain""}",,
+tax-provider,,Tax Calculation Provider,"External tax jurisdiction, calculation, and audit API.",[external;tax;saas],,"{""criticality"":""tier-1"",""lifecycle"":""retain""}",,
+fraud-provider,,Fraud Decision Provider,External real-time payment and account fraud scoring service.,[external;fraud;saas],,"{""criticality"":""tier-1"",""lifecycle"":""retain""}",,
+commerce-platform,acme-2027-edge-foundation,Digital Commerce Platform,Target cloud-native commerce platform introduced alongside the legacy system.,[target;ecommerce;microservices],,"{""availability_target"":""99.95%"",""criticality"":""tier-1"",""lifecycle"":""strategic""}",added,Create the target boundary without moving domain ownership yet.
+legacy-commerce,acme-2031-complete-cutover,,,,,,removed,"Archive required records, revoke routes and credentials, then decommission compute, database, cache, and batch infrastructure."

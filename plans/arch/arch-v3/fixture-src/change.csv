@@ -1,0 +1,6 @@
+id,description,group
+acme-2027-edge-foundation,,[year;ecom;code]
+acme-2028-catalog-search,,[year;ecom]
+acme-2029-customer-cart-pricing,,[year;ecom]
+acme-2030-transaction-core,,[year;ecom;code]
+acme-2031-complete-cutover,,[year;ecom;migrate]

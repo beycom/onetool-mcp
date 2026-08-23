@@ -1,0 +1,1920 @@
+schema_version: 3
+milestones:
+- id: acme-2027-edge-foundation
+  name: Edge Foundation
+  tags:
+  - year
+  - ecom
+  - code
+- id: acme-2028-catalog-search
+  name: Catalog and Search
+  tags:
+  - year
+  - ecom
+- id: acme-2029-customer-cart-pricing
+  name: Customer, Cart and Pricing
+  tags:
+  - year
+  - ecom
+- id: acme-2030-transaction-core
+  name: Transaction Core
+  tags:
+  - year
+  - ecom
+  - code
+- id: acme-2031-complete-cutover
+  name: Complete Cutover
+  tags:
+  - year
+  - ecom
+  - migrate
+timelines:
+- id: program
+  milestones:
+  - acme-2027-edge-foundation
+  - acme-2028-catalog-search
+  - acme-2029-customer-cart-pricing
+  - acme-2030-transaction-core
+  - acme-2031-complete-cutover
+systems:
+- id: legacy-commerce
+  name: Legacy Commerce Platform
+  until: acme-2031-complete-cutover
+  description: Customer storefront, back-office administration, and all commerce domains in
+    one deployable estate.
+  tags:
+  - legacy
+  - ecommerce
+  - strangler-source
+  properties:
+    availability_target: 99.9%
+    criticality: tier-1
+    lifecycle: migrate
+- id: enterprise-fulfilment
+  name: Enterprise Fulfilment
+  description: Existing ERP and warehouse management capabilities.
+  tags:
+  - enterprise
+  - fulfilment
+  properties:
+    criticality: tier-1
+    lifecycle: retain
+- id: enterprise-order-management
+  name: Enterprise Order Management
+  description: Internal enterprise OMS coordinating downstream fulfilment, exceptions, and
+    cross-channel order visibility.
+  tags:
+  - internal
+  - orders
+  - system-of-record
+  properties:
+    criticality: tier-1
+    group: sor
+    lifecycle: retain
+    ownership_boundary: enterprise-fulfilment-order
+- id: enterprise-finance
+  name: Enterprise Finance
+  description: Internal finance ledger, settlement, reconciliation, and revenue accounting
+    platform.
+  tags:
+  - internal
+  - finance
+  - system-of-record
+  properties:
+    criticality: tier-1
+    group: sor
+    lifecycle: retain
+- id: payment-provider
+  name: Payment Service Provider
+  description: External payment authorization, capture, refund, and token vault services.
+  tags:
+  - external
+  - payments
+  - pci
+  properties:
+    data_classification: pci
+    lifecycle: retain
+- id: customer-engagement
+  name: Customer Engagement Provider
+  description: External email and SMS delivery platform.
+  tags:
+  - external
+  - communications
+  properties:
+    lifecycle: retain
+- id: enterprise-identity
+  name: Enterprise Identity
+  description: Customer and workforce authentication provider.
+  tags:
+  - enterprise
+  - identity
+  properties:
+    criticality: tier-1
+    lifecycle: retain
+- id: analytics-provider
+  name: Digital Analytics Provider
+  description: External SaaS for consented web and product analytics.
+  tags:
+  - external
+  - analytics
+  - saas
+  properties:
+    data_classification: pseudonymous
+    lifecycle: retain
+- id: tax-provider
+  name: Tax Calculation Provider
+  description: External tax jurisdiction, calculation, and audit API.
+  tags:
+  - external
+  - tax
+  - saas
+  properties:
+    criticality: tier-1
+    lifecycle: retain
+- id: fraud-provider
+  name: Fraud Decision Provider
+  description: External real-time payment and account fraud scoring service.
+  tags:
+  - external
+  - fraud
+  - saas
+  properties:
+    criticality: tier-1
+    lifecycle: retain
+- id: commerce-platform
+  name: Digital Commerce Platform
+  from: acme-2027-edge-foundation
+  description: Target cloud-native commerce platform introduced alongside the legacy system.
+  tags:
+  - target
+  - ecommerce
+  - microservices
+  properties:
+    availability_target: 99.95%
+    criticality: tier-1
+    lifecycle: strategic
+subsystems:
+- id: commerce-monolith
+  name: Commerce Monolith
+  system: legacy-commerce
+  description: Single Java deployment containing storefront, administration, catalog, cart,
+    checkout, customer, and order logic.
+  tags:
+  - legacy
+  - monolith
+  - stateful
+  properties:
+    criticality: tier-1
+    deployment: virtual-machines
+    owner: Commerce Core Team
+    release_cadence: monthly
+    technology: Java / Spring MVC
+- id: commerce-monolith
+  name: Commerce Monolith
+  system: legacy-commerce
+  from: acme-2027-edge-foundation
+  description: Legacy commerce deployment reachable only behind strangler-controlled routes
+    and adapters.
+  tags:
+  - legacy
+  - monolith
+  - stateful
+  properties:
+    criticality: tier-1
+    deployment: virtual-machines
+    owner: Commerce Core Team
+    release_cadence: monthly
+    technology: Java / Spring MVC
+- id: erp-wms
+  name: ERP and WMS
+  system: enterprise-fulfilment
+  description: Inventory master, warehouse execution, and fulfilment planning.
+  tags:
+  - system-of-record
+  - fulfilment
+  properties:
+    owner: Supply Chain Technology
+    technology: Commercial ERP
+- id: enterprise-oms
+  name: Enterprise OMS
+  system: enterprise-order-management
+  description: Enterprise order routing, exception handling, and downstream fulfilment coordination.
+  tags:
+  - internal
+  - orders
+  - system-of-record
+  properties:
+    owner: Order Operations Technology
+    technology: Commercial OMS
+- id: finance-ledger
+  name: Finance Ledger and Reconciliation
+  system: enterprise-finance
+  description: Enterprise settlement, reconciliation, and accounting integration.
+  tags:
+  - internal
+  - finance
+  - system-of-record
+  properties:
+    owner: Finance Technology
+    technology: Finance ERP
+- id: payment-gateway
+  name: Payment Gateway API
+  system: payment-provider
+  description: Tokenized payment API hosted by the external provider.
+  tags:
+  - external-api
+  - pci
+  properties:
+    owner: Payment Provider
+    technology: REST API
+- id: messaging-provider
+  name: Messaging Provider API
+  system: customer-engagement
+  description: Email and SMS delivery API.
+  tags:
+  - external-api
+  properties:
+    owner: Engagement Provider
+    technology: REST API
+- id: identity-provider
+  name: Identity Provider
+  system: enterprise-identity
+  description: OAuth 2.0 and OpenID Connect identity service.
+  tags:
+  - identity
+  - security
+  properties:
+    owner: Identity Platform Team
+    technology: OIDC
+- id: digital-analytics-api
+  name: Digital Analytics API
+  system: analytics-provider
+  description: External analytics event collection and reporting API.
+  tags:
+  - external-api
+  - analytics
+  properties:
+    owner: Analytics Provider
+    technology: HTTPS collection API
+- id: tax-api
+  name: Tax Calculation API
+  system: tax-provider
+  description: External tax quote, commit, void, and audit API.
+  tags:
+  - external-api
+  - tax
+  properties:
+    owner: Tax Provider
+    technology: REST API
+- id: fraud-api
+  name: Fraud Decision API
+  system: fraud-provider
+  description: External fraud score and decision API.
+  tags:
+  - external-api
+  - fraud
+  properties:
+    owner: Fraud Provider
+    technology: REST API
+- id: commerce-edge
+  name: Commerce Edge
+  system: commerce-platform
+  from: acme-2027-edge-foundation
+  description: CDN, WAF, TLS termination, and route-based strangler control plane.
+  tags:
+  - edge
+  - security
+  - strangler
+  properties:
+    deployment: managed-cloud
+    owner: Platform Edge Team
+    technology: Managed CDN / WAF / API gateway
+- id: storefront-bff
+  name: Storefront BFF
+  system: commerce-platform
+  from: acme-2027-edge-foundation
+  description: Channel-oriented API composition layer for the web storefront.
+  tags:
+  - bff
+  - stateless
+  properties:
+    deployment: kubernetes
+    owner: Storefront Team
+    scaling: horizontal
+    technology: TypeScript / Node.js
+- id: event-backbone
+  name: Commerce Event Backbone
+  system: commerce-platform
+  from: acme-2027-edge-foundation
+  description: Durable domain-event transport with schema governance and replay.
+  tags:
+  - eventing
+  - platform
+  properties:
+    delivery_semantics: at-least-once
+    owner: Platform Messaging Team
+    technology: Managed Kafka
+- id: observability-platform
+  name: Commerce Observability Platform
+  system: commerce-platform
+  from: acme-2027-edge-foundation
+  description: Central metrics, logs, traces, alerting, and service-level objectives.
+  tags:
+  - observability
+  - platform
+  properties:
+    owner: Site Reliability Engineering
+    technology: OpenTelemetry / managed observability
+- id: legacy-integration-adapter
+  name: Legacy Anti-corruption Layer
+  system: commerce-platform
+  from: acme-2027-edge-foundation
+  until: acme-2031-complete-cutover
+  description: Stable adapters translating legacy concepts and contracts into target-domain
+    APIs and events.
+  tags:
+  - anti-corruption-layer
+  - temporary
+  - strangler
+  properties:
+    lifecycle: retire-in-year-5
+    owner: Migration Enablement Team
+    technology: Java / integration runtime
+- id: analytics-event-adapter
+  name: Analytics Event Adapter
+  system: commerce-platform
+  from: acme-2027-edge-foundation
+  description: Consent-aware, schema-controlled adapter for external digital analytics.
+  tags:
+  - analytics
+  - privacy
+  - anti-corruption-layer
+  properties:
+    owner: Digital Analytics Team
+    pii: prohibited
+    technology: TypeScript / streaming runtime
+- id: catalog-service
+  name: Catalog Service
+  system: commerce-platform
+  from: acme-2028-catalog-search
+  description: System of record for products, categories, assortment, and sellability.
+  tags:
+  - microservice
+  - bounded-context-catalog
+  properties:
+    criticality: tier-1
+    deployment: kubernetes
+    owner: Catalog Team
+    technology: Kotlin / Spring Boot
+- id: search-service
+  name: Search Service
+  system: commerce-platform
+  from: acme-2028-catalog-search
+  description: Product search, faceting, ranking, and query suggestions from event-fed projections.
+  tags:
+  - microservice
+  - bounded-context-search
+  - cqrs-read-model
+  properties:
+    deployment: kubernetes
+    owner: Search Team
+    technology: Java / OpenSearch
+- id: catalog-sync-adapter
+  name: Catalog Migration Adapter
+  system: commerce-platform
+  from: acme-2028-catalog-search
+  until: acme-2031-complete-cutover
+  description: Temporary idempotent translation and reconciliation between legacy merchandising
+    and Catalog Service.
+  tags:
+  - migration-adapter
+  - temporary
+  properties:
+    lifecycle: retire-in-year-5
+    owner: Migration Enablement Team
+    technology: Java / Kafka Connect
+- id: customer-service
+  name: Customer Service
+  system: commerce-platform
+  from: acme-2029-customer-cart-pricing
+  description: Customer profile, addresses, preferences, and identity linkage.
+  tags:
+  - microservice
+  - bounded-context-customer
+  properties:
+    data_classification: confidential
+    owner: Customer Accounts Team
+    technology: Kotlin / Spring Boot
+- id: cart-service
+  name: Cart Service
+  system: commerce-platform
+  from: acme-2029-customer-cart-pricing
+  description: Durable shopping carts with optimistic concurrency and expiry policies.
+  tags:
+  - microservice
+  - bounded-context-cart
+  properties:
+    criticality: tier-1
+    owner: Cart Team
+    technology: Go
+- id: pricing-service
+  name: Pricing Service
+  system: commerce-platform
+  from: acme-2029-customer-cart-pricing
+  description: Effective prices, promotions, eligibility, and explainable calculation results.
+  tags:
+  - microservice
+  - bounded-context-pricing
+  properties:
+    owner: Pricing Team
+    technology: Java / Spring Boot
+- id: notification-service
+  name: Notification Service
+  system: commerce-platform
+  from: acme-2029-customer-cart-pricing
+  description: Template, preference, deduplication, and delivery orchestration for customer
+    communications.
+  tags:
+  - microservice
+  - bounded-context-notification
+  - event-driven
+  properties:
+    owner: Customer Communications Team
+    technology: TypeScript / Node.js
+- id: checkout-service
+  name: Checkout Orchestrator
+  system: commerce-platform
+  from: acme-2030-transaction-core
+  description: Explicit saga coordinating validation, reservation, payment, order creation,
+    and compensations.
+  tags:
+  - microservice
+  - bounded-context-checkout
+  - saga-orchestrator
+  properties:
+    criticality: tier-1
+    idempotency: required
+    owner: Checkout Team
+    technology: Java / workflow engine
+- id: order-service
+  name: Order Service
+  system: commerce-platform
+  from: acme-2030-transaction-core
+  description: System of record for accepted orders and order lifecycle state.
+  tags:
+  - microservice
+  - bounded-context-order
+  properties:
+    criticality: tier-1
+    owner: Order Team
+    technology: Kotlin / Spring Boot
+- id: payment-service
+  name: Payment Service
+  system: commerce-platform
+  from: acme-2030-transaction-core
+  description: PCI-minimized payment intents, authorization, capture, refund, and reconciliation.
+  tags:
+  - microservice
+  - bounded-context-payment
+  - pci-scope-minimized
+  properties:
+    criticality: tier-1
+    owner: Payments Team
+    technology: Java / Spring Boot
+- id: inventory-service
+  name: Inventory Service
+  system: commerce-platform
+  from: acme-2030-transaction-core
+  description: Commerce availability projection and time-bound stock reservations synchronized
+    with ERP/WMS.
+  tags:
+  - microservice
+  - bounded-context-inventory
+  properties:
+    criticality: tier-1
+    owner: Inventory Team
+    technology: Go
+- id: admin-portal
+  name: Commerce Administration Portal
+  system: commerce-platform
+  from: acme-2031-complete-cutover
+  description: Role-based customer service and merchandising experience composed over target-domain
+    APIs.
+  tags:
+  - frontend
+  - internal
+  - micro-frontend-ready
+  properties:
+    authentication: enterprise-identity
+    owner: Commerce Operations Experience Team
+    technology: React / TypeScript
+- id: reporting-service
+  name: Commerce Reporting Service
+  system: commerce-platform
+  from: acme-2031-complete-cutover
+  description: Operational reporting over event-fed read models; never queries service databases
+    directly.
+  tags:
+  - microservice
+  - reporting
+  - cqrs-read-model
+  properties:
+    owner: Commerce Data Products Team
+    technology: Python / SQL
+components:
+- id: legacy-web-ui
+  name: Server-rendered Storefront
+  subsystem: commerce-monolith
+  description: Customer web experience rendered inside the monolith.
+  tags:
+  - legacy
+  - frontend
+  properties:
+    technology: JSP / JavaScript
+- id: legacy-catalog-module
+  name: Catalog and Merchandising Module
+  subsystem: commerce-monolith
+  description: Product, category, assortment, and merchandising logic.
+  tags:
+  - legacy
+  - bounded-context-catalog
+  properties:
+    technology: Java module
+- id: legacy-catalog-module
+  name: Legacy Catalog Compatibility Facade
+  subsystem: commerce-monolith
+  from: acme-2028-catalog-search
+  description: Read-only compatibility facade delegating canonical product changes through
+    the migration adapter.
+  tags:
+  - legacy
+  - bounded-context-catalog
+  properties:
+    technology: Java module
+- id: legacy-search-index
+  name: Embedded Search Index
+  subsystem: commerce-monolith
+  until: acme-2028-catalog-search
+  description: Locally managed product search index refreshed by batch jobs.
+  tags:
+  - legacy
+  - search
+  properties:
+    technology: Embedded search engine
+- id: legacy-cart-module
+  name: Cart and Pricing Module
+  subsystem: commerce-monolith
+  description: Session cart, promotions, and price calculation.
+  tags:
+  - legacy
+  - bounded-context-cart
+  properties:
+    technology: Java module
+- id: legacy-cart-module
+  name: Legacy Cart and Pricing Compatibility Facade
+  subsystem: commerce-monolith
+  from: acme-2029-customer-cart-pricing
+  description: Temporary facade delegating cart and price calculations to target services.
+  tags:
+  - legacy
+  - bounded-context-cart
+  properties:
+    technology: Java module
+- id: legacy-customer-module
+  name: Customer Account Module
+  subsystem: commerce-monolith
+  description: Customer profile, addresses, preferences, and authentication integration.
+  tags:
+  - legacy
+  - bounded-context-customer
+  properties:
+    technology: Java module
+- id: legacy-customer-module
+  name: Legacy Customer Compatibility Facade
+  subsystem: commerce-monolith
+  from: acme-2029-customer-cart-pricing
+  description: Temporary facade delegating profile operations to Customer Service.
+  tags:
+  - legacy
+  - bounded-context-customer
+  properties:
+    technology: Java module
+- id: legacy-checkout-module
+  name: Checkout and Payment Module
+  subsystem: commerce-monolith
+  description: Synchronous checkout transaction coordinating payment and order creation.
+  tags:
+  - legacy
+  - bounded-context-checkout
+  properties:
+    technology: Java module
+- id: legacy-checkout-module
+  name: Legacy Checkout Compatibility Facade
+  subsystem: commerce-monolith
+  from: acme-2030-transaction-core
+  description: Non-public compatibility facade delegating checkout to the target orchestrator.
+  tags:
+  - legacy
+  - bounded-context-checkout
+  properties:
+    technology: Java module
+- id: legacy-order-module
+  name: Order and Fulfilment Module
+  subsystem: commerce-monolith
+  description: Order lifecycle and point-to-point ERP integration.
+  tags:
+  - legacy
+  - bounded-context-order
+  properties:
+    technology: Java module
+- id: legacy-order-module
+  name: Legacy Order Compatibility Facade
+  subsystem: commerce-monolith
+  from: acme-2030-transaction-core
+  description: Temporary back-office facade reading and updating orders through Order Service.
+  tags:
+  - legacy
+  - bounded-context-order
+  properties:
+    technology: Java module
+- id: legacy-admin-module
+  name: Back-office Administration Module
+  subsystem: commerce-monolith
+  description: Customer service and merchandising administration screens.
+  tags:
+  - legacy
+  - admin
+  properties:
+    technology: Java module
+- id: legacy-commerce-db
+  name: Shared Commerce Database
+  subsystem: commerce-monolith
+  description: Shared relational schema used by every commerce domain.
+  tags:
+  - legacy
+  - database
+  - shared-database
+  properties:
+    backup: point-in-time-recovery
+    data_classification: confidential
+    migration_rule: no-new-service-direct-access
+    technology: PostgreSQL
+- id: legacy-session-cache
+  name: Shared Session Cache
+  subsystem: commerce-monolith
+  description: Distributed web session and coarse application cache.
+  tags:
+  - legacy
+  - cache
+  properties:
+    technology: Redis
+- id: legacy-batch-jobs
+  name: Commerce Batch Jobs
+  subsystem: commerce-monolith
+  description: Scheduled catalog, search, order, and integration processing.
+  tags:
+  - legacy
+  - batch
+  properties:
+    technology: Java scheduler
+- id: erp-database
+  name: ERP Operational Database
+  subsystem: erp-wms
+  description: Enterprise inventory and fulfilment system of record.
+  tags:
+  - database
+  - system-of-record
+  properties:
+    technology: Relational database
+- id: oms-database
+  name: OMS Operational Database
+  subsystem: enterprise-oms
+  description: Enterprise order routing and fulfilment state.
+  tags:
+  - database
+  - system-of-record
+  properties:
+    technology: Relational database
+- id: finance-ledger-db
+  name: Finance Ledger Database
+  subsystem: finance-ledger
+  description: Enterprise accounting, settlement, and reconciliation records.
+  tags:
+  - database
+  - system-of-record
+  properties:
+    technology: Relational database
+- id: psp-token-vault
+  name: Provider Token Vault
+  subsystem: payment-gateway
+  description: Provider-managed PCI token vault; ACME does not store cardholder data.
+  tags:
+  - pci
+  - managed
+  properties:
+    technology: Managed vault
+- id: identity-directory
+  name: Identity Directory
+  subsystem: identity-provider
+  description: Managed customer and workforce identity directory.
+  tags:
+  - identity
+  - managed
+  properties:
+    technology: Managed directory
+- id: analytics-event-store
+  name: Provider Analytics Event Store
+  subsystem: digital-analytics-api
+  description: Provider-managed pseudonymous analytics event storage.
+  tags:
+  - managed
+  - analytics
+  properties:
+    technology: Managed analytics storage
+- id: provider-tax-rules
+  name: Provider Tax Rules
+  subsystem: tax-api
+  description: Provider-managed jurisdiction and tax-rule data.
+  tags:
+  - managed
+  - tax
+  properties:
+    technology: Managed rules engine
+- id: provider-fraud-models
+  name: Provider Fraud Models
+  subsystem: fraud-api
+  description: Provider-managed fraud features and decision models.
+  tags:
+  - managed
+  - fraud
+  properties:
+    technology: Managed ML platform
+- id: edge-waf-cdn
+  name: WAF and CDN
+  subsystem: commerce-edge
+  from: acme-2027-edge-foundation
+  description: Managed perimeter protection, caching, bot control, and DDoS mitigation.
+  tags:
+  - security
+  - infrastructure
+  properties:
+    technology: Managed edge service
+- id: strangler-route-config
+  name: Strangler Route Configuration
+  subsystem: commerce-edge
+  from: acme-2027-edge-foundation
+  description: Version-controlled routing rules that move capabilities from legacy to target
+    services.
+  tags:
+  - configuration
+  - strangler
+  properties:
+    technology: Gateway configuration
+- id: bff-response-cache
+  name: BFF Response Cache
+  subsystem: storefront-bff
+  from: acme-2027-edge-foundation
+  description: Short-lived cache for safe catalog and navigation responses.
+  tags:
+  - cache
+  - infrastructure
+  properties:
+    technology: Redis
+- id: event-stream-cluster
+  name: Event Stream Cluster
+  subsystem: event-backbone
+  from: acme-2027-edge-foundation
+  description: Multi-zone durable event log with retention and replay.
+  tags:
+  - event-store
+  - infrastructure
+  properties:
+    technology: Managed Kafka
+- id: event-schema-registry
+  name: Event Schema Registry
+  subsystem: event-backbone
+  from: acme-2027-edge-foundation
+  description: Versioned compatibility checks for domain event contracts.
+  tags:
+  - governance
+  - infrastructure
+  properties:
+    technology: Schema registry
+- id: telemetry-store
+  name: Telemetry Store
+  subsystem: observability-platform
+  from: acme-2027-edge-foundation
+  description: Managed metrics, logs, and traces with production retention policies.
+  tags:
+  - observability
+  - infrastructure
+  properties:
+    technology: Managed observability storage
+- id: anti-corruption-runtime
+  name: Anti-corruption Adapter Runtime
+  subsystem: legacy-integration-adapter
+  from: acme-2027-edge-foundation
+  description: Translation, retry, circuit-breaker, and contract-isolation runtime.
+  tags:
+  - adapter
+  - resilience
+  properties:
+    technology: Integration service
+- id: analytics-consent-filter
+  name: Analytics Consent and Data Filter
+  subsystem: analytics-event-adapter
+  from: acme-2027-edge-foundation
+  description: Enforces consent, allowlisted fields, pseudonymous identifiers, and analytics
+    contract versions.
+  tags:
+  - privacy
+  - analytics
+  - infrastructure
+  properties:
+    default_policy: deny
+    technology: Stream processor
+- id: legacy-outbox
+  name: Legacy Transactional Outbox
+  subsystem: commerce-monolith
+  from: acme-2027-edge-foundation
+  description: Append-only outbox table used to publish changes without dual writes.
+  tags:
+  - outbox
+  - migration
+  properties:
+    data_owner: commerce-monolith
+    delivery_semantics: at-least-once
+    technology: PostgreSQL table / relay
+- id: catalog-db
+  name: Catalog Database
+  subsystem: catalog-service
+  from: acme-2028-catalog-search
+  description: Catalog-owned relational store; no other service has direct access.
+  tags:
+  - database
+  - database-per-service
+  properties:
+    backup: point-in-time-recovery
+    data_owner: catalog-service
+    technology: Managed PostgreSQL
+- id: catalog-cache
+  name: Catalog Cache
+  subsystem: catalog-service
+  from: acme-2028-catalog-search
+  description: Read-through cache for hot product and category data.
+  tags:
+  - cache
+  - infrastructure
+  properties:
+    technology: Redis
+- id: catalog-outbox
+  name: Catalog Transactional Outbox
+  subsystem: catalog-service
+  from: acme-2028-catalog-search
+  description: Atomically records catalog events for reliable publication.
+  tags:
+  - outbox
+  - eventing
+  properties:
+    technology: PostgreSQL outbox table
+- id: product-search-index
+  name: Product Search Index
+  subsystem: search-service
+  from: acme-2028-catalog-search
+  description: Rebuildable search projection populated only from versioned catalog events.
+  tags:
+  - search-index
+  - cqrs-read-model
+  properties:
+    rebuildable: 'true'
+    source_of_truth: catalog-service
+    technology: Managed OpenSearch
+- id: search-query-cache
+  name: Search Query Cache
+  subsystem: search-service
+  from: acme-2028-catalog-search
+  description: Short-lived cache for popular query and facet results.
+  tags:
+  - cache
+  - infrastructure
+  properties:
+    technology: Redis
+- id: catalog-reconciliation-store
+  name: Catalog Reconciliation Store
+  subsystem: catalog-sync-adapter
+  from: acme-2028-catalog-search
+  description: Temporary checkpoints and idempotency keys for migration reconciliation.
+  tags:
+  - migration
+  - database
+  - temporary
+  properties:
+    technology: Managed PostgreSQL
+- id: customer-db
+  name: Customer Database
+  subsystem: customer-service
+  from: acme-2029-customer-cart-pricing
+  description: Customer-owned relational data with encrypted sensitive fields.
+  tags:
+  - database
+  - database-per-service
+  properties:
+    data_owner: customer-service
+    encryption: field-and-storage
+    technology: Managed PostgreSQL
+- id: customer-outbox
+  name: Customer Transactional Outbox
+  subsystem: customer-service
+  from: acme-2029-customer-cart-pricing
+  description: Reliable customer-profile event publication.
+  tags:
+  - outbox
+  - eventing
+  properties:
+    technology: PostgreSQL outbox table
+- id: cart-store
+  name: Durable Cart Store
+  subsystem: cart-service
+  from: acme-2029-customer-cart-pricing
+  description: Partitioned durable key-value storage for carts and idempotency records.
+  tags:
+  - database
+  - database-per-service
+  properties:
+    consistency: optimistic
+    data_owner: cart-service
+    technology: Managed key-value database
+- id: cart-cache
+  name: Cart Hot Cache
+  subsystem: cart-service
+  from: acme-2029-customer-cart-pricing
+  description: Optional acceleration layer; the durable cart store remains authoritative.
+  tags:
+  - cache
+  - infrastructure
+  properties:
+    technology: Redis
+- id: pricing-db
+  name: Pricing Database
+  subsystem: pricing-service
+  from: acme-2029-customer-cart-pricing
+  description: Pricing-owned rules, price lists, promotions, and audit history.
+  tags:
+  - database
+  - database-per-service
+  properties:
+    data_owner: pricing-service
+    technology: Managed PostgreSQL
+- id: pricing-cache
+  name: Pricing Evaluation Cache
+  subsystem: pricing-service
+  from: acme-2029-customer-cart-pricing
+  description: Version-keyed cache that cannot outlive the owning price-rule version.
+  tags:
+  - cache
+  - infrastructure
+  properties:
+    technology: Redis
+- id: notification-db
+  name: Notification Database
+  subsystem: notification-service
+  from: acme-2029-customer-cart-pricing
+  description: Templates, preferences, delivery attempts, and deduplication keys.
+  tags:
+  - database
+  - database-per-service
+  properties:
+    data_owner: notification-service
+    technology: Managed PostgreSQL
+- id: checkout-workflow-store
+  name: Checkout Workflow Store
+  subsystem: checkout-service
+  from: acme-2030-transaction-core
+  description: Durable saga state, idempotency keys, and compensation progress.
+  tags:
+  - database
+  - database-per-service
+  - workflow-state
+  properties:
+    data_owner: checkout-service
+    technology: Managed PostgreSQL
+- id: order-db
+  name: Order Database
+  subsystem: order-service
+  from: acme-2030-transaction-core
+  description: Order-owned append-audited relational data.
+  tags:
+  - database
+  - database-per-service
+  properties:
+    data_owner: order-service
+    technology: Managed PostgreSQL
+- id: order-outbox
+  name: Order Transactional Outbox
+  subsystem: order-service
+  from: acme-2030-transaction-core
+  description: Reliable order-event publication without dual writes.
+  tags:
+  - outbox
+  - eventing
+  properties:
+    technology: PostgreSQL outbox table
+- id: payment-db
+  name: Payment Database
+  subsystem: payment-service
+  from: acme-2030-transaction-core
+  description: Payment intents, provider tokens, idempotency keys, and reconciliation state;
+    no PAN storage.
+  tags:
+  - database
+  - database-per-service
+  - pci-scope-minimized
+  properties:
+    cardholder_data: prohibited
+    data_owner: payment-service
+    technology: Managed PostgreSQL
+- id: payment-outbox
+  name: Payment Transactional Outbox
+  subsystem: payment-service
+  from: acme-2030-transaction-core
+  description: Reliable payment-state event publication.
+  tags:
+  - outbox
+  - eventing
+  properties:
+    technology: PostgreSQL outbox table
+- id: inventory-db
+  name: Inventory Projection Database
+  subsystem: inventory-service
+  from: acme-2030-transaction-core
+  description: Rebuildable availability projection plus authoritative commerce reservation
+    state.
+  tags:
+  - database
+  - database-per-service
+  - cqrs-read-model
+  properties:
+    data_owner: inventory-service
+    technology: Managed PostgreSQL
+    upstream_system_of_record: erp-wms
+- id: admin-static-assets
+  name: Administration Static Assets
+  subsystem: admin-portal
+  from: acme-2031-complete-cutover
+  description: Versioned immutable portal assets served through the managed edge.
+  tags:
+  - infrastructure
+  - immutable
+  properties:
+    technology: Object storage / CDN
+- id: reporting-read-model
+  name: Reporting Read Model
+  subsystem: reporting-service
+  from: acme-2031-complete-cutover
+  description: Rebuildable cross-domain operational projection populated from events.
+  tags:
+  - database
+  - cqrs-read-model
+  - rebuildable
+  properties:
+    data_owner: reporting-service
+    direct_service_db_access: prohibited
+    technology: Managed analytical PostgreSQL
+- id: reporting-object-store
+  name: Reporting Object Store
+  subsystem: reporting-service
+  from: acme-2031-complete-cutover
+  description: Retained extracts and archived operational reports with lifecycle policies.
+  tags:
+  - object-storage
+  - infrastructure
+  properties:
+    technology: Managed object storage
+users:
+- id: customer
+  name: Customer
+  description: Shopper browsing, purchasing, and managing an account.
+  tags:
+  - external
+- id: customer-service-agent
+  name: Customer Service Agent
+  description: Internal user assisting customers and orders.
+  tags:
+  - internal
+- id: merchandiser
+  name: Merchandiser
+  description: Internal user managing catalog, assortment, and pricing.
+  tags:
+  - internal
+- id: warehouse-operator
+  name: Warehouse Operator
+  description: Internal user executing fulfilment work in the retained WMS.
+  tags:
+  - internal
+interfaces:
+- id: customer-to-monolith
+  name: Customer storefront traffic
+  provider: customer
+  consumer: commerce-monolith
+  call_direction: provider_to_consumer
+  until: acme-2027-edge-foundation
+  tags:
+  - synchronous
+  - public
+  properties:
+    contract: html
+    security: tls
+    technology: HTTPS
+    type: web
+- id: agent-to-monolith
+  name: Customer service administration
+  provider: customer-service-agent
+  consumer: commerce-monolith
+  call_direction: provider_to_consumer
+  tags:
+  - synchronous
+  - internal
+  properties:
+    technology: HTTPS
+    type: web
+- id: merchandiser-to-monolith
+  name: Merchandising administration
+  provider: merchandiser
+  consumer: commerce-monolith
+  call_direction: provider_to_consumer
+  tags:
+  - synchronous
+  - internal
+  properties:
+    technology: HTTPS
+    type: web
+- id: monolith-to-identity
+  name: Authenticate customer
+  provider: commerce-monolith
+  consumer: identity-provider
+  call_direction: provider_to_consumer
+  tags:
+  - synchronous
+  - security
+  properties:
+    technology: OIDC
+    type: api
+- id: monolith-to-payment
+  name: Authorize and capture payment
+  provider: commerce-monolith
+  consumer: payment-gateway
+  call_direction: provider_to_consumer
+  until: acme-2030-transaction-core
+  tags:
+  - synchronous
+  - pci
+  - critical
+  properties:
+    idempotency: legacy-order-id
+    technology: REST / JSON
+    timeout_seconds: '5'
+    type: api
+- id: monolith-to-erp
+  name: Query inventory and fulfilment status
+  provider: commerce-monolith
+  consumer: erp-wms
+  call_direction: provider_to_consumer
+  until: acme-2030-transaction-core
+  tags:
+  - legacy
+  - point-to-point
+  properties:
+    technology: SOAP / SFTP
+    type: integration
+- id: monolith-to-oms
+  name: Submit accepted order to enterprise OMS
+  provider: commerce-monolith
+  consumer: enterprise-oms
+  call_direction: provider_to_consumer
+  until: acme-2030-transaction-core
+  tags:
+  - legacy
+  - point-to-point
+  - orders
+  properties:
+    technology: SOAP / JMS
+    type: integration
+- id: oms-to-erp
+  name: Coordinate warehouse fulfilment
+  provider: enterprise-oms
+  consumer: erp-wms
+  call_direction: provider_to_consumer
+  tags:
+  - internal
+  - retained
+  properties:
+    technology: Enterprise integration bus
+    type: integration
+- id: monolith-to-finance
+  name: Submit settlement and reconciliation batch
+  provider: commerce-monolith
+  consumer: finance-ledger
+  call_direction: provider_to_consumer
+  until: acme-2030-transaction-core
+  tags:
+  - legacy
+  - finance
+  - batch
+  properties:
+    technology: SFTP batch
+    type: integration
+- id: monolith-to-analytics
+  name: Send web and commerce analytics
+  provider: commerce-monolith
+  consumer: digital-analytics-api
+  call_direction: provider_to_consumer
+  until: acme-2027-edge-foundation
+  tags:
+  - external
+  - analytics
+  - legacy
+  properties:
+    consent_required: 'true'
+    pii: prohibited
+    technology: HTTPS collection
+    type: event
+- id: monolith-to-tax
+  name: Calculate checkout tax
+  provider: commerce-monolith
+  consumer: tax-api
+  call_direction: provider_to_consumer
+  until: acme-2030-transaction-core
+  tags:
+  - synchronous
+  - external
+  - critical
+  properties:
+    technology: REST / JSON
+    type: api
+- id: monolith-to-fraud
+  name: Score payment fraud risk
+  provider: commerce-monolith
+  consumer: fraud-api
+  call_direction: provider_to_consumer
+  until: acme-2030-transaction-core
+  tags:
+  - synchronous
+  - external
+  - critical
+  properties:
+    technology: REST / JSON
+    type: api
+- id: monolith-to-messaging
+  name: Send customer communications
+  provider: commerce-monolith
+  consumer: messaging-provider
+  call_direction: provider_to_consumer
+  until: acme-2029-customer-cart-pricing
+  tags:
+  - synchronous
+  properties:
+    technology: REST / JSON
+    type: api
+- id: warehouse-to-erp
+  name: Warehouse operations
+  provider: warehouse-operator
+  consumer: erp-wms
+  call_direction: provider_to_consumer
+  tags:
+  - internal
+  properties:
+    technology: HTTPS
+    type: user-interface
+- id: customer-to-edge
+  name: Customer traffic through commerce edge
+  provider: customer
+  consumer: commerce-edge
+  call_direction: provider_to_consumer
+  from: acme-2027-edge-foundation
+  tags:
+  - public
+  - synchronous
+  properties:
+    security: tls-waf-bot-control
+    technology: HTTPS
+    type: web
+- id: edge-to-bff
+  name: Route target storefront requests
+  provider: commerce-edge
+  consumer: storefront-bff
+  call_direction: provider_to_consumer
+  from: acme-2027-edge-foundation
+  tags:
+  - synchronous
+  - strangler-target
+  properties:
+    technology: HTTPS / JSON
+    type: api
+- id: edge-to-monolith
+  name: Route unmigrated customer journeys
+  provider: commerce-edge
+  consumer: commerce-monolith
+  call_direction: provider_to_consumer
+  from: acme-2027-edge-foundation
+  until: acme-2030-transaction-core
+  tags:
+  - synchronous
+  - strangler-fallback
+  - temporary
+  properties:
+    technology: HTTPS
+    type: web
+- id: bff-to-monolith
+  name: Compose unmigrated commerce capabilities
+  provider: storefront-bff
+  consumer: commerce-monolith
+  call_direction: provider_to_consumer
+  from: acme-2027-edge-foundation
+  until: acme-2030-transaction-core
+  tags:
+  - synchronous
+  - strangler-fallback
+  - temporary
+  properties:
+    technology: REST / JSON
+    type: api
+- id: monolith-to-legacy-adapter
+  name: Publish and translate legacy domain changes
+  provider: commerce-monolith
+  consumer: legacy-integration-adapter
+  call_direction: provider_to_consumer
+  from: acme-2027-edge-foundation
+  tags:
+  - migration
+  - anti-corruption-layer
+  properties:
+    technology: Outbox / REST
+    type: integration
+- id: edge-to-analytics-adapter
+  name: Send consented digital interaction events
+  provider: commerce-edge
+  consumer: analytics-event-adapter
+  call_direction: provider_to_consumer
+  from: acme-2027-edge-foundation
+  tags:
+  - asynchronous
+  - privacy-filtered
+  properties:
+    technology: HTTPS / JSON
+    type: event
+- id: analytics-adapter-to-provider
+  name: Forward allowlisted analytics events
+  provider: analytics-event-adapter
+  consumer: digital-analytics-api
+  call_direction: provider_to_consumer
+  from: acme-2027-edge-foundation
+  tags:
+  - external
+  - analytics
+  - privacy-filtered
+  properties:
+    consent_required: 'true'
+    pii: prohibited
+    technology: HTTPS collection
+    type: event
+- id: bff-to-catalog
+  name: Read product and navigation data
+  provider: storefront-bff
+  consumer: catalog-service
+  call_direction: provider_to_consumer
+  from: acme-2028-catalog-search
+  tags:
+  - synchronous
+  - versioned-contract
+  properties:
+    technology: REST / JSON
+    type: api
+- id: bff-to-search
+  name: Search and browse products
+  provider: storefront-bff
+  consumer: search-service
+  call_direction: provider_to_consumer
+  from: acme-2028-catalog-search
+  tags:
+  - synchronous
+  - versioned-contract
+  properties:
+    technology: REST / JSON
+    type: api
+- id: catalog-to-events
+  name: Publish catalog domain events
+  provider: catalog-service
+  consumer: event-backbone
+  call_direction: provider_to_consumer
+  from: acme-2028-catalog-search
+  tags:
+  - asynchronous
+  - outbox
+  - versioned-contract
+  properties:
+    technology: Kafka / Avro
+    type: event
+- id: events-to-search
+  name: Project catalog events into search
+  provider: event-backbone
+  consumer: search-service
+  call_direction: provider_to_consumer
+  from: acme-2028-catalog-search
+  tags:
+  - asynchronous
+  - idempotent-consumer
+  properties:
+    technology: Kafka / Avro
+    type: event
+- id: events-to-analytics-adapter
+  name: Consume allowlisted commerce domain events for analytics
+  provider: event-backbone
+  consumer: analytics-event-adapter
+  call_direction: provider_to_consumer
+  from: acme-2028-catalog-search
+  tags:
+  - asynchronous
+  - analytics
+  - privacy-filtered
+  - versioned-contract
+  properties:
+    technology: Kafka / Avro
+    type: event
+- id: legacy-adapter-to-catalog-sync
+  name: Translate legacy catalog updates
+  provider: legacy-integration-adapter
+  consumer: catalog-sync-adapter
+  call_direction: provider_to_consumer
+  from: acme-2028-catalog-search
+  tags:
+  - migration
+  - anti-corruption-layer
+  - temporary
+  properties:
+    technology: Kafka / REST
+    type: integration
+- id: catalog-sync-to-catalog
+  name: Apply reconciled catalog commands
+  provider: catalog-sync-adapter
+  consumer: catalog-service
+  call_direction: provider_to_consumer
+  from: acme-2028-catalog-search
+  tags:
+  - migration
+  - idempotent
+  - temporary
+  properties:
+    technology: REST / JSON
+    type: api
+- id: bff-to-customer
+  name: Read and update customer profile
+  provider: storefront-bff
+  consumer: customer-service
+  call_direction: provider_to_consumer
+  from: acme-2029-customer-cart-pricing
+  tags:
+  - synchronous
+  - versioned-contract
+  properties:
+    technology: REST / JSON
+    type: api
+- id: customer-to-identity
+  name: Resolve identity subject and account linkage
+  provider: customer-service
+  consumer: identity-provider
+  call_direction: provider_to_consumer
+  from: acme-2029-customer-cart-pricing
+  tags:
+  - synchronous
+  - security
+  properties:
+    technology: OIDC / SCIM
+    type: api
+- id: bff-to-cart
+  name: Manage shopping cart
+  provider: storefront-bff
+  consumer: cart-service
+  call_direction: provider_to_consumer
+  from: acme-2029-customer-cart-pricing
+  tags:
+  - synchronous
+  - versioned-contract
+  properties:
+    technology: REST / JSON
+    type: api
+- id: cart-to-pricing
+  name: Price cart contents
+  provider: cart-service
+  consumer: pricing-service
+  call_direction: provider_to_consumer
+  from: acme-2029-customer-cart-pricing
+  tags:
+  - synchronous
+  - bounded-timeout
+  properties:
+    technology: gRPC
+    type: api
+- id: bff-to-pricing
+  name: Display prices and promotions
+  provider: storefront-bff
+  consumer: pricing-service
+  call_direction: provider_to_consumer
+  from: acme-2029-customer-cart-pricing
+  tags:
+  - synchronous
+  - versioned-contract
+  properties:
+    technology: REST / JSON
+    type: api
+- id: customer-to-events
+  name: Publish customer domain events
+  provider: customer-service
+  consumer: event-backbone
+  call_direction: provider_to_consumer
+  from: acme-2029-customer-cart-pricing
+  tags:
+  - asynchronous
+  - outbox
+  - versioned-contract
+  properties:
+    technology: Kafka / Avro
+    type: event
+- id: events-to-notification
+  name: Consume communication-triggering domain events
+  provider: event-backbone
+  consumer: notification-service
+  call_direction: provider_to_consumer
+  from: acme-2029-customer-cart-pricing
+  tags:
+  - asynchronous
+  - idempotent-consumer
+  properties:
+    technology: Kafka / Avro
+    type: event
+- id: notification-to-provider
+  name: Deliver email and SMS
+  provider: notification-service
+  consumer: messaging-provider
+  call_direction: provider_to_consumer
+  from: acme-2029-customer-cart-pricing
+  tags:
+  - synchronous
+  - retry-with-backoff
+  properties:
+    technology: REST / JSON
+    type: api
+- id: legacy-adapter-to-customer
+  name: Translate legacy customer operations
+  provider: legacy-integration-adapter
+  consumer: customer-service
+  call_direction: provider_to_consumer
+  from: acme-2029-customer-cart-pricing
+  tags:
+  - migration
+  - temporary
+  properties:
+    technology: REST / JSON
+    type: api
+- id: legacy-adapter-to-cart
+  name: Translate legacy cart operations
+  provider: legacy-integration-adapter
+  consumer: cart-service
+  call_direction: provider_to_consumer
+  from: acme-2029-customer-cart-pricing
+  tags:
+  - migration
+  - temporary
+  properties:
+    technology: REST / JSON
+    type: api
+- id: legacy-adapter-to-pricing
+  name: Translate legacy pricing operations
+  provider: legacy-integration-adapter
+  consumer: pricing-service
+  call_direction: provider_to_consumer
+  from: acme-2029-customer-cart-pricing
+  tags:
+  - migration
+  - temporary
+  properties:
+    technology: REST / JSON
+    type: api
+- id: bff-to-checkout
+  name: Submit idempotent checkout command
+  provider: storefront-bff
+  consumer: checkout-service
+  call_direction: provider_to_consumer
+  from: acme-2030-transaction-core
+  tags:
+  - synchronous
+  - idempotent
+  - versioned-contract
+  properties:
+    technology: REST / JSON
+    type: api
+- id: checkout-to-cart
+  name: Lock and consume cart snapshot
+  provider: checkout-service
+  consumer: cart-service
+  call_direction: provider_to_consumer
+  from: acme-2030-transaction-core
+  tags:
+  - synchronous
+  - bounded-timeout
+  properties:
+    technology: gRPC
+    type: api
+- id: checkout-to-pricing
+  name: Validate authoritative price
+  provider: checkout-service
+  consumer: pricing-service
+  call_direction: provider_to_consumer
+  from: acme-2030-transaction-core
+  tags:
+  - synchronous
+  - bounded-timeout
+  properties:
+    technology: gRPC
+    type: api
+- id: checkout-to-inventory
+  name: Reserve or release inventory
+  provider: checkout-service
+  consumer: inventory-service
+  call_direction: provider_to_consumer
+  from: acme-2030-transaction-core
+  tags:
+  - synchronous
+  - idempotent
+  - compensatable
+  properties:
+    technology: gRPC
+    type: api
+- id: checkout-to-payment
+  name: Authorize or compensate payment
+  provider: checkout-service
+  consumer: payment-service
+  call_direction: provider_to_consumer
+  from: acme-2030-transaction-core
+  tags:
+  - synchronous
+  - idempotent
+  - compensatable
+  properties:
+    technology: gRPC
+    type: api
+- id: checkout-to-order
+  name: Create accepted order
+  provider: checkout-service
+  consumer: order-service
+  call_direction: provider_to_consumer
+  from: acme-2030-transaction-core
+  tags:
+  - synchronous
+  - idempotent
+  properties:
+    technology: gRPC
+    type: api
+- id: payment-to-provider
+  name: Execute tokenized payment operation
+  provider: payment-service
+  consumer: payment-gateway
+  call_direction: provider_to_consumer
+  from: acme-2030-transaction-core
+  tags:
+  - synchronous
+  - pci
+  - idempotent
+  properties:
+    circuit_breaker: required
+    technology: REST / JSON
+    timeout_seconds: '5'
+    type: api
+- id: checkout-to-tax
+  name: Calculate and commit checkout tax
+  provider: checkout-service
+  consumer: tax-api
+  call_direction: provider_to_consumer
+  from: acme-2030-transaction-core
+  tags:
+  - synchronous
+  - external
+  - idempotent
+  - critical
+  properties:
+    technology: REST / JSON
+    type: api
+- id: payment-to-fraud
+  name: Request payment fraud decision
+  provider: payment-service
+  consumer: fraud-api
+  call_direction: provider_to_consumer
+  from: acme-2030-transaction-core
+  tags:
+  - synchronous
+  - external
+  - bounded-timeout
+  - critical
+  properties:
+    technology: REST / JSON
+    type: api
+- id: payment-to-finance
+  name: Submit settlement and reconciliation records
+  provider: payment-service
+  consumer: finance-ledger
+  call_direction: provider_to_consumer
+  from: acme-2030-transaction-core
+  tags:
+  - asynchronous-preferred
+  - finance
+  - idempotent
+  properties:
+    technology: Managed integration API
+    type: integration
+- id: order-to-oms
+  name: Submit accepted order to enterprise OMS
+  provider: order-service
+  consumer: enterprise-oms
+  call_direction: provider_to_consumer
+  from: acme-2030-transaction-core
+  tags:
+  - asynchronous-preferred
+  - anti-corruption-layer
+  - orders
+  properties:
+    technology: Managed integration API
+    type: integration
+- id: inventory-to-erp
+  name: Synchronize availability and reservation outcomes
+  provider: inventory-service
+  consumer: erp-wms
+  call_direction: provider_to_consumer
+  from: acme-2030-transaction-core
+  tags:
+  - asynchronous-preferred
+  - anti-corruption-layer
+  - inventory
+  properties:
+    technology: Managed integration API
+    type: integration
+- id: order-to-events
+  name: Publish order domain events
+  provider: order-service
+  consumer: event-backbone
+  call_direction: provider_to_consumer
+  from: acme-2030-transaction-core
+  tags:
+  - asynchronous
+  - outbox
+  - versioned-contract
+  properties:
+    technology: Kafka / Avro
+    type: event
+- id: payment-to-events
+  name: Publish payment domain events
+  provider: payment-service
+  consumer: event-backbone
+  call_direction: provider_to_consumer
+  from: acme-2030-transaction-core
+  tags:
+  - asynchronous
+  - outbox
+  - versioned-contract
+  properties:
+    technology: Kafka / Avro
+    type: event
+- id: inventory-to-events
+  name: Publish inventory and reservation events
+  provider: inventory-service
+  consumer: event-backbone
+  call_direction: provider_to_consumer
+  from: acme-2030-transaction-core
+  tags:
+  - asynchronous
+  - versioned-contract
+  properties:
+    technology: Kafka / Avro
+    type: event
+- id: legacy-adapter-to-order
+  name: Translate legacy order administration
+  provider: legacy-integration-adapter
+  consumer: order-service
+  call_direction: provider_to_consumer
+  from: acme-2030-transaction-core
+  tags:
+  - migration
+  - temporary
+  properties:
+    technology: REST / JSON
+    type: api
+- id: agent-to-admin
+  name: Customer service administration
+  provider: customer-service-agent
+  consumer: admin-portal
+  call_direction: provider_to_consumer
+  from: acme-2031-complete-cutover
+  tags:
+  - internal
+  - synchronous
+  properties:
+    technology: HTTPS
+    type: web
+- id: merchandiser-to-admin
+  name: Merchandising administration
+  provider: merchandiser
+  consumer: admin-portal
+  call_direction: provider_to_consumer
+  from: acme-2031-complete-cutover
+  tags:
+  - internal
+  - synchronous
+  properties:
+    technology: HTTPS
+    type: web
+- id: admin-to-catalog
+  name: Manage catalog and assortment
+  provider: admin-portal
+  consumer: catalog-service
+  call_direction: provider_to_consumer
+  from: acme-2031-complete-cutover
+  tags:
+  - synchronous
+  - role-authorized
+  properties:
+    technology: REST / JSON
+    type: api
+- id: admin-to-customer
+  name: Support customer accounts
+  provider: admin-portal
+  consumer: customer-service
+  call_direction: provider_to_consumer
+  from: acme-2031-complete-cutover
+  tags:
+  - synchronous
+  - role-authorized
+  - audited
+  properties:
+    technology: REST / JSON
+    type: api
+- id: admin-to-order
+  name: Support order lifecycle
+  provider: admin-portal
+  consumer: order-service
+  call_direction: provider_to_consumer
+  from: acme-2031-complete-cutover
+  tags:
+  - synchronous
+  - role-authorized
+  - audited
+  properties:
+    technology: REST / JSON
+    type: api
+- id: admin-to-pricing
+  name: Manage pricing and promotions
+  provider: admin-portal
+  consumer: pricing-service
+  call_direction: provider_to_consumer
+  from: acme-2031-complete-cutover
+  tags:
+  - synchronous
+  - role-authorized
+  - audited
+  properties:
+    technology: REST / JSON
+    type: api
+- id: events-to-reporting
+  name: Build operational reporting projections
+  provider: event-backbone
+  consumer: reporting-service
+  call_direction: provider_to_consumer
+  from: acme-2031-complete-cutover
+  tags:
+  - asynchronous
+  - idempotent-consumer
+  - replayable
+  properties:
+    technology: Kafka / Avro
+    type: event
+- id: agent-to-reporting
+  name: View operational reports
+  provider: customer-service-agent
+  consumer: reporting-service
+  call_direction: provider_to_consumer
+  from: acme-2031-complete-cutover
+  tags:
+  - internal
+  - read-only
+  properties:
+    technology: HTTPS
+    type: web
+relationships:
+- id: warehouse-operator-runs-fulfilment
+  action: operates
+  source: warehouse-operator
+  target: enterprise-fulfilment
+  description: Executes pick, pack, and ship work in the retained WMS.
+- id: merchandiser-curates-catalog
+  action: curates
+  source: merchandiser
+  target: catalog-service
+  from: acme-2028-catalog-search
+  description: Manages assortment and product data in the target catalog once it is authoritative.
