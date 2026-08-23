@@ -103,7 +103,6 @@ details belong under `openspec/changes/`, not in this index.
 
 | Spec | Purpose |
 |------|---------|
-| [tool-arch-model-centric-rendering](otdev/tool-arch-model-centric-rendering/spec.md) | Architecture model import, validation, export, and rendering |
 | [tool-context7](otdev/tool-context7/spec.md) | Context7 documentation lookup |
 | [tool-db](otdev/tool-db/spec.md) | SQL database introspection and querying |
 | [tool-diagram](otdev/tool-diagram/spec.md) | Diagram generation and rendering |

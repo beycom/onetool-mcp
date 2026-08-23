@@ -160,7 +160,7 @@ Owner doc: schema.md.
 - [x] **Gate (architect):** acme fixture validates; diffs between its
       milestones are correct by inspection. Record line count vs budget in
       the log.
-- [ ] Cut over `arch.py` to v3; delete v1 modules; update any specs/docs
+- [x] Cut over `arch.py` to v3; delete v1 modules; update any specs/docs
       referencing v1 behavior. (Architect-reviewed step.)
 
 ## Phase 2 — Excel adapter (budget: 900 py lines)
@@ -233,6 +233,21 @@ None yet. Format: `branch-name — question being explored — outcome`.
    sparse early states (risk table; decide only with the acme report open).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-23** — v1 cutover complete (architect, inline). Deleted the 11 v1
+  `_arch` modules, v1 tests (`tests/otdev/{unit,integration}/tools/test_arch.py`,
+  the arch-only root `tests/otdev/conftest.py`, `tests/otdev/fixtures/arch/`),
+  the four v1 arch specs (`tool-arch-{drawio-export,model-centric-rendering,
+  solution-report,validation-warnings}`) + INDEX row, and the v1 config assets
+  (`global_templates/arch.yaml`, `arch-templates/`, their `ot/paths.py` init
+  entries). Rewrote `docs/reference/tools/arch.md` for v3, updated the
+  prompts.yaml pack description and pack-index row, `just docs-sync`
+  regenerated `tool-index.md`/`llms.txt`. Full docs page authoring stays a
+  backfill item. Verification: full unit suite 3,022+ passed after fixing the
+  one paths test that asserted `templates/arch` is copied on init; lint and
+  docs registry check clean. Phase 1 is DONE. Next action: D5 — Excel adapter
+  (`adapters.md`), preceded by no architect artifact; entire chunk is one
+  delegation.
 
 - **2026-08-23** — Phase-1 gate PASSED (architect review). 61 arch tests
   green, `just lint` clean. Acme validates: 0 errors, 24 warnings (clipping

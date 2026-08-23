@@ -36,11 +36,9 @@ INIT_TEMPLATE_FILES = (
     "snippets.yaml",
     "prompts.yaml",
     "security.yaml",
-    "arch.yaml",
     "diagram.yaml",
 )
 INIT_TEMPLATE_DIRS = {
-    "arch-templates": "templates/arch",
     "diagram-templates": "templates/diagram",
 }
 

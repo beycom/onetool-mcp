@@ -169,8 +169,8 @@ class TestEnsureOtDir:
         ensure_ot_dir(config_path, quiet=True)
 
         ot_dir = tmp_path / ".onetool"
-        assert (ot_dir / "templates" / "arch").is_dir()
         assert (ot_dir / "templates" / "diagram").is_dir()
+        assert not (ot_dir / "templates" / "arch").exists()
         assert not (ot_dir / "arch-templates").exists()
         assert not (ot_dir / "diagram-templates").exists()
         assert not (ot_dir / "skills").exists()

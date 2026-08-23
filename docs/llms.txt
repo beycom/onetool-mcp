@@ -26,7 +26,7 @@ Source of truth: `src/ot/config/global_templates/prompts.yaml` (`prompts.packs`)
 | Pack | Extra | Description |
 |---|---|---|
 | `ot` | `core` | ** Discover tools, packs. Get the help you need to call them correctly. The BEST PLACE to start. ** |
-| `arch` | `[dev]` | Architecture workflows for Excel ingest, validation, generation, round-trip, and bundling |
+| `arch` | `[dev]` | Architecture schema-v3 files — validate, resolve states, diff milestones, advance the baseline |
 | `brave` | `[util]` | Search the web, news, and images — fast, private, with batch support |
 | `chrome_util` | `[dev]` | Annotate and highlight page elements via Chrome DevTools |
 | `console` | `core` | Publish inline text, markdown, code, diffs, and more to a connected onetool-console app |

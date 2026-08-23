@@ -161,7 +161,7 @@ __onetool img.clip_ask(q="What does this screenshot show?")
 
 ### :material-draw: Live Visual Tools
 
-Draw on a live Excalidraw whiteboard with a Mermaid-compatible DSL and offline auto-layout. Render Mermaid, PlantUML, and D2 diagrams. Generate draw.io-editable architecture docs from a spreadsheet.
+Draw on a live Excalidraw whiteboard with a Mermaid-compatible DSL and offline auto-layout. Render Mermaid, PlantUML, and D2 diagrams.
 
 [:octicons-arrow-right-24: Whiteboard reference](reference/tools/whiteboard.md)
 
