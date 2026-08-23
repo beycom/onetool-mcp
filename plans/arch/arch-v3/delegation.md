@@ -21,7 +21,7 @@ below is the template it will be issued from.
 | D3 | Phase 1b: resolver (filter/clip/diff/advance) | READY (spec committed) | D2 |
 | D4 | Phase 1c: validation + pack tools | READY | D3 |
 | D5 | Phase 2: Excel adapter | READY | phase-1 gate |
-| D6 | Phase 3a: report bundle scaffold + POC port | GATED on payload spec | phase-1 gate (parallel with D5) |
+| D6 | Phase 3a: report bundle scaffold + POC port | READY (payload spec committed) | phase-2 gate |
 | D7 | Phase 3b: report features | GATED on projection spec + D6 | D6 |
 | D8 | Phase 4: SQLite adapter, SVG export | GATED on phase-3 gate | phase 3 |
 
@@ -266,16 +266,76 @@ Definition of done: rules 5–8. Then STOP — the phase-2 gate (a human editing
 the workbook and inspecting the diff) is run by the architect.
 ```
 
-## D6 / D7 / D8 — GATED (templates to be issued at phase start)
+## D6 — Phase 3a: report scaffold + payload pipeline (READY)
 
-- **D6 (report scaffold):** after the architect commits the payload JSON spec
-  (shape of milestones/timelines/rows with pre-resolved integer positions +
-  derived consequences). Scope: vite single-file build at pack build time,
-  React Flow v12 + elkjs-in-worker + AG Grid skeleton, Archify styling and
-  panel components ported from plans/arch/react-flow-poc/, payload loaded
-  from an injected <script> block, `arch.generate` doing template injection
-  only (~400 py, also exposed as a `generate` CLI subcommand so reports can
-  be produced without the MCP server). Runs in parallel with D5.
+```text
+[standard rules]
+
+Prereq: phases 1–2 are committed. The payload shape is defined in
+plans/arch/arch-v3/report.md, section "Payload contract (v1)" — READ IT IN
+FULL; it is the authoritative contract for every task below. Second donor:
+plans/arch/react-flow-poc/ is READ-ONLY like the v2 worktree — copy and
+adapt its source; never import from it or modify it.
+
+Budget: 400 Python source lines; 2,500 TS/TSX source lines (phase 3 has
+5,000 TS/TSX total and D7 needs the remainder). npm dependencies inside
+frontend/arch-report/ are allowed and expected (React, React Flow v12,
+elkjs, AG Grid Community, vite + a single-file plugin); the PYTHON
+dependency rule from the standard rules is unchanged.
+
+Task A — payload compiler (src/otdev/tools/_arch/v3/payload.py):
+build_payload(arch, source_name) -> dict exactly per the contract. Use the
+resolver (resolve, timeline_view, group_revisions, governing_row) in a
+per-position sweep as the contract's normative algorithm describes; do NOT
+reimplement interval or clipping semantics.
+
+Task B — report generation (src/otdev/tools/_arch/v3/report.py):
+generate_report(yaml_path, html_path): load, refuse on validation errors
+(mirror export_workbook), build the payload, inject into the template at
+src/otdev/tools/_arch/v3/_bundle/report-template.html per the contract's
+injection rules (token replacement, </ escaping, atomic temp+replace —
+mirror write_workbook). CLI subcommands in __main__.py: `generate <yaml>
+<html>` and `payload <yaml> [out.json]` (pretty JSON, stdout when no
+output operand). Facade: arch.generate with input_path/output_path in
+arch.py (this task MAY touch arch.py). Logic in the core; CLI and facade
+call the same functions.
+
+Task C — report bundle scaffold (frontend/arch-report/):
+Vite + React + TypeScript app building to ONE self-contained HTML file at
+the template path above, with the payload placeholder <script> element
+passing through the build untouched. The elkjs worker must be inlined —
+verify the built output is a single file with zero external requests.
+Port from the POC: Archify styling (grid, tokens, node/edge styles),
+custom nodes/edges, passport panel shell, minimap, light/dark. Behavior
+for THIS chunk: parse the payload, render the current state (position 0,
+first timeline) at systems level with union-graph elkjs layout, node
+selection opening the passport panel. Time slider, diff overlay, scoping,
+level roll-up, and tables are D7 — leave a single clean seam (one
+projectState(payload, view) call site), do not implement them. Dev loop:
+`npm run dev` against a checked-in fixture payload generated from the acme
+fixture via the `payload` CLI; document dev/build commands in
+frontend/arch-report/README.md. Add a `just build-arch-report` recipe;
+the built template gets committed (by the architect) so wheel builds
+never need Node.
+
+Tests (these only — tests/unit/tools/test_arch_v3_payload.py):
+1. Acme payload invariants: fixed top-level key order; every row's live and
+   clip segments sorted, disjoint, within the timeline domain; segment
+   union disjoint across each revision group; at least one clip segment
+   exists and every `by` names a known entity id; build twice -> equal.
+2. Generate smoke: output contains no placeholder token; the arch-payload
+   script element's content parses back to the payload; a second generate
+   run is byte-identical.
+Frontend has no test harness this chunk: report `npm run build` output and
+a manual file:// open of the generated acme report (nodes render, panel
+opens) instead.
+
+Definition of done: rules 5–8, both tests green, the manual file:// check
+reported. STOP after that — D7 is a separate prompt.
+```
+
+## D7 / D8 — GATED (templates to be issued at phase start)
+
 - **D7 (report features):** after the architect commits the client projection
   spec (filter/diff/scope-BFS/level-roll-up function contracts + test
   vectors). Scope: time slider, diff overlay, timeline picker, progressive

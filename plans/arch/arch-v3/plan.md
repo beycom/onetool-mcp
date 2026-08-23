@@ -188,8 +188,9 @@ Owner doc: adapters.md. Entire build chunk is one delegation. `→ D5`
 
 Owner doc: report.md. POC is the interaction donor.
 
-- [ ] **Architect:** payload JSON spec (rows with pre-resolved integer
-      positions + derived consequences) — unblocks D6.
+- [x] **Architect:** payload JSON spec (rows with pre-resolved integer
+      positions + derived consequences) — unblocks D6. (report.md "Payload
+      contract (v1)"; D6 prompt issued in delegation.md.)
 - [ ] Bundle scaffolding: React Flow v12 + elkjs worker + AG Grid, vite
       single-file build at **pack build time**; wheel-packaged artifact;
       Archify styling + panels ported from POC; `arch.generate` template
@@ -230,13 +231,36 @@ None yet. Format: `branch-name — question being explored — outcome`.
 
 ## Open questions (record answers in the design docs, log the change here)
 
-1. Report bundle location + build wiring into the wheel (phase 3 start).
+1. ~~Report bundle location + build wiring into the wheel~~ — ANSWERED
+   2026-08-23 in report.md "Shape": source in `frontend/arch-report/`,
+   `just build-arch-report` builds to `_arch/v3/_bundle/report-template.html`,
+   built template committed (no Node at wheel-build or generate time).
 2. Whether `arch.convert` is the umbrella tool name or `import_excel`/`export`
    stand alone (phase 2 start; delivery.md says aliased under convert).
 3. Per-state layout fallback if union-graph layout is chronically poor for
    sparse early states (risk table; decide only with the acme report open).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-23** — Payload contract v1 committed (architect); D6 flipped to
+  READY with its full prompt in delegation.md. Design: per-timeline integer
+  position space (0 = Current, i+1 = i-th milestone; slider index ==
+  position); each row carries `intervals` parallel to the materialized
+  timelines array, holding half-open effective-liveness segments (revision
+  succession + clipping folded in, `end: null` = unbounded) plus clip
+  segments with the authored root cause — so client state-at-position is one
+  array filter and no resolver semantics are reimplemented in TS (the
+  compiler is specced as a per-position resolve() sweep). No per-position
+  states, no diffs, no timestamps in the payload; byte-deterministic
+  generate; `</`-escaped compact JSON in a `<script type="application/json">`
+  block. Open question 1 answered: bundle source `frontend/arch-report/`,
+  built single-file template committed at `_arch/v3/_bundle/
+  report-template.html` (`just build-arch-report`); Node never required at
+  wheel-build or generate time. D6 adds CLI `generate` + `payload`
+  subcommands, `arch.generate`, and two control tests (acme payload
+  invariants, generate smoke). Next action: user runs D6; architect's next
+  artifact is the client projection spec (unblocks D7), which can be
+  authored while D6 runs.
 
 - **2026-08-23** — Phase-2 gate PASSED (architect review); D5 committed by
   architect (rule 8). Re-verified: 63 arch tests, `just lint` clean, CLI +

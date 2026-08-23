@@ -23,7 +23,15 @@ canonical YAML
 The payload is the flat interval model itself — milestones, timelines, and
 entity rows with interval positions pre-resolved to integers — plus derived
 consequences from clipping. It is small, human-inspectable, and contains
-every state implicitly.
+every state implicitly. The normative shape is "Payload contract (v1)"
+below.
+
+Bundle location (decided 2026-08-23, closes plan.md open question 1): app
+source lives in `frontend/arch-report/` (vite + React + TS); `just
+build-arch-report` builds the single-file template to
+`src/otdev/tools/_arch/v3/_bundle/report-template.html`, which is
+**committed** — wheel builds and dev installs never need Node. Rebuild is a
+manual step when the frontend changes.
 
 ## One projection, in the app
 
@@ -37,6 +45,104 @@ Because a state is a filter, the report app derives everything client-side:
 This deletes v2's three parallel pipelines (`viewgraph.py` 863 lines,
 `projection.py` 450, `projection.ts` 385) and the Python/TS parity tests
 between them. Python never builds a graph.
+
+## Payload contract (v1)
+
+Normative. Compiled by `build_payload(arch, source_name) -> dict`
+(`_arch/v3/payload.py`); injected by `arch.generate`.
+
+### Position space
+
+Positions are integers **per timeline**: `0` = Current, `i + 1` = the
+timeline's `i`-th milestone. The domain of a timeline with `M` milestones is
+`0..M`; the slider stop index IS the position. (`current`/`end` selectors and
+`-1` stay a resolver-internal convention; they do not appear in the payload.)
+
+### Top-level shape (fixed key order)
+
+```json
+{
+  "payload": "arch-report/v1",
+  "schema_version": 3,
+  "source": "acme.yaml",
+  "milestones": [ {"id": "acme-2027-edge-foundation", "name": "Edge foundation", "…": "…"} ],
+  "timelines": [ {"id": "program", "milestones": ["acme-2027-edge-foundation", "…"]} ],
+  "rows": {
+    "systems":       [ {"id": "commerce-platform", "name": "Commerce Platform",
+                        "from": "acme-2027-edge-foundation",
+                        "intervals": [ {"live": [[1, null]], "clips": []} ]} ],
+    "subsystems":    [], "components": [], "users": [],
+    "interfaces":    [], "relationships": []
+  }
+}
+```
+
+- `source` — basename of the input YAML, display only.
+- `milestones` — the full catalog in authored order, every milestone (on a
+  timeline or not), serialized like rows (below).
+- `timelines` — **materialized**: no declared timelines → one entry
+  `{"id": null, "milestones": [<catalog order>]}`; otherwise the declared
+  timelines in declared order. The picker renders when there are several;
+  the first is the default. Time UI renders only when the selected
+  timeline has at least one milestone (progressive disclosure).
+- `rows` — the six collections in schema order (systems, subsystems,
+  components, users, interfaces, relationships), each in **authored order**.
+  Row identity is `(collection, array index)`; revision rows share an `id`
+  across indices.
+
+### Row serialization
+
+Model fields dumped `by_alias` (`from`/`until` as authored milestone ids —
+kept for the passport panel), omitting `null`s, empty `tags`/`properties`,
+and `call_direction`/`data_flow` when `"unspecified"` (the client applies
+schema defaults). Plus one derived field:
+
+- `intervals` — array **parallel to `timelines`**. Entry `k` describes the
+  row on `timelines[k]`:
+  - `live` — half-open segments `[start, end]` (end exclusive; `null` =
+    unbounded) where this row is the **governing revision and effectively
+    live** (revision succession, off-timeline milestone rules, and clipping
+    all folded in).
+  - `clips` — segments `{"start": s, "end": e, "by": id}` where this row
+    governs but is clipped; `by` is the authored root cause per the
+    resolver's `Clip.clipped_by` semantics. Runs with the same cause are
+    coalesced.
+
+Segment lists are sorted, disjoint, and coalesced; all bounds lie in the
+timeline's domain. Within one revision group the union of all rows'
+`live` + `clips` segments is disjoint — at most one row of a group governs
+any position. A row that never governs on a timeline has both lists empty.
+
+State-at-position is therefore literally
+`rows[kind].filter(r => within(r.intervals[t].live, p))`; ghost/consequence
+rendering reads `clips` the same way. The payload carries **no** per-position
+materialized states and no diffs — diff, scope BFS, and level roll-up are
+client projections (D7) over these arrays. Size stays linear in
+rows × timelines.
+
+### Compilation (normative algorithm)
+
+For each timeline `t` and each position `p` in `0..M`, run the authoritative
+resolver (`resolve` with the selector for `p`; governing-row identity via
+`group_revisions` + `governing_row`): the governing effective row is live at
+`p`; a `(kind, id)` in `ResolvedState.clips` marks the governing row clipped
+at `p` with its `clipped_by`. Merge consecutive positions into segments.
+Interval/clipping semantics must NOT be reimplemented — the resolver is the
+single source of truth (this is what killed v2's parity tests).
+
+### Determinism and injection
+
+- No timestamps anywhere; fixed key order as above. Same input file ⇒
+  byte-identical payload and report.
+- The built template contains
+  `<script id="arch-payload" type="application/json">__ARCH_PAYLOAD_JSON__</script>`.
+  `arch.generate` validates (refusing on errors, like `arch.export`),
+  replaces the token with the compact JSON dump (`ensure_ascii=False`),
+  escapes every `</` as `<\/` (script-block safety; still valid JSON), and
+  writes atomically (temp file + replace). The app boots with
+  `JSON.parse(getElementById('arch-payload').textContent)`.
+- Pretty-printed payload for inspection comes from the `payload` CLI
+  subcommand, not from the report.
 
 ## The time slider is the hero
 
