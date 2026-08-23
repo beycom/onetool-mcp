@@ -59,6 +59,8 @@ subsystems:
     system: payments
     from: phase-2
 
+components: []
+
 users:
   - id: customer
     name: Customer

@@ -137,10 +137,10 @@ it. Three rules keep iteration fast:
 
 Owner doc: schema.md.
 
-- [ ] Pydantic models: Architecture root, Milestone, Timeline, six entity
+- [x] Pydantic models: Architecture root, Milestone, Timeline, six entity
       kinds, `from`/`until` fields, flat properties. ID/text rules from v2.
       `→ D2`
-- [ ] YAML read/write, deterministic output (harvest v2 `write.py` patterns).
+- [x] YAML read/write, deterministic output (harvest v2 `write.py` patterns).
       `→ D2`
 - [ ] **Architect:** resolver signatures + authoritative semantics test
       suite (interval edge cases: gap reintroduction, milestone not on
@@ -233,6 +233,14 @@ None yet. Format: `branch-name — question being explored — outcome`.
    sparse early states (risk table; decide only with the acme report open).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-23** - D2 complete. Added schema-v3 Pydantic models, strict
+  location-aware YAML loading, deterministic YAML writing, and the seed
+  `check` CLI. The canonical example now includes the required empty
+  `components` collection; omitted entity collections remain invalid. Source:
+  428 lines / 700 budget. Tests: 7 passed (`tests/unit/tools -k arch`), 540
+  deselected; `just lint` and targeted strict mypy clean. No new open
+  questions.
 
 - **2026-08-23** — Phase 0 complete. Layout confirmed as the recommended
   default. D1 executed inline by the architect (skeleton
