@@ -34,7 +34,10 @@ lands; a fresh session should be able to resume from this file alone.
 (`__ot excel`) to read/inspect workbooks and the `convert` pack (`__ot
 convert`) for format conversions — don't hand-roll openpyxl scripts for
 inspection. (In-pack _arch/v3 code still uses openpyxl directly, per the
-design docs.)
+design docs.) For UI verification (report app, phase 3+ gates), follow
+`wip/notes/test-ui.md` — Playwright driven through `__ot playwright.*` for
+snapshots, clicks, console/network inspection, and screenshots; console
+inspection belongs in every pass.
 
 **Donor shortlist from v2** (delivery.md rule 5 — harvest, don't refactor):
 Excel cell parsing / header normalization (`normalize.py`, `load.py`),

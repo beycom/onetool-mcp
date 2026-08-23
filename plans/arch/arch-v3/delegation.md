@@ -71,6 +71,20 @@ on branch feature/arch-v3. Rules:
    git add/commit/stash/restore/checkout on files you did not create.
 ```
 
+**UI chunks only (D7, D8, anything touching `frontend/arch-report/`) — append
+this to the prompt:**
+
+```text
+9. UI verification follows wip/notes/test-ui.md: drive the browser with
+   Playwright through OneTool (`__ot playwright.browser_navigate(...)`,
+   snapshots, CSS-targeted clicks, browser_console_messages,
+   browser_network_requests, screenshots; no `ot.` prefix on proxied
+   calls). Check the console for errors in EVERY verification pass, even
+   when the page looks correct. Use per-page injection for annotations
+   (`play_util.inject_annotations()`); enable_auto_inject is known broken.
+   Close the browser when done.
+```
+
 ## D1 — Phase 0: skeleton + fixture source dump (READY)
 
 ```text
@@ -337,7 +351,7 @@ reported. STOP after that — D7 is a separate prompt.
 ## D7 — Phase 3b: report features (READY, run after D6)
 
 ```text
-[standard rules]
+[standard rules + UI rule 9]
 
 Prereq: D6 is committed (frontend/arch-report/ scaffold renders the current
 state). Authoritative inputs, both READ-ONLY beyond what this prompt says:
@@ -387,9 +401,10 @@ vitest + jsdom): scrubbing the acme report's slider changes the rendered
 node set. No extra coverage.
 
 After the TS work: run `just build-arch-report`, regenerate the acme report
-via the CLI, and manually verify from file://: scrub the timeline, toggle
-the diff overlay, switch level and scope, open a copy-link URL. Report what
-you saw. Definition of done: rules 5–8 (rule 5's pytest run is unchanged by
+via the CLI, and verify from file:// per rule 9 (Playwright through __ot,
+wip/notes/test-ui.md): scrub the timeline, toggle the diff overlay, switch
+level and scope, open a copy-link URL, and confirm a clean console and zero
+external network requests. Report what you saw. Definition of done: rules 5–8 (rule 5's pytest run is unchanged by
 this chunk — also report `npm test` output), then STOP — the phase-3 gate
 (architect + user reading the acme story) follows.
 ```
