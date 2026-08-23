@@ -64,6 +64,35 @@ Revision rows are just two rows with the same `id` and different `from` —
 sortable and filterable like everything else. No row ordering constraints
 beyond the `Timelines` blocks.
 
+### Write modes (decided 2026-08-23)
+
+`write(arch, target)` is mode-aware:
+
+- **Target absent** → generate the template workbook: nine canonical
+  sheets, each a structured Excel table, dropdown validation on enum and
+  milestone-reference columns.
+- **Target exists** → **update in place**: locate the canonical sheets,
+  keep headers and all formatting, replace only the data rows, resize each
+  table `ref` and validation range to the new row count, and leave every
+  other sheet and feature untouched. Atomic replacement still applies
+  (write to temp copy, swap).
+
+Structured tables are what make in-place updates look right: table styles
+(banding, header formatting) auto-apply to added rows, so row-count changes
+need no per-cell style copying.
+
+**Preservation caveat (openpyxl):** cell styles, column widths, tables,
+data validation, conditional formatting, named ranges, pivot definitions,
+and user-added sheets all survive a load/save cycle. Charts, images, and
+drawing shapes do **not** — openpyxl drops them on save. In-place write
+must therefore detect charts/images in the target and refuse with a clear
+error (not silently destroy them). Maintainers who want charts keep them
+in a separate workbook referencing the data workbook; external references
+survive because that file is never rewritten.
+
+The round-trip guarantee remains **model** equality; formatting
+preservation is a workflow courtesy, not part of the contract.
+
 What a maintainer can now do natively in Excel, with zero tooling:
 
 - filter `until` blank → the end-state architecture;

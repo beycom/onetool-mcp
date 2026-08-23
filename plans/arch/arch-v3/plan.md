@@ -171,7 +171,10 @@ Owner doc: adapters.md. Entire build chunk is one delegation. `→ D5`
 - [ ] Workbook read: 9 sheets, header normalization, `[a;b]` lists, extra
       columns → properties, Timelines block ordering (harvest v2 parsing).
 - [ ] Workbook write + generated template: dropdown validation for enums and
-      milestone refs, revision-row banding.
+      milestone refs, revision-row banding. Write is mode-aware: existing
+      target → in-place data-row update preserving formatting/tables
+      (refuse if the workbook holds charts/images — openpyxl drops them);
+      see adapters.md "Write modes".
 - [ ] Tabular error contract: sheet/row/column/field, all locations, atomic
       failed import.
 - [ ] Tools: `arch.import_excel` (under `arch.convert`), `arch.export`.
@@ -233,6 +236,14 @@ None yet. Format: `branch-name — question being explored — outcome`.
    sparse early states (risk table; decide only with the acme report open).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-23** — Design decision (user + architect): `write(arch, target)`
+  gains an update-in-place mode — existing workbook keeps formatting,
+  structured tables, validation, and user sheets; only data rows are
+  replaced and table/validation refs resized. Charts/images are refused,
+  not silently dropped (openpyxl loses them on save). Recorded in
+  adapters.md "Write modes"; added to the D5 checklist (~+100 lines within
+  the 900 budget).
 
 - **2026-08-23** — v1 cutover complete (architect, inline). Deleted the 11 v1
   `_arch` modules, v1 tests (`tests/otdev/{unit,integration}/tools/test_arch.py`,
