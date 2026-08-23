@@ -146,7 +146,7 @@ Owner doc: schema.md.
       suite (interval edge cases: gap reintroduction, milestone not on
       timeline, from==until rejection, clipping chains, revision diffs,
       advance rewrites). This is the phase's design core — not delegated.
-- [ ] Resolver implementation: revision grouping, state-at-position filter
+- [x] Resolver implementation: revision grouping, state-at-position filter
       (`current`/milestone/`end` selector), clipping with `clipped_by`
       consequences, diff (added/removed/changed field-by-field),
       `advance(through=…)` deterministic rewrite. `→ D3` (to architect's
@@ -233,6 +233,19 @@ None yet. Format: `branch-name — question being explored — outcome`.
    sparse early states (risk table; decide only with the acme report open).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-23** — D3 complete, gate PASSED (architect review). Executor
+  implemented timeline/state selection, revision grouping and governing-row
+  resolution, liveness clipping with authored root causes, ordered
+  field-level diffs, and deterministic baseline advance. Source: 548 lines /
+  600 budget. Architect verification: 49 arch tests passed (all 42
+  authoritative resolver tests unchanged), `just lint` clean, CLI-standalone
+  run loads zero runtime modules, acme smoke checks correct by inspection
+  (adjacent-milestone diffs surface the facade revisions; current→end shows
+  them as removed because the whole legacy-commerce tree retires by `end`;
+  advance preserves end-state identity). Process note: the executor
+  committed despite rule 8; that commit was reverted and the architect
+  committed after review — rule 8 stands. Next action: run D4.
 
 - **2026-08-23** — D2 gate PASSED (architect review: tests/lint green, acme
   fixture round-trips with model equality + idempotent dump, CLI runs with
