@@ -1,18 +1,20 @@
-import type { Edge, Node } from '@xyflow/react'
+import type { Node } from '@xyflow/react'
 import ELK from 'elkjs/lib/elk.bundled.js'
-import type { ElkNode } from 'elkjs/lib/elk-api'
 
-import type { ReportPayload } from './types'
+import type { RolledGraph } from './types'
+
+export type Positions = Map<string, { x: number; y: number }>
+
+export const NODE_WIDTH = 240
+export const NODE_HEIGHT = 112
 
 const elk = new ELK()
+const cache = new Map<string, Promise<Positions>>()
 
-export async function unionLayout(payload: ReportPayload): Promise<Map<string, { x: number; y: number }>> {
-  const systems = [...new Map(payload.rows.systems.map((row) => [row.id, row])).values()]
-  const ids = new Set(systems.map((row) => row.id))
-  const connections = [...payload.rows.interfaces, ...payload.rows.relationships]
-    .map((row) => ({ id: row.id, source: row.provider ?? row.source, target: row.consumer ?? row.target }))
-    .filter((edge) => edge.source && edge.target && ids.has(edge.source) && ids.has(edge.target))
-  const graph = await elk.layout({
+export function unionLayout(graph: RolledGraph, cacheKey: string): Promise<Positions> {
+  const cached = cache.get(cacheKey)
+  if (cached) return cached
+  const result = elk.layout({
     id: 'root',
     layoutOptions: {
       'elk.algorithm': 'layered',
@@ -22,25 +24,15 @@ export async function unionLayout(payload: ReportPayload): Promise<Map<string, {
       'elk.spacing.nodeNode': '72',
       'elk.layered.spacing.nodeNodeBetweenLayers': '120',
     },
-    children: systems.map((row) => ({ id: row.id, width: 240, height: 112 })),
-    edges: connections.map((edge) => ({ id: edge.id, sources: [edge.source!], targets: [edge.target!] })),
-  })
-  return new Map((graph.children ?? []).map((node) => [node.id, { x: node.x ?? 0, y: node.y ?? 0 }]))
+    children: graph.nodes.map((node) => ({ id: node.key, width: NODE_WIDTH, height: NODE_HEIGHT })),
+    edges: graph.edges.map((edge) => ({ id: edge.key, sources: [edge.a], targets: [edge.b] })),
+  }).then((layout) => new Map(
+    (layout.children ?? []).map((node) => [node.id, { x: node.x ?? 0, y: node.y ?? 0 }]),
+  ))
+  cache.set(cacheKey, result)
+  return result
 }
 
-export function applyPositions(nodes: Node[], positions: Map<string, { x: number; y: number }>): Node[] {
+export function applyPositions(nodes: Node[], positions: Positions): Node[] {
   return nodes.map((node) => ({ ...node, position: positions.get(node.id) ?? node.position }))
-}
-
-export function connectionEdges(payload: ReportPayload): Edge[] {
-  const ids = new Set(payload.rows.systems.map((row) => row.id))
-  return [...payload.rows.interfaces, ...payload.rows.relationships]
-    .map((row) => ({
-      id: row.id,
-      source: row.provider ?? row.source ?? '',
-      target: row.consumer ?? row.target ?? '',
-      label: row.name ?? row.action ?? row.id,
-      type: 'semantic',
-    }))
-    .filter((edge) => ids.has(edge.source) && ids.has(edge.target))
 }

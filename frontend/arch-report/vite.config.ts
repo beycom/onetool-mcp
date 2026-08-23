@@ -10,9 +10,13 @@ function reportTemplate(): Plugin {
     generateBundle(_options, bundle) {
       const html = bundle['index.html']
       if (!html) throw new Error('Vite did not emit index.html')
+      if (html.type !== 'asset') throw new Error('Vite emitted index.html as a chunk')
       delete bundle['index.html']
-      html.fileName = 'report-template.html'
-      bundle[html.fileName] = html
+      this.emitFile({
+        fileName: 'report-template.html',
+        source: String(html.source).replace(/[ \t]+$/gm, ''),
+        type: 'asset',
+      })
     },
     name: 'arch-report-template-name',
   }
@@ -25,7 +29,6 @@ export default defineConfig({
     cssCodeSplit: false,
     emptyOutDir: true,
     outDir: fileURLToPath(new URL('../../src/otdev/tools/_arch/v3/_bundle', import.meta.url)),
-    rollupOptions: { output: { inlineDynamicImports: true } },
   },
   plugins: [react(), viteSingleFile(), reportTemplate()],
 })

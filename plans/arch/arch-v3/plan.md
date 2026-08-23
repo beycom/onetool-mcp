@@ -202,11 +202,11 @@ Owner doc: report.md. POC is the interaction donor.
       scope BFS, level roll-up — contracts + test vectors) — unblocks D7.
       (report.md "Client projection contract (v1)"; vectors in
       tests/unit/tools/fixtures/arch/projection/; D7 prompt issued.)
-- [ ] Client projection + union-graph layout (fixed positions across
+- [x] Client projection + union-graph layout (fixed positions across
       slider), passport panel, minimap, light/dark. `→ D7`
-- [ ] Time slider + diff overlay + timeline picker, progressive disclosure
+- [x] Time slider + diff overlay + timeline picker, progressive disclosure
       (zero milestones → no time UI). `→ D7`
-- [ ] Tables (entities, interfaces, milestones, diff) off the same filtered
+- [x] Tables (entities, interfaces, milestones, diff) off the same filtered
       arrays; URL-fragment views + copy-link; offline `file://` check. `→ D7`
 - [ ] **Gate (architect + user):** open acme's report, scrub the timeline;
       the story reads correctly without explanation.
@@ -246,6 +246,61 @@ None yet. Format: `branch-name — question being explored — outcome`.
    sparse early states (risk table; decide only with the acme report open).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-24** — D7 gate PASSED (architect review); committed by architect
+  (rule 8) with one architect fix. Re-verified: projection.ts matches the
+  contract clause-by-clause (half-open liveAt, resolver-mirroring diff with
+  b-state clipped_by, live-interfaces-only scope BFS with boundary stubs,
+  unordered-pair edge keys fixing D6's duplicate-edge-id note, ever-live
+  union graph); 14 vitest tests pass and the rollup vectors pin exact node
+  sets; `payload` CLI regeneration of the projection fixture is identical;
+  template rebuild byte-identical before the fix; 65 arch + 27 smoke tests,
+  `just lint` clean. Fix found via the user's minimap report: the app is a
+  controlled React Flow with no onNodesChange, so user nodes never received
+  measured dimensions — MiniMap rendered zero node rects (blank panel) and
+  initial fitView framed the graph wrong. Fixed by putting explicit
+  `width`/`height` (the same 240x112 ELK already assumes, now shared
+  NODE_WIDTH/NODE_HEIGHT constants in layout.ts) on the node objects;
+  App.test.tsx layout mock exports them too. Headless Playwright re-check
+  (OneTool's playwright proxy would not connect — needs an MCP restart;
+  drove the cached Playwright directly per test-ui.md discipline): minimap
+  shows the graph in both themes, all 14 current systems fit the viewport,
+  scrub to Edge Foundation + vs-current shows the added Digital Commerce
+  Platform, changed Legacy Commerce Platform (badges + popover) and ghosted
+  removed edges at stable positions, components level renders 43 nodes,
+  legacy-commerce + 1 hop yields a collapsed Warehouse Operator boundary
+  stub, the copied fragment URL reopens the identical node set, AG Grid
+  entities table is populated, console has 0 errors, and the only request
+  is the local file. Accepted with a note: MAP/PATH/LENS buttons currently
+  encode into the fragment and a data-mode attribute with no visual effect
+  (no styling hooks yet) — user may veto at the phase-3 gate. Next action:
+  phase-3 gate (user reads the acme story in the report).
+
+- **2026-08-24** — D7 complete. Added the pure TypeScript projection pipeline
+  (`liveAt`, `clipAt`, `stateAt`, `diffStates`, `scopeAt`, `rollUp`, and
+  `unionGraph`) and drove all 13 read-only vector cases through it. The report
+  now has timeline and milestone controls, current/position diff overlays,
+  stable union layout with explicit state re-fit, system-hop scope, three
+  roll-up levels, collapsed boundary stubs, four AG Grid tables, aspect and
+  mode controls, and complete URL-fragment views with copy-link. Source is
+  1,274 TS/TSX lines / 2,500 budget; tests are 13 projection vectors plus one
+  slider interaction. The concurrent tooling refresh moved the bundle rename
+  to Vite's supported `emitFile` API and the final gates use its upgraded
+  dependency set. Verification: `npm test` 14 passed; npm audit reports 0
+  vulnerabilities; `just build-arch-report` and `just lint` are clean; 65 arch
+  tests and 27 smoke tests passed. Regenerated the acme report and verified it
+  from `file://` through OneTool Playwright: scrubbing changed the node set,
+  current diff showed added/removed markers, component level and scoped hops
+  produced a collapsed boundary stub, the copied URL reopened the same state,
+  AG Grid mounted, every console check had 0 errors, and no external requests
+  occurred. Assumptions: the user's final no-commit instruction and rule 8
+  override the earlier request wording; `vs current` compares position 0 to
+  the selected position while `vs position` compares its chosen reference to
+  the selected position; the fragment uses named query parameters including
+  `compare-at` and never stores coordinates; MAP/PATH/LENS are encoded view
+  modes over the same projection because the contract defines no distinct
+  PATH/LENS projection semantics. No open questions. Changes are deliberately
+  uncommitted for the phase-3 gate.
 
 - **2026-08-23** — D6 gate PASSED (architect review); committed by architect
   (rule 8). Re-verified: 65 arch tests, `just lint` clean, standalone
