@@ -1,0 +1,523 @@
+{
+  "payload": "arch-report/v1",
+  "schema_version": 3,
+  "source": "model.yaml",
+  "milestones": [
+    {
+      "id": "m1",
+      "name": "Milestone one"
+    },
+    {
+      "id": "m2",
+      "name": "Milestone two"
+    },
+    {
+      "id": "m3",
+      "name": "Milestone three"
+    }
+  ],
+  "timelines": [
+    {
+      "id": "program",
+      "milestones": [
+        "m1",
+        "m2",
+        "m3"
+      ]
+    },
+    {
+      "id": "alt",
+      "milestones": [
+        "m1",
+        "m3"
+      ]
+    }
+  ],
+  "rows": {
+    "systems": [
+      {
+        "id": "sysA",
+        "name": "Alpha Platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          },
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "sysB",
+        "name": "Beta Services",
+        "from": "m1",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          },
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "sysL",
+        "name": "Legacy Suite",
+        "until": "m2",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                2
+              ]
+            ],
+            "clips": []
+          },
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      }
+    ],
+    "subsystems": [
+      {
+        "id": "subA",
+        "name": "Alpha Core",
+        "system": "sysA",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          },
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "subB",
+        "name": "Beta API",
+        "from": "m1",
+        "system": "sysB",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          },
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "subL",
+        "name": "Legacy Store",
+        "system": "sysL",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                2
+              ]
+            ],
+            "clips": [
+              {
+                "start": 2,
+                "end": null,
+                "by": "sysL"
+              }
+            ]
+          },
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "subG",
+        "name": "Gateway",
+        "until": "m1",
+        "system": "sysA",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                1
+              ]
+            ],
+            "clips": []
+          },
+          {
+            "live": [
+              [
+                0,
+                1
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "subG",
+        "name": "Gateway v2",
+        "from": "m2",
+        "system": "sysA",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                null
+              ]
+            ],
+            "clips": []
+          },
+          {
+            "live": [],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "subR",
+        "name": "Registry",
+        "description": "Legacy registry",
+        "properties": {
+          "owner": "core"
+        },
+        "system": "sysA",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                2
+              ]
+            ],
+            "clips": []
+          },
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "subR",
+        "name": "Registry",
+        "description": "Rewritten registry",
+        "properties": {
+          "owner": "platform"
+        },
+        "from": "m2",
+        "system": "sysA",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                null
+              ]
+            ],
+            "clips": []
+          },
+          {
+            "live": [],
+            "clips": []
+          }
+        ]
+      }
+    ],
+    "components": [
+      {
+        "id": "compA",
+        "name": "Alpha Worker",
+        "subsystem": "subA",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          },
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "compL",
+        "name": "Legacy Records",
+        "subsystem": "subL",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                2
+              ]
+            ],
+            "clips": [
+              {
+                "start": 2,
+                "end": null,
+                "by": "sysL"
+              }
+            ]
+          },
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      }
+    ],
+    "users": [
+      {
+        "id": "u1",
+        "name": "Operator",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          },
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      }
+    ],
+    "interfaces": [
+      {
+        "id": "iAL",
+        "name": "Read legacy records",
+        "provider": "subL",
+        "consumer": "subA",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                2
+              ]
+            ],
+            "clips": [
+              {
+                "start": 2,
+                "end": null,
+                "by": "sysL"
+              }
+            ]
+          },
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "iAA",
+        "name": "Register worker",
+        "provider": "compA",
+        "consumer": "subR",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          },
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "iUB",
+        "name": "Operate beta",
+        "from": "m1",
+        "provider": "subB",
+        "consumer": "u1",
+        "call_direction": "consumer_to_provider",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          },
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "iAB",
+        "name": "Sync alpha to beta",
+        "from": "m2",
+        "provider": "subA",
+        "consumer": "subB",
+        "data_flow": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                null
+              ]
+            ],
+            "clips": []
+          },
+          {
+            "live": [],
+            "clips": []
+          }
+        ]
+      }
+    ],
+    "relationships": [
+      {
+        "id": "r1",
+        "action": "governs",
+        "source": "sysA",
+        "target": "sysB",
+        "from": "m1",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          },
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -195,8 +195,10 @@ Owner doc: report.md. POC is the interaction donor.
       single-file build at **pack build time**; wheel-packaged artifact;
       Archify styling + panels ported from POC; `arch.generate` template
       injection (~400 py). `→ D6` (parallel with D5)
-- [ ] **Architect:** client projection spec (filter, diff set-arithmetic,
+- [x] **Architect:** client projection spec (filter, diff set-arithmetic,
       scope BFS, level roll-up — contracts + test vectors) — unblocks D7.
+      (report.md "Client projection contract (v1)"; vectors in
+      tests/unit/tools/fixtures/arch/projection/; D7 prompt issued.)
 - [ ] Client projection + union-graph layout (fixed positions across
       slider), passport panel, minimap, light/dark. `→ D7`
 - [ ] Time slider + diff overlay + timeline picker, progressive disclosure
@@ -241,6 +243,28 @@ None yet. Format: `branch-name — question being explored — outcome`.
    sparse early states (risk table; decide only with the acme report open).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-23** — Client projection contract v1 committed (architect,
+  authored in parallel with the user's executor running D6; no D6-owned
+  files touched). report.md gains the contract: pure-function pipeline
+  stateAt → scopeAt → rollUp (+ liveAt/clipAt, diffStates, unionGraph),
+  node keys `kind:id`, diff mirroring the Python resolver exactly (KINDS
+  order, clipped_by from the b-state, properties per-key, tags whole,
+  equal-content revisions unreported), scope = system-level BFS over live
+  interfaces with retained-connection + boundary-stub rules, roll-up =
+  representative-at-level with unordered aggregated edges (self-pairs
+  dropped, members carry direction), union graph = same roll-up over
+  ever-live rows for one-shot elkjs layout. Authoritative vectors in
+  tests/unit/tools/fixtures/arch/projection/ (model.yaml + payload.json +
+  vectors.json + README): synthetic 2-timeline model hitting gap
+  reintroduction, off-timeline from/until, clip chains, content revision,
+  and a systems-level self-loop; state/diff expectations computed by the
+  Python resolver, scope/rollup by reference tooling encoding the contract
+  (scratch, not kept); all 13 cases verified against hand analysis. D7
+  flipped to READY in delegation.md (2,500 TS/TSX budget, vitest vector
+  suite as the control mechanism, payload cross-check against D6's
+  build_payload). Next action: D6 gate review when the executor finishes,
+  then run D7.
 
 - **2026-08-23** — Payload contract v1 committed (architect); D6 flipped to
   READY with its full prompt in delegation.md. Design: per-timeline integer

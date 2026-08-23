@@ -22,7 +22,7 @@ below is the template it will be issued from.
 | D4 | Phase 1c: validation + pack tools | READY | D3 |
 | D5 | Phase 2: Excel adapter | READY | phase-1 gate |
 | D6 | Phase 3a: report bundle scaffold + POC port | READY (payload spec committed) | phase-2 gate |
-| D7 | Phase 3b: report features | GATED on projection spec + D6 | D6 |
+| D7 | Phase 3b: report features | READY (projection spec committed) | D6 |
 | D8 | Phase 4: SQLite adapter, SVG export | GATED on phase-3 gate | phase 3 |
 
 ## Standard rules — prepend to EVERY prompt
@@ -334,11 +334,67 @@ Definition of done: rules 5–8, both tests green, the manual file:// check
 reported. STOP after that — D7 is a separate prompt.
 ```
 
-## D7 / D8 — GATED (templates to be issued at phase start)
+## D7 — Phase 3b: report features (READY, run after D6)
 
-- **D7 (report features):** after the architect commits the client projection
-  spec (filter/diff/scope-BFS/level-roll-up function contracts + test
-  vectors). Scope: time slider, diff overlay, timeline picker, progressive
-  disclosure, tables, URL-fragment views, offline file:// check.
+```text
+[standard rules]
+
+Prereq: D6 is committed (frontend/arch-report/ scaffold renders the current
+state). Authoritative inputs, both READ-ONLY beyond what this prompt says:
+plans/arch/arch-v3/report.md sections "Payload contract (v1)" and "Client
+projection contract (v1)", and the vector fixtures in
+tests/unit/tools/fixtures/arch/projection/ (model.yaml, payload.json,
+vectors.json — NEVER edit these; a vector that looks wrong is a
+stop-and-ask per rule 1).
+
+Budget: 2,500 TS/TSX source lines (the remainder of phase 3's 5,000).
+Python changes: none expected; propose per rule 1 if you believe one is
+needed. npm devDependencies for testing (vitest) are allowed.
+
+Task A — projection layer (pure TS, no React imports):
+Implement the contract's functions (liveAt/clipAt, stateAt, diffStates,
+scopeAt, rollUp, unionGraph) behind the projectState seam D6 left. Wire a
+vitest suite that loads payload.json + vectors.json and drives every vector
+case through the real functions (`npm test`). Also regenerate payload.json
+from model.yaml with the CLI `payload` subcommand and compare: identical
+ids and interval segments are REQUIRED (serialization cosmetics may
+differ); on any semantic difference STOP and report — do not regenerate
+the committed fixture.
+
+Task B — time + diff UI:
+Milestone stepper/slider over the selected timeline (stops: Current then
+each milestone; slider index == payload position), timeline picker when
+several timelines exist, diff overlay toggle (compare off / vs current /
+vs position) marking added (accent + badge), removed (ghosted from the
+compared state), and changed (badge + field-level popover from
+diffStates), colors always paired with icon/line-style. Progressive
+disclosure: zero milestones on the selected timeline -> no time or compare
+controls at all. Layout: elkjs once on unionGraph, positions fixed while
+scrubbing; "re-fit this state" is an explicit button.
+
+Task C — scope, level, tables, views:
+Scope control (system multi-select + hops) and level control
+(systems/subsystems/components) driving scopeAt/rollUp; boundary stubs
+rendered collapsed. AG Grid tables (entities, interfaces, milestones,
+diff) reading the SAME projected arrays as the canvas. URL-fragment
+view encoding + copy-link (scope, level, time, compare, aspect, mode,
+theme — per the Views table in report.md); no coordinates ever persisted.
+Verify the built report works offline from file:// (no network requests).
+
+Tests (these only): the vitest vector suite from Task A, plus ONE
+interaction smoke test (any DOM-level harness D6 established or plain
+vitest + jsdom): scrubbing the acme report's slider changes the rendered
+node set. No extra coverage.
+
+After the TS work: run `just build-arch-report`, regenerate the acme report
+via the CLI, and manually verify from file://: scrub the timeline, toggle
+the diff overlay, switch level and scope, open a copy-link URL. Report what
+you saw. Definition of done: rules 5–8 (rule 5's pytest run is unchanged by
+this chunk — also report `npm test` output), then STOP — the phase-3 gate
+(architect + user reading the acme story) follows.
+```
+
+## D8 — GATED (template to be issued at phase start)
+
 - **D8 (phase 4):** SQLite adapter per adapters.md and client-side SVG/
   draw.io download; prompts written when phase 3 gate passes.

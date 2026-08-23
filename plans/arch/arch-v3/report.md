@@ -144,6 +144,71 @@ single source of truth (this is what killed v2's parity tests).
 - Pretty-printed payload for inspection comes from the `payload` CLI
   subcommand, not from the report.
 
+## Client projection contract (v1)
+
+Normative for D7. Pure functions over the payload; no React in the
+projection layer. The authoritative test vectors live in
+`tests/unit/tools/fixtures/arch/projection/` (`vectors.json` + its README):
+`state_at` and `diff` expectations were computed by the Python resolver;
+`scope` and `rollup` encode this section. Vectors are read-only for
+executors; the frontend vitest suite drives the functions below against
+them.
+
+Shared conventions: a **node key** is `"<kind>:<id>"` (ids are unique per
+collection, not globally). `t` is a timeline index into `payload.timelines`,
+`p` a position in that timeline's domain. All output lists are
+deterministically ordered: entity lists in authored group order, node/edge
+lists sorted by key, diff lists by KINDS order (systems, subsystems,
+components, users, interfaces, relationships) then authored group order.
+
+- **`liveAt(row, t, p)`** — true iff some segment `[s, e]` of
+  `row.intervals[t].live` has `s <= p` and (`e === null` or `p < e`).
+  `clipAt(row, t, p)` looks up `intervals[t].clips` the same way and yields
+  the segment's `by`.
+- **`stateAt(payload, t, p)`** — per kind: the rows passing `liveAt` (at
+  most one row per id by construction), plus the clipped map
+  `id -> {row, by}` from the clip segments. This is the single source for
+  canvas AND tables.
+- **`diffStates(payload, t, a, b)`** — mirrors the Python resolver's diff
+  exactly: **added** `{kind, id, name}` (name = `action` for relationships)
+  for ids live at `b` only; **removed** `{kind, id, name, clipped_by}` for
+  ids live at `a` only, `clipped_by` taken from the id's clip at `b` when
+  present, else null; **changed** for ids live at both via different row
+  indices whose content differs — compare every serialized field except
+  `id`, `from`, `until`, `intervals`; `properties` per key as
+  `properties.<key>` (old/new null when added/removed); `tags` as a whole
+  list; absent optional fields compare as absent. Equal-content
+  different-index pairs are not reported.
+- **`scopeAt(state, systems, hops)`** — top-level representative of a live
+  entity: systems and users are themselves; a subsystem is its `system`; a
+  component is its subsystem's system. Build the system-level graph over
+  live **interfaces only** (edge between the two endpoints' distinct
+  representatives). Kept = the selected systems (ignoring ones not live)
+  plus every node within `hops` BFS steps. A connection (interface or
+  relationship) is **retained** iff at least one endpoint representative is
+  kept; a non-kept representative touched by a retained connection is a
+  **boundary stub** (rendered collapsed). Kept entities = live entities
+  whose representative is kept, plus retained connections. `scope = null`
+  disables filtering.
+- **`rollUp(state, level)`** — representative at a level: entities below
+  the level map UP to their ancestor at the level; entities at or above it
+  (and users) stay themselves. Nodes = live entities of the level's kind,
+  plus users, plus every retained edge-endpoint representative. Edges are
+  keyed by the **unordered** representative pair, self-pairs dropped, and
+  carry their member `interfaces` / `relationships` id lists in authored
+  order — arrowheads per aspect are derived from members at render time.
+  Containment containers come from the parent references client-side and
+  are presentation, not part of this contract.
+- **`unionGraph(payload, t, level)`** — the same roll-up over the
+  **ever-live** rows (any non-empty `intervals[t].live`; a group's first
+  ever-live row supplies display fields). Layout runs once on the union
+  graph (elkjs, deterministic); per-position rendering filters nodes/edges
+  without moving anything.
+
+Composition order: `stateAt` → `scopeAt` → `rollUp` (diff overlays compute
+`diffStates` and mark the rolled-up nodes/edges containing affected
+entities). Every canvas view and every table reads from this one pipeline.
+
 ## The time slider is the hero
 
 The single interaction v1 and v2 never delivered, and the one the interval

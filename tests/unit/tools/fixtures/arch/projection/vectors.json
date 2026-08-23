@@ -1,0 +1,465 @@
+{
+  "state_at": [
+    {
+      "timeline": "program",
+      "position": 0,
+      "expect": {
+        "live": {
+          "systems": [
+            "sysA",
+            "sysL"
+          ],
+          "subsystems": [
+            "subA",
+            "subL",
+            "subG",
+            "subR"
+          ],
+          "components": [
+            "compA",
+            "compL"
+          ],
+          "users": [
+            "u1"
+          ],
+          "interfaces": [
+            "iAL",
+            "iAA"
+          ],
+          "relationships": []
+        },
+        "clips": {}
+      }
+    },
+    {
+      "timeline": "program",
+      "position": 1,
+      "expect": {
+        "live": {
+          "systems": [
+            "sysA",
+            "sysB",
+            "sysL"
+          ],
+          "subsystems": [
+            "subA",
+            "subB",
+            "subL",
+            "subR"
+          ],
+          "components": [
+            "compA",
+            "compL"
+          ],
+          "users": [
+            "u1"
+          ],
+          "interfaces": [
+            "iAL",
+            "iAA",
+            "iUB"
+          ],
+          "relationships": [
+            "r1"
+          ]
+        },
+        "clips": {}
+      }
+    },
+    {
+      "timeline": "program",
+      "position": 2,
+      "expect": {
+        "live": {
+          "systems": [
+            "sysA",
+            "sysB"
+          ],
+          "subsystems": [
+            "subA",
+            "subB",
+            "subG",
+            "subR"
+          ],
+          "components": [
+            "compA"
+          ],
+          "users": [
+            "u1"
+          ],
+          "interfaces": [
+            "iAA",
+            "iUB",
+            "iAB"
+          ],
+          "relationships": [
+            "r1"
+          ]
+        },
+        "clips": {
+          "subsystems": [
+            {
+              "id": "subL",
+              "by": "sysL"
+            }
+          ],
+          "components": [
+            {
+              "id": "compL",
+              "by": "sysL"
+            }
+          ],
+          "interfaces": [
+            {
+              "id": "iAL",
+              "by": "sysL"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "timeline": "alt",
+      "position": 2,
+      "expect": {
+        "live": {
+          "systems": [
+            "sysA",
+            "sysB",
+            "sysL"
+          ],
+          "subsystems": [
+            "subA",
+            "subB",
+            "subL",
+            "subR"
+          ],
+          "components": [
+            "compA",
+            "compL"
+          ],
+          "users": [
+            "u1"
+          ],
+          "interfaces": [
+            "iAL",
+            "iAA",
+            "iUB"
+          ],
+          "relationships": [
+            "r1"
+          ]
+        },
+        "clips": {}
+      }
+    }
+  ],
+  "diff": [
+    {
+      "timeline": "program",
+      "a": 1,
+      "b": 2,
+      "expect": {
+        "added": [
+          {
+            "kind": "subsystems",
+            "id": "subG",
+            "name": "Gateway v2"
+          },
+          {
+            "kind": "interfaces",
+            "id": "iAB",
+            "name": "Sync alpha to beta"
+          }
+        ],
+        "removed": [
+          {
+            "kind": "systems",
+            "id": "sysL",
+            "name": "Legacy Suite",
+            "clipped_by": null
+          },
+          {
+            "kind": "subsystems",
+            "id": "subL",
+            "name": "Legacy Store",
+            "clipped_by": "sysL"
+          },
+          {
+            "kind": "components",
+            "id": "compL",
+            "name": "Legacy Records",
+            "clipped_by": "sysL"
+          },
+          {
+            "kind": "interfaces",
+            "id": "iAL",
+            "name": "Read legacy records",
+            "clipped_by": "sysL"
+          }
+        ],
+        "changed": [
+          {
+            "kind": "subsystems",
+            "id": "subR",
+            "changes": [
+              {
+                "field": "description",
+                "old": "Legacy registry",
+                "new": "Rewritten registry"
+              },
+              {
+                "field": "properties.owner",
+                "old": "core",
+                "new": "platform"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "timeline": "program",
+      "a": 0,
+      "b": 1,
+      "expect": {
+        "added": [
+          {
+            "kind": "systems",
+            "id": "sysB",
+            "name": "Beta Services"
+          },
+          {
+            "kind": "subsystems",
+            "id": "subB",
+            "name": "Beta API"
+          },
+          {
+            "kind": "interfaces",
+            "id": "iUB",
+            "name": "Operate beta"
+          },
+          {
+            "kind": "relationships",
+            "id": "r1",
+            "name": "governs"
+          }
+        ],
+        "removed": [
+          {
+            "kind": "subsystems",
+            "id": "subG",
+            "name": "Gateway",
+            "clipped_by": null
+          }
+        ],
+        "changed": []
+      }
+    },
+    {
+      "timeline": "alt",
+      "a": 1,
+      "b": 2,
+      "expect": {
+        "added": [],
+        "removed": [],
+        "changed": []
+      }
+    }
+  ],
+  "scope": [
+    {
+      "timeline": "program",
+      "position": 0,
+      "systems": [
+        "sysA"
+      ],
+      "hops": 1,
+      "expect": {
+        "kept": [
+          "systems:sysA",
+          "systems:sysL"
+        ],
+        "stubs": [],
+        "interfaces": [
+          "iAL",
+          "iAA"
+        ],
+        "relationships": []
+      }
+    },
+    {
+      "timeline": "program",
+      "position": 2,
+      "systems": [
+        "sysA"
+      ],
+      "hops": 1,
+      "expect": {
+        "kept": [
+          "systems:sysA",
+          "systems:sysB"
+        ],
+        "stubs": [
+          "users:u1"
+        ],
+        "interfaces": [
+          "iAA",
+          "iUB",
+          "iAB"
+        ],
+        "relationships": [
+          "r1"
+        ]
+      }
+    },
+    {
+      "timeline": "program",
+      "position": 2,
+      "systems": [
+        "sysA"
+      ],
+      "hops": 0,
+      "expect": {
+        "kept": [
+          "systems:sysA"
+        ],
+        "stubs": [
+          "systems:sysB"
+        ],
+        "interfaces": [
+          "iAA",
+          "iAB"
+        ],
+        "relationships": [
+          "r1"
+        ]
+      }
+    }
+  ],
+  "rollup": [
+    {
+      "timeline": "program",
+      "position": 2,
+      "level": "systems",
+      "expect": {
+        "nodes": [
+          "systems:sysA",
+          "systems:sysB",
+          "users:u1"
+        ],
+        "edges": [
+          {
+            "a": "systems:sysA",
+            "b": "systems:sysB",
+            "interfaces": [
+              "iAB"
+            ],
+            "relationships": [
+              "r1"
+            ]
+          },
+          {
+            "a": "systems:sysB",
+            "b": "users:u1",
+            "interfaces": [
+              "iUB"
+            ],
+            "relationships": []
+          }
+        ]
+      }
+    },
+    {
+      "timeline": "program",
+      "position": 2,
+      "level": "subsystems",
+      "expect": {
+        "nodes": [
+          "subsystems:subA",
+          "subsystems:subB",
+          "subsystems:subG",
+          "subsystems:subR",
+          "systems:sysA",
+          "systems:sysB",
+          "users:u1"
+        ],
+        "edges": [
+          {
+            "a": "subsystems:subA",
+            "b": "subsystems:subB",
+            "interfaces": [
+              "iAB"
+            ],
+            "relationships": []
+          },
+          {
+            "a": "subsystems:subA",
+            "b": "subsystems:subR",
+            "interfaces": [
+              "iAA"
+            ],
+            "relationships": []
+          },
+          {
+            "a": "subsystems:subB",
+            "b": "users:u1",
+            "interfaces": [
+              "iUB"
+            ],
+            "relationships": []
+          },
+          {
+            "a": "systems:sysA",
+            "b": "systems:sysB",
+            "interfaces": [],
+            "relationships": [
+              "r1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "timeline": "program",
+      "level": "systems",
+      "union": true,
+      "expect": {
+        "nodes": [
+          "systems:sysA",
+          "systems:sysB",
+          "systems:sysL",
+          "users:u1"
+        ],
+        "edges": [
+          {
+            "a": "systems:sysA",
+            "b": "systems:sysB",
+            "interfaces": [
+              "iAB"
+            ],
+            "relationships": [
+              "r1"
+            ]
+          },
+          {
+            "a": "systems:sysA",
+            "b": "systems:sysL",
+            "interfaces": [
+              "iAL"
+            ],
+            "relationships": []
+          },
+          {
+            "a": "systems:sysB",
+            "b": "users:u1",
+            "interfaces": [
+              "iUB"
+            ],
+            "relationships": []
+          }
+        ]
+      }
+    }
+  ]
+}
