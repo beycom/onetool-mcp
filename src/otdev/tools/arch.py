@@ -4,7 +4,16 @@ from __future__ import annotations
 
 pack = "arch"
 
-__all__ = ["advance", "diff", "init", "resolve", "validate"]
+__all__ = [
+    "advance",
+    "convert",
+    "diff",
+    "export",
+    "import_excel",
+    "init",
+    "resolve",
+    "validate",
+]
 
 from typing import Any
 
@@ -15,6 +24,7 @@ from otdev.tools._arch.v3.api import (
     resolve_file,
     validate_file,
 )
+from otdev.tools._arch.v3.excel import export_workbook, import_workbook
 from otdev.tools._arch.v3.resolver import StateSelector
 from otpack import LogSpan, resolve_cwd_path
 
@@ -76,3 +86,29 @@ def advance(*, input_path: str, through: str) -> dict[str, Any]:
     """Rewrite a file after advancing its baseline through a milestone."""
     with LogSpan(span="arch.advance", inputPath=input_path, through=through):
         return advance_file(resolve_cwd_path(input_path), through)
+
+
+def import_excel(*, input_path: str, output_path: str) -> dict[str, Any]:
+    """Import an Excel workbook into canonical schema-v3 YAML."""
+    with LogSpan(
+        span="arch.import_excel", inputPath=input_path, outputPath=output_path
+    ):
+        return import_workbook(
+            resolve_cwd_path(input_path), resolve_cwd_path(output_path)
+        )
+
+
+def convert(*, input_path: str, output_path: str) -> dict[str, Any]:
+    """Import an Excel workbook into canonical schema-v3 YAML."""
+    with LogSpan(span="arch.convert", inputPath=input_path, outputPath=output_path):
+        return import_workbook(
+            resolve_cwd_path(input_path), resolve_cwd_path(output_path)
+        )
+
+
+def export(*, input_path: str, output_path: str) -> dict[str, Any]:
+    """Export canonical schema-v3 YAML to an Excel workbook."""
+    with LogSpan(span="arch.export", inputPath=input_path, outputPath=output_path):
+        return export_workbook(
+            resolve_cwd_path(input_path), resolve_cwd_path(output_path)
+        )

@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, cast
 from rich.console import Console
 
 from .api import advance_file, diff_file, init_file, resolve_file, validate_file
+from .excel import export_workbook, generate_template, import_workbook
 from .resolver import ResolverError, StateSelector
 from .yamlio import ArchitectureLoadError, dump_architecture, load_architecture
 
@@ -19,7 +20,9 @@ if TYPE_CHECKING:
 
 
 def _command(subparsers: Any, name: str, help_text: str) -> argparse.ArgumentParser:
-    command = cast("argparse.ArgumentParser", subparsers.add_parser(name, help=help_text))
+    command = cast(
+        "argparse.ArgumentParser", subparsers.add_parser(name, help=help_text)
+    )
     command.add_argument("--json", action="store_true", help="emit JSON")
     return command
 
@@ -47,6 +50,16 @@ def _parser() -> argparse.ArgumentParser:
     baseline = _command(commands, "advance", "advance the architecture baseline")
     baseline.add_argument("file", type=Path)
     baseline.add_argument("--through", required=True)
+    excel_import = _command(
+        commands, "import-excel", "import Excel into canonical YAML"
+    )
+    excel_import.add_argument("workbook", type=Path)
+    excel_import.add_argument("file", type=Path)
+    excel_export = _command(commands, "export", "export canonical YAML to Excel")
+    excel_export.add_argument("file", type=Path)
+    excel_export.add_argument("workbook", type=Path)
+    template = _command(commands, "template", "generate an empty Excel template")
+    template.add_argument("workbook", type=Path)
     return parser
 
 
@@ -94,8 +107,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 StateSelector(args.at_a, args.timeline_a),
                 StateSelector(args.at_b, args.timeline_b),
             )
-        else:
+        elif args.command == "advance":
             payload = advance_file(args.file, args.through)
+        elif args.command == "import-excel":
+            payload = import_workbook(args.workbook, args.file)
+        elif args.command == "export":
+            payload = export_workbook(args.file, args.workbook)
+        else:
+            generate_template(args.workbook)
+            payload = {"ok": True, "path": str(args.workbook)}
     except (ArchitectureLoadError, ResolverError, OSError, ValueError) as exc:
         payload = {"ok": False, "error": str(exc)}
     if args.json:

@@ -167,21 +167,22 @@ Owner doc: schema.md.
 
 Owner doc: adapters.md. Entire build chunk is one delegation. `→ D5`
 
-- [ ] Adapter interface: `read(source) -> Architecture`, `write(arch, target)`.
-- [ ] Workbook read: 9 sheets, header normalization, `[a;b]` lists, extra
+- [x] Adapter interface: `read(source) -> Architecture`, `write(arch, target)`.
+- [x] Workbook read: 9 sheets, header normalization, `[a;b]` lists, extra
       columns → properties, Timelines block ordering (harvest v2 parsing).
-- [ ] Workbook write + generated template: dropdown validation for enums and
+- [x] Workbook write + generated template: dropdown validation for enums and
       milestone refs, revision-row banding. Write is mode-aware: existing
       target → in-place data-row update preserving formatting/tables
       (refuse if the workbook holds charts/images — openpyxl drops them);
       see adapters.md "Write modes".
-- [ ] Tabular error contract: sheet/row/column/field, all locations, atomic
+- [x] Tabular error contract: sheet/row/column/field, all locations, atomic
       failed import.
-- [ ] Tools: `arch.import_excel` (under `arch.convert`), `arch.export`.
-- [ ] Round-trip model-equality tests on the acme fixture.
-- [ ] **Gate (architect + user):** edit acme in Excel (add milestone, retire
+- [x] Tools: `arch.import_excel` (under `arch.convert`), `arch.export`.
+- [x] Round-trip model-equality tests on the acme fixture.
+- [x] **Gate (architect + user):** edit acme in Excel (add milestone, retire
       system, revise subsystem) → import → diff shows exactly those three
-      edits.
+      edits. (Architect ran the scripted equivalent — see log; user may
+      still repeat it by hand in Excel and veto.)
 
 ## Phase 3 — Report app (budget: 5,000 TS/TSX + 400 py lines)
 
@@ -236,6 +237,42 @@ None yet. Format: `branch-name — question being explored — outcome`.
    sparse early states (risk table; decide only with the acme report open).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-23** — Phase-2 gate PASSED (architect review); D5 committed by
+  architect (rule 8). Re-verified: 63 arch tests, `just lint` clean, CLI +
+  excel module import with zero runtime modules loaded. Gate exercise run
+  scripted (openpyxl standing in for hand edits): exported acme, added
+  milestone `acme-2032-fraud-consolidation` (+ Timelines row), retired
+  `fraud-provider` via `until`, added a `tax-api` revision row → import →
+  diff(2031→2032) shows exactly the retirement (system + 3 descendants
+  correctly `clipped_by: fraud-provider`) and the name/description revision;
+  nothing spurious. A first attempt that left the revision row's property
+  cells blank correctly diffed those properties as removed — complete-record
+  semantics working as designed. In-place export back onto the edited
+  workbook preserved the user `Notes` sheet and resized the table ref.
+  Code review: adapter sound; one noted minor limitation — in update mode a
+  hand-authored DataValidation object spanning several controlled columns
+  collapses to the last matched column (generated workbooks use one
+  validation per column, unaffected); accept, revisit only if a real
+  workbook trips it. User may repeat the gate edit by hand in Excel and
+  veto. Next action: Phase 3 — architect payload JSON spec (unblocks D6).
+
+- **2026-08-23** — D5 complete. Added the schema-v3 Excel reader, new-workbook
+  writer, atomic in-place updater, generated template, standalone CLI commands,
+  and `arch.import_excel` / `arch.convert` / `arch.export` facade tools. Source:
+  `excel.py` 752 lines, CLI +20, facade +36 = 808 / 900 budget. Tests: 2 new
+  control tests; 63 arch tests pass. `just lint` is clean. Manual checks also
+  confirmed user-sheet and cell-style preservation, facade and CLI round trips,
+  and runtime-independent imports. Assumptions: the dated in-place contract in
+  adapters.md supersedes v2's new-workbook-only export rule; Milestone `tags` is
+  reserved in Excel because the required acme model-equality round trip contains
+  milestone tags; user-added sheets are ignored on read and preserved on update;
+  CLI operands are `import-excel WORKBOOK YAML`, `export YAML WORKBOOK`, and
+  `template WORKBOOK`, while facade tools use `input_path` / `output_path`;
+  template generation refuses to overwrite; an existing workbook must have one
+  table per canonical sheet and all property columns needed by the model because
+  update-in-place keeps headers unchanged. No open questions. Next action:
+  architect phase-2 gate; changes deliberately left uncommitted for review.
 
 - **2026-08-23** — Design decision (user + architect): `write(arch, target)`
   gains an update-in-place mode — existing workbook keeps formatting,
