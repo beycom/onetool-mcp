@@ -1,0 +1,1844 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ACME Architecture Reports</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.9/styles/ag-grid.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.9/styles/ag-theme-quartz.css">
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, system-ui, sans-serif;
+      --ink: #1f2930;
+      --muted: #69777f;
+      --line: #e1e7ea;
+      --wash: #f6f8f9;
+      --paper: #fff;
+      --dark: #273740;
+      --accent: #147c91;
+      --accent-soft: #edf7f8;
+      --selected: #eef8fa;
+      --reach: #f6f1e7;
+      --danger: #98413a;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; overflow-x: clip; }
+    body { background: #fff; color: var(--ink); }
+    button, select, input { font: inherit; }
+    button { cursor: pointer; }
+    :focus-visible { outline: 3px solid rgb(11 120 147 / 35%); outline-offset: 2px; }
+
+    .app {
+      display: block;
+      min-height: 100vh;
+    }
+    .topbar {
+      align-items: flex-start;
+      background: white;
+      border-bottom: 1px solid #edf1f3;
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 22px clamp(12px, 1.5vw, 28px) 16px;
+      z-index: 30;
+    }
+    .title b { display: block; font-size: 24px; letter-spacing: -.025em; }
+    .title span { color: var(--muted); display: block; font-size: 11px; margin-top: 5px; }
+    .global-controls {
+      align-items: end;
+      display: flex;
+      gap: 18px;
+      padding-bottom: 14px;
+      width: 100%;
+    }
+    .field label {
+      color: var(--muted);
+      display: block;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+    }
+    .field select {
+      background: white;
+      border: 1px solid #d4dde1;
+      border-radius: 2px;
+      color: var(--ink);
+      font-size: 12px;
+      min-height: 36px;
+      min-width: 220px;
+      padding: 6px 30px 6px 9px;
+    }
+    .button {
+      background: white;
+      border: 1px solid #dbe2e5;
+      border-radius: 2px;
+      color: #34444d;
+      font-size: 9px;
+      font-weight: 650;
+      min-height: 26px;
+      padding: 4px 7px;
+    }
+    .button.icon-button {
+      align-items: center;
+      display: inline-flex;
+      justify-content: center;
+      min-width: 27px;
+      padding: 2px 5px;
+    }
+    .button.icon-button svg {
+      fill: none;
+      height: 14px;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.8;
+      width: 14px;
+    }
+    dialog {
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      color: var(--ink);
+      max-width: min(520px, calc(100vw - 24px));
+      padding: 0;
+      width: 100%;
+    }
+    dialog::backdrop { background: rgb(15 28 37 / 38%); }
+    .dialog-head {
+      align-items: center;
+      background: #fafbfb;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 12px;
+    }
+    .dialog-head b { font-size: 12px; }
+    .dialog-body { padding: 12px; }
+    .dialog-actions {
+      border-top: 1px solid var(--line);
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+      padding: 9px 12px;
+    }
+    .text-field {
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      font-size: 10px;
+      min-height: 30px;
+      padding: 5px 7px;
+      width: 100%;
+    }
+    .column-list { display: grid; gap: 4px; margin-top: 9px; }
+    .column-config-row {
+      align-items: center;
+      background: var(--wash);
+      border-radius: 1px;
+      display: grid;
+      font-size: 9px;
+      gap: 6px;
+      grid-template-columns: auto minmax(0, 1fr) 110px;
+      padding: 5px 6px;
+    }
+    .column-config-row select {
+      background: white;
+      border: 1px solid #dbe2e5;
+      border-radius: 1px;
+      font-size: 9px;
+      min-height: 26px;
+      padding: 3px 5px;
+    }
+    .yaml-preview {
+      background: #182731;
+      border-radius: 2px;
+      color: #d7e5ec;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 8px;
+      margin-top: 9px;
+      max-height: 130px;
+      overflow: auto;
+      padding: 8px;
+      white-space: pre-wrap;
+    }
+
+    .layout-shell {
+      margin: 0;
+      max-width: none;
+      overflow: visible;
+      padding: 0 clamp(12px, 1.5vw, 28px) 32px;
+      width: 100%;
+    }
+    .scope-builder {
+      padding: 24px 0 30px;
+    }
+    .scope-heading,
+    .report-control-bar {
+      align-items: flex-end;
+      display: flex;
+      gap: 18px;
+      justify-content: space-between;
+    }
+    .scope-heading h2,
+    .report-control-bar h2 {
+      font-size: 17px;
+      letter-spacing: -.015em;
+      margin: 0;
+    }
+    .scope-heading p,
+    .report-control-bar p {
+      color: var(--muted);
+      font-size: 10px;
+      margin: 4px 0 0;
+    }
+    .scope-content { margin-top: 16px; }
+    .scope-toolbar {
+      align-items: center;
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+      margin-bottom: 9px;
+    }
+    .scope-toolbar > div { align-items: center; display: flex; gap: 6px; }
+    .scope-table-wrap {
+      border-bottom: 1px solid #edf1f3;
+      border-top: 1px solid #e4e9ec;
+      border-radius: 0;
+      overflow-x: auto;
+    }
+    .scope-table { font-family: Inter, system-ui, sans-serif; font-size: 10px; }
+    .scope-table th { background: #f8f9fa; font-size: 10px; padding: 8px 9px; }
+    .scope-table td { border-bottom: 0; padding: 9px; }
+    .scope-table b { font-weight: 400; }
+    .scope-table .scope-check { text-align: center; width: 42px; }
+    .scope-table tbody tr {
+      cursor: pointer;
+    }
+    .scope-table tbody tr:hover { background: #f7fafb; }
+    .scope-table tbody tr:has(input:checked) {
+      background: var(--selected);
+    }
+    .scope-table input { margin: 0; }
+    .scope-pagination {
+      align-items: center;
+      color: var(--muted);
+      display: flex;
+      font-size: 9px;
+      gap: 7px;
+      justify-content: flex-end;
+      padding-top: 8px;
+    }
+    .scope-pagination[hidden] { display: none; }
+    .scope-actions {
+      align-items: center;
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
+    .scope-actions p { color: var(--muted); font-size: 9px; margin: 0; }
+    .button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+      font-size: 10px;
+      min-height: 34px;
+      padding-inline: 14px;
+    }
+    .scope-builder.submitted { display: none; }
+    #report-shell[hidden] { display: none; }
+    .report-control-bar {
+      align-items: flex-start;
+      border-bottom: 0;
+      flex-direction: column;
+      gap: 14px;
+      padding: 24px 0 16px;
+    }
+    .report-control-bar .global-controls {
+      justify-content: flex-start;
+      padding: 0;
+      width: 100%;
+    }
+    .report-control-bar .field select { min-width: 190px; }
+    .report-summary { align-items: center; display: flex; gap: 10px; min-width: 260px; }
+    .report-summary .kind { display: block; margin-top: 7px; }
+    .report { display: block; }
+    .section {
+      background: transparent;
+      border: 0;
+      border-bottom: 0;
+      border-radius: 0;
+      margin: 0;
+      min-width: 0;
+      overflow: visible;
+    }
+    .section-header {
+      align-items: center;
+      background: #f7f9fa;
+      border: 0;
+      border-bottom: 0;
+      border-left: 2px solid #dce5e8;
+      display: flex;
+      justify-content: space-between;
+      margin-top: 18px;
+      min-height: 40px;
+      overflow: hidden;
+      padding: 9px 12px;
+      position: relative;
+      text-align: left;
+      width: 100%;
+    }
+    .section.open-focus .section-header { border-left-color: var(--accent); }
+    .section-header:hover { background: #f2f6f7; }
+    .section-title { align-items: baseline; display: flex; gap: 8px; }
+    .section-title b { font-size: 15px; }
+    .section-title span { color: var(--muted); font-size: 9px; }
+    .section-actions { align-items: center; display: flex; gap: 5px; }
+    .section-actions .button { pointer-events: auto; }
+    .disclosure {
+      align-items: center;
+      background: #e9f1f3;
+      border-radius: 1px;
+      color: var(--accent);
+      display: inline-flex;
+      font-size: 12px;
+      height: 18px;
+      justify-content: center;
+      width: 18px;
+    }
+    .section-body { padding: 12px 0 22px; }
+    .section.closed .section-body { display: none; }
+    .section.closed .section-header {
+      background: #f4f7f8;
+      border-bottom: 0;
+      border-left-color: #c8d8dd;
+    }
+    .section.closed .section-header::after {
+      border-color: transparent #a9c9d1 transparent transparent;
+      border-style: solid;
+      border-width: 0 18px 18px 0;
+      content: "";
+      height: 0;
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: 0;
+    }
+    .section.closed .disclosure { transform: rotate(-90deg); }
+
+    .grid-toolbar {
+      align-items: center;
+      display: flex;
+      gap: 6px;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .grid-toolbar .left,
+    .grid-toolbar .right { align-items: center; display: flex; gap: 5px; }
+    .grid-toolbar .right:has(.section-field) { align-items: flex-end; }
+    .section-field label { font-size: 7px; margin-bottom: 3px; }
+    .section-field select {
+      font-size: 10px;
+      min-height: 30px;
+      min-width: 165px;
+      padding: 4px 26px 4px 7px;
+    }
+    .search {
+      border: 1px solid #dbe2e5;
+      border-radius: 1px;
+      font-size: 10px;
+      min-height: 30px;
+      padding: 5px 8px;
+      width: 220px;
+    }
+    .segmented {
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      padding: 0;
+    }
+    .segmented button {
+      background: transparent;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+      color: var(--muted);
+      font-size: 8px;
+      padding: 7px 9px 5px;
+    }
+    .segmented button.active { border-bottom-color: var(--accent); color: var(--ink); font-weight: 800; }
+    .ag-grid-mock {
+      border: 0;
+      border-radius: 0;
+      max-height: 210px;
+      overflow: auto;
+    }
+    .actual-grid {
+      --ag-background-color: #fff;
+      --ag-border-color: transparent;
+      --ag-border-radius: 0;
+      --ag-font-family: Inter, system-ui, sans-serif;
+      --ag-font-size: 10px;
+      --ag-header-background-color: #f8f9fa;
+      --ag-header-height: 32px;
+      --ag-odd-row-background-color: #fff;
+      --ag-row-border-color: transparent;
+      --ag-row-border-width: 0px;
+      --ag-row-height: 30px;
+      --ag-selected-row-background-color: var(--selected);
+      height: auto;
+      min-height: 0;
+      overflow: hidden;
+      width: 100%;
+    }
+    .actual-grid .ag-layout-auto-height .ag-center-cols-container,
+    .actual-grid .ag-layout-auto-height .ag-center-cols-viewport,
+    .actual-grid.ag-layout-auto-height .ag-center-cols-container,
+    .actual-grid.ag-layout-auto-height .ag-center-cols-viewport {
+      min-height: 0 !important;
+    }
+    .actual-grid .ag-root-wrapper { border: 0; border-radius: 0; }
+    .actual-grid .ag-header { border-bottom: 1px solid #e5ebee; }
+    .actual-grid .ag-cell { border-right: 0 !important; }
+    .actual-grid .ag-row { border: 0 !important; }
+    .actual-grid .ag-row-hover { background-color: #fafcfc !important; }
+    .actual-grid .ag-paging-panel {
+      border-top: 0;
+      min-width: 0;
+      overflow-x: auto;
+    }
+    table { border-collapse: collapse; font-size: 8px; width: 100%; }
+    thead { position: sticky; top: 0; z-index: 2; }
+    th {
+      background: #edf1f3;
+      color: #52636f;
+      font-weight: 800;
+      text-align: left;
+    }
+    th, td { border-bottom: 1px solid #edf1f3; padding: 5px 6px; white-space: nowrap; }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover { background: #f7fafb; }
+    tbody tr.selected { background: var(--selected); }
+    tbody tr.out-of-scope { color: #9aa6ad; opacity: .58; }
+    .component-row { display: none; }
+    .show-components .component-row { display: table-row; }
+    .component-name { padding-left: 20px; }
+    .kind { color: var(--muted); font-size: 7px; text-transform: uppercase; }
+    .tag {
+      background: #f2f5f6;
+      border-radius: 999px;
+      display: inline-block;
+      margin-right: 2px;
+      padding: 2px 4px;
+    }
+    .reach {
+      background: var(--reach);
+      border-radius: 999px;
+      color: #7d5718;
+      display: inline-block;
+      font-weight: 750;
+      padding: 2px 4px;
+    }
+    .status {
+      border-radius: 999px;
+      display: inline-block;
+      font-weight: 800;
+      padding: 2px 4px;
+    }
+    .status.changed { background: #fff1d8; color: #945c06; }
+    .status.added { background: #edf6f1; color: #2d6b4c; }
+    .status.removed { background: #faf0ef; color: var(--danger); }
+    .status.current { background: #f2f5f6; color: #63727a; }
+
+    .diagram-list { display: grid; gap: 7px; }
+    .diagram-card {
+      border: 0;
+      border-radius: 0;
+      min-width: 0;
+      overflow: visible;
+    }
+    .diagram-card-header {
+      align-items: center;
+      background: white;
+      border-bottom: 0;
+      display: flex;
+      justify-content: space-between;
+      min-height: 34px;
+      padding: 6px 0 8px;
+    }
+    .diagram-card-header.actions-only { justify-content: flex-end; }
+    .diagram-card-header b { display: block; font-size: 12px; }
+    .diagram-card-header span { color: var(--muted); display: block; font-size: 8px; margin-top: 2px; }
+    .diagram-card-header > div:last-child { align-items: flex-end; display: flex; gap: 6px; }
+    .diagram-card-header .field { min-width: 150px; }
+    .diagram-card-header .field label { margin-bottom: 2px; }
+    .diagram-card-header .field select {
+      font-size: 9px;
+      min-height: 26px;
+      min-width: 150px;
+      padding: 3px 26px 3px 7px;
+    }
+    .diagram-card-header .button { height: 26px; min-height: 26px; }
+    .diagram-card.collapsed .diagram-stage { display: none; }
+    .diagram-card.collapsed .diagram-card-header { border-bottom: 0; }
+    .diagram-stage {
+      background-color: #fbfcfc;
+      background-image: none;
+      border-bottom: 0;
+      height: 420px;
+      position: relative;
+    }
+    .diagram-stage.small { height: 230px; }
+    .diagram-stage svg { height: 100%; inset: 0; position: absolute; width: 100%; }
+    .diagram-node {
+      background: white;
+      border: 1px solid #c8d2d7;
+      border-radius: 1px;
+      padding: 6px 7px;
+      position: absolute;
+      width: 112px;
+      z-index: 2;
+    }
+    .diagram-node strong { display: block; font-size: 8px; }
+    .diagram-node span { color: var(--muted); display: block; font-size: 6px; margin-top: 2px; }
+    .diagram-node.highlighted {
+      border: 2px solid var(--accent);
+    }
+    .diagram-edge { fill: none; stroke: #91a4b0; stroke-width: 2; }
+    .diagram-edge.highlighted { stroke: var(--accent); stroke-width: 5; }
+    .d-customer { left: 7%; top: 43%; }
+    .d-edge { left: 39%; top: 13%; }
+    .d-commerce { left: 40%; top: 50%; }
+    .d-erp { right: 7%; top: 32%; }
+    .d-analytics { right: 9%; top: 70%; }
+    .diagram-tools {
+      display: flex;
+      gap: 3px;
+      left: 7px;
+      position: absolute;
+      top: 7px;
+      z-index: 3;
+    }
+    .diagram-tools .button { min-height: 25px; }
+    .diagram-card.popout {
+      background: white;
+      border: 0;
+      border-radius: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      height: 100dvh;
+      inset: 0;
+      overflow: hidden;
+      position: fixed;
+      z-index: 200;
+    }
+    html.diagram-popout-open,
+    body.diagram-popout-open {
+      height: 100%;
+      overflow: hidden;
+    }
+    .diagram-card.popout .diagram-stage,
+    .diagram-card.popout #solution-stage,
+    .diagram-card.popout .diagram-stage.small {
+      height: auto !important;
+      min-height: 0 !important;
+    }
+    .sequence {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(4, 1fr);
+      height: 100%;
+      padding: 24px 35px 15px;
+    }
+    .attachment-stage {
+      align-items: center;
+      display: flex;
+      justify-content: center;
+      margin: 0;
+      overflow: auto;
+      padding: 20px;
+    }
+    .attachment-stage svg {
+      height: auto;
+      max-height: 100%;
+      max-width: 100%;
+      min-width: 620px;
+    }
+    .attachment-note {
+      color: var(--muted);
+      font-size: 11px;
+      margin-right: auto;
+    }
+    .lifeline { border-left: 1px dashed #9cadb7; position: relative; }
+    .lifeline b {
+      background: white;
+      border: 1px solid #cbd4d8;
+      border-radius: 1px;
+      display: block;
+      font-size: 7px;
+      left: -40px;
+      padding: 5px;
+      position: absolute;
+      text-align: center;
+      top: -12px;
+      width: 80px;
+    }
+    .message {
+      border-top: 1px solid #667c89;
+      font-size: 6px;
+      left: 0;
+      padding-top: 2px;
+      position: absolute;
+      width: calc(300% + 24px);
+    }
+    .m1 { top: 55px; }
+    .m2 { top: 100px; width: calc(200% + 16px); }
+    .m3 { top: 145px; }
+    .additional-diagrams { margin-top: 22px; }
+    .diagram-tabs {
+      border-bottom: 1px solid #e8edef;
+      display: flex;
+      gap: 18px;
+      overflow-x: auto;
+    }
+    .diagram-tabs button {
+      background: transparent;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 9px 1px 7px;
+      white-space: nowrap;
+    }
+    .diagram-tabs button[aria-selected="true"] {
+      border-bottom-color: var(--accent);
+      color: var(--ink);
+    }
+    [data-diagram-panel][hidden] { display: none; }
+
+    /* v1 report visual language: roomy type, soft cards, blue actions and
+       readable tables, retained in the full-width v2 report structure. */
+    :root {
+      --ink: #1e293b;
+      --muted: #64748b;
+      --line: #dbe3ed;
+      --wash: #f8fafc;
+      --accent: #2563eb;
+      --accent-soft: #eff6ff;
+      --selected: #eff6ff;
+      --reach: #fef3c7;
+      --danger: #b91c1c;
+    }
+    body { background: #fff; font-size: 14px; }
+    .topbar {
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 24px clamp(20px, 3vw, 48px);
+    }
+    .title b { font-size: 26px; font-weight: 750; }
+    .title span { font-size: 13px; margin-top: 6px; }
+    .layout-shell { padding: 0 clamp(20px, 3vw, 48px) 56px; }
+    .report-home { padding: 34px 0 20px; }
+    .report-home[hidden], .scope-builder[hidden] { display: none; }
+    .home-heading {
+      align-items: end;
+      display: flex;
+      gap: 24px;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .home-heading h1 { font-size: 22px; margin: 0; }
+    .home-heading p { color: var(--muted); font-size: 13px; margin: 5px 0 0; }
+    .report-library {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    }
+    .report-card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 1px 2px rgb(15 23 42 / 5%);
+      display: flex;
+      flex-direction: column;
+      min-height: 220px;
+      padding: 20px;
+      text-align: left;
+    }
+    .report-card:hover {
+      border-color: #93c5fd;
+      box-shadow: 0 8px 24px rgb(15 23 42 / 8%);
+      transform: translateY(-1px);
+    }
+    .report-card .eyebrow {
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .report-card h2 { font-size: 17px; margin: 10px 0 7px; }
+    .report-card > p { color: var(--muted); font-size: 12px; line-height: 1.55; margin: 0; }
+    .report-card .report-card-actions {
+      align-items: center;
+      display: flex;
+      justify-content: space-between;
+      margin-top: auto;
+      padding-top: 18px;
+    }
+    .report-counts { display: flex; gap: 18px; }
+    .report-counts span { color: var(--muted); display: block; font-size: 10px; }
+    .report-counts strong { color: var(--ink); display: block; font-size: 18px; margin-bottom: 2px; }
+    .new-report-card {
+      align-items: center;
+      background: transparent;
+      border: 1px dashed #94a3b8;
+      justify-content: center;
+      text-align: center;
+    }
+    .new-report-card .plus {
+      align-items: center;
+      background: #dbeafe;
+      border-radius: 999px;
+      color: var(--accent);
+      display: flex;
+      font-size: 27px;
+      height: 44px;
+      justify-content: center;
+      width: 44px;
+    }
+    .scope-builder { padding: 34px 0; }
+    .scope-heading h2, .report-control-bar h2 { font-size: 20px; }
+    .scope-heading p, .report-control-bar p { font-size: 12px; }
+    .scope-table-wrap {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+    }
+    .scope-table { font-size: 13px; }
+    .scope-table th { background: #f8fafc; font-size: 12px; padding: 11px 12px; }
+    .scope-table td { border-bottom: 1px solid #f1f5f9; padding: 11px 12px; }
+    .scope-table b { font-weight: 600; }
+    .button {
+      border-color: #cbd5e1;
+      border-radius: 6px;
+      color: #334155;
+      font-size: 12px;
+      min-height: 32px;
+      padding: 6px 10px;
+    }
+    .button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      font-size: 12px;
+      min-height: 38px;
+      padding-inline: 16px;
+    }
+    .field label { font-size: 10px; }
+    .field select {
+      border-color: #cbd5e1;
+      border-radius: 6px;
+      font-size: 13px;
+      min-height: 40px;
+    }
+    .search {
+      border-color: #cbd5e1;
+      border-radius: 6px;
+      font-size: 12px;
+      min-height: 36px;
+      width: 270px;
+    }
+    .report-control-bar {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 1px 2px rgb(15 23 42 / 5%);
+      margin-top: 18px;
+      padding: 20px;
+    }
+    .report-navigation {
+      align-items: center;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      gap: 14px;
+      justify-content: space-between;
+      padding: 18px 2px 14px;
+    }
+    .report-navigation .button { min-height: 40px; }
+    .report-summary {
+      align-items: flex-start;
+      justify-content: space-between;
+      width: 100%;
+    }
+    .report-summary > div p { color: var(--muted); font-size: 12px; margin: 4px 0 0; }
+    .report-settings {
+      align-items: flex-end;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+    .report-settings .field select { min-width: 220px; }
+    .report-settings .button { min-height: 40px; }
+    .report-stats {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      margin: 16px 0 28px;
+      overflow: hidden;
+    }
+    .report-stat { border-right: 1px solid #e2e8f0; padding: 17px 20px; }
+    .report-stat:last-child { border-right: 0; }
+    .report-stat span { color: var(--muted); display: block; font-size: 11px; }
+    .report-stat strong { display: block; font-size: 25px; margin-top: 3px; }
+    .section {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 1px 2px rgb(15 23 42 / 5%);
+      margin-bottom: 18px;
+      overflow: hidden;
+    }
+    #systems-section,
+    #apps-section,
+    #interfaces-section {
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+      overflow: visible;
+    }
+    #systems-section .section-body,
+    #apps-section .section-body,
+    #interfaces-section .section-body {
+      padding-inline: 0;
+    }
+    .section-header {
+      background: #fff;
+      border: 0;
+      border-bottom: 1px solid #e2e8f0;
+      margin: 0;
+      min-height: 52px;
+      padding: 13px 16px;
+    }
+    .section.open-focus .section-header { border-left: 0; }
+    .section-title b { font-size: 16px; }
+    .disclosure { background: #dbeafe; border-radius: 4px; color: var(--accent); }
+    .section-body { padding: 16px; }
+    .actual-grid {
+      --ag-border-color: #e2e8f0;
+      --ag-font-size: 12px;
+      --ag-header-background-color: #f8fafc;
+      --ag-header-height: 42px;
+      --ag-row-border-color: #eef2f7;
+      --ag-row-border-width: 1px;
+      --ag-row-height: 42px;
+    }
+    .actual-grid .ag-root-wrapper { border: 1px solid #e2e8f0; border-radius: 8px; }
+    .actual-grid .ag-row { border-bottom: 1px solid #eef2f7 !important; }
+    .diagram-card { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+    .diagram-card-header { background: #f8fafc; padding: 10px 12px; }
+    .diagram-stage {
+      background-color: #fbfdff;
+      background-image: radial-gradient(#dbe5f0 1px, transparent 1px);
+      background-size: 18px 18px;
+      border-top: 1px solid #e2e8f0;
+      height: 560px;
+    }
+    .diagram-stage.small { height: 390px; }
+    .likec4-generated-stage {
+      background-color: #fff;
+      background-image: none;
+      display: block;
+      overflow: hidden;
+      padding: 0;
+    }
+    .likec4-interactive-view {
+      display: block;
+      height: 100%;
+      width: 100%;
+    }
+    #solution-stage[data-detail="system"] { height: 420px; }
+    #solution-stage[data-detail="application"] { height: 650px; }
+    #solution-stage[data-detail="component"] { height: 720px; }
+    .likec4-generated-stage.small {
+      min-height: 470px;
+    }
+    .likec4-mark {
+      background: rgb(255 255 255 / 88%);
+      border-radius: 4px;
+      bottom: 10px;
+      color: #64748b;
+      font-size: 10px;
+      padding: 3px 6px;
+      position: absolute;
+      right: 12px;
+      z-index: 4;
+    }
+    .c4-boundary {
+      background: rgb(239 246 255 / 70%);
+      border: 2px solid #60a5fa;
+      border-radius: 14px;
+      inset: 92px 20% 55px 20%;
+      padding: 50px 24px 24px;
+      position: absolute;
+      z-index: 1;
+    }
+    .c4-boundary-title {
+      color: #1e40af;
+      font-size: 13px;
+      font-weight: 750;
+      left: 18px;
+      position: absolute;
+      top: 15px;
+    }
+    .c4-boundary-title small { display: block; font-size: 10px; font-weight: 500; margin-top: 3px; }
+    .c4-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(3, minmax(120px, 1fr));
+    }
+    .c4-element, .diagram-node {
+      background: #fff;
+      border: 1px solid #93c5fd;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgb(15 23 42 / 10%);
+      padding: 12px;
+    }
+    .c4-element strong, .diagram-node strong { display: block; font-size: 12px; }
+    .c4-element span, .diagram-node span { color: var(--muted); display: block; font-size: 9px; margin-top: 4px; }
+    .c4-element.platform { background: #2563eb; border-color: #1d4ed8; color: #fff; }
+    .c4-element.platform span { color: #dbeafe; }
+    .c4-external { background: #fff; border-color: #a78bfa; width: 170px; }
+    .diagram-edge { marker-end: url(#arrow); stroke: #64748b; stroke-width: 1.8; }
+    .diagram-edge.event { stroke-dasharray: 7 5; }
+    [data-diagram-entity].highlighted { filter: drop-shadow(0 0 7px #2563eb); }
+    [data-diagram-entity].highlighted rect,
+    [data-diagram-entity].highlighted .c4-element { stroke: #1d4ed8; stroke-width: 4; }
+    .diagram-tools { left: 12px; top: 12px; }
+    .diagram-tabs { border-bottom-color: #dbe3ed; gap: 28px; }
+    .diagram-tabs button { font-size: 12px; padding: 12px 2px 9px; }
+    dialog { border-radius: 10px; }
+    .dialog-head b { font-size: 14px; }
+
+    @media (max-width: 760px) {
+      .app { display: block; min-height: 100vh; }
+      .topbar { align-items: flex-start; flex-direction: column; position: static; }
+      .global-controls { align-items: stretch; flex-wrap: wrap; width: 100%; }
+      .field { flex: 1 1 40%; }
+      .field select { width: 100%; }
+      .layout-shell { overflow: visible; padding: 6px; }
+      .scope-heading, .report-control-bar { align-items: stretch; flex-direction: column; }
+      .report-navigation, .report-summary { align-items: stretch; flex-direction: column; }
+      .report-settings { align-items: stretch; flex-wrap: wrap; }
+      .report-settings .field { flex: 1 1 220px; }
+      .scope-toolbar { align-items: stretch; flex-direction: column; }
+      .scope-toolbar > div { flex-wrap: wrap; }
+      .report-control-bar .global-controls { justify-content: stretch; width: 100%; }
+      .section { margin-bottom: 6px !important; }
+      .grid-toolbar { align-items: stretch; flex-direction: column; }
+      .grid-toolbar .left, .grid-toolbar .right { flex-wrap: wrap; }
+      .search { width: 100%; }
+      .ag-grid-mock { max-height: 240px !important; overflow: auto; }
+      .actual-grid { height: auto !important; }
+      table { min-width: 700px; }
+      .diagram-stage { height: 430px; }
+      .report-library { grid-template-columns: 1fr; }
+      .report-stats { grid-template-columns: repeat(2, 1fr); }
+      .report-stat:nth-child(2) { border-right: 0; }
+      .c4-boundary { inset-inline: 8%; overflow: auto; }
+      .c4-grid { grid-template-columns: repeat(2, minmax(130px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="title"><b>ACME Architecture Reports</b><span>Saved solution-on-a-page reports</span></div>
+    </header>
+
+    <div class="layout-shell">
+      <section class="report-home" id="report-home">
+        <div class="home-heading">
+          <div><h1>Reports</h1><p>Open a saved architecture report or create a new report from the current model.</p></div>
+        </div>
+        <div class="report-library">
+          <button class="report-card" data-open-report data-report-name="ACME Commerce Modernisation" type="button">
+            <span class="eyebrow">Saved report · updated today</span>
+            <h2>ACME Commerce Modernisation</h2>
+            <p>Target commerce platform and retained enterprise services at the 2030 transaction-core stage.</p>
+            <span class="report-card-actions">
+              <span class="report-counts"><span><strong>11</strong>Systems</span><span><strong>27</strong>Applications</span><span><strong>44</strong>Interfaces</span></span>
+              <span class="button primary">Open</span>
+            </span>
+          </button>
+          <button class="report-card" data-open-report data-report-name="Edge Foundation Review" type="button">
+            <span class="eyebrow">Saved report · 2027 state</span>
+            <h2>Edge Foundation Review</h2>
+            <p>Commerce edge, storefront BFF, event backbone, observability, and the legacy strangler boundary.</p>
+            <span class="report-card-actions">
+              <span class="report-counts"><span><strong>11</strong>Systems</span><span><strong>16</strong>Applications</span><span><strong>19</strong>Interfaces</span></span>
+              <span class="button">Open</span>
+            </span>
+          </button>
+          <button class="report-card" data-open-report data-report-name="Target Commerce Platform" type="button">
+            <span class="eyebrow">Saved report · target state</span>
+            <h2>Target Commerce Platform</h2>
+            <p>Focused target-state report for the Digital Commerce Platform and its immediate integrations.</p>
+            <span class="report-card-actions">
+              <span class="report-counts"><span><strong>10</strong>Systems</span><span><strong>26</strong>Applications</span><span><strong>50</strong>Interfaces</span></span>
+              <span class="button">Open</span>
+            </span>
+          </button>
+          <button class="report-card new-report-card" id="create-report" type="button">
+            <span class="plus">+</span>
+            <h2>Create new report</h2>
+            <p>Select systems and generate a new saved report.</p>
+          </button>
+        </div>
+      </section>
+
+      <section class="scope-builder" id="scope-builder" hidden>
+        <div class="scope-heading">
+          <div><h2>Create report</h2><p>Select the systems that define the report scope.</p></div>
+          <button class="button" id="cancel-create-report" type="button">Back to reports</button>
+        </div>
+        <div class="scope-content">
+          <div class="scope-toolbar">
+            <input aria-label="Filter systems for report scope" class="search" id="scope-search" placeholder="Filter systems, groups or tags">
+          </div>
+          <div class="scope-table-wrap">
+            <table aria-label="Select Systems" class="scope-table">
+              <thead><tr><th class="scope-check"><input aria-label="Select all visible systems" id="scope-select-all" type="checkbox"></th><th>System</th><th>System group</th><th>Tags</th><th>Owner</th></tr></thead>
+              <tbody id="scope-options"></tbody>
+            </table>
+          </div>
+          <div class="scope-pagination" id="scope-pagination" hidden>
+            <button aria-label="Previous scope page" class="button icon-button" id="scope-previous-page" type="button">‹</button>
+            <span id="scope-page-label"></span>
+            <button aria-label="Next scope page" class="button icon-button" id="scope-next-page" type="button">›</button>
+          </div>
+          <div class="scope-actions">
+            <button class="button primary" id="generate-report" type="button">Generate report</button>
+          </div>
+        </div>
+      </section>
+
+      <div id="report-shell" hidden>
+        <nav aria-label="Report navigation" class="report-navigation">
+          <button class="button" id="back-to-reports" type="button">← All reports</button>
+        </nav>
+        <div class="report-control-bar">
+          <div class="report-summary">
+            <div><h2 id="active-report-name">ACME Commerce Modernisation</h2><p>Solution on a Page · ACME Commerce Architecture</p></div>
+            <div class="report-settings">
+              <div class="field"><label for="reach-control">System Scope</label><select id="reach-control"><option value="0" selected>Selected systems only</option><option value="1">Selected + 1 interface hop</option><option value="2">Selected + 2 interface hops</option><option value="3">Selected + 3 interface hops</option></select></div>
+              <div class="field"><label for="state-control">Roadmap state</label><select id="state-control"><option value="base">Baseline</option><option value="2027">2027 · Edge foundation</option><option value="2028">2028 · Catalog &amp; search</option><option value="2029">2029 · Customer, cart &amp; pricing</option><option value="2030" selected>2030 · Transaction core</option><option value="2031">2031 · Complete cutover</option></select></div>
+              <button class="button" id="edit-scope" type="button">Edit report scope</button>
+              <button class="button primary" id="save-report" type="button">Save report</button>
+            </div>
+          </div>
+        </div>
+        <div class="report-stats" aria-label="Report summary">
+          <div class="report-stat"><span>Systems in scope</span><strong id="summary-system-count">6</strong></div>
+          <div class="report-stat"><span>Applications</span><strong id="summary-app-count">29</strong></div>
+          <div class="report-stat"><span>Components</span><strong id="summary-component-count">50</strong></div>
+          <div class="report-stat"><span>Interfaces</span><strong id="summary-interface-count">63</strong></div>
+        </div>
+
+        <main class="report">
+        <section class="section open-focus" id="systems-section" data-section>
+          <button aria-expanded="true" class="section-header" data-section-toggle>
+            <span class="section-title"><span class="disclosure">▾</span><b>1. Systems</b></span>
+          </button>
+          <div class="section-body">
+            <div class="grid-toolbar"><div class="left"><input aria-label="Filter systems" class="search" data-grid-search="systems" placeholder="Filter systems"></div><div class="right"><button aria-label="Configure Systems columns" class="button icon-button" data-config-columns="systems" title="Configure columns"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.94 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.57 15 1.7 1.7 0 0 0 3 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.57 1.7 1.7 0 0 0 10 3h4v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 21 10h.08v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg></button></div></div>
+            <div aria-label="Systems AG Grid" class="ag-theme-quartz actual-grid" id="systems-grid"></div>
+          </div>
+        </section>
+
+        <section class="section" id="apps-section" data-section>
+          <button aria-expanded="true" class="section-header" data-section-toggle>
+            <span class="section-title"><span class="disclosure">▾</span><b>2. Applications and Components</b></span>
+          </button>
+          <div class="section-body">
+            <div class="grid-toolbar"><div class="left"><input aria-label="Filter applications" class="search" data-grid-search="apps" placeholder="Filter applications"></div><div class="right"><div class="field section-field"><label for="application-level-control">Application level</label><select id="application-level-control"><option value="apps">Applications</option><option value="components">Applications + components</option></select></div><button aria-label="Configure Applications columns" class="button icon-button" data-config-columns="apps" title="Configure columns"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.94 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.57 15 1.7 1.7 0 0 0 3 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.57 1.7 1.7 0 0 0 10 3h4v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 21 10h.08v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg></button></div></div>
+            <div aria-label="Applications AG Grid" class="ag-theme-quartz actual-grid" id="apps-grid"></div>
+          </div>
+        </section>
+
+        <section class="section" id="interfaces-section" data-section>
+          <button aria-expanded="true" class="section-header" data-section-toggle>
+            <span class="section-title"><span class="disclosure">▾</span><b>3. Interfaces</b></span>
+          </button>
+          <div class="section-body">
+            <div class="grid-toolbar"><div class="left"><input aria-label="Filter interfaces" class="search" data-grid-search="interfaces" placeholder="Filter interfaces"></div><div class="right"><button aria-label="Configure Interfaces columns" class="button icon-button" data-config-columns="interfaces" title="Configure columns"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.94 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.57 15 1.7 1.7 0 0 0 3 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.57 1.7 1.7 0 0 0 10 3h4v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 21 10h.08v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg></button></div></div>
+            <div aria-label="Interfaces AG Grid" class="ag-theme-quartz actual-grid" id="interfaces-grid"></div>
+          </div>
+        </section>
+
+        <section class="section" id="solution-diagram-section" data-section>
+          <button aria-expanded="true" class="section-header" data-section-toggle>
+            <span class="section-title"><span class="disclosure">▾</span><b>4. Solution Diagram</b></span>
+          </button>
+          <div class="section-body">
+            <div class="diagram-list">
+              <article class="diagram-card" data-diagram-card="solution">
+                <header class="diagram-card-header actions-only"><div><div class="field"><label for="diagram-detail-control">Level of detail</label><select id="diagram-detail-control"><option value="system" selected>System</option><option value="application">Application</option><option value="component">Component</option></select></div><button class="button" data-popout>Full screen</button></div></header>
+                <div class="diagram-stage likec4-generated-stage" id="solution-stage" data-detail="system">
+                  <likec4-view browser="false" class="likec4-interactive-view" color-scheme="light" id="solution-likec4-view" pannable="false" view-id="system_scope" zoomable="false"></likec4-view>
+                  <span class="likec4-mark" id="solution-likec4-caption">Interactive LikeC4 · hold Space + drag to pan · hold Cmd/Ctrl to zoom</span>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="other-diagrams-section" data-section>
+          <button aria-expanded="true" class="section-header" data-section-toggle>
+            <span class="section-title"><span class="disclosure">▾</span><b>5. Other diagrams</b></span>
+          </button>
+          <div class="section-body">
+            <div class="diagram-list">
+              <div class="additional-diagrams" style="margin-top: 0">
+                <div aria-label="Additional diagrams" class="diagram-tabs" role="tablist">
+                  <button aria-controls="place-order-svg-panel" aria-selected="true" data-diagram-tab="place-order-svg" role="tab">Place Order Sequence · SVG</button>
+                  <button aria-controls="integration-panel" aria-selected="false" data-diagram-tab="integration" role="tab">Integration Context</button>
+                  <button aria-controls="cutover-panel" aria-selected="false" data-diagram-tab="cutover" role="tab">Cutover Transition · SVG</button>
+                </div>
+
+                <article class="diagram-card" data-diagram-card="place-order-svg" data-diagram-panel="place-order-svg" id="place-order-svg-panel" role="tabpanel" aria-labelledby="place-order-svg-title">
+                  <header class="diagram-card-header"><div><b id="place-order-svg-title">Place Order Sequence</b><span class="attachment-note">Externally generated SVG attachment · presentation only</span></div><div><button class="button">Fit</button><button aria-label="Zoom out" class="button">−</button><button aria-label="Zoom in" class="button">+</button><button class="button">Download SVG</button><button class="button" data-popout>Full screen</button></div></header>
+                  <figure class="diagram-stage small attachment-stage" aria-describedby="place-order-svg-description">
+                    <svg aria-label="Place Order sequence diagram" role="img" viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg">
+                      <rect width="760" height="300" fill="#f8fafb"/>
+                      <g fill="#fff" stroke="#9cadb7"><rect x="35" y="20" width="130" height="34"/><rect x="220" y="20" width="130" height="34"/><rect x="405" y="20" width="130" height="34"/><rect x="590" y="20" width="130" height="34"/></g>
+                      <g fill="#20313b" font-family="system-ui, sans-serif" font-size="12" text-anchor="middle"><text x="100" y="42">Storefront BFF</text><text x="285" y="42">Checkout</text><text x="470" y="42">Payment</text><text x="655" y="42">Order Service</text></g>
+                      <g stroke="#9cadb7" stroke-dasharray="5 5"><line x1="100" y1="54" x2="100" y2="280"/><line x1="285" y1="54" x2="285" y2="280"/><line x1="470" y1="54" x2="470" y2="280"/><line x1="655" y1="54" x2="655" y2="280"/></g>
+                      <g fill="none" stroke="#315f75" stroke-width="1.5"><path d="M100 90 H278 l-8 -5 m8 5 -8 5"/><path d="M285 135 H463 l-8 -5 m8 5 -8 5"/><path d="M470 180 H648 l-8 -5 m8 5 -8 5"/><path d="M655 225 H292 l8 -5 m-8 5 8 5"/></g>
+                      <g fill="#20313b" font-family="system-ui, sans-serif" font-size="11"><text x="150" y="82">Submit checkout</text><text x="335" y="127">Authorize payment</text><text x="520" y="172">Create accepted order</text><text x="430" y="217">Order confirmed</text></g>
+                    </svg>
+                    <figcaption id="place-order-svg-description" class="sr-only">A static sequence diagram generated outside Report v2 and displayed without semantic selection, search, or playback.</figcaption>
+                  </figure>
+                </article>
+
+                <article class="diagram-card" data-diagram-card="integration" data-diagram-panel="integration" hidden id="integration-panel" role="tabpanel">
+                  <header class="diagram-card-header actions-only"><div><button class="button" data-popout>Full screen</button></div></header>
+                  <div class="diagram-stage small"><div class="diagram-node" style="left:10%;top:38%;width:190px"><strong>Commerce Event Backbone</strong><span>Managed Kafka · selected</span></div><div class="diagram-node" style="left:40%;top:15%;width:190px"><strong>Order Service</strong><span>Publishes order domain events</span></div><div class="diagram-node c4-external" style="right:10%;top:18%"><strong>Enterprise OMS</strong><span>Accepted orders</span></div><div class="diagram-node c4-external" style="right:10%;top:64%"><strong>Analytics Provider</strong><span>Allowlisted events</span></div><span class="likec4-mark">Mock LikeC4 integration view</span></div>
+                </article>
+
+                <article class="diagram-card" data-diagram-card="cutover" data-diagram-panel="cutover" hidden id="cutover-panel" role="tabpanel">
+                  <header class="diagram-card-header actions-only"><div><button class="button" data-popout>Full screen</button></div></header>
+                  <div class="diagram-stage small"><div class="sequence"><div class="lifeline"><b>2027 · Edge</b><span class="message m1">Route through strangler →</span></div><div class="lifeline"><b>2028–29 · Domains</b><span class="message m2">Migrate catalog &amp; customer →</span></div><div class="lifeline"><b>2030 · Core</b><span class="message m3">Transfer transaction ownership →</span></div><div class="lifeline"><b>2031 · Target</b></div></div><span class="likec4-mark">Static SVG attachment · presentation only</span></div>
+                </article>
+              </div>
+            </div>
+          </div>
+        </section>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <dialog id="save-view-dialog">
+    <form method="dialog">
+      <header class="dialog-head"><b>Save report</b><button aria-label="Close save report dialog" class="button" value="cancel">×</button></header>
+      <div class="dialog-body">
+        <label class="kind" for="view-name">Report name</label>
+        <input class="text-field" id="view-name" value="Core commerce review">
+        <p class="kind">The report includes selected systems, System Scope, roadmap state, diagrams, and table configuration.</p>
+        <pre class="yaml-preview" id="yaml-preview"></pre>
+      </div>
+      <footer class="dialog-actions"><button class="button" id="download-view-yaml" type="button">Download YAML</button><button class="button" value="cancel">Cancel</button><button class="button primary" id="confirm-save-view" type="button">Save report</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="column-dialog">
+    <form method="dialog">
+      <header class="dialog-head"><b id="column-dialog-title">Configure columns</b><button aria-label="Close column configuration" class="button" value="cancel">×</button></header>
+      <div class="dialog-body">
+        <span class="kind">Show or hide columns and choose where they are pinned. Drag headers in the table to reorder columns.</span>
+        <div class="column-list" id="column-list"></div>
+      </div>
+      <footer class="dialog-actions"><button class="button" id="reset-columns" type="button">Reset</button><button class="button" value="cancel">Cancel</button><button class="button" id="apply-columns" type="button">Apply</button></footer>
+    </form>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.9/dist/ag-grid-community.min.js"></script>
+  <script src="likec4/likec4-webcomponent.js"></script>
+  <script>
+    const sections = [...document.querySelectorAll("[data-section]")];
+    const gridApis = {};
+    const defaultSystemIds = ["commerce-platform", "legacy-commerce", "enterprise-fulfilment", "enterprise-order-management", "enterprise-finance", "enterprise-identity"];
+    let draftSelectedSystems = new Set(defaultSystemIds);
+    let submittedSelectedSystems = new Set(defaultSystemIds);
+    let appMode = "apps";
+    let configuredGrid = null;
+    let activeDiagram = "place-order-svg";
+
+    const systemRows = [{"id":"legacy-commerce","System":"Legacy Commerce Platform","Description":"Customer storefront, back-office administration, and all commerce domains in one deployable estate.","Groups":"Commerce platforms","Tags":"legacy, ecommerce, strangler-source","Owner":"Commerce Core Team","Lifecycle":"Migrate","introducedOrder":0,"removedOrder":5,"changes":{"5":"Removed"},"highlight":"legacy-commerce"},{"id":"enterprise-fulfilment","System":"Enterprise Fulfilment","Description":"Existing ERP and warehouse management capabilities.","Groups":"Enterprise platforms","Tags":"enterprise, fulfilment","Owner":"Supply Chain Technology","Lifecycle":"Retain","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"enterprise-fulfilment"},{"id":"enterprise-order-management","System":"Enterprise Order Management","Description":"Internal enterprise OMS coordinating downstream fulfilment, exceptions, and cross-channel order visibility.","Groups":"SOR","Tags":"internal, orders, system-of-record","Owner":"Order Operations Technology","Lifecycle":"Retain","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"enterprise-order-management"},{"id":"enterprise-finance","System":"Enterprise Finance","Description":"Internal finance ledger, settlement, reconciliation, and revenue accounting platform.","Groups":"SOR","Tags":"internal, finance, system-of-record","Owner":"Finance Technology","Lifecycle":"Retain","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"enterprise-finance"},{"id":"payment-provider","System":"Payment Service Provider","Description":"External payment authorization, capture, refund, and token vault services.","Groups":"External services","Tags":"external, payments, pci","Owner":"Payment Provider","Lifecycle":"Retain","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"payment-provider"},{"id":"customer-engagement","System":"Customer Engagement Provider","Description":"External email and SMS delivery platform.","Groups":"External services","Tags":"external, communications","Owner":"Engagement Provider","Lifecycle":"Retain","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"customer-engagement"},{"id":"enterprise-identity","System":"Enterprise Identity","Description":"Customer and workforce authentication provider.","Groups":"Enterprise platforms","Tags":"enterprise, identity","Owner":"Identity Platform Team","Lifecycle":"Retain","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"enterprise-identity"},{"id":"analytics-provider","System":"Digital Analytics Provider","Description":"External SaaS for consented web and product analytics.","Groups":"External services","Tags":"external, analytics, saas","Owner":"Analytics Provider","Lifecycle":"Retain","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"analytics-provider"},{"id":"tax-provider","System":"Tax Calculation Provider","Description":"External tax jurisdiction, calculation, and audit API.","Groups":"External services","Tags":"external, tax, saas","Owner":"Tax Provider","Lifecycle":"Retain","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"tax-provider"},{"id":"fraud-provider","System":"Fraud Decision Provider","Description":"External real-time payment and account fraud scoring service.","Groups":"External services","Tags":"external, fraud, saas","Owner":"Fraud Provider","Lifecycle":"Retain","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"fraud-provider"},{"id":"commerce-platform","System":"Digital Commerce Platform","Description":"Target cloud-native commerce platform introduced alongside the legacy system.","Groups":"Commerce platforms","Tags":"target, ecommerce, microservices","Owner":"Platform Edge Team","Lifecycle":"Strategic","introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"commerce-platform"}];
+    const applicationRows = [{"id":"commerce-monolith","Name":"Commerce Monolith","Kind":"Application","System":"Legacy Commerce Platform","systemId":"legacy-commerce","Parent":"","Description":"Legacy commerce deployment reachable only behind strangler-controlled routes and adapters.","Technology":"Java / Spring MVC","Tags":"legacy, monolith, stateful","Owner":"Commerce Core Team","introducedOrder":0,"removedOrder":null,"changes":{"1":"Changed"},"highlight":"legacy-commerce"},{"id":"erp-wms","Name":"ERP and WMS","Kind":"Application","System":"Enterprise Fulfilment","systemId":"enterprise-fulfilment","Parent":"","Description":"Inventory master, warehouse execution, and fulfilment planning.","Technology":"Commercial ERP","Tags":"system-of-record, fulfilment","Owner":"Supply Chain Technology","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"enterprise-fulfilment"},{"id":"enterprise-oms","Name":"Enterprise OMS","Kind":"Application","System":"Enterprise Order Management","systemId":"enterprise-order-management","Parent":"","Description":"Enterprise order routing, exception handling, and downstream fulfilment coordination.","Technology":"Commercial OMS","Tags":"internal, orders, system-of-record","Owner":"Order Operations Technology","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"enterprise-order-management"},{"id":"finance-ledger","Name":"Finance Ledger and Reconciliation","Kind":"Application","System":"Enterprise Finance","systemId":"enterprise-finance","Parent":"","Description":"Enterprise settlement, reconciliation, and accounting integration.","Technology":"Finance ERP","Tags":"internal, finance, system-of-record","Owner":"Finance Technology","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"enterprise-finance"},{"id":"payment-gateway","Name":"Payment Gateway API","Kind":"Application","System":"Payment Service Provider","systemId":"payment-provider","Parent":"","Description":"Tokenized payment API hosted by the external provider.","Technology":"REST API","Tags":"external-api, pci","Owner":"Payment Provider","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"payment-provider"},{"id":"messaging-provider","Name":"Messaging Provider API","Kind":"Application","System":"Customer Engagement Provider","systemId":"customer-engagement","Parent":"","Description":"Email and SMS delivery API.","Technology":"REST API","Tags":"external-api","Owner":"Engagement Provider","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"customer-engagement"},{"id":"identity-provider","Name":"Identity Provider","Kind":"Application","System":"Enterprise Identity","systemId":"enterprise-identity","Parent":"","Description":"OAuth 2.0 and OpenID Connect identity service.","Technology":"OIDC","Tags":"identity, security","Owner":"Identity Platform Team","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"enterprise-identity"},{"id":"digital-analytics-api","Name":"Digital Analytics API","Kind":"Application","System":"Digital Analytics Provider","systemId":"analytics-provider","Parent":"","Description":"External analytics event collection and reporting API.","Technology":"HTTPS collection API","Tags":"external-api, analytics","Owner":"Analytics Provider","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"analytics-provider"},{"id":"tax-api","Name":"Tax Calculation API","Kind":"Application","System":"Tax Calculation Provider","systemId":"tax-provider","Parent":"","Description":"External tax quote, commit, void, and audit API.","Technology":"REST API","Tags":"external-api, tax","Owner":"Tax Provider","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"tax-provider"},{"id":"fraud-api","Name":"Fraud Decision API","Kind":"Application","System":"Fraud Decision Provider","systemId":"fraud-provider","Parent":"","Description":"External fraud score and decision API.","Technology":"REST API","Tags":"external-api, fraud","Owner":"Fraud Provider","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"fraud-provider"},{"id":"commerce-edge","Name":"Commerce Edge","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"CDN, WAF, TLS termination, and route-based strangler control plane.","Technology":"Managed CDN / WAF / API gateway","Tags":"edge, security, strangler","Owner":"Platform Edge Team","introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"commerce-platform"},{"id":"storefront-bff","Name":"Storefront BFF","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"Channel-oriented API composition layer for the web storefront.","Technology":"TypeScript / Node.js","Tags":"bff, stateless","Owner":"Storefront Team","introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"commerce-platform"},{"id":"event-backbone","Name":"Commerce Event Backbone","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"Durable domain-event transport with schema governance and replay.","Technology":"Managed Kafka","Tags":"eventing, platform","Owner":"Platform Messaging Team","introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"commerce-platform"},{"id":"observability-platform","Name":"Commerce Observability Platform","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"Central metrics, logs, traces, alerting, and service-level objectives.","Technology":"OpenTelemetry / managed observability","Tags":"observability, platform","Owner":"Site Reliability Engineering","introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"commerce-platform"},{"id":"legacy-integration-adapter","Name":"Legacy Anti-corruption Layer","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"Stable adapters translating legacy concepts and contracts into target-domain APIs and events.","Technology":"Java / integration runtime","Tags":"anti-corruption-layer, temporary, strangler","Owner":"Migration Enablement Team","introducedOrder":1,"removedOrder":5,"changes":{"1":"Added","5":"Removed"},"highlight":"commerce-platform"},{"id":"analytics-event-adapter","Name":"Analytics Event Adapter","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"Consent-aware, schema-controlled adapter for external digital analytics.","Technology":"TypeScript / streaming runtime","Tags":"analytics, privacy, anti-corruption-layer","Owner":"Digital Analytics Team","introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"commerce-platform"},{"id":"catalog-service","Name":"Catalog Service","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"System of record for products, categories, assortment, and sellability.","Technology":"Kotlin / Spring Boot","Tags":"microservice, bounded-context-catalog","Owner":"Catalog Team","introducedOrder":2,"removedOrder":null,"changes":{"2":"Added"},"highlight":"commerce-platform"},{"id":"search-service","Name":"Search Service","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"Product search, faceting, ranking, and query suggestions from event-fed projections.","Technology":"Java / OpenSearch","Tags":"microservice, bounded-context-search, cqrs-read-model","Owner":"Search Team","introducedOrder":2,"removedOrder":null,"changes":{"2":"Added"},"highlight":"commerce-platform"},{"id":"catalog-sync-adapter","Name":"Catalog Migration Adapter","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"Temporary idempotent translation and reconciliation between legacy merchandising and Catalog Service.","Technology":"Java / Kafka Connect","Tags":"migration-adapter, temporary","Owner":"Migration Enablement Team","introducedOrder":2,"removedOrder":5,"changes":{"2":"Added","5":"Removed"},"highlight":"commerce-platform"},{"id":"customer-service","Name":"Customer Service","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"Customer profile, addresses, preferences, and identity linkage.","Technology":"Kotlin / Spring Boot","Tags":"microservice, bounded-context-customer","Owner":"Customer Accounts Team","introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"commerce-platform"},{"id":"cart-service","Name":"Cart Service","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"Durable shopping carts with optimistic concurrency and expiry policies.","Technology":"Go","Tags":"microservice, bounded-context-cart","Owner":"Cart Team","introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"commerce-platform"},{"id":"pricing-service","Name":"Pricing Service","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"Effective prices, promotions, eligibility, and explainable calculation results.","Technology":"Java / Spring Boot","Tags":"microservice, bounded-context-pricing","Owner":"Pricing Team","introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"commerce-platform"},{"id":"notification-service","Name":"Notification Service","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"Template, preference, deduplication, and delivery orchestration for customer communications.","Technology":"TypeScript / Node.js","Tags":"microservice, bounded-context-notification, event-driven","Owner":"Customer Communications Team","introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"commerce-platform"},{"id":"checkout-service","Name":"Checkout Orchestrator","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"Explicit saga coordinating validation, reservation, payment, order creation, and compensations.","Technology":"Java / workflow engine","Tags":"microservice, bounded-context-checkout, saga-orchestrator","Owner":"Checkout Team","introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"commerce-platform"},{"id":"order-service","Name":"Order Service","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"System of record for accepted orders and order lifecycle state.","Technology":"Kotlin / Spring Boot","Tags":"microservice, bounded-context-order","Owner":"Order Team","introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"commerce-platform"},{"id":"payment-service","Name":"Payment Service","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"PCI-minimized payment intents, authorization, capture, refund, and reconciliation.","Technology":"Java / Spring Boot","Tags":"microservice, bounded-context-payment, pci-scope-minimized","Owner":"Payments Team","introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"commerce-platform"},{"id":"inventory-service","Name":"Inventory Service","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"Commerce availability projection and time-bound stock reservations synchronized with ERP/WMS.","Technology":"Go","Tags":"microservice, bounded-context-inventory","Owner":"Inventory Team","introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"commerce-platform"},{"id":"admin-portal","Name":"Commerce Administration Portal","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"Role-based customer service and merchandising experience composed over target-domain APIs.","Technology":"React / TypeScript","Tags":"frontend, internal, micro-frontend-ready","Owner":"Commerce Operations Experience Team","introducedOrder":5,"removedOrder":null,"changes":{"5":"Added"},"highlight":"commerce-platform"},{"id":"reporting-service","Name":"Commerce Reporting Service","Kind":"Application","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"","Description":"Operational reporting over event-fed read models; never queries service databases directly.","Technology":"Python / SQL","Tags":"microservice, reporting, cqrs-read-model","Owner":"Commerce Data Products Team","introducedOrder":5,"removedOrder":null,"changes":{"5":"Added"},"highlight":"commerce-platform"},{"id":"legacy-web-ui","Name":"Server-rendered Storefront","Kind":"Component","System":"Legacy Commerce Platform","systemId":"legacy-commerce","Parent":"Commerce Monolith","Description":"Customer web experience rendered inside the monolith.","Technology":"JSP / JavaScript","Tags":"legacy, frontend","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"legacy-commerce"},{"id":"legacy-catalog-module","Name":"Legacy Catalog Compatibility Facade","Kind":"Component","System":"Legacy Commerce Platform","systemId":"legacy-commerce","Parent":"Commerce Monolith","Description":"Read-only compatibility facade delegating canonical product changes through the migration adapter.","Technology":"Java module","Tags":"legacy, bounded-context-catalog","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{"2":"Changed"},"highlight":"legacy-commerce"},{"id":"legacy-search-index","Name":"Embedded Search Index","Kind":"Component","System":"Legacy Commerce Platform","systemId":"legacy-commerce","Parent":"Commerce Monolith","Description":"Locally managed product search index refreshed by batch jobs.","Technology":"Embedded search engine","Tags":"legacy, search","Owner":"","introducedOrder":0,"removedOrder":2,"changes":{"2":"Removed"},"highlight":"legacy-commerce"},{"id":"legacy-cart-module","Name":"Legacy Cart and Pricing Compatibility Facade","Kind":"Component","System":"Legacy Commerce Platform","systemId":"legacy-commerce","Parent":"Commerce Monolith","Description":"Temporary facade delegating cart and price calculations to target services.","Technology":"Java module","Tags":"legacy, bounded-context-cart","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{"3":"Changed"},"highlight":"legacy-commerce"},{"id":"legacy-customer-module","Name":"Legacy Customer Compatibility Facade","Kind":"Component","System":"Legacy Commerce Platform","systemId":"legacy-commerce","Parent":"Commerce Monolith","Description":"Temporary facade delegating profile operations to Customer Service.","Technology":"Java module","Tags":"legacy, bounded-context-customer","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{"3":"Changed"},"highlight":"legacy-commerce"},{"id":"legacy-checkout-module","Name":"Legacy Checkout Compatibility Facade","Kind":"Component","System":"Legacy Commerce Platform","systemId":"legacy-commerce","Parent":"Commerce Monolith","Description":"Non-public compatibility facade delegating checkout to the target orchestrator.","Technology":"Java module","Tags":"legacy, bounded-context-checkout","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{"4":"Changed"},"highlight":"legacy-commerce"},{"id":"legacy-order-module","Name":"Legacy Order Compatibility Facade","Kind":"Component","System":"Legacy Commerce Platform","systemId":"legacy-commerce","Parent":"Commerce Monolith","Description":"Temporary back-office facade reading and updating orders through Order Service.","Technology":"Java module","Tags":"legacy, bounded-context-order","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{"4":"Changed"},"highlight":"legacy-commerce"},{"id":"legacy-admin-module","Name":"Back-office Administration Module","Kind":"Component","System":"Legacy Commerce Platform","systemId":"legacy-commerce","Parent":"Commerce Monolith","Description":"Customer service and merchandising administration screens.","Technology":"Java module","Tags":"legacy, admin","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"legacy-commerce"},{"id":"legacy-commerce-db","Name":"Shared Commerce Database","Kind":"Component","System":"Legacy Commerce Platform","systemId":"legacy-commerce","Parent":"Commerce Monolith","Description":"Shared relational schema used by every commerce domain.","Technology":"PostgreSQL","Tags":"legacy, database, shared-database","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"legacy-commerce"},{"id":"legacy-session-cache","Name":"Shared Session Cache","Kind":"Component","System":"Legacy Commerce Platform","systemId":"legacy-commerce","Parent":"Commerce Monolith","Description":"Distributed web session and coarse application cache.","Technology":"Redis","Tags":"legacy, cache","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"legacy-commerce"},{"id":"legacy-batch-jobs","Name":"Commerce Batch Jobs","Kind":"Component","System":"Legacy Commerce Platform","systemId":"legacy-commerce","Parent":"Commerce Monolith","Description":"Scheduled catalog, search, order, and integration processing.","Technology":"Java scheduler","Tags":"legacy, batch","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"legacy-commerce"},{"id":"erp-database","Name":"ERP Operational Database","Kind":"Component","System":"Enterprise Fulfilment","systemId":"enterprise-fulfilment","Parent":"ERP and WMS","Description":"Enterprise inventory and fulfilment system of record.","Technology":"Relational database","Tags":"database, system-of-record","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"enterprise-fulfilment"},{"id":"oms-database","Name":"OMS Operational Database","Kind":"Component","System":"Enterprise Order Management","systemId":"enterprise-order-management","Parent":"Enterprise OMS","Description":"Enterprise order routing and fulfilment state.","Technology":"Relational database","Tags":"database, system-of-record","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"enterprise-order-management"},{"id":"finance-ledger-db","Name":"Finance Ledger Database","Kind":"Component","System":"Enterprise Finance","systemId":"enterprise-finance","Parent":"Finance Ledger and Reconciliation","Description":"Enterprise accounting, settlement, and reconciliation records.","Technology":"Relational database","Tags":"database, system-of-record","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"enterprise-finance"},{"id":"psp-token-vault","Name":"Provider Token Vault","Kind":"Component","System":"Payment Service Provider","systemId":"payment-provider","Parent":"Payment Gateway API","Description":"Provider-managed PCI token vault; ACME does not store cardholder data.","Technology":"Managed vault","Tags":"pci, managed","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"payment-provider"},{"id":"identity-directory","Name":"Identity Directory","Kind":"Component","System":"Enterprise Identity","systemId":"enterprise-identity","Parent":"Identity Provider","Description":"Managed customer and workforce identity directory.","Technology":"Managed directory","Tags":"identity, managed","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"enterprise-identity"},{"id":"analytics-event-store","Name":"Provider Analytics Event Store","Kind":"Component","System":"Digital Analytics Provider","systemId":"analytics-provider","Parent":"Digital Analytics API","Description":"Provider-managed pseudonymous analytics event storage.","Technology":"Managed analytics storage","Tags":"managed, analytics","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"analytics-provider"},{"id":"provider-tax-rules","Name":"Provider Tax Rules","Kind":"Component","System":"Tax Calculation Provider","systemId":"tax-provider","Parent":"Tax Calculation API","Description":"Provider-managed jurisdiction and tax-rule data.","Technology":"Managed rules engine","Tags":"managed, tax","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"tax-provider"},{"id":"provider-fraud-models","Name":"Provider Fraud Models","Kind":"Component","System":"Fraud Decision Provider","systemId":"fraud-provider","Parent":"Fraud Decision API","Description":"Provider-managed fraud features and decision models.","Technology":"Managed ML platform","Tags":"managed, fraud","Owner":"","introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"fraud-provider"},{"id":"edge-waf-cdn","Name":"WAF and CDN","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Commerce Edge","Description":"Managed perimeter protection, caching, bot control, and DDoS mitigation.","Technology":"Managed edge service","Tags":"security, infrastructure","Owner":"","introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"commerce-platform"},{"id":"strangler-route-config","Name":"Strangler Route Configuration","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Commerce Edge","Description":"Version-controlled routing rules that move capabilities from legacy to target services.","Technology":"Gateway configuration","Tags":"configuration, strangler","Owner":"","introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"commerce-platform"},{"id":"bff-response-cache","Name":"BFF Response Cache","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Storefront BFF","Description":"Short-lived cache for safe catalog and navigation responses.","Technology":"Redis","Tags":"cache, infrastructure","Owner":"","introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"commerce-platform"},{"id":"event-stream-cluster","Name":"Event Stream Cluster","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Commerce Event Backbone","Description":"Multi-zone durable event log with retention and replay.","Technology":"Managed Kafka","Tags":"event-store, infrastructure","Owner":"","introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"commerce-platform"},{"id":"event-schema-registry","Name":"Event Schema Registry","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Commerce Event Backbone","Description":"Versioned compatibility checks for domain event contracts.","Technology":"Schema registry","Tags":"governance, infrastructure","Owner":"","introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"commerce-platform"},{"id":"telemetry-store","Name":"Telemetry Store","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Commerce Observability Platform","Description":"Managed metrics, logs, and traces with production retention policies.","Technology":"Managed observability storage","Tags":"observability, infrastructure","Owner":"","introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"commerce-platform"},{"id":"anti-corruption-runtime","Name":"Anti-corruption Adapter Runtime","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Legacy Anti-corruption Layer","Description":"Translation, retry, circuit-breaker, and contract-isolation runtime.","Technology":"Integration service","Tags":"adapter, resilience","Owner":"","introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"commerce-platform"},{"id":"analytics-consent-filter","Name":"Analytics Consent and Data Filter","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Analytics Event Adapter","Description":"Enforces consent, allowlisted fields, pseudonymous identifiers, and analytics contract versions.","Technology":"Stream processor","Tags":"privacy, analytics, infrastructure","Owner":"","introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"commerce-platform"},{"id":"legacy-outbox","Name":"Legacy Transactional Outbox","Kind":"Component","System":"Legacy Commerce Platform","systemId":"legacy-commerce","Parent":"Commerce Monolith","Description":"Append-only outbox table used to publish changes without dual writes.","Technology":"PostgreSQL table / relay","Tags":"outbox, migration","Owner":"","introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"legacy-commerce"},{"id":"catalog-db","Name":"Catalog Database","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Catalog Service","Description":"Catalog-owned relational store; no other service has direct access.","Technology":"Managed PostgreSQL","Tags":"database, database-per-service","Owner":"","introducedOrder":2,"removedOrder":null,"changes":{"2":"Added"},"highlight":"commerce-platform"},{"id":"catalog-cache","Name":"Catalog Cache","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Catalog Service","Description":"Read-through cache for hot product and category data.","Technology":"Redis","Tags":"cache, infrastructure","Owner":"","introducedOrder":2,"removedOrder":null,"changes":{"2":"Added"},"highlight":"commerce-platform"},{"id":"catalog-outbox","Name":"Catalog Transactional Outbox","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Catalog Service","Description":"Atomically records catalog events for reliable publication.","Technology":"PostgreSQL outbox table","Tags":"outbox, eventing","Owner":"","introducedOrder":2,"removedOrder":null,"changes":{"2":"Added"},"highlight":"commerce-platform"},{"id":"product-search-index","Name":"Product Search Index","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Search Service","Description":"Rebuildable search projection populated only from versioned catalog events.","Technology":"Managed OpenSearch","Tags":"search-index, cqrs-read-model","Owner":"","introducedOrder":2,"removedOrder":null,"changes":{"2":"Added"},"highlight":"commerce-platform"},{"id":"search-query-cache","Name":"Search Query Cache","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Search Service","Description":"Short-lived cache for popular query and facet results.","Technology":"Redis","Tags":"cache, infrastructure","Owner":"","introducedOrder":2,"removedOrder":null,"changes":{"2":"Added"},"highlight":"commerce-platform"},{"id":"catalog-reconciliation-store","Name":"Catalog Reconciliation Store","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Catalog Migration Adapter","Description":"Temporary checkpoints and idempotency keys for migration reconciliation.","Technology":"Managed PostgreSQL","Tags":"migration, database, temporary","Owner":"","introducedOrder":2,"removedOrder":null,"changes":{"2":"Added"},"highlight":"commerce-platform"},{"id":"customer-db","Name":"Customer Database","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Customer Service","Description":"Customer-owned relational data with encrypted sensitive fields.","Technology":"Managed PostgreSQL","Tags":"database, database-per-service","Owner":"","introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"commerce-platform"},{"id":"customer-outbox","Name":"Customer Transactional Outbox","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Customer Service","Description":"Reliable customer-profile event publication.","Technology":"PostgreSQL outbox table","Tags":"outbox, eventing","Owner":"","introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"commerce-platform"},{"id":"cart-store","Name":"Durable Cart Store","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Cart Service","Description":"Partitioned durable key-value storage for carts and idempotency records.","Technology":"Managed key-value database","Tags":"database, database-per-service","Owner":"","introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"commerce-platform"},{"id":"cart-cache","Name":"Cart Hot Cache","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Cart Service","Description":"Optional acceleration layer; the durable cart store remains authoritative.","Technology":"Redis","Tags":"cache, infrastructure","Owner":"","introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"commerce-platform"},{"id":"pricing-db","Name":"Pricing Database","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Pricing Service","Description":"Pricing-owned rules, price lists, promotions, and audit history.","Technology":"Managed PostgreSQL","Tags":"database, database-per-service","Owner":"","introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"commerce-platform"},{"id":"pricing-cache","Name":"Pricing Evaluation Cache","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Pricing Service","Description":"Version-keyed cache that cannot outlive the owning price-rule version.","Technology":"Redis","Tags":"cache, infrastructure","Owner":"","introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"commerce-platform"},{"id":"notification-db","Name":"Notification Database","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Notification Service","Description":"Templates, preferences, delivery attempts, and deduplication keys.","Technology":"Managed PostgreSQL","Tags":"database, database-per-service","Owner":"","introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"commerce-platform"},{"id":"checkout-workflow-store","Name":"Checkout Workflow Store","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Checkout Orchestrator","Description":"Durable saga state, idempotency keys, and compensation progress.","Technology":"Managed PostgreSQL","Tags":"database, database-per-service, workflow-state","Owner":"","introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"commerce-platform"},{"id":"order-db","Name":"Order Database","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Order Service","Description":"Order-owned append-audited relational data.","Technology":"Managed PostgreSQL","Tags":"database, database-per-service","Owner":"","introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"commerce-platform"},{"id":"order-outbox","Name":"Order Transactional Outbox","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Order Service","Description":"Reliable order-event publication without dual writes.","Technology":"PostgreSQL outbox table","Tags":"outbox, eventing","Owner":"","introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"commerce-platform"},{"id":"payment-db","Name":"Payment Database","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Payment Service","Description":"Payment intents, provider tokens, idempotency keys, and reconciliation state; no PAN storage.","Technology":"Managed PostgreSQL","Tags":"database, database-per-service, pci-scope-minimized","Owner":"","introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"commerce-platform"},{"id":"payment-outbox","Name":"Payment Transactional Outbox","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Payment Service","Description":"Reliable payment-state event publication.","Technology":"PostgreSQL outbox table","Tags":"outbox, eventing","Owner":"","introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"commerce-platform"},{"id":"inventory-db","Name":"Inventory Projection Database","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Inventory Service","Description":"Rebuildable availability projection plus authoritative commerce reservation state.","Technology":"Managed PostgreSQL","Tags":"database, database-per-service, cqrs-read-model","Owner":"","introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"commerce-platform"},{"id":"admin-static-assets","Name":"Administration Static Assets","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Commerce Administration Portal","Description":"Versioned immutable portal assets served through the managed edge.","Technology":"Object storage / CDN","Tags":"infrastructure, immutable","Owner":"","introducedOrder":5,"removedOrder":null,"changes":{"5":"Added"},"highlight":"commerce-platform"},{"id":"reporting-read-model","Name":"Reporting Read Model","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Commerce Reporting Service","Description":"Rebuildable cross-domain operational projection populated from events.","Technology":"Managed analytical PostgreSQL","Tags":"database, cqrs-read-model, rebuildable","Owner":"","introducedOrder":5,"removedOrder":null,"changes":{"5":"Added"},"highlight":"commerce-platform"},{"id":"reporting-object-store","Name":"Reporting Object Store","Kind":"Component","System":"Digital Commerce Platform","systemId":"commerce-platform","Parent":"Commerce Reporting Service","Description":"Retained extracts and archived operational reports with lifecycle policies.","Technology":"Managed object storage","Tags":"object-storage, infrastructure","Owner":"","introducedOrder":5,"removedOrder":null,"changes":{"5":"Added"},"highlight":"commerce-platform"}];
+    const interfaceRows = [{"id":"customer-to-monolith","Interface":"Customer storefront traffic","Description":"","SourceSystem":"External actor","SourceEntity":"Customer","TargetSystem":"Legacy Commerce Platform","TargetEntity":"Commerce Monolith","Direction":"Outbound","Type":"Web","systems":["legacy-commerce"],"introducedOrder":0,"removedOrder":1,"changes":{"1":"Removed"},"highlight":"customer-to-monolith"},{"id":"agent-to-monolith","Interface":"Customer service administration","Description":"","SourceSystem":"External actor","SourceEntity":"Customer Service Agent","TargetSystem":"Legacy Commerce Platform","TargetEntity":"Commerce Monolith","Direction":"Outbound","Type":"Web","systems":["legacy-commerce"],"introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"agent-to-monolith"},{"id":"merchandiser-to-monolith","Interface":"Merchandising administration","Description":"","SourceSystem":"External actor","SourceEntity":"Merchandiser","TargetSystem":"Legacy Commerce Platform","TargetEntity":"Commerce Monolith","Direction":"Outbound","Type":"Web","systems":["legacy-commerce"],"introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"merchandiser-to-monolith"},{"id":"monolith-to-identity","Interface":"Authenticate customer","Description":"","SourceSystem":"Legacy Commerce Platform","SourceEntity":"Commerce Monolith","TargetSystem":"Enterprise Identity","TargetEntity":"Identity Provider","Direction":"Outbound","Type":"Api","systems":["legacy-commerce","enterprise-identity"],"introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"monolith-to-identity"},{"id":"monolith-to-payment","Interface":"Authorize and capture payment","Description":"","SourceSystem":"Legacy Commerce Platform","SourceEntity":"Commerce Monolith","TargetSystem":"Payment Service Provider","TargetEntity":"Payment Gateway API","Direction":"Outbound","Type":"Api","systems":["legacy-commerce","payment-provider"],"introducedOrder":0,"removedOrder":4,"changes":{"4":"Removed"},"highlight":"monolith-to-payment"},{"id":"monolith-to-erp","Interface":"Query inventory and fulfilment status","Description":"","SourceSystem":"Legacy Commerce Platform","SourceEntity":"Commerce Monolith","TargetSystem":"Enterprise Fulfilment","TargetEntity":"ERP and WMS","Direction":"Outbound","Type":"Integration","systems":["legacy-commerce","enterprise-fulfilment"],"introducedOrder":0,"removedOrder":4,"changes":{"4":"Removed"},"highlight":"monolith-to-erp"},{"id":"monolith-to-oms","Interface":"Submit accepted order to enterprise OMS","Description":"","SourceSystem":"Legacy Commerce Platform","SourceEntity":"Commerce Monolith","TargetSystem":"Enterprise Order Management","TargetEntity":"Enterprise OMS","Direction":"Outbound","Type":"Integration","systems":["legacy-commerce","enterprise-order-management"],"introducedOrder":0,"removedOrder":4,"changes":{"4":"Removed"},"highlight":"monolith-to-oms"},{"id":"oms-to-erp","Interface":"Coordinate warehouse fulfilment","Description":"","SourceSystem":"Enterprise Order Management","SourceEntity":"Enterprise OMS","TargetSystem":"Enterprise Fulfilment","TargetEntity":"ERP and WMS","Direction":"Outbound","Type":"Integration","systems":["enterprise-order-management","enterprise-fulfilment"],"introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"oms-to-erp"},{"id":"monolith-to-finance","Interface":"Submit settlement and reconciliation batch","Description":"","SourceSystem":"Legacy Commerce Platform","SourceEntity":"Commerce Monolith","TargetSystem":"Enterprise Finance","TargetEntity":"Finance Ledger and Reconciliation","Direction":"Outbound","Type":"Integration","systems":["legacy-commerce","enterprise-finance"],"introducedOrder":0,"removedOrder":4,"changes":{"4":"Removed"},"highlight":"monolith-to-finance"},{"id":"monolith-to-analytics","Interface":"Send web and commerce analytics","Description":"","SourceSystem":"Legacy Commerce Platform","SourceEntity":"Commerce Monolith","TargetSystem":"Digital Analytics Provider","TargetEntity":"Digital Analytics API","Direction":"Outbound","Type":"Event","systems":["legacy-commerce","analytics-provider"],"introducedOrder":0,"removedOrder":1,"changes":{"1":"Removed"},"highlight":"monolith-to-analytics"},{"id":"monolith-to-tax","Interface":"Calculate checkout tax","Description":"","SourceSystem":"Legacy Commerce Platform","SourceEntity":"Commerce Monolith","TargetSystem":"Tax Calculation Provider","TargetEntity":"Tax Calculation API","Direction":"Outbound","Type":"Api","systems":["legacy-commerce","tax-provider"],"introducedOrder":0,"removedOrder":4,"changes":{"4":"Removed"},"highlight":"monolith-to-tax"},{"id":"monolith-to-fraud","Interface":"Score payment fraud risk","Description":"","SourceSystem":"Legacy Commerce Platform","SourceEntity":"Commerce Monolith","TargetSystem":"Fraud Decision Provider","TargetEntity":"Fraud Decision API","Direction":"Outbound","Type":"Api","systems":["legacy-commerce","fraud-provider"],"introducedOrder":0,"removedOrder":4,"changes":{"4":"Removed"},"highlight":"monolith-to-fraud"},{"id":"monolith-to-messaging","Interface":"Send customer communications","Description":"","SourceSystem":"Legacy Commerce Platform","SourceEntity":"Commerce Monolith","TargetSystem":"Customer Engagement Provider","TargetEntity":"Messaging Provider API","Direction":"Outbound","Type":"Api","systems":["legacy-commerce","customer-engagement"],"introducedOrder":0,"removedOrder":3,"changes":{"3":"Removed"},"highlight":"monolith-to-messaging"},{"id":"warehouse-to-erp","Interface":"Warehouse operations","Description":"","SourceSystem":"External actor","SourceEntity":"Warehouse Operator","TargetSystem":"Enterprise Fulfilment","TargetEntity":"ERP and WMS","Direction":"Outbound","Type":"User Interface","systems":["enterprise-fulfilment"],"introducedOrder":0,"removedOrder":null,"changes":{},"highlight":"warehouse-to-erp"},{"id":"customer-to-edge","Interface":"Customer traffic through commerce edge","Description":"","SourceSystem":"External actor","SourceEntity":"Customer","TargetSystem":"Digital Commerce Platform","TargetEntity":"Commerce Edge","Direction":"Outbound","Type":"Web","systems":["commerce-platform"],"introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"customer-to-edge"},{"id":"edge-to-bff","Interface":"Route target storefront requests","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Commerce Edge","TargetSystem":"Digital Commerce Platform","TargetEntity":"Storefront BFF","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"edge-to-bff"},{"id":"edge-to-monolith","Interface":"Route unmigrated customer journeys","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Commerce Edge","TargetSystem":"Legacy Commerce Platform","TargetEntity":"Commerce Monolith","Direction":"Outbound","Type":"Web","systems":["commerce-platform","legacy-commerce"],"introducedOrder":1,"removedOrder":4,"changes":{"1":"Added","4":"Removed"},"highlight":"edge-to-monolith"},{"id":"bff-to-monolith","Interface":"Compose unmigrated commerce capabilities","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Storefront BFF","TargetSystem":"Legacy Commerce Platform","TargetEntity":"Commerce Monolith","Direction":"Outbound","Type":"Api","systems":["commerce-platform","legacy-commerce"],"introducedOrder":1,"removedOrder":4,"changes":{"1":"Added","4":"Removed"},"highlight":"bff-to-monolith"},{"id":"monolith-to-legacy-adapter","Interface":"Publish and translate legacy domain changes","Description":"","SourceSystem":"Legacy Commerce Platform","SourceEntity":"Commerce Monolith","TargetSystem":"Digital Commerce Platform","TargetEntity":"Legacy Anti-corruption Layer","Direction":"Outbound","Type":"Integration","systems":["legacy-commerce","commerce-platform"],"introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"monolith-to-legacy-adapter"},{"id":"edge-to-analytics-adapter","Interface":"Send consented digital interaction events","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Commerce Edge","TargetSystem":"Digital Commerce Platform","TargetEntity":"Analytics Event Adapter","Direction":"Outbound","Type":"Event","systems":["commerce-platform","commerce-platform"],"introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"edge-to-analytics-adapter"},{"id":"analytics-adapter-to-provider","Interface":"Forward allowlisted analytics events","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Analytics Event Adapter","TargetSystem":"Digital Analytics Provider","TargetEntity":"Digital Analytics API","Direction":"Outbound","Type":"Event","systems":["commerce-platform","analytics-provider"],"introducedOrder":1,"removedOrder":null,"changes":{"1":"Added"},"highlight":"analytics-adapter-to-provider"},{"id":"bff-to-catalog","Interface":"Read product and navigation data","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Storefront BFF","TargetSystem":"Digital Commerce Platform","TargetEntity":"Catalog Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":2,"removedOrder":null,"changes":{"2":"Added"},"highlight":"bff-to-catalog"},{"id":"bff-to-search","Interface":"Search and browse products","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Storefront BFF","TargetSystem":"Digital Commerce Platform","TargetEntity":"Search Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":2,"removedOrder":null,"changes":{"2":"Added"},"highlight":"bff-to-search"},{"id":"catalog-to-events","Interface":"Publish catalog domain events","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Catalog Service","TargetSystem":"Digital Commerce Platform","TargetEntity":"Commerce Event Backbone","Direction":"Outbound","Type":"Event","systems":["commerce-platform","commerce-platform"],"introducedOrder":2,"removedOrder":null,"changes":{"2":"Added"},"highlight":"catalog-to-events"},{"id":"events-to-search","Interface":"Project catalog events into search","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Commerce Event Backbone","TargetSystem":"Digital Commerce Platform","TargetEntity":"Search Service","Direction":"Outbound","Type":"Event","systems":["commerce-platform","commerce-platform"],"introducedOrder":2,"removedOrder":null,"changes":{"2":"Added"},"highlight":"events-to-search"},{"id":"events-to-analytics-adapter","Interface":"Consume allowlisted commerce domain events for analytics","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Commerce Event Backbone","TargetSystem":"Digital Commerce Platform","TargetEntity":"Analytics Event Adapter","Direction":"Outbound","Type":"Event","systems":["commerce-platform","commerce-platform"],"introducedOrder":2,"removedOrder":null,"changes":{"2":"Added"},"highlight":"events-to-analytics-adapter"},{"id":"legacy-adapter-to-catalog-sync","Interface":"Translate legacy catalog updates","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Legacy Anti-corruption Layer","TargetSystem":"Digital Commerce Platform","TargetEntity":"Catalog Migration Adapter","Direction":"Outbound","Type":"Integration","systems":["commerce-platform","commerce-platform"],"introducedOrder":2,"removedOrder":null,"changes":{"2":"Added"},"highlight":"legacy-adapter-to-catalog-sync"},{"id":"catalog-sync-to-catalog","Interface":"Apply reconciled catalog commands","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Catalog Migration Adapter","TargetSystem":"Digital Commerce Platform","TargetEntity":"Catalog Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":2,"removedOrder":null,"changes":{"2":"Added"},"highlight":"catalog-sync-to-catalog"},{"id":"bff-to-customer","Interface":"Read and update customer profile","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Storefront BFF","TargetSystem":"Digital Commerce Platform","TargetEntity":"Customer Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"bff-to-customer"},{"id":"customer-to-identity","Interface":"Resolve identity subject and account linkage","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Customer Service","TargetSystem":"Enterprise Identity","TargetEntity":"Identity Provider","Direction":"Outbound","Type":"Api","systems":["commerce-platform","enterprise-identity"],"introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"customer-to-identity"},{"id":"bff-to-cart","Interface":"Manage shopping cart","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Storefront BFF","TargetSystem":"Digital Commerce Platform","TargetEntity":"Cart Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"bff-to-cart"},{"id":"cart-to-pricing","Interface":"Price cart contents","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Cart Service","TargetSystem":"Digital Commerce Platform","TargetEntity":"Pricing Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"cart-to-pricing"},{"id":"bff-to-pricing","Interface":"Display prices and promotions","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Storefront BFF","TargetSystem":"Digital Commerce Platform","TargetEntity":"Pricing Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"bff-to-pricing"},{"id":"customer-to-events","Interface":"Publish customer domain events","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Customer Service","TargetSystem":"Digital Commerce Platform","TargetEntity":"Commerce Event Backbone","Direction":"Outbound","Type":"Event","systems":["commerce-platform","commerce-platform"],"introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"customer-to-events"},{"id":"events-to-notification","Interface":"Consume communication-triggering domain events","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Commerce Event Backbone","TargetSystem":"Digital Commerce Platform","TargetEntity":"Notification Service","Direction":"Outbound","Type":"Event","systems":["commerce-platform","commerce-platform"],"introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"events-to-notification"},{"id":"notification-to-provider","Interface":"Deliver email and SMS","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Notification Service","TargetSystem":"Customer Engagement Provider","TargetEntity":"Messaging Provider API","Direction":"Outbound","Type":"Api","systems":["commerce-platform","customer-engagement"],"introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"notification-to-provider"},{"id":"legacy-adapter-to-customer","Interface":"Translate legacy customer operations","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Legacy Anti-corruption Layer","TargetSystem":"Digital Commerce Platform","TargetEntity":"Customer Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"legacy-adapter-to-customer"},{"id":"legacy-adapter-to-cart","Interface":"Translate legacy cart operations","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Legacy Anti-corruption Layer","TargetSystem":"Digital Commerce Platform","TargetEntity":"Cart Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"legacy-adapter-to-cart"},{"id":"legacy-adapter-to-pricing","Interface":"Translate legacy pricing operations","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Legacy Anti-corruption Layer","TargetSystem":"Digital Commerce Platform","TargetEntity":"Pricing Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":3,"removedOrder":null,"changes":{"3":"Added"},"highlight":"legacy-adapter-to-pricing"},{"id":"bff-to-checkout","Interface":"Submit idempotent checkout command","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Storefront BFF","TargetSystem":"Digital Commerce Platform","TargetEntity":"Checkout Orchestrator","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"bff-to-checkout"},{"id":"checkout-to-cart","Interface":"Lock and consume cart snapshot","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Checkout Orchestrator","TargetSystem":"Digital Commerce Platform","TargetEntity":"Cart Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"checkout-to-cart"},{"id":"checkout-to-pricing","Interface":"Validate authoritative price","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Checkout Orchestrator","TargetSystem":"Digital Commerce Platform","TargetEntity":"Pricing Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"checkout-to-pricing"},{"id":"checkout-to-inventory","Interface":"Reserve or release inventory","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Checkout Orchestrator","TargetSystem":"Digital Commerce Platform","TargetEntity":"Inventory Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"checkout-to-inventory"},{"id":"checkout-to-payment","Interface":"Authorize or compensate payment","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Checkout Orchestrator","TargetSystem":"Digital Commerce Platform","TargetEntity":"Payment Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"checkout-to-payment"},{"id":"checkout-to-order","Interface":"Create accepted order","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Checkout Orchestrator","TargetSystem":"Digital Commerce Platform","TargetEntity":"Order Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"checkout-to-order"},{"id":"payment-to-provider","Interface":"Execute tokenized payment operation","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Payment Service","TargetSystem":"Payment Service Provider","TargetEntity":"Payment Gateway API","Direction":"Outbound","Type":"Api","systems":["commerce-platform","payment-provider"],"introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"payment-to-provider"},{"id":"checkout-to-tax","Interface":"Calculate and commit checkout tax","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Checkout Orchestrator","TargetSystem":"Tax Calculation Provider","TargetEntity":"Tax Calculation API","Direction":"Outbound","Type":"Api","systems":["commerce-platform","tax-provider"],"introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"checkout-to-tax"},{"id":"payment-to-fraud","Interface":"Request payment fraud decision","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Payment Service","TargetSystem":"Fraud Decision Provider","TargetEntity":"Fraud Decision API","Direction":"Outbound","Type":"Api","systems":["commerce-platform","fraud-provider"],"introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"payment-to-fraud"},{"id":"payment-to-finance","Interface":"Submit settlement and reconciliation records","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Payment Service","TargetSystem":"Enterprise Finance","TargetEntity":"Finance Ledger and Reconciliation","Direction":"Outbound","Type":"Integration","systems":["commerce-platform","enterprise-finance"],"introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"payment-to-finance"},{"id":"order-to-oms","Interface":"Submit accepted order to enterprise OMS","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Order Service","TargetSystem":"Enterprise Order Management","TargetEntity":"Enterprise OMS","Direction":"Outbound","Type":"Integration","systems":["commerce-platform","enterprise-order-management"],"introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"order-to-oms"},{"id":"inventory-to-erp","Interface":"Synchronize availability and reservation outcomes","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Inventory Service","TargetSystem":"Enterprise Fulfilment","TargetEntity":"ERP and WMS","Direction":"Outbound","Type":"Integration","systems":["commerce-platform","enterprise-fulfilment"],"introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"inventory-to-erp"},{"id":"order-to-events","Interface":"Publish order domain events","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Order Service","TargetSystem":"Digital Commerce Platform","TargetEntity":"Commerce Event Backbone","Direction":"Outbound","Type":"Event","systems":["commerce-platform","commerce-platform"],"introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"order-to-events"},{"id":"payment-to-events","Interface":"Publish payment domain events","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Payment Service","TargetSystem":"Digital Commerce Platform","TargetEntity":"Commerce Event Backbone","Direction":"Outbound","Type":"Event","systems":["commerce-platform","commerce-platform"],"introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"payment-to-events"},{"id":"inventory-to-events","Interface":"Publish inventory and reservation events","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Inventory Service","TargetSystem":"Digital Commerce Platform","TargetEntity":"Commerce Event Backbone","Direction":"Outbound","Type":"Event","systems":["commerce-platform","commerce-platform"],"introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"inventory-to-events"},{"id":"legacy-adapter-to-order","Interface":"Translate legacy order administration","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Legacy Anti-corruption Layer","TargetSystem":"Digital Commerce Platform","TargetEntity":"Order Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":4,"removedOrder":null,"changes":{"4":"Added"},"highlight":"legacy-adapter-to-order"},{"id":"agent-to-admin","Interface":"Customer service administration","Description":"","SourceSystem":"External actor","SourceEntity":"Customer Service Agent","TargetSystem":"Digital Commerce Platform","TargetEntity":"Commerce Administration Portal","Direction":"Outbound","Type":"Web","systems":["commerce-platform"],"introducedOrder":5,"removedOrder":null,"changes":{"5":"Added"},"highlight":"agent-to-admin"},{"id":"merchandiser-to-admin","Interface":"Merchandising administration","Description":"","SourceSystem":"External actor","SourceEntity":"Merchandiser","TargetSystem":"Digital Commerce Platform","TargetEntity":"Commerce Administration Portal","Direction":"Outbound","Type":"Web","systems":["commerce-platform"],"introducedOrder":5,"removedOrder":null,"changes":{"5":"Added"},"highlight":"merchandiser-to-admin"},{"id":"admin-to-catalog","Interface":"Manage catalog and assortment","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Commerce Administration Portal","TargetSystem":"Digital Commerce Platform","TargetEntity":"Catalog Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":5,"removedOrder":null,"changes":{"5":"Added"},"highlight":"admin-to-catalog"},{"id":"admin-to-customer","Interface":"Support customer accounts","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Commerce Administration Portal","TargetSystem":"Digital Commerce Platform","TargetEntity":"Customer Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":5,"removedOrder":null,"changes":{"5":"Added"},"highlight":"admin-to-customer"},{"id":"admin-to-order","Interface":"Support order lifecycle","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Commerce Administration Portal","TargetSystem":"Digital Commerce Platform","TargetEntity":"Order Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":5,"removedOrder":null,"changes":{"5":"Added"},"highlight":"admin-to-order"},{"id":"admin-to-pricing","Interface":"Manage pricing and promotions","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Commerce Administration Portal","TargetSystem":"Digital Commerce Platform","TargetEntity":"Pricing Service","Direction":"Outbound","Type":"Api","systems":["commerce-platform","commerce-platform"],"introducedOrder":5,"removedOrder":null,"changes":{"5":"Added"},"highlight":"admin-to-pricing"},{"id":"events-to-reporting","Interface":"Build operational reporting projections","Description":"","SourceSystem":"Digital Commerce Platform","SourceEntity":"Commerce Event Backbone","TargetSystem":"Digital Commerce Platform","TargetEntity":"Commerce Reporting Service","Direction":"Outbound","Type":"Event","systems":["commerce-platform","commerce-platform"],"introducedOrder":5,"removedOrder":null,"changes":{"5":"Added"},"highlight":"events-to-reporting"},{"id":"agent-to-reporting","Interface":"View operational reports","Description":"","SourceSystem":"External actor","SourceEntity":"Customer Service Agent","TargetSystem":"Digital Commerce Platform","TargetEntity":"Commerce Reporting Service","Direction":"Outbound","Type":"Web","systems":["commerce-platform"],"introducedOrder":5,"removedOrder":null,"changes":{"5":"Added"},"highlight":"agent-to-reporting"}];
+    const systemLinks = [["analytics-provider","commerce-platform"],["analytics-provider","legacy-commerce"],["commerce-platform","customer-engagement"],["commerce-platform","enterprise-finance"],["commerce-platform","enterprise-fulfilment"],["commerce-platform","enterprise-identity"],["commerce-platform","enterprise-order-management"],["commerce-platform","fraud-provider"],["commerce-platform","legacy-commerce"],["commerce-platform","payment-provider"],["commerce-platform","tax-provider"],["customer-engagement","legacy-commerce"],["enterprise-finance","legacy-commerce"],["enterprise-fulfilment","enterprise-order-management"],["enterprise-fulfilment","legacy-commerce"],["enterprise-identity","legacy-commerce"],["enterprise-order-management","legacy-commerce"],["fraud-provider","legacy-commerce"],["legacy-commerce","payment-provider"],["legacy-commerce","tax-provider"]];
+
+    const commonGridOptions = {
+      defaultColDef: {
+        filter: true,
+        flex: 1,
+        sortable: true,
+        resizable: true,
+        minWidth: 90
+      },
+      animateRows: false,
+      domLayout: "autoHeight",
+      getRowId: (params) => params.data.id
+    };
+
+    function makeGrid(elementId, options) {
+      return agGrid.createGrid(document.getElementById(elementId), {
+        ...commonGridOptions,
+        ...options
+      });
+    }
+
+    const applicationColumnDefs = {
+      apps: [
+        { field: "Application", width: 210, pinned: "left" },
+        { field: "System", width: 190 },
+        { field: "Reach", width: 90 },
+        { field: "Status", width: 90 },
+        { field: "Technology", width: 190 },
+        { field: "Tags", width: 220 }
+      ],
+      components: [
+        { field: "Entity", width: 220, pinned: "left" },
+        { field: "Kind", width: 100 },
+        { field: "Parent", width: 180 },
+        { field: "System", width: 190 },
+        { field: "Reach", width: 90 },
+        { field: "Status", width: 90 },
+        { field: "Technology", width: 180 },
+        { field: "Tags", width: 220 }
+      ]
+    };
+
+    gridApis.systems = makeGrid("systems-grid", {
+      pagination: true,
+      paginationPageSize: 10,
+      paginationPageSizeSelector: false,
+      rowData: [],
+      columnDefs: [
+        { field: "System", width: 175, pinned: "left" },
+        { field: "Scope", width: 100 },
+        { field: "Groups", headerName: "System groups", width: 150 },
+        { field: "Tags", width: 165 },
+        { field: "Status", width: 90 },
+        { field: "Lifecycle", width: 100 },
+        { field: "Owner", width: 160 }
+      ],
+      onRowClicked: (event) => highlight(event.data.highlight)
+    });
+
+    gridApis.apps = makeGrid("apps-grid", {
+      pagination: true,
+      paginationPageSize: 20,
+      paginationPageSizeSelector: false,
+      rowData: [],
+      columnDefs: applicationColumnDefs.apps,
+      onRowClicked: (event) => highlight(event.data.highlight)
+    });
+
+    gridApis.interfaces = makeGrid("interfaces-grid", {
+      pagination: true,
+      paginationPageSize: 20,
+      paginationPageSizeSelector: false,
+      rowData: [],
+      columnDefs: [
+        { field: "Interface", width: 180, pinned: "left" },
+        { field: "SourceSystem", headerName: "Source system", width: 145 },
+        { field: "SourceEntity", headerName: "Source app / container", width: 155 },
+        { field: "TargetSystem", headerName: "Target system", width: 145 },
+        { field: "TargetEntity", headerName: "Target app / container", width: 155 },
+        { field: "Direction", width: 90 },
+        { field: "Type", width: 80 },
+        { field: "Scope", width: 90 },
+        { field: "Status", width: 90 }
+      ],
+      onRowClicked: (event) => highlight(event.data.highlight)
+    });
+
+    document.querySelectorAll("[data-section-toggle]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        if (event.target.closest(".button")) return;
+        const section = button.closest("[data-section]");
+        section.classList.toggle("closed");
+        section.classList.toggle("open-focus", !section.classList.contains("closed"));
+        button.setAttribute("aria-expanded", String(!section.classList.contains("closed")));
+      });
+    });
+
+    const stateProfiles = {
+      base: { order: 0 },
+      2027: { order: 1 },
+      2028: { order: 2 },
+      2029: { order: 3 },
+      2030: { order: 4 },
+      2031: { order: 5 }
+    };
+
+    function selectedSystems() {
+      return new Set(submittedSelectedSystems);
+    }
+
+    function rowAtState(row, order) {
+      if ((row.introducedOrder ?? 0) > order) return null;
+      if (row.removedOrder != null && row.removedOrder <= order) return null;
+      const Status = row.changes?.[order] ?? "Current";
+      return { ...row, Status };
+    }
+
+    function effectiveSystems(selected, hops) {
+      const neighbours = new Map(systemRows.map((row) => [row.id, new Set()]));
+      systemLinks.forEach(([source, target]) => {
+        neighbours.get(source)?.add(target);
+        neighbours.get(target)?.add(source);
+      });
+      const distances = new Map([...selected].map((system) => [system, 0]));
+      let frontier = new Set(selected);
+      for (let distance = 1; distance <= hops; distance += 1) {
+        const next = new Set();
+        frontier.forEach((system) => {
+          neighbours.get(system)?.forEach((neighbour) => {
+            if (!distances.has(neighbour)) next.add(neighbour);
+          });
+        });
+        next.forEach((system) => distances.set(system, distance));
+        frontier = next;
+      }
+      return distances;
+    }
+
+    function setApplicationGridColumns() {
+      gridApis.apps.setGridOption("columnDefs", applicationColumnDefs[appMode]);
+      const applicationFilter = document.querySelector('[data-grid-search="apps"]');
+      const filterLabel = appMode === "components" ? "Filter applications and components" : "Filter applications";
+      applicationFilter.placeholder = filterLabel;
+      applicationFilter.setAttribute("aria-label", filterLabel);
+    }
+
+    function updateScope() {
+      if (!gridApis.systems || !gridApis.apps || !gridApis.interfaces || submittedSelectedSystems.size === 0) return;
+      const selected = selectedSystems();
+      const hops = Number(document.getElementById("reach-control").value);
+      const state = stateProfiles[document.getElementById("state-control").value];
+      const effective = effectiveSystems(selected, hops);
+      const reportSystems = systemRows
+        .filter((row) => effective.has(row.id))
+        .map((row) => rowAtState(row, state.order))
+        .filter(Boolean)
+        .map((row) => {
+          const distance = effective.get(row.id);
+          return { ...row, Scope: distance === 0 ? "Selected" : `${distance} hop${distance === 1 ? "" : "s"}` };
+        });
+      const visibleSystemIds = new Set(reportSystems.map((row) => row.id));
+      const availableApplicationRows = applicationRows
+        .filter((row) => visibleSystemIds.has(row.systemId))
+        .map((row) => rowAtState(row, state.order))
+        .filter(Boolean)
+        .map((row) => {
+          const distance = effective.get(row.systemId);
+          return { ...row, Reach: distance === 0 ? "Selected" : `${distance} hop${distance === 1 ? "" : "s"}` };
+        });
+      const appRows = appMode === "components"
+        ? availableApplicationRows
+          .map((row) => ({ ...row, Entity: row.Kind === "Component" ? `↳ ${row.Name}` : row.Name }))
+        : availableApplicationRows
+          .filter((row) => row.Kind === "Application")
+          .map((row) => ({ ...row, Application: row.Name }));
+      const reportInterfaces = interfaceRows
+        .filter((row) => row.systems.some((system) => visibleSystemIds.has(system)))
+        .map((row) => rowAtState(row, state.order))
+        .filter(Boolean)
+        .map((row) => ({ ...row, Scope: row.systems.every((system) => selected.has(system)) ? "Selected" : "Boundary" }));
+
+      gridApis.systems.setGridOption("rowData", reportSystems);
+      gridApis.systems.setGridOption("suppressPaginationPanel", reportSystems.length <= 10);
+      gridApis.apps.setGridOption("suppressPaginationPanel", appRows.length <= 20);
+      gridApis.apps.setGridOption("rowData", appRows);
+      gridApis.interfaces.setGridOption("suppressPaginationPanel", reportInterfaces.length <= 20);
+      gridApis.interfaces.setGridOption("rowData", reportInterfaces);
+      document.getElementById("summary-system-count").textContent = reportSystems.length;
+      document.getElementById("summary-app-count").textContent = availableApplicationRows.filter((row) => row.Kind === "Application").length;
+      document.getElementById("summary-component-count").textContent = availableApplicationRows.filter((row) => row.Kind === "Component").length;
+      document.getElementById("summary-interface-count").textContent = reportInterfaces.length;
+    }
+
+    function resetReportView() {
+      document.getElementById("reach-control").value = "1";
+      document.getElementById("state-control").value = "2030";
+      document.getElementById("diagram-detail-control").value = "system";
+      appMode = "apps";
+      document.getElementById("application-level-control").value = appMode;
+      setApplicationGridColumns();
+      sections.forEach((section) => {
+        section.classList.remove("closed");
+        section.querySelector("[data-section-toggle]").setAttribute("aria-expanded", "true");
+      });
+      selectDiagram("place-order-svg");
+      updateDiagramDetail();
+      updateScope();
+    }
+    document.getElementById("reach-control").addEventListener("change", updateScope);
+    document.getElementById("state-control").addEventListener("change", updateScope);
+
+    const scopeOptions = document.getElementById("scope-options");
+    const scopeSearch = document.getElementById("scope-search");
+    const scopePageSize = 20;
+    let scopePage = 0;
+
+    function visibleScopeSystems() {
+      const query = scopeSearch.value.trim().toLowerCase();
+      if (!query) return systemRows;
+      return systemRows.filter((row) => [row.System, row.Groups, row.Tags, row.Owner].some((value) => value.toLowerCase().includes(query)));
+    }
+
+    function pagedScopeSystems() {
+      const visible = visibleScopeSystems();
+      return visible.slice(scopePage * scopePageSize, (scopePage + 1) * scopePageSize);
+    }
+
+    function updateScopeSelectionSummary() {
+      document.getElementById("generate-report").disabled = draftSelectedSystems.size === 0;
+      const visible = pagedScopeSystems();
+      const selectedVisible = visible.filter((row) => draftSelectedSystems.has(row.id)).length;
+      const selectAll = document.getElementById("scope-select-all");
+      selectAll.checked = visible.length > 0 && selectedVisible === visible.length;
+      selectAll.indeterminate = selectedVisible > 0 && selectedVisible < visible.length;
+    }
+
+    function renderScopeSystems() {
+      const visible = visibleScopeSystems();
+      const pageCount = Math.max(1, Math.ceil(visible.length / scopePageSize));
+      scopePage = Math.min(scopePage, pageCount - 1);
+      scopeOptions.replaceChildren();
+      pagedScopeSystems().forEach((system) => {
+        const row = document.createElement("tr");
+        row.dataset.systemId = system.id;
+        row.innerHTML = `<td class="scope-check"><input aria-label="Select ${system.System}" ${draftSelectedSystems.has(system.id) ? "checked" : ""} type="checkbox"></td><td><b>${system.System}</b></td><td>${system.Groups}</td><td>${system.Tags}</td><td>${system.Owner}</td>`;
+        scopeOptions.append(row);
+      });
+      document.getElementById("scope-pagination").hidden = pageCount <= 1;
+      document.getElementById("scope-page-label").textContent = `${scopePage + 1} / ${pageCount}`;
+      document.getElementById("scope-previous-page").disabled = scopePage === 0;
+      document.getElementById("scope-next-page").disabled = scopePage === pageCount - 1;
+      updateScopeSelectionSummary();
+    }
+
+    scopeOptions.addEventListener("change", (event) => {
+      const row = event.target.closest("[data-system-id]");
+      if (!row) return;
+      if (event.target.checked) draftSelectedSystems.add(row.dataset.systemId);
+      else draftSelectedSystems.delete(row.dataset.systemId);
+      updateScopeSelectionSummary();
+    });
+
+    scopeOptions.addEventListener("click", (event) => {
+      if (event.target.matches("input")) return;
+      const row = event.target.closest("[data-system-id]");
+      if (!row) return;
+      const checkbox = row.querySelector("input");
+      checkbox.checked = !checkbox.checked;
+      checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    document.getElementById("scope-select-all").addEventListener("change", (event) => {
+      pagedScopeSystems().forEach((system) => {
+        if (event.target.checked) draftSelectedSystems.add(system.id);
+        else draftSelectedSystems.delete(system.id);
+      });
+      renderScopeSystems();
+    });
+    scopeSearch.addEventListener("input", () => {
+      scopePage = 0;
+      renderScopeSystems();
+    });
+    document.getElementById("scope-previous-page").addEventListener("click", () => {
+      scopePage -= 1;
+      renderScopeSystems();
+    });
+    document.getElementById("scope-next-page").addEventListener("click", () => {
+      scopePage += 1;
+      renderScopeSystems();
+    });
+    document.getElementById("generate-report").addEventListener("click", () => {
+      if (draftSelectedSystems.size === 0) return;
+      submittedSelectedSystems = new Set(draftSelectedSystems);
+      document.getElementById("active-report-name").textContent = "New architecture report";
+      document.getElementById("scope-builder").hidden = true;
+      document.getElementById("report-shell").hidden = false;
+      resetReportView();
+      document.getElementById("report-shell").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    document.getElementById("edit-scope").addEventListener("click", () => {
+      document.getElementById("scope-builder").hidden = false;
+      document.getElementById("report-shell").hidden = true;
+      document.getElementById("scope-search").focus();
+    });
+    function showReportHome() {
+      document.getElementById("report-home").hidden = false;
+      document.getElementById("scope-builder").hidden = true;
+      document.getElementById("report-shell").hidden = true;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    document.getElementById("back-to-reports").addEventListener("click", showReportHome);
+    document.getElementById("cancel-create-report").addEventListener("click", showReportHome);
+    document.getElementById("create-report").addEventListener("click", () => {
+      document.getElementById("report-home").hidden = true;
+      document.getElementById("scope-builder").hidden = false;
+      document.getElementById("report-shell").hidden = true;
+      renderScopeSystems();
+    });
+    document.querySelectorAll("[data-open-report]").forEach((card) => card.addEventListener("click", () => {
+      const name = card.dataset.reportName;
+      document.getElementById("active-report-name").textContent = name;
+      document.getElementById("report-home").hidden = true;
+      document.getElementById("scope-builder").hidden = true;
+      document.getElementById("report-shell").hidden = false;
+      submittedSelectedSystems = new Set(defaultSystemIds);
+      draftSelectedSystems = new Set(defaultSystemIds);
+      resetReportView();
+      if (name === "Edge Foundation Review") {
+        submittedSelectedSystems = new Set(["commerce-platform", "legacy-commerce"]);
+        document.getElementById("state-control").value = "2027";
+        document.getElementById("reach-control").value = "1";
+      } else if (name === "Target Commerce Platform") {
+        submittedSelectedSystems = new Set(["commerce-platform"]);
+        document.getElementById("state-control").value = "2031";
+        document.getElementById("reach-control").value = "1";
+      }
+      updateScope();
+      scheduleLikeC4Fit(document.getElementById("report-shell"));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }));
+
+    document.getElementById("application-level-control").addEventListener("change", (event) => {
+      appMode = event.target.value;
+      setApplicationGridColumns();
+      updateScope();
+    });
+
+    renderScopeSystems();
+
+    function highlight(target) {
+      document.querySelectorAll(".highlighted").forEach((item) => item.classList.remove("highlighted"));
+      document.querySelectorAll(`[data-diagram-entity="${target}"],[data-diagram-edge="${target}"]`).forEach((item) => item.classList.add("highlighted"));
+    }
+
+    document.querySelectorAll("[data-diagram-entity]").forEach((node) => node.addEventListener("click", () => {
+      highlight(node.dataset.diagramEntity);
+    }));
+
+    const restrictedLikeC4Tabs = new Set(["Views", "Structure", "Deployments"]);
+    const observedLikeC4Roots = new WeakSet();
+
+    function observeLikeC4Root(root) {
+      if (!root || observedLikeC4Roots.has(root)) return;
+      observedLikeC4Roots.add(root);
+      if (root instanceof ShadowRoot) {
+        const interactionStyles = document.createElement("style");
+        interactionStyles.textContent = `
+          :host {
+            aspect-ratio: auto !important;
+            display: block !important;
+            height: 100% !important;
+            max-height: none !important;
+            width: 100% !important;
+          }
+          .likec4-view,
+          [data-likec4-instance] {
+            aspect-ratio: auto !important;
+            height: 100% !important;
+            max-height: none !important;
+            min-height: 100% !important;
+            width: 100% !important;
+          }
+          .react-flow__edge-path {
+            stroke-width: 3.2px !important;
+          }
+          .react-flow__edge:hover .react-flow__edge-path,
+          .react-flow__edge.selected .react-flow__edge-path,
+          .react-flow__edge:focus-within .react-flow__edge-path {
+            animation: report-interface-flow .75s linear infinite;
+            stroke-dasharray: 12 7;
+            stroke-width: 4px !important;
+          }
+          @keyframes report-interface-flow {
+            to { stroke-dashoffset: -38; }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .react-flow__edge-path { animation: none !important; }
+          }
+        `;
+        root.append(interactionStyles);
+      }
+      const removeRestrictedTabs = () => {
+        root.querySelectorAll('[role="tab"], button').forEach((tab) => {
+          if (!restrictedLikeC4Tabs.has(tab.textContent.trim())) return;
+          tab.remove();
+        });
+      };
+
+      const discoverNestedRoots = () => {
+        root.querySelectorAll("*").forEach((element) => {
+          if (element.shadowRoot) observeLikeC4Root(element.shadowRoot);
+        });
+      };
+
+      removeRestrictedTabs();
+      discoverNestedRoots();
+      new MutationObserver(() => {
+        removeRestrictedTabs();
+        discoverNestedRoots();
+      }).observe(root, { childList: true, subtree: true });
+    }
+
+    function restrictLikeC4ElementTabs(view) {
+      if (!view.shadowRoot || view.dataset.reportTabRestrictions === "true") return;
+      view.dataset.reportTabRestrictions = "true";
+      observeLikeC4Root(view.shadowRoot);
+    }
+
+    function remountLikeC4View(view, viewId = view.getAttribute("view-id")) {
+      const replacement = view.cloneNode(false);
+      replacement.removeAttribute("data-report-tab-restrictions");
+      replacement.setAttribute("view-id", viewId);
+      view.replaceWith(replacement);
+      restrictLikeC4ElementTabs(replacement);
+      return replacement;
+    }
+
+    function scheduleLikeC4Fit(container = document) {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        container.querySelectorAll("likec4-view").forEach((view) => remountLikeC4View(view));
+      }));
+    }
+
+    customElements.whenDefined("likec4-view").then(() => {
+      document.querySelectorAll("likec4-view").forEach(restrictLikeC4ElementTabs);
+    });
+
+    function resetDiagramInteraction() {
+      document.querySelectorAll("likec4-view").forEach((view) => {
+        view.setAttribute("pannable", "false");
+        view.setAttribute("zoomable", "false");
+      });
+    }
+
+    function hoveredLikeC4View() {
+      return [...document.querySelectorAll("likec4-view")].find((view) => view.matches(":hover"));
+    }
+
+    document.addEventListener("keydown", (event) => {
+      const view = hoveredLikeC4View();
+      if (!view) return;
+      if (event.code === "Space" && !event.target.matches?.("input, select, textarea, button, [contenteditable]")) {
+        event.preventDefault();
+        view.setAttribute("pannable", "true");
+      }
+      if (event.metaKey || event.ctrlKey) view.setAttribute("zoomable", "true");
+    });
+
+    document.addEventListener("keyup", (event) => {
+      if (event.code === "Space") {
+        document.querySelectorAll("likec4-view").forEach((view) => view.setAttribute("pannable", "false"));
+      }
+      if (!event.metaKey && !event.ctrlKey) {
+        document.querySelectorAll("likec4-view").forEach((view) => view.setAttribute("zoomable", "false"));
+      }
+    });
+    window.addEventListener("blur", resetDiagramInteraction);
+
+    function updateDiagramDetail() {
+      const detail = document.getElementById("diagram-detail-control").value;
+      const stage = document.getElementById("solution-stage");
+      const view = document.getElementById("solution-likec4-view");
+      stage.dataset.detail = detail;
+      remountLikeC4View(view, `${detail}_scope`);
+      document.getElementById("solution-likec4-caption").textContent =
+        `Interactive LikeC4 · hold Space + drag to pan · hold Cmd/Ctrl to zoom`;
+    }
+    document.getElementById("diagram-detail-control").addEventListener("change", updateDiagramDetail);
+
+    document.querySelectorAll("[data-grid-search]").forEach((input) => input.addEventListener("input", () => {
+      gridApis[input.dataset.gridSearch].setGridOption("quickFilterText", input.value);
+    }));
+
+    function selectDiagram(name) {
+      activeDiagram = name;
+      document.querySelectorAll("[data-diagram-tab]").forEach((tab) => {
+        tab.setAttribute("aria-selected", String(tab.dataset.diagramTab === name));
+      });
+      document.querySelectorAll("[data-diagram-panel]").forEach((panel) => {
+        panel.hidden = panel.dataset.diagramPanel !== name;
+      });
+    }
+
+    document.querySelectorAll("[data-diagram-tab]").forEach((tab) => {
+      tab.addEventListener("click", () => selectDiagram(tab.dataset.diagramTab));
+    });
+
+    document.querySelectorAll("[data-popout]").forEach((button) => button.addEventListener("click", () => {
+      const card = button.closest("[data-diagram-card]");
+      card.classList.remove("collapsed");
+      card.classList.toggle("popout");
+      button.textContent = card.classList.contains("popout") ? "Close full screen" : "Full screen";
+      document.documentElement.classList.toggle("diagram-popout-open", Boolean(document.querySelector(".diagram-card.popout")));
+      document.body.classList.toggle("diagram-popout-open", Boolean(document.querySelector(".diagram-card.popout")));
+      scheduleLikeC4Fit(card);
+    }));
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      const card = document.querySelector(".diagram-card.popout");
+      if (!card) return;
+      card.classList.remove("popout");
+      card.querySelector("[data-popout]").textContent = "Full screen";
+      document.documentElement.classList.remove("diagram-popout-open");
+      document.body.classList.remove("diagram-popout-open");
+      scheduleLikeC4Fit(card);
+    });
+
+    function captureView(name) {
+      const grids = {};
+      Object.entries(gridApis).forEach(([key, api]) => {
+        grids[key] = {
+          columns: api.getColumnState(),
+          filters: api.getFilterModel(),
+          page: api.paginationGetCurrentPage()
+        };
+      });
+      return {
+        report: {
+          id: name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
+          name,
+          selected_systems: [...selectedSystems()],
+          system_scope_hops: Number(document.getElementById("reach-control").value),
+          state: document.getElementById("state-control").value,
+          active_diagram: activeDiagram,
+          solution_diagram_detail: document.getElementById("diagram-detail-control").value,
+          application_grid_mode: appMode === "components" ? "applications_and_components" : "applications",
+          sections: Object.fromEntries(sections.map((section) => [section.id, !section.classList.contains("closed")])),
+          grids
+        }
+      };
+    }
+
+    function yamlScalar(value) {
+      if (value === null) return "null";
+      if (typeof value === "boolean" || typeof value === "number") return String(value);
+      const text = String(value);
+      return /^[A-Za-z0-9_.-]+$/.test(text) ? text : JSON.stringify(text);
+    }
+
+    function toYaml(value, indent = 0) {
+      const pad = " ".repeat(indent);
+      if (Array.isArray(value)) {
+        if (value.length === 0) return "[]";
+        return value.map((item) => {
+          if (item && typeof item === "object") return `${pad}-\n${toYaml(item, indent + 2)}`;
+          return `${pad}- ${yamlScalar(item)}`;
+        }).join("\n");
+      }
+      if (value && typeof value === "object") {
+        return Object.entries(value).map(([key, item]) => {
+          if (item && typeof item === "object" && Object.keys(item).length > 0) {
+            return `${pad}${key}:\n${toYaml(item, indent + 2)}`;
+          }
+          return `${pad}${key}: ${item && typeof item === "object" ? "[]" : yamlScalar(item)}`;
+        }).join("\n");
+      }
+      return `${pad}${yamlScalar(value)}`;
+    }
+
+    function viewYaml(name) {
+      return `${toYaml(captureView(name))}\n`;
+    }
+
+    const saveDialog = document.getElementById("save-view-dialog");
+    function openSaveDialog() {
+      document.getElementById("yaml-preview").textContent = viewYaml(document.getElementById("view-name").value);
+      saveDialog.showModal();
+    }
+    document.getElementById("view-name").addEventListener("input", (event) => {
+      document.getElementById("yaml-preview").textContent = viewYaml(event.target.value || "Untitled report");
+    });
+
+    function saveCurrentView() {
+      const name = document.getElementById("view-name").value.trim() || "Untitled report";
+      const state = captureView(name);
+      const yaml = `${toYaml(state)}\n`;
+      localStorage.setItem(`onetool.soap.report.${state.report.id}.yaml`, yaml);
+      document.getElementById("active-report-name").textContent = name;
+      saveDialog.close();
+    }
+
+    document.getElementById("confirm-save-view").addEventListener("click", saveCurrentView);
+    document.getElementById("save-report").addEventListener("click", openSaveDialog);
+    document.getElementById("download-view-yaml").addEventListener("click", () => {
+      const name = document.getElementById("view-name").value.trim() || "Untitled report";
+      const yaml = viewYaml(name);
+      const anchor = document.createElement("a");
+      anchor.href = URL.createObjectURL(new Blob([yaml], { type: "application/yaml" }));
+      anchor.download = `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.yaml`;
+      anchor.click();
+      URL.revokeObjectURL(anchor.href);
+    });
+
+    const columnDialog = document.getElementById("column-dialog");
+    const columnList = document.getElementById("column-list");
+
+    function populateColumnConfig(key) {
+      configuredGrid = key;
+      const api = gridApis[key];
+      document.getElementById("column-dialog-title").textContent = `Configure ${key} columns`;
+      columnList.replaceChildren();
+      api.getColumnState().forEach((state) => {
+        const def = api.getColumnDef(state.colId);
+        const row = document.createElement("div");
+        row.className = "column-config-row";
+        row.dataset.colId = state.colId;
+        const name = def?.headerName ?? def?.field ?? state.colId;
+        row.innerHTML = `<input aria-label="Show ${name}" ${state.hide ? "" : "checked"} type="checkbox"><span>${name}</span><select aria-label="Pin ${name}"><option value="" ${state.pinned ? "" : "selected"}>Not pinned</option><option value="left" ${state.pinned === "left" ? "selected" : ""}>Pin left</option><option value="right" ${state.pinned === "right" ? "selected" : ""}>Pin right</option></select>`;
+        columnList.append(row);
+      });
+    }
+
+    function renderColumnConfig(key) {
+      populateColumnConfig(key);
+      columnDialog.showModal();
+    }
+
+    document.querySelectorAll("[data-config-columns]").forEach((button) => button.addEventListener("click", () => renderColumnConfig(button.dataset.configColumns)));
+    document.getElementById("reset-columns").addEventListener("click", () => {
+      gridApis[configuredGrid].resetColumnState();
+      populateColumnConfig(configuredGrid);
+    });
+    document.getElementById("apply-columns").addEventListener("click", () => {
+      const state = [...columnList.children].map((row) => ({
+        colId: row.dataset.colId,
+        hide: !row.querySelector("input").checked,
+        pinned: row.querySelector("select").value || null
+      }));
+      gridApis[configuredGrid].applyColumnState({ state });
+      columnDialog.close();
+    });
+
+  </script>
+</body>
+</html>
