@@ -40,7 +40,7 @@ Because a state is a filter, the report app derives everything client-side:
 - **state at slider position** — one array filter;
 - **diff between positions** — set arithmetic;
 - **scope** (selected systems + hops) — BFS over live interfaces;
-- **level** (system / subsystem / component) — roll-up of nodes and edges.
+- **level** (system / container / component) — roll-up of nodes and edges.
 
 This deletes v2's three parallel pipelines (`viewgraph.py` 863 lines,
 `projection.py` 450, `projection.ts` 385) and the Python/TS parity tests
@@ -53,10 +53,11 @@ Normative. Compiled by `build_payload(arch, source_name) -> dict`
 
 ### Position space
 
-Positions are integers **per timeline**: `0` = Current, `i + 1` = the
-timeline's `i`-th milestone. The domain of a timeline with `M` milestones is
-`0..M`; the slider stop index IS the position. (`current`/`end` selectors and
-`-1` stay a resolver-internal convention; they do not appear in the payload.)
+Positions are integers **per timeline**: `0` = the base state, `i + 1` =
+the timeline's `i`-th milestone. The domain of a timeline with `M`
+milestones is `0..M`; the slider stop index IS the position. (`base`/`end`
+selectors stay a resolver-side convention; they do not appear in the
+payload.)
 
 ### Top-level shape (fixed key order)
 
@@ -69,9 +70,9 @@ timeline's `i`-th milestone. The domain of a timeline with `M` milestones is
   "timelines": [ {"id": "program", "milestones": ["acme-2027-edge-foundation", "…"]} ],
   "rows": {
     "systems":       [ {"id": "commerce-platform", "name": "Commerce Platform",
-                        "from": "acme-2027-edge-foundation",
+                        "start_in": "acme-2027-edge-foundation",
                         "intervals": [ {"live": [[1, null]], "clips": []} ]} ],
-    "subsystems":    [], "components": [], "users": [],
+    "containers":    [], "components": [], "code": [], "users": [],
     "interfaces":    [], "relationships": []
   }
 }
@@ -85,28 +86,29 @@ timeline's `i`-th milestone. The domain of a timeline with `M` milestones is
   timelines in declared order. The picker renders when there are several;
   the first is the default. Time UI renders only when the selected
   timeline has at least one milestone (progressive disclosure).
-- `rows` — the six collections in schema order (systems, subsystems,
-  components, users, interfaces, relationships), each in **authored order**.
-  Row identity is `(collection, array index)`; revision rows share an `id`
-  across indices.
+- `rows` — the seven collections in schema order (systems, containers,
+  components, code, users, interfaces, relationships), each in **authored
+  order**. Row identity is `(collection, array index)`; revision rows share
+  an `id` across indices.
 
 ### Row serialization
 
-Model fields dumped `by_alias` (`from`/`until` as authored milestone ids —
-kept for the passport panel), omitting `null`s, empty `tags`/`properties`,
-and `call_direction`/`data_flow` when `"unspecified"` (the client applies
-schema defaults). Plus one derived field:
+Model fields dumped as authored (`start_in`/`end_in` carry the authored
+milestone id or `base` — kept for the passport panel), omitting `null`s,
+empty `tags`/`properties`, and `call_direction`/`data_flow_direction` when
+equal to their schema defaults (the client applies the defaults). Plus one
+derived field:
 
 - `intervals` — array **parallel to `timelines`**. Entry `k` describes the
   row on `timelines[k]`:
-  - `live` — half-open segments `[start, end]` (end exclusive; `null` =
-    unbounded) where this row is the **governing revision and effectively
-    live** (revision succession, off-timeline milestone rules, and clipping
-    all folded in).
-  - `clips` — segments `{"start": s, "end": e, "by": id}` where this row
-    governs but is clipped; `by` is the authored root cause per the
-    resolver's `Clip.clipped_by` semantics. Runs with the same cause are
-    coalesced.
+  - `live` — inclusive segments `[start, end]` (`end` = the **last** live
+    position; `null` = unbounded) where this row is the **governing
+    revision and effectively live** (revision succession, off-timeline
+    milestone rules, and clipping all folded in).
+  - `clips` — segments `{"start": s, "end": e, "by": id}` (same inclusive
+    convention) where this row governs but is clipped; `by` is the authored
+    root cause per the resolver's `Clip.clipped_by` semantics. Runs with
+    the same cause are coalesced.
 
 Segment lists are sorted, disjoint, and coalesced; all bounds lie in the
 timeline's domain. Within one revision group the union of all rows'
@@ -158,13 +160,14 @@ Shared conventions: a **node key** is `"<kind>:<id>"` (ids are unique per
 collection, not globally). `t` is a timeline index into `payload.timelines`,
 `p` a position in that timeline's domain. All output lists are
 deterministically ordered: entity lists in authored group order, node/edge
-lists sorted by key, diff lists by KINDS order (systems, subsystems,
-components, users, interfaces, relationships) then authored group order.
+lists sorted by key, diff lists by KINDS order (systems, containers,
+components, code, users, interfaces, relationships) then authored group
+order.
 
 - **`liveAt(row, t, p)`** — true iff some segment `[s, e]` of
-  `row.intervals[t].live` has `s <= p` and (`e === null` or `p < e`).
-  `clipAt(row, t, p)` looks up `intervals[t].clips` the same way and yields
-  the segment's `by`.
+  `row.intervals[t].live` has `s <= p` and (`e === null` or `p <= e`)
+  (segments are end-inclusive). `clipAt(row, t, p)` looks up
+  `intervals[t].clips` the same way and yields the segment's `by`.
 - **`stateAt(payload, t, p)`** — per kind: the rows passing `liveAt` (at
   most one row per id by construction), plus the clipped map
   `id -> {row, by}` from the clip segments. This is the single source for
@@ -175,13 +178,14 @@ components, users, interfaces, relationships) then authored group order.
   ids live at `a` only, `clipped_by` taken from the id's clip at `b` when
   present, else null; **changed** for ids live at both via different row
   indices whose content differs — compare every serialized field except
-  `id`, `from`, `until`, `intervals`; `properties` per key as
+  `id`, `start_in`, `end_in`, `intervals`; `properties` per key as
   `properties.<key>` (old/new null when added/removed); `tags` as a whole
   list; absent optional fields compare as absent. Equal-content
   different-index pairs are not reported.
 - **`scopeAt(state, systems, hops)`** — top-level representative of a live
-  entity: systems and users are themselves; a subsystem is its `system`; a
-  component is its subsystem's system. Build the system-level graph over
+  entity: systems and users are themselves; anything else walks its parent
+  chain to the owning system (code → component → container → … → system,
+  through any container nesting). Build the system-level graph over
   live **interfaces only** (edge between the two endpoints' distinct
   representatives). Kept = the selected systems (ignoring ones not live)
   plus every node within `hops` BFS steps. A connection (interface or
@@ -190,9 +194,10 @@ components, users, interfaces, relationships) then authored group order.
   **boundary stub** (rendered collapsed). Kept entities = live entities
   whose representative is kept, plus retained connections. `scope = null`
   disables filtering.
-- **`rollUp(state, level)`** — representative at a level: entities below
-  the level map UP to their ancestor at the level; entities at or above it
-  (and users) stay themselves. Nodes = live entities of the level's kind,
+- **`rollUp(state, level)`** — representative at a level (system /
+  container / component): entities below the level map UP to their ancestor
+  at the level (code to its component, and onward up the parent chain);
+  entities at or above it (and users) stay themselves. Nodes = live entities of the level's kind,
   plus users, plus every retained edge-endpoint representative. Edges are
   keyed by the **unordered** representative pair, self-pairs dropped, and
   carry their member `interfaces` / `relationships` id lists in authored
@@ -214,7 +219,7 @@ entities). Every canvas view and every table reads from this one pipeline.
 The single interaction v1 and v2 never delivered, and the one the interval
 model makes nearly free:
 
-- A milestone stepper/slider across the selected timeline (Current → … →
+- A milestone stepper/slider across the selected timeline (Base → … →
   End). Dragging it re-filters the canvas and tables in place.
 - Nodes and edges animate in/out; a **diff overlay** toggle marks added
   (accent + badge), removed (ghosted, from the previous or compared
@@ -224,7 +229,7 @@ model makes nearly free:
   timelines, making scenario comparison a two-click act.
 - Progressive disclosure: with zero milestones (the common static case) the
   time and compare controls do not render at all — the report is a pure
-  current-state explorer. One milestone brings the stepper; multiple
+  base-state explorer. One milestone brings the stepper; multiple
   timelines bring the picker.
 - Layout stability across positions: layout the **union graph** (all rows,
   all positions) once with elkjs, then keep node positions fixed while
@@ -239,9 +244,9 @@ A view is a client-side configuration, shareable via copy-link (POC pattern):
 | Control | Values |
 | --- | --- |
 | Scope | selected systems + `system_hops` |
-| Level | systems / subsystems / components |
+| Level | systems / containers / components |
 | Time | timeline + slider position |
-| Compare | off / vs current / vs position |
+| Compare | off / vs base / vs position |
 | Aspect | ownership / call direction / data flow |
 | Mode | MAP / PATH / LENS (POC) |
 | Theme | light / dark |

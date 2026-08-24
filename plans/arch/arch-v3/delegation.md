@@ -23,7 +23,11 @@ below is the template it will be issued from.
 | D5 | Phase 2: Excel adapter | READY | phase-1 gate |
 | D6 | Phase 3a: report bundle scaffold + POC port | READY (payload spec committed) | phase-2 gate |
 | D7 | Phase 3b: report features | READY (projection spec committed) | D6 |
-| D8 | Phase 4: SQLite adapter, SVG export | GATED on phase-3 gate | phase 3 |
+| D8 | Phase 4: SQLite adapter, SVG export | GATED on phase-3 re-gate | phase 3R |
+| D9a | Phase 3R wave 1a: model/resolver/validation rework + fixture | READY (schema.md updated 2026-08-24) | now |
+| D9b | Phase 3R wave 1b: Excel + payload + projection rework | READY | D9a |
+| D10 | Phase 3R wave 2: report UI rework | GATED on reconciled report.md (open Qs 4–6) | D9 gate |
+| D11 | Phase 3R wave 3: view-mode capabilities | GATED on phase-3 re-gate + designs | phase-3 re-gate |
 
 ## Standard rules — prepend to EVERY prompt
 
@@ -412,4 +416,190 @@ this chunk — also report `npm test` output), then STOP — the phase-3 gate
 ## D8 — GATED (template to be issued at phase start)
 
 - **D8 (phase 4):** SQLite adapter per adapters.md and client-side SVG/
-  draw.io download; prompts written when phase 3 gate passes.
+  draw.io download; prompts written when the phase-3 re-gate passes
+  (rework waves D9/D10 come first).
+
+## D9–D11 — Phase 3R gate rework (GATED; issued per wave)
+
+Same delegation model as D1–D8. Requirements live in
+`plans/arch/arch-v3/issues/` (index `issues.md`); the architect folds each
+wave's decisions into the design docs first, then issues the prompt here —
+executors work only from the design docs and the prompt, never directly
+from issue files.
+
+- **D9 (wave 1 — schema/model):** ISSUED 2026-08-24 as D9a + D9b below.
+  schema.md, adapters.md, and report.md carry the reworked contracts (C4
+  kinds, id scheme, `start_in`/`end_in` over a base state,
+  Provider/Consumer directions).
+- **D10 (wave 2 — report UI):** the twelve `p2-*` issues. Gated on:
+  architect resolves plan.md open questions 4–6 (legend hide-vs-dim,
+  nested expand vs drill, status of `wip/interactions.md`), folds the
+  reconciled behavior into report.md, and translates the research's
+  binding lists (`research/ui/ui-research-findings.md` — "Top 10" and "Do
+  not copy") into prompt constraints. UI rule 9 applies. May be split
+  into layout/chrome and interaction/visual sub-prompts at scoping.
+- **D11 (wave 3 — view-mode capabilities):** `p3-report-definitions`
+  (view-mode flow; `views:` YAML export starting point) and
+  `p3-ui-guided-view` (resolves MAP/PATH/LENS). Gated on the phase-3
+  re-gate plus architect designs for both. `p3-edit-save-back` and
+  `p3-ui-manual-positions` are NOT delegated — edit mode is deferred and
+  gets its own prompts when the local-server write path is designed.
+
+## D9a — Phase 3R wave 1a: model/resolver/validation rework (READY)
+
+Run D9a and D9b back to back; the wave-1 gate reviews both together.
+
+```text
+[standard rules]
+
+Context: the phase-3 gate produced a schema rework. plans/arch/arch-v3/
+schema.md has been rewritten (C4 entity kinds, id scheme, inclusive
+start_in/end_in intervals over a base state, Provider/Consumer directions)
+— RE-READ IT IN FULL first; it supersedes everything you remember about the
+v3 schema. This chunk reworks the Python model layer to the new contract.
+Budget: 700 changed source lines (excluding tests and fixtures). The sweep
+is clean: NO back-compat aliases, no deprecation shims — the old names must
+not survive anywhere in v3 code, tests, or fixtures.
+
+Task A — renames (mechanical; semantics unchanged unless listed in Task B):
+- Collections/kinds: subsystems -> containers (Subsystem -> Container);
+  NEW collection code (kind Code). Collection order everywhere: systems,
+  containers, components, code, users, interfaces, relationships.
+- Parent fields: Container.parent (was Subsystem.system), Component.container
+  (was Component.subsystem), NEW Code.component.
+- Intervals: from/until -> start_in/end_in per schema.md "Intervals". This
+  is a semantic flip, not a rename: both bounds are now INCLUSIVE, and the
+  reserved reference `base` names position 0. Liveness becomes
+  pos(start_in) <= p <= pos(end_in); the resolver's internal position
+  convention is 0 = base (drop any -1/current convention).
+- Interface.data_flow -> data_flow_direction.
+- State selectors: current -> base (grammar: base | <milestone id> | end)
+  across resolver, CLI, and facade.
+- YAML dump row key order: id, name/action, parent/container/component/
+  provider/consumer/source/target, call_direction, data_flow_direction,
+  start_in, end_in, description, tags, properties.
+
+Task B — behavior changes (schema.md section in parentheses):
+- Direction enums ("Provider / Consumer interface model"): call_direction
+  Literal[consumer_to_provider, provider_to_consumer] default
+  consumer_to_provider; data_flow_direction Literal[provider_to_consumer,
+  consumer_to_provider, bidirectional] default provider_to_consumer. The
+  value "unspecified" is GONE. Deterministic dump omits a field equal to
+  its default.
+- Container.parent resolves to a System OR a Container ("Entity kinds"):
+  new validation errors for ambiguous parent (id present in both
+  collections) and containment cycles. Resolver parent-chain clipping
+  generalizes to arbitrary container nesting and Code
+  (code -> component -> container -> ... -> system).
+- Intervals ("Intervals"): start_in == end_in is now LEGAL (single-position
+  row); error only when start_in comes after end_in with both milestones on
+  one timeline. start_in: base is legal and equivalent to absent. end_in:
+  base means present only in the base state. Milestone id "base" is a new
+  validation error (reserved). Revision rule: at most one row per id may
+  start in the base (absent or base start_in).
+- advance ("Advancing the baseline"): delete rows whose end_in is base or
+  precedes `through`; rewrite end_in: through -> end_in: base; the rest as
+  documented.
+- New module src/otdev/tools/_arch/v3/ids.py ("Identifiers"): next_id(kind,
+  existing_ids) and assign_missing_ids(arch) -> {collection: [(row_index,
+  assigned_id)]} implementing the per-kind prefix scheme (s-, c-, cp-, cd-,
+  u-, i-, r-; max+1 over ids matching <prefix>-<digits>; zero-pad 4, wider
+  when exhausted; gaps never renumbered). Used by `init` (scheme-form ids)
+  and by D9b's Excel import. Slug ids stay legal — no new id validation.
+
+Task C — fixture and tests:
+- Regenerate tests/unit/tools/fixtures/arch/acme.yaml mechanically:
+  collection/field renames as above; every `until: m` becomes
+  `end_in: <the milestone immediately before m in catalog order>`, or
+  `end_in: base` when m is the first milestone; `from: m` becomes
+  `start_in: m` (same milestone — the from side does not shift). No other
+  content changes.
+- Existing test files (model, yamlio, resolver, validate, facade): apply
+  the same renames and boundary conversion to inputs and expectations.
+  The resolver suite is the authoritative spec: renames and interval
+  conversion ONLY — do not weaken, delete, or merge any assertion; report
+  per-file test counts before and after (they must not drop).
+- NEW tests, exactly these: (1) nested-container clip chain — a system
+  end_in clips a container, a nested container, a component, and a code
+  row plus an interface into the tree, with correct clipped_by; (2) code
+  kind round-trips through YAML; (3) validation: containment cycle,
+  ambiguous parent, reserved milestone id base — one case each; (4)
+  start_in == end_in row live at exactly that position; (5) end_in: base
+  row live at position 0 only; (6) ids.py: assignment into a gapped
+  sequence yields max+1, padding, per-kind independence; (7) direction
+  fields: defaults omitted on dump and applied on load; (8) advance:
+  end_in == through rewrites to base, earlier end_in rows deleted.
+
+Expected breakage: tests/unit/tools/test_arch_v3_payload.py and
+test_arch_v3_excel.py will FAIL after this chunk (payload.py and excel.py
+still speak the old schema) — that is D9b's job. Rule 5 applies to
+everything else; still run the full `-k arch` suite and report which tests
+fail and why. Definition of done: rules 5–8 with that exception, fixture
+regenerated, per-file test counts reported.
+```
+
+## D9b — Phase 3R wave 1b: Excel + payload + projection rework (READY, run after D9a)
+
+```text
+[standard rules + UI rule 9]
+
+Prereq: D9a is complete (model/resolver/validation on the new schema; acme
+fixture regenerated). Re-read plans/arch/arch-v3/schema.md, adapters.md,
+and report.md sections "Payload contract (v1)" and "Client projection
+contract (v1)" IN FULL — all three were reworked 2026-08-24 and supersede
+the code. Budget: 600 changed source lines total (Python + TS/TSX,
+excluding tests and generated fixtures).
+
+Task A — Excel adapter (src/otdev/tools/_arch/v3/excel.py per adapters.md):
+- Ten sheets: Architecture, Milestones, Timelines, Systems, Containers
+  (+ parent), Components (+ container), Code (+ component), Users,
+  Interfaces (+ provider, consumer, call_direction, data_flow_direction),
+  Relationships. Interval columns are start_in/end_in everywhere.
+- Blank id cells: auto-assign on import via ids.assign_missing_ids —
+  deterministic in sheet row order; assignments appear in the import
+  result/report. A blank-id row is always a new entity.
+- Template dropdowns: direction enums per the new literals; end_in
+  dropdowns include base.
+
+Task B — payload compiler (src/otdev/tools/_arch/v3/payload.py per the
+updated contract): seven collections in schema order; rows serialize
+start_in/end_in as authored (milestone id or base); call_direction/
+data_flow_direction omitted when equal to their defaults; live and clip
+segments are END-INCLUSIVE ([s, e] with e = last live position, null =
+unbounded). Positions are unchanged (0 = base). Keep driving the
+authoritative resolver — no reimplemented interval semantics.
+
+Task C — projection vector fixtures
+(tests/unit/tools/fixtures/arch/projection/): convert mechanically, then
+verify. model.yaml: same rename + interval conversion rules as D9a's acme
+step. payload.json: regenerate with the CLI `payload` subcommand from the
+converted model.yaml. vectors.json: kind names and node keys rename
+(subsystems -> containers, new code kind appears in KINDS order); level
+names systems/containers/components; positions and expected id sets are
+UNCHANGED — if any expected state, diff, scope, or rollup result would
+change beyond renaming, STOP and report per rule 1. Update the README
+provenance note (one dated line: converted for the wave-1 schema rework).
+
+Task D — frontend (frontend/arch-report/src/): types.ts, payload.ts,
+projection.ts, view.ts, App.tsx, GridPanel.tsx: apply the renames; liveAt
+becomes end-inclusive per the contract; KINDS and representative walk per
+the updated contract (parent chain through nested containers; code -> its
+component); level control and URL-fragment level tokens
+systems/containers/components; every UI label "Current" for position 0
+becomes "Base"; kind labels System/Container/Component/Code. Regenerate
+src/fixture-payload.json via the CLI from the acme fixture.
+
+Tests: existing suites updated by rename/conversion only. NEW tests,
+exactly these: (1) Excel import assigns scheme ids to blank-id rows,
+deterministically, and reports them; (2) Excel round-trip covers a Code row
+and a nested container. Frontend: vitest vector suite green against the
+converted fixtures; the D7 interaction smoke test still passes.
+
+Finish: `just build-arch-report`, regenerate the acme report via the CLI,
+verify per rule 9 from file:// (scrub the timeline — slider now starts at
+"Base" — toggle diff overlay, switch level and scope, clean console, zero
+external requests). Full `uv run pytest tests/unit/tools -k arch` must now
+be green including payload and excel. Definition of done: rules 5–8, npm
+test output reported, then STOP — the wave-1 gate (architect) reviews D9a +
+D9b together.
+```

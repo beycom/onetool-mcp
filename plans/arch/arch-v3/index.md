@@ -23,7 +23,7 @@ v1 and v2 each failed differently, and the failures point at one cause.
   "partial states" and never evaluated a third option.
 
 v3 adopts that third option: **lifecycle intervals**. Entities and connections
-carry `from` and `until` milestone references. A state is a filter, not a
+carry inclusive `start_in` and `end_in` milestone references. A state is a filter, not a
 replay. A diff is computed, not authored. See [schema](schema.md).
 
 ## What carries forward from v2 unchanged
@@ -31,7 +31,7 @@ replay. A diff is computed, not authored. See [schema](schema.md).
 These were settled by the grills and are not reopened:
 
 - Entity model: System → Subsystem → Component containment, User, Interface
-  (provider/consumer, `call_direction`, `data_flow`), Relationship
+  (provider/consumer, `call_direction`, `data_flow_direction`), Relationship
   (Source Action Target).
 - Common fields: `id`, `name` (`action` for Relationship), `description`,
   `tags`, flat `properties` (string or string-list only). No `group`, `notes`,
@@ -59,8 +59,8 @@ These were settled by the grills and are not reopened:
 
 | v2 concept | v3 replacement |
 | --- | --- |
-| `current_state` block + `changes` patches + replay | Flat entity collections with `from`/`until` intervals; state = filter |
-| `change_type: added/changed/removed` | Implied by `from`, `until`, and revision rows |
+| `current_state` block + `changes` patches + replay | Flat entity collections with `start_in`/`end_in` intervals; state = filter |
+| `change_type: added/changed/removed` | Implied by `start_in`, `end_in`, and revision rows |
 | `unset` marker, no-op patch validation | Revision rows are complete definitions; nothing is sparse |
 | Authored removal cascades + tombstones | Computed clipping + computed consequences; retired rows stay in the file |
 | Roadmap = ordered Change list | Ordered milestone catalog; optional named timelines for scenarios |

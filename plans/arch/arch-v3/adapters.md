@@ -15,8 +15,8 @@ markers. That is the part of v2 a spreadsheet user would get wrong.
 
 In v3 every row is a complete, self-describing record. A domain sheet is a
 plain table; blank always means blank. The whole adapter contract collapses
-to: **each collection is a table; each row is a record; `from`/`until` are
-two ordinary reference columns.** That contract maps identically onto Excel
+to: **each collection is a table; each row is a record; `start_in`/`end_in`
+are two ordinary reference columns.** That contract maps identically onto Excel
 sheets, SharePoint lists, SQLite tables, and CSV files — one mental model,
 N transports.
 
@@ -47,28 +47,36 @@ YAML  <──>  ┼── sqlite  (one table/kind)    later
 2. `Milestones` — `id`, `name`, `description` (+ property columns).
 3. `Timelines` — `timeline`, `milestone`; row order is milestone order, one
    contiguous block per timeline. Empty sheet = implicit timeline.
-4. `Systems` — `id`, `name`, `from`, `until`, `description`, `tags`.
-5. `Subsystems` — + `system`.
-6. `Components` — + `subsystem`.
-7. `Users` — as Systems.
-8. `Interfaces` — + `provider`, `consumer`, `call_direction`, `data_flow`.
-9. `Relationships` — `id`, `source`, `action`, `target`, `from`, `until`,
-   `description`, `tags`.
+4. `Systems` — `id`, `name`, `start_in`, `end_in`, `description`, `tags`.
+5. `Containers` — + `parent`.
+6. `Components` — + `container`.
+7. `Code` — + `component`.
+8. `Users` — as Systems.
+9. `Interfaces` — + `provider`, `consumer`, `call_direction`,
+   `data_flow_direction`.
+10. `Relationships` — `id`, `source`, `action`, `target`, `start_in`,
+    `end_in`, `description`, `tags`.
 
 Reserved columns always present; any additional column is a property
 (v2 rule, including its accepted typo risk, mitigated by the generated
 template). List cells use `[a;b]`. Enum and milestone-reference columns get
-dropdown validation in generated workbooks.
+dropdown validation in generated workbooks (`end_in` dropdowns include
+`base`).
 
-Revision rows are just two rows with the same `id` and different `from` —
-sortable and filterable like everything else. No row ordering constraints
+A blank `id` cell is auto-assigned on import per the schema.md id scheme —
+deterministic in sheet row order, with every assignment reported in the
+import result. A blank-id row is therefore always a *new* entity; revision
+rows must state their shared id explicitly.
+
+Revision rows are just two rows with the same `id` and different `start_in`
+— sortable and filterable like everything else. No row ordering constraints
 beyond the `Timelines` blocks.
 
 ### Write modes (decided 2026-08-23)
 
 `write(arch, target)` is mode-aware:
 
-- **Target absent** → generate the template workbook: nine canonical
+- **Target absent** → generate the template workbook: ten canonical
   sheets, each a structured Excel table, dropdown validation on enum and
   milestone-reference columns.
 - **Target exists** → **update in place**: locate the canonical sheets,
@@ -95,10 +103,10 @@ preservation is a workflow courtesy, not part of the contract.
 
 What a maintainer can now do natively in Excel, with zero tooling:
 
-- filter `until` blank → the end-state architecture;
-- filter `from` blank → the current architecture;
+- filter `end_in` blank → the end-state architecture;
+- filter `start_in` blank → the base architecture;
 - filter any column by milestone id → that phase's full impact;
-- sort by system → review a subsystem inventory row by row.
+- sort by parent → review a container inventory row by row.
 
 ## SQLite (later, small)
 
@@ -106,7 +114,7 @@ One table per collection with the reserved columns typed, properties in a
 side table (`entity_id`, `name`, `value`, `ord`). Because rows are complete
 records, the mapping is mechanical; the adapter is mostly DDL plus the same
 validation. This also becomes the natural query surface for large estates
-(`SELECT … WHERE until IS NULL`).
+(`SELECT … WHERE end_in IS NULL`).
 
 ## Errors
 

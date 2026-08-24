@@ -45,7 +45,7 @@ each with a line budget and a demo gate.
   round-trip model-equality tests.
 - Tools: `arch.import_excel` (aliased under `arch.convert`), `arch.export`.
 - Gate: edit the real dataset in Excel (add a milestone, retire a system,
-  revise a subsystem), import, diff shows exactly those edits.
+  revise a container), import, diff shows exactly those edits.
 
 ### Phase 3 — Report app (budget: 5,000 TS/TSX lines + 400 Python)
 

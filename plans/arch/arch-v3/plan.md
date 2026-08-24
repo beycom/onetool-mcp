@@ -29,6 +29,9 @@ lands; a fresh session should be able to resume from this file alone.
 | Real dataset for the phase-1 port | `plans/arch/wip/acme-arch-v2.xlsx` (dumped to `plans/arch/arch-v3/fixture-src/`) |
 | Canonical v3 fixture | `tests/unit/tools/fixtures/arch/acme.yaml` |
 | v2 design history (reference only) | `plans/arch/arch-v2/` incl. `grill/` |
+| Phase-3 gate feedback issues | `plans/arch/arch-v3/issues/` — 20 issues, index `issues.md`, waves p1/p2/p3 + reference screenshots |
+| UI research (IcePanel/Archify) | `plans/arch/arch-v3/research/ui/ui-research-findings.md` + evidence captures |
+| Interaction contract (v2-era, to reconcile) | `plans/arch/wip/interactions.md` — INT-* requirements the research cites |
 
 **Tooling hints (interactive/architect work):** use the OneTool `excel` pack
 (`__ot excel`) to read/inspect workbooks and the `convert` pack (`__ot
@@ -72,7 +75,9 @@ models the user runs with the prompts in [delegation.md](delegation.md):
 - **Rule:** no delegated chunk feeds the next phase until the architect has
   reviewed it at the gate. Sequence: D1 → (fixture, architect) → D2 →
   (resolver spec, architect) → D3 → D4 → phase-1 gate → D5 ∥ D6 → D7 → gate
-  → D8.
+  → D8. Rework sequence (Phase 3R): (schema.md rework, architect) → D9 →
+  gate → (report.md reconciliation, architect) → D10 → phase-3 re-gate →
+  D11 ∥ D8.
 
 ## Speed mode (agreed 2026-08-23)
 
@@ -210,6 +215,70 @@ Owner doc: report.md. POC is the interaction donor.
       arrays; URL-fragment views + copy-link; offline `file://` check. `→ D7`
 - [ ] **Gate (architect + user):** open acme's report, scrub the timeline;
       the story reads correctly without explanation.
+      *First run 2026-08-24: NOT passed — feedback captured as the 20 issues
+      in `issues/`. Re-gate after Phase 3R waves 1–2.*
+
+## Phase 3R — gate rework (waves from `issues/issues.md`)
+
+The phase-3 gate produced 20 issues, grouped into three waves (provisional
+fix order, not priorities — schema changes ripple into everything). Issue
+files carry the requirements; this section only tracks execution. The
+delegation model continues unchanged: architect updates the design docs
+and authors the prompt, executors implement to contract. Chunks are
+registered as **D9–D11** in delegation.md (GATED until their architect
+artifacts exist); budgets are agreed with the user per wave when each
+prompt is authored.
+
+### Wave 1 — schema/model (contract changes; do first)
+
+Issues: `p1-schema-c4-naming` (System/Container/Component/Code),
+`p1-schema-auto-ids` (`s-0001`-style ids), `p1-schema-from-until-inclusive`
+(inclusive interval naming), `p1-schema-provider-consumer` (interface model;
+backed by `issues/provider-consumer.md`).
+
+- [x] **Architect (2026-08-24):** schema.md rewritten for the four issues;
+      ripple folded into adapters.md (ten sheets, blank-id import) and
+      report.md (payload + projection contracts). Decisions recorded in the
+      progress log below. Budgets agreed with the user: D9a 700 / D9b 600
+      changed source lines.
+- [ ] Executor chunks: implement to the updated contracts. `→ D9a, D9b`
+- [ ] **Gate (architect):** resolver suite, round-trips, and projection
+      vectors green under the new schema; acme re-fixture validates.
+
+### Wave 2 — report UI
+
+Issues: the 12 `p2-*` files (nested groupings, side panel, resizable
+panels, layout density, plain background, legend, flow animation,
+dependency focus, entity boxes, edge rendering, fullscreen, v2-parity
+tables).
+
+Design inputs: `research/ui/ui-research-findings.md` — its "Top 10
+behaviors worth copying" and "Do not copy" lists are binding input for the
+prompts (semantic URL fragments only, graduated dimming over hiding, wide
+edge hit rails, explicit semantic-zoom levels, no remote assets — offline
+`file://` stays a gate check); measured Archify edge/node/opacity values
+are the styling reference.
+
+- [ ] **Architect:** reconcile issue text with the INT-* contract before
+      prompts (open questions 4–6 below), fold decisions into report.md,
+      agree budget, author prompt(s).
+- [ ] Executor chunk(s): implement the wave. `→ D10`
+- [ ] **Re-run phase-3 gate** (architect + user).
+
+### Wave 3 — new capabilities (after the re-gate)
+
+Write-path decision (2026-08-24): the app has **view** mode (standalone
+`file://`, read-only) and **edit** mode (local server owning the YAML write
+path). Edit-mode work is deferred until Schema, Report, and File Import are
+complete.
+
+- [ ] `p3-report-definitions` — named reports; view-mode flow. Starting
+      point: export the config as a ready-to-paste `views:` YAML entry;
+      only persist-to-model rides the deferred edit path. `→ D11`
+- [ ] `p3-ui-guided-view` — authored, playable guided views; resolves the
+      MAP/PATH/LENS placeholders left by D7. `→ D11`
+- [ ] `p3-edit-save-back` — DEFERRED (edit mode).
+- [ ] `p3-ui-manual-positions` — DEFERRED (edit mode).
 
 ## Phase 4 — Polish and second adapters (per-item budgets)
 
@@ -218,8 +287,11 @@ Owner doc: report.md. POC is the interaction donor.
 - [ ] SharePoint transport reusing the Excel mapping.
 - [ ] Migration converter from v2 YAML — only if a real v2 dataset exists to
       migrate; otherwise skip (throwaway tooling).
-- [ ] Revisit deferred items (sequence attachments, saved Report Definitions,
-      Confluence) against demonstrated need only.
+- [ ] Revisit deferred items (sequence attachments, Confluence; saved report
+      definitions moved to Phase 3R wave 3) against demonstrated need only.
+- [ ] Edit mode: local-server write path + `p3-edit-save-back` +
+      `p3-ui-manual-positions` (design deferred until Schema, Report, and
+      File Import are complete — see Phase 3R wave 3).
 
 ### Backfill (speed-mode debt — do once v3 is stable)
 
@@ -244,8 +316,88 @@ None yet. Format: `branch-name — question being explored — outcome`.
    stand alone (phase 2 start; delivery.md says aliased under convert).
 3. Per-state layout fallback if union-graph layout is chronically poor for
    sparse early states (risk table; decide only with the acme report open).
+4. Legend semantics: `p2-ui-legend` asks to hide unmatched entities;
+   INT-LEGEND-03 (and both researched tools) retain-and-dim instead.
+   Reconcile before wave-2 prompts.
+5. Nested groupings: should `p2-ui-nested-groupings` require in-place
+   expand/collapse, projection drill (the only pattern verified in
+   IcePanel), or both as separate gestures?
+6. Status of `plans/arch/wip/interactions.md`: it's a v2-era contract the
+   research treats as normative (INT-*). Decide whether it's adopted for v3
+   (and moved into the design docs) or mined and retired — issue text wins
+   where they conflict, per doc's own precedence rule?
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-24** — Wave-1 design closed with the user; schema.md rewritten,
+  ripple folded into adapters.md + report.md (index.md/delivery.md touched
+  up); D9a/D9b prompts issued. Decisions:
+  1. **C4 kinds:** systems / containers / components / code (Code is a full
+     modelled kind, usually empty). Container.parent references a System OR
+     a Container (nested containers are ordinary Containers); new validation:
+     ambiguous parent, containment cycles.
+  2. **Ids:** per-kind prefixed sequential scheme (s-/c-/cp-/cd-/u-/i-/r-,
+     zero-pad 4, max+1, gaps permanent), auto-assigned on Excel import and
+     init; slugs stay legal; milestones always authored.
+  3. **Intervals:** `start_in`/`end_in`, BOTH inclusive — chosen over the
+     issue's from/to candidates after the flip surfaced a gap ("live in the
+     base only, gone at the first milestone" has no last-alive milestone to
+     name; acme has two such rows). Resolution (user-approved): position 0
+     is renamed from "current" to **base** everywhere (selector, payload,
+     UI), and `base` is an ordinary position reference — `end_in: base`
+     covers the gap and the `advance` rewrite with no special mechanism
+     beyond reserving the milestone id. `start_in == end_in` is now legal.
+     Accepted cost: the removing milestone is no longer named on the row
+     (`end_in` names the last survivor state), so raw-YAML grep attribution
+     of retirements shifts one milestone earlier; diffs still report
+     removals at the right position.
+  4. **Provider/Consumer (simplified per user):** roles stay
+     provider/consumer; NO relationship-type enum; `call_direction`
+     (consumer_to_provider default | provider_to_consumer) + renamed
+     `data_flow_direction` (provider_to_consumer default |
+     consumer_to_provider | bidirectional); "unspecified" removed —
+     defaults omitted in dumps. schema.md absorbed provider-consumer.md's
+     definitions, principle, and examples.
+
+- **2026-08-24** — Plan restructured for the gate rework: added Phase 3R
+  tracking the three issue waves (issues/ stays the requirements source),
+  annotated the phase-3 gate as failed-first-run with re-gate after waves
+  1–2, split wave 3 into view-mode items vs deferred edit-mode items (edit
+  mode also added to Phase 4). UI research
+  (`research/ui/ui-research-findings.md`) incorporated as binding wave-2
+  design input (top-10 / do-not-copy lists, measured styles); its two
+  contract conflicts (legend hide vs dim, nested expand vs drill) and the
+  status of the v2-era `wip/interactions.md` INT-* contract recorded as
+  open questions 4–6 — architect resolves them before wave-2 prompts.
+  Delegation model extended to the rework: chunks registered as D9 (wave 1),
+  D10 (wave 2), D11 (wave 3 view-mode items) in delegation.md, all GATED on
+  their architect artifacts; executors work from design docs + prompt only,
+  never from issue files directly. Next action: agree wave-1 scope + budget
+  with the user, then update schema.md and author D9.
+
+- **2026-08-24** — Write-path decision (user): the report app gets two
+  modes — **view** (standalone `file://`, read-only, as today) and **edit**
+  (a local server owning the YAML write path). The edit-mode server design
+  is deliberately deferred until Schema, Report, and File Import are
+  complete. Clarification (same day): report definitions are effective
+  *views* of the data, not edits — the define/use flow belongs to view mode;
+  only persisting a definition into the model rides the edit path. Recorded
+  in issues/ (p3-edit-save-back, p3-report-definitions,
+  p3-ui-manual-positions, index note).
+
+- **2026-08-24** — Phase-3 gate: user review found many parts missing or not
+  working as required — gate NOT passed. Feedback captured as 20 fleshed-out
+  issues in `issues/` (index: `issues/issues.md`), named `px-cat-desc` by
+  provisional wave: wave 1 schema (C4 naming, auto ids, inclusive from/to,
+  provider/consumer model), wave 2 report UI (nested groupings, side panel,
+  resizable panels, layout density, plain background, legend, flow
+  animation, dependency focus view, entity boxes, edge rendering,
+  fullscreen, v2-parity tables), wave 3 capabilities (saved report
+  definitions, edit + save-back, manual positions, guided views). Reference
+  screenshots renamed meaningfully and embedded; v2 report/table behavior
+  inventoried as input (v2 had authored `views:` + AG Grid table config, no
+  save/edit UI). Next action: user + architect agree wave scoping and
+  budgets, then design-doc updates and executor prompts per wave.
 
 - **2026-08-24** — D7 gate PASSED (architect review); committed by architect
   (rule 8) with one architect fix. Re-verified: projection.ts matches the
