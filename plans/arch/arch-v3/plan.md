@@ -31,7 +31,7 @@ lands; a fresh session should be able to resume from this file alone.
 | v2 design history (reference only) | `plans/arch/arch-v2/` incl. `grill/` |
 | Phase-3 gate feedback issues | `plans/arch/arch-v3/issues/` — 20 issues, index `issues.md`, waves p1/p2/p3 + reference screenshots |
 | UI research (IcePanel/Archify) | `plans/arch/arch-v3/research/ui/ui-research-findings.md` + evidence captures |
-| Interaction contract (v2-era, to reconcile) | `plans/arch/wip/interactions.md` — INT-* requirements the research cites |
+| Interaction contract (v2-era) | `plans/arch/wip/interactions.md` — SUPERSEDED 2026-08-24; mined into report.md "Wave-2 UI contract" |
 
 **Tooling hints (interactive/architect work):** use the OneTool `excel` pack
 (`__ot excel`) to read/inspect workbooks and the `convert` pack (`__ot
@@ -189,8 +189,9 @@ Owner doc: adapters.md. Entire build chunk is one delegation. `→ D5`
 - [x] Round-trip model-equality tests on the acme fixture.
 - [x] **Gate (architect + user):** edit acme in Excel (add milestone, retire
       system, revise subsystem) → import → diff shows exactly those three
-      edits. (Architect ran the scripted equivalent — see log; user may
-      still repeat it by hand in Excel and veto.)
+      edits. (Architect ran the scripted equivalent — see log; the user
+      hand-run is folded into the Phase 3R wave-1 gate against the new
+      schema — agreed 2026-08-24.)
 
 ## Phase 3 — Report app (budget: 5,000 TS/TSX + 400 py lines)
 
@@ -242,8 +243,11 @@ backed by `issues/provider-consumer.md`).
       progress log below. Budgets agreed with the user: D9a 700 / D9b 600
       changed source lines.
 - [ ] Executor chunks: implement to the updated contracts. `→ D9a, D9b`
-- [ ] **Gate (architect):** resolver suite, round-trips, and projection
-      vectors green under the new schema; acme re-fixture validates.
+- [ ] **Gate (architect + user):** resolver suite, round-trips, and
+      projection vectors green under the new schema; acme re-fixture
+      validates. User hand-edits the exported acme workbook in Excel
+      against the new ten-sheet schema (this replaces the outstanding
+      phase-2 hand-run — agreed 2026-08-24).
 
 ### Wave 2 — report UI
 
@@ -259,10 +263,15 @@ edge hit rails, explicit semantic-zoom levels, no remote assets — offline
 `file://` stays a gate check); measured Archify edge/node/opacity values
 are the styling reference.
 
-- [ ] **Architect:** reconcile issue text with the INT-* contract before
-      prompts (open questions 4–6 below), fold decisions into report.md,
-      agree budget, author prompt(s).
-- [ ] Executor chunk(s): implement the wave. `→ D10`
+- [x] **Architect (2026-08-24):** report.md reconciliation done — new
+      normative section "Wave-2 UI contract (v1)" folds in the Q4–6
+      decisions, translates the research binding lists into constraints,
+      and carries the mined INT-* baseline with an overrides table;
+      interactions.md marked superseded. D10 issued as D10a (chrome,
+      panels, tables — 1,400 changed TS/TSX lines) + D10b (canvas
+      semantics + visuals — 1,900), budgets proposed pending user
+      confirmation.
+- [ ] Executor chunks: implement the wave. `→ D10a, D10b`
 - [ ] **Re-run phase-3 gate** (architect + user).
 
 ### Wave 3 — new capabilities (after the re-gate)
@@ -312,22 +321,69 @@ None yet. Format: `branch-name — question being explored — outcome`.
    2026-08-23 in report.md "Shape": source in `frontend/arch-report/`,
    `just build-arch-report` builds to `_arch/v3/_bundle/report-template.html`,
    built template committed (no Node at wheel-build or generate time).
-2. Whether `arch.convert` is the umbrella tool name or `import_excel`/`export`
-   stand alone (phase 2 start; delivery.md says aliased under convert).
+2. ~~Whether `arch.convert` is the umbrella tool name~~ — ANSWERED
+   2026-08-24 as-shipped by D5: `import_excel` aliased under `arch.convert`,
+   `export` standalone. No further work.
 3. Per-state layout fallback if union-graph layout is chronically poor for
-   sparse early states (risk table; decide only with the acme report open).
-4. Legend semantics: `p2-ui-legend` asks to hide unmatched entities;
-   INT-LEGEND-03 (and both researched tools) retain-and-dim instead.
-   Reconcile before wave-2 prompts.
-5. Nested groupings: should `p2-ui-nested-groupings` require in-place
-   expand/collapse, projection drill (the only pattern verified in
-   IcePanel), or both as separate gestures?
-6. Status of `plans/arch/wip/interactions.md`: it's a v2-era contract the
-   research treats as normative (INT-*). Decide whether it's adopted for v3
-   (and moved into the design docs) or mined and retired — issue text wins
-   where they conflict, per doc's own precedence rule?
+   sparse early states (risk table; re-evaluate at the phase-3 re-gate —
+   wave-2 layout changes may moot it).
+4. ~~Legend semantics: hide vs dim~~ — ANSWERED 2026-08-24 (user): dim
+   only, graduated Archify-style tiers; no hide/solo mode. Legend driver:
+   **tags** as the first pass (property/kind switch deferred). Decision
+   noted in the issue file; folded into report.md at the D10 architect step.
+5. ~~Nested groupings: in-place expand/collapse vs drill~~ — ANSWERED
+   2026-08-24 (user): no in-place expand/collapse. Keep drill navigation,
+   and add a **"C4 zoom"** level control with 4 levels — System, Container,
+   Child Containers, Component. Decision noted in the issue file; spec
+   detail (boundary-box rendering per level, drill semantics) lands in
+   report.md at the D10 architect step.
+6. ~~Status of `plans/arch/wip/interactions.md`~~ — ANSWERED 2026-08-24
+   (user): mine what's useful into report.md during the D10 reconciliation,
+   leave the rest and mark the doc superseded. Issue text wins where they
+   conflict; each override recorded in the reconciliation.
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-24** — Wave-2 architect step complete: report.md gains the
+  normative "Wave-2 UI contract (v1)" (D10a chrome/panels/tables + D10b
+  canvas subsections), the Views fragment table is reworked (four C4
+  `level` tokens, `drill`/`deps`/`lens` keys, `mode` retired), and "Canvas
+  and look" reflects the wave-2 profile. Design decisions taken while
+  folding: C4 zoom maps to internal rollUp levels systems /
+  **top-containers (new: representative = nearest ancestor container whose
+  parent is a system)** / containers / components so the read-only
+  projection vectors keep their level names; drill = direct-children
+  projection with system-representative boundary stubs, fragment-encoded
+  and history-pushing; MAP/PATH/LENS mode buttons removed (LENS → tag
+  legend lens, PATH → D11, MAP = default — resolves the D7 gate note);
+  reading depth MAP/READ/FULL at <100/100–174/≥175% gates entity-box
+  content; measured Archify edge/opacity/duration values adopted as the
+  styling reference; facts line = two most frequent property keys in
+  scene. interactions.md mined per Q6: adopted clauses in the contract's
+  "Interaction baseline", five recorded overrides (tags-only legend,
+  dependency view over INT-FOCUS-10..14, docked panel over the
+  Relationship Passport and the floating-panel machinery, mode removal);
+  doc header marked SUPERSEDED. delegation.md: D10a/D10b prompts issued
+  (READY after the wave-1 gate; budgets 1,400/1,900 changed TS/TSX lines
+  — proposed, confirm with user before running). Next action: user runs
+  D9a → D9b → wave-1 gate, then D10a → D10b → phase-3 re-gate.
+
+- **2026-08-24** — Outstanding-questions review with the user; all resolved
+  except Q3 (stays deferred to the phase-3 re-gate). Q2 marked answered
+  as-shipped. Wave-2 decisions (recorded in the issue files and in open
+  questions 4–6; folded into report.md at the D10 architect step): legend
+  **dims only**, graduated tiers, driven by **tags** as the first pass —
+  no hide/solo mode; nested groupings get **no in-place expand/collapse** —
+  drill navigation stays, plus a 4-level **"C4 zoom"** control (System /
+  Container / Child Containers / Component) replacing the flat level
+  selector; `wip/interactions.md` is mined for its useful INT-* clauses
+  into report.md and left superseded, issue text winning on conflict.
+  Phase-2 user hand-check folded into the Phase 3R wave-1 gate (hand-edit
+  against the new ten-sheet schema). delegation.md D10 entry updated to
+  carry the decisions; D10 remains gated only on the report.md
+  reconciliation. Next action: user runs D9a then D9b; architect does the
+  report.md reconciliation + D10 authoring in parallel or after the D9
+  gate.
 
 - **2026-08-24** — Wave-1 design closed with the user; schema.md rewritten,
   ripple folded into adapters.md + report.md (index.md/delivery.md touched

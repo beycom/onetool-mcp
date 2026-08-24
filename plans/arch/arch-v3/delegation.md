@@ -26,7 +26,8 @@ below is the template it will be issued from.
 | D8 | Phase 4: SQLite adapter, SVG export | GATED on phase-3 re-gate | phase 3R |
 | D9a | Phase 3R wave 1a: model/resolver/validation rework + fixture | READY (schema.md updated 2026-08-24) | now |
 | D9b | Phase 3R wave 1b: Excel + payload + projection rework | READY | D9a |
-| D10 | Phase 3R wave 2: report UI rework | GATED on reconciled report.md (open Qs 4–6) | D9 gate |
+| D10a | Phase 3R wave 2a: chrome, panels, tables | READY (report.md "Wave-2 UI contract" committed 2026-08-24) | wave-1 (D9) gate |
+| D10b | Phase 3R wave 2b: canvas semantics + visuals | READY | D10a |
 | D11 | Phase 3R wave 3: view-mode capabilities | GATED on phase-3 re-gate + designs | phase-3 re-gate |
 
 ## Standard rules — prepend to EVERY prompt
@@ -431,13 +432,12 @@ from issue files.
   schema.md, adapters.md, and report.md carry the reworked contracts (C4
   kinds, id scheme, `start_in`/`end_in` over a base state,
   Provider/Consumer directions).
-- **D10 (wave 2 — report UI):** the twelve `p2-*` issues. Gated on:
-  architect resolves plan.md open questions 4–6 (legend hide-vs-dim,
-  nested expand vs drill, status of `wip/interactions.md`), folds the
-  reconciled behavior into report.md, and translates the research's
-  binding lists (`research/ui/ui-research-findings.md` — "Top 10" and "Do
-  not copy") into prompt constraints. UI rule 9 applies. May be split
-  into layout/chrome and interaction/visual sub-prompts at scoping.
+- **D10 (wave 2 — report UI):** ISSUED 2026-08-24 as D10a + D10b below.
+  The twelve `p2-*` issues, the Q4–6 decisions, the research binding
+  lists, and the mined interactions.md clauses are all folded into
+  report.md "Wave-2 UI contract (v1)" — the single authoritative input.
+  Split per the scoping note: D10a chrome/panels/tables, D10b canvas
+  semantics + visuals. UI rule 9 applies to both.
 - **D11 (wave 3 — view-mode capabilities):** `p3-report-definitions`
   (view-mode flow; `views:` YAML export starting point) and
   `p3-ui-guided-view` (resolves MAP/PATH/LENS). Gated on the phase-3
@@ -602,4 +602,139 @@ external requests). Full `uv run pytest tests/unit/tools -k arch` must now
 be green including payload and excel. Definition of done: rules 5–8, npm
 test output reported, then STOP — the wave-1 gate (architect) reviews D9a +
 D9b together.
+```
+
+## D10a — Phase 3R wave 2a: chrome, panels, tables (READY, run after the wave-1 gate)
+
+```text
+[standard rules + UI rule 9]
+
+Prereq: the wave-1 gate (D9a + D9b) has passed and is committed. The
+authoritative contract is plans/arch/arch-v3/report.md — READ IN FULL the
+sections "Wave-2 UI contract (v1)" (your subsections are the ones marked
+D10a, plus "Interaction baseline"), "Views", and "Canvas and look". Do NOT
+read issue or research files; the contract supersedes them. The v2 donor
+worktree remains a READ-ONLY harvest source (its
+src/otdev/tools/_arch/v2/frontend grid/ArchitectureGrid.tsx and table
+config models are named donors for the tables task).
+
+Budget: 1,400 changed TS/TSX source lines (excluding tests). Python
+changes: none expected (propose per rule 1). No new npm runtime
+dependencies without a rule-1 proposal; vitest/jsdom devDependencies are
+fine.
+
+Scope — implement the D10a subsections of the contract exactly:
+1. Chrome and layout: one compact header line; grouped control clusters
+   (time strip, projection cluster, bottom-right zoom rail); remove the
+   MAP/PATH/LENS mode buttons and the `mode` fragment key (keep `view`
+   reserved); no horizontal page overflow down to 500 px, clusters
+   collapse into menus.
+2. Zoom rail with reading depth: fit / zoom out / percentage + MAP-READ-
+   FULL depth label / zoom in / fullscreen toggle. Thresholds (<100 MAP,
+   100-174 READ, >=175 FULL) as centralized constants; expose the current
+   depth as a CSS class/data attribute on the canvas root (D10b consumes
+   it — do not implement node content gating yourself).
+3. Plain background per the contract.
+4. Docked side panel (Details + Connections tabs, edge member list,
+   "Open dependency view" action stub that is present but disabled with
+   an accessible reason until D10b lands).
+5. Resizable panels: bottom tables panel + side panel drag handles,
+   collapse toggles, double-click reset, localStorage persistence
+   validated on load. Build the panel behavior as a reusable piece — the
+   D10b legend panel will use it.
+6. Fullscreen per the contract.
+7. Tables at v2 parity per the contract (harvest the v2 donor patterns).
+8. Interaction baseline items that touch this scope: Escape dismissal
+   order, keyboard zoom, fragment restoration diagnostics, history
+   replace-vs-push (the contract lists them).
+
+Tests (exactly these, plus keeping existing suites green):
+1. Panel/table layout persistence round-trip (vitest + jsdom
+   localStorage): save, reload, restored; a stored layout naming an
+   unknown column is rejected and defaults apply.
+2. View fragment encode/decode: no `mode` key emitted; no pixel-size or
+   coordinate keys ever appear; unknown fragment ids produce the
+   diagnostic path, not a crash.
+The existing vitest vector suite and the slider interaction smoke test
+must stay green (update DOM selectors in the smoke test if the chrome
+rework moved elements — do not weaken its assertion).
+
+Finish: `just build-arch-report`, regenerate the acme report via the CLI,
+verify per rule 9 from file://: compact header, side panel docks and the
+canvas resizes, panel drag-resize + collapse + double-click reset survive
+a reload, fullscreen enter/exit (keyboard f / Escape), table quick
+filter + multi-sort + column hide/pin persisting across reload, plain
+background in both themes, clean console, zero external requests.
+Definition of done: rules 5-8 (pytest run unchanged by this chunk — also
+report `npm test` output), then STOP — D10b is a separate prompt.
+```
+
+## D10b — Phase 3R wave 2b: canvas semantics + visuals (READY, run after D10a)
+
+```text
+[standard rules + UI rule 9]
+
+Prereq: D10a is committed. The authoritative contract is
+plans/arch/arch-v3/report.md — READ IN FULL "Wave-2 UI contract (v1)"
+(your subsections are the ones marked D10b, plus "Interaction baseline"),
+"Client projection contract (v1)", and "Views". The wave-2 contract
+extends contract v1; where it names a change it wins. The projection
+vector fixtures in tests/unit/tools/fixtures/arch/projection/ remain
+READ-ONLY and authoritative — their level names are unchanged; a vector
+that looks wrong is a stop-and-ask per rule 1. Do NOT read issue or
+research files.
+
+Budget: 1,900 changed TS/TSX source lines (excluding tests). Python
+changes: none expected (propose per rule 1). No new npm runtime
+dependencies without a rule-1 proposal.
+
+Scope — implement the D10b subsections of the contract exactly:
+1. C4 zoom: add the `top-containers` rollUp level (pure projection code;
+   representative = nearest ancestor container whose parent is a system);
+   four-level control with the contract's UI labels; fragment `level`
+   tokens per the Views table.
+2. Boundary boxes + hierarchical union layout (ELK INCLUDE_CHILDREN),
+   per-level ancestor boundaries, selectable, never edge endpoints,
+   child-count badges on roll-up nodes. Positions stay fixed while
+   scrubbing.
+3. Drill: distinct affordance, direct-children projection with
+   system-representative boundary stubs, `drill` fragment pushing
+   history, breadcrumb + Up, Back returns, scope disabled while drilled.
+4. Entity boxes: the five-part anatomy, uniform size per level, reading-
+   depth content gating driven by D10a's depth class.
+5. Edges and emphasis: default/emphasis strokes per the styling
+   reference, 24 px hit rail + 6 px focus rail, anchor distribution,
+   member-count chips; selection emphasis with animated outgoing /
+   static incoming edges, graduated dimming tiers (selection, hover,
+   lens), reduced-motion fallback.
+6. Legend + tag lens: floating collapsible panel (reuse D10a's panel
+   behavior), tag entries with projected counts, OR-semantics lens with
+   dim-only tiers, Clear, keyboard operability, `lens` fragment.
+7. Dependency focus view per the contract, `deps` fragment, entered from
+   the side panel action D10a stubbed (enable it) and a canvas control.
+
+Tests (exactly these, plus keeping existing suites green):
+1. top-containers structural invariants on the projection fixture
+   payload: every non-user node is a system or a container whose parent
+   is a system; no nested container appears; every component/code/nested-
+   container id is a member of exactly one displayed representative's
+   roll-up; edge keys remain unordered pairs with no self-pairs.
+2. Drill node set on the acme payload: drilling a system with containers
+   yields exactly its live direct children plus boundary stubs only for
+   entities outside the subtree with retained connections.
+3. Legend counts: for one acme state, each legend entry count equals the
+   number of projected nodes carrying that tag.
+The existing vitest vector suite (all cases) and the D10a tests must stay
+green.
+
+Finish: `just build-arch-report`, regenerate the acme report via the CLI,
+verify per rule 9 from file://: all four C4 levels render (boundaries at
+the three deeper levels), drill in + breadcrumb + browser Back, selecting
+a node animates outgoing and highlights incoming edges with unrelated
+content dimmed (and reduced-motion shows the static fallback), legend
+dims and never hides with counts matching the canvas, dependency view
+shows centered focus + in/out columns + count chips, node facts appear at
+FULL zoom (>=175%), clean console, zero external requests. Definition of
+done: rules 5-8 (also report `npm test` output), then STOP — the phase-3
+re-gate (architect + user) follows.
 ```

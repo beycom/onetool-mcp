@@ -40,7 +40,8 @@ Because a state is a filter, the report app derives everything client-side:
 - **state at slider position** — one array filter;
 - **diff between positions** — set arithmetic;
 - **scope** (selected systems + hops) — BFS over live interfaces;
-- **level** (system / container / component) — roll-up of nodes and edges.
+- **level** (four C4 levels since wave 2 — see "Wave-2 UI contract") —
+  roll-up of nodes and edges.
 
 This deletes v2's three parallel pipelines (`viewgraph.py` 863 lines,
 `projection.py` 450, `projection.ts` 385) and the Python/TS parity tests
@@ -241,15 +242,22 @@ model makes nearly free:
 
 A view is a client-side configuration, shareable via copy-link (POC pattern):
 
-| Control | Values |
-| --- | --- |
-| Scope | selected systems + `system_hops` |
-| Level | systems / containers / components |
-| Time | timeline + slider position |
-| Compare | off / vs base / vs position |
-| Aspect | ownership / call direction / data flow |
-| Mode | MAP / PATH / LENS (POC) |
-| Theme | light / dark |
+| Control | Fragment key | Values |
+| --- | --- | --- |
+| Scope | `scope`, `hops` | selected systems + `system_hops` |
+| C4 level | `level` | `systems` / `top-containers` / `containers` / `components` |
+| Drill | `drill` | `<kind>:<id>` (child projection; pushes history) |
+| Dependency focus | `deps` | `<kind>:<id>` (dedicated in/out view) |
+| Time | `timeline`, `time` | timeline + slider position |
+| Compare | `compare`, `compare-at` | off / vs base / vs position |
+| Aspect | `aspect` | ownership / call direction / data flow |
+| Lens | `lens` | selected tags (legend) |
+| Theme | `theme` | light / dark |
+| *(reserved)* | `view` | guided views — D11 |
+
+The `mode` key (MAP/PATH/LENS) is retired in wave 2 — see "Wave-2 UI
+contract". Panel sizes, collapsed state, table layouts, and fullscreen are
+session-local (localStorage / transient), never fragment state.
 
 Saved Report Definitions (YAML files holding these fields) come later; the
 URL fragment *is* the saved view in phase one. No coordinates, pan, or zoom
@@ -259,17 +267,322 @@ future layout-hint feature is a new schema discussion, not a report feature.
 
 ## Canvas and look
 
-- React Flow v12, custom nodes/edges in the Archify profile: faint technical
-  grid, outlined rounded nodes with kind icons, dashed containment
-  boundaries, orthogonal edges with pill labels, mono diagram labels, glow
-  reserved for selection/route.
-- elkjs layered layout in a web worker inside the report (deterministic:
-  fixed seed, sorted inputs). Running layout in the viewer removes v2's
-  unresolved "ELK needs a JS runtime in the CLI" gate entirely.
-- Passport panel, minimap, keyboard operability, light/dark — carried from
-  the POC as proven.
-- AG Grid Community tables (entities, interfaces, milestones, diff), always
-  consistent with the canvas because both read the same filtered arrays.
+- React Flow v12, custom nodes/edges. Wave 2 revises the visual profile:
+  **plain near-flat background** (the faint technical grid is gone),
+  information-carrying entity boxes, nested containment boundary boxes,
+  visible orthogonal edges with pill labels and wide hit rails, graduated
+  dimming for every emphasis state, glow reserved for selection. The
+  normative spec and the measured Archify style values are in "Wave-2 UI
+  contract" below.
+- elkjs layout in a web worker inside the report (deterministic: fixed
+  seed, sorted inputs; hierarchical `INCLUDE_CHILDREN` from wave 2 for
+  boundary boxes). Running layout in the viewer removes v2's unresolved
+  "ELK needs a JS runtime in the CLI" gate entirely.
+- Docked details side panel (wave 2 — replaces the floating passport),
+  minimap, keyboard operability, light/dark.
+- AG Grid Community tables (entities, interfaces, milestones, diff) at v2
+  feature parity (wave 2), always consistent with the canvas because both
+  read the same filtered arrays.
+
+## Wave-2 UI contract (v1)
+
+Normative for D10 (D10a chrome/panels/tables, D10b canvas semantics and
+visuals). Applies after the wave-1 (D9) gate. It **extends** "Client
+projection contract (v1)": where this section names a change, this section
+wins; everything it does not name is unchanged. Sources reconciled here
+(2026-08-24): the twelve `p2-*` issues, the binding lists and measured
+values in `research/ui/ui-research-findings.md`, and the mined subset of
+`plans/arch/wip/interactions.md` (now superseded — see "Interaction
+baseline"). Quoted pixel/opacity/duration values are the Archify-measured
+styling reference — tune only by eye at the gate, never invent different
+mechanisms.
+
+### Chrome and layout (D10a)
+
+- **One compact header line**: brand mark, model name, current-view
+  summary, global actions (theme, copy link, fullscreen). No second
+  full-width control bar; the canvas starts directly below the header.
+- Controls sit in **grouped clusters** on/around the canvas: the time
+  strip (timeline picker + slider + compare toggle) as one visual unit at
+  the top of the canvas; the projection cluster (C4 zoom, scope, aspect)
+  adjacent to the canvas; the **zoom rail** bottom-right (fit, zoom out,
+  current percentage + reading depth, zoom in, fullscreen toggle).
+- Related controls share one card/pill container; unrelated controls never
+  share a row. Every control has a visible label or tooltip.
+- Narrow viewports: clusters collapse into menus, never wrap into stacked
+  full-width rows; the page never gains horizontal overflow down to 500 px
+  (research #9; INT-RESP-01). Fit, time, and fullscreen-exit controls stay
+  reachable at every width.
+- The MAP/PATH/LENS mode buttons are **removed** (resolves the D7 gate
+  note): LENS is subsumed by the legend lens, PATH/guided views are D11
+  (`view` fragment key stays reserved), MAP is simply the default state.
+
+### Plain background (D10a)
+
+Near-flat canvas in both themes: light = paper white / very subtle tint;
+dark = flat dark surface (IcePanel-style, ~`rgb(31,33,33)` class). No
+hatch or strong grid (do-not-copy: Archify's 32 px page grid); at most an
+extremely faint dot grid that fades out below ~75% zoom. Nodes, edges, and
+boundaries separate from the ground by contrast, not texture.
+
+### Docked side panel (D10a)
+
+Replaces the floating passport popup. Docked at the right edge; opens on
+node / edge / boundary selection; the **canvas resizes** — the panel never
+overlays it (do-not-copy: IcePanel's occluding overlay). Close deselects;
+selecting another target swaps the content in place. Resizable and
+collapsible per "Resizable panels".
+
+- Header: kind icon + name. Tabs: **Details** and **Connections**.
+- Details: description, kind, parent ("Belongs to", clickable), live /
+  retired status at the current position incl. `clipped_by`, contains
+  count, tags, properties as a key/value list, `start_in` / `end_in`.
+- Connections: incoming and outgoing interfaces of the selection at the
+  current position (live only), grouped by direction under the current
+  aspect; each row clickable (selects that interface / other endpoint).
+  Plus an **Open dependency view** action.
+- Edge selection shows the same panel for the aggregated edge: direction
+  summary and the full member interface/relationship list — every
+  canonical member reachable, activating one selects it (INT-SELECT-16).
+
+### Resizable panels (D10a)
+
+Bottom tables panel, right side panel, and the legend panel each get: a
+drag handle (bottom panel: height; side panel: width), a collapse toggle
+that reduces to a slim bar and restores the previous size, and
+double-click-on-handle to reset the default. The canvas absorbs freed
+space and refits without losing the current zoom/pan intent. Sizes and
+collapsed state persist per session (localStorage, validated on load);
+pixel sizes never enter URL fragments.
+
+### Fullscreen (D10a)
+
+Toggle on the zoom rail + keyboard `f`; Escape exits after higher layers
+(menus, then side panel) have dismissed. Browser Fullscreen API where
+available, full-window layout fallback under `file://`. Header and bottom
+tables panel hide; floating clusters and the side panel remain usable.
+Entry preserves selection and view state and refits the camera; exit
+restores the inline layout and the invoking control's focus. Transient —
+never in the URL.
+
+### Tables at v2 parity (D10a)
+
+AG Grid Community + a custom toolbar (harvest the v2 donor's
+`grid/ArchitectureGrid.tsx` patterns):
+
+- multi-sort; quick-search box over all columns; per-column filters with
+  kind/status as set filters;
+- searchable Columns menu: hide/show, pin, drag to reorder, drag to
+  resize; density toggle;
+- per-table layout persistence to localStorage validated against known
+  columns on load (v2 `tableLayouts` pattern), plus a "Reset table"
+  action;
+- copy-selected-as-TSV and CSV export (filtered / all);
+- row selection synced with canvas selection in both directions;
+- columns = core fields plus auto-discovered property columns.
+
+### C4 zoom and drill (D10b)
+
+The flat level selector becomes a four-level **C4 zoom** control. Internal
+level ids (fragment tokens and the `rollUp` level argument) with their UI
+labels:
+
+| Level id | UI label | Node set |
+| --- | --- | --- |
+| `systems` | System | contract-v1 systems roll-up; flat, no boundaries |
+| `top-containers` | Container | **new roll-up level**: representative = the nearest ancestor container whose `parent` is a system; everything below rolls into it |
+| `containers` | Child Containers | contract-v1 containers level (every live container stays itself) |
+| `components` | Component | contract-v1 components level |
+
+Users stay plain nodes at every level. `rollUp`'s edge rules (unordered
+pair key, self-pairs dropped, member id lists, direction from members) are
+unchanged; only the representative function gains the `top-containers`
+case. Existing projection vectors keep their level names and stay green.
+
+**Boundary boxes** (presentation, IcePanel profile): ancestors above the
+active level render as containment group boxes — thin rounded outline
+(~8–10 px radius), restrained fill, small icon + name label at the top
+left (no solid title bar), generous inset around children. At
+`top-containers`: systems with displayed children are boundary boxes,
+childless systems are plain nodes. At `containers`: system boundaries plus
+parent-container boundaries, nested. At `components`: the full
+system/container ancestor chain. Boundary boxes are selectable (open the
+side panel) but are **never edge endpoints** — edges attach to displayed
+leaf nodes and cross boundary outlines (research A2). A roll-up node that
+hides children carries a child-count badge.
+
+Layout: union graph per level through ELK **hierarchical** layout
+(`INCLUDE_CHILDREN`), deterministic; positions stay fixed while scrubbing;
+boundary boxes size to their laid-out children.
+
+**Drill** — distinct from selection (INT-C4NAV-02; research #2): a node
+or boundary with live children exposes an explicit drill affordance
+(magnifier button + keyboard action; primary click remains selection).
+The drill projection renders the drilled entity as one boundary box
+containing its live **direct children** (whatever their kinds); a
+connection with an endpoint inside the drilled subtree keeps that
+endpoint's representative among the displayed children, while the outside
+endpoint rolls to its system representative rendered as a collapsed
+boundary stub (existing stub styling). Drill state is the `drill`
+fragment key and **pushes history** — browser Back returns
+(INT-C4NAV-06/08); a breadcrumb chip in the header shows the drill path
+with an Up action. Drill respects the time position; the scope control is
+disabled while drilled.
+
+### Entity boxes (D10b)
+
+Uniform size per level (layout stability); text never overflows the box.
+Anatomy, top to bottom:
+
+- **context line** — parent name, small and muted;
+- **identity line** — icon + name; the icon derives from a recognized
+  `technology`/`type` property value, else the kind default; users get a
+  person glyph, store-like nodes may use a cylinder;
+- **description** — one–two lines, truncated;
+- **facts line** — up to two `key: value` property pairs; the keys are
+  the two most frequent property keys across the current scene
+  (deterministic; alphabetical tie-break);
+- **badges** — child count, tag count, the existing revision/diff badges,
+  clip state.
+
+**Reading depth** gates the content (research #5/#6; INT-VIEW-10/11/15):
+**MAP** (<100%) icon + name only; **READ** (100–174%) adds context line,
+description, badges; **FULL** (≥175%) adds the facts line and edge label
+chips. Thresholds are centralized constants, not scattered per component.
+The zoom rail displays the current depth + percentage and updates on every
+camera change, whatever caused it (INT-VIEW-14). Facts hidden at the
+current depth remain available through selection and the side panel.
+
+### Edges and emphasis (D10b)
+
+Styling reference (measured; tune by eye at the gate):
+
+- default stroke 1.5 px, clearly visible in both themes (`#7b97aa`-class
+  in light — not near-invisible grey); emphasis 1.8 px teal (`#0d9488`
+  light / `#2dd4bf` dark); filled triangle arrowheads; labels in pill
+  chips on the path.
+- every edge has a transparent **~24 px hit rail** and a visible ~6 px
+  focus rail (research #4; INT-SELECT-14); line, label, and rail all
+  select the same canonical edge.
+- anchors distribute on the node side facing the counterpart; parallel
+  connections between one pair are already one aggregated edge (unordered
+  key) — it shows a member-count chip; routing avoids crossing node and
+  boundary interiors where ELK permits.
+
+**Selection emphasis** (p2-ui-flows-animation): the selection's
+**outgoing** edges (direction under the current aspect, derived per
+member) animate a directional dash flow (~1.75–2.15 s period); its
+**incoming** edges get the static emphasis stroke — in vs out readable at
+a glance. An aggregated edge with members both ways highlights without
+animation and labels both directions. Unrelated content dims per the
+tiers below; the selection's edge labels stay legible. Deselect restores
+neutral. `prefers-reduced-motion` replaces all animation with the static
+highlight (INT-A11Y-07).
+
+**Graduated dimming tiers** — emphasis always dims, never hides
+(research #3):
+
+| State | Emphasized | Neighbors | Unrelated |
+| --- | --- | --- | --- |
+| selection | 1.0 (+ shadow) | 1.0 | 0.13 |
+| hover (fine pointers only) | 1.0 | 1.0 | 0.2 |
+| lens | 1.0 | 0.62 | 0.11 |
+
+Dimming combines opacity with the existing non-color cues; color or
+motion alone never carries meaning (research #10; INT-A11Y-03).
+
+### Legend and tag lens (D10b)
+
+A floating, collapsible legend panel on the canvas (reusing the D10a
+panel behaviors; the one floating panel in wave 2). Entries = the **tags**
+present in the current projection — swatch + label + count, counts
+computed from the projected arrays, never the DOM (INT-LEGEND-07);
+zero-count entries omitted. Clicking an entry toggles that tag in the
+**lens** (multi-select, OR semantics); matched / neighbor / unrelated
+render per the lens dim tiers. Nothing is ever hidden and there is no
+solo/isolate mode (decision 2026-08-24). Selecting every tag or clearing
+the last one returns to neutral (INT-LEGEND-05); an explicit Clear exists.
+Keyboard operable with visible pressed state. Lens state lives in the
+`lens` fragment key, never in saved data; the lens never changes scope,
+selection, layout, or the grids (INT-LEGEND-08/09). A configurable driver
+(property/kind switch) is deferred.
+
+### Dependency focus view (D10b)
+
+A dedicated view for one focused entity (IcePanel dependencies pattern;
+research #7 — supersedes INT-FOCUS-10..14's in-place emphasis):
+
+- the focused entity centered; **incoming** dependencies as a left
+  column, **outgoing** as a right column, at the current C4 level's
+  representatives; direction per the current aspect;
+- one bundled edge per neighbor with a connection-count chip; header
+  totals: incoming dependencies, outgoing dependencies, total
+  connections; live interfaces only, at the current time position;
+- rows are entity boxes (anatomy above); clicking one refocuses the view
+  on it; the side panel follows the selection; a picker at the top swaps
+  the focus entity;
+- entered from the side panel's "Open dependency view" (and a canvas
+  control when an entity is selected); encoded as the `deps` fragment key
+  (pushes history); Back or an explicit close returns to the map.
+
+### Interaction baseline (mined from wip/interactions.md, 2026-08-24)
+
+`plans/arch/wip/interactions.md` is **superseded**. These are the clauses
+carried into v3, adapted to v3 naming; everything not listed is dropped
+or deferred (notably PATH/route probe, radar, guided stories → D11; scope
+builder, saved reports, attachments, tabs → out of scope or later
+phases).
+
+- One action → one coherent state change; selection is shared between
+  canvas and tables; a stale async layout/projection result never applies
+  (INT-STATE-01/02/06).
+- Fit changes only the camera. Reset view also clears lens and drill/deps
+  emphasis but keeps a valid selection (INT-VIEW-01/02). Camera moves
+  from selection or table-row activation reveal the target without
+  needless zoom change; an already fully visible target does not move the
+  camera (INT-VIEW-08/09).
+- Keyboard: the canvas is one page-level tab stop; Enter/Space selects;
+  `Ctrl`/`Cmd` `+`/`-`/`0` zoom in/out/reset while the frame has focus
+  (INT-VIEW-05); Escape dismisses one layer at a time in the order menu →
+  side panel → lens/drill/deps emphasis → fullscreen (INT-DISMISS-01);
+  letter shortcuts never fire from text inputs (INT-SHORT-02).
+- Fragment restoration validates every id against the payload, applies
+  the remaining valid state with a console-visible diagnostic, and never
+  substitutes by display name (INT-LINK-03/04). Meaningful view changes
+  (drill, deps, guided view) push browser history; selection, lens, and
+  slider changes replace URL state (INT-LINK-07; INT-C4NAV-08).
+- Reduced motion removes edge animation and animated camera transitions
+  (INT-A11Y-07); touch targets ≥ 44 px where space permits
+  (INT-A11Y-08); hover previews are omitted on coarse pointers without
+  hiding any fact (INT-RESP-06).
+- An empty projection explains why and offers a recovery action; a layout
+  or render failure keeps the app navigable with a concise diagnostic
+  (INT-FAIL-02/05).
+
+**Overrides** — where the 2026-08-24 decisions or issue text beat the
+INT-* contract, recorded per open question 6:
+
+| Superseded INT clause(s) | Winner |
+| --- | --- |
+| INT-LEGEND-01 legend over kinds/statuses/scopes/types | tags-only first pass; driver switch deferred |
+| INT-FOCUS-10..14 in-place inbound/outbound emphasis controls | dedicated dependency focus view (`p2-ui-dependency-focus`) |
+| INT-SELECT-07 separate floating Relationship Passport | docked side panel showing the aggregated edge's member list |
+| INT-PANEL-02..11 floating drag-grip panel machinery | docked resizable panels; only the legend floats (collapse, no drag contract) |
+| INT-FRAME-04/05 MAP/PATH/LENS as primary modes | mode buttons removed; lens = legend, PATH → D11 guided views, MAP = default |
+
+(The `p2-ui-legend` hide-vs-dim and `p2-ui-nested-groupings`
+expand-vs-drill conflicts were resolved the other way — the INT/research
+position won by user decision; both issue files carry the decision note.)
+
+### Wave-2 verification (gate inputs)
+
+- The existing vitest vector suite stays green — contract-v1 semantics
+  are unchanged for the existing levels.
+- The structural tests listed in the D10 prompts (top-containers
+  invariants, drill node set, legend counts).
+- A rule-9 Playwright pass per `wip/notes/test-ui.md`: clean console and
+  **zero external requests from `file://`** remain gate checks
+  (do-not-copy: remote assets, Google Fonts included).
 
 ## Exports
 
@@ -286,7 +599,8 @@ boundary.
 - Sequence diagrams: per the POC verdict, no native renderer; sanitized SVG
   attachments only, post-3.0.
 - Saved Report Definition files, Confluence embedding, PDF.
-- The v2 wip interaction catalog (~230 requirements, journey playback, radar,
-  lens legend algebra) is **not** carried into v3 scope. The POC's proven
-  interactions plus the time slider are the 3.0 surface; everything else
-  re-earns its place against real use.
+- The v2 wip interaction catalog (`plans/arch/wip/interactions.md`, ~230
+  requirements) was mined 2026-08-24: the useful clauses live in "Wave-2 UI
+  contract — Interaction baseline" above and the doc is marked superseded.
+  Journey playback/guided views are D11; route probe, radar, and the rest
+  re-earn their place against real use.

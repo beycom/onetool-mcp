@@ -1,6 +1,9 @@
 # Report v2 interaction requirements
 
-Status: working interaction contract for Report v2.
+Status: **SUPERSEDED** (2026-08-24). The useful clauses were mined into
+`plans/arch/arch-v3/report.md` "Wave-2 UI contract — Interaction baseline",
+which also records the overrides where v3 issue text or decisions won over
+this contract. Kept for reference only; do not implement from this file.
 
 This document expands the interaction requirements in `requirements.md` and the
 navigation design in `design.md` into implementation-ready behaviour. It takes
