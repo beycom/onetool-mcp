@@ -269,8 +269,8 @@ are the styling reference.
       and carries the mined INT-* baseline with an overrides table;
       interactions.md marked superseded. D10 issued as D10a (chrome,
       panels, tables — 1,400 changed TS/TSX lines) + D10b (canvas
-      semantics + visuals — 1,900), budgets proposed pending user
-      confirmation.
+      semantics + visuals — 1,900), budgets agreed with the user
+      2026-08-24.
 - [ ] Executor chunks: implement the wave. `→ D10a, D10b`
 - [ ] **Re-run phase-3 gate** (architect + user).
 
@@ -365,7 +365,7 @@ None yet. Format: `branch-name — question being explored — outcome`.
   Relationship Passport and the floating-panel machinery, mode removal);
   doc header marked SUPERSEDED. delegation.md: D10a/D10b prompts issued
   (READY after the wave-1 gate; budgets 1,400/1,900 changed TS/TSX lines
-  — proposed, confirm with user before running). Next action: user runs
+  — agreed with the user same day). Next action: user runs
   D9a → D9b → wave-1 gate, then D10a → D10b → phase-3 re-gate.
 
 - **2026-08-24** — Outstanding-questions review with the user; all resolved
