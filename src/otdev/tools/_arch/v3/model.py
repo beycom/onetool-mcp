@@ -22,13 +22,12 @@ def _strip_direction(value: object) -> object:
     return value.strip() if isinstance(value, str) else value
 
 
-Direction = Annotated[
-    Literal[
-        "provider_to_consumer",
-        "consumer_to_provider",
-        "bidirectional",
-        "unspecified",
-    ],
+CallDirection = Annotated[
+    Literal["consumer_to_provider", "provider_to_consumer"],
+    BeforeValidator(_strip_direction),
+]
+DataFlowDirection = Annotated[
+    Literal["provider_to_consumer", "consumer_to_provider", "bidirectional"],
     BeforeValidator(_strip_direction),
 ]
 
@@ -50,10 +49,10 @@ class NamedItem(StrictModel):
 
 
 class TemporalNamedItem(NamedItem):
-    """Named row with an authored half-open milestone interval."""
+    """Named row with an authored inclusive milestone interval."""
 
-    from_: Identifier | None = Field(default=None, alias="from")
-    until: Identifier | None = None
+    start_in: Identifier | None = None
+    end_in: Identifier | None = None
 
 
 class Milestone(NamedItem):
@@ -71,16 +70,22 @@ class System(TemporalNamedItem):
     """Highest-level software boundary."""
 
 
-class Subsystem(TemporalNamedItem):
-    """Logical division of one system."""
+class Container(TemporalNamedItem):
+    """Deployable boundary nested under a system or container."""
 
-    system: Identifier
+    parent: Identifier
 
 
 class Component(TemporalNamedItem):
-    """Leaf runtime or data boundary owned by one subsystem."""
+    """Leaf runtime or data boundary owned by one container."""
 
-    subsystem: Identifier
+    container: Identifier
+
+
+class Code(TemporalNamedItem):
+    """Code-level element owned by one component."""
+
+    component: Identifier
 
 
 class User(TemporalNamedItem):
@@ -92,8 +97,8 @@ class Interface(TemporalNamedItem):
 
     provider: Identifier
     consumer: Identifier
-    call_direction: Direction = "unspecified"
-    data_flow: Direction = "unspecified"
+    call_direction: CallDirection = "consumer_to_provider"
+    data_flow_direction: DataFlowDirection = "provider_to_consumer"
 
 
 class Relationship(StrictModel):
@@ -103,8 +108,8 @@ class Relationship(StrictModel):
     action: Text
     source: Identifier
     target: Identifier
-    from_: Identifier | None = Field(default=None, alias="from")
-    until: Identifier | None = None
+    start_in: Identifier | None = None
+    end_in: Identifier | None = None
     description: Text | None = None
     tags: list[Text] = Field(default_factory=list)
     properties: dict[Text, PropertyValue] = Field(default_factory=dict)
@@ -117,8 +122,9 @@ class Architecture(StrictModel):
     milestones: list[Milestone]
     timelines: list[Timeline] | None = None
     systems: list[System]
-    subsystems: list[Subsystem]
+    containers: list[Container]
     components: list[Component]
+    code: list[Code]
     users: list[User]
     interfaces: list[Interface]
     relationships: list[Relationship]

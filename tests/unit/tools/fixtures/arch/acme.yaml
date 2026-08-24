@@ -39,7 +39,7 @@ timelines:
 systems:
 - id: legacy-commerce
   name: Legacy Commerce Platform
-  until: acme-2031-complete-cutover
+  end_in: acme-2030-transaction-core
   description: Customer storefront, back-office administration, and all commerce domains in
     one deployable estate.
   tags:
@@ -143,7 +143,7 @@ systems:
     lifecycle: retain
 - id: commerce-platform
   name: Digital Commerce Platform
-  from: acme-2027-edge-foundation
+  start_in: acme-2027-edge-foundation
   description: Target cloud-native commerce platform introduced alongside the legacy system.
   tags:
   - target
@@ -153,10 +153,10 @@ systems:
     availability_target: 99.95%
     criticality: tier-1
     lifecycle: strategic
-subsystems:
+containers:
 - id: commerce-monolith
   name: Commerce Monolith
-  system: legacy-commerce
+  parent: legacy-commerce
   description: Single Java deployment containing storefront, administration, catalog, cart,
     checkout, customer, and order logic.
   tags:
@@ -171,8 +171,8 @@ subsystems:
     technology: Java / Spring MVC
 - id: commerce-monolith
   name: Commerce Monolith
-  system: legacy-commerce
-  from: acme-2027-edge-foundation
+  parent: legacy-commerce
+  start_in: acme-2027-edge-foundation
   description: Legacy commerce deployment reachable only behind strangler-controlled routes
     and adapters.
   tags:
@@ -187,7 +187,7 @@ subsystems:
     technology: Java / Spring MVC
 - id: erp-wms
   name: ERP and WMS
-  system: enterprise-fulfilment
+  parent: enterprise-fulfilment
   description: Inventory master, warehouse execution, and fulfilment planning.
   tags:
   - system-of-record
@@ -197,7 +197,7 @@ subsystems:
     technology: Commercial ERP
 - id: enterprise-oms
   name: Enterprise OMS
-  system: enterprise-order-management
+  parent: enterprise-order-management
   description: Enterprise order routing, exception handling, and downstream fulfilment coordination.
   tags:
   - internal
@@ -208,7 +208,7 @@ subsystems:
     technology: Commercial OMS
 - id: finance-ledger
   name: Finance Ledger and Reconciliation
-  system: enterprise-finance
+  parent: enterprise-finance
   description: Enterprise settlement, reconciliation, and accounting integration.
   tags:
   - internal
@@ -219,7 +219,7 @@ subsystems:
     technology: Finance ERP
 - id: payment-gateway
   name: Payment Gateway API
-  system: payment-provider
+  parent: payment-provider
   description: Tokenized payment API hosted by the external provider.
   tags:
   - external-api
@@ -229,7 +229,7 @@ subsystems:
     technology: REST API
 - id: messaging-provider
   name: Messaging Provider API
-  system: customer-engagement
+  parent: customer-engagement
   description: Email and SMS delivery API.
   tags:
   - external-api
@@ -238,7 +238,7 @@ subsystems:
     technology: REST API
 - id: identity-provider
   name: Identity Provider
-  system: enterprise-identity
+  parent: enterprise-identity
   description: OAuth 2.0 and OpenID Connect identity service.
   tags:
   - identity
@@ -248,7 +248,7 @@ subsystems:
     technology: OIDC
 - id: digital-analytics-api
   name: Digital Analytics API
-  system: analytics-provider
+  parent: analytics-provider
   description: External analytics event collection and reporting API.
   tags:
   - external-api
@@ -258,7 +258,7 @@ subsystems:
     technology: HTTPS collection API
 - id: tax-api
   name: Tax Calculation API
-  system: tax-provider
+  parent: tax-provider
   description: External tax quote, commit, void, and audit API.
   tags:
   - external-api
@@ -268,7 +268,7 @@ subsystems:
     technology: REST API
 - id: fraud-api
   name: Fraud Decision API
-  system: fraud-provider
+  parent: fraud-provider
   description: External fraud score and decision API.
   tags:
   - external-api
@@ -278,8 +278,8 @@ subsystems:
     technology: REST API
 - id: commerce-edge
   name: Commerce Edge
-  system: commerce-platform
-  from: acme-2027-edge-foundation
+  parent: commerce-platform
+  start_in: acme-2027-edge-foundation
   description: CDN, WAF, TLS termination, and route-based strangler control plane.
   tags:
   - edge
@@ -291,8 +291,8 @@ subsystems:
     technology: Managed CDN / WAF / API gateway
 - id: storefront-bff
   name: Storefront BFF
-  system: commerce-platform
-  from: acme-2027-edge-foundation
+  parent: commerce-platform
+  start_in: acme-2027-edge-foundation
   description: Channel-oriented API composition layer for the web storefront.
   tags:
   - bff
@@ -304,8 +304,8 @@ subsystems:
     technology: TypeScript / Node.js
 - id: event-backbone
   name: Commerce Event Backbone
-  system: commerce-platform
-  from: acme-2027-edge-foundation
+  parent: commerce-platform
+  start_in: acme-2027-edge-foundation
   description: Durable domain-event transport with schema governance and replay.
   tags:
   - eventing
@@ -316,8 +316,8 @@ subsystems:
     technology: Managed Kafka
 - id: observability-platform
   name: Commerce Observability Platform
-  system: commerce-platform
-  from: acme-2027-edge-foundation
+  parent: commerce-platform
+  start_in: acme-2027-edge-foundation
   description: Central metrics, logs, traces, alerting, and service-level objectives.
   tags:
   - observability
@@ -327,9 +327,9 @@ subsystems:
     technology: OpenTelemetry / managed observability
 - id: legacy-integration-adapter
   name: Legacy Anti-corruption Layer
-  system: commerce-platform
-  from: acme-2027-edge-foundation
-  until: acme-2031-complete-cutover
+  parent: commerce-platform
+  start_in: acme-2027-edge-foundation
+  end_in: acme-2030-transaction-core
   description: Stable adapters translating legacy concepts and contracts into target-domain
     APIs and events.
   tags:
@@ -342,8 +342,8 @@ subsystems:
     technology: Java / integration runtime
 - id: analytics-event-adapter
   name: Analytics Event Adapter
-  system: commerce-platform
-  from: acme-2027-edge-foundation
+  parent: commerce-platform
+  start_in: acme-2027-edge-foundation
   description: Consent-aware, schema-controlled adapter for external digital analytics.
   tags:
   - analytics
@@ -355,8 +355,8 @@ subsystems:
     technology: TypeScript / streaming runtime
 - id: catalog-service
   name: Catalog Service
-  system: commerce-platform
-  from: acme-2028-catalog-search
+  parent: commerce-platform
+  start_in: acme-2028-catalog-search
   description: System of record for products, categories, assortment, and sellability.
   tags:
   - microservice
@@ -368,8 +368,8 @@ subsystems:
     technology: Kotlin / Spring Boot
 - id: search-service
   name: Search Service
-  system: commerce-platform
-  from: acme-2028-catalog-search
+  parent: commerce-platform
+  start_in: acme-2028-catalog-search
   description: Product search, faceting, ranking, and query suggestions from event-fed projections.
   tags:
   - microservice
@@ -381,9 +381,9 @@ subsystems:
     technology: Java / OpenSearch
 - id: catalog-sync-adapter
   name: Catalog Migration Adapter
-  system: commerce-platform
-  from: acme-2028-catalog-search
-  until: acme-2031-complete-cutover
+  parent: commerce-platform
+  start_in: acme-2028-catalog-search
+  end_in: acme-2030-transaction-core
   description: Temporary idempotent translation and reconciliation between legacy merchandising
     and Catalog Service.
   tags:
@@ -395,8 +395,8 @@ subsystems:
     technology: Java / Kafka Connect
 - id: customer-service
   name: Customer Service
-  system: commerce-platform
-  from: acme-2029-customer-cart-pricing
+  parent: commerce-platform
+  start_in: acme-2029-customer-cart-pricing
   description: Customer profile, addresses, preferences, and identity linkage.
   tags:
   - microservice
@@ -407,8 +407,8 @@ subsystems:
     technology: Kotlin / Spring Boot
 - id: cart-service
   name: Cart Service
-  system: commerce-platform
-  from: acme-2029-customer-cart-pricing
+  parent: commerce-platform
+  start_in: acme-2029-customer-cart-pricing
   description: Durable shopping carts with optimistic concurrency and expiry policies.
   tags:
   - microservice
@@ -419,8 +419,8 @@ subsystems:
     technology: Go
 - id: pricing-service
   name: Pricing Service
-  system: commerce-platform
-  from: acme-2029-customer-cart-pricing
+  parent: commerce-platform
+  start_in: acme-2029-customer-cart-pricing
   description: Effective prices, promotions, eligibility, and explainable calculation results.
   tags:
   - microservice
@@ -430,8 +430,8 @@ subsystems:
     technology: Java / Spring Boot
 - id: notification-service
   name: Notification Service
-  system: commerce-platform
-  from: acme-2029-customer-cart-pricing
+  parent: commerce-platform
+  start_in: acme-2029-customer-cart-pricing
   description: Template, preference, deduplication, and delivery orchestration for customer
     communications.
   tags:
@@ -443,8 +443,8 @@ subsystems:
     technology: TypeScript / Node.js
 - id: checkout-service
   name: Checkout Orchestrator
-  system: commerce-platform
-  from: acme-2030-transaction-core
+  parent: commerce-platform
+  start_in: acme-2030-transaction-core
   description: Explicit saga coordinating validation, reservation, payment, order creation,
     and compensations.
   tags:
@@ -458,8 +458,8 @@ subsystems:
     technology: Java / workflow engine
 - id: order-service
   name: Order Service
-  system: commerce-platform
-  from: acme-2030-transaction-core
+  parent: commerce-platform
+  start_in: acme-2030-transaction-core
   description: System of record for accepted orders and order lifecycle state.
   tags:
   - microservice
@@ -470,8 +470,8 @@ subsystems:
     technology: Kotlin / Spring Boot
 - id: payment-service
   name: Payment Service
-  system: commerce-platform
-  from: acme-2030-transaction-core
+  parent: commerce-platform
+  start_in: acme-2030-transaction-core
   description: PCI-minimized payment intents, authorization, capture, refund, and reconciliation.
   tags:
   - microservice
@@ -483,8 +483,8 @@ subsystems:
     technology: Java / Spring Boot
 - id: inventory-service
   name: Inventory Service
-  system: commerce-platform
-  from: acme-2030-transaction-core
+  parent: commerce-platform
+  start_in: acme-2030-transaction-core
   description: Commerce availability projection and time-bound stock reservations synchronized
     with ERP/WMS.
   tags:
@@ -496,8 +496,8 @@ subsystems:
     technology: Go
 - id: admin-portal
   name: Commerce Administration Portal
-  system: commerce-platform
-  from: acme-2031-complete-cutover
+  parent: commerce-platform
+  start_in: acme-2031-complete-cutover
   description: Role-based customer service and merchandising experience composed over target-domain
     APIs.
   tags:
@@ -510,8 +510,8 @@ subsystems:
     technology: React / TypeScript
 - id: reporting-service
   name: Commerce Reporting Service
-  system: commerce-platform
-  from: acme-2031-complete-cutover
+  parent: commerce-platform
+  start_in: acme-2031-complete-cutover
   description: Operational reporting over event-fed read models; never queries service databases
     directly.
   tags:
@@ -524,7 +524,7 @@ subsystems:
 components:
 - id: legacy-web-ui
   name: Server-rendered Storefront
-  subsystem: commerce-monolith
+  container: commerce-monolith
   description: Customer web experience rendered inside the monolith.
   tags:
   - legacy
@@ -533,7 +533,7 @@ components:
     technology: JSP / JavaScript
 - id: legacy-catalog-module
   name: Catalog and Merchandising Module
-  subsystem: commerce-monolith
+  container: commerce-monolith
   description: Product, category, assortment, and merchandising logic.
   tags:
   - legacy
@@ -542,8 +542,8 @@ components:
     technology: Java module
 - id: legacy-catalog-module
   name: Legacy Catalog Compatibility Facade
-  subsystem: commerce-monolith
-  from: acme-2028-catalog-search
+  container: commerce-monolith
+  start_in: acme-2028-catalog-search
   description: Read-only compatibility facade delegating canonical product changes through
     the migration adapter.
   tags:
@@ -553,8 +553,8 @@ components:
     technology: Java module
 - id: legacy-search-index
   name: Embedded Search Index
-  subsystem: commerce-monolith
-  until: acme-2028-catalog-search
+  container: commerce-monolith
+  end_in: acme-2027-edge-foundation
   description: Locally managed product search index refreshed by batch jobs.
   tags:
   - legacy
@@ -563,7 +563,7 @@ components:
     technology: Embedded search engine
 - id: legacy-cart-module
   name: Cart and Pricing Module
-  subsystem: commerce-monolith
+  container: commerce-monolith
   description: Session cart, promotions, and price calculation.
   tags:
   - legacy
@@ -572,8 +572,8 @@ components:
     technology: Java module
 - id: legacy-cart-module
   name: Legacy Cart and Pricing Compatibility Facade
-  subsystem: commerce-monolith
-  from: acme-2029-customer-cart-pricing
+  container: commerce-monolith
+  start_in: acme-2029-customer-cart-pricing
   description: Temporary facade delegating cart and price calculations to target services.
   tags:
   - legacy
@@ -582,7 +582,7 @@ components:
     technology: Java module
 - id: legacy-customer-module
   name: Customer Account Module
-  subsystem: commerce-monolith
+  container: commerce-monolith
   description: Customer profile, addresses, preferences, and authentication integration.
   tags:
   - legacy
@@ -591,8 +591,8 @@ components:
     technology: Java module
 - id: legacy-customer-module
   name: Legacy Customer Compatibility Facade
-  subsystem: commerce-monolith
-  from: acme-2029-customer-cart-pricing
+  container: commerce-monolith
+  start_in: acme-2029-customer-cart-pricing
   description: Temporary facade delegating profile operations to Customer Service.
   tags:
   - legacy
@@ -601,7 +601,7 @@ components:
     technology: Java module
 - id: legacy-checkout-module
   name: Checkout and Payment Module
-  subsystem: commerce-monolith
+  container: commerce-monolith
   description: Synchronous checkout transaction coordinating payment and order creation.
   tags:
   - legacy
@@ -610,8 +610,8 @@ components:
     technology: Java module
 - id: legacy-checkout-module
   name: Legacy Checkout Compatibility Facade
-  subsystem: commerce-monolith
-  from: acme-2030-transaction-core
+  container: commerce-monolith
+  start_in: acme-2030-transaction-core
   description: Non-public compatibility facade delegating checkout to the target orchestrator.
   tags:
   - legacy
@@ -620,7 +620,7 @@ components:
     technology: Java module
 - id: legacy-order-module
   name: Order and Fulfilment Module
-  subsystem: commerce-monolith
+  container: commerce-monolith
   description: Order lifecycle and point-to-point ERP integration.
   tags:
   - legacy
@@ -629,8 +629,8 @@ components:
     technology: Java module
 - id: legacy-order-module
   name: Legacy Order Compatibility Facade
-  subsystem: commerce-monolith
-  from: acme-2030-transaction-core
+  container: commerce-monolith
+  start_in: acme-2030-transaction-core
   description: Temporary back-office facade reading and updating orders through Order Service.
   tags:
   - legacy
@@ -639,7 +639,7 @@ components:
     technology: Java module
 - id: legacy-admin-module
   name: Back-office Administration Module
-  subsystem: commerce-monolith
+  container: commerce-monolith
   description: Customer service and merchandising administration screens.
   tags:
   - legacy
@@ -648,7 +648,7 @@ components:
     technology: Java module
 - id: legacy-commerce-db
   name: Shared Commerce Database
-  subsystem: commerce-monolith
+  container: commerce-monolith
   description: Shared relational schema used by every commerce domain.
   tags:
   - legacy
@@ -661,7 +661,7 @@ components:
     technology: PostgreSQL
 - id: legacy-session-cache
   name: Shared Session Cache
-  subsystem: commerce-monolith
+  container: commerce-monolith
   description: Distributed web session and coarse application cache.
   tags:
   - legacy
@@ -670,7 +670,7 @@ components:
     technology: Redis
 - id: legacy-batch-jobs
   name: Commerce Batch Jobs
-  subsystem: commerce-monolith
+  container: commerce-monolith
   description: Scheduled catalog, search, order, and integration processing.
   tags:
   - legacy
@@ -679,7 +679,7 @@ components:
     technology: Java scheduler
 - id: erp-database
   name: ERP Operational Database
-  subsystem: erp-wms
+  container: erp-wms
   description: Enterprise inventory and fulfilment system of record.
   tags:
   - database
@@ -688,7 +688,7 @@ components:
     technology: Relational database
 - id: oms-database
   name: OMS Operational Database
-  subsystem: enterprise-oms
+  container: enterprise-oms
   description: Enterprise order routing and fulfilment state.
   tags:
   - database
@@ -697,7 +697,7 @@ components:
     technology: Relational database
 - id: finance-ledger-db
   name: Finance Ledger Database
-  subsystem: finance-ledger
+  container: finance-ledger
   description: Enterprise accounting, settlement, and reconciliation records.
   tags:
   - database
@@ -706,7 +706,7 @@ components:
     technology: Relational database
 - id: psp-token-vault
   name: Provider Token Vault
-  subsystem: payment-gateway
+  container: payment-gateway
   description: Provider-managed PCI token vault; ACME does not store cardholder data.
   tags:
   - pci
@@ -715,7 +715,7 @@ components:
     technology: Managed vault
 - id: identity-directory
   name: Identity Directory
-  subsystem: identity-provider
+  container: identity-provider
   description: Managed customer and workforce identity directory.
   tags:
   - identity
@@ -724,7 +724,7 @@ components:
     technology: Managed directory
 - id: analytics-event-store
   name: Provider Analytics Event Store
-  subsystem: digital-analytics-api
+  container: digital-analytics-api
   description: Provider-managed pseudonymous analytics event storage.
   tags:
   - managed
@@ -733,7 +733,7 @@ components:
     technology: Managed analytics storage
 - id: provider-tax-rules
   name: Provider Tax Rules
-  subsystem: tax-api
+  container: tax-api
   description: Provider-managed jurisdiction and tax-rule data.
   tags:
   - managed
@@ -742,7 +742,7 @@ components:
     technology: Managed rules engine
 - id: provider-fraud-models
   name: Provider Fraud Models
-  subsystem: fraud-api
+  container: fraud-api
   description: Provider-managed fraud features and decision models.
   tags:
   - managed
@@ -751,8 +751,8 @@ components:
     technology: Managed ML platform
 - id: edge-waf-cdn
   name: WAF and CDN
-  subsystem: commerce-edge
-  from: acme-2027-edge-foundation
+  container: commerce-edge
+  start_in: acme-2027-edge-foundation
   description: Managed perimeter protection, caching, bot control, and DDoS mitigation.
   tags:
   - security
@@ -761,8 +761,8 @@ components:
     technology: Managed edge service
 - id: strangler-route-config
   name: Strangler Route Configuration
-  subsystem: commerce-edge
-  from: acme-2027-edge-foundation
+  container: commerce-edge
+  start_in: acme-2027-edge-foundation
   description: Version-controlled routing rules that move capabilities from legacy to target
     services.
   tags:
@@ -772,8 +772,8 @@ components:
     technology: Gateway configuration
 - id: bff-response-cache
   name: BFF Response Cache
-  subsystem: storefront-bff
-  from: acme-2027-edge-foundation
+  container: storefront-bff
+  start_in: acme-2027-edge-foundation
   description: Short-lived cache for safe catalog and navigation responses.
   tags:
   - cache
@@ -782,8 +782,8 @@ components:
     technology: Redis
 - id: event-stream-cluster
   name: Event Stream Cluster
-  subsystem: event-backbone
-  from: acme-2027-edge-foundation
+  container: event-backbone
+  start_in: acme-2027-edge-foundation
   description: Multi-zone durable event log with retention and replay.
   tags:
   - event-store
@@ -792,8 +792,8 @@ components:
     technology: Managed Kafka
 - id: event-schema-registry
   name: Event Schema Registry
-  subsystem: event-backbone
-  from: acme-2027-edge-foundation
+  container: event-backbone
+  start_in: acme-2027-edge-foundation
   description: Versioned compatibility checks for domain event contracts.
   tags:
   - governance
@@ -802,8 +802,8 @@ components:
     technology: Schema registry
 - id: telemetry-store
   name: Telemetry Store
-  subsystem: observability-platform
-  from: acme-2027-edge-foundation
+  container: observability-platform
+  start_in: acme-2027-edge-foundation
   description: Managed metrics, logs, and traces with production retention policies.
   tags:
   - observability
@@ -812,8 +812,8 @@ components:
     technology: Managed observability storage
 - id: anti-corruption-runtime
   name: Anti-corruption Adapter Runtime
-  subsystem: legacy-integration-adapter
-  from: acme-2027-edge-foundation
+  container: legacy-integration-adapter
+  start_in: acme-2027-edge-foundation
   description: Translation, retry, circuit-breaker, and contract-isolation runtime.
   tags:
   - adapter
@@ -822,8 +822,8 @@ components:
     technology: Integration service
 - id: analytics-consent-filter
   name: Analytics Consent and Data Filter
-  subsystem: analytics-event-adapter
-  from: acme-2027-edge-foundation
+  container: analytics-event-adapter
+  start_in: acme-2027-edge-foundation
   description: Enforces consent, allowlisted fields, pseudonymous identifiers, and analytics
     contract versions.
   tags:
@@ -835,8 +835,8 @@ components:
     technology: Stream processor
 - id: legacy-outbox
   name: Legacy Transactional Outbox
-  subsystem: commerce-monolith
-  from: acme-2027-edge-foundation
+  container: commerce-monolith
+  start_in: acme-2027-edge-foundation
   description: Append-only outbox table used to publish changes without dual writes.
   tags:
   - outbox
@@ -847,8 +847,8 @@ components:
     technology: PostgreSQL table / relay
 - id: catalog-db
   name: Catalog Database
-  subsystem: catalog-service
-  from: acme-2028-catalog-search
+  container: catalog-service
+  start_in: acme-2028-catalog-search
   description: Catalog-owned relational store; no other service has direct access.
   tags:
   - database
@@ -859,8 +859,8 @@ components:
     technology: Managed PostgreSQL
 - id: catalog-cache
   name: Catalog Cache
-  subsystem: catalog-service
-  from: acme-2028-catalog-search
+  container: catalog-service
+  start_in: acme-2028-catalog-search
   description: Read-through cache for hot product and category data.
   tags:
   - cache
@@ -869,8 +869,8 @@ components:
     technology: Redis
 - id: catalog-outbox
   name: Catalog Transactional Outbox
-  subsystem: catalog-service
-  from: acme-2028-catalog-search
+  container: catalog-service
+  start_in: acme-2028-catalog-search
   description: Atomically records catalog events for reliable publication.
   tags:
   - outbox
@@ -879,8 +879,8 @@ components:
     technology: PostgreSQL outbox table
 - id: product-search-index
   name: Product Search Index
-  subsystem: search-service
-  from: acme-2028-catalog-search
+  container: search-service
+  start_in: acme-2028-catalog-search
   description: Rebuildable search projection populated only from versioned catalog events.
   tags:
   - search-index
@@ -891,8 +891,8 @@ components:
     technology: Managed OpenSearch
 - id: search-query-cache
   name: Search Query Cache
-  subsystem: search-service
-  from: acme-2028-catalog-search
+  container: search-service
+  start_in: acme-2028-catalog-search
   description: Short-lived cache for popular query and facet results.
   tags:
   - cache
@@ -901,8 +901,8 @@ components:
     technology: Redis
 - id: catalog-reconciliation-store
   name: Catalog Reconciliation Store
-  subsystem: catalog-sync-adapter
-  from: acme-2028-catalog-search
+  container: catalog-sync-adapter
+  start_in: acme-2028-catalog-search
   description: Temporary checkpoints and idempotency keys for migration reconciliation.
   tags:
   - migration
@@ -912,8 +912,8 @@ components:
     technology: Managed PostgreSQL
 - id: customer-db
   name: Customer Database
-  subsystem: customer-service
-  from: acme-2029-customer-cart-pricing
+  container: customer-service
+  start_in: acme-2029-customer-cart-pricing
   description: Customer-owned relational data with encrypted sensitive fields.
   tags:
   - database
@@ -924,8 +924,8 @@ components:
     technology: Managed PostgreSQL
 - id: customer-outbox
   name: Customer Transactional Outbox
-  subsystem: customer-service
-  from: acme-2029-customer-cart-pricing
+  container: customer-service
+  start_in: acme-2029-customer-cart-pricing
   description: Reliable customer-profile event publication.
   tags:
   - outbox
@@ -934,8 +934,8 @@ components:
     technology: PostgreSQL outbox table
 - id: cart-store
   name: Durable Cart Store
-  subsystem: cart-service
-  from: acme-2029-customer-cart-pricing
+  container: cart-service
+  start_in: acme-2029-customer-cart-pricing
   description: Partitioned durable key-value storage for carts and idempotency records.
   tags:
   - database
@@ -946,8 +946,8 @@ components:
     technology: Managed key-value database
 - id: cart-cache
   name: Cart Hot Cache
-  subsystem: cart-service
-  from: acme-2029-customer-cart-pricing
+  container: cart-service
+  start_in: acme-2029-customer-cart-pricing
   description: Optional acceleration layer; the durable cart store remains authoritative.
   tags:
   - cache
@@ -956,8 +956,8 @@ components:
     technology: Redis
 - id: pricing-db
   name: Pricing Database
-  subsystem: pricing-service
-  from: acme-2029-customer-cart-pricing
+  container: pricing-service
+  start_in: acme-2029-customer-cart-pricing
   description: Pricing-owned rules, price lists, promotions, and audit history.
   tags:
   - database
@@ -967,8 +967,8 @@ components:
     technology: Managed PostgreSQL
 - id: pricing-cache
   name: Pricing Evaluation Cache
-  subsystem: pricing-service
-  from: acme-2029-customer-cart-pricing
+  container: pricing-service
+  start_in: acme-2029-customer-cart-pricing
   description: Version-keyed cache that cannot outlive the owning price-rule version.
   tags:
   - cache
@@ -977,8 +977,8 @@ components:
     technology: Redis
 - id: notification-db
   name: Notification Database
-  subsystem: notification-service
-  from: acme-2029-customer-cart-pricing
+  container: notification-service
+  start_in: acme-2029-customer-cart-pricing
   description: Templates, preferences, delivery attempts, and deduplication keys.
   tags:
   - database
@@ -988,8 +988,8 @@ components:
     technology: Managed PostgreSQL
 - id: checkout-workflow-store
   name: Checkout Workflow Store
-  subsystem: checkout-service
-  from: acme-2030-transaction-core
+  container: checkout-service
+  start_in: acme-2030-transaction-core
   description: Durable saga state, idempotency keys, and compensation progress.
   tags:
   - database
@@ -1000,8 +1000,8 @@ components:
     technology: Managed PostgreSQL
 - id: order-db
   name: Order Database
-  subsystem: order-service
-  from: acme-2030-transaction-core
+  container: order-service
+  start_in: acme-2030-transaction-core
   description: Order-owned append-audited relational data.
   tags:
   - database
@@ -1011,8 +1011,8 @@ components:
     technology: Managed PostgreSQL
 - id: order-outbox
   name: Order Transactional Outbox
-  subsystem: order-service
-  from: acme-2030-transaction-core
+  container: order-service
+  start_in: acme-2030-transaction-core
   description: Reliable order-event publication without dual writes.
   tags:
   - outbox
@@ -1021,8 +1021,8 @@ components:
     technology: PostgreSQL outbox table
 - id: payment-db
   name: Payment Database
-  subsystem: payment-service
-  from: acme-2030-transaction-core
+  container: payment-service
+  start_in: acme-2030-transaction-core
   description: Payment intents, provider tokens, idempotency keys, and reconciliation state;
     no PAN storage.
   tags:
@@ -1035,8 +1035,8 @@ components:
     technology: Managed PostgreSQL
 - id: payment-outbox
   name: Payment Transactional Outbox
-  subsystem: payment-service
-  from: acme-2030-transaction-core
+  container: payment-service
+  start_in: acme-2030-transaction-core
   description: Reliable payment-state event publication.
   tags:
   - outbox
@@ -1045,8 +1045,8 @@ components:
     technology: PostgreSQL outbox table
 - id: inventory-db
   name: Inventory Projection Database
-  subsystem: inventory-service
-  from: acme-2030-transaction-core
+  container: inventory-service
+  start_in: acme-2030-transaction-core
   description: Rebuildable availability projection plus authoritative commerce reservation
     state.
   tags:
@@ -1059,8 +1059,8 @@ components:
     upstream_system_of_record: erp-wms
 - id: admin-static-assets
   name: Administration Static Assets
-  subsystem: admin-portal
-  from: acme-2031-complete-cutover
+  container: admin-portal
+  start_in: acme-2031-complete-cutover
   description: Versioned immutable portal assets served through the managed edge.
   tags:
   - infrastructure
@@ -1069,8 +1069,8 @@ components:
     technology: Object storage / CDN
 - id: reporting-read-model
   name: Reporting Read Model
-  subsystem: reporting-service
-  from: acme-2031-complete-cutover
+  container: reporting-service
+  start_in: acme-2031-complete-cutover
   description: Rebuildable cross-domain operational projection populated from events.
   tags:
   - database
@@ -1082,14 +1082,15 @@ components:
     technology: Managed analytical PostgreSQL
 - id: reporting-object-store
   name: Reporting Object Store
-  subsystem: reporting-service
-  from: acme-2031-complete-cutover
+  container: reporting-service
+  start_in: acme-2031-complete-cutover
   description: Retained extracts and archived operational reports with lifecycle policies.
   tags:
   - object-storage
   - infrastructure
   properties:
     technology: Managed object storage
+code: []
 users:
 - id: customer
   name: Customer
@@ -1117,7 +1118,7 @@ interfaces:
   provider: customer
   consumer: commerce-monolith
   call_direction: provider_to_consumer
-  until: acme-2027-edge-foundation
+  end_in: base
   tags:
   - synchronous
   - public
@@ -1164,7 +1165,7 @@ interfaces:
   provider: commerce-monolith
   consumer: payment-gateway
   call_direction: provider_to_consumer
-  until: acme-2030-transaction-core
+  end_in: acme-2029-customer-cart-pricing
   tags:
   - synchronous
   - pci
@@ -1179,7 +1180,7 @@ interfaces:
   provider: commerce-monolith
   consumer: erp-wms
   call_direction: provider_to_consumer
-  until: acme-2030-transaction-core
+  end_in: acme-2029-customer-cart-pricing
   tags:
   - legacy
   - point-to-point
@@ -1191,7 +1192,7 @@ interfaces:
   provider: commerce-monolith
   consumer: enterprise-oms
   call_direction: provider_to_consumer
-  until: acme-2030-transaction-core
+  end_in: acme-2029-customer-cart-pricing
   tags:
   - legacy
   - point-to-point
@@ -1215,7 +1216,7 @@ interfaces:
   provider: commerce-monolith
   consumer: finance-ledger
   call_direction: provider_to_consumer
-  until: acme-2030-transaction-core
+  end_in: acme-2029-customer-cart-pricing
   tags:
   - legacy
   - finance
@@ -1228,7 +1229,7 @@ interfaces:
   provider: commerce-monolith
   consumer: digital-analytics-api
   call_direction: provider_to_consumer
-  until: acme-2027-edge-foundation
+  end_in: base
   tags:
   - external
   - analytics
@@ -1243,7 +1244,7 @@ interfaces:
   provider: commerce-monolith
   consumer: tax-api
   call_direction: provider_to_consumer
-  until: acme-2030-transaction-core
+  end_in: acme-2029-customer-cart-pricing
   tags:
   - synchronous
   - external
@@ -1256,7 +1257,7 @@ interfaces:
   provider: commerce-monolith
   consumer: fraud-api
   call_direction: provider_to_consumer
-  until: acme-2030-transaction-core
+  end_in: acme-2029-customer-cart-pricing
   tags:
   - synchronous
   - external
@@ -1269,7 +1270,7 @@ interfaces:
   provider: commerce-monolith
   consumer: messaging-provider
   call_direction: provider_to_consumer
-  until: acme-2029-customer-cart-pricing
+  end_in: acme-2028-catalog-search
   tags:
   - synchronous
   properties:
@@ -1290,7 +1291,7 @@ interfaces:
   provider: customer
   consumer: commerce-edge
   call_direction: provider_to_consumer
-  from: acme-2027-edge-foundation
+  start_in: acme-2027-edge-foundation
   tags:
   - public
   - synchronous
@@ -1303,7 +1304,7 @@ interfaces:
   provider: commerce-edge
   consumer: storefront-bff
   call_direction: provider_to_consumer
-  from: acme-2027-edge-foundation
+  start_in: acme-2027-edge-foundation
   tags:
   - synchronous
   - strangler-target
@@ -1315,8 +1316,8 @@ interfaces:
   provider: commerce-edge
   consumer: commerce-monolith
   call_direction: provider_to_consumer
-  from: acme-2027-edge-foundation
-  until: acme-2030-transaction-core
+  start_in: acme-2027-edge-foundation
+  end_in: acme-2029-customer-cart-pricing
   tags:
   - synchronous
   - strangler-fallback
@@ -1329,8 +1330,8 @@ interfaces:
   provider: storefront-bff
   consumer: commerce-monolith
   call_direction: provider_to_consumer
-  from: acme-2027-edge-foundation
-  until: acme-2030-transaction-core
+  start_in: acme-2027-edge-foundation
+  end_in: acme-2029-customer-cart-pricing
   tags:
   - synchronous
   - strangler-fallback
@@ -1343,7 +1344,7 @@ interfaces:
   provider: commerce-monolith
   consumer: legacy-integration-adapter
   call_direction: provider_to_consumer
-  from: acme-2027-edge-foundation
+  start_in: acme-2027-edge-foundation
   tags:
   - migration
   - anti-corruption-layer
@@ -1355,7 +1356,7 @@ interfaces:
   provider: commerce-edge
   consumer: analytics-event-adapter
   call_direction: provider_to_consumer
-  from: acme-2027-edge-foundation
+  start_in: acme-2027-edge-foundation
   tags:
   - asynchronous
   - privacy-filtered
@@ -1367,7 +1368,7 @@ interfaces:
   provider: analytics-event-adapter
   consumer: digital-analytics-api
   call_direction: provider_to_consumer
-  from: acme-2027-edge-foundation
+  start_in: acme-2027-edge-foundation
   tags:
   - external
   - analytics
@@ -1382,7 +1383,7 @@ interfaces:
   provider: storefront-bff
   consumer: catalog-service
   call_direction: provider_to_consumer
-  from: acme-2028-catalog-search
+  start_in: acme-2028-catalog-search
   tags:
   - synchronous
   - versioned-contract
@@ -1394,7 +1395,7 @@ interfaces:
   provider: storefront-bff
   consumer: search-service
   call_direction: provider_to_consumer
-  from: acme-2028-catalog-search
+  start_in: acme-2028-catalog-search
   tags:
   - synchronous
   - versioned-contract
@@ -1406,7 +1407,7 @@ interfaces:
   provider: catalog-service
   consumer: event-backbone
   call_direction: provider_to_consumer
-  from: acme-2028-catalog-search
+  start_in: acme-2028-catalog-search
   tags:
   - asynchronous
   - outbox
@@ -1419,7 +1420,7 @@ interfaces:
   provider: event-backbone
   consumer: search-service
   call_direction: provider_to_consumer
-  from: acme-2028-catalog-search
+  start_in: acme-2028-catalog-search
   tags:
   - asynchronous
   - idempotent-consumer
@@ -1431,7 +1432,7 @@ interfaces:
   provider: event-backbone
   consumer: analytics-event-adapter
   call_direction: provider_to_consumer
-  from: acme-2028-catalog-search
+  start_in: acme-2028-catalog-search
   tags:
   - asynchronous
   - analytics
@@ -1445,7 +1446,7 @@ interfaces:
   provider: legacy-integration-adapter
   consumer: catalog-sync-adapter
   call_direction: provider_to_consumer
-  from: acme-2028-catalog-search
+  start_in: acme-2028-catalog-search
   tags:
   - migration
   - anti-corruption-layer
@@ -1458,7 +1459,7 @@ interfaces:
   provider: catalog-sync-adapter
   consumer: catalog-service
   call_direction: provider_to_consumer
-  from: acme-2028-catalog-search
+  start_in: acme-2028-catalog-search
   tags:
   - migration
   - idempotent
@@ -1471,7 +1472,7 @@ interfaces:
   provider: storefront-bff
   consumer: customer-service
   call_direction: provider_to_consumer
-  from: acme-2029-customer-cart-pricing
+  start_in: acme-2029-customer-cart-pricing
   tags:
   - synchronous
   - versioned-contract
@@ -1483,7 +1484,7 @@ interfaces:
   provider: customer-service
   consumer: identity-provider
   call_direction: provider_to_consumer
-  from: acme-2029-customer-cart-pricing
+  start_in: acme-2029-customer-cart-pricing
   tags:
   - synchronous
   - security
@@ -1495,7 +1496,7 @@ interfaces:
   provider: storefront-bff
   consumer: cart-service
   call_direction: provider_to_consumer
-  from: acme-2029-customer-cart-pricing
+  start_in: acme-2029-customer-cart-pricing
   tags:
   - synchronous
   - versioned-contract
@@ -1507,7 +1508,7 @@ interfaces:
   provider: cart-service
   consumer: pricing-service
   call_direction: provider_to_consumer
-  from: acme-2029-customer-cart-pricing
+  start_in: acme-2029-customer-cart-pricing
   tags:
   - synchronous
   - bounded-timeout
@@ -1519,7 +1520,7 @@ interfaces:
   provider: storefront-bff
   consumer: pricing-service
   call_direction: provider_to_consumer
-  from: acme-2029-customer-cart-pricing
+  start_in: acme-2029-customer-cart-pricing
   tags:
   - synchronous
   - versioned-contract
@@ -1531,7 +1532,7 @@ interfaces:
   provider: customer-service
   consumer: event-backbone
   call_direction: provider_to_consumer
-  from: acme-2029-customer-cart-pricing
+  start_in: acme-2029-customer-cart-pricing
   tags:
   - asynchronous
   - outbox
@@ -1544,7 +1545,7 @@ interfaces:
   provider: event-backbone
   consumer: notification-service
   call_direction: provider_to_consumer
-  from: acme-2029-customer-cart-pricing
+  start_in: acme-2029-customer-cart-pricing
   tags:
   - asynchronous
   - idempotent-consumer
@@ -1556,7 +1557,7 @@ interfaces:
   provider: notification-service
   consumer: messaging-provider
   call_direction: provider_to_consumer
-  from: acme-2029-customer-cart-pricing
+  start_in: acme-2029-customer-cart-pricing
   tags:
   - synchronous
   - retry-with-backoff
@@ -1568,7 +1569,7 @@ interfaces:
   provider: legacy-integration-adapter
   consumer: customer-service
   call_direction: provider_to_consumer
-  from: acme-2029-customer-cart-pricing
+  start_in: acme-2029-customer-cart-pricing
   tags:
   - migration
   - temporary
@@ -1580,7 +1581,7 @@ interfaces:
   provider: legacy-integration-adapter
   consumer: cart-service
   call_direction: provider_to_consumer
-  from: acme-2029-customer-cart-pricing
+  start_in: acme-2029-customer-cart-pricing
   tags:
   - migration
   - temporary
@@ -1592,7 +1593,7 @@ interfaces:
   provider: legacy-integration-adapter
   consumer: pricing-service
   call_direction: provider_to_consumer
-  from: acme-2029-customer-cart-pricing
+  start_in: acme-2029-customer-cart-pricing
   tags:
   - migration
   - temporary
@@ -1604,7 +1605,7 @@ interfaces:
   provider: storefront-bff
   consumer: checkout-service
   call_direction: provider_to_consumer
-  from: acme-2030-transaction-core
+  start_in: acme-2030-transaction-core
   tags:
   - synchronous
   - idempotent
@@ -1617,7 +1618,7 @@ interfaces:
   provider: checkout-service
   consumer: cart-service
   call_direction: provider_to_consumer
-  from: acme-2030-transaction-core
+  start_in: acme-2030-transaction-core
   tags:
   - synchronous
   - bounded-timeout
@@ -1629,7 +1630,7 @@ interfaces:
   provider: checkout-service
   consumer: pricing-service
   call_direction: provider_to_consumer
-  from: acme-2030-transaction-core
+  start_in: acme-2030-transaction-core
   tags:
   - synchronous
   - bounded-timeout
@@ -1641,7 +1642,7 @@ interfaces:
   provider: checkout-service
   consumer: inventory-service
   call_direction: provider_to_consumer
-  from: acme-2030-transaction-core
+  start_in: acme-2030-transaction-core
   tags:
   - synchronous
   - idempotent
@@ -1654,7 +1655,7 @@ interfaces:
   provider: checkout-service
   consumer: payment-service
   call_direction: provider_to_consumer
-  from: acme-2030-transaction-core
+  start_in: acme-2030-transaction-core
   tags:
   - synchronous
   - idempotent
@@ -1667,7 +1668,7 @@ interfaces:
   provider: checkout-service
   consumer: order-service
   call_direction: provider_to_consumer
-  from: acme-2030-transaction-core
+  start_in: acme-2030-transaction-core
   tags:
   - synchronous
   - idempotent
@@ -1679,7 +1680,7 @@ interfaces:
   provider: payment-service
   consumer: payment-gateway
   call_direction: provider_to_consumer
-  from: acme-2030-transaction-core
+  start_in: acme-2030-transaction-core
   tags:
   - synchronous
   - pci
@@ -1694,7 +1695,7 @@ interfaces:
   provider: checkout-service
   consumer: tax-api
   call_direction: provider_to_consumer
-  from: acme-2030-transaction-core
+  start_in: acme-2030-transaction-core
   tags:
   - synchronous
   - external
@@ -1708,7 +1709,7 @@ interfaces:
   provider: payment-service
   consumer: fraud-api
   call_direction: provider_to_consumer
-  from: acme-2030-transaction-core
+  start_in: acme-2030-transaction-core
   tags:
   - synchronous
   - external
@@ -1722,7 +1723,7 @@ interfaces:
   provider: payment-service
   consumer: finance-ledger
   call_direction: provider_to_consumer
-  from: acme-2030-transaction-core
+  start_in: acme-2030-transaction-core
   tags:
   - asynchronous-preferred
   - finance
@@ -1735,7 +1736,7 @@ interfaces:
   provider: order-service
   consumer: enterprise-oms
   call_direction: provider_to_consumer
-  from: acme-2030-transaction-core
+  start_in: acme-2030-transaction-core
   tags:
   - asynchronous-preferred
   - anti-corruption-layer
@@ -1748,7 +1749,7 @@ interfaces:
   provider: inventory-service
   consumer: erp-wms
   call_direction: provider_to_consumer
-  from: acme-2030-transaction-core
+  start_in: acme-2030-transaction-core
   tags:
   - asynchronous-preferred
   - anti-corruption-layer
@@ -1761,7 +1762,7 @@ interfaces:
   provider: order-service
   consumer: event-backbone
   call_direction: provider_to_consumer
-  from: acme-2030-transaction-core
+  start_in: acme-2030-transaction-core
   tags:
   - asynchronous
   - outbox
@@ -1774,7 +1775,7 @@ interfaces:
   provider: payment-service
   consumer: event-backbone
   call_direction: provider_to_consumer
-  from: acme-2030-transaction-core
+  start_in: acme-2030-transaction-core
   tags:
   - asynchronous
   - outbox
@@ -1787,7 +1788,7 @@ interfaces:
   provider: inventory-service
   consumer: event-backbone
   call_direction: provider_to_consumer
-  from: acme-2030-transaction-core
+  start_in: acme-2030-transaction-core
   tags:
   - asynchronous
   - versioned-contract
@@ -1799,7 +1800,7 @@ interfaces:
   provider: legacy-integration-adapter
   consumer: order-service
   call_direction: provider_to_consumer
-  from: acme-2030-transaction-core
+  start_in: acme-2030-transaction-core
   tags:
   - migration
   - temporary
@@ -1811,7 +1812,7 @@ interfaces:
   provider: customer-service-agent
   consumer: admin-portal
   call_direction: provider_to_consumer
-  from: acme-2031-complete-cutover
+  start_in: acme-2031-complete-cutover
   tags:
   - internal
   - synchronous
@@ -1823,7 +1824,7 @@ interfaces:
   provider: merchandiser
   consumer: admin-portal
   call_direction: provider_to_consumer
-  from: acme-2031-complete-cutover
+  start_in: acme-2031-complete-cutover
   tags:
   - internal
   - synchronous
@@ -1835,7 +1836,7 @@ interfaces:
   provider: admin-portal
   consumer: catalog-service
   call_direction: provider_to_consumer
-  from: acme-2031-complete-cutover
+  start_in: acme-2031-complete-cutover
   tags:
   - synchronous
   - role-authorized
@@ -1847,7 +1848,7 @@ interfaces:
   provider: admin-portal
   consumer: customer-service
   call_direction: provider_to_consumer
-  from: acme-2031-complete-cutover
+  start_in: acme-2031-complete-cutover
   tags:
   - synchronous
   - role-authorized
@@ -1860,7 +1861,7 @@ interfaces:
   provider: admin-portal
   consumer: order-service
   call_direction: provider_to_consumer
-  from: acme-2031-complete-cutover
+  start_in: acme-2031-complete-cutover
   tags:
   - synchronous
   - role-authorized
@@ -1873,7 +1874,7 @@ interfaces:
   provider: admin-portal
   consumer: pricing-service
   call_direction: provider_to_consumer
-  from: acme-2031-complete-cutover
+  start_in: acme-2031-complete-cutover
   tags:
   - synchronous
   - role-authorized
@@ -1886,7 +1887,7 @@ interfaces:
   provider: event-backbone
   consumer: reporting-service
   call_direction: provider_to_consumer
-  from: acme-2031-complete-cutover
+  start_in: acme-2031-complete-cutover
   tags:
   - asynchronous
   - idempotent-consumer
@@ -1899,7 +1900,7 @@ interfaces:
   provider: customer-service-agent
   consumer: reporting-service
   call_direction: provider_to_consumer
-  from: acme-2031-complete-cutover
+  start_in: acme-2031-complete-cutover
   tags:
   - internal
   - read-only
@@ -1916,5 +1917,5 @@ relationships:
   action: curates
   source: merchandiser
   target: catalog-service
-  from: acme-2028-catalog-search
+  start_in: acme-2028-catalog-search
   description: Manages assortment and product data in the target catalog once it is authoritative.

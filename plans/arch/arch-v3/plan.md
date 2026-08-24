@@ -344,6 +344,48 @@ None yet. Format: `branch-name — question being explored — outcome`.
 
 ## Progress log (append-only, newest first)
 
+- **2026-08-24** — D9a interim architect review PASSED; committed by architect
+  (rule 8). The formal wave-1 gate still reviews D9a+D9b together after D9b —
+  this interim pass unblocks D9b on a clean tree. Re-verified: 71 arch tests
+  pass with exactly the 4 contracted D9b failures (excel ×2, payload ×2);
+  `just lint` clean; standalone import loads zero runtime modules; acme CLI
+  validate: 0 errors / 24 clipping warnings; old names survive only in
+  D9b-owned excel.py/payload.py. Code review: inclusive-bound governing_row,
+  base=0 position mapping, recursive nested-container clipping with cycle
+  guard, advance's governing-row-at-through keep + end_in:through→base
+  rewrite, ambiguous-parent/containment-cycle/reserved-base validation, and
+  ids.py max+1 scheme all match schema.md; resolver suite conversion is
+  faithful (renames + 4 new tests, no assertion dropped; from==until became
+  the base-end rejection case). Fixture conversion spot-checked: `until: m` →
+  previous-milestone `end_in`, both first-milestone retirements → `end_in:
+  base`; acme story intact (edge foundation +23/−2, cutover −27, tail diff
+  empty). All three executor assumptions ACCEPTED (D9b-file exclusion per
+  prompt; budget = source churn excl. tests/fixtures, 557/700; ids API shape
+  — model_construct for blank-id rows is the intended D9b import pattern).
+  Next action: user runs D9b (prompt READY in delegation.md).
+
+- **2026-08-24** — D9a landed uncommitted: renamed the core model to C4
+  systems/containers/components/code, replaced temporal fields with inclusive
+  `start_in`/`end_in` over position-0 `base`, added Provider/Consumer direction
+  defaults, generalized resolver clipping through nested containers and code,
+  added containment/parent/base validation, updated baseline advance, and added
+  `ids.py` generated-id assignment. The acme fixture was mechanically converted
+  and validates with 0 errors (24 expected clipping warnings). Assumptions:
+  (1) D9b-owned `excel.py`, `payload.py`, their tests, frontend sources, and the
+  generated report bundle are excluded from D9a's clean sweep because the prompt
+  explicitly requires their tests to remain broken until D9b; (2) the 700-line
+  budget counts source diff churn (additions + deletions), excluding tests and
+  fixtures; (3) `next_id(kind, ...)` takes canonical plural collection names,
+  and `assign_missing_ids` mutates the supplied Architecture while returning the
+  specified assignment map, omitting collections with no assignments. Source
+  churn: 557 / 700 lines. Existing collected
+  tests before -> after: model 1 -> 1, yamlio 6 -> 8, resolver 42 -> 46,
+  validate 11 -> 14, facade 1 -> 1; new ids suite: 1 (71 focused tests total,
+  all pass). Verification: `just lint` clean; scoped mypy clean for seven core
+  source files; full `pytest tests/unit/tools -k arch`: 71 passed,
+  4 expected D9b failures (2 Excel, 2 payload). Open questions: none. No commit
+  or staging performed per user instruction.
+
 - **2026-08-24** — Wave-2 architect step complete: report.md gains the
   normative "Wave-2 UI contract (v1)" (D10a chrome/panels/tables + D10b
   canvas subsections), the Views fragment table is reworked (four C4

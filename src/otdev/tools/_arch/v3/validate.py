@@ -92,15 +92,18 @@ def _duplicate_findings(architecture: Architecture) -> list[Finding]:
                 )
             seen.add(row.id)
     for kind in KINDS:
-        grouped: dict[str, list[tuple[int, object]]] = {}
+        grouped: dict[str, list[tuple[int, EntityRow]]] = {}
         for index, row in enumerate(getattr(architecture, kind)):
             grouped.setdefault(row.id, []).append((index, row))
         for entity_id, indexed_rows in grouped.items():
             if len(indexed_rows) < 2:
                 continue
-            from_values = [getattr(row, "from_", None) for _, row in indexed_rows]
-            valid = from_values.count(None) <= 1 and len(from_values) == len(
-                set(from_values)
+            start_values = [
+                None if row.start_in in (None, "base") else row.start_in
+                for _, row in indexed_rows
+            ]
+            valid = start_values.count(None) <= 1 and len(start_values) == len(
+                set(start_values)
             )
             if not valid:
                 index = indexed_rows[1][0]
@@ -124,21 +127,57 @@ def _reference_findings(architecture: Architecture) -> list[Finding]:
     for kind in KINDS:
         for index, row in enumerate(getattr(architecture, kind)):
             references: list[tuple[str, str, set[str], str]] = []
-            if kind == "subsystems":
-                references.append(("system", row.system, identity["systems"], "unresolved_parent"))
+            if kind == "containers":
+                parent_kinds = [
+                    parent_kind
+                    for parent_kind in ("systems", "containers")
+                    if row.parent in identity[parent_kind]
+                ]
+                if len(parent_kinds) > 1:
+                    findings.append(
+                        _finding(
+                            architecture,
+                            "error",
+                            "ambiguous_parent",
+                            f"parent {row.parent!r} matches a system and container",
+                            (kind, index, "parent"),
+                        )
+                    )
+                elif not parent_kinds:
+                    references.append(
+                        ("parent", row.parent, set(), "unresolved_parent")
+                    )
             elif kind == "components":
                 references.append(
-                    ("subsystem", row.subsystem, identity["subsystems"], "unresolved_parent")
+                    (
+                        "container",
+                        row.container,
+                        identity["containers"],
+                        "unresolved_parent",
+                    )
+                )
+            elif kind == "code":
+                references.append(
+                    (
+                        "component",
+                        row.component,
+                        identity["components"],
+                        "unresolved_parent",
+                    )
                 )
             elif isinstance(row, Interface):
                 references.extend(
-                    [("provider", row.provider, endpoints, "unresolved_endpoint"),
-                     ("consumer", row.consumer, endpoints, "unresolved_endpoint")]
+                    [
+                        ("provider", row.provider, endpoints, "unresolved_endpoint"),
+                        ("consumer", row.consumer, endpoints, "unresolved_endpoint"),
+                    ]
                 )
             elif isinstance(row, Relationship):
                 references.extend(
-                    [("source", row.source, endpoints, "unresolved_endpoint"),
-                     ("target", row.target, endpoints, "unresolved_endpoint")]
+                    [
+                        ("source", row.source, endpoints, "unresolved_endpoint"),
+                        ("target", row.target, endpoints, "unresolved_endpoint"),
+                    ]
                 )
             for field, value, valid_ids, code in references:
                 if value not in valid_ids:
@@ -151,8 +190,8 @@ def _reference_findings(architecture: Architecture) -> list[Finding]:
                             (kind, index, field),
                         )
                     )
-            for field, value in (("from", row.from_), ("until", row.until)):
-                if value is not None and value not in milestone_ids:
+            for field, value in (("start_in", row.start_in), ("end_in", row.end_in)):
+                if value is not None and value != "base" and value not in milestone_ids:
                     findings.append(
                         _finding(
                             architecture,
@@ -165,6 +204,45 @@ def _reference_findings(architecture: Architecture) -> list[Finding]:
     return findings
 
 
+def _containment_findings(architecture: Architecture) -> list[Finding]:
+    container_ids = {row.id for row in architecture.containers}
+    parents: dict[str, set[str]] = {entity_id: set() for entity_id in container_ids}
+    for row in architecture.containers:
+        if row.parent in container_ids:
+            parents[row.id].add(row.parent)
+
+    state: dict[str, int] = {}
+    stack: list[str] = []
+    cycle_ids: set[str] = set()
+
+    def visit(entity_id: str) -> None:
+        state[entity_id] = 1
+        stack.append(entity_id)
+        for parent in parents[entity_id]:
+            if state.get(parent, 0) == 0:
+                visit(parent)
+            elif state[parent] == 1:
+                cycle_ids.update(stack[stack.index(parent) :])
+        stack.pop()
+        state[entity_id] = 2
+
+    for entity_id in parents:
+        if state.get(entity_id, 0) == 0:
+            visit(entity_id)
+
+    return [
+        _finding(
+            architecture,
+            "error",
+            "containment_cycle",
+            f"container {row.id!r} belongs to a containment cycle",
+            ("containers", index, "parent"),
+        )
+        for index, row in enumerate(architecture.containers)
+        if row.id in cycle_ids
+    ]
+
+
 def _temporal_findings(architecture: Architecture) -> list[Finding]:
     findings: list[Finding] = []
     timeline_orders = (
@@ -174,9 +252,11 @@ def _temporal_findings(architecture: Architecture) -> list[Finding]:
     )
     milestone_ids = {milestone.id for milestone in architecture.milestones}
     for index, timeline in enumerate(architecture.timelines or []):
-        invalid = not timeline.milestones or len(timeline.milestones) != len(
-            set(timeline.milestones)
-        ) or any(item not in milestone_ids for item in timeline.milestones)
+        invalid = (
+            not timeline.milestones
+            or len(timeline.milestones) != len(set(timeline.milestones))
+            or any(item not in milestone_ids for item in timeline.milestones)
+        )
         if invalid:
             findings.append(
                 _finding(
@@ -189,12 +269,13 @@ def _temporal_findings(architecture: Architecture) -> list[Finding]:
             )
     for kind in KINDS:
         for index, row in enumerate(getattr(architecture, kind)):
-            if row.from_ is None or row.until is None:
+            if row.start_in is None or row.end_in is None:
                 continue
-            invalid = row.from_ == row.until or any(
-                row.from_ in order
-                and row.until in order
-                and order.index(row.from_) >= order.index(row.until)
+            invalid = any(
+                row.start_in in ["base", *order]
+                and row.end_in in ["base", *order]
+                and ["base", *order].index(row.start_in)
+                > ["base", *order].index(row.end_in)
                 for order in timeline_orders
             )
             if invalid:
@@ -203,8 +284,8 @@ def _temporal_findings(architecture: Architecture) -> list[Finding]:
                         architecture,
                         "error",
                         "invalid_interval",
-                        f"interval [{row.from_}, {row.until}) is not ordered",
-                        (kind, index, "from"),
+                        f"interval [{row.start_in}, {row.end_in}] is not ordered",
+                        (kind, index, "start_in"),
                     )
                 )
     return findings
@@ -218,8 +299,8 @@ def _revision_warnings(architecture: Architecture) -> list[Finding]:
             groups.setdefault(row.id, []).append((index, row))
         for entity_id, rows in groups.items():
             for (previous_index, previous), (index, row) in pairwise(rows):
-                old = previous.model_dump(exclude={"from_", "until"})
-                new = row.model_dump(exclude={"from_", "until"})
+                old = previous.model_dump(exclude={"start_in", "end_in"})
+                new = row.model_dump(exclude={"start_in", "end_in"})
                 if old == new:
                     findings.append(
                         _finding(
@@ -246,7 +327,7 @@ def _resolution_warnings(architecture: Architecture) -> list[Finding]:
         }
         for timeline_id in timeline_ids:
             view = timeline_view(architecture, timeline_id)
-            selectors = [StateSelector("current", timeline_id)] + [
+            selectors = [StateSelector("base", timeline_id)] + [
                 StateSelector(milestone, timeline_id) for milestone in view.milestones
             ]
             for selector in selectors:
@@ -254,16 +335,23 @@ def _resolution_warnings(architecture: Architecture) -> list[Finding]:
                 for kind in KINDS:
                     live[kind].update(row.id for row in state.entities[kind])
                 for clip in state.clips:
-                    row = governing_row(groups[clip.kind][clip.id], state.timeline, state.position)
+                    row = governing_row(
+                        groups[clip.kind][clip.id], state.timeline, state.position
+                    )
                     if row is not None:
                         index = next(
-                            i for i, candidate in enumerate(getattr(architecture, clip.kind))
+                            i
+                            for i, candidate in enumerate(
+                                getattr(architecture, clip.kind)
+                            )
                             if candidate is row
                         )
                         clipped_rows.add((clip.kind, index))
     except ResolverError:
         return findings
-    for kind, index in sorted(clipped_rows, key=lambda item: (KINDS.index(item[0]), item[1])):
+    for kind, index in sorted(
+        clipped_rows, key=lambda item: (KINDS.index(item[0]), item[1])
+    ):
         row = getattr(architecture, kind)[index]
         findings.append(
             _finding(
@@ -296,6 +384,7 @@ def validate(architecture: Architecture) -> list[Finding]:
     findings = _required_findings(architecture)
     findings.extend(_duplicate_findings(architecture))
     findings.extend(_reference_findings(architecture))
+    findings.extend(_containment_findings(architecture))
     findings.extend(_temporal_findings(architecture))
     findings.extend(_revision_warnings(architecture))
     findings.extend(_resolution_warnings(architecture))
@@ -303,10 +392,20 @@ def validate(architecture: Architecture) -> list[Finding]:
         value
         for kind in KINDS
         for row in getattr(architecture, kind)
-        for value in (row.from_, row.until)
-        if value is not None
+        for value in (row.start_in, row.end_in)
+        if value not in (None, "base")
     }
     for index, milestone in enumerate(architecture.milestones):
+        if milestone.id == "base":
+            findings.append(
+                _finding(
+                    architecture,
+                    "error",
+                    "reserved_milestone",
+                    "milestone id 'base' is reserved",
+                    ("milestones", index, "id"),
+                )
+            )
         if milestone.id not in referenced:
             findings.append(
                 _finding(

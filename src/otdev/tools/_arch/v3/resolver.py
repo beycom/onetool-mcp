@@ -7,9 +7,9 @@ authoritative specification is tests/unit/tools/test_arch_v3_resolver.py —
 where prose and tests could be read differently, the tests win.
 
 Everything is evaluated point-wise at a single timeline position; there is no
-interval arithmetic. Position ``-1`` is the current state; position ``i >= 0``
-is the state *at* the timeline's ``i``-th milestone (intervals are half-open:
-a row with ``until: m`` is absent at ``m``).
+interval arithmetic. Position ``0`` is the base state; position ``i + 1`` is
+the state at the timeline's ``i``-th milestone. Both interval bounds are
+inclusive.
 """
 
 from __future__ import annotations
@@ -18,23 +18,25 @@ from dataclasses import dataclass, field
 
 from .model import (
     Architecture,
+    Code,
     Component,
+    Container,
     Interface,
     Relationship,
-    Subsystem,
     System,
     User,
 )
 
-EntityRow = System | Subsystem | Component | User | Interface | Relationship
+EntityRow = System | Container | Component | Code | User | Interface | Relationship
 
 #: Collection names in canonical order. Used as the ``kind`` vocabulary
 #: everywhere in this module (``Clip.kind``, ``DiffEntry.kind``,
 #: ``ResolvedState.entities`` keys, ordering of diff output).
 KINDS = (
     "systems",
-    "subsystems",
+    "containers",
     "components",
+    "code",
     "users",
     "interfaces",
     "relationships",
@@ -42,7 +44,7 @@ KINDS = (
 
 #: Kinds searched (in this order) when resolving interface provider/consumer
 #: and relationship source/target endpoints. First match wins.
-ENDPOINT_KINDS = ("systems", "subsystems", "components", "users")
+ENDPOINT_KINDS = ("systems", "containers", "components", "code", "users")
 
 
 class ResolverError(ValueError):
@@ -55,7 +57,7 @@ class ResolverError(ValueError):
 class StateSelector:
     """State selection per schema.md "State selection boundary".
 
-    ``at`` is ``"current"``, a milestone id, or ``"end"`` (the last milestone
+    ``at`` is ``"base"``, a milestone id, or ``"end"`` (the last milestone
     of the timeline). ``timeline`` names a declared timeline; it may be
     omitted (None) when no timelines are declared (implicit timeline: every
     catalog milestone in catalog order) or when exactly one timeline is
@@ -63,7 +65,7 @@ class StateSelector:
     timelines is a ResolverError.
     """
 
-    at: str = "current"
+    at: str = "base"
     timeline: str | None = None
 
 
@@ -79,12 +81,14 @@ class TimelineView:
     milestones: tuple[str, ...]
 
     def position(self, milestone_id: str) -> int:
-        """0-based position of ``milestone_id`` on this timeline.
+        """Position of ``milestone_id`` on this timeline, with base at 0.
 
         Raises ResolverError if the milestone is not on the timeline.
         """
         try:
-            return self.milestones.index(milestone_id)
+            return (
+                0 if milestone_id == "base" else self.milestones.index(milestone_id) + 1
+            )
         except ValueError as exc:
             timeline = self.id or "implicit timeline"
             raise ResolverError(
@@ -93,7 +97,7 @@ class TimelineView:
 
     def contains(self, milestone_id: str) -> bool:
         """True when ``milestone_id`` is on this timeline."""
-        return milestone_id in self.milestones
+        return milestone_id == "base" or milestone_id in self.milestones
 
 
 def timeline_view(
@@ -125,16 +129,16 @@ def resolve_position(
 ) -> tuple[TimelineView, int]:
     """Resolve a selector to (timeline view, position).
 
-    ``current`` -> -1. A milestone id -> its position on the selected
+    ``base`` -> 0. A milestone id -> its position on the selected
     timeline (ResolverError if it is not on it, or does not exist at all).
-    ``end`` -> the last position, or -1 when the timeline has no milestones
-    (zero-milestone architectures: end == current).
+    ``end`` -> the last position, or 0 when the timeline has no milestones
+    (zero-milestone architectures: end == base).
     """
     view = timeline_view(architecture, selector.timeline)
-    if selector.at == "current":
-        return view, -1
+    if selector.at == "base":
+        return view, 0
     if selector.at == "end":
-        return view, len(view.milestones) - 1
+        return view, len(view.milestones)
     if selector.at not in {item.id for item in architecture.milestones}:
         raise ResolverError(f"unknown milestone {selector.at!r}")
     return view, view.position(selector.at)
@@ -153,9 +157,8 @@ class RevisionGroup:
 def group_revisions(rows: list[EntityRow]) -> dict[str, RevisionGroup]:
     """Group a collection's rows by id, enforcing the Revisions rules.
 
-    ResolverError when: more than one row of a group omits ``from``; two rows
-    of a group share a ``from`` value; or any single row has ``from`` equal
-    to ``until`` (identity comparison, timeline-independent).
+    ResolverError when more than one row starts in the base, or two rows
+    share a non-base ``start_in`` value.
     The returned dict preserves first-appearance order.
     """
     grouped: dict[str, list[EntityRow]] = {}
@@ -164,21 +167,25 @@ def group_revisions(rows: list[EntityRow]) -> dict[str, RevisionGroup]:
 
     result: dict[str, RevisionGroup] = {}
     for entity_id, revisions in grouped.items():
-        from_values = [row.from_ for row in revisions]
-        if from_values.count(None) > 1:
+        start_values = [
+            None if row.start_in in (None, "base") else row.start_in
+            for row in revisions
+        ]
+        if start_values.count(None) > 1:
             raise ResolverError(
-                f"revision group {entity_id!r} has more than one current row"
+                f"revision group {entity_id!r} has more than one base row"
             )
-        authored_from = [value for value in from_values if value is not None]
-        if len(authored_from) != len(set(authored_from)):
+        authored_starts = [value for value in start_values if value is not None]
+        if len(authored_starts) != len(set(authored_starts)):
             raise ResolverError(
-                f"revision group {entity_id!r} repeats a from milestone"
+                f"revision group {entity_id!r} repeats a start_in milestone"
             )
         if any(
-            row.from_ is not None and row.from_ == row.until for row in revisions
+            row.end_in == "base" and row.start_in not in (None, "base")
+            for row in revisions
         ):
             raise ResolverError(
-                f"revision group {entity_id!r} has equal from and until"
+                f"revision group {entity_id!r} starts after its base end"
             )
         result[entity_id] = RevisionGroup(entity_id, tuple(revisions))
     return result
@@ -189,31 +196,28 @@ def governing_row(
 ) -> EntityRow | None:
     """The revision governing ``group`` at ``position``, ignoring clipping.
 
-    Per schema.md Intervals/Revisions: a milestone not on ``view`` makes
-    ``from`` = +inf (row never appears) or ``until`` = +inf (never retired);
-    absent ``from`` = -inf, absent ``until`` = +inf. Among rows with
-    pos(from) <= position, the newest (greatest pos(from)) is the candidate —
-    a revision implicitly ends its predecessor at its ``from``. The candidate
-    governs iff its own pos(until) > position; otherwise the entity is absent
-    (None), even when an older revision carries no ``until``.
+    A milestone not on ``view`` makes ``start_in`` or ``end_in`` infinite.
+    An absent or base ``start_in`` is position 0; absent ``end_in`` is
+    infinite. The newest started revision governs while its inclusive end
+    position has not passed.
     """
     candidates: list[tuple[int, EntityRow]] = []
     for row in group.rows:
-        if row.from_ is None:
-            from_position = -1
-        elif view.contains(row.from_):
-            from_position = view.position(row.from_)
+        if row.start_in in (None, "base"):
+            start_position = 0
+        elif row.start_in is not None and view.contains(row.start_in):
+            start_position = view.position(row.start_in)
         else:
             continue
-        if from_position <= position:
-            candidates.append((from_position, row))
+        if start_position <= position:
+            candidates.append((start_position, row))
 
     if not candidates:
         return None
     _, candidate = max(candidates, key=lambda item: item[0])
-    if candidate.until is None or not view.contains(candidate.until):
+    if candidate.end_in is None or not view.contains(candidate.end_in):
         return candidate
-    return candidate if view.position(candidate.until) > position else None
+    return candidate if view.position(candidate.end_in) >= position else None
 
 
 @dataclass(frozen=True)
@@ -255,18 +259,17 @@ class ResolvedState:
 
     def entity(self, kind: str, entity_id: str) -> EntityRow | None:
         """The effectively-live governing row, or None."""
-        return next(
-            (row for row in self.entities[kind] if row.id == entity_id), None
-        )
+        return next((row for row in self.entities[kind] if row.id == entity_id), None)
 
 
 def resolve(
     architecture: Architecture, selector: StateSelector | None = None
 ) -> ResolvedState:
-    """Resolve the state selected by ``selector`` (default: current).
+    """Resolve the state selected by ``selector`` (default: base).
 
     Effective liveness per schema.md Resolution: an entity is effectively
-    live only while its parent chain (component -> subsystem -> system) is
+    live only while its parent chain (code -> component -> container -> ...
+    -> system) is
     effectively live; an interface/relationship only while both endpoints
     are effectively live (endpoint lookup over ENDPOINT_KINDS, first match).
     Rows authored-live but not effectively live appear in ``clips``, not in
@@ -301,19 +304,51 @@ def resolve(
 
     effective["systems"].update(authored["systems"])
 
-    for entity_id, row in authored["subsystems"].items():
-        cause = blocked_by("systems", row.system)
-        if cause is None:
-            effective["subsystems"][entity_id] = row
+    visiting: set[str] = set()
+
+    def resolve_container(entity_id: str) -> str | None:
+        if entity_id in effective["containers"]:
+            return None
+        if ("containers", entity_id) in clip_causes:
+            return clip_causes[("containers", entity_id)]
+        row = authored["containers"].get(entity_id)
+        if row is None:
+            return entity_id
+        assert isinstance(row, Container)
+        if entity_id in visiting:
+            return entity_id
+        visiting.add(entity_id)
+        if row.parent in groups["systems"]:
+            cause = blocked_by("systems", row.parent)
+        elif row.parent in groups["containers"]:
+            cause = resolve_container(row.parent)
         else:
-            clip_causes[("subsystems", entity_id)] = cause
+            cause = row.parent
+        visiting.remove(entity_id)
+        if cause is None:
+            effective["containers"][entity_id] = row
+        else:
+            clip_causes[("containers", entity_id)] = cause
+        return cause
+
+    for entity_id in authored["containers"]:
+        resolve_container(entity_id)
 
     for entity_id, row in authored["components"].items():
-        cause = blocked_by("subsystems", row.subsystem)
+        assert isinstance(row, Component)
+        cause = blocked_by("containers", row.container)
         if cause is None:
             effective["components"][entity_id] = row
         else:
             clip_causes[("components", entity_id)] = cause
+
+    for entity_id, row in authored["code"].items():
+        assert isinstance(row, Code)
+        cause = blocked_by("components", row.component)
+        if cause is None:
+            effective["code"][entity_id] = row
+        else:
+            clip_causes[("code", entity_id)] = cause
 
     effective["users"].update(authored["users"])
 
@@ -328,6 +363,7 @@ def resolve(
         return None
 
     for entity_id, row in authored["interfaces"].items():
+        assert isinstance(row, Interface)
         cause = connection_cause((row.provider, row.consumer))
         if cause is None:
             effective["interfaces"][entity_id] = row
@@ -335,16 +371,14 @@ def resolve(
             clip_causes[("interfaces", entity_id)] = cause
 
     for entity_id, row in authored["relationships"].items():
+        assert isinstance(row, Relationship)
         cause = connection_cause((row.source, row.target))
         if cause is None:
             effective["relationships"][entity_id] = row
         else:
             clip_causes[("relationships", entity_id)] = cause
 
-    entities = {
-        kind: tuple(effective[kind].values())
-        for kind in KINDS
-    }
+    entities = {kind: tuple(effective[kind].values()) for kind in KINDS}
     clips = tuple(
         Clip(kind, entity_id, clip_causes[(kind, entity_id)])
         for kind in KINDS
@@ -359,7 +393,7 @@ class FieldChange:
     """One field-level difference between two governing revisions. For
     ``properties``, one entry per key, named ``properties.<key>`` (old/new
     None when the key is added/removed); ``tags`` compares as a whole list.
-    ``id``, ``from``, and ``until`` are never reported."""
+    ``id``, ``start_in``, and ``end_in`` are never reported."""
 
     field: str
     old: object
@@ -399,9 +433,7 @@ class Diff:
     changed: tuple[ChangedEntry, ...]
 
 
-def diff(
-    architecture: Architecture, a: StateSelector, b: StateSelector
-) -> Diff:
+def diff(architecture: Architecture, a: StateSelector, b: StateSelector) -> Diff:
     """Diff the states selected by ``a`` (origin) and ``b``."""
     state_a = resolve(architecture, a)
     state_b = resolve(architecture, b)
@@ -415,7 +447,7 @@ def diff(
 
     def field_changes(old: EntityRow, new: EntityRow) -> tuple[FieldChange, ...]:
         changes: list[FieldChange] = []
-        excluded = {"id", "from_", "until", "properties"}
+        excluded = {"id", "start_in", "end_in", "properties"}
         for field_name in type(old).model_fields:
             if field_name in excluded:
                 continue
@@ -430,9 +462,7 @@ def diff(
             old_value = old.properties.get(key)
             new_value = new.properties.get(key)
             if old_value != new_value:
-                changes.append(
-                    FieldChange(f"properties.{key}", old_value, new_value)
-                )
+                changes.append(FieldChange(f"properties.{key}", old_value, new_value))
         return tuple(changes)
 
     for kind in KINDS:
@@ -468,12 +498,11 @@ def advance(architecture: Architecture, through: str) -> Architecture:
     Let D be the delivered set: every milestone at or before ``through`` in
     catalog order. Per schema.md "Advancing the baseline":
 
-    - rows whose ``until`` is in D are deleted;
-    - remaining ``from`` markers in D are removed (rows become current);
-    - superseded revisions are dropped: among a group's rows whose ``from``
-      is in D or absent, only the one with the greatest catalog position of
-      ``from`` (absent = -inf) is kept — unless already deleted by its
-      ``until``; rows whose ``from`` is not in D are kept untouched;
+    - rows ending in base or before ``through`` are deleted;
+    - a row ending at ``through`` is rewritten to end in the new base;
+    - remaining ``start_in`` markers in D are removed;
+    - superseded revisions are dropped, keeping the row governing at
+      ``through`` plus untouched future revisions;
     - milestones in D are removed from the catalog and from every timeline;
       a timeline left with no milestones is dropped, and ``timelines``
       becomes None when none remain.
@@ -502,7 +531,9 @@ def advance(architecture: Architecture, through: str) -> Architecture:
         timelines = []
         for timeline in architecture.timelines:
             remaining = [
-                milestone for milestone in timeline.milestones if milestone not in delivered
+                milestone
+                for milestone in timeline.milestones
+                if milestone not in delivered
             ]
             if remaining:
                 timelines.append(
@@ -512,35 +543,34 @@ def advance(architecture: Architecture, through: str) -> Architecture:
     else:
         updates["timelines"] = None
 
+    view = TimelineView(None, tuple(catalog_positions))
+    through_position = view.position(through)
+
     for kind in KINDS:
         rows: list[EntityRow] = list(getattr(architecture, kind))
         groups = group_revisions(rows)
-        keep_current: dict[str, EntityRow] = {}
-        for entity_id, group in groups.items():
-            eligible = [
-                row
-                for row in group.rows
-                if row.until not in delivered
-                and (row.from_ is None or row.from_ in delivered)
-            ]
-            if eligible:
-                keep_current[entity_id] = max(
-                    eligible,
-                    key=lambda row: (
-                        -1
-                        if row.from_ is None
-                        else catalog_positions.get(row.from_, len(catalog_positions))
-                    ),
-                )
+        keep_base = {
+            entity_id: row
+            for entity_id, group in groups.items()
+            if (row := governing_row(group, view, through_position)) is not None
+        }
 
         rewritten: list[EntityRow] = []
         for row in rows:
-            if row.until in delivered:
+            if row.end_in == "base" or (
+                row.end_in in catalog_positions
+                and view.position(row.end_in) < through_position
+            ):
                 continue
-            if row.from_ is None or row.from_ in delivered:
-                if keep_current.get(row.id) is not row:
+            if row.start_in in (None, "base") or row.start_in in delivered:
+                if keep_base.get(row.id) is not row:
                     continue
-                rewritten.append(row.model_copy(update={"from_": None}, deep=True))
+                end_in = "base" if row.end_in == through else row.end_in
+                rewritten.append(
+                    row.model_copy(
+                        update={"start_in": None, "end_in": end_in}, deep=True
+                    )
+                )
             else:
                 rewritten.append(row.model_copy(deep=True))
         updates[kind] = rewritten

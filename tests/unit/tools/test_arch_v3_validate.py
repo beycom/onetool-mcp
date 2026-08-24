@@ -20,8 +20,9 @@ def _architecture(**updates: object) -> Architecture:
         "schema_version": 3,
         "milestones": [],
         "systems": [],
-        "subsystems": [],
+        "containers": [],
         "components": [],
+        "code": [],
         "users": [],
         "interfaces": [],
         "relationships": [],
@@ -52,7 +53,7 @@ def _missing_required() -> Architecture:
         (
             "unresolved_parent",
             lambda: _architecture(
-                subsystems=[{"id": "child", "name": "Child", "system": "missing"}]
+                containers=[{"id": "child", "name": "Child", "parent": "missing"}]
             ),
         ),
         (
@@ -72,17 +73,46 @@ def _missing_required() -> Architecture:
         (
             "unresolved_milestone",
             lambda: _architecture(
-                systems=[{"id": "system", "name": "System", "from": "missing"}]
+                systems=[{"id": "system", "name": "System", "start_in": "missing"}]
             ),
         ),
         (
             "invalid_interval",
             lambda: _architecture(
-                milestones=[{"id": "m", "name": "Milestone"}],
+                milestones=[
+                    {"id": "m1", "name": "First"},
+                    {"id": "m2", "name": "Second"},
+                ],
                 systems=[
-                    {"id": "system", "name": "System", "from": "m", "until": "m"}
+                    {"id": "system", "name": "System", "start_in": "m2", "end_in": "m1"}
                 ],
             ),
+        ),
+        (
+            "containment_cycle",
+            lambda: _architecture(
+                containers=[
+                    {"id": "a", "name": "A", "parent": "b"},
+                    {"id": "b", "name": "B", "parent": "a"},
+                ]
+            ),
+        ),
+        (
+            "ambiguous_parent",
+            lambda: _architecture(
+                systems=[
+                    {"id": "root", "name": "Root"},
+                    {"id": "parent", "name": "System"},
+                ],
+                containers=[
+                    {"id": "parent", "name": "Container", "parent": "root"},
+                    {"id": "child", "name": "Child", "parent": "parent"},
+                ],
+            ),
+        ),
+        (
+            "reserved_milestone",
+            lambda: _architecture(milestones=[{"id": "base", "name": "Reserved"}]),
         ),
         (
             "invalid_timeline",
@@ -94,7 +124,7 @@ def _missing_required() -> Architecture:
                 milestones=[{"id": "m", "name": "Milestone"}],
                 systems=[
                     {"id": "system", "name": "System"},
-                    {"id": "system", "name": "System", "from": "m"},
+                    {"id": "system", "name": "System", "start_in": "m"},
                 ],
             ),
         ),
@@ -102,8 +132,8 @@ def _missing_required() -> Architecture:
             "interval_clipped",
             lambda: _architecture(
                 milestones=[{"id": "m", "name": "Milestone"}],
-                systems=[{"id": "system", "name": "System", "until": "m"}],
-                subsystems=[{"id": "child", "name": "Child", "system": "system"}],
+                systems=[{"id": "system", "name": "System", "end_in": "base"}],
+                containers=[{"id": "child", "name": "Child", "parent": "system"}],
             ),
         ),
         (
@@ -118,14 +148,10 @@ def _missing_required() -> Architecture:
                     {"id": "unscheduled", "name": "Unscheduled"},
                 ],
                 timelines=[{"id": "timeline", "milestones": ["scheduled"]}],
-                systems=[
-                    {"id": "system", "name": "System", "from": "unscheduled"}
-                ],
+                systems=[{"id": "system", "name": "System", "start_in": "unscheduled"}],
             ),
         ),
     ],
 )
-def test_each_finding_code_fires(
-    code: str, build: Callable[[], Architecture]
-) -> None:
+def test_each_finding_code_fires(code: str, build: Callable[[], Architecture]) -> None:
     assert code in {finding.code for finding in validate(build())}

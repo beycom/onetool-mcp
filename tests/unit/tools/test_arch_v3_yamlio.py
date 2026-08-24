@@ -29,20 +29,21 @@ systems:
     name: Payments
   - id: legacy-clearing
     name: Legacy Clearing
-    until: phase-2
-subsystems:
+    end_in: phase-1
+containers:
   - id: payments-api
     name: Payments API
-    system: payments
+    parent: payments
   - id: clearing-api
     name: Clearing API
-    system: legacy-clearing
-    until: phase-2
+    parent: legacy-clearing
+    end_in: phase-1
   - id: new-clearing
     name: Clearing
-    system: payments
-    from: phase-2
+    parent: payments
+    start_in: phase-2
 components: []
+code: []
 users:
   - id: customer
     name: Customer
@@ -54,13 +55,13 @@ interfaces:
     provider: clearing-api
     consumer: payments-api
     call_direction: consumer_to_provider
-    until: phase-2
+    end_in: phase-1
   - id: payments-to-new-clearing
     name: Submit clearing request
     provider: new-clearing
     consumer: payments-api
     call_direction: consumer_to_provider
-    from: phase-2
+    start_in: phase-2
 relationships:
   - id: payments-owned-by-team
     source: payments-team
@@ -72,8 +73,9 @@ MINIMAL_YAML = """\
 schema_version: 3
 milestones: []
 systems: []
-subsystems: []
+containers: []
 components: []
+code: []
 users: []
 interfaces: []
 relationships: []
@@ -91,7 +93,7 @@ def test_canonical_example_loads(tmp_path: Path) -> None:
     )
 
     assert architecture.schema_version == 3
-    assert len(architecture.subsystems) == 3
+    assert len(architecture.containers) == 3
     assert architecture.relationships[0].action == "owns"
 
 
@@ -107,6 +109,53 @@ def test_round_trip_is_semantic_and_idempotent(tmp_path: Path) -> None:
 
     assert reloaded == original
     assert second_dump.read_bytes() == first_dump.read_bytes()
+
+
+def test_code_round_trips(tmp_path: Path) -> None:
+    source = _write(
+        tmp_path / "source.yaml",
+        MINIMAL_YAML.replace(
+            "components: []\ncode: []",
+            "components:\n  - id: component\n    name: Component\n    container: container\n"
+            "code:\n  - id: code\n    name: Code\n    component: component",
+        )
+        .replace(
+            "containers: []",
+            "containers:\n  - id: container\n    name: Container\n    parent: system",
+        )
+        .replace("systems: []", "systems:\n  - id: system\n    name: System"),
+    )
+    output = tmp_path / "output.yaml"
+
+    architecture = load_architecture(source)
+    dump_architecture(architecture, output)
+
+    assert load_architecture(output) == architecture
+    assert architecture.code[0].component == "component"
+
+
+def test_direction_defaults_are_applied_and_omitted(tmp_path: Path) -> None:
+    source = _write(
+        tmp_path / "source.yaml",
+        MINIMAL_YAML.replace(
+            "systems: []", "systems:\n  - id: system\n    name: System"
+        ).replace(
+            "interfaces: []",
+            "interfaces:\n  - id: interface\n    name: Interface\n"
+            "    provider: system\n    consumer: system",
+        ),
+    )
+    output = tmp_path / "output.yaml"
+
+    architecture = load_architecture(source)
+    assert architecture.interfaces[0].call_direction == "consumer_to_provider"
+    assert architecture.interfaces[0].data_flow_direction == "provider_to_consumer"
+
+    dump_architecture(architecture, output)
+
+    dumped = output.read_text(encoding="utf-8")
+    assert "call_direction" not in dumped
+    assert "data_flow_direction" not in dumped
 
 
 @pytest.mark.parametrize(

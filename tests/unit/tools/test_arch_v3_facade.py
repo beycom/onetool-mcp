@@ -24,14 +24,14 @@ def test_facade_workflow(tmp_path: Path) -> None:
 
     architecture = load_architecture(path)
     architecture.milestones = [Milestone(id="m", name="Milestone")]
-    architecture.systems = [System(id="system", name="System", from_="m")]
+    architecture.systems = [System(id="system", name="System", start_in="m")]
     dump_architecture(architecture, path)
 
-    resolved = arch.resolve(input_path=str(path), at="current")
-    difference = arch.diff(input_path=str(path), at_a="current", at_b="end")
+    resolved = arch.resolve(input_path=str(path), at="base")
+    difference = arch.diff(input_path=str(path), at_a="base", at_b="end")
     advanced = arch.advance(input_path=str(path), through="m")
 
     assert resolved["entities"]["systems"] == []
     assert [item["id"] for item in difference["added"]] == ["system"]
     assert advanced["ok"]
-    assert load_architecture(path).systems[0].from_ is None
+    assert load_architecture(path).systems[0].start_in is None

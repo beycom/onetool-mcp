@@ -25,8 +25,9 @@ _ROOT_KEYS = (
     "milestones",
     "timelines",
     "systems",
-    "subsystems",
+    "containers",
     "components",
+    "code",
     "users",
     "interfaces",
     "relationships",
@@ -34,13 +35,21 @@ _ROOT_KEYS = (
 _ROW_KEYS = {
     "milestones": ("id", "name", "description", "tags", "properties"),
     "timelines": ("id", "milestones"),
-    "systems": ("id", "name", "from", "until", "description", "tags", "properties"),
-    "subsystems": (
+    "systems": (
         "id",
         "name",
-        "system",
-        "from",
-        "until",
+        "start_in",
+        "end_in",
+        "description",
+        "tags",
+        "properties",
+    ),
+    "containers": (
+        "id",
+        "name",
+        "parent",
+        "start_in",
+        "end_in",
         "description",
         "tags",
         "properties",
@@ -48,23 +57,33 @@ _ROW_KEYS = {
     "components": (
         "id",
         "name",
-        "subsystem",
-        "from",
-        "until",
+        "container",
+        "start_in",
+        "end_in",
         "description",
         "tags",
         "properties",
     ),
-    "users": ("id", "name", "from", "until", "description", "tags", "properties"),
+    "code": (
+        "id",
+        "name",
+        "component",
+        "start_in",
+        "end_in",
+        "description",
+        "tags",
+        "properties",
+    ),
+    "users": ("id", "name", "start_in", "end_in", "description", "tags", "properties"),
     "interfaces": (
         "id",
         "name",
         "provider",
         "consumer",
         "call_direction",
-        "data_flow",
-        "from",
-        "until",
+        "data_flow_direction",
+        "start_in",
+        "end_in",
         "description",
         "tags",
         "properties",
@@ -74,8 +93,8 @@ _ROW_KEYS = {
         "action",
         "source",
         "target",
-        "from",
-        "until",
+        "start_in",
+        "end_in",
         "description",
         "tags",
         "properties",
@@ -238,6 +257,11 @@ def load_architecture(path: Path) -> Architecture:
 
 
 def _ordered_row(row: dict[str, Any], *, collection: str) -> dict[str, Any]:
+    if collection == "interfaces":
+        if row.get("call_direction") == "consumer_to_provider":
+            row.pop("call_direction")
+        if row.get("data_flow_direction") == "provider_to_consumer":
+            row.pop("data_flow_direction")
     ordered = {key: row[key] for key in _ROW_KEYS[collection] if key in row}
     if "properties" in ordered:
         ordered["properties"] = dict(sorted(ordered["properties"].items()))

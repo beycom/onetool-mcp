@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
 
+from .ids import assign_missing_ids
 from .model import Architecture
 from .resolver import StateSelector, advance, diff, resolve
 from .validate import validate
@@ -19,16 +20,19 @@ class ArchitectureValidationError(ValueError):
 
 
 def _starter() -> Architecture:
-    return Architecture(
+    architecture = Architecture(
         schema_version=3,
         milestones=[],
         systems=[],
-        subsystems=[],
+        containers=[],
         components=[],
+        code=[],
         users=[],
         interfaces=[],
         relationships=[],
     )
+    assign_missing_ids(architecture)
+    return architecture
 
 
 def _row_payload(row: object) -> dict[str, Any]:
@@ -40,7 +44,9 @@ def _load_valid(path: Path) -> Architecture:
     errors = [item for item in validate(architecture) if item.severity == "error"]
     if errors:
         codes = ", ".join(dict.fromkeys(item.code for item in errors))
-        raise ArchitectureValidationError(f"architecture has validation errors: {codes}")
+        raise ArchitectureValidationError(
+            f"architecture has validation errors: {codes}"
+        )
     return architecture
 
 

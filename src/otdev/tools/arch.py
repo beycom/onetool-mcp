@@ -44,13 +44,13 @@ def validate(*, input_path: str) -> dict[str, Any]:
 
 
 def resolve(
-    *, input_path: str, at: str = "current", timeline: str | None = None
+    *, input_path: str, at: str = "base", timeline: str | None = None
 ) -> dict[str, Any]:
     """Resolve an architecture state.
 
     Args:
         input_path: Architecture YAML file path.
-        at: ``current``, a milestone id, or ``end``.
+        at: ``base``, a milestone id, or ``end``.
         timeline: Timeline id when the architecture declares several.
     """
     with LogSpan(span="arch.resolve", inputPath=input_path, at=at, timeline=timeline):
@@ -62,7 +62,7 @@ def resolve(
 def diff(
     *,
     input_path: str,
-    at_a: str = "current",
+    at_a: str = "base",
     at_b: str = "end",
     timeline_a: str | None = None,
     timeline_b: str | None = None,
