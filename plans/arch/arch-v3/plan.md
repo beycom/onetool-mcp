@@ -245,11 +245,13 @@ backed by `issues/provider-consumer.md`).
       progress log below. Budgets agreed with the user: D9a 700 / D9b 600
       changed source lines.
 - [x] Executor chunks: implement to the updated contracts. `→ D9a, D9b`
-- [ ] **Gate (architect + user):** resolver suite, round-trips, and
+- [x] **Gate (architect + user):** resolver suite, round-trips, and
       projection vectors green under the new schema; acme re-fixture
       validates. User hand-edits the exported acme workbook in Excel
       against the new ten-sheet schema (this replaces the outstanding
-      phase-2 hand-run — agreed 2026-08-24).
+      phase-2 hand-run — agreed 2026-08-24). *PASSED 2026-08-25; the
+      hand-edit half was run as the scripted equivalent by the architect
+      at the user's request — see log.*
 
 ### Wave 2 — report UI
 
@@ -382,6 +384,28 @@ None yet. Format: `branch-name — question being explored — outcome`.
    interval preserves the old behavior on both timelines.
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-25** — Wave-1 gate PASSED. The Excel hand-edit half was run by
+  the architect as the scripted equivalent (openpyxl standing in for hand
+  edits, at the user's request; this also closes the folded-in phase-2
+  hand-run). Exercise on the exported ten-sheet acme workbook: added
+  milestone `acme-2032-fraud-consolidation` (+ Timelines row), retired
+  `fraud-provider` via inclusive `end_in: acme-2031-complete-cutover`,
+  added a complete-record revision row for `search-service`
+  (name + description), added a blank-id container, added a user `Notes`
+  sheet. Import assigned `c-0001` and reported it under `assigned_ids`
+  with the row index; diff 2031→2032 shows exactly the edits and the
+  correct cascade — removed fraud-provider with `clipped_by:
+  fraud-provider` on `fraud-api`, `provider-fraud-models`, and
+  `payment-to-fraud`; changed search-service on name/description only;
+  added c-0001; nothing spurious. Imported YAML validates 0 errors / 27
+  warnings (3 new clipping advisories from the retirement). In-place
+  export preserved the Notes sheet, resized the Containers table ref to
+  the two new rows, and the workbook re-imports model-equal to the YAML.
+  Residual caveat (not a blocker): the `arch_end_milestones`
+  VSTACK/FILTER dropdown is still unverified in real Excel — eyeball it
+  next time a generated workbook is opened there. Next actions: user runs
+  D10a (READY); architect authors the D12a parser-vector fixture.
 
 - **2026-08-25** — D9b architect gate review PASSED; committed by architect
   (rule 8). Re-verified: 77 arch tests, 14 vitest, `just lint` clean,
