@@ -8,7 +8,7 @@ each with a line budget and a demo gate.
 
 ## Ground rules
 
-1. **Docs stay this size.** These five documents are the design. New design
+1. **Docs stay this size.** These six documents are the design. New design
    writing replaces text here; it does not accumulate in new files. The v2
    wip docs are historical reference only.
 2. **Budgets are contracts** (source lines, excluding tests). Exceeding a
@@ -59,13 +59,27 @@ each with a line budget and a demo gate.
 - Gate: open the real dataset's report, scrub the timeline, and the story of
   the architecture reads correctly without explanation.
 
+### Phase 3S — Sequence diagrams (budget: ~500 Python + ~2,200 TS/TSX)
+
+Owner doc: sequence.md. Added 2026-08-25 (user-directed), replacing the
+"sequence attachments" deferral.
+
+- Flow-doc parser, validation findings, `sequences` payload section, CLI.
+- Custom deterministic sequence layout + React rendering; participant
+  headers reuse the canvas entity-box component.
+- Interaction contract: playback, sticky headers, C4 group collapse,
+  focus, hide/show, scenarios, navigator, minimap, search, sync/async.
+- Gate: open an acme flow, play it through, collapse a system, focus a
+  participant — the story reads without explanation; zero external
+  requests from `file://`.
+
 ### Phase 4 — Polish and second adapters (budget: per-item)
 
 - Client-side SVG / draw.io download; timeline picker for multi-scenario
   data; saved Report Definition files if URL fragments prove insufficient.
 - SQLite adapter, then SharePoint transport reusing the Excel mapping.
-- Only then: revisit deferred items (sequence attachments, Confluence,
-  layout hints) against demonstrated need.
+- Only then: revisit deferred items (Confluence, layout hints) against
+  demonstrated need.
 
 ## What must NOT return without a fight
 

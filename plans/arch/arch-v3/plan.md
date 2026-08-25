@@ -9,12 +9,12 @@ lands; a fresh session should be able to resume from this file alone.
 
 - **Resuming:** read this file, then index.md, then the doc owning the phase
   you are in (schema.md for phase 1, adapters.md for phase 2, report.md for
-  phase 3). Check the progress log for the last entry.
+  phase 3, sequence.md for phase 3S). Check the progress log for the last entry.
 - **Stopping:** append a progress-log entry saying what state the tree is in
   and the next action. Commit WIP rather than leaving dirty trees.
 - **Exploring a different direction:** branch off `feature/arch-v3`, note the
   branch and question under "Exploration branches" below. Design changes go
-  into the five docs (replacing text, not adding files — delivery.md rule 1),
+  into the six docs (replacing text, not adding files — delivery.md rule 1),
   with a log entry here.
 
 ## Ground truth
@@ -22,7 +22,7 @@ lands; a fresh session should be able to resume from this file alone.
 | What | Where |
 | --- | --- |
 | Working tree / branch | this worktree, `feature/arch-v3` (worktree `arch-v3`) |
-| Design docs | `plans/arch/arch-v3/` (index, schema, report, adapters, delivery) |
+| Design docs | `plans/arch/arch-v3/` (index, schema, report, sequence, adapters, delivery) |
 | v1 implementation (to be replaced) | `src/otdev/tools/arch.py` + `src/otdev/tools/_arch/` (models, ingest, validate, generate, exporters, roundtrip, …) |
 | v2 donor code (do NOT build on; harvest only) | worktree `[STUCK]arch-v2`, branch `feature/arch-v2`, pushed to origin, clean. `src/otdev/tools/_arch/v2/` — 8,761 lines |
 | Report interaction reference | `plans/arch/react-flow-poc/` (vite app: `ArchitectureCanvas.tsx`, styles, panels) |
@@ -77,7 +77,9 @@ models the user runs with the prompts in [delegation.md](delegation.md):
   (resolver spec, architect) → D3 → D4 → phase-1 gate → D5 ∥ D6 → D7 → gate
   → D8. Rework sequence (Phase 3R): (schema.md rework, architect) → D9 →
   gate → (report.md reconciliation, architect) → D10 → phase-3 re-gate →
-  D11 ∥ D8.
+  D11 ∥ D8. Sequence aspect (Phase 3S): (sequence.md + vectors + acme
+  flows, architect) → D12a after the wave-1 gate → D12b after the phase-3
+  re-gate (∥ D11/D8).
 
 ## Speed mode (agreed 2026-08-23)
 
@@ -86,7 +88,7 @@ To move fast, formal ceremony is deferred until the design stabilises
 
 - **OpenSpec: skipped entirely.** No change proposals, no spec deltas during
   the build. Backfilled once v3 ships.
-- **Docs: skipped.** The five design docs remain the only design writing;
+- **Docs: skipped.** The six design docs remain the only design writing;
   no user docs, no docstring polish beyond what code clarity needs.
 - **Tests: kept only where they do work now, breadth backfilled.**
   - KEEP — tests that are the control mechanism for executor models or the
@@ -242,7 +244,7 @@ backed by `issues/provider-consumer.md`).
       report.md (payload + projection contracts). Decisions recorded in the
       progress log below. Budgets agreed with the user: D9a 700 / D9b 600
       changed source lines.
-- [ ] Executor chunks: implement to the updated contracts. `→ D9a, D9b`
+- [x] Executor chunks: implement to the updated contracts. `→ D9a, D9b`
 - [ ] **Gate (architect + user):** resolver suite, round-trips, and
       projection vectors green under the new schema; acme re-fixture
       validates. User hand-edits the exported acme workbook in Excel
@@ -289,6 +291,36 @@ complete.
 - [ ] `p3-edit-save-back` — DEFERRED (edit mode).
 - [ ] `p3-ui-manual-positions` — DEFERRED (edit mode).
 
+## Phase 3S — Sequence diagrams (budgets provisional: ~500 py + ~2,200 TS/TSX)
+
+Owner doc: sequence.md (added 2026-08-25, user-directed — replaces the
+"sequence attachments" deferral). Flows are Markdown docs in `sequences/`
+beside the model YAML, referencing entity/interface ids plus ad-hoc
+participants; renderer is a custom deterministic layout + React with the
+canvas entity-box component as participant headers (library survey and
+rationale in sequence.md). Budgets are re-agreed with the user when each
+prompt is authored.
+
+- [x] **Architect:** sequence.md v1 — source-doc format, DSL, compilation
+      + payload shape, renderer decision, SEQ-* interaction contract
+      (playback, sticky headers, C4 group collapse, focus, hide/show,
+      scenarios, navigator, minimap, search, sync/async), verification
+      plan. (2026-08-25)
+- [ ] **Architect:** parser-vector fixture
+      (`tests/unit/tools/fixtures/arch/sequence/`) — the D12a control
+      mechanism.
+- [ ] Python: parser, validation findings, `sequences` payload, CLI +
+      facade wiring. `→ D12a` (runnable after the wave-1 gate)
+- [ ] **Architect:** layout vectors + 2–3 acme flow docs (multi-scenario,
+      interval-carrying, ad-hoc participant) — the D12b control mechanism.
+- [ ] Frontend: `seqlayout.ts`, SVG layer, entity-box header row, SEQ-*
+      interactions, fragment keys. `→ D12b` (after the phase-3 re-gate;
+      ∥ D11/D8)
+- [ ] **Gate (architect + user):** open an acme flow, play it through,
+      collapse a system band, focus a participant, hide one, switch
+      scenario — the story reads without explanation; sticky headers hold;
+      console clean; zero external requests from `file://`.
+
 ## Phase 4 — Polish and second adapters (per-item budgets)
 
 - [ ] Client-side SVG / draw.io download from the report. `→ D8`
@@ -296,8 +328,9 @@ complete.
 - [ ] SharePoint transport reusing the Excel mapping.
 - [ ] Migration converter from v2 YAML — only if a real v2 dataset exists to
       migrate; otherwise skip (throwaway tooling).
-- [ ] Revisit deferred items (sequence attachments, Confluence; saved report
-      definitions moved to Phase 3R wave 3) against demonstrated need only.
+- [ ] Revisit deferred items (Confluence; saved report definitions moved to
+      Phase 3R wave 3; sequence diagrams promoted to Phase 3S) against
+      demonstrated need only.
 - [ ] Edit mode: local-server write path + `p3-edit-save-back` +
       `p3-ui-manual-positions` (design deferred until Schema, Report, and
       File Import are complete — see Phase 3R wave 3).
@@ -341,8 +374,140 @@ None yet. Format: `branch-name — question being explored — outcome`.
    (user): mine what's useful into report.md during the D10 reconciliation,
    leave the rest and mark the doc superseded. Issue text wins where they
    conflict; each override recorded in the reconciliation.
+7. ~~D9b projection vector conversion~~ — ANSWERED 2026-08-24 (user): the
+   new inclusive `start_in`/`end_in` schema wins, so update the authoritative
+   alternate-timeline expectations. `sysL` has old `until: m2` while the
+   alternate timeline is `[m1, m3]`. The required conversion to inclusive
+   `end_in: m1` removes `sysL` after `m1` on that timeline. No single v3
+   interval preserves the old behavior on both timelines.
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-25** — D9b architect gate review PASSED; committed by architect
+  (rule 8). Re-verified: 77 arch tests, 14 vitest, `just lint` clean,
+  standalone import loads zero runtime modules, template rebuild
+  byte-identical, both checked-in payloads (projection fixture + acme dev
+  payload) regenerate identically via the CLI, acme validates 0 errors /
+  24 clipping warnings. Code review: ten C4 sheets with renamed headers;
+  blank-id import builds a `model_construct` draft, runs
+  `assign_missing_ids`, writes ids back into raw with id-cell source
+  locations, and reports the map as `assigned_ids`; per-field direction
+  dropdowns (allow-blank = omitted default); payload live/clip segments
+  inclusive with the `base` selector at position 0; projection `within`
+  inclusive, kind-qualified id index, cycle-guarded parent walk through
+  Code, ancestor-of-kind roll-up. Q7 conversion confirmed in the vector
+  model (`sysL` `end_in: m1`, `subG` `end_in: base`). All four executor
+  assumptions ACCEPTED: `assigned_ids` key naming (adapters.md names no
+  key), Code kept empty in the projection fixture (nested/Code round-trip
+  covered by the new Excel test), `end_in` dropdown as a VSTACK/FILTER
+  defined name prepending `base` (noted: dynamic-array functions need
+  Excel 365; elsewhere the validation degrades, cells stay editable), and
+  no-commit per rule 8. Wave-1 gate: architect half done — remaining is
+  the user's Excel hand-edit of the exported acme workbook (the folded-in
+  phase-2 hand-run). Next actions: user runs the hand-edit gate exercise,
+  then D10a (READY); architect's next artifact is the D12a parser-vector
+  fixture (unblocked now).
+
+- **2026-08-25** — Sequence DSL: notes / logic / dividers / multiline
+  closed out (user follow-up on the davidje13 feature set). Adopted:
+  `note left of` / `note right of` placements (Mermaid parity), davidje13
+  `if`/`else if`/`else` and `repeat` as aliases normalized to alt/loop,
+  a `group` labeled frame (vertical message-run annotation — distinct
+  from Mermaid's reserved `box`, which is horizontal participant grouping
+  and stays model-owned), divider types `line`/`space`/`delay`/`tear`,
+  and multiline labels via `\n` / `<br/>` escapes (labels stay single
+  physical lines). Rejected with named errors or deferred: `note
+  between`, `state over`, `text left/right`, `divider … with height`
+  (layout owns spacing), inline markdown in labels. Payload: frame kind
+  `group`, note `placement`/`at`, divider `style`, pre-unescaped line
+  breaks. sequence.md DSL / payload / deferred sections updated.
+
+- **2026-08-25** — Sequence DSL revised (user decision, supersedes the
+  "mermaid-adjacent" tokens in the entry below): **union grammar** — the
+  Mermaid sequence syntax base (`participant … as`, `actor`, alt/opt/loop,
+  `note over`, comments) with arrows generalized **compositionally**
+  (optional left head `<`/`<<`, line `-`/`--`/`~`, optional right head
+  `>`/`>>`/`)`/`x`) so every form either tool publishes is valid: `->`,
+  `->>`, `-->>`, `-)`, `-x`, reversed `<-`, bidirectional `<->`/`<<-->`,
+  wavy `~>`, unlabeled arrows. Kind derives by rule (x → lost, `)`/`~` →
+  async, `--` → reply, else sync); left heads reverse direction. Explicit
+  `+`/`-` activation markers are **supported** (per-scenario manual mode —
+  any marker disables auto-activation for that scenario); davidje13
+  extensions adopted: `[`/`]` external endpoints both directions,
+  `...id` deferred async delivery (crossing, rendered diagonal),
+  `divider [delay]: label`. Reserved words with named parser errors:
+  par/critical/break/box/autonumber/activate-deactivate statements/create/
+  destroy/rect/link; simultaneity markers rejected (break the monotonic
+  order playback and `step` depend on). Confirmed stance: entity ids,
+  interface links (`[i-…]`), and self-defined ad-hoc participants coexist
+  in one flow. Licensing recorded in sequence.md "Donors and licensing":
+  grammars reimplemented from published syntax docs only — LGPL davidje13
+  code never copied; MIT geometry fragments harvestable with attribution.
+  sequence.md DSL / compilation / payload / SEQ-KIND / deferred sections
+  updated. Parser-vector fixture (next architect artifact) must cover the
+  compositional arrow matrix, activation-mode switching, and
+  reserved-word errors.
+
+- **2026-08-25** — Sequence-diagram aspect added (user-directed):
+  new design doc sequence.md joins the set (index.md table, delivery.md
+  rule 1 now "six documents"), new Phase 3S here, D12a/D12b registered
+  GATED in delegation.md, report.md deferred-list entry reversed and its
+  Views table extended with the sequence fragment keys, delivery.md gains
+  the Phase 3S entry and drops "sequence attachments" from phase 4.
+  Decisions: flows are Markdown docs in `sequences/` beside the model YAML
+  (frontmatter id/name/interval, `##` headings = scenarios, ```seq fences)
+  — never carried by Excel; DSL is mermaid-adjacent (`->` sync, `-->`
+  reply, `-)` async, `[i-…]` interface links, alt/opt/loop, auto-
+  activation); Python parses/validates/compiles a `sequences` payload
+  section (parser vectors = D12a control); renderer is **custom**: pure
+  deterministic `seqlayout.ts` + React header row reusing the canvas
+  entity-box component + one SVG layer — library survey (2026-08-25 web
+  re-survey + the 2026-08-11 POC spike) rejected davidje13/SequenceDiagram
+  (LGPL-3.0), Mermaid (multi-MB black-box SVG, no coordinate API), ZenUML
+  (own React 19 + Tailwind, 869 KB gzip POC-measured, fragile hooks), and
+  js-sequence-diagrams (dead, remote fonts); no off-the-shelf option
+  supports custom participant boxes + the interaction list. SEQ-* contract
+  covers playback, sticky headers, C4 group collapse (canvas boundary
+  styling), focus, hide/show (recorded divergence from the canvas
+  dim-only rule), scenario tabs, navigator, vertical minimap, search,
+  sync/async arrow shapes, side-panel + time-slider integration.
+  Provisional budgets ~500 py / ~2,200 TS/TSX — re-agreed at prompt
+  authoring. Next action for the aspect: architect authors the parser
+  vectors (D12a runnable after the wave-1 gate); D12b waits for the
+  phase-3 re-gate. The immediate plan sequence (D9b gate → D10a/D10b) is
+  unchanged.
+
+- **2026-08-24** - D9b complete and left uncommitted for gate review. Excel
+  now exports and imports the ten C4 sheets, assigns blank ids through
+  `assign_missing_ids`, reports the assignment map, and supplies the new
+  interval and direction dropdowns. Payload compilation emits seven
+  collections with inclusive live/clip segments and omitted direction
+  defaults. The frontend uses systems/containers/components/code, walks
+  nested containment through Code, treats segment ends as inclusive, exposes
+  Base at position 0, and uses the new direction defaults. Projection and
+  acme payload fixtures plus the bundled report were regenerated. Source
+  churn: 334 / 600 lines. Tests: Excel 2 existing + 2 new, payload 2, full
+  focused suite 77 passed, vitest 14 passed, smoke 27 passed; `just lint` and
+  `just build-arch-report` clean. File report verification reached position 2,
+  compare=base, level=containers, and one-system scope; console errors 0 and
+  external requests 0. Assumptions: the import result key is `assigned_ids`;
+  Code stays empty in the projection fixture; the `end_in` dropdown uses a
+  defined dynamic range that prepends `base`; per the user's answer to Q7,
+  inclusive schema behavior updates the alternate-timeline expectations; no
+  commit or staging under the user's final instruction. Open questions: none.
+
+- **2026-08-24** - D9b paused at open question 7 after the first vector run.
+  Partial implementation converts Excel, payload compilation, frontend
+  projection, and fixtures to the wave-1 schema. Python Excel/payload tests:
+  6 passed. Vitest: 12 passed, 2 failed only because the mandated `sysL`
+  conversion changes the alternate-timeline state and diff. Source churn is
+  315 / 600 lines. Assumptions made before the conflict: (1) the Excel import
+  result exposes the exact `assign_missing_ids` map as `assigned_ids`; (2)
+  `code: []` satisfies the projection fixture's new KINDS entry because adding
+  a Code row would change expected id sets; (3) the `end_in` dropdown uses a
+  workbook defined name that prepends `base` to the milestone range; (4) the
+  user's final instruction overrides the prompt's commit wording, so no commit
+  or staging will occur. Open question: 7. No commit or staging performed.
 
 - **2026-08-24** — D9a interim architect review PASSED; committed by architect
   (rule 8). The formal wave-1 gate still reviews D9a+D9b together after D9b —

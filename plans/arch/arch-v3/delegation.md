@@ -445,6 +445,22 @@ from issue files.
   `p3-ui-manual-positions` are NOT delegated — edit mode is deferred and
   gets its own prompts when the local-server write path is designed.
 
+## D12 — Phase 3S: sequence diagrams (GATED; issued per chunk)
+
+Design doc: sequence.md (2026-08-25). Prompts are issued when the
+architect artifacts exist; executors work from sequence.md + the prompt.
+
+- **D12a (Python):** flow-doc parser, validation findings, `sequences`
+  payload section, CLI + `arch.validate`/`arch.generate` wiring. Gated on
+  the architect's parser-vector fixture
+  (`tests/unit/tools/fixtures/arch/sequence/`) — that suite is the control
+  mechanism. Runnable after the wave-1 (D9) gate; no frontend files.
+- **D12b (frontend):** `seqlayout.ts` + SVG layer + entity-box header row
+  + the SEQ-* interaction contract. Gated on the architect's layout
+  vectors and the acme flow docs. Runs after the phase-3 re-gate (D10b
+  owns the same frontend surface until then); may run parallel with
+  D11/D8.
+
 ## D9a — Phase 3R wave 1a: model/resolver/validation rework (READY)
 
 Run D9a and D9b back to back; the wave-1 gate reviews both together.

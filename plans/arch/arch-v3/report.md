@@ -254,6 +254,7 @@ A view is a client-side configuration, shareable via copy-link (POC pattern):
 | Lens | `lens` | selected tags (legend) |
 | Theme | `theme` | light / dark |
 | *(reserved)* | `view` | guided views — D11 |
+| Sequence view | `seq`, `scenario`, `step`, `focus`, `hide`, `collapse` | owned by sequence.md; canvas-only keys ignored in that section |
 
 The `mode` key (MAP/PATH/LENS) is retired in wave 2 — see "Wave-2 UI
 contract". Panel sizes, collapsed state, table layouts, and fullscreen are
@@ -596,8 +597,10 @@ boundary.
 
 ## Explicitly deferred
 
-- Sequence diagrams: per the POC verdict, no native renderer; sanitized SVG
-  attachments only, post-3.0.
+- ~~Sequence diagrams~~ — no longer deferred (2026-08-25): now a native
+  aspect owned by [sequence.md](sequence.md). The POC verdict rejected
+  *third-party* renderers; the adopted design is a custom layout + React
+  renderer sharing this app's entity boxes, panels, and dimming rules.
 - Saved Report Definition files, Confluence embedding, PDF.
 - The v2 wip interaction catalog (`plans/arch/wip/interactions.md`, ~230
   requirements) was mined 2026-08-24: the useful clauses live in "Wave-2 UI

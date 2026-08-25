@@ -74,6 +74,7 @@ These were settled by the grills and are not reopened:
 | --- | --- |
 | [schema.md](schema.md) | Entities, milestones, intervals, revisions, resolution, validation, canonical YAML |
 | [report.md](report.md) | Report app: views, time slider, diagrams, tables, pipeline |
+| [sequence.md](sequence.md) | Sequence diagrams: flow docs + DSL, compilation, renderer, interaction contract |
 | [adapters.md](adapters.md) | Excel mapping now; SharePoint, SQLite, CSV later |
 | [delivery.md](delivery.md) | Phases, size budgets, and the guardrails that stop v3 circling |
 
