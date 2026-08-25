@@ -42,6 +42,13 @@ design docs.) For UI verification (report app, phase 3+ gates), follow
 snapshots, clicks, console/network inspection, and screenshots; console
 inspection belongs in every pass.
 
+**Standing practice (user request 2026-08-25):** after every landed feature
+that touches the report (bundle, payload, or fixture), regenerate the
+user's test artifact so progress is always inspectable:
+`uv run python -m otdev.tools._arch.v3 generate
+tests/unit/tools/fixtures/arch/acme.yaml plans/arch/wip/acme-report.html`
+(stays untracked; part of every gate-review wrap-up).
+
 **Donor shortlist from v2** (delivery.md rule 5 — harvest, don't refactor):
 Excel cell parsing / header normalization (`normalize.py`, `load.py`),
 deterministic YAML/workbook writers (`write.py`, `exporter.py`), ID/text rules
