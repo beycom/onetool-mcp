@@ -1,0 +1,924 @@
+{
+  "model": "model.yaml",
+  "flows": {
+    "activation.md": {
+      "findings": [],
+      "sequence": {
+        "id": "activation-modes",
+        "name": "Activation modes",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                1
+              ]
+            ],
+            "clips": []
+          }
+        ],
+        "participants": [
+          {
+            "id": "customer",
+            "ref": "users:customer"
+          },
+          {
+            "id": "pay-api",
+            "ref": "containers:pay-api"
+          },
+          {
+            "id": "event-bus",
+            "ref": "containers:event-bus"
+          }
+        ],
+        "scenarios": [
+          {
+            "id": "auto",
+            "name": "Auto",
+            "items": [
+              {
+                "kind": "sync",
+                "from": "customer",
+                "to": "pay-api",
+                "text": "Place order"
+              },
+              {
+                "kind": "reply",
+                "from": "pay-api",
+                "to": "customer",
+                "text": "OK"
+              }
+            ]
+          },
+          {
+            "id": "manual",
+            "name": "Manual",
+            "activation": "manual",
+            "items": [
+              {
+                "kind": "sync",
+                "from": "customer",
+                "to": "pay-api",
+                "text": "Place order",
+                "activate": true
+              },
+              {
+                "kind": "async",
+                "from": "pay-api",
+                "to": "event-bus",
+                "text": "OrderPlaced"
+              },
+              {
+                "kind": "reply",
+                "from": "pay-api",
+                "to": "customer",
+                "text": "OK",
+                "deactivate": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "arrows.md": {
+      "findings": [],
+      "sequence": {
+        "id": "arrow-matrix",
+        "name": "Arrow matrix",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ],
+        "participants": [
+          {
+            "id": "shop",
+            "ref": "systems:shop"
+          },
+          {
+            "id": "pay-api",
+            "ref": "containers:pay-api"
+          },
+          {
+            "id": "event-bus",
+            "ref": "containers:event-bus"
+          },
+          {
+            "id": "customer",
+            "ref": "users:customer"
+          },
+          {
+            "id": "fraud-check",
+            "ref": "components:fraud-check"
+          },
+          {
+            "id": "charge-fn",
+            "ref": "code:charge-fn"
+          }
+        ],
+        "scenarios": [
+          {
+            "id": "main",
+            "name": "Main",
+            "items": [
+              {
+                "kind": "sync",
+                "from": "shop",
+                "to": "pay-api",
+                "text": "solid single"
+              },
+              {
+                "kind": "sync",
+                "from": "pay-api",
+                "to": "event-bus",
+                "text": "solid double"
+              },
+              {
+                "kind": "reply",
+                "from": "pay-api",
+                "to": "shop",
+                "text": "dashed single"
+              },
+              {
+                "kind": "reply",
+                "from": "pay-api",
+                "to": "shop",
+                "text": "dashed double"
+              },
+              {
+                "kind": "async",
+                "from": "pay-api",
+                "to": "event-bus",
+                "text": "paren async"
+              },
+              {
+                "kind": "async",
+                "from": "pay-api",
+                "to": "event-bus",
+                "text": "dashed async"
+              },
+              {
+                "kind": "lost",
+                "from": "pay-api",
+                "to": "event-bus",
+                "text": "lost solid"
+              },
+              {
+                "kind": "lost",
+                "from": "pay-api",
+                "to": "event-bus",
+                "text": "lost dashed"
+              },
+              {
+                "kind": "async",
+                "from": "pay-api",
+                "to": "event-bus",
+                "text": "wavy async",
+                "wavy": true
+              },
+              {
+                "kind": "sync",
+                "from": "pay-api",
+                "to": "customer",
+                "text": "reversed solid"
+              },
+              {
+                "kind": "reply",
+                "from": "pay-api",
+                "to": "customer",
+                "text": "reversed dashed"
+              },
+              {
+                "kind": "sync",
+                "from": "pay-api",
+                "to": "customer",
+                "text": "reversed double"
+              },
+              {
+                "kind": "sync",
+                "from": "pay-api",
+                "to": "event-bus",
+                "text": "bidi sync",
+                "bidi": true
+              },
+              {
+                "kind": "reply",
+                "from": "pay-api",
+                "to": "event-bus",
+                "text": "bidi reply",
+                "bidi": true
+              },
+              {
+                "kind": "reply",
+                "from": "pay-api",
+                "to": "event-bus",
+                "text": "bidi double reply",
+                "bidi": true
+              },
+              {
+                "kind": "sync",
+                "from": "fraud-check",
+                "to": "charge-fn",
+                "text": "component to code"
+              },
+              {
+                "kind": "sync",
+                "from": "pay-api",
+                "to": "pay-api",
+                "text": "self call"
+              },
+              {
+                "kind": "sync",
+                "from": "pay-api",
+                "to": "event-bus"
+              },
+              {
+                "kind": "sync",
+                "from": "customer",
+                "to": "pay-api",
+                "interface": "i-0001"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "deferred-external.md": {
+      "findings": [],
+      "sequence": {
+        "id": "deferred-external",
+        "name": "Deferred and external",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ],
+        "participants": [
+          {
+            "id": "pay-api",
+            "ref": "containers:pay-api"
+          },
+          {
+            "id": "event-bus",
+            "ref": "containers:event-bus"
+          }
+        ],
+        "scenarios": [
+          {
+            "id": "main",
+            "name": "Main",
+            "items": [
+              {
+                "kind": "sync",
+                "to": "pay-api",
+                "external": "in",
+                "text": "Inbound webhook"
+              },
+              {
+                "kind": "async",
+                "from": "pay-api",
+                "defer": "settle",
+                "text": "Settle later"
+              },
+              {
+                "kind": "reply",
+                "from": "pay-api",
+                "external": "out",
+                "edge": "right",
+                "text": "Webhook ack"
+              },
+              {
+                "kind": "sync",
+                "to": "pay-api",
+                "external": "in",
+                "edge": "right",
+                "text": "Poll request"
+              },
+              {
+                "kind": "async",
+                "defer": "settle",
+                "to": "event-bus"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "errors.md": {
+      "findings": [
+        {
+          "severity": "error",
+          "code": "reserved_keyword",
+          "line": 9
+        },
+        {
+          "severity": "error",
+          "code": "reserved_keyword",
+          "line": 10
+        },
+        {
+          "severity": "error",
+          "code": "reserved_keyword",
+          "line": 11
+        },
+        {
+          "severity": "error",
+          "code": "reserved_keyword",
+          "line": 12
+        },
+        {
+          "severity": "error",
+          "code": "reserved_keyword",
+          "line": 13
+        },
+        {
+          "severity": "error",
+          "code": "reserved_keyword",
+          "line": 14
+        },
+        {
+          "severity": "error",
+          "code": "reserved_keyword",
+          "line": 15
+        },
+        {
+          "severity": "error",
+          "code": "reserved_keyword",
+          "line": 16
+        },
+        {
+          "severity": "error",
+          "code": "reserved_keyword",
+          "line": 17
+        },
+        {
+          "severity": "error",
+          "code": "reserved_keyword",
+          "line": 18
+        },
+        {
+          "severity": "error",
+          "code": "reserved_keyword",
+          "line": 19
+        },
+        {
+          "severity": "error",
+          "code": "reserved_keyword",
+          "line": 20
+        },
+        {
+          "severity": "error",
+          "code": "reserved_keyword",
+          "line": 21
+        },
+        {
+          "severity": "error",
+          "code": "reserved_keyword",
+          "line": 22
+        },
+        {
+          "severity": "error",
+          "code": "reserved_keyword",
+          "line": 23
+        },
+        {
+          "severity": "error",
+          "code": "unresolved_interface",
+          "line": 29
+        },
+        {
+          "severity": "error",
+          "code": "unresolved_participant",
+          "line": 30
+        },
+        {
+          "severity": "error",
+          "code": "parse_error",
+          "line": 31
+        },
+        {
+          "severity": "error",
+          "code": "parse_error",
+          "line": 32
+        },
+        {
+          "severity": "error",
+          "code": "parse_error",
+          "line": 33
+        },
+        {
+          "severity": "error",
+          "code": "parse_error",
+          "line": 34
+        },
+        {
+          "severity": "error",
+          "code": "unpaired_defer",
+          "line": 35
+        },
+        {
+          "severity": "error",
+          "code": "unpaired_defer",
+          "line": 36
+        },
+        {
+          "severity": "error",
+          "code": "parse_error",
+          "line": 37
+        },
+        {
+          "severity": "error",
+          "code": "parse_error",
+          "line": 38
+        },
+        {
+          "severity": "error",
+          "code": "invalid_id",
+          "line": 42
+        },
+        {
+          "severity": "error",
+          "code": "duplicate_id",
+          "line": 54
+        }
+      ],
+      "sequence": null
+    },
+    "frames.md": {
+      "findings": [],
+      "sequence": {
+        "id": "frames-and-notes",
+        "name": "Frames and notes",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ],
+        "participants": [
+          {
+            "id": "pay-api",
+            "ref": "containers:pay-api"
+          },
+          {
+            "id": "event-bus",
+            "ref": "containers:event-bus"
+          },
+          {
+            "id": "fraud-check",
+            "ref": "components:fraud-check"
+          }
+        ],
+        "scenarios": [
+          {
+            "id": "main",
+            "name": "Main",
+            "items": [
+              {
+                "frame": "loop",
+                "label": "Every morning",
+                "items": [
+                  {
+                    "kind": "sync",
+                    "from": "pay-api",
+                    "to": "event-bus",
+                    "text": "Poll"
+                  },
+                  {
+                    "frame": "alt",
+                    "label": "backlog > 100",
+                    "items": [
+                      {
+                        "kind": "sync",
+                        "from": "pay-api",
+                        "to": "fraud-check",
+                        "text": "Bulk scan"
+                      }
+                    ],
+                    "else": [
+                      {
+                        "label": "backlog > 0",
+                        "items": [
+                          {
+                            "kind": "sync",
+                            "from": "pay-api",
+                            "to": "fraud-check",
+                            "text": "Scan"
+                          }
+                        ]
+                      },
+                      {
+                        "items": [
+                          {
+                            "kind": "sync",
+                            "from": "pay-api",
+                            "to": "pay-api",
+                            "text": "Sleep"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "frame": "loop",
+                "label": "Until drained",
+                "items": [
+                  {
+                    "kind": "sync",
+                    "from": "pay-api",
+                    "to": "event-bus",
+                    "text": "Drain"
+                  }
+                ]
+              },
+              {
+                "frame": "opt",
+                "label": "Trace enabled",
+                "items": [
+                  {
+                    "kind": "async",
+                    "from": "pay-api",
+                    "to": "event-bus",
+                    "text": "TraceSpan"
+                  }
+                ]
+              },
+              {
+                "frame": "group",
+                "label": "Cleanup",
+                "items": [
+                  {
+                    "kind": "sync",
+                    "from": "pay-api",
+                    "to": "event-bus",
+                    "text": "Purge"
+                  }
+                ]
+              },
+              {
+                "divider": "Later"
+              },
+              {
+                "divider": "Same day"
+              },
+              {
+                "divider": "Quiet gap",
+                "style": "space"
+              },
+              {
+                "divider": "3 days",
+                "style": "delay"
+              },
+              {
+                "divider": "200 calls elided",
+                "style": "tear"
+              },
+              {
+                "note": "Single note",
+                "placement": "over",
+                "at": [
+                  "pay-api"
+                ]
+              },
+              {
+                "note": "Spanning note",
+                "placement": "over",
+                "at": [
+                  "pay-api",
+                  "event-bus"
+                ]
+              },
+              {
+                "note": "Left note\nsecond line",
+                "placement": "left",
+                "at": [
+                  "pay-api"
+                ]
+              },
+              {
+                "note": "Right note\nthird line",
+                "placement": "right",
+                "at": [
+                  "pay-api"
+                ]
+              },
+              {
+                "kind": "sync",
+                "from": "pay-api",
+                "to": "event-bus",
+                "text": "First line\nSecond line"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "frontmatter-bad.md": {
+      "findings": [
+        {
+          "severity": "error",
+          "code": "missing_required",
+          "line": 1
+        },
+        {
+          "severity": "error",
+          "code": "unresolved_milestone",
+          "line": 3
+        }
+      ],
+      "sequence": null
+    },
+    "order-checkout.md": {
+      "findings": [],
+      "sequence": {
+        "id": "order-checkout",
+        "name": "Order checkout",
+        "description": "How an order is placed, authorised, and confirmed.",
+        "tags": [
+          "payments"
+        ],
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ],
+        "participants": [
+          {
+            "id": "customer",
+            "ref": "users:customer"
+          },
+          {
+            "id": "PSP",
+            "label": "Worldline PSP"
+          },
+          {
+            "id": "ops",
+            "label": "Ops Engineer",
+            "actor": true
+          },
+          {
+            "id": "pay-api",
+            "ref": "containers:pay-api"
+          },
+          {
+            "id": "event-bus",
+            "ref": "containers:event-bus"
+          }
+        ],
+        "scenarios": [
+          {
+            "id": "happy-path",
+            "name": "Happy path",
+            "description": "The customer pays and the order is confirmed.",
+            "items": [
+              {
+                "kind": "sync",
+                "from": "customer",
+                "to": "pay-api",
+                "text": "Place order",
+                "interface": "i-0001"
+              },
+              {
+                "kind": "sync",
+                "from": "pay-api",
+                "to": "PSP",
+                "text": "Authorise card"
+              },
+              {
+                "kind": "reply",
+                "from": "PSP",
+                "to": "pay-api",
+                "text": "Approved"
+              },
+              {
+                "kind": "async",
+                "from": "pay-api",
+                "to": "event-bus",
+                "text": "OrderPlaced"
+              },
+              {
+                "kind": "reply",
+                "from": "pay-api",
+                "to": "customer",
+                "text": "202 Accepted"
+              }
+            ]
+          },
+          {
+            "id": "declined",
+            "name": "Declined",
+            "items": [
+              {
+                "kind": "sync",
+                "from": "customer",
+                "to": "pay-api",
+                "text": "Place order",
+                "interface": "i-0001"
+              },
+              {
+                "kind": "sync",
+                "from": "pay-api",
+                "to": "PSP",
+                "text": "Authorise card"
+              },
+              {
+                "frame": "alt",
+                "label": "Soft decline",
+                "items": [
+                  {
+                    "kind": "reply",
+                    "from": "PSP",
+                    "to": "pay-api",
+                    "text": "Soft decline"
+                  },
+                  {
+                    "kind": "sync",
+                    "from": "pay-api",
+                    "to": "PSP",
+                    "text": "Retry authorisation"
+                  },
+                  {
+                    "divider": "cooldown",
+                    "style": "delay"
+                  },
+                  {
+                    "kind": "reply",
+                    "from": "PSP",
+                    "to": "pay-api",
+                    "text": "Approved"
+                  }
+                ],
+                "else": [
+                  {
+                    "label": "Hard decline",
+                    "items": [
+                      {
+                        "kind": "lost",
+                        "from": "pay-api",
+                        "to": "PSP",
+                        "text": "Authorise card"
+                      },
+                      {
+                        "kind": "reply",
+                        "from": "pay-api",
+                        "to": "customer",
+                        "text": "402 Declined"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "note": "Customer sees the outcome",
+                "placement": "over",
+                "at": [
+                  "customer",
+                  "pay-api"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "warnings.md": {
+      "findings": [
+        {
+          "severity": "warning",
+          "code": "dangling_interval",
+          "line": 4
+        },
+        {
+          "severity": "warning",
+          "code": "implicit_participant",
+          "line": 10
+        },
+        {
+          "severity": "warning",
+          "code": "crossed_reply",
+          "line": 11
+        },
+        {
+          "severity": "warning",
+          "code": "unmatched_activation",
+          "line": 20
+        }
+      ],
+      "sequence": {
+        "id": "warning-flow",
+        "name": "Warning flow",
+        "intervals": [
+          {
+            "live": [],
+            "clips": []
+          }
+        ],
+        "participants": [
+          {
+            "id": "adhoc-one"
+          },
+          {
+            "id": "pay-api",
+            "ref": "containers:pay-api"
+          },
+          {
+            "id": "event-bus",
+            "ref": "containers:event-bus"
+          },
+          {
+            "id": "customer",
+            "ref": "users:customer"
+          }
+        ],
+        "scenarios": [
+          {
+            "id": "crossed-replies",
+            "name": "Crossed replies",
+            "items": [
+              {
+                "kind": "sync",
+                "from": "adhoc-one",
+                "to": "pay-api",
+                "text": "Hello"
+              },
+              {
+                "kind": "sync",
+                "from": "pay-api",
+                "to": "event-bus",
+                "text": "First call"
+              },
+              {
+                "kind": "sync",
+                "from": "pay-api",
+                "to": "event-bus",
+                "text": "Second call"
+              },
+              {
+                "kind": "reply",
+                "from": "event-bus",
+                "to": "pay-api",
+                "text": "Done"
+              }
+            ]
+          },
+          {
+            "id": "manual-mismatch",
+            "name": "Manual mismatch",
+            "activation": "manual",
+            "items": [
+              {
+                "kind": "sync",
+                "from": "customer",
+                "to": "pay-api",
+                "text": "Start",
+                "activate": true
+              },
+              {
+                "kind": "reply",
+                "from": "event-bus",
+                "to": "customer",
+                "text": "Oops",
+                "deactivate": true
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "crossdoc": {
+    "findings": [
+      {
+        "file": "second.md",
+        "severity": "error",
+        "code": "duplicate_id",
+        "line": 2
+      }
+    ]
+  }
+}

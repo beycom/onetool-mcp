@@ -1,0 +1,40 @@
+schema_version: 3
+milestones:
+  - id: m1
+    name: Milestone one
+  - id: m2
+    name: Milestone two
+  - id: m-orphan
+    name: Orphan milestone
+timelines:
+  - id: program
+    milestones:
+      - m1
+      - m2
+systems:
+  - id: shop
+    name: Shop Platform
+containers:
+  - id: pay-api
+    name: Payments API
+    parent: shop
+  - id: event-bus
+    name: Event Bus
+    parent: shop
+components:
+  - id: fraud-check
+    name: Fraud Check
+    container: pay-api
+code:
+  - id: charge-fn
+    name: ChargeHandler
+    component: fraud-check
+users:
+  - id: customer
+    name: Customer
+interfaces:
+  - id: i-0001
+    name: Place order
+    provider: pay-api
+    consumer: customer
+relationships: []

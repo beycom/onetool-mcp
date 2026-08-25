@@ -315,11 +315,11 @@ prompt is authored.
       (playback, sticky headers, C4 group collapse, focus, hide/show,
       scenarios, navigator, minimap, search, sync/async), verification
       plan. (2026-08-25)
-- [ ] **Architect:** parser-vector fixture
+- [x] **Architect:** parser-vector fixture
       (`tests/unit/tools/fixtures/arch/sequence/`) — the D12a control
-      mechanism.
+      mechanism. (2026-08-25; D12a prompt issued the same day)
 - [ ] Python: parser, validation findings, `sequences` payload, CLI +
-      facade wiring. `→ D12a` (runnable after the wave-1 gate)
+      facade wiring. `→ D12a` (READY; run serially with D10a/D10b)
 - [ ] **Architect:** layout vectors + 2–3 acme flow docs (multi-scenario,
       interval-carrying, ad-hoc participant) — the D12b control mechanism.
 - [ ] Frontend: `seqlayout.ts`, SVG layer, entity-box header row, SEQ-*
@@ -391,6 +391,39 @@ None yet. Format: `branch-name — question being explored — outcome`.
    interval preserves the old behavior on both timelines.
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-25** — D12a parser-vector fixture authored (architect) and the
+  D12a prompt issued (READY; run serially with D10a/D10b — payload.py
+  overlap). Fixture at `tests/unit/tools/fixtures/arch/sequence/`:
+  minimal model.yaml (validates 0 errors; its 3 unused-milestone warnings
+  are expected — milestones are referenced only by flow docs), eight flow
+  docs + a crossdoc duplicate-id pair, expected.json (findings as
+  severity/code/line, compiled entries by deep equality), README with the
+  driver contract. Coverage: the full compositional arrow matrix with
+  kind derivation, activation-mode switching, frames/aliases/dividers/
+  notes/multiline, deferred + external endpoints, all 15 reserved-word
+  errors, and the four vector-pinned warnings. Line anchors were computed
+  by content lookup (scratch tooling, not kept), and each spot-checked.
+  Design decisions taken while authoring, folded into sequence.md same
+  day: finding-code registry (reuse missing_required/duplicate_id/
+  unresolved_milestone/invalid_interval; new reserved_keyword,
+  parse_error, invalid_id, unresolved_participant, unresolved_interface,
+  unpaired_defer; warnings implicit_participant, dangling_interval,
+  crossed_reply, unmatched_activation, large_scenario with pinned >30
+  participants / >300 items thresholds); auto-activation pairing = LIFO
+  per direction pair over flattened document order, crossed_reply only in
+  auto scenarios; `+` only on the receiving end and `-` only on the
+  sending end (wrong-end/bidi markers are parse errors); at least one
+  arrow head required and no `x` with a left head; right-edge external
+  messages carry `edge: "right"`; implicit ad-hoc participants compile
+  id-only; docs process in sorted filename order and `sequences` sorts by
+  flow id, with the key OMITTED when empty — existing payloads and the
+  report bundle stay byte-identical, keeping D12a off D10's surface.
+  Budget carried into the prompt: 500 changed source lines (the
+  provisional ~500 from sequence.md; adjust before running if needed).
+  Next actions: user runs D10a (then D10b), D12a any time serially with
+  them; architect's next artifacts are the D12b layout vectors + acme
+  flow docs (after the phase-3 re-gate).
 
 - **2026-08-25** — Wave-1 gate PASSED. The Excel hand-edit half was run by
   the architect as the scripted equivalent (openpyxl standing in for hand

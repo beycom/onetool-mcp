@@ -29,6 +29,8 @@ below is the template it will be issued from.
 | D10a | Phase 3R wave 2a: chrome, panels, tables | READY (report.md "Wave-2 UI contract" committed 2026-08-24) | wave-1 (D9) gate |
 | D10b | Phase 3R wave 2b: canvas semantics + visuals | READY | D10a |
 | D11 | Phase 3R wave 3: view-mode capabilities | GATED on phase-3 re-gate + designs | phase-3 re-gate |
+| D12a | Phase 3S: sequence parser + payload | READY (parser vectors committed 2026-08-25) | wave-1 gate (passed); serial with D10a/D10b |
+| D12b | Phase 3S: sequence renderer + SEQ-* | GATED on layout vectors + acme flow docs | phase-3 re-gate |
 
 ## Standard rules — prepend to EVERY prompt
 
@@ -450,11 +452,12 @@ from issue files.
 Design doc: sequence.md (2026-08-25). Prompts are issued when the
 architect artifacts exist; executors work from sequence.md + the prompt.
 
-- **D12a (Python):** flow-doc parser, validation findings, `sequences`
-  payload section, CLI + `arch.validate`/`arch.generate` wiring. Gated on
-  the architect's parser-vector fixture
-  (`tests/unit/tools/fixtures/arch/sequence/`) — that suite is the control
-  mechanism. Runnable after the wave-1 (D9) gate; no frontend files.
+- **D12a (Python):** ISSUED 2026-08-25 (below) — flow-doc parser,
+  validation findings, `sequences` payload section, CLI +
+  `arch.validate`/`arch.generate` wiring. The parser-vector fixture
+  (`tests/unit/tools/fixtures/arch/sequence/`) is committed and is the
+  control mechanism. Wave-1 gate has passed; run serially with
+  D10a/D10b (payload.py overlap), no frontend files.
 - **D12b (frontend):** `seqlayout.ts` + SVG layer + entity-box header row
   + the SEQ-* interaction contract. Gated on the architect's layout
   vectors and the acme flow docs. Runs after the phase-3 re-gate (D10b
@@ -753,4 +756,68 @@ shows centered focus + in/out columns + count chips, node facts appear at
 FULL zoom (>=175%), clean console, zero external requests. Definition of
 done: rules 5-8 (also report `npm test` output), then STOP — the phase-3
 re-gate (architect + user) follows.
+```
+
+## D12a — Phase 3S: sequence parser + payload (READY, run serially with D10a/D10b)
+
+```text
+[standard rules]
+
+Context: v3 gains sequence diagrams. plans/arch/arch-v3/sequence.md is the
+owner doc — READ IT IN FULL first (source-doc format, DSL, compilation,
+payload shape, finding codes). This chunk is the Python half only: parse
+and validate Markdown flow docs, compile the `sequences` payload section,
+and wire discovery into validate/generate. NO frontend files, no bundle
+rebuild (the payload of every existing fixture/report is unchanged — see
+"omit when empty" below).
+
+Control mechanism: tests/unit/tools/fixtures/arch/sequence/ — architect-
+authored parser vectors. READ ITS README FIRST; it pins the driver
+contract, finding codes, anchor rules, and every decision the vectors
+encode (pairing rule, marker placement, drop-defaults, ordering).
+Vectors are READ-ONLY: one that looks wrong is a rule-1 stop, never an
+edit. Budget: 500 changed source lines (excluding tests and fixtures).
+
+Task:
+1. New module src/otdev/tools/_arch/v3/sequence.py: parse one flow doc
+   (frontmatter, doc-level participant lines, `##` scenario headings with
+   prose, ```seq fences) and compile the doc set against an Architecture
+   per sequence.md "DSL" + "Compilation". Findings use the existing
+   Finding dataclass (file = the flow doc path, line/column per the
+   README anchor rules; columns are your choice but must be >= 1).
+2. Discovery: <model-dir>/sequences/*.md beside the model YAML, sorted
+   filename order. arch.validate / CLI validate include flow-doc
+   findings; any flow-doc error fails generate atomically, exactly like
+   model errors.
+3. Payload: build_payload gains the top-level `sequences` key (after the
+   entity collections), sorted by flow id, compiled per sequence.md —
+   intervals reuse the existing segment machinery (clips always []).
+   OMIT the key when there are no flow docs: existing checked-in
+   payloads (projection fixture, acme dev payload) and the generated
+   report must stay byte-identical — that is what keeps this chunk off
+   D10's surface.
+4. Facade/CLI: no new subcommands; validate/generate/payload pick the
+   flows up via the shared load path in api.py.
+
+Tests (exactly these):
+1. tests/unit/tools/test_arch_v3_sequence.py — the vector driver per the
+   fixture README: for each flows/*.md compare (severity, code, line)
+   triples sorted by (line, code) and deep-compare the compiled entry
+   against expected.json ("sequence": null = doc must produce >= 1 error
+   and no compiled entry); plus the crossdoc/ set producing exactly the
+   listed duplicate_id finding.
+2. large_scenario thresholds: synthetic docs with 31 participants (warn)
+   / 30 (silent), and 301 items in one scenario (warn) / 300 (silent).
+3. Discovery + atomicity: a temp model dir whose sequences/ holds one
+   good and one erroring doc -> validate reports both docs' findings,
+   generate fails atomically (no output file); with the erroring doc
+   removed -> payload contains `sequences` sorted by flow id; and a
+   model dir with no sequences/ -> payload has NO `sequences` key.
+
+Definition of done: rules 5–8, plus: all existing arch tests stay green,
+`uv run python -m otdev.tools._arch.v3 validate
+tests/unit/tools/fixtures/arch/sequence/model.yaml` still reports 0
+errors, and regenerating the checked-in projection-fixture payload and
+acme dev payload via the CLI is byte-identical. STOP after the log entry
+— the architect reviews at the gate.
 ```

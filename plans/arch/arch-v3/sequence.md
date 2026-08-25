@@ -106,7 +106,9 @@ label. Endpoints:
 right head (`>` / `>>` / `)` / `x`). Every form both grammars publish is
 therefore legal: `->`, `->>`, `-->`, `-->>`, `-)`, `-x`, `--x`, `<-`,
 `<--`, `<->`, `<-->`, `<<-->`, `~>`, unlabeled arrows, `Bar -> Bar`
-self-messages.
+self-messages. At least one head is required (a headless line is a parse
+error), and an `x` head may not combine with a left head — lost messages
+are directional (2026-08-25, pinned by the parser vectors).
 
 **Kind derivation** (first match wins; drives rendering and validation):
 
@@ -146,7 +148,13 @@ deferred — text renders plain.
 - **Activation:** by default a sync call activates its target until the
   matching reply (auto-activation). A scenario containing any explicit
   `+`/`-` marker switches to **manual** activation for that whole scenario
-  — the two schemes never mix.
+  — the two schemes never mix. Auto pairing (2026-08-25): in flattened
+  document order, a reply from B to A closes the most recent open sync
+  call A→B (LIFO per direction pair); unmatched replies are silent.
+  Marker placement: after direction normalization `+` is legal only on
+  the receiving endpoint and `-` only on the sending endpoint; wrong-end
+  or bidirectional markers are parse errors. A `-` whose bar is not open
+  still compiles, with a warning — the renderer clamps.
 - **Reserved keywords** we deliberately do not support fail with a named
   parser error (never silently parse as a message): `par`, `critical`,
   `break`, `box` (C4 grouping comes from the model, not the doc),
@@ -166,12 +174,26 @@ error in any flow doc fails `generate` atomically, exactly like model
 errors. Errors additionally cover: reserved keywords (named as deferred),
 an unpaired deferred id (`...req` with no send or no completion), a
 completion preceding its send or crossing scenarios, and unknown interface
-links. Advisory warnings: unresolved bare participant names, sync call
-with no matching reply where a reply exists for a later call (crossed
-pairing), scenarios above ~30 participants or ~300 messages, and sequence
+links. Advisory warnings: unresolved bare participant names, a sync call
+left open at scenario end while a later same-pair call was closed
+(crossed pairing — auto scenarios only, per the pairing rule above),
+docs above 30 participants or scenarios above 300 items, and sequence
 intervals referencing milestones on no timeline (the dangling case after
 `advance` — `advance` does **not** rewrite flow docs; the warning routes
 the manual fix).
+
+Finding codes (2026-08-25, pinned by the parser vectors) — reused from
+model validation: `missing_required`, `duplicate_id`,
+`unresolved_milestone`, `invalid_interval`. New errors:
+`reserved_keyword`, `parse_error`, `invalid_id`, `unresolved_participant`,
+`unresolved_interface`, `unpaired_defer`. New warnings:
+`implicit_participant`, `dangling_interval`, `crossed_reply`,
+`unmatched_activation`, `large_scenario`. An errored line is skipped
+(opens nothing, pairs with nothing); an unclosed frame anchors its error
+at the opening line; frontmatter findings anchor at the offending key's
+line (line 1 for a missing key). Docs are processed in sorted filename
+order (a cross-doc duplicate flow id errors on the later file) and the
+compiled `sequences` array is sorted by flow id.
 
 The payload gains a top-level `sequences` key (after the entity
 collections), compiled deterministically:
@@ -208,7 +230,8 @@ preserves a `~` line for rendering; explicit activation markers compile to
 `"activate": true` (on the receiver) / `"deactivate": true` (on the
 sender), and the scenario carries `"activation": "auto" | "manual"`.
 External messages omit the outside endpoint and carry
-`external: "in" | "out"`; a deferred pair is two items sharing `defer`
+`external: "in" | "out"` plus `"edge": "right"` when the `]` edge is used
+(left is the default and dropped); a deferred pair is two items sharing `defer`
 (send omits `to`, completion omits `from`), validated as exactly one of
 each with the completion later in the same scenario. Frame kinds are
 `alt` / `opt` / `loop` / `group` (aliases normalized away — `if` becomes
@@ -218,8 +241,10 @@ each with the completion later in the same scenario. Frame kinds are
 line breaks already unescaped (`\n` / `<br/>` → newline). Omitted keys
 follow the payload contract's drop-defaults rule. Model-backed
 participants carry `ref` (`kind:id` node key — the client joins to the
-entity row for box content, containment, and liveness); ad-hoc participants
-carry `label` only.
+entity row for box content, containment, and liveness) with the canonical
+case-normalized model id as participant id; declared ad-hoc participants
+carry `label` (plus `actor: true` for `actor` lines); implicit ad-hoc
+participants (bare unresolved names) carry id only.
 
 ## Renderer decision (2026-08-25)
 
@@ -342,7 +367,9 @@ transient.
 
 - **Parser vectors** (authoritative, architect-authored — the D12a control
   mechanism): flow docs + expected compiled `sequences` payload + expected
-  findings, in `tests/unit/tools/fixtures/arch/sequence/`.
+  findings, in `tests/unit/tools/fixtures/arch/sequence/`. AUTHORED
+  2026-08-25 — its README carries the driver contract and pinned
+  decisions; vectors are the tie-breaker on any wording gap here.
 - **Layout vectors** (vitest, the D12b control mechanism): compiled
   scenario + view state (hidden / collapsed / focus) → expected column
   order, row assignments, and elision runs — indices, not pixels.
