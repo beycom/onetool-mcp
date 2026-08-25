@@ -758,7 +758,57 @@ done: rules 5-8 (also report `npm test` output), then STOP — the phase-3
 re-gate (architect + user) follows.
 ```
 
-## D12a — Phase 3S: sequence parser + payload (READY, run serially with D10a/D10b)
+## D13 — Phase 3P: UI polish passes (GATED; issued per pass)
+
+Four presentation passes D13a–D13d over the wave-2 report UI (plan.md
+"Phase 3P"). Each is GATED until its architect spec lands in report.md;
+prompts are issued one pass at a time and each pass gates before the
+next is issued. No new features ride along.
+
+## D13a — Phase 3P pass 1: visual foundation (READY)
+
+```text
+[standard rules + UI rule 9]
+
+Prereq: commit c37e3d05 (wave-2 UI + gate fixes) is the baseline. The
+authoritative contract is plans/arch/arch-v3/report.md — READ IN FULL
+the section "Polish contract — pass 1: visual foundation (D13a)". Do
+NOT read issue or research files. This is a PURE PRESENTATION pass:
+projection.ts, layout.ts, view.ts, types.ts, zoom.ts and all behavior,
+DOM semantics, aria labels, data-testids, and fragment keys are
+untouched. Expected surface: styles.css (dominant), a new icons
+component file, and minimal App.tsx/GridPanel.tsx edits where markup
+must host the icons, footer wording, and the tables-bar affordance.
+
+Budget: 700 changed source lines (excluding tests). Python changes:
+none. No new npm dependencies (icons are local inline-SVG components).
+
+Scope — implement the contract section exactly:
+1. Design tokens on :root (fonts, type scale, spacing, radius,
+   elevation, control height); dark theme redefines colors only.
+2. Mono-for-data / sans-for-UI typography split; eliminate sub-11px
+   chrome text and the uppercase mono micro-labels.
+3. One shared card recipe for clusters, zoom rail, legend, minimap,
+   scope menu, and panel chrome.
+4. Inline-SVG icon set for the chrome controls listed in the contract
+   (node drill magnifier and kind icons are OUT — pass 3).
+5. Dark and light contrast audit per the contract targets.
+6. Footer humanised per the contract; rendered-node-ids visually
+   hidden but kept in the DOM with its testid.
+7. Collapsed tables panel as a docked bar.
+
+Tests: none new. `npm test` must pass UNCHANGED — if a test needs
+editing, you have changed behavior; stop and report instead.
+
+Finish: `just build-arch-report`, regenerate the acme report via the
+CLI, verify per rule 9 from file://: both themes, full width and
+500px, clean console, zero external requests; capture before/after
+screenshots of the default systems view (light + dark) for the gate.
+Definition of done: rules 5-8 (report `npm test` output; pytest run
+unchanged by this chunk), then STOP — D13b is a separate prompt.
+```
+
+## D12a — Phase 3S: sequence parser + payload (issued 2026-08-25, ON HOLD until the Phase 3P exit gate)
 
 ```text
 [standard rules]

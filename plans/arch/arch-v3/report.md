@@ -585,6 +585,86 @@ position won by user decision; both issue files carry the decision note.)
   **zero external requests from `file://`** remain gate checks
   (do-not-copy: remote assets, Google Fonts included).
 
+## Polish contract — pass 1: visual foundation (D13a)
+
+Normative for D13a (Phase 3P pass 1). A **pure presentation pass**: no
+changes to projection, layout, or view logic, DOM structure semantics,
+aria labels, data-testids, fragment keys, or any behavior. Styling,
+iconography, and how the footer presents its content are the entire
+surface. Where this section names a change it wins over "Canvas and
+look" and the Wave-2 styling values; everything unnamed is unchanged.
+
+### Design tokens
+
+All values become CSS custom properties on `:root`; the dark theme
+redefines **colors only**, never sizes or spacing.
+
+- **Fonts.** `--font-ui`: system sans stack (`-apple-system, 'Segoe
+  UI', Roboto, 'Helvetica Neue', sans-serif`). `--font-data`: the
+  existing SFMono/Consolas mono stack. Mono is **reserved for data
+  values** — entity/interface ids, counts, the zoom percentage, and
+  milestone ids in the time output. Every control label, button, tab,
+  panel header, tooltip, and summary uses `--font-ui`.
+- **Type scale.** `--text-xs: 11px`, `--text-sm: 12px`, `--text-md:
+  13px`, `--text-lg: 15px`. No chrome text below 11px — the current
+  8–10px mono micro-labels are eliminated. The uppercase micro-labels
+  (TIME, COMPARE, ASPECT, TAGS, Scope) become `--text-xs` muted
+  sentence-case labels in `--font-ui` (no letter-spacing tricks).
+- **Spacing / radius / elevation.** `--space-1..5`: 4/8/12/16/24 px.
+  `--radius-sm: 6px` (controls), `--radius-md: 10px` (cards).
+  `--elevation-1` (resting cards), `--elevation-2` (menus/popovers) as
+  the only two shadows. `--control-h: 30px` stays the single control
+  height.
+- **One card recipe.** The floating clusters, zoom rail, legend panel,
+  minimap, scope menu, and the side/tables panel chrome all share one
+  tokened surface treatment (background, border, `--radius-md`,
+  `--elevation-1`). The five current ad-hoc variants converge; nothing
+  invents its own border or shadow.
+
+### Iconography
+
+Replace the ASCII/unicode glyph buttons (⌘ ◐ ○ ↗ ⌁ ×, chevrons, + −)
+with inline SVG icons: 16×16 viewBox, 1.5px stroke, `currentColor`,
+defined as local React components — no icon font, no external assets
+(offline rule). Covered: brand mark, theme toggle, copy link,
+fullscreen enter/exit, close, panel collapse/expand chevrons, zoom in
+/ out, fit. The node drill magnifier and kind icons are **pass 3** —
+leave them. All aria-labels and tooltips stay exactly as they are.
+
+### Dark theme contrast
+
+Both themes stay flat (no gradients). In dark, raise `--border` and
+the muted text tone until: card borders are visibly distinct from the
+canvas at rest, and every label meets ~4.5:1 against its surface.
+Interactive control outlines target ≥3:1 against their background.
+Light theme gets the same audit (the near-invisible label greys).
+
+### Footer and status
+
+- Left: `N nodes · M connections · <scope summary>` in `--font-ui`
+  with mono only for the numbers.
+- Right: the current position in plain words (`Base · position 0` →
+  e.g. `Base` / `Complete Cutover`), no `ELK union layout · offline ·
+  program · N authored systems` debug string. The transient
+  `laying out…` state remains as a subtle indicator.
+- The `rendered-node-ids` span becomes visually hidden (clip-rect
+  pattern), keeping its data-testid and content for tests. The
+  node/connection counts keep their testids.
+
+### Tables toggle
+
+The collapsed bottom panel presents as a slim full-width docked bar
+(ui font label + chevron icon), not a floating debug pill. Expanded
+behavior is untouched.
+
+### Verification (gate inputs)
+
+Presentation-only: `npm test` passes **unchanged** (if a selector
+broke, the pass overstepped), plus the rule-9 browser pass in both
+themes and at 500px — clean console, zero external requests, and a
+before/after screenshot pair at the D13a gate for the architect + user
+eyeball.
+
 ## Exports
 
 Phase one exports are data-shaped and require no layout engine in Python:

@@ -282,10 +282,14 @@ are the styling reference.
       panels, tables — 1,400 changed TS/TSX lines) + D10b (canvas
       semantics + visuals — 1,900), budgets agreed with the user
       2026-08-24.
-- [ ] Executor chunks: implement the wave. `→ D10a, D10b`
-- [ ] **Re-run phase-3 gate** (architect + user).
+- [x] Executor chunks: implement the wave. `→ D10a, D10b` (landed
+      2026-08-25 with the architect gate fixes, commit c37e3d05)
+- [x] **Re-run phase-3 gate** — architect half PASSED 2026-08-25 (see
+      log); the user half is FOLDED INTO the Phase 3P exit gate (user
+      decision 2026-08-25).
 
-### Wave 3 — new capabilities (after the re-gate)
+### Wave 3 — new capabilities (DELAYED until Phase 3P completes — user
+directive 2026-08-25: polish the existing UI before any new big pieces)
 
 Write-path decision (2026-08-24): the app has **view** mode (standalone
 `file://`, read-only) and **edit** mode (local server owning the YAML write
@@ -299,6 +303,81 @@ complete.
       MAP/PATH/LENS placeholders left by D7. `→ D11`
 - [ ] `p3-edit-save-back` — DEFERRED (edit mode).
 - [ ] `p3-ui-manual-positions` — DEFERRED (edit mode).
+
+## Phase 3P — UI polish passes (before D11/D12/D8 — user-directed 2026-08-25)
+
+The wave-2 build is functionally complete but reads as clunky and
+poorly designed. Four polish passes clean up look and feel, each
+independently gateable, ordered so later passes build on earlier ones.
+**No new features land during 3P**; D11, D12 (both halves — the issued
+D12a prompt is ON HOLD), and D8 wait until the 3P exit gate. Passes are
+executor chunks `D13a–D13d`; the architect authors each pass's
+normative spec (folded into report.md as amendments to the Wave-2 UI
+contract) plus the prompt, with budgets agreed per pass. Design
+references: the measured Archify/IcePanel values and binding lists in
+`research/ui/ui-research-findings.md` + the evidence captures, and the
+reference screenshots in `issues/`.
+
+Evidence baseline (architect critique, 2026-08-25, from the acme
+report): default fit strands the graph in a corner of a mostly-empty
+canvas at 37% zoom; nodes are uniform 250×168 cards that are ~80%
+empty at MAP depth yet still truncate their names; edges route as huge
+orthogonal rectangular detours that read as phantom boundary boxes and
+cross node interiors, with near-invisible strokes and no visible
+arrowheads; fitted content hides behind the floating legend; the
+legend is a full-height list of identical teal swatches (mostly
+count-1 tags) with no meaning in the color; chrome is dev-tool-styled
+(8–10px mono uppercase labels everywhere, ASCII glyph buttons ⌘◐↗⌕⌁,
+raw node-id dump visible in the footer, debug-pill "Open Tables
+panel"); the MAP→READ threshold (100%) does not match layout scale, so
+the useful 40–90% range shows only names in oversized boxes.
+
+- [ ] **Pass 1 — visual foundation: tokens, type, chrome.** `→ D13a`
+      (spec: report.md "Polish contract — pass 1"; prompt READY in
+      delegation.md; budget 700 changed source lines, proposed
+      2026-08-25 — confirm before running.)
+      Design-token pass (spacing / radius / shadow / type scale), one
+      shared card style for clusters, panels, rail, and minimap; mono
+      reserved for data (ids, counts) with UI labels in a readable
+      sans scale; real inline-SVG icon set replacing ASCII glyphs;
+      dark-theme contrast pass; footer humanised (node-id dump hidden
+      from view, kept for tests); tables toggle styled as a proper
+      docked-bar affordance. CSS-dominant, low risk — do first.
+- [ ] **Pass 2 — canvas composition: layout, fit, density.** `→ D13b`
+      Per-depth/level node sizing (names never truncate before the box
+      does); ELK tuning — tighter spacing, aspect-ratio hint, edge
+      routing that kills the giant rectangular detours and interior
+      crossings, proportional boundary padding (compact single-child
+      boundaries); fit that accounts for open overlays (legend / side
+      panel / cluster insets) and lands small graphs at READ depth;
+      reading-depth thresholds re-derived from real node scale; grid
+      packing for sparse/edgeless drill sets; minimap repositioned
+      clear of the zoom rail and legend. Highest-risk pass; existing
+      projection vectors and tests must stay green.
+- [ ] **Pass 3 — graph elements: nodes, edges, boundaries.** `→ D13c`
+      Entity-box redesign per reading depth (MAP compact chip, READ
+      card, FULL facts) with kind accenting and person-styled users;
+      drill affordance with a real hit target; edge contrast pass —
+      zoom-compensated stroke, visible arrowheads, label pills scoped
+      to FULL/selection; boundaries visually distinct from edge routes
+      (fill tint, label placement, nested shading); dimming tiers
+      re-tuned against the Archify reference values.
+- [ ] **Pass 4 — panels and overlays: legend, side panel, tables,
+      empty states.** `→ D13d` Legend becomes meaningful: per-tag
+      deterministic categorical colors, count-descending sort,
+      singleton tags grouped under an expandable rare section, compact
+      rows, height respecting rail/minimap; side-panel hierarchy
+      (title block, kv grid, directional connection chips); tables
+      toolbar/density polish; designed empty and failure states (drill
+      with no connections, layout failure, laying-out skeleton); final
+      motion/consistency sweep with a reduced-motion audit.
+- [ ] **Exit gate (architect + user):** the phase-3 gate question —
+      open acme's report cold and the story reads without explanation,
+      but now also *looks* deliberate: no dead-space fit, no phantom
+      rectangles, readable nodes at default zoom, meaningful legend,
+      coherent chrome in both themes. Browser pass stays console-clean
+      and offline. Only after this gate do D11/D12b/D8 resume (and the
+      held D12a run).
 
 ## Phase 3S — Sequence diagrams (budgets provisional: ~500 py + ~2,200 TS/TSX)
 
@@ -319,12 +398,13 @@ prompt is authored.
       (`tests/unit/tools/fixtures/arch/sequence/`) — the D12a control
       mechanism. (2026-08-25; D12a prompt issued the same day)
 - [ ] Python: parser, validation findings, `sequences` payload, CLI +
-      facade wiring. `→ D12a` (READY; run serially with D10a/D10b)
+      facade wiring. `→ D12a` (prompt issued but ON HOLD until the
+      Phase 3P exit gate — user directive 2026-08-25)
 - [ ] **Architect:** layout vectors + 2–3 acme flow docs (multi-scenario,
       interval-carrying, ad-hoc participant) — the D12b control mechanism.
 - [ ] Frontend: `seqlayout.ts`, SVG layer, entity-box header row, SEQ-*
-      interactions, fragment keys. `→ D12b` (after the phase-3 re-gate;
-      ∥ D11/D8)
+      interactions, fragment keys. `→ D12b` (after the phase-3 re-gate
+      AND the Phase 3P exit gate; ∥ D11/D8)
 - [ ] **Gate (architect + user):** open an acme flow, play it through,
       collapse a system band, focus a participant, hide one, switch
       scenario — the story reads without explanation; sticky headers hold;
@@ -391,6 +471,38 @@ None yet. Format: `branch-name — question being explored — outcome`.
    interval preserves the old behavior on both timelines.
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-25** — Phase-3 re-gate user half folded into the 3P exit
+  gate (user decision); the wave-2 checkboxes are closed on that
+  basis. D13a authored: normative spec added to report.md ("Polish
+  contract — pass 1: visual foundation" — tokens, mono-for-data
+  typography split, one shared card recipe, inline-SVG chrome icons,
+  dark/light contrast targets, humanised footer with visually-hidden
+  node-id dump, docked tables bar; pure presentation, npm test must
+  pass unchanged) and the D13a prompt registered READY in
+  delegation.md with a proposed budget of 700 changed source lines
+  (confirm before running). D13b–D13d remain GATED pending their
+  specs. Next actions: user confirms the D13a budget and runs it;
+  architect gates D13a with before/after screenshots, then authors
+  D13b (canvas composition — the highest-risk pass).
+
+- **2026-08-25** — Phase 3P (UI polish) planned, user-directed: the
+  wave-2 UI works but is clunky, so D11, D12 (both halves; the issued
+  D12a prompt is ON HOLD), and D8 are delayed until polish completes.
+  Architect critique captured from fresh acme-report screenshots
+  (dead-space fit at 37%, 80%-empty 250×168 nodes that still truncate
+  names, rectangular edge detours reading as phantom boundaries,
+  content hidden behind the legend, meaningless single-color legend
+  swatches, dev-tool chrome, MAP→READ threshold mismatched to layout
+  scale). Four passes registered as D13a–D13d: (1) tokens / type /
+  chrome, (2) canvas composition — layout, fit, density (highest
+  risk), (3) graph elements — nodes / edges / boundaries, (4) panels,
+  overlays, empty states + motion sweep; exit gate re-runs the
+  phase-3 story test with a "looks deliberate" bar. Next actions:
+  architect authors the D13a spec (report.md amendment) + prompt with
+  a budget agreed with the user; the phase-3 re-gate user half can run
+  on the current build or fold into the 3P exit gate at the user's
+  choice.
 
 - **2026-08-25** — Gate findings fixed (architect, user-directed), left
   uncommitted with the D10 tree. (1) Drill root carve-out: `drillAt`
