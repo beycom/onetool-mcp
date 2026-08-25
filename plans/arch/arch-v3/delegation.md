@@ -183,6 +183,17 @@ Four presentation passes D13a–D13d over the wave-2 report UI (plan.md
 prompts are issued one pass at a time and each pass gates before the
 next is issued. No new features ride along.
 
+Spec-authoring input (architect only — executors read report.md, never
+issue files): `plans/arch/arch-v3/ui-polish.md` tags each of its 24
+issues to a pass. When authoring a pass's contract, translate that
+pass's tagged issues into normative requirements (or record a waiver in
+ui-polish.md), and give the behavior fixes folded into passes 2 and 4
+(plan.md pass bullets) tests — they are behavior, not presentation.
+Pass-4 precheck before speccing D13d: confirm the payload already
+carries edge endpoint/interface/aspect data for the connection-details
+fix (ui-polish #21); if it needs plumbing, escalate to the user instead
+of burying it in a polish pass.
+
 ## D13a — Phase 3P pass 1: visual foundation (READY)
 
 ```text

@@ -30,6 +30,7 @@ lands; a fresh session should be able to resume from this file alone.
 | Fixture source of record | `plans/arch/wip/acme-arch-v2.xlsx` (dumped to `plans/arch/arch-v3/fixture-src/`) |
 | Open issues (wave 3) | `plans/arch/arch-v3/issues/` — p3-* files + index; resolved p1/p2 files in `issues/resolved/`; Archify/IcePanel reference screenshots stay in `issues/` (cited by the 3P pass specs) |
 | UI research (IcePanel/Archify) | `plans/arch/arch-v3/research/ui/ui-research-findings.md` + evidence captures |
+| UI polish issue list (3P input) | `plans/arch/arch-v3/ui-polish.md` — 24 itemized issues from the 2026-08-25 Playwright walkthrough, tagged D13a–D13d; the 3P pass specs must close or waive every tagged item |
 | Progress-log archive | `plans/arch/arch-v3/log-archive.md` |
 | Archived history (reference only) | `plans/arch/archive/` — `arch-v2/` design history incl. `grill/`; `v2-wip/` (v2-era design/ideas/requirements/mocks + superseded interactions.md, mined into report.md "Wave-2 UI contract") |
 | v2 donor code | HARVEST COMPLETE — branch `feature/arch-v2` on origin (head `e242fbb5`); worktree removed 2026-08-25. The dead patch/replay list ("must NOT return") lives in delivery.md |
@@ -208,6 +209,16 @@ raw node-id dump visible in the footer, debug-pill "Open Tables
 panel"); the MAP→READ threshold (100%) does not match layout scale, so
 the useful 40–90% range shows only names in oversized boxes.
 
+**Itemized issue list (2026-08-25, second evidence source):**
+`ui-polish.md` — 24 issues from a full Playwright walkthrough
+(per `wip/notes/test-ui.md`), each with observed → expected and a
+D13a–D13d tag. It confirms the baseline above and adds measured
+values (all 17 edges 1px `#B1B1B7`, `marker-end: null`, zero edge
+labels) plus six interaction/behavior defects the original pass
+bullets did not cover; those are now folded into passes 2 and 4
+below. Each pass spec must close or explicitly waive every issue
+tagged to it; the exit gate checks the list is empty.
+
 - [ ] **Pass 1 — visual foundation: tokens, type, chrome.** `→ D13a`
       (spec: report.md "Polish contract — pass 1"; prompt READY in
       delegation.md; budget 700 changed source lines, proposed
@@ -228,8 +239,17 @@ the useful 40–90% range shows only names in oversized boxes.
       panel / cluster insets) and lands small graphs at READ depth;
       reading-depth thresholds re-derived from real node scale; grid
       packing for sparse/edgeless drill sets; minimap repositioned
-      clear of the zoom rail and legend. Highest-risk pass; existing
-      projection vectors and tests must stay green.
+      clear of the zoom rail and legend. Behavior fixes folded in from
+      ui-polish.md (#12, #14a, #15, #17, and the resize/overlay
+      triggers of #9): selection pans/zooms into the visible canvas
+      instead of hiding behind the details panel; legend collapse
+      state never changes except by user action; the time toolbar
+      never disappears as a side effect of select/close; time-pill
+      controls sit in fixed-width slots so nothing jumps while
+      scrubbing; re-fit fires on viewport resize and panel
+      open/close. These are behavior changes — they get tests, unlike
+      the presentation work. Highest-risk pass; existing projection
+      vectors and tests must stay green.
 - [ ] **Pass 3 — graph elements: nodes, edges, boundaries.** `→ D13c`
       Entity-box redesign per reading depth (MAP compact chip, READ
       card, FULL facts) with kind accenting and person-styled users;
@@ -237,7 +257,12 @@ the useful 40–90% range shows only names in oversized boxes.
       zoom-compensated stroke, visible arrowheads, label pills scoped
       to FULL/selection; boundaries visually distinct from edge routes
       (fill tint, label placement, nested shading); dimming tiers
-      re-tuned against the Archify reference values.
+      re-tuned against the Archify reference values. From ui-polish.md:
+      interface stubs get a glyph/label and visually attach to their
+      node or don't render at that level (#6); compare-mode styling is
+      an increment on legible base edges, never the only visible ink
+      (#7); the Call-direction aspect must produce a visibly different
+      picture (#2).
 - [ ] **Pass 4 — panels and overlays: legend, side panel, tables,
       empty states.** `→ D13d` Legend becomes meaningful: per-tag
       deterministic categorical colors, count-descending sort,
@@ -246,13 +271,28 @@ the useful 40–90% range shows only names in oversized boxes.
       (title block, kv grid, directional connection chips); tables
       toolbar/density polish; designed empty and failure states (drill
       with no connections, layout failure, laying-out skeleton); final
-      motion/consistency sweep with a reduced-motion audit.
+      motion/consistency sweep with a reduced-motion audit. From
+      ui-polish.md: Escape closes the topmost overlay / clears
+      selection (#13); the selection-scoped "Dependencies" control
+      moves out of the level-tabs bar into the side panel or a
+      selection toolbar (#16); connection details show endpoints
+      (linked), direction, interface, aspect values, and lifecycle
+      interval (#21) — **architect precheck before authoring this
+      spec:** confirm the payload already carries that edge data; if
+      it needs plumbing, that part escalates to the user at the gate
+      rather than riding a polish pass; tables columns auto-size,
+      all-empty columns collapse, headers never truncate (#22).
 - [ ] **Exit gate (architect + user):** the phase-3 gate question —
       open acme's report cold and the story reads without explanation,
       but now also *looks* deliberate: no dead-space fit, no phantom
       rectangles, readable nodes at default zoom, meaningful legend,
       coherent chrome in both themes. Browser pass stays console-clean
-      and offline. Only after this gate do D11/D12b/D8 resume (and the
+      and offline. Additionally: every ui-polish.md issue is closed or
+      carries an explicit waiver note in that file — rerun the
+      test-ui.md walkthrough (fresh load, select node + edge, collapse
+      legend, scrub time, compare on, tables open, both themes,
+      1024×720) and confirm none of the six behavior defects
+      reproduce. Only after this gate do D11/D12b/D8 resume (and the
       held D12a run).
 
 ## Phase 3S — Sequence diagrams (budgets provisional: ~500 py + ~2,200 TS/TSX)
@@ -328,6 +368,27 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-25** — UI walkthrough evidence captured (architect,
+  user-directed): full Playwright pass over the acme report per
+  wip/notes/test-ui.md (both themes, System/Container levels, time
+  scrub, compare, tables, node+edge selection, 1440×900 and
+  1024×720). Result: `ui-polish.md` — 24 observed→expected issues
+  tagged D13a–D13d, registered in Ground truth. Confirms the 3P
+  baseline and adds measured edge values (all edges 1px `#B1B1B7`,
+  no marker-end, zero labels) plus six behavior defects now folded
+  into the pass bullets: selection hidden behind the details panel,
+  legend self-expanding on select, time toolbar vanishing after
+  select/close, time-pill reflow while scrubbing (→ pass 2 with
+  tests); Escape not closing overlays, "Dependencies" spliced into
+  the level bar (→ pass 4). Pass-4 precheck added: confirm the
+  payload carries edge endpoint/interface data before speccing the
+  connection-details fix (#21). Exit gate now requires every
+  ui-polish.md issue closed or waived and a re-run of the
+  walkthrough. D13a is untouched by all this and stays READY —
+  next action unchanged: user confirms the D13a budget and runs it;
+  the architect folds the tagged issues into each pass spec as it
+  is authored.
 
 - **2026-08-25** — plans/arch reorg (user-directed). Deleted
   `react-flow-poc/` (198M incl. node_modules; superseded by the
