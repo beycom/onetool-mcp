@@ -293,7 +293,7 @@ projection contract (v1)": where this section names a change, this section
 wins; everything it does not name is unchanged. Sources reconciled here
 (2026-08-24): the twelve `p2-*` issues, the binding lists and measured
 values in `research/ui/ui-research-findings.md`, and the mined subset of
-`plans/arch/wip/interactions.md` (now superseded — see "Interaction
+`plans/arch/archive/v2-wip/interactions.md` (now superseded — see "Interaction
 baseline"). Quoted pixel/opacity/duration values are the Archify-measured
 styling reference — tune only by eye at the gate, never invent different
 mechanisms.
@@ -528,7 +528,7 @@ research #7 — supersedes INT-FOCUS-10..14's in-place emphasis):
 
 ### Interaction baseline (mined from wip/interactions.md, 2026-08-24)
 
-`plans/arch/wip/interactions.md` is **superseded**. These are the clauses
+`plans/arch/archive/v2-wip/interactions.md` is **superseded**. These are the clauses
 carried into v3, adapted to v3 naming; everything not listed is dropped
 or deferred (notably PATH/route probe, radar, guided stories → D11; scope
 builder, saved reports, attachments, tabs → out of scope or later
@@ -682,7 +682,7 @@ boundary.
   *third-party* renderers; the adopted design is a custom layout + React
   renderer sharing this app's entity boxes, panels, and dimming rules.
 - Saved Report Definition files, Confluence embedding, PDF.
-- The v2 wip interaction catalog (`plans/arch/wip/interactions.md`, ~230
+- The v2 wip interaction catalog (`plans/arch/archive/v2-wip/interactions.md`, ~230
   requirements) was mined 2026-08-24: the useful clauses live in "Wave-2 UI
   contract — Interaction baseline" above and the doc is marked superseded.
   Journey playback/guided views are D11; route probe, radar, and the rest

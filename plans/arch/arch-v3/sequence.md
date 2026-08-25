@@ -255,7 +255,7 @@ over our own data model; single-file offline bundle; MIT-class licenses;
 light/dark theming shared with the app.
 
 Alternatives surveyed (2026-08-25 web re-survey + the 2026-08-11 POC spike
-in `plans/arch/react-flow-poc/`):
+in `plans/arch/react-flow-poc/`, deleted 2026-08-25 — git history):
 
 | Option | License | Verdict |
 | --- | --- | --- |
