@@ -39,9 +39,8 @@ export type ReportRow = {
 export type Timeline = { id: string | null; milestones: string[] }
 export type RowKind = typeof KINDS[number]
 export type EntityKind = typeof ENTITY_KINDS[number]
-export type Level = 'systems' | 'containers' | 'components'
+export type Level = 'systems' | 'top-containers' | 'containers' | 'components'
 export type Aspect = 'ownership' | 'call-direction' | 'data-flow'
-export type DiagramMode = 'MAP' | 'PATH' | 'LENS'
 export type Theme = 'light' | 'dark'
 export type CompareMode = 'off' | 'base' | 'position'
 
@@ -86,6 +85,16 @@ export type GraphNode = {
   members: RowRef[]
 }
 
+export type GraphBoundary = {
+  key: string
+  nodeKey: string
+  kind: EntityKind
+  row: ReportRow
+  parentKey: string | null
+  childKeys: string[]
+  stub: boolean
+}
+
 export type GraphEdge = {
   key: string
   a: string
@@ -100,6 +109,7 @@ export type GraphEdge = {
 export type RolledGraph = {
   nodes: GraphNode[]
   edges: GraphEdge[]
+  boundaries: GraphBoundary[]
   state: ScopedState
 }
 
@@ -111,7 +121,9 @@ export type View = {
   compare: CompareMode
   comparePosition: number
   aspect: Aspect
-  mode: DiagramMode
+  deps: string | null
+  drill: string | null
+  lens: string[]
   theme: Theme
 }
 

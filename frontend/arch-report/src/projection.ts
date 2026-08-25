@@ -3,6 +3,7 @@ import {
   KINDS,
   type EntityKind,
   type FieldChange,
+  type GraphBoundary,
   type GraphEdge,
   type GraphNode,
   type Level,
@@ -183,6 +184,20 @@ function ancestorOfKind(
   return cursor
 }
 
+function topContainerRepresentative(ref: RowRef, byId: Map<string, RowRef>): RowRef | null {
+  const seen = new Set<string>()
+  let cursor: RowRef | null = ref
+  while (cursor && cursor.kind !== 'systems' && cursor.kind !== 'users') {
+    const key = nodeKey(cursor.kind as EntityKind, cursor.row.id)
+    if (seen.has(key)) return null
+    seen.add(key)
+    const parent = parentRef(cursor, byId)
+    if (cursor.kind === 'containers' && parent?.kind === 'systems') return cursor
+    cursor = parent
+  }
+  return cursor
+}
+
 function endpoints(row: ReportRow): [string, string] | null {
   const left = row.provider ?? row.source
   const right = row.consumer ?? row.target
@@ -283,6 +298,7 @@ function representativeAtLevel(
   if (top && boundaryStubs.has(nodeKey(top.kind as EntityKind, top.row.id))) return top
   if (ref.kind === 'users' || ref.kind === 'systems') return ref
   if (level === 'systems') return top
+  if (level === 'top-containers') return topContainerRepresentative(ref, byId)
   if (level === 'containers') {
     return ancestorOfKind(ref, 'containers', byId) ?? ref
   }
@@ -306,7 +322,7 @@ export function rollUp(state: ScopedState, level: Level): RolledGraph {
     return created
   }
 
-  const levelKind = level as EntityKind
+  const levelKind = level === 'top-containers' ? null : level as EntityKind
   for (const ref of entityRows(state)) {
     if (ref.kind === levelKind || ref.kind === 'users') ensureNode(ref)
     const representative = representativeAtLevel(ref, level, byId, state.boundaryStubs)
@@ -364,8 +380,169 @@ export function rollUp(state: ScopedState, level: Level): RolledGraph {
   return {
     nodes: [...nodes.values()].sort((left, right) => left.key.localeCompare(right.key)),
     edges: [...edges.values()].sort((left, right) => left.key.localeCompare(right.key)),
+    boundaries: [],
     state,
   }
+}
+
+function boundaryKey(ref: RowRef): string {
+  return `boundary:${nodeKey(ref.kind as EntityKind, ref.row.id)}`
+}
+
+function boundaryAncestors(ref: RowRef, level: Level, byId: Map<string, RowRef>): RowRef[] {
+  if (level === 'systems') return []
+  const ancestors: RowRef[] = []
+  let cursor = parentRef(ref, byId)
+  while (cursor) {
+    if (cursor.kind === 'systems' || (level !== 'top-containers' && cursor.kind === 'containers')) {
+      ancestors.unshift(cursor)
+    }
+    cursor = parentRef(cursor, byId)
+  }
+  return ancestors
+}
+
+export function withBoundaries(graph: RolledGraph, level: Level): RolledGraph {
+  const boundaries = new Map<string, GraphBoundary>()
+  for (const node of graph.nodes) {
+    const ref = { kind: node.kind, row: node.row }
+    const ancestors = boundaryAncestors(ref, level, graph.state.entityLookup)
+    let parentKey: string | null = null
+    for (const ancestor of ancestors) {
+      const key = boundaryKey(ancestor)
+      if (!boundaries.has(key)) {
+        boundaries.set(key, {
+          key,
+          nodeKey: nodeKey(ancestor.kind as EntityKind, ancestor.row.id),
+          kind: ancestor.kind as EntityKind,
+          row: ancestor.row,
+          parentKey,
+          childKeys: [],
+          stub: false,
+        })
+      }
+      parentKey = key
+    }
+    if (parentKey) boundaries.get(parentKey)!.childKeys.push(node.key)
+  }
+  for (const boundary of boundaries.values()) {
+    if (boundary.parentKey) boundaries.get(boundary.parentKey)?.childKeys.push(boundary.key)
+    if (graph.edges.some((edge) => edge.a === boundary.nodeKey || edge.b === boundary.nodeKey)) {
+      boundary.childKeys.push(boundary.nodeKey)
+    }
+  }
+  const claimedEndpointNodes = new Set([...boundaries.values()].filter((boundary) => boundary.childKeys.includes(boundary.nodeKey)).map((boundary) => boundary.nodeKey))
+  for (const boundary of boundaries.values()) {
+    boundary.childKeys = boundary.childKeys.filter((child) => !claimedEndpointNodes.has(child) || child === boundary.nodeKey)
+  }
+  return { ...graph, boundaries: [...boundaries.values()].sort((left, right) => left.key.localeCompare(right.key)) }
+}
+
+function isDescendant(ref: RowRef, rootKey: string, byId: Map<string, RowRef>): boolean {
+  let cursor: RowRef | null = ref
+  while (cursor) {
+    if (nodeKey(cursor.kind as EntityKind, cursor.row.id) === rootKey) return true
+    cursor = parentRef(cursor, byId)
+  }
+  return false
+}
+
+function directChildRepresentative(ref: RowRef, rootKey: string, byId: Map<string, RowRef>): RowRef | null {
+  let cursor: RowRef | null = ref
+  let child: RowRef | null = null
+  while (cursor) {
+    const key = nodeKey(cursor.kind as EntityKind, cursor.row.id)
+    if (key === rootKey) return child
+    child = cursor
+    cursor = parentRef(cursor, byId)
+  }
+  return null
+}
+
+export function drillAt(state: ProjectedState, rootKey: string): RolledGraph {
+  const scoped = scopeAt(state, null)
+  const byId = scoped.entityLookup
+  const root = byId.get(rootKey)
+  if (!root) return { nodes: [], edges: [], boundaries: [], state: scoped }
+  const directChildren = entityRows(state).filter((ref) => parentRef(ref, byId) === root)
+  const nodes = new Map(directChildren.map((ref) => {
+    const node = graphNode(ref, new Map())
+    node.members.push(ref)
+    return [node.key, node]
+  }))
+  const edges = new Map<string, GraphEdge>()
+  const stubs = new Map<string, RowRef>()
+  for (const kind of ['interfaces', 'relationships'] as const) {
+    for (const row of state.rows[kind]) {
+      const pair = endpoints(row)
+      if (!pair) continue
+      const raw = pair.map((id) => byId.get(id))
+      if (!raw[0] || !raw[1]) continue
+      const inside = raw.map((ref) => isDescendant(ref!, rootKey, byId))
+      if (!inside[0] && !inside[1]) continue
+      const representatives = raw.map((ref, index) => {
+        // null from directChildRepresentative means the endpoint IS the drilled
+        // root: keep it as a leaf inside its own boundary (same carve-out as
+        // withBoundaries) instead of dropping the connection.
+        if (inside[index]) return directChildRepresentative(ref!, rootKey, byId) ?? root
+        const top = topRepresentative(ref!, byId)
+        if (top?.kind === 'systems') stubs.set(nodeKey(top.kind, top.row.id), top)
+        return top
+      })
+      if (!representatives[0] || !representatives[1]) continue
+      const leftKey = nodeKey(representatives[0]!.kind as EntityKind, representatives[0]!.row.id)
+      const rightKey = nodeKey(representatives[1]!.kind as EntityKind, representatives[1]!.row.id)
+      if (leftKey === rightKey) continue
+      representatives.forEach((ref, index) => {
+        const key = index ? rightKey : leftKey
+        if (!nodes.has(key)) nodes.set(key, graphNode(ref!, stubs))
+        const rawRef = raw[index]!
+        if (!nodes.get(key)!.members.some((member) => member.kind === rawRef.kind && member.row.id === rawRef.row.id)) {
+          nodes.get(key)!.members.push(rawRef)
+        }
+      })
+      const [a, b] = [leftKey, rightKey].sort()
+      const key = `${a}|${b}`
+      if (!edges.has(key)) edges.set(key, {
+        key, a, b, interfaces: [], relationships: [], interfaceRows: [], relationshipRows: [], orientations: [],
+      })
+      const edge = edges.get(key)!
+      edge.orientations.push({ kind, id: row.id, from: leftKey, to: rightKey })
+      if (kind === 'interfaces') { edge.interfaces.push(row.id); edge.interfaceRows.push(row) }
+      else { edge.relationships.push(row.id); edge.relationshipRows.push(row) }
+    }
+  }
+  const rootBoundary: GraphBoundary = {
+    key: boundaryKey(root),
+    nodeKey: rootKey,
+    kind: root.kind as EntityKind,
+    row: root.row,
+    parentKey: null,
+    childKeys: [
+      ...directChildren.map((ref) => nodeKey(ref.kind as EntityKind, ref.row.id)),
+      ...(nodes.has(rootKey) ? [rootKey] : []),
+    ],
+    stub: false,
+  }
+  const stubBoundaries = [...stubs.entries()].map(([key, ref]): GraphBoundary => ({
+    key: boundaryKey(ref), nodeKey: key, kind: ref.kind as EntityKind, row: ref.row,
+    parentKey: null, childKeys: [], stub: true,
+  }))
+  return {
+    nodes: [...nodes.values()].sort((left, right) => left.key.localeCompare(right.key)),
+    edges: [...edges.values()].sort((left, right) => left.key.localeCompare(right.key)),
+    boundaries: [rootBoundary, ...stubBoundaries],
+    state: { ...scoped, boundaryStubs: stubs },
+  }
+}
+
+export function legendEntries(graph: RolledGraph): Array<{ tag: string; count: number }> {
+  const counts = new Map<string, number>()
+  for (const node of graph.nodes) {
+    const tags = new Set([...(node.row.tags ?? []), ...node.members.flatMap((member) => member.row.tags ?? [])])
+    for (const tag of tags) counts.set(tag, (counts.get(tag) ?? 0) + 1)
+  }
+  return [...counts].sort(([left], [right]) => left.localeCompare(right)).map(([tag, count]) => ({ tag, count }))
 }
 
 function everLiveState(payload: ReportPayload, timeline: number): ProjectedState {
@@ -381,13 +558,17 @@ function everLiveState(payload: ReportPayload, timeline: number): ProjectedState
   return { rows, clips: emptyClips() }
 }
 
-export function unionGraph(payload: ReportPayload, timeline: number, level: Level): RolledGraph {
-  return rollUp(scopeAt(everLiveState(payload, timeline), null), level)
+export function unionGraph(payload: ReportPayload, timeline: number, level: Level, drill: string | null = null): RolledGraph {
+  const state = everLiveState(payload, timeline)
+  return drill ? drillAt(state, drill) : withBoundaries(rollUp(scopeAt(state, null), level), level)
 }
 
 export function projectState(payload: ReportPayload, view: View): ProjectedView {
   const rawState = stateAt(payload, view.timeline, view.position)
-  return { ...rollUp(scopeAt(rawState, view.scope), view.level), rawState }
+  const graph = view.drill
+    ? drillAt(rawState, view.drill)
+    : withBoundaries(rollUp(scopeAt(rawState, view.scope), view.level), view.level)
+  return { ...graph, rawState }
 }
 
 export function affectedKeys(diff: StateDiff): Set<string> {
