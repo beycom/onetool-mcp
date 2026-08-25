@@ -54,7 +54,7 @@ export function GridPanel({
           id: node.row.id,
           kind: node.kind,
           name: node.row.name,
-          parent: node.row.system ?? node.row.subsystem ?? '',
+          parent: node.row.parent ?? node.row.container ?? node.row.component ?? '',
         })),
       }
     }
@@ -63,12 +63,12 @@ export function GridPanel({
         columns: [
           { field: 'id' }, { field: 'name' }, { field: 'provider' }, { field: 'consumer' },
           { field: 'call_direction', headerName: 'Call direction' },
-          { field: 'data_flow', headerName: 'Data flow' },
+          { field: 'data_flow_direction', headerName: 'Data flow direction' },
         ],
         rows: projected.state.rows.interfaces.map((row) => ({
-          call_direction: row.call_direction ?? 'unspecified',
+          call_direction: row.call_direction ?? 'consumer_to_provider',
           consumer: row.consumer,
-          data_flow: row.data_flow ?? 'unspecified',
+          data_flow_direction: row.data_flow_direction ?? 'provider_to_consumer',
           id: row.id,
           name: row.name,
           provider: row.provider,

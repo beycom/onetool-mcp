@@ -33,10 +33,10 @@ afterEach(cleanup)
 test('scrubbing the acme timeline changes the rendered node set', async () => {
   render(<App />)
   const nodeIds = screen.getByTestId('rendered-node-ids')
-  const current = nodeIds.textContent
+  const initial = nodeIds.textContent
 
   fireEvent.change(screen.getByLabelText('Architecture position'), { target: { value: '1' } })
 
-  await waitFor(() => expect(nodeIds.textContent).not.toBe(current))
+  await waitFor(() => expect(nodeIds.textContent).not.toBe(initial))
   expect(nodeIds.textContent).toContain('systems:commerce-platform')
 })

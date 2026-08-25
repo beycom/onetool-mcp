@@ -1,13 +1,14 @@
 export const KINDS = [
   'systems',
-  'subsystems',
+  'containers',
   'components',
+  'code',
   'users',
   'interfaces',
   'relationships',
 ] as const
 
-export const ENTITY_KINDS = ['systems', 'subsystems', 'components', 'users'] as const
+export const ENTITY_KINDS = ['systems', 'containers', 'components', 'code', 'users'] as const
 
 export type Bound = number | null
 export type LiveSegment = [number, Bound]
@@ -21,27 +22,28 @@ export type ReportRow = {
   description?: string
   tags?: string[]
   properties?: Record<string, string | string[]>
-  from?: string
-  until?: string
-  system?: string
-  subsystem?: string
+  start_in?: string
+  end_in?: string
+  parent?: string
+  container?: string
+  component?: string
   provider?: string
   consumer?: string
   source?: string
   target?: string
   call_direction?: string
-  data_flow?: string
+  data_flow_direction?: string
   intervals: RowIntervals[]
 }
 
 export type Timeline = { id: string | null; milestones: string[] }
 export type RowKind = typeof KINDS[number]
 export type EntityKind = typeof ENTITY_KINDS[number]
-export type Level = 'systems' | 'subsystems' | 'components'
+export type Level = 'systems' | 'containers' | 'components'
 export type Aspect = 'ownership' | 'call-direction' | 'data-flow'
 export type DiagramMode = 'MAP' | 'PATH' | 'LENS'
 export type Theme = 'light' | 'dark'
-export type CompareMode = 'off' | 'current' | 'position'
+export type CompareMode = 'off' | 'base' | 'position'
 
 export type ReportPayload = {
   payload: 'arch-report/v1'

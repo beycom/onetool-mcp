@@ -9,8 +9,8 @@ import type {
   View,
 } from './types'
 
-const LEVELS = new Set<Level>(['systems', 'subsystems', 'components'])
-const COMPARE_MODES = new Set<CompareMode>(['off', 'current', 'position'])
+const LEVELS = new Set<Level>(['systems', 'containers', 'components'])
+const COMPARE_MODES = new Set<CompareMode>(['off', 'base', 'position'])
 const ASPECTS = new Set<Aspect>(['ownership', 'call-direction', 'data-flow'])
 const MODES = new Set<DiagramMode>(['MAP', 'PATH', 'LENS'])
 const THEMES = new Set<Theme>(['light', 'dark'])

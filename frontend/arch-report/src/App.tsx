@@ -26,6 +26,7 @@ import {
   type FieldChange,
   type GraphEdge,
   type GraphNode,
+  type EntityKind,
   type Level,
   type ReportPayload,
   type ReportRow,
@@ -38,7 +39,7 @@ type DiffStatus = 'added' | 'removed' | 'changed'
 type ArchitectureData = {
   boundary: boolean
   changes: FieldChange[]
-  kind: string
+  kind: EntityKind
   label: string
   row: ReportRow
   statuses: DiffStatus[]
@@ -50,6 +51,13 @@ type SemanticFlowEdge = Edge<SemanticData, 'semantic'>
 const payload = readPayload()
 const STATUS_ORDER: DiffStatus[] = ['added', 'removed', 'changed']
 const STATUS_ICON: Record<DiffStatus, string> = { added: '+', removed: '−', changed: 'Δ' }
+const KIND_LABEL: Record<EntityKind, string> = {
+  systems: 'System',
+  containers: 'Container',
+  components: 'Component',
+  code: 'Code',
+  users: 'User',
+}
 
 function rowLabel(row: ReportRow): string {
   return row.name ?? row.action ?? row.id
@@ -65,7 +73,7 @@ function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureNode>) {
     >
       <span aria-hidden="true" className="node-icon">{data.boundary ? '◁' : '◇'}</span>
       <strong>{data.label}</strong>
-      <span className="node-subtitle">{data.boundary ? 'BOUNDARY' : data.kind.toUpperCase()}</span>
+      <span className="node-subtitle">{data.boundary ? 'BOUNDARY' : KIND_LABEL[data.kind].toUpperCase()}</span>
       {data.statuses.length ? (
         <span aria-label={`Changes: ${data.statuses.join(', ')}`} className="diff-badges">
           {data.statuses.map((status) => <b data-status={status} key={status}>{STATUS_ICON[status]}</b>)}
@@ -124,14 +132,14 @@ function SemanticEdge({
 const nodeTypes = { architecture: memo(ArchitectureNodeView) }
 const edgeTypes = { semantic: memo(SemanticEdge) }
 
-function Passport({ kind, row, onClose }: { kind: string; row: ReportRow; onClose: () => void }) {
+function Passport({ kind, row, onClose }: { kind: EntityKind; row: ReportRow; onClose: () => void }) {
   const ordinaryFields = Object.entries(row).filter(([key, value]) => (
     !['id', 'name', 'action', 'description', 'tags', 'properties', 'intervals'].includes(key) && value !== undefined
   ))
   return (
     <aside aria-label={`Details for ${rowLabel(row)}`} className="semantic-passport">
       <header>
-        <div><span className="panel-kicker">{kind.toUpperCase()} PASSPORT</span><h2>{rowLabel(row)}</h2><code>{row.id}</code></div>
+        <div><span className="panel-kicker">{KIND_LABEL[kind].toUpperCase()} PASSPORT</span><h2>{rowLabel(row)}</h2><code>{row.id}</code></div>
         <button aria-label="Close passport" className="icon-button" onClick={onClose} type="button">×</button>
       </header>
       {row.description ? <p>{row.description}</p> : null}
@@ -158,7 +166,7 @@ function PositionControls({ payload, setView, view }: {
   if (!milestones.length) return null
   const milestoneById = new Map(payload.milestones.map((milestone) => [milestone.id, milestone]))
   const label = view.position === 0
-    ? 'Current'
+    ? 'Base'
     : milestoneById.get(milestones[view.position - 1])?.name ?? milestones[view.position - 1]
   return (
     <div className="time-controls control-group">
@@ -179,7 +187,7 @@ function PositionControls({ payload, setView, view }: {
         <span>Compare</span>
         <select aria-label="Diff comparison" onChange={(event) => setView({ compare: event.target.value as View['compare'] })} value={view.compare}>
           <option value="off">Off</option>
-          <option value="current">vs current</option>
+          <option value="base">vs base</option>
           <option value="position">vs position</option>
         </select>
       </label>
@@ -293,11 +301,13 @@ function edgePresentation(edge: GraphEdge, aspect: Aspect): {
       showArrow: directions.size > 0,
     }
   }
-  const field = aspect === 'call-direction' ? 'call_direction' : 'data_flow'
+  const field = aspect === 'call-direction' ? 'call_direction' : 'data_flow_direction'
   for (const row of edge.interfaceRows) {
     const orientation = edge.orientations.find((item) => item.kind === 'interfaces' && item.id === row.id)
     if (!orientation) continue
-    const direction = row[field] ?? 'unspecified'
+    const direction = row[field] ?? (
+      aspect === 'call-direction' ? 'consumer_to_provider' : 'provider_to_consumer'
+    )
     if (direction === 'provider_to_consumer' || direction === 'bidirectional') {
       addDirection(orientation.from, orientation.to)
     }
@@ -331,7 +341,7 @@ function flowEdge(edge: GraphEdge, aspect: Aspect, statuses: DiffStatus[]): Sema
 
 export default function App() {
   const [view, setViewState] = useState<View>(() => defaultView(payload))
-  const [selected, setSelected] = useState<{ kind: string; row: ReportRow } | null>(null)
+  const [selected, setSelected] = useState<{ kind: EntityKind; row: ReportRow } | null>(null)
   const [positions, setPositions] = useState<Positions>(new Map())
   const [flow, setFlow] = useState<ReactFlowInstance | null>(null)
   const [showTables, setShowTables] = useState(false)
@@ -340,7 +350,7 @@ export default function App() {
   const setView = (change: Partial<View>) => setViewState((current) => ({ ...current, ...change }))
 
   const projected = useMemo(() => projectState(payload, view), [view])
-  const compareFrom = view.compare === 'off' ? null : view.compare === 'current' ? 0 : view.comparePosition
+  const compareFrom = view.compare === 'off' ? null : view.compare === 'base' ? 0 : view.comparePosition
   const diff = useMemo(() => compareFrom === null
     ? null
     : diffStates(payload, view.timeline, compareFrom, view.position), [compareFrom, view.position, view.timeline])
@@ -400,7 +410,7 @@ export default function App() {
   const systemRows = [...new Map(payload.rows.systems.map((row) => [row.id, row])).values()]
   const timelineLabel = timeline.id ?? 'implicit timeline'
   const currentPositionLabel = view.position === 0
-    ? 'Current'
+    ? 'Base'
     : payload.milestones.find((item) => item.id === timeline.milestones[view.position - 1])?.name ?? `Position ${view.position}`
 
   const chooseTimeline = (value: number) => {
@@ -441,7 +451,7 @@ export default function App() {
         ) : null}
         <PositionControls payload={payload} setView={setView} view={view} />
         <div className="segmented control-group" role="group" aria-label="Architecture level">
-          {(['systems', 'subsystems', 'components'] as Level[]).map((level) => (
+          {(['systems', 'containers', 'components'] as Level[]).map((level) => (
             <button aria-pressed={view.level === level} key={level} onClick={() => setView({ level })} type="button">{level}</button>
           ))}
         </div>

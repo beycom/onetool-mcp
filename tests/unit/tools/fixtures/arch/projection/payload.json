@@ -62,7 +62,7 @@
       {
         "id": "sysB",
         "name": "Beta Services",
-        "from": "m1",
+        "start_in": "m1",
         "intervals": [
           {
             "live": [
@@ -87,13 +87,13 @@
       {
         "id": "sysL",
         "name": "Legacy Suite",
-        "until": "m2",
+        "end_in": "m1",
         "intervals": [
           {
             "live": [
               [
                 0,
-                2
+                1
               ]
             ],
             "clips": []
@@ -102,7 +102,7 @@
             "live": [
               [
                 0,
-                null
+                1
               ]
             ],
             "clips": []
@@ -110,11 +110,11 @@
         ]
       }
     ],
-    "subsystems": [
+    "containers": [
       {
         "id": "subA",
         "name": "Alpha Core",
-        "system": "sysA",
+        "parent": "sysA",
         "intervals": [
           {
             "live": [
@@ -139,8 +139,8 @@
       {
         "id": "subB",
         "name": "Beta API",
-        "from": "m1",
-        "system": "sysB",
+        "start_in": "m1",
+        "parent": "sysB",
         "intervals": [
           {
             "live": [
@@ -165,13 +165,13 @@
       {
         "id": "subL",
         "name": "Legacy Store",
-        "system": "sysL",
+        "parent": "sysL",
         "intervals": [
           {
             "live": [
               [
                 0,
-                2
+                1
               ]
             ],
             "clips": [
@@ -186,24 +186,30 @@
             "live": [
               [
                 0,
-                null
+                1
               ]
             ],
-            "clips": []
+            "clips": [
+              {
+                "start": 2,
+                "end": null,
+                "by": "sysL"
+              }
+            ]
           }
         ]
       },
       {
         "id": "subG",
         "name": "Gateway",
-        "until": "m1",
-        "system": "sysA",
+        "end_in": "base",
+        "parent": "sysA",
         "intervals": [
           {
             "live": [
               [
                 0,
-                1
+                0
               ]
             ],
             "clips": []
@@ -212,7 +218,7 @@
             "live": [
               [
                 0,
-                1
+                0
               ]
             ],
             "clips": []
@@ -222,8 +228,8 @@
       {
         "id": "subG",
         "name": "Gateway v2",
-        "from": "m2",
-        "system": "sysA",
+        "start_in": "m2",
+        "parent": "sysA",
         "intervals": [
           {
             "live": [
@@ -247,13 +253,13 @@
         "properties": {
           "owner": "core"
         },
-        "system": "sysA",
+        "parent": "sysA",
         "intervals": [
           {
             "live": [
               [
                 0,
-                2
+                1
               ]
             ],
             "clips": []
@@ -276,8 +282,8 @@
         "properties": {
           "owner": "platform"
         },
-        "from": "m2",
-        "system": "sysA",
+        "start_in": "m2",
+        "parent": "sysA",
         "intervals": [
           {
             "live": [
@@ -299,7 +305,7 @@
       {
         "id": "compA",
         "name": "Alpha Worker",
-        "subsystem": "subA",
+        "container": "subA",
         "intervals": [
           {
             "live": [
@@ -324,13 +330,13 @@
       {
         "id": "compL",
         "name": "Legacy Records",
-        "subsystem": "subL",
+        "container": "subL",
         "intervals": [
           {
             "live": [
               [
                 0,
-                2
+                1
               ]
             ],
             "clips": [
@@ -345,14 +351,21 @@
             "live": [
               [
                 0,
-                null
+                1
               ]
             ],
-            "clips": []
+            "clips": [
+              {
+                "start": 2,
+                "end": null,
+                "by": "sysL"
+              }
+            ]
           }
         ]
       }
     ],
+    "code": [],
     "users": [
       {
         "id": "u1",
@@ -390,7 +403,7 @@
             "live": [
               [
                 0,
-                2
+                1
               ]
             ],
             "clips": [
@@ -405,10 +418,16 @@
             "live": [
               [
                 0,
-                null
+                1
               ]
             ],
-            "clips": []
+            "clips": [
+              {
+                "start": 2,
+                "end": null,
+                "by": "sysL"
+              }
+            ]
           }
         ]
       },
@@ -441,10 +460,9 @@
       {
         "id": "iUB",
         "name": "Operate beta",
-        "from": "m1",
+        "start_in": "m1",
         "provider": "subB",
         "consumer": "u1",
-        "call_direction": "consumer_to_provider",
         "intervals": [
           {
             "live": [
@@ -469,10 +487,9 @@
       {
         "id": "iAB",
         "name": "Sync alpha to beta",
-        "from": "m2",
+        "start_in": "m2",
         "provider": "subA",
         "consumer": "subB",
-        "data_flow": "provider_to_consumer",
         "intervals": [
           {
             "live": [
@@ -496,7 +513,7 @@
         "action": "governs",
         "source": "sysA",
         "target": "sysB",
-        "from": "m1",
+        "start_in": "m1",
         "intervals": [
           {
             "live": [

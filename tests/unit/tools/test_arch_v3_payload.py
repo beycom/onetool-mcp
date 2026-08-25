@@ -15,8 +15,9 @@ pytestmark = [pytest.mark.unit, pytest.mark.tools]
 FIXTURE = Path(__file__).parent / "fixtures" / "arch" / "acme.yaml"
 KINDS = (
     "systems",
-    "subsystems",
+    "containers",
     "components",
+    "code",
     "users",
     "interfaces",
     "relationships",
@@ -30,7 +31,7 @@ def _points(segment: list[int | None] | dict[str, int | str | None], end: int) -
         start, stop = segment["start"], segment["end"]
     assert isinstance(start, int)
     assert stop is None or isinstance(stop, int)
-    return set(range(start, end + 1 if stop is None else stop))
+    return set(range(start, end + 1 if stop is None else stop + 1))
 
 
 def test_acme_payload_invariants() -> None:

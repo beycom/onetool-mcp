@@ -16,49 +16,50 @@ systems:
     name: Alpha Platform
   - id: sysB
     name: Beta Services
-    from: m1
+    start_in: m1
   - id: sysL
     name: Legacy Suite
-    until: m2
-subsystems:
+    end_in: m1
+containers:
   - id: subA
     name: Alpha Core
-    system: sysA
+    parent: sysA
   - id: subB
     name: Beta API
-    system: sysB
-    from: m1
+    parent: sysB
+    start_in: m1
   - id: subL
     name: Legacy Store
-    system: sysL
+    parent: sysL
   - id: subG
     name: Gateway
-    system: sysA
-    until: m1
+    parent: sysA
+    end_in: base
   - id: subG
     name: Gateway v2
-    system: sysA
-    from: m2
+    parent: sysA
+    start_in: m2
   - id: subR
     name: Registry
-    system: sysA
+    parent: sysA
     description: Legacy registry
     properties:
       owner: core
   - id: subR
     name: Registry
-    system: sysA
-    from: m2
+    parent: sysA
+    start_in: m2
     description: Rewritten registry
     properties:
       owner: platform
 components:
   - id: compA
     name: Alpha Worker
-    subsystem: subA
+    container: subA
   - id: compL
     name: Legacy Records
-    subsystem: subL
+    container: subL
+code: []
 users:
   - id: u1
     name: Operator
@@ -75,17 +76,17 @@ interfaces:
     name: Operate beta
     provider: subB
     consumer: u1
-    from: m1
+    start_in: m1
     call_direction: consumer_to_provider
   - id: iAB
     name: Sync alpha to beta
     provider: subA
     consumer: subB
-    from: m2
-    data_flow: provider_to_consumer
+    start_in: m2
+    data_flow_direction: provider_to_consumer
 relationships:
   - id: r1
     action: governs
     source: sysA
     target: sysB
-    from: m1
+    start_in: m1

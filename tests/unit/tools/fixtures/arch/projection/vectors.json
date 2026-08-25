@@ -9,7 +9,7 @@
             "sysA",
             "sysL"
           ],
-          "subsystems": [
+          "containers": [
             "subA",
             "subL",
             "subG",
@@ -19,6 +19,7 @@
             "compA",
             "compL"
           ],
+          "code": [],
           "users": [
             "u1"
           ],
@@ -41,7 +42,7 @@
             "sysB",
             "sysL"
           ],
-          "subsystems": [
+          "containers": [
             "subA",
             "subB",
             "subL",
@@ -51,6 +52,7 @@
             "compA",
             "compL"
           ],
+          "code": [],
           "users": [
             "u1"
           ],
@@ -75,7 +77,7 @@
             "sysA",
             "sysB"
           ],
-          "subsystems": [
+          "containers": [
             "subA",
             "subB",
             "subG",
@@ -84,6 +86,7 @@
           "components": [
             "compA"
           ],
+          "code": [],
           "users": [
             "u1"
           ],
@@ -97,7 +100,7 @@
           ]
         },
         "clips": {
-          "subsystems": [
+          "containers": [
             {
               "id": "subL",
               "by": "sysL"
@@ -125,24 +128,21 @@
         "live": {
           "systems": [
             "sysA",
-            "sysB",
-            "sysL"
+            "sysB"
           ],
-          "subsystems": [
+          "containers": [
             "subA",
             "subB",
-            "subL",
             "subR"
           ],
           "components": [
-            "compA",
-            "compL"
+            "compA"
           ],
+          "code": [],
           "users": [
             "u1"
           ],
           "interfaces": [
-            "iAL",
             "iAA",
             "iUB"
           ],
@@ -150,7 +150,26 @@
             "r1"
           ]
         },
-        "clips": {}
+        "clips": {
+          "containers": [
+            {
+              "id": "subL",
+              "by": "sysL"
+            }
+          ],
+          "components": [
+            {
+              "id": "compL",
+              "by": "sysL"
+            }
+          ],
+          "interfaces": [
+            {
+              "id": "iAL",
+              "by": "sysL"
+            }
+          ]
+        }
       }
     }
   ],
@@ -162,7 +181,7 @@
       "expect": {
         "added": [
           {
-            "kind": "subsystems",
+            "kind": "containers",
             "id": "subG",
             "name": "Gateway v2"
           },
@@ -180,7 +199,7 @@
             "clipped_by": null
           },
           {
-            "kind": "subsystems",
+            "kind": "containers",
             "id": "subL",
             "name": "Legacy Store",
             "clipped_by": "sysL"
@@ -200,7 +219,7 @@
         ],
         "changed": [
           {
-            "kind": "subsystems",
+            "kind": "containers",
             "id": "subR",
             "changes": [
               {
@@ -230,7 +249,7 @@
             "name": "Beta Services"
           },
           {
-            "kind": "subsystems",
+            "kind": "containers",
             "id": "subB",
             "name": "Beta API"
           },
@@ -247,7 +266,7 @@
         ],
         "removed": [
           {
-            "kind": "subsystems",
+            "kind": "containers",
             "id": "subG",
             "name": "Gateway",
             "clipped_by": null
@@ -262,7 +281,32 @@
       "b": 2,
       "expect": {
         "added": [],
-        "removed": [],
+        "removed": [
+          {
+            "kind": "systems",
+            "id": "sysL",
+            "name": "Legacy Suite",
+            "clipped_by": null
+          },
+          {
+            "kind": "containers",
+            "id": "subL",
+            "name": "Legacy Store",
+            "clipped_by": "sysL"
+          },
+          {
+            "kind": "components",
+            "id": "compL",
+            "name": "Legacy Records",
+            "clipped_by": "sysL"
+          },
+          {
+            "kind": "interfaces",
+            "id": "iAL",
+            "name": "Read legacy records",
+            "clipped_by": "sysL"
+          }
+        ],
         "changed": []
       }
     }
@@ -373,36 +417,36 @@
     {
       "timeline": "program",
       "position": 2,
-      "level": "subsystems",
+      "level": "containers",
       "expect": {
         "nodes": [
-          "subsystems:subA",
-          "subsystems:subB",
-          "subsystems:subG",
-          "subsystems:subR",
+          "containers:subA",
+          "containers:subB",
+          "containers:subG",
+          "containers:subR",
           "systems:sysA",
           "systems:sysB",
           "users:u1"
         ],
         "edges": [
           {
-            "a": "subsystems:subA",
-            "b": "subsystems:subB",
+            "a": "containers:subA",
+            "b": "containers:subB",
             "interfaces": [
               "iAB"
             ],
             "relationships": []
           },
           {
-            "a": "subsystems:subA",
-            "b": "subsystems:subR",
+            "a": "containers:subA",
+            "b": "containers:subR",
             "interfaces": [
               "iAA"
             ],
             "relationships": []
           },
           {
-            "a": "subsystems:subB",
+            "a": "containers:subB",
             "b": "users:u1",
             "interfaces": [
               "iUB"

@@ -23,8 +23,12 @@ def _serialize(item: StrictModel) -> dict[str, Any]:
     for field in ("tags", "properties"):
         if not value.get(field):
             value.pop(field, None)
-    for field in ("call_direction", "data_flow"):
-        if value.get(field) == "unspecified":
+    defaults = {
+        "call_direction": "consumer_to_provider",
+        "data_flow_direction": "provider_to_consumer",
+    }
+    for field, default in defaults.items():
+        if value.get(field) == default:
             value.pop(field)
     return value
 
@@ -36,10 +40,10 @@ def _live_segments(positions: list[int], last: int) -> list[list[int | None]]:
     start = previous = positions[0]
     for position in positions[1:]:
         if position != previous + 1:
-            segments.append([start, previous + 1])
+            segments.append([start, previous])
             start = position
         previous = position
-    segments.append([start, None if previous == last else previous + 1])
+    segments.append([start, None if previous == last else previous])
     return segments
 
 
@@ -54,12 +58,12 @@ def _clip_segments(
     for position, next_cause in positions[1:]:
         if position != previous + 1 or next_cause != cause:
             segments.append(
-                {"start": start, "end": previous + 1, "by": cause}
+                {"start": start, "end": previous, "by": cause}
             )
             start, cause = position, next_cause
         previous = position
     segments.append(
-        {"start": start, "end": None if previous == last else previous + 1, "by": cause}
+        {"start": start, "end": None if previous == last else previous, "by": cause}
     )
     return segments
 
@@ -91,7 +95,7 @@ def build_payload(architecture: Architecture, source_name: str) -> dict[str, Any
 
     for timeline_index, item in enumerate(materialized):
         view = timeline_view(architecture, item["id"])
-        selectors = ["current", *view.milestones]
+        selectors = ["base", *view.milestones]
         for payload_position, at in enumerate(selectors):
             state = resolve(architecture, StateSelector(at=at, timeline=view.id))
             clip_causes = {(clip.kind, clip.id): clip.clipped_by for clip in state.clips}

@@ -75,13 +75,13 @@
           "criticality": "tier-1",
           "lifecycle": "migrate"
         },
-        "until": "acme-2031-complete-cutover",
+        "end_in": "acme-2030-transaction-core",
         "intervals": [
           {
             "live": [
               [
                 0,
-                5
+                4
               ]
             ],
             "clips": []
@@ -326,7 +326,7 @@
           "criticality": "tier-1",
           "lifecycle": "strategic"
         },
-        "from": "acme-2027-edge-foundation",
+        "start_in": "acme-2027-edge-foundation",
         "intervals": [
           {
             "live": [
@@ -340,7 +340,7 @@
         ]
       }
     ],
-    "subsystems": [
+    "containers": [
       {
         "id": "commerce-monolith",
         "name": "Commerce Monolith",
@@ -357,13 +357,13 @@
           "release_cadence": "monthly",
           "technology": "Java / Spring MVC"
         },
-        "system": "legacy-commerce",
+        "parent": "legacy-commerce",
         "intervals": [
           {
             "live": [
               [
                 0,
-                1
+                0
               ]
             ],
             "clips": []
@@ -386,14 +386,14 @@
           "release_cadence": "monthly",
           "technology": "Java / Spring MVC"
         },
-        "from": "acme-2027-edge-foundation",
-        "system": "legacy-commerce",
+        "start_in": "acme-2027-edge-foundation",
+        "parent": "legacy-commerce",
         "intervals": [
           {
             "live": [
               [
                 1,
-                5
+                4
               ]
             ],
             "clips": [
@@ -418,7 +418,7 @@
           "owner": "Supply Chain Technology",
           "technology": "Commercial ERP"
         },
-        "system": "enterprise-fulfilment",
+        "parent": "enterprise-fulfilment",
         "intervals": [
           {
             "live": [
@@ -444,7 +444,7 @@
           "owner": "Order Operations Technology",
           "technology": "Commercial OMS"
         },
-        "system": "enterprise-order-management",
+        "parent": "enterprise-order-management",
         "intervals": [
           {
             "live": [
@@ -470,7 +470,7 @@
           "owner": "Finance Technology",
           "technology": "Finance ERP"
         },
-        "system": "enterprise-finance",
+        "parent": "enterprise-finance",
         "intervals": [
           {
             "live": [
@@ -495,7 +495,7 @@
           "owner": "Payment Provider",
           "technology": "REST API"
         },
-        "system": "payment-provider",
+        "parent": "payment-provider",
         "intervals": [
           {
             "live": [
@@ -519,7 +519,7 @@
           "owner": "Engagement Provider",
           "technology": "REST API"
         },
-        "system": "customer-engagement",
+        "parent": "customer-engagement",
         "intervals": [
           {
             "live": [
@@ -544,7 +544,7 @@
           "owner": "Identity Platform Team",
           "technology": "OIDC"
         },
-        "system": "enterprise-identity",
+        "parent": "enterprise-identity",
         "intervals": [
           {
             "live": [
@@ -569,7 +569,7 @@
           "owner": "Analytics Provider",
           "technology": "HTTPS collection API"
         },
-        "system": "analytics-provider",
+        "parent": "analytics-provider",
         "intervals": [
           {
             "live": [
@@ -594,7 +594,7 @@
           "owner": "Tax Provider",
           "technology": "REST API"
         },
-        "system": "tax-provider",
+        "parent": "tax-provider",
         "intervals": [
           {
             "live": [
@@ -619,7 +619,7 @@
           "owner": "Fraud Provider",
           "technology": "REST API"
         },
-        "system": "fraud-provider",
+        "parent": "fraud-provider",
         "intervals": [
           {
             "live": [
@@ -646,8 +646,8 @@
           "owner": "Platform Edge Team",
           "technology": "Managed CDN / WAF / API gateway"
         },
-        "from": "acme-2027-edge-foundation",
-        "system": "commerce-platform",
+        "start_in": "acme-2027-edge-foundation",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
@@ -674,8 +674,8 @@
           "scaling": "horizontal",
           "technology": "TypeScript / Node.js"
         },
-        "from": "acme-2027-edge-foundation",
-        "system": "commerce-platform",
+        "start_in": "acme-2027-edge-foundation",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
@@ -701,8 +701,8 @@
           "owner": "Platform Messaging Team",
           "technology": "Managed Kafka"
         },
-        "from": "acme-2027-edge-foundation",
-        "system": "commerce-platform",
+        "start_in": "acme-2027-edge-foundation",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
@@ -727,8 +727,8 @@
           "owner": "Site Reliability Engineering",
           "technology": "OpenTelemetry / managed observability"
         },
-        "from": "acme-2027-edge-foundation",
-        "system": "commerce-platform",
+        "start_in": "acme-2027-edge-foundation",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
@@ -755,15 +755,15 @@
           "owner": "Migration Enablement Team",
           "technology": "Java / integration runtime"
         },
-        "from": "acme-2027-edge-foundation",
-        "until": "acme-2031-complete-cutover",
-        "system": "commerce-platform",
+        "start_in": "acme-2027-edge-foundation",
+        "end_in": "acme-2030-transaction-core",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
               [
                 1,
-                5
+                4
               ]
             ],
             "clips": []
@@ -784,8 +784,8 @@
           "pii": "prohibited",
           "technology": "TypeScript / streaming runtime"
         },
-        "from": "acme-2027-edge-foundation",
-        "system": "commerce-platform",
+        "start_in": "acme-2027-edge-foundation",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
@@ -812,8 +812,8 @@
           "owner": "Catalog Team",
           "technology": "Kotlin / Spring Boot"
         },
-        "from": "acme-2028-catalog-search",
-        "system": "commerce-platform",
+        "start_in": "acme-2028-catalog-search",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
@@ -840,8 +840,8 @@
           "owner": "Search Team",
           "technology": "Java / OpenSearch"
         },
-        "from": "acme-2028-catalog-search",
-        "system": "commerce-platform",
+        "start_in": "acme-2028-catalog-search",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
@@ -867,15 +867,15 @@
           "owner": "Migration Enablement Team",
           "technology": "Java / Kafka Connect"
         },
-        "from": "acme-2028-catalog-search",
-        "until": "acme-2031-complete-cutover",
-        "system": "commerce-platform",
+        "start_in": "acme-2028-catalog-search",
+        "end_in": "acme-2030-transaction-core",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
               [
                 2,
-                5
+                4
               ]
             ],
             "clips": []
@@ -895,8 +895,8 @@
           "owner": "Customer Accounts Team",
           "technology": "Kotlin / Spring Boot"
         },
-        "from": "acme-2029-customer-cart-pricing",
-        "system": "commerce-platform",
+        "start_in": "acme-2029-customer-cart-pricing",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
@@ -922,8 +922,8 @@
           "owner": "Cart Team",
           "technology": "Go"
         },
-        "from": "acme-2029-customer-cart-pricing",
-        "system": "commerce-platform",
+        "start_in": "acme-2029-customer-cart-pricing",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
@@ -948,8 +948,8 @@
           "owner": "Pricing Team",
           "technology": "Java / Spring Boot"
         },
-        "from": "acme-2029-customer-cart-pricing",
-        "system": "commerce-platform",
+        "start_in": "acme-2029-customer-cart-pricing",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
@@ -975,8 +975,8 @@
           "owner": "Customer Communications Team",
           "technology": "TypeScript / Node.js"
         },
-        "from": "acme-2029-customer-cart-pricing",
-        "system": "commerce-platform",
+        "start_in": "acme-2029-customer-cart-pricing",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
@@ -1004,8 +1004,8 @@
           "owner": "Checkout Team",
           "technology": "Java / workflow engine"
         },
-        "from": "acme-2030-transaction-core",
-        "system": "commerce-platform",
+        "start_in": "acme-2030-transaction-core",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
@@ -1031,8 +1031,8 @@
           "owner": "Order Team",
           "technology": "Kotlin / Spring Boot"
         },
-        "from": "acme-2030-transaction-core",
-        "system": "commerce-platform",
+        "start_in": "acme-2030-transaction-core",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
@@ -1059,8 +1059,8 @@
           "owner": "Payments Team",
           "technology": "Java / Spring Boot"
         },
-        "from": "acme-2030-transaction-core",
-        "system": "commerce-platform",
+        "start_in": "acme-2030-transaction-core",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
@@ -1086,8 +1086,8 @@
           "owner": "Inventory Team",
           "technology": "Go"
         },
-        "from": "acme-2030-transaction-core",
-        "system": "commerce-platform",
+        "start_in": "acme-2030-transaction-core",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
@@ -1114,8 +1114,8 @@
           "owner": "Commerce Operations Experience Team",
           "technology": "React / TypeScript"
         },
-        "from": "acme-2031-complete-cutover",
-        "system": "commerce-platform",
+        "start_in": "acme-2031-complete-cutover",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
@@ -1141,8 +1141,8 @@
           "owner": "Commerce Data Products Team",
           "technology": "Python / SQL"
         },
-        "from": "acme-2031-complete-cutover",
-        "system": "commerce-platform",
+        "start_in": "acme-2031-complete-cutover",
+        "parent": "commerce-platform",
         "intervals": [
           {
             "live": [
@@ -1168,13 +1168,13 @@
         "properties": {
           "technology": "JSP / JavaScript"
         },
-        "subsystem": "commerce-monolith",
+        "container": "commerce-monolith",
         "intervals": [
           {
             "live": [
               [
                 0,
-                5
+                4
               ]
             ],
             "clips": [
@@ -1198,13 +1198,13 @@
         "properties": {
           "technology": "Java module"
         },
-        "subsystem": "commerce-monolith",
+        "container": "commerce-monolith",
         "intervals": [
           {
             "live": [
               [
                 0,
-                2
+                1
               ]
             ],
             "clips": []
@@ -1222,14 +1222,14 @@
         "properties": {
           "technology": "Java module"
         },
-        "from": "acme-2028-catalog-search",
-        "subsystem": "commerce-monolith",
+        "start_in": "acme-2028-catalog-search",
+        "container": "commerce-monolith",
         "intervals": [
           {
             "live": [
               [
                 2,
-                5
+                4
               ]
             ],
             "clips": [
@@ -1253,14 +1253,14 @@
         "properties": {
           "technology": "Embedded search engine"
         },
-        "until": "acme-2028-catalog-search",
-        "subsystem": "commerce-monolith",
+        "end_in": "acme-2027-edge-foundation",
+        "container": "commerce-monolith",
         "intervals": [
           {
             "live": [
               [
                 0,
-                2
+                1
               ]
             ],
             "clips": []
@@ -1278,13 +1278,13 @@
         "properties": {
           "technology": "Java module"
         },
-        "subsystem": "commerce-monolith",
+        "container": "commerce-monolith",
         "intervals": [
           {
             "live": [
               [
                 0,
-                3
+                2
               ]
             ],
             "clips": []
@@ -1302,14 +1302,14 @@
         "properties": {
           "technology": "Java module"
         },
-        "from": "acme-2029-customer-cart-pricing",
-        "subsystem": "commerce-monolith",
+        "start_in": "acme-2029-customer-cart-pricing",
+        "container": "commerce-monolith",
         "intervals": [
           {
             "live": [
               [
                 3,
-                5
+                4
               ]
             ],
             "clips": [
@@ -1333,13 +1333,13 @@
         "properties": {
           "technology": "Java module"
         },
-        "subsystem": "commerce-monolith",
+        "container": "commerce-monolith",
         "intervals": [
           {
             "live": [
               [
                 0,
-                3
+                2
               ]
             ],
             "clips": []
@@ -1357,14 +1357,14 @@
         "properties": {
           "technology": "Java module"
         },
-        "from": "acme-2029-customer-cart-pricing",
-        "subsystem": "commerce-monolith",
+        "start_in": "acme-2029-customer-cart-pricing",
+        "container": "commerce-monolith",
         "intervals": [
           {
             "live": [
               [
                 3,
-                5
+                4
               ]
             ],
             "clips": [
@@ -1388,13 +1388,13 @@
         "properties": {
           "technology": "Java module"
         },
-        "subsystem": "commerce-monolith",
+        "container": "commerce-monolith",
         "intervals": [
           {
             "live": [
               [
                 0,
-                4
+                3
               ]
             ],
             "clips": []
@@ -1412,14 +1412,14 @@
         "properties": {
           "technology": "Java module"
         },
-        "from": "acme-2030-transaction-core",
-        "subsystem": "commerce-monolith",
+        "start_in": "acme-2030-transaction-core",
+        "container": "commerce-monolith",
         "intervals": [
           {
             "live": [
               [
                 4,
-                5
+                4
               ]
             ],
             "clips": [
@@ -1443,13 +1443,13 @@
         "properties": {
           "technology": "Java module"
         },
-        "subsystem": "commerce-monolith",
+        "container": "commerce-monolith",
         "intervals": [
           {
             "live": [
               [
                 0,
-                4
+                3
               ]
             ],
             "clips": []
@@ -1467,14 +1467,14 @@
         "properties": {
           "technology": "Java module"
         },
-        "from": "acme-2030-transaction-core",
-        "subsystem": "commerce-monolith",
+        "start_in": "acme-2030-transaction-core",
+        "container": "commerce-monolith",
         "intervals": [
           {
             "live": [
               [
                 4,
-                5
+                4
               ]
             ],
             "clips": [
@@ -1498,13 +1498,13 @@
         "properties": {
           "technology": "Java module"
         },
-        "subsystem": "commerce-monolith",
+        "container": "commerce-monolith",
         "intervals": [
           {
             "live": [
               [
                 0,
-                5
+                4
               ]
             ],
             "clips": [
@@ -1532,13 +1532,13 @@
           "migration_rule": "no-new-service-direct-access",
           "technology": "PostgreSQL"
         },
-        "subsystem": "commerce-monolith",
+        "container": "commerce-monolith",
         "intervals": [
           {
             "live": [
               [
                 0,
-                5
+                4
               ]
             ],
             "clips": [
@@ -1562,13 +1562,13 @@
         "properties": {
           "technology": "Redis"
         },
-        "subsystem": "commerce-monolith",
+        "container": "commerce-monolith",
         "intervals": [
           {
             "live": [
               [
                 0,
-                5
+                4
               ]
             ],
             "clips": [
@@ -1592,13 +1592,13 @@
         "properties": {
           "technology": "Java scheduler"
         },
-        "subsystem": "commerce-monolith",
+        "container": "commerce-monolith",
         "intervals": [
           {
             "live": [
               [
                 0,
-                5
+                4
               ]
             ],
             "clips": [
@@ -1622,7 +1622,7 @@
         "properties": {
           "technology": "Relational database"
         },
-        "subsystem": "erp-wms",
+        "container": "erp-wms",
         "intervals": [
           {
             "live": [
@@ -1646,7 +1646,7 @@
         "properties": {
           "technology": "Relational database"
         },
-        "subsystem": "enterprise-oms",
+        "container": "enterprise-oms",
         "intervals": [
           {
             "live": [
@@ -1670,7 +1670,7 @@
         "properties": {
           "technology": "Relational database"
         },
-        "subsystem": "finance-ledger",
+        "container": "finance-ledger",
         "intervals": [
           {
             "live": [
@@ -1694,7 +1694,7 @@
         "properties": {
           "technology": "Managed vault"
         },
-        "subsystem": "payment-gateway",
+        "container": "payment-gateway",
         "intervals": [
           {
             "live": [
@@ -1718,7 +1718,7 @@
         "properties": {
           "technology": "Managed directory"
         },
-        "subsystem": "identity-provider",
+        "container": "identity-provider",
         "intervals": [
           {
             "live": [
@@ -1742,7 +1742,7 @@
         "properties": {
           "technology": "Managed analytics storage"
         },
-        "subsystem": "digital-analytics-api",
+        "container": "digital-analytics-api",
         "intervals": [
           {
             "live": [
@@ -1766,7 +1766,7 @@
         "properties": {
           "technology": "Managed rules engine"
         },
-        "subsystem": "tax-api",
+        "container": "tax-api",
         "intervals": [
           {
             "live": [
@@ -1790,7 +1790,7 @@
         "properties": {
           "technology": "Managed ML platform"
         },
-        "subsystem": "fraud-api",
+        "container": "fraud-api",
         "intervals": [
           {
             "live": [
@@ -1814,8 +1814,8 @@
         "properties": {
           "technology": "Managed edge service"
         },
-        "from": "acme-2027-edge-foundation",
-        "subsystem": "commerce-edge",
+        "start_in": "acme-2027-edge-foundation",
+        "container": "commerce-edge",
         "intervals": [
           {
             "live": [
@@ -1839,8 +1839,8 @@
         "properties": {
           "technology": "Gateway configuration"
         },
-        "from": "acme-2027-edge-foundation",
-        "subsystem": "commerce-edge",
+        "start_in": "acme-2027-edge-foundation",
+        "container": "commerce-edge",
         "intervals": [
           {
             "live": [
@@ -1864,8 +1864,8 @@
         "properties": {
           "technology": "Redis"
         },
-        "from": "acme-2027-edge-foundation",
-        "subsystem": "storefront-bff",
+        "start_in": "acme-2027-edge-foundation",
+        "container": "storefront-bff",
         "intervals": [
           {
             "live": [
@@ -1889,8 +1889,8 @@
         "properties": {
           "technology": "Managed Kafka"
         },
-        "from": "acme-2027-edge-foundation",
-        "subsystem": "event-backbone",
+        "start_in": "acme-2027-edge-foundation",
+        "container": "event-backbone",
         "intervals": [
           {
             "live": [
@@ -1914,8 +1914,8 @@
         "properties": {
           "technology": "Schema registry"
         },
-        "from": "acme-2027-edge-foundation",
-        "subsystem": "event-backbone",
+        "start_in": "acme-2027-edge-foundation",
+        "container": "event-backbone",
         "intervals": [
           {
             "live": [
@@ -1939,8 +1939,8 @@
         "properties": {
           "technology": "Managed observability storage"
         },
-        "from": "acme-2027-edge-foundation",
-        "subsystem": "observability-platform",
+        "start_in": "acme-2027-edge-foundation",
+        "container": "observability-platform",
         "intervals": [
           {
             "live": [
@@ -1964,14 +1964,14 @@
         "properties": {
           "technology": "Integration service"
         },
-        "from": "acme-2027-edge-foundation",
-        "subsystem": "legacy-integration-adapter",
+        "start_in": "acme-2027-edge-foundation",
+        "container": "legacy-integration-adapter",
         "intervals": [
           {
             "live": [
               [
                 1,
-                5
+                4
               ]
             ],
             "clips": [
@@ -1997,8 +1997,8 @@
           "default_policy": "deny",
           "technology": "Stream processor"
         },
-        "from": "acme-2027-edge-foundation",
-        "subsystem": "analytics-event-adapter",
+        "start_in": "acme-2027-edge-foundation",
+        "container": "analytics-event-adapter",
         "intervals": [
           {
             "live": [
@@ -2024,14 +2024,14 @@
           "delivery_semantics": "at-least-once",
           "technology": "PostgreSQL table / relay"
         },
-        "from": "acme-2027-edge-foundation",
-        "subsystem": "commerce-monolith",
+        "start_in": "acme-2027-edge-foundation",
+        "container": "commerce-monolith",
         "intervals": [
           {
             "live": [
               [
                 1,
-                5
+                4
               ]
             ],
             "clips": [
@@ -2057,8 +2057,8 @@
           "data_owner": "catalog-service",
           "technology": "Managed PostgreSQL"
         },
-        "from": "acme-2028-catalog-search",
-        "subsystem": "catalog-service",
+        "start_in": "acme-2028-catalog-search",
+        "container": "catalog-service",
         "intervals": [
           {
             "live": [
@@ -2082,8 +2082,8 @@
         "properties": {
           "technology": "Redis"
         },
-        "from": "acme-2028-catalog-search",
-        "subsystem": "catalog-service",
+        "start_in": "acme-2028-catalog-search",
+        "container": "catalog-service",
         "intervals": [
           {
             "live": [
@@ -2107,8 +2107,8 @@
         "properties": {
           "technology": "PostgreSQL outbox table"
         },
-        "from": "acme-2028-catalog-search",
-        "subsystem": "catalog-service",
+        "start_in": "acme-2028-catalog-search",
+        "container": "catalog-service",
         "intervals": [
           {
             "live": [
@@ -2134,8 +2134,8 @@
           "source_of_truth": "catalog-service",
           "technology": "Managed OpenSearch"
         },
-        "from": "acme-2028-catalog-search",
-        "subsystem": "search-service",
+        "start_in": "acme-2028-catalog-search",
+        "container": "search-service",
         "intervals": [
           {
             "live": [
@@ -2159,8 +2159,8 @@
         "properties": {
           "technology": "Redis"
         },
-        "from": "acme-2028-catalog-search",
-        "subsystem": "search-service",
+        "start_in": "acme-2028-catalog-search",
+        "container": "search-service",
         "intervals": [
           {
             "live": [
@@ -2185,14 +2185,14 @@
         "properties": {
           "technology": "Managed PostgreSQL"
         },
-        "from": "acme-2028-catalog-search",
-        "subsystem": "catalog-sync-adapter",
+        "start_in": "acme-2028-catalog-search",
+        "container": "catalog-sync-adapter",
         "intervals": [
           {
             "live": [
               [
                 2,
-                5
+                4
               ]
             ],
             "clips": [
@@ -2218,8 +2218,8 @@
           "encryption": "field-and-storage",
           "technology": "Managed PostgreSQL"
         },
-        "from": "acme-2029-customer-cart-pricing",
-        "subsystem": "customer-service",
+        "start_in": "acme-2029-customer-cart-pricing",
+        "container": "customer-service",
         "intervals": [
           {
             "live": [
@@ -2243,8 +2243,8 @@
         "properties": {
           "technology": "PostgreSQL outbox table"
         },
-        "from": "acme-2029-customer-cart-pricing",
-        "subsystem": "customer-service",
+        "start_in": "acme-2029-customer-cart-pricing",
+        "container": "customer-service",
         "intervals": [
           {
             "live": [
@@ -2270,8 +2270,8 @@
           "data_owner": "cart-service",
           "technology": "Managed key-value database"
         },
-        "from": "acme-2029-customer-cart-pricing",
-        "subsystem": "cart-service",
+        "start_in": "acme-2029-customer-cart-pricing",
+        "container": "cart-service",
         "intervals": [
           {
             "live": [
@@ -2295,8 +2295,8 @@
         "properties": {
           "technology": "Redis"
         },
-        "from": "acme-2029-customer-cart-pricing",
-        "subsystem": "cart-service",
+        "start_in": "acme-2029-customer-cart-pricing",
+        "container": "cart-service",
         "intervals": [
           {
             "live": [
@@ -2321,8 +2321,8 @@
           "data_owner": "pricing-service",
           "technology": "Managed PostgreSQL"
         },
-        "from": "acme-2029-customer-cart-pricing",
-        "subsystem": "pricing-service",
+        "start_in": "acme-2029-customer-cart-pricing",
+        "container": "pricing-service",
         "intervals": [
           {
             "live": [
@@ -2346,8 +2346,8 @@
         "properties": {
           "technology": "Redis"
         },
-        "from": "acme-2029-customer-cart-pricing",
-        "subsystem": "pricing-service",
+        "start_in": "acme-2029-customer-cart-pricing",
+        "container": "pricing-service",
         "intervals": [
           {
             "live": [
@@ -2372,8 +2372,8 @@
           "data_owner": "notification-service",
           "technology": "Managed PostgreSQL"
         },
-        "from": "acme-2029-customer-cart-pricing",
-        "subsystem": "notification-service",
+        "start_in": "acme-2029-customer-cart-pricing",
+        "container": "notification-service",
         "intervals": [
           {
             "live": [
@@ -2399,8 +2399,8 @@
           "data_owner": "checkout-service",
           "technology": "Managed PostgreSQL"
         },
-        "from": "acme-2030-transaction-core",
-        "subsystem": "checkout-service",
+        "start_in": "acme-2030-transaction-core",
+        "container": "checkout-service",
         "intervals": [
           {
             "live": [
@@ -2425,8 +2425,8 @@
           "data_owner": "order-service",
           "technology": "Managed PostgreSQL"
         },
-        "from": "acme-2030-transaction-core",
-        "subsystem": "order-service",
+        "start_in": "acme-2030-transaction-core",
+        "container": "order-service",
         "intervals": [
           {
             "live": [
@@ -2450,8 +2450,8 @@
         "properties": {
           "technology": "PostgreSQL outbox table"
         },
-        "from": "acme-2030-transaction-core",
-        "subsystem": "order-service",
+        "start_in": "acme-2030-transaction-core",
+        "container": "order-service",
         "intervals": [
           {
             "live": [
@@ -2478,8 +2478,8 @@
           "data_owner": "payment-service",
           "technology": "Managed PostgreSQL"
         },
-        "from": "acme-2030-transaction-core",
-        "subsystem": "payment-service",
+        "start_in": "acme-2030-transaction-core",
+        "container": "payment-service",
         "intervals": [
           {
             "live": [
@@ -2503,8 +2503,8 @@
         "properties": {
           "technology": "PostgreSQL outbox table"
         },
-        "from": "acme-2030-transaction-core",
-        "subsystem": "payment-service",
+        "start_in": "acme-2030-transaction-core",
+        "container": "payment-service",
         "intervals": [
           {
             "live": [
@@ -2531,8 +2531,8 @@
           "technology": "Managed PostgreSQL",
           "upstream_system_of_record": "erp-wms"
         },
-        "from": "acme-2030-transaction-core",
-        "subsystem": "inventory-service",
+        "start_in": "acme-2030-transaction-core",
+        "container": "inventory-service",
         "intervals": [
           {
             "live": [
@@ -2556,8 +2556,8 @@
         "properties": {
           "technology": "Object storage / CDN"
         },
-        "from": "acme-2031-complete-cutover",
-        "subsystem": "admin-portal",
+        "start_in": "acme-2031-complete-cutover",
+        "container": "admin-portal",
         "intervals": [
           {
             "live": [
@@ -2584,8 +2584,8 @@
           "direct_service_db_access": "prohibited",
           "technology": "Managed analytical PostgreSQL"
         },
-        "from": "acme-2031-complete-cutover",
-        "subsystem": "reporting-service",
+        "start_in": "acme-2031-complete-cutover",
+        "container": "reporting-service",
         "intervals": [
           {
             "live": [
@@ -2609,8 +2609,8 @@
         "properties": {
           "technology": "Managed object storage"
         },
-        "from": "acme-2031-complete-cutover",
-        "subsystem": "reporting-service",
+        "start_in": "acme-2031-complete-cutover",
+        "container": "reporting-service",
         "intervals": [
           {
             "live": [
@@ -2624,6 +2624,7 @@
         ]
       }
     ],
+    "code": [],
     "users": [
       {
         "id": "customer",
@@ -2716,7 +2717,7 @@
           "technology": "HTTPS",
           "type": "web"
         },
-        "until": "acme-2027-edge-foundation",
+        "end_in": "base",
         "provider": "customer",
         "consumer": "commerce-monolith",
         "call_direction": "provider_to_consumer",
@@ -2725,7 +2726,7 @@
             "live": [
               [
                 0,
-                1
+                0
               ]
             ],
             "clips": []
@@ -2751,7 +2752,7 @@
             "live": [
               [
                 0,
-                5
+                4
               ]
             ],
             "clips": [
@@ -2783,7 +2784,7 @@
             "live": [
               [
                 0,
-                5
+                4
               ]
             ],
             "clips": [
@@ -2815,7 +2816,7 @@
             "live": [
               [
                 0,
-                5
+                4
               ]
             ],
             "clips": [
@@ -2842,7 +2843,7 @@
           "timeout_seconds": "5",
           "type": "api"
         },
-        "until": "acme-2030-transaction-core",
+        "end_in": "acme-2029-customer-cart-pricing",
         "provider": "commerce-monolith",
         "consumer": "payment-gateway",
         "call_direction": "provider_to_consumer",
@@ -2851,7 +2852,7 @@
             "live": [
               [
                 0,
-                4
+                3
               ]
             ],
             "clips": []
@@ -2869,7 +2870,7 @@
           "technology": "SOAP / SFTP",
           "type": "integration"
         },
-        "until": "acme-2030-transaction-core",
+        "end_in": "acme-2029-customer-cart-pricing",
         "provider": "commerce-monolith",
         "consumer": "erp-wms",
         "call_direction": "provider_to_consumer",
@@ -2878,7 +2879,7 @@
             "live": [
               [
                 0,
-                4
+                3
               ]
             ],
             "clips": []
@@ -2897,7 +2898,7 @@
           "technology": "SOAP / JMS",
           "type": "integration"
         },
-        "until": "acme-2030-transaction-core",
+        "end_in": "acme-2029-customer-cart-pricing",
         "provider": "commerce-monolith",
         "consumer": "enterprise-oms",
         "call_direction": "provider_to_consumer",
@@ -2906,7 +2907,7 @@
             "live": [
               [
                 0,
-                4
+                3
               ]
             ],
             "clips": []
@@ -2951,7 +2952,7 @@
           "technology": "SFTP batch",
           "type": "integration"
         },
-        "until": "acme-2030-transaction-core",
+        "end_in": "acme-2029-customer-cart-pricing",
         "provider": "commerce-monolith",
         "consumer": "finance-ledger",
         "call_direction": "provider_to_consumer",
@@ -2960,7 +2961,7 @@
             "live": [
               [
                 0,
-                4
+                3
               ]
             ],
             "clips": []
@@ -2981,7 +2982,7 @@
           "technology": "HTTPS collection",
           "type": "event"
         },
-        "until": "acme-2027-edge-foundation",
+        "end_in": "base",
         "provider": "commerce-monolith",
         "consumer": "digital-analytics-api",
         "call_direction": "provider_to_consumer",
@@ -2990,7 +2991,7 @@
             "live": [
               [
                 0,
-                1
+                0
               ]
             ],
             "clips": []
@@ -3009,7 +3010,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "until": "acme-2030-transaction-core",
+        "end_in": "acme-2029-customer-cart-pricing",
         "provider": "commerce-monolith",
         "consumer": "tax-api",
         "call_direction": "provider_to_consumer",
@@ -3018,7 +3019,7 @@
             "live": [
               [
                 0,
-                4
+                3
               ]
             ],
             "clips": []
@@ -3037,7 +3038,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "until": "acme-2030-transaction-core",
+        "end_in": "acme-2029-customer-cart-pricing",
         "provider": "commerce-monolith",
         "consumer": "fraud-api",
         "call_direction": "provider_to_consumer",
@@ -3046,7 +3047,7 @@
             "live": [
               [
                 0,
-                4
+                3
               ]
             ],
             "clips": []
@@ -3063,7 +3064,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "until": "acme-2029-customer-cart-pricing",
+        "end_in": "acme-2028-catalog-search",
         "provider": "commerce-monolith",
         "consumer": "messaging-provider",
         "call_direction": "provider_to_consumer",
@@ -3072,7 +3073,7 @@
             "live": [
               [
                 0,
-                3
+                2
               ]
             ],
             "clips": []
@@ -3116,7 +3117,7 @@
           "technology": "HTTPS",
           "type": "web"
         },
-        "from": "acme-2027-edge-foundation",
+        "start_in": "acme-2027-edge-foundation",
         "provider": "customer",
         "consumer": "commerce-edge",
         "call_direction": "provider_to_consumer",
@@ -3143,7 +3144,7 @@
           "technology": "HTTPS / JSON",
           "type": "api"
         },
-        "from": "acme-2027-edge-foundation",
+        "start_in": "acme-2027-edge-foundation",
         "provider": "commerce-edge",
         "consumer": "storefront-bff",
         "call_direction": "provider_to_consumer",
@@ -3171,8 +3172,8 @@
           "technology": "HTTPS",
           "type": "web"
         },
-        "from": "acme-2027-edge-foundation",
-        "until": "acme-2030-transaction-core",
+        "start_in": "acme-2027-edge-foundation",
+        "end_in": "acme-2029-customer-cart-pricing",
         "provider": "commerce-edge",
         "consumer": "commerce-monolith",
         "call_direction": "provider_to_consumer",
@@ -3181,7 +3182,7 @@
             "live": [
               [
                 1,
-                4
+                3
               ]
             ],
             "clips": []
@@ -3200,8 +3201,8 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2027-edge-foundation",
-        "until": "acme-2030-transaction-core",
+        "start_in": "acme-2027-edge-foundation",
+        "end_in": "acme-2029-customer-cart-pricing",
         "provider": "storefront-bff",
         "consumer": "commerce-monolith",
         "call_direction": "provider_to_consumer",
@@ -3210,7 +3211,7 @@
             "live": [
               [
                 1,
-                4
+                3
               ]
             ],
             "clips": []
@@ -3228,7 +3229,7 @@
           "technology": "Outbox / REST",
           "type": "integration"
         },
-        "from": "acme-2027-edge-foundation",
+        "start_in": "acme-2027-edge-foundation",
         "provider": "commerce-monolith",
         "consumer": "legacy-integration-adapter",
         "call_direction": "provider_to_consumer",
@@ -3237,7 +3238,7 @@
             "live": [
               [
                 1,
-                5
+                4
               ]
             ],
             "clips": [
@@ -3261,7 +3262,7 @@
           "technology": "HTTPS / JSON",
           "type": "event"
         },
-        "from": "acme-2027-edge-foundation",
+        "start_in": "acme-2027-edge-foundation",
         "provider": "commerce-edge",
         "consumer": "analytics-event-adapter",
         "call_direction": "provider_to_consumer",
@@ -3291,7 +3292,7 @@
           "technology": "HTTPS collection",
           "type": "event"
         },
-        "from": "acme-2027-edge-foundation",
+        "start_in": "acme-2027-edge-foundation",
         "provider": "analytics-event-adapter",
         "consumer": "digital-analytics-api",
         "call_direction": "provider_to_consumer",
@@ -3318,7 +3319,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2028-catalog-search",
+        "start_in": "acme-2028-catalog-search",
         "provider": "storefront-bff",
         "consumer": "catalog-service",
         "call_direction": "provider_to_consumer",
@@ -3345,7 +3346,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2028-catalog-search",
+        "start_in": "acme-2028-catalog-search",
         "provider": "storefront-bff",
         "consumer": "search-service",
         "call_direction": "provider_to_consumer",
@@ -3373,7 +3374,7 @@
           "technology": "Kafka / Avro",
           "type": "event"
         },
-        "from": "acme-2028-catalog-search",
+        "start_in": "acme-2028-catalog-search",
         "provider": "catalog-service",
         "consumer": "event-backbone",
         "call_direction": "provider_to_consumer",
@@ -3400,7 +3401,7 @@
           "technology": "Kafka / Avro",
           "type": "event"
         },
-        "from": "acme-2028-catalog-search",
+        "start_in": "acme-2028-catalog-search",
         "provider": "event-backbone",
         "consumer": "search-service",
         "call_direction": "provider_to_consumer",
@@ -3429,7 +3430,7 @@
           "technology": "Kafka / Avro",
           "type": "event"
         },
-        "from": "acme-2028-catalog-search",
+        "start_in": "acme-2028-catalog-search",
         "provider": "event-backbone",
         "consumer": "analytics-event-adapter",
         "call_direction": "provider_to_consumer",
@@ -3457,7 +3458,7 @@
           "technology": "Kafka / REST",
           "type": "integration"
         },
-        "from": "acme-2028-catalog-search",
+        "start_in": "acme-2028-catalog-search",
         "provider": "legacy-integration-adapter",
         "consumer": "catalog-sync-adapter",
         "call_direction": "provider_to_consumer",
@@ -3466,7 +3467,7 @@
             "live": [
               [
                 2,
-                5
+                4
               ]
             ],
             "clips": [
@@ -3491,7 +3492,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2028-catalog-search",
+        "start_in": "acme-2028-catalog-search",
         "provider": "catalog-sync-adapter",
         "consumer": "catalog-service",
         "call_direction": "provider_to_consumer",
@@ -3500,7 +3501,7 @@
             "live": [
               [
                 2,
-                5
+                4
               ]
             ],
             "clips": [
@@ -3524,7 +3525,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2029-customer-cart-pricing",
+        "start_in": "acme-2029-customer-cart-pricing",
         "provider": "storefront-bff",
         "consumer": "customer-service",
         "call_direction": "provider_to_consumer",
@@ -3551,7 +3552,7 @@
           "technology": "OIDC / SCIM",
           "type": "api"
         },
-        "from": "acme-2029-customer-cart-pricing",
+        "start_in": "acme-2029-customer-cart-pricing",
         "provider": "customer-service",
         "consumer": "identity-provider",
         "call_direction": "provider_to_consumer",
@@ -3578,7 +3579,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2029-customer-cart-pricing",
+        "start_in": "acme-2029-customer-cart-pricing",
         "provider": "storefront-bff",
         "consumer": "cart-service",
         "call_direction": "provider_to_consumer",
@@ -3605,7 +3606,7 @@
           "technology": "gRPC",
           "type": "api"
         },
-        "from": "acme-2029-customer-cart-pricing",
+        "start_in": "acme-2029-customer-cart-pricing",
         "provider": "cart-service",
         "consumer": "pricing-service",
         "call_direction": "provider_to_consumer",
@@ -3632,7 +3633,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2029-customer-cart-pricing",
+        "start_in": "acme-2029-customer-cart-pricing",
         "provider": "storefront-bff",
         "consumer": "pricing-service",
         "call_direction": "provider_to_consumer",
@@ -3660,7 +3661,7 @@
           "technology": "Kafka / Avro",
           "type": "event"
         },
-        "from": "acme-2029-customer-cart-pricing",
+        "start_in": "acme-2029-customer-cart-pricing",
         "provider": "customer-service",
         "consumer": "event-backbone",
         "call_direction": "provider_to_consumer",
@@ -3687,7 +3688,7 @@
           "technology": "Kafka / Avro",
           "type": "event"
         },
-        "from": "acme-2029-customer-cart-pricing",
+        "start_in": "acme-2029-customer-cart-pricing",
         "provider": "event-backbone",
         "consumer": "notification-service",
         "call_direction": "provider_to_consumer",
@@ -3714,7 +3715,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2029-customer-cart-pricing",
+        "start_in": "acme-2029-customer-cart-pricing",
         "provider": "notification-service",
         "consumer": "messaging-provider",
         "call_direction": "provider_to_consumer",
@@ -3741,7 +3742,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2029-customer-cart-pricing",
+        "start_in": "acme-2029-customer-cart-pricing",
         "provider": "legacy-integration-adapter",
         "consumer": "customer-service",
         "call_direction": "provider_to_consumer",
@@ -3750,7 +3751,7 @@
             "live": [
               [
                 3,
-                5
+                4
               ]
             ],
             "clips": [
@@ -3774,7 +3775,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2029-customer-cart-pricing",
+        "start_in": "acme-2029-customer-cart-pricing",
         "provider": "legacy-integration-adapter",
         "consumer": "cart-service",
         "call_direction": "provider_to_consumer",
@@ -3783,7 +3784,7 @@
             "live": [
               [
                 3,
-                5
+                4
               ]
             ],
             "clips": [
@@ -3807,7 +3808,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2029-customer-cart-pricing",
+        "start_in": "acme-2029-customer-cart-pricing",
         "provider": "legacy-integration-adapter",
         "consumer": "pricing-service",
         "call_direction": "provider_to_consumer",
@@ -3816,7 +3817,7 @@
             "live": [
               [
                 3,
-                5
+                4
               ]
             ],
             "clips": [
@@ -3841,7 +3842,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2030-transaction-core",
+        "start_in": "acme-2030-transaction-core",
         "provider": "storefront-bff",
         "consumer": "checkout-service",
         "call_direction": "provider_to_consumer",
@@ -3868,7 +3869,7 @@
           "technology": "gRPC",
           "type": "api"
         },
-        "from": "acme-2030-transaction-core",
+        "start_in": "acme-2030-transaction-core",
         "provider": "checkout-service",
         "consumer": "cart-service",
         "call_direction": "provider_to_consumer",
@@ -3895,7 +3896,7 @@
           "technology": "gRPC",
           "type": "api"
         },
-        "from": "acme-2030-transaction-core",
+        "start_in": "acme-2030-transaction-core",
         "provider": "checkout-service",
         "consumer": "pricing-service",
         "call_direction": "provider_to_consumer",
@@ -3923,7 +3924,7 @@
           "technology": "gRPC",
           "type": "api"
         },
-        "from": "acme-2030-transaction-core",
+        "start_in": "acme-2030-transaction-core",
         "provider": "checkout-service",
         "consumer": "inventory-service",
         "call_direction": "provider_to_consumer",
@@ -3951,7 +3952,7 @@
           "technology": "gRPC",
           "type": "api"
         },
-        "from": "acme-2030-transaction-core",
+        "start_in": "acme-2030-transaction-core",
         "provider": "checkout-service",
         "consumer": "payment-service",
         "call_direction": "provider_to_consumer",
@@ -3978,7 +3979,7 @@
           "technology": "gRPC",
           "type": "api"
         },
-        "from": "acme-2030-transaction-core",
+        "start_in": "acme-2030-transaction-core",
         "provider": "checkout-service",
         "consumer": "order-service",
         "call_direction": "provider_to_consumer",
@@ -4008,7 +4009,7 @@
           "timeout_seconds": "5",
           "type": "api"
         },
-        "from": "acme-2030-transaction-core",
+        "start_in": "acme-2030-transaction-core",
         "provider": "payment-service",
         "consumer": "payment-gateway",
         "call_direction": "provider_to_consumer",
@@ -4037,7 +4038,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2030-transaction-core",
+        "start_in": "acme-2030-transaction-core",
         "provider": "checkout-service",
         "consumer": "tax-api",
         "call_direction": "provider_to_consumer",
@@ -4066,7 +4067,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2030-transaction-core",
+        "start_in": "acme-2030-transaction-core",
         "provider": "payment-service",
         "consumer": "fraud-api",
         "call_direction": "provider_to_consumer",
@@ -4094,7 +4095,7 @@
           "technology": "Managed integration API",
           "type": "integration"
         },
-        "from": "acme-2030-transaction-core",
+        "start_in": "acme-2030-transaction-core",
         "provider": "payment-service",
         "consumer": "finance-ledger",
         "call_direction": "provider_to_consumer",
@@ -4122,7 +4123,7 @@
           "technology": "Managed integration API",
           "type": "integration"
         },
-        "from": "acme-2030-transaction-core",
+        "start_in": "acme-2030-transaction-core",
         "provider": "order-service",
         "consumer": "enterprise-oms",
         "call_direction": "provider_to_consumer",
@@ -4150,7 +4151,7 @@
           "technology": "Managed integration API",
           "type": "integration"
         },
-        "from": "acme-2030-transaction-core",
+        "start_in": "acme-2030-transaction-core",
         "provider": "inventory-service",
         "consumer": "erp-wms",
         "call_direction": "provider_to_consumer",
@@ -4178,7 +4179,7 @@
           "technology": "Kafka / Avro",
           "type": "event"
         },
-        "from": "acme-2030-transaction-core",
+        "start_in": "acme-2030-transaction-core",
         "provider": "order-service",
         "consumer": "event-backbone",
         "call_direction": "provider_to_consumer",
@@ -4206,7 +4207,7 @@
           "technology": "Kafka / Avro",
           "type": "event"
         },
-        "from": "acme-2030-transaction-core",
+        "start_in": "acme-2030-transaction-core",
         "provider": "payment-service",
         "consumer": "event-backbone",
         "call_direction": "provider_to_consumer",
@@ -4233,7 +4234,7 @@
           "technology": "Kafka / Avro",
           "type": "event"
         },
-        "from": "acme-2030-transaction-core",
+        "start_in": "acme-2030-transaction-core",
         "provider": "inventory-service",
         "consumer": "event-backbone",
         "call_direction": "provider_to_consumer",
@@ -4260,7 +4261,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2030-transaction-core",
+        "start_in": "acme-2030-transaction-core",
         "provider": "legacy-integration-adapter",
         "consumer": "order-service",
         "call_direction": "provider_to_consumer",
@@ -4269,7 +4270,7 @@
             "live": [
               [
                 4,
-                5
+                4
               ]
             ],
             "clips": [
@@ -4293,7 +4294,7 @@
           "technology": "HTTPS",
           "type": "web"
         },
-        "from": "acme-2031-complete-cutover",
+        "start_in": "acme-2031-complete-cutover",
         "provider": "customer-service-agent",
         "consumer": "admin-portal",
         "call_direction": "provider_to_consumer",
@@ -4320,7 +4321,7 @@
           "technology": "HTTPS",
           "type": "web"
         },
-        "from": "acme-2031-complete-cutover",
+        "start_in": "acme-2031-complete-cutover",
         "provider": "merchandiser",
         "consumer": "admin-portal",
         "call_direction": "provider_to_consumer",
@@ -4347,7 +4348,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2031-complete-cutover",
+        "start_in": "acme-2031-complete-cutover",
         "provider": "admin-portal",
         "consumer": "catalog-service",
         "call_direction": "provider_to_consumer",
@@ -4375,7 +4376,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2031-complete-cutover",
+        "start_in": "acme-2031-complete-cutover",
         "provider": "admin-portal",
         "consumer": "customer-service",
         "call_direction": "provider_to_consumer",
@@ -4403,7 +4404,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2031-complete-cutover",
+        "start_in": "acme-2031-complete-cutover",
         "provider": "admin-portal",
         "consumer": "order-service",
         "call_direction": "provider_to_consumer",
@@ -4431,7 +4432,7 @@
           "technology": "REST / JSON",
           "type": "api"
         },
-        "from": "acme-2031-complete-cutover",
+        "start_in": "acme-2031-complete-cutover",
         "provider": "admin-portal",
         "consumer": "pricing-service",
         "call_direction": "provider_to_consumer",
@@ -4459,7 +4460,7 @@
           "technology": "Kafka / Avro",
           "type": "event"
         },
-        "from": "acme-2031-complete-cutover",
+        "start_in": "acme-2031-complete-cutover",
         "provider": "event-backbone",
         "consumer": "reporting-service",
         "call_direction": "provider_to_consumer",
@@ -4486,7 +4487,7 @@
           "technology": "HTTPS",
           "type": "web"
         },
-        "from": "acme-2031-complete-cutover",
+        "start_in": "acme-2031-complete-cutover",
         "provider": "customer-service-agent",
         "consumer": "reporting-service",
         "call_direction": "provider_to_consumer",
@@ -4527,7 +4528,7 @@
         "action": "curates",
         "source": "merchandiser",
         "target": "catalog-service",
-        "from": "acme-2028-catalog-search",
+        "start_in": "acme-2028-catalog-search",
         "description": "Manages assortment and product data in the target catalog once it is authoritative.",
         "intervals": [
           {

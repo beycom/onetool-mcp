@@ -20,10 +20,10 @@ import {
 } from './types'
 
 const ENTITY_KIND_SET = new Set<RowKind>(ENTITY_KINDS)
-const OMITTED_DIFF_FIELDS = new Set(['id', 'from', 'until', 'intervals', 'properties'])
+const OMITTED_DIFF_FIELDS = new Set(['id', 'start_in', 'end_in', 'intervals', 'properties'])
 
 function within(start: number, end: number | null, position: number): boolean {
-  return start <= position && (end === null || position < end)
+  return start <= position && (end === null || position <= end)
 }
 
 export function liveAt(row: ReportRow, timeline: number, position: number): boolean {
@@ -133,18 +133,54 @@ function nodeKey(kind: EntityKind, id: string): string {
 
 function idIndex(state: ProjectedState): Map<string, RowRef> {
   const index = new Map<string, RowRef>()
-  for (const ref of entityRows(state)) index.set(ref.row.id, ref)
+  for (const ref of entityRows(state)) {
+    index.set(nodeKey(ref.kind as EntityKind, ref.row.id), ref)
+    if (!index.has(ref.row.id)) index.set(ref.row.id, ref)
+  }
   return index
 }
 
-function topRepresentative(ref: RowRef, byId: Map<string, RowRef>): RowRef | null {
-  if (ref.kind === 'systems' || ref.kind === 'users') return ref
-  if (ref.kind === 'subsystems') return ref.row.system ? byId.get(ref.row.system) ?? null : null
-  if (ref.kind === 'components') {
-    const subsystem = ref.row.subsystem ? byId.get(ref.row.subsystem) : null
-    return subsystem ? topRepresentative(subsystem, byId) : null
+function parentRef(ref: RowRef, byId: Map<string, RowRef>): RowRef | null {
+  if (ref.kind === 'containers' && ref.row.parent) {
+    return byId.get(`systems:${ref.row.parent}`)
+      ?? byId.get(`containers:${ref.row.parent}`)
+      ?? null
+  }
+  if (ref.kind === 'components' && ref.row.container) {
+    return byId.get(`containers:${ref.row.container}`) ?? null
+  }
+  if (ref.kind === 'code' && ref.row.component) {
+    return byId.get(`components:${ref.row.component}`) ?? null
   }
   return null
+}
+
+function topRepresentative(ref: RowRef, byId: Map<string, RowRef>): RowRef | null {
+  const seen = new Set<string>()
+  let cursor: RowRef | null = ref
+  while (cursor && cursor.kind !== 'systems' && cursor.kind !== 'users') {
+    const key = nodeKey(cursor.kind as EntityKind, cursor.row.id)
+    if (seen.has(key)) return null
+    seen.add(key)
+    cursor = parentRef(cursor, byId)
+  }
+  return cursor
+}
+
+function ancestorOfKind(
+  ref: RowRef,
+  kind: EntityKind,
+  byId: Map<string, RowRef>,
+): RowRef | null {
+  const seen = new Set<string>()
+  let cursor: RowRef | null = ref
+  while (cursor && cursor.kind !== kind) {
+    const key = nodeKey(cursor.kind as EntityKind, cursor.row.id)
+    if (seen.has(key)) return null
+    seen.add(key)
+    cursor = parentRef(cursor, byId)
+  }
+  return cursor
 }
 
 function endpoints(row: ReportRow): [string, string] | null {
@@ -247,9 +283,10 @@ function representativeAtLevel(
   if (top && boundaryStubs.has(nodeKey(top.kind as EntityKind, top.row.id))) return top
   if (ref.kind === 'users' || ref.kind === 'systems') return ref
   if (level === 'systems') return top
-  if (ref.kind === 'subsystems') return ref
-  if (level === 'subsystems') return ref.row.subsystem ? byId.get(ref.row.subsystem) ?? null : null
-  return ref
+  if (level === 'containers') {
+    return ancestorOfKind(ref, 'containers', byId) ?? ref
+  }
+  return ancestorOfKind(ref, 'components', byId) ?? ref
 }
 
 function graphNode(ref: RowRef, boundaryStubs: Map<string, RowRef>): GraphNode {

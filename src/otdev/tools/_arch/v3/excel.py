@@ -13,13 +13,23 @@ from typing import Any
 from openpyxl import Workbook, load_workbook
 from openpyxl.formatting.rule import FormulaRule
 from openpyxl.styles import PatternFill
-from openpyxl.utils.cell import range_boundaries
+from openpyxl.utils.cell import get_column_letter, range_boundaries
 from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from pydantic import ValidationError
 
-from .model import Architecture
+from .ids import assign_missing_ids
+from .model import (
+    Architecture,
+    Code,
+    Component,
+    Container,
+    Interface,
+    Relationship,
+    System,
+    User,
+)
 from .validate import validate
 from .yamlio import dump_architecture, format_data_path, load_architecture
 
@@ -28,8 +38,9 @@ SHEETS = (
     "Milestones",
     "Timelines",
     "Systems",
-    "Subsystems",
+    "Containers",
     "Components",
+    "Code",
     "Users",
     "Interfaces",
     "Relationships",
@@ -37,8 +48,9 @@ SHEETS = (
 COLLECTIONS = {
     "Milestones": "milestones",
     "Systems": "systems",
-    "Subsystems": "subsystems",
+    "Containers": "containers",
     "Components": "components",
+    "Code": "code",
     "Users": "users",
     "Interfaces": "interfaces",
     "Relationships": "relationships",
@@ -47,35 +59,44 @@ HEADERS = {
     "Architecture": ("schema_version",),
     "Milestones": ("id", "name", "description", "tags"),
     "Timelines": ("timeline", "milestone"),
-    "Systems": ("id", "name", "from", "until", "description", "tags"),
-    "Subsystems": (
+    "Systems": ("id", "name", "start_in", "end_in", "description", "tags"),
+    "Containers": (
         "id",
         "name",
-        "system",
-        "from",
-        "until",
+        "parent",
+        "start_in",
+        "end_in",
         "description",
         "tags",
     ),
     "Components": (
         "id",
         "name",
-        "subsystem",
-        "from",
-        "until",
+        "container",
+        "start_in",
+        "end_in",
         "description",
         "tags",
     ),
-    "Users": ("id", "name", "from", "until", "description", "tags"),
+    "Code": (
+        "id",
+        "name",
+        "component",
+        "start_in",
+        "end_in",
+        "description",
+        "tags",
+    ),
+    "Users": ("id", "name", "start_in", "end_in", "description", "tags"),
     "Interfaces": (
         "id",
         "name",
         "provider",
         "consumer",
         "call_direction",
-        "data_flow",
-        "from",
-        "until",
+        "data_flow_direction",
+        "start_in",
+        "end_in",
         "description",
         "tags",
     ),
@@ -84,8 +105,8 @@ HEADERS = {
         "source",
         "action",
         "target",
-        "from",
-        "until",
+        "start_in",
+        "end_in",
         "description",
         "tags",
     ),
@@ -94,19 +115,30 @@ ID_FIELDS = {
     "id",
     "timeline",
     "milestone",
-    "system",
-    "subsystem",
+    "parent",
+    "container",
+    "component",
     "provider",
     "consumer",
     "source",
     "target",
-    "from",
-    "until",
+    "start_in",
+    "end_in",
 }
-ENUM_FIELDS = {"call_direction", "data_flow"}
+ENUM_FIELDS = {"call_direction", "data_flow_direction"}
 LIST_FIELDS = {"tags"}
 PROPERTY_SHEETS = set(COLLECTIONS)
 MILESTONE_VALIDATION_NAME = "arch_milestones"
+END_MILESTONE_VALIDATION_NAME = "arch_end_milestones"
+ROW_MODELS = {
+    "systems": System,
+    "containers": Container,
+    "components": Component,
+    "code": Code,
+    "users": User,
+    "interfaces": Interface,
+    "relationships": Relationship,
+}
 
 
 class WorkbookError(ValueError):
@@ -303,7 +335,12 @@ def _source_location(
 
 def _architecture_raw(
     path: Path, sheets: dict[str, _SheetRows]
-) -> tuple[dict[str, Any], dict[str, _CellLocation], list[str]]:
+) -> tuple[
+    dict[str, Any],
+    dict[str, _CellLocation],
+    list[str],
+    dict[str, list[tuple[int, str]]],
+]:
     issues: list[str] = []
     sources: dict[str, _CellLocation] = {}
     architecture_rows = sheets["Architecture"].rows
@@ -353,7 +390,7 @@ def _architecture_raw(
     timeline_rows = sheets["Timelines"].rows
     timelines: list[dict[str, Any]] = []
     seen: set[str] = set()
-    current: str | None = None
+    active_timeline: str | None = None
     for row_index, (row_number, row) in enumerate(timeline_rows):
         timeline = row.get("timeline")
         milestone = row.get("milestone")
@@ -368,7 +405,7 @@ def _architecture_raw(
                         else f"{path}: sheet 'Timelines', row {row_number}, field {field!r}: {message}"
                     )
             continue
-        if timeline != current:
+        if timeline != active_timeline:
             if timeline in seen:
                 location = sheets["Timelines"].locations.get((row_index, "timeline"))
                 message = (
@@ -381,7 +418,7 @@ def _architecture_raw(
                 )
             seen.add(timeline)
             timelines.append({"id": timeline, "milestones": []})
-            current = timeline
+            active_timeline = timeline
         timeline_index = len(timelines) - 1
         milestone_index = len(timelines[timeline_index]["milestones"])
         timelines[timeline_index]["milestones"].append(milestone)
@@ -393,7 +430,36 @@ def _architecture_raw(
             if location:
                 sources[model_path] = location
     raw["timelines"] = timelines or None
-    return raw, sources, issues
+    draft_values = {
+        **raw,
+        **{
+            collection: [
+                ROW_MODELS[collection].model_construct(**row)
+                for row in raw[collection]
+            ]
+            for collection in ROW_MODELS
+        },
+    }
+    draft = Architecture.model_construct(**draft_values)
+    assigned_ids = assign_missing_ids(draft)
+    for collection, assignments in assigned_ids.items():
+        sheet = next(
+            name for name, candidate in COLLECTIONS.items() if candidate == collection
+        )
+        id_column = sheets[sheet].headers.index("id") + 1
+        for row_index, assigned_id in assignments:
+            raw[collection][row_index]["id"] = assigned_id
+            workbook_row = sheets[sheet].rows[row_index][0]
+            location = _CellLocation(
+                path,
+                sheet,
+                workbook_row,
+                get_column_letter(id_column),
+                "id",
+            )
+            sources[f"{collection}[{row_index}]"] = location
+            sources[f"{collection}[{row_index}].id"] = location
+    return raw, sources, issues, assigned_ids
 
 
 def _validation_issues(
@@ -428,8 +494,9 @@ def _validation_issues(
     return issues
 
 
-def read_workbook(path: Path) -> Architecture:
-    """Read one `.xlsx` workbook into a validated architecture model."""
+def _read_workbook(
+    path: Path,
+) -> tuple[Architecture, dict[str, list[tuple[int, str]]]]:
     if path.suffix.lower() != ".xlsx":
         raise WorkbookError(f"Excel architecture input must use .xlsx: {path}")
     try:
@@ -451,7 +518,7 @@ def read_workbook(path: Path) -> Architecture:
             )
             parsed[canonical] = sheet_rows
             issues.extend(sheet_issues)
-        raw, sources, structure_issues = _architecture_raw(path, parsed)
+        raw, sources, structure_issues, assigned_ids = _architecture_raw(path, parsed)
         issues.extend(structure_issues)
         try:
             architecture = Architecture.model_validate(raw)
@@ -470,9 +537,15 @@ def read_workbook(path: Path) -> Architecture:
         if issues:
             raise WorkbookError("\n".join(dict.fromkeys(issues)))
         assert architecture is not None
-        return architecture
+        return architecture, assigned_ids
     finally:
         workbook.close()
+
+
+def read_workbook(path: Path) -> Architecture:
+    """Read one `.xlsx` workbook into a validated architecture model."""
+    architecture, _assigned_ids = _read_workbook(path)
+    return architecture
 
 
 def _rows(architecture: Architecture) -> dict[str, list[dict[str, Any]]]:
@@ -538,20 +611,30 @@ def _add_validations(
     only: set[str] | None = None,
 ) -> None:
     by_header = {_normalise(header): index + 1 for index, header in enumerate(headers)}
-    for field in ("milestone", "from", "until"):
+    for field in ("milestone", "start_in", "end_in"):
         if field not in by_header or (only is not None and field not in only):
             continue
+        validation_name = (
+            END_MILESTONE_VALIDATION_NAME
+            if field == "end_in"
+            else MILESTONE_VALIDATION_NAME
+        )
         validation = DataValidation(
-            type="list", formula1=f"={MILESTONE_VALIDATION_NAME}", allow_blank=True
+            type="list", formula1=f"={validation_name}", allow_blank=True
         )
         worksheet.add_data_validation(validation)
         column = worksheet.cell(1, by_header[field]).column_letter
         validation.add(f"{column}2:{column}{end_row}")
-    choices = '"provider_to_consumer,consumer_to_provider,bidirectional,unspecified"'
-    for field in ENUM_FIELDS:
+    choices = {
+        "call_direction": '"consumer_to_provider,provider_to_consumer"',
+        "data_flow_direction": '"provider_to_consumer,consumer_to_provider,bidirectional"',
+    }
+    for field, field_choices in choices.items():
         if field not in by_header or (only is not None and field not in only):
             continue
-        validation = DataValidation(type="list", formula1=choices, allow_blank=False)
+        validation = DataValidation(
+            type="list", formula1=field_choices, allow_blank=True
+        )
         worksheet.add_data_validation(validation)
         column = worksheet.cell(1, by_header[field]).column_letter
         validation.add(f"{column}2:{column}{end_row}")
@@ -565,6 +648,15 @@ def _new_workbook(architecture: Architecture) -> Workbook:
         DefinedName(
             MILESTONE_VALIDATION_NAME,
             attr_text="'Milestones'!$A$2:$A$1048576",
+        )
+    )
+    workbook.defined_names.add(
+        DefinedName(
+            END_MILESTONE_VALIDATION_NAME,
+            attr_text=(
+                '_xlfn.VSTACK("base",_xlfn._xlws.FILTER('
+                'arch_milestones,arch_milestones<>"",""))'
+            ),
         )
     )
     rows_by_sheet = _rows(architecture)
@@ -632,6 +724,15 @@ def _update_workbook(workbook: Workbook, architecture: Architecture) -> None:
     workbook.defined_names.add(
         DefinedName(MILESTONE_VALIDATION_NAME, attr_text="'Milestones'!$A$2:$A$1048576")
     )
+    workbook.defined_names.add(
+        DefinedName(
+            END_MILESTONE_VALIDATION_NAME,
+            attr_text=(
+                '_xlfn.VSTACK("base",_xlfn._xlws.FILTER('
+                'arch_milestones,arch_milestones<>"",""))'
+            ),
+        )
+    )
     for sheet in SHEETS:
         worksheet = _canonical_sheet(workbook, sheet)
         tables = list(worksheet.tables.values())
@@ -675,7 +776,7 @@ def _update_workbook(workbook: Workbook, architecture: Architecture) -> None:
         table.ref = f"{worksheet.cell(1, min_col).coordinate}:{worksheet.cell(end_row, max_col).coordinate}"
         controlled = {
             field: normalised_headers.index(field) + min_col
-            for field in ("milestone", "from", "until", *ENUM_FIELDS)
+            for field in ("milestone", "start_in", "end_in", *ENUM_FIELDS)
             if field in normalised_headers
         }
         matched: set[str] = set()
@@ -723,8 +824,9 @@ def generate_template(path: Path) -> None:
         schema_version=3,
         milestones=[],
         systems=[],
-        subsystems=[],
+        containers=[],
         components=[],
+        code=[],
         users=[],
         interfaces=[],
         relationships=[],
@@ -734,9 +836,14 @@ def generate_template(path: Path) -> None:
 
 def import_workbook(workbook_path: Path, yaml_path: Path) -> dict[str, Any]:
     """Validate a workbook and atomically replace its canonical YAML target."""
-    architecture = read_workbook(workbook_path)
+    architecture, assigned_ids = _read_workbook(workbook_path)
     dump_architecture(architecture, yaml_path)
-    return {"ok": True, "input_path": str(workbook_path), "path": str(yaml_path)}
+    return {
+        "ok": True,
+        "input_path": str(workbook_path),
+        "path": str(yaml_path),
+        "assigned_ids": assigned_ids,
+    }
 
 
 def export_workbook(yaml_path: Path, workbook_path: Path) -> dict[str, Any]:
