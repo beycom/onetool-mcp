@@ -10,6 +10,46 @@ date)` or `— WAIVED (reason, date)` to each issue it covered. The 3P
 exit gate requires every issue closed or waived and a re-run of this
 walkthrough confirming the behavior defects (#12–#17) don't reproduce.
 
+## 0. Control simplification (2026-08-26 design review, `designs/` artboards)
+
+Decisions from the artboard review. These read as visual polish but each one
+changes behavior/state, so they bind the 3P passes the same way the numbered
+issues do:
+
+- **Detail level is a dropdown, not a segmented tab bar.** One "Detail"
+  dropdown (System / Container / Child / Component), styled like the tags
+  dropdown, defaulting to **System**. Rationale: it is a select-one view
+  setting, not navigation; a dropdown has a fixed footprint at any label
+  length and viewport, and keeps the context row to one control style.
+- **Time slider replaced by a "Stage" dropdown.** One entry per stage
+  ("0 · Base", "4 · Transaction Core", …). Rationale: stages are discrete
+  named states, not a continuum — a slider invites scrubbing between
+  meaningless intermediate positions, needs fixed-width slots to avoid
+  reflow (#17), and hides the stage names. A dropdown shows every stage by
+  name, jumps directly, and makes #17's reflow problem structurally
+  impossible for this control.
+- **Compare dropdown removed.** Each stage inherently describes its changes
+  against the previous stage, so diff styling (where shown) is a property of
+  the selected stage, not a separate mode to configure. Removes a whole
+  state dimension (compare target × position) and the inverted-emphasis
+  trap it produced (#7 stays for stage-diff rendering).
+- **Scope control removed from the viewer.** How scope should interact with
+  the live display was never clear; scope is a *report generation* concern
+  (what the report was built to cover), not a canvas toggle. If it returns,
+  it belongs in report configuration, not viewer chrome.
+- **"Base · Systems" title badge removed.** It duplicated the Detail and
+  Stage controls' current values as static text — dead weight in the title
+  bar that had to be kept in sync.
+- **Status-bar readouts removed.** "N nodes · N connections · scope …" and
+  "ELK UNION LAYOUT · OFFLINE · POSITION …" are debug/engine internals with
+  no user decision attached; counts also went stale against filters. The
+  status bar goes away entirely unless a future item earns its place.
+
+Net effect on the issue list: #15 and #17 lose their hardest cases (the
+time pill and compare dropdown no longer exist); #7 is reinterpreted as
+stage-diff styling; the fixed-width-slots remedy in #17 applies only to
+whatever chrome remains.
+
 ## 1. Connectors (worst area — D13c, routing in D13b)
 
 1. **Edges are invisible.** Every edge is a 1px `#B1B1B7` stroke — the React

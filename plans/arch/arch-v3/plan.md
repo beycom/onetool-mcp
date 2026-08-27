@@ -313,9 +313,20 @@ prompt is authored.
 - [x] **Architect:** parser-vector fixture
       (`tests/unit/tools/fixtures/arch/sequence/`) — the D12a control
       mechanism. (2026-08-25; D12a prompt issued the same day)
+- [ ] **Architect:** message-file attachments design (user request
+      2026-08-26): sequence messages AND model interfaces can link to
+      message files — sample request/response payloads (xml, json, csv)
+      stored beside the model — and the report renders them
+      syntax-highlighted (highlighter ships in the offline bundle; no
+      external requests). Design lands as amendments to schema.md
+      (interface-level field), sequence.md (DSL reference + `sequences`
+      payload), and report.md (viewer contract: side panel for
+      interfaces, message click-through in the seq view) BEFORE D12a
+      runs; the held D12a prompt is re-scoped to parse/emit the refs.
 - [ ] Python: parser, validation findings, `sequences` payload, CLI +
       facade wiring. `→ D12a` (prompt issued but ON HOLD until the
-      Phase 3P exit gate — user directive 2026-08-25)
+      Phase 3P exit gate — user directive 2026-08-25; re-scope for
+      message-file refs before running — see architect item above)
 - [ ] **Architect:** layout vectors + 2–3 acme flow docs (multi-scenario,
       interval-carrying, ad-hoc participant) — the D12b control mechanism.
 - [ ] Frontend: `seqlayout.ts`, SVG layer, entity-box header row, SEQ-*
@@ -324,7 +335,9 @@ prompt is authored.
 - [ ] **Gate (architect + user):** open an acme flow, play it through,
       collapse a system band, focus a participant, hide one, switch
       scenario — the story reads without explanation; sticky headers hold;
-      console clean; zero external requests from `file://`.
+      open a message's linked request/response file and it renders
+      syntax-highlighted; console clean; zero external requests from
+      `file://`.
 
 ## Phase 4 — Polish and second adapters (per-item budgets)
 
@@ -368,6 +381,16 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-26** — New capability registered (user request): sequence
+  messages and model interfaces can link to message files — sample
+  request/response payloads (xml, json, csv) — rendered
+  syntax-highlighted in the report. Tracked as a new Phase 3S architect
+  design item (amendments to schema.md, sequence.md, report.md); the
+  held D12a prompt gets re-scoped to include the refs before it runs;
+  the 3S gate now checks a highlighted message file opens. No 3P
+  impact — polish passes proceed unchanged; next action still: user
+  confirms the D13a budget and runs it.
 
 - **2026-08-25** — UI walkthrough evidence captured (architect,
   user-directed): full Playwright pass over the acme report per

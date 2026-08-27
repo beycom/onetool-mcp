@@ -1,0 +1,148 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <style>
+    body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    a { color: #008eab; text-decoration: none; } a:hover { color: #078b79; }
+    .pn { --mono: "SFMono-Regular", Consolas, monospace; }
+    .pn .kick { font: 800 9px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .pn .cap { color: #60798e; font: 600 9px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .pn .card { background: #fff; border: 1px solid #ccd9df; border-radius: 9px; box-shadow: 0 8px 24px rgba(12,30,38,.09); overflow: hidden; }
+    .pn .kv { display: grid; grid-template-columns: 128px 1fr; gap: 10px; border-top: 1px solid #ccd9df; padding: 8px 0; align-items: baseline; }
+    .pn .kv dt { color: #60798e; font: 500 9px var(--mono); letter-spacing: .04em; margin: 0; }
+    .pn .kv dd { font-size: 11px; margin: 0; color: #12283b; overflow-wrap: anywhere; }
+    .pn .chip { border: 1px solid #ccd9df; border-radius: 999px; color: #60798e; font: 500 9px var(--mono); padding: 3px 8px; display: inline-flex; align-items: center; gap: 4px; }
+    .pn .chip.link { border-color: color-mix(in srgb, #008eab 45%, #ccd9df); color: #008eab; background: color-mix(in srgb, #008eab 5%, #fff); }
+    .pn .tab { background: #fff; border: 1px solid #ccd9df; border-radius: 5px; font-size: 10px; padding: 6px 10px; color: #12283b; }
+    .pn .tab.on { background: #078b79; border-color: #078b79; color: #fff; }
+    .pn th { text-align: left; color: #60798e; font: 600 9px var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 7px 10px; border-bottom: 1px solid #ccd9df; white-space: nowrap; }
+    .pn td { font-size: 10px; color: #12283b; padding: 7px 10px; border-bottom: 1px solid #f0f4f5; white-space: nowrap; }
+    .pn td.mut { color: #60798e; }
+    .pn .endcard { border: 1px solid #ccd9df; border-radius: 8px; background: #f0f4f5; display: grid; gap: 2px; padding: 9px 11px; }
+    .pn .endcard strong { font: 600 11px var(--mono); color: #008eab; }
+    .pn .endcard span { color: #60798e; font: 500 8px var(--mono); }
+  </style>
+</helmet>
+
+<div class="pn" style="position: relative; width: 1180px; height: 780px; overflow: hidden; background: #fbfcfc; color: #12283b; padding: 0">
+
+  <div style="position: absolute; left: 40px; top: 26px">
+    <span class="kick" style="color: #008eab">Panel anatomy</span>
+    <div style="font: 600 15px var(--mono); margin-top: 4px">Shared across all three options</div>
+  </div>
+  <div style="position: absolute; right: 40px; top: 30px; color: #60798e; font-size: 10px; max-width: 400px; text-align: right; line-height: 1.5">One label style, values never collide, counts are links, empty columns collapse. Closes walkthrough issues #20–#23.</div>
+
+  <!-- ============ 1. Entity details ============ -->
+  <div style="position: absolute; left: 40px; top: 92px; width: 350px">
+    <div class="cap" style="margin-bottom: 9px">Entity details — kv grid, linked contains</div>
+    <div class="card">
+      <header style="display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid #ccd9df; padding: 16px 16px 12px">
+        <div>
+          <span class="kick" style="color: #008eab">System</span>
+          <h2 style="font: 600 18px var(--mono); margin: 5px 0 2px">Legacy Commerce Platform</h2>
+          <span style="color: #60798e; font: 500 9px var(--mono)">systems:legacy-commerce</span>
+        </div>
+        <span class="tab" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; padding: 0; border-radius: 7px; color: #60798e">✕</span>
+      </header>
+      <nav style="display: flex; gap: 5px; border-bottom: 1px solid #ccd9df; padding: 7px 10px">
+        <span class="tab on">Details</span>
+        <span class="tab">Connections <b style="font-weight: 600; color: #60798e">7</b></span>
+        <span class="tab">Changes <b style="font-weight: 600; color: #60798e">2</b></span>
+      </nav>
+      <div style="padding: 12px 16px 18px">
+        <p style="color: #60798e; font-size: 11.5px; line-height: 1.5; margin: 0 0 12px">Customer storefront, back-office administration, and all commerce domains in one deployable estate.</p>
+        <dl style="margin: 0">
+          <div class="kv"><dt>lifecycle</dt><dd>migrate</dd></div>
+          <div class="kv"><dt>criticality</dt><dd>tier-1</dd></div>
+          <div class="kv"><dt>availability target</dt><dd>99.9%</dd></div>
+          <div class="kv"><dt>data classification</dt><dd style="color: #60798e">—</dd></div>
+          <div class="kv"><dt>tags</dt><dd style="display: flex; flex-wrap: wrap; gap: 5px"><span class="chip">legacy</span><span class="chip">ecommerce</span><span class="chip">strangler-source</span></dd></div>
+          <div class="kv"><dt>contains</dt><dd style="display: flex; flex-wrap: wrap; gap: 5px"><span class="chip link">Commerce Monolith</span><span class="chip link">Commerce Edge</span><span class="chip link">+3 more</span></dd></div>
+          <div class="kv"><dt>lifespan</dt><dd>0 · Base → 8 · Complete Cutover</dd></div>
+        </dl>
+      </div>
+    </div>
+    <div style="margin-top: 10px; color: #60798e; font-size: 9.5px; line-height: 1.55">Labels humanize once, in one style. Absent values show an em dash instead of vanishing rows. “Contains” counts became chips that open the member.</div>
+  </div>
+
+  <!-- ============ 2. Connection details ============ -->
+  <div style="position: absolute; left: 430px; top: 92px; width: 350px">
+    <div class="cap" style="margin-bottom: 9px">Connection details — endpoints, direction, interval</div>
+    <div class="card">
+      <header style="display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid #ccd9df; padding: 16px 16px 12px">
+        <div>
+          <span class="kick" style="color: #008eab">Connection</span>
+          <h2 style="font: 600 18px var(--mono); margin: 5px 0 2px; line-height: 1.3">Submit accepted order to enterprise OMS</h2>
+          <span style="color: #60798e; font: 500 9px var(--mono)">monolith-to-oms</span>
+        </div>
+        <span class="tab" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; padding: 0; border-radius: 7px; color: #60798e">✕</span>
+      </header>
+      <nav style="display: flex; gap: 5px; border-bottom: 1px solid #ccd9df; padding: 7px 10px">
+        <span class="tab on">Details</span>
+        <span class="tab">Interfaces <b style="font-weight: 600; color: #60798e">1</b></span>
+        <span style="flex: 1"></span>
+        <span class="tab" style="color: #008eab; border-color: color-mix(in srgb, #008eab 40%, #ccd9df)">Dependency view</span>
+      </nav>
+      <div style="padding: 14px 16px 18px">
+        <div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin-bottom: 14px">
+          <div class="endcard"><strong>Legacy Commerce Platform</strong><span>PROVIDER · SYSTEM</span></div>
+          <svg width="20" height="12" viewBox="0 0 20 12" fill="none" stroke="#078b79" stroke-width="1.8"><path d="M1 6h15.5M13 2.5 17 6l-4 3.5"/></svg>
+          <div class="endcard"><strong>Enterprise Order Management</strong><span>CONSUMER · SYSTEM</span></div>
+        </div>
+        <dl style="margin: 0">
+          <div class="kv"><dt>direction</dt><dd>provider → consumer</dd></div>
+          <div class="kv"><dt>interface</dt><dd>Create accepted order · api · HTTPS</dd></div>
+          <div class="kv"><dt>call direction</dt><dd>synchronous</dd></div>
+          <div class="kv"><dt>data sensitivity</dt><dd>order · customer-pii</dd></div>
+          <div class="kv"><dt>tags</dt><dd style="display: flex; gap: 5px"><span class="chip">orders</span><span class="chip">synchronous</span></dd></div>
+          <div class="kv"><dt>lifespan</dt><dd>0 · Base → present <span class="chip" style="border-color: color-mix(in srgb, #078b79 40%, #ccd9df); color: #078b79">active</span></dd></div>
+        </dl>
+      </div>
+    </div>
+    <div style="margin-top: 10px; color: #60798e; font-size: 9.5px; line-height: 1.55">Endpoints are linked cards with an explicit direction arrow. Tabs fit the entity kind — a connection gets Interfaces, not Connections. Aspect values and the lifecycle interval always render.</div>
+  </div>
+
+  <!-- ============ 3. Tables ============ -->
+  <div style="position: absolute; left: 820px; top: 92px; width: 320px">
+    <div class="cap" style="margin-bottom: 9px">Tables — auto-size, empty columns collapse</div>
+    <div class="card">
+      <header style="display: flex; align-items: center; gap: 5px; border-bottom: 1px solid #ccd9df; padding: 7px 10px">
+        <span class="tab on" style="font-size: 9px">Systems 12</span>
+        <span class="tab" style="font-size: 9px">Connections 17</span>
+        <span style="flex: 1"></span>
+        <span class="chip">6 empty hidden</span>
+      </header>
+      <table style="border-collapse: collapse; width: 100%">
+        <thead><tr><th>Name</th><th>Lifecycle</th><th>Tags</th></tr></thead>
+        <tbody>
+          <tr><td>Legacy Commerce Platform</td><td class="mut">migrate</td><td><span class="chip">legacy</span></td></tr>
+          <tr style="background: color-mix(in srgb, #078b79 8%, transparent)"><td>Digital Commerce Platform</td><td class="mut">strategic</td><td><span class="chip">target</span></td></tr>
+          <tr><td>Enterprise Fulfilment</td><td class="mut">retain</td><td><span class="chip">fulfilment</span></td></tr>
+          <tr><td>Payment Service Provider</td><td class="mut">retain</td><td><span class="chip">pci</span></td></tr>
+          <tr><td>Tax Calculation Provider</td><td class="mut">retain</td><td><span class="chip">saas</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top: 10px; color: #60798e; font-size: 9.5px; line-height: 1.55">Columns size to content — headers never truncate. All-empty columns collapse into the “hidden” chip, which reopens them from the Columns menu.</div>
+
+    <div class="cap" style="margin: 22px 0 9px">Docked-bar affordance (replaces debug pills)</div>
+    <div class="card" style="display: flex; align-items: center; gap: 8px; padding: 9px 12px">
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="#60798e" stroke-width="1.3"><rect x="1.5" y="2" width="10" height="9" rx="1.5"/><path d="M1.5 5.5h10M5.5 5.5V11"/></svg>
+      <span style="color: #60798e; font: 600 9px var(--mono); letter-spacing: .06em">TABLES</span>
+      <b style="background: #f0f4f5; border-radius: 999px; color: #60798e; font: 600 8px var(--mono); padding: 2px 6px">42</b>
+      <span style="flex: 1"></span>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#60798e" stroke-width="1.5"><path d="M2.5 7.5 6 4l3.5 3.5"/></svg>
+    </div>
+    <div style="margin-top: 10px; color: #60798e; font-size: 9.5px; line-height: 1.55">One styled chip per collapsed panel, docked to its canvas edge — no bare default buttons.</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
