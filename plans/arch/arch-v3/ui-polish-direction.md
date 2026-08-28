@@ -101,7 +101,11 @@ only Base, Tags with no tags, and Guided views with no authored guides.
 
 ### Detail
 
-Detail is a dropdown for System, Container, Child Containers, and Component.
+Detail is a dropdown for System, Subsystem, Container, and Component
+(level model renamed 2026-08-28: Subsystem — a logical grouping of
+related containers — replaces the former container-in-container "Child
+Containers" level; the Subsystem option is hidden when the model
+defines no subsystems).
 Boxes with children also have a small persistent drill affordance. Drilling
 changes focus and adds a breadcrumb. It does not expand children in place.
 

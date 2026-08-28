@@ -48,13 +48,14 @@ YAML  <──>  ┼── sqlite  (one table/kind)    later
 3. `Timelines` — `timeline`, `milestone`; row order is milestone order, one
    contiguous block per timeline. Empty sheet = implicit timeline.
 4. `Systems` — `id`, `name`, `start_in`, `end_in`, `description`, `tags`.
-5. `Containers` — + `parent`.
-6. `Components` — + `container`.
-7. `Code` — + `component`.
-8. `Users` — as Systems.
-9. `Interfaces` — + `provider`, `consumer`, `call_direction`,
-   `data_flow_direction`.
-10. `Relationships` — `id`, `source`, `action`, `target`, `start_in`,
+5. `Subsystems` — + `parent` (a System).
+6. `Containers` — + `parent` (a System or a Subsystem).
+7. `Components` — + `container`.
+8. `Code` — + `component`.
+9. `Users` — as Systems.
+10. `Interfaces` — + `provider`, `consumer`, `call_direction`,
+    `data_flow_direction`.
+11. `Relationships` — `id`, `source`, `action`, `target`, `start_in`,
     `end_in`, `description`, `tags`.
 
 Reserved columns always present; any additional column is a property

@@ -29,24 +29,29 @@ architecture before any milestone lands — the filter "rows live at position
 
 ## Entity kinds (C4-aligned)
 
-| Kind | Parent field | Contains |
-| --- | --- | --- |
-| System | — | Containers |
-| Container | `parent` — a System **or** a Container | Containers, Components |
-| Component | `container` — a Container | Code |
-| Code | `component` — a Component | — |
+| Kind | Meaning | Parent field | Contains |
+| --- | --- | --- | --- |
+| System | the overall product or platform | — | Subsystems, Containers |
+| Subsystem | a cohesive business capability — a logical grouping of related containers | `parent` — a System | Containers |
+| Container | an independently runnable/deployable application or data store | `parent` — a System **or** a Subsystem | Components |
+| Component | a significant module inside a container | `container` — a Container | Code |
+| Code | implementation details | `component` — a Component | — |
 
-- A nested container is **not** a separate kind: it is a Container whose
-  `parent` is another Container instead of a System.
+- **Subsystems are optional** (renamed level model, 2026-08-28 — replaces
+  the earlier container-in-container nesting): a container may attach
+  directly to its system. Subsystems never nest and are purely a logical
+  grouping — deployability lives at the container.
+- Containers no longer nest: `parent` must name a System or a Subsystem,
+  never another Container.
 - Code is a full modelled kind — same row shape, intervals, revisions, and
   interface eligibility as every other entity — expected to be unpopulated
   in most datasets.
 - Users, Interfaces, and Relationships keep their v2 names and semantics.
   Interface endpoints and relationship `source`/`target` may reference any
   entity kind.
-- Because `parent` may name a System or a Container, an id present in both
-  collections is a validation error (ambiguous parent), and containment
-  must be acyclic.
+- Because `parent` may name a System or a Subsystem, an id present in both
+  collections is a validation error (ambiguous parent). Containment is
+  acyclic by construction (strict layering).
 
 ## Identifiers
 
@@ -62,6 +67,7 @@ follow a per-kind prefixed sequential scheme:
 | Kind | Scheme |
 | --- | --- |
 | System | `s-0001` |
+| Subsystem | `ss-0001` |
 | Container | `c-0001` |
 | Component | `cp-0001` |
 | Code | `cd-0001` |
@@ -101,17 +107,23 @@ systems:
     name: Legacy Clearing
     end_in: phase-1        # last present at phase-1; gone at phase-2
 
+# subsystems are optional groupings of containers within a system
+subsystems:
+  - id: clearing
+    name: Clearing
+    parent: payments
+
 containers:
   - id: payments-api
     name: Payments API
-    parent: payments
+    parent: payments        # directly under the system — no subsystem
   - id: clearing-api
     name: Clearing API
     parent: legacy-clearing
     end_in: phase-1
   - id: new-clearing
-    name: Clearing
-    parent: payments
+    name: Clearing API
+    parent: clearing        # grouped under the payments/clearing subsystem
     start_in: phase-2
 
 components: []
@@ -147,7 +159,7 @@ contain it. Grep `phase-2` and you see what arrives at phase-2 (`start_in`);
 what phase-2 sweeps away carries `end_in: phase-1` — the last state it
 survives. No patch grammar, no second vocabulary.
 
-Root keys `schema_version`, `milestones`, and the seven entity collections
+Root keys `schema_version`, `milestones`, and the eight entity collections
 are required (collections may be empty). `timelines` is optional.
 
 ## Static architectures are the base case
@@ -378,8 +390,9 @@ without unbounded file growth.
 
 Structural (errors): unique ids per collection (revision rows excepted per
 the rules above), resolvable parents, endpoints, and milestone references,
-ambiguous `parent` (id present in both `systems` and `containers`),
-containment cycles, the reserved milestone id `base`, required fields,
+ambiguous `parent` (id present in both `systems` and `subsystems`),
+container `parent` naming another container (containers no longer nest),
+the reserved milestone id `base`, required fields,
 interval ordering (`start_in` after `end_in` when both are milestones on
 one timeline; equality is legal), timeline rules, ID/text/property rules
 inherited from v2.

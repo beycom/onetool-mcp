@@ -296,7 +296,7 @@ what a link preserves and excludes):
 
 | Control | Fragment key | Values |
 | --- | --- | --- |
-| Detail | `level` | `systems` / `top-containers` / `containers` / `components` |
+| Detail | `level` | `systems` / `subsystems` / `containers` / `components` |
 | Drill | `drill` | `<kind>:<id>` (child projection; pushes history) |
 | Dependency focus | `deps` | `<kind>:<id>` (entered from Info's "View dependencies") |
 | Stage | `timeline`, `time` | timeline + stage position |
@@ -462,30 +462,37 @@ AG Grid Community + a custom toolbar (harvest the v2 donor's
 
 ### C4 zoom and drill (D10b)
 
-The flat level selector becomes a four-level **C4 zoom** control. Internal
-level ids (fragment tokens and the `rollUp` level argument) with their UI
-labels:
+The flat level selector becomes a four-level **C4 zoom** control.
+(Level model renamed 2026-08-28 — Subsystem replaces the former
+`top-containers` / "Child Containers" split; see schema.md "Entity
+kinds".) Internal level ids (fragment tokens and the `rollUp` level
+argument) with their UI labels:
 
 | Level id | UI label | Node set |
 | --- | --- | --- |
-| `systems` | System | contract-v1 systems roll-up; flat, no boundaries |
-| `top-containers` | Container | **new roll-up level**: representative = the nearest ancestor container whose `parent` is a system; everything below rolls into it |
-| `containers` | Child Containers | contract-v1 containers level (every live container stays itself) |
-| `components` | Component | contract-v1 components level |
+| `systems` | System | systems roll-up; flat, no boundaries |
+| `subsystems` | Subsystem | subsystems as nodes; a container with no subsystem stays itself; components/code roll up through their container |
+| `containers` | Container | every live container stays itself; subsystems and systems become boundaries |
+| `components` | Component | components level (a container without live components represents itself) |
 
-Users stay plain nodes at every level. `rollUp`'s edge rules (unordered
-pair key, self-pairs dropped, member id lists, direction from members) are
-unchanged; only the representative function gains the `top-containers`
-case. Existing projection vectors keep their level names and stay green.
+The Subsystem option is **hidden** when the model defines no subsystems
+(the level is dataset-optional); its fragment token remains valid and
+then renders identically to an all-ungrouped subsystem view. Users stay
+plain nodes at every level. `rollUp`'s edge rules (unordered pair key,
+self-pairs dropped, member id lists, direction from members) are
+unchanged; the representative function follows the strict
+System ⊃ Subsystem ⊃ Container ⊃ Component ⊃ Code layering. Projection
+vectors are renamed/re-cut to these levels (subsystem roll-up gets its
+own vector cases).
 
 **Boundary boxes** (presentation, IcePanel profile): ancestors above the
 active level render as containment group boxes — thin rounded outline
 (~8–10 px radius), restrained fill, small icon + name label at the top
 left (no solid title bar), generous inset around children. At
-`top-containers`: systems with displayed children are boundary boxes,
+`subsystems`: systems with displayed children are boundary boxes,
 childless systems are plain nodes. At `containers`: system boundaries plus
-parent-container boundaries, nested. At `components`: the full
-system/container ancestor chain. Boundary boxes are selectable (open the
+subsystem boundaries, nested. At `components`: the full
+system/subsystem/container ancestor chain. Boundary boxes are selectable (open the
 side panel) but are **never edge endpoints** — edges attach to displayed
 leaf nodes and cross boundary outlines (research A2). A roll-up node that
 hides children carries a child-count badge.
@@ -708,9 +715,10 @@ Per the direction's "App shell" table and defaults:
 
 ### Controls conversion
 
-- **Detail dropdown** (System / Container / Child Containers /
-  Component) replacing the level control; `level` fragment tokens
-  unchanged.
+- **Detail dropdown** (System / Subsystem / Container / Component —
+  level model renamed 2026-08-28; the Subsystem option is hidden when
+  the model defines no subsystems) replacing the level control; the
+  `level` fragment tokens are the level ids in the C4 zoom table.
 - **Stage dropdown** ("0 · Base", "1 · <name>", …) replacing both the
   time slider and the Compare control. Selecting a stage updates canvas,
   Data tables, counts, and Info together. Diff styling is driven by
@@ -814,8 +822,9 @@ edge rendering, or selection emphasis (pass 3), nor dock content
 
 - Replace the fixed 250 × 168 card with per-Detail-level size tiers:
   uniform card **width** per level (starting values: System 280 px,
-  Container 260 px, Child Containers / Component 240 px — tune against
-  the acceptance checks), **height from content**. Uniform width within
+  Subsystem 260 px, Container / Component 240 px — level names per the
+  2026-08-28 rename; tune against the acceptance checks), **height from
+  content**. Uniform width within
   a level keeps ELK's layered ranks clean; content-driven height kills
   the ~80%-empty box.
 - Names wrap to at most two lines within the tier width; a name may

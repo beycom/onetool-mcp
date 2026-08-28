@@ -261,6 +261,23 @@ tagged to it; the exit gate checks the list is empty.
       drill sets; Map minimap attaches above the lower-left row.
       Behavior changes get tests; existing projection vectors and
       tests must stay green. Highest-risk pass.
+- [ ] **Interlude — subsystem level rename (user-directed 2026-08-28;
+      exception to the no-new-features rule; runs before pass 3).**
+      `→ D14` (prompt READY in delegation.md; budget 1,100 changed
+      source lines proposed — confirm before running.)
+      The detail-level model becomes System / Subsystem (optional) /
+      Container / Component / Code: Subsystem is a new entity kind (a
+      logical grouping of related containers inside a system);
+      containers no longer nest; the former `top-containers` /
+      "Child Containers" frontend levels are replaced by `subsystems`
+      / `containers` with the Subsystem option hidden when a model
+      defines none. Normative design landed 2026-08-28 in schema.md
+      ("Entity kinds"), report.md ("C4 zoom and drill"), adapters.md
+      (eleven-sheet workbook), ui-polish-direction.md (Detail
+      dropdown). The acme fixture delta (six subsystems inside
+      Digital Commerce Platform mapping the migration waves; 19
+      container rewires; components already populated) is authored
+      in the D14 prompt.
 - [ ] **Pass 3 — graph elements: cards, splines, selection.** `→ D13c`
       (spec: report.md "Polish contract — pass 3: graph elements",
       authored 2026-08-28; prompt READY in delegation.md, D13b gate
@@ -402,6 +419,37 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-28** — Subsystem level rename designed (user-directed); D14
+  authored and slotted before D13c. New naming: System (the overall
+  product/platform), Subsystem (optional — a cohesive business
+  capability: a logical grouping of related containers), Container
+  (independently runnable/deployable app or data store), Component
+  (significant module inside a container), Code (implementation
+  details). Subsystem is a real entity kind (`subsystems` collection,
+  `parent` = a system, id prefix `ss`); containers no longer nest
+  (`parent` = system or subsystem); ambiguous-parent validation moves
+  to systems×subsystems. Frontend levels 'top-containers'/'containers'
+  ("Container"/"Child Containers") → 'subsystems'/'containers'
+  ("Subsystem"/"Container"), Subsystem option hidden when the model has
+  none; cardSize tiers 280/260/240/240 re-keyed. Design amendments
+  landed in schema.md (kinds table, id scheme, canonical YAML, eight
+  collections, validation), adapters.md (eleven sheets — Subsystems is
+  sheet 5), report.md (fragment table, C4 zoom table + boundary
+  chains, Detail dropdown, D13b tier names), ui-polish-direction.md.
+  Fact checked first: acme has NO container-in-container nesting (the
+  old Child Containers level was vacuous there) and already carries 55
+  components, so the component level needs no fixture work; the acme
+  delta (authored in the D14 prompt) adds six subsystems inside
+  Digital Commerce Platform matching the milestone waves
+  (storefront-edge, platform-foundation, catalog-search,
+  customer-cart-pricing, transaction-core, back-office-insight) and
+  rewires 19 container parents, leaving single-container systems
+  ungrouped to exercise the optional path. D13c re-sequenced after the
+  D14 gate (prompt prereq updated; its anchors are level-agnostic).
+  Next action: user confirms the D14 budget (1,100 changed source
+  lines proposed) and runs the delegation.md D14 prompt; the architect
+  gates it, then D13c runs on the renamed baseline.
 
 - **2026-08-28** — D13b architect gate PASSED; tree committed. Independently
   re-verified: 28 frontend tests including exactly the six prescribed D13b

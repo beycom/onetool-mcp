@@ -21,7 +21,8 @@ below is the template it will be issued from.
 | D10a, D10b | Phase 3R wave 2: report UI | DONE, commit c37e3d05 | — |
 | D13a | Phase 3P pass 1: app shell | DONE, gate PASSED 2026-08-28 (974/1,800 lines) | — |
 | D13b | Phase 3P pass 2: canvas composition | DONE (gate PASSED 2026-08-28) | — |
-| D13c | Phase 3P pass 3: graph elements | READY (spec in report.md; budget 1,600 proposed) | now, once the budget is confirmed |
+| D14 | Subsystem level rename (schema + report + acme) | READY (schema.md/report.md amended 2026-08-28; budget 1,100 proposed) | now, once the budget is confirmed |
+| D13c | Phase 3P pass 3: graph elements | READY (spec in report.md; budget 1,600 proposed) | D14 gate |
 | D13d | Phase 3P pass 4 | GATED on its spec + the #21 payload precheck | D13c gate |
 | D12a | Phase 3S: sequence parser + payload | ISSUED, ON HOLD | Phase 3P exit gate |
 | D12b | Phase 3S: sequence renderer + SEQ-* | GATED on layout vectors + acme flow docs | Phase 3P exit gate |
@@ -216,14 +217,189 @@ capped at Read, thresholds derived from the type scale (79% Read /
 effect; 407/1,400 changed source lines. Gate review 2026-08-28.
 (Prompt text in git history.)
 
-## D13c — Phase 3P pass 3: graph elements (READY, authored 2026-08-28; D13b gate passed — run once the budget is confirmed)
+## D14 — Subsystem level rename (READY, authored 2026-08-28; run before D13c)
 
 ```text
 [standard rules + UI rule 9]
 
-Prereq: the D13b canvas-composition commit is the baseline (content-
-sized cards, tuned ELK, initialViewport framing, shiftViewport
-camera). Authoritative contract — READ IN FULL, in this order:
+Prereq: the D13b canvas-composition commit is the baseline.
+Authoritative contract — READ IN FULL, in this order:
+1. plans/arch/arch-v3/schema.md, section "Entity kinds (C4-aligned)"
+   (amended 2026-08-28: the new Subsystem kind and the strict
+   System > Subsystem > Container > Component > Code layering);
+2. plans/arch/arch-v3/report.md, section "C4 zoom and drill (D10b)"
+   (amended 2026-08-28: the four level ids systems / subsystems /
+   containers / components, their roll-up semantics, boundary chains,
+   and the hidden-when-empty Subsystem option);
+3. plans/arch/arch-v3/adapters.md, "Excel workbook" (eleven sheets —
+   Subsystems is sheet 5).
+Any ambiguity between this prompt and those sections is a rule-1 stop.
+
+WHAT THIS IS: a schema + naming change, no visual redesign. The
+detail-level model becomes System / Subsystem (optional) / Container /
+Component: Subsystem is a new entity kind (a logical grouping of
+related containers inside a system); containers no longer nest. The
+former frontend levels 'top-containers' and 'containers' ("Container"
+/ "Child Containers") are replaced by 'subsystems' ("Subsystem") and
+'containers' ("Container"). Do NOT touch D13b's layout/camera behavior
+or start pass-3 work (edge/card visuals).
+
+Budget: 1,100 changed source lines (Python + TS/TSX + fixture; tests
+excluded). No new dependencies.
+
+Scope A — Python (src/otdev/tools/_arch/v3/):
+1. model.py: Subsystem model (row shape as Container; `parent`
+   required, must name a System). Architecture gains the `subsystems`
+   collection; Container.parent now references a System or Subsystem.
+2. yamlio.py: `subsystems` in the canonical key order, between
+   `systems` and `containers`.
+3. ids.py: generated-id prefix `ss` for subsystems.
+4. resolver.py: add `subsystems` to the kind lists; clipping parent
+   chain becomes system > subsystem > container > component > code
+   (a container with a subsystem parent clips to the subsystem, which
+   clips to its system). Subsystems are legal interface/relationship
+   endpoints (schema.md: any entity kind).
+5. validate.py: subsystem `parent` must resolve to a system; container
+   `parent` resolves to a system OR subsystem; ambiguous parent = id
+   present in both `systems` and `subsystems`; a container `parent`
+   naming another container is now an error (nesting removed). Drop
+   the container-cycle machinery only if it is exclusively about
+   container nesting.
+6. excel.py: `Subsystems` sheet (sheet 5, headers as Systems +
+   `parent`), same dropdown/validation pattern as Containers;
+   round-trip and in-place write include it.
+7. payload.py: emit `rows.subsystems`.
+
+Scope B — Frontend (frontend/arch-report/src/):
+8. types.ts: Level = 'systems' | 'subsystems' | 'containers' |
+   'components'; RowKind + payload rows gain 'subsystems'; row parent
+   fields per schema.
+9. projection.ts: representativeAtLevel/rollUp/boundaryAncestors per
+   the amended C4 zoom table — at 'subsystems' a container with no
+   subsystem stays itself; at 'containers' subsystem + system
+   boundaries nest; at 'components' the full chain. Drill through a
+   subsystem boundary works like any boundary.
+10. view.ts: level fragment tokens updated ('top-containers' retired;
+    unknown values keep falling back per existing diagnostics).
+11. ViewDock.tsx: DETAILS = System / Subsystem / Container /
+    Component; the Subsystem option renders only when the payload has
+    at least one subsystem row.
+12. cardSize.ts: CARD_WIDTH keys → systems 280, subsystems 260,
+    containers 240, components 240.
+13. App.tsx: KIND_LABEL, search kinds, child-count logic (a
+    subsystem's children are containers whose parent is its id).
+14. GridPanel: a Subsystems table with the standard columns.
+
+Scope C — acme fixture (tests/unit/tools/fixtures/arch/acme.yaml):
+15. Insert this `subsystems:` collection between `systems:` and
+    `containers:` (hand-authored slug ids are legal):
+
+subsystems:
+- id: storefront-edge
+  name: Storefront and Edge
+  parent: commerce-platform
+  start_in: acme-2027-edge-foundation
+  description: Customer-facing entry points routing storefront traffic
+    into the new platform.
+  tags:
+  - ecommerce
+  - frontend
+- id: platform-foundation
+  name: Platform Foundation
+  parent: commerce-platform
+  start_in: acme-2027-edge-foundation
+  description: Cross-cutting eventing, observability, and legacy
+    integration capability underpinning every other subsystem.
+  tags:
+  - platform
+  - integration
+- id: catalog-search
+  name: Catalog and Search
+  parent: commerce-platform
+  start_in: acme-2028-catalog-search
+  description: Product catalog mastering, merchandising, and search
+    capability.
+  tags:
+  - bounded-context-catalog
+- id: customer-cart-pricing
+  name: Customer, Cart and Pricing
+  parent: commerce-platform
+  start_in: acme-2029-customer-cart-pricing
+  description: Customer-identity-linked shopping capability - profiles,
+    carts, prices, and notifications.
+  tags:
+  - bounded-context-customer
+- id: transaction-core
+  name: Transaction Core
+  parent: commerce-platform
+  start_in: acme-2030-transaction-core
+  description: Order capture and fulfilment initiation - checkout,
+    orders, payments, and inventory.
+  tags:
+  - bounded-context-order
+- id: back-office-insight
+  name: Back Office and Insight
+  parent: commerce-platform
+  start_in: acme-2031-complete-cutover
+  description: Administration and operational reporting over the
+    completed platform.
+  tags:
+  - admin
+  - analytics
+
+16. Rewire exactly these container `parent` values (all other
+    containers keep their system parent — that exercises the
+    "subsystem is optional" path):
+    storefront-edge: commerce-edge, storefront-bff
+    platform-foundation: event-backbone, observability-platform,
+      legacy-integration-adapter, analytics-event-adapter
+    catalog-search: catalog-service, search-service,
+      catalog-sync-adapter
+    customer-cart-pricing: customer-service, cart-service,
+      pricing-service, notification-service
+    transaction-core: checkout-service, order-service,
+      payment-service, inventory-service
+    back-office-insight: admin-portal, reporting-service
+17. Components stay untouched (the component level is already
+    populated with 55 rows).
+
+Tests — exactly five new cases plus mechanical updates (level-token
+renames in existing suites and vectors; expected counts updated where
+the subsystem level changes them):
+(1) py round-trip: YAML and Excel round-trip a model with subsystems
+    unchanged;
+(2) py validation: ambiguous parent (id in systems AND subsystems) and
+    a container parented to a container are both errors;
+(3) TS projection: at 'subsystems', a grouped container rolls up to
+    its subsystem and an ungrouped container stays itself;
+(4) TS projection: at 'containers', subsystem boundaries nest inside
+    system boundaries;
+(5) TS ViewDock: the Subsystem option is absent when the payload has
+    no subsystems and present when it does.
+
+Finish: regenerate frontend/arch-report/src/fixture-payload.json (the
+README command), `just build-arch-report`, regenerate the acme report
+via the CLI, verify per rule 9 from file:// at 1440x900 (light): clean
+console, zero external requests; the Detail dropdown reads System /
+Subsystem / Container / Component; the Subsystem level shows the six
+subsystems inside the Digital Commerce Platform boundary with
+ungrouped containers as leaves; the Container level nests subsystem
+boundaries inside system boundaries; Stage switches still move
+nothing. Capture screenshots: subsystem level cold load, container
+level showing nested boundaries. Definition of done: rules 5-8, then
+STOP — D13c is a separate prompt.
+```
+
+## D13c — Phase 3P pass 3: graph elements (READY, authored 2026-08-28; D13b gate passed — run after the D14 gate, once the budget is confirmed)
+
+```text
+[standard rules + UI rule 9]
+
+Prereq: the D14 subsystem-rename commit is the baseline (D13b
+content-sized cards, tuned ELK, initialViewport framing, shiftViewport
+camera, plus the renamed detail levels System / Subsystem / Container /
+Component — subsystem cards and boundaries get the same anatomy rules
+as every other kind). Authoritative contract — READ IN FULL, in this order:
 1. plans/arch/arch-v3/ui-polish-direction.md (the product direction);
 2. plans/arch/arch-v3/report.md, sections "Confirmed UI direction
    (2026-08-27)" and "Polish contract — pass 3: graph elements
