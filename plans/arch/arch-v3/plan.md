@@ -299,6 +299,9 @@ tagged to it; the exit gate checks the list is empty.
       Relationship switch visibly changes the picture without moving
       boxes.
 - [ ] **Pass 4 — View / Info / Data content and states.** `→ D13d`
+      (spec: report.md "Polish contract — pass 4"; prompt READY in
+      delegation.md; budget 1,500 changed source lines proposed —
+      confirm before running.)
       View control stack per the direction (controls with no
       meaningful choice hide; guided-story controls at the top of
       View); adaptive Info — Details / Connections tabs, stage changes
@@ -310,10 +313,13 @@ tagged to it; the exit gate checks the list is empty.
       lifecycle interval (#21) — **architect precheck before
       authoring this spec:** confirm the payload already carries that
       edge data; if it needs plumbing, that part escalates to the
-      user at the gate rather than riding a polish pass; Data tables
+      user at the gate rather than riding a polish pass (precheck
+      PASSED 2026-08-29 — no plumbing needed); Data tables
       auto-size populated columns, collapse all-empty columns, never
       truncate headers (#22), sync selection with the canvas both
-      ways, offer Show on Canvas; the read-only Payload viewer;
+      ways, offer Show on Canvas; the read-only Payload viewer
+      (DEFERRED 2026-08-29 to the Phase 3S attachments chunk — no
+      file refs exist in the payload until that design lands);
       Escape order per the direction (#13); designed empty and
       failure states; final motion/consistency sweep with a
       reduced-motion audit.
@@ -429,6 +435,34 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-29** — D13d authored (architect); tree committed. Normative
+  spec "Polish contract — pass 4: View / Info / Data content and states
+  (D13d)" added to report.md, grounded in the post-D14 tree (SidePanel,
+  ResizablePanel, GridPanel, ViewDock): viewport-filling shell with dock
+  header rows / chevrons / icon rails replacing every floating pill and
+  gutter (#25, #26); no-choice View controls hide and Tags caps at 5
+  rows (#27); humanized non-overlapping Info kv with linked Contains
+  chips (#20); stage changes as a Details section with the card
+  change-popover removed (the D13c leftover); kind-appropriate
+  connection Details rendering endpoints, direction, values, and
+  lifecycle interval from the existing payload (#21, no Python);
+  internal Back + "View dependencies" in Details (#16 rest); final
+  Escape order (#13); Data at the direction's four tabs with the D14
+  subsystems tab folded into a rawState-sourced Entities, auto-size /
+  empty-collapse / untruncated headers (#22), Show on Canvas, two-way
+  sync; designed empty states and the motion/reduced-motion sweep. Six
+  prescribed tests. Architect decision: the read-only Payload viewer and
+  Attachments tabs are DEFERRED out of 3P to the Phase 3S attachments
+  chunk — no file refs exist in the payload until the schema.md/
+  sequence.md attachments design lands, and the syntax highlighter
+  should ship once, with real data (pass-4 bullet amended; the 3P exit
+  gate does not check a Payload viewer). D13d prompt READY in
+  delegation.md, proposed budget 1,500 changed source lines. Next
+  action: user confirms the D13d budget and passes the delegation.md
+  prompt to the executor; the architect gates the result, then runs the
+  3P exit gate (with the user) — after which D12a re-scope, D11, D12b,
+  and D8 unlock.
 
 - **2026-08-29** — D14 architect gate PASSED; #21 payload precheck PASSED;
   tree committed. Independently re-verified: 78 arch py tests + `just lint`

@@ -1105,6 +1105,162 @@ latter).
   a selection with one-hop emphasis at 1440 × 900, the same selection
   under reduced motion, and a Stage-diff view.
 
+## Polish contract — pass 4: View / Info / Data content and states (D13d)
+
+Normative spec for the last 3P pass (authored 2026-08-29 after the D14
+gate; decision source: ui-polish-direction.md "View dock" / "Data dock" /
+"Info dock" + ui-polish.md #13, #16-rest, #20, #21, #22, #25, #26, #27).
+Grounded in the post-D14 tree: the Info panel is `SidePanel` in App.tsx
+(Details/Connections tabs, raw `ordinaryFields` kv, bare Contains count,
+"Open dependency view" at the bottom of Connections), dock chrome is
+`ResizablePanel.tsx` (text-label `panel-collapse` button, 34 px collapsed
+strip), tables are `GridPanel.tsx` (AG Grid, five tabs incl. the D14
+`subsystems` tab, no auto-size/empty-collapse), View is `ViewDock.tsx`.
+Pass 2's layout/camera modules, pass 3's edge/card modules, and
+projection.ts are OUT OF SCOPE — do not touch them.
+
+### Shell (#25, #26)
+
+- The app fills the browser viewport at every window size at or above the
+  1024 × 720 floor: no fixed-size render, no outer page scroll, no dead
+  band. Below the floor the app clamps to 1024 × 720 and the *page*
+  scrolls (existing `min-width`/`min-height` behavior); at or above it,
+  header, docks, and canvas flex to consume exactly 100vw × 100vh. Audit
+  the generated single-file template's wrapper markup too — the fix must
+  hold over `file://` in the generated report, not just `vite dev`.
+- Dock chrome uses standard panel patterns. Each dock gets a slim header
+  row: dock title, then an icon-only collapse chevron (`aria-label`,
+  `title` tooltip) — the floating "Collapse View dock" / "Collapse Data
+  dock" pills, the rotated-text "Open Info dock" gutter, and the "Open
+  Data dock" text strip are all removed. A collapsed dock renders as a
+  slim icon rail (vertical for View/Info, horizontal for Data) whose
+  icon button reopens it; rails never overlap canvas content (they keep
+  reserving layout space as today). Resize handles and double-click
+  default-restore keep their D13a behavior.
+- View-dock content rows restyle as compact list rows: the grouped
+  diagram list (the oversized Canvas/Model map card becomes a list row
+  with a small glyph), and the Copy view link footer row. Same type
+  scale and row height as the rest of the dock.
+
+### View dock (#27, direction "View dock")
+
+- Controls with no meaningful choice hide: Stage hides when the active
+  timeline has no milestones (Timeline already hides for a single
+  timeline; Detail already hides Subsystem for subsystem-less models —
+  keep both), Tags hides when the model has no tags. Relationship always
+  renders. Guided-view controls render only when authored guides exist —
+  none do until D11, so nothing renders (the hide rule IS this pass's
+  deliverable; do not build guided-story UI).
+- Tags caps at 5 visible rows, then scrolls internally inside a fixed
+  max-height; the tag count column and lens behavior are unchanged; the
+  rest of the View stack stays visible below it.
+
+### Info dock (#13, #16-rest, #20, #21)
+
+- **Details kv grid.** One label style: humanized Title-Case labels
+  (snake_case converted, e.g. `end_in` → "End in",
+  `availability_target` → "Availability target") for built-in fields and
+  properties alike; a two-column grid where label and value can never
+  collide (long values wrap under their own column). "Contains" stops
+  being a bare count: it renders the contained rows as clickable chips
+  (name, kind-colored) that select the child; cap at 8 chips + an
+  "and N more" chip that expands.
+- **Stage changes in Details.** When the selected row has a diff status
+  at the current stage (added / removed / changed relative to the
+  previous stage, same source as the Data Diff tab), Details shows a
+  concise "Changes at this stage" section: status line, and for
+  `changed` the changed fields as old → new rows. The canvas card's Δ
+  `change-popover` is REMOVED (D13c intentionally left it for this
+  pass); update the Escape handler that queries `.change-popover[open]`.
+- **Connection Info.** A selected interface/relationship/spline gets
+  tabs that make sense for its kind — Details only (plus the member list
+  for aggregated splines); the "Connections" tab renders only for
+  entities. Interface Details shows: both endpoints as linked rows
+  (provider/consumer resolved to display names; click selects that
+  entity), direction under the active Relationship (from
+  `call_direction` / source→target), the interface name and id,
+  relationship values (properties as the same humanized kv, tags as
+  chips), and the lifecycle interval rendered from the payload
+  `intervals` (live segments as stage names, e.g. "Base → 3 · Catalog
+  and Search"; open end = "onward"). The payload already carries all of
+  this (#21 precheck 2026-08-29) — no Python changes.
+- **Navigation.** Info gets an internal Back action: after moving from
+  an entity to a connection (via Connections rows or spline members),
+  Back returns to the previous selection; it appears only when there is
+  somewhere to go back to. "View dependencies" moves out of the
+  Connections tab bottom into a persistent entry in Details (it opens
+  the existing deps view; do not redesign the deps diagram itself).
+- **Escape (#13).** Final order per the direction, one keydown handler:
+  global search → open menus → selection + Info. With the change-popover
+  gone, re-verify and keep the D13a tests green.
+
+### Data dock (#22, direction "Data dock")
+
+- Tabs become the direction's four: **Entities, Interfaces, Milestones,
+  Diff** — the D14 `subsystems` tab is removed. Entities changes source:
+  it lists ALL live entity rows at the current stage across kinds
+  (systems, subsystems, containers, components, code, users — from
+  `rawState`, not the projected nodes), with a `kind` column, so the
+  table is level-independent and subsystems are always present. The
+  direction's absent-from-diagram flow follows: selecting a row that is
+  rendered at the current level highlights it on canvas; selecting one
+  that is not offers a "Show on Canvas" action (switches Detail to the
+  row's own level and selects it) instead of switching views silently.
+- Column behavior: auto-size populated columns to their content, collapse
+  columns whose every cell is empty by default (re-enable via the
+  existing column menu), never truncate a header — headers get the same
+  humanized labels as Info. Persisted per-tab layouts keep working; a
+  persisted layout that hides a now-populated column stays as the user
+  set it.
+- Selection sync both ways: canvas → the matching row highlights and
+  scrolls into view when its table is open (row → Info already works and
+  stays).
+
+### States and motion sweep
+
+- Designed empty states: an empty table tab ("No interfaces at this
+  stage"), global search with no matches, and the payload-diagnostics
+  banner styled to the token system (no raw unstyled text). No failure
+  state may render a blank panel.
+- Consistency sweep: one transition duration/easing pair for dock
+  collapse/expand and Info content swaps; `prefers-reduced-motion`
+  disables every non-essential animation (docks, Info, search dialog —
+  canvas already handled by D13c). This is the final 3P pass — leave no
+  mixed paddings/radii/font sizes in the three docks.
+
+### Out of scope
+
+- The read-only Payload viewer and Attachments tabs: **deferred to the
+  Phase 3S message-file attachments chunk** (architect decision
+  2026-08-29 — the payload carries no file refs until the schema.md/
+  sequence.md attachments design lands, and the syntax highlighter
+  should ship once, with real data). The conditional rule "Attachments
+  renders only when files exist" is trivially satisfied by rendering no
+  such tab in this pass. plan.md's pass-4 bullet is amended accordingly.
+- Guided-story playback UI (D11), the deps-diagram layout itself, dark
+  theme, and everything in "Explicitly deferred".
+
+### Prescribed tests (exactly these six, plus keeping every existing test green)
+
+1. Info details kv: a row with `availability_target` renders the label
+   "Availability target", no rendered `dt` contains an underscore, and
+   Contains renders clickable child chips (clicking selects the child).
+2. Interface Info: shows both endpoints resolved to names, the direction
+   for the active Relationship, and a lifecycle interval derived from
+   `intervals`; a connection selection renders no Connections tab.
+3. Stage changes: an entity with status `changed` at the selected stage
+   shows the "Changes at this stage" section with old → new field rows;
+   `.change-popover` no longer exists in the card DOM.
+4. Data columns: with a fixture where one optional column is entirely
+   empty and another is populated, the empty column is collapsed by
+   default and the populated one auto-sizes; the `subsystems` tab is
+   gone and subsystem rows appear in Entities with `kind: subsystems`.
+5. Dock chrome: a collapsed dock renders an icon rail (accessible name
+   present, no text-pill button), and activating it reopens the dock.
+6. Escape order with the popover removed: search open + selection active
+   → first Escape closes search, second clears selection and closes
+   Info (extends the D13a test).
+
 ## Exports
 
 Phase one exports are data-shaped and require no layout engine in Python:

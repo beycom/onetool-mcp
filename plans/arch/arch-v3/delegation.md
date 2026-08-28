@@ -217,6 +217,65 @@ capped at Read, thresholds derived from the type scale (79% Read /
 effect; 407/1,400 changed source lines. Gate review 2026-08-28.
 (Prompt text in git history.)
 
+## D13d — Phase 3P pass 4: View / Info / Data content and states (READY, authored 2026-08-29; run once the budget is confirmed)
+
+```text
+[standard rules + UI rule 9]
+
+Prereq: the D14 subsystem-level commit (703ee691) is the baseline.
+Authoritative contract — READ IN FULL, in this order:
+1. plans/arch/arch-v3/report.md "Polish contract — pass 4: View / Info /
+   Data content and states (D13d)" — the normative spec; implement it
+   exactly.
+2. plans/arch/arch-v3/ui-polish-direction.md "View dock", "Data dock",
+   "Info dock" — the confirmed direction the spec encodes.
+3. plans/arch/arch-v3/ui-polish.md #13, #16, #20, #21, #22, #25, #26,
+   #27 — the observed→expected evidence this pass must close.
+
+Scope — implement the pass contract exactly:
+1. Shell: viewport fill at/above the 1024 × 720 floor (no dead band, no
+   outer page scroll, verified in the generated file:// report); dock
+   header rows with icon-only collapse chevrons; collapsed docks as
+   slim icon rails; View-dock content as compact list rows.
+2. View: controls with no meaningful choice hide; Tags capped at 5
+   visible rows with internal scroll.
+3. Info: humanized, non-overlapping kv grid with linked Contains chips;
+   "Changes at this stage" Details section and removal of the card
+   change-popover; kind-appropriate connection Details (linked
+   endpoints, direction, values, lifecycle interval — the payload
+   already carries everything, NO Python changes); internal Back;
+   "View dependencies" entry in Details; final Escape order.
+4. Data: the four direction tabs (the subsystems tab folds into a
+   rawState-sourced Entities with a kind column), auto-sized populated
+   columns, all-empty columns collapsed, headers never truncated,
+   Show on Canvas, two-way selection sync.
+5. Designed empty/failure states and the motion/consistency sweep with
+   a reduced-motion audit.
+Out of scope — do not touch: cardSize/camera/layout, edgeAnchors/
+splinePath/edgePresentation, projection.ts, all Python, the Payload
+viewer and Attachments tabs (deferred to Phase 3S), guided-story UI,
+the deps-diagram layout, dark theme.
+
+Budget: 1,500 changed source lines (additions plus deletions, TS/TSX/
+CSS, tests and the generated bundle excluded). Stop and ask before
+exceeding it.
+
+Tests: exactly the six cases in the pass contract's "Prescribed
+tests"; every existing frontend and arch python test stays green.
+
+Finish: `just lint`, frontend suite, `just build-arch-report`,
+regenerate the acme report via the CLI, then verify per rule 9 from
+file:// in light theme at 1440x900, 1024x720, AND 1920x1080 (proving
+viewport fill with no dead band): clean console, zero external
+requests; walk cold load -> select an entity (Details kv, chips,
+changes section) -> open a connection from Connections and Back
+returns -> Data open (four tabs, auto-sized columns, Show on Canvas)
+-> collapse and reopen every dock via the new chrome -> Escape order.
+Capture screenshots: info-entity-details, info-connection,
+data-autosized, collapsed-rails, viewport-fill-1920. Definition of
+done: rules 5-8, then STOP.
+```
+
 ## D14 — Subsystem level rename (DONE, gate PASSED 2026-08-29)
 
 ```text
