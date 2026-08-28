@@ -14,20 +14,25 @@ Status legend: **READY** — paste and run now (respect the "after" column).
 **GATED** — the architect must produce an input artifact first; the prompt
 below is the template it will be issued from.
 
+**Numbering note (reorg 2026-08-29):** plan.md renumbered outstanding
+chunks to `Dxy` wave ids (x = wave, y = priority — mapping table in
+plan.md "Chunk numbering"). Completed chunks keep their historical ids;
+outstanding headings below carry both (`D21 (was D12a)` etc.).
+
 | Prompt | Chunk | Status | Run after |
 | --- | --- | --- | --- |
 | D1–D7 | Phases 0–3 build chunks | DONE (2026-08-23/24) | — |
 | D9a, D9b | Phase 3R wave 1: schema/model + Excel/payload rework | DONE, gate PASSED 2026-08-25 | — |
 | D10a, D10b | Phase 3R wave 2: report UI | DONE, commit c37e3d05 | — |
-| D13a | Phase 3P pass 1: app shell | DONE, gate PASSED 2026-08-28 (974/1,800 lines) | — |
-| D13b | Phase 3P pass 2: canvas composition | DONE (gate PASSED 2026-08-28) | — |
-| D13c | Phase 3P pass 3: graph elements | DONE, gate PASSED 2026-08-28 (797/1,600 lines) | — |
+| D13a | Polish pass 1: app shell | DONE, gate PASSED 2026-08-28 (974/1,800 lines) | — |
+| D13b | Polish pass 2: canvas composition | DONE (gate PASSED 2026-08-28) | — |
+| D13c | Polish pass 3: graph elements | DONE, gate PASSED 2026-08-28 (797/1,600 lines) | — |
 | D14 | Subsystem level rename (schema + report + acme) | DONE, gate PASSED 2026-08-29 (293/1,100 lines) | — |
-| D13d | Phase 3P pass 4 | READY (spec + prompt authored 2026-08-29; #21 precheck PASSED — payload needs no plumbing) | budget confirmed |
-| D12a | Phase 3S: sequence parser + payload | ISSUED, ON HOLD | Phase 3P exit gate |
-| D12b | Phase 3S: sequence renderer + SEQ-* | GATED on layout vectors + acme flow docs | Phase 3P exit gate |
-| D11 | wave 3: view-mode capabilities | GATED on designs | Phase 3P exit gate |
-| D8 | Phase 4: SQLite adapter, SVG export | GATED | Phase 3P exit gate |
+| D13d | Polish pass 4: View / Info / Data | DONE, gate PASSED 2026-08-29 (630/1,500 lines) | — |
+| D21 (was D12a) | Sequence parser + payload | ISSUED 2026-08-25, ON HOLD (re-scope for message-file refs) | Phase 1 exit gate + attachments design |
+| D22 (was D11) | Report definitions + guided views | GATED on designs | Phase 1 exit gate |
+| D23 (was D8) | SQLite adapter, SVG/draw.io export | GATED | Phase 1 exit gate |
+| D31 (was D12b) | Sequence renderer + SEQ-* | GATED on layout vectors + acme flow docs | D21 gate |
 
 ## Standard rules — prepend to EVERY prompt
 
@@ -117,12 +122,12 @@ Report scaffold: payload compiler, vite single-file bundle, template injection. 
 
 Client projection + union layout, time slider + diff, tables, fragment views. (The first phase-3 gate on the result produced the issues/ set.) Full prompt in git history.
 
-## D8 — GATED (template to be issued at phase start)
+## D23 (was D8) — GATED (template to be issued at wave-2 start)
 
-- **D8 (phase 4):** SQLite adapter per adapters.md and client-side SVG/
-  draw.io download; prompts written after the Phase 3P exit gate.
+- **D23:** SQLite adapter per adapters.md and client-side SVG/
+  draw.io download; prompts written after the Phase 1 exit gate.
 
-## D9–D11 — Phase 3R gate rework (GATED; issued per wave)
+## D9–D10 + D22 — gate rework and view-mode capabilities (issued per wave)
 
 Same delegation model as D1–D8. Requirements live in
 `plans/arch/arch-v3/issues/` (index `issues.md`); the architect folds each
@@ -140,28 +145,30 @@ from issue files.
   report.md "Wave-2 UI contract (v1)" — the single authoritative input.
   Split per the scoping note: D10a chrome/panels/tables, D10b canvas
   semantics + visuals. UI rule 9 applies to both.
-- **D11 (wave 3 — view-mode capabilities):** `p3-report-definitions`
+- **D22 (was D11 — view-mode capabilities):** `p3-report-definitions`
   (view-mode flow; `views:` YAML export starting point) and
-  `p3-ui-guided-view` (resolves MAP/PATH/LENS). Gated on the Phase 3P
+  `p3-ui-guided-view` (resolves MAP/PATH/LENS). Gated on the Phase 1
   exit gate plus architect designs for both. `p3-edit-save-back` and
-  `p3-ui-manual-positions` are NOT delegated — edit mode is deferred and
-  gets its own prompts when the local-server write path is designed.
+  `p3-ui-manual-positions` are NOT delegated — edit mode (D43) is
+  deferred and gets its own prompts when the local-server write path is
+  designed.
 
-## D12 — Phase 3S: sequence diagrams (GATED; issued per chunk)
+## D21/D31 (were D12a/D12b) — sequence diagrams (GATED; issued per chunk)
 
 Design doc: sequence.md (2026-08-25). Prompts are issued when the
 architect artifacts exist; executors work from sequence.md + the prompt.
 
-- **D12a (Python):** ISSUED 2026-08-25 (below) — flow-doc parser,
-  validation findings, `sequences` payload section, CLI +
+- **D21 (was D12a — Python):** ISSUED 2026-08-25 (below) — flow-doc
+  parser, validation findings, `sequences` payload section, CLI +
   `arch.validate`/`arch.generate` wiring. The parser-vector fixture
   (`tests/unit/tools/fixtures/arch/sequence/`) is committed and is the
-  control mechanism. ON HOLD until the Phase 3P exit gate (user
-  directive 2026-08-25); no frontend files.
-- **D12b (frontend):** `seqlayout.ts` + SVG layer + entity-box header row
-  + the SEQ-* interaction contract. Gated on the architect's layout
-  vectors and the acme flow docs; runs after the Phase 3P exit gate,
-  may run parallel with D11/D8.
+  control mechanism. ON HOLD until the Phase 1 exit gate (user
+  directive 2026-08-25); re-scope for message-file refs before running;
+  no frontend files.
+- **D31 (was D12b — frontend):** `seqlayout.ts` + SVG layer + entity-box
+  header row + the SEQ-* interaction contract. Gated on the architect's
+  layout vectors and the acme flow docs; runs after the D21 gate, may
+  run parallel with D22/D23.
 
 ## D9a — Phase 3R wave 1a: model/resolver/validation rework (DONE 2026-08-25, committed)
 
@@ -179,7 +186,7 @@ Wave-2a chrome, panels, tables. Full prompt in git history.
 
 Wave-2b canvas semantics + visuals; architect gate fixes (drill root carve-out, cluster button styling, layout-key staleness guard) rode the same commit. Full prompt in git history.
 
-## D13 — Phase 3P: UI polish passes (GATED; issued per pass)
+## D13 — UI polish passes (DONE — all four passes gated PASSED by 2026-08-29)
 
 Four passes D13a–D13d implementing the confirmed UI direction over the
 wave-2 report UI (plan.md "Phase 3P" carries the re-scoped pass list,
@@ -217,7 +224,7 @@ capped at Read, thresholds derived from the type scale (79% Read /
 effect; 407/1,400 changed source lines. Gate review 2026-08-28.
 (Prompt text in git history.)
 
-## D13d — Phase 3P pass 4: View / Info / Data content and states (READY, authored 2026-08-29; run once the budget is confirmed)
+## D13d — Polish pass 4: View / Info / Data content and states (DONE 2026-08-29, gate PASSED)
 
 ```text
 [standard rules + UI rule 9]
@@ -522,7 +529,7 @@ pytest run unchanged by this chunk), then STOP — D13d is a separate
 prompt.
 ```
 
-## D12a — Phase 3S: sequence parser + payload (issued 2026-08-25, ON HOLD until the Phase 3P exit gate)
+## D21 (was D12a) — sequence parser + payload (issued 2026-08-25, ON HOLD until the Phase 1 exit gate; re-scope for message-file refs first)
 
 ```text
 [standard rules]

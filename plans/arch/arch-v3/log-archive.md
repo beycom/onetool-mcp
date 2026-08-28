@@ -4,6 +4,257 @@ Older progress-log entries moved out of plan.md (reorg 2026-08-25).
 Same append-only content, newest first; plan.md keeps only recent
 entries. Continue archiving from plan.md as its log grows.
 
+- **2026-08-28** — D14 subsystem level rename complete; worktree left dirty
+  for architect review. Schema-v3 now models the strict System > Subsystem >
+  Container > Component > Code chain: YAML, generated ids, resolver clipping,
+  validation, the eleven-sheet Excel adapter, and report payloads all include
+  Subsystems; container nesting is rejected. The report now uses System /
+  Subsystem / Container / Component levels, hides the Subsystem option for
+  empty datasets, rolls grouped and ungrouped containers per contract, nests
+  Subsystem boundaries inside System boundaries, includes Subsystems in search
+  and Data, and keeps D13c card and edge presentation unchanged. The acme model
+  has the six prescribed Subsystems and 19 container rewires. Source budget:
+  293/1,100 changed Python, TS/TSX, and acme-fixture lines, counted as additions
+  plus deletions with tests and generated artifacts excluded. Tests: exactly
+  five prescribed cases added; 36 frontend tests passed, arch Python 78 passed /
+  540 deselected, smoke 27 passed / 3,209 deselected, and `just lint`,
+  `just build-arch-report`, payload regeneration, and CLI acme report generation
+  passed. Rule-9 Playwright passed on the regenerated `file://` report at
+  1440 x 900: every pass had zero console errors and zero external requests;
+  the Detail options were System / Subsystem / Container / Component; the
+  Subsystem cold load showed all six Subsystems plus ungrouped container leaves;
+  the Container level rendered six Subsystem boundaries nested within System
+  boundaries; 44 entities live across the Stage 5 to 4 switch and the viewport
+  kept identical transforms. Screenshots:
+  `plans/arch/wip/d14-subsystem-cold-load.png` and
+  `plans/arch/wip/d14-container-nested-boundaries.png`. Assumptions: the
+  execution request confirms the proposed 1,100-line budget; the final
+  no-commit instruction controls; rule 8 permits this progress entry as the
+  sole design-doc write; schema.md's explicit five-kind chain supersedes the
+  index.md summary typo that omits Container; "same dropdown/validation pattern
+  as Containers" means the existing milestone validations, since Containers
+  have no parent-id dropdown; a container parented to a container reports the
+  existing `unresolved_parent` code because the allowed parent sets are now
+  Systems and Subsystems; the required Subsystem cold load uses the final acme
+  stage where all six prescribed rows are live; Stage stability compares rows
+  live at both positions and excludes the intentional removal ghost. Open
+  questions: none. Next action: architect gate review, then the #21 payload
+  precheck and D13d authoring.
+
+- **2026-08-28** — D13c architect gate PASSED; tree committed. Independently
+  re-verified: 33 frontend tests including exactly the five prescribed D13c
+  cases (four-side facing anchors + lane separation, direction split under
+  all three Relationships with bidirectional counted on both, label
+  visibility, one-hop emphasis over tag lens, provider-side grouped port),
+  `just lint`, 77 arch py tests, `just build-arch-report` reproduces the
+  tree's template byte-for-byte (shasum match), budget confirmed at
+  797/1,600 changed source lines (453 tracked + 344 new modules). Code
+  review of edgeAnchors.ts (pure four-side anchors, clamped lane offsets),
+  splinePath.ts (deterministic visibility-graph obstacle routing, cubic
+  path, arc-length label point), edgePresentation.ts (per-direction member
+  split, selection > tag priority, port grouping) and the App.tsx wiring
+  (entityIcon deleted, kind/external pills, SVG drill icon in the 28 px
+  control, per-spline selection with direction, zoom-compensated strokes +
+  custom markers, per-member diff statuses) conforms to the pass-3
+  contract; CSS confirms readable dim floors (.32–.42), accent-border diff
+  markers with no fill wash, subtle boundary tints, and the reduced-motion
+  static fallback. Screenshots confirm spline routing with visible
+  arrowheads, no orthogonal detours, one-hop selection, and stage-diff as
+  increments on a legible base. Minor, not gate-blocking: the edges memo
+  depends on `zoom`, so splines re-route on every zoom tick (fine on acme —
+  revisit only if large models jank); a dead `getBezierPath` mock entry in
+  App.test.tsx; one duplicated `.semantic-edge.is-*` CSS rule pair.
+  ui-polish.md annotated: #1–#7 CLOSED; #12 edge-route-highlight residual
+  CLOSED. Next action: user confirms the D14 budget (1,100 changed source
+  lines proposed) and runs the delegation.md D14 prompt; after its gate,
+  the architect runs the #21 payload precheck and authors D13d.
+
+- **2026-08-28** — User screenshot feedback on the current build filed as
+  ui-polish.md §7 (#25 shell must be responsive and fill the viewport,
+  #26 dock chrome must use standard clean panel patterns instead of
+  floating text pills / rotated-text gutters, #27 Tags list capped at 5
+  visible rows then internal scroll). All three folded into the D13d
+  pass-4 scope; the exit-gate issue sweep now includes them.
+
+- **2026-08-28**: D13c graph elements complete; worktree left dirty for
+  architect review. Cards now use the per-depth kind/name/description/fact/count
+  anatomy with no entity icons, persistent 28 px drill controls, compact
+  external stubs, and diff pills plus narrow markers. Containment boundaries
+  use subtle tints and readable kind/name headers. Directional cubic splines
+  use floating four-side anchors, separated lanes, deterministic obstacle
+  routing, one wide hit rail, count labels, provider-side interface ports,
+  zoom-compensated strokes and custom arrows. Selection follows the one-hop
+  model with animated outgoing, static incoming, readable dimming, tag priority,
+  and a static reduced-motion fallback. Source budget: 797/1,600 changed
+  TS/TSX/CSS lines, counted as additions plus deletions with tests and the
+  generated bundle excluded.
+  Tests: exactly the five prescribed D13c cases added; 33 frontend tests passed,
+  including untouched projection/vector suites. `just lint` passed, smoke 27
+  passed / 3,208 deselected, arch Python 77 passed / 540 deselected, and
+  `just build-arch-report` plus CLI acme regeneration passed. Rule-9 Playwright
+  passed over `file://` at 1440 x 900 and 1024 x 720: zero console errors and
+  only the local HTML request; System and Container probes found zero card-body
+  crossings and zero orthogonal path commands; every cold edge had a custom
+  arrow; the minimum 1024 cold-load stroke measured 1.499999 screen px; Full
+  and hover labels, attached ports, legible-base Stage diffs, one-hop selection,
+  and forced reduced motion all passed. Screenshots:
+  `wip/test-results/d13c/system-cold-1440.png`, `container-1440.png`,
+  `selection-1440.png`, `selection-reduced-motion-1440.png`, and
+  `stage-diff-1024.png`. Relationship switches left every node transform
+  unchanged. The acme payload assigns the same orientation under Calls, Data
+  flow, and Ownership, so it cannot display an arrow reversal; the synthetic
+  direction-split case verifies re-resolution and distinct member groups.
+  Assumptions: the execution request confirms the 1,600-line budget; the final
+  no-commit instruction controls; rule 8 permits this log entry as the sole
+  design-doc write; relationship rows retain stored source-to-target direction
+  outside Ownership while interfaces follow the selected direction field; a
+  grouped port uses the first interface in deterministic order plus the distinct
+  interface count. Open questions: none. Next action: architect gate review,
+  then confirm D14's 1,100-line budget and run D14.
+
+- **2026-08-28** — Subsystem level rename designed (user-directed); D14
+  authored and slotted before D13c. New naming: System (the overall
+  product/platform), Subsystem (optional — a cohesive business
+  capability: a logical grouping of related containers), Container
+  (independently runnable/deployable app or data store), Component
+  (significant module inside a container), Code (implementation
+  details). Subsystem is a real entity kind (`subsystems` collection,
+  `parent` = a system, id prefix `ss`); containers no longer nest
+  (`parent` = system or subsystem); ambiguous-parent validation moves
+  to systems×subsystems. Frontend levels 'top-containers'/'containers'
+  ("Container"/"Child Containers") → 'subsystems'/'containers'
+  ("Subsystem"/"Container"), Subsystem option hidden when the model has
+  none; cardSize tiers 280/260/240/240 re-keyed. Design amendments
+  landed in schema.md (kinds table, id scheme, canonical YAML, eight
+  collections, validation), adapters.md (eleven sheets — Subsystems is
+  sheet 5), report.md (fragment table, C4 zoom table + boundary
+  chains, Detail dropdown, D13b tier names), ui-polish-direction.md.
+  Fact checked first: acme has NO container-in-container nesting (the
+  old Child Containers level was vacuous there) and already carries 55
+  components, so the component level needs no fixture work; the acme
+  delta (authored in the D14 prompt) adds six subsystems inside
+  Digital Commerce Platform matching the milestone waves
+  (storefront-edge, platform-foundation, catalog-search,
+  customer-cart-pricing, transaction-core, back-office-insight) and
+  rewires 19 container parents, leaving single-container systems
+  ungrouped to exercise the optional path. Sequencing correction made
+  while designing: D13c executor work (edgeAnchors/splinePath/
+  edgePresentation) appeared in the worktree mid-design — D13c was
+  already in flight, so D14 runs AFTER the D13c gate on its baseline
+  (D14's rename surface is level keys and kind lists; D13c's anatomy
+  rules apply to subsystem cards automatically). Next action: D13c
+  finishes and is gated; then the user confirms the D14 budget (1,100
+  changed source lines proposed) and runs the delegation.md D14
+  prompt.
+
+- **2026-08-28** — D13b architect gate PASSED; tree committed. Independently
+  re-verified: 28 frontend tests including exactly the six prescribed D13b
+  cases (cardSize wrap-and-grow, initialViewport small/large, shiftViewport
+  inside/outside, layout-key + ELK-input stability across stage/relationship/
+  lens, edgeless grid packing non-overlap, derived readingDepth boundaries),
+  `just lint`, 77 arch py tests, `just build-arch-report` reproduces the
+  tree's template byte-for-byte (shasum match), budget confirmed at 407/1,400
+  changed source lines (296 tracked + 111 new modules). Code review of
+  cardSize.ts (tier widths 280/260/240, injectable measurer, two-line clamp),
+  camera.ts (fit/initial/shift pure functions, Read cap + center), layout.ts
+  (aspect clamp [1.2,2], spacing 40/72, proportional boundary padding,
+  deterministic grid pack with boundary nesting, applyPositions parentId
+  guard), and the App.tsx camera wiring (initial framing per layout key,
+  selection neighborhood fit as the sole zoom change, ResizeObserver minimal
+  pan, D13a refit effect removed) conforms to the pass-2 contract; the
+  explicit Fit button still fits the whole graph uncapped. Screenshots
+  confirm 41% Far dead-space → 79% Read cold framing with full names at both
+  resolutions, Container level readable at default, selection visible beside
+  the open Info dock. Minor noted, not gate-blocking: the zoom pill can read
+  "79% Far" right at the Read threshold after a neighborhood fit (display
+  rounding); revisit only if it shows up in the exit-gate walkthrough.
+  ui-polish.md annotated: #8, #9, #10, #11, #15, #17 CLOSED; #12 CLOSED for
+  camera (edge-route highlight stays D13c). D13c prompt re-checked against
+  the post-D13b tree — its anchors (getSmoothStepPath, entityIcon,
+  hash-mod-3 handles) are intact, prompt unchanged and READY. Next action:
+  user confirms the D13c budget (1,600 changed source lines proposed) and
+  passes the delegation.md D13c prompt to the executor; the architect gates
+  the result, then runs the #21 payload precheck and authors D13d.
+
+- **2026-08-28** — D13b canvas composition complete; worktree left dirty for
+  architect review. Per-level cards now use uniform widths and measured
+  content heights with two-line names; ELK consumes those sizes with the
+  specified aspect, spacing, boundary padding, and deterministic edgeless-grid
+  path. Cold framing caps at Read, explicit Fit remains whole-graph, and dock,
+  selection, and resize camera changes use minimal pan with selection-neighborhood
+  fit as the sole automatic zoom change. Source budget: 407/1,400 changed
+  TS/TSX/CSS lines (additions plus deletions, tests and generated bundle
+  excluded). Tests: exactly 6 prescribed D13b cases added; frontend 28 passed,
+  TypeScript/single-file build clean, `just lint` clean, smoke 27 passed / 3,208
+  deselected, arch Python 77 passed / 540 deselected. The bundle and acme report
+  were regenerated. Rule-9 Playwright passed at 1440 x 900 and 1024 x 720 over
+  `file://`: zero console warnings/errors, only the local HTML request, cold
+  System and Container framing at Read, 13 live Container cards visible,
+  stage/relationship switches moved no common nodes or viewport, dock
+  open/close/resize and viewport resize preserved zoom and selection visibility,
+  and the edgeless observability drill rendered its deterministic grid path.
+  Screenshots: `wip/test-results/d13b/1440-before.png`, `1440-after.png`,
+  `1024-cold.png`, `info-selection-visible.png`, `container-default.png`.
+  Assumptions recorded: the execution request confirms the proposed 1,400-line
+  budget; the explicit "Do not commit" instruction controls over the earlier
+  "including commit" wording; ELK samples the visible-cell aspect ratio when a
+  `(timeline, level, drill)` key is first laid out so dock changes cannot move
+  cards; cold whole-graph framing means the current live graph, so a
+  stage-removed diff ghost does not displace the initial camera while explicit
+  Fit still includes every rendered node. Open questions: none. Next action:
+  architect gate review, then run the already-authored D13c prompt.
+
+- **2026-08-28** — D13c authored ahead of the D13b run (user-directed;
+  the prompt still waits for the D13b gate). Normative spec "Polish
+  contract — pass 3: graph elements (D13c)" added to report.md,
+  grounded in the current render layer: card anatomy per depth with
+  kind pills and `entityIcon` deleted, persistent ≥24 px drill
+  control, boundary stubs as compact external cards, subtle-tint
+  containment boundaries, bezier-only splines with geometry-derived
+  floating anchors (`edgeAnchors` pure function, lane separation)
+  replacing the hash-mod-3 left/right handles, per-direction spline
+  split of aggregated edges (bidirectional members count on both),
+  zoom-compensated strokes + custom arrowheads, neutral-at-Full /
+  always-on-selection label pills, provider-side interface ports,
+  IcePanel one-hop selection with reduced-motion fallback, stage-diff
+  as increments on a legible base; five prescribed tests. Scope
+  boundaries fixed against neighbors: pass 2's layout/camera code and
+  projection.ts untouched (direction split happens in App-side edge
+  building); the Δ change-popover survives until pass 4 moves field
+  changes into Info. D13c prompt READY in delegation.md, run-after =
+  D13b gate, proposed budget 1,600 changed source lines (confirm
+  before running). ui-polish #1–#7 are D13c's gate checklist. Next
+  action unchanged for execution order: user confirms the D13b budget
+  and runs D13b first; D13c follows its gate.
+
+- **2026-08-28** — D13a architect gate PASSED; D13b authored; tree
+  committed. Gate evidence, independently re-verified: 22 frontend tests
+  (including exactly the four prescribed D13a cases), `just lint`, 77
+  arch py tests, `just build-arch-report` reproduces the tree's
+  template diff (38/38 lines), budget confirmed at 974/1,800 changed
+  source lines (817 tracked + 157 new components). Code review of
+  view.ts (retired keys + `select` validation, replaceState writes),
+  layoutPreferences (schema v2, dock limits), App.tsx (Escape order
+  search → menus → selection+Info, revealInfo/closeInfo, 1024 transient
+  View collapse, hidden testid spans), ViewDock/GlobalSearch/Icons
+  conforms to the pass-1 contract; dark theme fully absent from
+  styles.css; screenshots at 1440×900 and 1024×720 confirm the docked
+  shell with the selection visible beside the open Info dock. Residual
+  ugliness (tiny truncating cards, orthogonal detours, snake_case Info
+  labels) is pass 2/3/4 scope by design. ui-polish.md annotated: #14,
+  #18, #19, #23 CLOSED, #16 chrome-half CLOSED, #24 WAIVED (dark theme
+  deferral); #15/#17 stay for the D13b-gate walkthrough re-check. D13b
+  authored the same day: normative spec "Polish contract — pass 2:
+  canvas composition (D13b)" in report.md (card geometry via
+  injectable-measurer cardSize, ELK tuning + grid packing for edgeless
+  drill sets, initialViewport framing capped at Read, thresholds
+  re-derived from the type scale, shiftViewport minimal-pan camera
+  replacing the D13a refit effect, six prescribed tests) and the D13b
+  prompt READY in delegation.md with a proposed budget of 1,400 changed
+  source lines (confirm before running). Next action: user confirms the
+  D13b budget and passes the delegation.md prompt to the executor; the
+  architect gates the result, then authors D13c.
+
 - **2026-08-27** — D13a rule-9 browser gate PASSED on retry. OneTool
   Playwright verified the regenerated `file://` acme report at 1440 x 900
   and 1024 x 720 in light theme: clean console in every pass; no external
