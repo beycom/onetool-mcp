@@ -23,7 +23,13 @@ vi.mock('./layout', () => ({
   NODE_HEIGHT: 112,
   NODE_WIDTH: 240,
   applyPositions: (nodes: unknown[]) => nodes,
+  makeLayoutKey: ({ timeline, level, drill }: { timeline: number; level: string; drill: string | null }) => `${timeline}:${level}:${drill ?? 'map'}`,
   unionLayout: async () => new Map(),
+}))
+
+vi.mock('./cardSize', () => ({
+  cardSize: () => ({ width: 240, height: 112, nameLines: 1 }),
+  measureCardText: () => 10,
 }))
 
 import App from './App'

@@ -123,8 +123,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .search-results em { color: var(--muted); font-size: 11px; font-style: normal; }
 .search-results p { color: var(--muted); font-size: 12px; padding: var(--space-3); }
 
-.react-flow__node-architecture { background: transparent; border: 0; height: 168px; width: 250px; }
-.architecture-node { background: color-mix(in srgb, var(--surface) 96%, var(--teal) 4%); border: 2px solid color-mix(in srgb, var(--teal) 72%, var(--border)); border-radius: 10px; box-shadow: 0 5px 14px color-mix(in srgb, var(--teal) 10%, transparent); display: grid; gap: 5px; grid-template-rows: 15px 28px minmax(24px, 1fr) 16px 23px 18px; height: 100%; overflow: hidden; padding: 12px 14px 10px; position: relative; transition: box-shadow 150ms ease, opacity 150ms ease, transform 150ms ease; width: 100%; }
+.react-flow__node-architecture { background: transparent; border: 0; }
+.architecture-node { align-content: start; background: color-mix(in srgb, var(--surface) 96%, var(--teal) 4%); border: 2px solid color-mix(in srgb, var(--teal) 72%, var(--border)); border-radius: 10px; box-shadow: 0 5px 14px color-mix(in srgb, var(--teal) 10%, transparent); display: grid; gap: 5px; grid-auto-rows: max-content; height: 100%; overflow: hidden; padding: 12px 14px 10px; position: relative; transition: box-shadow 150ms ease, opacity 150ms ease, transform 150ms ease; width: 100%; }
 .architecture-node[data-boundary='true'] { border-style: dashed; opacity: .76; }
 .architecture-node[data-status~='added'] { border-color: var(--focus); box-shadow: 0 0 0 5px color-mix(in srgb, var(--focus) 18%, transparent); }
 .architecture-node[data-status~='removed'] { border-style: dashed; filter: grayscale(.8); opacity: .42; }
@@ -136,8 +136,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .app[data-selection='off'][data-lens='active'] .architecture-node[data-emphasis='unrelated'] { opacity: .11; }
 .app[data-selection='off'][data-lens='off'][data-hover='active'] .architecture-node[data-emphasis='unrelated'] { opacity: .2; }
 .node-context { color: var(--muted); font: 9px "SFMono-Regular", Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.node-identity { align-items: center; display: flex; gap: 8px; min-width: 0; }
-.node-identity strong { font: 600 14px "SFMono-Regular", Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.node-identity { align-items: flex-start; display: flex; gap: 8px; min-width: 0; }
+.node-identity strong { display: -webkit-box; font: 600 14px/18px "SFMono-Regular", Consolas, monospace; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .node-icon { color: var(--teal); flex: 0 0 auto; font-size: 17px; }
 .node-description { color: var(--muted); display: -webkit-box; font-size: 10px; line-height: 1.3; margin: 0; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .node-subtitle { color: var(--muted); font: 8px "SFMono-Regular", Consolas, monospace; letter-spacing: .12em; }
@@ -147,6 +147,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .node-facts dt { color: var(--muted); }
 .node-badges { align-items: center; display: flex; gap: 5px; min-width: 0; }
 .node-badges span { background: var(--surface-muted); border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font: 8px "SFMono-Regular", Consolas, monospace; padding: 2px 5px; }
+.node-description:empty, .node-facts:empty, .node-badges:empty { display: none; }
 .drill-button { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; bottom: 8px; font-size: 14px; height: 28px; position: absolute; right: 8px; width: 28px; }
 .depth-far .architecture-node { align-content: center; grid-template-rows: auto; }
 .depth-far .node-context, .depth-far .node-description, .depth-far .node-subtitle, .depth-far .node-facts, .depth-far .node-badges { display: none; }

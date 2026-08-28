@@ -15,10 +15,12 @@ import {
 } from '@xyflow/react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { fitViewport, initialViewport, shiftViewport, type Rect } from './camera'
+import { cardSize, measureCardText } from './cardSize'
 import { GlobalSearch, type SearchResult } from './GlobalSearch'
 import { GridPanel } from './GridPanel'
 import { FitIcon, MapIcon, SearchIcon } from './Icons'
-import { applyPositions, NODE_HEIGHT, NODE_WIDTH, unionLayout, type Positions } from './layout'
+import { applyPositions, makeLayoutKey, NODE_HEIGHT, NODE_WIDTH, unionLayout, type Positions } from './layout'
 import { loadLayout, saveLayout, type DockName, type LayoutPreferences } from './layoutPreferences'
 import { readPayload } from './payload'
 import { diffStates, legendEntries, projectState, unionGraph } from './projection'
@@ -40,7 +42,7 @@ import {
 } from './types'
 import { copyViewLink, decodeView, persistView } from './view'
 import { ViewDock } from './ViewDock'
-import { readingDepth } from './zoom'
+import { READING_DEPTH, readingDepth } from './zoom'
 
 type DiffStatus = 'added' | 'removed' | 'changed'
 type ArchitectureData = {
@@ -122,7 +124,7 @@ function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureNode>) {
       data-status={data.statuses.join(' ')}
     >
       <span className="node-context">{data.context}</span>
-      <div className="node-identity"><span aria-hidden="true" className="node-icon">{data.boundary ? '◁' : entityIcon(data.kind, data.row)}</span><strong>{data.label}</strong></div>
+      <div className="node-identity"><span aria-hidden="true" className="node-icon">{data.boundary ? '◁' : entityIcon(data.kind, data.row)}</span><strong title={data.label}>{data.label}</strong></div>
       <p className="node-description">{data.description}</p>
       <span className="node-subtitle">{data.boundary ? 'BOUNDARY STUB' : KIND_LABEL[data.kind].toUpperCase()}</span>
       <dl className="node-facts">{data.facts.map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl>
@@ -453,6 +455,9 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [autoViewCollapsed, setAutoViewCollapsed] = useState(false)
   const [hoveredKey, setHoveredKey] = useState<string | null>(null)
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const framedLayout = useRef('')
+  const cameraFrame = useRef(0)
   const searchTrigger = useRef<HTMLButtonElement>(null)
   const setView = useCallback((change: Partial<View>, push = false) => setViewState((current) => {
     const next = { ...current, ...change }
@@ -486,7 +491,8 @@ export default function App() {
     ? null
     : projectState(payload, { ...view, position: previousPosition }), [previousPosition, view])
   const union = useMemo(() => unionGraph(payload, view.timeline, view.level, view.drill), [view.drill, view.level, view.timeline])
-  const layoutKey = `${view.timeline}:${view.level}:${view.drill ?? 'map'}`
+  const layoutKey = makeLayoutKey(view)
+  const cardSizes = useMemo(() => new Map(union.nodes.map((node) => [node.key, cardSize(node, view.level, measureCardText)])), [union, view.level])
   // A layout computed for a different projection must never apply
   // (INT-STATE-06): stale positions carry parentIds for boundaries that no
   // longer exist in the current graph.
@@ -494,6 +500,8 @@ export default function App() {
   const legend = useMemo(() => legendEntries(projected), [projected])
 
   const selectedKey = selected?.type === 'row' ? `${selected.kind}:${selected.row.id}` : null
+  const selectedDisplayKey = useMemo(() => projected.nodes.find((node) => selectedKey
+    && [node.key, ...node.members.map((member) => `${member.kind}:${member.row.id}`)].includes(selectedKey))?.key ?? null, [projected.nodes, selectedKey])
   useEffect(() => {
     for (const message of initial.diagnostics) console.warn(message)
   }, [initial])
@@ -511,20 +519,14 @@ export default function App() {
   }, [closeInfo])
   useEffect(() => { saveLayout(window.localStorage, layout) }, [layout])
   useEffect(() => {
-    if (!flow) return
-    const frame = requestAnimationFrame(() => { void flow.fitView({ duration: 180, padding: 0.2 }) })
-    return () => cancelAnimationFrame(frame)
-  }, [flow, layout.docks.data.collapsed, layout.docks.data.size, layout.docks.info.collapsed, layout.docks.info.size, layout.docks.view.collapsed, layout.docks.view.size])
-  useEffect(() => {
     let active = true
-    void unionLayout(union, layoutKey)
+    const rect = canvasRef.current?.getBoundingClientRect()
+    const aspectRatio = rect?.height ? rect.width / rect.height : 1.6
+    void unionLayout(union, layoutKey, cardSizes, aspectRatio)
       .then((next) => { if (active) setLayoutResult({ key: layoutKey, positions: next }) })
       .catch(() => { if (active) setDiagnostic('Layout failed. The report remains available with fallback positions.') })
     return () => { active = false }
-  }, [layoutKey, union])
-  useEffect(() => {
-    if (flow && positions.size) void flow.fitView({ duration: 250, padding: 0.2 })
-  }, [flow, positions])
+  }, [cardSizes, layoutKey, union])
 
   const graphNodes = useMemo(() => {
     const merged = new Map(projected.nodes.map((node) => [node.key, { node, ghost: false }]))
@@ -560,6 +562,7 @@ export default function App() {
       const parentId = node.row.parent ?? node.row.container ?? node.row.component
       const parent = parentId ? byId.get(parentId)?.row : undefined
       const childCount = Object.values(projected.rawState.rows).flat().filter((row) => [row.parent, row.container, row.component].includes(node.row.id)).length
+      const size = cardSizes.get(node.key) ?? { width: NODE_WIDTH, height: NODE_HEIGHT }
       return {
         data: {
           boundary: node.boundary,
@@ -581,12 +584,12 @@ export default function App() {
           statuses: ghost ? ['removed'] : statusesForNode(node, diff),
           tags: nodeTags(node),
         },
-        height: NODE_HEIGHT,
+        height: size.height,
         id: node.key,
         position: { x: index * 280, y: 0 },
         selected: selectedNodes.has(node.key),
         type: 'architecture',
-        width: NODE_WIDTH,
+        width: size.width,
       }
     })
     const boundaryByKey = new Map(projected.boundaries.map((boundary) => [boundary.key, boundary]))
@@ -607,7 +610,7 @@ export default function App() {
       type: 'boundary',
     }))
     return applyPositions([...boundaryNodes, ...architectureNodes], positions) as CanvasNode[]
-  }, [diff, graphNodes, hoveredKey, positions, projected, selectedKey, setView, view.lens])
+  }, [cardSizes, diff, graphNodes, hoveredKey, positions, projected, selectedKey, setView, view.lens])
 
   const graphEdges = useMemo(() => {
     const merged = new Map(projected.edges.map((edge) => [edge.key, { edge, ghost: false }]))
@@ -618,7 +621,6 @@ export default function App() {
     return [...merged.values()]
   }, [compared, diff, projected.edges])
   const edges = useMemo(() => {
-    const selectedDisplayKey = projected.nodes.find((node) => selectedKey && [node.key, ...node.members.map((member) => `${member.kind}:${member.row.id}`)].includes(selectedKey))?.key
     const lensMatched = new Set(projected.nodes.filter((node) => nodeTags(node).some((tag) => view.lens.includes(tag))).map((node) => node.key))
     const edgeEmphasis = (edge: GraphEdge): SemanticData['emphasis'] => {
       if (selectedDisplayKey) {
@@ -639,7 +641,68 @@ export default function App() {
       edgeEmphasis(edge),
       () => revealInfo({ type: 'edge', edge }),
     ))
-  }, [diff, graphEdges, hoveredKey, projected.nodes, revealInfo, selectedKey, view.aspect, view.lens])
+  }, [diff, graphEdges, hoveredKey, projected.nodes, revealInfo, selectedDisplayKey, view.aspect, view.lens])
+
+  const visibleCanvas = useCallback((): Rect | null => {
+    const element = canvasRef.current
+    if (!element || element.clientWidth === 0 || element.clientHeight === 0) return null
+    return { x: 0, y: 0, width: element.clientWidth, height: element.clientHeight }
+  }, [])
+  const focusSelection = useCallback((allowNeighborhoodFit: boolean) => {
+    const visible = visibleCanvas()
+    if (!flow || !visible || !selectedDisplayKey) return
+    const neighbors = projected.edges.flatMap((edge) => edge.a === selectedDisplayKey
+      ? [edge.b] : edge.b === selectedDisplayKey ? [edge.a] : [])
+    const neighborhood = [...new Set([selectedDisplayKey, ...neighbors])]
+    const neighborhoodBounds = flow.getNodesBounds(neighborhood)
+    const viewport = flow.getViewport()
+    const neighborhoodFits = neighborhoodBounds.width * viewport.zoom <= visible.width
+      && neighborhoodBounds.height * viewport.zoom <= visible.height
+    let next = viewport
+    if (neighborhoodFits) next = shiftViewport(viewport, visible, neighborhoodBounds)
+    else if (allowNeighborhoodFit) next = fitViewport(neighborhoodBounds, visible)
+    else next = shiftViewport(viewport, visible, flow.getNodesBounds([selectedDisplayKey]))
+    if (next !== viewport) void flow.setViewport(next, { duration: 180 })
+  }, [flow, projected.edges, selectedDisplayKey, visibleCanvas])
+  const focusSelectionRef = useRef(focusSelection)
+  focusSelectionRef.current = focusSelection
+
+  useEffect(() => {
+    if (!flow || !positions.size || framedLayout.current === layoutKey) return
+    const frame = requestAnimationFrame(() => {
+      const visible = visibleCanvas()
+      const flowNodes = flow.getNodes()
+      const nodeIds = flowNodes.filter((node) => node.type !== 'architecture'
+        || !(node.data as ArchitectureData).statuses.includes('removed')).map((node) => node.id)
+      if (!visible || !nodeIds.length) return
+      framedLayout.current = layoutKey
+      void flow.setViewport(initialViewport(flow.getNodesBounds(nodeIds), visible, READING_DEPTH), { duration: 250 })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [flow, layoutKey, positions, visibleCanvas])
+
+  const previousSelection = useRef<string | null>(null)
+  useEffect(() => {
+    if (previousSelection.current === selectedDisplayKey) return
+    previousSelection.current = selectedDisplayKey
+    if (!selectedDisplayKey) return
+    const frame = requestAnimationFrame(() => focusSelectionRef.current(true))
+    return () => cancelAnimationFrame(frame)
+  }, [selectedDisplayKey])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(cameraFrame.current)
+      cameraFrame.current = requestAnimationFrame(() => focusSelectionRef.current(false))
+    })
+    observer.observe(canvas)
+    return () => {
+      observer.disconnect()
+      cancelAnimationFrame(cameraFrame.current)
+    }
+  }, [])
 
   const setDock = (name: DockName, dock: LayoutPreferences['docks'][DockName]) => {
     setLayout((current) => ({ ...current, docks: { ...current.docks, [name]: dock } }))
@@ -647,28 +710,14 @@ export default function App() {
   const selectRow = useCallback((kind: RowKind, row: ReportRow, members: RowRef[] = []) => {
     revealInfo({ type: 'row', kind, members, row })
   }, [revealInfo])
-  const centerKeys = useCallback((keys: string[]) => {
-    if (!flow || !keys.length) return
-    const points = keys.flatMap((key) => {
-      const position = positions.get(key)
-      return position ? [{ x: position.x + NODE_WIDTH / 2, y: position.y + NODE_HEIGHT / 2 }] : []
-    })
-    if (!points.length) return
-    const center = points.reduce((total, point) => ({ x: total.x + point.x, y: total.y + point.y }), { x: 0, y: 0 })
-    void flow.setCenter(center.x / points.length, center.y / points.length, { duration: 220, zoom: Math.max(zoom, 0.8) })
-  }, [flow, positions, zoom])
-  const selectById = useCallback((kind: RowKind, id: string, center = false) => {
+  const selectById = useCallback((kind: RowKind, id: string) => {
     const row = projected.rawState.rows[kind].find((item) => item.id === id)
       ?? payload.rows[kind].find((item) => item.id === id)
     if (!row) return
     const canonicalKey = `${kind}:${id}`
     const node = projected.nodes.find((item) => [item.key, ...item.members.map((member) => `${member.kind}:${member.row.id}`)].includes(canonicalKey))
     selectRow(kind, row, node?.members)
-    if (center) {
-      const edge = kind === 'interfaces' ? projected.edges.find((item) => item.interfaces.includes(id)) : undefined
-      requestAnimationFrame(() => centerKeys(node ? [node.key] : edge ? [edge.a, edge.b] : []))
-    }
-  }, [centerKeys, projected, selectRow])
+  }, [projected, selectRow])
   useEffect(() => {
     if (!restoreSelect) return
     const [kind, ...id] = restoreSelect.split(':')
@@ -684,17 +733,17 @@ export default function App() {
     })
   }, [projected.rawState])
   const searchResults = useMemo<SearchResult[]>(() => {
-    const diagrams: SearchResult[] = [{ id: 'canvas', kind: 'diagram', label: 'Canvas', meta: 'Architecture', onChoose: () => { setView({ deps: null }); requestAnimationFrame(() => { if (flow) void flow.fitView({ duration: 180, padding: 0.2 }) }) } }]
+    const diagrams: SearchResult[] = [{ id: 'canvas', kind: 'diagram', label: 'Canvas', meta: 'Architecture', onChoose: () => setView({ deps: null }) }]
     const rows = (['systems', 'containers', 'components', 'code', 'users', 'interfaces'] as RowKind[])
       .flatMap((kind) => projected.rawState.rows[kind].map((row) => ({
         id: row.id,
         kind,
         label: rowLabel(row),
         meta: KIND_LABEL[kind],
-        onChoose: () => selectById(kind, row.id, true),
+        onChoose: () => selectById(kind, row.id),
       })))
     return [...diagrams, ...rows]
-  }, [flow, projected.rawState.rows, selectById, setView])
+  }, [projected.rawState.rows, selectById, setView])
   const copyLink = async () => {
     try {
       await copyViewLink(view, selectedKey)
@@ -771,13 +820,11 @@ export default function App() {
             <ViewDock canvasActive={!view.deps} copyStatus={copyStatus} drillPath={drillPath} legend={legend} onCanvas={() => setView({ deps: null }, true)} onCopy={() => void copyLink()} onUp={() => setView({ drill: parentKey(view.drill!), deps: null }, true)} onView={setView} payload={payload} view={view} />
           </ResizablePanel>
 
-          <div className={`canvas-root depth-${depth}`} data-reading-depth={depth}>
+          <div className={`canvas-root depth-${depth}`} data-reading-depth={depth} ref={canvasRef}>
             {view.deps ? <DependencyView aspect={view.aspect} focusKey={view.deps} onClose={() => setView({ deps: null }, true)} onFocus={(key) => setView({ deps: key }, true)} onSelect={selectRow} projected={projected} /> : !projected.nodes.length ? <div className="empty-state"><p>No entities match the current projection.</p><button onClick={() => setView({ deps: null, drill: null, lens: [] })} type="button">Show the full architecture</button></div> : <ReactFlow
               colorMode="light"
               edges={edges}
               edgeTypes={edgeTypes}
-              fitView
-              fitViewOptions={{ padding: 0.2 }}
               minZoom={0.2}
               nodes={nodes}
               nodesConnectable={false}
