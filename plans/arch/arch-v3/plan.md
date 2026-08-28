@@ -29,7 +29,7 @@ lands; a fresh session should be able to resume from this file alone.
 | Implementation | `src/otdev/tools/arch.py` facade + `src/otdev/tools/_arch/v3/`; report app source `frontend/arch-report/` (v1 deleted at cutover 2026-08-23) |
 | Canonical v3 fixture | `tests/unit/tools/fixtures/arch/acme.yaml` |
 | Fixture source of record | `plans/arch/wip/acme-arch-v2.xlsx` (dumped to `plans/arch/arch-v3/fixture-src/`) |
-| Open issues (Phase 2 wave 2) | `plans/arch/arch-v3/issues/` — p3-* files + index (feed D22/D43); resolved p1/p2 files in `issues/resolved/`; Archify/IcePanel reference screenshots stay in `issues/` (cited by the polish pass specs) |
+| Open issues (Phase 2 wave 2) | `plans/arch/arch-v3/issues/` — p3-* files + index (feed P22/P43); resolved p1/p2 files in `issues/resolved/`; Archify/IcePanel reference screenshots stay in `issues/` (cited by the polish pass specs) |
 | UI research (IcePanel/Archify) | `plans/arch/arch-v3/research/ui/ui-research-findings.md` + evidence captures |
 | Confirmed UI direction (decision source for all UI work) | `plans/arch/arch-v3/ui-polish-direction.md` — confirmed 2026-08-27; authoritative for all UI/interaction decisions, supersedes conflicting guidance in ui-polish.md and the report.md wave-2 contract. The `designs/` artboard directory was removed the same day (decisions captured in the direction; files in git history) |
 | UI polish issue list (CLOSED 2026-08-29) | `plans/arch/arch-v3/ui-polish.md` — 27 itemized issues (2026-08-25 Playwright walkthrough + 2026-08-28 user screenshots), tagged D13a–D13d; every issue now carries a CLOSED/WAIVED/superseded annotation — the Phase 1 exit gate re-checks the walkthrough, not the list |
@@ -79,8 +79,8 @@ models the user runs with the prompts in [delegation.md](delegation.md):
   Prompts carry the contract; executors stop and ask rather than improvise.
 - **Rule:** no delegated chunk feeds the next wave until the architect has
   reviewed it at the gate. Remaining sequence (waves 0–1 done — see
-  Phase 1): Phase 1 exit gate → wave 2 (D21 ∥ D22 ∥ D23 as their
-  architect artifacts land) → wave 3 (D31 → sequence gate) → waves 4–5.
+  Phase 1): Phase 1 exit gate → wave 2 (P21 ∥ P22 ∥ P23 as their
+  architect artifacts land) → wave 3 (P31 → sequence gate) → waves 4–5.
   Historical sequencing detail: log-archive.md.
 
 ## Speed mode (agreed 2026-08-23)
@@ -137,7 +137,7 @@ it. Three rules keep iteration fast:
 
 ## Chunk numbering (reorg 2026-08-29)
 
-Executor chunks are numbered `Dxy`: `x` = wave (execution order), `y` =
+Executor chunks are numbered `Pxy`: `x` = wave (execution order), `y` =
 priority inside the wave (lower first; same-wave chunks may run in
 parallel once their architect inputs exist). Waves 0–1 are the completed
 build — their chunks keep their historical ids (D1–D14, D13a–D13d) in
@@ -148,14 +148,14 @@ carry both.
 
 | New id | Was | Chunk |
 | --- | --- | --- |
-| D21 | D12a | Sequence parser + payload (prompt ON HOLD, needs re-scope) |
-| D22 | D11 | Report definitions + guided views |
-| D23 | D8 | Client-side SVG / draw.io export + SQLite adapter |
-| D31 | D12b | Sequence renderer frontend |
-| D41 | — | SharePoint transport |
-| D42 | — | v2 YAML migration converter (conditional) |
-| D43 | — | Edit mode (save-back + manual positions) |
-| D51 | Dn (backfill) | Test-breadth backfill |
+| P21 | D12a | Sequence parser + payload (prompt ON HOLD, needs re-scope) |
+| P22 | D11 | Report definitions + guided views |
+| P23 | D8 | Client-side SVG / draw.io export + SQLite adapter |
+| P31 | D12b | Sequence renderer frontend |
+| P41 | — | SharePoint transport |
+| P42 | — | v2 YAML migration converter (conditional) |
+| P43 | — | Edit mode (save-back + manual positions) |
+| P51 | Dn (backfill) | Test-breadth backfill |
 
 ## Phase 1 — Core build, gate rework, UI polish (waves 0–1) — DONE except the exit gate
 
@@ -207,9 +207,9 @@ docs):
 
 ## Phase 2 — Sequence diagrams, saved views, exports (waves 2–3)
 
-Unlocks at the Phase 1 exit gate. Owner docs: sequence.md (D21/D31),
-report.md (D22/D23). Budgets are re-agreed when each prompt is issued
-(provisional: ~500 py for D21, ~2,200 TS/TSX for D31). Write-path
+Unlocks at the Phase 1 exit gate. Owner docs: sequence.md (P21/P31),
+report.md (P22/P23). Budgets are re-agreed when each prompt is issued
+(provisional: ~500 py for P21, ~2,200 TS/TSX for P31). Write-path
 decision (2026-08-24) still stands: the app has **view** mode
 (standalone `file://`, read-only) and **edit** mode (local server owning
 the YAML write path); edit-mode work stays in Phase 3.
@@ -217,40 +217,40 @@ the YAML write path); edit-mode work stays in Phase 3.
 Wave 2 — independent chunks, run in parallel once each chunk's architect
 inputs exist:
 
-- [ ] **Architect (before D21):** message-file attachments design (user
+- [ ] **Architect (before P21):** message-file attachments design (user
       request 2026-08-26): sequence messages AND model interfaces can
       link to sample request/response payload files (xml, json, csv)
       stored beside the model; the report renders them
       syntax-highlighted (highlighter ships in the offline bundle, no
       external requests). Lands as amendments to schema.md
       (interface-level field), sequence.md (DSL reference + `sequences`
-      payload), and report.md (viewer contract) BEFORE D21 runs; the
-      held D21 prompt is re-scoped to parse/emit the refs. The
+      payload), and report.md (viewer contract) BEFORE P21 runs; the
+      held P21 prompt is re-scoped to parse/emit the refs. The
       read-only Payload viewer deferred out of D13d (2026-08-29) ships
       with this design.
-- [ ] **D21 (was D12a)** — sequence parser, validation findings,
+- [ ] **P21 (was D12a)** — sequence parser, validation findings,
       `sequences` payload, CLI + facade wiring. Control mechanism: the
       parser-vector fixture
       (`tests/unit/tools/fixtures/arch/sequence/`, committed
       2026-08-25). Prompt issued 2026-08-25, ON HOLD — re-scope for
       message-file refs before running.
-- [ ] **D22 (was D11)** — saved report definitions + guided views:
+- [ ] **P22 (was D11)** — saved report definitions + guided views:
       `p3-report-definitions` (named reports, view-mode flow — starting
       point: export the config as a ready-to-paste `views:` YAML entry;
       persist-to-model rides the deferred edit path) and
       `p3-ui-guided-view` (authored, playable guided views; resolves
       the MAP/PATH/LENS placeholders left by D7). Gated on architect
       designs for both. Issues: `issues/p3-*`.
-- [ ] **D23 (was D8)** — client-side SVG / draw.io download from the
+- [ ] **P23 (was D8)** — client-side SVG / draw.io download from the
       report (serialize the laid-out scene client-side — the v2
       `ArchitectureScene`-not-DOM rule applies) + SQLite adapter (one
       table/kind + properties side table, per adapters.md).
 
-Wave 3 — after the D21 gate:
+Wave 3 — after the P21 gate:
 
-- [ ] **Architect (D31 control):** layout vectors + 2–3 acme flow docs
+- [ ] **Architect (P31 control):** layout vectors + 2–3 acme flow docs
       (multi-scenario, interval-carrying, ad-hoc participant).
-- [ ] **D31 (was D12b)** — `seqlayout.ts`, SVG layer, entity-box header
+- [ ] **P31 (was D12b)** — `seqlayout.ts`, SVG layer, entity-box header
       row, SEQ-* interactions, fragment keys.
 - [ ] **Sequence gate (architect + user):** open an acme flow from
       View's Sequences group, play it through, switch scenario via the
@@ -264,14 +264,14 @@ Wave 3 — after the D21 gate:
 
 Wave 4 — per-item budgets, ordered by demonstrated need:
 
-- [ ] **D41** — SharePoint transport reusing the Excel mapping.
-- [ ] **D42** — migration converter from v2 YAML — only if a real v2
+- [ ] **P41** — SharePoint transport reusing the Excel mapping.
+- [ ] **P42** — migration converter from v2 YAML — only if a real v2
       dataset exists to migrate; otherwise skip (throwaway tooling).
 - [ ] **Architect:** edit-mode design — the local-server write path
       (deferred until Schema, Report, and File Import were complete;
       those are done, so this unblocks whenever edit mode is
       prioritised).
-- [ ] **D43** — edit mode: `p3-edit-save-back` +
+- [ ] **P43** — edit mode: `p3-edit-save-back` +
       `p3-ui-manual-positions` (after the edit-mode design).
 - [ ] Revisit deferred items against demonstrated need only: Confluence
       embedding, PDF, dark theme (ui-polish.md #24 evidence binds any
@@ -282,7 +282,7 @@ Wave 5 — speed-mode debt, once v3 is stable:
 - [ ] **Architect:** OpenSpec — author the v3 spec
       (`openspec/specs/.../tool-arch/`) from the shipped behavior;
       archive/replace v1 spec content.
-- [ ] **D51** — test breadth: validation codes with location
+- [ ] **P51** — test breadth: validation codes with location
       assertions, YAML/Excel error locations, header-normalization
       cases, model field-rule cases, template generation (mechanical;
       prompt written then).
@@ -310,21 +310,21 @@ inclusive `end_in` (Q7, 2026-08-24).
 ## Progress log (append-only, newest first)
 
 - **2026-08-29** — Plan reorganised (user-directed); tree committed.
-  Chunk ids move to `Dxy` wave numbering (x = wave, y = priority) and
+  Chunk ids move to `Pxy` wave numbering (x = wave, y = priority) and
   the phases are renamed Phase 1 / 2 / 3. Completed work (old Phases
   0–3, 3R waves 1–2, 3P passes, D14) is collapsed into the Phase 1 DONE
   record; finished chunks keep their historical ids (D1–D14, D13a–D13d)
-  wherever already referenced. Outstanding chunks renumber: D12a→D21,
-  D11→D22, D8→D23, D12b→D31; newly numbered D41 SharePoint, D42
-  migration converter (conditional), D43 edit mode, D51 test-breadth
+  wherever already referenced. Outstanding chunks renumber: D12a→P21,
+  D11→P22, D8→P23, D12b→P31; newly numbered P41 SharePoint, P42
+  migration converter (conditional), P43 edit mode, P51 test-breadth
   backfill — mapping table in "Chunk numbering"; delegation.md headings
   carry both ids. Status at reorg: DONE — the whole Phase 1 build
   (D1–D10, polish passes D13a–D13d, D14 subsystem level, all gates
   PASSED), sequence.md v1, the sequence parser-vector fixture, and all
   27 ui-polish.md issues closed/waived. OUTSTANDING — the Phase 1 exit
   gate (architect + user, next action), then wave 2 (attachments
-  design → D21; D22; D23), wave 3 (layout vectors → D31 → sequence
-  gate), waves 4–5 (D41–D43; OpenSpec, D51, docs backfill). The nine
+  design → P21; P22; P23), wave 3 (layout vectors → P31 → sequence
+  gate), waves 4–5 (P41–P43; OpenSpec, P51, docs backfill). The nine
   2026-08-28 log entries moved to log-archive.md. Next action: run the
   Phase 1 exit gate with the user.
 
