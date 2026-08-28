@@ -2,21 +2,30 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   Handle,
-  MarkerType,
   MiniMap,
   Position,
   ReactFlow,
-  getSmoothStepPath,
   type Edge,
   type EdgeProps,
   type Node,
   type NodeProps,
   type ReactFlowInstance,
 } from '@xyflow/react'
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 
 import { fitViewport, initialViewport, shiftViewport, type Rect } from './camera'
 import { cardSize, measureCardText } from './cardSize'
+import { edgeAnchors, type EdgeAnchorPair, type EdgeRect } from './edgeAnchors'
+import {
+  classifyEmphasis,
+  edgeLabelVisible,
+  interfacePort,
+  splitEdgeDirections,
+  type DirectionalSpline,
+  type EdgeEmphasis,
+  type InterfacePort,
+  type SplineDirection,
+} from './edgePresentation'
 import { GlobalSearch, type SearchResult } from './GlobalSearch'
 import { GridPanel } from './GridPanel'
 import { FitIcon, MapIcon, SearchIcon } from './Icons'
@@ -25,6 +34,7 @@ import { loadLayout, saveLayout, type DockName, type LayoutPreferences } from '.
 import { readPayload } from './payload'
 import { diffStates, legendEntries, projectState, unionGraph } from './projection'
 import { ResizablePanel } from './ResizablePanel'
+import { splinePath, type SplinePath } from './splinePath'
 import {
   type Aspect,
   type FieldChange,
@@ -49,6 +59,7 @@ type ArchitectureData = {
   boundary: boolean
   changes: FieldChange[]
   childCount: number
+  connectionCount: number
   context: string
   description: string
   drillable: boolean
@@ -67,17 +78,27 @@ type BoundaryData = { boundary: GraphBoundary; label: string; onDrill: () => voi
 type BoundaryNode = Node<BoundaryData, 'boundary'>
 type CanvasNode = ArchitectureNode | BoundaryNode
 type SemanticData = {
+  anchors: EdgeAnchorPair
+  direction: SplineDirection
   edge: GraphEdge
-  emphasis: 'normal' | 'outgoing' | 'incoming' | 'both' | 'neighbor' | 'unrelated'
+  emphasis: EdgeEmphasis | 'selected'
+  hovered: boolean
   label: string
+  labelPoint: SplinePath['labelPoint']
   memberCount: number
   onSelect: () => void
+  onHover: (hovered: boolean) => void
+  port: InterfacePort | null
+  path: string
+  selected: boolean
+  showLabel: boolean
   statuses: DiffStatus[]
+  zoom: number
 }
 type SemanticFlowEdge = Edge<SemanticData, 'semantic'>
 type Selection =
   | { type: 'row'; kind: RowKind; members: RowRef[]; row: ReportRow }
-  | { type: 'edge'; edge: GraphEdge }
+  | { type: 'edge'; direction: SplineDirection; edge: GraphEdge }
 
 const payload = readPayload()
 const STATUS_ORDER: DiffStatus[] = ['added', 'removed', 'changed']
@@ -96,21 +117,14 @@ function rowLabel(row: ReportRow): string {
   return row.name ?? row.action ?? row.id
 }
 
-function entityIcon(kind: EntityKind, row: ReportRow): string {
-  if (kind === 'users') return '♙'
-  const technology = String(row.properties?.technology ?? row.properties?.type ?? '').toLowerCase()
-  if (/(database|store|postgres|sql|redis|cache)/.test(technology)) return '◉'
-  if (/(browser|web|react|ui)/.test(technology)) return '▣'
-  if (kind === 'systems') return '⬡'
-  if (kind === 'containers') return '▱'
-  if (kind === 'components') return '◇'
-  return '⌁'
-}
-
 function connectionLabel(row: ReportRow, aspect: Aspect): string {
   const direction = aspect === 'data-flow' ? row.data_flow_direction ?? 'provider_to_consumer' : row.call_direction ?? 'consumer_to_provider'
   if (direction === 'bidirectional') return `${row.provider} ↔ ${row.consumer}`
   return direction === 'provider_to_consumer' ? `${row.provider} → ${row.consumer}` : `${row.consumer} → ${row.provider}`
+}
+
+function DrillIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M3 3h5v2H5v6h6V8h2v5H3z" /><path d="M8 3h5v5h-2V6.4l-4.3 4.3-1.4-1.4L9.6 5H8z" /></svg>
 }
 
 function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureNode>) {
@@ -123,16 +137,16 @@ function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureNode>) {
       data-selected={selected ? 'true' : 'false'}
       data-status={data.statuses.join(' ')}
     >
-      <span className="node-context">{data.context}</span>
-      <div className="node-identity"><span aria-hidden="true" className="node-icon">{data.boundary ? '◁' : entityIcon(data.kind, data.row)}</span><strong title={data.label}>{data.label}</strong></div>
+      <div className="node-heading"><span className="kind-pill">{KIND_LABEL[data.kind]}</span>{data.boundary ? <span className="external-pill">External</span> : null}</div>
+      <strong className="node-name" title={data.label}>{data.label}</strong>
       <p className="node-description">{data.description}</p>
-      <span className="node-subtitle">{data.boundary ? 'BOUNDARY STUB' : KIND_LABEL[data.kind].toUpperCase()}</span>
-      <dl className="node-facts">{data.facts.map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl>
-      <div className="node-badges">
+      <span className="node-context">{data.context}</span>
+      <dl className="node-facts">{data.facts.map(([key, value]) => <div key={key} title={`${key}: ${value}`}><dt>{key}</dt><dd>{value}</dd></div>)}</dl>
+      <div className="node-counts">
         {data.childCount ? <span title={`${data.childCount} children`}>{data.childCount} children</span> : null}
-        {data.tags.length ? <span title={data.tags.join(', ')}>{data.tags.length} tags</span> : null}
+        {data.connectionCount ? <span title={`${data.connectionCount} connections`}>{data.connectionCount} connections</span> : null}
       </div>
-      {data.drillable ? <button aria-label={`Drill into ${data.label}`} className="drill-button" onClick={(event) => { event.stopPropagation(); data.onDrill() }} title="Drill into direct children" type="button">⌕</button> : null}
+      {data.drillable ? <button aria-label={`Drill into ${data.label}`} className="drill-button" onClick={(event) => { event.stopPropagation(); data.onDrill() }} title="Drill into direct children" type="button"><DrillIcon /></button> : null}
       {data.statuses.length ? (
         <span aria-label={`Changes: ${data.statuses.join(', ')}`} className="diff-badges">
           {data.statuses.map((status) => <b data-status={status} key={status}>{STATUS_ICON[status]}</b>)}
@@ -149,8 +163,8 @@ function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureNode>) {
           ))}</ul>
         </details>
       ) : null}
-      {[25, 50, 75].map((top, index) => <Handle id={`target-${index}`} key={`target-${top}`} position={Position.Left} style={{ top: `${top}%` }} type="target" />)}
-      {[25, 50, 75].map((top, index) => <Handle id={`source-${index}`} key={`source-${top}`} position={Position.Right} style={{ top: `${top}%` }} type="source" />)}
+      <Handle position={Position.Left} type="target" />
+      <Handle position={Position.Right} type="source" />
     </article>
   )
 }
@@ -158,7 +172,7 @@ function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureNode>) {
 function BoundaryNodeView({ data, selected }: NodeProps<BoundaryNode>) {
   return (
     <section className="containment-boundary" data-selected={selected ? 'true' : 'false'} data-stub={data.boundary.stub ? 'true' : 'false'}>
-      <header><span aria-hidden="true">{entityIcon(data.boundary.kind, data.boundary.row)}</span><strong>{data.label}</strong><button aria-label={`Drill into ${data.label}`} onClick={(event) => { event.stopPropagation(); data.onDrill() }} type="button">⌕</button></header>
+      <header><span className="kind-pill">{KIND_LABEL[data.boundary.kind]}</span><strong>{data.label}</strong><button aria-label={`Drill into ${data.label}`} onClick={(event) => { event.stopPropagation(); data.onDrill() }} type="button"><DrillIcon /></button></header>
     </section>
   )
 }
@@ -166,35 +180,44 @@ function BoundaryNodeView({ data, selected }: NodeProps<BoundaryNode>) {
 function SemanticEdge({
   data,
   id,
-  markerEnd,
-  markerStart,
-  sourcePosition,
-  sourceX,
-  sourceY,
-  targetPosition,
-  targetX,
-  targetY,
 }: EdgeProps<SemanticFlowEdge>) {
-  const [path, x, y] = getSmoothStepPath({ sourcePosition, sourceX, sourceY, targetPosition, targetX, targetY })
+  if (!data) return null
+  const path = data.path
   const statuses = data?.statuses ?? []
   const emphasis = data?.emphasis ?? 'normal'
+  const markerId = `arrow-${id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
+  const arrowSize = Math.max(8, 8 / Math.max(data.zoom, 0.2))
+  const strokeWidth = Math.max(1.5, 1.5 / Math.max(data.zoom, 0.2))
+  const emphasized = ['outgoing', 'incoming', 'neighbor', 'selected'].includes(emphasis)
+  const diffIncrement = statuses.includes('added') || statuses.includes('changed') ? 0.25 : 0
+  const edgeStyle = { strokeWidth: strokeWidth + (emphasized ? 0.8 : diffIncrement) } as CSSProperties
+  const focusStyle = { strokeWidth: strokeWidth + 5 } as CSSProperties
+  const expandedPort = data.showLabel
   return (
     <>
-      <BaseEdge className="semantic-edge-hit" id={`${id}:hit`} path={path} />
-      <BaseEdge className={`semantic-edge-focus is-${emphasis}`} id={`${id}:focus`} path={path} />
+      <defs>
+        <marker id={markerId} markerHeight={arrowSize} markerUnits="userSpaceOnUse" markerWidth={arrowSize} orient="auto" refX="9" refY="5" viewBox="0 0 10 10">
+          <path className={`semantic-arrow is-${emphasis} ${statuses.map((status) => `is-${status}`).join(' ')}`} d="M 0 0 L 10 5 L 0 10 z" />
+        </marker>
+      </defs>
+      <BaseEdge className={`semantic-edge-focus is-${emphasis}`} id={`${id}:focus`} interactionWidth={0} path={path} style={focusStyle} />
       <BaseEdge
         className={`semantic-edge is-${emphasis} ${statuses.map((status) => `is-${status}`).join(' ')}`}
         id={id}
-        markerEnd={markerEnd}
-        markerStart={markerStart}
+        interactionWidth={24}
+        markerEnd={`url(#${markerId})`}
         path={path}
+        style={edgeStyle}
       />
       <EdgeLabelRenderer>
-        <button className="edge-label" data-emphasis={emphasis} data-status={statuses.join(' ')} onClick={() => data?.onSelect()} style={{ transform: `translate(-50%, -50%) translate(${x}px,${y}px)` }} type="button">
-          {data?.label ?? id}
-          {(data?.memberCount ?? 0) > 1 ? <i>{data?.memberCount}</i> : null}
+        {data.showLabel ? <button className="edge-label" data-emphasis={emphasis} data-status={statuses.join(' ')} onClick={data.onSelect} onMouseEnter={() => data.onHover(true)} onMouseLeave={() => data.onHover(false)} style={{ transform: `translate(-50%, -50%) translate(${data.labelPoint.x}px,${data.labelPoint.y}px)` }} type="button">
+          {data.label}
+          {data.memberCount > 1 ? <i>{data.memberCount}</i> : null}
           {statuses.map((status) => <b data-status={status} key={status}>{STATUS_ICON[status]}</b>)}
-        </button>
+        </button> : null}
+        {data.port ? <button aria-label={`Interface port ${data.port.label}`} className="interface-port" data-expanded={expandedPort ? 'true' : 'false'} onClick={data.onSelect} onMouseEnter={() => data.onHover(true)} onMouseLeave={() => data.onHover(false)} style={{ transform: `translate(-50%, -50%) translate(${data.port.point.x}px,${data.port.point.y}px)` }} title={data.port.label} type="button">
+          {expandedPort ? <>{data.port.label}{data.port.count > 1 ? <i>{data.port.count}</i> : null}</> : null}
+        </button> : null}
       </EdgeLabelRenderer>
     </>
   )
@@ -235,11 +258,11 @@ function SidePanel({
   ].map((item) => [item.id, item])).values()]
   const groupedConnections = { incoming: [] as ReportRow[], outgoing: [] as ReportRow[] }
   if (selectedNodeKey) for (const item of selectedEdges) {
-    const presentation = edgePresentation(item, aspect)
-    const source = presentation.reverse ? item.b : item.a
-    const target = presentation.reverse ? item.a : item.b
-    if (presentation.bidirectional || target === selectedNodeKey) groupedConnections.incoming.push(...item.interfaceRows)
-    if (presentation.bidirectional || source === selectedNodeKey) groupedConnections.outgoing.push(...item.interfaceRows)
+    for (const spline of splitEdgeDirections(item, aspect)) {
+      const interfaces = spline.members.filter((member) => member.kind === 'interfaces').map((member) => member.row)
+      if (spline.target === selectedNodeKey) groupedConnections.incoming.push(...interfaces)
+      if (spline.source === selectedNodeKey) groupedConnections.outgoing.push(...interfaces)
+    }
   } else if (row && kind !== 'interfaces' && kind !== 'relationships') for (const item of connections) {
     const direction = aspect === 'data-flow' ? item.data_flow_direction ?? 'provider_to_consumer' : item.call_direction ?? 'consumer_to_provider'
     const pairs = direction === 'provider_to_consumer' ? [[item.provider, item.consumer]]
@@ -300,13 +323,10 @@ function changesForNode(node: GraphNode, diff: StateDiff | null): FieldChange[] 
   return diff.changed.filter((item) => keys.has(`${item.kind}:${item.id}`)).flatMap((item) => item.changes)
 }
 
-function statusesForEdge(edge: GraphEdge, diff: StateDiff | null): DiffStatus[] {
+function statusesForMembers(members: DirectionalSpline['members'], diff: StateDiff | null): DiffStatus[] {
   if (!diff) return []
-  const interfaces = new Set(edge.interfaces)
-  const relationships = new Set(edge.relationships)
-  const includes = (kind: string, id: string) => (
-    kind === 'interfaces' ? interfaces.has(id) : kind === 'relationships' && relationships.has(id)
-  )
+  const keys = new Set(members.map((member) => `${member.kind}:${member.row.id}`))
+  const includes = (kind: string, id: string) => keys.has(`${kind}:${id}`)
   const found = new Set<DiffStatus>()
   if (diff.added.some((item) => includes(item.kind, item.id))) found.add('added')
   if (diff.removed.some((item) => includes(item.kind, item.id))) found.add('removed')
@@ -314,78 +334,69 @@ function statusesForEdge(edge: GraphEdge, diff: StateDiff | null): DiffStatus[] 
   return STATUS_ORDER.filter((status) => found.has(status))
 }
 
-function edgePresentation(edge: GraphEdge, aspect: Aspect): {
-  bidirectional: boolean
-  label: string
-  reverse: boolean
-  showArrow: boolean
-} {
-  const directions = new Set<'forward' | 'reverse'>()
-  const addDirection = (from: string, to: string) => {
-    if (from === edge.a && to === edge.b) directions.add('forward')
-    if (from === edge.b && to === edge.a) directions.add('reverse')
-  }
-  if (aspect === 'ownership') {
-    const relationActions = edge.relationshipRows.map((row) => row.action).filter(Boolean)
-    edge.orientations.forEach(({ from, to }) => addDirection(from, to))
-    return {
-      bidirectional: directions.size === 2,
-      label: relationActions.length ? relationActions.join(' · ') : edge.interfaceRows.map(rowLabel).join(' · '),
-      reverse: directions.has('reverse') && !directions.has('forward'),
-      showArrow: directions.size > 0,
-    }
-  }
-  const field = aspect === 'call-direction' ? 'call_direction' : 'data_flow_direction'
-  for (const row of edge.interfaceRows) {
-    const orientation = edge.orientations.find((item) => item.kind === 'interfaces' && item.id === row.id)
-    if (!orientation) continue
-    const direction = row[field] ?? (
-      aspect === 'call-direction' ? 'consumer_to_provider' : 'provider_to_consumer'
-    )
-    if (direction === 'provider_to_consumer' || direction === 'bidirectional') {
-      addDirection(orientation.from, orientation.to)
-    }
-    if (direction === 'consumer_to_provider' || direction === 'bidirectional') {
-      addDirection(orientation.to, orientation.from)
-    }
-  }
-  return {
-    bidirectional: directions.size === 2,
-    label: edge.interfaceRows.length ? edge.interfaceRows.map(rowLabel).join(' · ') : 'No interface',
-    reverse: directions.has('reverse') && !directions.has('forward'),
-    showArrow: directions.size > 0,
-  }
+function statusesForEdge(edge: GraphEdge, diff: StateDiff | null): DiffStatus[] {
+  return statusesForMembers([
+    ...edge.interfaceRows.map((row) => ({ kind: 'interfaces' as const, providerKey: null, row })),
+    ...edge.relationshipRows.map((row) => ({ kind: 'relationships' as const, providerKey: null, row })),
+  ], diff)
 }
 
 function flowEdge(
   edge: GraphEdge,
-  aspect: Aspect,
+  spline: DirectionalSpline,
+  anchors: EdgeAnchorPair,
+  route: SplinePath,
   statuses: DiffStatus[],
-  emphasis: SemanticData['emphasis'] = 'normal',
+  emphasis: SemanticData['emphasis'],
+  selected: boolean,
+  hovered: boolean,
+  showLabel: boolean,
+  zoom: number,
   onSelect: () => void = () => {},
+  onHover: (hovered: boolean) => void = () => {},
 ): SemanticFlowEdge {
-  const presentation = edgePresentation(edge, aspect)
-  let source = edge.a
-  let target = edge.b
-  if (presentation.reverse) [source, target] = [target, source]
   return {
     data: {
+      anchors,
+      direction: spline.direction,
       edge,
       emphasis,
-      label: presentation.label || edge.key,
-      memberCount: edge.interfaces.length + edge.relationships.length,
+      hovered,
+      label: spline.label || edge.key,
+      labelPoint: route.labelPoint,
+      memberCount: spline.members.length,
+      onHover,
       onSelect,
+      port: interfacePort(spline, anchors),
+      path: route.path,
+      selected,
+      showLabel,
       statuses,
+      zoom,
     },
-    id: edge.key,
-    markerEnd: presentation.showArrow ? { type: MarkerType.ArrowClosed } : undefined,
-    markerStart: presentation.bidirectional ? { type: MarkerType.ArrowClosed } : undefined,
-    source,
-    sourceHandle: `source-${[...edge.key].reduce((total, value) => total + value.charCodeAt(0), 0) % 3}`,
-    target,
-    targetHandle: `target-${[...edge.key].reduce((total, value) => total + value.charCodeAt(0), 0) % 3}`,
+    id: spline.id,
+    source: spline.source,
+    target: spline.target,
     type: 'semantic',
   }
+}
+
+function absoluteRect(key: string, positions: Positions): EdgeRect | null {
+  const position = positions.get(key)
+  if (!position) return null
+  let x = position.x
+  let y = position.y
+  let parentId = position.parentId
+  const visited = new Set([key])
+  while (parentId && !visited.has(parentId)) {
+    visited.add(parentId)
+    const parent = positions.get(parentId)
+    if (!parent) break
+    x += parent.x
+    y += parent.y
+    parentId = parent.parentId
+  }
+  return { x, y, width: position.width, height: position.height }
 }
 
 function nodeTags(node: GraphNode): string[] {
@@ -412,13 +423,11 @@ function DependencyView({
   const incoming: Array<{ edge: GraphEdge; node: GraphNode }> = []
   const outgoing: Array<{ edge: GraphEdge; node: GraphNode }> = []
   for (const edge of projected.edges.filter((item) => item.a === focusKey || item.b === focusKey)) {
-    const presentation = edgePresentation(edge, aspect)
-    const source = presentation.reverse ? edge.b : edge.a
-    const target = presentation.reverse ? edge.a : edge.b
     const neighbor = projected.nodes.find((node) => node.key === (edge.a === focusKey ? edge.b : edge.a))
     if (!neighbor) continue
-    if (presentation.bidirectional || target === focusKey) incoming.push({ edge, node: neighbor })
-    if (presentation.bidirectional || source === focusKey) outgoing.push({ edge, node: neighbor })
+    const splines = splitEdgeDirections(edge, aspect)
+    if (splines.some((spline) => spline.target === focusKey)) incoming.push({ edge, node: neighbor })
+    if (splines.some((spline) => spline.source === focusKey)) outgoing.push({ edge, node: neighbor })
   }
   const column = (label: string, entries: Array<{ edge: GraphEdge; node: GraphNode }>) => (
     <section aria-label={`${label} dependencies`} className="dependency-column">
@@ -431,7 +440,7 @@ function DependencyView({
       <header><div><span className="panel-kicker">DEPENDENCY FOCUS</span><h2>{rowLabel(focus.row)}</h2><p>{incoming.length} incoming · {outgoing.length} outgoing · {new Set([...incoming, ...outgoing].flatMap(({ edge }) => [...edge.interfaces, ...edge.relationships])).size} connections</p><label>Focus <select aria-label="Dependency focus" onChange={(event) => { const node = projected.nodes.find((item) => item.key === event.target.value); if (node) { onFocus(node.key); onSelect(node.kind, node.row, node.members) } }} value={focusKey}>{projected.nodes.map((node) => <option key={node.key} value={node.key}>{rowLabel(node.row)}</option>)}</select></label></div><button aria-label="Close dependency view" onClick={onClose} type="button">×</button></header>
       <div className="dependency-columns">
         {column('Incoming', incoming)}
-        <button className="dependency-focus-node" onClick={() => onSelect(focus.kind, focus.row, focus.members)} type="button"><span>{entityIcon(focus.kind, focus.row)}</span><strong>{rowLabel(focus.row)}</strong><small>{KIND_LABEL[focus.kind]}</small></button>
+        <button className="dependency-focus-node" onClick={() => onSelect(focus.kind, focus.row, focus.members)} type="button"><span className="kind-pill">{KIND_LABEL[focus.kind]}</span><strong>{rowLabel(focus.row)}</strong></button>
         {column('Outgoing', outgoing)}
       </div>
     </section>
@@ -455,6 +464,7 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [autoViewCollapsed, setAutoViewCollapsed] = useState(false)
   const [hoveredKey, setHoveredKey] = useState<string | null>(null)
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const framedLayout = useRef('')
   const cameraFrame = useRef(0)
@@ -502,6 +512,7 @@ export default function App() {
   const selectedKey = selected?.type === 'row' ? `${selected.kind}:${selected.row.id}` : null
   const selectedDisplayKey = useMemo(() => projected.nodes.find((node) => selectedKey
     && [node.key, ...node.members.map((member) => `${member.kind}:${member.row.id}`)].includes(selectedKey))?.key ?? null, [projected.nodes, selectedKey])
+  const selectedSplineId = selected?.type === 'edge' ? `${selected.edge.key}:${selected.direction}` : null
   useEffect(() => {
     for (const message of initial.diagnostics) console.warn(message)
   }, [initial])
@@ -540,19 +551,20 @@ export default function App() {
     const byId = new Map(Object.entries(projected.rawState.rows).flatMap(([kind, rows]) => rows.map((row) => [row.id, { kind: kind as RowKind, row }] as const)))
     const propertyCounts = new Map<string, number>()
     for (const { node } of graphNodes) for (const key of Object.keys(node.row.properties ?? {})) propertyCounts.set(key, (propertyCounts.get(key) ?? 0) + 1)
-    const factKeys = [...propertyCounts].sort(([leftKey, leftCount], [rightKey, rightCount]) => rightCount - leftCount || leftKey.localeCompare(rightKey)).slice(0, 2).map(([key]) => key)
+    const factKeys = [...propertyCounts].sort(([leftKey, leftCount], [rightKey, rightCount]) => rightCount - leftCount || leftKey.localeCompare(rightKey)).slice(0, 3).map(([key]) => key)
     const memberKeys = (node: GraphNode) => new Set([node.key, ...node.members.map((member) => `${member.kind}:${member.row.id}`)])
     const lensMatched = new Set(graphNodes.filter(({ node }) => nodeTags(node).some((tag) => view.lens.includes(tag))).map(({ node }) => node.key))
+    const directionalEdges = projected.edges.flatMap((edge) => splitEdgeDirections(edge, view.aspect))
+    const classified = classifyEmphasis(graphNodes.map(({ node }) => node.key), directionalEdges, selectedDisplayKey, lensMatched)
     const neighborKeys = (keys: Set<string>) => new Set(projected.edges.flatMap((edge) => keys.has(edge.a) ? [edge.b] : keys.has(edge.b) ? [edge.a] : []))
     const selectedNodes = new Set(graphNodes.filter(({ node }) => selectedKey && memberKeys(node).has(selectedKey)).map(({ node }) => node.key))
-    const selectedNeighbors = neighborKeys(selectedNodes)
     const hoverNodes = new Set(hoveredKey ? [hoveredKey] : [])
     const hoverNeighbors = neighborKeys(hoverNodes)
-    const lensNeighbors = neighborKeys(lensMatched)
     const emphasis = (key: string): ArchitectureData['emphasis'] => {
-      if (selectedNodes.size) return selectedNodes.has(key) ? 'emphasized' : selectedNeighbors.has(key) ? 'neighbor' : 'unrelated'
+      if (selectedDisplayKey) return classified.nodes[key]
+      if (selected?.type === 'edge') return key === selected.edge.a || key === selected.edge.b ? 'neighbor' : 'unrelated'
+      if (view.lens.length) return classified.nodes[key]
       if (hoverNodes.size) return hoverNodes.has(key) ? 'emphasized' : hoverNeighbors.has(key) ? 'neighbor' : 'unrelated'
-      if (view.lens.length) return lensMatched.has(key) ? 'emphasized' : lensNeighbors.has(key) ? 'neighbor' : 'unrelated'
       return 'normal'
     }
     const boundaryEntityKeys = new Set(projected.boundaries.filter((boundary) => !boundary.stub).map((boundary) => boundary.nodeKey))
@@ -562,12 +574,15 @@ export default function App() {
       const parentId = node.row.parent ?? node.row.container ?? node.row.component
       const parent = parentId ? byId.get(parentId)?.row : undefined
       const childCount = Object.values(projected.rawState.rows).flat().filter((row) => [row.parent, row.container, row.component].includes(node.row.id)).length
+      const connectionCount = new Set(projected.edges.filter((edge) => edge.a === node.key || edge.b === node.key)
+        .flatMap((edge) => [...edge.interfaces, ...edge.relationships])).size
       const size = cardSizes.get(node.key) ?? { width: NODE_WIDTH, height: NODE_HEIGHT }
       return {
         data: {
           boundary: node.boundary,
           changes: changesForNode(node, diff),
           childCount,
+          connectionCount,
           context: parent ? rowLabel(parent) : KIND_LABEL[node.kind],
           description: node.row.description ?? '',
           drillable: childCount > 0,
@@ -610,7 +625,7 @@ export default function App() {
       type: 'boundary',
     }))
     return applyPositions([...boundaryNodes, ...architectureNodes], positions) as CanvasNode[]
-  }, [cardSizes, diff, graphNodes, hoveredKey, positions, projected, selectedKey, setView, view.lens])
+  }, [cardSizes, diff, graphNodes, hoveredKey, positions, projected, selected, selectedDisplayKey, selectedKey, setView, view.aspect, view.lens])
 
   const graphEdges = useMemo(() => {
     const merged = new Map(projected.edges.map((edge) => [edge.key, { edge, ghost: false }]))
@@ -622,26 +637,46 @@ export default function App() {
   }, [compared, diff, projected.edges])
   const edges = useMemo(() => {
     const lensMatched = new Set(projected.nodes.filter((node) => nodeTags(node).some((tag) => view.lens.includes(tag))).map((node) => node.key))
-    const edgeEmphasis = (edge: GraphEdge): SemanticData['emphasis'] => {
-      if (selectedDisplayKey) {
-        if (edge.a !== selectedDisplayKey && edge.b !== selectedDisplayKey) return 'unrelated'
-        const presentation = edgePresentation(edge, view.aspect)
-        if (presentation.bidirectional) return 'both'
-        const source = presentation.reverse ? edge.b : edge.a
-        return source === selectedDisplayKey ? 'outgoing' : 'incoming'
-      }
-      if (hoveredKey) return edge.a === hoveredKey || edge.b === hoveredKey ? 'neighbor' : 'unrelated'
-      if (view.lens.length) return lensMatched.has(edge.a) || lensMatched.has(edge.b) ? 'neighbor' : 'unrelated'
+    const rendered = graphEdges.flatMap(({ edge, ghost }) => splitEdgeDirections(edge, view.aspect)
+      .map((spline) => ({ edge, ghost, spline })))
+    const obstacleRects = nodes.flatMap((node) => {
+      const rect = absoluteRect(node.id, positions)
+      return rect ? [rect] : []
+    })
+    const classified = classifyEmphasis(projected.nodes.map((node) => node.key), rendered.map(({ spline }) => spline), selectedDisplayKey, lensMatched)
+    const edgeEmphasis = (spline: DirectionalSpline): SemanticData['emphasis'] => {
+      if (selectedSplineId) return spline.id === selectedSplineId ? 'selected' : 'unrelated'
+      if (selectedDisplayKey || view.lens.length) return classified.edges[spline.id]
+      if (hoveredEdgeId) return spline.id === hoveredEdgeId ? 'selected' : 'unrelated'
+      if (hoveredKey) return spline.source === hoveredKey || spline.target === hoveredKey ? 'neighbor' : 'unrelated'
       return 'normal'
     }
-    return graphEdges.map(({ edge, ghost }) => flowEdge(
-      edge,
-      view.aspect,
-      ghost ? ['removed'] : statusesForEdge(edge, diff),
-      edgeEmphasis(edge),
-      () => revealInfo({ type: 'edge', edge }),
-    ))
-  }, [diff, graphEdges, hoveredKey, projected.nodes, revealInfo, selectedDisplayKey, view.aspect, view.lens])
+    return rendered.flatMap(({ edge, ghost, spline }, _index, all) => {
+      const sourceRect = absoluteRect(spline.source, positions)
+      const targetRect = absoluteRect(spline.target, positions)
+      if (!sourceRect || !targetRect) return []
+      const siblings = all.filter((item) => item.edge.key === edge.key)
+      const laneIndex = siblings.findIndex((item) => item.spline.id === spline.id)
+      const anchors = edgeAnchors(sourceRect, targetRect, laneIndex, siblings.length)
+      const route = splinePath(anchors, obstacleRects)
+      const isSelected = spline.id === selectedSplineId
+      const isHovered = spline.id === hoveredEdgeId
+      return [flowEdge(
+        edge,
+        spline,
+        anchors,
+        route,
+        ghost ? ['removed'] : statusesForMembers(spline.members, diff),
+        edgeEmphasis(spline),
+        isSelected,
+        isHovered,
+        edgeLabelVisible(depth, isSelected, isHovered),
+        zoom,
+        () => revealInfo({ type: 'edge', direction: spline.direction, edge }),
+        (hovered) => setHoveredEdgeId(hovered ? spline.id : null),
+      )]
+    })
+  }, [depth, diff, graphEdges, hoveredEdgeId, hoveredKey, nodes, positions, projected.nodes, revealInfo, selectedDisplayKey, selectedSplineId, view.aspect, view.lens, zoom])
 
   const visibleCanvas = useCallback((): Rect | null => {
     const element = canvasRef.current
@@ -808,7 +843,7 @@ export default function App() {
     drillCursor = parentKey(drillCursor)
   }
   return (
-    <div className="app" data-hover={hoveredKey ? 'active' : 'off'} data-lens={view.lens.length ? 'active' : 'off'} data-selection={selectedKey ? 'active' : 'off'}>
+    <div className="app" data-hover={hoveredKey || hoveredEdgeId ? 'active' : 'off'} data-lens={view.lens.length ? 'active' : 'off'} data-selection={selected ? 'active' : 'off'}>
       <header className="app-header">
         <div className="brand-lockup"><span className="brand-mark">OT</span><div><span>OneTool Architecture</span><strong>{payload.source}</strong></div></div>
         <button className="search-trigger" onClick={() => setSearchOpen(true)} ref={searchTrigger} type="button"><SearchIcon /><span>Search</span><kbd>⌘K</kbd></button>
@@ -831,9 +866,11 @@ export default function App() {
               nodesDraggable={false}
               nodeTypes={nodeTypes}
               onEdgeClick={(_event, edge) => {
-                const graphEdge = (edge.data as SemanticData | undefined)?.edge
-                if (graphEdge) revealInfo({ type: 'edge', edge: graphEdge })
+                const data = edge.data as SemanticData | undefined
+                if (data) revealInfo({ type: 'edge', direction: data.direction, edge: data.edge })
               }}
+              onEdgeMouseEnter={(_event, edge) => setHoveredEdgeId(edge.id)}
+              onEdgeMouseLeave={() => setHoveredEdgeId(null)}
               onInit={(instance) => { setFlow(instance); setZoom(instance.getZoom()) }}
               onNodeClick={(_event, node) => {
                 if (node.type === 'boundary') {

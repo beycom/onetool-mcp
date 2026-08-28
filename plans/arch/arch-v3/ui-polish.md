@@ -73,30 +73,45 @@ whatever chrome remains.
    edges effectively disappear; in dark theme they are worse.
    Expected: themed stroke with real contrast in both themes,
    zoom-compensated width so an edge is always ≥1px on screen.
+   — CLOSED (D13c, 2026-08-28: `--edge` token stroke with zoom
+   compensation; minimum cold-load stroke measured 1.5 screen px).
 2. **No arrowheads.** `marker-end` is null on all 17 edges; direction is
    unreadable. The Call-direction aspect changes nothing visible.
    Expected: visible arrowheads at every target, sized with zoom; aspect
    switch must produce a visibly different picture.
+   — CLOSED (D13c, 2026-08-28: custom zoom-compensated markers on every
+   spline; Relationship switch re-resolves per-direction splines).
 3. **No edge labels.** Zero edge labels render at any zoom (`labelCount: 0`).
    Connection names exist (they show in the side panel) but never on canvas.
    Expected: label pills at FULL depth and on selection/hover.
+   — CLOSED (D13c, 2026-08-28: `edgeLabelVisible` — neutral pills at Full,
+   selected/hovered pills at every depth, with count chips).
 4. **Routing draws phantom boxes.** Orthogonal routes take huge rectangular
    detours across empty canvas (e.g. analytics-provider's edge loops around
    a ~700×250px empty rectangle). These outlines read as boundary boxes, not
    edges. Expected: direct routes, no detour larger than the nodes it avoids.
+   — CLOSED (D13c, 2026-08-28: bezier splines on geometry-derived facing
+   anchors; zero orthogonal path commands in the browser probe).
 5. **Edges cross node interiors and chrome.** Routes pass under the Customer
    node, under the collapsed legend strip, and under the minimap.
    Expected: routes avoid node bodies and never rely on areas covered by
    overlays.
+   — CLOSED (D13c, 2026-08-28: deterministic obstacle routing; System and
+   Container probes found zero card-body crossings).
 6. **Empty stub boxes float next to nodes.** Small empty rounded rects sit
    detached beside Warehouse Operator, Enterprise Order Management, and on
    the left rank — they look like broken labels. Expected: interface stubs
    (if that is what they are) get a glyph/label and attach visually to their
    node, or don't render at this level.
+   — CLOSED (D13c, 2026-08-28: boundary stubs render as compact kind-pill
+   cards with an External marker; interfaces are provider-side ports
+   attached at the spline anchor — no detached empty boxes).
 7. **Inverted emphasis in compare mode.** Added edges render bold teal with
    arrowheads while the entire base architecture stays 1px pale gray — the
    diff is more legible than the architecture itself. Expected: base edges
    legible always; diff styling an increment on top, not the only visible ink.
+   — CLOSED (D13c, 2026-08-28: base splines keep full neutral legibility in
+   every stage; diff hue/dash/pills are increments on the base weight).
 
 ## 2. Layout and fit (D13b)
 
@@ -136,8 +151,9 @@ whatever chrome remains.
     Expected: on select, pan/zoom the selection into the remaining visible
     canvas and highlight it; on edge select, highlight the full route.
     — CLOSED for camera (D13b, 2026-08-28: selection stays inside the
-    visible canvas via minimal pan / neighborhood fit). Edge route
-    highlight remains D13c.
+    visible canvas via minimal pan / neighborhood fit). Edge-route
+    highlight CLOSED (D13c, 2026-08-28: selected spline gains accent,
+    weight, halo, and its label pill at every depth).
 13. **Escape doesn't close the details panel.** Only the small ✕ does.
     Expected standard keys: Escape closes topmost overlay / clears selection.
 14. **Legend state is unstable.** Collapsed legend re-expands by itself when
@@ -227,6 +243,37 @@ whatever chrome remains.
     dark theme returns, and this evidence binds it when it does.*
     — WAIVED (D13a, 2026-08-28: dark theme and its toggle removed with
     the deferral; this evidence binds any future dark pass).
+
+## 7. Post-D13b user feedback (2026-08-28 screenshots — D13d)
+
+Evidence: five user screenshots of the current build (D13a/D13b landed,
+D13c in gate review), 2026-08-28. All tagged D13d — the only remaining
+polish pass.
+
+25. **Report is not responsive — doesn't fit the page.** The shell renders
+    at a fixed size inside the browser window instead of filling the
+    viewport; unused page space shows around/below the app (the "Open Data
+    dock" strip sits above a blank band). Expected: the app shell fills
+    100% of the viewport width and height at any window size at or above
+    the 1024 × 720 floor — header, docks, and canvas flex to fit with no
+    outer page scroll and no dead band.
+26. **Dock chrome is non-standard and ugly.** The collapse/expand
+    affordances are floating text pills and raw strips: "Collapse View
+    dock" is a bordered text pill overlapping the View header, "Open Info
+    dock" is a full-height gutter with rotated text, "Collapse Data dock"
+    is another floating pill, and "Open Data dock" is a plain text strip.
+    The View dock's diagram card (oversized "Canvas / Model map" box) and
+    the Copy view link row also read heavy and unfinished. Expected:
+    standard, clean panel patterns — each dock gets a slim header row with
+    an icon-only collapse chevron (tooltip for the label); collapsed docks
+    become slim icon rails, not text gutters; dock content rows (diagram
+    list, Copy view link) styled as compact list items consistent with the
+    rest of the dock; no floating labeled pills anywhere.
+27. **Tags list is unbounded.** The View dock's Tags list renders every
+    tag as a full-height list that pushes the dock into a long scroll
+    (dominated by count-1 tags). Expected: show at most 5 tag rows, then
+    the list scrolls internally within a fixed max height; the rest of the
+    View stack stays visible.
 
 ## Fixed-baseline notes
 

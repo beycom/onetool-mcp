@@ -31,7 +31,7 @@ lands; a fresh session should be able to resume from this file alone.
 | Open issues (wave 3) | `plans/arch/arch-v3/issues/` — p3-* files + index; resolved p1/p2 files in `issues/resolved/`; Archify/IcePanel reference screenshots stay in `issues/` (cited by the 3P pass specs) |
 | UI research (IcePanel/Archify) | `plans/arch/arch-v3/research/ui/ui-research-findings.md` + evidence captures |
 | Confirmed UI direction (3P/3S decision source) | `plans/arch/arch-v3/ui-polish-direction.md` — confirmed 2026-08-27; authoritative for all UI/interaction decisions, supersedes conflicting guidance in ui-polish.md and the report.md wave-2 contract. The `designs/` artboard directory was removed the same day (decisions captured in the direction; files in git history) |
-| UI polish issue list (3P input) | `plans/arch/arch-v3/ui-polish.md` — 24 itemized issues from the 2026-08-25 Playwright walkthrough, tagged D13a–D13d; the 3P pass specs must close or waive every tagged item (expectations superseded where they conflict with ui-polish-direction.md) |
+| UI polish issue list (3P input) | `plans/arch/arch-v3/ui-polish.md` — 24 itemized issues from the 2026-08-25 Playwright walkthrough, tagged D13a–D13d, plus #25–#27 from 2026-08-28 user screenshot feedback (all D13d); the 3P pass specs must close or waive every tagged item (expectations superseded where they conflict with ui-polish-direction.md) |
 | Progress-log archive | `plans/arch/arch-v3/log-archive.md` |
 | Archived history (reference only) | `plans/arch/archive/` — `arch-v2/` design history incl. `grill/`; `v2-wip/` (v2-era design/ideas/requirements/mocks + superseded interactions.md, mined into report.md "Wave-2 UI contract") |
 | v2 donor code | HARVEST COMPLETE — branch `feature/arch-v2` on origin (head `e242fbb5`); worktree removed 2026-08-25. The dead patch/replay list ("must NOT return") lives in delivery.md |
@@ -219,7 +219,8 @@ panel"); the MAP→READ threshold (100%) does not match layout scale, so
 the useful 40–90% range shows only names in oversized boxes.
 
 **Itemized issue list (2026-08-25, second evidence source):**
-`ui-polish.md` — 24 issues from a full Playwright walkthrough
+`ui-polish.md` — 24 issues from a full Playwright walkthrough,
+plus #25–#27 (2026-08-28 user screenshot feedback → D13d)
 (per `wip/notes/test-ui.md`), each with observed → expected and a
 D13a–D13d tag. It confirms the baseline above and adds measured
 values (all 17 edges 1px `#B1B1B7`, `marker-end: null`, zero edge
@@ -279,11 +280,9 @@ tagged to it; the exit gate checks the list is empty.
       Digital Commerce Platform mapping the migration waves; 19
       container rewires; components already populated) is authored
       in the D14 prompt.
-- [ ] **Pass 3 — graph elements: cards, splines, selection.** `→ D13c`
-      (spec: report.md "Polish contract — pass 3: graph elements",
-      authored 2026-08-28; prompt READY in delegation.md, D13b gate
-      passed; budget 1,600 changed source lines proposed — confirm
-      before running.)
+- [x] **Pass 3 — graph elements: cards, splines, selection.** `→ D13c`
+      (DONE, gate PASSED 2026-08-28; spec: report.md "Polish contract —
+      pass 3: graph elements"; 797/1,600 changed source lines.)
       Larger text-led cards per the direction's card anatomy — one
       rounded shape for every kind, no entity icons or logos, kind
       and fact pills, two-line name wrap; persistent drill affordance
@@ -318,6 +317,16 @@ tagged to it; the exit gate checks the list is empty.
       Escape order per the direction (#13); designed empty and
       failure states; final motion/consistency sweep with a
       reduced-motion audit.
+      **Added scope (user feedback 2026-08-28, ui-polish.md §7):**
+      the shell fills the browser viewport at any size at or above
+      the 1024 × 720 floor — no fixed-size render, no outer page
+      scroll or dead band (#25); dock chrome redesigned to standard
+      clean panel patterns — slim dock header rows with icon-only
+      collapse chevrons, collapsed docks as icon rails, no floating
+      labeled pills ("Collapse View dock" / "Open Info dock" gutter /
+      "Open Data dock" strip all replaced), View-dock diagram card
+      and Copy view link restyled as compact list rows (#26); the
+      Tags list caps at 5 visible rows then scrolls internally (#27).
 - [ ] **Exit gate (architect + user):** the phase-3 gate question —
       open acme's report cold and the story reads without
       explanation, but now also *looks* deliberate: no dead-space
@@ -420,6 +429,77 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-28** — D13c architect gate PASSED; tree committed. Independently
+  re-verified: 33 frontend tests including exactly the five prescribed D13c
+  cases (four-side facing anchors + lane separation, direction split under
+  all three Relationships with bidirectional counted on both, label
+  visibility, one-hop emphasis over tag lens, provider-side grouped port),
+  `just lint`, 77 arch py tests, `just build-arch-report` reproduces the
+  tree's template byte-for-byte (shasum match), budget confirmed at
+  797/1,600 changed source lines (453 tracked + 344 new modules). Code
+  review of edgeAnchors.ts (pure four-side anchors, clamped lane offsets),
+  splinePath.ts (deterministic visibility-graph obstacle routing, cubic
+  path, arc-length label point), edgePresentation.ts (per-direction member
+  split, selection > tag priority, port grouping) and the App.tsx wiring
+  (entityIcon deleted, kind/external pills, SVG drill icon in the 28 px
+  control, per-spline selection with direction, zoom-compensated strokes +
+  custom markers, per-member diff statuses) conforms to the pass-3
+  contract; CSS confirms readable dim floors (.32–.42), accent-border diff
+  markers with no fill wash, subtle boundary tints, and the reduced-motion
+  static fallback. Screenshots confirm spline routing with visible
+  arrowheads, no orthogonal detours, one-hop selection, and stage-diff as
+  increments on a legible base. Minor, not gate-blocking: the edges memo
+  depends on `zoom`, so splines re-route on every zoom tick (fine on acme —
+  revisit only if large models jank); a dead `getBezierPath` mock entry in
+  App.test.tsx; one duplicated `.semantic-edge.is-*` CSS rule pair.
+  ui-polish.md annotated: #1–#7 CLOSED; #12 edge-route-highlight residual
+  CLOSED. Next action: user confirms the D14 budget (1,100 changed source
+  lines proposed) and runs the delegation.md D14 prompt; after its gate,
+  the architect runs the #21 payload precheck and authors D13d.
+
+- **2026-08-28** — User screenshot feedback on the current build filed as
+  ui-polish.md §7 (#25 shell must be responsive and fill the viewport,
+  #26 dock chrome must use standard clean panel patterns instead of
+  floating text pills / rotated-text gutters, #27 Tags list capped at 5
+  visible rows then internal scroll). All three folded into the D13d
+  pass-4 scope; the exit-gate issue sweep now includes them.
+
+- **2026-08-28**: D13c graph elements complete; worktree left dirty for
+  architect review. Cards now use the per-depth kind/name/description/fact/count
+  anatomy with no entity icons, persistent 28 px drill controls, compact
+  external stubs, and diff pills plus narrow markers. Containment boundaries
+  use subtle tints and readable kind/name headers. Directional cubic splines
+  use floating four-side anchors, separated lanes, deterministic obstacle
+  routing, one wide hit rail, count labels, provider-side interface ports,
+  zoom-compensated strokes and custom arrows. Selection follows the one-hop
+  model with animated outgoing, static incoming, readable dimming, tag priority,
+  and a static reduced-motion fallback. Source budget: 797/1,600 changed
+  TS/TSX/CSS lines, counted as additions plus deletions with tests and the
+  generated bundle excluded.
+  Tests: exactly the five prescribed D13c cases added; 33 frontend tests passed,
+  including untouched projection/vector suites. `just lint` passed, smoke 27
+  passed / 3,208 deselected, arch Python 77 passed / 540 deselected, and
+  `just build-arch-report` plus CLI acme regeneration passed. Rule-9 Playwright
+  passed over `file://` at 1440 x 900 and 1024 x 720: zero console errors and
+  only the local HTML request; System and Container probes found zero card-body
+  crossings and zero orthogonal path commands; every cold edge had a custom
+  arrow; the minimum 1024 cold-load stroke measured 1.499999 screen px; Full
+  and hover labels, attached ports, legible-base Stage diffs, one-hop selection,
+  and forced reduced motion all passed. Screenshots:
+  `wip/test-results/d13c/system-cold-1440.png`, `container-1440.png`,
+  `selection-1440.png`, `selection-reduced-motion-1440.png`, and
+  `stage-diff-1024.png`. Relationship switches left every node transform
+  unchanged. The acme payload assigns the same orientation under Calls, Data
+  flow, and Ownership, so it cannot display an arrow reversal; the synthetic
+  direction-split case verifies re-resolution and distinct member groups.
+  Assumptions: the execution request confirms the 1,600-line budget; the final
+  no-commit instruction controls; rule 8 permits this log entry as the sole
+  design-doc write; relationship rows retain stored source-to-target direction
+  outside Ownership while interfaces follow the selected direction field; a
+  grouped port uses the first interface in deterministic order plus the distinct
+  interface count. Open questions: none. Next action: architect gate review,
+  then confirm D14's 1,100-line budget and run D14.
 
 - **2026-08-28** — Subsystem level rename designed (user-directed); D14
   authored and slotted before D13c. New naming: System (the overall

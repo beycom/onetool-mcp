@@ -10,10 +10,9 @@ export const CARD_WIDTH: Record<Level, number> = {
   components: 240,
 }
 
-const NAME_FONT = '600 14px "SFMono-Regular", Consolas, monospace'
+const NAME_FONT = '600 14px Inter, ui-sans-serif, sans-serif'
 const BODY_FONT = '10px Inter, ui-sans-serif, sans-serif'
 const HORIZONTAL_PADDING = 28
-const IDENTITY_CHROME = 25
 const NAME_LINE_HEIGHT = 18
 const BODY_LINE_HEIGHT = 13
 const ROW_GAP = 5
@@ -39,19 +38,24 @@ function wrappedLines(text: string, width: number, font: string, measure: TextMe
 export function cardSize(node: GraphNode, level: Level, measure: TextMeasure): CardDimensions {
   const width = CARD_WIDTH[level]
   const textWidth = width - HORIZONTAL_PADDING
-  const nameWidth = textWidth - IDENTITY_CHROME
   const name = node.row.name ?? node.row.action ?? node.row.id
-  const nameLines = Math.min(2, wrappedLines(name, nameWidth, NAME_FONT, measure)) as 1 | 2
+  const nameLines = Math.min(2, wrappedLines(name, textWidth, NAME_FONT, measure)) as 1 | 2
+  if (node.boundary) {
+    return {
+      width,
+      height: VERTICAL_PADDING + 18 + nameLines * NAME_LINE_HEIGHT + 18 + ROW_GAP * 2,
+      nameLines,
+    }
+  }
   const descriptionLines = Math.min(2, wrappedLines(node.row.description ?? '', textWidth, BODY_FONT, measure))
   const hasFacts = Object.keys(node.row.properties ?? {}).length > 0
-  const hasBadges = (node.row.tags?.length ?? 0) > 0 || node.members.length > 1
   const rowHeights = [
-    12,
+    18,
     nameLines * NAME_LINE_HEIGHT,
     ...(descriptionLines ? [descriptionLines * BODY_LINE_HEIGHT] : []),
-    11,
-    ...(hasFacts ? [18] : []),
-    ...(hasBadges ? [18] : []),
+    13,
+    ...(hasFacts ? [20] : []),
+    20,
   ]
   return {
     width,

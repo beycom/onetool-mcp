@@ -10,13 +10,12 @@ vi.mock('@xyflow/react', () => ({
   BaseEdge: () => null,
   EdgeLabelRenderer: ({ children }: { children: ReactNode }) => children,
   Handle: () => null,
-  MarkerType: { ArrowClosed: 'arrowclosed' },
   MiniMap: () => null,
-  Position: { Left: 'left', Right: 'right' },
+  Position: { Bottom: 'bottom', Left: 'left', Right: 'right', Top: 'top' },
   ReactFlow: ({ nodes }: { nodes: Array<{ id: string }> }) => (
     <div aria-label="Architecture canvas">{nodes.map((node) => <span key={node.id}>{node.id}</span>)}</div>
   ),
-  getSmoothStepPath: () => ['', 0, 0],
+  getBezierPath: () => ['', 0, 0],
 }))
 
 vi.mock('./layout', () => ({
