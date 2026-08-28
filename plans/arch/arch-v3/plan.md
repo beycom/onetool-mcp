@@ -78,10 +78,17 @@ models the user runs with the prompts in [delegation.md](delegation.md):
 - **Executor (tags `→ Dn` below):** well-specified implementation chunks.
   Prompts carry the contract; executors stop and ask rather than improvise.
 - **Rule:** no delegated chunk feeds the next wave until the architect has
-  reviewed it at the gate. Remaining sequence (waves 0–1 done — see
-  Phase 1): Phase 1 exit gate → wave 2 (P21 ∥ P22 ∥ P23 as their
-  architect artifacts land) → wave 3 (P31 → sequence gate) → waves 4–5.
-  Historical sequencing detail: log-archive.md.
+  reviewed it at the gate. Remaining sequence (waves 0–1 build done —
+  see Phase 1): P11 → P12 → Phase 1 exit gate → wave 2 (P21 ∥ P22 ∥
+  P23 as their architect artifacts land) → wave 3 (P31 → sequence
+  gate) → waves 4–5. Historical sequencing detail: log-archive.md.
+- **Rolling prompt pipeline (user-directed 2026-08-29):** prompts are
+  generated ahead — as many as make sense for the piece of work, no
+  strict limit — and every queued prompt is REVIEWED AND UPDATED
+  against the landed tree as part of each gate review before it runs
+  (e.g. P11 and P12 generated together; P11 runs; at the P11 gate the
+  architect re-checks P12's prompt against the post-P11 tree, updates
+  it, and generates the next prompt in sequence).
 
 ## Speed mode (agreed 2026-08-23)
 
@@ -148,6 +155,8 @@ carry both.
 
 | New id | Was | Chunk |
 | --- | --- | --- |
+| P11 | — | Canvas presentation: radial layout, edge labels/ports, color economy, theme (added 2026-08-29) |
+| P12 | — | Map model: in-place C4 expansion, endpoint resolution, presets (added 2026-08-29) |
 | P21 | D12a | Sequence parser + payload (prompt ON HOLD, needs re-scope) |
 | P22 | D11 | Report definitions + guided views |
 | P23 | D8 | Client-side SVG / draw.io export + SQLite adapter |
@@ -194,6 +203,31 @@ docs):
 - **Subsystem level** (was the D14 interlude; gate PASSED 2026-08-29,
   293/1,100): System / Subsystem / Container / Component / Code chain,
   Subsystem entity kind, eleven-sheet Excel, acme fixture delta.
+- [ ] **P11 — canvas presentation** (added 2026-08-29 from the user's
+  IcePanel comparison review; spec: report.md "Polish contract — pass 5:
+  canvas presentation (P11)"; prompt READY in delegation.md; proposed
+  budget 2,400 changed source lines — confirm before running).
+  Topology-aware layout (hub-centered radial for star-shaped flat
+  graphs, layered kept elsewhere), uniform spacing, edge termination
+  stubs + distributed visible ports, at-rest edge label pills, quiet
+  neutral strokes, strict color economy (one accent, spent only on
+  interaction), per-kind color identity with the user-definable YAML
+  `theme` block (schema.md "Theme"; Excel Settings sheet — the small
+  Python scope), compact user cards. Prechecks done 2026-08-29: elkjs
+  0.12.0 bundles radial/stress/force/sporeOverlap; endpoint kinds
+  already unrestricted; systems structurally root-only.
+- [ ] **P12 — map model: in-place C4 expansion** (added 2026-08-29,
+  user-directed; spec: report.md "Map contract — in-place C4 expansion
+  (P12)"; prompt GENERATED in delegation.md — review + update at the
+  P11 gate per the pipeline rule; proposed budget 2,600 changed source
+  lines — confirm before running). Expansion-set view state replacing
+  level+drill, tree-based one-generation expand/collapse (mixed child
+  kinds), persistent cumulative expansion, deepest-visible endpoint
+  resolution (defined vs derived attachment), Detail dropdown as bulk
+  presets, drill/breadcrumb retirement, local push-apart relayout with
+  position stability, boundary identity with description, acme
+  showcase-path delta (four-level zoom path + subsystem- and
+  component-level interfaces). Reverses answered question Q5.
 - [ ] **Phase 1 exit gate (architect + user)** — the held 3P exit gate:
   open acme's report cold and the story reads without explanation and
   *looks* deliberate. Run ui-polish-direction.md "Acceptance checks" at
@@ -303,11 +337,46 @@ Answered questions (answers live in the design docs; details in
 log-archive.md): bundle location/build wiring (report.md "Shape");
 `arch.convert` umbrella naming (as-shipped by D5); legend dim-not-hide
 with tags driver (Q4, 2026-08-24); drill + 4-level C4 zoom over
-in-place expand/collapse (Q5, 2026-08-24); interactions.md superseded
+in-place expand/collapse (Q5, 2026-08-24 — **REVERSED 2026-08-29**,
+user-directed: the map model wins; report.md "Map contract (P12)" is
+the new authority); interactions.md superseded
 and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-29** — P11/P12 designed and authored (user-directed, from the
+  IcePanel comparison review of the current acme report); tree committed.
+  The review found the landscape layout, edge presentation, color usage,
+  and level navigation all short of the bar: corner-fan layered layout
+  for a star graph, no at-rest edge labels, teal-everywhere, endpoint
+  convergence at corners, and level-redraw navigation that loses the
+  user's place. Thirty agreed changes captured as two new wave-1 chunks
+  ahead of the Phase 1 exit gate: **P11 canvas presentation** (radial
+  hub layout for star-shaped flat graphs, uniform spacing, termination
+  stubs + distributed visible ports, at-rest white label pills, quiet
+  neutral strokes, strict one-accent color economy, per-kind color
+  identity user-definable via a new YAML `theme` block with Excel
+  Settings sheet, compact user cards) and **P12 map model** (expansion-
+  set view state replacing level+drill, tree-based one-generation
+  expansion with mixed child kinds, persistent cumulative expansion,
+  deepest-visible endpoint resolution with defined/derived attachment,
+  Detail dropdown as bulk presets, drill retirement, local push-apart
+  relayout, boundary identity, acme showcase-path delta) — P12
+  REVERSES Q5 (2026-08-24). Design landed as: schema.md normative
+  containment matrix + "Theme" section, adapters.md Settings sheet
+  (twelve sheets), report.md "Polish contract — pass 5 (P11)" and "Map
+  contract (P12)", ui-polish-direction.md Detail + canvas-language
+  amendments. Prechecks passed: elkjs 0.12.0 bundles
+  radial/stress/sporeOverlap; ENDPOINT_KINDS already spans all six
+  entity kinds (no Python for any-level interfaces); System/User have
+  no parent field (matrix structurally enforced). New process rule
+  recorded: rolling prompt pipeline — prompts generated ahead, each
+  reviewed/updated at the preceding gate. Prompts authored in
+  delegation.md: P11 READY (budget 2,400 proposed), P12 GENERATED
+  (budget 2,600 proposed; re-review at the P11 gate). Next action: user
+  confirms the P11 budget and runs the P11 prompt; architect gates it,
+  re-reviews P12, then P12 runs; the Phase 1 exit gate follows both.
 
 - **2026-08-29** — Plan reorganised (user-directed); tree committed.
   Chunk ids move to `Pxy` wave numbering (x = wave, y = priority) and

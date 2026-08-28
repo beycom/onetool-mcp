@@ -29,6 +29,8 @@ outstanding headings below carry both (`P21 (was D12a)` etc.).
 | D13c | Polish pass 3: graph elements | DONE, gate PASSED 2026-08-28 (797/1,600 lines) | — |
 | D14 | Subsystem level rename (schema + report + acme) | DONE, gate PASSED 2026-08-29 (293/1,100 lines) | — |
 | D13d | Polish pass 4: View / Info / Data | DONE, gate PASSED 2026-08-29 (630/1,500 lines) | — |
+| P11 | Canvas presentation: radial layout, labels, ports, color economy, theme | READY (authored 2026-08-29) | budget confirmed |
+| P12 | Map model: in-place C4 expansion | GENERATED 2026-08-29 — review + update at the P11 gate | P11 gate |
 | P21 (was D12a) | Sequence parser + payload | ISSUED 2026-08-25, ON HOLD (re-scope for message-file refs) | Phase 1 exit gate + attachments design |
 | P22 (was D11) | Report definitions + guided views | GATED on designs | Phase 1 exit gate |
 | P23 (was D8) | SQLite adapter, SVG/draw.io export | GATED | Phase 1 exit gate |
@@ -591,4 +593,151 @@ tests/unit/tools/fixtures/arch/sequence/model.yaml` still reports 0
 errors, and regenerating the checked-in projection-fixture payload and
 acme dev payload via the CLI is byte-identical. STOP after the log entry
 — the architect reviews at the gate.
+```
+
+## P11 — Canvas presentation: layout, edges, ports, color, theme (READY, authored 2026-08-29; run once the budget is confirmed)
+
+```text
+[standard rules + UI rule 9]
+
+Prereq: the plan-reorg commit (99133320) or later is the baseline.
+Authoritative contract — READ IN FULL, in this order:
+1. plans/arch/arch-v3/report.md "Polish contract — pass 5: canvas
+   presentation (P11)" — the normative spec; implement it exactly.
+2. plans/arch/arch-v3/schema.md "Theme (presentation colors)" and
+   "Entity kinds" (containment matrix) — the schema authority for the
+   theme block.
+3. plans/arch/arch-v3/adapters.md sheet list — the Settings sheet
+   (sheet 12) you are adding.
+4. plans/arch/arch-v3/ui-polish-direction.md "Canvas visual language"
+   (2026-08-29 amendment) — the confirmed direction the spec encodes.
+
+Scope — implement the pass-5 contract exactly:
+1. Topology-aware layout: the star-detection pure function; the
+   deterministic radial construction (hub center, users top arc,
+   stable ring order, >= 48 px clearance, two-plus-hop outward
+   placement, unconnected grid pack); ELK layered untouched for
+   non-star graphs, boundary levels, and the deps view.
+2. Edge termination: per-side distributed attachment (>= 14 px apart,
+   >= 14 px off corners), perpendicular 12 px stubs both ends, visible
+   port dots, accent-tinted ports on selection; rework edgeAnchors.ts
+   accordingly (its existing tests are updated, not deleted).
+3. At-rest labels: white label pills at Read and Full per the spec
+   (content, max-width + ellipsis + title, midpoint placement with
+   deterministic nudging); D13c selection/hover label behavior stays
+   on top.
+4. Color economy: neutral edge/border/pill tokens; per-kind CSS custom
+   properties (--kind-system ... --kind-user) defaulting to the D13d
+   Info-chip palette and consumed by canvas kind pills, card borders,
+   boundary tints, Info Contains chips, and Data kind chips; the teal
+   accent ONLY on selection/one-hop/focus/dock links; arrowheads
+   scaled ~0.8x; compact user cards (width tier 220, description at
+   Full only).
+5. Theme plumbing (Python — this chunk MAY touch model.py, yamlio.py,
+   validate.py, payload.py, excel.py in _arch/v3/): optional `theme`
+   model block per schema.md, validation codes unknown_theme_key /
+   invalid_color (located), canonical YAML position after timelines,
+   payload pass-through, Excel Settings sheet with round-trip
+   equality; regenerate checked-in payloads via the CLI (must be
+   byte-identical except where a fixture gains a theme).
+Out of scope — do not touch: projection.ts, view.ts, drill/expansion
+behavior (P12), Info/Data content beyond the kind-token consumption
+named above, camera.ts logic, sequence work.
+
+Budget: 2,400 changed source lines (additions plus deletions; py +
+TS/TSX/CSS; tests and the generated bundle excluded). Stop and ask
+before exceeding it.
+
+Tests: exactly the six cases in the pass-5 contract's "Prescribed
+tests"; every existing frontend and arch python test stays green
+(edgeAnchors tests updated to the new attachment contract count as
+updates, not new tests).
+
+Finish: `just lint`, arch py suite, frontend suite,
+`just build-arch-report`, regenerate the acme report via the CLI, then
+verify per rule 9 from file:// in light theme at 1440x900 and
+1024x720: clean console, zero external requests; walk cold load (the
+acme System landscape MUST lay out radially — hub centered, no
+corner fan, no card overlap) -> confirm at-rest label pills at Read ->
+zoom to confirm ports, stubs, and flush arrowheads -> select the hub
+(accent appears ONLY on selection artifacts; everything else neutral)
+-> switch Stage (diff colors intact over the neutral base) -> confirm
+kind pill/border colors match the Info Contains chip colors. Capture
+screenshots: landscape-radial-1440, labels-at-rest, ports-closeup,
+selection-accent, theme-kinds. Definition of done: rules 5-8, then
+STOP.
+```
+
+## P12 — Map model: in-place C4 expansion (GENERATED 2026-08-29; REVIEW + UPDATE at the P11 gate before issuing)
+
+```text
+[standard rules + UI rule 9]
+
+Prereq: the P11 gate commit is the baseline (prompt re-reviewed against
+it per the pipeline rule).
+Authoritative contract — READ IN FULL, in this order:
+1. plans/arch/arch-v3/report.md "Map contract — in-place C4 expansion
+   (P12)" — the normative spec; implement it exactly.
+2. plans/arch/arch-v3/schema.md "Entity kinds" — the containment
+   matrix that defines what expands to what.
+3. plans/arch/arch-v3/ui-polish-direction.md "Detail" (2026-08-29
+   amendment) — the confirmed direction.
+
+Scope — implement the map contract exactly:
+1. View state: the `expand` fragment key (validated id list); level+
+   drill retired with legacy-link mapping (drill= -> ancestor-chain
+   expansion + select; level= -> the equivalent preset); Detail
+   dropdown as bulk presets with "Custom" display; history semantics
+   (each expand/collapse and each preset application = one entry).
+2. Projection: tree-based rendering (collapsed card with roll-up
+   members / expanded boundary with mixed-kind direct children,
+   recursive); boundary identity (header + bottom description; never
+   a card inside its own boundary); per-endpoint deepest-visible
+   resolution with defined/derived attachment, aggregation on shared
+   visible pairs, internal-edge suppression; direction/one-hop/lens/
+   diff semantics unchanged.
+3. Interaction: expand control = magnifier + live child count (only
+   with live children), double-click expands, boundary-header collapse
+   prunes the subtree; drill view, breadcrumb, and Up control removed;
+   Escape order unchanged.
+4. Layout: ELK layered inside expanded boundaries (INCLUDE_CHILDREN
+   when nested); local push-apart on expand (only displaced neighbors
+   move, minimum displacement to restore 48 px clearance,
+   deterministic); collapse restores cached positions exactly; presets
+   re-lay out fresh (P11 star rules decide radial vs layered); camera
+   keeps the expanded entity's center fixed, zoom unchanged.
+5. Acme showcase delta: verify/enrich the four-level path Digital
+   Commerce Platform -> storefront-edge -> one container -> its
+   components (names/descriptions at every hop); add ONE interface
+   defined at subsystem level and ONE at component level (exact rows
+   specified at issue time after the P11-gate re-review); regenerate
+   the wip acme report.
+Out of scope — do not touch: P11's radial/edge/color modules beyond
+consuming them, all Python except payload regeneration commands, Info/
+Data content (selection sync must keep working), the deps view,
+sequence work.
+
+Budget: 2,600 changed source lines (additions plus deletions; TS/TSX/
+CSS + acme fixture YAML; tests and the generated bundle excluded).
+Stop and ask before exceeding it.
+
+Tests: exactly the six cases in the map contract's "Prescribed tests";
+every existing frontend and arch python test stays green (projection
+vectors for the retired levels are re-cut per the spec, counted as
+updates).
+
+Finish: `just lint`, arch py suite, frontend suite,
+`just build-arch-report`, regenerate the acme report via the CLI, then
+verify per rule 9 from file:// in light theme at 1440x900 and
+1024x720: clean console, zero external requests; walk cold load ->
+expand Digital Commerce Platform (boundary grows in place, neighbors
+displace minimally, everything else holds position) -> expand
+storefront-edge -> a container -> components (four-level path, mixed
+child kinds visible at the system level) -> confirm an external edge
+slides from derived to defined attachment while expanding -> collapse
+back up (positions restore) -> apply each Detail preset -> Copy view
+link and reload it (expansion restored) -> browser Back walks the
+expansion steps. Capture screenshots: map-collapsed, map-sys-expanded,
+map-four-levels, endpoint-slide, preset-container. Definition of done:
+rules 5-8, then STOP.
 ```

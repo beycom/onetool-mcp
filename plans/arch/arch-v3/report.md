@@ -1261,6 +1261,247 @@ projection.ts are OUT OF SCOPE — do not touch them.
    → first Escape closes search, second clears selection and closes
    Info (extends the D13a test).
 
+## Polish contract — pass 5: canvas presentation (P11)
+
+Normative spec (authored 2026-08-29; decision source: the user's
+IcePanel comparison review — hub layout, at-rest labels, termination
+ports, color economy, per-kind theme). Grounded in the post-D13d tree:
+`layout.ts` (unionLayout + grid pack), `edgeAnchors.ts`,
+`splinePath.ts`, `edgePresentation.ts`, `cardSize.ts`, `styles.css`,
+and — for the theme block only — `model.py`, `yamlio.py`, `payload.py`,
+`excel.py`, `validate.py` (schema.md "Theme" is the schema authority).
+Supersedes, where they conflict: D13b's ELK-only layout rule for flat
+levels, D13c's anchor projection and edge color rules, and every
+teal-at-rest usage in the D13a token set. Out of scope: expansion/map
+semantics (P12), `projection.ts`, Info/Data content, drill behavior.
+
+### Topology-aware landscape layout
+
+- **Star detection** (pure function, per layout key, computed on the
+  projected graph): eligible when the projection renders zero
+  boundaries and ≥ 6 nodes, and one node's incident edges are ≥ 40% of
+  all rendered edges. Eligible → **radial layout**; otherwise the
+  existing ELK layered path runs unchanged (boundary levels and the
+  deps view never use radial).
+- **Radial construction (deterministic, no ELK):** the hub at the
+  center; its one-hop neighbors on a ring — `users` biased to the top
+  arc, remaining neighbors ordered around the ring by (kind, connection
+  count desc, name) to keep the order stable; ring radius = the radius
+  at which adjacent cards keep ≥ 48 px clearance including label room
+  (grows with node count). Nodes at two+ hops place outside their
+  nearest one-hop anchor on the outward bearing with the same
+  clearance; unconnected nodes pack below the ring via the existing
+  grid-pack path. No two cards may overlap by construction.
+- **Spacing everywhere:** minimum 48 px card-to-card clearance holds in
+  both radial and layered modes (layered keeps its D13b ELK spacing
+  values; radial guarantees it by construction).
+
+### Edge termination and ports
+
+- **Per-side distributed attachment** replaces the current projection
+  anchors: for each node, each edge is assigned a side by bearing to
+  its counterpart; a side's edges are ordered by bearing and placed
+  along the side with ≥ 14 px separation, clamped ≥ 14 px from each
+  corner. Attachment points never converge and never sit on corners.
+- **Normal stubs:** every spline begins and ends with a straight stub
+  perpendicular to its card side (12 px at zoom 1); the curve runs
+  between stub tips; arrowheads sit flush on the border.
+- **Visible ports:** a small dot (5 px, `--border`-toned fill, card
+  background ring) renders at every attachment point; ports of the
+  selected/one-hop splines tint accent. Interface ports from D13c keep
+  their labels and adopt the same dot geometry.
+
+### At-rest edge labels
+
+- Every rendered spline shows a **label pill at Read and Full** depth
+  (at Far only when selected/hovered — D13c's selection rules are
+  unchanged and sit on top). Pill: white background, 1 px `--border`,
+  dark 10–11 px text, max-width ~180 px with ellipsis (`title` carries
+  the full text). Content: the single member's `action` (relationships)
+  or name (interfaces); aggregated splines show the first member's
+  label in deterministic member order plus the existing count chip.
+- Placement: arc-length midpoint, nudged along the spline (up to ±20%
+  of arc length) to clear card bodies; a pill never renders clipped by
+  a card — overlap with another pill resolves by alternating the nudge
+  direction deterministically.
+
+### Color economy and per-kind theme
+
+- **Neutral-first surface:** cards white; card border, description,
+  secondary text, and boundary washes in gray tokens; edges
+  `--edge` neutral gray (≈ #98a4ad), zoom-compensated widths kept from
+  D13c but arrowheads scaled ~0.8×. The animated dash remains reserved
+  for one-hop outgoing.
+- **Kind identity:** each of the six kinds (system, subsystem,
+  container, component, code, user) has one base hue driving its kind
+  pill (tinted bg + border + text), card border (1 px, ~55% mix toward
+  `--border`), and boundary tint (≤ 6% alpha wash) — all derived from
+  the one hue via `color-mix`. The D13d Info-chip palette becomes the
+  single default set, exposed as CSS custom properties
+  (`--kind-system`, …) so canvas pills/borders, Info Contains chips,
+  and Data kind chips read identical tokens.
+- **Model override:** the payload's `theme.kinds` (schema.md "Theme")
+  merges over the defaults at app start — one hue per kind, partial
+  allowed. Python scope: optional `theme` on the model, validation
+  codes `unknown_theme_key` / `invalid_color` (located), YAML canonical
+  position after `timelines`, payload pass-through, Excel `Settings`
+  sheet (adapters.md sheet 12) with YAML↔Excel round-trip equality.
+- **One accent:** the teal interaction accent appears ONLY on
+  selection (card border/halo, one-hop splines + their ports + label
+  emphasis), focus rings, and dock links/actions. Nothing at rest on
+  the canvas uses it. Diff status colors (added/removed/changed) are
+  unchanged. Dim floors from D13c are unchanged.
+- **User cards compact:** `users` render a reduced card (kind pill +
+  name; description only at Full), width tier 220 — no icons.
+
+### Prescribed tests (exactly these six, plus keeping every existing test green)
+
+1. Star detection: a flat fixture graph where one node carries ≥ 40% of
+   edges lays out radially (hub at the bounding-box center, every
+   one-hop neighbor within ±10% of one ring radius); a non-star fixture
+   takes the ELK layered path with unchanged input options.
+2. Attachment distribution: a node with three same-side edges gets
+   three distinct attachment points ≥ 14 px apart, none within 14 px of
+   a corner; the first and last spline segments are perpendicular to
+   their card sides.
+3. At-rest labels: at Read depth a single-member spline renders its
+   action pill and an aggregated spline renders first-member label +
+   count chip; at Far with no selection, no pill renders.
+4. Theme plumbing (py): a model with `theme.kinds.system` round-trips
+   YAML→Excel→YAML unchanged and reaches the payload verbatim; an
+   invalid value produces located `invalid_color`; an unknown key
+   produces `unknown_theme_key`.
+5. Theme application (ts): with a payload theme override, the system
+   kind's CSS custom property carries the override while unset kinds
+   keep defaults.
+6. Color economy: with nothing selected, rendered card borders, kind
+   pills, and edge strokes resolve to non-accent tokens; selecting a
+   node applies the accent to its border and one-hop splines only.
+
+## Map contract — in-place C4 expansion (P12)
+
+Normative spec (authored 2026-08-29; decision source: the user's map
+directive — c4model.com "maps of your code" navigation; REVERSES
+answered question Q5 of 2026-08-24, drill + uniform levels → in-place
+expansion). Supersedes: "C4 zoom and drill (D10b)" (the level table,
+drill projection, and breadcrumb), the Detail-dropdown-as-mode rows of
+the pass-1 controls, and D13b's initial-framing rule where it assumed a
+uniform level. Builds on P11 (radial landscape = the all-collapsed
+map; layered runs inside expanded boundaries). Grounded in
+`projection.ts`, `view.ts`, `layout.ts`, `camera.ts`, App wiring.
+
+### View state: the expansion set
+
+- `level` and `drill` retire. New fragment key `expand` = comma list of
+  expanded entity ids (any kind from the containment matrix that has
+  children). Unknown or childless ids are dropped with a console
+  diagnostic. Old links: a `drill=<key>` fragment maps to
+  `expand=<that id's ancestor chain + itself>` plus `select`; a
+  `level=` fragment maps to the equivalent preset. Copy view link and
+  saved views carry `expand`.
+- **Detail dropdown becomes presets** (same control, new semantics):
+  System = collapse all; Subsystem = expand all systems;
+  Container = expand systems + subsystems; Component = expand systems +
+  subsystems + containers. A preset writes the bulk expansion set in
+  one history push. When the live set matches no preset the dropdown
+  displays "Custom". The Subsystem option still hides for
+  subsystem-less models.
+- Expansion is **persistent and cumulative**: it survives stage,
+  relationship, and tag changes (the layout key becomes
+  `(timeline, expansion set)` — those switches move nothing, D13b
+  rule carried over). Expand/collapse pushes history; browser Back
+  walks expansion steps.
+
+### Projection: tree-based rendering
+
+- For each root (systems, users): collapsed → one card with the
+  existing roll-up members; expanded → a **boundary** containing its
+  live *direct children, whatever their kinds* (a system may show
+  subsystem and container cards side by side), each child again
+  collapsed or expanded, recursively. An expanded entity never renders
+  as a card inside its own boundary. A childless entity offers no
+  expansion (no affordance, invalid in `expand`).
+- **Boundary identity:** kind pill + name header (selectable, as
+  today) and the entity description at the bottom inside the boundary,
+  small and muted.
+- **Endpoint resolution (per endpoint, independent):** every
+  interface/relationship endpoint attaches to the **deepest visible
+  node on the defined endpoint's ancestor chain** — the defined entity
+  itself when visible ("defined" attachment), else its deepest visible
+  ancestor ("derived"). An interface defined on an entity that is
+  itself expanded attaches to that boundary's border (this narrowly
+  supersedes "boundaries are never edge endpoints" — only for
+  interfaces defined on the expanded entity itself). Multiple members
+  resolving to one visible pair aggregate into one spline with the
+  count chip (P11 labels apply); expanding a side re-resolves and
+  splits them. Both ends resolving to the same visible node = internal
+  edge, not drawn (connection-count facts still include it). Direction,
+  one-hop selection, tag lens, and diff semantics are unchanged — only
+  attachment changes.
+
+### Interaction
+
+- Expand: the existing drill control becomes the expand control
+  (magnifier + live child count), rendered only when live children
+  exist; double-click on such a card also expands. Collapse: an
+  icon-only control in the boundary header; collapsing prunes the
+  entity and all its descendants from the set. Escape order is
+  unchanged (Escape never collapses).
+- The **drill view, breadcrumb, and Up control retire**. The deps view
+  is untouched. "Focus a scope" = expand + camera fit to the boundary.
+
+### Layout: local, stable growth
+
+- Interior of an expanded boundary: ELK layered (`INCLUDE_CHILDREN`
+  for nested expansions), boundary sized to its laid-out children +
+  header/description inset.
+- **Expanding must not re-lay the map.** On expand, every node outside
+  the expanded entity keeps its position except those the grown
+  boundary would overlap: overlapping neighbors displace along the
+  vector from the expanded entity's pre-expansion center, the minimum
+  distance that restores the P11 48 px clearance (deterministic,
+  iterated until clear). Collapsing restores the pre-expansion
+  positions exactly (positions cached per expansion set). Applying a
+  preset is a deliberate bulk action and re-lays out fresh (P11 rules
+  decide radial vs layered on the result).
+- Camera: on expand/collapse the expanded entity's center stays fixed
+  in screen space; zoom changes only via the existing explicit
+  controls. Initial framing (D13b) applies to the preset/link-derived
+  first layout.
+
+### Acme showcase delta (authored in the P12 prompt)
+
+One verified four-level path — Digital Commerce Platform →
+`storefront-edge` → one of its containers → that container's
+components — with meaningful names/descriptions at every hop, plus at
+least one interface *defined* at subsystem level and one at component
+level so derived→defined attachment sliding is demonstrable. Enrich
+only where the existing fixture is thin; regenerate the wip acme
+report.
+
+### Prescribed tests (exactly these six, plus keeping every existing test green)
+
+1. Mixed-kind expansion: a system with two subsystems and one direct
+   container expands to a boundary containing exactly those three
+   cards (kinds preserved); collapsed siblings keep their roll-up
+   members.
+2. Endpoint resolution ladder: interface `C → Sys2` with C's system
+   collapsed attaches system→Sys2; expanding the system re-attaches
+   subsystem→Sys2; expanding the subsystem attaches C→Sys2; the two
+   derived stages carry aggregation counts when other members share
+   the pair.
+3. Internal edges: an interface wholly inside a collapsed system draws
+   no spline; expanding until both endpoints are visible draws it.
+4. Presets: the Container preset produces expand = all systems + all
+   subsystems; a hand-modified set renders the dropdown as "Custom";
+   preset application is one history entry.
+5. Layout stability: expanding one entity changes only the positions of
+   nodes its boundary displaced (all others exactly equal); collapsing
+   restores the prior positions exactly.
+6. Fragment round-trip: `expand` encodes/decodes losslessly; an unknown
+   id is dropped with a diagnostic; a legacy `drill=` link resolves to
+   the equivalent expansion + selection.
+
 ## Exports
 
 Phase one exports are data-shaped and require no layout engine in Python:

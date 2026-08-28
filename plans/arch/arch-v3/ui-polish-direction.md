@@ -101,13 +101,18 @@ only Base, Tags with no tags, and Guided views with no authored guides.
 
 ### Detail
 
-Detail is a dropdown for System, Subsystem, Container, and Component
-(level model renamed 2026-08-28: Subsystem — a logical grouping of
-related containers — replaces the former container-in-container "Child
-Containers" level; the Subsystem option is hidden when the model
-defines no subsystems).
-Boxes with children also have a small persistent drill affordance. Drilling
-changes focus and adds a breadcrumb. It does not expand children in place.
+**Amended 2026-08-29 (user-directed — the map model, report.md "Map
+contract (P12)"; reverses Q5):** the canvas is one continuous C4 map.
+Entities expand **in place** to their direct children (a system may show
+subsystems and containers side by side), expansion is per-entity,
+persistent, and cumulative, and connections attach to the deepest
+visible node on each endpoint's ancestor chain. The Detail dropdown
+remains but becomes **bulk-expansion presets** (System / Subsystem /
+Container / Component; "Custom" when hand-modified; Subsystem hidden
+for subsystem-less models). The former rule below is superseded: the
+drill view, breadcrumb, and "does not expand in place" behavior are
+retired — the expand affordance (magnifier + child count) replaces the
+drill affordance on cards with children.
 
 ### Stage
 
@@ -191,6 +196,18 @@ Use a light, near-white, plain background. Do not render a hatch or visible
 grid. Use neutral cards and chrome with one OneTool teal accent for active
 controls, links, selection, and emphasized splines. Tag, lifecycle, and diff
 colors stay in pills or narrow indicators rather than full-card fills.
+
+**Amended 2026-08-29 (user-directed — IcePanel comparison; report.md
+"Polish contract — pass 5 (P11)"):** the accent rule is strict — at
+rest, nothing on the canvas is teal; the accent is spent only on
+selection/one-hop, focus, and dock links. Entity kinds carry a per-kind
+color identity (pill, card border, boundary tint — one hue per kind,
+user-overridable via the model's `theme` block, schema.md "Theme").
+Edges are quiet neutral gray with small arrowheads and carry their
+action label as a white pill **at rest** (Read and Full depths), with
+distributed border ports and perpendicular termination stubs. The
+star-shaped landscape lays out hub-centered radially; layered layout
+remains for flow-shaped graphs and boundary interiors.
 
 Use readable sans-serif typography for names and prose. Reserve monospace
 for IDs, numeric values, and technical metadata.

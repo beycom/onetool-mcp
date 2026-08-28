@@ -57,6 +57,9 @@ YAML  <──>  ┼── sqlite  (one table/kind)    later
     `data_flow_direction`.
 11. `Relationships` — `id`, `source`, `action`, `target`, `start_in`,
     `end_in`, `description`, `tags`.
+12. `Settings` — key/value columns `setting`, `value`; carries the
+    optional `theme.kinds.<kind>` colors (schema.md "Theme", added
+    2026-08-29 with P11). Absent sheet = no settings.
 
 Reserved columns always present; any additional column is a property
 (v2 rule, including its accepted typo risk, mitigated by the generated

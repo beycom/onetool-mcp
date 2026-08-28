@@ -52,6 +52,15 @@ architecture before any milestone lands — the filter "rows live at position
 - Because `parent` may name a System or a Subsystem, an id present in both
   collections is a validation error (ambiguous parent). Containment is
   acyclic by construction (strict layering).
+- **The table above is the normative containment matrix (confirmed
+  2026-08-29).** Systems and Users are root kinds: their row shape has no
+  parent field, so nesting them is structurally impossible (a `parent`
+  key on a system row is a strict-model parse error, not merely a
+  validation finding). Every other cell is closed by the parent-field
+  types: subsystems parent only to systems, containers to systems or
+  subsystems, components to containers, code to components. Anything the
+  row shape cannot express needs no validator rule; the validator covers
+  the remaining referential cases (unresolved parent, ambiguous parent).
 
 ## Identifiers
 
@@ -386,6 +395,37 @@ This is an explicit, reviewable git commit — the file stays small and the
 history lives in version control, honoring "the data is the audit trail"
 without unbounded file growth.
 
+## Theme (presentation colors — added 2026-08-29, lands with P11)
+
+Each entity kind carries a color identity in the report (kind pill, card
+border, boundary tint, Info chips, Data kind chips — one hue per kind,
+lighter variants derived by the app via `color-mix`). Defaults ship in
+the app; a model may override any subset with an optional top-level
+`theme` block:
+
+```yaml
+theme:
+  kinds:
+    system: "#2e6f9b"
+    subsystem: "#257b72"
+    container: "#686d9a"
+    component: "#865b7e"
+    code: "#68713e"
+    user: "#925d37"
+```
+
+Rules: keys are the six singular kind names (unknown keys are a
+validation error `unknown_theme_key`); values are hex colors `#RGB` or
+`#RRGGBB` (anything else is `invalid_color`, located); partial blocks are
+legal — unset kinds keep the app defaults; the block is optional and its
+absence emits nothing. The payload carries the authored `theme` verbatim
+(empty object when absent); the report merges it over its built-in
+default palette. Excel transport: a `Settings` sheet (sheet 12,
+key/value columns `setting`, `value`, keys `theme.kinds.<kind>`) —
+round-trip preserves the block; an absent sheet means no theme. The
+theme never affects resolution, diffing, or validation semantics — it is
+presentation only.
+
 ## Validation
 
 Structural (errors): unique ids per collection (revision rows excepted per
@@ -395,7 +435,7 @@ container `parent` naming another container (containers no longer nest),
 the reserved milestone id `base`, required fields,
 interval ordering (`start_in` after `end_in` when both are milestones on
 one timeline; equality is legal), timeline rules, ID/text/property rules
-inherited from v2.
+inherited from v2, theme rules (`unknown_theme_key`, `invalid_color`).
 
 Advisory (warnings): identical adjacent revisions, authored intervals that
 exceed clipping, milestones referenced by no row, entities live on no
