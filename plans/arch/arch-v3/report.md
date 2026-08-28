@@ -37,7 +37,7 @@ manual step when the frontend changes.
 
 Because a state is a filter, the report app derives everything client-side:
 
-- **state at slider position** — one array filter;
+- **state at stage position** — one array filter;
 - **diff between positions** — set arithmetic;
 - **scope** (selected systems + hops) — BFS over live interfaces;
 - **level** (four C4 levels since wave 2 — see "Wave-2 UI contract") —
@@ -215,50 +215,105 @@ Composition order: `stateAt` → `scopeAt` → `rollUp` (diff overlays compute
 `diffStates` and mark the rolled-up nodes/edges containing affected
 entities). Every canvas view and every table reads from this one pipeline.
 
-## The time slider is the hero
+## Confirmed UI direction (2026-08-27) — normative
 
-The single interaction v1 and v2 never delivered, and the one the interval
-model makes nearly free:
+[ui-polish-direction.md](ui-polish-direction.md) is the authoritative UI
+and interaction contract for the Phase 3 report. Where it conflicts with
+"Stages instead of a time slider", "Views", "Canvas and look", or the
+"Wave-2 UI contract" below, the direction wins; the Wave-2 contract
+remains the record of what D10 built. Headline deltas from the built
+wave-2 UI:
 
-- A milestone stepper/slider across the selected timeline (Base → … →
-  End). Dragging it re-filters the canvas and tables in place.
-- Nodes and edges animate in/out; a **diff overlay** toggle marks added
-  (accent + badge), removed (ghosted, from the previous or compared
-  position), and revised (badge with field-level popover) — colors always
-  paired with icon/line-style per the v2 accessibility rule.
+- **App shell** — Option E supplies the shell only: a compact header
+  (model identity + `Cmd/Ctrl+K` global search), the **View** dock left
+  (diagram selection + view controls), the adaptive **Info** dock right
+  (inspector, opens on selection), and the full-width **Data** dock at the
+  bottom (tables + payload viewer). Docks reserve layout space, resize,
+  and collapse into rails; the only canvas overlay is the fixed lower-left
+  `Map | Fit | − | % · level | +` cluster with its optional minimap. No
+  floating selection toolbar, no status bar.
+- **Controls move into View** — Diagram (grouped list: Architecture,
+  Sequences), Detail (dropdown), Stage (dropdown — replaces the time
+  slider and the Compare control), Relationship (dropdown — the "aspect"
+  control), Tags (the only lens), Guided stories, Copy view link. Empty
+  controls hide. Scope/hop controls are removed from the viewer.
+- **Cards** — larger, text-led, one rounded shape for every kind; pills
+  for kind and high-value facts; no vendor logos or generic entity icons.
+  Semantic zoom is Far / Read / Full.
+- **Edges** — **splines** are the only architecture edge style (orthogonal
+  routing is superseded). Same-endpoint same-direction connections
+  aggregate with a count chip; opposite directions stay two separated
+  splines.
+- **Selection** — one-hop IcePanel-style emphasis: strongest accent on the
+  selected card, animated outgoing / static incoming splines in one accent
+  color, brightened direct neighbors, dimmed-but-readable everything else.
+- **Stability** — layout never moves across Stage, Relationship, or tag
+  changes; tags brighten/dim, never hide; stage changes use pills and
+  narrow border markers, never opacity.
+- **Payloads and dependencies** — linked request/response/JSON/XML/CSV
+  files list under Info's Attachments and open read-only in Data's Payload
+  tab. Dependencies opens contextually from Info's "View dependencies",
+  never from a global list.
+- **Scope floor** — light theme only; viewports down to **1024 × 720**
+  (the wave-2 500 px responsive target is superseded).
+- **Removed or deferred** (full list in the direction): dark theme,
+  application fullscreen, Share, a Changes diagram view or Info tab, saved
+  report creation, manual card positioning, viewer scope/hop controls,
+  Technology/Status lenses, floating panels.
+
+## Stages instead of a time slider
+
+The single interaction v1 and v2 never delivered — moving through the
+architecture's states — ships as the **Stage dropdown** in the View dock
+(the 2026-08-26 design review retired the slider; see the direction's
+"Stage" section):
+
+- One entry per named stage ("0 · Base", "4 · Transaction Core", …).
+  Selecting a stage updates the canvas, Data tables, counts, and Info
+  together, in place.
+- Additions, removals, and changes are relative to the **previous stage**
+  — diff styling is a property of the selected stage, not a separate
+  Compare mode (the Compare control is removed). Stage changes render as
+  pills and narrow border markers — colors always paired with a non-color
+  cue per the v2 accessibility rule — and appear as a concise section in
+  entity Info.
 - A timeline picker appears when the architecture declares multiple
   timelines, making scenario comparison a two-click act.
-- Progressive disclosure: with zero milestones (the common static case) the
-  time and compare controls do not render at all — the report is a pure
-  base-state explorer. One milestone brings the stepper; multiple
-  timelines bring the picker.
+- Progressive disclosure: with zero milestones (the common static case)
+  the Stage control does not render at all — the report is a pure
+  base-state explorer.
 - Layout stability across positions: layout the **union graph** (all rows,
   all positions) once with elkjs, then keep node positions fixed while
-  filtering — absent nodes collapse/ghost rather than trigger re-layout.
+  filtering — absent nodes drop/ghost rather than trigger re-layout.
   This sidesteps v2's roadmap-displacement quality gates by construction; a
   per-position re-layout is an explicit user action ("re-fit this state").
 
 ## Views (dynamic, all URL-fragment encoded)
 
-A view is a client-side configuration, shareable via copy-link (POC pattern):
+A view is a client-side configuration, shareable via View's **Copy view
+link** (the direction's "Interaction and shared links" section governs
+what a link preserves and excludes):
 
 | Control | Fragment key | Values |
 | --- | --- | --- |
-| Scope | `scope`, `hops` | selected systems + `system_hops` |
-| C4 level | `level` | `systems` / `top-containers` / `containers` / `components` |
+| Detail | `level` | `systems` / `top-containers` / `containers` / `components` |
 | Drill | `drill` | `<kind>:<id>` (child projection; pushes history) |
-| Dependency focus | `deps` | `<kind>:<id>` (dedicated in/out view) |
-| Time | `timeline`, `time` | timeline + slider position |
-| Compare | `compare`, `compare-at` | off / vs base / vs position |
-| Aspect | `aspect` | ownership / call direction / data flow |
-| Lens | `lens` | selected tags (legend) |
-| Theme | `theme` | light / dark |
-| *(reserved)* | `view` | guided views — D11 |
-| Sequence view | `seq`, `scenario`, `step`, `focus`, `hide`, `collapse` | owned by sequence.md; canvas-only keys ignored in that section |
+| Dependency focus | `deps` | `<kind>:<id>` (entered from Info's "View dependencies") |
+| Stage | `timeline`, `time` | timeline + stage position |
+| Relationship | `aspect` | calls / data flow / ownership |
+| Tags | `lens` | emphasized tags (dim, never hide) |
+| Selection | `select` | `<kind>:<id>` (current selection) |
+| *(reserved)* | `view` | guided stories — D11 |
+| Sequence view | `seq`, `scenario`, `step`, `focus`, `hide` | owned by sequence.md; canvas-only keys ignored in that section |
 
-The `mode` key (MAP/PATH/LENS) is retired in wave 2 — see "Wave-2 UI
-contract". Panel sizes, collapsed state, table layouts, and fullscreen are
-session-local (localStorage / transient), never fragment state.
+Removed keys (2026-08-27, per the confirmed direction): `scope`/`hops`
+(scope is a report-*generation* concern, not viewer state — the scopeAt
+projection stays in the contract for that pipeline), `compare`/
+`compare-at` (each stage inherently diffs against the previous stage),
+and `theme` (light only in the first pass). The `mode` key (MAP/PATH/
+LENS) was already retired in wave 2. Dock sizes, collapsed state, table
+layouts, searches, pan, and zoom are session-local (localStorage /
+transient), never fragment state.
 
 Saved Report Definitions (YAML files holding these fields) come later; the
 URL fragment *is* the saved view in phase one. No coordinates, pan, or zoom
@@ -268,22 +323,27 @@ future layout-hint feature is a new schema discussion, not a report feature.
 
 ## Canvas and look
 
-- React Flow v12, custom nodes/edges. Wave 2 revises the visual profile:
-  **plain near-flat background** (the faint technical grid is gone),
-  information-carrying entity boxes, nested containment boundary boxes,
-  visible orthogonal edges with pill labels and wide hit rails, graduated
-  dimming for every emphasis state, glow reserved for selection. The
-  normative spec and the measured Archify style values are in "Wave-2 UI
-  contract" below.
+- React Flow v12, custom nodes/edges. The visual language is the
+  direction's "Canvas visual language": light, near-white, **plain**
+  background (no grid or hatch); larger text-led cards in one rounded
+  shape with kind/fact pills and no entity icons or logos; containment
+  boundaries as subtle tints with clear headers; interfaces as small
+  labeled ports attached where a spline connects; **splines** as the only
+  edge style, with distributed anchors, aggregation count chips, wide hit
+  rails, and one-hop IcePanel-style selection emphasis; graduated dimming
+  for every emphasis state.
 - elkjs layout in a web worker inside the report (deterministic: fixed
   seed, sorted inputs; hierarchical `INCLUDE_CHILDREN` from wave 2 for
   boundary boxes). Running layout in the viewer removes v2's unresolved
   "ELK needs a JS runtime in the CLI" gate entirely.
-- Docked details side panel (wave 2 — replaces the floating passport),
-  minimap, keyboard operability, light/dark.
-- AG Grid Community tables (entities, interfaces, milestones, diff) at v2
-  feature parity (wave 2), always consistent with the canvas because both
-  read the same filtered arrays.
+- The Option E docked shell (direction "App shell"): View dock left,
+  adaptive Info dock right, full-width Data dock bottom, fixed lower-left
+  Map/Fit/Zoom cluster; light theme; keyboard operability.
+- AG Grid Community tables (entities, interfaces, milestones, diff) in the
+  Data dock at v2 feature parity, always consistent with the canvas
+  because both read the same filtered arrays; Data also hosts the
+  read-only **Payload** viewer for linked request/response files
+  (direction "Data dock").
 
 ## Wave-2 UI contract (v1)
 
@@ -298,22 +358,40 @@ baseline"). Quoted pixel/opacity/duration values are the Archify-measured
 styling reference — tune only by eye at the gate, never invent different
 mechanisms.
 
+> **Superseded where it conflicts (2026-08-27).** This contract is the
+> record of what D10 built and gated. The confirmed direction
+> ([ui-polish-direction.md](ui-polish-direction.md)) now governs the UI;
+> the deltas are summarized in "Confirmed UI direction" above. In
+> particular: the header's theme / copy-link / fullscreen actions, the
+> bottom-right zoom rail, the floating legend panel, the "Fullscreen"
+> section, dark theme, and the 500 px responsive target are superseded;
+> the docked side panel becomes the Info dock, the bottom tables panel
+> becomes the full-width Data dock, orthogonal edge styling gives way to
+> splines, and MAP/READ/FULL reading depth becomes Far/Read/Full semantic
+> zoom. Non-UI semantics — C4 zoom and drill, roll-up rules, graduated
+> dimming as a reference, fragment restoration, reduced-motion and
+> non-color-cue rules — carry forward.
+
 ### Chrome and layout (D10a)
 
 - **One compact header line**: brand mark, model name, current-view
-  summary, global actions (theme, copy link, fullscreen). No second
+  summary, global actions (theme, copy link, fullscreen) *(superseded —
+  the direction's header keeps only identity + global search; Copy view
+  link moves to the bottom of View)*. No second
   full-width control bar; the canvas starts directly below the header.
 - Controls sit in **grouped clusters** on/around the canvas: the time
   strip (timeline picker + slider + compare toggle) as one visual unit at
   the top of the canvas; the projection cluster (C4 zoom, scope, aspect)
   adjacent to the canvas; the **zoom rail** bottom-right (fit, zoom out,
-  current percentage + reading depth, zoom in, fullscreen toggle).
+  current percentage + reading depth, zoom in, fullscreen toggle)
+  *(superseded — the direction moves controls into the View dock and puts
+  one fixed `Map | Fit | Zoom` row at the lower left, with no fullscreen)*.
 - Related controls share one card/pill container; unrelated controls never
   share a row. Every control has a visible label or tooltip.
 - Narrow viewports: clusters collapse into menus, never wrap into stacked
-  full-width rows; the page never gains horizontal overflow down to 500 px
-  (research #9; INT-RESP-01). Fit, time, and fullscreen-exit controls stay
-  reachable at every width.
+  full-width rows *(the 500 px floor of this clause is superseded — the
+  direction's first-pass minimum is 1024 × 720, with View auto-collapsing
+  to its rail when Info opens at 1024 px)*.
 - The MAP/PATH/LENS mode buttons are **removed** (resolves the D7 gate
   note): LENS is subsumed by the legend lens, PATH/guided views are D11
   (`view` fragment key stays reserved), MAP is simply the default state.
@@ -356,7 +434,7 @@ space and refits without losing the current zoom/pan intent. Sizes and
 collapsed state persist per session (localStorage, validated on load);
 pixel sizes never enter URL fragments.
 
-### Fullscreen (D10a)
+### Fullscreen (D10a) — removed 2026-08-27 (direction: no application fullscreen)
 
 Toggle on the zoom rail + keyboard `f`; Escape exits after higher layers
 (menus, then side panel) have dismissed. Browser Fullscreen API where
@@ -428,7 +506,8 @@ boundary stub (existing stub styling). Drill state is the `drill`
 fragment key and **pushes history** — browser Back returns
 (INT-C4NAV-06/08); a breadcrumb chip in the header shows the drill path
 with an Up action. Drill respects the time position; the scope control is
-disabled while drilled.
+disabled while drilled *(moot since 2026-08-27 — the viewer no longer has
+a scope control)*.
 
 ### Entity boxes (D10b)
 
@@ -492,7 +571,7 @@ highlight (INT-A11Y-07).
 Dimming combines opacity with the existing non-color cues; color or
 motion alone never carries meaning (research #10; INT-A11Y-03).
 
-### Legend and tag lens (D10b)
+### Legend and tag lens (D10b) — floating panel superseded (Tags moves into the View dock)
 
 A floating, collapsible legend panel on the canvas (reusing the D10a
 panel behaviors; the one floating panel in wave 2). Entries = the **tags**
@@ -585,85 +664,272 @@ position won by user decision; both issue files carry the decision note.)
   **zero external requests from `file://`** remain gate checks
   (do-not-copy: remote assets, Google Fonts included).
 
-## Polish contract — pass 1: visual foundation (D13a)
+## Polish contract — pass 1: app shell (D13a)
 
-Normative for D13a (Phase 3P pass 1). A **pure presentation pass**: no
-changes to projection, layout, or view logic, DOM structure semantics,
-aria labels, data-testids, fragment keys, or any behavior. Styling,
-iconography, and how the footer presents its content are the entire
-surface. Where this section names a change it wins over "Canvas and
-look" and the Wave-2 styling values; everything unnamed is unchanged.
+Normative for D13a (re-authored 2026-08-27; the 2026-08-25
+presentation-only pass-1 contract is superseded — full text in git
+history). This pass implements the app-shell portion of
+[ui-polish-direction.md](ui-polish-direction.md); the direction is
+authoritative for behavior, this section scopes exactly what pass 1
+changes and what waits for later passes. Unlike its predecessor this
+pass changes structure and behavior: chrome layout, control types, and
+fragment keys.
 
-### Design tokens
+### Shell regions
 
-All values become CSS custom properties on `:root`; the dark theme
-redefines **colors only**, never sizes or spacing.
+Per the direction's "App shell" table and defaults:
 
-- **Fonts.** `--font-ui`: system sans stack (`-apple-system, 'Segoe
-  UI', Roboto, 'Helvetica Neue', sans-serif`). `--font-data`: the
-  existing SFMono/Consolas mono stack. Mono is **reserved for data
-  values** — entity/interface ids, counts, the zoom percentage, and
-  milestone ids in the time output. Every control label, button, tab,
-  panel header, tooltip, and summary uses `--font-ui`.
-- **Type scale.** `--text-xs: 11px`, `--text-sm: 12px`, `--text-md:
-  13px`, `--text-lg: 15px`. No chrome text below 11px — the current
-  8–10px mono micro-labels are eliminated. The uppercase micro-labels
-  (TIME, COMPARE, ASPECT, TAGS, Scope) become `--text-xs` muted
-  sentence-case labels in `--font-ui` (no letter-spacing tricks).
-- **Spacing / radius / elevation.** `--space-1..5`: 4/8/12/16/24 px.
-  `--radius-sm: 6px` (controls), `--radius-md: 10px` (cards).
-  `--elevation-1` (resting cards), `--elevation-2` (menus/popovers) as
-  the only two shadows. `--control-h: 30px` stays the single control
-  height.
-- **One card recipe.** The floating clusters, zoom rail, legend panel,
-  minimap, scope menu, and the side/tables panel chrome all share one
-  tokened surface treatment (background, border, `--radius-md`,
-  `--elevation-1`). The five current ad-hoc variants converge; nothing
-  invents its own border or shadow.
+- **Header** (compact): brand mark, model name (payload `source`), and
+  the global search trigger with `Cmd/Ctrl+K`. Nothing else — the theme
+  toggle, fullscreen, and copy-link controls leave the header.
+- **View dock** (left, open by default): the grouped diagram list
+  (Architecture → Canvas, the default; a Sequences group only when the
+  payload has sequences — none yet; Dependencies is not a list item)
+  followed by the view controls in the direction's order: Detail, Stage,
+  Relationship, Tags, Guided views (absent until D11), Copy view link.
+- **Info dock** (right, collapsed until selection): rehouses the
+  existing side panel as-is — Details/Connections tabs, aggregated-edge
+  member rows, the dependency action. Content redesign is pass 4; pass 1
+  changes the housing only: opens on selection, swaps content in place,
+  close deselects.
+- **Data dock** (bottom): rehouses the tables panel; spans the full
+  application width beneath View, Canvas, and Info; collapses (the
+  default) into a full-width bottom bar; tabs unchanged (Entities,
+  Interfaces, Milestones, Diff).
+- **Dock behavior**: each dock is resizable and collapsible (side docks
+  into attached rails, Data into the bar); double-clicking a resize
+  handle restores the default size; sizes and collapsed state persist in
+  localStorage (extend the existing `layoutPreferences` pattern), never
+  in fragments. At 1024 px width, opening Info collapses View to its
+  rail; closing Info restores it.
+- **Camera on dock changes**: keep the existing refit behavior for now —
+  the direction's preserve-zoom / minimal-shift contract is pass 2
+  (D13b). Do not add new camera logic in this pass.
 
-### Iconography
+### Controls conversion
 
-Replace the ASCII/unicode glyph buttons (⌘ ◐ ○ ↗ ⌁ ×, chevrons, + −)
-with inline SVG icons: 16×16 viewBox, 1.5px stroke, `currentColor`,
-defined as local React components — no icon font, no external assets
-(offline rule). Covered: brand mark, theme toggle, copy link,
-fullscreen enter/exit, close, panel collapse/expand chevrons, zoom in
-/ out, fit. The node drill magnifier and kind icons are **pass 3** —
-leave them. All aria-labels and tooltips stay exactly as they are.
+- **Detail dropdown** (System / Container / Child Containers /
+  Component) replacing the level control; `level` fragment tokens
+  unchanged.
+- **Stage dropdown** ("0 · Base", "1 · <name>", …) replacing both the
+  time slider and the Compare control. Selecting a stage updates canvas,
+  Data tables, counts, and Info together. Diff styling is driven by
+  (position, position − 1) — the separate compare mode and its fragment
+  keys are removed. The timeline picker stays, rendered only with
+  multiple timelines.
+- **Relationship dropdown** (Calls default / Data flow / Ownership)
+  replacing the aspect control; `aspect` fragment tokens unchanged.
+- **Tags**: the floating legend panel is removed; the tag lens moves
+  into View with the same multi-select OR, dim-never-hide semantics,
+  projected-array counts, Clear action, and `lens` fragment key.
+- **Scope**: the control is removed from the viewer (the `scopeAt`
+  projection function and its vectors stay — it is a generation-time
+  concern).
+- **Progressive disclosure**: Stage hides with zero milestones, Tags
+  with zero tags, the timeline picker with one timeline.
 
-### Dark theme contrast
+### Global search
 
-Both themes stay flat (no gradients). In dark, raise `--border` and
-the muted text tone until: card borders are visibly distinct from the
-canvas at rest, and every label meets ~4.5:1 against its surface.
-Interactive control outlines target ≥3:1 against their background.
-Light theme gets the same audit (the near-invisible label greys).
+`Cmd/Ctrl+K` opens a floating search box (temporary UI — it may float
+while active). It matches entities and interfaces by name and id among
+rows live at the current stage position, plus diagram names. Choosing a
+model item switches to Canvas when needed, centers and selects it, and
+opens Info; arrows + Enter navigate; Escape closes. Flat ranked list —
+no fuzzy-match dependency.
 
-### Footer and status
+### Map, Fit, and Zoom
 
-- Left: `N nodes · M connections · <scope summary>` in `--font-ui`
-  with mono only for the numbers.
-- Right: the current position in plain words (`Base · position 0` →
-  e.g. `Base` / `Complete Cutover`), no `ELK union layout · offline ·
-  program · N authored systems` debug string. The transient
-  `laying out…` state remains as a subtle indicator.
-- The `rendered-node-ids` span becomes visually hidden (clip-rect
-  pattern), keeping its data-testid and content for tests. The
-  node/connection counts keep their testids.
+One fixed row at the canvas lower left:
+`Map | Fit | − | percentage + semantic label | +`, replacing the
+bottom-right zoom rail. Map toggles the minimap, which attaches directly
+above the row and is closed by default. The semantic label is renamed
+Far / Read / Full (labels only — the thresholds are re-derived in
+pass 2). Controls never move as values change. The status bar is
+removed: a transient "Laying out" indicator appears beside the row while
+layout runs; the node/connection counts and `rendered-node-ids` span
+stay in the DOM visually hidden (clip-rect) with their data-testids.
 
-### Tables toggle
+### Removals
 
-The collapsed bottom panel presents as a slim full-width docked bar
-(ui font label + chevron icon), not a floating debug pill. Expanded
-behavior is untouched.
+Dark theme and its toggle (delete the dark variable set), application
+fullscreen (control, `f` key, Escape layer), the floating legend, the
+time slider, the Compare control, the scope control, and the header
+copy-link (it moves to View). Escape order becomes: topmost temporary
+UI (menu / search) first, then clear selection and close Info. Escape
+never collapses docks.
+
+### Fragments
+
+Removed keys: `scope`, `hops`, `compare`, `compare-at`, `theme`
+(removed/unknown keys are ignored with the existing console
+diagnostic). New key: `select` = `<kind>:<id>` — the current selection,
+written on selection change (replaceState, not push), restored on load
+after validation against the payload (invalid → ignored). All other
+keys keep their wave-2 semantics.
+
+### Visual foundation (carried from the superseded contract, light only)
+
+- Tokens on `:root`: fonts, type scale (no chrome text below 11 px),
+  spacing 4/8/12/16/24 px, radius 6/10 px, two elevations, 30 px
+  control height. Light theme only — no dark redefinitions.
+- Sans-for-UI / mono-for-data split; the uppercase mono micro-labels
+  become sentence-case sans labels.
+- One shared surface recipe (background, border, radius, elevation) for
+  docks, rails, the lower-left cluster, minimap, and menus.
+- Inline-SVG chrome icons (16×16 viewBox, 1.5 px stroke,
+  `currentColor`, local components — no icon font, no external assets).
+  Node kind icons and the drill magnifier are untouched (pass 3 owns
+  cards).
+- Contrast audit: labels ~4.5:1 against their surface, interactive
+  outlines ≥3:1.
 
 ### Verification (gate inputs)
 
-Presentation-only: `npm test` passes **unchanged** (if a selector
-broke, the pass overstepped), plus the rule-9 browser pass in both
-themes and at 500px — clean console, zero external requests, and a
-before/after screenshot pair at the D13a gate for the architect + user
-eyeball.
+- Tests: update ONLY tests that reference removed or moved chrome
+  (theme, fullscreen, slider, compare, scope, legend); the
+  projection/vector suites pass untouched. New tests, exactly four:
+  (1) `select` fragment round-trip + invalid-id ignore; (2) removed
+  fragment keys ignored with a diagnostic; (3) the Stage dropdown
+  renders one entry per position and drives the same projected state as
+  the old slider; (4) dock size/collapse localStorage round-trip.
+- Rule-9 browser pass at 1440 × 900 AND 1024 × 720, light theme, from
+  `file://`: clean console, zero external requests; docks resize,
+  collapse, and restore; opening Info at 1024 collapses View; the
+  selected item stays visible when Info opens. Screenshots for the
+  gate: default view before/after at 1440 × 900, plus 1024 × 720 with
+  Info open.
+
+## Polish contract — pass 2: canvas composition (D13b)
+
+Normative for D13b (authored 2026-08-28, after the D13a gate). This pass
+implements the layout / fit / camera portion of
+[ui-polish-direction.md](ui-polish-direction.md) on top of the D13a
+docked shell. It owns card *geometry*, layout tuning, framing, semantic
+thresholds, and every camera movement. It does NOT own card anatomy,
+edge rendering, or selection emphasis (pass 3), nor dock content
+(pass 4). Closes or discharges ui-polish issues #8, #9, #10, #11, #12,
+#15 (see gate inputs).
+
+### Card geometry (sizing only — anatomy is pass 3)
+
+- Replace the fixed 250 × 168 card with per-Detail-level size tiers:
+  uniform card **width** per level (starting values: System 280 px,
+  Container 260 px, Child Containers / Component 240 px — tune against
+  the acceptance checks), **height from content**. Uniform width within
+  a level keeps ELK's layered ranks clean; content-driven height kills
+  the ~80%-empty box.
+- Names wrap to at most two lines within the tier width; a name may
+  truncate only after two full lines (#10 — "a name never truncates
+  while its box has empty rows" becomes structural: the box has no
+  empty rows). The current card content (kind label, name, facts at
+  FULL) is otherwise unchanged.
+- Sizing is a pure function `cardSize(node, level, measure)` in a new
+  module, where `measure(text, font) → px` is injected: production
+  passes a shared offscreen-canvas measurer, tests pass a fixed-width
+  stub so results are deterministic. `layout.ts` consumes per-node
+  sizes; `NODE_WIDTH`/`NODE_HEIGHT` remain only as fallbacks.
+
+### Layout tuning (ELK)
+
+- Keep `elk.algorithm: layered`, `INCLUDE_CHILDREN`, and the fixed
+  random seed. Add an aspect-ratio hint toward the visible canvas
+  (`elk.aspectRatio` ≈ visible width / height, clamped to [1.2, 2.0]).
+- Tighten spacing (starting values, tune to acceptance):
+  `elk.spacing.nodeNode` 72 → 40,
+  `elk.layered.spacing.nodeNodeBetweenLayers` 120 → 72.
+- Boundary padding becomes proportional: top = boundary header height
+  + 12 px; sides/bottom 20 px; nested boundaries do not multiply the
+  top padding (only the outermost header needs the full clearance
+  beyond its own).
+- **Grid packing for sparse drill sets:** when the union graph for the
+  current layout key has zero edges, skip ELK and pack leaf cards into
+  a near-square grid (`ceil(sqrt(n))` columns, tier spacing), keeping
+  boundary nesting. Deterministic order: existing node order.
+- Layout input stays a function of `(timeline, level, drill)` only —
+  Stage, Relationship, and tag changes must not recompute layout or
+  move boxes (the existing `layoutKey` contract, now asserted by a
+  test).
+
+### Initial framing and Fit
+
+- Fit rect is the *visible* canvas — the flex cell between the docks
+  (#8, #9). The D13a shell already reserves dock space, so React
+  Flow's `fitView` rect is correct by construction; this pass asserts
+  it and removes any use of the full window.
+- **Cold load / projection change:** compute the whole-graph fit zoom.
+  If it lands at or above the Read threshold, fit the whole graph.
+  Otherwise cap zoom at the Read threshold and center the graph —
+  offscreen context is Map's job (direction "Initial framing").
+- **The explicit Fit button** always fits the whole graph, even below
+  Read (Far is acceptable on user request).
+- The framing decision is a pure function
+  (`initialViewport(graphBounds, visibleRect, thresholds)`) with tests.
+
+### Semantic-zoom thresholds (#11)
+
+Re-derive Far / Read / Full from the real card scale: Read is the zoom
+where a card's name line renders at ≥ 11 screen px; Full is where body
+text renders at ≥ 11 screen px. Derive the two constants from the
+type-scale tokens, document the derivation in `zoom.ts`, and update the
+`readingDepth` boundaries. Labels stay Far / Read / Full. The MAP→READ
+mismatch (evidence baseline) must be gone: at cold-load framing of
+acme's System level the view is at Read with readable names.
+
+### Camera changes (replaces the D13a temporary refit)
+
+One pure helper `shiftViewport(viewport, visibleRect, focusRect) →
+viewport` computes the minimal pan (zoom unchanged) that brings the
+focus rect inside the visible rect; returns the viewport unchanged when
+it already is. Apply it to:
+
+- **Dock open / close / resize** (including Data): preserve zoom, shift
+  only enough to keep the focus visible — never a full Fit. Focus =
+  the current selection's node (plus its direct neighbors when they fit),
+  else the viewport center. Remove the D13a `fitView`-on-dock-change
+  effect.
+- **Selection / Info opening** (#12): when Info opens (canvas click,
+  Data row, search, fragment restore), keep zoom and pan minimally so
+  the selected node stays inside the visible canvas; if the selection's
+  one-hop neighborhood cannot fit at the current zoom, fit to that
+  neighborhood instead (the only sanctioned zoom change).
+- **Viewport resize** (window or 1024 transition): same minimal-shift
+  rule.
+
+Chrome persistence (#15): no interaction may remove persistent chrome —
+already structural after D13a (the vanishing time pill is gone); the
+gate walkthrough re-checks it.
+
+### Map
+
+The minimap keeps its D13a attachment above the lower-left row and must
+render the content-sized cards correctly (React Flow handles this; the
+gate eyeballs it). No behavior change.
+
+### Verification (gate inputs)
+
+- Tests — exactly six new cases (plus mechanical updates to existing
+  tests that assert the old fixed card size or thresholds):
+  (1) `cardSize`: a long name wraps to two lines and grows the box; no
+  truncation while spare height remains (stub measurer);
+  (2) `initialViewport`: a small graph fits whole at ≥ Read; a large
+  graph caps at Read, centered;
+  (3) `shiftViewport`: focus inside → unchanged; focus outside →
+  minimal pan, zoom unchanged;
+  (4) layout stability: position/aspect/lens changes leave the layout
+  key and ELK input unchanged;
+  (5) grid packing: an edgeless drill set packs into a non-overlapping
+  near-square grid;
+  (6) `readingDepth`: boundaries equal the derived constants.
+  Projection vectors and all existing suites stay green.
+- Rule-9 browser pass at 1440 × 900 AND 1024 × 720, light, `file://`:
+  clean console, zero external requests; cold load centered with
+  readable names (no dead-space fit — #8); opening/closing/resizing
+  Data and Info preserves zoom and keeps the selection visible (#9,
+  #12); Stage and Relationship switches move nothing; Container level
+  readable at its default framing (#11); an edgeless drill set shows a
+  grid. Screenshots for the gate: cold load at 1440 × 900 (before and
+  after), cold load at 1024 × 720, Info open with a selection visible,
+  Container level default framing.
 
 ## Exports
 
@@ -682,6 +948,12 @@ boundary.
   *third-party* renderers; the adopted design is a custom layout + React
   renderer sharing this app's entity boxes, panels, and dimming rules.
 - Saved Report Definition files, Confluence embedding, PDF.
+- The confirmed direction's first-pass cuts (2026-08-27): dark theme,
+  application fullscreen, Share, a Changes diagram view or Info tab,
+  saved report creation, manual card positioning, viewer scope/hop
+  controls, Technology/Status lenses, entity icons/logos, floating
+  panels, viewports below 1024 × 720 — authoritative list in
+  [ui-polish-direction.md](ui-polish-direction.md) "Deferred or removed".
 - The v2 wip interaction catalog (`plans/arch/archive/v2-wip/interactions.md`, ~230
   requirements) was mined 2026-08-24: the useful clauses live in "Wave-2 UI
   contract — Interaction baseline" above and the doc is marked superseded.

@@ -30,7 +30,8 @@ lands; a fresh session should be able to resume from this file alone.
 | Fixture source of record | `plans/arch/wip/acme-arch-v2.xlsx` (dumped to `plans/arch/arch-v3/fixture-src/`) |
 | Open issues (wave 3) | `plans/arch/arch-v3/issues/` — p3-* files + index; resolved p1/p2 files in `issues/resolved/`; Archify/IcePanel reference screenshots stay in `issues/` (cited by the 3P pass specs) |
 | UI research (IcePanel/Archify) | `plans/arch/arch-v3/research/ui/ui-research-findings.md` + evidence captures |
-| UI polish issue list (3P input) | `plans/arch/arch-v3/ui-polish.md` — 24 itemized issues from the 2026-08-25 Playwright walkthrough, tagged D13a–D13d; the 3P pass specs must close or waive every tagged item |
+| Confirmed UI direction (3P/3S decision source) | `plans/arch/arch-v3/ui-polish-direction.md` — confirmed 2026-08-27; authoritative for all UI/interaction decisions, supersedes conflicting guidance in ui-polish.md and the report.md wave-2 contract. The `designs/` artboard directory was removed the same day (decisions captured in the direction; files in git history) |
+| UI polish issue list (3P input) | `plans/arch/arch-v3/ui-polish.md` — 24 itemized issues from the 2026-08-25 Playwright walkthrough, tagged D13a–D13d; the 3P pass specs must close or waive every tagged item (expectations superseded where they conflict with ui-polish-direction.md) |
 | Progress-log archive | `plans/arch/arch-v3/log-archive.md` |
 | Archived history (reference only) | `plans/arch/archive/` — `arch-v2/` design history incl. `grill/`; `v2-wip/` (v2-era design/ideas/requirements/mocks + superseded interactions.md, mined into report.md "Wave-2 UI contract") |
 | v2 donor code | HARVEST COMPLETE — branch `feature/arch-v2` on origin (head `e242fbb5`); worktree removed 2026-08-25. The dead patch/replay list ("must NOT return") lives in delivery.md |
@@ -189,11 +190,19 @@ independently gateable, ordered so later passes build on earlier ones.
 **No new features land during 3P**; D11, D12 (both halves — the issued
 D12a prompt is ON HOLD), and D8 wait until the 3P exit gate. Passes are
 executor chunks `D13a–D13d`; the architect authors each pass's
-normative spec (folded into report.md as amendments to the Wave-2 UI
-contract) plus the prompt, with budgets agreed per pass. Design
-references: the measured Archify/IcePanel values and binding lists in
-`research/ui/ui-research-findings.md` + the evidence captures, and the
-reference screenshots in `issues/`.
+normative spec plus the prompt, with budgets agreed per pass.
+
+**Direction update (2026-08-27):** `ui-polish-direction.md` is confirmed
+and is the decision source for every pass spec; report.md and sequence.md
+are reconciled to it (Option E docked shell — View/Info/Data docks,
+compact header, lower-left Map/Fit/Zoom, Stage/Relationship dropdowns,
+splines, one-hop selection, light theme, 1024 × 720 floor). The
+previously authored D13a spec and prompt were written against the wave-2
+chrome and were **superseded pre-run**; each pass spec is re-authored from
+the direction before its prompt is issued (D13a re-authored the same day
+— READY below) — contract reconciliation precedes all frontend work. Secondary design references: the measured
+Archify/IcePanel values in `research/ui/ui-research-findings.md` + the
+evidence captures, and the reference screenshots in `issues/`.
 
 Evidence baseline (architect critique, 2026-08-25, from the acme
 report): default fit strands the graph in a corner of a mostly-empty
@@ -219,79 +228,86 @@ bullets did not cover; those are now folded into passes 2 and 4
 below. Each pass spec must close or explicitly waive every issue
 tagged to it; the exit gate checks the list is empty.
 
-- [ ] **Pass 1 — visual foundation: tokens, type, chrome.** `→ D13a`
-      (spec: report.md "Polish contract — pass 1"; prompt READY in
-      delegation.md; budget 700 changed source lines, proposed
-      2026-08-25 — confirm before running.)
-      Design-token pass (spacing / radius / shadow / type scale), one
-      shared card style for clusters, panels, rail, and minimap; mono
-      reserved for data (ids, counts) with UI labels in a readable
-      sans scale; real inline-SVG icon set replacing ASCII glyphs;
-      dark-theme contrast pass; footer humanised (node-id dump hidden
-      from view, kept for tests); tables toggle styled as a proper
-      docked-bar affordance. CSS-dominant, low risk — do first.
-- [ ] **Pass 2 — canvas composition: layout, fit, density.** `→ D13b`
-      Per-depth/level node sizing (names never truncate before the box
-      does); ELK tuning — tighter spacing, aspect-ratio hint, edge
-      routing that kills the giant rectangular detours and interior
-      crossings, proportional boundary padding (compact single-child
-      boundaries); fit that accounts for open overlays (legend / side
-      panel / cluster insets) and lands small graphs at READ depth;
-      reading-depth thresholds re-derived from real node scale; grid
-      packing for sparse/edgeless drill sets; minimap repositioned
-      clear of the zoom rail and legend. Behavior fixes folded in from
-      ui-polish.md (#12, #14a, #15, #17, and the resize/overlay
-      triggers of #9): selection pans/zooms into the visible canvas
-      instead of hiding behind the details panel; legend collapse
-      state never changes except by user action; the time toolbar
-      never disappears as a side effect of select/close; time-pill
-      controls sit in fixed-width slots so nothing jumps while
-      scrubbing; re-fit fires on viewport resize and panel
-      open/close. These are behavior changes — they get tests, unlike
-      the presentation work. Highest-risk pass; existing projection
-      vectors and tests must stay green.
-- [ ] **Pass 3 — graph elements: nodes, edges, boundaries.** `→ D13c`
-      Entity-box redesign per reading depth (MAP compact chip, READ
-      card, FULL facts) with kind accenting and person-styled users;
-      drill affordance with a real hit target; edge contrast pass —
-      zoom-compensated stroke, visible arrowheads, label pills scoped
-      to FULL/selection; boundaries visually distinct from edge routes
-      (fill tint, label placement, nested shading); dimming tiers
-      re-tuned against the Archify reference values. From ui-polish.md:
-      interface stubs get a glyph/label and visually attach to their
-      node or don't render at that level (#6); compare-mode styling is
-      an increment on legible base edges, never the only visible ink
-      (#7); the Call-direction aspect must produce a visibly different
-      picture (#2).
-- [ ] **Pass 4 — panels and overlays: legend, side panel, tables,
-      empty states.** `→ D13d` Legend becomes meaningful: per-tag
-      deterministic categorical colors, count-descending sort,
-      singleton tags grouped under an expandable rare section, compact
-      rows, height respecting rail/minimap; side-panel hierarchy
-      (title block, kv grid, directional connection chips); tables
-      toolbar/density polish; designed empty and failure states (drill
-      with no connections, layout failure, laying-out skeleton); final
-      motion/consistency sweep with a reduced-motion audit. From
-      ui-polish.md: Escape closes the topmost overlay / clears
-      selection (#13); the selection-scoped "Dependencies" control
-      moves out of the level-tabs bar into the side panel or a
-      selection toolbar (#16); connection details show endpoints
-      (linked), direction, interface, aspect values, and lifecycle
-      interval (#21) — **architect precheck before authoring this
-      spec:** confirm the payload already carries that edge data; if
-      it needs plumbing, that part escalates to the user at the gate
-      rather than riding a polish pass; tables columns auto-size,
-      all-empty columns collapse, headers never truncate (#22).
+- [x] **Pass 1 — app shell.** `→ D13a` (DONE, gate PASSED 2026-08-28;
+      spec: report.md "Polish contract — pass 1: app shell"; 974/1,800
+      changed source lines.)
+      The Option E docked shell per the direction: compact
+      header (identity + `Cmd/Ctrl+K` global search only), View dock
+      left (grouped diagram list + Detail / Stage / Relationship /
+      Tags controls + Copy view link), adaptive Info dock right,
+      full-width Data dock bottom, dock resize / collapse / rail /
+      restore behavior, fixed lower-left `Map | Fit | Zoom` cluster;
+      removal of the status bar, floating legend, theme toggle,
+      fullscreen, and Share. Light-only design tokens, sans-for-UI /
+      mono-for-data typography, inline-SVG icons, contrast audit.
+      1024 × 720 floor with View auto-collapse when Info opens at
+      1024 px. Closes the shell-superseded issues (#14, #16 chrome,
+      #18, #19, #23; #24 deferred with dark theme).
+- [ ] **Pass 2 — canvas composition: layout, fit, camera.** `→ D13b`
+      (spec: report.md "Polish contract — pass 2: canvas composition",
+      authored 2026-08-28; prompt READY in delegation.md; budget 1,400
+      changed source lines proposed — confirm before running.)
+      Per-level content-sized cards (names never truncate before the
+      box does — #10); ELK tuning — tighter spacing, aspect-ratio
+      hint, proportional boundary padding; fit against the *visible*
+      canvas between the docks (#8, #9); initial framing per the
+      direction (whole graph only when it stays at Read, else cap at
+      Read and center); semantic-zoom thresholds (Far / Read / Full)
+      re-derived from real node scale (#11); dock open/close/resize
+      preserves zoom and shifts the camera only enough to keep the
+      focus visible — never a full Fit; layout stays fixed across
+      Stage, Relationship, and tag changes; selection stays visible
+      when Info opens (#12, #15 by construction — the vanishing
+      chrome no longer exists); grid packing for sparse/edgeless
+      drill sets; Map minimap attaches above the lower-left row.
+      Behavior changes get tests; existing projection vectors and
+      tests must stay green. Highest-risk pass.
+- [ ] **Pass 3 — graph elements: cards, splines, selection.** `→ D13c`
+      Larger text-led cards per the direction's card anatomy — one
+      rounded shape for every kind, no entity icons or logos, kind
+      and fact pills, two-line name wrap; persistent drill affordance
+      with a real hit target; **splines** replace orthogonal routing
+      (kills #4/#5's rectangular detours and interior crossings) with
+      distributed anchors, aggregation count chips, visible arrowheads
+      and real contrast (#1, #2), label pills at Full and on
+      selection/hover (#3); one-hop IcePanel selection emphasis
+      (animated outgoing / static incoming in one accent, brightened
+      neighbors, dimmed-but-readable unrelated, reduced-motion static
+      fallback); containment boundaries as subtle tints with clear
+      headers; interfaces as attached labeled ports (#6); stage-diff
+      styling as an increment on legible base splines (#7);
+      Relationship switch visibly changes the picture without moving
+      boxes.
+- [ ] **Pass 4 — View / Info / Data content and states.** `→ D13d`
+      View control stack per the direction (controls with no
+      meaningful choice hide; guided-story controls at the top of
+      View); adaptive Info — Details / Connections tabs, stage changes
+      as a concise Details section, Attachments only when files
+      exist, internal Back, kv grid that never overlaps with one
+      label style (#20), "View dependencies" entry (resolves #16
+      without a floating toolbar); connection details show endpoints
+      (linked), direction, interface, relationship values, and
+      lifecycle interval (#21) — **architect precheck before
+      authoring this spec:** confirm the payload already carries that
+      edge data; if it needs plumbing, that part escalates to the
+      user at the gate rather than riding a polish pass; Data tables
+      auto-size populated columns, collapse all-empty columns, never
+      truncate headers (#22), sync selection with the canvas both
+      ways, offer Show on Canvas; the read-only Payload viewer;
+      Escape order per the direction (#13); designed empty and
+      failure states; final motion/consistency sweep with a
+      reduced-motion audit.
 - [ ] **Exit gate (architect + user):** the phase-3 gate question —
-      open acme's report cold and the story reads without explanation,
-      but now also *looks* deliberate: no dead-space fit, no phantom
-      rectangles, readable nodes at default zoom, meaningful legend,
-      coherent chrome in both themes. Browser pass stays console-clean
-      and offline. Additionally: every ui-polish.md issue is closed or
-      carries an explicit waiver note in that file — rerun the
-      test-ui.md walkthrough (fresh load, select node + edge, collapse
-      legend, scrub time, compare on, tables open, both themes,
-      1024×720) and confirm none of the six behavior defects
+      open acme's report cold and the story reads without
+      explanation, but now also *looks* deliberate: no dead-space
+      fit, no phantom rectangles, readable cards at initial framing,
+      coherent docked chrome. Run the direction's "Acceptance checks"
+      at 1440 × 900 and 1024 × 720 under `file://` (light theme) —
+      console-clean, zero external requests. Additionally: every
+      ui-polish.md issue is closed, superseded, or carries an
+      explicit waiver note in that file — rerun the test-ui.md
+      walkthrough (fresh load, select card + spline, Stage switch,
+      Data open, 1024 × 720) and confirm none of the behavior defects
       reproduce. Only after this gate do D11/D12b/D8 resume (and the
       held D12a run).
 
@@ -306,10 +322,11 @@ rationale in sequence.md). Budgets are re-agreed with the user when each
 prompt is authored.
 
 - [x] **Architect:** sequence.md v1 — source-doc format, DSL, compilation
-      + payload shape, renderer decision, SEQ-* interaction contract
-      (playback, sticky headers, C4 group collapse, focus, hide/show,
-      scenarios, navigator, minimap, search, sync/async), verification
-      plan. (2026-08-25)
+      + payload shape, renderer decision, SEQ-* interaction contract,
+      verification plan. (2026-08-25; interaction contract revised
+      2026-08-27 to the confirmed direction — controls in View, Scenario
+      dropdown, Map overview; C4 group collapse and the floating
+      navigator removed)
 - [x] **Architect:** parser-vector fixture
       (`tests/unit/tools/fixtures/arch/sequence/`) — the D12a control
       mechanism. (2026-08-25; D12a prompt issued the same day)
@@ -332,12 +349,13 @@ prompt is authored.
 - [ ] Frontend: `seqlayout.ts`, SVG layer, entity-box header row, SEQ-*
       interactions, fragment keys. `→ D12b` (after the phase-3 re-gate
       AND the Phase 3P exit gate; ∥ D11/D8)
-- [ ] **Gate (architect + user):** open an acme flow, play it through,
-      collapse a system band, focus a participant, hide one, switch
-      scenario — the story reads without explanation; sticky headers hold;
-      open a message's linked request/response file and it renders
-      syntax-highlighted; console clean; zero external requests from
-      `file://`.
+- [ ] **Gate (architect + user):** open an acme flow from View's
+      Sequences group, play it through, switch scenario via the
+      dropdown, focus a participant, hide one, open the Map vertical
+      overview — the story reads without explanation; sticky headers
+      hold; open a message's linked request/response file in Data's
+      Payload tab and it renders syntax-highlighted; console clean;
+      zero external requests from `file://`.
 
 ## Phase 4 — Polish and second adapters (per-item budgets)
 
@@ -381,6 +399,114 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-28** — D13a architect gate PASSED; D13b authored; tree
+  committed. Gate evidence, independently re-verified: 22 frontend tests
+  (including exactly the four prescribed D13a cases), `just lint`, 77
+  arch py tests, `just build-arch-report` reproduces the tree's
+  template diff (38/38 lines), budget confirmed at 974/1,800 changed
+  source lines (817 tracked + 157 new components). Code review of
+  view.ts (retired keys + `select` validation, replaceState writes),
+  layoutPreferences (schema v2, dock limits), App.tsx (Escape order
+  search → menus → selection+Info, revealInfo/closeInfo, 1024 transient
+  View collapse, hidden testid spans), ViewDock/GlobalSearch/Icons
+  conforms to the pass-1 contract; dark theme fully absent from
+  styles.css; screenshots at 1440×900 and 1024×720 confirm the docked
+  shell with the selection visible beside the open Info dock. Residual
+  ugliness (tiny truncating cards, orthogonal detours, snake_case Info
+  labels) is pass 2/3/4 scope by design. ui-polish.md annotated: #14,
+  #18, #19, #23 CLOSED, #16 chrome-half CLOSED, #24 WAIVED (dark theme
+  deferral); #15/#17 stay for the D13b-gate walkthrough re-check. D13b
+  authored the same day: normative spec "Polish contract — pass 2:
+  canvas composition (D13b)" in report.md (card geometry via
+  injectable-measurer cardSize, ELK tuning + grid packing for edgeless
+  drill sets, initialViewport framing capped at Read, thresholds
+  re-derived from the type scale, shiftViewport minimal-pan camera
+  replacing the D13a refit effect, six prescribed tests) and the D13b
+  prompt READY in delegation.md with a proposed budget of 1,400 changed
+  source lines (confirm before running). Next action: user confirms the
+  D13b budget and passes the delegation.md prompt to the executor; the
+  architect gates the result, then authors D13c.
+
+- **2026-08-27** — D13a rule-9 browser gate PASSED on retry. OneTool
+  Playwright verified the regenerated `file://` acme report at 1440 x 900
+  and 1024 x 720 in light theme: clean console in every pass; no external
+  requests (the report file itself was the sole network entry); View and Data
+  collapse/open, pointer resize, localStorage persistence, and double-click
+  default restore all worked; Map opened and closed its attached minimap;
+  Stage changed the fragment and projected node count; global search ranked
+  and selected a live row, restored focus to its trigger, and obeyed the
+  temporary-UI-first Escape order. At 1024, selecting Legacy Commerce wrote
+  `select=systems:legacy-commerce`, opened Info, transiently collapsed View,
+  and left the selected node fully inside the measured Canvas rectangle;
+  closing Info cleared selection and restored View. Screenshots:
+  `wip/test-results/d13a/1440-before.png` (baseline regenerated from
+  c37e3d05), `1440-after.png`, and `1024-info-open.png`; visual inspection
+  found no D13a shell defect (card density remains pass 2). Playwright closed.
+  Open questions: none. D13a executor definition of done is complete; next
+  action: architect gate review, then author D13b.
+
+- **2026-08-27** — D13a app-shell implementation complete; browser gate
+  blocked by a shared Playwright profile lock. The report now has the compact
+  identity/search header, persisted View/Info/Data docks, responsive transient
+  View collapse at 1024 px, dropdown-based Detail/Stage/Relationship controls,
+  the tags lens and Copy view link in View, ranked global search, the lower-left
+  Map/Fit/zoom row, light-only tokens and inline SVG chrome icons. Removed
+  viewer fragments diagnose and ignore old keys; validated row selections use
+  `select`. Source: 974 changed TS/TSX/CSS lines / 1,800 budget (additions plus
+  deletions, tests excluded). Tests: exactly 4 prescribed D13a cases represented
+  within 22 passing frontend tests; TypeScript and single-file build clean;
+  `just lint` clean; smoke 27 passed / 3,208 deselected; arch Python 77 passed /
+  540 deselected. Bundle rebuilt and acme report regenerated. Rule-9 evidence is
+  incomplete: OneTool's Playwright proxy reports its shared Chrome profile is
+  already in use by an older MCP process, including after the one allowed proxy
+  restart, so the 1440 x 900 and 1024 x 720 interaction pass and required
+  screenshots were not captured. Assumptions: the request to execute confirms
+  the 1,800-line budget; the final no-commit instruction overrides any earlier
+  commit wording; rule 8 is the explicit exception allowing this entry in the
+  otherwise read-only design docs; dock defaults are View 280 px, Info 360 px,
+  Data 280 px with existing practical bounds; search ranks exact, prefix, then
+  substring matches case-insensitively; "at 1024 px" means 1024 px and below;
+  responsive View collapse is transient so closing Info restores the persisted
+  user state; the `select=<kind>:<id>` grammar covers payload-backed entity and
+  interface rows, while aggregated spline selection stays local because it has
+  no payload row id; searched interfaces center their rendered aggregate
+  endpoints. Open questions: none. Blocker: release the shared Playwright
+  browser profile, then run the rule-9 gate and capture the three screenshots
+  before marking pass 1 complete.
+
+- **2026-08-27** — UI direction reconciled into the contracts
+  (architect). `ui-polish-direction.md` (confirmed 2026-08-27) is now
+  the decision source for the report/sequence UI; registered in Ground
+  truth. report.md: new "Confirmed UI direction" section; "The time
+  slider is the hero" replaced by the Stage-dropdown section; fragment
+  table loses `scope`/`hops`, `compare`, `theme` and gains `select`;
+  the Wave-2 UI contract is banner-superseded where it conflicts
+  (zoom rail placement, fullscreen, dark theme, floating legend,
+  500 px target); the D13a "Polish contract — pass 1" is marked
+  superseded pre-run. sequence.md: SEQ-* contract rewritten to the
+  direction — controls move into View (Scenario dropdown, compact
+  playback, local search, participant eye-hide), Map opens a vertical
+  overview, Info/Data own message details and payload files; SEQ-GROUP
+  (C4 bands, group collapse, merged lifelines, retargeting, self-loop
+  aggregation), SEQ-NAV (floating navigator), and the `collapse`
+  fragment key are removed; SEQ-PART records the containment-as-
+  header-context rule. plan.md/delivery.md: 3P passes re-scoped to
+  implement the direction (pass 1 = app shell; D13a spec/prompt
+  superseded — re-author before issuing), the 500 px target replaced
+  by the 1024 × 720 floor, 3S gate updated. delegation.md: D13a
+  status → SUPERSEDED, prompt body collapsed. ui-polish.md: direction
+  note added; #14/#16/#18/#24 carry supersession notes. designs/:
+  REMOVED entirely (user-directed, same day) — the direction doc is
+  the sole design source; all artboards, canvas.json, and the
+  published report-ui-polish.html bundle remain in git history
+  (d7db02a0). D13a re-authored the same day: normative spec "Polish
+  contract — pass 1: app shell (D13a)" in report.md, prompt READY in
+  delegation.md with a proposed budget of 1,800 changed source lines
+  (confirm before running). Next action: user confirms the D13a
+  budget and passes the delegation.md prompt to the executor; the
+  architect gates the result with screenshots at 1440×900 and
+  1024×720, then authors D13b.
 
 - **2026-08-26** — New capability registered (user request): sequence
   messages and model interfaces can link to message files — sample
@@ -491,86 +617,5 @@ inclusive `end_in` (Q7, 2026-08-24).
   (fresh tab: zero console messages, zero external requests; note
   file:// caches aggressively — hard-reload when eyeballing).
   Next action: user half of the phase-3 re-gate.
-
-- **2026-08-25** — Architect half of the phase-3 re-gate run on the
-  uncommitted D10a+D10b tree. Re-verified independently: 21 frontend
-  tests, `just lint`, 77 arch py tests, `just build-arch-report`
-  (rebuild reproduces the tree's template byte-diff), acme report
-  regenerated. Code review of the semantic files (projection, layout,
-  view, types, zoom) conforms to the Wave-2 UI contract. Browser
-  spot-check on the acme report over file://: console clean and zero
-  external requests across every interaction; four C4 levels with
-  contract labels; nested boundary boxes with the
-  system-as-edge-endpoint leaf carve-out working; drill with
-  breadcrumb/Up/Back, `drill` fragment, history push, scope disabled;
-  docked side panel Details/Connections with member rows and Open
-  dependency view; deps view (columns, totals, picker, `deps` fragment,
-  history); legend lens with `lens` fragment, Clear, dim-not-hide;
-  dark theme flat; retired-at-position selection shows empty live
-  connections correctly. Two findings for the joint gate: (1) MEDIUM —
-  `drillAt` drops connections whose inside endpoint is the drilled
-  entity itself (`directChildRepresentative` returns null for the
-  root); acme authors every interface on containers, so drilling any
-  leaf-childful container (e.g. Commerce Monolith) shows its children
-  with 0 connections in a single column — the withBoundaries leaf
-  carve-out should extend to drillAt. (2) MINOR — with the side panel
-  open at ~1100 px the floating legend panel overlaps the projection
-  cluster's Dependencies/Reset view buttons (two floating overlays
-  collide as the canvas shrinks). Also worth a reading check at the
-  gate: legend counts include rolled-up member tags, so component tags
-  appear at System level. Next action: user half of the gate; decide
-  whether findings 1–2 are fixed pre- or post-commit.
-
-- **2026-08-25** — D10b complete and left uncommitted for gate review. The
-  report now has the four-level C4 projection, hierarchical ELK containment
-  boundaries, direct-child drill with history and breadcrumbs, five-part
-  depth-gated entity boxes, distributed edge anchors and selection flow,
-  a persisted tag-lens legend, and the dependency focus view. Source: 639
-  changed TS/TSX lines / 1,900 budget (additions + deletions, tests excluded,
-  measured above the 785-line D10a baseline). Tests: 3 added; `npm test` 21
-  passed, `just lint` clean, `uv run pytest tests/unit/tools -k arch` 77 passed
-  / 540 deselected, and `just build-arch-report` clean. The CLI-regenerated
-  acme report passed the rule-9 `file://` browser gate: all four C4 levels and
-  deeper-level boundaries, drill / Up / Back, outgoing animation and static
-  incoming emphasis, reduced-motion fallback, tag OR lens without hiding,
-  dependency columns / totals / picker, FULL-depth facts and edge labels,
-  500 px responsive controls, clean console, and zero external requests.
-  Assumptions: D10a's complete, gate-verified worktree state satisfies D10b's
-  "committed" prerequisite because D10a was deliberately left uncommitted for
-  the same review; the user's final no-commit instruction overrides the
-  introductory request for a commit; users remain plain nodes when connected
-  across a drill boundary because the C4 contract keeps users plain at every
-  level, while non-user external endpoints become system boundary stubs; a
-  childful ancestor that is itself a canonical edge endpoint keeps a distinct
-  leaf endpoint nested inside its boundary so the boundary box never becomes
-  an edge endpoint; adding the legend to layout schema v1 intentionally makes
-  older stored layouts without that required panel fail validation and reset.
-  Open questions: none. Next action: phase-3 re-gate by architect and user.
-
-- **2026-08-25** — D10a complete and left uncommitted for gate review. The
-  report now has one-line chrome, canvas control clusters, a fit/zoom/depth/
-  fullscreen rail, plain light/dark backgrounds, a docked Details/Connections
-  panel with aggregated-edge members, reusable persisted resize/collapse/reset
-  panels, and the v2-parity AG Grid table controls. MAP/PATH/LENS and the
-  `mode` fragment key are removed; fragment restoration filters unknown ids
-  through console diagnostics and keeps local layout/camera values out of the
-  URL. Source: 785 changed TS/TSX lines / 1,400 budget (additions + deletions,
-  tests excluded). Tests: 4 added; `npm test` 18 passed, `just lint` clean,
-  `uv run pytest tests/unit/tools -k arch` 77 passed / 540 deselected, and
-  `just build-arch-report` clean. The CLI-regenerated acme report passed the
-  rule-9 `file://` browser check: compact and 500 px layouts, panel resize /
-  collapse / double-click reset persistence, fullscreen and Escape ordering,
-  quick filter / multi-sort / hide / pin persistence, both plain themes,
-  aggregated-edge selection, clean console, and no external requests.
-  Assumptions: the explicit no-commit instruction and rule 8 override the
-  prompt's introductory mention of a commit; AG Grid Community's custom
-  kind/status checkbox filters satisfy the set-filter requirement without an
-  Enterprise runtime dependency; the existing three-level roll-up contract
-  governs the D10a C4 control despite `Views` reserving `top-containers`; the
-  bottom panel starts collapsed, preserving the prior closed-table state;
-  invalid stored column ids reject that table layout as a whole and restore
-  defaults; double-click resets size without changing collapse state; the
-  disabled dependency action uses an `aria-describedby` reason until D10b.
-  Open questions: none. Next action: architect gate review, then D10b.
 
 - **(older entries)** — see [log-archive.md](log-archive.md).

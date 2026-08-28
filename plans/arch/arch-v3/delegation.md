@@ -19,8 +19,9 @@ below is the template it will be issued from.
 | D1–D7 | Phases 0–3 build chunks | DONE (2026-08-23/24) | — |
 | D9a, D9b | Phase 3R wave 1: schema/model + Excel/payload rework | DONE, gate PASSED 2026-08-25 | — |
 | D10a, D10b | Phase 3R wave 2: report UI | DONE, commit c37e3d05 | — |
-| D13a | Phase 3P pass 1: visual foundation | READY (spec in report.md; budget 700 proposed) | now |
-| D13b–D13d | Phase 3P passes 2–4 | GATED on per-pass specs | previous pass gate |
+| D13a | Phase 3P pass 1: app shell | DONE, gate PASSED 2026-08-28 (974/1,800 lines) | — |
+| D13b | Phase 3P pass 2: canvas composition | READY (spec in report.md; budget 1,400 proposed) | now, once the budget is confirmed |
+| D13c–D13d | Phase 3P passes 3–4 | GATED on per-pass specs (authored from ui-polish-direction.md) | previous pass gate |
 | D12a | Phase 3S: sequence parser + payload | ISSUED, ON HOLD | Phase 3P exit gate |
 | D12b | Phase 3S: sequence renderer + SEQ-* | GATED on layout vectors + acme flow docs | Phase 3P exit gate |
 | D11 | wave 3: view-mode capabilities | GATED on designs | Phase 3P exit gate |
@@ -178,63 +179,163 @@ Wave-2b canvas semantics + visuals; architect gate fixes (drill root carve-out, 
 
 ## D13 — Phase 3P: UI polish passes (GATED; issued per pass)
 
-Four presentation passes D13a–D13d over the wave-2 report UI (plan.md
-"Phase 3P"). Each is GATED until its architect spec lands in report.md;
-prompts are issued one pass at a time and each pass gates before the
-next is issued. No new features ride along.
+Four passes D13a–D13d implementing the confirmed UI direction over the
+wave-2 report UI (plan.md "Phase 3P" carries the re-scoped pass list,
+2026-08-27). Each is GATED until its architect spec lands; prompts are
+issued one pass at a time and each pass gates before the next is issued.
+No new features ride along.
 
-Spec-authoring input (architect only — executors read report.md, never
-issue files): `plans/arch/arch-v3/ui-polish.md` tags each of its 24
-issues to a pass. When authoring a pass's contract, translate that
-pass's tagged issues into normative requirements (or record a waiver in
-ui-polish.md), and give the behavior fixes folded into passes 2 and 4
-(plan.md pass bullets) tests — they are behavior, not presentation.
-Pass-4 precheck before speccing D13d: confirm the payload already
-carries edge endpoint/interface/aspect data for the connection-details
-fix (ui-polish #21); if it needs plumbing, escalate to the user instead
-of burying it in a polish pass.
+Spec-authoring input (architect only — executors read the design docs,
+never issue files): `plans/arch/arch-v3/ui-polish-direction.md` is the
+decision source for every pass spec; `ui-polish.md` tags its 24
+walkthrough issues to a pass as evidence (its expectations are
+superseded where they conflict with the direction). When authoring a
+pass's contract, translate the direction plus that pass's tagged issues
+into normative requirements (or record a waiver/supersession in
+ui-polish.md), and give behavior changes tests — they are behavior, not
+presentation. Pass-4 precheck before speccing D13d: confirm the payload
+already carries edge endpoint/interface/relationship data for the
+connection-details fix (ui-polish #21); if it needs plumbing, escalate
+to the user instead of burying it in a polish pass.
 
-## D13a — Phase 3P pass 1: visual foundation (READY)
+## D13a — Phase 3P pass 1: app shell (DONE 2026-08-28, gate PASSED)
+
+Docked View/Info/Data shell, compact header + global search, dropdown
+controls, lower-left Map/Fit/Zoom row, light-only tokens, `select`
+fragment; 974/1,800 changed source lines. Gate review 2026-08-28.
+(Prompt text in git history; the 2026-08-25 "visual foundation"
+predecessor was superseded pre-run.)
 
 ```text
 [standard rules + UI rule 9]
 
-Prereq: commit c37e3d05 (wave-2 UI + gate fixes) is the baseline. The
-authoritative contract is plans/arch/arch-v3/report.md — READ IN FULL
-the section "Polish contract — pass 1: visual foundation (D13a)". Do
-NOT read issue or research files. This is a PURE PRESENTATION pass:
-projection.ts, layout.ts, view.ts, types.ts, zoom.ts and all behavior,
-DOM semantics, aria labels, data-testids, and fragment keys are
-untouched. Expected surface: styles.css (dominant), a new icons
-component file, and minimal App.tsx/GridPanel.tsx edits where markup
-must host the icons, footer wording, and the tables-bar affordance.
+Prereq: commit c37e3d05 (wave-2 UI + gate fixes) is the baseline.
+Authoritative contract — READ IN FULL, in this order:
+1. plans/arch/arch-v3/ui-polish-direction.md (the product direction);
+2. plans/arch/arch-v3/report.md, sections "Confirmed UI direction
+   (2026-08-27)" and "Polish contract — pass 1: app shell (D13a)" —
+   the pass contract scopes exactly what this pass implements versus
+   defers.
+Do NOT read issue, research, or ui-polish files. The pass contract
+wins on scope; the direction wins on behavior; any other ambiguity is
+a rule-1 stop.
 
-Budget: 700 changed source lines (excluding tests). Python changes:
-none. No new npm dependencies (icons are local inline-SVG components).
+This pass restructures the chrome into the docked shell and converts
+the controls. It does NOT touch projection semantics, layout
+algorithms, node/edge visuals, or panel content redesign (later
+passes): projection.ts and layout.ts are READ-ONLY. Expected surface:
+App.tsx, styles.css, view.ts (fragment keys), zoom.ts (semantic
+labels), GridPanel.tsx (rehousing only), ResizablePanel.tsx,
+layoutPreferences.ts, plus new components for the docks, global
+search, and icons.
 
-Scope — implement the contract section exactly:
-1. Design tokens on :root (fonts, type scale, spacing, radius,
-   elevation, control height); dark theme redefines colors only.
-2. Mono-for-data / sans-for-UI typography split; eliminate sub-11px
-   chrome text and the uppercase mono micro-labels.
-3. One shared card recipe for clusters, zoom rail, legend, minimap,
-   scope menu, and panel chrome.
-4. Inline-SVG icon set for the chrome controls listed in the contract
-   (node drill magnifier and kind icons are OUT — pass 3).
-5. Dark and light contrast audit per the contract targets.
-6. Footer humanised per the contract; rendered-node-ids visually
-   hidden but kept in the DOM with its testid.
-7. Collapsed tables panel as a docked bar.
+Budget: 1,800 changed source lines (excluding tests). Python changes:
+none. No new npm dependencies.
 
-Tests: none new. `npm test` must pass UNCHANGED — if a test needs
-editing, you have changed behavior; stop and report instead.
+Scope — implement the pass contract exactly:
+1. Shell regions: compact header (identity + Cmd/Ctrl+K global search
+   only); View dock left; Info dock right (rehoused side panel); Data
+   dock bottom (rehoused tables, full application width, collapsed
+   bar by default); dock resize / collapse / rail / double-click
+   restore with localStorage persistence; View auto-collapses at
+   1024 px when Info opens. Keep the existing refit behavior on dock
+   changes — no new camera logic (that is pass 2).
+2. Controls into View: grouped diagram list; Detail, Stage (replaces
+   the time slider AND the Compare control), and Relationship
+   dropdowns; the tag lens moved from the floating legend with
+   identical dim-never-hide semantics; Copy view link at the bottom;
+   progressive disclosure per the contract.
+3. Global search per the contract (flat ranked list, no fuzzy-match
+   dependency).
+4. Lower-left `Map | Fit | − | % + Far/Read/Full | +` row; minimap
+   toggled by Map, attached above, closed by default; status bar
+   removed with the counts and rendered-node-ids kept visually hidden
+   under their existing data-testids.
+5. Removals: dark theme + toggle, fullscreen, floating legend, time
+   slider, Compare, scope control, header copy-link; Escape order per
+   the contract (temporary UI first, then selection/Info; never
+   docks).
+6. Fragments: remove scope/hops/compare/compare-at/theme; add
+   `select`; keep the existing validation diagnostics.
+7. Visual foundation, light only: tokens on :root, sans-for-UI /
+   mono-for-data split, one shared surface recipe, inline-SVG chrome
+   icons (kind icons and drill magnifier untouched), contrast audit.
+
+Tests: update ONLY tests that reference removed or moved chrome; the
+projection/vector suites must pass untouched. New tests: exactly the
+four listed in the pass contract's Verification section.
 
 Finish: `just build-arch-report`, regenerate the acme report via the
-CLI, verify per rule 9 from file://: both themes, full width and
-500px, clean console, zero external requests; capture before/after
-screenshots of the default systems view (light + dark) for the gate.
-Definition of done: rules 5-8 (report `npm test` output; pytest run
-unchanged by this chunk), then STOP — D13b is a separate prompt.
+CLI, verify per rule 9 from file:// at 1440x900 AND 1024x720 (light):
+clean console, zero external requests, docks resize/collapse/restore,
+Info at 1024 collapses View, the selected item stays visible when
+Info opens. Capture screenshots: default view before/after at
+1440x900, and 1024x720 with Info open. Definition of done: rules 5–8
+(report npm test output; pytest run unchanged by this chunk), then
+STOP — D13b is a separate prompt.
+```
+
+## D13b — Phase 3P pass 2: canvas composition (READY, authored 2026-08-28)
+
+```text
+[standard rules + UI rule 9]
+
+Prereq: the D13a app-shell commit is the baseline (docked View/Info/
+Data shell, dropdown controls, lower-left Map/Fit/Zoom row).
+Authoritative contract — READ IN FULL, in this order:
+1. plans/arch/arch-v3/ui-polish-direction.md (the product direction);
+2. plans/arch/arch-v3/report.md, sections "Confirmed UI direction
+   (2026-08-27)" and "Polish contract — pass 2: canvas composition
+   (D13b)" — the pass contract scopes exactly what this pass
+   implements versus defers.
+Do NOT read issue, research, or ui-polish files. The pass contract
+wins on scope; the direction wins on behavior; any other ambiguity is
+a rule-1 stop.
+
+This pass owns card GEOMETRY, ELK tuning, framing, semantic-zoom
+thresholds, and all camera movement. It does NOT touch card anatomy/
+visuals, edge rendering, selection emphasis (pass 3), dock content
+(pass 4), or projection semantics: projection.ts is READ-ONLY.
+Expected surface: layout.ts, zoom.ts, App.tsx (camera + node sizing
+wiring), styles.css, plus new modules for card sizing and viewport
+math (suggested: cardSize.ts, camera.ts) and their test files.
+
+Budget: 1,400 changed source lines (excluding tests). Python changes:
+none. No new npm dependencies.
+
+Scope — implement the pass contract exactly:
+1. Card geometry: per-Detail-level uniform widths, content-driven
+   height via the injectable-measurer cardSize function; two-line
+   name wrap; layout.ts consumes per-node sizes.
+2. ELK tuning: aspect-ratio hint, tightened spacing, proportional
+   boundary padding; grid packing for edgeless drill sets; layout
+   input stays a function of (timeline, level, drill) only.
+3. Framing: initialViewport pure function — whole-graph fit only when
+   it lands at/above Read, else cap at Read and center; the Fit
+   button always fits the whole graph; fit rect is the visible canvas
+   cell.
+4. Thresholds: re-derive Read/Full from the type scale (name line
+   >= 11 screen px at Read, body text >= 11 px at Full), documented
+   in zoom.ts.
+5. Camera: shiftViewport pure function; apply on dock open/close/
+   resize (REMOVE the D13a fitView-on-dock-change effect), on
+   selection/Info opening (one-hop-neighborhood fit is the only
+   sanctioned zoom change), and on viewport resize. Zoom is otherwise
+   never changed by the app.
+
+Tests: exactly the six cases listed in the pass contract's
+Verification section, plus mechanical updates to existing tests that
+assert the old fixed card size or thresholds. The projection/vector
+suites must pass untouched.
+
+Finish: `just build-arch-report`, regenerate the acme report via the
+CLI, verify per rule 9 from file:// at 1440x900 AND 1024x720 (light):
+clean console, zero external requests, cold-load framing centered and
+readable, dock changes preserve zoom and keep the selection visible,
+Stage/Relationship switches move nothing, Container level readable.
+Capture the five screenshots listed in the pass contract. Definition
+of done: rules 5-8 (report npm test output; pytest run unchanged by
+this chunk), then STOP — D13c is a separate prompt.
 ```
 
 ## D12a — Phase 3S: sequence parser + payload (issued 2026-08-25, ON HOLD until the Phase 3P exit gate)

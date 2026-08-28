@@ -4,6 +4,87 @@ Older progress-log entries moved out of plan.md (reorg 2026-08-25).
 Same append-only content, newest first; plan.md keeps only recent
 entries. Continue archiving from plan.md as its log grows.
 
+- **2026-08-25** — Architect half of the phase-3 re-gate run on the
+  uncommitted D10a+D10b tree. Re-verified independently: 21 frontend
+  tests, `just lint`, 77 arch py tests, `just build-arch-report`
+  (rebuild reproduces the tree's template byte-diff), acme report
+  regenerated. Code review of the semantic files (projection, layout,
+  view, types, zoom) conforms to the Wave-2 UI contract. Browser
+  spot-check on the acme report over file://: console clean and zero
+  external requests across every interaction; four C4 levels with
+  contract labels; nested boundary boxes with the
+  system-as-edge-endpoint leaf carve-out working; drill with
+  breadcrumb/Up/Back, `drill` fragment, history push, scope disabled;
+  docked side panel Details/Connections with member rows and Open
+  dependency view; deps view (columns, totals, picker, `deps` fragment,
+  history); legend lens with `lens` fragment, Clear, dim-not-hide;
+  dark theme flat; retired-at-position selection shows empty live
+  connections correctly. Two findings for the joint gate: (1) MEDIUM —
+  `drillAt` drops connections whose inside endpoint is the drilled
+  entity itself (`directChildRepresentative` returns null for the
+  root); acme authors every interface on containers, so drilling any
+  leaf-childful container (e.g. Commerce Monolith) shows its children
+  with 0 connections in a single column — the withBoundaries leaf
+  carve-out should extend to drillAt. (2) MINOR — with the side panel
+  open at ~1100 px the floating legend panel overlaps the projection
+  cluster's Dependencies/Reset view buttons (two floating overlays
+  collide as the canvas shrinks). Also worth a reading check at the
+  gate: legend counts include rolled-up member tags, so component tags
+  appear at System level. Next action: user half of the gate; decide
+  whether findings 1–2 are fixed pre- or post-commit.
+
+- **2026-08-25** — D10b complete and left uncommitted for gate review. The
+  report now has the four-level C4 projection, hierarchical ELK containment
+  boundaries, direct-child drill with history and breadcrumbs, five-part
+  depth-gated entity boxes, distributed edge anchors and selection flow,
+  a persisted tag-lens legend, and the dependency focus view. Source: 639
+  changed TS/TSX lines / 1,900 budget (additions + deletions, tests excluded,
+  measured above the 785-line D10a baseline). Tests: 3 added; `npm test` 21
+  passed, `just lint` clean, `uv run pytest tests/unit/tools -k arch` 77 passed
+  / 540 deselected, and `just build-arch-report` clean. The CLI-regenerated
+  acme report passed the rule-9 `file://` browser gate: all four C4 levels and
+  deeper-level boundaries, drill / Up / Back, outgoing animation and static
+  incoming emphasis, reduced-motion fallback, tag OR lens without hiding,
+  dependency columns / totals / picker, FULL-depth facts and edge labels,
+  500 px responsive controls, clean console, and zero external requests.
+  Assumptions: D10a's complete, gate-verified worktree state satisfies D10b's
+  "committed" prerequisite because D10a was deliberately left uncommitted for
+  the same review; the user's final no-commit instruction overrides the
+  introductory request for a commit; users remain plain nodes when connected
+  across a drill boundary because the C4 contract keeps users plain at every
+  level, while non-user external endpoints become system boundary stubs; a
+  childful ancestor that is itself a canonical edge endpoint keeps a distinct
+  leaf endpoint nested inside its boundary so the boundary box never becomes
+  an edge endpoint; adding the legend to layout schema v1 intentionally makes
+  older stored layouts without that required panel fail validation and reset.
+  Open questions: none. Next action: phase-3 re-gate by architect and user.
+
+- **2026-08-25** — D10a complete and left uncommitted for gate review. The
+  report now has one-line chrome, canvas control clusters, a fit/zoom/depth/
+  fullscreen rail, plain light/dark backgrounds, a docked Details/Connections
+  panel with aggregated-edge members, reusable persisted resize/collapse/reset
+  panels, and the v2-parity AG Grid table controls. MAP/PATH/LENS and the
+  `mode` fragment key are removed; fragment restoration filters unknown ids
+  through console diagnostics and keeps local layout/camera values out of the
+  URL. Source: 785 changed TS/TSX lines / 1,400 budget (additions + deletions,
+  tests excluded). Tests: 4 added; `npm test` 18 passed, `just lint` clean,
+  `uv run pytest tests/unit/tools -k arch` 77 passed / 540 deselected, and
+  `just build-arch-report` clean. The CLI-regenerated acme report passed the
+  rule-9 `file://` browser check: compact and 500 px layouts, panel resize /
+  collapse / double-click reset persistence, fullscreen and Escape ordering,
+  quick filter / multi-sort / hide / pin persistence, both plain themes,
+  aggregated-edge selection, clean console, and no external requests.
+  Assumptions: the explicit no-commit instruction and rule 8 override the
+  prompt's introductory mention of a commit; AG Grid Community's custom
+  kind/status checkbox filters satisfy the set-filter requirement without an
+  Enterprise runtime dependency; the existing three-level roll-up contract
+  governs the D10a C4 control despite `Views` reserving `top-containers`; the
+  bottom panel starts collapsed, preserving the prior closed-table state;
+  invalid stored column ids reject that table layout as a whole and restore
+  defaults; double-click resets size without changing collapse state; the
+  disabled dependency action uses an `aria-describedby` reason until D10b.
+  Open questions: none. Next action: architect gate review, then D10b.
+
 - **2026-08-25** — D12a parser-vector fixture authored (architect) and the
   D12a prompt issued (READY; run serially with D10a/D10b — payload.py
   overlap). Fixture at `tests/unit/tools/fixtures/arch/sequence/`:

@@ -10,7 +10,23 @@ date)` or `— WAIVED (reason, date)` to each issue it covered. The 3P
 exit gate requires every issue closed or waived and a re-run of this
 walkthrough confirming the behavior defects (#12–#17) don't reproduce.
 
-## 0. Control simplification (2026-08-26 design review, `designs/` artboards)
+## Direction (2026-08-27) — supersedes conflicting expectations
+
+[ui-polish-direction.md](ui-polish-direction.md) is the confirmed product
+direction for the report UI and the decision source for every 3P pass spec.
+Where an issue's "Expected" clause below conflicts with the direction, the
+direction wins — the issues stay as walkthrough evidence, not as
+requirements. Chrome-level consequences: the shell is Option E's docked
+View / Info / Data layout, the Map / Fit / Zoom cluster is the fixed
+lower-**left** canvas overlay (not a bottom-right stack), and there is no
+floating legend, floating selection toolbar, or dark theme in the first
+pass; the responsive floor is 1024 × 720. The D13a–D13d tags below predate
+the direction; pass ownership is reassigned as the architect re-authors
+each pass spec against the direction (plan.md "Phase 3P") — issues whose
+chrome no longer exists are closed by the shell restructure and carry a
+supersession note below (#14, #16, #18, #24).
+
+## 0. Control simplification (2026-08-26 design review of the artboards, since removed — git history)
 
 Decisions from the artboard review. These read as visual polish but each one
 changes behavior/state, so they bind the 3P passes the same way the numbered
@@ -118,14 +134,24 @@ whatever chrome remains.
     minimap. Expected: panel state changes only on user action; collapsed
     state is a small docked affordance at the canvas edge; open panels
     participate in fit (see #9).
+    *Superseded (2026-08-27): the floating legend is removed entirely —
+    Tags is a View-dock control that brightens matches and dims
+    nonmatches (direction). The evidence stands; the remedy is the
+    docked shell.* — CLOSED (D13a, 2026-08-28: no floating legend;
+    Tags lives in the View dock).
 15. **Time toolbar vanishes.** After a select/close-details sequence the
     entire time pill (slider + compare) disappeared and only a full reload
     restored it. Expected: persistent chrome never disappears as a side
     effect.
 16. **Contextual controls jump into unrelated groups.** A "Dependencies"
     button appears inside the level-tabs bar only while a node is selected.
-    Expected: selection-scoped actions live with the selection (side panel
-    or a selection toolbar), not spliced into a global control group.
+    Expected: selection-scoped actions live with the selection, not
+    spliced into a global control group.
+    *Superseded remedy (2026-08-27): no floating selection toolbar exists
+    — Dependencies opens contextually from the Info dock's "View
+    dependencies" action (direction).* — CLOSED for chrome (D13a,
+    2026-08-28: the level bar is gone; Dependencies opens from Info).
+    Info content itself remains pass 4 (#20/#21).
 17. **Controls shift as values change.** The time pill re-flows when the
     position label changes width ("0. Base" → "4. Transaction Core"),
     moving the compare dropdown; the COMPARE label is crammed against it.
@@ -138,9 +164,16 @@ whatever chrome remains.
     overlaps the minimap. Expected: one bottom-right stack (minimap above,
     zoom rail below), never overlapping each other, panels, or fitted
     content.
+    *Superseded remedy (2026-08-27): nothing docks bottom-right — the
+    confirmed direction has one fixed lower-left `Map | Fit | Zoom` row
+    with the optional minimap attached directly above it.* — CLOSED
+    (D13a, 2026-08-28: lower-left row shipped; minimap attaches above
+    it, closed by default).
 19. **Floating toolbars overlap the canvas contents.** The time pill and
     level bar float over the diagram and cover nodes at small viewports.
     Expected: reserve their space in the canvas fit (or dock them).
+    — CLOSED (D13a, 2026-08-28: all controls live in docks that reserve
+    layout space; the only canvas overlay is the lower-left cluster).
 
 ## 5. Panels (D13d)
 
@@ -164,13 +197,19 @@ whatever chrome remains.
 23. **Debug-pill affordances.** "Open Tables panel" / "Collapse Tables
     panel" / "Collapse Legend panel" are unstyled default-button pills stuck
     to edges. Expected: the docked-bar affordance already specified in
-    pass 1.
+    pass 1. — CLOSED (D13a, 2026-08-28: docks collapse into styled
+    rails and the full-width Data bar).
 
 ## 6. Theme (D13a)
 
 24. **Dark theme is canvas-only.** Toggling dark restyles nodes/canvas while
     the header, time pill, level bar, zoom rail, minimap, tables button, and
     status bar all stay light. Expected: every surface themes together.
+    *Superseded (2026-08-27): dark theme is deferred out of the first
+    pass (direction "Deferred or removed") — the issue is moot until
+    dark theme returns, and this evidence binds it when it does.*
+    — WAIVED (D13a, 2026-08-28: dark theme and its toggle removed with
+    the deferral; this evidence binds any future dark pass).
 
 ## Fixed-baseline notes
 

@@ -53,11 +53,16 @@ each with a line budget and a demo gate.
   at *pack build time*, committed or wheel-packaged — never at generate
   time.
 - Payload compiler + injection in Python (`arch.generate`).
-- 3.0 surface: canvas with Archify styling, union-graph layout, time slider,
-  diff overlay, scope + level + aspect controls, passport panel, tables,
-  copy-link, light/dark, offline from `file://`.
-- Gate: open the real dataset's report, scrub the timeline, and the story of
-  the architecture reads correctly without explanation.
+- 3.0 surface: canvas, union-graph layout, stage-aware filtering with
+  inherent per-stage diff, Detail / Stage / Relationship / Tags controls,
+  inspector, tables, copy-link, offline from `file://`. UI shell and
+  interaction are governed by
+  `plans/arch/arch-v3/ui-polish-direction.md` (2026-08-27): the Option E
+  docked shell (View / Info / Data), lower-left Map/Fit/Zoom, splines,
+  one-hop selection, light theme only, 1024 × 720 first-pass floor.
+- Gate: open the real dataset's report, step through the stages, and the
+  story of the architecture reads correctly without explanation — at
+  1440 × 900 and 1024 × 720, console-clean, zero external requests.
 
 ### Phase 3S — Sequence diagrams (budget: ~500 Python + ~2,200 TS/TSX)
 
@@ -67,19 +72,26 @@ Owner doc: sequence.md. Added 2026-08-25 (user-directed), replacing the
 - Flow-doc parser, validation findings, `sequences` payload section, CLI.
 - Custom deterministic sequence layout + React rendering; participant
   headers reuse the canvas entity-box component.
-- Interaction contract: playback, sticky headers, C4 group collapse,
-  focus, hide/show, scenarios, navigator, minimap, search, sync/async.
-- Gate: open an acme flow, play it through, collapse a system, focus a
-  participant — the story reads without explanation; zero external
-  requests from `file://`.
+- Interaction contract (controls live in the View dock — direction
+  2026-08-27): Scenario dropdown, compact playback, local search, sticky
+  headers, participant focus and explicit hiding, Map vertical overview,
+  sync/async kinds; message details in Info, payload files in Data. No
+  C4 group bands, group collapse, merged lifelines, or floating
+  participant navigation.
+- Gate: open an acme flow from View, play it through, switch scenario,
+  focus a participant, hide one — the story reads without explanation;
+  zero external requests from `file://`.
 
 ### Phase 4 — Polish and second adapters (budget: per-item)
 
 - Client-side SVG / draw.io download; timeline picker for multi-scenario
   data; saved Report Definition files if URL fragments prove insufficient.
 - SQLite adapter, then SharePoint transport reusing the Excel mapping.
-- Only then: revisit deferred items (Confluence, layout hints) against
-  demonstrated need.
+- Only then: revisit deferred items against demonstrated need —
+  Confluence, layout hints, and the 2026-08-27 direction's first-pass
+  cuts (dark theme, application fullscreen, Share, a Changes diagram
+  view, saved report creation, manual positions, viewer scope controls,
+  Technology/Status lenses).
 
 ## What must NOT return without a fight
 
